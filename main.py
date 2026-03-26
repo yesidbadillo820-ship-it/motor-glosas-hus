@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from pydantic import BaseModel
 
-# ✅ MEJORA: Seguridad y Rate Limiting
+# ✅ Seguridad y Rate Limiting
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -24,7 +24,8 @@ from models import (
     PlantillaGlosa, GlosaResult
 )
 from database import engine, Base, get_db
-from auth import get_current_user, create_access_token, verify_password
+# ⚠️ CORRECCIÓN: Usamos el nombre exacto que tienes en auth.py
+from auth import get_usuario_actual, create_access_token, verify_password
 
 # Inicializar base de datos
 Base.metadata.create_all(bind=engine)
@@ -36,7 +37,7 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ✅ CONFIGURACIÓN CORS (Seguridad)
+# ✅ CONFIGURACIÓN CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"],
@@ -57,7 +58,7 @@ async def login(data: dict, db: Session = Depends(get_db)):
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- ENDPOINT ANALIZAR (CON RATE LIMIT) ---
+# --- ENDPOINT ANALIZAR ---
 
 @app.post("/analizar")
 @limiter.limit("20/minute")
@@ -71,19 +72,17 @@ async def analizar_endpoint(
     tabla_excel: str = Form(...),
     archivos: List[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    usuario_actual: UsuarioRecord = Depends(get_current_user)
+    usuario_actual: UsuarioRecord = Depends(get_usuario_actual)
 ):
     contexto_pdf = ""
     if archivos:
         for arc in archivos:
             if arc.filename:
                 content = await arc.read()
-                # Límite de 10MB por archivo para estabilidad
                 if len(content) > 10 * 1024 * 1024:
                     continue
                 contexto_pdf += await glosa_service.extraer_pdf(content)
 
-    # Llamada al servicio de IA optimizado
     resultado = await glosa_service.analizar(
         db=db,
         eps=eps,
@@ -96,16 +95,15 @@ async def analizar_endpoint(
     )
     return resultado
 
-# --- ENDPOINT ANALYTICS (CON CACHÉ DE 5 MINUTOS) ---
+# --- ENDPOINT ANALYTICS (CACHÉ 5 MIN) ---
 
 _analytics_cache = {"data": None, "ts": None}
 
 @app.get("/analytics")
-def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_current_user)):
+def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     global _analytics_cache
     ahora = datetime.now()
 
-    # Verificar caché para no saturar la BD
     if _analytics_cache["ts"] and (ahora - _analytics_cache["ts"]).seconds < 300:
         return _analytics_cache["data"]
 
@@ -124,18 +122,15 @@ def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioReco
     v_def = v_obj - (stats.acep or 0)
     tasa = round((v_def / v_obj) * 100, 1) if v_obj > 0 else 0
 
-    # Top 5 EPS
     eps_q = db.query(GlosaRecord.eps, func.count(GlosaRecord.id).label('n'))\
         .group_by(GlosaRecord.eps).order_by(func.count(GlosaRecord.id).desc()).limit(5).all()
     
-    # Top 5 Códigos
     cod_q = db.query(GlosaRecord.codigo_glosa, func.count(GlosaRecord.id).label('n'))\
         .filter(GlosaRecord.codigo_glosa != "N/A")\
         .group_by(GlosaRecord.codigo_glosa).order_by(func.count(GlosaRecord.id).desc()).limit(5).all()
 
-    # Datos para Chart.js
     graficas = {
-        "meses": ["Ene", "Feb", "Mar"], # Ejemplo, podrías calcular dinámicamente
+        "meses": ["Ene", "Feb", "Mar"],
         "valores_objetados": [10000000, 15000000, v_obj],
         "valores_defendidos": [8000000, 14000000, v_def],
         "nombres_eps": [r.eps for r in eps_q],
@@ -161,28 +156,28 @@ class PlantillaInput(BaseModel):
     texto: str
 
 @app.get("/plantillas")
-def listar_plantillas(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def listar_plantillas(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     return db.query(PlantillaGlosa).all()
 
 @app.post("/plantillas")
-def crear_plantilla(data: PlantillaInput, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def crear_plantilla(data: PlantillaInput, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     nueva = PlantillaGlosa(titulo=data.titulo, texto=data.texto)
     db.add(nueva)
     db.commit()
     return {"status": "ok"}
 
-# --- OTROS ENDPOINTS (Historial y Config) ---
+# --- OTROS ENDPOINTS ---
 
 @app.get("/glosas")
-def listar_historial(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def listar_historial(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(100).all()
 
 @app.get("/contratos")
-def listar_contratos(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def listar_contratos(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     return db.query(ContratoRecord).all()
 
 @app.post("/contratos")
-def guardar_contrato(data: dict, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def guardar_contrato(data: dict, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     existente = db.query(ContratoRecord).filter(ContratoRecord.eps == data['eps']).first()
     if existente:
         existente.detalles = data['detalles']
@@ -193,7 +188,7 @@ def guardar_contrato(data: dict, db: Session = Depends(get_db), user: UsuarioRec
     return {"status": "ok"}
 
 @app.post("/descargar-pdf")
-async def generar_pdf_endpoint(data: dict, user: UsuarioRecord = Depends(get_current_user)):
+async def generar_pdf_endpoint(data: dict, usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
     return Response(
         content=pdf_bytes,
