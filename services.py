@@ -97,20 +97,26 @@ class GlosaService:
 
         instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta un argumento MÉDICO-ASISTENCIAL sólido (máximo 4 líneas) defendiendo al hospital y justificando por qué el cobro facturado ES CORRECTO según los soportes. MENCIONA LA PÁGINA EXACTA donde encontraste la evidencia (Ej: 'Como se evidencia en la PÁG 84...'). ¡DEFIENDE AL HUS!"
         if val_ac_num > 0:
+           instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta un argumento MÉDICO-ASISTENCIAL sólido (máximo 4 líneas) defendiendo al hospital y justificando por qué el cobro facturado ES CORRECTO según los soportes. MENCIONA LA PÁGINA EXACTA donde encontraste la evidencia (Ej: 'Como se evidencia en la PÁG 8...'). ¡DEFIENDE AL HUS!"
+        if val_ac_num > 0:
             instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta 3 líneas explicando formalmente por qué el hospital ACEPTA esta glosa. NO uses leyes ni viñetas."
 
-        prompt = f"""ACTÚA COMO MÉDICO AUDITOR DE LA ESE HUS DEFENDIENDO LA FACTURACIÓN DEL HOSPITAL.
+        # ✅ MEJORA: SYSTEM PROMPT (La identidad inquebrantable de la IA)
+        system_prompt = "Eres un Médico Auditor experto de la ESE Hospital Universitario de Santander (HUS). Tu objetivo es defender la facturación del hospital frente a las EPS con argumentos técnicos, médicos y legales, basándote estrictamente en los soportes proporcionados. Eres preciso, formal, contundente y obedeces el formato de salida al pie de la letra sin inventar datos ni alucinar."
+
+        # ✅ MEJORA: USER PROMPT (Los datos de la tarea específica)
+        user_prompt = f"""
         EPS: {data.eps}
         GLOSA: "{texto_base}"
         SOPORTES: {contexto_pdf}
         
         INSTRUCCIONES OBLIGATORIAS:
         1. Extrae los datos solicitados. Si un dato no existe, escribe exactamente N/A.
-        2. El CODIGO_GLOSA es estrictamente el código de objeción (Ej: FA0701).
+        2. El CODIGO_GLOSA es estrictamente el código de objeción (Ej: FA0701, SO0201).
         3. NO uses asteriscos (**), viñetas (-), ni saltos de línea en tus respuestas.
         4. {instruccion_ia}
         
-        RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
+        RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO, USANDO SALTOS DE LÍNEA ENTRE CADA DATO:
         PACIENTE: 
         INGRESO: 
         EGRESO: 
@@ -123,7 +129,15 @@ class GlosaService:
         """
         
         try:
-            completion = await self.cliente.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.1-8b-instant", temperature=0.1)
+            # ✅ MEJORA: Enviamos los mensajes separados por roles
+            completion = await self.cliente.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ], 
+                model="llama-3.3-70b-versatile", # Asegúrate de tener el modelo potente aquí
+                temperature=0.1
+            )
             res_ia = completion.choices[0].message.content
         except Exception as e: 
             print(f"Error con la IA: {e}")
