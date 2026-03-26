@@ -13,7 +13,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from services import GlosaService, crear_oficio_pdf
-from models import Base, GlosaRecord, UsuarioRecord, ContratoEPS, PlantillaGlosa
+from models import GlosaInput, GlosaResult, PDFRequest, GlosaRecord, ContratoRecord, ContratoInput, UsuarioRecord, PlantillaGlosa
 from database import engine, Base, get_db, SessionLocal
 from auth import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM
 from dotenv import load_dotenv
