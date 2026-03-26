@@ -24,7 +24,7 @@ from models import (
     PlantillaGlosa, GlosaResult
 )
 from database import engine, Base, get_db
-from auth import get_usuario_actual, create_access_token, verify_password
+from auth import get_current_user, create_access_token, verify_password
 
 # Inicializar base de datos
 Base.metadata.create_all(bind=engine)
@@ -71,7 +71,7 @@ async def analizar_endpoint(
     tabla_excel: str = Form(...),
     archivos: List[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    usuario_actual: UsuarioRecord = Depends(get_usuario_actual)
+    usuario_actual: UsuarioRecord = Depends(get_current_user)
 ):
     contexto_pdf = ""
     if archivos:
@@ -101,7 +101,7 @@ async def analizar_endpoint(
 _analytics_cache = {"data": None, "ts": None}
 
 @app.get("/analytics")
-def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
+def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_current_user)):
     global _analytics_cache
     ahora = datetime.now()
 
@@ -161,11 +161,11 @@ class PlantillaInput(BaseModel):
     texto: str
 
 @app.get("/plantillas")
-def listar_plantillas(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+def listar_plantillas(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
     return db.query(PlantillaGlosa).all()
 
 @app.post("/plantillas")
-def crear_plantilla(data: PlantillaInput, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+def crear_plantilla(data: PlantillaInput, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
     nueva = PlantillaGlosa(titulo=data.titulo, texto=data.texto)
     db.add(nueva)
     db.commit()
@@ -174,15 +174,15 @@ def crear_plantilla(data: PlantillaInput, db: Session = Depends(get_db), user: U
 # --- OTROS ENDPOINTS (Historial y Config) ---
 
 @app.get("/glosas")
-def listar_historial(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+def listar_historial(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
     return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(100).all()
 
 @app.get("/contratos")
-def listar_contratos(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+def listar_contratos(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
     return db.query(ContratoRecord).all()
 
 @app.post("/contratos")
-def guardar_contrato(data: dict, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+def guardar_contrato(data: dict, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
     existente = db.query(ContratoRecord).filter(ContratoRecord.eps == data['eps']).first()
     if existente:
         existente.detalles = data['detalles']
@@ -193,7 +193,7 @@ def guardar_contrato(data: dict, db: Session = Depends(get_db), user: UsuarioRec
     return {"status": "ok"}
 
 @app.post("/descargar-pdf")
-async def generar_pdf_endpoint(data: dict, user: UsuarioRecord = Depends(get_usuario_actual)):
+async def generar_pdf_endpoint(data: dict, user: UsuarioRecord = Depends(get_current_user)):
     pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
     return Response(
         content=pdf_bytes,
