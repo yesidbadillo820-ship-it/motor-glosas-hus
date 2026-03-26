@@ -183,12 +183,11 @@
         
         <div class="field" id="contenedor-archivos">
             <label for="archivos">Soportes (Opcional)</label>
-            <div class="upload-zone">
-                <input type="file" id="archivos" multiple accept=".pdf">
-                <div style="font-size:12px;color:var(--slate)">📎 Adjuntar PDFs (Epicrisis)</div>
-            </div>
-        </div>
-
+        <div class="upload-zone">
+              <input type="file" id="archivos" multiple accept=".pdf">
+              <div id="file-label" style="font-size:12px;color:var(--slate)">📎 Adjuntar PDFs (Epicrisis)</div>
+     </div>
+        
         <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:auto;" id="botones-individual">
             <button class="btn btn-primary" id="btnAnalizar" onclick="analizarGlosa()">Analizar Glosa</button>
             <button class="btn btn-outline" style="font-size: 0.75rem; padding: 0.4rem;" onclick="limpiarTodo()">Limpiar todo</button>
@@ -506,6 +505,10 @@
         `;
         document.getElementById('result-actions').style.display = 'none';
         dataGuardada = null;
+        document.getElementById('file-label').innerText = '📎 Adjuntar PDFs (Epicrisis)';
+        document.getElementById('file-label').style.color = 'var(--slate)';
+        document.querySelector('.upload-zone').style.borderColor = 'var(--border)';
+       document.querySelector('.upload-zone').style.background = '#fafbfc';
     }
 
     function mostrarToast(msg, tipo = '') {
@@ -877,6 +880,24 @@
             .then(() => mostrarToast('✓ Texto copiado al portapapeles', 'success'))
             .catch(() => mostrarToast('Error al copiar', 'error'));
     }
+    // Detectar cuando el usuario elige archivos y avisar en pantalla
+document.getElementById('archivos').addEventListener('change', function(e) {
+    const label = document.getElementById('file-label');
+    const zone = document.querySelector('.upload-zone');
+    const cant = e.target.files.length;
+    
+    if (cant > 0) {
+        label.innerText = `✅ ${cant} archivo(s) listo(s) para analizar`;
+        label.style.color = 'var(--green)';
+        zone.style.borderColor = 'var(--green)';
+        zone.style.background = '#f0fdf4';
+    } else {
+        label.innerText = '📎 Adjuntar PDFs (Epicrisis)';
+        label.style.color = 'var(--slate)';
+        zone.style.borderColor = 'var(--border)';
+        zone.style.background = '#fafbfc';
+    }
+});
 </script>
 </body>
 </html>
