@@ -229,22 +229,29 @@ async def generar_pdf_endpoint(
         headers={"Content-Disposition": f"attachment; filename=Respuesta_{data['eps']}.pdf"}
     )
     
+@app.post("/token")
+async def login(data: dict, db: Session = Depends(get_db)):
+    user = db.query(UsuarioRecord).filter(UsuarioRecord.email == data.get("username")).first()
+    if not user or not verify_password(data.get("password"), user.password_hash):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.get("/setup-admin")
 def setup_admin(db: Session = Depends(get_db)):
     from auth import get_password_hash
-    import traceback
     try:
         existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == "admin@hus.gov.co").first()
         if existente:
             return {"msg": "El usuario ya existe", "email": existente.email}
         nuevo = UsuarioRecord(
             email="admin@hus.gov.co",
-            hashed_password=get_password_hash("HUS2026*")
+            nombre="Administrador HUS",
+            password_hash=get_password_hash("HUS2026*")
         )
         db.add(nuevo)
         db.commit()
         return {"msg": "Usuario creado", "email": "admin@hus.gov.co", "password": "HUS2026*"}
     except Exception as e:
         db.rollback()
-        return {"error": str(e), "detalle": traceback.format_exc()}
-```
+        return {"error": str(e)}
