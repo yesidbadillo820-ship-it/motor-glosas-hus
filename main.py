@@ -1,7 +1,4 @@
 import os
-import re
-import io
-import asyncio
 from typing import List
 from datetime import datetime
 
@@ -16,16 +13,16 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+from auth import get_current_user, create_access_token, verify_password
 from services import GlosaService, crear_oficio_pdf
 from models import (
-    GlosaRecord, ContratoRecord, UsuarioRecord, 
+    GlosaRecord, ContratoRecord, UsuarioRecord,
     PlantillaGlosa, GlosaResult
 )
 from database import engine, Base, get_db
-# ✅ AHORA SÍ COINCIDE CON AUTH.PY
-from auth import get_current_user, create_access_token, verify_password
 
 Base.metadata.create_all(bind=engine)
+
 app = FastAPI(title="Motor Glosas HUS", version="2.2")
 
 # Rate Limiting
@@ -33,7 +30,7 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS restringido
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"],
@@ -43,6 +40,7 @@ app.add_middleware(
 
 glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
 
+
 @app.post("/token")
 async def login(data: dict, db: Session = Depends(get_db)):
     user = db.query(UsuarioRecord).filter(UsuarioRecord.email == data.get("username")).first()
@@ -51,13 +49,17 @@ async def login(data: dict, db: Session = Depends(get_db)):
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @app.post("/analizar")
 @limiter.limit("20/minute")
 async def analizar_endpoint(
     request: Request,
-    eps: str = Form(...), etapa: str = Form(...),
-    fecha_radicacion: str = Form(...), fecha_recepcion: str = Form(...),
-    valor_aceptado: str = Form(...), tabla_excel: str = Form(...),
+    eps: str = Form(...),
+    etapa: str = Form(...),
+    fecha_radicacion: str = Form(...),
+    fecha_recepcion: str = Form(...),
+    valor_aceptado: str = Form(...),
+    tabla_excel: str = Form(...),
     archivos: List[UploadFile] = File(None),
     db: Session = Depends(get_db),
     user: UsuarioRecord = Depends(get_current_user)
@@ -76,10 +78,14 @@ async def analizar_endpoint(
         contexto_pdf=contexto_pdf
     )
 
+
 _analytics_cache = {"data": None, "ts": None}
 
 @app.get("/analytics")
-def obtener_analytics(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def obtener_analytics(
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
     global _analytics_cache
     ahora = datetime.now()
     if _analytics_cache["ts"] and (ahora - _analytics_cache["ts"]).seconds < 300:
@@ -87,10 +93,10 @@ def obtener_analytics(db: Session = Depends(get_db), user: UsuarioRecord = Depen
 
     hoy = ahora.date()
     mes_inicio = hoy.replace(day=1)
-    
+
     glosas_hoy = db.query(GlosaRecord).filter(func.date(GlosaRecord.creado_en) == hoy).count()
     glosas_mes = db.query(GlosaRecord).filter(func.date(GlosaRecord.creado_en) >= mes_inicio).count()
-    
+
     stats = db.query(
         func.sum(GlosaRecord.valor_objetado).label('obj'),
         func.sum(GlosaRecord.valor_aceptado).label('acep')
@@ -100,49 +106,71 @@ def obtener_analytics(db: Session = Depends(get_db), user: UsuarioRecord = Depen
     v_def = v_obj - (stats.acep or 0)
     tasa = round((v_def / v_obj) * 100, 1) if v_obj > 0 else 0
 
-    eps_q = db.query(GlosaRecord.eps, func.count(GlosaRecord.id).label('n'))\
-        .group_by(GlosaRecord.eps).order_by(func.count(GlosaRecord.id).desc()).limit(5).all()
-    
+    eps_q = db.query(GlosaRecord.eps, func.count(GlosaRecord.id).label('n')) \
+        .group_by(GlosaRecord.eps) \
+        .order_by(func.count(GlosaRecord.id).desc()) \
+        .limit(5).all()
+
     res = {
-        "glosas_hoy": glosas_hoy, "glosas_mes": glosas_mes,
-        "valor_objetado_mes": v_obj, "valor_recuperado_mes": v_def,
-        "tasa_exito_pct": tasa, 
+        "glosas_hoy": glosas_hoy,
+        "glosas_mes": glosas_mes,
+        "valor_objetado_mes": v_obj,
+        "valor_recuperado_mes": v_def,
+        "tasa_exito_pct": tasa,
         "top_eps": [{"eps": r.eps, "total": r.n} for r in eps_q],
-        "top_codigos": [], "graficas": {} 
+        "top_codigos": [],
+        "graficas": {}
     }
     _analytics_cache.update({"data": res, "ts": ahora})
     return res
 
+
 @app.get("/plantillas")
-def listar_plantillas(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def listar_plantillas(
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
     return db.query(PlantillaGlosa).all()
 
+
 @app.post("/plantillas")
-async def crear_plantilla(data: dict, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+async def crear_plantilla(
+    data: dict,
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
     nueva = PlantillaGlosa(titulo=data['titulo'], texto=data['texto'])
     db.add(nueva)
     db.commit()
     return {"status": "ok"}
 
+
 @app.get("/glosas")
-def listar_historial(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def listar_historial(
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
     return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(100).all()
 
+
 @app.get("/contratos")
-def listar_contratos(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def listar_contratos(
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
     return db.query(ContratoRecord).all()
 
+
 @app.post("/contratos")
-def guardar_contrato(data: dict, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_current_user)):
+def guardar_contrato(
+    data: dict,
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
     nuevo = ContratoRecord(eps=data['eps'], detalles=data['detalles'])
     db.add(nuevo)
     db.commit()
     return {"status": "ok"}
 
-@app.post("/descargar-pdf")
-async def generar_pdf_endpoint(data: dict, user: UsuarioRecord = Depends(get_current_user)):
-    pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
-    return Response(
-        content=pdf_bytes, media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=Respuesta_{data['eps']}.pdf"}
-    )
+
+@app
