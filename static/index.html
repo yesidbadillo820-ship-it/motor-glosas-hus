@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Motor de Glosas IA — ESE HUS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --navy: #0f1f3d; --navy-2: #1a3560; --blue: #1e5cad; --blue-lt: #3b82f6;
+            --teal: #0d9488; --teal-lt: #14b8a6; --red: #dc2626; --amber: #d97706;
+            --green: #16a34a; --slate: #64748b; --bg: #f0f4f8; --bg-card: #ffffff;
+            --border: #dbe4ef; --text: #0f1f3d; --radius: 10px; --shadow: 0 2px 12px rgba(15,31,61,.08);
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'IBM Plex Sans', sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100vh;overflow:hidden;}
+        
+        /* --- ESTILOS PANTALLA DE LOGIN --- */
+        #login-overlay { position:fixed; inset:0; background:var(--navy); display:flex; align-items:center; justify-content:center; z-index:9999; transition: opacity 0.3s; }
+        .login-box { background:#fff; padding:2.5rem; border-radius:var(--radius); box-shadow: 0 10px 25px rgba(0,0,0,0.2); width:100%; max-width:400px; text-align:center; }
+        .login-box h2 { font-family:'Syne'; color:var(--navy); margin-bottom:0.5rem; }
+        .login-box p { color:var(--slate); font-size:0.85rem; margin-bottom:1.5rem; }
+        .login-box input { width:100%; margin-bottom:1rem; padding:0.75rem; border:1px solid var(--border); border-radius:8px; outline:none; font-family:inherit; }
+        .login-box input:focus { border-color:var(--blue-lt); }
+        .login-box .btn-login { width:100%; background:var(--blue); color:white; padding:0.8rem; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:1rem; transition:0.2s; }
+        .login-box .btn-login:hover { background:var(--navy-2); }
+        #login-error { color:var(--red); font-size:0.8rem; margin-top:1rem; display:none; }
+
+        header{background:var(--navy);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:60px;flex-shrink:0;border-bottom:2px solid var(--navy-2)}
+        .logo{display:flex;align-items:center;gap:.75rem;color:#fff}
+        .logo-icon{width:34px;height:34px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Syne';font-weight:800;font-size:14px}
+        
+        nav{display:flex;gap:1.5rem; align-items:center;}
+        .nav-btn{color:#8da4c4;font-size:.8rem;font-weight:600;text-transform:uppercase;cursor:pointer;border:none;background:none;padding:.5rem 0;border-bottom:2px solid transparent}
+        .nav-btn.active{color:#fff;border-bottom-color:var(--teal-lt)}
+        .logout-btn { color:var(--red); font-size:0.75rem; background:transparent; border:1px solid var(--red); padding:0.3rem 0.6rem; border-radius:6px; cursor:pointer; font-weight:bold; margin-left: 1rem;}
+        .logout-btn:hover { background:var(--red); color:white; }
+
+        main{display:flex; flex:1; height:calc(100vh - 60px); overflow:hidden;}
+        .sidebar{width:350px; flex-shrink:0; background:var(--bg-card); border-right:1px solid var(--border); overflow-y:auto; padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;}
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        .section-title{font-family:'Syne';font-size:.65rem;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.12em;padding-bottom:.5rem;border-bottom:1px solid var(--border);margin-bottom:.75rem}
+        .field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.75rem}
+        .field label{font-size:.75rem;font-weight:600;color:var(--navy-2)}
+        input,select,textarea{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:.55rem .75rem;font-size:.85rem;font-family:inherit; outline:none;}
+        input:focus,select:focus,textarea:focus{border-color:var(--blue-lt)}
+        
+        .etapa-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+        .etapa-opt{border:1.5px solid var(--border);border-radius:8px;padding:.5rem .4rem;text-align:center;cursor:pointer;font-size:.7rem;font-weight:600;text-transform:uppercase;transition:all .2s;}
+        .etapa-opt.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+        .upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:1rem;text-align:center;background:#fafbfc;position:relative;transition:all .2s;}
+        .upload-zone:hover{border-color:var(--blue-lt);background:#eff6ff}
+        .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+        .btn{display:flex;align-items:center;justify-content:center;gap:.5rem;border:none;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:.85rem;padding:.65rem 1.25rem;transition:all .2s;}
+        .btn-primary{background:var(--navy);color:#fff}
+        .btn-primary:hover{background:var(--navy-2);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+        .btn-teal{background:var(--teal);color:#fff}
+        .btn-teal:hover{background:var(--teal-lt)}
+        .btn-danger{background:white; color:var(--red); border:1px solid var(--red);}
+        .btn-danger:hover{background:var(--red); color:white;}
+        .btn-outline{background:transparent;color:var(--slate);border:1px solid var(--border)}
+        .btn-outline:hover{border-color:var(--navy);color:var(--navy)}
+
+        .panel{flex:1; display:flex; flex-direction:column; background:var(--bg); overflow:hidden;}
+        .tabs{display:flex; border-bottom:2px solid var(--border); background:#fff; padding:0 1.5rem; flex-shrink:0;}
+        .tab{padding:.85rem 1.25rem;font-size:.8rem;font-weight:600;color:var(--slate);cursor:pointer;border:none;background:none;border-bottom:3px solid transparent; display:none;}
+        .tab.active{color:var(--navy);border-bottom-color:var(--navy); display:block;}
+        
+        .tab-pane { display:none; padding:1.5rem; padding-bottom:5rem; overflow-y:auto; height:calc(100vh - 100px); }
+        .tab-pane.active { display:block; }
+
+        .result-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow); margin-bottom:1rem;}
+        .result-header{background:var(--navy);padding:.85rem 1.25rem;color:#fff;display:flex;justify-content:space-between;align-items:center}
+        .result-body{padding:1.5rem;}
+        
+        .pill{padding:.2rem .6rem;border-radius:20px;font-size:.65rem;font-weight:700;text-transform:uppercase}
+        .pill-blue{background:#eff6ff;color:var(--blue)}
+        .pill-green{background:#dcfce7;color:#16a34a;border:1px solid #86efac}
+        .pill-orange{background:#fef3c7;color:#d97706;border:1px solid #fde047}
+        
+        .spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        #toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--navy);color:#fff;padding:.8rem 1.5rem;border-radius:var(--radius);transform:translateY(100px);transition:.3s;z-index:1000}
+        #toast.show{transform:translateY(0)}
+
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-bottom:1rem; }
+        .history-table th { background: var(--navy); color: white; padding: 0.8rem; text-align: left; text-transform: uppercase; letter-spacing: 0.05em; }
+        .history-table td { padding: 0.8rem; border-bottom: 1px solid var(--border); color: var(--text-2); }
+        .history-table tr:hover { background: #f8fafc; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .kpi-card { background: #fff; padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); }
+        .kpi-title { font-size: 0.75rem; color: var(--slate); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+        .kpi-value { font-size: 1.8rem; font-weight: 800; color: var(--navy); }
+        
+        .list-card { background: #fff; padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); flex: 1; margin-bottom:1rem; }
+        .list-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        .list-item:last-child { border-bottom: none; }
+
+        .excel-table-wrapper { width: 100%; overflow-x: auto; overflow-y: auto; max-height: 250px; margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+        .excel-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; white-space: nowrap; }
+        .excel-table th { background: var(--navy); color: white; padding: 0.5rem; text-align: left; position: sticky; top: 0; }
+        .excel-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+        .excel-table tr:hover { background: #f1f5f9; }
+        .paste-box { width: 100%; padding: 1.5rem; border: 2px dashed var(--blue-lt); border-radius: var(--radius); text-align: center; background: #eff6ff; color: var(--blue); font-weight: 600; cursor: pointer; outline: none; transition: 0.2s; font-size: 0.9rem; }
+        .paste-box:focus { background: #dbeafe; border-color: var(--blue); }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="login-box">
+        <div class="logo-icon" style="margin: 0 auto 1rem auto; width: 48px; height: 48px; font-size: 18px;">HUS</div>
+        <h2>Acceso Restringido</h2>
+        <p>Motor de Auditoría y Defensa de Glosas</p>
+        <form onsubmit="iniciarSesion(event)">
+            <input type="email" id="login-email" placeholder="Correo electrónico" required>
+            <input type="password" id="login-password" placeholder="Contraseña" required>
+            <button type="submit" class="btn-login" id="btn-login-submit">Ingresar al Sistema</button>
+            <div id="login-error">Credenciales incorrectas. Intente de nuevo.</div>
+        </form>
+    </div>
+</div>
+
+<header>
+    <div class="logo">
+        <div class="logo-icon">HUS</div>
+        <div><div style="font-weight:700">Motor de Glosas IA</div><div style="font-size:10px;opacity:.7">ESE HOSPITAL UNIVERSITARIO DE SANTANDER</div></div>
+    </div>
+    <nav>
+        <button class="nav-btn active" id="nav-analizar" onclick="switchNav('analizar')">Analizar (Individual)</button>
+        <button class="nav-btn" id="nav-lote" onclick="switchNav('lote')">Cargue Masivo</button>
+        <button class="nav-btn" id="nav-historial" onclick="switchNav('historial')">Historial</button>
+        <button class="nav-btn" id="nav-analytics" onclick="switchNav('analytics')">Estadísticas</button>
+        <button class="nav-btn" id="nav-contratos" onclick="switchNav('contratos')">Config. Contratos</button>
+        <button class="logout-btn" onclick="cerrarSesion()">Cerrar Sesión</button>
+    </nav>
+</header>
+
+<main>
+    <aside class="sidebar">
+        <div class="section-title">Datos Globales de la Glosa</div>
+        <div class="field">
+            <label for="eps">EPS / Pagador</label>
+            <select id="eps"></select>
+        </div>
+        
+        <div class="field">
+            <label>Etapa Procesal</label>
+            <div class="etapa-row">
+                <div class="etapa-opt active" onclick="setEtapa(this, 'INICIAL')">Inicial</div>
+                <div class="etapa-opt" onclick="setEtapa(this, 'RATIFICADA')">Ratif.</div>
+                <div class="etapa-opt" onclick="setEtapa(this, 'DEVOLUCIÓN')">Devol.</div>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem;">
+            <div class="field">
+                <label for="fecha_radicacion">F. Radicación</label>
+                <input type="date" id="fecha_radicacion">
+            </div>
+            <div class="field">
+                <label for="fecha_recepcion">F. Recepción</label>
+                <input type="date" id="fecha_recepcion">
+            </div>
+        </div>
+
+        <div class="field">
+            <label for="valor_aceptado">Valor Aceptado (Si aplica)</label>
+            <input type="text" id="valor_aceptado" placeholder="$ 0" oninput="fmtCurrency(this)">
+        </div>
+        
+        <div class="field" id="contenedor-texto">
+            <label for="tabla_excel">Descripción de la Glosa Individual</label>
+            <textarea id="tabla_excel" style="min-height: 120px;" placeholder="Pega aquí el contenido de la glosa individual..."></textarea>
+        </div>
+        
+        <div class="field" id="contenedor-archivos">
+            <label for="archivos">Soportes (Opcional)</label>
+            <div class="upload-zone">
+                <input type="file" id="archivos" multiple accept=".pdf">
+                <div style="font-size:12px;color:var(--slate)">📎 Adjuntar PDFs (Epicrisis)</div>
+            </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:auto;" id="botones-individual">
+            <button class="btn btn-primary" id="btnAnalizar" onclick="analizarGlosa()">Analizar Glosa</button>
+            <button class="btn btn-outline" style="font-size: 0.75rem; padding: 0.4rem;" onclick="limpiarTodo()">Limpiar todo</button>
+        </div>
+    </aside>
+
+    <div class="panel">
+        <div class="tabs">
+            <button class="tab active" id="tab-analizar">Resultado Legal (Individual)</button>
+            <button class="tab" id="tab-lote">Cargue Masivo (Lotes Excel)</button>
+            <button class="tab" id="tab-historial">Historial de Auditoría</button>
+            <button class="tab" id="tab-analytics">Dashboard de Estadísticas</button>
+            <button class="tab" id="tab-contratos">Configuración de Contratos</button>
+        </div>
+
+        <div class="tab-pane active" id="pane-analizar">
+            <div id="result-content">
+                <div style="text-align:center;padding:5rem;color:var(--slate)">
+                    <h2>⚖️</h2><p>Listo para generar defensa técnica.</p>
+                </div>
+            </div>
+            <div id="result-actions" style="display:none; gap:1rem; margin-top: 1rem;">
+                <button class="btn btn-teal" onclick="descargarPDF()">Descargar PDF</button>
+                <button class="btn btn-primary" onclick="copiarTexto()">Copiar Texto</button>
+            </div>
+        </div>
+
+        <div class="tab-pane" id="pane-lote">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="color:var(--navy); margin:0;">Procesamiento Masivo de Glosas</h3>
+            </div>
+            <div style="background:#fff; padding:1.5rem; border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); flex-shrink: 0; margin-bottom: 1.5rem;">
+                <p style="font-size:0.85rem; color:var(--slate); margin-bottom:1rem;">
+                    Configura la <b>EPS, Etapa y Fechas</b> en el menú lateral. Luego, haz clic en la caja azul y presiona <b>Ctrl+V</b> para pegar tu tabla directamente desde Excel.
+                </p>
+                
+                <input type="text" id="paste-box" class="paste-box" placeholder="📋 Haz clic aquí y presiona Ctrl+V para pegar desde Excel..." autocomplete="off">
+                
+                <div id="lote-table-container" class="excel-table-wrapper" style="display:none;">
+                    <table class="excel-table">
+                        <thead>
+                            <tr>
+                                <th>Entidad</th><th>Factura</th><th>Valor Glosado</th><th>Cód. Glosa</th><th>Concepto del Código</th><th>CUPS/CUMS</th><th>Servicio</th><th>Observación EPS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excel-tbody"></tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top:1.5rem; display:flex; align-items:center; gap:1rem;">
+                    <button class="btn btn-primary" id="btn-procesar-lote" onclick="iniciarLote()" disabled>🚀 Iniciar Cargue Masivo</button>
+                    <div id="lote-status" style="font-size:0.85rem; font-weight:600; color:var(--navy); display:none;">
+                        Procesando: <span id="lote-count">0</span> / <span id="lote-total">0</span>
+                    </div>
+                </div>
+                
+                <div id="lote-progress-container" style="margin-top:1rem; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:none;">
+                    <div id="lote-progress-bar" style="height:100%; width:0%; background:var(--teal); transition:width 0.3s;"></div>
+                </div>
+            </div>
+
+            <div id="lote-resultados" style="display:none;">
+                <h4 style="color:var(--navy); margin-bottom:1rem;">Resultados de la Operación</h4>
+                <div id="lote-lista-resultados" style="display:flex; flex-direction:column; gap:0.5rem; padding-right: 5px;"></div>
+            </div>
+        </div>
+
+        <div class="tab-pane" id="pane-historial">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="color:var(--navy); margin:0;">Registro de Glosas Procesadas</h3>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-teal" style="padding:0.4rem 1rem;" onclick="exportarExcel()">📥 Descargar Excel</button>
+                    <button class="btn btn-outline" style="padding:0.4rem 1rem;" onclick="cargarHistorial()">↻ Actualizar</button>
+                </div>
+            </div>
+            <div id="historial-content">
+                <div style="text-align:center;padding:3rem;color:var(--slate)"><div class="spinner" style="border-color:#ccc; border-top-color:var(--navy); margin:auto;"></div></div>
+            </div>
+        </div>
+
+        <div class="tab-pane" id="pane-analytics">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="color:var(--navy); margin:0;">Indicadores del Mes Actual</h3>
+                <button class="btn btn-outline" style="padding:0.4rem 1rem;" onclick="cargarAnalytics()">↻ Actualizar</button>
+            </div>
+            <div id="analytics-content">
+                <div style="text-align:center;padding:3rem;color:var(--slate)"><div class="spinner" style="border-color:#ccc; border-top-color:var(--navy); margin:auto;"></div></div>
+            </div>
+        </div>
+
+        <div class="tab-pane" id="pane-contratos">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="color:var(--navy); margin:0;">Gestión de Tarifas y Contratos EPS</h3>
+            </div>
+            
+            <div style="display:grid; grid-template-columns:300px 1fr; gap:1.5rem;">
+                <div style="background:#fff; padding:1.5rem; border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); height:fit-content;">
+                    <h4 style="font-size:0.9rem; margin-bottom:1rem; color:var(--navy);">Agregar / Editar EPS</h4>
+                    <div class="field">
+                        <label for="cfg-eps">Nombre de la EPS</label>
+                        <input type="text" id="cfg-eps" placeholder="EJ: SANITAS">
+                    </div>
+                    <div class="field">
+                        <label for="cfg-detalles">Detalle del Contrato (Se enviará a la IA)</label>
+                        <textarea id="cfg-detalles" style="min-height:150px; font-size:0.8rem;" placeholder="CONTRATO 001. TARIFA: SOAT -15%. OBS: Excluye medicamentos."></textarea>
+                    </div>
+                    <button class="btn btn-primary" style="width:100%" onclick="guardarContrato()">💾 Guardar Contrato</button>
+                </div>
+
+                <div style="background:#fff; border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden;">
+                    <table class="history-table" style="margin:0; box-shadow:none;">
+                        <thead>
+                            <tr>
+                                <th>Entidad EPS</th>
+                                <th>Detalle del Contrato / Tarifas</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-contratos">
+                            <tr><td colspan="3" style="text-align:center;">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<div id="toast">Mensaje enviado</div>
+
+<script>
+    let etapaActual = 'INICIAL';
+    let dataGuardada = null;
+    window.loteRawData = [];
+
+    // --- NUEVA LÓGICA DE SEGURIDAD (TOKEN JWT) ---
+    function getAuthHeaders() {
+        const token = localStorage.getItem('access_token');
+        return { 'Authorization': `Bearer ${token}` };
+    }
+
+    function checkAuthError(res) {
+        if (res.status === 401) {
+            cerrarSesion();
+            throw new Error("Sesión expirada");
+        }
+        return res;
+    }
+
+    window.onload = function() {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            document.getElementById('login-overlay').style.display = 'none';
+            cargarContratosDropdown();
+        }
+    };
+
+    // ✅ CORRECCIÓN — Envía JSON puro y espera respuesta
+    async function iniciarSesion(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const pass = document.getElementById('login-password').value;
+        const btn = document.getElementById('btn-login-submit');
+        const errDiv = document.getElementById('login-error');
+        
+        btn.innerText = "Verificando...";
+        errDiv.style.display = 'none';
+
+        try {
+            const res = await fetch('/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: email, password: pass })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                localStorage.setItem('access_token', data.access_token);
+                document.getElementById('login-overlay').style.display = 'none';
+                cargarContratosDropdown();
+                mostrarToast('Bienvenido al sistema', 'success');
+            } else {
+                errDiv.style.display = 'block';
+            }
+        } catch (error) {
+            errDiv.innerText = "Error de conexión con el servidor.";
+            errDiv.style.display = 'block';
+        } finally {
+            btn.innerText = "Ingresar al Sistema";
+        }
+    }
+
+    function cerrarSesion() {
+        localStorage.removeItem('access_token');
+        document.getElementById('login-overlay').style.display = 'flex';
+        document.getElementById('login-email').value = '';
+        document.getElementById('login-password').value = '';
+    }
+
+    // --- FUNCIONES ACTUALIZADAS CON SEGURIDAD ---
+
+    async function cargarContratosDropdown() {
+        try {
+            const res = await fetch('/contratos', { headers: getAuthHeaders() });
+            checkAuthError(res);
+            const data = await res.json();
+            const select = document.getElementById('eps');
+            select.innerHTML = '';
+            data.forEach(c => {
+                let isSelected = c.eps.includes("OTRA") ? "selected" : "";
+                select.innerHTML += `<option value="${c.eps}" ${isSelected}>${c.eps}</option>`;
+            });
+        } catch(e) { console.error("Error al cargar contratos."); }
+    }
+
+    document.getElementById('paste-box').addEventListener('paste', function(e) {
+        e.preventDefault();
+        let paste = (e.clipboardData || window.clipboardData).getData('text');
+        let rows = paste.split('\n').filter(r => r.trim().length > 5);
+        
+        if(rows.length === 0) return mostrarToast('No se detectaron datos válidos', 'error');
+        if(rows.length > 50) return mostrarToast('Máximo 50 filas por lote', 'error');
+        
+        window.loteRawData = rows;
+        let tbody = document.getElementById('excel-tbody');
+        tbody.innerHTML = '';
+        
+        rows.forEach(row => {
+            let cols = row.split('\t');
+            while(cols.length < 8) cols.push('');
+            
+            let tr = document.createElement('tr');
+            for(let i=0; i<8; i++) {
+                let td = document.createElement('td');
+                td.innerText = cols[i];
+                td.title = cols[i];
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        });
+        
+        document.getElementById('lote-table-container').style.display = 'block';
+        document.getElementById('btn-procesar-lote').disabled = false;
+        mostrarToast(`Se cargaron ${rows.length} filas desde Excel`, 'success');
+        this.value = ''; 
+    });
+
+    function switchNav(seccion) {
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+        
+        document.getElementById('nav-' + seccion).classList.add('active');
+        document.getElementById('tab-' + seccion).classList.add('active');
+        document.getElementById('pane-' + seccion).classList.add('active');
+
+        if(seccion === 'lote') {
+            document.getElementById('contenedor-texto').style.display = 'none';
+            document.getElementById('contenedor-archivos').style.display = 'none';
+            document.getElementById('botones-individual').style.display = 'none';
+        } else if(seccion === 'contratos') {
+            document.getElementById('contenedor-texto').style.display = 'none';
+            document.getElementById('contenedor-archivos').style.display = 'none';
+            document.getElementById('botones-individual').style.display = 'none';
+            cargarTablaContratos();
+        } else {
+            document.getElementById('contenedor-texto').style.display = 'flex';
+            document.getElementById('contenedor-archivos').style.display = 'flex';
+            document.getElementById('botones-individual').style.display = 'flex';
+        }
+
+        if(seccion === 'historial') cargarHistorial();
+        if(seccion === 'analytics') cargarAnalytics();
+    }
+
+    function fmtCurrency(input) {
+        const raw = input.value.replace(/\D/g,'');
+        if (!raw) { input.value=''; return; }
+        input.value = '$ ' + parseInt(raw).toLocaleString('es-CO');
+    }
+
+    function formaterMoneda(num) {
+        if (!num || num === 'N/A') return 'N/A';
+        const clean = String(num).replace(/[^\d.]/g, ''); 
+        if (!clean) return num; 
+        
+        const valor = parseFloat(clean);
+        if (isNaN(valor)) return num;
+        
+        return new Intl.NumberFormat('es-CO', { 
+            style: 'currency', 
+            currency: 'COP',
+            maximumFractionDigits: 0
+        }).format(valor);
+    }
+
+    function setEtapa(el, val) {
+        document.querySelectorAll('.etapa-opt').forEach(opt => opt.classList.remove('active'));
+        el.classList.add('active');
+        etapaActual = val;
+    }
+
+    function limpiarTodo() {
+        document.getElementById('eps').selectedIndex = 0;
+        document.getElementById('fecha_radicacion').value = '';
+        document.getElementById('fecha_recepcion').value = '';
+        document.getElementById('valor_aceptado').value = '';
+        document.getElementById('tabla_excel').value = '';
+        document.getElementById('archivos').value = '';
+        document.getElementById('result-content').innerHTML = `
+            <div style="text-align:center;padding:5rem;color:var(--slate)">
+                <h2>⚖️</h2><p>Listo para generar defensa técnica.</p>
+            </div>
+        `;
+        document.getElementById('result-actions').style.display = 'none';
+        dataGuardada = null;
+    }
+
+    function mostrarToast(msg, tipo = '') {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        if (tipo === 'success') { t.style.background = 'var(--green)'; }
+        else if (tipo === 'error') { t.style.background = 'var(--red)'; }
+        else { t.style.background = 'var(--navy)'; }
+        
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    async function cargarTablaContratos() {
+        const tbody = document.getElementById('tabla-contratos');
+        try {
+            const res = await fetch('/contratos', { headers: getAuthHeaders() });
+            checkAuthError(res);
+            const data = await res.json();
+            tbody.innerHTML = '';
+            data.forEach(c => {
+                const seguroEPS = c.eps.replace(/"/g, '&quot;');
+                const seguroDetalles = c.detalles.replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${c.eps}</strong></td>
+                        <td style="font-size:0.75rem; white-space:pre-wrap;">${c.detalles}</td>
+                        <td style="display:flex; gap:0.5rem;">
+                            <button class="btn btn-outline" style="padding:0.3rem 0.6rem; font-size:0.7rem;" onclick="prepararEdicion('${seguroEPS}', '${seguroDetalles}')">✎</button>
+                            <button class="btn btn-danger" style="padding:0.3rem 0.6rem; font-size:0.7rem;" onclick="eliminarContrato('${seguroEPS}')">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch(e) { tbody.innerHTML = `<tr><td colspan="3">Error cargando contratos.</td></tr>`; }
+    }
+
+    function prepararEdicion(eps, detalles) {
+        document.getElementById('cfg-eps').value = eps;
+        document.getElementById('cfg-detalles').value = detalles;
+        mostrarToast("Listo para editar", "success");
+    }
+
+    async function guardarContrato() {
+        const eps = document.getElementById('cfg-eps').value.trim();
+        const detalles = document.getElementById('cfg-detalles').value.trim();
+        if(!eps || !detalles) return alert("Llena ambos campos");
+
+        try {
+            const res = await fetch('/contratos', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders() 
+                },
+                body: JSON.stringify({ eps, detalles })
+            });
+            checkAuthError(res);
+            mostrarToast("Contrato guardado", "success");
+            document.getElementById('cfg-eps').value = '';
+            document.getElementById('cfg-detalles').value = '';
+            cargarTablaContratos();
+            cargarContratosDropdown();
+        } catch(e) { mostrarToast("Error al guardar", "error"); }
+    }
+
+    async function eliminarContrato(eps) {
+        if(eps.includes("OTRA")) return alert("No puedes eliminar la opción por defecto.");
+        if(!confirm(`¿Estás seguro de eliminar el contrato de ${eps}?`)) return;
+
+        try {
+            const res = await fetch(`/contratos/${eps}`, { 
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            checkAuthError(res);
+            mostrarToast("Contrato eliminado", "success");
+            cargarTablaContratos();
+            cargarContratosDropdown();
+        } catch(e) { mostrarToast("Error al eliminar", "error"); }
+    }
+
+    async function analizarGlosa() {
+        const btn = document.getElementById('btnAnalizar');
+        const text = document.getElementById('tabla_excel').value;
+        if(!text) return alert("Por favor, pega el contenido de la glosa.");
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div> Analizando...';
+        
+        const fd = new FormData();
+        fd.append('eps', document.getElementById('eps').value);
+        fd.append('etapa', etapaActual);
+        fd.append('fecha_radicacion', document.getElementById('fecha_radicacion').value);
+        fd.append('fecha_recepcion', document.getElementById('fecha_recepcion').value);
+        fd.append('valor_aceptado', document.getElementById('valor_aceptado').value.replace(/\D/g,'') || "0");
+        fd.append('tabla_excel', text);
+        
+        const fileInput = document.getElementById('archivos');
+        for (let file of fileInput.files) fd.append('archivos', file);
+
+        try {
+            const res = await fetch('/analizar', { 
+                method: 'POST', 
+                headers: getAuthHeaders(), // Pasamos el Token
+                body: fd 
+            });
+            checkAuthError(res);
+            const data = await res.json();
+            dataGuardada = { eps: document.getElementById('eps').value, ...data };
+            renderResult(data);
+        } catch (e) {
+            if(e.message !== "Sesión expirada") alert("Error de conexión al servidor.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Analizar Glosa";
+        }
+    }
+
+    function renderResult(data) {
+        const area = document.getElementById('result-content');
+        area.innerHTML = `
+            <div class="result-card">
+                <div class="result-header">
+                    <div>
+                        <div style="font-size:10px;opacity:.8">${data.tipo}</div>
+                        <div style="font-weight:700">${data.resumen}</div>
+                    </div>
+                    <span class="pill pill-blue">${data.codigo_glosa}</span>
+                </div>
+                <div class="result-body">
+                    <div style="padding:.5rem 1rem; border-radius:8px; margin-bottom:1.5rem; font-size:11px; font-weight:700; color:#fff; display:inline-block;" class="${data.color_tiempo}">
+                        ${data.mensaje_tiempo}
+                    </div>
+                    <div>${data.dictamen}</div>
+                </div>
+            </div>
+        `;
+        document.getElementById('result-actions').style.display = 'flex';
+    }
+
+    async function iniciarLote() {
+        const lineas = window.loteRawData;
+        if(!lineas || lineas.length === 0) return alert("Pega primero los datos de Excel en la caja azul.");
+
+        const btn = document.getElementById('btn-procesar-lote');
+        btn.disabled = true;
+        
+        document.getElementById('lote-status').style.display = 'block';
+        document.getElementById('lote-progress-container').style.display = 'block';
+        document.getElementById('lote-resultados').style.display = 'block';
+        document.getElementById('lote-lista-resultados').innerHTML = '';
+        document.getElementById('lote-total').innerText = lineas.length;
+
+        let exitos = 0;
+
+        for(let i = 0; i < lineas.length; i++) {
+            document.getElementById('lote-count').innerText = i + 1;
+            let pct = Math.round(((i) / lineas.length) * 100);
+            document.getElementById('lote-progress-bar').style.width = pct + '%';
+
+            const fd = new FormData();
+            fd.append('eps', document.getElementById('eps').value);
+            fd.append('etapa', etapaActual);
+            fd.append('fecha_radicacion', document.getElementById('fecha_radicacion').value);
+            fd.append('fecha_recepcion', document.getElementById('fecha_recepcion').value);
+            fd.append('valor_aceptado', document.getElementById('valor_aceptado').value.replace(/\D/g,'') || "0");
+            fd.append('tabla_excel', lineas[i]);
+
+            try {
+                const res = await fetch('/analizar', { 
+                    method: 'POST', 
+                    headers: getAuthHeaders(),
+                    body: fd 
+                });
+                checkAuthError(res);
+                if (!res.ok) throw new Error("Error en servidor");
+                const data = await res.json();
+                
+                const valObj = formaterMoneda(data.valor_objetado);
+                const item = document.createElement('div');
+                item.style = "background:#fff; padding:0; border:1px solid var(--border); border-radius:8px; border-left:4px solid var(--green); display:flex; flex-direction:column; margin-bottom:0.8rem; overflow:hidden; flex-shrink: 0;";
+                
+                const idUnico = 'res-' + Math.random().toString(36).substr(2, 9);
+                
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:1.2rem; cursor:pointer; background:#fff;" onclick="const el = document.getElementById('${idUnico}'); el.style.display = el.style.display === 'none' ? 'block' : 'none';">
+                        <div>
+                            <strong style="color:var(--navy); font-size:1.1rem;">${data.codigo_glosa}</strong> <span style="color:var(--slate);">| Paciente: ${data.paciente}</span>
+                            <div style="font-size:0.75rem; color:var(--slate); margin-top:6px; font-weight:600;">${data.mensaje_tiempo} | ${data.tipo}</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:1.5rem;">
+                            <strong style="color:var(--text); font-size:1.1rem;">${valObj}</strong>
+                            <span style="font-size:0.8rem; background:#eff6ff; padding:0.4rem 0.8rem; border-radius:6px; border:1px solid #bfdbfe; color:var(--blue); font-weight:700; transition:all 0.2s;">Ver Respuesta ⬇️</span>
+                        </div>
+                    </div>
+                    <div id="${idUnico}" style="display:none; padding:1.5rem; border-top:1px solid var(--border); background:#f8fafc;">
+                        <div style="background:#fff; padding:1.5rem; border-radius:8px; border:1px solid var(--border); font-size:0.85rem; margin-bottom:1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            ${data.dictamen}
+                        </div>
+                        <button class="btn btn-outline" style="font-size:0.8rem; padding:0.5rem 1rem; background:white;" onclick="copiarDesdeElemento(this)">📋 Copiar Respuesta al Portapapeles</button>
+                    </div>
+                `;
+                document.getElementById('lote-lista-resultados').append(item); 
+                exitos++;
+            } catch (e) {
+                if(e.message === "Sesión expirada") return;
+                const item = document.createElement('div');
+                item.style = "background:#fee2e2; padding:1.2rem; border:1px solid #fca5a5; border-radius:8px; border-left:4px solid var(--red); margin-bottom:0.8rem; flex-shrink: 0;";
+                item.innerHTML = `<strong style="color:var(--red); font-size:1rem;">Fallo en la línea ${i+1}</strong><br><span style="font-size:0.8rem; color:var(--slate); margin-top:5px; display:inline-block;">Se superó el límite de peticiones o el formato es inválido.</span>`;
+                document.getElementById('lote-lista-resultados').append(item);
+            }
+            await new Promise(r => setTimeout(r, 1500));
+        }
+
+        document.getElementById('lote-progress-bar').style.width = '100%';
+        btn.disabled = false;
+        btn.innerText = "🚀 Procesar Nuevo Lote";
+        mostrarToast(`Lote finalizado: ${exitos} procesadas exitosamente.`, 'success');
+    }
+
+    function copiarDesdeElemento(btn) {
+        const divContenido = btn.previousElementSibling;
+        const textToCopy = divContenido.innerText.trim();
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => mostrarToast('✓ Respuesta copiada al portapapeles', 'success'))
+            .catch(() => mostrarToast('Error al copiar', 'error'));
+    }
+
+    async function cargarHistorial() {
+        const container = document.getElementById('historial-content');
+        container.innerHTML = '<div style="text-align:center;padding:3rem;"><div class="spinner" style="border-color:#ccc; border-top-color:var(--navy); margin:auto;"></div></div>';
+        
+        try {
+            const res = await fetch('/glosas', { headers: getAuthHeaders() });
+            checkAuthError(res);
+            const data = await res.json();
+            
+            if(data.length === 0) {
+                container.innerHTML = '<div style="text-align:center; color:var(--slate); padding:2rem;">Aún no hay glosas guardadas en el sistema.</div>';
+                return;
+            }
+
+            let html = '<table class="history-table"><thead><tr><th>Fecha</th><th>EPS</th><th>Paciente</th><th>Código</th><th>Valor Obj.</th><th>Estado</th></tr></thead><tbody>';
+            data.forEach(g => {
+                const fecha = new Date(g.creado_en).toLocaleDateString('es-CO');
+                const badge = g.estado === 'LEVANTADA' ? 'pill-green' : (g.estado === 'ACEPTADA' ? 'pill-orange' : 'pill-blue');
+                html += `<tr>
+                    <td><strong>${fecha}</strong></td>
+                    <td>${g.eps}</td>
+                    <td style="font-size:11px;">${g.paciente || 'N/A'}</td>
+                    <td><strong>${g.codigo_glosa}</strong></td>
+                    <td style="color:var(--navy-2); font-weight:600;">${formaterMoneda(g.valor_objetado)}</td>
+                    <td><span class="pill ${badge}">${g.estado}</span></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        } catch(e) {
+            if(e.message !== "Sesión expirada") container.innerHTML = '<div style="color:red; text-align:center; padding:2rem;">Error conectando con la base de datos.</div>';
+        }
+    }
+
+    async function exportarExcel() {
+        mostrarToast('Descargando archivo...', 'success');
+        try {
+            const res = await fetch('/exportar-historial', { headers: getAuthHeaders() });
+            checkAuthError(res);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Reporte_Glosas_HUS.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            if(error.message !== "Sesión expirada") mostrarToast('Error al descargar', 'error');
+        }
+    }
+
+    async function cargarAnalytics() {
+        const container = document.getElementById('analytics-content');
+        container.innerHTML = '<div style="text-align:center;padding:3rem;"><div class="spinner" style="border-color:#ccc; border-top-color:var(--navy); margin:auto;"></div></div>';
+        
+        try {
+            const res = await fetch('/analytics', { headers: getAuthHeaders() });
+            checkAuthError(res);
+            const data = await res.json();
+            
+            let epsHtml = data.top_eps.map(e => `<div class="list-item"><span>${e.eps}</span><strong>${e.total} Glosas</strong></div>`).join('');
+            if(!epsHtml) epsHtml = '<div class="list-item">Sin datos suficientes</div>';
+
+            let codHtml = data.top_codigos.map(c => `<div class="list-item"><span>Código ${c.codigo}</span><strong>${c.total} Veces</strong></div>`).join('');
+            if(!codHtml) codHtml = '<div class="list-item">Sin datos suficientes</div>';
+
+            container.innerHTML = `
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="border-left: 4px solid var(--blue);">
+                        <div class="kpi-title">Glosas Gestionadas (Mes)</div>
+                        <div class="kpi-value">${data.glosas_mes}</div>
+                        <div style="font-size:11px; color:var(--slate); margin-top:5px;">${data.glosas_hoy} procesadas el día de hoy</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 4px solid var(--red);">
+                        <div class="kpi-title">Valor Objetado (Mes)</div>
+                        <div class="kpi-value" style="font-size:1.4rem;">${formaterMoneda(data.valor_objetado_mes)}</div>
+                        <div style="font-size:11px; color:var(--slate); margin-top:5px;">Total reclamado por las EPS</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 4px solid var(--green);">
+                        <div class="kpi-title">Valor Defendido (Mes)</div>
+                        <div class="kpi-value" style="font-size:1.4rem; color:var(--green);">${formaterMoneda(data.valor_recuperado_mes)}</div>
+                        <div style="font-size:11px; color:var(--slate); margin-top:5px;">Tasa de éxito: <strong>${data.tasa_exito_pct}%</strong></div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:1rem;">
+                    <div class="list-card">
+                        <div class="kpi-title" style="margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:5px;">EPS Que Más Glosan</div>
+                        ${epsHtml}
+                    </div>
+                    <div class="list-card">
+                        <div class="kpi-title" style="margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:5px;">Códigos Frecuentes</div>
+                        ${codHtml}
+                    </div>
+                </div>
+            `;
+        } catch(e) {
+            if(e.message !== "Sesión expirada") container.innerHTML = '<div style="color:red; text-align:center; padding:2rem;">Error cargando métricas.</div>';
+        }
+    }
+
+    async function descargarPDF() {
+        if (!dataGuardada) return;
+        const btn = document.querySelector('.btn-teal');
+        btn.innerText = "Generando...";
+        try {
+            const res = await fetch('/descargar-pdf', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders()
+                },
+                body: JSON.stringify({
+                    eps: dataGuardada.eps,
+                    resumen: dataGuardada.resumen,
+                    dictamen: dataGuardada.dictamen
+                })
+            });
+            checkAuthError(res);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Oficio_Respuesta_Glosa_HUS.pdf';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch(e) {
+            if(e.message !== "Sesión expirada") alert("Error al descargar PDF");
+        } finally {
+            btn.innerText = "Descargar PDF";
+        }
+    }
+
+    function copiarTexto() {
+        if(!dataGuardada) return;
+        const element = document.createElement('div');
+        element.innerHTML = dataGuardada.dictamen;
+        const textToCopy = element.innerText.trim();
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => mostrarToast('✓ Texto copiado al portapapeles', 'success'))
+            .catch(() => mostrarToast('Error al copiar', 'error'));
+    }
+</script>
+</body>
+</html>
