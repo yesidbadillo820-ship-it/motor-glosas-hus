@@ -1,6 +1,7 @@
 import os
 import io
 import re
+import asyncio
 from datetime import datetime, timedelta
 import PyPDF2
 from groq import AsyncGroq
@@ -128,21 +129,31 @@ class GlosaService:
         JUSTIFICACION_DEFENSA: 
         """
         
-        try:
-            # ✅ MEJORA: Enviamos los mensajes separados por roles
-            completion = await self.cliente.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ], 
-                model="llama-3.3-70b-versatile", # Asegúrate de tener el modelo potente aquí
-                temperature=0.1
-                max_tokens=600  # ✅ EL FRENO DE EMERGENCIA
-            )
-            res_ia = completion.choices[0].message.content
-        except Exception as e: 
-            print(f"Error con la IA: {e}")
-            return GlosaResult(tipo="Error", resumen="Error Groq", dictamen="Ocurrió un error al contactar el modelo. Reintente.", codigo_glosa="N/A", valor_objetado="0", paciente="N/A", mensaje_tiempo="", color_tiempo="")
+        # ✅ MEJORA DE CONFIABILIDAD 4: RETRY CON EXPONENTIAL BACKOFF
+        res_ia = ""
+        for intento in range(3):
+            try:
+                completion = await self.cliente.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ], 
+                    model="llama-3.3-70b-versatile",
+                    temperature=0.1,
+                    max_tokens=600
+                )
+                res_ia = completion.choices[0].message.content
+                break  # Si la llamada es exitosa, rompemos el bucle
+            except Exception as e: 
+                print(f"Intento {intento + 1} falló al contactar a Groq: {e}")
+                if intento == 2:  # Si es el tercer intento (0, 1, 2) y falla, nos rendimos
+                    return GlosaResult(
+                        tipo="Error", 
+                        resumen="Error de Conexión IA", 
+                        dictamen="Ocurrió un error persistente al contactar el modelo tras varios intentos. Por favor, reintente en unos minutos.", 
+                        codigo_glosa="N/A", valor_objetado="0", paciente="N/A", mensaje_tiempo="", color_tiempo=""
+                    )
+                await asyncio.sleep(2 ** intento) # Espera 1s en el primer fallo, 2s en el segundo.
 
         def b(e):
             # Regex a prueba de balas: Busca la clave y se detiene EXACTAMENTE al encontrar la siguiente clave, sin importar si hay salto de línea o no.
