@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+python-multipart
+groq
+PyPDF2
+reportlab
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
