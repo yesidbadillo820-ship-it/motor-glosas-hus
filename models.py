@@ -45,6 +45,12 @@ class GlosaRecord(Base):
     dictamen = Column(Text)
     creado_en = Column(DateTime, server_default=func.now())
 
+class PlantillaGlosa(Base):
+    __tablename__ = "plantillas"
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String, index=True)
+    texto = Column(String)
+
 class ContratoRecord(Base):
     __tablename__ = "contratos_config"
     
