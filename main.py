@@ -173,4 +173,14 @@ def guardar_contrato(
     return {"status": "ok"}
 
 
-@app
+@app.post("/descargar-pdf")
+async def generar_pdf_endpoint(
+    data: dict,
+    user: UsuarioRecord = Depends(get_current_user)
+):
+    pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=Respuesta_{data['eps']}.pdf"}
+    )
