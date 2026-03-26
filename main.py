@@ -4,10 +4,10 @@ from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
-from pydantic import BaseModel
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -38,7 +38,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Archivos estáticos
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
+
+
+@app.get("/")
+def root():
+    return FileResponse("static/index.html")
 
 
 @app.post("/token")
@@ -80,6 +88,7 @@ async def analizar_endpoint(
 
 
 _analytics_cache = {"data": None, "ts": None}
+
 
 @app.get("/analytics")
 def obtener_analytics(
@@ -171,6 +180,41 @@ def guardar_contrato(
     db.add(nuevo)
     db.commit()
     return {"status": "ok"}
+
+
+@app.delete("/contratos/{eps}")
+def eliminar_contrato(
+    eps: str,
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
+    contrato = db.query(ContratoRecord).filter(ContratoRecord.eps == eps).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+    db.delete(contrato)
+    db.commit()
+    return {"status": "ok"}
+
+
+@app.get("/exportar-historial")
+def exportar_historial(
+    db: Session = Depends(get_db),
+    user: UsuarioRecord = Depends(get_current_user)
+):
+    glosas = db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).all()
+    lines = ["Fecha,EPS,Paciente,Código Glosa,Valor Objetado,Valor Aceptado,Estado"]
+    for g in glosas:
+        fecha = g.creado_en.strftime("%Y-%m-%d") if g.creado_en else ""
+        lines.append(
+            f"{fecha},{g.eps},{g.paciente or ''},{g.codigo_glosa},"
+            f"{g.valor_objetado or 0},{g.valor_aceptado or 0},{g.estado}"
+        )
+    csv_content = "\n".join(lines)
+    return Response(
+        content=csv_content.encode("utf-8-sig"),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=Reporte_Glosas_HUS.csv"}
+    )
 
 
 @app.post("/descargar-pdf")
