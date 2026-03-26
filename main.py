@@ -13,7 +13,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from services import GlosaService, crear_oficio_pdf
-from models import GlosaInput, GlosaResult, PDFRequest, GlosaRecord, ContratoRecord, ContratoInput, UsuarioRecord
+from models import Base, GlosaRecord, UsuarioRecord, ContratoEPS, PlantillaGlosa
 from database import engine, Base, get_db, SessionLocal
 from auth import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM
 from dotenv import load_dotenv
@@ -68,6 +68,22 @@ BASE_CONTRATOS_DEFAULT = {
     "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
 }
 
+class PlantillaCreate(BaseModel):
+    titulo: str
+    texto: str
+
+@app.get("/plantillas")
+def get_plantillas(db: Session = Depends(get_db), current_user: UsuarioRecord = Depends(get_current_user)):
+    return db.query(PlantillaGlosa).all()
+
+@app.post("/plantillas")
+def create_plantilla(plantilla: PlantillaCreate, db: Session = Depends(get_db), current_user: UsuarioRecord = Depends(get_current_user)):
+    db_plan = PlantillaGlosa(titulo=plantilla.titulo, texto=plantilla.texto)
+    db.add(db_plan)
+    db.commit()
+    db.refresh(db_plan)
+    return db_plan
+    
 @app.on_event("startup")
 def startup_event():
     db = SessionLocal()
