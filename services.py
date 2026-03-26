@@ -137,6 +137,7 @@ class GlosaService:
                 ], 
                 model="llama-3.3-70b-versatile", # Asegúrate de tener el modelo potente aquí
                 temperature=0.1
+                max_tokens=600  # ✅ EL FRENO DE EMERGENCIA
             )
             res_ia = completion.choices[0].message.content
         except Exception as e: 
