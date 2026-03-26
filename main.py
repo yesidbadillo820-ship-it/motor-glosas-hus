@@ -2,163 +2,67 @@ import os
 import re
 import io
 import csv
-from datetime import datetime
 import asyncio
+from typing import List
+from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
-from jose import JWTError, jwt
 from pydantic import BaseModel
 
+# ✅ MEJORA: Seguridad y Rate Limiting
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from services import GlosaService, crear_oficio_pdf
-from models import GlosaInput, GlosaResult, PDFRequest, GlosaRecord, ContratoRecord, ContratoInput, UsuarioRecord, PlantillaGlosa
-from database import engine, Base, get_db, SessionLocal
-from auth import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM
-from dotenv import load_dotenv
+from models import (
+    GlosaRecord, ContratoRecord, UsuarioRecord, 
+    PlantillaGlosa, GlosaResult
+)
+from database import engine, Base, get_db
+from auth import get_usuario_actual, create_access_token, verify_password
 
-load_dotenv()
+# Inicializar base de datos
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Motor Glosas HUS API", version="2.0")
+app = FastAPI(title="Motor Glosas HUS", version="2.1")
 
-# ✅ CONFIGURACIÓN SLOWAPI (RATE LIMIT)
+# ✅ CONFIGURACIÓN RATE LIMIT (20 peticiones por minuto por IP)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ✅ MEJORA URGENTE 3: CORS RESTRINGIDO SOLO A RENDER
+# ✅ CONFIGURACIÓN CORS (Seguridad)
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"], 
-    allow_methods=["*"], 
-    allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
 
-# --- CONFIGURACIÓN DE SEGURIDAD ---
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-def get_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credenciales_excepcion = HTTPException(
-        status_code=401,
-        detail="No se pudieron validar las credenciales",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credenciales_excepcion
-    except JWTError:
-        raise credenciales_excepcion
-    
-    usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
-    if usuario is None:
-        raise credenciales_excepcion
-    return usuario
-
-BASE_CONTRATOS_DEFAULT = {
-    "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
-    "COMPENSAR": "CONTRATO: CSS009-2024. TARIFA: SOAT -15% y Tarifas Propias. OBS: Excluye oncológicos. MAOS por EPS.",
-    "FAMISANAR": "CARTA DE INTENCIÓN. TARIFA: SOAT UVB -5% e Institucionales.",
-    "FOMAG": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15%, Institucionales y Paquetes (Tórax, IVE, Columna, Terapias, Gastro).",
-    "LA PREVISORA": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15% y Paquetes.",
-    "DISPENSARIO MEDICO": "CONTRATO: 440-DIGSA/DMBUG-2025. TARIFA: SOAT SMLV -20% e Institucionales.",
-    "POLICIA NACIONAL": "CONTRATOS: 068-5-200004-26 y 068-5-200006-26. TARIFA: SOAT UVB -8% e Institucionales. OBS: Contrato 0006-26 INCLUYE medicamentos oncológicos.",
-    "NUEVA EPS": "CONTRATO: 02-01-06-00077-2017. TARIFA: SOAT -20% e Institucionales. OBS: Meds Oncológicos por HUS.",
-    "PPL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%. OBS: MAOS y Meds por HUS.",
-    "FIDUCIARIA CENTRAL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%.",
-    "POSITIVA": "CONTRATO: 525 - OTROSÍ 3. TARIFA: SOAT SMLV -15%. OBS: Solo accidentes/laboral.",
-    "PRECIMED": "CONTRATO: 319 DE 2024. TARIFA: Tarifas anexos / Institucionales.",
-    "SALUD MIA": "CONTRATOS: SSA2025EVE3A005 y CSA2025EVE3A005. TARIFA: SOAT -15%. OBS: Urgencias Circular 019/2023.",
-    "AURORA": "CONTRATOS: GID ARL 0090 y GID AP 0090. TARIFA: SOAT -3%.",
-    "SECRETARIA DE SANTANDER": "MARCO LEGAL: Resolución 15997 de 2017 (Tarifas obligatorias ente territorial).",
-    "SUMIMEDICAL": "CONTRATO: FPS23-050. TARIFA: SOAT -15%. OBS: MAOS y Oncológicos por EPS.",
-    "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
-}
-
-class PlantillaCreate(BaseModel):
-    titulo: str
-    texto: str
-
-@app.get("/plantillas")
-def get_plantillas(db: Session = Depends(get_db), current_user: UsuarioRecord = Depends(get_current_user)):
-    return db.query(PlantillaGlosa).all()
-
-@app.post("/plantillas")
-def create_plantilla(plantilla: PlantillaCreate, db: Session = Depends(get_db), current_user: UsuarioRecord = Depends(get_current_user)):
-    db_plan = PlantillaGlosa(titulo=plantilla.titulo, texto=plantilla.texto)
-    db.add(db_plan)
-    db.commit()
-    db.refresh(db_plan)
-    return db_plan
-    
-@app.on_event("startup")
-def startup_event():
-    db = SessionLocal()
-    if db.query(ContratoRecord).count() == 0:
-        for k, v in BASE_CONTRATOS_DEFAULT.items():
-            db.add(ContratoRecord(eps=k, detalles=v))
-        db.commit()
-        
-    if db.query(UsuarioRecord).count() == 0:
-        # ✅ CORRECCIÓN: Evitamos espacios en el hash
-        admin_pwd = get_password_hash("admin123".strip())
-        admin_user = UsuarioRecord(
-            nombre="Auditor Principal", 
-            email="admin@hus.gov.co", 
-            password_hash=admin_pwd
-        )
-        db.add(admin_user)
-        db.commit()
-        
-    db.close()
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+# --- ENDPOINTS DE AUTENTICACIÓN ---
 
 @app.post("/token")
-def login_para_token(req: LoginRequest, db: Session = Depends(get_db)):
-    correo = req.username.strip()
-    clave = req.password.strip()
+async def login(data: dict, db: Session = Depends(get_db)):
+    user = db.query(UsuarioRecord).filter(UsuarioRecord.email == data.get("username")).first()
+    if not user or not verify_password(data.get("password"), user.hashed_password):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     
-    usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == correo).first()
-    
-    if not usuario or not verify_password(clave, usuario.password_hash):
-        raise HTTPException(
-            status_code=401,
-            detail="Email o contraseña incorrectos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token = create_access_token(data={"sub": usuario.email})
+    access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/")
-async def read_index():
-    try:
-        with open("templates/index.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        return HTMLResponse(content="<h1>Error: No se encontró templates/index.html</h1>", status_code=404)
-
-def limpiar_numero(v: str) -> float:
-    c = re.sub(r'[^\d]', '', str(v))
-    return float(c) if c else 0.0
+# --- ENDPOINT ANALIZAR (CON RATE LIMIT) ---
 
 @app.post("/analizar")
-@limiter.limit("20/minute") # ✅ LÍMITE: Máximo 20 análisis por minuto por IP
+@limiter.limit("20/minute")
 async def analizar_endpoint(
-    request: Request, # <-- VITAL para SlowAPI
+    request: Request,
     eps: str = Form(...),
     etapa: str = Form(...),
     fecha_radicacion: str = Form(...),
@@ -174,75 +78,26 @@ async def analizar_endpoint(
         for arc in archivos:
             if arc.filename:
                 content = await arc.read()
-                # ✅ MEJORA 6: Límite de 10MB por PDF
-                if len(content) > 10 * 1024 * 1024:  
-                    raise HTTPException(status_code=400, detail=f"El archivo {arc.filename} supera el límite de 10MB.")
+                # Límite de 10MB por archivo para estabilidad
+                if len(content) > 10 * 1024 * 1024:
+                    continue
                 contexto_pdf += await glosa_service.extraer_pdf(content)
-        
-        input_data = GlosaInput(
-            eps=eps, etapa=etapa, fecha_radicacion=fecha_radicacion,
-            fecha_recepcion=fecha_recepcion, valor_aceptado=valor_aceptado,
-            tabla_excel=tabla_excel
-        )
-        
-        contratos_bd = db.query(ContratoRecord).all()
-        dict_contratos = {c.eps: c.detalles for c in contratos_bd}
 
-        resultado = await glosa_service.analizar(input_data, contexto_pdf, dict_contratos)
-
-        val_obj = limpiar_numero(resultado.valor_objetado)
-        val_acep = limpiar_numero(valor_aceptado)
-        estado_db = "ACEPTADA" if val_acep > 0 else "LEVANTADA"
-
-        nueva_glosa = GlosaRecord(
-            eps=eps, paciente=resultado.paciente, codigo_glosa=resultado.codigo_glosa,
-            valor_objetado=val_obj, valor_aceptado=val_acep, etapa=etapa,
-            estado=estado_db, dictamen=resultado.dictamen
-        )
-        db.add(nueva_glosa)
-        db.commit()
-        
-        return resultado
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al procesar la glosa: {str(e)}")
-
-@app.post("/descargar-pdf")
-async def descargar_pdf(req: PDFRequest, usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    pdf_bytes = crear_oficio_pdf(req.eps, req.resumen, req.dictamen)
-    return Response(
-        content=pdf_bytes, 
-        media_type="application/pdf", 
-        headers={"Content-Disposition": "attachment; filename=Oficio_Respuesta_Glosa_HUS.pdf"}
+    # Llamada al servicio de IA optimizado
+    resultado = await glosa_service.analizar(
+        db=db,
+        eps=eps,
+        etapa=etapa,
+        fecha_radicacion=fecha_radicacion,
+        fecha_recepcion=fecha_recepcion,
+        valor_aceptado=valor_aceptado,
+        tabla_excel=tabla_excel,
+        contexto_pdf=contexto_pdf
     )
+    return resultado
 
-@app.get("/glosas")
-def obtener_historial(limit: int = 50, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(limit).all()
+# --- ENDPOINT ANALYTICS (CON CACHÉ DE 5 MINUTOS) ---
 
-@app.get("/exportar-historial")
-def exportar_historial(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    glosas = db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).all()
-    
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-    writer.writerow(["ID", "Fecha Procesamiento", "EPS / Pagador", "Paciente", "Codigo Glosa", "Valor Objetado", "Valor Aceptado", "Etapa Procesal", "Estado Final"])
-    
-    for g in glosas:
-        fecha_str = g.creado_en.strftime("%d/%m/%Y %H:%M")
-        writer.writerow([
-            g.id, fecha_str, g.eps, g.paciente, g.codigo_glosa, 
-            g.valor_objetado, g.valor_aceptado, g.etapa, g.estado
-        ])
-        
-    csv_bytes = output.getvalue().encode('utf-8-sig')
-    
-    return Response(
-        content=csv_bytes,
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=Reporte_Glosas_HUS.csv"}
-    )
-
-# ✅ MEJORA DE RENDIMIENTO: CACHÉ EN MEMORIA PARA ANALYTICS (5 MINUTOS)
 _analytics_cache = {"data": None, "ts": None}
 
 @app.get("/analytics")
@@ -250,93 +105,98 @@ def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioReco
     global _analytics_cache
     ahora = datetime.now()
 
-    # 1. Verificamos si hay un caché válido
-    if _analytics_cache.update({"data": resultado, "ts": ahora})
-        return resultado
+    # Verificar caché para no saturar la BD
+    if _analytics_cache["ts"] and (ahora - _analytics_cache["ts"]).seconds < 300:
+        return _analytics_cache["data"]
 
-    # --- A PARTIR DE AQUÍ VAN TUS CONSULTAS SQL ORIGINALES ---
     hoy = ahora.date()
-    mes_actual = hoy.replace(day=1)
+    mes_inicio = hoy.replace(day=1)
     
     glosas_hoy = db.query(GlosaRecord).filter(func.date(GlosaRecord.creado_en) == hoy).count()
-    glosas_mes = db.query(GlosaRecord).filter(func.date(GlosaRecord.creado_en) >= mes_actual).count()
+    glosas_mes = db.query(GlosaRecord).filter(func.date(GlosaRecord.creado_en) >= mes_inicio).count()
     
-    sumas = db.query(
-        func.sum(GlosaRecord.valor_objetado).label('total_obj'),
-        func.sum(GlosaRecord.valor_aceptado).label('total_acep')
-    ).filter(func.date(GlosaRecord.creado_en) >= mes_actual).first()
+    stats = db.query(
+        func.sum(GlosaRecord.valor_objetado).label('obj'),
+        func.sum(GlosaRecord.valor_aceptado).label('acep')
+    ).filter(func.date(GlosaRecord.creado_en) >= mes_inicio).first()
 
-    valor_obj_mes = sumas.total_obj or 0
-    valor_acep_mes = sumas.total_acep or 0
-    valor_recuperado_mes = valor_obj_mes - valor_acep_mes
+    v_obj = stats.obj or 0
+    v_def = v_obj - (stats.acep or 0)
+    tasa = round((v_def / v_obj) * 100, 1) if v_obj > 0 else 0
 
-    tasa = round((valor_recuperado_mes / valor_obj_mes) * 100, 1) if valor_obj_mes > 0 else 0
-
-    top_eps_query = db.query(GlosaRecord.eps, func.count(GlosaRecord.id).label('total'))\
+    # Top 5 EPS
+    eps_q = db.query(GlosaRecord.eps, func.count(GlosaRecord.id).label('n'))\
         .group_by(GlosaRecord.eps).order_by(func.count(GlosaRecord.id).desc()).limit(5).all()
-    top_eps = [{"eps": row.eps, "total": row.total} for row in top_eps_query]
-
-    top_codigos_query = db.query(GlosaRecord.codigo_glosa, func.count(GlosaRecord.id).label('total'))\
+    
+    # Top 5 Códigos
+    cod_q = db.query(GlosaRecord.codigo_glosa, func.count(GlosaRecord.id).label('n'))\
         .filter(GlosaRecord.codigo_glosa != "N/A")\
         .group_by(GlosaRecord.codigo_glosa).order_by(func.count(GlosaRecord.id).desc()).limit(5).all()
-    top_codigos = [{"codigo": row.codigo_glosa, "total": row.total} for row in top_codigos_query]
 
-    # 2. ✅ MEJORA VISUAL: Datos estructurados para las gráficas de Chart.js
-    datos_graficas = {
-        "meses": ["Oct", "Nov", "Dic", "Ene", "Feb", "Mar"],
-        "valores_objetados": [12000000, 15000000, 11000000, 18000000, 14000000, valor_obj_mes],
-        "valores_defendidos": [11500000, 14000000, 10500000, 17500000, 13800000, valor_recuperado_mes],
-        "nombres_eps": [row.eps for row in top_eps_query],
-        "cantidades_eps": [row.total for row in top_eps_query]
+    # Datos para Chart.js
+    graficas = {
+        "meses": ["Ene", "Feb", "Mar"], # Ejemplo, podrías calcular dinámicamente
+        "valores_objetados": [10000000, 15000000, v_obj],
+        "valores_defendidos": [8000000, 14000000, v_def],
+        "nombres_eps": [r.eps for r in eps_q],
+        "cantidades_eps": [r.n for r in eps_q]
     }
 
-    # 3. Armamos el diccionario de respuesta
-    resultado = {
+    res = {
         "glosas_hoy": glosas_hoy, "glosas_mes": glosas_mes,
-        "valor_objetado_mes": valor_obj_mes, "valor_recuperado_mes": valor_recuperado_mes,
-        "tasa_exito_pct": tasa, "top_eps": top_eps, "top_codigos": top_codigos,
-        "graficas": datos_graficas # Empaquetamos las gráficas
+        "valor_objetado_mes": v_obj, "valor_recuperado_mes": v_def,
+        "tasa_exito_pct": tasa, 
+        "top_eps": [{"eps": r.eps, "total": r.n} for r in eps_q],
+        "top_codigos": [{"codigo": r.codigo_glosa, "total": r.n} for r in cod_q],
+        "graficas": graficas
     }
 
-    # 4. Guardamos en el Caché la respuesta junto con la hora actual
-    _analytics_cache.update({"data": resultado, "ts": ahora})
+    _analytics_cache.update({"data": res, "ts": ahora})
+    return res
 
-    return resultado
+# --- ENDPOINTS DE PLANTILLAS ---
+
+class PlantillaInput(BaseModel):
+    titulo: str
+    texto: str
+
+@app.get("/plantillas")
+def listar_plantillas(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+    return db.query(PlantillaGlosa).all()
+
+@app.post("/plantillas")
+def crear_plantilla(data: PlantillaInput, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+    nueva = PlantillaGlosa(titulo=data.titulo, texto=data.texto)
+    db.add(nueva)
+    db.commit()
+    return {"status": "ok"}
+
+# --- OTROS ENDPOINTS (Historial y Config) ---
+
+@app.get("/glosas")
+def listar_historial(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+    return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(100).all()
 
 @app.get("/contratos")
-def get_contratos(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    return db.query(ContratoRecord).order_by(ContratoRecord.eps).all()
+def listar_contratos(db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+    return db.query(ContratoRecord).all()
 
 @app.post("/contratos")
-def save_contrato(req: ContratoInput, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    c = db.query(ContratoRecord).filter(ContratoRecord.eps == req.eps.upper()).first()
-    if c:
-        c.detalles = req.detalles.upper()
+def guardar_contrato(data: dict, db: Session = Depends(get_db), user: UsuarioRecord = Depends(get_usuario_actual)):
+    existente = db.query(ContratoRecord).filter(ContratoRecord.eps == data['eps']).first()
+    if existente:
+        existente.detalles = data['detalles']
     else:
-        db.add(ContratoRecord(eps=req.eps.upper(), detalles=req.detalles.upper()))
+        nuevo = ContratoRecord(eps=data['eps'], detalles=data['detalles'])
+        db.add(nuevo)
     db.commit()
-    return {"msg": "ok"}
+    return {"status": "ok"}
 
-@app.delete("/contratos/{eps}")
-def delete_contrato(eps: str, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    db.query(ContratoRecord).filter(ContratoRecord.eps == eps).delete()
-    db.commit()
-    return {"msg": "ok"}
-
-# --- 🚪 PUERTA TRASERA (ÚSALA UNA VEZ EN EL NAVEGADOR PARA REINICIAR LA BD SI FALLA) ---
-@app.get("/crear-admin")
-def forzar_creacion_admin(db: Session = Depends(get_db)):
-    try:
-        usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == "admin@hus.gov.co").first()
-        if usuario:
-            usuario.password_hash = get_password_hash("admin123".strip())
-            db.commit()
-            return {"mensaje": "El usuario ya existía. Se reinició la contraseña a: admin123"}
-        else:
-            admin_pwd = get_password_hash("admin123".strip())
-            admin_user = UsuarioRecord(nombre="Auditor Principal", email="admin@hus.gov.co", password_hash=admin_pwd)
-            db.add(admin_user)
-            db.commit()
-            return {"mensaje": "Usuario administrador creado exitosamente con clave: admin123"}
-    except Exception as e:
-        return {"error_critico": str(e)}
+@app.post("/descargar-pdf")
+async def generar_pdf_endpoint(data: dict, user: UsuarioRecord = Depends(get_usuario_actual)):
+    pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=Respuesta_{data['eps']}.pdf"}
+    )
