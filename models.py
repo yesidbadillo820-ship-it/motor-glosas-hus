@@ -33,7 +33,6 @@ class ContratoInput(BaseModel):
 
 class GlosaRecord(Base):
     __tablename__ = "glosas_historial"
-
     id = Column(Integer, primary_key=True, index=True)
     eps = Column(String, index=True)
     paciente = Column(String)
@@ -41,7 +40,7 @@ class GlosaRecord(Base):
     valor_objetado = Column(Float, default=0.0)
     valor_aceptado = Column(Float, default=0.0)
     etapa = Column(String)
-    estado = Column(String) 
+    estado = Column(String)
     dictamen = Column(Text)
     creado_en = Column(DateTime, server_default=func.now())
 
@@ -53,16 +52,14 @@ class PlantillaGlosa(Base):
 
 class ContratoRecord(Base):
     __tablename__ = "contratos_config"
-    
     id = Column(Integer, primary_key=True, index=True)
     eps = Column(String, unique=True, index=True)
     detalles = Column(Text)
 
 class UsuarioRecord(Base):
     __tablename__ = "usuarios_sistema"
-
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String)
     email = Column(String, unique=True, index=True)
-    password_hash = Column(String)
+    hashed_password = Column(String)
     activo = Column(Boolean, default=True)
