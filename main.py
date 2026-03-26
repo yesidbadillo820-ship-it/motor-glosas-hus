@@ -3,14 +3,19 @@ import re
 import io
 import csv
 from datetime import datetime
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
+import asyncio
+
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from jose import JWTError, jwt
 from pydantic import BaseModel
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from services import GlosaService, crear_oficio_pdf
 from models import GlosaInput, GlosaResult, PDFRequest, GlosaRecord, ContratoRecord, ContratoInput, UsuarioRecord, PlantillaGlosa
@@ -21,8 +26,20 @@ from dotenv import load_dotenv
 load_dotenv()
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Motor Glosas HUS - V2 Pro con Contratos y Excel")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="Motor Glosas HUS API", version="2.0")
+
+# ✅ CONFIGURACIÓN SLOWAPI (RATE LIMIT)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ✅ MEJORA URGENTE 3: CORS RESTRINGIDO SOLO A RENDER
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"], 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
 
 glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -138,25 +155,29 @@ def limpiar_numero(v: str) -> float:
     c = re.sub(r'[^\d]', '', str(v))
     return float(c) if c else 0.0
 
-@app.post("/analizar", response_model=GlosaResult)
+@app.post("/analizar")
+@limiter.limit("20/minute") # ✅ LÍMITE: Máximo 20 análisis por minuto por IP
 async def analizar_endpoint(
+    request: Request, # <-- VITAL para SlowAPI
     eps: str = Form(...),
     etapa: str = Form(...),
-    fecha_radicacion: str = Form(None),
-    fecha_recepcion: str = Form(None),
-    valor_aceptado: str = Form("0"),
+    fecha_radicacion: str = Form(...),
+    fecha_recepcion: str = Form(...),
+    valor_aceptado: str = Form(...),
     tabla_excel: str = Form(...),
-    archivos: list[UploadFile] = File(None),
+    archivos: List[UploadFile] = File(None),
     db: Session = Depends(get_db),
     usuario_actual: UsuarioRecord = Depends(get_usuario_actual)
 ):
-    try:
-        contexto_pdf = ""
-        if archivos:
-            for arc in archivos:
-                if arc.filename:
-                    content = await arc.read()
-                    contexto_pdf += await glosa_service.extraer_pdf(content)
+    contexto_pdf = ""
+    if archivos:
+        for arc in archivos:
+            if arc.filename:
+                content = await arc.read()
+                # ✅ MEJORA 6: Límite de 10MB por PDF
+                if len(content) > 10 * 1024 * 1024:  
+                    raise HTTPException(status_code=400, detail=f"El archivo {arc.filename} supera el límite de 10MB.")
+                contexto_pdf += await glosa_service.extraer_pdf(content)
         
         input_data = GlosaInput(
             eps=eps, etapa=etapa, fecha_radicacion=fecha_radicacion,
@@ -229,9 +250,9 @@ def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioReco
     global _analytics_cache
     ahora = datetime.now()
 
-    # 1. Verificamos si hay un caché válido (menos de 300 segundos / 5 minutos)
-    if _analytics_cache["ts"] and (ahora - _analytics_cache["ts"]).seconds < 300:
-        return _analytics_cache["data"]
+    # 1. Verificamos si hay un caché válido
+    if _analytics_cache.update({"data": resultado, "ts": ahora})
+        return resultado
 
     # --- A PARTIR DE AQUÍ VAN TUS CONSULTAS SQL ORIGINALES ---
     hoy = ahora.date()
