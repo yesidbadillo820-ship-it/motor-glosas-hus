@@ -232,14 +232,19 @@ async def generar_pdf_endpoint(
 @app.get("/setup-admin")
 def setup_admin(db: Session = Depends(get_db)):
     from auth import get_password_hash
-    existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == "admin@hus.gov.co").first()
-    if existente:
-        return {"msg": "El usuario ya existe"}
-    nuevo = UsuarioRecord(
-        email="admin@hus.gov.co",
-        nombre="Administrador HUS",
-        hashed_password=get_password_hash("HUS2026*")
-    )
-    db.add(nuevo)
-    db.commit()
-    return {"msg": "Usuario creado", "email": "admin@hus.gov.co", "password": "HUS2026*"}
+    import traceback
+    try:
+        existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == "admin@hus.gov.co").first()
+        if existente:
+            return {"msg": "El usuario ya existe", "email": existente.email}
+        nuevo = UsuarioRecord(
+            email="admin@hus.gov.co",
+            hashed_password=get_password_hash("HUS2026*")
+        )
+        db.add(nuevo)
+        db.commit()
+        return {"msg": "Usuario creado", "email": "admin@hus.gov.co", "password": "HUS2026*"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "detalle": traceback.format_exc()}
+```
