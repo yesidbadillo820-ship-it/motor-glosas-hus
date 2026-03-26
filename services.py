@@ -105,11 +105,15 @@ class GlosaService:
         # ✅ MEJORA: SYSTEM PROMPT (La identidad inquebrantable de la IA)
         system_prompt = "Eres un Médico Auditor experto de la ESE Hospital Universitario de Santander (HUS). Tu objetivo es defender la facturación del hospital frente a las EPS con argumentos técnicos, médicos y legales, basándote estrictamente en los soportes proporcionados. Eres preciso, formal, contundente y obedeces el formato de salida al pie de la letra sin inventar datos ni alucinar."
 
-        # ✅ MEJORA: USER PROMPT (Los datos de la tarea específica)
+        # ✅ MEJORA DE CONFIABILIDAD 5: EVITAR DESBORDAMIENTO SILENCIOSO
+        MAX_CONTEXTO = 12000  # ~3000 tokens. Deja margen de sobra para el prompt y los max_tokens
+        contexto_seguro = contexto_pdf[:MAX_CONTEXTO]
+
+        # ✅ USER PROMPT (Los datos de la tarea)
         user_prompt = f"""
         EPS: {data.eps}
         GLOSA: "{texto_base}"
-        SOPORTES: {contexto_pdf}
+        SOPORTES: {contexto_seguro}
         
         INSTRUCCIONES OBLIGATORIAS:
         1. Extrae los datos solicitados. Si un dato no existe, escribe exactamente N/A.
