@@ -20,30 +20,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger("motor_glosas")
 
+# ✅ MEJORA DE RENDIMIENTO: Función síncrona aislada para evitar bloqueo del Event Loop
+def _procesar_pdf_sync(file_content: bytes) -> str:
+    reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+    total_paginas = len(reader.pages)
+    paginas = []
+    
+    for i in range(total_paginas):
+        txt = reader.pages[i].extract_text()
+        if txt:
+            paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
+    
+    texto_unido = "".join(paginas)
+    
+    # LECTOR NINJA OPTIMIZADO: Lee solo las primeras 2 y las últimas 4 páginas
+    if total_paginas > 8:
+        texto_unido = "".join(paginas[:2]) + "\n\n... [PÁGINAS OMITIDAS PARA AHORRAR MEMORIA] ...\n\n" + "".join(paginas[-4:])
+        
+    return texto_unido[:14000] # Límite seguro para la API
+
 class GlosaService:
     def __init__(self, api_key: str):
         self.cliente = AsyncGroq(api_key=api_key)
+
     async def extraer_pdf(self, file_content: bytes) -> str:
         try:
-            reader = PyPDF2.PdfReader(io.BytesIO(file_content))
-            total_paginas = len(reader.pages)
-            paginas = []
-            
-            for i in range(total_paginas):
-                txt = reader.pages[i].extract_text()
-                if txt:
-                    paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
-            
-            texto_unido = "".join(paginas)
-            
-            # LECTOR INTELIGENTE: Si el PDF es muy largo, leemos el principio (Ingreso) y el final (Epicrisis/Fórmulas)
-            if len(texto_unido) > 20000:
-                texto_unido = "".join(paginas[:4]) + "\n\n... [PÁGINAS OMITIDAS] ...\n\n" + "".join(paginas[-8:])
-                
-            return texto_unido[:25000] # Ampliamos su capacidad de lectura de 4,000 a 25,000 caracteres
+            # ✅ MEJORA: Mandamos el trabajo pesado de CPU a un hilo secundario
+            loop = asyncio.get_running_loop()
+            texto = await loop.run_in_executor(None, _procesar_pdf_sync, file_content)
+            return texto
         except Exception as e:
             logger.error("Error al extraer texto del PDF", exc_info=True)
-            return ""    
+            return ""   
 
     def convertir_numero(self, m_str):
         if not m_str: return 0.0
