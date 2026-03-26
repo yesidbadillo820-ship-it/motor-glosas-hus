@@ -228,3 +228,18 @@ async def generar_pdf_endpoint(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=Respuesta_{data['eps']}.pdf"}
     )
+    
+@app.get("/setup-admin")
+def setup_admin(db: Session = Depends(get_db)):
+    from auth import get_password_hash
+    existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == "admin@hus.gov.co").first()
+    if existente:
+        return {"msg": "El usuario ya existe"}
+    nuevo = UsuarioRecord(
+        email="admin@hus.gov.co",
+        nombre="Administrador HUS",
+        hashed_password=get_password_hash("HUS2026*")
+    )
+    db.add(nuevo)
+    db.commit()
+    return {"msg": "✅ Usuario creado", "email": "admin@hus.gov.co", "password": "HUS2026*"}
