@@ -382,6 +382,7 @@
 
     // ✅ MEJORA 2: Flag de cancelación del lote
     let loteCancelado = false;
+    let abortController = null; // ✅ NUEVO: Controlador para matar peticiones en vuelo
 
     // --- SEGURIDAD JWT ---
     function getAuthHeaders() {
@@ -822,6 +823,7 @@
         if(!lineas || lineas.length === 0) return alert("Pega primero los datos de Excel en la caja azul.");
 
         loteCancelado = false;
+        abortController = new AbortController(); // ✅ NUEVO
         const btn = document.getElementById('btn-procesar-lote');
         const btnCancelar = document.getElementById('btn-cancelar-lote');
 
@@ -857,10 +859,11 @@
 
             try {
                 const res = await fetch('/analizar', {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: fd
-                });
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: fd,
+                signal: abortController.signal // ✅ NUEVO: Conectamos el botón de pánico
+            });
                 checkAuthError(res);
                 if (!res.ok) throw new Error("Error en servidor");
                 const data = await res.json();
@@ -894,7 +897,11 @@
                 document.getElementById('lote-lista-resultados').append(item);
                 exitos++;
             } catch (e) {
-                if(e.message === "Sesión expirada") return;
+            if (e.name === 'AbortError') {
+                console.log("Petición abortada por el usuario");
+                break; // Salimos del ciclo
+            }
+            if (e.message === "Sesión expirada") return;    
                 const item = document.createElement('div');
                 item.style = "background:#fee2e2; padding:1.2rem; border:1px solid #fca5a5; border-radius:8px; border-left:4px solid var(--red); margin-bottom:0.8rem; flex-shrink: 0;";
                 item.innerHTML = `<strong style="color:var(--red); font-size:1rem;">Fallo en la línea ${i+1}</strong><br><span style="font-size:0.8rem; color:var(--slate); margin-top:5px; display:inline-block;">Se superó el límite de peticiones o el formato es inválido.</span>`;
@@ -918,6 +925,8 @@
     function cancelarLote() {
         if (!confirm('¿Cancelar el procesamiento del lote en curso?')) return;
         loteCancelado = true;
+        if (abortController) abortController.abort(); // ✅ NUEVO: Mata la petición HTTP al instante
+        
         document.getElementById('btn-cancelar-lote').classList.remove('visible');
         document.getElementById('btn-procesar-lote').disabled = false;
         document.getElementById('btn-procesar-lote').innerText = "🚀 Procesar Nuevo Lote";
