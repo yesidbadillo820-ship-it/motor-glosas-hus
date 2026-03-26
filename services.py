@@ -17,10 +17,24 @@ class GlosaService:
     async def extraer_pdf(self, file_content: bytes) -> str:
         try:
             reader = PyPDF2.PdfReader(io.BytesIO(file_content))
-            return "\n".join([p.extract_text() for p in reader.pages])
+            total_paginas = len(reader.pages)
+            paginas = []
+            
+            for i in range(total_paginas):
+                txt = reader.pages[i].extract_text()
+                if txt:
+                    paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
+            
+            texto_unido = "".join(paginas)
+            
+            # LECTOR INTELIGENTE: Si el PDF es muy largo, leemos el principio (Ingreso) y el final (Epicrisis/Fórmulas)
+            if len(texto_unido) > 20000:
+                texto_unido = "".join(paginas[:4]) + "\n\n... [PÁGINAS OMITIDAS] ...\n\n" + "".join(paginas[-8:])
+                
+            return texto_unido[:25000] # Ampliamos su capacidad de lectura de 4,000 a 25,000 caracteres
         except Exception as e:
             print(f"Error al extraer PDF: {e}")
-            return ""
+            return ""    
 
     def convertir_numero(self, m_str):
         if not m_str: return 0.0
@@ -81,19 +95,19 @@ class GlosaService:
             texto_ext = f"ESE HUS NO ACEPTA GLOSA EXTEMPORANEA. AL HABERSE SUPERADO DICHO PLAZO LEGAL (HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN Y LA RECEPCIÓN) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA NOTIFICACIÓN FORMAL DE LAS OBJECIONES DENTRO DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER LOS RECURSOS ASOCIADOS A ESTA CUENTA, DE CONFORMIDAD CON LO DISPUESTO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 13 (LITERAL D) DE LA LEY 1122 DE 2007, ASÍ COMO LO REGLAMENTADO EN EL DECRETO 4747 DE 2007 (ACTUALMENTE COMPILADO EN EL DECRETO ÚNICO REGLAMENTARIO 780 DE 2016) Y LA RESOLUCIÓN 3047 DE 2008 CON SUS RESPECTIVAS MODIFICACIONES, LAS ENTIDADES RESPONSABLES DEL PAGO (EPS) CUENTAN CON UN TÉRMINO MÁXIMO, PERENTÓRIO E IMPRORROGABLE DE VEINTE (20) DÍAS HÁBILES, CONTADOS A PARTIR DE LA FECHA DE RADICACIÓN DE LA FACTURA CON SUS RESPECTIVOS SOPORTES, PARA FORMULAR Y COMUNICAR DE MANERA SIMULTÁNEA TODAS LAS GLOSAS A LAS QUE HAYA LUGAR, SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS APLICADAS."
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORÁNEA", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_ext}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
-        instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta un argumento MÉDICO-ASISTENCIAL (máximo 3 líneas) justificando la necesidad clínica del servicio."
+        instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta un argumento MÉDICO-ASISTENCIAL sólido (máximo 4 líneas) defendiendo al hospital y justificando por qué el cobro facturado ES CORRECTO según los soportes. MENCIONA LA PÁGINA EXACTA donde encontraste la evidencia (Ej: 'Como se evidencia en la PÁG 84...'). ¡DEFIENDE AL HUS!"
         if val_ac_num > 0:
             instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta 3 líneas explicando formalmente por qué el hospital ACEPTA esta glosa. NO uses leyes ni viñetas."
 
-        prompt = f"""ACTÚA COMO AUDITOR DE LA ESE HUS.
+        prompt = f"""ACTÚA COMO MÉDICO AUDITOR DE LA ESE HUS DEFENDIENDO LA FACTURACIÓN DEL HOSPITAL.
         EPS: {data.eps}
         GLOSA: "{texto_base}"
-        SOPORTES: {contexto_pdf[:4000]}
+        SOPORTES: {contexto_pdf}
         
         INSTRUCCIONES OBLIGATORIAS:
         1. Extrae los datos solicitados. Si un dato no existe, escribe exactamente N/A.
-        2. IMPORTANTE: El CODIGO_GLOSA es estrictamente el código de objeción que empieza con dos letras (Ej: TA0201, CO5701, FA0801, CO0601). NUNCA extraigas el código del insumo (Ej: 861801H o FMQ01811).
-        3. NO uses asteriscos (**), viñetas (-), ni saltos de línea.
+        2. El CODIGO_GLOSA es estrictamente el código de objeción (Ej: FA0701).
+        3. NO uses asteriscos (**), viñetas (-), ni saltos de línea en tus respuestas.
         4. {instruccion_ia}
         
         RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
@@ -109,14 +123,17 @@ class GlosaService:
         """
         
         try:
-            completion = await self.cliente.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.1-8b-instant", temperature=0)
+            completion = await self.cliente.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.1-8b-instant", temperature=0.1)
             res_ia = completion.choices[0].message.content
         except Exception as e: 
             print(f"Error con la IA: {e}")
             return GlosaResult(tipo="Error", resumen="Error Groq", dictamen="Ocurrió un error al contactar el modelo. Reintente.", codigo_glosa="N/A", valor_objetado="0", paciente="N/A", mensaje_tiempo="", color_tiempo="")
 
         def b(e):
-            m = re.search(fr'{e}:\s*(.*?)(?=\n[A-Z_]+:|$)', res_ia, re.IGNORECASE | re.DOTALL)
+            # Regex a prueba de balas: Busca la clave y se detiene EXACTAMENTE al encontrar la siguiente clave, sin importar si hay salto de línea o no.
+            claves = ["PACIENTE", "INGRESO", "EGRESO", "DIAGNOSTICO", "EPICRISIS_NO", "CODIGO_GLOSA", "VALOR_OBJETADO", "SERVICIO_GLOSADO", "JUSTIFICACION_DEFENSA"]
+            patron_claves = "|".join(claves)
+            m = re.search(fr'{e}:\s*(.*?)(?=(?:{patron_claves}):|$)', res_ia, re.IGNORECASE | re.DOTALL)
             if not m: return "N/A"
             val = m.group(1).strip()
             val = val.replace("*", "").replace("-", "").replace('"', '') 
