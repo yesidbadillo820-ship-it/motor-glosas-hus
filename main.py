@@ -242,4 +242,4 @@ def setup_admin(db: Session = Depends(get_db)):
     )
     db.add(nuevo)
     db.commit()
-    return {"msg": "✅ Usuario creado", "email": "admin@hus.gov.co", "password": "HUS2026*"}
+    return {"msg": "Usuario creado", "email": "admin@hus.gov.co", "password": "HUS2026*"}
