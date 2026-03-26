@@ -61,5 +61,5 @@ class UsuarioRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String)
     email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    password_hash = Column(String)
     activo = Column(Boolean, default=True)
