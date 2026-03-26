@@ -25,12 +25,10 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Motor Glosas HUS", version="2.2")
 
-# Rate Limiting
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"],
@@ -38,7 +36,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
@@ -52,7 +49,7 @@ def root():
 @app.post("/token")
 async def login(data: dict, db: Session = Depends(get_db)):
     user = db.query(UsuarioRecord).filter(UsuarioRecord.email == data.get("username")).first()
-    if not user or not verify_password(data.get("password"), user.hashed_password):
+    if not user or not verify_password(data.get("password"), user.password_hash):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -228,14 +225,7 @@ async def generar_pdf_endpoint(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=Respuesta_{data['eps']}.pdf"}
     )
-    
-@app.post("/token")
-async def login(data: dict, db: Session = Depends(get_db)):
-    user = db.query(UsuarioRecord).filter(UsuarioRecord.email == data.get("username")).first()
-    if not user or not verify_password(data.get("password"), user.password_hash):
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+
 
 @app.get("/setup-admin")
 def setup_admin(db: Session = Depends(get_db)):
