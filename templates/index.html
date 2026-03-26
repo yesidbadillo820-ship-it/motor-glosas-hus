@@ -376,6 +376,32 @@
 <div id="toast">Mensaje enviado</div>
 
 <script>
+    // ✅ MEJORA DE UX: GUARDAR Y RESTAURAR ESTADO DEL FORMULARIO
+const CAMPOS_A_GUARDAR = ['eps', 'etapa', 'fecha_radicacion', 'fecha_recepcion', 'valor_aceptado', 'tabla_excel'];
+
+// 1. Guardar automáticamente cuando el usuario escribe o cambia algo
+document.addEventListener('input', (e) => {
+    if (CAMPOS_A_GUARDAR.includes(e.target.id)) {
+        sessionStorage.setItem(`form_${e.target.id}`, e.target.value);
+    }
+});
+
+// 2. Restaurar los datos cuando se recarga la página
+window.addEventListener('load', () => {
+    CAMPOS_A_GUARDAR.forEach(id => {
+        const valorGuardado = sessionStorage.getItem(`form_${id}`);
+        const elemento = document.getElementById(id);
+        if (valorGuardado && elemento) {
+            elemento.value = valorGuardado;
+        }
+    });
+    console.log("Estado del formulario restaurado desde sessionStorage");
+});
+
+// 3. Limpiar el caché después de un análisis exitoso
+function limpiarCacheFormulario() {
+    CAMPOS_A_GUARDAR.forEach(id => sessionStorage.removeItem(`form_${id}`));
+}
     let etapaActual = 'INICIAL';
     let dataGuardada = null;
     window.loteRawData = [];
@@ -700,42 +726,93 @@
         } catch(e) { mostrarToast("Error al eliminar", "error"); }
     }
 
-    async function analizarGlosa() {
-        const btn = document.getElementById('btnAnalizar');
-        const text = document.getElementById('tabla_excel').value;
-        if(!text) return alert("Por favor, pega el contenido de la glosa.");
+    // --- 1. LÓGICA DE PERSISTENCIA (sessionStorage) ---
+const CAMPOS_A_GUARDAR = ['eps', 'etapa', 'fecha_radicacion', 'fecha_recepcion', 'valor_aceptado', 'tabla_excel'];
 
-        btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div> Analizando...';
+// Guardar automáticamente al escribir
+document.addEventListener('input', (e) => {
+    if (CAMPOS_A_GUARDAR.includes(e.target.id)) {
+        sessionStorage.setItem(`form_${e.target.id}`, e.target.value);
+    }
+});
 
-        const fd = new FormData();
-        fd.append('eps', document.getElementById('eps').value);
-        fd.append('etapa', etapaActual);
-        fd.append('fecha_radicacion', document.getElementById('fecha_radicacion').value);
-        fd.append('fecha_recepcion', document.getElementById('fecha_recepcion').value);
-        fd.append('valor_aceptado', document.getElementById('valor_aceptado').value.replace(/\D/g,'') || "0");
-        fd.append('tabla_excel', text);
+// Restaurar al cargar la página
+window.addEventListener('load', () => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+        CAMPOS_A_GUARDAR.forEach(id => {
+            const valorGuardado = sessionStorage.getItem(`form_${id}`);
+            const elemento = document.getElementById(id);
+            if (valorGuardado && elemento) {
+                elemento.value = valorGuardado;
+                // Si el campo es valor_aceptado, formatear visualmente
+                if(id === 'valor_aceptado') fmtCurrency(elemento);
+            }
+        });
+        console.log("Estado del formulario restaurado.");
+    }
+});
 
-        const fileInput = document.getElementById('archivos');
-        for (let file of fileInput.files) fd.append('archivos', file);
+// Función de limpieza para invocar tras éxito
+function limpiarCacheFormulario() {
+    CAMPOS_A_GUARDAR.forEach(id => sessionStorage.removeItem(`form_${id}`));
+}
 
-        try {
-            const res = await fetch('/analizar', {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: fd
-            });
-            checkAuthError(res);
+// --- 2. FUNCIÓN ANALIZAR ACTUALIZADA ---
+async function analizarGlosa() {
+    const btn = document.getElementById('btnAnalizar');
+    const text = document.getElementById('tabla_excel').value;
+    if(!text) return alert("Por favor, pega el contenido de la glosa.");
+
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Analizando...';
+
+    const fd = new FormData();
+    fd.append('eps', document.getElementById('eps').value);
+    fd.append('etapa', etapaActual);
+    fd.append('fecha_radicacion', document.getElementById('fecha_radicacion').value);
+    fd.append('fecha_recepcion', document.getElementById('fecha_recepcion').value);
+    fd.append('valor_aceptado', document.getElementById('valor_aceptado').value.replace(/\D/g,'') || "0");
+    fd.append('tabla_excel', text);
+
+    const fileInput = document.getElementById('archivos');
+    for (let file of fileInput.files) fd.append('archivos', file);
+
+    try {
+        const res = await fetch('/analizar', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: fd
+        });
+        
+        checkAuthError(res);
+        
+        if (res.ok) {
             const data = await res.json();
             dataGuardada = { eps: document.getElementById('eps').value, ...data };
+            
+            // ✅ Renderizamos el resultado
             renderResult(data);
-        } catch (e) {
-            if(e.message !== "Sesión expirada") alert("Error de conexión al servidor.");
-        } finally {
-            btn.disabled = false;
-            btn.innerText = "Analizar Glosa";
+            
+            // ✅ LIMPIEZA: Como el análisis fue exitoso, borramos el caché 
+            // para que la próxima glosa no herede el texto de esta.
+            limpiarCacheFormulario();
+            
+            mostrarToast("Análisis completado con éxito", "success");
+        } else {
+            throw new Error("Error en la respuesta del servidor");
         }
+
+    } catch (e) {
+        if(e.message !== "Sesión expirada") {
+            console.error(e);
+            alert("Error al procesar la glosa. Intente de nuevo.");
+        }
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Analizar Glosa";
     }
+}
     // --- LÓGICA DE PLANTILLAS ---
     async function cargarListaPlantillas() {
         try {
