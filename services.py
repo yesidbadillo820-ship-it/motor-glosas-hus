@@ -2,6 +2,7 @@ import os
 import io
 import re
 import asyncio
+import logging  # ✅ MEJORA: Importamos la librería estándar de logs
 from datetime import datetime, timedelta
 import PyPDF2
 from groq import AsyncGroq
@@ -11,10 +12,17 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
 from models import GlosaInput, GlosaResult
 
+# ✅ MEJORA: CONFIGURACIÓN DEL LOGGING PARA PRODUCCIÓN
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("motor_glosas")
+
 class GlosaService:
     def __init__(self, api_key: str):
         self.cliente = AsyncGroq(api_key=api_key)
-
     async def extraer_pdf(self, file_content: bytes) -> str:
         try:
             reader = PyPDF2.PdfReader(io.BytesIO(file_content))
@@ -34,7 +42,7 @@ class GlosaService:
                 
             return texto_unido[:25000] # Ampliamos su capacidad de lectura de 4,000 a 25,000 caracteres
         except Exception as e:
-            print(f"Error al extraer PDF: {e}")
+            logger.error("Error al extraer texto del PDF", exc_info=True)
             return ""    
 
     def convertir_numero(self, m_str):
@@ -72,7 +80,8 @@ class GlosaService:
                 else:
                     msg_tiempo, color_tiempo = f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)", "bg-emerald-500"
             except Exception as e: 
-                print(f"Error procesando fechas: {e}")
+                logger.error(f"Intento {intento + 1} falló al contactar a Groq", exc_info=True)
+                # ...
                 msg_tiempo, color_tiempo = "Error en fechas", "bg-slate-500"
 
         val_ac_num = self.convertir_numero(data.valor_aceptado)
