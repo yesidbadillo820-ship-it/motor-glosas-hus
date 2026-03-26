@@ -10,3 +10,4 @@ PyPDF2
 groq
 reportlab
 pydantic
+slowapi
