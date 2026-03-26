@@ -11,3 +11,4 @@ groq
 reportlab
 pydantic
 slowapi
+aiofiles
