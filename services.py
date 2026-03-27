@@ -107,44 +107,45 @@ class GlosaService:
             texto_ext = f"ESE HUS NO ACEPTA GLOSA EXTEMPORANEA. AL HABERSE SUPERADO DICHO PLAZO LEGAL (HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN Y LA RECEPCIÓN) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA NOTIFICACIÓN FORMAL DE LAS OBJECIONES DENTRO DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER LOS RECURSOS ASOCIADOS A ESTA CUENTA, DE CONFORMIDAD CON LO DISPUESTO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 13 (LITERAL D) DE LA LEY 1122 DE 2007, ASÍ COMO LO REGLAMENTADO EN EL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN 3047 DE 2008, SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS APLICADAS."
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORÁNEA", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_ext}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
-        nombre_eps_mostrar = "LA ENTIDAD RESPONSABLE DEL PAGO" if ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura) else eps_segura
-
         if val_ac_num > 0:
-            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta un documento formal en MAYÚSCULAS donde ESE HUS ACEPTA la glosa (por valor de ${val_ac_num:,.0f})."""
+            prompt = f"""ACTÚA COMO ABOGADO AUDITOR. Extrae datos y en DICTAMEN_INTEGRAL redacta en MAYÚSCULAS que se acepta la glosa por ${val_ac_num:,.0f}."""
         else:
-            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta la defensa completa y profundamente analítica (ESTILO ABOGADO AUDITOR SENIOR Y EXPERTO EN FACTURACIÓN).
-        REGLAS DE ORO ABSOLUTAS:
-        1. INICIO OBLIGATORIO: Debes iniciar tu respuesta EXACTAMENTE con esta frase: "ESE HUS NO ACEPTA LA GLOSA [CÓDIGO] INTERPUESTA POR [MOTIVO BREVE], Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS CONTRACTUALES, TÉCNICOS Y NORMATIVOS:"
-        2. ANÁLISIS PROFUNDO (CRUCE DE DATOS): No seas genérico. Menciona fechas exactas, nombres de médicos con su RM, y números de folios/consecutivos (ej. hoja de gastos). Si la glosa ignora que el procedimiento fue BILATERAL o MÚLTIPLE (revisa Epicrisis y Descripción Quirúrgica), ataca esa contradicción fuertemente.
-        3. DEFENSA TÉCNICA SEGÚN PREFIJO:
-           - SI ES TA (Tarifas/Mayor Valor): Si hubo cirugía bilateral o múltiple, justifica las unidades cobradas basándote en la liquidación de tiempos quirúrgicos del tarifario aplicable (ej. SOAT). Exige respeto al contrato: "{info_c}". Rechaza el valor menor de la EPS citando el principio de buena fe (Art 871 C.Co).
-           - SI ES FA (Facturación): Demuestra que el cobro es independiente, tiene código propio (ej. POCT) y NO está incluido en sala/enfermería. Cita Res 3047 Anexo 3.
-           - SI ES SO (Soportes/Insumos): Argumenta que el insumo/material es indispensable para la técnica. Exige el pago al "costo de adquisición más el porcentaje de administración pactado". Menciona que se adjunta la factura de compra. Cita Anexo 5 Res 3047.
-           - SI ES CO / CL / PE: Basa la defensa en la Epicrisis, integralidad y pertinencia médica.
-        4. CIERRE: Finaliza exigiendo el levantamiento inmediato de la glosa y el pago íntegro de la factura, mencionando los soportes adjuntos.
-        5. FORMATO: Escribe TODO EN MAYÚSCULAS SOSTENIDAS."""
+            prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR Y ESPECIALISTA EN FACTURACIÓN DE LA ESE HUS.
+            EPS: {eps_segura}
+            GLOSA: "{texto_base}"
+            CONTRATO A APLICAR: {info_c}
+            SOPORTES CLÍNICOS: {contexto_pdf[:10000]}
+            
+            INSTRUCCIONES OBLIGATORIAS:
+            1. Extrae los datos solicitados. (Escribe N/A si no existen).
+            2. El CODIGO_GLOSA es el código alfanumérico (Ej: TA5801, SO4201, FA0802).
+            3. DICTAMEN_INTEGRAL: Redacta la respuesta de defensa basándote en las siguientes REGLAS DE ORO:
+            
+               A) INICIO EXACTO: Empieza obligatoriamente con: "ESE HUS NO ACEPTA LA GLOSA [CÓDIGO] INTERPUESTA POR [RESUMEN DEL MOTIVO], Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS CONTRACTUALES, TÉCNICOS Y NORMATIVOS:"
+               
+               B) AISLAMIENTO DE CAUSAL (¡CRÍTICO!): Identifica las primeras 2 letras del CÓDIGO_GLOSA y aplica SOLO la estrategia correspondiente, ignorando el resto:
+                  - SI EL PREFIJO ES 'TA' (Tarifas/Mayor Valor): Tu defensa es 100% sobre el valor del procedimiento. Justifica el cobro revisando si fue cirugía bilateral o múltiple (míralo en la Epicrisis). Cita el CONTRATO A APLICAR y el Art 871 del Código de Comercio. PROHIBICIÓN: ESTÁ ESTRICTAMENTE PROHIBIDO listar o mencionar medicamentos, insumos o anestesia de la hoja de gastos en este tipo de glosa.
+                  - SI EL PREFIJO ES 'SO' (Soportes/Insumos): Aquí tu defensa es sobre los materiales. Argumenta que el insumo objetado es indispensable para la técnica quirúrgica. Exige el pago al "costo de adquisición más porcentaje de administración", soportado en la factura de compra adjunta. Cita Anexo 5 de la Res 3047.
+                  - SI EL PREFIJO ES 'FA' (Facturación): Demuestra que el código o servicio cobrado es autónomo, no está incluido en la estancia/sala y tiene derecho a cobro independiente. Cita Anexo 3 de la Res 3047.
+                  - SI EL PREFIJO ES 'CO' o 'PE' (Cobertura/Pertinencia): Basa tu defensa en el diagnóstico, la urgencia médica y la integralidad del servicio prestado.
+               
+               C) USO DE DATOS DUROS: Apoya tu causal usando el nombre del médico, fechas o números de folio, pero SIEMPRE enfocado en la estrategia de tu causal.
+               
+               D) CIERRE: Termina exigiendo el levantamiento inmediato de la glosa y el pago íntegro de la factura.
+               
+               E) FORMATO: Escribe TODO EN MAYÚSCULAS. Genera el texto en UN SOLO PÁRRAFO CONTINUO, sin saltos de línea ni viñetas.
 
-        prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR DE ESE HUS.
-        EPS: {eps_segura}
-        GLOSA: "{texto_base}"
-        SOPORTES CLÍNICOS: {contexto_pdf[:10000]}
-        
-        INSTRUCCIONES OBLIGATORIAS:
-        1. Extrae los datos solicitados (Escribe N/A si no existen en los soportes).
-        2. El CODIGO_GLOSA es el código alfanumérico de objeción (Ej: TA5801, SO4201, FA0802).
-        3. {instruccion_dictamen}
-        
-        RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
-        PACIENTE: 
-        INGRESO: 
-        EGRESO: 
-        DIAGNOSTICO: 
-        EPICRISIS_NO: 
-        CODIGO_GLOSA: 
-        VALOR_OBJETADO: 
-        SERVICIO_GLOSADO: 
-        DICTAMEN_INTEGRAL: 
-        """
+            RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
+            PACIENTE: 
+            INGRESO: 
+            EGRESO: 
+            DIAGNOSTICO: 
+            EPICRISIS_NO: 
+            CODIGO_GLOSA: 
+            VALOR_OBJETADO: 
+            SERVICIO_GLOSADO: 
+            DICTAMEN_INTEGRAL: 
+            """
         
         # ── LLamada a la IA con sistema de reintentos (Retry + Backoff) ──
         res_ia = ""
@@ -218,7 +219,6 @@ def crear_oficio_pdf(eps, resumen, conclusion):
     match = re.search(r'<div[^>]*>(.*?)</div>', conclusion, re.IGNORECASE | re.DOTALL)
     cuerpo_texto = match.group(1) if match else conclusion
     
-    # Extrae el texto limpio para el PDF (un solo bloque)
     clean_text = re.sub(r'<[^>]+>', '', cuerpo_texto).strip()
     
     fecha_actual = datetime.now().strftime("%d/%m/%Y")
@@ -242,7 +242,7 @@ def crear_oficio_pdf(eps, resumen, conclusion):
         Spacer(1, 20),
         Paragraph(f"<b>ASUNTO:</b> {resumen}", estilo_n),
         Spacer(1, 20),
-        Paragraph(clean_text, estilo_n),  # Aquí entra el bloque MASIVO de texto como un solo párrafo
+        Paragraph(clean_text, estilo_n),
         Spacer(1, 40),
         Paragraph("__________________________________________", estilo_n),
         Paragraph("<b>DEPARTAMENTO DE AUDITORÍA</b><br/>ESE HOSPITAL UNIVERSITARIO DE SANTANDER", estilo_n)
