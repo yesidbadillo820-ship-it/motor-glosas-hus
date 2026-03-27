@@ -110,7 +110,7 @@ class GlosaService:
 
         instruccion_ia = """JUSTIFICACION_DEFENSA: Redacta un argumento contundente (máximo 5 líneas). 
         REGLA VITAL: 
-        - Si la glosa es por "ausencia de lista de precios", "tarifas" o insumos no relacionados en la malla básica, argumenta administrativamente que: El insumo es altamente especializado e inherente a la técnica quirúrgica, por lo que su facturación se efectuó dando estricto cumplimiento al acuerdo contractual vigente, liquidándose al costo de adquisición (factura de compra) más el porcentaje de administración pactado, y exige el levantamiento por adjuntar dicha factura.
+        - Si la glosa es por "ausencia de lista de precios", "tarifas" o insumos no relacionados en la malla básica, argumenta administrativamente que: El insumo es altamente especializado e inherente a la técnica quirúrgica, por lo que su facturación se efectuó dando estricto cumplimiento al acuerdo contractual vigente, liquidándose al costo de adquisición más el porcentaje de administración pactado. TERMINA LA FRASE EXACTAMENTE ASÍ: "Se adjunta a la presente respuesta la respectiva factura de compra que avala el valor cobrado, por consiguiente, se exige el levantamiento inmediato de la glosa y el pago íntegro del dispositivo."
         - Si la glosa es puramente médica o clínica, justifica la necesidad del servicio basándote exclusivamente en los soportes."""
         
         if val_ac_num > 0:
