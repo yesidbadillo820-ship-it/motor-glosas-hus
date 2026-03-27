@@ -110,7 +110,7 @@ class GlosaService:
         if val_ac_num > 0:
             prompt = f"""ACTÚA COMO ABOGADO AUDITOR. Extrae datos y en DICTAMEN_INTEGRAL redacta en MAYÚSCULAS que se acepta la glosa por ${val_ac_num:,.0f}."""
         else:
-            prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR Y ESPECIALISTA EN FACTURACIÓN DE LA ESE HUS.
+            prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR Y ESPECIALISTA EN FACTURACIÓN DE ESE HUS.
             EPS: {eps_segura}
             GLOSA: "{texto_base}"
             CONTRATO A APLICAR: {info_c}
