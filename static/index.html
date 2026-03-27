@@ -352,6 +352,12 @@
         `;
         document.getElementById('result-actions').style.display = 'none';
         dataGuardada = null;
+        // Resetear estilo de la caja de archivos
+        const labelArchivos = document.querySelector('.upload-zone div');
+        labelArchivos.innerHTML = `📎 Adjuntar PDFs (Epicrisis)`;
+        labelArchivos.style.color = "var(--slate)";
+        document.querySelector('.upload-zone').style.borderColor = "var(--border)";
+        document.querySelector('.upload-zone').style.background = "#fafbfc";
     }
 
     // ─── Navegación ────────────────────────────────────────────────────────────
