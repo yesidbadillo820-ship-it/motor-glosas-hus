@@ -89,6 +89,7 @@ class GlosaService:
         val_ac_num = self.convertir_numero(data.valor_aceptado)
         texto_base = str(data.tabla_excel)
 
+        # 1. CASO RATIFICADA
         if data.etapa == "RATIFICADA" and val_ac_num == 0:
             cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
             codigo_real = cod_m.group(1) if cod_m else "N/A"
@@ -98,6 +99,7 @@ class GlosaService:
             texto_rat = "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA GLOSA INICIAL Y CONTINUACIÓN DEL PROCESO DE ACUERDO CON LA NORMA. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE LA CONCILIACIÓN DE LA AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE LAS PARTES. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL CARTERA@HUS.GOV.CO. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, DE NO OBTENERSE LA RATIFICACIÓN DE LA RESPUESTA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN."
             return GlosaResult(tipo="LEGAL - RATIFICACIÓN", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_rat}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600")
 
+        # 2. CASO EXTEMPORÁNEA
         if es_extemporanea and val_ac_num == 0 and data.etapa != "RATIFICADA":
             cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
             codigo_real = cod_m.group(1) if cod_m else "N/A"
@@ -107,22 +109,24 @@ class GlosaService:
             texto_ext = f"ESE HUS NO ACEPTA GLOSA EXTEMPORANEA. AL HABERSE SUPERADO DICHO PLAZO LEGAL (HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN Y LA RECEPCIÓN) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA NOTIFICACIÓN FORMAL DE LAS OBJECIONES DENTRO DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER LOS RECURSOS ASOCIADOS A ESTA CUENTA, DE CONFORMIDAD CON LO DISPUESTO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 13 (LITERAL D) DE LA LEY 1122 DE 2007, ASÍ COMO LO REGLAMENTADO EN EL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN 3047 DE 2008, SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS APLICADAS."
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORÁNEA", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_ext}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
+        # 3. EL CEREBRO DE LA IA
         nombre_eps_mostrar = "LA ENTIDAD RESPONSABLE DEL PAGO" if ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura) else eps_segura
 
-        # ✅ EL NUEVO CEREBRO HOLÍSTICO DIVIDIDO POR TIPO DE GLOSA
         if val_ac_num > 0:
             instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta un párrafo formal y legal donde ESE HUS ACEPTA la glosa (por valor de ${val_ac_num:,.0f}). Explica que se revisó el caso y procede la aceptación. Todo en MAYÚSCULAS."""
         else:
+            # ✅ NUEVAS REGLAS DE ORO (Añadido contraataque de Facturación FA)
             instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta la defensa completa, altamente técnica, médica y legal (ESTILO ABOGADO AUDITOR Y ESPECIALISTA EN FACTURACIÓN).
         REGLAS DE ORO PARA EL DICTAMEN:
         1. Inicia exactamente con: "ESE HUS NO ACEPTA LA GLOSA [CÓDIGO] INTERPUESTA POR [MOTIVO BREVE O CÓDIGO], Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS TÉCNICOS, CONTRACTUALES Y NORMATIVOS:"
-        2. EXTRAE DATOS CLAVE: Fecha de cirugía/atención, nombre del procedimiento, lateralidad (¿fue bilateral?), médico tratante (con RM) y folios si los hay en los soportes.
+        2. EXTRAE DATOS CLAVE: Fecha de cirugía/atención, nombre del procedimiento, médico tratante (con RM) y folios si los hay en los soportes.
         3. ESTRUCTURA DE DEFENSA SEGÚN PREFIJO DE GLOSA:
-           - SI ES DE TARIFAS (Ej. TA5801, mayor valor, diferencias pactadas): Defiende la liquidación de la factura. SI LA CIRUGÍA FUE BILATERAL O MÚLTIPLE (según Epicrisis o DQX), argumenta vigorosamente que esto justifica el cobro de múltiples unidades y tiempos quirúrgicos aplicados según la norma (Ej. SOAT). Destaca que el cobro respeta estrictamente el contrato vigente con {nombre_eps_mostrar}: "{info_c}". Rechaza tajantemente el valor menor propuesto por la EPS indicando que no corresponde a lo pactado y que aplicarlo unilateralmente viola el principio de buena fe (Art. 871 del Código de Comercio).
-           - SI ES DE INSUMOS/PRECIOS (Ej. SO4201, falta lista de precios): Argumenta que el insumo/dispositivo (ej. fijador de malla) es indispensable para la técnica usada. Afirma que se factura al "costo de adquisición más el porcentaje de administración pactado" y exige el levantamiento indicando: "SE ADJUNTA A LA PRESENTE RESPUESTA LA FACTURA DE COMPRA DEL INSUMO". Cita el Anexo Técnico 5 de la Res. 3047 de 2008.
-           - SI ES MÉDICA/PERTINENCIA: Justifica clínicamente por qué el paciente requería el servicio.
-        4. CONCLUSIÓN: Cierra exigiendo el levantamiento inmediato de la glosa y el pago íntegro de la factura.
-        5. FORMATO: Redacta TODO en MAYÚSCULAS sostenidas. Puedes usar saltos de línea dobles si quieres separar los hallazgos de los argumentos normativos, para darle estilo de Oficio."""
+           - SI ES DE FACTURACIÓN O INCLUSIÓN (Ej. FA0802, Glucometrías incluidas en sala): Destroza el argumento indicando que el servicio glosado tiene un código y tarifa independiente en el manual tarifario aplicable (Ej. SOAT Decreto 2423 de 1996) y es un apoyo diagnóstico autónomo (POCT), NO una actividad rutinaria de enfermería ni está incluido en los derechos de sala. Argumenta que la EPS incumple el Anexo Técnico 3 de la Res 3047 de 2008 al no citar la norma exacta de la supuesta inclusión.
+           - SI ES DE TARIFAS (Ej. TA5801, mayor valor): Defiende la liquidación de la factura. SI LA CIRUGÍA FUE BILATERAL O MÚLTIPLE, argumenta vigorosamente que esto justifica el cobro de múltiples unidades y tiempos quirúrgicos aplicados según la norma. Destaca que el cobro respeta el contrato vigente con {nombre_eps_mostrar}: "{info_c}". Rechaza tajantemente el valor menor propuesto por la EPS indicando que viola el principio de buena fe (Art. 871 del Código de Comercio).
+           - SI ES DE INSUMOS/PRECIOS (Ej. SO4201, falta lista de precios): Argumenta que el insumo/dispositivo es indispensable para la técnica usada. Afirma que se factura al "costo de adquisición más el porcentaje de administración pactado". Menciona: "SE ADJUNTA A LA PRESENTE RESPUESTA LA FACTURA DE ADQUISICIÓN". Cita el Anexo Técnico 5 de la Res. 3047 de 2008.
+           - SI ES MÉDICA/PERTINENCIA: Justifica clínicamente por qué el paciente requería el servicio basándote en la Epicrisis.
+        4. Cierra exigiendo el levantamiento inmediato de la glosa y el pago íntegro del valor.
+        5. FORMATO ESTRICTO: Redacta TODO en UN SOLO PÁRRAFO CONTINUO, EN MAYÚSCULAS SOSTENIDAS. ESTÁ ESTRICTAMENTE PROHIBIDO USAR SALTOS DE LÍNEA O VIÑETAS."""
 
         prompt = f"""ACTÚA COMO AUDITOR MÉDICO Y JURÍDICO EXPERTO DE LA ESE HUS.
         EPS: {eps_segura}
@@ -131,7 +135,7 @@ class GlosaService:
         
         INSTRUCCIONES OBLIGATORIAS:
         1. Extrae los datos solicitados (Escribe N/A si no existen en los soportes).
-        2. El CODIGO_GLOSA es el código alfanumérico de objeción (Ej: TA5801, SO4201).
+        2. El CODIGO_GLOSA es el código alfanumérico de objeción (Ej: TA5801, SO4201, FA0802).
         3. {instruccion_dictamen}
         
         RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
@@ -170,6 +174,9 @@ class GlosaService:
         servicio = b("SERVICIO_GLOSADO")
         cuerpo_dictamen = b("DICTAMEN_INTEGRAL")
 
+        # ✅ APLASTADOR DE PÁRRAFOS: Fuerzo a Python a quitar cualquier "Enter" o salto de línea escondido que la IA haya puesto
+        cuerpo_dictamen = " ".join(cuerpo_dictamen.split())
+
         if val_ac_num > 0:
             val_obj_num = self.convertir_numero(valor)
             valor_acep_formato = f"$ {val_ac_num:,.0f}".replace(",", ".")
@@ -187,13 +194,10 @@ class GlosaService:
             tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
             tipo_final = "TÉCNICO-LEGAL"
 
-        # Reemplazar saltos de línea del dictamen de la IA por etiquetas HTML para que se vea estructurado en pantalla/PDF
-        cuerpo_dictamen_html = cuerpo_dictamen.replace('\n', '<br>')
-
         return GlosaResult(
             tipo=tipo_final, 
             resumen=f"DEFENSA FACTURA - {paciente if paciente != 'N/A' else 'PACIENTE EN MENCIÓN'}", 
-            dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7;">{cuerpo_dictamen_html.upper()}</div>', 
+            dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7;">{cuerpo_dictamen.upper()}</div>', 
             codigo_glosa=codigo, valor_objetado=valor, paciente=paciente, 
             mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo
         )
@@ -208,7 +212,8 @@ def crear_oficio_pdf(eps, resumen, conclusion):
     match = re.search(r'<div[^>]*>(.*?)</div>', conclusion, re.IGNORECASE | re.DOTALL)
     cuerpo_texto = match.group(1) if match else conclusion
     
-    clean_text = re.sub('<br>', '\n\n', cuerpo_texto)
+    # Limpiamos el HTML para el PDF, asegurando que sea un bloque contínuo
+    clean_text = re.sub('<br>', ' ', cuerpo_texto)
     clean_text = re.sub('<[^<]+?>', '', clean_text).strip()
     fecha_actual = datetime.now().strftime("%d/%m/%Y")
     
