@@ -15,7 +15,8 @@ from slowapi.errors import RateLimitExceeded
 
 from services import GlosaService, crear_oficio_pdf
 from models import GlosaRecord, ContratoRecord, PlantillaGlosa, GlosaResult
-from database import engine, Base, get_db
+from database import engine, Base, get_db, SessionLocal
+from contextlib import asynccontextmanager
 
 Base.metadata.create_all(bind=engine)
 
