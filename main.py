@@ -20,12 +20,31 @@ from contextlib import asynccontextmanager
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Motor Glosas HUS", version="2.3")
+# ✅ MEJORA: AUTO-CREAR CONTRATO POR DEFECTO AL INICIAR LA APP
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = SessionLocal()
+    try:
+        # Busca si ya existe el contrato por defecto
+        if not db.query(ContratoRecord).filter(ContratoRecord.eps == "OTRA / SIN DEFINIR").first():
+            db.add(ContratoRecord(
+                eps="OTRA / SIN DEFINIR", 
+                detalles="SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
+            ))
+            db.commit()
+    finally:
+        db.close()
+    yield
 
+# 1. Creamos la app pasándole el "lifespan" (ciclo de vida)
+app = FastAPI(title="Motor Glosas HUS", version="2.4", lifespan=lifespan)
+
+# 2. Tu configuración de Rate Limiting (Intacta)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# 3. Tu configuración de CORS (Intacta)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"],
@@ -33,8 +52,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 4. Archivos estáticos e IA (Intactos)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
 
 
