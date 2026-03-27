@@ -189,7 +189,7 @@ class GlosaService:
             tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJETADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#d97706;">VALOR ACEPTADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold; color:#d97706;">{valor_acep_formato}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
             return GlosaResult(tipo="AUDITORÍA - ACEPTACIÓN", resumen=f"ACEPTACIÓN DE GLOSA - {paciente if paciente != 'N/A' else 'PACIENTE EN MENCIÓN'}", dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7;">{cuerpo.upper()}</div>', codigo_glosa=codigo, valor_objetado=valor, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
-        pprefijo = str(codigo[:2]).upper() if codigo else "XX"
+        prefijo = str(codigo[:2]).upper() if codigo else "XX"
         cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA"
         
         # ✅ VARIABLE DINÁMICA: Por defecto dice "NO ACEPTA GLOSA"
