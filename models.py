@@ -1,8 +1,9 @@
 from typing import Optional
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text
 from sqlalchemy.sql import func
 from database import Base
+
 
 class GlosaInput(BaseModel):
     eps: str
@@ -11,6 +12,7 @@ class GlosaInput(BaseModel):
     fecha_recepcion: Optional[str] = None
     valor_aceptado: str = "0"
     tabla_excel: str
+
 
 class GlosaResult(BaseModel):
     tipo: str
@@ -22,14 +24,17 @@ class GlosaResult(BaseModel):
     mensaje_tiempo: str
     color_tiempo: str
 
+
 class PDFRequest(BaseModel):
     eps: str
     resumen: str
     dictamen: str
 
+
 class ContratoInput(BaseModel):
     eps: str
     detalles: str
+
 
 class GlosaRecord(Base):
     __tablename__ = "glosas_historial"
@@ -44,22 +49,16 @@ class GlosaRecord(Base):
     dictamen = Column(Text)
     creado_en = Column(DateTime, server_default=func.now())
 
+
 class PlantillaGlosa(Base):
     __tablename__ = "plantillas"
     id = Column(Integer, primary_key=True, index=True)
     titulo = Column(String, index=True)
     texto = Column(String)
 
+
 class ContratoRecord(Base):
     __tablename__ = "contratos_config"
     id = Column(Integer, primary_key=True, index=True)
     eps = Column(String, unique=True, index=True)
     detalles = Column(Text)
-
-class UsuarioRecord(Base):
-    __tablename__ = "usuarios_sistema"
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String)
-    email = Column(String, unique=True, index=True)
-    password_hash = Column(String)
-    activo = Column(Boolean, default=True)
