@@ -3,16 +3,16 @@ import re
 import asyncio
 import logging
 from datetime import datetime, timedelta
-
+ 
 import PyPDF2
 from groq import AsyncGroq
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
-
+ 
 from models import GlosaInput, GlosaResult
-
+ 
 # Configuración del logging para producción
 logging.basicConfig(
     level=logging.INFO,
@@ -20,21 +20,21 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger("motor_glosas")
-
-
+ 
+ 
 def _procesar_pdf_sync(file_content: bytes) -> str:
     """Función síncrona aislada para procesar PDFs sin bloquear el event loop."""
     reader = PyPDF2.PdfReader(io.BytesIO(file_content))
     total_paginas = len(reader.pages)
     paginas = []
-
+ 
     for i in range(total_paginas):
         txt = reader.pages[i].extract_text()
         if txt:
             paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
-
+ 
     texto_unido = "".join(paginas)
-
+ 
     # Para documentos largos: lee las primeras 2 y las últimas 4 páginas
     if total_paginas > 8:
         texto_unido = (
@@ -42,14 +42,14 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
             + "\n\n... [PÁGINAS OMITIDAS PARA AHORRAR MEMORIA] ...\n\n"
             + "".join(paginas[-4:])
         )
-
+ 
     return texto_unido[:14000]  # Límite seguro para la API
-
-
+ 
+ 
 class GlosaService:
     def __init__(self, api_key: str):
         self.cliente = AsyncGroq(api_key=api_key)
-
+ 
     async def extraer_pdf(self, file_content: bytes) -> str:
         try:
             loop = asyncio.get_running_loop()
@@ -58,7 +58,7 @@ class GlosaService:
         except Exception:
             logger.error("Error al extraer texto del PDF", exc_info=True)
             return ""
-
+ 
     def convertir_numero(self, m_str: str) -> float:
         if not m_str:
             return 0.0
@@ -67,7 +67,7 @@ class GlosaService:
             return float(clean)
         except ValueError:
             return 0.0
-
+ 
     async def analizar(
         self,
         data: GlosaInput,
@@ -76,7 +76,7 @@ class GlosaService:
     ) -> GlosaResult:
         if contratos_db is None:
             contratos_db = {}
-
+ 
         # Resolución de contrato por EPS
         info_c = contratos_db.get(
             "OTRA / SIN DEFINIR",
@@ -86,24 +86,24 @@ class GlosaService:
             if k in data.eps.upper():
                 info_c = v
                 break
-
+ 
         # Cálculo de términos (días hábiles)
         msg_tiempo = "Fechas no ingresadas"
         color_tiempo = "bg-slate-500"
         es_extemporanea = False
         dias = 0
-
+ 
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
                 f1 = datetime.strptime(data.fecha_radicacion, "%Y-%m-%d")
                 f2 = datetime.strptime(data.fecha_recepcion, "%Y-%m-%d")
-
+ 
                 dia_actual = f1
                 while dia_actual < f2:
                     dia_actual += timedelta(days=1)
                     if dia_actual.weekday() < 5:
                         dias += 1
-
+ 
                 if dias > 20:
                     es_extemporanea = True
                     msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES)"
@@ -115,10 +115,10 @@ class GlosaService:
                 logger.error("Error calculando días hábiles entre fechas", exc_info=True)
                 msg_tiempo = "Error en fechas"
                 color_tiempo = "bg-slate-500"
-
+ 
         val_ac_num = self.convertir_numero(data.valor_aceptado)
         texto_base = data.tabla_excel
-
+ 
         # --- CASO: RATIFICADA sin valor aceptado ---
         if data.etapa == "RATIFICADA" and val_ac_num == 0:
             cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
@@ -156,7 +156,7 @@ class GlosaService:
                 mensaje_tiempo=msg_tiempo,
                 color_tiempo="bg-blue-600",
             )
-
+ 
         # --- CASO: EXTEMPORÁNEA sin valor aceptado ---
         if es_extemporanea and val_ac_num == 0 and data.etapa != "RATIFICADA":
             cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
@@ -201,7 +201,7 @@ class GlosaService:
                 mensaje_tiempo=msg_tiempo,
                 color_tiempo=color_tiempo,
             )
-
+ 
         # --- INSTRUCCIÓN IA según valor aceptado ---
         if val_ac_num > 0:
             instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta 3 líneas explicando formalmente por qué el hospital ACEPTA esta glosa. NO uses leyes ni viñetas."
@@ -212,17 +212,17 @@ class GlosaService:
                 "MENCIONA LA PÁGINA EXACTA donde encontraste la evidencia (Ej: 'Como se evidencia en la PÁG 84...'). "
                 "¡DEFIENDE AL HUS!"
             )
-
+ 
         system_prompt = (
             "Eres un Médico Auditor experto de la ESE Hospital Universitario de Santander (HUS). "
             "Tu objetivo es defender la facturación del hospital frente a las EPS con argumentos técnicos, "
             "médicos y legales, basándote estrictamente en los soportes proporcionados. Eres preciso, formal, "
             "contundente y obedeces el formato de salida al pie de la letra sin inventar datos ni alucinar."
         )
-
+ 
         MAX_CONTEXTO = 12000
         contexto_seguro = contexto_pdf[:MAX_CONTEXTO]
-
+ 
         user_prompt = f"""
         EPS: {data.eps}
         GLOSA: "{texto_base}"
@@ -245,7 +245,7 @@ class GlosaService:
         SERVICIO_GLOSADO: 
         JUSTIFICACION_DEFENSA: 
         """
-
+ 
         # Retry con exponential backoff
         res_ia = ""
         for intento in range(3):
@@ -275,7 +275,7 @@ class GlosaService:
                         color_tiempo="",
                     )
                 await asyncio.sleep(2 ** intento)
-
+ 
         # Parser de respuesta IA
         def b(e):
             claves = ["PACIENTE", "INGRESO", "EGRESO", "DIAGNOSTICO", "EPICRISIS_NO",
@@ -288,7 +288,7 @@ class GlosaService:
             val = val.replace("*", "").replace("-", "").replace('"', '')
             val = re.sub(r'^(JUSTIFICACI[OÓ]N DE DEFENSA|JUSTIFICACION):?\s*', '', val, flags=re.IGNORECASE)
             return val.strip() if val.strip() else "N/A"
-
+ 
         paciente = b("PACIENTE")
         ingreso = b("INGRESO")
         egreso = b("EGRESO")
@@ -298,24 +298,24 @@ class GlosaService:
         valor = b("VALOR_OBJETADO")
         servicio = b("SERVICIO_GLOSADO")
         defensa_ia = b("JUSTIFICACION_DEFENSA")
-
+ 
         txt_paciente = f" CORRESPONDIENTE AL PACIENTE {paciente}" if paciente != "N/A" else " CORRESPONDIENTE AL PACIENTE EN MENCIÓN"
         txt_ingreso = f", IDENTIFICADO CON INGRESO N.° {ingreso}" if ingreso != "N/A" else ""
         txt_egreso = f" CON FECHA DE EGRESO {egreso}" if egreso != "N/A" else ""
         txt_epi = f" (EPICRISIS N.° {epi})" if epi != "N/A" else ""
         txt_dx = f" Y DIAGNÓSTICO {dx}" if dx != "N/A" else ""
-
+ 
         texto_defensa = ""
         if defensa_ia.upper() != "N/A" and defensa_ia:
             texto_defensa = f" TÉCNICAMENTE SE ACLARA: {defensa_ia.upper()}"
             if not texto_defensa.endswith("."):
                 texto_defensa += "."
-
+ 
         # --- CASO: Aceptación parcial o total ---
         if val_ac_num > 0:
             val_obj_num = self.convertir_numero(valor)
             valor_acep_formato = f"$ {val_ac_num:,.0f}".replace(",", ".")
-
+ 
             if val_ac_num >= val_obj_num and val_obj_num > 0:
                 cod_res, desc_res = "RE9702", "GLOSA ACEPTADA TOTALMENTE"
                 cuerpo = (
@@ -329,7 +329,7 @@ class GlosaService:
                     f"{texto_defensa} SIN EMBARGO, ESTA INSTITUCIÓN RECHAZA EL EXCEDENTE DEL VALOR GLOSADO Y "
                     f"EXIGE EL PAGO ÍNTEGRO DEL SALDO RESTANTE."
                 )
-
+ 
             tabla_html = (
                 f'<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;">'
                 f'<tr style="background-color:#1e3a8a; color:white;">'
@@ -353,16 +353,16 @@ class GlosaService:
                 mensaje_tiempo=msg_tiempo,
                 color_tiempo=color_tiempo,
             )
-
+ 
         # --- CASO: Defensa técnico-legal por prefijo ---
         prefijo = codigo[:2].upper() if codigo and codigo != "N/A" else "XX"
         cod_res = "RE9901"
         desc_res = "GLOSA NO ACEPTADA"
-
+ 
         if prefijo == "TA" and ("OTRA" in data.eps.upper() or "SIN DEFINIR" in data.eps.upper()):
             cod_res = "RE9206"
             desc_res = "GLOSA INJUSTIFICADA 100%"
-
+ 
         if prefijo == "TA":
             cuerpo = (
                 f"ESE HUS NO ACEPTA GLOSA {codigo} DEL SERVICIO {servicio}{txt_paciente}{txt_ingreso}, "
@@ -419,7 +419,7 @@ class GlosaService:
                 f"ESE HUS RECHAZA GLOSA {codigo} AL SERVICIO {servicio}.{texto_defensa} "
                 f"SE EXIGE LEVANTAMIENTO ACORDE AL CONTRATO ({info_c})."
             )
-
+ 
         tabla_html = (
             f'<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;">'
             f'<tr style="background-color:#1e3a8a; color:white;">'
@@ -433,7 +433,7 @@ class GlosaService:
             f'<td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br>'
             f'<span style="font-size:9px;">{desc_res}</span></td></tr></table>'
         )
-
+ 
         return GlosaResult(
             tipo="TÉCNICO-LEGAL",
             resumen=f"DEFENSA FACTURA - {paciente if paciente != 'N/A' else 'PACIENTE EN MENCIÓN'}",
@@ -444,8 +444,8 @@ class GlosaService:
             mensaje_tiempo=msg_tiempo,
             color_tiempo=color_tiempo,
         )
-
-
+ 
+ 
 def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -456,14 +456,14 @@ def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
     estilo_n = ParagraphStyle('n', parent=estilos['Normal'], alignment=TA_JUSTIFY, fontSize=11, leading=16)
     estilo_titulo = ParagraphStyle('titulo', parent=estilos['Heading1'], alignment=1, fontSize=14, spaceAfter=20)
     estilo_sub = ParagraphStyle('sub', parent=estilos['Normal'], alignment=1, fontSize=12)
-
+ 
     match = re.search(r'<div[^>]*>(.*?)</div>', conclusion, re.IGNORECASE | re.DOTALL)
     cuerpo_texto = match.group(1) if match else conclusion
-
+ 
     clean_text = re.sub('<br>', '\n', cuerpo_texto)
     clean_text = re.sub('<[^<]+?>', ' ', clean_text).strip()
     fecha_actual = datetime.now().strftime("%d/%m/%Y")
-
+ 
     elements = [
         Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", estilo_titulo),
         Paragraph("<b>OFICINA DE AUDITORÍA Y JURÍDICA DE CUENTAS MÉDICAS</b>", estilo_sub),
