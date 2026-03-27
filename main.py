@@ -13,17 +13,13 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from auth import get_current_user, create_access_token, verify_password
 from services import GlosaService, crear_oficio_pdf
-from models import (
-    GlosaRecord, ContratoRecord, UsuarioRecord,
-    PlantillaGlosa, GlosaResult
-)
+from models import GlosaRecord, ContratoRecord, PlantillaGlosa, GlosaResult
 from database import engine, Base, get_db
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Motor Glosas HUS", version="2.2")
+app = FastAPI(title="Motor Glosas HUS", version="2.3")
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
@@ -46,15 +42,6 @@ def root():
     return FileResponse("static/index.html")
 
 
-@app.post("/token")
-async def login(data: dict, db: Session = Depends(get_db)):
-    user = db.query(UsuarioRecord).filter(UsuarioRecord.email == data.get("username")).first()
-    if not user or not verify_password(data.get("password"), user.password_hash):
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
 @app.post("/analizar")
 @limiter.limit("20/minute")
 async def analizar_endpoint(
@@ -67,7 +54,6 @@ async def analizar_endpoint(
     tabla_excel: str = Form(...),
     archivos: List[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
 ):
     contexto_pdf = ""
     if archivos:
@@ -76,22 +62,54 @@ async def analizar_endpoint(
                 content = await arc.read()
                 contexto_pdf += await glosa_service.extraer_pdf(content)
 
-    return await glosa_service.analizar(
-        db=db, eps=eps, etapa=etapa,
-        fecha_radicacion=fecha_radicacion, fecha_recepcion=fecha_recepcion,
-        valor_aceptado=valor_aceptado, tabla_excel=tabla_excel,
-        contexto_pdf=contexto_pdf
+    contratos = db.query(ContratoRecord).all()
+    contratos_db = {c.eps: c.detalles for c in contratos}
+
+    from models import GlosaInput
+    data = GlosaInput(
+        eps=eps,
+        etapa=etapa,
+        fecha_radicacion=fecha_radicacion,
+        fecha_recepcion=fecha_recepcion,
+        valor_aceptado=valor_aceptado,
+        tabla_excel=tabla_excel,
     )
+
+    resultado = await glosa_service.analizar(
+        data=data,
+        contexto_pdf=contexto_pdf,
+        contratos_db=contratos_db,
+    )
+
+    # Guardar en historial
+    try:
+        import re
+        val_num = glosa_service.convertir_numero(resultado.valor_objetado)
+        val_ac_num = glosa_service.convertir_numero(valor_aceptado)
+        estado = "ACEPTADA" if val_ac_num > 0 else "LEVANTADA"
+        registro = GlosaRecord(
+            eps=eps,
+            paciente=resultado.paciente,
+            codigo_glosa=resultado.codigo_glosa,
+            valor_objetado=val_num,
+            valor_aceptado=val_ac_num,
+            etapa=etapa,
+            estado=estado,
+            dictamen=resultado.dictamen,
+        )
+        db.add(registro)
+        db.commit()
+    except Exception:
+        pass  # No bloquear respuesta si falla el guardado
+
+    return resultado
 
 
 _analytics_cache = {"data": None, "ts": None}
 
 
 @app.get("/analytics")
-def obtener_analytics(
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
+def obtener_analytics(db: Session = Depends(get_db)):
     global _analytics_cache
     ahora = datetime.now()
     if _analytics_cache["ts"] and (ahora - _analytics_cache["ts"]).seconds < 300:
@@ -132,19 +150,12 @@ def obtener_analytics(
 
 
 @app.get("/plantillas")
-def listar_plantillas(
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
+def listar_plantillas(db: Session = Depends(get_db)):
     return db.query(PlantillaGlosa).all()
 
 
 @app.post("/plantillas")
-async def crear_plantilla(
-    data: dict,
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
+async def crear_plantilla(data: dict, db: Session = Depends(get_db)):
     nueva = PlantillaGlosa(titulo=data['titulo'], texto=data['texto'])
     db.add(nueva)
     db.commit()
@@ -152,39 +163,29 @@ async def crear_plantilla(
 
 
 @app.get("/glosas")
-def listar_historial(
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
+def listar_historial(db: Session = Depends(get_db)):
     return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(100).all()
 
 
 @app.get("/contratos")
-def listar_contratos(
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
+def listar_contratos(db: Session = Depends(get_db)):
     return db.query(ContratoRecord).all()
 
 
 @app.post("/contratos")
-def guardar_contrato(
-    data: dict,
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
-    nuevo = ContratoRecord(eps=data['eps'], detalles=data['detalles'])
-    db.add(nuevo)
+def guardar_contrato(data: dict, db: Session = Depends(get_db)):
+    # Upsert: si ya existe la EPS, actualiza los detalles
+    existente = db.query(ContratoRecord).filter(ContratoRecord.eps == data['eps']).first()
+    if existente:
+        existente.detalles = data['detalles']
+    else:
+        db.add(ContratoRecord(eps=data['eps'], detalles=data['detalles']))
     db.commit()
     return {"status": "ok"}
 
 
 @app.delete("/contratos/{eps}")
-def eliminar_contrato(
-    eps: str,
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
+def eliminar_contrato(eps: str, db: Session = Depends(get_db)):
     contrato = db.query(ContratoRecord).filter(ContratoRecord.eps == eps).first()
     if not contrato:
         raise HTTPException(status_code=404, detail="Contrato no encontrado")
@@ -194,10 +195,7 @@ def eliminar_contrato(
 
 
 @app.get("/exportar-historial")
-def exportar_historial(
-    db: Session = Depends(get_db),
-    user: UsuarioRecord = Depends(get_current_user)
-):
+def exportar_historial(db: Session = Depends(get_db)):
     glosas = db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).all()
     lines = ["Fecha,EPS,Paciente,Código Glosa,Valor Objetado,Valor Aceptado,Estado"]
     for g in glosas:
@@ -215,10 +213,7 @@ def exportar_historial(
 
 
 @app.post("/descargar-pdf")
-async def generar_pdf_endpoint(
-    data: dict,
-    user: UsuarioRecord = Depends(get_current_user)
-):
+async def generar_pdf_endpoint(data: dict):
     pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
     return Response(
         content=pdf_bytes,
