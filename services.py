@@ -60,7 +60,7 @@ class GlosaService:
         if contratos_db is None: contratos_db = {}
         
         eps_segura = str(data.eps).upper() if data.eps else "OTRA / SIN DEFINIR"
-        info_c = contratos_db.get("OTRA / SIN DEFINIR", "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022).")
+        info_c = contratos_db.get("OTRA / SIN DEFINIR", "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO. Se exige el pago al 100% de la tarifa vigente.")
         for k, v in contratos_db.items():
             if k in eps_segura: 
                 info_c = v
@@ -110,29 +110,26 @@ class GlosaService:
         nombre_eps_mostrar = "LA ENTIDAD RESPONSABLE DEL PAGO" if ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura) else eps_segura
 
         if val_ac_num > 0:
-            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta un documento formal y legal donde ESE HUS ACEPTA la glosa (por valor de ${val_ac_num:,.0f}). Explica brevemente la procedencia. TODO EN MAYÚSCULAS."""
+            prompt_system = f"""ACTÚA COMO AUDITOR DE LA ESE HUS. Extrae los datos y en el campo DICTAMEN_INTEGRAL redacta en MAYÚSCULAS que se acepta la glosa por valor de ${val_ac_num:,.0f}."""
         else:
-            # 🔥 EL NUEVO CEREBRO: ANALÍTICO, RELACIONAL Y ESTRUCTURADO
-            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta la defensa completa y estructurada (ESTILO ABOGADO AUDITOR SENIOR). 
-        REGLAS DE ORO:
-        1. ESTRUCTURA VISUAL: Usa párrafos separados para jerarquizar la información. NO uses un solo bloque de texto. ESCRIBE TODO EN MAYÚSCULAS.
-        2. ANÁLISIS RELACIONAL (CRUCE DE DATOS CUÁDRUPLE): Lee cuidadosamente los soportes adjuntos. Compara siempre lo AUTORIZADO vs lo EJECUTADO (Epicrisis/DQX) vs lo FACTURADO (Hoja de gastos). Si encuentras que la EPS autorizó algo (ej. "Bilateral") y luego lo glosa, usa esta contradicción como argumento principal para destrozar la glosa.
-        3. DEFENSA TÉCNICA SEGÚN PREFIJO:
-           - FA (Facturación): Demuestra que el cobro es independiente, cita códigos autónomos del manual tarifario (ej. SOAT) y rechaza inclusiones infundadas. Cita la Res 3047 Anexo 3.
-           - TA (Tarifas/Mayor Valor): Si hubo cirugía bilateral o múltiple, justifica el cobro de la 2da unidad basándote en la liquidación de tiempos quirúrgicos del tarifario aplicable. Exige respeto al contrato: {info_c}. Cita la buena fe contractual (Art 871 C.Co).
-           - SO (Soportes/Insumos): Argumenta que el insumo es inherente y vital para la técnica. Exige el pago al costo de adquisición + administración. Cita el Anexo 5 Res 3047.
-           - CO (Cobertura) / CL / PE (Pertinencia): Basa la defensa en la Epicrisis y el criterio médico. Cita Ley 1751 de 2015.
-        4. CIERRE: Exige categóricamente el levantamiento inmediato de la glosa y el pago íntegro de la factura."""
+            prompt_system = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR DE LA ESE HUS. 
+        REGLAS DE ORO ABSOLUTAS:
+        1. ESTRUCTURA VISUAL: Usa párrafos separados (saltos de línea) para que sea fácil de leer. ESCRIBE TODO EN MAYÚSCULAS.
+        2. ANÁLISIS RELACIONAL: Cruza siempre lo AUTORIZADO vs lo EJECUTADO (Epicrisis) vs lo FACTURADO. Detecta y ataca contradicciones.
+        3. ANTI-REDUNDANCIA: NUNCA repitas la misma frase ni el mismo nombre del contrato en todos los párrafos. Sé directo, letal y fluido. NO redactes tres párrafos de conclusión; cierra con UNA ÚNICA ORACIÓN exigiendo el levantamiento y el pago íntegro.
+        4. DEFENSA TÉCNICA:
+           - FA (Facturación): Demuestra que el cobro es independiente, no está incluido en sala/enfermería. Cita Res 3047 Anexo 3.
+           - TA (Tarifas/Mayor Valor): Si hubo cirugía bilateral o múltiple, justifica las unidades cobradas. Exige respeto al contrato: {info_c}. Cita Art 871 C.Co.
+           - SO (Soportes/Insumos): El insumo es vital para la técnica. Exige el pago al costo de adquisición + administración. Cita Anexo 5 Res 3047.
+           - CO / CL / PE: Basa la defensa en la Epicrisis y pertinencia médica.
+        
+        NO ESCRIBAS INTRODUCCIONES. Ve directo a los argumentos en el campo CUERPO_ARGUMENTATIVO."""
 
-        prompt = f"""ACTÚA COMO AUDITOR MÉDICO Y JURÍDICO EXPERTO DE LA ESE HUS.
-        EPS: {eps_segura}
+        prompt = f"""EPS: {eps_segura}
         GLOSA: "{texto_base}"
         SOPORTES CLÍNICOS: {contexto_pdf[:10000]}
         
-        INSTRUCCIONES OBLIGATORIAS:
-        1. Extrae los datos solicitados (Escribe N/A si no existen en los soportes).
-        2. El CODIGO_GLOSA es el código alfanumérico de objeción (Ej: TA5801, SO4201, FA0802).
-        3. {instruccion_dictamen}
+        {prompt_system}
         
         RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
         PACIENTE: 
@@ -143,7 +140,8 @@ class GlosaService:
         CODIGO_GLOSA: 
         VALOR_OBJETADO: 
         SERVICIO_GLOSADO: 
-        DICTAMEN_INTEGRAL: 
+        MOTIVO_GLOSA_RESUMIDO: (Máximo 6 palabras, ej: PRESUNTA AUSENCIA DE LISTA DE PRECIOS)
+        CUERPO_ARGUMENTATIVO: (Escribe aquí los párrafos de tu defensa sin introducciones ni saludos)
         """
         
         try:
@@ -167,9 +165,19 @@ class GlosaService:
         codigo = b("CODIGO_GLOSA")
         valor = b("VALOR_OBJETADO")
         servicio = b("SERVICIO_GLOSADO")
-        cuerpo_dictamen = b("DICTAMEN_INTEGRAL")
+        motivo_resumido = b("MOTIVO_GLOSA_RESUMIDO")
+        
+        if val_ac_num > 0:
+            cuerpo_dictamen = b("DICTAMEN_INTEGRAL")
+        else:
+            cuerpo_arg = b("CUERPO_ARGUMENTATIVO")
+            if motivo_resumido == "N/A" or not motivo_resumido:
+                motivo_resumido = "MOTIVOS INJUSTIFICADOS"
+            
+            # 🔥 AQUÍ ESTÁ LA MAGIA: PYTHON ESCRIBE LA PRIMERA LÍNEA A LA FUERZA
+            cuerpo_dictamen = f"ESE HUS NO ACEPTA LA GLOSA {codigo} INTERPUESTA POR {motivo_resumido.upper()}, Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS TÉCNICOS, CONTRACTUALES Y NORMATIVOS:\n\n{cuerpo_arg}"
 
-        # ✅ EL TOQUE MÁGICO: Convertimos los saltos de línea de la IA en etiquetas <br/> para que el PDF de ReportLab los respete y haga párrafos bonitos.
+        # Convertimos saltos de línea para el HTML y PDF
         cuerpo_dictamen_html = cuerpo_dictamen.replace('\n', '<br/>')
 
         if val_ac_num > 0:
@@ -204,11 +212,9 @@ def crear_oficio_pdf(eps, resumen, conclusion):
     estilo_n = ParagraphStyle('n', parent=estilos['Normal'], alignment=TA_JUSTIFY, fontSize=11, leading=16)
     estilo_titulo = ParagraphStyle('titulo', parent=estilos['Heading1'], alignment=1, fontSize=14, spaceAfter=20)
     
-    # 💡 REPARACIÓN DEL PDF: Extraemos el contenido de la etiqueta <div> enviada desde el frontend
     match = re.search(r'<div[^>]*>(.*?)</div>', conclusion, re.IGNORECASE | re.DOTALL)
     cuerpo_texto = match.group(1) if match else conclusion
     
-    # Convertimos los <br/> que generó Python en saltos reales para ReportLab y limpiamos basura
     clean_text = re.sub(r'<br\s*/?>', '\n', cuerpo_texto)
     clean_text = re.sub(r'<[^>]+>', '', clean_text).strip()
     
@@ -235,11 +241,10 @@ def crear_oficio_pdf(eps, resumen, conclusion):
         Spacer(1, 20)
     ])
 
-    # Convertimos cada salto de línea detectado en un párrafo real dentro del PDF
     for parrafo in clean_text.split('\n'):
         if parrafo.strip():
             elements.append(Paragraph(parrafo.strip(), estilo_n))
-            elements.append(Spacer(1, 6)) # Espacio entre párrafos
+            elements.append(Spacer(1, 6))
 
     elements.extend([
         Spacer(1, 40),
