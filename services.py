@@ -192,16 +192,19 @@ class GlosaService:
         prefijo = str(codigo[:2]).upper() if codigo else "XX"
         cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA"
         
-        # ✅ VARIABLE DINÁMICA DE APERTURA (y usamos eps_segura que ya está definida)
+        # ✅ NOMBRE ELEGANTE: Si la EPS es la opción por defecto, usa un término formal. Si es otra, usa su nombre real.
+        nombre_eps_mostrar = "LA ENTIDAD RESPONSABLE DEL PAGO" if ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura) else eps_segura
+        
+        # ✅ VARIABLE DINÁMICA DE APERTURA
         texto_apertura = f"ESE HUS NO ACEPTA GLOSA {codigo}"
         
         if prefijo == "TA" and ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura):
             cod_res, desc_res = "RE9206", "GLOSA INJUSTIFICADA 100%"
-            # ✅ CAMBIO DE TEXTO PARA GLOSA INJUSTIFICADA
             texto_apertura = f"ESE HUS NO ACEPTA GLOSA INJUSTIFICADA {codigo}"
 
         if prefijo == "TA":
-            cuerpo = f"{texto_apertura} DEL SERVICIO {servicio}{txt_paciente}{txt_ingreso}, ARGUMENTANDO UNA PRESUNTA DIFERENCIA ENTRE EL VALOR OBJETADO Y LA TARIFA PACTADA. AL RESPECTO, SE PRECISA TÉCNICA Y CONTRACTUALMENTE LO SIGUIENTE: EL VALOR FACTURADO DE {valor} SE LIQUIDÓ EN ESTRICTO CUMPLIMIENTO DE LAS CONDICIONES ESTABLECIDAS EN EL ACUERDO VIGENTE CON {eps_segura} ({info_c}). EN CONSECUENCIA, EL VALOR COBRADO ES PLENAMENTE CONCORDANTE CON LO ACORDADO ENTRE LAS PARTES.{texto_defensa} CONFORME AL DECRETO 441 DE 2022, LOS ACUERDOS TARIFARIOS DEBEN RESPETARSE EN SU INTEGRIDAD."
+            # 👇 Aquí inyectamos {nombre_eps_mostrar} en lugar de la variable antigua
+            cuerpo = f"{texto_apertura} DEL SERVICIO {servicio}{txt_paciente}{txt_ingreso}, ARGUMENTANDO UNA PRESUNTA DIFERENCIA ENTRE EL VALOR OBJETADO Y LA TARIFA PACTADA. AL RESPECTO, SE PRECISA TÉCNICA Y CONTRACTUALMENTE LO SIGUIENTE: EL VALOR FACTURADO DE {valor} SE LIQUIDÓ EN ESTRICTO CUMPLIMIENTO DE LAS CONDICIONES ESTABLECIDAS EN EL ACUERDO VIGENTE CON {nombre_eps_mostrar} ({info_c}). EN CONSECUENCIA, EL VALOR COBRADO ES PLENAMENTE CONCORDANTE CON LO ACORDADO ENTRE LAS PARTES.{texto_defensa} CONFORME AL DECRETO 441 DE 2022, LOS ACUERDOS TARIFARIOS DEBEN RESPETARSE EN SU INTEGRIDAD."
         elif prefijo == "CO":
             cuerpo = f"{texto_apertura} APLICADA POR CONCEPTO DE COBERTURA AL SERVICIO {servicio}{txt_paciente}, POR CUANTO LOS SERVICIOS FACTURADOS FUERON PRESCRITOS Y EJECUTADOS BAJO CRITERIO MÉDICO JUSTIFICADO, GUARDANDO RELACIÓN DIRECTA CON EL DIAGNÓSTICO QUE MOTIVÓ LA ATENCIÓN, SIENDO SU USO NECESARIO Y PERTINENTE.{texto_defensa} NORMATIVAMENTE, LA LEY 1751 DE 2015 CONSAGRA LA SALUD COMO DERECHO FUNDAMENTAL E IMPIDE NEGAR SERVICIOS CLÍNICAMENTE NECESARIOS; LA RESOLUCIÓN 3512 DE 2019 ESTABLECE QUE SOLO LO TAXATIVAMENTE EXCLUIDO DEL PBS PUEDE SER OBJETADO, POR LO QUE EN AUSENCIA DE EXCLUSIÓN EXPRESA, LA COBERTURA DEBE PRESUMIRSE; Y LAS RUTAS INTEGRALES (RESOLUCIÓN 3280 DE 2018) HACEN OBLIGATORIO EL CUMPLIMIENTO DE LAS INTERVENCIONES. EL ACUERDO VIGENTE ({info_c}) CONTEMPLA LA ATENCIÓN INTEGRAL. SE EXIGE LEVANTAMIENTO."
         elif prefijo == "FA":
@@ -214,7 +217,7 @@ class GlosaService:
             cuerpo = f"{texto_apertura} AL SERVICIO {servicio}.{texto_defensa} SE EXIGE LEVANTAMIENTO ACORDE AL CONTRATO ({info_c})."
 
         tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
-        
+       
         return GlosaResult(
             tipo="TÉCNICO-LEGAL", 
             resumen=f"DEFENSA FACTURA - {paciente if paciente != 'N/A' else 'PACIENTE EN MENCIÓN'}", 
