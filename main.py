@@ -1,6 +1,7 @@
 import os
 from typing import List
 from datetime import datetime
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,37 +15,51 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from services import GlosaService, crear_oficio_pdf
-from models import GlosaRecord, ContratoRecord, PlantillaGlosa, GlosaResult
+from models import GlosaRecord, ContratoRecord, PlantillaGlosa, GlosaInput
 from database import engine, Base, get_db, SessionLocal
-from contextlib import asynccontextmanager
 
 Base.metadata.create_all(bind=engine)
 
-# ✅ MEJORA: AUTO-CREAR CONTRATO POR DEFECTO AL INICIAR LA APP
+# ✅ Diccionario inyectable para auto-reparar la Base de Datos
+BASE_CONTRATOS_DEFAULT = {
+    "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
+    "COMPENSAR": "CONTRATO: CSS009-2024. TARIFA: SOAT -15% y Tarifas Propias. OBS: Excluye oncológicos. MAOS por EPS.",
+    "FAMISANAR": "CARTA DE INTENCIÓN. TARIFA: SOAT UVB -5% e Institucionales.",
+    "FOMAG": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15%, Institucionales y Paquetes (Tórax, IVE, Columna, Terapias, Gastro).",
+    "LA PREVISORA": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15% y Paquetes.",
+    "DISPENSARIO MEDICO": "CONTRATO: 440-DIGSA/DMBUG-2025. TARIFA: SOAT SMLV -20% e Institucionales.",
+    "POLICIA NACIONAL": "CONTRATOS: 068-5-200004-26 y 068-5-200006-26. TARIFA: SOAT UVB -8% e Institucionales. OBS: Contrato 0006-26 INCLUYE medicamentos oncológicos.",
+    "NUEVA EPS": "CONTRATO: 02-01-06-00077-2017. TARIFA: SOAT -20% e Institucionales. OBS: Meds Oncológicos por HUS.",
+    "PPL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%. OBS: MAOS y Meds por HUS.",
+    "FIDUCIARIA CENTRAL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%.",
+    "POSITIVA": "CONTRATO: 525 - OTROSÍ 3. TARIFA: SOAT SMLV -15%. OBS: Solo accidentes/laboral.",
+    "PRECIMED": "CONTRATO: 319 DE 2024. TARIFA: Tarifas anexos / Institucionales.",
+    "SALUD MIA": "CONTRATOS: SSA2025EVE3A005 y CSA2025EVE3A005. TARIFA: SOAT -15%. OBS: Urgencias Circular 019/2023.",
+    "AURORA": "CONTRATOS: GID ARL 0090 y GID AP 0090. TARIFA: SOAT -3%.",
+    "SECRETARIA DE SANTANDER": "MARCO LEGAL: Resolución 15997 de 2017 (Tarifas obligatorias ente territorial).",
+    "SUMIMEDICAL": "CONTRATO: FPS23-050. TARIFA: SOAT -15%. OBS: MAOS y Oncológicos por EPS.",
+    "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
+}
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
-        # Busca si ya existe el contrato por defecto
-        if not db.query(ContratoRecord).filter(ContratoRecord.eps == "OTRA / SIN DEFINIR").first():
-            db.add(ContratoRecord(
-                eps="OTRA / SIN DEFINIR", 
-                detalles="SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
-            ))
+        # Verifica si está vacío, si lo está, inyecta los 17 contratos
+        if db.query(ContratoRecord).count() == 0:
+            for eps_name, detalle in BASE_CONTRATOS_DEFAULT.items():
+                db.add(ContratoRecord(eps=eps_name, detalles=detalle))
             db.commit()
     finally:
         db.close()
     yield
 
-# 1. Creamos la app pasándole el "lifespan" (ciclo de vida)
 app = FastAPI(title="Motor Glosas HUS", version="2.4", lifespan=lifespan)
 
-# 2. Tu configuración de Rate Limiting (Intacta)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 3. Tu configuración de CORS (Intacta)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"],
@@ -52,15 +67,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 4. Archivos estáticos e IA (Intactos)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
 
+glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
 
 @app.get("/")
 def root():
-    return FileResponse("static/index.html")
-
+    return FileResponse("static/index.html", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    })
 
 @app.post("/analizar")
 @limiter.limit("20/minute")
@@ -85,7 +102,6 @@ async def analizar_endpoint(
     contratos = db.query(ContratoRecord).all()
     contratos_db = {c.eps: c.detalles for c in contratos}
 
-    from models import GlosaInput
     data = GlosaInput(
         eps=eps,
         etapa=etapa,
@@ -101,9 +117,7 @@ async def analizar_endpoint(
         contratos_db=contratos_db,
     )
 
-    # Guardar en historial
     try:
-        import re
         val_num = glosa_service.convertir_numero(resultado.valor_objetado)
         val_ac_num = glosa_service.convertir_numero(valor_aceptado)
         estado = "ACEPTADA" if val_ac_num > 0 else "LEVANTADA"
@@ -120,13 +134,12 @@ async def analizar_endpoint(
         db.add(registro)
         db.commit()
     except Exception:
-        pass  # No bloquear respuesta si falla el guardado
+        pass 
 
     return resultado
 
 
 _analytics_cache = {"data": None, "ts": None}
-
 
 @app.get("/analytics")
 def obtener_analytics(db: Session = Depends(get_db)):
@@ -173,7 +186,6 @@ def obtener_analytics(db: Session = Depends(get_db)):
 def listar_plantillas(db: Session = Depends(get_db)):
     return db.query(PlantillaGlosa).all()
 
-
 @app.post("/plantillas")
 async def crear_plantilla(data: dict, db: Session = Depends(get_db)):
     nueva = PlantillaGlosa(titulo=data['titulo'], texto=data['texto'])
@@ -181,20 +193,16 @@ async def crear_plantilla(data: dict, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "ok"}
 
-
 @app.get("/glosas")
 def listar_historial(db: Session = Depends(get_db)):
     return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(100).all()
-
 
 @app.get("/contratos")
 def listar_contratos(db: Session = Depends(get_db)):
     return db.query(ContratoRecord).all()
 
-
 @app.post("/contratos")
 def guardar_contrato(data: dict, db: Session = Depends(get_db)):
-    # Upsert: si ya existe la EPS, actualiza los detalles
     existente = db.query(ContratoRecord).filter(ContratoRecord.eps == data['eps']).first()
     if existente:
         existente.detalles = data['detalles']
@@ -202,7 +210,6 @@ def guardar_contrato(data: dict, db: Session = Depends(get_db)):
         db.add(ContratoRecord(eps=data['eps'], detalles=data['detalles']))
     db.commit()
     return {"status": "ok"}
-
 
 @app.delete("/contratos/{eps}")
 def eliminar_contrato(eps: str, db: Session = Depends(get_db)):
@@ -212,7 +219,6 @@ def eliminar_contrato(eps: str, db: Session = Depends(get_db)):
     db.delete(contrato)
     db.commit()
     return {"status": "ok"}
-
 
 @app.get("/exportar-historial")
 def exportar_historial(db: Session = Depends(get_db)):
@@ -231,12 +237,17 @@ def exportar_historial(db: Session = Depends(get_db)):
         headers={"Content-Disposition": "attachment; filename=Reporte_Glosas_HUS.csv"}
     )
 
-
 @app.post("/descargar-pdf")
 async def generar_pdf_endpoint(data: dict):
     pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
+    
+    # ✅ NOMBRE INTELIGENTE DEL PDF
+    fecha_hoy = datetime.now().strftime("%d-%m-%Y")
+    nombre_limpio = data['eps'].replace(" ", "_").replace("/", "-")
+    nombre_archivo = f"Respuesta_{nombre_limpio}_{fecha_hoy}.pdf"
+    
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=Respuesta_{data['eps']}.pdf"}
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
     )
