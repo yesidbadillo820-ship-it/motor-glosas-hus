@@ -124,7 +124,7 @@ class GlosaService:
         4. CIERRE: Finaliza exigiendo el levantamiento inmediato de la glosa y el pago íntegro de la factura, mencionando los soportes adjuntos.
         5. FORMATO: Escribe TODO EN MAYÚSCULAS SOSTENIDAS."""
 
-        prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR DE LA ESE HUS.
+        prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR DE ESE HUS.
         EPS: {eps_segura}
         GLOSA: "{texto_base}"
         SOPORTES CLÍNICOS: {contexto_pdf[:10000]}
