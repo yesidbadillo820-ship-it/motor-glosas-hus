@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -20,7 +20,6 @@ from database import engine, Base, get_db, SessionLocal
 
 Base.metadata.create_all(bind=engine)
 
-# ✅ Diccionario inyectable para auto-reparar la Base de Datos
 BASE_CONTRATOS_DEFAULT = {
     "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
     "COMPENSAR": "CONTRATO: CSS009-2024. TARIFA: SOAT -15% y Tarifas Propias. OBS: Excluye oncológicos. MAOS por EPS.",
@@ -45,7 +44,6 @@ BASE_CONTRATOS_DEFAULT = {
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
-        # Verifica si está vacío, si lo está, inyecta los 17 contratos
         if db.query(ContratoRecord).count() == 0:
             for eps_name, detalle in BASE_CONTRATOS_DEFAULT.items():
                 db.add(ContratoRecord(eps=eps_name, detalles=detalle))
@@ -54,7 +52,7 @@ async def lifespan(app: FastAPI):
         db.close()
     yield
 
-app = FastAPI(title="Motor Glosas HUS", version="2.4", lifespan=lifespan)
+app = FastAPI(title="Motor Glosas HUS", version="2.6", lifespan=lifespan)
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
@@ -79,25 +77,28 @@ def root():
         "Expires": "0"
     })
 
+# ✅ ENDPOINT 100% ANTIBALAS (Parseo Manual de FormData)
 @app.post("/analizar")
 @limiter.limit("20/minute")
-async def analizar_endpoint(
-    request: Request,
-    eps: str = Form(...),
-    etapa: str = Form(...),
-    fecha_radicacion: str = Form(...),
-    fecha_recepcion: str = Form(...),
-    valor_aceptado: str = Form(...),
-    tabla_excel: str = Form(...),
-    archivos: List[UploadFile] = File(None),
-    db: Session = Depends(get_db),
-):
+async def analizar_endpoint(request: Request, db: Session = Depends(get_db)):
+    # 1. Leemos el formulario de forma segura
+    form = await request.form()
+    
+    eps = str(form.get("eps", "OTRA / SIN DEFINIR"))
+    etapa = str(form.get("etapa", "INICIAL"))
+    fecha_radicacion = str(form.get("fecha_radicacion", ""))
+    fecha_recepcion = str(form.get("fecha_recepcion", ""))
+    valor_aceptado = str(form.get("valor_aceptado", "0"))
+    tabla_excel = str(form.get("tabla_excel", ""))
+    
+    # 2. Extraemos los archivos (si los hay)
+    archivos = form.getlist("archivos")
+    
     contexto_pdf = ""
-    if archivos:
-        for arc in archivos:
-            if arc.filename:
-                content = await arc.read()
-                contexto_pdf += await glosa_service.extraer_pdf(content)
+    for arc in archivos:
+        if hasattr(arc, "filename") and arc.filename:
+            content = await arc.read()
+            contexto_pdf += await glosa_service.extraer_pdf(content)
 
     contratos = db.query(ContratoRecord).all()
     contratos_db = {c.eps: c.detalles for c in contratos}
@@ -241,7 +242,6 @@ def exportar_historial(db: Session = Depends(get_db)):
 async def generar_pdf_endpoint(data: dict):
     pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
     
-    # ✅ NOMBRE INTELIGENTE DEL PDF
     fecha_hoy = datetime.now().strftime("%d-%m-%Y")
     nombre_limpio = data['eps'].replace(" ", "_").replace("/", "-")
     nombre_archivo = f"Respuesta_{nombre_limpio}_{fecha_hoy}.pdf"
