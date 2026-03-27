@@ -110,26 +110,29 @@ class GlosaService:
         nombre_eps_mostrar = "LA ENTIDAD RESPONSABLE DEL PAGO" if ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura) else eps_segura
 
         if val_ac_num > 0:
-            prompt_system = f"""ACTÚA COMO AUDITOR DE LA ESE HUS. Extrae los datos y en el campo DICTAMEN_INTEGRAL redacta en MAYÚSCULAS que se acepta la glosa por valor de ${val_ac_num:,.0f}."""
+            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta un documento formal en MAYÚSCULAS donde ESE HUS ACEPTA la glosa (por valor de ${val_ac_num:,.0f})."""
         else:
-            prompt_system = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR DE LA ESE HUS. 
+            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta la defensa completa y profundamente analítica (ESTILO ABOGADO AUDITOR SENIOR Y EXPERTO EN FACTURACIÓN).
         REGLAS DE ORO ABSOLUTAS:
-        1. ESTRUCTURA VISUAL: Usa párrafos separados (saltos de línea) para que sea fácil de leer. ESCRIBE TODO EN MAYÚSCULAS.
-        2. ANÁLISIS RELACIONAL: Cruza siempre lo AUTORIZADO vs lo EJECUTADO (Epicrisis) vs lo FACTURADO. Detecta y ataca contradicciones.
-        3. ANTI-REDUNDANCIA: NUNCA repitas la misma frase ni el mismo nombre del contrato en todos los párrafos. Sé directo, letal y fluido. NO redactes tres párrafos de conclusión; cierra con UNA ÚNICA ORACIÓN exigiendo el levantamiento y el pago íntegro.
-        4. DEFENSA TÉCNICA:
-           - FA (Facturación): Demuestra que el cobro es independiente, no está incluido en sala/enfermería. Cita Res 3047 Anexo 3.
-           - TA (Tarifas/Mayor Valor): Si hubo cirugía bilateral o múltiple, justifica las unidades cobradas. Exige respeto al contrato: {info_c}. Cita Art 871 C.Co.
-           - SO (Soportes/Insumos): El insumo es vital para la técnica. Exige el pago al costo de adquisición + administración. Cita Anexo 5 Res 3047.
-           - CO / CL / PE: Basa la defensa en la Epicrisis y pertinencia médica.
-        
-        NO ESCRIBAS INTRODUCCIONES. Ve directo a los argumentos en el campo CUERPO_ARGUMENTATIVO."""
+        1. INICIO OBLIGATORIO: Debes iniciar tu respuesta EXACTAMENTE con esta frase: "ESE HUS NO ACEPTA LA GLOSA [CÓDIGO] INTERPUESTA POR [MOTIVO BREVE], Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS CONTRACTUALES, TÉCNICOS Y NORMATIVOS:"
+        2. ANÁLISIS PROFUNDO (CRUCE DE DATOS): No seas genérico. Menciona fechas exactas, nombres de médicos con su RM, y números de folios/consecutivos (ej. hoja de gastos). Si la glosa ignora que el procedimiento fue BILATERAL o MÚLTIPLE (revisa Epicrisis y Descripción Quirúrgica), ataca esa contradicción fuertemente.
+        3. DEFENSA TÉCNICA SEGÚN PREFIJO:
+           - SI ES TA (Tarifas/Mayor Valor): Si hubo cirugía bilateral o múltiple, justifica las unidades cobradas basándote en la liquidación de tiempos quirúrgicos del tarifario aplicable (ej. SOAT). Exige respeto al contrato: "{info_c}". Rechaza el valor menor de la EPS citando el principio de buena fe (Art 871 C.Co).
+           - SI ES FA (Facturación): Demuestra que el cobro es independiente, tiene código propio (ej. POCT) y NO está incluido en sala/enfermería. Cita Res 3047 Anexo 3.
+           - SI ES SO (Soportes/Insumos): Argumenta que el insumo/material es indispensable para la técnica. Exige el pago al "costo de adquisición más el porcentaje de administración pactado". Menciona que se adjunta la factura de compra. Cita Anexo 5 Res 3047.
+           - SI ES CO / CL / PE: Basa la defensa en la Epicrisis, integralidad y pertinencia médica.
+        4. CIERRE: Finaliza exigiendo el levantamiento inmediato de la glosa y el pago íntegro de la factura, mencionando los soportes adjuntos.
+        5. FORMATO: Escribe TODO EN MAYÚSCULAS SOSTENIDAS."""
 
-        prompt = f"""EPS: {eps_segura}
+        prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR DE LA ESE HUS.
+        EPS: {eps_segura}
         GLOSA: "{texto_base}"
         SOPORTES CLÍNICOS: {contexto_pdf[:10000]}
         
-        {prompt_system}
+        INSTRUCCIONES OBLIGATORIAS:
+        1. Extrae los datos solicitados (Escribe N/A si no existen en los soportes).
+        2. El CODIGO_GLOSA es el código alfanumérico de objeción (Ej: TA5801, SO4201, FA0802).
+        3. {instruccion_dictamen}
         
         RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
         PACIENTE: 
@@ -140,20 +143,30 @@ class GlosaService:
         CODIGO_GLOSA: 
         VALOR_OBJETADO: 
         SERVICIO_GLOSADO: 
-        MOTIVO_GLOSA_RESUMIDO: (Máximo 6 palabras, ej: PRESUNTA AUSENCIA DE LISTA DE PRECIOS)
-        CUERPO_ARGUMENTATIVO: (Escribe aquí los párrafos de tu defensa sin introducciones ni saludos)
+        DICTAMEN_INTEGRAL: 
         """
         
-        try:
-            completion = await self.cliente.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}], 
-                model="llama-3.3-70b-versatile", 
-                temperature=0.1
-            )
-            res_ia = completion.choices[0].message.content
-        except Exception as e: 
-            logger.error("Error con la IA Groq", exc_info=True)
-            return GlosaResult(tipo="Error", resumen="Error Groq", dictamen="Ocurrió un error al contactar el modelo.", codigo_glosa="N/A", valor_objetado="0", paciente="N/A", mensaje_tiempo="", color_tiempo="")
+        # ── LLamada a la IA con sistema de reintentos (Retry + Backoff) ──
+        res_ia = ""
+        for intento in range(3):
+            try:
+                completion = await self.cliente.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}], 
+                    model="llama-3.3-70b-versatile", 
+                    temperature=0.1
+                )
+                res_ia = completion.choices[0].message.content
+                break
+            except Exception as e: 
+                logger.error(f"Intento {intento + 1} fallo al contactar Groq: {e}", exc_info=True)
+                if intento == 2:
+                    return GlosaResult(
+                        tipo="Error", resumen="Error de Conexión IA",
+                        dictamen="Error persistente al contactar el modelo. Por favor reintente.",
+                        codigo_glosa="N/A", valor_objetado="0", paciente="N/A",
+                        mensaje_tiempo="", color_tiempo=""
+                    )
+                await asyncio.sleep(2 ** intento)
 
         def b(e):
             m = re.search(fr'{e}:\s*(.*?)(?=\n[A-Z_]+:|$)', res_ia, re.IGNORECASE | re.DOTALL)
@@ -165,20 +178,10 @@ class GlosaService:
         codigo = b("CODIGO_GLOSA")
         valor = b("VALOR_OBJETADO")
         servicio = b("SERVICIO_GLOSADO")
-        motivo_resumido = b("MOTIVO_GLOSA_RESUMIDO")
-        
-        if val_ac_num > 0:
-            cuerpo_dictamen = b("DICTAMEN_INTEGRAL")
-        else:
-            cuerpo_arg = b("CUERPO_ARGUMENTATIVO")
-            if motivo_resumido == "N/A" or not motivo_resumido:
-                motivo_resumido = "MOTIVOS INJUSTIFICADOS"
-            
-            # 🔥 AQUÍ ESTÁ LA MAGIA: PYTHON ESCRIBE LA PRIMERA LÍNEA A LA FUERZA
-            cuerpo_dictamen = f"ESE HUS NO ACEPTA LA GLOSA {codigo} INTERPUESTA POR {motivo_resumido.upper()}, Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS TÉCNICOS, CONTRACTUALES Y NORMATIVOS:\n\n{cuerpo_arg}"
+        cuerpo_dictamen = b("DICTAMEN_INTEGRAL")
 
-        # Convertimos saltos de línea para el HTML y PDF
-        cuerpo_dictamen_html = cuerpo_dictamen.replace('\n', '<br/>')
+        # 🔥 APLASTADOR DE PÁRRAFOS ACTIVADO (Fuerza UN SOLO bloque de texto continuo)
+        cuerpo_dictamen = " ".join(cuerpo_dictamen.split())
 
         if val_ac_num > 0:
             val_obj_num = self.convertir_numero(valor)
@@ -200,7 +203,7 @@ class GlosaService:
         return GlosaResult(
             tipo=tipo_final, 
             resumen=f"DEFENSA FACTURA - {paciente if paciente != 'N/A' else 'PACIENTE EN MENCIÓN'}", 
-            dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7; font-size:11px;">{cuerpo_dictamen_html}</div>', 
+            dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7; font-size:11px;">{cuerpo_dictamen}</div>', 
             codigo_glosa=codigo, valor_objetado=valor, paciente=paciente, 
             mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo
         )
@@ -215,8 +218,8 @@ def crear_oficio_pdf(eps, resumen, conclusion):
     match = re.search(r'<div[^>]*>(.*?)</div>', conclusion, re.IGNORECASE | re.DOTALL)
     cuerpo_texto = match.group(1) if match else conclusion
     
-    clean_text = re.sub(r'<br\s*/?>', '\n', cuerpo_texto)
-    clean_text = re.sub(r'<[^>]+>', '', clean_text).strip()
+    # Extrae el texto limpio para el PDF (un solo bloque)
+    clean_text = re.sub(r'<[^>]+>', '', cuerpo_texto).strip()
     
     fecha_actual = datetime.now().strftime("%d/%m/%Y")
     
@@ -238,15 +241,8 @@ def crear_oficio_pdf(eps, resumen, conclusion):
         Paragraph(f"<b>Señores:</b><br/>{eps.upper()}", estilo_n),
         Spacer(1, 20),
         Paragraph(f"<b>ASUNTO:</b> {resumen}", estilo_n),
-        Spacer(1, 20)
-    ])
-
-    for parrafo in clean_text.split('\n'):
-        if parrafo.strip():
-            elements.append(Paragraph(parrafo.strip(), estilo_n))
-            elements.append(Spacer(1, 6))
-
-    elements.extend([
+        Spacer(1, 20),
+        Paragraph(clean_text, estilo_n),  # Aquí entra el bloque MASIVO de texto como un solo párrafo
         Spacer(1, 40),
         Paragraph("__________________________________________", estilo_n),
         Paragraph("<b>DEPARTAMENTO DE AUDITORÍA</b><br/>ESE HOSPITAL UNIVERSITARIO DE SANTANDER", estilo_n)
