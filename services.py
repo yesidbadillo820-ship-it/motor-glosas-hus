@@ -89,9 +89,12 @@ class GlosaService:
         val_ac_num = self.convertir_numero(data.valor_aceptado)
         texto_base = str(data.tabla_excel)
 
+        # Extracción previa del código de glosa en Python para ruteo inteligente
+        cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
+        codigo_real = cod_m.group(1) if cod_m else "N/A"
+        prefijo_glosa = codigo_real[:2].upper() if codigo_real != "N/A" else "XX"
+
         if data.etapa == "RATIFICADA" and val_ac_num == 0:
-            cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
-            codigo_real = cod_m.group(1) if cod_m else "N/A"
             val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
             valor_obj = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
             tabla = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">ETAPA</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo_real}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;"><b>RATIFICACIÓN</b></td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor_obj}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">RE9901<br><span style="font-size:9px;">GLOSA SUBSANADA TOTALMENTE</span></td></tr></table>"""
@@ -99,41 +102,55 @@ class GlosaService:
             return GlosaResult(tipo="LEGAL - RATIFICACIÓN", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_rat}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600")
 
         if es_extemporanea and val_ac_num == 0 and data.etapa != "RATIFICADA":
-            cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
-            codigo_real = cod_m.group(1) if cod_m else "N/A"
             val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
             valor_obj = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
             tabla = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">ESTADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo_real}</td><td style="padding:8px; border:1px solid #b91c1c; text-align:center; color:white;"><b>EXTEMPORÁNEA ({dias} DÍAS)</b></td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor_obj}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">RE9502<br><span style="font-size:9px;">ACEPTACIÓN TÁCITA</span></td></tr></table>"""
             texto_ext = f"ESE HUS NO ACEPTA GLOSA EXTEMPORANEA. AL HABERSE SUPERADO DICHO PLAZO LEGAL (HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN Y LA RECEPCIÓN) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA NOTIFICACIÓN FORMAL DE LAS OBJECIONES DENTRO DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER LOS RECURSOS ASOCIADOS A ESTA CUENTA, DE CONFORMIDAD CON LO DISPUESTO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 13 (LITERAL D) DE LA LEY 1122 DE 2007, ASÍ COMO LO REGLAMENTADO EN EL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN 3047 DE 2008, SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS APLICADAS."
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORÁNEA", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_ext}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
-        if val_ac_num > 0:
-            prompt = f"""ACTÚA COMO ABOGADO AUDITOR. Extrae datos y en DICTAMEN_INTEGRAL redacta en MAYÚSCULAS que se acepta la glosa por ${val_ac_num:,.0f}."""
+        # 🔥 ESTRATEGIA DINÁMICA (Aislamiento de Causal)
+        estrategia_especifica = ""
+        if prefijo_glosa == "TA":
+            estrategia_especifica = f"""ESTRATEGIA ÚNICA: La glosa es de TARIFAS/MAYOR VALOR. Tu única misión es justificar el valor cobrado.
+            - Revisa en los soportes si la cirugía fue BILATERAL o MÚLTIPLE (Ej. hernia bilateral). Si lo fue, justifica el cobro de unidades adicionales.
+            - Cita estrictamente este contrato: "{info_c}".
+            - Invoca el principio de buena fe (Art. 871 Código de Comercio).
+            - PROHIBICIÓN ABSOLUTA: No listes medicamentos, ni anestesias, ni jeringas, ni hables de facturas de compra. Enfócate SOLO en el valor y el contrato."""
+        elif prefijo_glosa == "SO":
+            estrategia_especifica = """ESTRATEGIA ÚNICA: La glosa es de SOPORTES/INSUMOS. Tu única misión es defender el material cobrado.
+            - Argumenta que el insumo/material es indispensable para la técnica quirúrgica o tratamiento (menciona su nombre).
+            - Exige el pago amparado en el "costo de adquisición más porcentaje de administración".
+            - Menciona explícitamente que se adjunta la factura de compra del proveedor como soporte.
+            - Cita el Anexo 5 de la Resolución 3047 de 2008."""
+        elif prefijo_glosa == "FA":
+            estrategia_especifica = """ESTRATEGIA ÚNICA: La glosa es de FACTURACIÓN. Tu única misión es defender la autonomía del cobro.
+            - Demuestra que el servicio o ítem cobrado NO está incluido en los derechos de sala, estancia o enfermería.
+            - Exige que la EPS señale la norma exacta que sustente la inclusión (la cual no existe).
+            - Cita el Anexo 3 de la Resolución 3047 de 2008."""
         else:
-            prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR Y ESPECIALISTA EN FACTURACIÓN DE ESE HUS.
+            estrategia_especifica = """ESTRATEGIA ÚNICA: La glosa es de COBERTURA/PERTINENCIA. Tu única misión es defender el acto médico.
+            - Basa tu argumento en la historia clínica, la evolución del paciente y la pertinencia médica.
+            - Habla sobre el derecho a la salud integral (Ley 1751 de 2015)."""
+
+        if val_ac_num > 0:
+            prompt = f"""ACTÚA COMO ABOGADO AUDITOR. Extrae datos y en CUERPO_ARGUMENTATIVO redacta en MAYÚSCULAS que se acepta la glosa por ${val_ac_num:,.0f}."""
+        else:
+            prompt = f"""ACTÚA COMO ABOGADO AUDITOR SENIOR Y ESPECIALISTA EN FACTURACIÓN DE LA ESE HUS.
             EPS: {eps_segura}
             GLOSA: "{texto_base}"
-            CONTRATO A APLICAR: {info_c}
             SOPORTES CLÍNICOS: {contexto_pdf[:10000]}
             
             INSTRUCCIONES OBLIGATORIAS:
-            1. Extrae los datos solicitados. (Escribe N/A si no existen).
-            2. El CODIGO_GLOSA es el código alfanumérico (Ej: TA5801, SO4201, FA0802).
-            3. DICTAMEN_INTEGRAL: Redacta la respuesta de defensa basándote en las siguientes REGLAS DE ORO:
+            1. Extrae los datos solicitados. (Si no existen, escribe N/A).
+            2. CODIGO_GLOSA: Código alfanumérico detectado.
+            3. MOTIVO_GLOSA_RESUMIDO: Resumen de máximo 6 palabras del motivo de la EPS.
+            4. CUERPO_ARGUMENTATIVO: Redacta tu defensa técnica basándote ESTRICTAMENTE en la siguiente regla:
             
-               A) INICIO EXACTO: Empieza obligatoriamente con: "ESE HUS NO ACEPTA LA GLOSA [CÓDIGO] INTERPUESTA POR [RESUMEN DEL MOTIVO], Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS CONTRACTUALES, TÉCNICOS Y NORMATIVOS:"
-               
-               B) AISLAMIENTO DE CAUSAL (¡CRÍTICO!): Identifica las primeras 2 letras del CÓDIGO_GLOSA y aplica SOLO la estrategia correspondiente, ignorando el resto:
-                  - SI EL PREFIJO ES 'TA' (Tarifas/Mayor Valor): Tu defensa es 100% sobre el valor del procedimiento. Justifica el cobro revisando si fue cirugía bilateral o múltiple (míralo en la Epicrisis). Cita el CONTRATO A APLICAR y el Art 871 del Código de Comercio. PROHIBICIÓN: ESTÁ ESTRICTAMENTE PROHIBIDO listar o mencionar medicamentos, insumos o anestesia de la hoja de gastos en este tipo de glosa.
-                  - SI EL PREFIJO ES 'SO' (Soportes/Insumos): Aquí tu defensa es sobre los materiales. Argumenta que el insumo objetado es indispensable para la técnica quirúrgica. Exige el pago al "costo de adquisición más porcentaje de administración", soportado en la factura de compra adjunta. Cita Anexo 5 de la Res 3047.
-                  - SI EL PREFIJO ES 'FA' (Facturación): Demuestra que el código o servicio cobrado es autónomo, no está incluido en la estancia/sala y tiene derecho a cobro independiente. Cita Anexo 3 de la Res 3047.
-                  - SI EL PREFIJO ES 'CO' o 'PE' (Cobertura/Pertinencia): Basa tu defensa en el diagnóstico, la urgencia médica y la integralidad del servicio prestado.
-               
-               C) USO DE DATOS DUROS: Apoya tu causal usando el nombre del médico, fechas o números de folio, pero SIEMPRE enfocado en la estrategia de tu causal.
-               
-               D) CIERRE: Termina exigiendo el levantamiento inmediato de la glosa y el pago íntegro de la factura.
-               
-               E) FORMATO: Escribe TODO EN MAYÚSCULAS. Genera el texto en UN SOLO PÁRRAFO CONTINUO, sin saltos de línea ni viñetas.
+            {estrategia_especifica}
+            
+            5. Usa nombres de médicos, fechas o folios que encuentres, pero SOLO si apoyan tu estrategia principal.
+            6. Termina exigiendo el levantamiento íntegro de la glosa objetada.
+            7. FORMATO: TODO EN MAYÚSCULAS. SIN INTRODUCCIONES. SIN SALUDOS. SOLO LA ARGUMENTACIÓN.
 
             RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
             PACIENTE: 
@@ -144,10 +161,10 @@ class GlosaService:
             CODIGO_GLOSA: 
             VALOR_OBJETADO: 
             SERVICIO_GLOSADO: 
-            DICTAMEN_INTEGRAL: 
+            MOTIVO_GLOSA_RESUMIDO: 
+            CUERPO_ARGUMENTATIVO: 
             """
         
-        # ── LLamada a la IA con sistema de reintentos (Retry + Backoff) ──
         res_ia = ""
         for intento in range(3):
             try:
@@ -176,13 +193,24 @@ class GlosaService:
             return val.strip() if val.strip() else "N/A"
 
         paciente = b("PACIENTE")
-        codigo = b("CODIGO_GLOSA")
+        codigo = b("CODIGO_GLOSA") if b("CODIGO_GLOSA") != "N/A" else codigo_real
         valor = b("VALOR_OBJETADO")
         servicio = b("SERVICIO_GLOSADO")
-        cuerpo_dictamen = b("DICTAMEN_INTEGRAL")
+        motivo_resumen = b("MOTIVO_GLOSA_RESUMIDO").upper()
+        cuerpo_arg = b("CUERPO_ARGUMENTATIVO")
+
+        if motivo_resumen == "N/A" or not motivo_resumen:
+            motivo_resumen = "OBJECIÓN INJUSTIFICADA"
 
         # 🔥 APLASTADOR DE PÁRRAFOS ACTIVADO (Fuerza UN SOLO bloque de texto continuo)
-        cuerpo_dictamen = " ".join(cuerpo_dictamen.split())
+        cuerpo_arg_plano = " ".join(cuerpo_arg.split())
+
+        # 🔥 INYECCIÓN OBLIGATORIA DEL ARRANQUE MEDIANTE PYTHON
+        if val_ac_num == 0:
+            arranque_obligatorio = f"ESE HUS NO ACEPTA LA GLOSA {codigo} INTERPUESTA POR {motivo_resumen}, Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS CONTRACTUALES, TÉCNICOS Y NORMATIVOS: "
+            cuerpo_dictamen = arranque_obligatorio + cuerpo_arg_plano
+        else:
+            cuerpo_dictamen = cuerpo_arg_plano
 
         if val_ac_num > 0:
             val_obj_num = self.convertir_numero(valor)
@@ -242,7 +270,7 @@ def crear_oficio_pdf(eps, resumen, conclusion):
         Spacer(1, 20),
         Paragraph(f"<b>ASUNTO:</b> {resumen}", estilo_n),
         Spacer(1, 20),
-        Paragraph(clean_text, estilo_n),
+        Paragraph(clean_text, estilo_n), 
         Spacer(1, 40),
         Paragraph("__________________________________________", estilo_n),
         Paragraph("<b>DEPARTAMENTO DE AUDITORÍA</b><br/>ESE HOSPITAL UNIVERSITARIO DE SANTANDER", estilo_n)
