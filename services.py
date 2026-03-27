@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import PyPDF2
 from groq import AsyncGroq
 from reportlab.lib.pagesizes import letter
-# ✅ Importamos Image para el logo
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
@@ -60,9 +59,11 @@ class GlosaService:
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         if contratos_db is None: contratos_db = {}
         
+        # ✅ DEFINIMOS eps_segura AQUÍ PARA TODO EL MÉTODO
+        eps_segura = str(data.eps).upper() if data.eps else "OTRA / SIN DEFINIR"
         info_c = contratos_db.get("OTRA / SIN DEFINIR", "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022).")
         for k, v in contratos_db.items():
-            if k in data.eps.upper(): 
+            if k in eps_segura: 
                 info_c = v
                 break
 
@@ -87,7 +88,7 @@ class GlosaService:
                 msg_tiempo, color_tiempo = "Error en fechas", "bg-slate-500"
 
         val_ac_num = self.convertir_numero(data.valor_aceptado)
-        texto_base = data.tabla_excel
+        texto_base = str(data.tabla_excel)
 
         if data.etapa == "RATIFICADA" and val_ac_num == 0:
             cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
@@ -112,7 +113,7 @@ class GlosaService:
             instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta 3 líneas explicando formalmente por qué el hospital ACEPTA esta glosa. NO uses leyes ni viñetas."
 
         prompt = f"""ACTÚA COMO AUDITOR DE LA ESE HUS.
-        EPS: {data.eps}
+        EPS: {eps_segura}
         GLOSA: "{texto_base}"
         SOPORTES: {contexto_pdf[:4000]}
         
@@ -135,7 +136,6 @@ class GlosaService:
         """
         
         try:
-            # ✅ USAMOS EL MODELO PESADO (Más estable para evitar Error de conexión)
             completion = await self.cliente.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}], 
                 model="llama-3.3-70b-versatile", 
@@ -192,12 +192,12 @@ class GlosaService:
         prefijo = str(codigo[:2]).upper() if codigo else "XX"
         cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA"
         
-        # ✅ VARIABLE DINÁMICA: Por defecto dice "NO ACEPTA GLOSA"
+        # ✅ VARIABLE DINÁMICA DE APERTURA (y usamos eps_segura que ya está definida)
         texto_apertura = f"ESE HUS NO ACEPTA GLOSA {codigo}"
         
         if prefijo == "TA" and ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura):
             cod_res, desc_res = "RE9206", "GLOSA INJUSTIFICADA 100%"
-            # ✅ SI CUMPLE LA CONDICIÓN, CAMBIA EL TEXTO INICIAL:
+            # ✅ CAMBIO DE TEXTO PARA GLOSA INJUSTIFICADA
             texto_apertura = f"ESE HUS NO ACEPTA GLOSA INJUSTIFICADA {codigo}"
 
         if prefijo == "TA":
