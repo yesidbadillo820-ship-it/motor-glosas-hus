@@ -1,9 +1,6 @@
 fastapi
 uvicorn
 sqlalchemy
-python-jose[cryptography]
-passlib
-bcrypt<4.0.0
 python-multipart
 python-dotenv
 PyPDF2
