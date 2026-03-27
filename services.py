@@ -59,7 +59,6 @@ class GlosaService:
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         if contratos_db is None: contratos_db = {}
         
-        # ✅ DEFINIMOS eps_segura AQUÍ PARA TODO EL MÉTODO
         eps_segura = str(data.eps).upper() if data.eps else "OTRA / SIN DEFINIR"
         info_c = contratos_db.get("OTRA / SIN DEFINIR", "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022).")
         for k, v in contratos_db.items():
@@ -90,6 +89,7 @@ class GlosaService:
         val_ac_num = self.convertir_numero(data.valor_aceptado)
         texto_base = str(data.tabla_excel)
 
+        # 1. CASO RATIFICADA
         if data.etapa == "RATIFICADA" and val_ac_num == 0:
             cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
             codigo_real = cod_m.group(1) if cod_m else "N/A"
@@ -99,33 +99,41 @@ class GlosaService:
             texto_rat = "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA GLOSA INICIAL Y CONTINUACIÓN DEL PROCESO DE ACUERDO CON LA NORMA. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE LA CONCILIACIÓN DE LA AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE LAS PARTES. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL CARTERA@HUS.GOV.CO. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, DE NO OBTENERSE LA RATIFICACIÓN DE LA RESPUESTA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN."
             return GlosaResult(tipo="LEGAL - RATIFICACIÓN", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_rat}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600")
 
+        # 2. CASO EXTEMPORÁNEA
         if es_extemporanea and val_ac_num == 0 and data.etapa != "RATIFICADA":
             cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
             codigo_real = cod_m.group(1) if cod_m else "N/A"
             val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
             valor_obj = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
             tabla = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">ESTADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo_real}</td><td style="padding:8px; border:1px solid #b91c1c; text-align:center; color:white;"><b>EXTEMPORÁNEA ({dias} DÍAS)</b></td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor_obj}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">RE9502<br><span style="font-size:9px;">ACEPTACIÓN TÁCITA</span></td></tr></table>"""
-            texto_ext = f"ESE HUS NO ACEPTA GLOSA EXTEMPORANEA. AL HABERSE SUPERADO DICHO PLAZO LEGAL (HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN Y LA RECEPCIÓN) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA NOTIFICACIÓN FORMAL DE LAS OBJECIONES DENTRO DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER LOS RECURSOS ASOCIADOS A ESTA CUENTA, DE CONFORMIDAD CON LO DISPUESTO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 13 (LITERAL D) DE LA LEY 1122 DE 2007, ASÍ COMO LO REGLAMENTADO EN EL DECRETO 4747 DE 2007 (ACTUALMENTE COMPILADO EN EL DECRETO ÚNICO REGLAMENTARIO 780 DE 2016) Y LA RESOLUCIÓN 3047 DE 2008 CON SUS RESPECTIVAS MODIFICACIONES, LAS ENTIDADES RESPONSABLES DEL PAGO (EPS) CUENTAN CON UN TÉRMINO MÁXIMO, PERENTÓRIO E IMPRORROGABLE DE VEINTE (20) DÍAS HÁBILES, CONTADOS A PARTIR DE LA FECHA DE RADICACIÓN DE LA FACTURA CON SUS RESPECTIVOS SOPORTES, PARA FORMULAR Y COMUNICAR DE MANERA SIMULTÁNEA TODAS LAS GLOSAS A LAS QUE HAYA LUGAR, SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS APLICADAS."
+            texto_ext = f"ESE HUS NO ACEPTA GLOSA EXTEMPORANEA. AL HABERSE SUPERADO DICHO PLAZO LEGAL (HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN Y LA RECEPCIÓN) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA NOTIFICACIÓN FORMAL DE LAS OBJECIONES DENTRO DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER LOS RECURSOS ASOCIADOS A ESTA CUENTA, DE CONFORMIDAD CON LO DISPUESTO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 13 (LITERAL D) DE LA LEY 1122 DE 2007, ASÍ COMO LO REGLAMENTADO EN EL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN 3047 DE 2008, SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS APLICADAS."
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORÁNEA", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_ext}</div>', codigo_glosa=codigo_real, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
-        instruccion_ia = """JUSTIFICACION_DEFENSA: Redacta un argumento contundente (máximo 5 líneas). 
-        REGLA VITAL: 
-        - Si la glosa es por "ausencia de lista de precios", "tarifas" o insumos no relacionados en la malla básica, argumenta administrativamente que: El insumo es altamente especializado e inherente a la técnica quirúrgica, por lo que su facturación se efectuó dando estricto cumplimiento al acuerdo contractual vigente, liquidándose al costo de adquisición más el porcentaje de administración pactado. TERMINA LA FRASE EXACTAMENTE ASÍ: "Se adjunta a la presente respuesta la respectiva factura de compra que avala el valor cobrado, por consiguiente, se exige el levantamiento inmediato de la glosa y el pago íntegro del dispositivo."
-        - Si la glosa es puramente médica o clínica, justifica la necesidad del servicio basándote exclusivamente en los soportes."""
-        
-        if val_ac_num > 0:
-            instruccion_ia = "JUSTIFICACION_DEFENSA: Redacta 3 líneas explicando formalmente por qué el hospital ACEPTA esta glosa. NO uses leyes ni viñetas."
+        # 3. EL NUEVO CEREBRO HOLÍSTICO DE LA IA
+        nombre_eps_mostrar = "LA ENTIDAD RESPONSABLE DEL PAGO" if ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura) else eps_segura
 
-        prompt = f"""ACTÚA COMO AUDITOR DE LA ESE HUS.
+        if val_ac_num > 0:
+            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta un párrafo formal y legal donde ESE HUS ACEPTA la glosa (por valor de ${val_ac_num:,.0f}). Explica que se revisó el caso y procede la aceptación. Todo en un solo párrafo, en MAYÚSCULAS y sin viñetas."""
+        else:
+            instruccion_dictamen = f"""DICTAMEN_INTEGRAL: Redacta la defensa completa en un solo párrafo largo, fluido, altamente técnico, médico y legal (ESTILO ABOGADO AUDITOR). 
+        REGLAS DE ORO PARA EL DICTAMEN:
+        1. Inicia exactamente con: "ESE HUS NO ACEPTA LA GLOSA [CÓDIGO] INTERPUESTA POR [MOTIVO BREVE O CÓDIGO], Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS TÉCNICOS, CONTRACTUALES Y NORMATIVOS:"
+        2. EXTRAE Y MENCIONA DATOS EXACTOS DE LOS SOPORTES: Fecha exacta de la atención/cirugía, nombre exacto del procedimiento, nombre del médico tratante y su registro médico (ej. RM), números de folios o consecutivo de hojas de gasto si aparecen en los PDFs.
+        3. Si la glosa es administrativa, de tarifas o falta de lista de precios (Ej. SO4201, TA...): Argumenta que el insumo/servicio es indispensable para la técnica usada, que se factura al "costo de adquisición más el porcentaje de administración pactado contractual", menciona el valor exacto objetado, indica que "SE ADJUNTA A LA PRESENTE RESPUESTA LA FACTURA DE ADQUISICIÓN", y cita el Anexo Técnico 5 de la Resolución 3047 de 2008 y la Resolución 1995 de 1999.
+        4. Si la glosa es de pertinencia clínica: Justifica la necesidad médica usando lo descrito en la Epicrisis o Descripción Quirúrgica.
+        5. Menciona que el cobro respeta las condiciones del acuerdo vigente establecido con {nombre_eps_mostrar}: {info_c}.
+        6. Cierra el párrafo exigiendo el levantamiento inmediato de la glosa y el reconocimiento íntegro del valor.
+        7. NO uses viñetas, ni asteriscos, ni saltos de línea. Escribe todo seguido en MAYÚSCULAS sostenidas."""
+
+        prompt = f"""ACTÚA COMO AUDITOR MÉDICO Y JURÍDICO EXPERTO DE LA ESE HUS.
         EPS: {eps_segura}
         GLOSA: "{texto_base}"
-        SOPORTES: {contexto_pdf[:4000]}
+        SOPORTES: {contexto_pdf[:6000]}
         
         INSTRUCCIONES OBLIGATORIAS:
-        1. Extrae los datos solicitados. Si un dato no existe, escribe exactamente N/A.
-        2. IMPORTANTE: El CODIGO_GLOSA es estrictamente el código de objeción que empieza con dos letras (Ej: TA0201, CO5701, FA0801, CO0601). NUNCA extraigas el código del insumo (Ej: 861801H o FMQ01811).
-        3. NO uses asteriscos (**), viñetas (-), ni saltos de línea.
-        4. {instruccion_ia}
+        1. Extrae los datos solicitados (Escribe N/A si no existen en los soportes).
+        2. El CODIGO_GLOSA es el código alfanumérico de objeción (Ej: SO4201, TA0801).
+        3. {instruccion_dictamen}
         
         RESPONDE ESTRICTAMENTE CON ESTE FORMATO EXACTO:
         PACIENTE: 
@@ -136,7 +144,7 @@ class GlosaService:
         CODIGO_GLOSA: 
         VALOR_OBJETADO: 
         SERVICIO_GLOSADO: 
-        JUSTIFICACION_DEFENSA: 
+        DICTAMEN_INTEGRAL: 
         """
         
         try:
@@ -155,77 +163,36 @@ class GlosaService:
             if not m: return "N/A"
             val = m.group(1).strip()
             val = val.replace("*", "").replace("-", "").replace('"', '') 
-            val = re.sub(r'^(JUSTIFICACI[OÓ]N DE DEFENSA|JUSTIFICACION):?\s*', '', val, flags=re.IGNORECASE)
             return val.strip() if val.strip() else "N/A"
 
         paciente = b("PACIENTE")
-        ingreso = b("INGRESO")
-        egreso = b("EGRESO")
-        dx = b("DIAGNOSTICO")
-        epi = b("EPICRISIS_NO")
         codigo = b("CODIGO_GLOSA")
         valor = b("VALOR_OBJETADO")
         servicio = b("SERVICIO_GLOSADO")
-        defensa_ia = b("JUSTIFICACION_DEFENSA")
+        cuerpo_dictamen = b("DICTAMEN_INTEGRAL")
 
-        txt_paciente = f" CORRESPONDIENTE AL PACIENTE {paciente}" if paciente != "N/A" else " CORRESPONDIENTE AL PACIENTE EN MENCIÓN"
-        txt_ingreso = f", IDENTIFICADO CON INGRESO N.° {ingreso}" if ingreso != "N/A" else ""
-        txt_egreso = f" CON FECHA DE EGRESO {egreso}" if egreso != "N/A" else ""
-        txt_epi = f" (EPICRISIS N.° {epi})" if epi != "N/A" else ""
-        txt_dx = f" Y DIAGNÓSTICO {dx}" if dx != "N/A" else ""
-
-        texto_defensa = ""
-        if defensa_ia.upper() != "N/A" and defensa_ia:
-            texto_defensa = f" TÉCNICAMENTE SE ACLARA: {defensa_ia.upper()}"
-            if not texto_defensa.endswith("."): texto_defensa += "."
-
+        # Determinación de Aceptación o Rechazo para la Cabecera de la Tabla HTML
         if val_ac_num > 0:
             val_obj_num = self.convertir_numero(valor)
             valor_acep_formato = f"$ {val_ac_num:,.0f}".replace(",", ".")
-            
             if val_ac_num >= val_obj_num and val_obj_num > 0:
                 cod_res, desc_res = "RE9702", "GLOSA ACEPTADA TOTALMENTE"
-                cuerpo = f"ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE {valor_acep_formato} POR CONCEPTO DE {servicio}.{texto_defensa} EN CONSECUENCIA, SE PROCEDE CON LA ACEPTACIÓN DEL 100% DEL VALOR OBJETADO."
             else:
                 cod_res, desc_res = "RE9801", "GLOSA PARCIALMENTE ACEPTADA"
-                cuerpo = f"ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE {valor_acep_formato} POR CONCEPTO DE {servicio}.{texto_defensa} SIN EMBARGO, ESTA INSTITUCIÓN RECHAZA EL EXCEDENTE DEL VALOR GLOSADO Y EXIGE EL PAGO ÍNTEGRO DEL SALDO RESTANTE."
-
             tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJETADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#d97706;">VALOR ACEPTADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold; color:#d97706;">{valor_acep_formato}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
-            return GlosaResult(tipo="AUDITORÍA - ACEPTACIÓN", resumen=f"ACEPTACIÓN DE GLOSA - {paciente if paciente != 'N/A' else 'PACIENTE EN MENCIÓN'}", dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7;">{cuerpo.upper()}</div>', codigo_glosa=codigo, valor_objetado=valor, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
-
-        prefijo = str(codigo[:2]).upper() if codigo else "XX"
-        cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA"
-        
-        # ✅ NOMBRE ELEGANTE: Si la EPS es la opción por defecto, usa un término formal. Si es otra, usa su nombre real.
-        nombre_eps_mostrar = "LA ENTIDAD RESPONSABLE DEL PAGO" if ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura) else eps_segura
-        
-        # ✅ VARIABLE DINÁMICA DE APERTURA
-        texto_apertura = f"ESE HUS NO ACEPTA GLOSA {codigo}"
-        
-        if prefijo == "TA" and ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura):
-            cod_res, desc_res = "RE9206", "GLOSA INJUSTIFICADA 100%"
-            texto_apertura = f"ESE HUS NO ACEPTA GLOSA INJUSTIFICADA {codigo}"
-
-        if prefijo == "TA":
-            # 👇 Aquí inyectamos {nombre_eps_mostrar} en lugar de la variable antigua
-            cuerpo = f"{texto_apertura} DEL SERVICIO {servicio}{txt_paciente}{txt_ingreso}, ARGUMENTANDO UNA PRESUNTA DIFERENCIA ENTRE EL VALOR OBJETADO Y LA TARIFA PACTADA. AL RESPECTO, SE PRECISA TÉCNICA Y CONTRACTUALMENTE LO SIGUIENTE: EL VALOR FACTURADO DE {valor} SE LIQUIDÓ EN ESTRICTO CUMPLIMIENTO DE LAS CONDICIONES ESTABLECIDAS EN EL ACUERDO VIGENTE CON {nombre_eps_mostrar} ({info_c}). EN CONSECUENCIA, EL VALOR COBRADO ES PLENAMENTE CONCORDANTE CON LO ACORDADO ENTRE LAS PARTES.{texto_defensa} CONFORME AL DECRETO 441 DE 2022, LOS ACUERDOS TARIFARIOS DEBEN RESPETARSE EN SU INTEGRIDAD."
-        elif prefijo == "CO":
-            cuerpo = f"{texto_apertura} APLICADA POR CONCEPTO DE COBERTURA AL SERVICIO {servicio}{txt_paciente}, POR CUANTO LOS SERVICIOS FACTURADOS FUERON PRESCRITOS Y EJECUTADOS BAJO CRITERIO MÉDICO JUSTIFICADO, GUARDANDO RELACIÓN DIRECTA CON EL DIAGNÓSTICO QUE MOTIVÓ LA ATENCIÓN, SIENDO SU USO NECESARIO Y PERTINENTE.{texto_defensa} NORMATIVAMENTE, LA LEY 1751 DE 2015 CONSAGRA LA SALUD COMO DERECHO FUNDAMENTAL E IMPIDE NEGAR SERVICIOS CLÍNICAMENTE NECESARIOS; LA RESOLUCIÓN 3512 DE 2019 ESTABLECE QUE SOLO LO TAXATIVAMENTE EXCLUIDO DEL PBS PUEDE SER OBJETADO, POR LO QUE EN AUSENCIA DE EXCLUSIÓN EXPRESA, LA COBERTURA DEBE PRESUMIRSE; Y LAS RUTAS INTEGRALES (RESOLUCIÓN 3280 DE 2018) HACEN OBLIGATORIO EL CUMPLIMIENTO DE LAS INTERVENCIONES. EL ACUERDO VIGENTE ({info_c}) CONTEMPLA LA ATENCIÓN INTEGRAL. SE EXIGE LEVANTAMIENTO."
-        elif prefijo == "FA":
-            cuerpo = f"{texto_apertura} APLICADA POR CONCEPTO DE FACTURACION SOBRE EL SERVICIO {servicio}{txt_paciente} POR VALOR DE {valor}, POR CUANTO LA FACTURACIÓN PRESENTADA CUMPLE ÍNTEGRAMENTE CON LOS REQUISITOS NORMATIVOS Y EL ACUERDO VIGENTE ({info_c}). EL SERVICIO CONSTITUYE UN ACTO MÉDICO AUTÓNOMO E INDEPENDIENTE.{texto_defensa} LA RESOLUCIÓN 1885 DE 2018 EXIGE QUE TODA GLOSA SEA SUSTENTADA DE MANERA ESPECÍFICA, Y EL DECRETO 441 DE 2022 PROHÍBE LA APLICACIÓN UNILATERAL DE CRITERIOS DE PAGO NO PACTADOS."
-        elif prefijo == "SO":
-            cuerpo = f"{texto_apertura} APLICADA POR CONCEPTO DE SOPORTES AL SERVICIO {servicio}{txt_paciente}{txt_ingreso}, POR CUANTO LA DOCUMENTACIÓN TÉCNICA Y CLÍNICA QUE SOPORTA LA PRESTACIÓN DEL SERVICIO REPOSA ÍNTEGRAMENTE EN EL EXPEDIENTE REMITIDO.{texto_defensa} OBRA EN EL EXPEDIENTE LA INFORMACIÓN ASISTENCIAL{txt_epi}{txt_egreso}{txt_dx}, DOCUMENTO QUE CONFORME A LA RESOLUCIÓN 1995 DE 1999 Y LA RESOLUCIÓN 1645 DE 2016 CONSTITUYE SOPORTE CLÍNICO SUFICIENTE Y FEHACIENTE. ASÍ MISMO, EL ANEXO TÉCNICO N.° 5 DE LA RESOLUCIÓN 3047 DE 2008 RECONOCE ESTOS SOPORTES COMO VÁLIDOS."
-        elif prefijo in ["CL", "PE"]:
-            cuerpo = f"{texto_apertura} APLICADA POR CONCEPTO DE PERTINENCIA AL SERVICIO {servicio}{txt_paciente}{txt_ingreso}, POR CUANTO LA PERTINENCIA CLÍNICA ESTÁ PLENAMENTE ACREDITADA EN LOS SOPORTES REMITIDOS.{texto_defensa} EL SERVICIO FUE INDICADO COMO PARTE DEL MANEJO TERAPÉUTICO REQUERIDO, SIENDO NECESARIO E INSUSTITUIBLE SEGÚN LOS PROTOCOLO VIGENTES. CONFORME A LA RESOLUCIÓN 1995 DE 1999 Y LA RESOLUCIÓN 3047 DE 2008, LA HISTORIA CLÍNICA ES SOPORTE SUFICIENTE, SIENDO IMPROCEDENTE OBJETAR LA PERTINENCIA SIN QUE EL ASEGURADOR APORTE UN CONCEPTO MÉDICO INDIVIDUALIZADO."
+            tipo_final = "AUDITORÍA - ACEPTACIÓN"
         else:
-            cuerpo = f"{texto_apertura} AL SERVICIO {servicio}.{texto_defensa} SE EXIGE LEVANTAMIENTO ACORDE AL CONTRATO ({info_c})."
+            prefijo = str(codigo[:2]).upper() if codigo else "XX"
+            cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA"
+            if prefijo == "TA" and ("OTRA" in eps_segura or "SIN DEFINIR" in eps_segura):
+                cod_res, desc_res = "RE9206", "GLOSA INJUSTIFICADA 100%"
+            tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
+            tipo_final = "TÉCNICO-LEGAL"
 
-        tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
-       
         return GlosaResult(
-            tipo="TÉCNICO-LEGAL", 
+            tipo=tipo_final, 
             resumen=f"DEFENSA FACTURA - {paciente if paciente != 'N/A' else 'PACIENTE EN MENCIÓN'}", 
-            dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7;">{cuerpo.upper()}</div>', 
+            dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7;">{cuerpo_dictamen.upper()}</div>', 
             codigo_glosa=codigo, valor_objetado=valor, paciente=paciente, 
             mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo
         )
@@ -246,7 +213,6 @@ def crear_oficio_pdf(eps, resumen, conclusion):
     
     elements = []
     
-    # ✅ SE INSERTA EL LOGO SI EL ARCHIVO EXISTE
     logo_path = "static/logo.png"
     if os.path.exists(logo_path):
         img = Image(logo_path, width=250, height=60)
