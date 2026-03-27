@@ -773,6 +773,26 @@
             .then(() => mostrarToast('✓ Texto copiado al portapapeles', 'success'))
             .catch(() => mostrarToast('Error al copiar', 'error'));
     }
+    // ─── Visualizador de Archivos PDF ──────────────────────────────────────────
+    document.getElementById('archivos').addEventListener('change', function(e) {
+        const label = this.nextElementSibling;
+        if (this.files && this.files.length > 1) {
+            label.innerHTML = `📎 <b>${this.files.length} documentos PDF cargados listos para analizar</b>`;
+            label.style.color = "var(--teal)";
+            this.parentElement.style.borderColor = "var(--teal)";
+            this.parentElement.style.background = "#f0fdf4";
+        } else if (this.files && this.files.length === 1) {
+            label.innerHTML = `📎 <b>${this.files[0].name} cargado</b>`;
+            label.style.color = "var(--teal)";
+            this.parentElement.style.borderColor = "var(--teal)";
+            this.parentElement.style.background = "#f0fdf4";
+        } else {
+            label.innerHTML = `📎 Adjuntar PDFs (Epicrisis)`;
+            label.style.color = "var(--slate)";
+            this.parentElement.style.borderColor = "var(--border)";
+            this.parentElement.style.background = "#fafbfc";
+        }
+    });
 </script>
 </body>
 </html>
