@@ -208,11 +208,13 @@ class GlosaService:
 4. Si detectas lateralidad (bilateral) o varios tiempos quirúrgicos reales en la epicrisis, ataca ese punto demostrando que la liquidación de la ESE HUS es correcta.
 5. Cita el Art. 871 del Código de Comercio (Buena Fe)."""
         elif prefijo == "SO":
-            estrategia = """DEFENSA DE SOPORTES E INSUMOS:
+            estrategia = """DEFENSA DE SOPORTES (CLÍNICOS O DE INSUMOS):
 1. PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
-2. Localiza el insumo en los soportes. Menciona el folio y el médico SÓLO SI ESTÁN CLAROS EN EL TEXTO. Si no, remítete a la "Hoja de Gastos". ¡NO INVENTES NOMBRES!
-3. ARGUMENTO NORMATIVO: La historia clínica es el soporte probatorio por excelencia (Res. 1995/1999). Exige el reconocimiento del VALOR OBJETADO en virtud del Anexo 5 Res. 3047/2008 (Costo de adquisición + administración) amparado en la factura del proveedor."""
-        elif prefijo == "FA":
+2. IDENTIFICA QUÉ TIPO DE SOPORTE ESTÁ RECLAMANDO LA EPS EN EL MOTIVO DE LA GLOSA:
+   - CASO A (Falta Documento Clínico): Si la EPS objeta que falta una lectura, resultado, epicrisis o descripción quirúrgica, LOCALIZA esa información en los anexos. Nombra la fecha, el médico (con RM) y el hallazgo. Argumenta que el documento SÍ ESTÁ en el expediente, desvirtuando la objeción por completo. PROHIBIDO hablar de facturas de compra o proveedores en este caso.
+   - CASO B (Falta Factura de Insumo/Medicamento): Si la EPS objeta un insumo o medicamento por falta de soporte de compra, exige el pago en virtud del Anexo 5 Res. 3047/2008 (Costo de adquisición + administración) amparado en la factura del proveedor.
+3. ARGUMENTO NORMATIVO BASE: La historia clínica y sus anexos son el soporte probatorio asistencial pleno (Res. 1995/1999). La realidad fáctica documental obliga al levantamiento de la glosa."""
+            elif prefijo == "FA":
             estrategia = """DEFENSA DE FACTURACIÓN Y CONCURRENCIA:
 1. PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
 2. Demuestra que el VALOR OBJETADO corresponde a un acto en salud AUTÓNOMO, que no hace parte constitutiva de estancias o paquetes integrales. Menciónalo basándote SOLO en los documentos leídos.
