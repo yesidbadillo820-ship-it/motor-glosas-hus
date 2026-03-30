@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger("motor_glosas")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EXTRACCIÓN DE PDF
+# 1. EXTRACCIÓN DE PDF
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _procesar_pdf_sync(file_content: bytes) -> str:
@@ -35,15 +35,14 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
             if txt:
                 paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
         unido = "".join(paginas)
-        # Cortamos a 6000 caracteres para evitar Error 429 (Saturación)
         if len(unido) > 6000:
-            unido = unido[:3000] + "\n\n...[ANÁLISIS TÉCNICO]...\n\n" + unido[-3000:]
+            unido = unido[:3000] + "\n\n...[ANÁLISIS TÉCNICO INTERMEDIO]...\n\n" + unido[-3000:]
         return unido
     except Exception:
         return ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SERVICIO DE AUDITORÍA Y JURÍDICA E.S.E. HUS
+# 2. SERVICIO DE AUDITORÍA Y JURÍDICA E.S.E. HUS
 # ─────────────────────────────────────────────────────────────────────────────
 
 class GlosaService:
@@ -76,7 +75,6 @@ class GlosaService:
         eps_segura = str(data.eps).upper() if data.eps else "OTRA / SIN DEFINIR"
         etapa_segura = str(data.etapa).strip().upper()
         
-        # 1. DETECCIÓN CONTRACTUAL (EL SINALAGMA)
         tiene_contrato = False
         info_c = "AUSENCIA DE CONTRATO VIGENTE. Rige la RESOLUCIÓN 054 DE 2026 de la ESE HUS (TARIFA SOAT PLENO 100%)."
         
@@ -106,18 +104,37 @@ class GlosaService:
                     msg_tiempo, color_tiempo = f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)", "bg-emerald-500"
             except Exception: pass
 
-        # 🛡️ GUILLOTINAS LEGALES 
+        # ══════════════════════════════════════════════════════════════════════
+        # 🛡️ 3. GUILLOTINAS LEGALES (LOS TEXTOS AGRESIVOS AHORA SÍ ESTÁN AQUÍ)
+        # ══════════════════════════════════════════════════════════════════════
         if "RATIF" in etapa_segura and val_ac_num <= 0:
-            tabla = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA SUBSANADA TOTALMENTE")
-            texto_rat = "ESE HUS NO ACEPTA LA GLOSA RATIFICADA. SE MANTIENE LA DEFENSA INICIAL. SE SOLICITA CONCILIACIÓN SEGÚN LEY 1438 DE 2011."
+            tabla = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA SUBSANADA TOTALMENTE", color_header="#1e3a8a")
+            texto_rat = (
+                "ESE HUS RECHAZA DE PLANO LA RATIFICACIÓN DE LA GLOSA. LA INSTITUCIÓN SE RATIFICA Y MANTIENE EN SU INTEGRIDAD "
+                "LA DEFENSA TÉCNICA, JURÍDICA Y NORMATIVA PRESENTADA EN LA RESPUESTA INICIAL, TODA VEZ QUE LA ENTIDAD GLOSANTE "
+                "NO APORTA NUEVOS ELEMENTOS DE JUICIO, EVIDENCIA CLÍNICA O SOPORTES CONTRACTUALES QUE DESVIRTÚEN LA FACTURACIÓN "
+                "DEL SERVICIO.<br/><br/>"
+                "POR LO ANTERIOR, SE DA POR AGOTADA ESTA INSTANCIA Y SE SOLICITA LA PROGRAMACIÓN INMEDIATA DE LA FECHA DE CONCILIACIÓN "
+                "DE AUDITORÍA MÉDICA ENTRE LAS PARTES (CORREO: CARTERA@HUS.GOV.CO), EN CUMPLIMIENTO DEL ARTÍCULO 57 DE LA LEY 1438 DE 2011. "
+                "DE NO LLEGARSE A UN ACUERDO, SE PROCEDERÁ CON EL TRÁMITE DE RECAUDO JURÍDICO DEL VALOR OBJETADO Y EL REPORTE A LA SUPERSALUD."
+            )
             return GlosaResult(tipo="LEGAL - RATIFICACIÓN", resumen="RECHAZO DE RATIFICACIÓN", dictamen=tabla + _div(texto_rat), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600")
 
         if es_extemporanea and val_ac_num <= 0:
             tabla = _tabla_simple(codigo_detectado, f"EXTEMPORÁNEA ({dias} DÍAS)", valor_obj_raw, "RE9502", "ACEPTACIÓN TÁCITA", color_estado="#b91c1c")
-            texto_ext = f"ESE HUS NO ACEPTA POR EXTEMPORANEIDAD (ART. 57 LEY 1438/2011). OPERA ACEPTACIÓN TÁCITA."
+            texto_ext = (
+                f"ESE HUS RECHAZA DE PLANO LA GLOSA NOTIFICADA POR EXTEMPORANEIDAD EN SU FORMULACIÓN. AL HABER TRANSCURRIDO {dias} DÍAS HÁBILES "
+                f"ENTRE LA FECHA DE RADICACIÓN DE LA FACTURA Y LA RECEPCIÓN DE LA GLOSA, SE HA SUPERADO AMPLIAMENTE EL TÉRMINO MÁXIMO PERENTORIO "
+                f"E IMPRORROGABLE DE VEINTE (20) DÍAS HÁBILES ESTABLECIDO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011.<br/><br/>"
+                f"EN CONSECUENCIA, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. LA FACULTAD DE "
+                f"AUDITORÍA DE LA EPS HA PRECLUIDO Y SE EXIGE EL PAGO INMEDIATO E ÍNTEGRO DEL VALOR OBJETADO, SO PENA DE INICIAR LAS ACCIONES "
+                f"DE COBRO COACTIVO DE MANERA INMEDIATA."
+            )
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO POR EXTEMPORANEIDAD", dictamen=tabla + _div(texto_ext), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
-        # 🧠 3. ESTRATEGIA Y MATRIZ DE PÁRRAFOS (OBLIGATORIA)
+        # ══════════════════════════════════════════════════════════════════════
+        # 🧠 4. CEREBRO IA (ESTRUCTURA DE 3 PÁRRAFOS)
+        # ══════════════════════════════════════════════════════════════════════
         if tiene_contrato:
             base_normativa = f"MARCO CONTRACTUAL DE OBLIGATORIO CUMPLIMIENTO: {info_c}"
         else:
@@ -126,12 +143,12 @@ class GlosaService:
         if prefijo == "TA":
             estrategia = """ESTRATEGIA TARIFARIA:
             - PÁRRAFO 1: Identifica y cita textualmente el contrato pactado o la Resolución.
-            - PÁRRAFO 2: Desvirtúa el descuento abusivo de la EPS explicando que el hospital liquidó correctamente las tarifas basándose en el acuerdo de voluntades o manual institucional.
+            - PÁRRAFO 2: Desvirtúa el descuento abusivo de la EPS explicando que el hospital liquidó correctamente.
             - PÁRRAFO 3: Exige el pago del VALOR OBJETADO citando el Art 871 del Código de Comercio (Buena Fe)."""
         elif prefijo == "SO":
             estrategia = """ESTRATEGIA SOPORTES:
-            - PÁRRAFO 1: Menciona el nombre del contrato/resolución.
-            - PÁRRAFO 2: Localiza el soporte en el PDF (Dr, RM, Fecha). Cita la Res. 1995/1999.
+            - PÁRRAFO 1: Menciona el nombre del contrato o resolución aplicable.
+            - PÁRRAFO 2: Localiza el soporte en el PDF (Dr, RM, Fecha). Cita la Res. 1995/1999 demostrando que la HC es plena prueba.
             - PÁRRAFO 3: Exige el VALOR OBJETADO."""
         else:
             estrategia = "ESTRATEGIA TÉCNICA: Justifica la pertinencia médica en 3 párrafos basados en la Ley 1751/2015 y los anexos."
@@ -140,7 +157,7 @@ class GlosaService:
         REGLAS INQUEBRANTABLES:
         1. TODO EN MAYÚSCULAS.
         2. TU REDACCIÓN DEBE TENER MÍNIMO 3 PÁRRAFOS ROBUSTOS Y TÉCNICOS. NO RESUMAS. 
-        3. DEFIENDE ESTE MARCO NORMATIVO/CONTRACTUAL A CAPA Y ESPADA: {base_normativa}
+        3. DEFIENDE ESTE MARCO NORMATIVO/CONTRACTUAL: {base_normativa}
         4. USA 'VALOR OBJETADO'. NUNCA 'valor facturado'.
         5. DEVUELVE TU RESPUESTA ESTRICTAMENTE EN ESTE FORMATO XML:
         <paciente>Nombre o N/A</paciente>
@@ -148,18 +165,17 @@ class GlosaService:
         <valor_objetado>Valor</valor_objetado>
         <servicio_glosado>Servicio reclamado</servicio_glosado>
         <motivo_resumido>Motivo corto</motivo_resumido>
-        <argumento>TODA TU REDACCIÓN LEGAL AQUÍ, EN MÍNIMO 3 PÁRRAFOS SEPARADOS</argumento>"""
+        <argumento>TODA TU REDACCIÓN LEGAL AQUÍ</argumento>"""
 
         user_prompt = f"EPS: {eps_segura}\nBASE: {base_normativa}\nESTRATEGIA A APLICAR: {estrategia}\nGLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:6000]}"
 
         res_ia = ""
         for intento in range(3):
             try:
-                # 🔥 VOLVEMOS AL 70B (EL CEREBRO MAESTRO) 🔥
                 completion = await self.cliente.chat.completions.create(
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
                     model="llama-3.3-70b-versatile",
-                    temperature=0.3, # Le damos creatividad para expandir los párrafos
+                    temperature=0.3,
                     max_tokens=2500
                 )
                 res_ia = completion.choices[0].message.content
@@ -169,7 +185,7 @@ class GlosaService:
                     res_ia = "<argumento>EL SERVIDOR DE IA ESTÁ SATURADO. POR FAVOR ESPERE 30 SEGUNDOS Y REINTENTE.</argumento>"
                 await asyncio.sleep(20)
 
-        # 4. ENSAMBLAJE
+        # 5. ENSAMBLAJE
         paciente      = self.xml("paciente", res_ia, "NO IDENTIFICADO")
         codigo_final  = self.xml("codigo_glosa", res_ia, codigo_detectado)
         valor_xml     = self.xml("valor_objetado", res_ia, valor_obj_raw)
@@ -190,16 +206,18 @@ class GlosaService:
 
         tabla_html = _tabla_defensa(codigo_final, servicio, valor_xml, cod_res, desc_res)
         
-        # Limpieza final de la respuesta
         if not re.search(r'^ESE HUS (NO |)ACEPTA', argumento_ia, re.IGNORECASE):
             dictamen_final = apertura + "\n\n" + argumento_ia
         else:
             dictamen_final = argumento_ia
 
-        return GlosaResult(tipo="TÉCNICO-LEGAL", resumen=f"DEFENSA FACTURA – {paciente}", dictamen=tabla_html + _div(dictamen_final.replace("\n", "<br/><br/>")), codigo_glosa=codigo_final, valor_objetado=valor_xml, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
+        dictamen_limpio = dictamen_final.replace("\n", "<br/><br/>")
+        dictamen_limpio = re.sub(r'(<br/>\s*){3,}', '<br/><br/>', dictamen_limpio)
+
+        return GlosaResult(tipo="TÉCNICO-LEGAL", resumen=f"DEFENSA FACTURA – {paciente}", dictamen=tabla_html + _div(dictamen_limpio), codigo_glosa=codigo_final, valor_objetado=valor_xml, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FUNCIONES AUXILIARES DE TABLAS Y PDF
+# FUNCIONES AUXILIARES
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _div(texto): 
