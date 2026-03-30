@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger("motor_glosas")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EXTRACCIÓN DE PDF
+# 1. EXTRACCIÓN DE PDF (Minería de Datos)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _procesar_pdf_sync(file_content: bytes) -> str:
@@ -35,14 +35,15 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
             if txt:
                 paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
         unido = "".join(paginas)
+        # Límite estricto de 8000 caracteres para evitar Error 429 en Groq
         if len(unido) > 8000:
-            unido = unido[:4000] + "\n\n...[ANÁLISIS TÉCNICO]...\n\n" + unido[-4000:]
+            unido = unido[:4000] + "\n\n...[ANÁLISIS TÉCNICO INTERMEDIO]...\n\n" + unido[-4000:]
         return unido
     except Exception:
         return ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SERVICIO DE AUDITORÍA Y JURÍDICA E.S.E. HUS
+# 2. SERVICIO DE AUDITORÍA Y JURÍDICA E.S.E. HUS
 # ─────────────────────────────────────────────────────────────────────────────
 
 class GlosaService:
@@ -54,6 +55,7 @@ class GlosaService:
             loop = asyncio.get_running_loop()
             return await loop.run_in_executor(None, _procesar_pdf_sync, file_content)
         except Exception:
+            logger.error("Error al extraer PDF", exc_info=True)
             return ""
 
     def convertir_numero(self, m_str: str) -> float:
@@ -63,6 +65,7 @@ class GlosaService:
         except ValueError: return 0.0
 
     def xml(self, tag: str, texto: str, default: str = "") -> str:
+        """Extractor XML blindado"""
         m = re.search(fr'<{tag}>(.*?)</{tag}>', texto, re.IGNORECASE | re.DOTALL)
         if m:
             val = m.group(1).strip().replace("**", "").replace("*", "")
@@ -90,7 +93,7 @@ class GlosaService:
         val_ac_num = self.convertir_numero(data.valor_aceptado)
         cod_m = re.search(r'\b([A-Z]{2,3}\d{3,4})\b', texto_base)
         codigo_detectado = cod_m.group(1) if cod_m else "N/A"
-        prefijo = codigo_detectado[:2].upper()
+        prefijo = codigo_detectado[:2].upper() if codigo_detectado != "N/A" else "XX"
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
         valor_obj_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
@@ -109,7 +112,7 @@ class GlosaService:
 
         # 🛡️ GUILLOTINAS LEGALES (RATIFICACIÓN / EXTEMPORÁNEA)
         if "RATIF" in etapa_segura and val_ac_num <= 0:
-            tabla = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA SUBSANADA TOTALMENTE")
+            tabla = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA SUBSANADA TOTALMENTE", color_header="#1e3a8a")
             texto_rat = "ESE HUS NO ACEPTA LA GLOSA RATIFICADA. SE MANTIENE LA DEFENSA INICIAL. SE SOLICITA CONCILIACIÓN SEGÚN LEY 1438 DE 2011."
             return GlosaResult(tipo="LEGAL - RATIFICACIÓN", resumen="RECHAZO DE RATIFICACIÓN", dictamen=tabla + _div(texto_rat), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600")
 
@@ -161,11 +164,73 @@ class GlosaService:
         cod_res, desc_res = ("RE9602", "GLOSA NO ACEPTADA") if (prefijo in ["TA", "SO"] or not tiene_contrato) else ("RE9901", "GLOSA NO ACEPTADA")
         
         if val_ac_num > 0:
-            # Lógica de aceptación si el usuario puso un valor aceptado
-            # ... (se mantiene igual que antes)
-            pass
+            val_obj_num = self.convertir_numero(valor_xml)
+            valor_acep_fmt = f"$ {val_ac_num:,.0f}".replace(",", ".")
+            apertura = f"ESE HUS ACEPTA LA GLOSA {codigo_final} POR UN VALOR DE {valor_acep_fmt}, CONSIDERANDO LO SIGUIENTE: "
+            cod_res, desc_res = ("RE9702", "GLOSA ACEPTADA TOTALMENTE") if val_ac_num >= val_obj_num else ("RE9801", "GLOSA PARCIALMENTE ACEPTADA")
+            tabla_html = _tabla_aceptacion(codigo_final, valor_xml, valor_acep_fmt, cod_res, desc_res)
+            tipo_final, res_final = "AUDITORÍA - ACEPTACIÓN", f"ACEPTACIÓN DE GLOSA – {paciente}"
+        else:
+            tabla_html = _tabla_defensa(codigo_final, servicio, valor_xml, cod_res, desc_res)
+            tipo_final, res_final = "TÉCNICO-LEGAL", f"DEFENSA FACTURA – {paciente}"
 
-        tabla_html = _tabla_defensa(codigo_final, servicio, valor_xml, cod_res, desc_res)
-        return GlosaResult(tipo="TÉCNICO-LEGAL", resumen=f"DEFENSA FACTURA – {paciente}", dictamen=tabla_html + _div(apertura + "\n\n" + argumento_ia), codigo_glosa=codigo_final, valor_objetado=valor_xml, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
+        if not re.search(r'^ESE HUS (NO |)ACEPTA', argumento_ia, re.IGNORECASE):
+            dictamen_final = apertura + "\n\n" + argumento_ia
+        else:
+            dictamen_final = argumento_ia
 
-# ... [Mantenemos las funciones auxiliares _div, _tabla_simple, _tabla_defensa, _tabla_aceptacion y crear_oficio_pdf]
+        return GlosaResult(tipo=tipo_final, resumen=res_final, dictamen=tabla_html + _div(dictamen_final.replace("\n", "<br/>")), codigo_glosa=codigo_final, valor_objetado=valor_xml, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES AUXILIARES DE TABLAS HTML
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _div(texto): 
+    return f'<div style="text-align:justify;line-height:1.8;font-size:11px;">{texto}</div>'
+
+def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_header="#1e3a8a", color_estado=None):
+    e_st = f'background-color:{color_estado};color:white;' if color_estado else ''
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:{color_header};color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">ESTADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;{e_st}"><b>{estado}</b></td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
+
+def _tabla_defensa(codigo, servicio, valor, cod_res, desc_res):
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
+
+def _tabla_aceptacion(codigo, valor_obj, valor_acep, cod_res, desc_res):
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR OBJETADO</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#d97706;">VALOR ACEPTADO</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor_obj}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:#d97706;">{valor_acep}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GENERADOR DE OFICIO PDF (ReportLab)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
+    estilos = getSampleStyleSheet()
+    estilo_n = ParagraphStyle('n', parent=estilos['Normal'], alignment=TA_JUSTIFY, fontSize=11, leading=16)
+    estilo_titulo = ParagraphStyle('titulo', parent=estilos['Heading1'], alignment=1, fontSize=14, spaceAfter=20)
+    match = re.search(r'<div[^>]*>(.*?)</div>', conclusion, re.IGNORECASE | re.DOTALL)
+    cuerpo = match.group(1) if match else conclusion
+    clean  = re.sub(r'<br\s*/?>', '\n', re.sub(r'<[^>]+>', '', cuerpo)).strip()
+    fecha = datetime.now().strftime("%d/%m/%Y")
+    elements = []
+    logo_path = "static/logo.png"
+    if os.path.exists(logo_path):
+        try:
+            img = Image(logo_path, width=250, height=60)
+            img.hAlign = 'LEFT'
+            elements.extend([img, Spacer(1, 15)])
+        except: pass
+    elements.extend([
+        Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", estilo_titulo),
+        Paragraph("<b>OFICINA DE AUDITORÍA Y JURÍDICA DE CUENTAS MÉDICAS</b>", ParagraphStyle('sub', alignment=1, fontSize=12)),
+        Spacer(1, 30), Paragraph(f"Bucaramanga, {fecha}", estilo_n), Spacer(1, 20),
+        Paragraph(f"<b>Señores:</b><br/>{eps.upper()}", estilo_n), Spacer(1, 20),
+        Paragraph(f"<b>ASUNTO:</b> {resumen}", estilo_n), Spacer(1, 20),
+    ])
+    for parrafo in clean.split('\n'):
+        if parrafo.strip(): elements.extend([Paragraph(parrafo.strip(), estilo_n), Spacer(1, 6)])
+    elements.extend([Spacer(1, 40), Paragraph("__________________________________________", estilo_n), Paragraph("<b>DEPARTAMENTO DE AUDITORÍA</b><br/>ESE HOSPITAL UNIVERSITARIO DE SANTANDER", estilo_n)])
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.read()
