@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger("motor_glosas")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EXTRACCIÓN DE PDF (Minería de Datos Asistencial)
+# EXTRACCIÓN DE PDF
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _procesar_pdf_sync(file_content: bytes) -> str:
@@ -35,15 +35,14 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
             if txt:
                 paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
         unido = "".join(paginas)
-        # Limitamos el contexto para no saturar los tokens de Groq
         if total > 8:
-            unido = "".join(paginas[:2]) + "\n\n...[ANÁLISIS TÉCNICO INTERMEDIO]...\n\n" + "".join(paginas[-4:])
+            unido = "".join(paginas[:2]) + "\n\n...[ANÁLISIS TÉCNICO]...\n\n" + "".join(paginas[-4:])
         return unido[:16000]
     except Exception:
         return ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SERVICIO DE AUDITORÍA Y JURÍDICA E.S.E. HUS
+# SERVICIO PRINCIPAL - CEREBRO 70B ELITE 
 # ─────────────────────────────────────────────────────────────────────────────
 
 class GlosaService:
@@ -55,7 +54,6 @@ class GlosaService:
             loop = asyncio.get_running_loop()
             return await loop.run_in_executor(None, _procesar_pdf_sync, file_content)
         except Exception:
-            logger.error("Error al extraer PDF", exc_info=True)
             return ""
 
     def convertir_numero(self, m_str: str) -> float:
@@ -64,7 +62,8 @@ class GlosaService:
         try: return float(clean)
         except ValueError: return 0.0
 
-    def xml(self, tag: str, texto: str, default: str = "N/A") -> str:
+    def xml(self, tag: str, texto: str, default: str = "") -> str:
+        """Extractor XML seguro"""
         m = re.search(fr'<{tag}>(.*?)</{tag}>', texto, re.IGNORECASE | re.DOTALL)
         if m:
             val = m.group(1).strip().replace("**", "").replace("*", "")
@@ -76,16 +75,14 @@ class GlosaService:
 
         eps_segura = str(data.eps).upper() if data.eps else "OTRA / SIN DEFINIR"
         
-        # 🏛️ PILARES LEGALES DE LA E.S.E. HUS (Inyectados directamente en el cerebro)
         BASE_LEGAL_HUS = """
-        - RESOLUCIÓN 054 DE 2026: Unifica tarifas institucionales y adopta el Manual de Tarifas Institucionales de la E.S.E. HUS. Es de OBLIGATORIO CUMPLIMIENTO para todas las Entidades Responsables de Pago (Art. 2).
-        - RESOLUCIÓN 120 DE 2026: Crea y actualiza códigos y tarifas (especialmente Gastroenterología) incorporándolos al Manual de Tarifas Institucionales (Art. 2 y 4).
-        - TARIFA SOBERANA: Ante ausencia de acuerdo contractual, la E.S.E. HUS liquida servicios a TARIFA SOAT PLENO (100% del Decreto 2423 de 1996) según lo dictado en el parágrafo de la Res. 054/2026.
-        - AUTONOMÍA: La entidad es descentralizada con personería jurídica y autonomía administrativa (Decreto 0025 de 2005).
+        - RESOLUCIÓN INSTITUCIONAL 054 DE 2026: Unifica tarifas de la E.S.E. HUS. Es de OBLIGATORIO CUMPLIMIENTO.
+        - RESOLUCIÓN INSTITUCIONAL 120 DE 2026: Códigos y tarifas (Ej. Gastroenterología).
+        - TARIFA SOBERANA: Sin acuerdo contractual, la E.S.E. HUS liquida a TARIFA SOAT PLENO (100% del Decreto 2423 de 1996).
         """
 
         info_c = contratos_db.get("OTRA / SIN DEFINIR", 
-            f"AUSENCIA DE CONTRATO VIGENTE. Rige de manera vinculante la RESOLUCIÓN 054 DE 2026 y la RESOLUCIÓN 120 DE 2026 de la E.S.E. HUS. La tarifa institucional obligatoria es SOAT PLENO (100% del Decreto 2423 de 1996).")
+            f"AUSENCIA DE CONTRATO VIGENTE. Rige de manera vinculante la RESOLUCIÓN 054 DE 2026 de la E.S.E. HUS. Tarifa obligatoria es SOAT PLENO (100% del Decreto 2423 de 1996).")
         
         for k, v in contratos_db.items():
             if k in eps_segura:
@@ -108,38 +105,36 @@ class GlosaService:
             try:
                 f1 = datetime.strptime(data.fecha_radicacion, "%Y-%m-%d")
                 f2 = datetime.strptime(data.fecha_recepcion, "%Y-%m-%d")
-                dia_actual = f1
-                while dia_actual < f2:
-                    dia_actual += timedelta(days=1)
-                    if dia_actual.weekday() < 5: dias += 1
+                dias = sum(1 for d in range((f2 - f1).days) if (f1 + timedelta(days=d+1)).weekday() < 5)
                 if dias > 20:
                     es_extemporanea, msg_tiempo, color_tiempo = True, f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES)", "bg-red-600"
                 else:
                     msg_tiempo, color_tiempo = f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)", "bg-emerald-500"
             except Exception: pass
 
-        # 🧠 ESTRATEGIA DE AUDITORÍA FORENSE - INSTRUCCIONES MILITARES
+        # ── ESTRATEGIAS FORENSES ──
         if prefijo == "TA":
-            estrategia = """ESTRATEGIA TARIFARIA OBLIGATORIA (MÍNIMO 3 PÁRRAFOS):
-            - PÁRRAFO 1: Cita la RESOLUCIÓN 054 DE 2026 y la RESOLUCIÓN 120 DE 2026. Explica que estas normas unifican las tarifas de la E.S.E. HUS y son de cumplimiento OBLIGATORIO para las EPS.
-            - PÁRRAFO 2: Defiende el cobro a TARIFA SOAT PLENO (100%). Argumenta que la EPS intenta imponer unilateralmente tarifas (como SMLV o indexaciones no pactadas) que vulneran la autonomía administrativa del hospital otorgada por el Decreto 0025 de 2005.
-            - PÁRRAFO 3: Exige el pago del VALOR OBJETADO invocando el Art. 871 del Código de Comercio (Buena fe contractual). Finaliza indicando que el CÓDIGO DE RESPUESTA ES RE9602.
-            - REGLA: Prohibido decir 'valor facturado'. Usa SIEMPRE 'VALOR OBJETADO'."""
+            estrategia = "Defiende el SOAT PLENO. Cita Resolución 054 y 120 de 2026. La EPS no puede imponer tarifas (SMLV/ISS) sin contrato. Exige el VALOR OBJETADO."
         elif prefijo == "SO":
-            estrategia = """ESTRATEGIA SOPORTES: Localiza en los anexos el documento clínico que la EPS dice que falta. Cita el médico, RM, hallazgos y fecha. Invoca la Res. 1995/1999 (Historia Clínica como plena prueba). PROHIBIDO hablar de facturas si es un soporte clínico. Código RE9602."""
+            estrategia = "Busca el resultado clínico en los anexos. Cita médico y fecha. Invoca Res. 1995/1999 (Historia Clínica es plena prueba). Exige el VALOR OBJETADO."
         elif prefijo == "FA":
-            estrategia = "ESTRATEGIA FACTURACIÓN: Defiende la autonomía del código CUPS glosado. Cita el Anexo 3 Res 3047/2008. Exige a la EPS la norma técnica que justifique la inclusión; de lo contrario, la glosa es improcedente."
+            estrategia = "Defiende el código CUPS como autónomo. Cita Anexo 3 Res 3047. Exige norma de inclusión."
         else:
-            estrategia = "ESTRATEGIA INTEGRAL: Cruce milimétrico de la realidad fáctica del PDF contra el Manual de Tarifas Institucional."
+            estrategia = "Defiende la pertinencia médica y el derecho a la salud (Ley 1751/2015)."
 
-        system_prompt = f"""Eres el DIRECTOR NACIONAL DE JURÍDICA Y AUDITORÍA DE LA ESE HUS. Tienes 30 años de experiencia ganando defensas contra EPS.
-        REGLAS DE ORO:
+        system_prompt = f"""Eres el DIRECTOR DE JURÍDICA Y AUDITORÍA DE LA ESE HUS (30 años de experiencia).
+        REGLAS:
         1. TODO EN MAYÚSCULAS.
-        2. PROHIBIDO LAS RESPUESTAS CORTAS: Debes redactar un argumento extenso, técnico y legal (Mínimo 150 palabras).
-        3. TERMINOLOGÍA: Nunca digas 'valor facturado'. Usa SIEMPRE 'VALOR OBJETADO'.
-        4. FUNDAMENTO: {BASE_LEGAL_HUS}
-        5. LÉXICO: Sinalagma contractual, Autonomía administrativa, Preclusión, Realidad fáctica, Acuerdo de voluntades.
-        6. RESPUESTA XML: <paciente><codigo_glosa><valor_objetado><servicio_glosado><motivo_resumido><argumento>"""
+        2. DICTAMEN LARGO Y SUSTENTADO (MÍNIMO 2 PÁRRAFOS).
+        3. USA LA BASE LEGAL: {BASE_LEGAL_HUS}
+        4. NUNCA DIGAS 'valor facturado'. USA SIEMPRE 'VALOR OBJETADO'.
+        5. DEVUELVE TU RESPUESTA ESTRICTAMENTE EN ESTE FORMATO XML:
+        <paciente>Nombre o N/A</paciente>
+        <codigo_glosa>Código de glosa</codigo_glosa>
+        <valor_objetado>Valor</valor_objetado>
+        <servicio_glosado>Servicio reclamado</servicio_glosado>
+        <motivo_resumido>Motivo corto</motivo_resumido>
+        <argumento>TODA TU REDACCIÓN LEGAL AQUÍ</argumento>"""
 
         user_prompt = f"EPS: {eps_segura}\nNORMA: {info_c}\nESTRATEGIA: {estrategia}\nGLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:10000]}"
 
@@ -149,22 +144,34 @@ class GlosaService:
                 completion = await self.cliente.chat.completions.create(
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
                     model="llama-3.3-70b-versatile",
-                    temperature=0.2, # Mayor temperatura para fomentar redacción extensa
+                    temperature=0.2,
                     max_tokens=3000
                 )
                 res_ia = completion.choices[0].message.content
                 break
-            except Exception: await asyncio.sleep(25)
+            except Exception as e:
+                if "429" in str(e) and intento == 2:
+                    res_ia = "<argumento>EL SERVIDOR DE IA ESTÁ SATURADO (LÍMITE DE VELOCIDAD GROQ). POR FAVOR, ESPERE 40 SEGUNDOS Y VUELVA A INTENTARLO.</argumento>"
+                await asyncio.sleep(20)
 
-        # Extracción segura
+        # 🛡️ EXTRACCIÓN A PRUEBA DE BALAS 🛡️
         paciente      = self.xml("paciente", res_ia, "NO IDENTIFICADO")
         codigo_final  = self.xml("codigo_glosa", res_ia, codigo_detectado)
         valor_xml     = self.xml("valor_objetado", res_ia, valor_obj_raw)
         servicio      = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
         motivo        = self.xml("motivo_resumido", res_ia, "OBJECIÓN DE LA EPS").upper()
-        argumento_ia  = self.xml("argumento", res_ia, "ERROR: LA IA NO GENERÓ EL ARGUMENTO.")
-        argumento_ia  = re.sub(r'[ \t]+', ' ', argumento_ia).strip()
+        
+        # El salvavidas absoluto: si el XML falla, atrapamos todo el texto devuelto
+        argumento_ia  = self.xml("argumento", res_ia, "")
+        if not argumento_ia:
+            # Limpiamos posibles etiquetas rotas y tomamos el texto crudo
+            argumento_ia = re.sub(r'<[^>]+>', '', res_ia).strip()
+            if not argumento_ia:
+                argumento_ia = "ERROR AL CONECTAR CON EL CEREBRO DE LA IA. REINTENTE EN 1 MINUTO."
 
+        argumento_ia = re.sub(r'[ \t]+', ' ', argumento_ia)
+
+        # ── ENSAMBLAJE DE LA RESPUESTA ──
         if val_ac_num > 0:
             val_obj_num = self.convertir_numero(valor_xml)
             valor_acep_fmt = f"$ {val_ac_num:,.0f}".replace(",", ".")
@@ -174,7 +181,6 @@ class GlosaService:
             tipo_final, res_final = "AUDITORÍA - ACEPTACIÓN", f"ACEPTACIÓN DE GLOSA – {paciente}"
         else:
             apertura = f"ESE HUS NO ACEPTA LA GLOSA {codigo_final} INTERPUESTA POR {motivo}, Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS TÉCNICOS, CONTRACTUALES Y NORMATIVOS: "
-            # Lógica RE9602 para tarifas o SO institucional
             if (prefijo in ["TA", "SO"] or "OTRA" in eps_segura or "SIN DEFINIR" in eps_segura):
                 cod_res, desc_res = "RE9602", "GLOSA NO ACEPTADA"
             else:
@@ -191,7 +197,6 @@ class GlosaService:
         return GlosaResult(tipo=tipo_final, resumen=res_final, dictamen=tabla_html + f'<div style="text-align:justify;line-height:1.8;font-size:11px;">{dictamen_final.replace("\n", "<br/>")}</div>', codigo_glosa=codigo_final, valor_objetado=valor_xml, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
 
 # ── FUNCIONES TABLAS ──
-def _div(texto): return f'<div style="text-align:justify;line-height:1.8;font-size:11px;">{texto}</div>'
 def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_header="#1e3a8a", color_estado=None):
     e_st = f'background-color:{color_estado};color:white;' if color_estado else ''
     return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:{color_header};color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">ESTADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;{e_st}"><b>{estado}</b></td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
