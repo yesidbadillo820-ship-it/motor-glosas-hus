@@ -217,10 +217,9 @@ RESPONDE ÚNICAMENTE CON ESTE FORMATO XML EXACTO:
                         {"role": "system", "content": system_prompt},
                         {"role": "user",   "content": user_prompt}
                     ],
-                    # 🔥 CAMBIO CRÍTICO: Usamos el modelo 8b. Es rapidísimo y no bloquea tanto.
-                    model="llama3-8b-8192", 
+                    model="llama-3.1-8b-instant", # <-- AQUÍ ESTÁ LA MAGIA
                     temperature=0.15,
-                    max_tokens=1500, # Ahorramos tokens
+                    max_tokens=2000,
                 )
                 res_ia = completion.choices[0].message.content
                 break
