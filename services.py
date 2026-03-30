@@ -32,7 +32,7 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
                 paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
         texto_unido = "".join(paginas)
         if total_paginas > 8:
-            texto_unido = "".join(paginas[:2]) + "\n\n... [ANÁLISIS DE CONTENIDO INTERMEDIO] ...\n\n" + "".join(paginas[-4:])
+            texto_unido = "".join(paginas[:2]) + "\n\n... [ANÁLISIS DE CONTENIDO INTERMEDIO RESERVADO] ...\n\n" + "".join(paginas[-4:])
         return texto_unido[:16000]
     except Exception:
         return ""
@@ -55,6 +55,14 @@ class GlosaService:
         try: return float(clean)
         except ValueError: return 0.0
 
+    # Extractor XML a prueba de balas
+    def extraer_xml(self, tag: str, texto: str, default: str = "N/A") -> str:
+        match = re.search(fr'<{tag}>(.*?)</{tag}>', texto, re.IGNORECASE | re.DOTALL)
+        if match:
+            clean = match.group(1).strip().replace("*", "")
+            return clean if clean else default
+        return default
+
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         if contratos_db is None: contratos_db = {}
         
@@ -65,6 +73,18 @@ class GlosaService:
                 info_c = v
                 break
 
+        # 1. Extracción Inicial Básica
+        texto_base = str(data.tabla_excel)
+        cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
+        codigo_detectado = cod_m.group(1) if cod_m else "N/A"
+        if codigo_detectado == "N/A" and len(texto_base.split()) > 0:
+            codigo_detectado = texto_base.split()[0][:10].upper() # Fallback por si escriben "MVC" o algo raro
+        
+        prefijo = codigo_detectado[:2].upper()
+        val_ac_num = self.convertir_numero(data.valor_aceptado)
+        is_ratificada = str(data.etapa).strip().upper() == "RATIFICADA"
+
+        # 2. Análisis Implacable de Tiempos (Extemporaneidad)
         msg_tiempo, color_tiempo, es_extemporanea, dias = "Fechas no ingresadas", "bg-slate-500", False, 0
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
@@ -80,47 +100,71 @@ class GlosaService:
                     msg_tiempo, color_tiempo = f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)", "bg-emerald-500"
             except Exception: pass
 
-        val_ac_num = self.convertir_numero(data.valor_aceptado)
-        texto_base = str(data.tabla_excel)
-        cod_m = re.search(r'([A-Z]{2,3}\d{3,4})', texto_base)
-        codigo_real = cod_m.group(1) if cod_m else "N/A"
-        prefijo = codigo_real[:2].upper()
-
-        if prefijo == "TA":
-            tesis_causal = f"""TESIS DE DEFENSA TARIFARIA: Ataca la interpretación errónea del manual por parte de la EPS. 1. Justifica la liquidación técnica: Si hubo bilateralidad o procedimientos múltiples, fundamenta el cobro basándote en la descripción quirúrgica y el manual pactado. 2. Cita el nexo causal: Cruza folio de descripción quirúrgica, cirujano (con RM) y el acuerdo contractual: {info_c}. 3. Argumento legal: La EPS no puede modificar lo pactado (Art. 1602 C.C. y 871 C.Co)."""
-        elif prefijo == "SO":
-            tesis_causal = """TESIS DE DEFENSA DE SOPORTES Y TECNOLOGÍAS: 1. Fundamento en Historia Clínica: La HC es soporte pleno (Res. 1995/1999). Identifica el insumo, cita folio, hora y pertinencia vital. 2. Vacío Tarifario: Si no tiene tarifa, aplica Anexo 5 Res. 3047 (Costo de adquisición + administración). 3. Realidad Fáctica: La falta de código no anula el gasto real."""
-        elif prefijo == "FA":
-            tesis_causal = """TESIS DE DEFENSA DE FACTURACIÓN (CONCURRENCIA): 1. Autonomía del Acto: El código es independiente y no está incluido en estancias o sala. 2. Cita el Anexo Técnico No. 3 de la Res. 3047. Exige la norma exacta que obligue a la inclusión."""
-        elif prefijo in ["PE", "CL", "CO"]:
-            tesis_causal = """TESIS DE DEFENSA TÉCNICO-CIENTÍFICA: 1. Prevalencia del Criterio Clínico: El auditor administrativo no sustituye al médico tratante. Cita diagnósticos CIE-10 y evolución. 2. Marco Constitucional: Invoca Ley 1751 de 2015 (Derecho Fundamental e Integralidad)."""
-        else:
-            tesis_causal = "ESTRATEGIA INTEGRAL: Cruce de datos entre lo facturado y lo documentado para exigir el cumplimiento del contrato."
-
-        prompt = f"""ACTÚA COMO EL DIRECTOR NACIONAL DE AUDITORÍA Y JURÍDICA DE CUENTAS MÉDICAS DE LA ESE HUS.
-        SOPORTES CLÍNICOS: {contexto_pdf[:12000]}
-        GLOSA: "{texto_base}"
-        VÍNCULO CONTRACTUAL: {info_c}
+        # =====================================================================
+        # 🛡️ GILLOTINA LEGAL: CORTES DIRECTOS (SIN IA)
+        # =====================================================================
         
-        DIRECTRICES SENIOR:
-        1. NO SEAS PASIVO: Usa la data como arma (cita nombres, RM, folios).
-        2. {tesis_causal}
-        3. LÉXICO SUPERIOR: Usa "Sinalagma contractual", "Carga de la prueba", "Principio de confianza legítima", "Realidad fáctica".
-        4. ESTRUCTURA: Inicia con: "ESE HUS NO ACEPTA LA GLOSA [CÓDIGO] INTERPUESTA POR [MOTIVO], Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS CONTRACTUALES, TÉCNICOS Y NORMATIVOS:".
-        5. CIERRE: Exige levantamiento inmediato y pago íntegro.
-        6. FORMATO: TODO EN MAYÚSCULAS. UN SOLO BLOQUE DE TEXTO CONTINUO SIN SALTOS DE LÍNEA.
+        val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
+        valor_obj = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
-        RESPONDE EXACTAMENTE ASÍ:
-        PACIENTE:
-        INGRESO:
-        EGRESO:
-        DIAGNOSTICO:
-        EPICRISIS_NO:
-        CODIGO_GLOSA:
-        VALOR_OBJETADO:
-        SERVICIO_GLOSADO:
-        MOTIVO_GLOSA_RESUMIDO:
-        DICTAMEN_INTEGRAL:
+        # A) GUILLOTINA RATIFICADA
+        if is_ratificada and val_ac_num == 0:
+            tabla = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">ETAPA</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo_detectado}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;"><b>RATIFICACIÓN</b></td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor_obj}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">RE9901<br><span style="font-size:9px;">GLOSA SUBSANADA TOTALMENTE</span></td></tr></table>"""
+            texto_rat = "ESE HUS NO ACEPTA LA GLOSA RATIFICADA. SE MANTIENE LA RESPUESTA DE DEFENSA DADA EN EL TRÁMITE DE LA GLOSA INICIAL, TODA VEZ QUE LA EPS NO APORTA NUEVOS ELEMENTOS DE JUICIO QUE DESVIRTÚEN NUESTRA FACTURACIÓN. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE CONCILIACIÓN DE AUDITORÍA MÉDICA ENTRE LAS PARTES (CORREO: CARTERA@HUS.GOV.CO). NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, DE NO LLEGARSE A UN ACUERDO, SE CONTINUARÁ CON LAS ACCIONES DE COBRO COACTIVO RESPECTIVAS."
+            return GlosaResult(tipo="LEGAL - RATIFICACIÓN", resumen="RECHAZO DE RATIFICACIÓN", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_rat}</div>', codigo_glosa=codigo_detectado, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600")
+
+        # B) GUILLOTINA EXTEMPORÁNEA
+        if es_extemporanea and val_ac_num == 0:
+            tabla = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">ESTADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo_detectado}</td><td style="padding:8px; border:1px solid #b91c1c; text-align:center; color:white;"><b>EXTEMPORÁNEA ({dias} DÍAS)</b></td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor_obj}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">RE9502<br><span style="font-size:9px;">ACEPTACIÓN TÁCITA</span></td></tr></table>"""
+            texto_ext = f"ESE HUS NO ACEPTA LA GLOSA POR EXTEMPORANEIDAD. AL HABERSE SUPERADO EL PLAZO LEGAL (HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN DE LA FACTURA Y LA RECEPCIÓN DE LA GLOSA) SIN RECIBIR NOTIFICACIÓN DENTRO DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, PRECLUYÓ DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR O RETENER LOS RECURSOS, CONFORME AL ART. 57 DE LA LEY 1438 DE 2011, LEY 1122 DE 2007 Y RESOLUCIÓN 3047 DE 2008. SE EXIGE EL PAGO INMEDIATO."
+            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO POR EXTEMPORANEIDAD", dictamen=tabla+f'<div style="text-align:justify; line-height:1.7;">{texto_ext}</div>', codigo_glosa=codigo_detectado, valor_objetado=valor_obj, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
+
+
+        # =====================================================================
+        # 🧠 EL CEREBRO DE AUDITORÍA ADAPTATIVA (SOLO SE EJECUTA SI PASA LOS FILTROS)
+        # =====================================================================
+        
+        if val_ac_num > 0:
+            tesis_causal = "ACEPTACIÓN: Extrae los datos y en <argumento> redacta brevemente que la ESE HUS acepta el valor objetado por pertinencia administrativa/médica, ajustando la cuenta."
+        elif prefijo == "TA":
+            tesis_causal = f"""DEFENSA TARIFARIA LEY 1602: Ataca la interpretación errónea del manual por parte de la EPS.
+            1. Si los soportes revelan bilateralidad o múltiples tiempos, justifica el cobro exacto.
+            2. Obligatorio citar el contrato: {info_c}.
+            3. Argumento: La EPS vulnera la buena fe y el Art 1602 del Código Civil. No puede recibir un servicio y pretender liquidar por debajo de la norma pactada."""
+        elif prefijo == "SO":
+            tesis_causal = """DEFENSA TECNOLÓGICA (SOPORTES):
+            1. Localiza el insumo/medicamento en la Epicrisis u Hoja de Gastos. Demuestra que era VITAL para el paciente.
+            2. Argumento Letal: La Historia Clínica es soporte pleno (Res. 1995/1999). Si el insumo no tiene tarifa pactada, por Ley rige el Anexo 5 Res 3047: Se cobra al Costo de Adquisición + Porcentaje de Administración, soportado con Factura del Proveedor."""
+        elif prefijo == "FA":
+            tesis_causal = """DEFENSA FACTURACIÓN (CONCURRENCIA):
+            1. Demuestra que el procedimiento cobrado es AUTÓNOMO. No está incluido ni en derechos de sala ni en estancia.
+            2. Argumento Letal: Cita el Anexo 3 de la Res. 3047. Exige a la EPS que cite la norma exacta que obligue a su inclusión, lo cual es improcedente."""
+        elif prefijo in ["PE", "CL", "CO"]:
+            tesis_causal = """DEFENSA TÉCNICO-CIENTÍFICA (PERTINENCIA):
+            1. El auditor administrativo no puede sobreponerse al JUICIO MÉDICO ESPECIALIZADO.
+            2. Cita los diagnósticos (CIE-10), la evolución y la gravedad del caso.
+            3. Argumento Letal: Invoca la Ley 1751 de 2015 (Derecho a la Salud e Integralidad). La atención fue pertinente, idónea y necesaria para salvaguardar la vida."""
+        else:
+            tesis_causal = f"DEFENSA CONTRACTUAL INTEGRAL: Basa tu argumento en el cumplimiento estricto del contrato {info_c} y la prestación efectiva del servicio evidenciado en la historia clínica."
+
+        prompt = f"""ACTÚA COMO EL DIRECTOR NACIONAL DE AUDITORÍA Y JURÍDICA DE CUENTAS MÉDICAS DE LA ESE HUS. (Experiencia: 30 años).
+        
+        SOPORTES CLÍNICOS: {contexto_pdf[:12000]}
+        GLOSA REPORTADA: "{texto_base}"
+        
+        INSTRUCCIONES DE ALTO NIVEL:
+        1. Eres implacable, profesional y técnico. Usa lenguaje como: "Sinalagma contractual", "Acervo probatorio", "Precluyó".
+        2. NO RESUMAS la historia clínica; usa los datos (nombres de médicos, RM, folios) como ARMAS para fundamentar tu tesis.
+        3. APLICA ESTA ESTRATEGIA EXACTA: {tesis_causal}
+        4. No escribas frases introductorias en el argumento. Ve directo al fundamento técnico.
+        
+        RESPONDE ESTRICTA Y ÚNICAMENTE USANDO ESTE FORMATO XML:
+        <paciente>Nombre del paciente</paciente>
+        <codigo_glosa>Código de la glosa</codigo_glosa>
+        <valor_objetado>Valor en pesos</valor_objetado>
+        <servicio_glosado>Nombre del servicio</servicio_glosado>
+        <motivo_resumido>Resumen muy breve (max 6 palabras) de lo que alega la EPS</motivo_resumido>
+        <argumento>Aquí va todo tu texto de defensa argumentativa en MAYÚSCULAS y en un solo bloque continuo.</argumento>
         """
         
         res_ia = ""
@@ -136,35 +180,45 @@ class GlosaService:
             except Exception:
                 await asyncio.sleep(2)
 
-        def b(e):
-            m = re.search(fr'{e}:\s*(.*?)(?=\n[A-Z_]+:|$)', res_ia, re.IGNORECASE | re.DOTALL)
-            return m.group(1).strip().replace("*", "") if m else "N/A"
-
-        paciente = b("PACIENTE")
-        codigo = b("CODIGO_GLOSA") if b("CODIGO_GLOSA") != "N/A" else codigo_real
-        valor = b("VALOR_OBJETADO")
-        servicio = b("SERVICIO_GLOSADO")
-        dictamen_ia = b("DICTAMEN_INTEGRAL")
+        # 3. Extracción Limpia y Segura desde XML
+        paciente = self.extraer_xml("paciente", res_ia, "NO DISPONIBLE")
+        codigo_xml = self.extraer_xml("codigo_glosa", res_ia, codigo_detectado)
+        codigo_final = codigo_xml if codigo_xml != "N/A" else codigo_detectado
+        valor = self.extraer_xml("valor_objetado", res_ia, valor_obj)
+        servicio = self.extraer_xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
+        motivo_resumen = self.extraer_xml("motivo_resumido", res_ia, "OBJECIÓN DE LA EPS").upper()
+        argumento_ia = self.extraer_xml("argumento", res_ia, "SE RECHAZA LA GLOSA AMPARADOS EN EL CUMPLIMIENTO DE LA NORMA Y EL CONTRATO VIGENTE.")
         
-        # Aplastador de párrafos
-        dictamen_final = " ".join(dictamen_ia.split())
+        # Aseguramos que sea un solo bloque
+        argumento_ia = " ".join(argumento_ia.split())
 
+        # =====================================================================
+        # 🔨 INYECCIÓN FORZADA DEL "ACEPTA" / "NO ACEPTA" POR PARTE DE PYTHON
+        # =====================================================================
         if val_ac_num > 0:
             val_obj_num = self.convertir_numero(valor)
             valor_acep_formato = f"$ {val_ac_num:,.0f}".replace(",", ".")
+            texto_inicio = f"ESE HUS ACEPTA LA GLOSA {codigo_final} POR UN VALOR DE {valor_acep_formato}, SUSTENTANDO LO SIGUIENTE: "
             cod_res, desc_res = ("RE9702", "GLOSA ACEPTADA TOTALMENTE") if val_ac_num >= val_obj_num else ("RE9801", "GLOSA PARCIALMENTE ACEPTADA")
-            tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJETADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#d97706;">VALOR ACEPTADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold; color:#d97706;">{valor_acep_formato}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
+            
+            tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJETADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#d97706;">VALOR ACEPTADO</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo_final}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold; color:#d97706;">{valor_acep_formato}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
             tipo_f = "AUDITORÍA - ACEPTACIÓN"
+            
         else:
-            cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA"
-            tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo}</td><td style="padding:8px; border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
+            texto_inicio = f"ESE HUS NO ACEPTA LA GLOSA {codigo_final} INTERPUESTA POR {motivo_resumen}, Y SUSTENTA SU POSICIÓN EN LOS SIGUIENTES ARGUMENTOS CONTRACTUALES, TÉCNICOS Y NORMATIVOS: "
+            cod_res, desc_res = ("RE9206", "GLOSA INJUSTIFICADA 100%") if (prefijo == "TA" and "OTRA" in eps_segura) else ("RE9901", "GLOSA NO ACEPTADA")
+            
+            tabla_html = f"""<table border="1" style="width:100%; border-collapse:collapse; text-transform:uppercase; font-size:11px; margin-bottom:15px;"><tr style="background-color:#1e3a8a; color:white;"><th style="padding:8px; border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px; border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px; border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px; border:1px solid #cbd5e1; background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{codigo_final}</td><td style="padding:8px; border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center;">{valor}</td><td style="padding:8px; border:1px solid #cbd5e1; text-align:center; font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>"""
             tipo_f = "TÉCNICO-LEGAL"
+
+        # Ensamblaje Perfecto
+        dictamen_final = f"{texto_inicio}{argumento_ia}"
 
         return GlosaResult(
             tipo=tipo_f, 
             resumen=f"DEFENSA FACTURA - {paciente}", 
             dictamen=tabla_html + f'<div style="text-align:justify; line-height:1.7; font-size:11px;">{dictamen_final}</div>', 
-            codigo_glosa=codigo, valor_objetado=valor, paciente=paciente, 
+            codigo_glosa=codigo_final, valor_objetado=valor, paciente=paciente, 
             mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo
         )
 
