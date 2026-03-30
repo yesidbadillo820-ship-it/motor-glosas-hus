@@ -208,6 +208,7 @@ RESPONDE ÚNICAMENTE CON ESTE FORMATO XML EXACTO:
 <motivo_resumido>Máximo 6 palabras: argumento de EPS</motivo_resumido>
 <argumento>Tu texto de defensa en MAYÚSCULAS.</argumento>"""
 
+        # ── Llamada a Groq con modelo rápido y backoff inteligente ───────────
         res_ia = ""
         for intento in range(3):
             try:
@@ -216,15 +217,24 @@ RESPONDE ÚNICAMENTE CON ESTE FORMATO XML EXACTO:
                         {"role": "system", "content": system_prompt},
                         {"role": "user",   "content": user_prompt}
                     ],
-                    model="llama-3.3-70b-versatile",
+                    # 🔥 CAMBIO CRÍTICO: Usamos el modelo 8b. Es rapidísimo y no bloquea tanto.
+                    model="llama3-8b-8192", 
                     temperature=0.15,
-                    max_tokens=2000,
+                    max_tokens=1500, # Ahorramos tokens
                 )
                 res_ia = completion.choices[0].message.content
                 break
             except Exception as e:
-                if intento == 2: return GlosaResult(tipo="Error", resumen="Error IA", dictamen="Reintente.", codigo_glosa="N/A", valor_objetado="0", paciente="N/A", mensaje_tiempo="", color_tiempo="")
-                await asyncio.sleep(2 ** intento)
+                logger.error(f"Intento {intento + 1} falló al contactar Groq: {e}", exc_info=True)
+                if intento == 2:
+                    return GlosaResult(
+                        tipo="Error", resumen="Error de Conexión IA",
+                        dictamen="Límite de velocidad de Groq superado (Error 429). Por favor, espera 60 segundos y vuelve a intentarlo.",
+                        codigo_glosa="N/A", valor_objetado="0",
+                        paciente="N/A", mensaje_tiempo="", color_tiempo=""
+                    )
+                # 🔥 CAMBIO CRÍTICO: Si Groq nos bloquea, esperamos 10 segundos antes de reintentar
+                await asyncio.sleep(10 * (intento + 1))
 
         paciente      = self.xml("paciente", res_ia, "NO IDENTIFICADO")
         codigo_xml    = self.xml("codigo_glosa", res_ia, codigo_detectado)
