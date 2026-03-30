@@ -14,12 +14,17 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+# Importamos el cerebro de la IA y el generador de PDFs
 from services import GlosaService, crear_oficio_pdf
 from models import GlosaRecord, ContratoRecord, PlantillaGlosa, GlosaInput
 from database import engine, Base, get_db, SessionLocal
 
+# Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
 
+# =====================================================================
+# 🛡️ DICCIONARIO MAESTRO DE CONTRATOS (EL ARSENAL LEGAL)
+# =====================================================================
 BASE_CONTRATOS_DEFAULT = {
     "FOMAG": "CONTRATOS VIGENTES: 12076-604-2024 y 12076-359-2025. TARIFAS ACORDADAS: SOAT -15% (aplicable a 2.653 CUPS según negociación), Tarifas Institucionales y Paquetes Integrales específicos (Tórax, IVE, Columna, Terapias Física/Ocupacional/Lenguaje y Gastro). SOPORTE LEGAL Y DE VIGENCIA: Acta de Negociación Precontractual N.° 09 (agosto 2024) y Carta de Ratificación de Manifestación de Interés del 29 de julio de 2025, suscrita por el Gerente Ricardo Arturo Hoyos Lanziano. Dicha carta establece expresamente en su numeral 3 que 'Las tarifas actuales seguirán vigentes... teniendo como punto de partida lo establecido en el manual tarifario E.S.E. HUS y el Anexo 1 Tarifario Dinámico de FOMAG'.",
     
@@ -52,6 +57,7 @@ BASE_CONTRATOS_DEFAULT = {
     "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO. En ausencia de un acuerdo contractual vigente entre las partes, la facturación se rige obligatoriamente por el marco legal aplicable a la venta de servicios de salud, liquidando los procedimientos, estancias y honorarios con base en el Manual Tarifario SOAT vigente sin ningún tipo de descuento. Cualquier objeción de 'mayor valor' (TA5801) o intento de imposición unilateral de tarifas por parte de la EPS carece de fundamento jurídico, contraviniendo la jurisprudencia y las resoluciones del Ministerio de Salud. Así mismo, los insumos y materiales no tarifados se facturarán al costo de adquisición soportado en la factura de compra del proveedor."
 }
 
+# Inicializador de la DB (Asegura que los contratos se carguen la primera vez)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
@@ -64,15 +70,19 @@ async def lifespan(app: FastAPI):
         db.close()
     yield
 
-app = FastAPI(title="Motor Glosas HUS", version="2.6", lifespan=lifespan)
+# =====================================================================
+# CONFIGURACIÓN DE LA APLICACIÓN FASTAPI
+# =====================================================================
+app = FastAPI(title="Motor Glosas HUS - Edición Producción", version="3.0", lifespan=lifespan)
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# CORS para que el Frontend funcione perfecto en Render
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://motor-glosas-hus.onrender.com", "http://localhost:8000"],
+    allow_origins=["*"], # Permitir todos para evitar bloqueos en el lanzamiento
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -89,11 +99,13 @@ def root():
         "Expires": "0"
     })
 
-# ✅ ENDPOINT 100% ANTIBALAS (Parseo Manual de FormData)
+# =====================================================================
+# ENDPOINT PRINCIPAL DE ANÁLISIS (100% BLINDADO)
+# =====================================================================
 @app.post("/analizar")
 @limiter.limit("20/minute")
 async def analizar_endpoint(request: Request, db: Session = Depends(get_db)):
-    # 1. Leemos el formulario de forma segura
+    # Leemos el formulario de forma segura (multipart/form-data)
     form = await request.form()
     
     eps = str(form.get("eps", "OTRA / SIN DEFINIR"))
@@ -103,7 +115,7 @@ async def analizar_endpoint(request: Request, db: Session = Depends(get_db)):
     valor_aceptado = str(form.get("valor_aceptado", "0"))
     tabla_excel = str(form.get("tabla_excel", ""))
     
-    # 2. Extraemos los archivos (si los hay)
+    # Extraemos los archivos PDF adjuntos
     archivos = form.getlist("archivos")
     
     contexto_pdf = ""
@@ -112,9 +124,11 @@ async def analizar_endpoint(request: Request, db: Session = Depends(get_db)):
             content = await arc.read()
             contexto_pdf += await glosa_service.extraer_pdf(content)
 
+    # Obtenemos los contratos de la Base de Datos en vivo
     contratos = db.query(ContratoRecord).all()
     contratos_db = {c.eps: c.detalles for c in contratos}
 
+    # Empaquetamos los datos para el servicio
     data = GlosaInput(
         eps=eps,
         etapa=etapa,
@@ -124,12 +138,14 @@ async def analizar_endpoint(request: Request, db: Session = Depends(get_db)):
         tabla_excel=tabla_excel,
     )
 
+    # Enviamos a la IA / Cerebro de Auditoría (services.py)
     resultado = await glosa_service.analizar(
         data=data,
         contexto_pdf=contexto_pdf,
         contratos_db=contratos_db,
     )
 
+    # Guardar en Base de Datos el historial de la glosa procesada
     try:
         val_num = glosa_service.convertir_numero(resultado.valor_objetado)
         val_ac_num = glosa_service.convertir_numero(valor_aceptado)
@@ -146,12 +162,15 @@ async def analizar_endpoint(request: Request, db: Session = Depends(get_db)):
         )
         db.add(registro)
         db.commit()
-    except Exception:
-        pass 
+    except Exception as e:
+        logger.error(f"Error guardando en BD: {e}")
 
     return resultado
 
 
+# =====================================================================
+# RUTAS DE ESTADÍSTICAS Y PANEL DE CONTROL
+# =====================================================================
 _analytics_cache = {"data": None, "ts": None}
 
 @app.get("/analytics")
@@ -194,22 +213,30 @@ def obtener_analytics(db: Session = Depends(get_db)):
     _analytics_cache.update({"data": res, "ts": ahora})
     return res
 
-
-@app.get("/plantillas")
-def listar_plantillas(db: Session = Depends(get_db)):
-    return db.query(PlantillaGlosa).all()
-
-@app.post("/plantillas")
-async def crear_plantilla(data: dict, db: Session = Depends(get_db)):
-    nueva = PlantillaGlosa(titulo=data['titulo'], texto=data['texto'])
-    db.add(nueva)
-    db.commit()
-    return {"status": "ok"}
-
 @app.get("/glosas")
 def listar_historial(db: Session = Depends(get_db)):
     return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(100).all()
 
+@app.get("/exportar-historial")
+def exportar_historial(db: Session = Depends(get_db)):
+    glosas = db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).all()
+    lines = ["Fecha,EPS,Paciente,Código Glosa,Valor Objetado,Valor Aceptado,Estado"]
+    for g in glosas:
+        fecha = g.creado_en.strftime("%Y-%m-%d") if g.creado_en else ""
+        lines.append(
+            f"{fecha},{g.eps},{g.paciente or ''},{g.codigo_glosa},"
+            f"{g.valor_objetado or 0},{g.valor_aceptado or 0},{g.estado}"
+        )
+    csv_content = "\n".join(lines)
+    return Response(
+        content=csv_content.encode("utf-8-sig"),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=Reporte_Glosas_HUS.csv"}
+    )
+
+# =====================================================================
+# RUTAS DE GESTIÓN DE CONTRATOS
+# =====================================================================
 @app.get("/contratos")
 def listar_contratos(db: Session = Depends(get_db)):
     return db.query(ContratoRecord).all()
@@ -233,25 +260,12 @@ def eliminar_contrato(eps: str, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "ok"}
 
-@app.get("/exportar-historial")
-def exportar_historial(db: Session = Depends(get_db)):
-    glosas = db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).all()
-    lines = ["Fecha,EPS,Paciente,Código Glosa,Valor Objetado,Valor Aceptado,Estado"]
-    for g in glosas:
-        fecha = g.creado_en.strftime("%Y-%m-%d") if g.creado_en else ""
-        lines.append(
-            f"{fecha},{g.eps},{g.paciente or ''},{g.codigo_glosa},"
-            f"{g.valor_objetado or 0},{g.valor_aceptado or 0},{g.estado}"
-        )
-    csv_content = "\n".join(lines)
-    return Response(
-        content=csv_content.encode("utf-8-sig"),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=Reporte_Glosas_HUS.csv"}
-    )
-
+# =====================================================================
+# RUTAS DE PDF Y PLANTILLAS
+# =====================================================================
 @app.post("/descargar-pdf")
 async def generar_pdf_endpoint(data: dict):
+    # Llama a la función importada desde services.py
     pdf_bytes = crear_oficio_pdf(data['eps'], data['resumen'], data['dictamen'])
     
     fecha_hoy = datetime.now().strftime("%d-%m-%Y")
@@ -263,3 +277,23 @@ async def generar_pdf_endpoint(data: dict):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
     )
+
+@app.get("/plantillas")
+def listar_plantillas(db: Session = Depends(get_db)):
+    return db.query(PlantillaGlosa).all()
+
+@app.post("/plantillas")
+async def crear_plantilla(data: dict, db: Session = Depends(get_db)):
+    nueva = PlantillaGlosa(titulo=data['titulo'], texto=data['texto'])
+    db.add(nueva)
+    db.commit()
+    return {"status": "ok"}
+
+# =====================================================================
+# ARRANQUE PARA RENDER Y LOCAL
+# =====================================================================
+if __name__ == "__main__":
+    import uvicorn
+    # Render asigna el puerto dinámicamente. 0.0.0.0 permite acceso externo.
+    puerto = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=puerto, reload=False)
