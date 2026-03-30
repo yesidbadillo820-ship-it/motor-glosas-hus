@@ -150,7 +150,7 @@ class GlosaService:
                 "DEFENSA TÉCNICA, CONTRACTUAL Y NORMATIVA PRESENTADA EN EL TRÁMITE DE LA GLOSA INICIAL, "
                 "TODA VEZ QUE LA ENTIDAD GLOSANTE NO APORTA NUEVOS ELEMENTOS DE JUICIO QUE DESVIRTÚEN "
                 "LA FACTURACIÓN NI LA PRESTACIÓN DEL SERVICIO. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA "
-                "DE CONCILIACIÓN DE AUDITORÍA MÉDICA ENTRE LAS PARTES (CORREO: CARTERA@HUS.GOV.CO - GLOSASYDEVOLUCIONES@HUS.GOV.CO). "
+                "DE CONCILIACIÓN DE AUDITORÍA MÉDICA ENTRE LAS PARTES (CORREO: CARTERA@HUS.GOV.CO). "
                 "NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, DE NO LLEGARSE A UN "
                 "ACUERDO EN LA INSTANCIA DE CONCILIACIÓN, SE CONTINUARÁ CON LAS ACCIONES DE COBRO "
                 "PERTINENTES EN LOS TÉRMINOS LEGALES VIGENTES."
@@ -192,54 +192,49 @@ class GlosaService:
         # 🧠  CEREBRO DE AUDITORÍA ADAPTATIVA — PASA LOS FILTROS → LLAMA A IA
         # ══════════════════════════════════════════════════════════════════════
 
-        # Estrategia específica por tipo de glosa
+        # Estrategia específica por tipo de glosa (Cero alucinaciones)
         if val_ac_num > 0:
             valor_acep_fmt = f"${val_ac_num:,.0f}".replace(",", ".")
             estrategia = (
                 f"CASO ACEPTACIÓN: La ESE HUS acepta la glosa por valor de {valor_acep_fmt}. "
                 f"En <argumento> redacta máximo 3 líneas explicando el motivo de la aceptación "
-                f"(error de codificación, soporte insuficiente, etc.) de forma formal. "
-                f"Sin leyes, sin viñetas, en MAYÚSCULAS."
+                f"de forma formal. Sin leyes, sin viñetas, en MAYÚSCULAS."
             )
         elif prefijo == "TA":
             estrategia = f"""DEFENSA TARIFARIA (MAYOR VALOR / TARIFAS):
-1. REGLA ESTRICTA: PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". DEBES USAR SIEMPRE "VALOR OBJETADO".
-2. EXTRACCIÓN LETAL: Busca en los soportes el nombre del paciente, el médico tratante, la fecha y el folio exacto donde se registra el servicio. Menciónalos explícitamente para darle peso a la respuesta.
+1. PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". DEBES USAR SIEMPRE "VALOR OBJETADO".
+2. Busca en los soportes el nombre del médico, fecha y folio. ÚSALOS SOLO SI LOS ENCUENTRAS. Si no están, di "el registro clínico anexo". ¡CERO INVENTOS!
 3. CONTRATO: Invoca el contrato {info_c}. Argumenta que la EPS incurre en una glosa temeraria al desconocer el acuerdo de voluntades.
-4. Si detectas lateralidad (bilateral) o varios tiempos quirúrgicos en la epicrisis, ataca ese punto demostrando que la liquidación de la ESE HUS es correcta.
-5. Cita el Art. 871 del Código de Comercio (Buena Fe). 
-6. Si hay tabla de ítems, usa esta cabecera HTML: <th style="padding:6px;border:1px solid #ccc;">VALOR OBJETADO</th>."""
+4. Si detectas lateralidad (bilateral) o varios tiempos quirúrgicos reales en la epicrisis, ataca ese punto demostrando que la liquidación de la ESE HUS es correcta.
+5. Cita el Art. 871 del Código de Comercio (Buena Fe)."""
         elif prefijo == "SO":
             estrategia = """DEFENSA DE SOPORTES E INSUMOS:
-1. REGLA ESTRICTA: PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
-2. EXTRACCIÓN LETAL: Localiza el insumo/medicamento en la Epicrisis u Hoja de Gastos. Menciona la hora, la fecha, el médico que lo ordenó y el folio exacto.
-3. ARGUMENTO NORMATIVO: La historia clínica es el soporte probatorio por excelencia (Res. 1995/1999). Exige el reconocimiento del VALOR OBJETADO en virtud del Anexo 5 Res. 3047/2008 (Costo de adquisición + administración) amparado en la factura del proveedor.
-4. Cierre: Argumenta que el insumo era irremplazable y vital para salvaguardar el procedimiento o la vida del paciente."""
+1. PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
+2. Localiza el insumo en los soportes. Menciona el folio y el médico SÓLO SI ESTÁN CLAROS EN EL TEXTO. Si no, remítete a la "Hoja de Gastos". ¡NO INVENTES NOMBRES!
+3. ARGUMENTO NORMATIVO: La historia clínica es el soporte probatorio por excelencia (Res. 1995/1999). Exige el reconocimiento del VALOR OBJETADO en virtud del Anexo 5 Res. 3047/2008 (Costo de adquisición + administración) amparado en la factura del proveedor."""
         elif prefijo == "FA":
             estrategia = """DEFENSA DE FACTURACIÓN Y CONCURRENCIA:
-1. REGLA ESTRICTA: PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
-2. EXTRACCIÓN LETAL: Cita el folio exacto, la fecha de atención y el profesional que brindó el servicio.
-3. ARGUMENTO TÉCNICO: Demuestra que el VALOR OBJETADO corresponde a un acto en salud AUTÓNOMO, que no hace parte constitutiva ni se encuentra subsumido en derechos de sala, estancia o paquetes integrales.
-4. Cita el Anexo Técnico N.° 3 Res. 3047/2008 exigiendo a la EPS revelar la norma puntual de inclusión."""
+1. PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
+2. Demuestra que el VALOR OBJETADO corresponde a un acto en salud AUTÓNOMO, que no hace parte constitutiva de estancias o paquetes integrales. Menciónalo basándote SOLO en los documentos leídos.
+3. Cita el Anexo Técnico N.° 3 Res. 3047/2008 exigiendo a la EPS revelar la norma puntual de inclusión."""
         elif prefijo in ["CO", "CL", "PE"]:
             estrategia = """DEFENSA TÉCNICO-CIENTÍFICA (PERTINENCIA/COBERTURA):
-1. REGLA ESTRICTA: PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
-2. EXTRACCIÓN LETAL: Extrae y menciona el diagnóstico CIE-10, la evolución clínica, el médico (con su RM) y los días de estancia.
-3. ARGUMENTO TÉCNICO: Defiende el JUICIO MÉDICO ESPECIALIZADO. El auditor de la EPS no puede glosar el VALOR OBJETADO desconociendo la necesidad vital del paciente.
-4. Normas a citar: Ley 1751 de 2015 (Derecho a la Salud, Integralidad)."""
+1. PROHIBIDO USAR LA PALABRA "VALOR FACTURADO". USA SIEMPRE "VALOR OBJETADO".
+2. Extrae diagnósticos y justificación clínica de los documentos. SI NO HAY NOMBRES DE MÉDICOS, NO LOS INVENTES, di "el especialista tratante".
+3. Defiende el JUICIO MÉDICO. El auditor de la EPS no puede glosar el VALOR OBJETADO desconociendo la necesidad vital del paciente. Invoca la Ley 1751 de 2015."""
         else:
             estrategia = (
                 f"DEFENSA CONTRACTUAL INTEGRAL: PROHIBIDO DECIR 'VALOR FACTURADO', USA 'VALOR OBJETADO'. "
-                f"Fundamenta en el cumplimiento del contrato ({info_c}), citando folios exactos, médicos y fechas de la atención."
+                f"Fundamenta en el cumplimiento del contrato ({info_c}) basándote ÚNICAMENTE en datos reales del expediente."
             )
 
-        # ── Construcción del prompt ───────────────────────────────────────────
+        # ── Construcción del prompt con escudo anti-alucinaciones ────────────
         system_prompt = f"""Eres el DIRECTOR NACIONAL DE AUDITORÍA Y JURÍDICA DE CUENTAS MÉDICAS de la ESE HUS.
-Llevas 30 años de experiencia destrozando glosas injustificadas de las EPS. Tu nivel técnico es supremo.
+Llevas 30 años de experiencia. Eres estricto, técnico y 100% APEGADO A LA VERDAD.
 
 REGLAS DE ORO — NUNCA LAS INCUMPLAS:
 1. TODO EN MAYÚSCULAS. Sin excepción.
-2. MINERÍA DE SOPORTES OBLIGATORIA: Una respuesta genérica es inaceptable. DEBES extraer y escribir en tu argumento: Nombres de médicos, números de Registro Médico (RM), fechas exactas de la atención, y folios/páginas de la epicrisis u hoja de gastos. 
+2. CERO ALUCINACIONES (REGLA DE VIDA O MUERTE): DEBES basar tu defensa SOLO en la información real proporcionada en los soportes. Busca nombres de médicos, Registro Médico (RM), fechas y folios. SI EXISTEN en los soportes, úsalos para dar peso a tu argumento. SI NO EXISTEN, TIENES ESTRICTAMENTE PROHIBIDO INVENTAR DATOS (NUNCA uses "Juan Pérez", "12345", "10 de febrero", etc.). Si no encuentras el dato exacto, limítate a decir "el profesional tratante", "la fecha de atención" o "el expediente clínico". ¡NO INVENTES NADA!
 3. LÉXICO: NO USES LA FRASE "VALOR FACTURADO", ESTÁ ESTRICTAMENTE PROHIBIDO. REEMPLÁZALO SIEMPRE POR "VALOR OBJETADO".
 4. Usa jerga superior: "Sinalagma contractual", "Carga probatoria", "Precluyó", "Realidad fáctica documental".
 5. APLICA EXACTAMENTE ESTA ESTRATEGIA ENFOCADA: {estrategia}
@@ -249,18 +244,18 @@ REGLAS DE ORO — NUNCA LAS INCUMPLAS:
         user_prompt = f"""EPS: {eps_segura}
 CONTRATO VIGENTE: {info_c}
 GLOSA RECIBIDA: "{texto_base}"
-SOPORTES CLÍNICOS DEL EXPEDIENTE (EXTRAE NOMBRES, FECHAS, FOLIOS PARA TU DEFENSA):
+SOPORTES CLÍNICOS DEL EXPEDIENTE (SOLO USA DATOS QUE PUEDAS LEER AQUÍ, NO INVENTES NADA):
 {contexto_pdf[:12000]}
 
 RESPONDE ÚNICAMENTE CON ESTE FORMATO XML EXACTO:
-<paciente>Nombre completo del paciente o N/A</paciente>
+<paciente>Nombre completo del paciente o N/A si no está</paciente>
 <codigo_glosa>Código de objeción (ej: FA0802, SO4201, TA5801)</codigo_glosa>
 <valor_objetado>Valor en pesos (ej: $ 2.030.800) o N/A</valor_objetado>
 <servicio_glosado>Nombre del servicio o procedimiento glosado</servicio_glosado>
 <motivo_resumido>Máximo 6 palabras: el argumento que usa la EPS</motivo_resumido>
-<argumento>Aquí va TODO el texto de defensa en MAYÚSCULAS, integrando los médicos, fechas, folios, normatividad y exigiendo el pago íntegro del VALOR OBJETADO.</argumento>"""
+<argumento>Aquí va TODO el texto de defensa en MAYÚSCULAS, apegado estrictamente a la realidad de los documentos, usando la normatividad y exigiendo el pago íntegro del VALOR OBJETADO.</argumento>"""
 
-        # ── Llamada a Groq con retry + backoff ────────────────────────────────
+        # ── Llamada a Groq con retry + backoff (TEMPERATURA FRÍA: 0.15) ───────────
         res_ia = ""
         for intento in range(3):
             try:
@@ -270,7 +265,7 @@ RESPONDE ÚNICAMENTE CON ESTE FORMATO XML EXACTO:
                         {"role": "user",   "content": user_prompt}
                     ],
                     model="llama-3.3-70b-versatile",
-                    temperature=0.25,
+                    temperature=0.15, # Muy bajo para evitar alucinaciones
                     max_tokens=2000,
                 )
                 res_ia = completion.choices[0].message.content
