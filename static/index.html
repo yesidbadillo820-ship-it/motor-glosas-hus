@@ -23,18 +23,25 @@
         }
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100vh;overflow:hidden;font-size:14px}
-        header{background:var(--navy);padding:0 1.75rem;display:flex;align-items:center;justify-content:space-between;height:58px;flex-shrink:0;position:relative;z-index:100;border-bottom: 2px solid var(--teal);}
+        header{background:var(--navy);padding:0 1.75rem;display:flex;align-items:center;justify-content:space-between;height:58px;flex-shrink:0;position:relative;z-index:100;border-bottom: 3px solid var(--teal);}
         .logo{display:flex;align-items:center;gap:.85rem}
         .logo-badge{width:36px;height:36px;background:linear-gradient(135deg,var(--blue) 0%,var(--teal) 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-weight:800;font-size:13px;color:#fff;box-shadow:0 4px 12px rgba(26,86,219,.35);}
         .logo-title{font-family:'Outfit';font-weight:700;font-size:.95rem;color:#fff;}
         nav{display:flex;gap:.15rem;align-items:center}
         .nav-btn{color:rgba(255,255,255,.45);font-size:.76rem;font-weight:600;cursor:pointer;border:none;background:none;padding:.5rem .85rem;border-radius:8px;transition:all .2s;text-transform:uppercase;position:relative}
+        .nav-btn:hover{color:#fff;background:rgba(255,255,255,.06)}
         .nav-btn.active{color:#fff;background:rgba(59,130,246,.18)}
         .alerta-badge{position:absolute;top:3px;right:5px;background:var(--red);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
         main{display:flex;flex:1;height:calc(100vh - 58px);overflow:hidden}
         .sidebar{width:316px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border);padding:1.4rem 1.25rem;display:flex;flex-direction:column;gap:1rem;overflow-y:auto;}
         .tab-panel{flex:1;overflow:auto;display:none;padding:1.4rem;}
         .tab-panel.active{display:flex;flex-direction:column}
+        .field{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.65rem}
+        .field label{font-size:.72rem;font-weight:600;color:var(--navy-3);}
+        input,select,textarea{background:#f8fafd;border:1.5px solid var(--border);border-radius:9px;padding:.55rem .8rem;font-size:.83rem;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;}
+        .etapa-row{display:grid;grid-template-columns:1fr 1fr;gap:.4rem}
+        .etapa-opt{border:1.5px solid var(--border);border-radius:9px;padding:.55rem .3rem;text-align:center;cursor:pointer;font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--slate);background:#f8fafd;}
+        .etapa-opt.active{background:var(--navy);color:#fff;border-color:var(--navy);}
         .btn{display:flex;align-items:center;justify-content:center;gap:.5rem;border:none;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:.83rem;padding:.65rem 1.2rem;transition:all .2s;}
         .btn-primary{background:linear-gradient(135deg,var(--blue) 0%,var(--navy-3) 100%);color:#fff;}
         .btn-teal{background:var(--teal);color:#fff;}
@@ -44,10 +51,9 @@
         .hist-table table{width:100%;border-collapse:collapse;font-size:.78rem}
         .hist-table th{background:var(--navy);color:#fff;padding:.65rem .9rem;text-align:left;}
         .hist-table td{padding:.6rem .9rem;border-bottom:1px solid var(--border);}
-        .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1rem;}
-        .kpi-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;}
-        .kpi-value{font-size:1.5rem;font-weight:800;color:var(--navy);}
-        .dictamen-box{background:#f8fafd;border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:11px;line-height:1.8;max-height:450px;overflow-y:auto;}
+        .dictamen-box{background:#f8fafd;border:1px solid var(--border);border-radius:10px;padding:1.5rem;font-size:11.5px;line-height:1.8;max-height:500px;overflow-y:auto;color:var(--text-2);}
+        .toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--navy);color:#fff;padding:.75rem 1.2rem;border-radius:10px;z-index:9999;transform:translateY(100px);opacity:0;transition:0.3s;}
+        .toast.show{transform:translateY(0);opacity:1}
     </style>
 </head>
 <body>
@@ -60,13 +66,13 @@
             <div style="font-size:9px;color:rgba(255,255,255,0.5)">ESE HUS · PRO v4.0</div>
         </div>
     </div>
-    <nav>
-        <button class="nav-btn active" onclick="cambiarTab('analizar')">Individual</button>
-        <button class="nav-btn" onclick="cambiarTab('batch')">Lote (Excel)</button>
-        <button class="nav-btn" onclick="cambiarTab('dashboard')">Analytics</button>
-        <button class="nav-btn" onclick="cambiarTab('historial')">Historial</button>
-        <button class="nav-btn" onclick="cambiarTab('alertas')">Alertas <span id="alerta-badge" class="alerta-badge" style="display:none">0</span></button>
-        <button class="nav-btn" onclick="cambiarTab('contratos')">Config</button>
+    <nav id="main-nav">
+        <button class="nav-btn active" onclick="cambiarTab(event, 'analizar')">Individual</button>
+        <button class="nav-btn" onclick="cambiarTab(event, 'batch')">Lote (Excel)</button>
+        <button class="nav-btn" onclick="cambiarTab(event, 'dashboard')">Analytics</button>
+        <button class="nav-btn" onclick="cambiarTab(event, 'historial')">Historial</button>
+        <button class="nav-btn" onclick="cambiarTab(event, 'alertas')">Alertas <span id="alerta-badge" class="alerta-badge" style="display:none">0</span></button>
+        <button class="nav-btn" onclick="cambiarTab(event, 'contratos')">Config</button>
     </nav>
 </header>
 
@@ -100,18 +106,18 @@
             <label>Soportes PDF</label>
             <input type="file" id="pdf-files" multiple accept=".pdf"/>
         </div>
-        <button class="btn btn-primary" id="btn-analizar" onclick="analizar()">⚡ Analizar Glosa</button>
-        <button class="btn btn-outline" onclick="limpiarTodo()">Limpiar</button>
+        <button class="btn btn-primary" id="btn-analizar" onclick="analizar()" style="width:100%">⚡ Analizar Glosa</button>
+        <button class="btn btn-outline" onclick="limpiarTodo()" style="width:100%; margin-top:10px">Limpiar</button>
     </aside>
 
-    <div class="content">
+    <div class="content" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
         <div class="tab-panel active" id="panel-analizar">
-            <div id="result-area">
-                <div style="text-align:center;padding:5rem;opacity:0.5">⚖️ Complete los datos para iniciar el análisis.</div>
+            <div id="result-area" style="flex:1">
+                <div style="text-align:center;padding:5rem;opacity:0.5">⚖️ Complete los datos para iniciar el análisis jurídico.</div>
             </div>
-            <div id="result-actions" style="display:none;gap:1rem;margin-top:1rem">
-                <button class="btn btn-teal" onclick="descargarPDF()">📥 Generar PDF HUS</button>
-                <button class="btn btn-primary" onclick="copiarDictamen()">📋 Copiar Texto</button>
+            <div id="result-actions" style="display:none;gap:1rem;margin-top:1rem;padding:1rem;background:white;border-top:1px solid var(--border)">
+                <button class="btn btn-teal" onclick="descargarPDF()">📥 Generar PDF Oficial HUS</button>
+                <button class="btn btn-primary" onclick="copiarDictamen()">📋 Copiar Texto para Excel</button>
             </div>
         </div>
 
@@ -128,28 +134,28 @@
                 </div>
                 <div id="batch-status" style="font-size:12px;margin-top:5px;text-align:center"></div>
             </div>
-            <div id="batch-results" style="margin-top:1rem"></div>
+            <div id="batch-results" style="margin-top:1rem; overflow-y:auto"></div>
         </div>
 
         <div class="tab-panel" id="panel-dashboard">
-            <div class="kpi-grid" id="kpi-grid"></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-                <div class="kpi-card"><h4>Top EPS</h4><canvas id="chart-eps"></canvas></div>
-                <div class="kpi-card"><h4>Top Códigos</h4><canvas id="chart-codigos"></canvas></div>
+            <div id="kpi-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.5rem"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem; flex:1">
+                <div style="background:white; padding:1rem; border-radius:12px; border:1px solid var(--border)"><h4>Top EPS</h4><canvas id="chart-eps"></canvas></div>
+                <div style="background:white; padding:1rem; border-radius:12px; border:1px solid var(--border)"><h4>Top Códigos</h4><canvas id="chart-codigos"></canvas></div>
             </div>
         </div>
 
         <div class="tab-panel" id="panel-historial">
-            <div class="hist-table">
+            <div class="hist-table" style="flex:1; overflow-y:auto">
                 <table>
-                    <thead><tr><th>Fecha</th><th>EPS</th><th>Paciente</th><th>Código</th><th>Estado</th><th>Valor Obj.</th></tr></thead>
+                    <thead style="position:sticky; top:0; z-index:10"><tr><th>Fecha</th><th>EPS</th><th>Paciente</th><th>Código</th><th>Estado</th><th>Valor Obj.</th></tr></thead>
                     <tbody id="hist-tbody"></tbody>
                 </table>
             </div>
         </div>
 
         <div class="tab-panel" id="panel-contratos">
-            <div id="contratos-container"></div>
+            <div id="contratos-container" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1rem"></div>
         </div>
     </div>
 </main>
@@ -164,9 +170,9 @@
 
     window.onload = () => { cargarContratos(); fetchAlertas(); };
 
-    function cambiarTab(tab) {
+    function cambiarTab(e, tab) {
         document.querySelectorAll('.nav-btn, .tab-panel').forEach(el => el.classList.remove('active'));
-        event.target.classList.add('active');
+        e.target.classList.add('active');
         document.getElementById(`panel-${tab}`).classList.add('active');
         document.getElementById('sidebar').style.display = (tab === 'analizar' || tab === 'batch') ? 'flex' : 'none';
         if(tab === 'dashboard') cargarDashboard();
@@ -174,16 +180,21 @@
     }
 
     async function cargarContratos() {
-        const res = await fetch('/contratos', { headers: headersAuth });
-        const data = await res.json();
-        const sel = document.getElementById('eps-select');
-        const cont = document.getElementById('contratos-container');
-        sel.innerHTML = '<option value="OTRA / SIN DEFINIR">OTRA / SIN DEFINIR ▼</option>';
-        cont.innerHTML = '';
-        data.forEach(c => {
-            sel.innerHTML += `<option value="${c.eps}">${c.eps}</option>`;
-            cont.innerHTML += `<div class="kpi-card" style="margin-bottom:10px"><b>${c.eps}</b><p style="font-size:11px;color:#666">${c.detalles}</p></div>`;
-        });
+        try {
+            const res = await fetch('/contratos', { headers: headersAuth });
+            const data = await res.json();
+            const sel = document.getElementById('eps-select');
+            const cont = document.getElementById('contratos-container');
+            sel.innerHTML = '<option value="OTRA / SIN DEFINIR">OTRA / SIN DEFINIR ▼</option>';
+            cont.innerHTML = '';
+            data.forEach(c => {
+                sel.innerHTML += `<option value="${c.eps}">${c.eps}</option>`;
+                cont.innerHTML += `<div style="background:white; padding:1rem; border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow)">
+                    <b style="color:var(--navy)">${c.eps}</b>
+                    <p style="font-size:11px;color:var(--slate); margin-top:5px">${c.detalles}</p>
+                </div>`;
+            });
+        } catch(e) { console.error(e); }
     }
 
     async function analizar() {
@@ -198,20 +209,24 @@
         fd.append('tabla_excel', document.getElementById('tabla-excel').value);
         for (let f of document.getElementById('pdf-files').files) fd.append('archivos', f);
 
-        const res = await fetch('/analizar', { method: 'POST', headers: headersAuth, body: fd });
-        const d = await res.json();
-        ultimoResultado = d;
-        document.getElementById('result-area').innerHTML = `
-            <div class="dictamen-box">
-                <h3 style="color:var(--navy);margin-bottom:10px">${d.resumen}</h3>
-                <div style="margin-bottom:10px"><span style="background:var(--blue);color:white;padding:2px 8px;border-radius:5px">${d.codigo_glosa}</span></div>
-                ${d.dictamen}
-            </div>`;
-        document.getElementById('result-actions').style.display = 'flex';
+        try {
+            const res = await fetch('/analizar', { method: 'POST', headers: headersAuth, body: fd });
+            const d = await res.json();
+            ultimoResultado = d;
+            document.getElementById('result-area').innerHTML = `
+                <div class="dictamen-box">
+                    <h3 style="color:var(--navy);margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:10px">${d.resumen}</h3>
+                    <div style="margin-bottom:15px">
+                        <span style="background:var(--blue);color:white;padding:4px 10px;border-radius:6px; font-weight:bold; font-size:12px">${d.codigo_glosa}</span>
+                        <span style="margin-left:10px; font-size:11px; font-weight:bold; color:var(--red)">${d.mensaje_tiempo}</span>
+                    </div>
+                    ${d.dictamen}
+                </div>`;
+            document.getElementById('result-actions').style.display = 'flex';
+        } catch(e) { alert("Error de conexión"); }
         btn.disabled = false; btn.innerText = "⚡ Analizar Glosa";
     }
 
-    // LÓGICA DE PEGADO EXCEL
     document.getElementById('paste-box').addEventListener('paste', e => {
         e.preventDefault();
         const rows = (e.clipboardData || window.clipboardData).getData('text').trim().split('\n');
@@ -243,10 +258,12 @@
             fd.append('valor_aceptado', '0');
             fd.append('tabla_excel', loteRawData[i]);
 
-            const res = await fetch('/analizar', { method: 'POST', headers: headersAuth, body: fd });
-            const d = await res.json();
-            resBox.innerHTML += `<div style="background:white;padding:10px;border-radius:8px;margin-bottom:5px;border-left:4px solid var(--teal);font-size:11px"><b>${d.paciente}</b> | ${d.codigo_glosa} | ${d.valor_objetado}</div>`;
-            await new Promise(r => setTimeout(r, 1500));
+            try {
+                const res = await fetch('/analizar', { method: 'POST', headers: headersAuth, body: fd });
+                const d = await res.json();
+                resBox.innerHTML += `<div style="background:white;padding:10px;border-radius:8px;margin-bottom:5px;border-left:4px solid var(--teal);font-size:11px; box-shadow:var(--shadow)"><b>${d.paciente}</b> | ${d.codigo_glosa} | ${d.valor_objetado}</div>`;
+                await new Promise(r => setTimeout(r, 1200));
+            } catch(e) { console.error(e); }
         }
         btn.disabled = false;
     }
@@ -279,13 +296,13 @@
         });
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = `HUS_Defensa.pdf`; a.click();
+        const a = document.createElement('a'); a.href = url; a.download = `HUS_Oficio_Defensa.pdf`; a.click();
     }
 
     function copiarDictamen() {
         const tmp = document.createElement('div'); tmp.innerHTML = ultimoResultado.dictamen;
         navigator.clipboard.writeText(tmp.innerText);
-        alert("Copiado");
+        alert("Copiado al portapapeles");
     }
 </script>
 </body>
