@@ -89,10 +89,10 @@ def login_para_token(req: LoginRequest, db: Session = Depends(get_db)):
 @app.get("/")
 async def read_index():
     try:
-        with open("templates/index.html", "r", encoding="utf-8") as f:
+        with open("static/index.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
-        return HTMLResponse(content="<h1>Error: No se encontró templates/index.html</h1>", status_code=404)
+        return HTMLResponse(content="<h1>Error: No se encontró static/index.html</h1>", status_code=404)
 
 def limpiar_numero(v: str) -> float:
     c = re.sub(r'[^\d]', '', str(v))
