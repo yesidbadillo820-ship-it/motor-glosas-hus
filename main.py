@@ -25,7 +25,7 @@ templates = Jinja2Templates(directory="static")
 API_KEY = os.getenv("GROQ_API_KEY")
 glosa_service = GlosaService(api_key=API_KEY)
 
-# ─── BASE DE DATOS MEJORADA ───
+# ─── BASE DE DATOS MEJORADA CON AUTO-CARGA DE CONTRATOS ───
 def init_db():
     conn = sqlite3.connect("glosas_hus.db")
     c = conn.cursor()
@@ -35,6 +35,19 @@ def init_db():
         eps TEXT, paciente TEXT, factura TEXT, codigo_glosa TEXT, valor_objetado TEXT, 
         estado TEXT, dictamen TEXT, dias_restantes INTEGER
     )''')
+    
+    # 🔥 INYECTAR CONTRATOS POR DEFECTO SI LA TABLA ESTÁ VACÍA
+    c.execute("SELECT COUNT(*) FROM contratos")
+    if c.fetchone()[0] == 0:
+        contratos_base = [
+            ("DISPENSARIO MEDICO", "CONTRATO 440-DIGSA/DMBUG-2025. TARIFAS ANEXO 6.2 (PROCEDIMIENTOS, LABORATORIO, IMAGENOLOGÍA). OBLIGATORIO CUMPLIMIENTO."),
+            ("NUEVA EPS", "CONTRATO 02-01-06-00077-2017. MANUAL TARIFARIO SOAT -20% Y ANEXO DE TARIFAS INSTITUCIONALES PROPIAS."),
+            ("SANITAS", "CONTRATO ACTUAL VIGENTE. TARIFA SOAT -15%. EXCLUYE MEDICAMENTOS."),
+            ("COOSALUD", "CONTRATO DE PRESTACION DE SERVICIOS VIGENTE. TARIFA SOAT PLENO."),
+            ("FOMAG", "CONTRATO VIGENTE PRESTACIÓN DE SERVICIOS DE SALUD FOMAG. APLICACIÓN DE TARIFAS PACTADAS.")
+        ]
+        c.executemany("INSERT INTO contratos (eps, detalles) VALUES (?, ?)", contratos_base)
+        
     conn.commit()
     conn.close()
 
@@ -42,9 +55,8 @@ init_db()
 
 # ─── SEGURIDAD ───
 async def verify_token(request: Request):
-    # Para el prototipo, permitimos acceso libre al HTML, pero protegemos las APIs
     token = request.headers.get("Authorization")
-    if ACCESS_TOKEN and ACCESS_TOKEN != "HUS2026": # Si definiste un token real
+    if ACCESS_TOKEN and ACCESS_TOKEN != "HUS2026": 
         if not token or token != f"Bearer {ACCESS_TOKEN}":
             raise HTTPException(status_code=401, detail="No autorizado")
 
@@ -80,13 +92,8 @@ async def analizar_glosa(
 
     return resultado.model_dump()
 
-# ─── NUEVO: BATCH PROCESSING (LOTE) CON SSE ───
 @app.post("/analizar-lote")
 async def analizar_lote(request: Request):
-    """Procesamiento masivo asíncrono para Excel (Simulado con SSE)"""
-    # Esta función requiere armar el JSON desde el frontend y enviar SSE.
-    # Por tiempo, se mantiene la lógica del lote en el Frontend (JS), 
-    # ya que es más seguro para la capa gratuita de Groq (evita timeout del server).
     pass 
 
 @app.get("/glosas")
@@ -104,7 +111,6 @@ async def obtener_historial(limite: int = 50, eps: Optional[str] = None):
 
 @app.get("/alertas")
 async def obtener_alertas():
-    """Devuelve glosas que vencen en 5 días o menos"""
     conn = sqlite3.connect("glosas_hus.db")
     conn.row_factory = sqlite3.Row
     filas = [dict(row) for row in conn.execute("SELECT * FROM historial WHERE dias_restantes <= 5 AND dias_restantes > 0 ORDER BY dias_restantes ASC").fetchall()]
