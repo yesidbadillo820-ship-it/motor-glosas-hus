@@ -23,6 +23,15 @@ FERIADOS_CO = [
     "2026-01-01", "2026-01-12", "2026-03-23", "2026-04-02", "2026-04-03", "2026-05-01", "2026-05-18", "2026-06-08", "2026-06-15", "2026-06-29", "2026-07-20", "2026-08-07", "2026-08-17", "2026-10-12", "2026-11-02", "2026-11-16", "2026-12-08", "2026-12-25"
 ]
 
+# 📝 CONTRATOS DUROS (Para que NUNCA desaparezcan en Render)
+CONTRATOS_FIJOS = {
+    "DISPENSARIO MEDICO": "CONTRATO 440-DIGSA/DMBUG-2025. TARIFAS ANEXO 6.2 (PROCEDIMIENTOS, LABORATORIO, IMAGENOLOGÍA). OBLIGATORIO CUMPLIMIENTO.",
+    "NUEVA EPS": "CONTRATO 02-01-06-00077-2017. MANUAL TARIFARIO SOAT -20% Y ANEXO DE TARIFAS INSTITUCIONALES PROPIAS.",
+    "SANITAS": "CONTRATO ACTUAL VIGENTE. TARIFA SOAT -15%. EXCLUYE MEDICAMENTOS.",
+    "COOSALUD": "CONTRATO DE PRESTACION DE SERVICIOS VIGENTE. TARIFA SOAT PLENO.",
+    "FOMAG": "CONTRATO VIGENTE PRESTACIÓN DE SERVICIOS DE SALUD FOMAG. APLICACIÓN DE TARIFAS PACTADAS."
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. EXTRACCIÓN AVANZADA DE PDF (pdfplumber + Fallback)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -78,13 +87,15 @@ class GlosaService:
         return m.group(1).strip().replace("**", "") if m else default
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
+        # Combinar contratos duros con los de la base de datos
         if contratos_db is None: contratos_db = {}
+        contratos_activos = {**CONTRATOS_FIJOS, **contratos_db}
 
         eps_segura = str(data.eps).upper() if data.eps else "OTRA"
         etapa_segura = str(data.etapa).strip().upper()
         
-        info_c = contratos_db.get(eps_segura, "AUSENCIA DE CONTRATO VIGENTE. RIGE RESOLUCIÓN INSTITUCIONAL 054 Y 120 DE 2026 (SOAT PLENO 100%).")
-        tiene_contrato = eps_segura in contratos_db
+        info_c = contratos_activos.get(eps_segura, "AUSENCIA DE CONTRATO VIGENTE. RIGE RESOLUCIÓN INSTITUCIONAL 054 Y 120 DE 2026 (SOAT PLENO 100%).")
+        tiene_contrato = eps_segura in contratos_activos
 
         texto_base = str(data.tabla_excel).strip()
         val_ac_num = float(re.sub(r'[^\d]', '', str(data.valor_aceptado)) or 0)
@@ -96,6 +107,13 @@ class GlosaService:
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
         valor_obj_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
+        # Nombres dinámicos para los rechazos
+        nombres_glosa = {
+            "TA": "TARIFAS", "SO": "SOPORTES", "FA": "FACTURACIÓN",
+            "PE": "PERTINENCIA", "AU": "AUTORIZACIÓN", "CO": "COBERTURA"
+        }
+        nombre_tipo = nombres_glosa.get(prefijo, "OBJECIÓN INJUSTIFICADA")
+
         dias = _calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) if data.fecha_radicacion and data.fecha_recepcion else 0
         es_extemporanea = dias > 20
         dias_restantes = max(0, 20 - dias)
@@ -103,13 +121,13 @@ class GlosaService:
         msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS - FALTAN {dias_restantes})"
         color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
 
-        # GUILLOTINAS LEGALES
+        # GUILLOTINAS LEGALES CON NUEVOS TEXTOS
         if "RATIF" in etapa_segura and val_ac_num <= 0:
-            txt = "ESE HUS NO ACEPTA GLOSA RATIFICADA. NO SE APORTAN NUEVOS ELEMENTOS DE JUICIO. SE SOLICITA CONCILIACIÓN (ART. 57 LEY 1438 DE 2011)."
+            txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) EN INSTANCIA DE RATIFICACIÓN. NO SE APORTAN NUEVOS ELEMENTOS DE JUICIO. SE SOLICITA CONCILIACIÓN (ART. 57 LEY 1438 DE 2011)."
             return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=dias_restantes)
 
         if es_extemporanea and val_ac_num <= 0:
-            txt = f"ESE HUS NO ACEPTA GLOSA EXTEMPORÁNEA ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO. SE EXIGE EL PAGO INMEDIATO."
+            txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR HABER SIDO NOTIFICADA DE MANERA EXTEMPORÁNEA ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO. SE EXIGE EL PAGO INMEDIATO."
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo, dias_restantes=0)
 
         # 🎯 FEW-SHOT EXAMPLES (Ejemplos de entrenamiento en vivo)
@@ -147,7 +165,7 @@ class GlosaService:
         
         LA OBJECIÓN CARECE DE FUNDAMENTO, PUESTO QUE LA HISTORIA CLÍNICA ADJUNTA A LA FACTURACIÓN CONSTITUYE PLENA PRUEBA DE LA REALIZACIÓN DEL PROCEDIMIENTO, TAL COMO LO ESTABLECE LA RESOLUCIÓN 1995 DE 1999 DEL MINISTERIO DE SALUD. EL REGISTRO MÉDICO DEMUESTRA LA TOMA DE LA MUESTRA Y EL ANÁLISIS PERTINENTE, CUMPLIENDO CON LOS REQUISITOS LEGALES EXIGIDOS.
         
-       SE REQUIERE EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO DEL VALOR OBJETADO, YA QUE LA INSTITUCIÓN HA DEMOSTRADO FEHACIENTEMENTE LA PRESTACIÓN EFECTIVA DEL SERVICIO. LA RETENCIÓN DE ESTOS RECURSOS VULNERA EL EQUILIBRIO CONTRACTUAL Y EL PRINCIPIO DE BUENA FE ESTABLECIDO EN LA NORMATIVIDAD COMERCIAL Y EN SALUD VIGENTE.</argumento>
+        SE REQUIERE EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO DEL VALOR OBJETADO, YA QUE LA INSTITUCIÓN HA DEMOSTRADO FEHACIENTEMENTE LA PRESTACIÓN EFECTIVA DEL SERVICIO. LA RETENCIÓN DE ESTOS RECURSOS VULNERA EL EQUILIBRIO CONTRACTUAL Y EL PRINCIPIO DE BUENA FE ESTABLECIDO EN LA NORMATIVIDAD COMERCIAL Y EN SALUD VIGENTE.</argumento>
         </ejemplos_de_respuestas_perfectas>
         """
 
@@ -174,7 +192,6 @@ class GlosaService:
         user_prompt = f"USUARIO: EPS: {eps_segura}. GLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:5000]}\nASISTENTE:"
 
         res_ia = ""
-        # FALLBACK ENGINE: Intenta 70B, si falla intenta Mixtral
         try:
             comp = await self.cliente.chat.completions.create(
                 messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
@@ -191,7 +208,6 @@ class GlosaService:
             except Exception as e:
                 res_ia = f"<argumento>ERROR DE IA: {str(e)}</argumento>"
 
-        # EXTRACCIÓN Y BLINDAJE REGEX (A PRUEBA DE FALLOS)
         paciente = self.xml("paciente", res_ia, "NO IDENTIFICADO")
         factura = self.xml("factura", res_ia, "N/A")
         autorizacion = self.xml("autorizacion", res_ia, "N/A")
@@ -209,7 +225,7 @@ class GlosaService:
             apertura = f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA {codigo_final} POR $ {val_ac_num:,.0f}.<br/><br/>"
             tipo = "AUDITORÍA - ACEPTADA"
         else:
-            apertura = f"ESE HUS NO ACEPTA LA GLOSA {codigo_final} POR CONSIDERARLA INJUSTIFICADA, SUSTENTANDO ASÍ:<br/><br/>"
+            apertura = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_final}) POR CONSIDERARLA INJUSTIFICADA, SUSTENTANDO ASÍ:<br/><br/>"
             tipo = "TÉCNICO-LEGAL"
 
         return GlosaResult(
