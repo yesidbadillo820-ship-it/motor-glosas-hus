@@ -164,7 +164,7 @@ class GlosaService:
         servicio = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
         arg = self.xml("argumento", res_ia, "SIN ARGUMENTO").replace('\n', '<br/>')
         
-        dictamen = _tabla_defensa(codigo_det, servicio, valor_raw, "RE9602", "GLOSA O DEVOLUCIÓN INJUSTIFICADA") + _div(f"<b>ESE HUS NO ACEPTA LA GLOSA POR CONSIDERARLA INJUSTIFICADA:</b><br/><br/>{arg}")
+        dictamen = _tabla_defensa(codigo_det, servicio, valor_raw, "RE9602", "GLOSA O DEVOLUCIÓN INJUSTIFICADA") + _div(f"<b>ESE HUS NO ACEPTA GLOSA INJUSTIFICADA:</b><br/><br/>{arg}")
         
         return GlosaResult(tipo=f"TÉCNICO-LEGAL [{prefijo}]", resumen=f"DEFENSA: {paciente}", dictamen=dictamen, codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", score=95, dias_restantes=max(0, 20-dias))
 
