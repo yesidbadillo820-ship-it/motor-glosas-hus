@@ -173,38 +173,56 @@ class GlosaService:
         eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
         info_c = {**CONTRATOS_FIJOS, **(contratos_db or {})}.get(eps_key, CONTRATOS_FIJOS["OTRA / SIN DEFINIR"])
         
-        est_actual = ESTRATEGIAS.get(prefijo, "ESTRATEGIA GENERAL: Desvirtuar la glosa apelando a la pertinencia médica, los soportes clínicos adjuntos y el principio de buena fe (Art 871 C.Co). Exigir pago.")
-
-        # --- INICIO DEL CÓDIGO A REEMPLAZAR ---
-        sys_p = f"""Eres el Director Jurídico y de Auditoría de Cuentas Médicas de la ESE HUS (Colombia).
-        MARCO CONTRACTUAL: {info_c}
-        INSTRUCCIÓN LEGAL: {est_actual}
-
-        Tu tarea es redactar la defensa técnica y jurídica para levantar esta glosa.
-        REGLAS ESTRICTAS:
-        1. Responde ÚNICAMENTE en formato XML: <paciente>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>.
-        2. El <argumento> DEBE estar TODO EN MAYÚSCULAS y seguir esta estructura exacta:
-        - HECHOS: Describe brevemente el servicio prestado basado en los soportes.
-        - CONSIDERACIONES JURÍDICAS: Desarrolla el argumento usando las LEYES A CITAR indicadas en tu instrucción legal.
-        - PRETENSIÓN: Exige el levantamiento de la glosa y el pago inmediato según Decreto 4747 de 2007.
-        - ADVERTENCIA LEGAL: Advierte sobre el cobro de intereses de mora (Art. 56 Ley 1438/2011) y posible reporte a la SUPERSALUD.
-        """
+        # 1. Detectar si es una EPS sin contrato
+        es_sin_contrato = (eps_key == "OTRA" or eps_key == "")
         
-        FORMATO OBLIGATORIO:
-        <paciente>Nombre del paciente (o NO IDENTIFICADO)</paciente>
-        <codigo_glosa>Código alfanumérico (ej. TA0201, o N/A)</codigo_glosa>
-        <valor_objetado>Monto en pesos (ej. $ 1.500.000, o N/A)</valor_objetado>
-        <servicio_glosado>Nombre del servicio (o SERVICIOS ASISTENCIALES)</servicio_glosado>
-        <argumento>AQUÍ VA TU REDACCIÓN LEGAL Y TÉCNICA DEFENDIENDO A LA ESE HUS...</argumento>"""
+        # 2. Asignar la estrategia legal específica según el código y el contrato
+        if prefijo == "TA":
+            if es_sin_contrato:
+                est_actual = (
+                    "ESTRATEGIA TARIFARIA ESTRICTA (SIN CONTRATO): \n"
+                    "1. Aclara enfáticamente que NO EXISTE ACUERDO DE VOLUNTADES ni contrato vigente con esta EPS.\n"
+                    "2. Argumenta que, según el Art. 11 del Decreto 4747 de 2007, ante la ausencia de contrato aplica el manual tarifario vigente.\n"
+                    "3. Cita las Resoluciones Institucionales 054 y 120 de 2026 de la ESE HUS que determinan el cobro al SOAT PLENO (100%).\n"
+                    "4. Concluye que es ilegal e improcedente que la EPS imponga descuentos unilaterales, violando el principio de Buena Fe (Art. 871 C.Co)."
+                )
+            else:
+                est_actual = (
+                    "ESTRATEGIA TARIFARIA (CON CONTRATO): \n"
+                    "1. Cita el contrato y las tarifas pactadas que se te informan en el MARCO CONTRACTUAL.\n"
+                    "2. Demuestra que el valor cobrado es exacto a lo acordado.\n"
+                    "3. Rechaza la glosa argumentando que la EPS no puede desconocer lo que firmó (Art. 871 C.Co)."
+                )
+        elif prefijo == "SO":
+            est_actual = "ESTRATEGIA SOPORTES: Demostrar que la Historia Clínica es plena prueba (Res. 1995/1999). Menciona que los soportes fueron enviados."
+        elif prefijo == "AU":
+            est_actual = "ESTRATEGIA AUTORIZACIÓN: Urgencia vital (Art. 168 Ley 100/1993). Trámite oportuno."
+        elif prefijo == "CO":
+            est_actual = "ESTRATEGIA COBERTURA: Demostrar que el servicio es obligación de la EPS (Ley 1751/2015 y Ley 100/1993)."
+        else:
+            est_actual = "ESTRATEGIA PERTINENCIA: Autonomía médica (Ley 1751/2015 Art. 17). Justificar el acto médico basado en diagnóstico y soportes."
+
+        # 3. Prompt estricto anti-alucinaciones
+        sys_p = f"""Eres el Director Jurídico de la ESE HUS.
+MARCO CONTRACTUAL A APLICAR: {info_c}
+INSTRUCCIÓN LEGAL: {est_actual}
+
+REGLAS ESTRICTAS E INQUEBRANTABLES:
+1. Responde ÚNICAMENTE en XML válido. Cero texto fuera del XML.
+2. El <argumento> DEBE estar TODO EN MAYÚSCULAS y tener al menos 2 párrafos robustos.
+3. BAJO NINGUNA CIRCUNSTANCIA inventes contratos o datos que no estén en el MARCO CONTRACTUAL. Si el marco dice SIN CONTRATO, asúmelo tajantemente sin agregar códigos inventados.
+
+FORMATO:
+<paciente>Nombre del paciente (o NO IDENTIFICADO)</paciente>
+<codigo_glosa>Código alfanumérico detectado</codigo_glosa>
+<valor_objetado>Monto con $</valor_objetado>
+<servicio_glosado>Nombre del servicio</servicio_glosado>
+<argumento>TU DEFENSA LEGAL AQUÍ...</argumento>"""
         
         try:
             comp = await self.cliente.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": sys_p}, 
-                    {"role": "user", "content": f"GLOSA:\n{texto_base}\n\nSOPORTES:\n{contexto_pdf[:3000]}"}
-                ],
-                model="llama-3.3-70b-versatile", 
-                temperature=0.2
+                messages=[{"role": "system", "content": sys_p}, {"role": "user", "content": f"GLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:3000]}"}],
+                model="llama-3.3-70b-versatile", temperature=0.2
             )
             res_ia = comp.choices[0].message.content
         except Exception as e: 
