@@ -1,4 +1,3 @@
-import os
 import io
 import re
 import asyncio
@@ -85,7 +84,8 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
             if txt: unido += f"\n--- PÁG {i+1} ---\n{txt}"
     return unido[:4000] + "\n...[RECORTADO]...\n" + unido[-4000:] if len(unido) > 8000 else unido
 
-def _calcular_dias_habiles(f_rad, f_rec):
+# ESTA ES LA FUNCIÓN QUE CAUSABA EL ERROR (REQUERÍA NOMBRE EXACTO)
+def calcular_dias_habiles(f_rad, f_rec):
     try:
         d1, d2 = datetime.strptime(f_rad, "%Y-%m-%d"), datetime.strptime(f_rec, "%Y-%m-%d")
         dias, current = 0, d1
@@ -124,34 +124,31 @@ class GlosaService:
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
         valor_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
-        dias = _calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) if data.fecha_radicacion and data.fecha_recepcion else 0
+        dias = calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) if data.fecha_radicacion and data.fecha_recepcion else 0
         es_extemporanea = dias > 20
         msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS)"
 
-        # PRIORIDAD 1: RATIFICACIÓN (Texto legal solicitado)
         if "RATIF" in etapa_str:
             txt_ratif = ("ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA GLOSA INICIAL "
                          "Y CONTINUACIÓN DEL PROCESO DE ACUERDO CON LA NORMA. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE LA "
                          "CONCILIACIÓN DE LA AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE LAS PARTES. CUALQUIER INFORMACIÓN AL CORREO "
                          "ELECTRÓNICO INSTITUCIONAL CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO, VENTANILLA ÚNICA DE "
                          "LA ESE HUS CARRERA 33 NO. 28-126. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, "
-                         "DE NO OBTENERSE LA RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR "
+                         "DE NO OBTENERSE LA RATIFICACIÓN DE LA RESPUESTA A LA GLOSA INLOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR "
                          "LEVANTADA LA RESPECTIVA OBJECIÓN.")
             tabla = _tabla_simple(codigo_det, "RATIFICACIÓN", valor_raw, "RE9901", "GLOSA INJUSTIFICADA", color_e="#2563eb")
             return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla + _div(txt_ratif), codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=max(0, 20-dias))
 
-        # PRIORIDAD 2: EXTEMPORÁNEA
         if es_extemporanea and val_ac_num <= 0:
             txt_ext = f"ESE HUS NO ACEPTA LA GLOSA POR EXTEMPORANEIDAD ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO (ART. 57 LEY 1438/2011). SE EXIGE EL PAGO INMEDIATO."
             tabla = _tabla_simple(codigo_det, "EXTEMPORÁNEA", valor_raw, "RE9502", "GLOSA FUERA DE TIEMPOS")
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt_ext), codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", dias_restantes=0)
 
-        # PRIORIDAD 3: CASO INICIAL (Análisis IA Pro)
         eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
         info_c = {**CONTRATOS_FIJOS, **(contratos_db or {})}.get(eps_key, CONTRATOS_FIJOS["OTRA / SIN DEFINIR"])
         est_actual = ESTRATEGIAS.get(prefijo, ESTRATEGIAS["PE"])
 
-        sys_p = f"Eres el DIRECTOR JURÍDICO ESE HUS. TODO EN MAYÚSCULAS. XML. MARCO: {info_c}. ESTRATEGIA: {est_actual}. DEVUELVE: <paciente>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>."
+        sys_p = f"Director Jurídico ESE HUS. XML. Marco: {info_c}. Estrategia: {est_actual}. XML: <paciente>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>."
         
         try:
             comp = await self.cliente.chat.completions.create(
@@ -170,27 +167,23 @@ class GlosaService:
         return GlosaResult(tipo=f"TÉCNICO-LEGAL [{prefijo}]", resumen=f"DEFENSA: {paciente}", dictamen=dictamen, codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", score=95, dias_restantes=max(0, 20-dias))
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 4. GENERADOR DE OFICIO PDF PRO
+# 4. GENERADORES PRO
 # ═════════════════════════════════════════════════════════════════════════════
 
 def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=2.4*cm, leftMargin=2.4*cm, topMargin=2.2*cm, bottomMargin=2.2*cm)
     
-    navy, teal = colors.HexColor("#0b1829"), colors.HexColor("#0d9488")
+    navy = colors.HexColor("#0b1829")
     st_body = ParagraphStyle('B', fontName='Helvetica', fontSize=10, leading=16, alignment=TA_JUSTIFY, textColor=navy)
-    st_bold = ParagraphStyle('Bo', fontName='Helvetica-Bold', fontSize=10, leading=16, textColor=navy)
     
-    # Limpieza de HTML para el PDF
     cuerpo = re.sub(r'<table.*?>.*?</table>', '', conclusion, flags=re.IGNORECASE | re.DOTALL)
     cuerpo = re.sub(r'<br\s*/?>', '\n', re.sub(r'<[^>]+>', '', cuerpo)).strip()
     
     elems = []
     elems.append(Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", ParagraphStyle('T', fontName='Helvetica-Bold', fontSize=13, alignment=TA_CENTER, textColor=navy)))
-    elems.append(Paragraph("NIT: 900006037-0 | Oficina de Auditoría Médica y Cuentas", ParagraphStyle('S', fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor("#64748b"))))
-    elems.append(HRFlowable(width="100%", thickness=2, color=navy))
+    elems.append(HRFlowable(width="100%", thickness=1, color=navy))
     elems.append(Spacer(1, 20))
-    
     elems.append(Paragraph(f"Bucaramanga, {datetime.now().strftime('%d de %m de %Y')}", st_body))
     elems.append(Spacer(1, 15))
     elems.append(Paragraph(f"<b>Señores:</b><br/>{eps.upper()}<br/><b>Ref:</b> {resumen}", st_body))
@@ -201,10 +194,6 @@ def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
             elems.append(Paragraph(parr.strip(), st_body))
             elems.append(Spacer(1, 10))
 
-    elems.append(Spacer(1, 40))
-    firma = Table([[Paragraph("__________________________<br/><b>JEFE DE AUDITORÍA MÉDICA</b>", st_body), Paragraph("__________________________<br/><b>ASESOR JURÍDICO</b>", st_body)]], colWidths=[8.5*cm, 8.5*cm])
-    elems.append(firma)
-    
     doc.build(elems)
     buf.seek(0)
     return buf.read()
