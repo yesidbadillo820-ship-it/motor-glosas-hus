@@ -13,3 +13,4 @@ python-jose[cryptography]
 bcrypt==4.0.1
 passlib[bcrypt]
 psycopg2-binary
+httpx>=0.27.0
