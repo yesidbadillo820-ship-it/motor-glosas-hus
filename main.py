@@ -20,13 +20,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from jose import JWTError, jwt
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
-
 from services import GlosaService, crear_oficio_pdf, calcular_dias_habiles, exportar_excel_pro
 from models import GlosaRecord, ContratoRecord, UsuarioRecord, GlosaInput, GlosaResult, PDFRequest, ContratoInput
 from database import engine, Base, get_db, SessionLocal
@@ -34,10 +27,6 @@ from auth import verify_password, get_password_hash, create_access_token, SECRET
 
 logger = logging.getLogger("motor_glosas")
 Base.metadata.create_all(bind=engine)
-
-# ═════════════════════════════════════════════════════════════════════════════
-# CONFIGURACIÓN INICIAL
-# ═════════════════════════════════════════════════════════════════════════════
 
 BASE_CONTRATOS_DEFAULT = {
     "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
@@ -74,19 +63,11 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Motor Glosas HUS PRO v4.0", lifespan=lifespan)
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY", ""))
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# ═════════════════════════════════════════════════════════════════════════════
-# SEGURIDAD
-# ═════════════════════════════════════════════════════════════════════════════
 
 def get_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     if token == "HUS2026":
@@ -100,16 +81,11 @@ def get_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depend
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
 
-# ═════════════════════════════════════════════════════════════════════════════
-# ENDPOINTS
-# ═════════════════════════════════════════════════════════════════════════════
-
 @app.get("/")
 def root():
     return FileResponse("static/index.html")
 
 @app.post("/analizar")
-@limiter.limit("15/minute")
 async def analizar_endpoint(
     request: Request,
     eps: str = Form(...), etapa: str = Form(...), 
@@ -126,19 +102,18 @@ async def analizar_endpoint(
 
     data = GlosaInput(eps=eps, etapa=etapa, fecha_radicacion=fecha_radicacion, fecha_recepcion=fecha_recepcion, valor_aceptado=valor_aceptado, tabla_excel=tabla_excel)
     contratos_db = {c.eps: c.detalles for c in db.query(ContratoRecord).all()}
+    resultado = await glosa_service.analizar(data, contexto_pdf, contratos_db)
     
-    res = await glosa_service.analizar(data, contexto_pdf, contratos_db)
-    
-    val_obj = float(re.sub(r'[^\d]', '', res.valor_objetado) or 0)
+    val_obj = float(re.sub(r'[^\d]', '', resultado.valor_objetado) or 0)
     val_acep = float(re.sub(r'[^\d]', '', valor_aceptado) or 0)
     
     db.add(GlosaRecord(
-        eps=eps, paciente=res.paciente, codigo_glosa=res.codigo_glosa, valor_objetado=val_obj,
+        eps=eps, paciente=resultado.paciente, codigo_glosa=resultado.codigo_glosa, valor_objetado=val_obj,
         valor_aceptado=val_acep, etapa=etapa, estado="ACEPTADA" if val_acep > 0 else "LEVANTADA",
-        dictamen=res.dictamen, dias_restantes=res.dias_restantes
+        dictamen=resultado.dictamen, dias_restantes=resultado.dias_restantes
     ))
     db.commit()
-    return res
+    return resultado
 
 @app.get("/glosas")
 def listar_historial(limit: int = 50, db: Session = Depends(get_db), u: UsuarioRecord = Depends(get_usuario_actual)):
@@ -151,11 +126,13 @@ def obtener_alertas(db: Session = Depends(get_db), u: UsuarioRecord = Depends(ge
 @app.get("/analytics")
 def obtener_analytics(db: Session = Depends(get_db), u: UsuarioRecord = Depends(get_usuario_actual)):
     stats = db.query(func.count(GlosaRecord.id), func.sum(GlosaRecord.valor_objetado), func.sum(GlosaRecord.valor_aceptado)).first()
+    v_obj = stats[1] or 0
+    v_rec = v_obj - (stats[2] or 0)
     return {
         "glosas_mes": stats[0] or 0,
-        "valor_objetado_mes": stats[1] or 0,
-        "valor_recuperado_mes": (stats[1] or 0) - (stats[2] or 0),
-        "tasa_exito_pct": round(((stats[1] or 0) - (stats[2] or 0)) / (stats[1] or 1) * 100, 1)
+        "valor_objetado_mes": v_obj,
+        "valor_recuperado_mes": v_rec,
+        "tasa_exito_pct": round((v_rec / v_obj * 100) if v_obj > 0 else 0, 1)
     }
 
 @app.get("/contratos")
