@@ -8,86 +8,89 @@ from datetime import datetime, timedelta
 import PyPDF2
 from groq import AsyncGroq
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas
 
 from models import GlosaInput, GlosaResult
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-logger = logging.getLogger("motor_glosas")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("motor_glosas_v2")
+
+# FESTIVOS COLOMBIA 2025-2026 (Para cálculo exacto de vencimientos)
+FERIADOS_CO = [
+    "2025-01-01", "2025-01-06", "2025-03-24", "2025-04-17", "2025-04-18", "2025-05-01", "2025-06-02", "2025-06-23", "2025-06-30", "2025-07-20", "2025-08-07", "2025-08-18", "2025-10-13", "2025-11-03", "2025-11-17", "2025-12-08", "2025-12-25",
+    "2026-01-01", "2026-01-12", "2026-03-23", "2026-04-02", "2026-04-03", "2026-05-01", "2026-05-18", "2026-06-08", "2026-06-15", "2026-06-29", "2026-07-20", "2026-08-07", "2026-08-17", "2026-10-12", "2026-11-02", "2026-11-16", "2026-12-08", "2026-12-25"
+]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. EXTRACCIÓN DE PDF (Minería de Datos)
+# 1. EXTRACCIÓN AVANZADA DE PDF (pdfplumber + Fallback a PyPDF2)
 # ─────────────────────────────────────────────────────────────────────────────
-
 def _procesar_pdf_sync(file_content: bytes) -> str:
+    unido = ""
     try:
+        import pdfplumber
+        with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+            for i, page in enumerate(pdf.pages):
+                txt = page.extract_text() or ""
+                tables = page.extract_tables()
+                for table in tables:
+                    for row in table:
+                        txt += " | ".join([str(c).replace('\n', ' ') if c else "" for c in row]) + "\n"
+                unido += f"\n--- PÁG {i+1} ---\n{txt}"
+    except Exception as e:
+        logger.warning(f"Fallo pdfplumber, usando PyPDF2: {e}")
         reader = PyPDF2.PdfReader(io.BytesIO(file_content))
-        total = len(reader.pages)
-        paginas = []
-        for i in range(total):
+        for i in range(len(reader.pages)):
             txt = reader.pages[i].extract_text()
-            if txt:
-                paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
-        unido = "".join(paginas)
-        if len(unido) > 6000:
-            unido = unido[:3000] + "\n\n...[ANÁLISIS TÉCNICO INTERMEDIO]...\n\n" + unido[-3000:]
-        return unido
-    except Exception:
-        return ""
+            if txt: unido += f"\n--- PÁG {i+1} ---\n{txt}"
+
+    if len(unido) > 8000:
+        unido = unido[:4000] + "\n\n...[ANÁLISIS RECORTADO]...\n\n" + unido[-4000:]
+    return unido
+
+def _calcular_dias_habiles(f_rad, f_rec):
+    try:
+        d1 = datetime.strptime(f_rad, "%Y-%m-%d")
+        d2 = datetime.strptime(f_rec, "%Y-%m-%d")
+        dias = 0
+        current = d1
+        while current < d2:
+            current += timedelta(days=1)
+            if current.weekday() < 5 and current.strftime("%Y-%m-%d") not in FERIADOS_CO:
+                dias += 1
+        return dias
+    except: return 0
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. SERVICIO DE AUDITORÍA Y JURÍDICA E.S.E. HUS
+# 2. MOTOR IA GROQ (Con Fallback)
 # ─────────────────────────────────────────────────────────────────────────────
-
 class GlosaService:
     def __init__(self, api_key: str):
         self.cliente = AsyncGroq(api_key=api_key)
 
     async def extraer_pdf(self, file_content: bytes) -> str:
-        try:
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(None, _procesar_pdf_sync, file_content)
-        except Exception:
-            return ""
-
-    def convertir_numero(self, m_str: str) -> float:
-        if not m_str: return 0.0
-        clean = re.sub(r'[^\d]', '', str(m_str))
-        try: return float(clean)
-        except ValueError: return 0.0
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _procesar_pdf_sync, file_content)
 
     def xml(self, tag: str, texto: str, default: str = "") -> str:
         m = re.search(fr'<{tag}>(.*?)</{tag}>', texto, re.IGNORECASE | re.DOTALL)
-        if m:
-            val = m.group(1).strip().replace("**", "").replace("*", "")
-            return val if val else default
-        return default
+        return m.group(1).strip().replace("**", "") if m else default
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         if contratos_db is None: contratos_db = {}
 
-        eps_segura = str(data.eps).upper() if data.eps else "OTRA / SIN DEFINIR"
+        eps_segura = str(data.eps).upper() if data.eps else "OTRA"
         etapa_segura = str(data.etapa).strip().upper()
         
-        tiene_contrato = False
-        info_c = "AUSENCIA DE CONTRATO VIGENTE. Rige la RESOLUCIÓN INSTITUCIONAL 054 Y 120 DE 2026 de la ESE HUS (TARIFA SOAT PLENO 100%)."
-        
-        for k, v in contratos_db.items():
-            if k in eps_segura and "OTRA" not in k:
-                info_c = v
-                tiene_contrato = True
-                break
+        info_c = contratos_db.get(eps_segura, "AUSENCIA DE CONTRATO. RIGE RESOLUCIÓN INSTITUCIONAL 054/2026 (SOAT PLENO).")
+        tiene_contrato = eps_segura in contratos_db
 
         texto_base = str(data.tabla_excel).strip()
-        val_ac_num = self.convertir_numero(data.valor_aceptado)
+        val_ac_num = float(re.sub(r'[^\d]', '', str(data.valor_aceptado)) or 0)
         
-        # EXTRACCIÓN SEGURA POR REGEX (NUESTRO SALVAVIDAS)
         cod_m = re.search(r'\b([A-Z]{2,3}\d{3,4})\b', texto_base)
         codigo_detectado = cod_m.group(1) if cod_m else "N/A"
         prefijo = codigo_detectado[:2].upper() if codigo_detectado != "N/A" else "XX"
@@ -95,176 +98,173 @@ class GlosaService:
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
         valor_obj_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
-        # ── CÁLCULO DE EXTEMPORANEIDAD ──
-        msg_tiempo, color_tiempo, es_extemporanea, dias = "Fechas no ingresadas", "bg-slate-500", False, 0
-        if data.fecha_radicacion and data.fecha_recepcion:
-            try:
-                f1 = datetime.strptime(data.fecha_radicacion, "%Y-%m-%d")
-                f2 = datetime.strptime(data.fecha_recepcion, "%Y-%m-%d")
-                dias = sum(1 for d in range((f2 - f1).days) if (f1 + timedelta(days=d+1)).weekday() < 5)
-                if dias > 20:
-                    es_extemporanea, msg_tiempo, color_tiempo = True, f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES)", "bg-red-600"
-                else:
-                    msg_tiempo, color_tiempo = f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)", "bg-emerald-500"
-            except Exception: pass
+        dias = _calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) if data.fecha_radicacion and data.fecha_recepcion else 0
+        es_extemporanea = dias > 20
+        dias_restantes = max(0, 20 - dias)
 
-        # 🛡️ 3. GUILLOTINAS LEGALES
+        msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS - FALTAN {dias_restantes})"
+        color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
+
+        # GUILLOTINAS
         if "RATIF" in etapa_segura and val_ac_num <= 0:
-            tabla = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA INJUSTIFICADA")
-            texto_rat = (
-                "ESE HUS RECHAZA DE PLANO LA RATIFICACIÓN DE LA GLOSA POR CONSIDERARLA ABSOLUTAMENTE INJUSTIFICADA. "
-                "LA INSTITUCIÓN SE RATIFICA EN LA DEFENSA INICIAL, TODA VEZ QUE LA ENTIDAD GLOSANTE NO APORTA NUEVOS "
-                "ELEMENTOS DE JUICIO O SOPORTES QUE DESVIRTÚEN LA FACTURACIÓN.\n\n"
-                "SE DA POR AGOTADA LA INSTANCIA Y SE SOLICITA CONCILIACIÓN SEGÚN LEY 1438 DE 2011."
-            )
-            return GlosaResult(tipo="LEGAL - RATIFICACIÓN", resumen="RECHAZO DE RATIFICACIÓN", dictamen=tabla + _div(texto_rat), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600")
+            txt = "ESE HUS RECHAZA DE PLANO LA RATIFICACIÓN POR INJUSTIFICADA. NO SE APORTAN NUEVOS ELEMENTOS DE JUICIO. SE SOLICITA CONCILIACIÓN (ART. 57 LEY 1438 DE 2011)."
+            return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=dias_restantes)
 
         if es_extemporanea and val_ac_num <= 0:
-            tabla = _tabla_simple(codigo_detectado, f"EXTEMPORÁNEA", valor_obj_raw, "RE9502", "GLOSA INJUSTIFICADA", color_estado="#b91c1c")
-            texto_ext = (
-                f"ESE HUS RECHAZA LA GLOSA POR CONSIDERARLA INJUSTIFICADA DEBIDO A SU EXTEMPORANEIDAD. AL TRANSCURRIR {dias} DÍAS HÁBILES, "
-                "OPERA DE PLENO DERECHO LA ACEPTACIÓN TÁCITA (ART. 57 LEY 1438/2011). SE EXIGE EL PAGO INMEDIATO."
-            )
-            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO POR EXTEMPORANEIDAD", dictamen=tabla + _div(texto_ext), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
+            txt = f"ESE HUS RECHAZA LA GLOSA POR INJUSTIFICADA Y EXTEMPORÁNEA ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO. SE EXIGE EL PAGO INMEDIATO."
+            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo, dias_restantes=0)
 
-        # 🧠 4. CEREBRO IA (MATRIZ DE ESTRATEGIA RESTAURADA)
-        base_normativa = info_c if tiene_contrato else "LA RESOLUCIÓN 054 Y 120 DE 2026 DE LA ESE HUS."
-        
-        if prefijo == "TA":
-            estrategia = """ESTRATEGIA TARIFARIA:
-            - PÁRRAFO 1: Identifica y cita textualmente el contrato pactado o la Resolución.
-            - PÁRRAFO 2: Desvirtúa el descuento abusivo de la EPS explicando que el hospital liquidó correctamente las tarifas.
-            - PÁRRAFO 3: Exige el pago del VALOR OBJETADO citando el Art 871 del Código de Comercio (Buena Fe)."""
-        elif prefijo == "SO":
-            estrategia = """ESTRATEGIA SOPORTES:
-            - PÁRRAFO 1: Menciona el nombre del contrato o resolución aplicable.
-            - PÁRRAFO 2: Localiza el soporte en el PDF (Dr, RM, Fecha). Cita la Res. 1995/1999 demostrando que la Historia Clínica es plena prueba.
-            - PÁRRAFO 3: Exige el VALOR OBJETADO."""
-        else:
-            estrategia = "ESTRATEGIA TÉCNICA: Justifica la pertinencia médica en 3 párrafos robustos basados en la Ley 1751/2015 y los anexos."
+        # LAS 6 ESTRATEGIAS
+        estrategias = {
+            "TA": "P1: Cita contrato/Res. 054. P2: Desvirtúa descuento abusivo de EPS justificando liquidación HUS. P3: Exige pago por Buena Fe (Art 871 C.Co).",
+            "SO": "P1: Cita contrato. P2: Demuestra que el soporte existe o que la Historia Clínica es plena prueba (Res 1995/99). P3: Exige pago.",
+            "PE": "P1: Cita contrato. P2: Justifica pertinencia clínica del acto médico basado en la autonomía profesional (Ley 1751/15). P3: Exige pago.",
+            "AU": "P1: Cita contrato. P2: Demuestra que se tramitó la autorización o que era una urgencia vital (Decreto 4747/07). P3: Exige pago.",
+            "CO": "P1: Cita contrato. P2: Demuestra cobertura del servicio en el plan de beneficios o contrato. P3: Exige pago.",
+            "FA": "P1: Cita contrato. P2: Aclara que la estructura de la factura cumple con la norma vigente. P3: Exige pago."
+        }
+        est_actual = estrategias.get(prefijo, estrategias["PE"])
 
-        system_prompt = f"""Eres el DIRECTOR JURÍDICO DE LA ESE HUS. Tienes prohibido dar respuestas cortas.
-        REGLAS INQUEBRANTABLES:
-        1. TODO EN MAYÚSCULAS.
-        2. TU REDACCIÓN DEBE TENER MÍNIMO 3 PÁRRAFOS TÉCNICOS Y EXTENSOS. NO RESUMAS.
-        3. USA SIEMPRE LA PALABRA 'VALOR OBJETADO'.
-        4. DEFIENDE ESTE MARCO NORMATIVO/CONTRACTUAL: {base_normativa}
-        5. DEVUELVE TU RESPUESTA ESTRICTAMENTE EN ESTE FORMATO XML:
-        <paciente>Nombre o N/A</paciente>
-        <codigo_glosa>CÓDIGO EXACTO (Ej. TA0201)</codigo_glosa>
-        <valor_objetado>VALOR EXACTO (Ej. $ 120.000)</valor_objetado>
-        <servicio_glosado>Servicio exacto</servicio_glosado>
-        <motivo_resumido>Motivo corto</motivo_resumido>
-        <argumento>TODA TU REDACCIÓN LEGAL AQUÍ</argumento>"""
+        system_prompt = f"""Eres el DIRECTOR JURÍDICO de la ESE HUS. 
+        REGLAS: TODO EN MAYÚSCULAS. MÍNIMO 3 PÁRRAFOS TÉCNICOS.
+        MARCO: {info_c}
+        ESTRATEGIA: {est_actual}
+        DEVUELVE XML: <paciente>, <factura>, <autorizacion>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <motivo_resumido>, <score> (0-100 nivel confianza), <argumento> (TU REDACCIÓN AQUÍ)."""
 
-        user_prompt = f"EPS: {eps_segura}\nBASE: {base_normativa}\nESTRATEGIA A APLICAR: {estrategia}\nGLOSA: {texto_base}\nSOPORTES PDF: {contexto_pdf[:6000]}"
+        user_prompt = f"EPS: {eps_segura}\nGLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:5000]}"
 
         res_ia = ""
-        for intento in range(3):
+        # FALLBACK ENGINE: Intenta 70B, si falla intenta Mixtral
+        try:
+            comp = await self.cliente.chat.completions.create(
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                model="llama-3.3-70b-versatile", temperature=0.2, max_tokens=2000
+            )
+            res_ia = comp.choices[0].message.content
+        except:
             try:
-                completion = await self.cliente.chat.completions.create(
+                comp = await self.cliente.chat.completions.create(
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-                    model="llama-3.3-70b-versatile",
-                    temperature=0.3,
-                    max_tokens=2500
+                    model="mixtral-8x7b-32768", temperature=0.2, max_tokens=2000
                 )
-                res_ia = completion.choices[0].message.content
-                break
-            except Exception: await asyncio.sleep(10)
+                res_ia = comp.choices[0].message.content
+            except Exception as e:
+                res_ia = f"<argumento>ERROR DE IA: {str(e)}</argumento>"
 
-        # 5. ENSAMBLAJE FINAL CON SEGURO ANTI-ALUCINACIONES
-        paciente      = self.xml("paciente", res_ia, "NO IDENTIFICADO")
+        paciente = self.xml("paciente", res_ia, "NO IDENTIFICADO")
+        factura = self.xml("factura", res_ia, "N/A")
+        autorizacion = self.xml("autorizacion", res_ia, "N/A")
+        score = int(self.xml("score", res_ia, "100") or 100)
+        argumento_ia = self.xml("argumento", res_ia, "").replace('\n', '<br/><br/>')
         
-        # Seguro para el código de glosa
-        codigo_final  = self.xml("codigo_glosa", res_ia, codigo_detectado)
-        if len(codigo_final) > 10 or codigo_final == "N/A": 
-            codigo_final = codigo_detectado
-            
-        # Seguro para el valor objetado
-        valor_xml     = self.xml("valor_objetado", res_ia, valor_obj_raw)
-        if "$" not in valor_xml and not any(char.isdigit() for char in valor_xml):
-            valor_xml = valor_obj_raw
-            
-        servicio      = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
-        motivo        = self.xml("motivo_resumido", res_ia, "OBJECIÓN DE LA EPS").upper()
-        argumento_ia  = self.xml("argumento", res_ia, "") or re.sub(r'<[^>]+>', '', res_ia).strip()
-
         if val_ac_num > 0:
-            valor_acep_fmt = f"$ {val_ac_num:,.0f}".replace(",", ".")
-            apertura = f"ESE HUS ACEPTA LA GLOSA {codigo_final} POR UN VALOR DE {valor_acep_fmt}: "
-            cod_res, desc_res = "RE9801", "GLOSA ACEPTADA"
-            tabla_html = _tabla_aceptacion(codigo_final, valor_xml, valor_acep_fmt, cod_res, desc_res)
+            apertura = f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA {codigo_detectado} POR $ {val_ac_num:,.0f}."
+            tipo = "AUDITORÍA - ACEPTADA"
         else:
-            apertura = f"ESE HUS NO ACEPTA LA GLOSA {codigo_final} POR CONSIDERARLA INJUSTIFICADA, TODA VEZ QUE LA OBJECIÓN POR {motivo} CARECE DE SUSTENTO CONTRACTUAL Y NORMATIVO, SUSTENTANDO NUESTRA POSICIÓN ASÍ: "
-            cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA"
-            tabla_html = _tabla_defensa(codigo_final, servicio, valor_xml, cod_res, desc_res)
+            apertura = f"ESE HUS NO ACEPTA LA GLOSA {codigo_detectado} POR CONSIDERARLA INJUSTIFICADA, SUSTENTANDO ASÍ:<br/><br/>"
+            tipo = "TÉCNICO-LEGAL"
 
-        if not re.search(r'^ESE HUS', argumento_ia, re.IGNORECASE):
-            dictamen_final = apertura + "\n\n" + argumento_ia
-        else:
-            dictamen_final = argumento_ia
-
-        dictamen_limpio = dictamen_final.replace("\n", "<br/><br/>")
-        dictamen_limpio = re.sub(r'(<br/>\s*){3,}', '<br/><br/>', dictamen_limpio)
-
-        return GlosaResult(tipo="TÉCNICO-LEGAL", resumen=f"DEFENSA FACTURA – {paciente}", dictamen=tabla_html + _div(dictamen_limpio), codigo_glosa=codigo_final, valor_objetado=valor_xml, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo)
+        return GlosaResult(
+            tipo=tipo, resumen=f"DEFENSA: {paciente}", dictamen=apertura + argumento_ia,
+            codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente=paciente,
+            mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo,
+            factura=factura, autorizacion=autorizacion, score=score, dias_restantes=dias_restantes
+        )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FUNCIONES AUXILIARES
+# 3. GENERADOR OFICIO PDF PRO (Membrete y Marca de Agua)
 # ─────────────────────────────────────────────────────────────────────────────
+def add_watermark(canvas_obj, doc):
+    canvas_obj.saveState()
+    canvas_obj.setFont("Helvetica-Bold", 60)
+    canvas_obj.setFillColor(colors.lightgrey)
+    canvas_obj.translate(300, 400)
+    canvas_obj.rotate(45)
+    canvas_obj.drawCentredString(0, 0, "ESE H.U.S.")
+    canvas_obj.restoreState()
 
-def _div(texto): 
-    return f'<div style="text-align:justify;line-height:1.8;font-size:11px;">{texto}</div>'
-
-def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_header="#1e3a8a", color_estado=None):
-    e_st = f'background-color:{color_estado};color:white;' if color_estado else ''
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:{color_header};color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">ESTADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;{e_st}"><b>{estado}</b></td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
-
-def _tabla_defensa(codigo, servicio, valor, cod_res, desc_res):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
-
-def _tabla_aceptacion(codigo, valor_obj, valor_acep, cod_res, desc_res):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR OBJETADO</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#d97706;">VALOR ACEPTADO</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor_obj}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:#d97706;">{valor_acep}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. GENERADOR DE OFICIO PDF
-# ─────────────────────────────────────────────────────────────────────────────
-
-def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
+def crear_oficio_pdf(eps: str, resumen: str, conclusion: str, codigo: str = "N/A", valor: str = "N/A") -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
     estilos = getSampleStyleSheet()
-    estilo_n = ParagraphStyle('n', parent=estilos['Normal'], alignment=TA_JUSTIFY, fontSize=11, leading=16)
-    estilo_titulo = ParagraphStyle('titulo', parent=estilos['Heading1'], alignment=1, fontSize=14, spaceAfter=20)
+    estilo_n = ParagraphStyle('n', alignment=TA_JUSTIFY, fontSize=11, leading=16)
     
-    match = re.search(r'<div[^>]*>(.*?)</div>', conclusion, re.IGNORECASE | re.DOTALL)
-    cuerpo = match.group(1) if match else conclusion
-    clean  = re.sub(r'<br\s*/?>', '\n', re.sub(r'<[^>]+>', '', cuerpo)).strip()
-    
-    fecha = datetime.now().strftime("%d/%m/%Y")
     elements = []
-    
-    logo_path = "static/logo.png"
-    if os.path.exists(logo_path):
-        try:
-            img = Image(logo_path, width=250, height=60)
-            img.hAlign = 'LEFT'
-            elements.extend([img, Spacer(1, 15)])
-        except: pass
+    fecha_str = datetime.now().strftime("%d de %B de %Y")
+    radicado = f"ACMG-2026-{datetime.now().strftime('%m%d%H%M')}"
 
-    elements.extend([
-        Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", estilo_titulo),
-        Paragraph("<b>OFICINA DE AUDITORÍA Y JURÍDICA DE CUENTAS MÉDICAS</b>", ParagraphStyle('sub', alignment=1, fontSize=12)),
-        Spacer(1, 30), Paragraph(f"Bucaramanga, {fecha}", estilo_n), Spacer(1, 20),
-        Paragraph(f"<b>Señores:</b><br/>{eps.upper()}", estilo_n), Spacer(1, 20),
-        Paragraph(f"<b>ASUNTO:</b> {resumen}", estilo_n), Spacer(1, 20),
-    ])
+    # Encabezado
+    elements.append(Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", ParagraphStyle('h1', alignment=TA_CENTER, fontSize=14)))
+    elements.append(Paragraph("NIT: 890.201.222-0 | Oficina de Auditoría Médica", ParagraphStyle('h2', alignment=TA_CENTER, fontSize=10)))
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph(f"<b>Bucaramanga, {fecha_str}</b><br/><b>Radicado Oficio:</b> {radicado}", estilo_n))
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph(f"<b>Señores:</b><br/>{eps.upper()}<br/><b>Ref:</b> {resumen}", estilo_n))
+    elements.append(Spacer(1, 15))
+
+    # Tabla Resumen
+    t_data = [['CÓDIGO GLOSA', 'VALOR OBJETADO', 'ESTADO'], [codigo, valor, 'GLOSA INJUSTIFICADA / RECHAZADA']]
+    t = Table(t_data, colWidths=[120, 150, 200])
+    t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1c3460")),
+                           ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                           ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                           ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                           ('BOTTOMPADDING', (0,0), (-1,0), 8),
+                           ('GRID', (0,0), (-1,-1), 1, colors.black)]))
+    elements.append(t)
+    elements.append(Spacer(1, 20))
+
+    # Cuerpo
+    clean_text = re.sub(r'<br\s*/?>', '\n', conclusion).strip()
+    for p in clean_text.split('\n\n'):
+        if p.strip(): elements.append(Paragraph(p.strip(), estilo_n))
+        elements.append(Spacer(1, 8))
+
+    # Firmas
+    elements.append(Spacer(1, 40))
+    elements.append(Paragraph("__________________________________________<br/><b>JEFE DE AUDITORÍA DE CUENTAS MÉDICAS</b><br/>ESE Hospital Universitario de Santander", estilo_n))
+
+    doc.build(elements, onFirstPage=add_watermark, onLaterPages=add_watermark)
+    buffer.seek(0)
+    return buffer.read()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. EXPORTACIÓN EXCEL PRO
+# ─────────────────────────────────────────────────────────────────────────────
+def exportar_excel_pro(glosas: list) -> bytes:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Reporte Glosas HUS"
+
+    headers = ["Fecha", "EPS", "Factura", "Paciente", "Código", "Valor", "Estado", "Días Restantes"]
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="1C3460", end_color="1C3460", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
     
-    for parrafo in clean.split('\n'):
-        if parrafo.strip(): elements.extend([Paragraph(parrafo.strip(), estilo_n), Spacer(1, 8)])
-    
-    elements.extend([Spacer(1, 40), Paragraph("__________________________________________", estilo_n), Paragraph("<b>DEPARTAMENTO DE AUDITORÍA</b><br/>ESE HOSPITAL UNIVERSITARIO DE SANTANDER", estilo_n)])
-    
-    doc.build(elements)
+    for col_num, cell in enumerate(ws[1], 1):
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 18
+
+    ws.column_dimensions['B'].width = 30 # EPS
+    ws.column_dimensions['D'].width = 30 # Paciente
+
+    for g in glosas:
+        ws.append([
+            g['creado_en'][:10], g['eps'], g.get('factura', 'N/A'), 
+            g['paciente'], g['codigo_glosa'], g['valor_objetado'], 
+            g['estado'], g.get('dias_restantes', 0)
+        ])
+
+    # Auto-filter
+    ws.auto_filter.ref = ws.dimensions
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
     buffer.seek(0)
     return buffer.read()
