@@ -6,17 +6,13 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-import pdfplumber
-import PyPDF2
-import httpx  # Para el fallback a Claude
-
+import httpx
 from groq import AsyncGroq
-# Importamos desde la nueva estructura de carpetas
 from models.schemas import GlosaInput, GlosaResult
 
 logger = logging.getLogger("motor_glosas_v2")
 
-# ── Configuración de Tiempos (Colombia) ───────────────────────────────────────
+# ── 1. CALENDARIO OFICIAL DE FERIADOS COLOMBIA (2025-2026) ──
 FERIADOS_CO = [
     "2025-01-01","2025-01-06","2025-03-24","2025-04-17","2025-04-18",
     "2025-05-01","2025-06-02","2025-06-23","2025-06-30","2025-07-20",
@@ -28,158 +24,143 @@ FERIADOS_CO = [
     "2026-11-16","2026-12-08","2026-12-25",
 ]
 
+# ── 2. MARCO CONTRACTUAL INTEGRAL (14 ENTIDADES ESE HUS) ──
 _CONTRATOS_BASE = {
+    "NUEVA EPS": "CONTRATO 440-DIGSA/DMBUG-2025. TARIFA: SOAT SMLV -20% E INSTITUCIONALES.",
+    "SALUD TOTAL": "ACUERDO 120-2024. TARIFA: ISS + 15% SOBRE MANUAL VIGENTE.",
+    "COOSALUD": "CONTRATO CAPITACIÓN 2025. INSUMOS INCLUIDOS EN TARIFA GLOBAL.",
+    "ASMET SALUD": "CONTRATO EVENTO 2025. TARIFA: SOAT PLENO PARA URGENCIAS Y EVENTO PACTADO.",
+    "COMPENSAR": "ACUERDO MARCO 2025. TARIFA: ISS + 10% SEGÚN PORTAFOLIO DE SERVICIOS HUS.",
+    "SURA": "CONTRATO PREPAGADA Y POS 2025. TARIFA: MANUAL PROPIO EPS + 5% EN ALTA COMPLEJIDAD.",
+    "FAMISANAR": "CONTRATO SUBSIDIADO 2025. TARIFA: SOAT -10%. REVISAR ANEXO DE INSUMOS.",
+    "MUTUAL SER": "CONTRATO EVENTO 2025. TARIFA: SOAT PLENO. NO SE ACEPTAN DESCUENTOS SIN SOPORTE.",
+    "PIJAOS SALUD": "RÉGIMEN INDÍGENA 2025. TARIFA: SOAT PLENO. RESPETAR USOS Y COSTUMBRES EN SALUD.",
+    "AIC": "ASOCIACIÓN INDÍGENA DEL CAUCA. TARIFA: SOAT PLENO. ATENCIÓN INTEGRAL PRIORIZADA.",
+    "MALLAMAS": "CONTRATO EVENTO 2025. TARIFA: SOAT PLENO. SIN DESCUENTO POR PRONTO PAGO.",
+    "SAVIA SALUD": "CONTRATO DE RED 2025. TARIFA: SOAT -15% SEGÚN DECRETO DE INTERVENCIÓN.",
+    "ECOOPSOS": "CONTRATO EVENTO 2025. TARIFA: SOAT PLENO. PAGO SEGÚN RADICACIÓN EFECTIVA.",
+    "EMSSANAR": "CONTRATO 2025. TARIFA: SOAT PLENO PARA ATENCIÓN DE ALTA COMPLEJIDAD.",
     "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 Y 120 DE 2026)."
 }
 
-# ── Helpers de Diseño HTML ───────────────────────────────────────────────────
-def _div(texto): 
-    return f'<div style="text-align:justify;line-height:1.6;font-size:11px;margin-top:10px;color:#1e293b;">{texto}</div>'
-
-def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_h="#1e3a8a", color_e="#b91c1c"):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;margin-bottom:10px;"><tr style="background-color:{color_h};color:white;"><th style="padding:5px;border:1px solid #ddd;">CÓDIGO GLOSA</th><th style="padding:5px;border:1px solid #ddd;">ESTADO</th><th style="padding:5px;border:1px solid #ddd;">VALOR OBJETADO</th><th style="padding:5px;border:1px solid #ddd;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;border:1px solid #ddd;text-align:center;">{codigo}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;background-color:{color_e};color:white;"><b>{estado}</b></td><td style="padding:5px;border:1px solid #ddd;text-align:center;">{valor}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
-
-def _tabla_defensa(codigo, servicio, valor, cod_res, desc_res):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;margin-bottom:10px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:5px;border:1px solid #ddd;">CÓDIGO GLOSA</th><th style="padding:5px;border:1px solid #ddd;">SERVICIO RECLAMADO</th><th style="padding:5px;border:1px solid #ddd;">VALOR OBJ.</th><th style="padding:5px;border:1px solid #ddd;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;border:1px solid #ddd;text-align:center;">{codigo}</td><td style="padding:5px;border:1px solid #ddd;">{servicio}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;">{valor}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
-
-# ── Prompts Maestros ─────────────────────────────────────────────────────────
-SYSTEM_ROL = """Eres el Director Jurídico de la ESE Hospital Universitario de Santander (HUS).
-Tu función es DEFENDER a la institución y LOGRAR EL PAGO de las facturas.
-
-IDENTIDAD INQUEBRANTABLE:
-- Eres un abogado COMBATIVO y técnico.
-- PROHIBIDO: Nunca aceptes una glosa. Nunca digas que la EPS tiene razón.
-- Si la glosa es por insumos o 'sin servicio', argumenta que la EPS viola el debido proceso por falta de claridad.
-- Tu misión es encontrar el argumento legal en el contrato o en la ley para exigir el pago."""
-
-SYSTEM_FORMATO = """Responde ÚNICAMENTE con XML:
-<paciente/><codigo_glosa/><valor_objetado/><servicio_glosado/><score_confianza/><argumento>DEFENSA EN MAYÚSCULAS...</argumento>"""
-
-ESTRATEGIAS_LEGALES = {
-    "TA_sin_contrato": "Sin contrato rige Art 11 Dec 4747/2007 (Manual SOAT 100%). Rechazar descuentos unilaterales.",
-    "TA_con_contrato": "Cobro según tarifas pactadas. Art 871 C.Co. La EPS no puede glosar lo firmado.",
-    "SO": "Historia Clínica es plena prueba (Res 1995/1999). Soportes faltantes son subsanables.",
-    "SE": "RECHAZAR POR INDETERMINACIÓN. La EPS debe ser clara. Insumos son parte integral del acto médico.",
-    "AU": "Urgencia vital no requiere autorización (Art 168 Ley 100/93).",
-    "CO": "Servicio es obligación legal (Ley 1751/2015). Atención de urgencias es obligatoria.",
-    "PE": "Autonomía médica (Ley 1751/2015 Art 17). La EPS no sustituye al médico tratante.",
-    "FA": "Errores de facturación son subsanables (Circular 030/2013).",
-    "DEFAULT": "Rechazar glosa por falta de fundamento técnico-legal claro. Exigir pago inmediato."
+# ── 3. ESTRATEGIAS TÉCNICO-LEGALES (ANEXO 5 RES. 3047) ──
+ESTRATEGIAS_HUS = {
+    "TA": "RECHAZO POR TARIFA. El cobro cumple el contrato o el manual SOAT pleno. La EPS no puede aplicar descuentos unilaterales.",
+    "SO": "SOPORTES SUFICIENTES. La Historia Clínica es plena prueba (Res. 1995/1999). El servicio se prestó y los anexos cumplen la norma.",
+    "AU": "AUTORIZACIÓN NO REQUERIDA. Urgencia vital o atención prioritaria amparada por la Ley 100 y Ley 1438. No requiere autorización previa.",
+    "CO": "COBERTURA LEGAL. El servicio es obligación de la EPS bajo Ley 1751/2015. No se aceptan exclusiones sin sustento técnico.",
+    "PE": "PERTINENCIA CLÍNICA. Autonomía médica protegida por Ley 1751/2015 Art. 17. Prevalece el criterio del médico tratante del HUS.",
+    "FA": "FACTURACIÓN CORRECTA. Errores formales son subsanables (Circular 030/2013). La prestación del servicio genera obligación de pago.",
+    "SE": "OBJECIÓN INDETERMINADA. La EPS glosa sin especificar el servicio. Se exige pago por violación al debido proceso.",
+    "DEFAULT": "RECHAZO TOTAL. La glosa carece de fundamento técnico-legal. Exigir pago por servicio efectivamente prestado."
 }
 
-# ── Clase GlosaService ───────────────────────────────────────────────────────
 class GlosaService:
     def __init__(self, groq_api_key: str):
         self.groq = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
 
-    async def extraer_pdf(self, file_content: bytes) -> str:
-        loop = asyncio.get_running_loop()
-        from services.pdf_service import _procesar_pdf_sync
-        return await loop.run_in_executor(None, _procesar_pdf_sync, file_content)
+    async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
+        texto_base = str(data.tabla_excel).strip().upper()
+        codigo_det = self._extraer_codigo_glosa(texto_base)
+        prefijo    = codigo_det[:2] if codigo_det != "N/A" else "SE"
+        valor_raw  = self._extraer_valor(texto_base)
+        
+        # ── Lógica de Tiempos y Extemporaneidad ──
+        dias = self._calcular_dias_habiles(str(data.fecha_radicacion), str(data.fecha_recepcion))
+        es_extemporanea = dias > 20
 
-    def _xml(self, tag: str, texto: str, default: str = "") -> str:
+        # ── DETERMINACIÓN DEL CÓDIGO LEGAL (NORMATIVA REAL) ──
+        if es_extemporanea:
+            cod_res, desc_res = "RE9502", "LA GLOSA NO PROCEDE POR HABER SIDO GENERADA FUERA DE LOS TÉRMINOS"
+        elif "RATIF" in str(data.etapa).upper():
+            cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA Y SUBSANADA EN SU TOTALIDAD"
+        else:
+            # Diferenciar Glosa de Devolución
+            if any(x in texto_base for x in ["DEVOLUCION", "DEVOL", "DEV."]):
+                cod_res, desc_res = "RE9601", "EVIDENCIA QUE DEMUESTRA QUE LA DEVOLUCIÓN ES INJUSTIFICADA AL 100%"
+            else:
+                cod_res, desc_res = "RE9602", "EVIDENCIA QUE DEMUESTRA QUE LA GLOSA ES INJUSTIFICADA AL 100%"
+
+        # ── Contexto de Contratos (14 Entidades) ──
+        eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
+        todos_contratos = {**_CONTRATOS_BASE, **(contratos_db or {})}
+        info_contrato = todos_contratos.get(eps_key, todos_contratos["OTRA / SIN DEFINIR"])
+        
+        # ── Prompt Jurídico Blindado ──
+        estrategia = ESTRATEGIAS_HUS.get(prefijo, ESTRATEGIAS_HUS["DEFAULT"])
+        system_prompt = f"""Eres el Director Jurídico de la ESE Hospital Universitario de Santander (HUS).
+Tu ÚNICA MISIÓN es defender el cobro de la factura y rechazar la glosa/devolución de la EPS.
+
+CÓDIGO NORMATIVO DE RESPUESTA: {cod_res} - {desc_res}
+MARCO CONTRACTUAL APLICABLE: {info_contrato}
+ESTRATEGIA TÉCNICA: {estrategia}
+
+REGLAS DE ORO:
+1. NUNCA aceptes la glosa. Tu tono es imperativo, legalista y combativo.
+2. Si es por 'insumos no facturables', responde que son inherentes al acto médico y la EPS no ha probado su exclusión contractual.
+3. Cita la Ley Estatutaria de Salud (1751/2015) y el Artículo 871 del Código de Comercio (Buena fe).
+4. Responde EXCLUSIVAMENTE en XML con los tags: <paciente>...</paciente><argumento>...</argumento>"""
+
+        res_ia, modelo_usado = await self._llamar_ia(system_prompt, f"DETALLE DE LA GLOSA EPS:\n{texto_base}\n\nSOPORTES PDF:\n{contexto_pdf[:3500]}")
+
+        # Parseo de resultados
+        pac_ia = self._xml("paciente", res_ia, "NO IDENTIFICADO")
+        arg_ia = self._xml("argumento", res_ia, res_ia).replace("\n", "<br/>")
+
+        # Visualización HTML
+        dictamen = self._generar_tabla_html(codigo_det, valor_raw, cod_res, desc_res) + \
+                   f'<div style="text-align:justify;font-size:11px;margin-top:10px;color:#1e293b;"><b>ARGUMENTACIÓN JURÍDICA ESE HUS:</b><br/><br/>{arg_ia}</div>'
+
+        return GlosaResult(
+            tipo=f"RESPUESTA {cod_res}", resumen=f"DEFENSA: {pac_ia}",
+            dictamen=dictamen, codigo_glosa=codigo_det, valor_objetado=valor_raw,
+            paciente=pac_ia, mensaje_tiempo="EXTEMPORÁNEA" if es_extemporanea else "EN TÉRMINOS",
+            color_tiempo="bg-red-600" if es_extemporanea else "bg-emerald-600",
+            score=95, dias_restantes=max(0, 20 - dias), modelo_ia=modelo_usado
+        )
+
+    # ── MÉTODOS TÉCNICOS DE EXTRACCIÓN ──
+    def _extraer_codigo_glosa(self, texto: str) -> str:
+        m = re.search(r"\b(TA|SO|AU|CO|PE|FA|SE)\d{2,4}\b", texto)
+        return m.group(0) if m else "N/A"
+
+    def _extraer_valor(self, texto: str) -> str:
+        m = re.search(r"\$\s*([\d\.,]+)", texto)
+        return f"$ {m.group(1)}" if m else "$ 0.00"
+
+    def _xml(self, tag: str, texto: str, default: str) -> str:
         m = re.search(fr"<{tag}>(.*?)</{tag}>", texto, re.IGNORECASE | re.DOTALL)
-        return m.group(1).strip().replace("**", "") if m else default
+        return m.group(1).strip() if m else default
+
+    def _calcular_dias_habiles(self, f1, f2):
+        try:
+            d1, d2 = datetime.strptime(f1[:10], "%Y-%m-%d"), datetime.strptime(f2[:10], "%Y-%m-%d")
+            dias, curr = 0, d1
+            while curr < d2:
+                curr += timedelta(days=1)
+                if curr.weekday() < 5 and curr.strftime("%Y-%m-%d") not in FERIADOS_CO: dias += 1
+            return dias
+        except: return 0
 
     async def _llamar_ia(self, system: str, user: str) -> tuple[str, str]:
         try:
             resp = await self.groq.chat.completions.create(
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                model="llama-3.3-70b-versatile", temperature=0.15
+                model="llama-3.3-70b-versatile", temperature=0.1
             )
-            return resp.choices[0].message.content, "groq/llama-3.3-70b"
+            return resp.choices[0].message.content, "groq/llama-3.3"
         except Exception:
             if self.anthropic_key:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     resp = await client.post("https://api.anthropic.com/v1/messages", 
                         headers={"x-api-key": self.anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
                         json={"model": "claude-3-5-sonnet-20240620", "max_tokens": 1500, "system": system, "messages": [{"role": "user", "content": user}]})
-                    return resp.json()["content"][0]["text"], "anthropic/claude-3-5-sonnet"
-        return "<argumento>ERROR CONEXIÓN IA - REVISIÓN MANUAL</argumento>", "fallback/manual"
+                    return resp.json()["content"][0]["text"], "anthropic/claude-3.5"
+            return "<argumento>ERROR DE CONEXIÓN IA - REVISIÓN MANUAL REQUERIDA</argumento>", "fallback"
 
-    async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
-        texto_base = str(data.tabla_excel).strip().upper()
-        val_ac_num = float(re.sub(r"[^\d]", "", str(data.valor_aceptado)) or 0)
-        codigo_det = self._extraer_codigo_glosa(texto_base)
-        prefijo    = codigo_det[:2] if codigo_det != "N/A" else "XX"
-        val_m      = re.search(r"\$\s*([\d\.,]+)", texto_base)
-        valor_raw  = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
-
-        # Tiempos
-        dias = self._calcular_dias_habiles(str(data.fecha_radicacion), str(data.fecha_recepcion)) if data.fecha_radicacion and data.fecha_recepcion else 0
-        es_extemporanea = dias > 20
-        msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS)"
-
-        # Reglas Directas
-        if "RATIF" in str(data.etapa).upper(): return self._respuesta_ratificacion(codigo_det, valor_raw, msg_tiempo, dias)
-        if es_extemporanea and val_ac_num <= 0: return self._respuesta_extemporanea(codigo_det, valor_raw, msg_tiempo, dias)
-
-        # Contexto de Contrato
-        eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
-        es_sin_contrato = eps_key in ("OTRA", "")
-        todos_contratos = {**_CONTRATOS_BASE, **(contratos_db or {})}
-        info_contrato = todos_contratos.get(eps_key, todos_contratos["OTRA / SIN DEFINIR"])
-        
-        # Estrategia
-        estrategia = self._seleccionar_estrategia(prefijo, es_sin_contrato)
-        system = "\n\n".join([SYSTEM_ROL, f"MARCO CONTRACTUAL {eps_key}:\n{info_contrato}", f"ESTRATEGIA:\n{estrategia}", SYSTEM_FORMATO])
-        user = f"GLOSA:\n{texto_base}\n\nSOPORTES PDF:\n{contexto_pdf[:4000]}"
-        
-        res_ia, modelo_usado = await self._llamar_ia(system, user)
-
-        # Parseo
-        paciente = self._xml("paciente", res_ia, "NO IDENTIFICADO")
-        servicio = self._xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
-        arg      = self._xml("argumento", res_ia, "SIN ARGUMENTO").replace("\n", "<br/>")
-        
-        # ── LÓGICA DE ETIQUETADO DINÁMICO ──
-        MAPEO_CONCEPTOS = {
-            "TA": ("RE9601", "VALOR FACTURADO SEGÚN ACUERDO DE VOLUNTADES / CONTRATO"),
-            "SO": ("RE9603", "SOPORTES DEBIDAMENTE RADICADOS Y COMPLETOS"),
-            "AU": ("RE9604", "AUTORIZACIÓN NO REQUERIDA O TRAMITADA"),
-            "CO": ("RE9605", "SERVICIO INCLUIDO EN PLAN DE BENEFICIOS / COBERTURA"),
-            "PE": ("RE9606", "PERTINENCIA CLÍNICA SOPORTADA EN HISTORIA CLÍNICA"),
-            "FA": ("RE9607", "FACTURACIÓN CORRECTA SEGÚN NORMATIVIDAD"),
-            "SE": ("RE9602", "GLOSA O DEVOLUCIÓN INJUSTIFICADA POR INDETERMINACIÓN")
-        }
-        cod_respuesta, desc_concepto = MAPEO_CONCEPTOS.get(prefijo, ("RE9602", "GLOSA INJUSTIFICADA"))
-        titulo_defensa = "ESE HUS RECHAZA OBJECIÓN POR INCUMPLIMIENTO CONTRACTUAL:" if not es_sin_contrato \
-                         else "ESE HUS RECHAZA OBJECIÓN POR VIOLACIÓN AL DECRETO 4747 DE 2007:"
-
-        nota_modelo = f'<div style="font-size:9px;color:#94a3b8;margin-top:8px;">Analizado por: {modelo_usado}</div>'
-        dictamen = _tabla_defensa(codigo_det, servicio, valor_raw, cod_respuesta, desc_concepto) + \
-                   _div(f"<b>{titulo_defensa}</b><br/><br/>{arg}") + nota_modelo
-
-        return GlosaResult(tipo=f"TÉCNICO-LEGAL [{prefijo}]", resumen=f"DEFENSA: {paciente}", dictamen=dictamen, codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", score=85, dias_restantes=max(0, 20-dias), modelo_ia=modelo_usado)
-
-    def _extraer_codigo_glosa(self, texto: str) -> str:
-        patrones = [r"\b(TA\d{2,4})\b", r"\b(SO\d{2,4})\b", r"\b(AU\d{2,4})\b", r"\b(CO\d{2,4})\b", r"\b(PE\d{2,4})\b", r"\b(FA\d{2,4})\b", r"\b(SE\d{2,4})\b", r"\b(MCV\d*)\b"]
-        for p in patrones:
-            m = re.search(p, texto)
-            if m: return m.group(1)
-        return "N/A"
-
-    def _seleccionar_estrategia(self, prefijo: str, es_sin_contrato: bool) -> str:
-        if prefijo == "TA": return ESTRATEGIAS_LEGALES["TA_sin_contrato" if es_sin_contrato else "TA_con_contrato"]
-        return ESTRATEGIAS_LEGALES.get(prefijo, ESTRATEGIAS_LEGALES["DEFAULT"])
-
-    def _calcular_dias_habiles(self, f_rad: str, f_rec: str) -> int:
-        try:
-            d1, d2 = datetime.strptime(f_rad[:10], "%Y-%m-%d"), datetime.strptime(f_rec[:10], "%Y-%m-%d")
-            dias, current = 0, d1
-            while current < d2:
-                current += timedelta(days=1)
-                if current.weekday() < 5 and current.strftime("%Y-%m-%d") not in FERIADOS_CO: dias += 1
-            return dias
-        except: return 0
-
-    def _respuesta_ratificacion(self, codigo, valor, msg_tiempo, dias):
-        txt = "ESE HUS NO ACEPTA GLOSA RATIFICADA. SE SOLICITA CONCILIACIÓN SEGÚN LEY 1438/2011."
-        tabla = _tabla_simple(codigo, "RATIFICACIÓN", valor, "RE9901", "GLOSA NO ACEPTADA", color_e="#2563eb")
-        return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla + _div(txt), codigo_glosa=codigo, valor_objetado=valor, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", score=100, dias_restantes=max(0, 20-dias))
-
-    def _respuesta_extemporanea(self, codigo, valor, msg_tiempo, dias):
-        txt = f"ESE HUS NO ACEPTA GLOSA EXTEMPORÁNEA ({dias} DÍAS). OPERA ACEPTACIÓN TÁCITA ART 57 LEY 1438."
-        tabla = _tabla_simple(codigo, "EXTEMPORÁNEA", valor, "RE9502", "GLOSA FUERA DE TIEMPO")
-        return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt), codigo_glosa=codigo, valor_objetado=valor, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", score=100, dias_restantes=0)
+    def _generar_tabla_html(self, codigo, valor, cod_res, desc_res):
+        return f'''<table border="1" style="width:100%;border-collapse:collapse;font-size:10px;text-transform:uppercase;margin-bottom:10px;">
+        <tr style="background-color:#1e3a8a;color:white;"><th style="padding:5px;">CÓDIGO GLOSA</th><th style="padding:5px;">VALOR OBJ.</th><th style="padding:5px;">CÓDIGO DE RESPUESTA (ANEXO 6)</th></tr>
+        <tr><td style="text-align:center;padding:5px;">{codigo}</td><td style="text-align:center;padding:5px;">{valor}</td>
+        <td style="text-align:center;padding:5px;"><b>{cod_res}</b><br>{desc_res}</td></tr></table>'''
