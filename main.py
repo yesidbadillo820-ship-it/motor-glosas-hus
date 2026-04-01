@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from jose import JWTError, jwt
 
-from services import GlosaService, crear_oficio_pdf, calcular_dias_habiles, exportar_excel_pro
+from services import GlosaService, crear_oficio_pdf, exportar_excel_pro
 from models import GlosaRecord, ContratoRecord, UsuarioRecord, GlosaInput, GlosaResult, PDFRequest, ContratoInput
 from database import engine, Base, get_db, SessionLocal
 from auth import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM
