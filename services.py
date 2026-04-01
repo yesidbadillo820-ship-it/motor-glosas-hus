@@ -46,7 +46,7 @@ CONTRATOS_FIJOS = {
 ESTRATEGIAS = {
     "TA": "ESTRATEGIA TARIFARIA: Citar contrato o Res. 054. Demostrar liquidación correcta. Invocar Art. 871 C.Co (Buena Fe).",
     "SO": "ESTRATEGIA SOPORTES: Demostrar que la Historia Clínica es plena prueba (Res. 1995/99). Identificar envío de documentos.",
-    "CL": "ESTRATEGIA PERTINENCIA: Autonomía médica (Ley 1751/15). Justificar acto médico basado en diagnóstico.",
+    "PE": "ESTRATEGIA PERTINENCIA: Autonomía médica (Ley 1751/15). Justificar acto médico basado en diagnóstico.",
     "AU": "ESTRATEGIA AUTORIZACIÓN: Urgencia vital (Art. 168 Ley 100/93). Trámite oportuno de autorizaciones."
 }
 
