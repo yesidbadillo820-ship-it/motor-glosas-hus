@@ -87,7 +87,6 @@ class GlosaService:
         return m.group(1).strip().replace("**", "") if m else default
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
-        # Combinar contratos duros con los de la base de datos
         if contratos_db is None: contratos_db = {}
         contratos_activos = {**CONTRATOS_FIJOS, **contratos_db}
 
@@ -95,7 +94,6 @@ class GlosaService:
         etapa_segura = str(data.etapa).strip().upper()
         
         info_c = contratos_activos.get(eps_segura, "AUSENCIA DE CONTRATO VIGENTE. RIGE RESOLUCIÓN INSTITUCIONAL 054 Y 120 DE 2026 (SOAT PLENO 100%).")
-        tiene_contrato = eps_segura in contratos_activos
 
         texto_base = str(data.tabla_excel).strip()
         val_ac_num = float(re.sub(r'[^\d]', '', str(data.valor_aceptado)) or 0)
@@ -107,12 +105,16 @@ class GlosaService:
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
         valor_obj_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
-        # Nombres dinámicos para los rechazos
+        # 🔥 NOMBRES DINÁMICOS PARA LOS RECHAZOS (Justo lo que pediste)
         nombres_glosa = {
-            "TA": "TARIFAS", "SO": "SOPORTES", "FA": "FACTURACIÓN",
-            "PE": "PERTINENCIA", "AU": "AUTORIZACIÓN", "CO": "COBERTURA"
+            "TA": "TARIFAS", 
+            "SO": "SOPORTES", 
+            "FA": "FACTURACIÓN",
+            "PE": "PERTINENCIA", 
+            "AU": "AUTORIZACIÓN", 
+            "CO": "COBERTURA"
         }
-        nombre_tipo = nombres_glosa.get(prefijo, "OBJECIÓN INJUSTIFICADA")
+        nombre_tipo = nombres_glosa.get(prefijo, "OBJECIONES VARIAS")
 
         dias = _calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) if data.fecha_radicacion and data.fecha_recepcion else 0
         es_extemporanea = dias > 20
@@ -121,16 +123,16 @@ class GlosaService:
         msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS - FALTAN {dias_restantes})"
         color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
 
-        # GUILLOTINAS LEGALES CON NUEVOS TEXTOS
+        # GUILLOTINAS LEGALES
         if "RATIF" in etapa_segura and val_ac_num <= 0:
             txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) EN INSTANCIA DE RATIFICACIÓN. NO SE APORTAN NUEVOS ELEMENTOS DE JUICIO. SE SOLICITA CONCILIACIÓN (ART. 57 LEY 1438 DE 2011)."
             return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=dias_restantes)
 
         if es_extemporanea and val_ac_num <= 0:
-            txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR HABER SIDO NOTIFICADA DE MANERA EXTEMPORÁNEA ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO. SE EXIGE EL PAGO INMEDIATO."
+            txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR EXTEMPORANEIDAD ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO. SE EXIGE EL PAGO INMEDIATO."
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo, dias_restantes=0)
 
-        # 🎯 FEW-SHOT EXAMPLES (Ejemplos de entrenamiento en vivo)
+        # 🎯 FEW-SHOT EXAMPLES 
         few_shot_examples = """
         <ejemplos_de_respuestas_perfectas>
         --- EJEMPLO 1 (GLOSA TARIFARIA - TA) ---
@@ -225,6 +227,7 @@ class GlosaService:
             apertura = f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA {codigo_final} POR $ {val_ac_num:,.0f}.<br/><br/>"
             tipo = "AUDITORÍA - ACEPTADA"
         else:
+            # 🔥 AQUÍ ESTÁ LA MAGIA QUE PEDISTE 🔥
             apertura = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_final}) POR CONSIDERARLA INJUSTIFICADA, SUSTENTANDO ASÍ:<br/><br/>"
             tipo = "TÉCNICO-LEGAL"
 
