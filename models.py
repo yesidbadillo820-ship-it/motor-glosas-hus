@@ -9,8 +9,8 @@ from database import Base
 class GlosaInput(BaseModel):
     eps: str
     etapa: str
-    fecha_radicacion: str
-    fecha_recepcion: str
+    fecha_radicacion: Optional[str] = None
+    fecha_recepcion: Optional[str] = None
     valor_aceptado: str
     tabla_excel: str
 
