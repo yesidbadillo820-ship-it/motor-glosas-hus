@@ -42,16 +42,13 @@ CONTRATOS_FIJOS = {
 }
 
 def _div(texto): 
-    return f'<div style="text-align:justify;line-height:1.8;font-size:11px;">{texto}</div>'
-
-def _tabla_defensa(codigo, servicio, valor, cod_res, desc_res):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
-
-def _tabla_aceptacion(codigo, valor_obj, valor_acep, cod_res, desc_res):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR OBJETADO</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#d97706;">VALOR ACEPTADO</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor_obj}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;color:#d97706;">{valor_acep}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
+    return f'<div style="text-align:justify;line-height:1.6;font-size:11px;">{texto}</div>'
 
 def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_header="#1e3a8a", color_estado="#b91c1c"):
     return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:{color_header};color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">ESTADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;background-color:{color_estado};color:white;"><b>{estado}</b></td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
+
+def _tabla_defensa(codigo, servicio, valor, cod_res, desc_res):
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:11px;margin-bottom:15px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:8px;border:1px solid #cbd5e1;">CÓDIGO GLOSA</th><th style="padding:8px;border:1px solid #cbd5e1;">SERVICIO RECLAMADO</th><th style="padding:8px;border:1px solid #cbd5e1;">VALOR OBJ.</th><th style="padding:8px;border:1px solid #cbd5e1;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{codigo}</td><td style="padding:8px;border:1px solid #cbd5e1;">{servicio}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;">{valor}</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:center;font-weight:bold;">{cod_res}<br><span style="font-size:9px;">{desc_res}</span></td></tr></table>'
 
 def _procesar_pdf_sync(file_content: bytes) -> str:
     unido = ""
@@ -60,10 +57,6 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
         with pdfplumber.open(io.BytesIO(file_content)) as pdf:
             for i, page in enumerate(pdf.pages):
                 txt = page.extract_text() or ""
-                tables = page.extract_tables()
-                for table in tables:
-                    for row in table:
-                        txt += " | ".join([str(c).replace('\n', ' ') if c else "" for c in row]) + "\n"
                 unido += f"\n--- PÁG {i+1} ---\n{txt}"
     except Exception:
         reader = PyPDF2.PdfReader(io.BytesIO(file_content))
@@ -95,185 +88,90 @@ class GlosaService:
         return m.group(1).strip().replace("**", "") if m else default
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
-        if contratos_db is None: contratos_db = {}
-        contratos_activos = {**CONTRATOS_FIJOS, **contratos_db}
-
-        eps_segura = str(data.eps).upper() if data.eps else "OTRA"
-        etapa_segura = str(data.etapa).strip().upper()
-        
+        contratos_activos = {**CONTRATOS_FIJOS, **(contratos_db or {})}
+        eps_segura = str(data.eps).upper()
         eps_key = eps_segura.replace(" / SIN DEFINIR", "").strip()
         info_c = contratos_activos.get(eps_key, CONTRATOS_FIJOS["OTRA / SIN DEFINIR"])
 
-        texto_base = str(data.tabla_excel).strip()
+        texto_base = str(data.tabla_excel).strip().upper()
         val_ac_num = float(re.sub(r'[^\d]', '', str(data.valor_aceptado)) or 0)
         
-        cod_m = re.search(r'\b([A-Z]{2,3}\d{3,4})\b', texto_base)
+        # Corrección de detección MVC / MV
+        cod_m = re.search(r'\b([A-Z]{2,3}\d{0,4})\b', texto_base)
         codigo_detectado = cod_m.group(1) if cod_m else "N/A"
         
-        prefijo = codigo_detectado[:2].upper() if codigo_detectado != "N/A" else "XX"
-        if "MCV" in texto_base.upper() or prefijo == "MC" or prefijo == "MV":
-            prefijo = "TA" 
+        prefijo = codigo_detectado[:2]
+        if "MCV" in texto_base or "MV" in texto_base or prefijo in ["MC", "MV"]:
+            nombre_tipo = "TARIFAS Y MAYOR VALOR COBRADO"
+            prefijo_eval = "TA"
+            if codigo_detectado == "N/A": codigo_detectado = "MCV"
+        else:
+            nombres = {"TA": "TARIFAS", "SO": "SOPORTES", "FA": "FACTURACIÓN", "PE": "PERTINENCIA", "AU": "AUTORIZACIÓN"}
+            nombre_tipo = nombres.get(prefijo, "OBJECIONES VARIAS")
+            prefijo_eval = prefijo
 
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
         valor_obj_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
-        nombres_glosa = {
-            "TA": "TARIFAS", "MV": "TARIFAS", "MC": "TARIFAS", "SO": "SOPORTES", "FA": "FACTURACIÓN",
-            "PE": "PERTINENCIA", "AU": "AUTORIZACIÓN", "CO": "COBERTURA"
-        }
-        
-        if "MAYOR VALOR" in texto_base.upper() or prefijo == "TA":
-            nombre_tipo = "TARIFAS Y MAYOR VALOR COBRADO"
-            prefijo_evaluacion = "TA"
-        else:
-            nombre_tipo = nombres_glosa.get(prefijo, "OBJECIONES VARIAS")
-            prefijo_evaluacion = prefijo
-
         dias = _calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) if data.fecha_radicacion and data.fecha_recepcion else 0
         es_extemporanea = dias > 20
-        dias_restantes = max(0, 20 - dias)
-
         msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS)"
-        color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
 
+        # RESPUESTA RATIFICADA (TEXTO EXACTO PROPORCIONADO)
         if "RATIF" in str(data.etapa).upper() and val_ac_num <= 0:
-            apertura_txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) EN INSTANCIA DE RATIFICACIÓN. NO SE APORTAN NUEVOS ELEMENTOS DE JUICIO QUE DESVIRTÚEN LA DEFENSA INICIAL. SE SOLICITA CONCILIACIÓN SEGÚN LEY 1438 DE 2011."
-            tabla_html = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA INJUSTIFICADA", color_estado="#2563eb")
-            return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla_html + _div(apertura_txt), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=dias_restantes)
+            txt_legal = ("ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA GLOSA INICIAL "
+                         "Y CONTINUACIÓN DEL PROCESO DE ACUERDO CON LA NORMA. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE LA "
+                         "CONCILIACIÓN DE LA AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE LAS PARTES. CUALQUIER INFORMACIÓN AL CORREO "
+                         "ELECTRÓNICO INSTITUCIONAL CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO, VENTANILLA ÚNICA DE "
+                         "LA ESE HUS CARRERA 33 NO. 28-126. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, "
+                         "DE NO OBTENERSE LA RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR "
+                         "LEVANTADA LA RESPECTIVA OBJECIÓN.")
+            tabla = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA INJUSTIFICADA", color_estado="#2563eb")
+            return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla + _div(txt_legal), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=max(0, 20-dias))
 
+        # RESPUESTA EXTEMPORÁNEA
         if es_extemporanea and val_ac_num <= 0:
-            apertura_txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR CONSIDERARLA INJUSTIFICADA DEBIDO A SU EXTEMPORANEIDAD. AL TRANSCURRIR {dias} DÍAS HÁBILES, OPERA DE PLENO DERECHO LA ACEPTACIÓN TÁCITA (ART. 57 LEY 1438/2011). SE EXIGE EL PAGO INMEDIATO."
-            tabla_html = _tabla_simple(codigo_detectado, "EXTEMPORÁNEA", valor_obj_raw, "RE9502", "GLOSA INJUSTIFICADA")
-            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla_html + _div(apertura_txt), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo, dias_restantes=0)
+            txt_ext = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR EXTEMPORANEIDAD ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO (ART. 57 LEY 1438/2011). SE EXIGE EL PAGO INMEDIATO."
+            tabla = _tabla_simple(codigo_detectado, "EXTEMPORÁNEA", valor_obj_raw, "RE9502", "GLOSA INJUSTIFICADA")
+            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt_ext), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", dias_restantes=0)
 
-        estrategias = {
-            "TA": "P1: Cita contrato o Res. 054. P2: Desvirtúa descuento abusivo de EPS y justifica que la tarifa facturada es la correcta según el contrato. P3: Exige pago por Buena Fe (Art 871 C.Co).",
-            "SO": "P1: Cita contrato. P2: Demuestra que la Historia Clínica es plena prueba (Res 1995/99). P3: Exige pago.",
-            "PE": "P1: Cita contrato. P2: Justifica pertinencia clínica del acto médico basado en autonomía profesional (Ley 1751/15). P3: Exige pago.",
-            "AU": "P1: Cita contrato. P2: Demuestra urgencia vital o trámite de autorización (Decreto 4747/07). P3: Exige pago."
-        }
-        est_actual = estrategias.get(prefijo_evaluacion, estrategias["PE"])
-
-        few_shot_examples = """
-        <ejemplos_de_respuestas_perfectas>
-        --- EJEMPLO 1 (GLOSA TARIFARIA / MAYOR VALOR) ---
-        USUARIO: EPS: DISPENSARIO. GLOSA: MVC001 Mayor valor cobrado. Valor Glosado: $ 150.000.
-        ASISTENTE:
-        <paciente>CARLOS PEREZ</paciente>
-        <factura>F-1020</factura>
-        <autorizacion>N/A</autorizacion>
-        <codigo_glosa>MVC001</codigo_glosa>
-        <valor_objetado>$ 150.000</valor_objetado>
-        <servicio_glosado>ATENCIÓN MÉDICA</servicio_glosado>
-        <motivo_resumido>MAYOR VALOR COBRADO</motivo_resumido>
-        <score>98</score>
-        <argumento>SE DEBE DESTACAR QUE EL CONTRATO VIGENTE ENTRE LAS PARTES ESTABLECE CLARAMENTE LAS TARIFAS APLICABLES PARA LOS PROCEDIMIENTOS Y SERVICIOS FACTURADOS.
+        # ESTRATEGIA IA PARA GLOSA INICIAL
+        system_prompt = f"""DIRECTOR JURÍDICO ESE HUS. TODO EN MAYÚSCULAS. 3 PÁRRAFOS.
+        MARCO: {info_c}. ESTRATEGIA: Citar contrato, desvirtuar glosa tarifaria/mayor valor, exigir pago Buena Fe Art 871 C.Co.
+        DEVUELVE XML: <paciente>, <factura>, <autorizacion>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>."""
         
-        SE DESVIRTÚA LA OBJECIÓN DE LA EPS, YA QUE EL HOSPITAL LIQUIDÓ EL VALOR DEL SERVICIO CORRECTAMENTE Y CON APEGO ESTRICTO AL MANUAL TARIFARIO PACTADO. EN ESTE SENTIDO, LA FACTURACIÓN SE AJUSTA A LAS TARIFAS ESTABLECIDAS, POR LO QUE NO EXISTE MAYOR VALOR COBRADO.
-        
-        EXIGIMOS EL PAGO INMEDIATO DEL VALOR OBJETADO, TODA VEZ QUE EL ARTÍCULO 871 DEL CÓDIGO DE COMERCIO COLOMBIANO OBLIGA A LAS PARTES A EJECUTAR SUS ACTUACIONES DE BUENA FE. LA NEGATIVA AL PAGO CONSTITUYE UN INCUMPLIMIENTO INJUSTIFICADO, REQUIRIENDO EL REINTEGRO TOTAL A FAVOR DE NUESTRA INSTITUCIÓN.</argumento>
-        </ejemplos_de_respuestas_perfectas>
-        """
-
-        system_prompt = f"""Eres el DIRECTOR JURÍDICO de la ESE HUS. DEBES RESPONDER EN XML. TODO EN MAYÚSCULAS. EXACTAMENTE 3 PÁRRAFOS TÉCNICOS.
-        MARCO A DEFENDER Y CITAR: {info_c}
-        ESTRATEGIA APLICABLE: {est_actual}
-        
-        {few_shot_examples}
-        
-        DEVUELVE: <paciente>, <factura>, <autorizacion>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <score> (0-100), <argumento>."""
-        
-        user_prompt = f"EPS: {eps_segura}. GLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:5000]}"
-
         try:
             comp = await self.cliente.chat.completions.create(
-                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-                model="llama-3.3-70b-versatile", temperature=0.2, max_tokens=2000
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": f"GLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:3000]}"}],
+                model="llama-3.3-70b-versatile", temperature=0.2
             )
             res_ia = comp.choices[0].message.content
-        except Exception as e:
-            res_ia = f"<argumento>ERROR DE IA: {str(e)}</argumento>"
+        except: res_ia = "<argumento>ERROR IA</argumento>"
 
         paciente = self.xml("paciente", res_ia, "NO IDENTIFICADO")
-        servicio = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
-        codigo_final = self.xml("codigo_glosa", res_ia, codigo_detectado)
-        if len(codigo_final) > 10 or codigo_final == "N/A": codigo_final = codigo_detectado
+        servicio = self.xml("servicio_glosado", res_ia, "SERVICIOS SALUD")
+        arg = self.xml("argumento", res_ia, "SIN ARGUMENTO").replace('\n', '<br/>')
         
-        valor_xml = self.xml("valor_objetado", res_ia, valor_obj_raw)
-        if "$" not in valor_xml and not any(char.isdigit() for char in valor_xml): valor_xml = valor_obj_raw
+        apertura = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR CONSIDERARLA INJUSTIFICADA:"
+        tabla = _tabla_defensa(codigo_detectado, servicio, valor_obj_raw, "RE9602", "GLOSA INJUSTIFICADA")
         
-        argumento_ia = self.xml("argumento", res_ia, "").replace('\n\n', '<br/><br/>')
-        
-        if val_ac_num > 0:
-            apertura = f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA {codigo_final} POR $ {val_ac_num:,.0f}."
-            tabla_html = _tabla_aceptacion(codigo_final, valor_xml, f"$ {val_ac_num:,.0f}", "RE9801", "GLOSA ACEPTADA")
-            tipo = "AUDITORÍA - ACEPTADA"
-        else:
-            apertura = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_final}) POR CONSIDERARLA INJUSTIFICADA, SUSTENTANDO ASÍ:"
-            tabla_html = _tabla_defensa(codigo_final, servicio, valor_xml, "RE9602", "GLOSA INJUSTIFICADA")
-            tipo = "TÉCNICO-LEGAL"
-
-        dictamen_final = tabla_html + _div(f"<b>{apertura}</b><br/><br/>{argumento_ia}")
-
-        return GlosaResult(
-            tipo=tipo, resumen=f"DEFENSA: {paciente}", dictamen=dictamen_final,
-            codigo_glosa=codigo_final, valor_objetado=valor_xml, paciente=paciente,
-            mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo, factura=self.xml("factura", res_ia, "N/A"), 
-            autorizacion=self.xml("autorizacion", res_ia, "N/A"), score=int(self.xml("score", res_ia, "100") or 100), dias_restantes=dias_restantes
-        )
+        return GlosaResult(tipo="TÉCNICO-LEGAL", resumen=f"DEFENSA: {paciente}", dictamen=tabla + _div(f"<b>{apertura}</b><br/><br/>{arg}"), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", factura=self.xml("factura", res_ia, "N/A"), autorizacion=self.xml("autorizacion", res_ia, "N/A"), score=95, dias_restantes=max(0, 20-dias))
 
 def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
-    estilos = getSampleStyleSheet()
-    estilo_n = ParagraphStyle('n', alignment=TA_JUSTIFY, fontSize=11, leading=16)
-    
-    elements = [
-        Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", ParagraphStyle('h1', alignment=TA_CENTER, fontSize=14)),
-        Spacer(1, 20), Paragraph(f"<b>Señores:</b><br/>{eps.upper()}<br/><b>Ref:</b> {resumen}", estilo_n), Spacer(1, 15)
-    ]
-    
-    clean_text = re.sub(r'<br\s*/?>', '\n', re.sub(r'<table.*?>.*?</table>', '', conclusion, flags=re.IGNORECASE | re.DOTALL)).strip()
-    for p in clean_text.split('\n\n'):
-        if p.strip(): elements.append(Paragraph(p.strip(), estilo_n))
-        elements.append(Spacer(1, 8))
-
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = [Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", ParagraphStyle('h1', alignment=TA_CENTER, fontSize=14)), Spacer(1, 20)]
+    clean_text = re.sub(r'<table.*?>.*?</table>', '', conclusion, flags=re.IGNORECASE | re.DOTALL)
+    elements.append(Paragraph(clean_text.replace('<br/>', '\n'), ParagraphStyle('n', alignment=TA_JUSTIFY, fontSize=11)))
     doc.build(elements)
-    buffer.seek(0)
-    return buffer.read()
+    return buffer.getvalue()
 
 def exportar_excel_pro(glosas: list) -> bytes:
     import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment
-
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Reporte Glosas HUS"
-
-    headers = ["ID", "Fecha Procesamiento", "EPS / Pagador", "Paciente", "Codigo Glosa", "Valor Objetado", "Valor Aceptado", "Etapa Procesal", "Estado Final"]
-    ws.append(headers)
-
-    header_fill = PatternFill(start_color="1C3460", end_color="1C3460", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
-    
-    for col_num, cell in enumerate(ws[1], 1):
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center")
-        ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 18
-
-    ws.column_dimensions['C'].width = 30 
-    ws.column_dimensions['D'].width = 30 
-
-    for g in glosas:
-        ws.append([
-            g.id, g.creado_en.strftime("%d/%m/%Y %H:%M"), g.eps, g.paciente, 
-            g.codigo_glosa, g.valor_objetado, g.valor_aceptado, g.etapa, g.estado
-        ])
-
-    ws.auto_filter.ref = ws.dimensions
-
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return buffer.read()
+    ws.append(["ID", "Fecha", "EPS", "Paciente", "Código", "Valor", "Estado"])
+    for g in glosas: ws.append([g.id, g.creado_en.strftime("%d/%m/%Y"), g.eps, g.paciente, g.codigo_glosa, g.valor_objetado, g.estado])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
