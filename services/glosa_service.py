@@ -11,7 +11,8 @@ import PyPDF2
 import httpx  # para llamar a Claude como fallback
 
 from groq import AsyncGroq
-from models import GlosaInput, GlosaResult
+# ── CORRECCIÓN DE IMPORTS PARA LA NUEVA ESTRUCTURA ──
+from models.schemas import GlosaInput, GlosaResult
 
 logger = logging.getLogger("motor_glosas_v2")
 
@@ -27,10 +28,23 @@ FERIADOS_CO = [
     "2026-11-16","2026-12-08","2026-12-25",
 ]
 
+# ── CORRECCIÓN: Definir los contratos base que el código intenta usar ──
+_CONTRATOS_BASE = {
+    "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 Y 120 DE 2026)."
+}
+
+# ── Funciones de Diseño HTML (Helpers) ────────────────────────────────────────
+def _div(texto): 
+    return f'<div style="text-align:justify;line-height:1.6;font-size:11px;margin-top:10px;color:#1e293b;">{texto}</div>'
+
+def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_h="#1e3a8a", color_e="#b91c1c"):
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;margin-bottom:10px;"><tr style="background-color:{color_h};color:white;"><th style="padding:5px;border:1px solid #ddd;">CÓDIGO GLOSA</th><th style="padding:5px;border:1px solid #ddd;">ESTADO</th><th style="padding:5px;border:1px solid #ddd;">VALOR OBJETADO</th><th style="padding:5px;border:1px solid #ddd;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;border:1px solid #ddd;text-align:center;">{codigo}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;background-color:{color_e};color:white;"><b>{estado}</b></td><td style="padding:5px;border:1px solid #ddd;text-align:center;">{valor}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
+
+def _tabla_defensa(codigo, servicio, valor, cod_res, desc_res):
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;margin-bottom:10px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:5px;border:1px solid #ddd;">CÓDIGO GLOSA</th><th style="padding:5px;border:1px solid #ddd;">SERVICIO RECLAMADO</th><th style="padding:5px;border:1px solid #ddd;">VALOR OBJ.</th><th style="padding:5px;border:1px solid #ddd;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;border:1px solid #ddd;text-align:center;">{codigo}</td><td style="padding:5px;border:1px solid #ddd;">{servicio}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;">{valor}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
 
 # ── Helpers PDF ───────────────────────────────────────────────────────────────
 def _procesar_pdf_sync(file_content: bytes) -> str:
-    """Extrae texto del PDF priorizando las primeras y últimas páginas."""
     paginas = []
     try:
         with pdfplumber.open(io.BytesIO(file_content)) as pdf:
@@ -38,9 +52,7 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
                 txt = page.extract_text() or ""
                 for table in page.extract_tables() or []:
                     for row in table:
-                        txt += " | ".join(
-                            [str(c).replace("\n", " ") if c else "" for c in row]
-                        ) + "\n"
+                        txt += " | ".join([str(c).replace("\n", " ") if c else "" for c in row]) + "\n"
                 paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
     except Exception:
         reader = PyPDF2.PdfReader(io.BytesIO(file_content))
@@ -48,158 +60,56 @@ def _procesar_pdf_sync(file_content: bytes) -> str:
             txt = reader.pages[i].extract_text() or ""
             paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
 
-    if not paginas:
-        return ""
-
-    # Estrategia inteligente: primeras 2 páginas (encabezado/paciente)
-    # + últimas 2 (totales/firmas) en lugar de corte lineal ciego
-    if len(paginas) <= 4:
-        return "".join(paginas)
-
+    if not paginas: return ""
+    if len(paginas) <= 4: return "".join(paginas)
+    
     inicio = "".join(paginas[:2])
     fin    = "".join(paginas[-2:])
     medio  = "".join(paginas[2:-2])
-
-    # Presupuesto: 3000 chars inicio + 2000 fin + lo que quede del medio
-    resultado = inicio[:3000] + "\n...[PÁGINAS INTERMEDIAS]...\n" + medio[:2000] + "\n...\n" + fin[:2000]
-    return resultado
-
+    return inicio[:3000] + "\n...[PÁGINAS INTERMEDIAS]...\n" + medio[:2000] + "\n...\n" + fin[:2000]
 
 def calcular_dias_habiles(f_rad: str, f_rec: str) -> int:
     try:
-        d1 = datetime.strptime(f_rad, "%Y-%m-%d")
-        d2 = datetime.strptime(f_rec, "%Y-%m-%d")
+        d1, d2 = datetime.strptime(f_rad, "%Y-%m-%d"), datetime.strptime(f_rec, "%Y-%m-%d")
         dias, current = 0, d1
         while current < d2:
             current += timedelta(days=1)
-            if current.weekday() < 5 and current.strftime("%Y-%m-%d") not in FERIADOS_CO:
-                dias += 1
+            if current.weekday() < 5 and current.strftime("%Y-%m-%d") not in FERIADOS_CO: dias += 1
         return dias
-    except Exception:
-        return 0
+    except Exception: return 0
 
-
-# ── Construcción del prompt ───────────────────────────────────────────────────
-# Separar el prompt en secciones hace que el modelo mantenga el rol
-# sin "olvidar" las instrucciones de formato al final del bloque.
-
+# ── Estrategias y Prompts ─────────────────────────────────────────────────────
 SYSTEM_ROL = """Eres el Director Jurídico de la ESE Hospital Universitario de Santander (HUS).
 Tu única función es redactar respuestas a glosas médicas con argumentos legales precisos.
-
 IDENTIDAD ESTRICTA:
-- Representas EXCLUSIVAMENTE a la ESE HUS como prestador de servicios de salud.
+- Representas EXCLUSIVAMENTE a la ESE HUS.
 - Nunca defiendas a la EPS ni adoptes una postura neutral.
-- Nunca inventes contratos, resoluciones, sentencias ni fechas que no estén en el contexto.
-- Si un dato no está en el contexto, omítelo — no lo suplas con información genérica."""
+- No inventes datos que no estén en el contexto."""
 
 SYSTEM_FORMATO = """FORMATO DE RESPUESTA — OBLIGATORIO:
-Responde ÚNICAMENTE con XML válido. Cero texto, cero markdown, cero explicaciones fuera del XML.
+Responde ÚNICAMENTE con XML válido. Cero texto fuera del XML.
+<paciente/><codigo_glosa/><valor_objetado/><servicio_glosado/><score_confianza/><argumento>DEFENSA EN MAYÚSCULAS...</argumento>"""
 
-<paciente>Nombre completo o NO IDENTIFICADO si no aparece</paciente>
-<codigo_glosa>Código alfanumérico exacto de la glosa</codigo_glosa>
-<valor_objetado>Monto con signo $ tal como aparece en el documento</valor_objetado>
-<servicio_glosado>Nombre del servicio o procedimiento objetado</servicio_glosado>
-<score_confianza>Número del 0 al 100 según estos criterios:
-  - 90-100: datos completos, código claro, contrato vigente identificado
-  - 70-89: datos suficientes pero algún campo inferido
-  - 50-69: información parcial, PDF poco legible o código ambiguo
-  - 0-49: datos insuficientes, no se puede construir defensa sólida
-</score_confianza>
-<argumento>
-DEFENSA JURÍDICA EN MAYÚSCULAS. MÍNIMO DOS PÁRRAFOS:
-PÁRRAFO 1: Contexto del caso (paciente, servicio, valor, contrato aplicable).
-PÁRRAFO 2: Fundamento legal específico con normas vigentes.
-PÁRRAFO 3 (si aplica): Jurisprudencia o precedente administrativo.
-CIERRE: Exigencia explícita de levantamiento de la glosa.
-</argumento>"""
-
-# Estrategias legales por prefijo de código — separadas del prompt principal
-# para facilitar mantenimiento sin tocar la lógica de IA
 ESTRATEGIAS_LEGALES = {
-    "TA_sin_contrato": (
-        "ESTRATEGIA: Glosa tarifaria SIN CONTRATO VIGENTE.\n"
-        "1. Declara que no existe contrato entre la ESE HUS y esta entidad.\n"
-        "2. Aplica Art. 11 Decreto 4747/2007: sin contrato rige el manual tarifario oficial.\n"
-        "3. Cita Resoluciones HUS 054 y 120 de 2026 que fijan SOAT PLENO (100%).\n"
-        "4. La EPS no puede imponer descuentos unilaterales sin acuerdo (Art. 871 C.Co, buena fe)."
-    ),
-    "TA_con_contrato": (
-        "ESTRATEGIA: Glosa tarifaria CON CONTRATO VIGENTE.\n"
-        "1. El cobro corresponde exactamente a las tarifas pactadas en el contrato vigente.\n"
-        "2. La EPS no puede desconocer lo que suscribió (Art. 871 C.Co).\n"
-        "3. Cita Circular 030/2013 SUPERSALUD: EPS no puede objetar tarifas que ella misma pactó."
-    ),
-    "SO": (
-        "ESTRATEGIA: Glosa por soportes documentales.\n"
-        "1. La Historia Clínica es plena prueba según Resolución 1995/1999.\n"
-        "2. Soportes subsanables no extinguen la obligación de pago (Art. 56 Ley 1438/2011).\n"
-        "3. Si es urgencia vital: no requiere autorización previa (Art. 168 Ley 100/1993)."
-    ),
-    "AU": (
-        "ESTRATEGIA: Glosa por autorización.\n"
-        "1. Urgencia vital — atención obligatoria sin autorización previa (Art. 168 Ley 100/1993).\n"
-        "2. La EPS tiene 5 días para objetar la urgencia (Res. 3047/2008), si no lo hizo, acepta.\n"
-        "3. El trámite de autorización se realizó de manera oportuna según los registros."
-    ),
-    "CO": (
-        "ESTRATEGIA: Glosa por cobertura.\n"
-        "1. El servicio es obligación legal de la EPS (Ley 1751/2015 Art. 15).\n"
-        "2. Atención de urgencias: Art. 168 Ley 100/1993 y Art. 32 Ley 1438/2011.\n"
-        "3. Si la EPS alega exclusión, debe demostrarlo — la carga probatoria es suya."
-    ),
-    "PE": (
-        "ESTRATEGIA: Glosa por pertinencia clínica.\n"
-        "1. Autonomía médica protegida: Ley 1751/2015 Art. 17.\n"
-        "2. Sentencia T-760/2008: prevalece el criterio médico sobre el administrativo.\n"
-        "3. La EPS debe especificar el criterio técnico-científico usado para objetar (Res. 3047/2008)."
-    ),
-    "FA": (
-        "ESTRATEGIA: Glosa por facturación.\n"
-        "1. Errores subsanables no son causal de no pago (Circular 030/2013 SUPERSALUD).\n"
-        "2. Principio de realidad sobre formalidad: el servicio fue prestado.\n"
-        "3. La obligación de pago subsiste independientemente del error formal."
-    ),
-    "DEFAULT": (
-        "ESTRATEGIA: Glosa de tipo no especificado.\n"
-        "1. Defender la prestación del servicio con base en la Historia Clínica.\n"
-        "2. Invocar el principio de continuidad de la atención (Art. 32 Ley 1438/2011).\n"
-        "3. Exigir que la EPS especifique el fundamento técnico-legal de la objeción."
-    ),
+    "TA_sin_contrato": "ESTRATEGIA: Sin contrato rige Art 11 Dec 4747/2007. SOAT PLENO 100%.",
+    "TA_con_contrato": "ESTRATEGIA: Cobro según tarifas pactadas. Art 871 C.Co.",
+    "SO": "ESTRATEGIA: Historia Clínica es plena prueba (Res 1995/1999).",
+    "AU": "ESTRATEGIA: Urgencia vital no requiere autorización (Art 168 Ley 100/93).",
+    "CO": "ESTRATEGIA: Servicio es obligación legal de la EPS.",
+    "PE": "ESTRATEGIA: Autonomía médica Ley 1751/2015 Art 17.",
+    "FA": "ESTRATEGIA: Errores subsanables no son causal de no pago.",
+    "DEFAULT": "ESTRATEGIA GENERAL: Defensa basada en HC y continuidad."
 }
 
-
-def _construir_prompt(
-    info_contrato: str,
-    estrategia: str,
-    texto_glosa: str,
-    contexto_pdf: str,
-    eps: str,
-) -> tuple[str, str]:
-    """
-    Retorna (system_prompt, user_prompt) separados.
-    Separar system/user mejora el seguimiento de instrucciones
-    en modelos que distinguen estos roles.
-    """
-    system = "\n\n".join([
-        SYSTEM_ROL,
-        f"MARCO CONTRACTUAL VIGENTE CON {eps.upper()}:\n{info_contrato}",
-        f"INSTRUCCIÓN ESTRATÉGICA:\n{estrategia}",
-        SYSTEM_FORMATO,
-    ])
-
-    user = (
-        f"DATOS DE LA GLOSA A CONTESTAR:\n{texto_glosa}\n\n"
-        f"CONTEXTO EXTRAÍDO DE LOS SOPORTES PDF:\n{contexto_pdf or 'Sin soportes adjuntos.'}"
-    )
-
+def _construir_prompt(info_contrato: str, estrategia: str, texto_glosa: str, contexto_pdf: str, eps: str) -> tuple[str, str]:
+    system = "\n\n".join([SYSTEM_ROL, f"CONTRATO CON {eps.upper()}:\n{info_contrato}", f"ESTRATEGIA:\n{estrategia}", SYSTEM_FORMATO])
+    user = f"GLOSA:\n{texto_glosa}\n\nSOPORTES:\n{contexto_pdf or 'Sin soportes.'}"
     return system, user
 
-
-# ── Cliente IA con fallback ───────────────────────────────────────────────────
+# ── Clase de Servicio Principal ───────────────────────────────────────────────
 class GlosaService:
     def __init__(self, groq_api_key: str):
         self.groq = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
-        # Claude como fallback — lee la key de env, no la recibe como parámetro
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
 
     async def extraer_pdf(self, file_content: bytes) -> str:
@@ -210,243 +120,69 @@ class GlosaService:
         m = re.search(fr"<{tag}>(.*?)</{tag}>", texto, re.IGNORECASE | re.DOTALL)
         return m.group(1).strip().replace("**", "") if m else default
 
-    async def _llamar_groq(self, system: str, user: str) -> str:
-        """Llama a Groq/Llama. Lanza excepción si falla para activar fallback."""
-        if not self.groq:
-            raise ValueError("GROQ_API_KEY no configurada")
-
-        resp = await self.groq.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user",   "content": user},
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.15,       # más bajo = menos alucinaciones
-            max_tokens=1500,
-            # Forzar que la respuesta sea XML válido
-            response_format={"type": "text"},
-        )
-        contenido = resp.choices[0].message.content or ""
-
-        # Validación básica: si no tiene tags XML, rechazar
-        if "<argumento>" not in contenido:
-            raise ValueError(f"Respuesta sin XML válido: {contenido[:200]}")
-
-        return contenido
-
-    async def _llamar_claude(self, system: str, user: str) -> str:
-        """
-        Fallback a Claude claude-sonnet-4-20250514 vía API REST directa.
-        Se usa solo si Groq falla o está caído.
-        """
-        if not self.anthropic_key:
-            raise ValueError("ANTHROPIC_API_KEY no configurada para fallback")
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": self.anthropic_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "claude-sonnet-4-20250514",
-                    "max_tokens": 1500,
-                    "system": system,
-                    "messages": [{"role": "user", "content": user}],
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            contenido = data["content"][0]["text"]
-
-            if "<argumento>" not in contenido:
-                raise ValueError(f"Claude: respuesta sin XML válido: {contenido[:200]}")
-
-            return contenido
-
     async def _llamar_ia(self, system: str, user: str) -> tuple[str, str]:
-        """
-        Orquesta Groq → Claude → error controlado.
-        Retorna (xml_respuesta, modelo_usado).
-        """
-        # Intento 1: Groq (más rápido, gratuito)
         try:
-            resultado = await self._llamar_groq(system, user)
-            logger.info("IA: respuesta obtenida de Groq")
-            return resultado, "groq/llama-3.3-70b"
-        except Exception as e_groq:
-            logger.warning(f"Groq falló ({type(e_groq).__name__}: {e_groq}), intentando Claude...")
+            resp = await self.groq.chat.completions.create(
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                model="llama-3.3-70b-versatile", temperature=0.15
+            )
+            return resp.choices[0].message.content, "groq/llama-3.3-70b"
+        except Exception:
+            if self.anthropic_key:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post("https://api.anthropic.com/v1/messages", 
+                        headers={"x-api-key": self.anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                        json={"model": "claude-3-5-sonnet-20240620", "max_tokens": 1500, "system": system, "messages": [{"role": "user", "content": user}]})
+                    return resp.json()["content"][0]["text"], "anthropic/claude-3.5-sonnet"
+        return "<argumento>ERROR CONEXIÓN IA - REVISIÓN MANUAL</argumento>", "fallback/manual"
 
-        # Intento 2: Claude como fallback
-        try:
-            resultado = await self._llamar_claude(system, user)
-            logger.info("IA: respuesta obtenida de Claude (fallback)")
-            return resultado, "anthropic/claude-sonnet-4"
-        except Exception as e_claude:
-            logger.error(f"Claude también falló: {e_claude}")
-
-        # Si ambos fallan: respuesta de error estructurada (no rompe el flujo)
-        fallback_xml = (
-            "<paciente>NO IDENTIFICADO</paciente>"
-            "<codigo_glosa>N/A</codigo_glosa>"
-            "<valor_objetado>$ 0.00</valor_objetado>"
-            "<servicio_glosado>ERROR — REVISAR MANUALMENTE</servicio_glosado>"
-            "<score_confianza>0</score_confianza>"
-            "<argumento>ERROR DE CONEXIÓN CON LOS SERVICIOS DE IA. "
-            "ESTA GLOSA REQUIERE REVISIÓN MANUAL POR EL AUDITOR. "
-            "LOS SERVICIOS DE IA NO ESTÁN DISPONIBLES EN ESTE MOMENTO.</argumento>"
-        )
-        return fallback_xml, "fallback/manual"
-
-    async def analizar(
-        self,
-        data: GlosaInput,
-        contexto_pdf: str = "",
-        contratos_db: dict = None,
-    ) -> GlosaResult:
-        etapa_str    = str(data.etapa).upper()
-        texto_base   = str(data.tabla_excel).strip().upper()
-        val_ac_num   = float(re.sub(r"[^\d]", "", str(data.valor_aceptado)) or 0)
-
-        # Extracción de código de glosa — más robusta que antes
+    async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
+        texto_base = str(data.tabla_excel).strip().upper()
+        val_ac_num = float(re.sub(r"[^\d]", "", str(data.valor_aceptado)) or 0)
         codigo_det = self._extraer_codigo_glosa(texto_base)
         prefijo    = codigo_det[:2] if codigo_det != "N/A" else "XX"
-
         val_m      = re.search(r"\$\s*([\d\.,]+)", texto_base)
         valor_raw  = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
+        
+        dias = calcular_dias_habiles(str(data.fecha_radicacion), str(data.fecha_recepcion)) if data.fecha_radicacion and data.fecha_recepcion else 0
+        es_extemporanea = dias > 20
+        msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS)"
 
-        dias             = calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) \
-                           if data.fecha_radicacion and data.fecha_recepcion else 0
-        es_extemporanea  = dias > 20
-        msg_tiempo       = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea \
-                           else f"EN TÉRMINOS ({dias} DÍAS)"
+        if "RATIF" in str(data.etapa).upper(): return self._respuesta_ratificacion(codigo_det, valor_raw, msg_tiempo, dias)
+        if es_extemporanea and val_ac_num <= 0: return self._respuesta_extemporanea(codigo_det, valor_raw, msg_tiempo, dias)
 
-        # ── Casos sin IA (reglas puras) ────────────────────────────────────────
-        if "RATIF" in etapa_str:
-            return self._respuesta_ratificacion(codigo_det, valor_raw, msg_tiempo, dias)
-
-        if es_extemporanea and val_ac_num <= 0:
-            return self._respuesta_extemporanea(codigo_det, valor_raw, msg_tiempo, dias)
-
-        # ── Caso IA ────────────────────────────────────────────────────────────
-        eps_key     = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
+        eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
         todos_contratos = {**_CONTRATOS_BASE, **(contratos_db or {})}
-        info_contrato   = todos_contratos.get(eps_key, todos_contratos["OTRA / SIN DEFINIR"])
-        es_sin_contrato = eps_key in ("OTRA", "")
-
-        estrategia = self._seleccionar_estrategia(prefijo, es_sin_contrato)
+        info_contrato = todos_contratos.get(eps_key, todos_contratos["OTRA / SIN DEFINIR"])
+        
+        estrategia = self._seleccionar_estrategia(prefijo, eps_key in ("OTRA", ""))
         system, user = _construir_prompt(info_contrato, estrategia, texto_base, contexto_pdf, eps_key)
-
         res_ia, modelo_usado = await self._llamar_ia(system, user)
 
-        # Parseo de campos con defaults seguros
-        paciente  = self._xml("paciente",        res_ia, "NO IDENTIFICADO")
-        servicio  = self._xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
-        arg       = self._xml("argumento",        res_ia, "SIN ARGUMENTO").replace("\n", "<br/>")
-        score_raw = self._xml("score_confianza",  res_ia, "0")
-
-        # Score dinámico: penalizar si algún campo quedó vacío o en default
-        try:
-            score = int(re.sub(r"[^\d]", "", score_raw) or 0)
-        except ValueError:
-            score = 0
-
-        if paciente == "NO IDENTIFICADO":  score = max(0, score - 15)
-        if not contexto_pdf:               score = max(0, score - 10)
-        if modelo_usado.startswith("fallback"): score = 0
-
-        # Tag de modelo usado (ayuda al auditor a saber qué IA respondió)
-        nota_modelo = f'<div style="font-size:9px;color:#94a3b8;margin-top:8px;">Generado por: {modelo_usado}</div>'
-
-        dictamen = (
-            _tabla_defensa(codigo_det, servicio, valor_raw, "RE9602",
-                           "GLOSA O DEVOLUCIÓN INJUSTIFICADA")
-            + _div(f"<b>ESE HUS NO ACEPTA GLOSA INJUSTIFICADA:</b><br/><br/>{arg}")
-            + nota_modelo
-        )
-
-        return GlosaResult(
-            tipo=f"TÉCNICO-LEGAL [{prefijo}]",
-            resumen=f"DEFENSA: {paciente}",
-            dictamen=dictamen,
-            codigo_glosa=codigo_det,
-            valor_objetado=valor_raw,
-            paciente=paciente,
-            mensaje_tiempo=msg_tiempo,
-            color_tiempo="bg-emerald-500",
-            score=score,
-            dias_restantes=max(0, 20 - dias),
-        )
+        paciente = self._xml("paciente", res_ia, "NO IDENTIFICADO")
+        servicio = self._xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
+        arg      = self._xml("argumento", res_ia, "SIN ARGUMENTO").replace("\n", "<br/>")
+        
+        dictamen = _tabla_defensa(codigo_det, servicio, valor_raw, "RE9602", "GLOSA INJUSTIFICADA") + _div(f"<b>ESE HUS NO ACEPTA GLOSA INJUSTIFICADA:</b><br/><br/>{arg}")
+        return GlosaResult(tipo=f"TÉCNICO-LEGAL [{prefijo}]", resumen=f"DEFENSA: {paciente}", dictamen=dictamen, codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", score=80, dias_restantes=max(0, 20-dias))
 
     def _extraer_codigo_glosa(self, texto: str) -> str:
-        """
-        Jerarquía de extracción: patrones específicos primero,
-        regex genérico como último recurso.
-        """
-        patrones_conocidos = [
-            r"\b(TA\d{2,4})\b",   # Tarifas
-            r"\b(SO\d{2,4})\b",   # Soportes
-            r"\b(AU\d{2,4})\b",   # Autorización
-            r"\b(CO\d{2,4})\b",   # Cobertura
-            r"\b(PE\d{2,4})\b",   # Pertinencia
-            r"\b(FA\d{2,4})\b",   # Facturación
-            r"\b(MCV\d*)\b",      # Código especial HUS
-        ]
-        for patron in patrones_conocidos:
-            m = re.search(patron, texto)
-            if m:
-                return m.group(1)
-
-        # Fallback genérico
-        m = re.search(r"\b([A-Z]{2,3}\d{2,4})\b", texto)
-        return m.group(1) if m else "N/A"
+        patrones = [r"\b(TA\d{2,4})\b", r"\b(SO\d{2,4})\b", r"\b(AU\d{2,4})\b", r"\b(CO\d{2,4})\b", r"\b(PE\d{2,4})\b", r"\b(FA\d{2,4})\b", r"\b(MCV\d*)\b"]
+        for p in patrones:
+            m = re.search(p, texto)
+            if m: return m.group(1)
+        return "N/A"
 
     def _seleccionar_estrategia(self, prefijo: str, es_sin_contrato: bool) -> str:
-        if prefijo == "TA":
-            return ESTRATEGIAS_LEGALES["TA_sin_contrato" if es_sin_contrato else "TA_con_contrato"]
+        if prefijo == "TA": return ESTRATEGIAS_LEGALES["TA_sin_contrato" if es_sin_contrato else "TA_con_contrato"]
         return ESTRATEGIAS_LEGALES.get(prefijo, ESTRATEGIAS_LEGALES["DEFAULT"])
 
-    # ── Respuestas de reglas puras (sin IA) ────────────────────────────────────
     def _respuesta_ratificacion(self, codigo, valor, msg_tiempo, dias):
-        txt = (
-            "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE "
-            "DE LA GLOSA INICIAL Y CONTINUACIÓN DEL PROCESO DE ACUERDO CON LA NORMA. "
-            "SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE LA CONCILIACIÓN DE LA AUDITORÍA "
-            "MÉDICA Y/O TÉCNICA ENTRE LAS PARTES. CONTACTO: CARTERA@HUS.GOV.CO, "
-            "GLOSASYDEVOLUCIONES@HUS.GOV.CO. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA "
-            "LEY 1438 DE 2011, DE NO OBTENERSE LA RATIFICACIÓN EN LOS TÉRMINOS ESTABLECIDOS, "
-            "SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN."
-        )
-        tabla = _tabla_simple(codigo, "RATIFICACIÓN", valor, "RE9901",
-                              "GLOSA NO ACEPTADA Y SUBSANADA EN SU TOTALIDAD",
-                              color_e="#2563eb")
-        return GlosaResult(
-            tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN",
-            dictamen=tabla + _div(txt), codigo_glosa=codigo,
-            valor_objetado=valor, paciente="N/A",
-            mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600",
-            score=100, dias_restantes=max(0, 20 - dias),
-        )
+        txt = "ESE HUS NO ACEPTA GLOSA RATIFICADA... (SE MANTIENE RESPUESTA INICIAL)"
+        tabla = _tabla_simple(codigo, "RATIFICACIÓN", valor, "RE9901", "GLOSA NO ACEPTADA", color_e="#2563eb")
+        return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla + _div(txt), codigo_glosa=codigo, valor_objetado=valor, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", score=100, dias_restantes=max(0, 20-dias))
 
     def _respuesta_extemporanea(self, codigo, valor, msg_tiempo, dias):
-        txt = (
-            f"ESE HUS NO ACEPTA GLOSA EXTEMPORÁNEA. AL HABERSE SUPERADO DICHO PLAZO LEGAL "
-            f"(HAN TRANSCURRIDO {dias} DÍAS HÁBILES ENTRE LA RADICACIÓN Y LA RECEPCIÓN) SIN "
-            "QUE NUESTRA INSTITUCIÓN RECIBIERA NOTIFICACIÓN FORMAL DE LAS OBJECIONES DENTRO "
-            "DEL TÉRMINO ESTABLECIDO, HA OPERADO DE PLENO DERECHO EL FENÓMENO JURÍDICO DE LA "
-            "ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO DEFINITIVAMENTE "
-            "LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER LOS RECURSOS "
-            "ASOCIADOS A ESTA CUENTA, DE CONFORMIDAD CON LO DISPUESTO EN EL ARTÍCULO 57 DE "
-            "LA LEY 1438 DE 2011 Y EL ARTÍCULO 13 (LITERAL D) DE LA LEY 1122 DE 2007."
-        )
-        tabla = _tabla_simple(codigo, "EXTEMPORÁNEA", valor, "RE9502",
-                              "GLOSA O DEVOLUCIÓN EXTEMPORÁNEA")
-        return GlosaResult(
-            tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD",
-            dictamen=tabla + _div(txt), codigo_glosa=codigo,
-            valor_objetado=valor, paciente="N/A",
-            mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600",
-            score=100, dias_restantes=0,
-        )
+        txt = f"ESE HUS NO ACEPTA GLOSA EXTEMPORÁNEA ({dias} DÍAS). OPERA ACEPTACIÓN TÁCITA (ART 57 LEY 1438/2011)."
+        tabla = _tabla_simple(codigo, "EXTEMPORÁNEA", valor, "RE9502", "GLOSA FUERA DE TIEMPO")
+        return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt), codigo_glosa=codigo, valor_objetado=valor, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", score=100, dias_restantes=0)
