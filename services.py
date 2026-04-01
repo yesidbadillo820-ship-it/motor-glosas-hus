@@ -44,10 +44,34 @@ CONTRATOS_FIJOS = {
 }
 
 ESTRATEGIAS = {
-    "TA": "ESTRATEGIA TARIFARIA: Citar contrato o Res. 054. Demostrar liquidación correcta. Invocar Art. 871 C.Co (Buena Fe).",
-    "SO": "ESTRATEGIA SOPORTES: Demostrar que la Historia Clínica es plena prueba (Res. 1995/99). Identificar envío de documentos.",
-    "PE": "ESTRATEGIA PERTINENCIA: Autonomía médica (Ley 1751/15). Justificar acto médico basado en diagnóstico.",
-    "AU": "ESTRATEGIA AUTORIZACIÓN: Urgencia vital (Art. 168 Ley 100/93). Trámite oportuno de autorizaciones."
+    "TA": (
+        "GLOSA POR TARIFAS. ESTRATEGIA: Demostrar que el cobro corresponde a lo pactado. "
+        "LEYES A CITAR: Si hay contrato, invocar el principio de buena fe (Art. 83 Constitución y Art. 871 Código de Comercio). "
+        "Si no hay contrato, invocar Art. 11 del Decreto 4747 de 2007 y aplicar subsidiariamente el Manual Tarifario SOAT (Res. 5395/2013). "
+        "Recordar que la EPS no puede objetar tarifas que ella misma pactó (Circular 030/2013 SUPERSALUD)."
+    ),
+    "SO": (
+        "GLOSA POR SOPORTES. ESTRATEGIA: Defender la validez de la Historia Clínica como soporte principal. "
+        "LEYES A CITAR: Resolución 1995 de 1999 (Historia clínica es plena prueba). "
+        "Recordar que la falta de un soporte subsanable no extingue la obligación de pago (Art. 56 Ley 1438/2011). "
+        "Si es urgencia vital, citar Art. 168 Ley 100/1993 (no requiere autorización previa)."
+    ),
+    "PE": (
+        "GLOSA POR PERTINENCIA CLÍNICA. ESTRATEGIA: Defender la autonomía médica. "
+        "LEYES A CITAR: Ley 1751 de 2015, Art. 17 (Autonomía médica protegida frente a criterios administrativos). "
+        "Sentencia T-760 de 2008 (Prevalencia del criterio médico). "
+        "Exigir que la EPS especifique el criterio técnico-científico usado para objetar (Res. 3047/2008)."
+    ),
+    "CO": (
+        "GLOSA POR COBERTURA. ESTRATEGIA: Demostrar que el servicio es obligación de la EPS. "
+        "LEYES A CITAR: Si es urgencia, Ley 100/1993 Art. 168 (Atención obligatoria). "
+        "Art. 32 Ley 1438/2011 (Continuidad de la atención). Si alegan exclusión, exigir que lo demuestren bajo la Ley 1751/2015 Art. 15."
+    ),
+    "FA": (
+        "GLOSA POR FACTURACIÓN. ESTRATEGIA: Corrección de errores formales sin perder el derecho al pago. "
+        "LEYES A CITAR: Circular 030/2013 SUPERSALUD (errores subsanables no son causal de no pago). "
+        "Principio de realidad sobre formalidad. La obligación de pago subsiste ya que el servicio fue prestado."
+    )
 }
 
 def _div(texto): 
@@ -152,16 +176,20 @@ class GlosaService:
         est_actual = ESTRATEGIAS.get(prefijo, "ESTRATEGIA GENERAL: Desvirtuar la glosa apelando a la pertinencia médica, los soportes clínicos adjuntos y el principio de buena fe (Art 871 C.Co). Exigir pago.")
 
         # --- INICIO DEL CÓDIGO A REEMPLAZAR ---
-        sys_p = f"""Eres el Director Jurídico y de Auditoría de Cuentas de la ESE HUS (Colombia).
-        MARCO CONTRACTUAL A APLICAR: {info_c}
-        ESTRATEGIA DE DEFENSA: {est_actual}
-        
-        REGLAS ESTRICTAS:
-        1. Tu respuesta debe ser ÚNICAMENTE en código XML válido. Cero saludos, cero texto fuera del XML.
-        2. El <argumento> debe contener una defensa técnica y jurídica robusta, de mínimo 2 párrafos.
-        3. TODO EL TEXTO DEL ARGUMENTO DEBE ESTAR EN MAYÚSCULAS.
-        4. No inventes datos que no estén en la glosa.
+        sys_p = f"""Eres el Director Jurídico y de Auditoría de Cuentas Médicas de la ESE HUS (Colombia).
+        MARCO CONTRACTUAL: {info_c}
+        INSTRUCCIÓN LEGAL: {est_actual}
 
+        Tu tarea es redactar la defensa técnica y jurídica para levantar esta glosa.
+        REGLAS ESTRICTAS:
+        1. Responde ÚNICAMENTE en formato XML: <paciente>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>.
+        2. El <argumento> DEBE estar TODO EN MAYÚSCULAS y seguir esta estructura exacta:
+        - HECHOS: Describe brevemente el servicio prestado basado en los soportes.
+        - CONSIDERACIONES JURÍDICAS: Desarrolla el argumento usando las LEYES A CITAR indicadas en tu instrucción legal.
+        - PRETENSIÓN: Exige el levantamiento de la glosa y el pago inmediato según Decreto 4747 de 2007.
+        - ADVERTENCIA LEGAL: Advierte sobre el cobro de intereses de mora (Art. 56 Ley 1438/2011) y posible reporte a la SUPERSALUD.
+        """
+        
         FORMATO OBLIGATORIO:
         <paciente>Nombre del paciente (o NO IDENTIFICADO)</paciente>
         <codigo_glosa>Código alfanumérico (ej. TA0201, o N/A)</codigo_glosa>
