@@ -1,180 +1,136 @@
 import os
-import json
-import sqlite3
-import asyncio
-from typing import Optional
+import re
+import io
+import csv
+from datetime import datetime
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, Response
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
+from jose import JWTError, jwt
+from pydantic import BaseModel
 
-from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException, Depends
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, Response
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from services import GlosaService, crear_oficio_pdf
+from models import GlosaInput, GlosaResult, PDFRequest, GlosaRecord, ContratoRecord, ContratoInput, UsuarioRecord
+from database import engine, Base, get_db, SessionLocal
+from auth import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM
 from dotenv import load_dotenv
 
-from models import GlosaInput
-from services import GlosaService, crear_oficio_pdf, exportar_excel_pro
-
 load_dotenv()
+Base.metadata.create_all(bind=engine)
 
-# MIDDLEWARE DE SEGURIDAD (TOKEN BÁSICO)
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN", "HUS2026") # Cambia esto en producción
+app = FastAPI(title="Motor Glosas HUS - V2 Pro")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-app = FastAPI(title="Motor Glosas IA HUS")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="static")
+glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-API_KEY = os.getenv("GROQ_API_KEY")
-glosa_service = GlosaService(api_key=API_KEY)
-
-# ─── BASE DE DATOS MEJORADA CON AUTO-CARGA DE CONTRATOS ───
-def init_db():
-    conn = sqlite3.connect("glosas_hus.db")
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS contratos (eps TEXT PRIMARY KEY, detalles TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS historial (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        eps TEXT, paciente TEXT, factura TEXT, codigo_glosa TEXT, valor_objetado TEXT, 
-        estado TEXT, dictamen TEXT, dias_restantes INTEGER
-    )''')
+def get_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credenciales_excepcion = HTTPException(
+        status_code=401, detail="No se pudieron validar las credenciales", headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None: raise credenciales_excepcion
+    except JWTError:
+        raise credenciales_excepcion
     
-    # 🔥 INYECTAR CONTRATOS POR DEFECTO SI LA TABLA ESTÁ VACÍA
-    c.execute("SELECT COUNT(*) FROM contratos")
-    if c.fetchone()[0] == 0:
-        contratos_base = [
-            ("DISPENSARIO MEDICO", "CONTRATO 440-DIGSA/DMBUG-2025. TARIFAS ANEXO 6.2 (PROCEDIMIENTOS, LABORATORIO, IMAGENOLOGÍA). OBLIGATORIO CUMPLIMIENTO."),
-            ("NUEVA EPS", "CONTRATO 02-01-06-00077-2017. MANUAL TARIFARIO SOAT -20% Y ANEXO DE TARIFAS INSTITUCIONALES PROPIAS."),
-            ("SANITAS", "CONTRATO ACTUAL VIGENTE. TARIFA SOAT -15%. EXCLUYE MEDICAMENTOS."),
-            ("COOSALUD", "CONTRATO DE PRESTACION DE SERVICIOS VIGENTE. TARIFA SOAT PLENO."),
-            ("FOMAG", "CONTRATO VIGENTE PRESTACIÓN DE SERVICIOS DE SALUD FOMAG. APLICACIÓN DE TARIFAS PACTADAS.")
-        ]
-        c.executemany("INSERT INTO contratos (eps, detalles) VALUES (?, ?)", contratos_base)
-        
-    conn.commit()
-    conn.close()
+    usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
+    if usuario is None: raise credenciales_excepcion
+    return usuario
 
-init_db()
+BASE_CONTRATOS_DEFAULT = {
+    "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
+    "COMPENSAR": "CONTRATO: CSS009-2024. TARIFA: SOAT -15% y Tarifas Propias. OBS: Excluye oncológicos. MAOS por EPS.",
+    "FAMISANAR": "CARTA DE INTENCIÓN. TARIFA: SOAT UVB -5% e Institucionales.",
+    "FOMAG": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15%, Institucionales y Paquetes (Tórax, IVE, Columna, Terapias, Gastro).",
+    "LA PREVISORA": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15% y Paquetes.",
+    "DISPENSARIO MEDICO": "CONTRATO: 440-DIGSA/DMBUG-2025. TARIFA: SOAT SMLV -20% e Institucionales.",
+    "POLICIA NACIONAL": "CONTRATOS: 068-5-200004-26 y 068-5-200006-26. TARIFA: SOAT UVB -8% e Institucionales. OBS: Contrato 0006-26 INCLUYE medicamentos oncológicos.",
+    "NUEVA EPS": "CONTRATO: 02-01-06-00077-2017. TARIFA: SOAT -20% e Institucionales. OBS: Meds Oncológicos por HUS.",
+    "PPL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%. OBS: MAOS y Meds por HUS.",
+    "FIDUCIARIA CENTRAL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%.",
+    "POSITIVA": "CONTRATO: 525 - OTROSÍ 3. TARIFA: SOAT SMLV -15%. OBS: Solo accidentes/laboral.",
+    "PRECIMED": "CONTRATO: 319 DE 2024. TARIFA: Tarifas anexos / Institucionales.",
+    "SALUD MIA": "CONTRATOS: SSA2025EVE3A005 y CSA2025EVE3A005. TARIFA: SOAT -15%. OBS: Urgencias Circular 019/2023.",
+    "AURORA": "CONTRATOS: GID ARL 0090 y GID AP 0090. TARIFA: SOAT -3%.",
+    "SECRETARIA DE SANTANDER": "MARCO LEGAL: Resolución 15997 de 2017 (Tarifas obligatorias ente territorial).",
+    "SUMIMEDICAL": "CONTRATO: FPS23-050. TARIFA: SOAT -15%. OBS: MAOS y Oncológicos por EPS.",
+    "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
+}
 
-# ─── SEGURIDAD ───
-async def verify_token(request: Request):
-    token = request.headers.get("Authorization")
-    if ACCESS_TOKEN and ACCESS_TOKEN != "HUS2026": 
-        if not token or token != f"Bearer {ACCESS_TOKEN}":
-            raise HTTPException(status_code=401, detail="No autorizado")
+@app.on_event("startup")
+def startup_event():
+    db = SessionLocal()
+    if db.query(ContratoRecord).count() == 0:
+        for k, v in BASE_CONTRATOS_DEFAULT.items():
+            db.add(ContratoRecord(eps=k, detalles=v))
+        db.commit()
+    if db.query(UsuarioRecord).count() == 0:
+        admin_pwd = get_password_hash("admin123")
+        db.add(UsuarioRecord(nombre="Auditor Principal", email="admin@hus.gov.co", password_hash=admin_pwd))
+        db.commit()
+    db.close()
 
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
-@app.post("/analizar")
-async def analizar_glosa(
-    eps: str = Form(...), etapa: str = Form(...), 
-    fecha_radicacion: str = Form(""), fecha_recepcion: str = Form(""),
-    valor_aceptado: str = Form(""), tabla_excel: str = Form(...),
-    archivos: list[UploadFile] = File(default=[])):
+@app.post("/token")
+def login_para_token(req: LoginRequest, db: Session = Depends(get_db)):
+    usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == req.username.strip()).first()
+    if not usuario or not verify_password(req.password.strip(), usuario.password_hash):
+        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+    return {"access_token": create_access_token(data={"sub": usuario.email}), "token_type": "bearer"}
+
+@app.get("/")
+async def read_index():
+    try:
+        with open("templates/index.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Error: No se encontró templates/index.html</h1>", status_code=404)
+
+def limpiar_numero(v: str) -> float:
+    c = re.sub(r'[^\d]', '', str(v))
+    return float(c) if c else 0.0
+
+@app.post("/analizar", response_model=GlosaResult)
+async def analizar_endpoint(
+    eps: str = Form(...), etapa: str = Form(...), fecha_radicacion: str = Form(None),
+    fecha_recepcion: str = Form(None), valor_aceptado: str = Form("0"), tabla_excel: str = Form(...),
+    archivos: list[UploadFile] = File(None), db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
     
-    conn = sqlite3.connect("glosas_hus.db")
-    contratos = {row[0]: row[1] for row in conn.execute("SELECT eps, detalles FROM contratos").fetchall()}
-    conn.close()
-
     contexto_pdf = ""
-    for f in archivos:
-        if f.filename: contexto_pdf += await glosa_service.extraer_pdf(await f.read())
-
-    data_in = GlosaInput(eps=eps, etapa=etapa, fecha_radicacion=fecha_radicacion, fecha_recepcion=fecha_recepcion, valor_aceptado=valor_aceptado, tabla_excel=tabla_excel)
-    resultado = await glosa_service.analizar(data_in, contexto_pdf, contratos)
-
-    estado = "LEVANTADA" if "ACEPTA LA GLOSA" in resultado.dictamen else ("ACEPTADA" if "ACEPTA" in resultado.dictamen else "RECHAZADA")
-
-    conn = sqlite3.connect("glosas_hus.db")
-    conn.execute("INSERT INTO historial (eps, paciente, factura, codigo_glosa, valor_objetado, estado, dictamen, dias_restantes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                 (eps, resultado.paciente, resultado.factura, resultado.codigo_glosa, resultado.valor_objetado, estado, resultado.dictamen, resultado.dias_restantes))
-    conn.commit()
-    conn.close()
-
-    return resultado.model_dump()
-
-@app.post("/analizar-lote")
-async def analizar_lote(request: Request):
-    pass 
-
-@app.get("/glosas")
-async def obtener_historial(limite: int = 50, eps: Optional[str] = None):
-    conn = sqlite3.connect("glosas_hus.db")
-    conn.row_factory = sqlite3.Row
-    query = "SELECT * FROM historial ORDER BY creado_en DESC LIMIT ?"
-    params = [limite]
-    if eps:
-        query = "SELECT * FROM historial WHERE eps = ? ORDER BY creado_en DESC LIMIT ?"
-        params = [eps, limite]
-    filas = [dict(row) for row in conn.execute(query, params).fetchall()]
-    conn.close()
-    return JSONResponse(content=filas)
-
-@app.get("/alertas")
-async def obtener_alertas():
-    conn = sqlite3.connect("glosas_hus.db")
-    conn.row_factory = sqlite3.Row
-    filas = [dict(row) for row in conn.execute("SELECT * FROM historial WHERE dias_restantes <= 5 AND dias_restantes > 0 ORDER BY dias_restantes ASC").fetchall()]
-    conn.close()
-    return JSONResponse(content=filas)
-
-@app.get("/analytics")
-async def obtener_analytics():
-    conn = sqlite3.connect("glosas_hus.db")
-    c = conn.cursor()
-    total_mes = c.execute("SELECT COUNT(*) FROM historial WHERE strftime('%Y-%m', creado_en) = strftime('%Y-%m', 'now')").fetchone()[0]
-    total_hoy = c.execute("SELECT COUNT(*) FROM historial WHERE date(creado_en) = date('now')").fetchone()[0]
+    if archivos:
+        for arc in archivos:
+            if arc.filename: contexto_pdf += await glosa_service.extraer_pdf(await arc.read())
     
-    val_obj = 0; val_rec = 0
-    for row in c.execute("SELECT valor_objetado, estado FROM historial WHERE strftime('%Y-%m', creado_en) = strftime('%Y-%m', 'now')").fetchall():
-        try:
-            v = float(re.sub(r'[^\d]', '', str(row[0])))
-            val_obj += v
-            if row[1] == "RECHAZADA": val_rec += v
-        except: pass
+    input_data = GlosaInput(eps=eps, etapa=etapa, fecha_radicacion=fecha_radicacion, fecha_recepcion=fecha_recepcion, valor_aceptado=valor_aceptado, tabla_excel=tabla_excel)
+    dict_contratos = {c.eps: c.detalles for c in db.query(ContratoRecord).all()}
     
-    tasa = round((val_rec / val_obj * 100) if val_obj > 0 else 0, 1)
+    resultado = await glosa_service.analizar(input_data, contexto_pdf, dict_contratos)
+    val_obj, val_acep = limpiar_numero(resultado.valor_objetado), limpiar_numero(valor_aceptado)
     
-    top_eps = [{"eps": r[0], "total": r[1]} for r in c.execute("SELECT eps, COUNT(*) as c FROM historial GROUP BY eps ORDER BY c DESC LIMIT 5").fetchall()]
-    top_cod = [{"codigo": r[0], "total": r[1]} for r in c.execute("SELECT codigo_glosa, COUNT(*) as c FROM historial GROUP BY codigo_glosa ORDER BY c DESC LIMIT 5").fetchall()]
-    
-    conn.close()
-    return {"glosas_mes": total_mes, "glosas_hoy": total_hoy, "valor_objetado_mes": val_obj, "valor_recuperado_mes": val_rec, "tasa_exito_pct": tasa, "top_eps": top_eps, "top_codigos": top_cod}
-
-@app.get("/contratos")
-async def listar_contratos():
-    conn = sqlite3.connect("glosas_hus.db")
-    filas = [{"eps": r[0], "detalles": r[1]} for r in conn.execute("SELECT * FROM contratos").fetchall()]
-    conn.close()
-    return JSONResponse(content=filas)
-
-@app.post("/contratos")
-async def guardar_contrato(request: Request):
-    data = await request.json()
-    conn = sqlite3.connect("glosas_hus.db")
-    conn.execute("INSERT OR REPLACE INTO contratos (eps, detalles) VALUES (?, ?)", (data['eps'].upper(), data['detalles']))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
-
-@app.delete("/contratos/{eps}")
-async def borrar_contrato(eps: str):
-    conn = sqlite3.connect("glosas_hus.db")
-    conn.execute("DELETE FROM contratos WHERE eps = ?", (eps,))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
+    db.add(GlosaRecord(
+        eps=eps, paciente=resultado.paciente, codigo_glosa=resultado.codigo_glosa, valor_objetado=val_obj, 
+        valor_aceptado=val_acep, etapa=etapa, estado="ACEPTADA" if val_acep > 0 else "LEVANTADA", dictamen=resultado.dictamen
+    ))
+    db.commit()
+    return resultado
 
 @app.post("/descargar-pdf")
-async def descargar_pdf(request: Request):
-    data = await request.json()
-    pdf_bytes = crear_oficio_pdf(data.get('eps', ''), data.get('resumen', ''), data.get('dictamen', ''), data.get('codigo', 'N/A'), data.get('valor', 'N/A'))
-    return Response(content=pdf_bytes, media_type="application/pdf")
+async def descargar_pdf(req: PDFRequest, usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
+    pdf_bytes = crear_oficio_pdf(req.eps, req.resumen, req.dictamen)
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=Oficio_HUS.pdf"})
 
-@app.get("/exportar-historial")
-async def exportar_historial():
-    conn = sqlite3.connect("glosas_hus.db")
-    conn.row_factory = sqlite3.Row
-    filas = [dict(row) for row in conn.execute("SELECT * FROM historial ORDER BY creado_en DESC").fetchall()]
-    conn.close()
-    excel_bytes = exportar_excel_pro(filas)
-    return Response(content=excel_bytes, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+@app.get("/glosas")
+def obtener_historial(limit: int = 50, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
+    return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(limit).all()
+
+@app.get("/contratos")
+def get_contratos(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
+    return db.query(ContratoRecord).order_by(ContratoRecord.eps).all()
