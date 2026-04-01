@@ -3,382 +3,129 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Motor de Glosas IA — ESE HUS</title>
+    <title>Motor de Glosas IA — ESE HUS 2.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
         :root {
-            --navy:       #0b1829;
-            --navy-2:     #122240;
-            --navy-3:     #1c3460;
-            --blue:       #1a56db;
-            --blue-lt:    #3b82f6;
-            --blue-glow:  rgba(59,130,246,.18);
-            --teal:       #0d9488;
-            --teal-lt:    #14b8a6;
-            --red:        #dc2626;
-            --amber:      #d97706;
-            --green:      #16a34a;
-            --green-lt:   #22c55e;
-            --slate:      #64748b;
-            --slate-lt:   #94a3b8;
-            --bg:         #f1f5fb;
-            --bg-card:    #ffffff;
-            --border:     #e2eaf5;
-            --border-2:   #cbd5e1;
-            --text:       #0b1829;
-            --text-2:     #374151;
-            --radius:     12px;
-            --radius-lg:  18px;
+            --navy:       #0b1829; --navy-2:     #122240; --navy-3:     #1c3460;
+            --blue:       #1a56db; --blue-lt:    #3b82f6; --blue-glow:  rgba(59,130,246,.18);
+            --teal:       #0d9488; --teal-lt:    #14b8a6;
+            --red:        #dc2626; --amber:      #d97706;
+            --green:      #16a34a; --green-lt:   #22c55e;
+            --slate:      #64748b; --slate-lt:   #94a3b8;
+            --bg:         #f1f5fb; --bg-card:    #ffffff;
+            --border:     #e2eaf5; --border-2:   #cbd5e1;
+            --text:       #0b1829; --text-2:     #374151;
+            --radius:     12px; --radius-lg:  18px;
             --shadow:     0 1px 3px rgba(11,24,41,.06), 0 4px 16px rgba(11,24,41,.06);
             --shadow-md:  0 4px 6px rgba(11,24,41,.07), 0 10px 30px rgba(11,24,41,.1);
-            --shadow-lg:  0 20px 60px rgba(11,24,41,.15);
         }
-        
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body {
-            font-family: 'DM Sans', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            overflow: hidden;
-            font-size: 14px;
-        }
-        
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; overflow: hidden; font-size: 14px; }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #c9d5e8; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #a0b0c8; }
         
-        /* ─── Header ─────────────────────── */
-        header {
-            background: var(--navy);
-            padding: 0 1.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 58px;
-            flex-shrink: 0;
-            position: relative;
-            z-index: 100;
-        }
-        header::after {
-            content: '';
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(59,130,246,.5), rgba(20,184,166,.4), transparent);
-        }
+        /* Header y Alertas */
+        header { background: var(--navy); padding: 0 1.75rem; display: flex; align-items: center; justify-content: space-between; height: 58px; flex-shrink: 0; position: relative; z-index: 100; border-bottom: 2px solid var(--teal); }
         .logo { display: flex; align-items: center; gap: .85rem; }
-        .logo-badge {
-            width: 36px; height: 36px;
-            background: linear-gradient(135deg, var(--blue) 0%, var(--teal) 100%);
-            border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'Outfit'; font-weight: 800; font-size: 13px; color: #fff;
-            box-shadow: 0 4px 12px rgba(26,86,219,.35);
-            letter-spacing: .03em;
-        }
-        .logo-text { line-height: 1.2; }
-        .logo-title { font-family: 'Outfit'; font-weight: 700; font-size: .95rem; color: #fff; letter-spacing: .02em; }
+        .logo-badge { width: 36px; height: 36px; background: linear-gradient(135deg, var(--blue) 0%, var(--teal) 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'Outfit'; font-weight: 800; font-size: 13px; color: #fff; box-shadow: 0 4px 12px rgba(26,86,219,.35); }
+        .logo-title { font-family: 'Outfit'; font-weight: 700; font-size: .95rem; color: #fff; }
         .logo-sub { font-size: 9px; color: rgba(255,255,255,.45); font-weight: 500; text-transform: uppercase; letter-spacing: .12em; }
+        
         nav { display: flex; gap: .15rem; align-items: center; }
-        .nav-btn {
-            color: rgba(255,255,255,.45);
-            font-family: 'DM Sans';
-            font-size: .76rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            background: none;
-            padding: .5rem .85rem;
-            border-radius: 8px;
-            transition: all .2s;
-            letter-spacing: .01em;
-            text-transform: uppercase;
-        }
-        .nav-btn:hover { color: rgba(255,255,255,.75); background: rgba(255,255,255,.06); }
+        .nav-btn { color: rgba(255,255,255,.45); font-family: 'DM Sans'; font-size: .76rem; font-weight: 600; cursor: pointer; border: none; background: none; padding: .5rem .85rem; border-radius: 8px; transition: all .2s; text-transform: uppercase; }
+        .nav-btn:hover { color: #fff; background: rgba(255,255,255,.06); }
         .nav-btn.active { color: #fff; background: rgba(59,130,246,.18); }
         
-        /* ─── Layout ─────────────────────── */
-        main { display: flex; flex: 1; height: calc(100vh - 58px); overflow: hidden; }
+        .alert-bell { position: relative; cursor: pointer; margin-left: 1rem; color: #fff; font-size: 1.2rem; }
+        .alert-badge { position: absolute; top: -5px; right: -8px; background: var(--red); color: #fff; font-size: 0.6rem; font-weight: bold; padding: 2px 5px; border-radius: 10px; box-shadow: 0 0 5px rgba(220,38,38,0.5); }
         
-        /* ─── Sidebar ────────────────────── */
-        .sidebar {
-            width: 316px;
-            flex-shrink: 0;
-            background: var(--bg-card);
-            border-right: 1px solid var(--border);
-            overflow-y: auto;
-            padding: 1.4rem 1.25rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-        .section-title {
-            font-family: 'Outfit';
-            font-size: .6rem;
-            font-weight: 700;
-            color: var(--slate-lt);
-            text-transform: uppercase;
-            letter-spacing: .14em;
-            padding-bottom: .6rem;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: .5rem;
-        }
+        /* Layout Principal */
+        main { display: flex; flex: 1; height: calc(100vh - 58px); overflow: hidden; }
+        .sidebar { width: 316px; flex-shrink: 0; background: var(--bg-card); border-right: 1px solid var(--border); overflow-y: auto; padding: 1.4rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+        .section-title { font-family: 'Outfit'; font-size: .6rem; font-weight: 700; color: var(--slate-lt); text-transform: uppercase; letter-spacing: .14em; padding-bottom: .6rem; border-bottom: 1px solid var(--border); margin-bottom: .5rem; }
         .field { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .65rem; }
-        .field label { font-size: .72rem; font-weight: 600; color: var(--navy-3); letter-spacing: .01em; }
-        input, select, textarea {
-            background: #f8fafd;
-            border: 1.5px solid var(--border);
-            border-radius: 9px;
-            padding: .55rem .8rem;
-            font-size: .83rem;
-            font-family: 'DM Sans', sans-serif;
-            color: var(--text);
-            outline: none;
-            transition: border-color .2s, box-shadow .2s, background .2s;
-        }
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--blue-lt);
-            background: #fff;
-            box-shadow: 0 0 0 3px var(--blue-glow);
-        }
-        select {
-            cursor: pointer; appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat; background-position: right .75rem center; padding-right: 2.2rem;
-        }
+        .field label { font-size: .72rem; font-weight: 600; color: var(--navy-3); }
+        input, select, textarea { background: #f8fafd; border: 1.5px solid var(--border); border-radius: 9px; padding: .55rem .8rem; font-size: .83rem; font-family: 'DM Sans', sans-serif; color: var(--text); outline: none; transition: 0.2s; }
+        input:focus, select:focus, textarea:focus { border-color: var(--blue-lt); background: #fff; box-shadow: 0 0 0 3px var(--blue-glow); }
+        select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .75rem center; }
+        
         .etapa-row { display: grid; grid-template-columns: repeat(3,1fr); gap: .4rem; }
-        .etapa-opt {
-            border: 1.5px solid var(--border);
-            border-radius: 9px;
-            padding: .55rem .3rem;
-            text-align: center;
-            cursor: pointer;
-            font-size: .66rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            color: var(--slate);
-            transition: all .2s;
-            background: #f8fafd;
-        }
-        .etapa-opt:hover { border-color: var(--blue-lt); color: var(--blue); }
-        .etapa-opt.active {
-            background: var(--navy);
-            color: #fff;
-            border-color: var(--navy);
-            box-shadow: 0 2px 8px rgba(11,24,41,.25);
-        }
-        .upload-zone {
-            border: 2px dashed var(--border-2);
-            border-radius: var(--radius);
-            padding: .9rem;
-            text-align: center;
-            background: #f8fafd;
-            position: relative;
-            transition: all .2s;
-            cursor: pointer;
-        }
+        .etapa-opt { border: 1.5px solid var(--border); border-radius: 9px; padding: .55rem .3rem; text-align: center; cursor: pointer; font-size: .66rem; font-weight: 700; text-transform: uppercase; color: var(--slate); background: #f8fafd; transition: 0.2s; }
+        .etapa-opt.active { background: var(--navy); color: #fff; border-color: var(--navy); box-shadow: 0 2px 8px rgba(11,24,41,.25); }
+        
+        .upload-zone { border: 2px dashed var(--border-2); border-radius: var(--radius); padding: .9rem; text-align: center; background: #f8fafd; position: relative; cursor: pointer; transition: 0.2s; }
         .upload-zone:hover { border-color: var(--blue-lt); background: #eff6ff; }
         .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-        .upload-zone-label { font-size: .76rem; color: var(--slate); font-weight: 500; }
         
-        .btn {
-            display: flex; align-items: center; justify-content: center; gap: .5rem;
-            border: none; border-radius: var(--radius); cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-weight: 600; font-size: .83rem;
-            padding: .65rem 1.2rem;
-            transition: all .2s;
-            white-space: nowrap;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, var(--navy-2) 0%, var(--navy-3) 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(11,24,41,.2);
-        }
+        .btn { display: flex; align-items: center; justify-content: center; gap: .5rem; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 600; font-size: .83rem; padding: .65rem 1.2rem; transition: 0.2s; }
+        .btn-primary { background: linear-gradient(135deg, var(--navy-2) 0%, var(--navy-3) 100%); color: #fff; box-shadow: 0 2px 8px rgba(11,24,41,.2); }
         .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(11,24,41,.25); }
-        .btn-primary:active { transform: translateY(0); }
-        .btn-teal {
-            background: linear-gradient(135deg, var(--teal) 0%, var(--teal-lt) 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(13,148,136,.25);
-        }
-        .btn-teal:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(13,148,136,.35); }
-        .btn-danger { background: #fff; color: var(--red); border: 1.5px solid #fca5a5; }
-        .btn-danger:hover { background: var(--red); color: #fff; border-color: var(--red); }
+        .btn-teal { background: linear-gradient(135deg, var(--teal) 0%, var(--teal-lt) 100%); color: #fff; box-shadow: 0 2px 8px rgba(13,148,136,.25); }
+        .btn-teal:hover { transform: translateY(-1px); }
         .btn-outline { background: transparent; color: var(--slate); border: 1.5px solid var(--border-2); }
         .btn-outline:hover { border-color: var(--navy-3); color: var(--navy); background: #f8fafd; }
+        .btn-danger { background: #fff; color: var(--red); border: 1.5px solid #fca5a5; }
         
         .panel { flex: 1; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
-        .tabs {
-            display: flex;
-            border-bottom: 1px solid var(--border);
-            background: #fff;
-            padding: 0 1.5rem;
-            flex-shrink: 0;
-            gap: .15rem;
-        }
-        .tab {
-            padding: .9rem 1.1rem;
-            font-family: 'DM Sans';
-            font-size: .76rem;
-            font-weight: 600;
-            color: var(--slate);
-            cursor: pointer;
-            border: none;
-            background: none;
-            border-bottom: 2px solid transparent;
-            display: none;
-            transition: all .2s;
-            margin-bottom: -1px;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-        .tab:hover { color: var(--navy); }
-        .tab.active { display: block; color: var(--navy); border-bottom-color: var(--blue); }
-        
+        .tabs { display: flex; border-bottom: 1px solid var(--border); background: #fff; padding: 0 1.5rem; flex-shrink: 0; gap: .15rem; }
+        .tab { padding: .9rem 1.1rem; font-size: .76rem; font-weight: 600; color: var(--slate); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; text-transform: uppercase; }
+        .tab.active { color: var(--navy); border-bottom-color: var(--blue); }
         .tab-pane { display: none; padding: 1.5rem; overflow-y: auto; height: calc(100vh - 100px); padding-bottom: 4rem; }
         .tab-pane.active { display: block; }
         
-        .result-card {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            box-shadow: var(--shadow-md);
-            margin-bottom: 1rem;
-            animation: fadeUp .35s ease both;
-        }
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(12px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-        .result-header {
-            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-3) 100%);
-            padding: 1rem 1.4rem;
-            color: #fff;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .result-header-label { font-size: .68rem; opacity: .65; font-weight: 500; margin-bottom: .2rem; text-transform: uppercase; letter-spacing: .08em; }
-        .result-header-title { font-family: 'Outfit'; font-weight: 700; font-size: 1rem; line-height: 1.3; }
+        /* Tarjeta de Resultados Pro */
+        .result-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md); margin-bottom: 1rem; animation: fadeUp .35s ease; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .result-header { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-3) 100%); padding: 1rem 1.4rem; color: #fff; display: flex; justify-content: space-between; align-items: center; }
         .result-body { padding: 1.75rem; }
-        
-        .pill { padding: .25rem .7rem; border-radius: 20px; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+        .pill { padding: .25rem .7rem; border-radius: 20px; font-size: .62rem; font-weight: 700; text-transform: uppercase; }
         .pill-blue   { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
         .pill-green  { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
         .pill-orange { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-        .pill-slate  { background: #f1f5f9; color: var(--slate); border: 1px solid #e2e8f0; }
+        .pill-red    { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
         
         .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .75s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner-dark { border-color: rgba(11,24,41,.15); border-top-color: var(--navy); }
         
-        #toast {
-            position: fixed; bottom: 1.5rem; right: 1.5rem;
-            color: #fff; padding: .8rem 1.4rem;
-            border-radius: var(--radius); font-size: .82rem; font-weight: 600;
-            transform: translateY(80px) scale(.95); opacity: 0;
-            transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
-            z-index: 9999; pointer-events: none;
-            box-shadow: var(--shadow-lg);
-        }
-        #toast.show { transform: translateY(0) scale(1); opacity: 1; }
+        #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; color: #fff; padding: .8rem 1.4rem; border-radius: var(--radius); font-size: .82rem; font-weight: 600; transform: translateY(80px); opacity: 0; transition: 0.3s; z-index: 9999; box-shadow: var(--shadow-lg); }
+        #toast.show { transform: translateY(0); opacity: 1; }
         
-        .history-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .8rem; background: #fff; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 1rem; }
-        .history-table th { background: var(--navy); color: rgba(255,255,255,.85); padding: .85rem 1rem; text-align: left; text-transform: uppercase; letter-spacing: .07em; font-size: .68rem; font-weight: 700; }
-        .history-table th:first-child { border-radius: var(--radius-lg) 0 0 0; }
-        .history-table th:last-child  { border-radius: 0 var(--radius-lg) 0 0; }
-        .history-table td { padding: .85rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: middle; }
-        .history-table tr:last-child td { border-bottom: none; }
-        .history-table tbody tr { transition: background .15s; }
-        .history-table tbody tr:hover td { background: #f8fafd; }
+        /* Tablas e Historial Pro */
+        .filter-bar { display: flex; gap: 1rem; background: #fff; padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1rem; box-shadow: var(--shadow); }
+        .history-table { width: 100%; border-collapse: collapse; font-size: .8rem; background: #fff; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); text-align: left; }
+        .history-table th { background: var(--navy); color: rgba(255,255,255,.85); padding: .85rem 1rem; text-transform: uppercase; font-size: .68rem; font-weight: 700; }
+        .history-table td { padding: .85rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-2); }
+        .history-table tr:hover td { background: #f8fafd; }
+        .dias-badge { font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; }
+        .dias-critico { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .dias-medio { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .dias-ok { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
         
+        /* Dashboards Chart.js */
         .kpi-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.5rem; }
-        .kpi-card {
-            background: #fff; padding: 1.4rem 1.5rem;
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            transition: transform .2s, box-shadow .2s;
-            position: relative; overflow: hidden;
-        }
-        .kpi-card::before {
-            content: '';
-            position: absolute; top: 0; left: 0;
-            width: 4px; height: 100%;
-        }
-        .kpi-card.blue::before { background: linear-gradient(180deg, var(--blue) 0%, var(--blue-lt) 100%); }
-        .kpi-card.red::before  { background: linear-gradient(180deg, var(--red) 0%, #f87171 100%); }
-        .kpi-card.grn::before  { background: linear-gradient(180deg, var(--green) 0%, var(--green-lt) 100%); }
-        .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-        .kpi-title { font-size: .68rem; color: var(--slate); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .5rem; }
-        .kpi-value { font-family: 'Outfit'; font-size: 1.9rem; font-weight: 800; color: var(--navy); line-height: 1.1; }
-        .kpi-sub { font-size: .7rem; color: var(--slate-lt); margin-top: .4rem; }
+        .kpi-card { background: #fff; padding: 1.4rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; overflow: hidden; }
+        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+        .kpi-card.blue::before { background: var(--blue); } .kpi-card.red::before { background: var(--red); } .kpi-card.grn::before { background: var(--green); }
+        .kpi-title { font-size: .68rem; color: var(--slate); font-weight: 700; text-transform: uppercase; }
+        .kpi-value { font-family: 'Outfit'; font-size: 1.9rem; font-weight: 800; color: var(--navy); line-height: 1.1; margin-top: 0.3rem;}
+        .chart-container { background: #fff; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; height: 300px; width: 100%; margin-bottom: 1.5rem;}
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         
-        .list-card { background: #fff; padding: 1.25rem 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow); flex: 1; margin-bottom: 1rem; }
-        .list-item { display: flex; justify-content: space-between; align-items: center; padding: .55rem 0; border-bottom: 1px solid var(--border); font-size: .82rem; }
-        .list-item:last-child { border-bottom: none; }
-        
-        .excel-table-wrapper { width: 100%; overflow-x: auto; overflow-y: auto; max-height: 240px; margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+        /* Lotes Excel */
+        .excel-table-wrapper { width: 100%; overflow: auto; max-height: 240px; margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
         .excel-table { width: 100%; border-collapse: collapse; font-size: .75rem; white-space: nowrap; }
-        .excel-table th { background: var(--navy); color: rgba(255,255,255,.8); padding: .5rem .8rem; text-align: left; position: sticky; top: 0; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
-        .excel-table td { padding: .4rem .8rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); }
-        .excel-table tr:hover td { background: #f1f5fb; }
-        
-        .paste-box {
-            width: 100%; padding: 1.25rem;
-            border: 2px dashed #93c5fd;
-            border-radius: var(--radius);
-            text-align: center;
-            background: linear-gradient(135deg, #eff6ff 0%, #f0fdfa 100%);
-            color: var(--blue);
-            font-family: 'DM Sans';
-            font-weight: 600; cursor: pointer; outline: none;
-            transition: all .2s; font-size: .88rem;
-        }
-        .paste-box:focus { background: #dbeafe; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-glow); }
-        
-        .lote-item {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            border-left: 4px solid var(--green);
-            overflow: hidden;
-            margin-bottom: .75rem;
-            box-shadow: var(--shadow);
-            transition: box-shadow .2s;
-        }
-        .lote-item:hover { box-shadow: var(--shadow-md); }
-        .lote-item-header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem 1.25rem; cursor: pointer; background: #fff;
-            transition: background .15s;
-        }
-        .lote-item-header:hover { background: #f8fafd; }
-        .lote-item-body { display: none; padding: 1.25rem; border-top: 1px solid var(--border); background: #f8fafd; }
-        
-        .progress-track { height: 6px; background: #e2e8f0; border-radius: 6px; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--blue-lt)); border-radius: 6px; transition: width .3s ease; }
-        
-        .section-card {
-            background: #fff; padding: 1.5rem;
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            margin-bottom: 1.5rem;
-        }
+        .excel-table th { background: var(--navy); color: #fff; padding: .5rem; position: sticky; top: 0; }
+        .excel-table td { padding: .4rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+        .paste-box { width: 100%; padding: 1.25rem; border: 2px dashed var(--blue-lt); border-radius: var(--radius); text-align: center; background: #eff6ff; color: var(--blue); font-weight: 600; cursor: pointer; outline: none; }
         
         .empty-state { text-align: center; padding: 5rem 2rem; color: var(--slate-lt); }
         .empty-state .icon { font-size: 2.5rem; margin-bottom: 1rem; opacity: .5; }
-        .empty-state p { font-size: .88rem; line-height: 1.6; }
     </style>
 </head>
 <body>
@@ -386,26 +133,30 @@
 <header>
     <div class="logo">
         <div class="logo-badge">HUS</div>
-        <div class="logo-text">
-            <div class="logo-title">Motor de Glosas IA</div>
+        <div>
+            <div class="logo-title">Motor de Glosas IA <span style="font-size:10px; background:var(--teal); padding:2px 6px; border-radius:6px; margin-left:5px;">v2.0 PRO</span></div>
             <div class="logo-sub">ESE Hospital Universitario de Santander</div>
         </div>
     </div>
     <nav>
         <button class="nav-btn active" id="nav-analizar" onclick="switchNav('analizar')">Individual</button>
-        <button class="nav-btn" id="nav-lote" onclick="switchNav('lote')">Cargue Masivo</button>
+        <button class="nav-btn" id="nav-lote" onclick="switchNav('lote')">Masivo (Lotes)</button>
         <button class="nav-btn" id="nav-historial" onclick="switchNav('historial')">Historial</button>
-        <button class="nav-btn" id="nav-analytics" onclick="switchNav('analytics')">Estadísticas</button>
-        <button class="nav-btn" id="nav-contratos" onclick="switchNav('contratos')">Contratos</button>
+        <button class="nav-btn" id="nav-analytics" onclick="switchNav('analytics')">Dashboards</button>
+        <button class="nav-btn" id="nav-contratos" onclick="switchNav('contratos')">Configuración</button>
+        
+        <div class="alert-bell" onclick="switchNav('historial')" title="Glosas por vencer en los próximos 5 días">
+            🔔<span id="alert-badge" class="alert-badge" style="display:none;">0</span>
+        </div>
     </nav>
 </header>
 
 <main>
     <aside class="sidebar">
         <div>
-            <div class="section-title">Datos de la Glosa</div>
+            <div class="section-title">Datos de la Factura</div>
             <div class="field">
-                <label for="eps">EPS / Pagador</label>
+                <label>EPS / Pagador</label>
                 <select id="eps"></select>
             </div>
             <div class="field">
@@ -417,156 +168,102 @@
                 </div>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:.5rem;">
-                <div class="field">
-                    <label for="fecha_radicacion">F. Radicación</label>
-                    <input type="date" id="fecha_radicacion">
-                </div>
-                <div class="field">
-                    <label for="fecha_recepcion">F. Recepción</label>
-                    <input type="date" id="fecha_recepcion">
-                </div>
+                <div class="field"><label>F. Radicación</label><input type="date" id="fecha_radicacion"></div>
+                <div class="field"><label>F. Recepción</label><input type="date" id="fecha_recepcion"></div>
             </div>
             <div class="field">
-                <label for="valor_aceptado">Valor Aceptado (si aplica)</label>
+                <label>Valor Aceptado (Si aplica)</label>
                 <input type="text" id="valor_aceptado" placeholder="$ 0" oninput="fmtCurrency(this)">
             </div>
         </div>
         
         <div class="field" id="contenedor-texto">
-            <label for="tabla_excel">Descripción de la Glosa</label>
-            <textarea id="tabla_excel" style="min-height:110px; resize:vertical;" placeholder="Pega aquí el contenido de la glosa individual..."></textarea>
+            <label>Descripción de la Glosa (Texto / Tabla)</label>
+            <textarea id="tabla_excel" style="min-height:110px; resize:vertical;" placeholder="Pega aquí el motivo o la fila del Excel..."></textarea>
         </div>
         
         <div class="field" id="contenedor-archivos">
-            <label>Soportes (Opcional)</label>
+            <label>Soportes Clínicos (NUEVO: Lector Tablas PDF)</label>
             <div class="upload-zone">
                 <input type="file" id="archivos" multiple accept=".pdf">
-                <div class="upload-zone-label">📎 Adjuntar PDFs (Epicrisis)</div>
+                <div class="upload-zone-label" id="file-lbl">📎 Adjuntar PDFs (Epicrisis)</div>
             </div>
         </div>
         
         <div style="display:flex; flex-direction:column; gap:.5rem; margin-top:auto;" id="botones-individual">
-            <button class="btn btn-primary" id="btnAnalizar" onclick="analizarGlosa()" style="width:100%;">Analizar Glosa</button>
+            <button class="btn btn-primary" id="btnAnalizar" onclick="analizarGlosa()" style="width:100%;">🚀 Analizar con IA</button>
             <button class="btn btn-outline" style="font-size:.72rem; padding:.4rem;" onclick="limpiarTodo()">Limpiar todo</button>
         </div>
     </aside>
 
     <div class="panel">
         <div class="tabs">
-            <button class="tab active" id="tab-analizar">Resultado Legal</button>
-            <button class="tab" id="tab-lote">Cargue Masivo</button>
-            <button class="tab" id="tab-historial">Historial</button>
-            <button class="tab" id="tab-analytics">Dashboard</button>
-            <button class="tab" id="tab-contratos">Contratos</button>
+            <button class="tab active" id="tab-analizar">Dictamen Técnico-Legal</button>
+            <button class="tab" id="tab-lote">Cargue Masivo (Excel)</button>
+            <button class="tab" id="tab-historial">Buscador Historial</button>
+            <button class="tab" id="tab-analytics">Analytics Pro</button>
+            <button class="tab" id="tab-contratos">Tarifarios</button>
         </div>
 
         <div class="tab-pane active" id="pane-analizar">
             <div id="result-content">
-                <div class="empty-state">
-                    <div class="icon">⚖️</div>
-                    <p>Completa los datos en el panel lateral<br>y haz clic en <strong>Analizar Glosa</strong> para generar<br>la defensa técnico-legal.</p>
-                </div>
+                <div class="empty-state"><div class="icon">⚖️</div><p>Completa los datos en el panel lateral<br>y haz clic en <strong>Analizar con IA</strong>.</p></div>
             </div>
             <div id="result-actions" style="display:none; gap:.75rem; margin-top:1rem;">
-                <button class="btn btn-teal" onclick="descargarPDF()">Descargar PDF</button>
-                <button class="btn btn-primary" onclick="copiarTexto()">Copiar Texto</button>
+                <button class="btn btn-teal" onclick="descargarPDF()">📄 Generar Oficio PDF HUS</button>
+                <button class="btn btn-primary" onclick="copiarTexto()">📋 Copiar al Portapapeles</button>
             </div>
         </div>
 
         <div class="tab-pane" id="pane-lote">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                <div>
-                    <h3 style="font-family:'Outfit'; font-weight:700; color:var(--navy); font-size:1.1rem;">Procesamiento Masivo</h3>
-                    <p style="font-size:.78rem; color:var(--slate-lt); margin-top:.2rem;">Configura EPS, Etapa y Fechas en el panel lateral antes de procesar.</p>
-                </div>
+            <div style="margin-bottom:1rem;">
+                <h3 style="font-family:'Outfit'; color:var(--navy); font-size:1.1rem;">Motor de Procesamiento en Paralelo (Batch)</h3>
+                <p style="font-size:.78rem; color:var(--slate-lt);">Configura EPS y Fechas lateralmente. Luego pega tu Excel aquí.</p>
             </div>
-            
-            <div class="section-card">
-                <input type="text" id="paste-box" class="paste-box" placeholder="📋 Haz clic aquí y presiona Ctrl+V para pegar desde Excel..." autocomplete="off">
-                <div id="lote-table-container" class="excel-table-wrapper" style="display:none;">
-                    <table class="excel-table">
-                        <thead>
-                            <tr>
-                                <th>Entidad</th><th>Factura</th><th>Valor Glosado</th><th>Cód. Glosa</th>
-                                <th>Concepto</th><th>CUPS/CUMS</th><th>Servicio</th><th>Observación EPS</th>
-                            </tr>
-                        </thead>
-                        <tbody id="excel-tbody"></tbody>
-                    </table>
-                </div>
-                
-                <div style="margin-top:1.25rem; display:flex; align-items:center; gap:1rem;">
-                    <button class="btn btn-primary" id="btn-procesar-lote" onclick="iniciarLote()" disabled>🚀 Iniciar Cargue Masivo</button>
-                    <div id="lote-status" style="font-size:.82rem; font-weight:600; color:var(--navy); display:none;">
-                        Procesando: <span id="lote-count">0</span> / <span id="lote-total">0</span>
-                    </div>
-                </div>
-                <div id="lote-progress-container" style="margin-top:.85rem; display:none;">
-                    <div class="progress-track"><div class="progress-fill" id="lote-progress-bar" style="width:0%"></div></div>
-                </div>
+            <input type="text" id="paste-box" class="paste-box" placeholder="📋 Ctrl+V para pegar filas desde Excel..." autocomplete="off">
+            <div id="lote-table-container" class="excel-table-wrapper" style="display:none;">
+                <table class="excel-table"><tbody id="excel-tbody"></tbody></table>
             </div>
-            
-            <div id="lote-resultados" style="display:none;">
-                <h4 style="font-family:'Outfit'; font-weight:700; color:var(--navy); margin-bottom:.85rem; font-size:.9rem; text-transform:uppercase; letter-spacing:.06em;">Resultados del Lote</h4>
-                <div id="lote-lista-resultados" style="display:flex; flex-direction:column;"></div>
+            <div style="margin-top:1.25rem; display:flex; align-items:center; gap:1rem;">
+                <button class="btn btn-primary" id="btn-procesar-lote" onclick="iniciarLote()" disabled>🚀 Iniciar Lote</button>
+                <div id="lote-status" style="font-weight:600; color:var(--navy); display:none;">Progreso: <span id="lote-count">0</span> / <span id="lote-total">0</span></div>
             </div>
+            <div id="lote-progress-container" style="margin-top:1rem; height:8px; background:#e2e8f0; border-radius:4px; display:none;"><div id="lote-progress-bar" style="height:100%; width:0%; background:var(--teal); transition:0.3s;"></div></div>
+            <div id="lote-resultados" style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.5rem;"></div>
         </div>
 
         <div class="tab-pane" id="pane-historial">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                <h3 style="font-family:'Outfit'; font-weight:700; color:var(--navy); font-size:1.1rem;">Registro de Auditoría</h3>
-                <div style="display:flex; gap:.5rem;">
-                    <button class="btn btn-teal" style="padding:.4rem 1rem; font-size:.78rem;" onclick="exportarExcel()">📥 Exportar CSV</button>
-                    <button class="btn btn-outline" style="padding:.4rem 1rem; font-size:.78rem;" onclick="cargarHistorial()">↻ Actualizar</button>
-                </div>
+            <div class="filter-bar">
+                <input type="text" id="hist-search" placeholder="🔍 Buscar paciente, glosa o texto..." style="flex:1;">
+                <select id="hist-eps" style="width:200px;"><option value="">Todas las EPS</option></select>
+                <button class="btn btn-primary" onclick="cargarHistorial()">Buscar</button>
+                <button class="btn btn-teal" onclick="exportarExcel()">📥 Exportar Reporte</button>
             </div>
-            <div id="historial-content">
-                <div style="text-align:center; padding:3rem;"><div class="spinner spinner-dark" style="margin:auto;"></div></div>
-            </div>
+            <div id="historial-content" style="overflow-x:auto;"></div>
         </div>
 
         <div class="tab-pane" id="pane-analytics">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
-                <h3 style="font-family:'Outfit'; font-weight:700; color:var(--navy); font-size:1.1rem;">Indicadores del Mes Actual</h3>
-                <button class="btn btn-outline" style="padding:.4rem 1rem; font-size:.78rem;" onclick="cargarAnalytics()">↻ Actualizar</button>
+            <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
+                <h3 style="font-family:'Outfit'; color:var(--navy);">Dashboard de Gestión</h3>
+                <button class="btn btn-outline" onclick="cargarAnalytics()">↻ Actualizar Data</button>
             </div>
-            <div id="analytics-content">
-                <div style="text-align:center; padding:3rem;"><div class="spinner spinner-dark" style="margin:auto;"></div></div>
+            <div id="kpi-container"></div>
+            <div class="chart-grid">
+                <div class="chart-container"><canvas id="chartEps"></canvas></div>
+                <div class="chart-container"><canvas id="chartCodigos"></canvas></div>
             </div>
         </div>
 
         <div class="tab-pane" id="pane-contratos">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
-                <h3 style="font-family:'Outfit'; font-weight:700; color:var(--navy); font-size:1.1rem;">Gestión de Tarifas y Contratos EPS</h3>
-            </div>
-            
-            <div style="display:grid; grid-template-columns:290px 1fr; gap:1.5rem;">
-                <div class="section-card" style="height:fit-content;">
-                    <h4 style="font-size:.85rem; font-weight:700; margin-bottom:1rem; color:var(--navy); font-family:'Outfit';">Agregar / Editar EPS</h4>
-                    <div class="field">
-                        <label for="cfg-eps">Nombre de la EPS</label>
-                        <input type="text" id="cfg-eps" placeholder="EJ: SANITAS">
-                    </div>
-                    <div class="field">
-                        <label for="cfg-detalles">Detalle del Contrato</label>
-                        <textarea id="cfg-detalles" style="min-height:140px; font-size:.78rem;" placeholder="CONTRATO 001. TARIFA: SOAT -15%. OBS: Excluye medicamentos."></textarea>
-                    </div>
-                    <button class="btn btn-primary" style="width:100%;" onclick="guardarContrato()">💾 Guardar Contrato</button>
+            <div style="display:grid; grid-template-columns:300px 1fr; gap:1.5rem;">
+                <div style="background:#fff; padding:1.5rem; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow); height:fit-content;">
+                    <h4 style="font-family:'Outfit'; color:var(--navy); margin-bottom:1rem;">Nuevo Contrato</h4>
+                    <div class="field"><input type="text" id="cfg-eps" placeholder="Nombre EPS"></div>
+                    <div class="field"><textarea id="cfg-detalles" style="min-height:120px;" placeholder="Detalles de tarifas y acuerdos..."></textarea></div>
+                    <button class="btn btn-primary" style="width:100%;" onclick="guardarContrato()">💾 Guardar</button>
                 </div>
-                
-                <div style="background:#fff; border-radius:var(--radius-lg); border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden;">
-                    <table class="history-table" style="margin:0; box-shadow:none;">
-                        <thead>
-                            <tr>
-                                <th>Entidad EPS</th>
-                                <th>Detalle del Contrato / Tarifas</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-contratos">
-                            <tr><td colspan="3" style="text-align:center; color:var(--slate-lt); padding:2rem;">Cargando contratos...</td></tr>
-                        </tbody>
-                    </table>
+                <div style="overflow:auto; max-height:calc(100vh - 200px); border-radius:var(--radius-lg); box-shadow:var(--shadow);">
+                    <table class="history-table"><tbody id="tabla-contratos"></tbody></table>
                 </div>
             </div>
         </div>
@@ -576,33 +273,35 @@
 <div id="toast"></div>
 
 <script>
+    // 🔒 TOKEN DE SEGURIDAD (Se inyecta en cada petición al backend)
+    const AUTH_TOKEN = "HUS2026"; 
+    const headersJSON = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AUTH_TOKEN}` };
+    const headersAuth = { 'Authorization': `Bearer ${AUTH_TOKEN}` };
+
     let etapaActual = 'INICIAL';
     let dataGuardada = null;
     window.loteRawData = [];
+    
+    // Variables globales para destruir gráficos de Chart.js y que no se superpongan
+    let chartEpsInstance = null;
+    let chartCodigosInstance = null;
 
-    window.onload = function() { cargarContratosDropdown(); };
+    window.onload = function() { 
+        cargarContratosDropdown(); 
+        cargarAlertas(); // Verifica vencimientos al abrir la app
+    };
 
     function mostrarToast(msg, tipo = '') {
         const t = document.getElementById('toast');
         t.innerText = msg;
         t.style.background = tipo === 'success' ? '#15803d' : tipo === 'error' ? '#dc2626' : '#0b1829';
         t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3200);
+        setTimeout(() => t.classList.remove('show'), 3000);
     }
 
     function fmtCurrency(input) {
         const raw = input.value.replace(/\D/g, '');
-        if (!raw) { input.value = ''; return; }
-        input.value = '$ ' + parseInt(raw).toLocaleString('es-CO');
-    }
-
-    function formaterMoneda(num) {
-        if (!num || num === 'N/A') return 'N/A';
-        const clean = String(num).replace(/[^\d.]/g, '');
-        if (!clean) return num;
-        const valor = parseFloat(clean);
-        if (isNaN(valor)) return num;
-        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor);
+        input.value = raw ? '$ ' + parseInt(raw).toLocaleString('es-CO') : '';
     }
 
     function setEtapa(el, val) {
@@ -612,114 +311,104 @@
     }
 
     function limpiarTodo() {
-        document.getElementById('eps').selectedIndex = 0;
-        document.getElementById('fecha_radicacion').value = '';
-        document.getElementById('fecha_recepcion').value = '';
-        document.getElementById('valor_aceptado').value = '';
-        document.getElementById('tabla_excel').value = '';
+        document.querySelectorAll('input[type="date"], input[type="text"], textarea').forEach(e => e.value = '');
         document.getElementById('archivos').value = '';
-        
-        document.getElementById('result-content').innerHTML = `<div class="empty-state"><div class="icon">⚖️</div><p>Completa los datos en el panel lateral<br>y haz clic en <strong>Analizar Glosa</strong>.</p></div>`;
+        document.getElementById('file-lbl').innerHTML = '📎 Adjuntar PDFs (Epicrisis)';
+        document.getElementById('result-content').innerHTML = `<div class="empty-state"><div class="icon">⚖️</div><p>Listo para análisis.</p></div>`;
         document.getElementById('result-actions').style.display = 'none';
         dataGuardada = null;
-        
-        const lbl = document.querySelector('.upload-zone-label');
-        lbl.innerHTML = '📎 Adjuntar PDFs (Epicrisis)';
-        lbl.style.color = '';
-        document.querySelector('.upload-zone').style.borderColor = '';
-        document.querySelector('.upload-zone').style.background = '';
     }
 
     function switchNav(seccion) {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-        
+        document.querySelectorAll('.nav-btn, .tab, .tab-pane').forEach(e => e.classList.remove('active'));
         document.getElementById('nav-' + seccion).classList.add('active');
         document.getElementById('tab-' + seccion).classList.add('active');
         document.getElementById('pane-' + seccion).classList.add('active');
         
-        const showSidebar = !['lote', 'contratos'].includes(seccion);
-        document.getElementById('contenedor-texto').style.display   = showSidebar ? 'flex' : 'none';
-        document.getElementById('contenedor-archivos').style.display = showSidebar ? 'flex' : 'none';
-        document.getElementById('botones-individual').style.display  = showSidebar ? 'flex' : 'none';
-        
+        const showSidebar = ['analizar', 'historial', 'analytics'].includes(seccion) ? 'flex' : 'none';
+        if(seccion === 'lote' || seccion === 'contratos') {
+            document.getElementById('contenedor-texto').style.display = 'none';
+            document.getElementById('contenedor-archivos').style.display = 'none';
+            document.getElementById('botones-individual').style.display = 'none';
+        } else {
+            document.getElementById('contenedor-texto').style.display = 'flex';
+            document.getElementById('contenedor-archivos').style.display = 'flex';
+            document.getElementById('botones-individual').style.display = 'flex';
+        }
+
         if (seccion === 'historial') cargarHistorial();
         if (seccion === 'analytics') cargarAnalytics();
         if (seccion === 'contratos') cargarTablaContratos();
     }
 
+    // ─── API CALLS (Con Seguridad Bearer Token) ───
+
+    async function cargarAlertas() {
+        try {
+            const res = await fetch('/alertas', { headers: headersAuth });
+            const data = await res.json();
+            const badge = document.getElementById('alert-badge');
+            if (data.length > 0) {
+                badge.innerText = data.length;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch(e) {}
+    }
+
     async function cargarContratosDropdown() {
         try {
-            const res = await fetch('/contratos');
+            const res = await fetch('/contratos', { headers: headersAuth });
             const data = await res.json();
-            const select = document.getElementById('eps');
-            select.innerHTML = '';
-            data.forEach(c => { select.innerHTML += `<option value="${c.eps}">${c.eps}</option>`; });
-        } catch(e) { console.error("Error contratos:", e); }
+            const selects = [document.getElementById('eps'), document.getElementById('hist-eps')];
+            selects.forEach(s => {
+                s.innerHTML = s.id === 'hist-eps' ? '<option value="">Todas las EPS</option>' : '';
+                data.forEach(c => s.innerHTML += `<option value="${c.eps}">${c.eps}</option>`);
+            });
+        } catch(e) {}
     }
 
     async function cargarTablaContratos() {
-        const tbody = document.getElementById('tabla-contratos');
         try {
-            const res = await fetch('/contratos');
+            const res = await fetch('/contratos', { headers: headersAuth });
             const data = await res.json();
-            tbody.innerHTML = '';
+            const tbody = document.getElementById('tabla-contratos');
+            tbody.innerHTML = `<tr><th style="background:var(--navy);color:white;padding:10px;">EPS</th><th style="background:var(--navy);color:white;">Detalles</th><th style="background:var(--navy);color:white;">Acción</th></tr>`;
             data.forEach(c => {
                 const se = c.eps.replace(/"/g, '&quot;');
-                const sd = c.detalles.replace(/"/g, '&quot;').replace(/\n/g, '\\n');
                 tbody.innerHTML += `<tr>
-                    <td><strong>${c.eps}</strong></td>
-                    <td style="font-size:.74rem; white-space:pre-wrap; color:var(--slate); max-width:380px;">${c.detalles}</td>
-                    <td><div style="display:flex; gap:.4rem;">
-                        <button class="btn btn-outline" style="padding:.3rem .65rem; font-size:.7rem;" onclick="prepararEdicion('${se}','${sd}')">✎</button>
-                        <button class="btn btn-danger" style="padding:.3rem .65rem; font-size:.7rem;" onclick="eliminarContrato('${se}')">🗑️</button>
-                    </div></td></tr>`;
+                    <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${c.eps}</strong></td>
+                    <td style="font-size:12px; border-bottom:1px solid #eee; max-width:300px;">${c.detalles}</td>
+                    <td style="border-bottom:1px solid #eee;"><button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="borrarContrato('${se}')">Borrar</button></td></tr>`;
             });
-        } catch(e) { tbody.innerHTML = `<tr><td colspan="3" style="color:red; text-align:center;">Error cargando contratos.</td></tr>`; }
-    }
-
-    function prepararEdicion(eps, detalles) {
-        document.getElementById('cfg-eps').value = eps;
-        document.getElementById('cfg-detalles').value = detalles;
-        mostrarToast("Contrato listo para editar", "success");
+        } catch(e) {}
     }
 
     async function guardarContrato() {
-        const eps = document.getElementById('cfg-eps').value.trim();
-        const detalles = document.getElementById('cfg-detalles').value.trim();
-        if (!eps || !detalles) return alert("Por favor llena ambos campos.");
-        try {
-            const res = await fetch('/contratos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eps, detalles }) });
-            if (!res.ok) throw new Error();
-            mostrarToast("Contrato guardado", "success");
-            document.getElementById('cfg-eps').value = '';
-            document.getElementById('cfg-detalles').value = '';
-            cargarTablaContratos(); cargarContratosDropdown();
-        } catch(e) { mostrarToast("Error al guardar", "error"); }
+        const eps = document.getElementById('cfg-eps').value;
+        const detalles = document.getElementById('cfg-detalles').value;
+        if (!eps || !detalles) return;
+        await fetch('/contratos', { method: 'POST', headers: headersJSON, body: JSON.stringify({eps, detalles}) });
+        mostrarToast("Guardado", "success");
+        cargarTablaContratos(); cargarContratosDropdown();
     }
 
-    async function eliminarContrato(eps) {
-        if (eps.includes("OTRA")) return alert("No puedes eliminar la opción por defecto.");
-        if (!confirm(`¿Eliminar el contrato de ${eps}?`)) return;
-        try {
-            const res = await fetch(`/contratos/${eps}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error();
-            mostrarToast("Contrato eliminado", "success");
+    async function borrarContrato(eps) {
+        if(confirm("¿Borrar?")) {
+            await fetch(`/contratos/${eps}`, { method: 'DELETE', headers: headersAuth });
             cargarTablaContratos(); cargarContratosDropdown();
-        } catch(e) { mostrarToast("Error al eliminar", "error"); }
+        }
     }
 
     async function analizarGlosa() {
-        const btn = document.getElementById('btnAnalizar');
         const text = document.getElementById('tabla_excel').value;
+        if (!text) return alert("Pega el texto a analizar.");
         
-        if (!text) return alert("Por favor, pega el contenido de la glosa.");
+        const btn = document.getElementById('btnAnalizar');
+        btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Analizando (Llama-70B)...';
         
-        btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div> Analizando...';
-        
-        const fd = new FormData();
+        const fd = new FormData(); // FormData establece su propio Content-Type
         fd.append('eps', document.getElementById('eps').value);
         fd.append('etapa', etapaActual);
         fd.append('fecha_radicacion', document.getElementById('fecha_radicacion').value);
@@ -729,241 +418,221 @@
         for (let f of document.getElementById('archivos').files) fd.append('archivos', f);
         
         try {
-            const res = await fetch('/analizar', { method: 'POST', body: fd });
+            const res = await fetch('/analizar', { method: 'POST', headers: headersAuth, body: fd });
             if (!res.ok) throw new Error();
             const data = await res.json();
             dataGuardada = { eps: document.getElementById('eps').value, ...data };
             renderResult(data);
+            cargarAlertas();
         } catch(e) { 
-            mostrarToast("Error de conexión al servidor.", "error"); 
+            mostrarToast("Error API / Timeout", "error"); 
         } finally { 
-            btn.disabled = false; 
-            btn.innerText = "Analizar Glosa"; 
+            btn.disabled = false; btn.innerText = "🚀 Analizar con IA"; 
         }
     }
 
     function renderResult(data) {
+        // Indicador de confianza visual
+        const colorConfianza = data.score > 80 ? 'green' : (data.score > 50 ? 'orange' : 'red');
+        
         document.getElementById('result-content').innerHTML = `
             <div class="result-card">
                 <div class="result-header">
                     <div>
-                        <div class="result-header-label">${data.tipo}</div>
-                        <div class="result-header-title">${data.resumen}</div>
+                        <div style="font-size:11px; opacity:0.8;">${data.tipo}</div>
+                        <div style="font-size:16px; font-weight:bold;">${data.resumen}</div>
                     </div>
-                    <span class="pill pill-blue">${data.codigo_glosa}</span>
+                    <div style="text-align:right;">
+                        <span class="pill pill-blue" style="font-size:14px;">${data.codigo_glosa}</span>
+                        <div style="font-size:10px; margin-top:5px; color:${colorConfianza}; background:white; border-radius:10px; padding:2px; text-align:center; font-weight:bold;">
+                            Confianza IA: ${data.score}%
+                        </div>
+                    </div>
                 </div>
                 <div class="result-body">
-                    <div style="display:inline-block; padding:.45rem 1rem; border-radius:8px; margin-bottom:1.5rem; font-size:.72rem; font-weight:700; color:#fff;" class="${data.color_tiempo}">${data.mensaje_tiempo}</div>
-                    <div style="font-size:.88rem; line-height:1.75; color:var(--text-2);">${data.dictamen}</div>
+                    <div style="display:inline-block; padding:4px 10px; border-radius:6px; margin-bottom:15px; font-size:11px; font-weight:bold; color:#fff;" class="${data.color_tiempo}">${data.mensaje_tiempo}</div>
+                    <div style="font-size:13px; line-height:1.8; color:var(--text-2);">${data.dictamen}</div>
                 </div>
             </div>`;
         document.getElementById('result-actions').style.display = 'flex';
     }
 
+    async function descargarPDF() {
+        if (!dataGuardada) return;
+        const btn = document.querySelector('.btn-teal');
+        btn.innerHTML = '<div class="spinner"></div> Generando PDF...';
+        try {
+            const res = await fetch('/descargar-pdf', { 
+                method: 'POST', headers: headersJSON, 
+                body: JSON.stringify({ eps: dataGuardada.eps, resumen: dataGuardada.resumen, dictamen: dataGuardada.dictamen, codigo: dataGuardada.codigo_glosa, valor: dataGuardada.valor_objetado }) 
+            });
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `ACMG-${dataGuardada.codigo_glosa}.pdf`; a.click();
+        } catch(e) { mostrarToast("Error PDF", "error"); }
+        finally { btn.innerText = "📄 Generar Oficio PDF HUS"; }
+    }
+
+    function copiarTexto() {
+        if (!dataGuardada) return;
+        const el = document.createElement('div'); el.innerHTML = dataGuardada.dictamen;
+        navigator.clipboard.writeText(el.innerText).then(() => mostrarToast('✓ Copiado', 'success'));
+    }
+
+    // ─── CARGUE MASIVO LOTE ───
     document.getElementById('paste-box').addEventListener('paste', function(e) {
         e.preventDefault();
-        const paste = (e.clipboardData || window.clipboardData).getData('text');
-        const rows = paste.split('\n').filter(r => r.trim().length > 5);
-        if (rows.length === 0) return mostrarToast('No se detectaron datos válidos', 'error');
-        if (rows.length > 50) return mostrarToast('Máximo 50 filas por lote', 'error');
-        
+        const rows = (e.clipboardData || window.clipboardData).getData('text').split('\n').filter(r => r.trim().length > 5);
+        if(rows.length === 0) return;
         window.loteRawData = rows;
-        const tbody = document.getElementById('excel-tbody');
-        tbody.innerHTML = '';
-        
-        rows.forEach(row => {
-            const cols = row.split('\t');
-            while (cols.length < 8) cols.push('');
+        const tbody = document.getElementById('excel-tbody'); tbody.innerHTML = '';
+        rows.forEach(r => {
             const tr = document.createElement('tr');
-            for (let i = 0; i < 8; i++) {
-                const td = document.createElement('td');
-                td.innerText = cols[i]; td.title = cols[i]; tr.appendChild(td);
-            }
+            r.split('\t').forEach(c => { const td = document.createElement('td'); td.innerText=c; tr.appendChild(td); });
             tbody.appendChild(tr);
         });
-        
         document.getElementById('lote-table-container').style.display = 'block';
         document.getElementById('btn-procesar-lote').disabled = false;
-        mostrarToast(`${rows.length} filas cargadas desde Excel`, 'success');
+        mostrarToast(`${rows.length} filas detectadas`, 'success');
         this.value = '';
     });
 
     async function iniciarLote() {
         const lineas = window.loteRawData;
-        if (!lineas || lineas.length === 0) return alert("Pega primero los datos de Excel.");
-        
         const btn = document.getElementById('btn-procesar-lote');
-        btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div> Procesando...';
+        btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Procesando...';
         
         document.getElementById('lote-status').style.display = 'block';
         document.getElementById('lote-progress-container').style.display = 'block';
-        document.getElementById('lote-resultados').style.display = 'block';
-        document.getElementById('lote-lista-resultados').innerHTML = '';
+        const resBox = document.getElementById('lote-resultados'); resBox.innerHTML = '';
         document.getElementById('lote-total').innerText = lineas.length;
         
         let exitos = 0;
-        
         for (let i = 0; i < lineas.length; i++) {
             document.getElementById('lote-count').innerText = i + 1;
             document.getElementById('lote-progress-bar').style.width = Math.round((i / lineas.length) * 100) + '%';
             
             const fd = new FormData();
-            fd.append('eps', document.getElementById('eps').value);
-            fd.append('etapa', etapaActual);
+            fd.append('eps', document.getElementById('eps').value); fd.append('etapa', etapaActual);
             fd.append('fecha_radicacion', document.getElementById('fecha_radicacion').value);
             fd.append('fecha_recepcion', document.getElementById('fecha_recepcion').value);
-            fd.append('valor_aceptado', document.getElementById('valor_aceptado').value.replace(/\D/g, '') || "0");
-            fd.append('tabla_excel', lineas[i]);
+            fd.append('valor_aceptado', "0"); fd.append('tabla_excel', lineas[i]);
             
             try {
-                const res = await fetch('/analizar', { method: 'POST', body: fd });
-                if (!res.ok) throw new Error();
-                const data = await res.json();
+                const res = await fetch('/analizar', { method: 'POST', headers: headersAuth, body: fd });
+                if(!res.ok) throw new Error();
+                const d = await res.json();
                 
-                const id = 'res-' + Math.random().toString(36).substr(2, 9);
-                const item = document.createElement('div');
-                item.className = 'lote-item';
-                item.innerHTML = `
-                    <div class="lote-item-header" onclick="const el=document.getElementById('${id}'); el.style.display=el.style.display==='none'?'block':'none';">
-                        <div>
-                            <strong style="color:var(--navy); font-size:.95rem;">${data.codigo_glosa}</strong>
-                            <span style="color:var(--slate); margin-left:.5rem;">| Paciente: ${data.paciente}</span>
-                            <div style="font-size:.7rem; color:var(--slate-lt); margin-top:.3rem;">${data.mensaje_tiempo} · ${data.tipo}</div>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:1rem;">
-                            <strong style="color:var(--navy); font-size:.95rem;">${formaterMoneda(data.valor_objetado)}</strong>
-                            <span class="pill pill-blue">Ver ↓</span>
-                        </div>
+                const html = `<div style="background:#fff; border:1px solid var(--border); border-radius:8px; border-left:4px solid var(--green); padding:15px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div><b>${d.codigo_glosa}</b> | Fac: ${d.factura} | ${d.mensaje_tiempo}</div>
+                        <div><b>${d.valor_objetado}</b></div>
                     </div>
-                    <div id="${id}" class="lote-item-body">
-                        <div style="background:#fff; padding:1.25rem; border-radius:8px; border:1px solid var(--border); font-size:.84rem; line-height:1.75; color:var(--text-2); margin-bottom:.85rem;">${data.dictamen}</div>
-                        <button class="btn btn-outline" style="font-size:.78rem; padding:.45rem .9rem;" onclick="copiarDesdeElemento(this)">📋 Copiar Respuesta</button>
-                    </div>`;
-                document.getElementById('lote-lista-resultados').append(item);
-                exitos++;
+                    <div style="font-size:12px; margin-top:10px; color:#555;">${d.dictamen}</div>
+                </div>`;
+                resBox.innerHTML += html; exitos++;
             } catch(e) {
-                const item = document.createElement('div');
-                item.style = "background:#fef2f2; padding:1rem 1.25rem; border:1px solid #fca5a5; border-radius:var(--radius); border-left:4px solid var(--red); margin-bottom:.75rem;";
-                item.innerHTML = `<strong style="color:var(--red);">Fallo en línea ${i+1}</strong><br><span style="font-size:.75rem; color:var(--slate);">Se superó el límite de peticiones o el formato es inválido.</span>`;
-                document.getElementById('lote-lista-resultados').append(item);
+                resBox.innerHTML += `<div style="background:#fee2e2; border-left:4px solid red; padding:15px; margin-bottom:10px;">Error fila ${i+1} (Rate limit API)</div>`;
             }
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 2000)); // Espera para no saturar Groq Free
         }
-        
         document.getElementById('lote-progress-bar').style.width = '100%';
-        btn.disabled = false;
-        btn.innerText = "🚀 Procesar Nuevo Lote";
-        mostrarToast(`Lote finalizado: ${exitos} procesadas exitosamente.`, 'success');
+        btn.disabled = false; btn.innerText = "🚀 Procesar Nuevo Lote";
+        cargarAlertas();
     }
 
-    function copiarDesdeElemento(btn) {
-        const div = btn.previousElementSibling;
-        navigator.clipboard.writeText(div.innerText.trim())
-            .then(() => mostrarToast('✓ Respuesta copiada', 'success'))
-            .catch(() => mostrarToast('Error al copiar', 'error'));
-    }
-
+    // ─── HISTORIAL PRO CON FILTROS ───
     async function cargarHistorial() {
+        const epsFiltro = document.getElementById('hist-eps').value;
+        const textoFiltro = document.getElementById('hist-search').value.toLowerCase();
+        
+        let url = '/glosas?limite=100';
+        if (epsFiltro) url += `&eps=${encodeURIComponent(epsFiltro)}`;
+        
         const container = document.getElementById('historial-content');
-        container.innerHTML = '<div style="text-align:center; padding:3rem;"><div class="spinner spinner-dark" style="margin:auto;"></div></div>';
+        container.innerHTML = '<div style="text-align:center;padding:2rem;"><div class="spinner spinner-dark" style="margin:auto;"></div></div>';
+        
         try {
-            const res = await fetch('/glosas');
+            const res = await fetch(url, { headers: headersAuth });
             const data = await res.json();
-            if (data.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">📂</div><p>Aún no hay glosas guardadas en el sistema.</p></div>';
-                return;
-            }
-            let html = `<table class="history-table"><thead><tr><th>Fecha</th><th>EPS</th><th>Paciente</th><th>Código</th><th>Valor Obj.</th><th>Estado</th></tr></thead><tbody>`;
+            
+            let html = `<table class="history-table"><thead><tr><th>Alerta</th><th>Fecha</th><th>EPS</th><th>Factura</th><th>Cód</th><th>Valor</th><th>Estado</th></tr></thead><tbody>`;
             data.forEach(g => {
-                const fecha = new Date(g.creado_en).toLocaleDateString('es-CO');
-                const badge = g.estado === 'LEVANTADA' ? 'pill-green' : (g.estado === 'ACEPTADA' ? 'pill-orange' : 'pill-blue');
-                html += `<tr><td><strong>${fecha}</strong></td><td>${g.eps}</td><td style="font-size:.75rem;">${g.paciente || 'N/A'}</td><td><strong>${g.codigo_glosa}</strong></td><td style="font-family:'Outfit'; font-weight:700; color:var(--navy);">${formaterMoneda(g.valor_objetado)}</td><td><span class="pill ${badge}">${g.estado}</span></td></tr>`;
+                // Búsqueda en frontend rápida
+                if (textoFiltro && !g.paciente.toLowerCase().includes(textoFiltro) && !g.codigo_glosa.toLowerCase().includes(textoFiltro)) return;
+                
+                const f = new Date(g.creado_en).toLocaleDateString('es-CO');
+                const badgeDias = g.dias_restantes <= 2 ? 'dias-critico' : (g.dias_restantes <= 5 ? 'dias-medio' : 'dias-ok');
+                const colorE = g.estado === 'LEVANTADA' ? 'pill-green' : (g.estado === 'ACEPTADA' ? 'pill-orange' : 'pill-red');
+                
+                html += `<tr>
+                    <td><span class="dias-badge ${badgeDias}">${g.dias_restantes}d</span></td>
+                    <td>${f}</td><td>${g.eps}</td><td>${g.factura}</td><td><b>${g.codigo_glosa}</b></td>
+                    <td>${g.valor_objetado}</td><td><span class="pill ${colorE}">${g.estado}</span></td>
+                </tr>`;
             });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-        } catch(e) {
-            container.innerHTML = '<div style="color:var(--red); text-align:center; padding:2rem; font-weight:600;">Error conectando con la base de datos.</div>';
-        }
+            container.innerHTML = html + '</tbody></table>';
+        } catch(e) { container.innerHTML = 'Error cargando historial.'; }
     }
 
     async function exportarExcel() {
-        mostrarToast('Descargando...', 'success');
+        mostrarToast('Generando Excel...', 'success');
         try {
-            const res = await fetch('/exportar-historial');
+            const res = await fetch('/exportar-historial', { headers: headersAuth });
             const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 'Reporte_Glosas_HUS.csv'; a.click();
-            URL.revokeObjectURL(url);
-        } catch(e) { mostrarToast('Error al descargar', 'error'); }
+            a.href = URL.createObjectURL(blob); a.download = 'Reporte_Gerencial_HUS.xlsx'; a.click();
+        } catch(e) { mostrarToast('Error Export', 'error'); }
     }
 
+    // ─── ANALYTICS Y CHART.JS ───
     async function cargarAnalytics() {
-        const container = document.getElementById('analytics-content');
-        container.innerHTML = '<div style="text-align:center; padding:3rem;"><div class="spinner spinner-dark" style="margin:auto;"></div></div>';
         try {
-            const res = await fetch('/analytics');
-            const data = await res.json();
-            let epsHtml = data.top_eps.map(e => `<div class="list-item"><span>${e.eps}</span><strong>${e.total} Glosas</strong></div>`).join('');
-            if (!epsHtml) epsHtml = '<div class="list-item" style="color:var(--slate-lt);">Sin datos suficientes</div>';
-            let codHtml = data.top_codigos.map(c => `<div class="list-item"><span>Código ${c.codigo}</span><strong>${c.total} Veces</strong></div>`).join('');
-            if (!codHtml) codHtml = '<div class="list-item" style="color:var(--slate-lt);">Sin datos suficientes</div>';
+            const res = await fetch('/analytics', { headers: headersAuth });
+            const d = await res.json();
             
-            container.innerHTML = `
+            document.getElementById('kpi-container').innerHTML = `
                 <div class="kpi-grid">
-                    <div class="kpi-card blue"><div class="kpi-title">Glosas Gestionadas (Mes)</div><div class="kpi-value">${data.glosas_mes}</div><div class="kpi-sub">${data.glosas_hoy} procesadas hoy</div></div>
-                    <div class="kpi-card red"><div class="kpi-title">Valor Objetado (Mes)</div><div class="kpi-value" style="font-size:1.35rem;">${formaterMoneda(data.valor_objetado_mes)}</div><div class="kpi-sub">Total reclamado por EPS</div></div>
-                    <div class="kpi-card grn"><div class="kpi-title">Valor Defendido (Mes)</div><div class="kpi-value" style="font-size:1.35rem; color:var(--green);">${formaterMoneda(data.valor_recuperado_mes)}</div><div class="kpi-sub">Tasa de éxito: <strong>${data.tasa_exito_pct}%</strong></div></div>
-                </div>
-                <div style="display:flex; gap:1rem;">
-                    <div class="list-card"><div class="kpi-title" style="margin-bottom:.85rem; border-bottom:1px solid var(--border); padding-bottom:.5rem;">EPS que más glosan</div>${epsHtml}</div>
-                    <div class="list-card"><div class="kpi-title" style="margin-bottom:.85rem; border-bottom:1px solid var(--border); padding-bottom:.5rem;">Códigos frecuentes</div>${codHtml}</div>
+                    <div class="kpi-card blue"><div class="kpi-title">Glosas Procesadas</div><div class="kpi-value">${d.glosas_mes}</div><div style="font-size:11px;color:#888;">${d.glosas_hoy} hoy</div></div>
+                    <div class="kpi-card red"><div class="kpi-title">Valor en Riesgo</div><div class="kpi-value" style="font-size:24px;">$${d.valor_objetado_mes.toLocaleString('es-CO')}</div></div>
+                    <div class="kpi-card grn"><div class="kpi-title">Defensa (Tasa Éxito)</div><div class="kpi-value" style="font-size:24px;color:var(--green);">$${d.valor_recuperado_mes.toLocaleString('es-CO')}</div><div style="font-size:11px;color:#888;">${d.tasa_exito_pct}% efectividad</div></div>
                 </div>`;
-        } catch(e) {
-            container.innerHTML = '<div style="color:var(--red); text-align:center; padding:2rem; font-weight:600;">Error cargando métricas.</div>';
-        }
+            
+            // Destruir gráficos anteriores si existen (para no superponer al actualizar)
+            if(chartEpsInstance) chartEpsInstance.destroy();
+            if(chartCodigosInstance) chartCodigosInstance.destroy();
+
+            // Gráfico EPS
+            const ctxEps = document.getElementById('chartEps').getContext('2d');
+            chartEpsInstance = new Chart(ctxEps, {
+                type: 'bar',
+                data: {
+                    labels: d.top_eps.map(x => x.eps),
+                    datasets: [{ label: 'Top EPS Glosadoras', data: d.top_eps.map(x => x.total), backgroundColor: '#1a56db', borderRadius: 6 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: {display: true, text: 'Top EPS Glosadoras'} } }
+            });
+
+            // Gráfico Códigos (Doughnut)
+            const ctxCod = document.getElementById('chartCodigos').getContext('2d');
+            chartCodigosInstance = new Chart(ctxCod, {
+                type: 'doughnut',
+                data: {
+                    labels: d.top_codigos.map(x => x.codigo),
+                    datasets: [{ data: d.top_codigos.map(x => x.total), backgroundColor: ['#0b1829', '#1a56db', '#0d9488', '#d97706', '#dc2626'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { title: {display: true, text: 'Top 5 Códigos Frecuentes'} } }
+            });
+
+        } catch(e) {}
     }
 
-    async function descargarPDF() {
-        if (!dataGuardada) return;
-        const btn = document.querySelector('.btn-teal');
-        btn.innerHTML = '<div class="spinner"></div> Generando...';
-        try {
-            const res = await fetch('/descargar-pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eps: dataGuardada.eps, resumen: dataGuardada.resumen, dictamen: dataGuardada.dictamen }) });
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'Oficio_Respuesta_Glosa_HUS.pdf'; a.click();
-            URL.revokeObjectURL(url);
-        } catch(e) { mostrarToast("Error al descargar PDF", "error"); }
-        finally { btn.innerText = "Descargar PDF"; }
-    }
-
-    function copiarTexto() {
-        if (!dataGuardada) return;
-        const el = document.createElement('div');
-        el.innerHTML = dataGuardada.dictamen;
-        navigator.clipboard.writeText(el.innerText.trim())
-            .then(() => mostrarToast('✓ Texto copiado', 'success'))
-            .catch(() => mostrarToast('Error al copiar', 'error'));
-    }
-
-    document.getElementById('archivos').addEventListener('change', function() {
-        const label = document.querySelector('.upload-zone-label');
-        const zone  = document.querySelector('.upload-zone');
-        if (this.files && this.files.length > 1) {
-            label.innerHTML = `📎 <b>${this.files.length} PDFs cargados</b>`;
-            label.style.color = 'var(--teal)'; zone.style.borderColor = 'var(--teal)'; zone.style.background = '#f0fdf4';
-        } else if (this.files && this.files.length === 1) {
-            label.innerHTML = `📎 <b>${this.files[0].name}</b>`;
-            label.style.color = 'var(--teal)'; zone.style.borderColor = 'var(--teal)'; zone.style.background = '#f0fdf4';
-        } else {
-            label.innerHTML = '📎 Adjuntar PDFs (Epicrisis)';
-            label.style.color = ''; zone.style.borderColor = ''; zone.style.background = '';
-        }
+    document.getElementById('archivos').addEventListener('change', function(e) {
+        const l = document.getElementById('file-lbl');
+        if (this.files.length > 0) { l.innerHTML = `📎 <b>${this.files.length} PDF listos para extraer Tablas</b>`; l.style.color="var(--teal)"; }
+        else { l.innerHTML = '📎 Adjuntar PDFs'; l.style.color=""; }
     });
 </script>
-
 </body>
 </html>
