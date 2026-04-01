@@ -358,16 +358,15 @@
     }
 
     async function cargarContratosDropdown() {
-        try {
-            const res = await fetch('/contratos', { headers: headersAuth });
-            const data = await res.json();
-            const selects = [document.getElementById('eps'), document.getElementById('hist-eps')];
-            selects.forEach(s => {
-                s.innerHTML = s.id === 'hist-eps' ? '<option value="">Todas las EPS</option>' : '';
-                data.forEach(c => s.innerHTML += `<option value="${c.eps}">${c.eps}</option>`);
-            });
-        } catch(e) {}
-    }
+    try {
+        const res = await fetch('/contratos', { headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` } });
+        const data = await res.json();
+        const selectEps = document.getElementById('eps');
+        
+        selectEps.innerHTML = '<option value="OTRA / SIN DEFINIR">OTRA / SIN DEFINIR ▼</option>';
+        data.forEach(c => selectEps.innerHTML += `<option value="${c.eps}">${c.eps}</option>`);
+    } catch(e) { console.error("Error cargando contratos", e); }
+}
 
     async function cargarTablaContratos() {
         try {
