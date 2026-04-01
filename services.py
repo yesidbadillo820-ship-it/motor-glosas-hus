@@ -124,7 +124,7 @@ class GlosaService:
                          "LA ESE HUS CARRERA 33 NO. 28-126. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, "
                          "DE NO OBTENERSE LA RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR "
                          "LEVANTADA LA RESPECTIVA OBJECIÓN.")
-            tabla = _tabla_simple(codigo_det, "RATIFICACIÓN", valor_raw, "RE9901", "GLOSA INJUSTIFICADA", color_e="#2563eb")
+            tabla = _tabla_simple(codigo_det, "RATIFICACIÓN", valor_raw, "RE9901", "GLOSA NO ACEPTADA Y SUBSANADA EN SU TOTALIDAD", color_e="#2563eb")
             return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla + _div(txt_ratif), codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=max(0, 20-dias))
 
         # EXTEMPORÁNEA (Texto Legal Solicitado con variable dinámica)
@@ -142,7 +142,7 @@ class GlosaService:
                 "MANERA SIMULTÁNEA TODAS LAS GLOSAS A LAS QUE HAYA LUGAR, SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA "
                 "TOTALIDAD DE LAS GLOSAS APLICADAS."
             )
-            tabla = _tabla_simple(codigo_det, "EXTEMPORÁNEA", valor_raw, "RE9502", "GLOSA FUERA DE TIEMPOS")
+            tabla = _tabla_simple(codigo_det, "EXTEMPORÁNEA", valor_raw, "RE9502", "GLOSA O DEVOLUCIÓN EXTEMPORÁNEA")
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt_ext), codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", dias_restantes=0)
 
         # CASO INICIAL (IA)
@@ -164,7 +164,7 @@ class GlosaService:
         servicio = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
         arg = self.xml("argumento", res_ia, "SIN ARGUMENTO").replace('\n', '<br/>')
         
-        dictamen = _tabla_defensa(codigo_det, servicio, valor_raw, "RE9602", "GLOSA INJUSTIFICADA") + _div(f"<b>ESE HUS NO ACEPTA LA GLOSA POR CONSIDERARLA INJUSTIFICADA:</b><br/><br/>{arg}")
+        dictamen = _tabla_defensa(codigo_det, servicio, valor_raw, "RE9602", "GLOSA O DEVOLUCIÓN INJUSTIFICADA") + _div(f"<b>ESE HUS NO ACEPTA LA GLOSA POR CONSIDERARLA INJUSTIFICADA:</b><br/><br/>{arg}")
         
         return GlosaResult(tipo=f"TÉCNICO-LEGAL [{prefijo}]", resumen=f"DEFENSA: {paciente}", dictamen=dictamen, codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", score=95, dias_restantes=max(0, 20-dias))
 
