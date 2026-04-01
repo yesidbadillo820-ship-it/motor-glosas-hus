@@ -208,12 +208,12 @@
         fd.append('fecha_recepcion', document.getElementById('fecha-rec').value || '');
         fd.append('valor_aceptado', document.getElementById('valor-acep').value || '0');
         
-        // ¡AQUÍ ESTABA EL ERROR! El ID en el HTML es 'tabla-excel'
-        const tablaExcelTexto = document.getElementById('tabla-excel').value || 'Sin descripción';
-        fd.append('tabla_excel', tablaExcelTexto);
+        // SOLUCIÓN AL ERROR 422: Validar que siempre se envíe texto en la tabla_excel
+        const textoGlosa = document.getElementById('tabla-excel').value.trim();
+        fd.append('tabla_excel', textoGlosa ? textoGlosa : 'Sin descripción aportada');
 
         const inputArchivos = document.getElementById('pdf-files');
-        if (inputArchivos.files.length > 0) {
+        if (inputArchivos && inputArchivos.files.length > 0) {
             for (let f of inputArchivos.files) fd.append('archivos', f);
         }
 
@@ -221,13 +221,13 @@
             const res = await fetch('/analizar', { method: 'POST', headers: headersAuth, body: fd });
             
             if (!res.ok) {
-                const errData = await res.json();
-                console.error("Error del servidor:", errData);
-                throw new Error("El servidor rechazó la solicitud (422). Revisa la consola.");
+                console.error("Error del servidor:", res.status);
+                throw new Error("Solicitud rechazada por el servidor.");
             }
-            
+
             const d = await res.json();
             ultimoResultado = d;
+            
             document.getElementById('result-area').innerHTML = `
                 <div class="dictamen-box">
                     <h3 style="color:var(--navy);margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:10px">${d.resumen}</h3>
@@ -239,10 +239,12 @@
                 </div>`;
             document.getElementById('result-actions').style.display = 'flex';
         } catch(e) { 
-            alert("Error: " + e.message); 
+            alert("Ocurrió un error. Asegúrate de pegar el texto de la glosa.");
+            console.error(e);
+        } finally {
+            btn.disabled = false; btn.innerText = "Analizar Glosa";
         }
-        btn.disabled = false; btn.innerText = "⚡ Analizar Glosa";
-    }    
+    }
 
     document.getElementById('paste-box').addEventListener('paste', e => {
         e.preventDefault();
