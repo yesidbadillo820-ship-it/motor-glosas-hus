@@ -145,20 +145,47 @@ class GlosaService:
             tabla = _tabla_simple(codigo_det, "EXTEMPORÁNEA", valor_raw, "RE9502", "GLOSA O DEVOLUCIÓN EXTEMPORÁNEA")
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt_ext), codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", dias_restantes=0)
 
-        # CASO INICIAL (IA)
+       # CASO INICIAL (IA) 
         eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
         info_c = {**CONTRATOS_FIJOS, **(contratos_db or {})}.get(eps_key, CONTRATOS_FIJOS["OTRA / SIN DEFINIR"])
-        est_actual = ESTRATEGIAS.get(prefijo, ESTRATEGIAS["PE"])
+        
+        est_actual = ESTRATEGIAS.get(prefijo, "ESTRATEGIA GENERAL: Desvirtuar la glosa apelando a la pertinencia médica, los soportes clínicos adjuntos y el principio de buena fe (Art 871 C.Co). Exigir pago.")
 
-        sys_p = f"Director Jurídico ESE HUS. XML. Marco: {info_c}. Estrategia: {est_actual}. XML: <paciente>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>."
+        # --- INICIO DEL CÓDIGO A REEMPLAZAR ---
+        sys_p = f"""Eres el Director Jurídico y de Auditoría de Cuentas de la ESE HUS (Colombia).
+        MARCO CONTRACTUAL A APLICAR: {info_c}
+        ESTRATEGIA DE DEFENSA: {est_actual}
+        
+        REGLAS ESTRICTAS:
+        1. Tu respuesta debe ser ÚNICAMENTE en código XML válido. Cero saludos, cero texto fuera del XML.
+        2. El <argumento> debe contener una defensa técnica y jurídica robusta, de mínimo 2 párrafos.
+        3. TODO EL TEXTO DEL ARGUMENTO DEBE ESTAR EN MAYÚSCULAS.
+        4. No inventes datos que no estén en la glosa.
+
+        FORMATO OBLIGATORIO:
+        <paciente>Nombre del paciente (o NO IDENTIFICADO)</paciente>
+        <codigo_glosa>Código alfanumérico (ej. TA0201, o N/A)</codigo_glosa>
+        <valor_objetado>Monto en pesos (ej. $ 1.500.000, o N/A)</valor_objetado>
+        <servicio_glosado>Nombre del servicio (o SERVICIOS ASISTENCIALES)</servicio_glosado>
+        <argumento>AQUÍ VA TU REDACCIÓN LEGAL Y TÉCNICA DEFENDIENDO A LA ESE HUS...</argumento>"""
         
         try:
             comp = await self.cliente.chat.completions.create(
-                messages=[{"role": "system", "content": sys_p}, {"role": "user", "content": f"GLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:3000]}"}],
-                model="llama-3.3-70b-versatile", temperature=0.2
+                messages=[
+                    {"role": "system", "content": sys_p}, 
+                    {"role": "user", "content": f"GLOSA:\n{texto_base}\n\nSOPORTES:\n{contexto_pdf[:3000]}"}
+                ],
+                model="llama-3.3-70b-versatile", 
+                temperature=0.2
             )
             res_ia = comp.choices[0].message.content
-        except: res_ia = "<argumento>ERROR IA</argumento>"
+        except Exception as e: 
+            res_ia = f"<argumento>ERROR DE CONEXIÓN CON IA: {str(e)}</argumento>"
+        # --- FIN DEL CÓDIGO A REEMPLAZAR ---
+
+        paciente = self.xml("paciente", res_ia, "NO IDENTIFICADO")
+        servicio = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
+        arg = self.xml("argumento", res_ia, "SIN ARGUMENTO").replace('\n', '<br/>')
 
         paciente = self.xml("paciente", res_ia, "NO IDENTIFICADO")
         servicio = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
