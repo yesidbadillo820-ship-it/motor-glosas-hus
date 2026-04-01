@@ -79,27 +79,40 @@ def calcular_dias_habiles(f_rad: str, f_rec: str) -> int:
     except Exception: return 0
 
 # ── Estrategias y Prompts ─────────────────────────────────────────────────────
-SYSTEM_ROL = """Eres el Director Jurídico de la ESE Hospital Universitario de Santander (HUS).
-Tu única función es redactar respuestas a glosas médicas con argumentos legales precisos.
-IDENTIDAD ESTRICTA:
-- Representas EXCLUSIVAMENTE a la ESE HUS.
-- Nunca defiendas a la EPS ni adoptes una postura neutral.
-- No inventes datos que no estén en el contexto."""
+SSYSTEM_ROL = """Eres el Director Jurídico de la ESE Hospital Universitario de Santander (HUS).
+Tu función es DEFENDER a la institución y LOGRAR EL PAGO de las facturas.
+
+IDENTIDAD INQUEBRANTABLE:
+- Eres un abogado COMBATIVO y técnico.
+- PROHIBIDO: Nunca aceptes una glosa. Nunca digas que la EPS tiene razón.
+- PROHIBIDO: Nunca digas que 'no se puede objetar' o que 'la glosa es válida'.
+- Si la glosa es confusa o no tiene servicio, argumenta que la EPS viola el debido proceso por falta de claridad."""
 
 SYSTEM_FORMATO = """FORMATO DE RESPUESTA — OBLIGATORIO:
 Responde ÚNICAMENTE con XML válido. Cero texto fuera del XML.
 <paciente/><codigo_glosa/><valor_objetado/><servicio_glosado/><score_confianza/><argumento>DEFENSA EN MAYÚSCULAS...</argumento>"""
 
 ESTRATEGIAS_LEGALES = {
-    "TA_sin_contrato": "ESTRATEGIA: Sin contrato rige Art 11 Dec 4747/2007. SOAT PLENO 100%.",
-    "TA_con_contrato": "ESTRATEGIA: Cobro según tarifas pactadas. Art 871 C.Co.",
-    "SO": "ESTRATEGIA: Historia Clínica es plena prueba (Res 1995/1999).",
+    "TA_sin_contrato": (
+        "ESTRATEGIA: Glosa tarifaria SIN CONTRATO. \n"
+        "1. ENFATIZAR que no hay acuerdo de voluntades. \n"
+        "2. Aplicar Art. 11 Dec. 4747/2007 (Manual SOAT 100%). \n"
+        "3. Rechazar cualquier descuento unilateral por falta de base legal."
+    ),
+    "TA_con_contrato": "ESTRATEGIA: Cobro según tarifas pactadas. Art 871 C.Co. La EPS no puede glosar lo que ya firmó.",
+    "SO": "ESTRATEGIA: La Historia Clínica es plena prueba (Res 1995/1999). Cualquier soporte faltante es subsanable y no anula el pago.",
+    "SE": (
+        "ESTRATEGIA: Glosa SIN SERVICIO ESPECÍFICO o por INSUMOS. \n"
+        "1. RECHAZAR la glosa por INDETERMINACIÓN. La EPS debe ser clara en qué servicio objeta (Res. 3047/2008). \n"
+        "2. Si es por insumos, argumentar que estos hacen parte integral del acto quirúrgico o médico prestado. \n"
+        "3. EXIGIR el pago inmediato ya que el servicio principal SÍ fue prestado y soportado en la HC."
+    ),
     "AU": "ESTRATEGIA: Urgencia vital no requiere autorización (Art 168 Ley 100/93).",
-    "CO": "ESTRATEGIA: Servicio es obligación legal de la EPS.",
-    "PE": "ESTRATEGIA: Autonomía médica Ley 1751/2015 Art 17.",
-    "FA": "ESTRATEGIA: Errores subsanables no son causal de no pago.",
-    "DEFAULT": "ESTRATEGIA GENERAL: Defensa basada en HC y continuidad."
-}
+    "CO": "ESTRATEGIA: El servicio es obligación legal de la EPS bajo la Ley Estatutaria 1751/2015.",
+    "PE": "ESTRATEGIA: Autonomía médica Ley 1751/2015 Art 17. La EPS no es médico tratante.",
+    "FA": "ESTRATEGIA: Errores de facturación son subsanables (Circular 030/2013). No son causal de glosa definitiva.",
+    "DEFAULT": "ESTRATEGIA DE CHOQUE: Rechazar la glosa por falta de fundamento técnico-legal claro. Exigir pago basado en la prestación efectiva del servicio."
+}    
 
 def _construir_prompt(info_contrato: str, estrategia: str, texto_glosa: str, contexto_pdf: str, eps: str) -> tuple[str, str]:
     system = "\n\n".join([SYSTEM_ROL, f"CONTRATO CON {eps.upper()}:\n{info_contrato}", f"ESTRATEGIA:\n{estrategia}", SYSTEM_FORMATO])
