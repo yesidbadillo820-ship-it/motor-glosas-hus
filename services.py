@@ -21,6 +21,26 @@ FERIADOS_CO = [
     "2026-01-01", "2026-01-12", "2026-03-23", "2026-04-02", "2026-04-03", "2026-05-01", "2026-05-18", "2026-06-08", "2026-06-15", "2026-06-29", "2026-07-20", "2026-08-07", "2026-08-17", "2026-10-12", "2026-11-02", "2026-11-16", "2026-12-08", "2026-12-25"
 ]
 
+CONTRATOS_FIJOS = {
+    "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
+    "COMPENSAR": "CONTRATO: CSS009-2024. TARIFA: SOAT -15% y Tarifas Propias. OBS: Excluye oncológicos. MAOS por EPS.",
+    "FAMISANAR": "CARTA DE INTENCIÓN. TARIFA: SOAT UVB -5% e Institucionales.",
+    "FOMAG": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15%, Institucionales y Paquetes (Tórax, IVE, Columna, Terapias, Gastro).",
+    "LA PREVISORA": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15% y Paquetes.",
+    "DISPENSARIO MEDICO": "CONTRATO: 440-DIGSA/DMBUG-2025. TARIFA: SOAT SMLV -20% e Institucionales.",
+    "POLICIA NACIONAL": "CONTRATOS: 068-5-200004-26 y 068-5-200006-26. TARIFA: SOAT UVB -8% e Institucionales. OBS: Contrato 0006-26 INCLUYE medicamentos oncológicos.",
+    "NUEVA EPS": "CONTRATO: 02-01-06-00077-2017. TARIFA: SOAT -20% e Institucionales. OBS: Meds Oncológicos por HUS.",
+    "PPL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%. OBS: MAOS y Meds por HUS.",
+    "FIDUCIARIA CENTRAL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%.",
+    "POSITIVA": "CONTRATO: 525 - OTROSÍ 3. TARIFA: SOAT SMLV -15%. OBS: Solo accidentes/laboral.",
+    "PRECIMED": "CONTRATO: 319 DE 2024. TARIFA: Tarifas anexos / Institucionales.",
+    "SALUD MIA": "CONTRATOS: SSA2025EVE3A005 y CSA2025EVE3A005. TARIFA: SOAT -15%. OBS: Urgencias Circular 019/2023.",
+    "AURORA": "CONTRATOS: GID ARL 0090 y GID AP 0090. TARIFA: SOAT -3%.",
+    "SECRETARIA DE SANTANDER": "MARCO LEGAL: Resolución 15997 de 2017 (Tarifas obligatorias ente territorial).",
+    "SUMIMEDICAL": "CONTRATO: FPS23-050. TARIFA: SOAT -15%. OBS: MAOS y Oncológicos por EPS.",
+    "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
+}
+
 def _procesar_pdf_sync(file_content: bytes) -> str:
     unido = ""
     try:
@@ -64,7 +84,7 @@ class GlosaService:
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         eps_segura = str(data.eps).upper() if data.eps else "OTRA"
-        info_c = (contratos_db or {}).get(eps_segura.replace(" / SIN DEFINIR", "").strip(), "RESOLUCIÓN 054 Y 120 DE 2026 (SOAT PLENO 100%).")
+        info_c = (contratos_db or {}).get(eps_segura.replace(" / SIN DEFINIR", "").strip(), CONTRATOS_FIJOS["OTRA / SIN DEFINIR"])
         
         texto_base = str(data.tabla_excel).strip()
         val_ac_num = float(re.sub(r'[^\d]', '', str(data.valor_aceptado)) or 0)
@@ -89,6 +109,10 @@ class GlosaService:
             txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) EN INSTANCIA DE RATIFICACIÓN. NO SE APORTAN NUEVOS ELEMENTOS. SE SOLICITA CONCILIACIÓN."
             return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=dias_restantes)
 
+        if es_extemporanea and val_ac_num <= 0:
+            txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR HABER SIDO NOTIFICADA DE MANERA EXTEMPORÁNEA ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO. SE EXIGE EL PAGO INMEDIATO."
+            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=txt, codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo, dias_restantes=0)
+
         estrategia = "P1: Cita contrato. P2: Desvirtúa glosa. P3: Exige pago por Buena Fe (Art 871 C.Co)."
         system_prompt = f"""Eres el DIRECTOR JURÍDICO de la ESE HUS. DEBES RESPONDER EN XML. TODO EN MAYÚSCULAS. 3 PÁRRAFOS TÉCNICOS.
         MARCO: {info_c}. ESTRATEGIA: {estrategia}.
@@ -106,7 +130,11 @@ class GlosaService:
 
         paciente = self.xml("paciente", res_ia, "NO IDENTIFICADO")
         codigo_final = self.xml("codigo_glosa", res_ia, codigo_detectado)
+        if len(codigo_final) > 10 or codigo_final == "N/A": codigo_final = codigo_detectado
+        
         valor_xml = self.xml("valor_objetado", res_ia, valor_obj_raw)
+        if "$" not in valor_xml and not any(char.isdigit() for char in valor_xml): valor_xml = valor_obj_raw
+        
         argumento_ia = self.xml("argumento", res_ia, "").replace('\n', '<br/><br/>')
         
         apertura = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_final}) POR CONSIDERARLA INJUSTIFICADA, SUSTENTANDO ASÍ:<br/><br/>"
@@ -135,5 +163,41 @@ def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
         elements.append(Spacer(1, 8))
 
     doc.build(elements)
+    buffer.seek(0)
+    return buffer.read()
+
+def exportar_excel_pro(glosas: list) -> bytes:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Reporte Glosas HUS"
+
+    headers = ["ID", "Fecha Procesamiento", "EPS / Pagador", "Paciente", "Codigo Glosa", "Valor Objetado", "Valor Aceptado", "Etapa Procesal", "Estado Final"]
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="1C3460", end_color="1C3460", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    
+    for col_num, cell in enumerate(ws[1], 1):
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 18
+
+    ws.column_dimensions['C'].width = 30 
+    ws.column_dimensions['D'].width = 30 
+
+    for g in glosas:
+        ws.append([
+            g.id, g.creado_en.strftime("%d/%m/%Y %H:%M"), g.eps, g.paciente, 
+            g.codigo_glosa, g.valor_objetado, g.valor_aceptado, g.etapa, g.estado
+        ])
+
+    ws.auto_filter.ref = ws.dimensions
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
     buffer.seek(0)
     return buffer.read()
