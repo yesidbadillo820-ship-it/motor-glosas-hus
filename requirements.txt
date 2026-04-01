@@ -1,11 +1,10 @@
 fastapi
 uvicorn
-sqlalchemy
+groq
+PyPDF2
 python-multipart
 python-dotenv
-PyPDF2
-groq
+jinja2
 reportlab
-pydantic
-slowapi
-aiofiles
+pdfplumber
+openpyxl
