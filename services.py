@@ -106,19 +106,23 @@ class GlosaService:
 
         texto_base = str(data.tabla_excel).strip()
         val_ac_num = float(re.sub(r'[^\d]', '', str(data.valor_aceptado)) or 0)
+        
         cod_m = re.search(r'\b([A-Z]{2,3}\d{3,4})\b', texto_base)
         codigo_detectado = cod_m.group(1) if cod_m else "N/A"
-        prefijo = codigo_detectado[:2].upper() if codigo_detectado != "N/A" else "XX"
         
+        prefijo = codigo_detectado[:2].upper() if codigo_detectado != "N/A" else "XX"
+        if "MCV" in texto_base.upper() or prefijo == "MC" or prefijo == "MV":
+            prefijo = "TA" 
+
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
         valor_obj_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
         nombres_glosa = {
-            "TA": "TARIFAS", "MV": "TARIFAS", "SO": "SOPORTES", "FA": "FACTURACIÓN",
+            "TA": "TARIFAS", "MV": "TARIFAS", "MC": "TARIFAS", "SO": "SOPORTES", "FA": "FACTURACIÓN",
             "PE": "PERTINENCIA", "AU": "AUTORIZACIÓN", "CO": "COBERTURA"
         }
         
-        if "MAYOR VALOR" in texto_base.upper() or prefijo == "MV":
+        if "MAYOR VALOR" in texto_base.upper() or prefijo == "TA":
             nombre_tipo = "TARIFAS Y MAYOR VALOR COBRADO"
             prefijo_evaluacion = "TA"
         else:
@@ -133,12 +137,12 @@ class GlosaService:
         color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
 
         if "RATIF" in str(data.etapa).upper() and val_ac_num <= 0:
-            apertura_txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) EN INSTANCIA DE RATIFICACIÓN. NO SE APORTAN NUEVOS ELEMENTOS. SE SOLICITA CONCILIACIÓN."
+            apertura_txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) EN INSTANCIA DE RATIFICACIÓN. NO SE APORTAN NUEVOS ELEMENTOS DE JUICIO QUE DESVIRTÚEN LA DEFENSA INICIAL. SE SOLICITA CONCILIACIÓN SEGÚN LEY 1438 DE 2011."
             tabla_html = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA INJUSTIFICADA", color_estado="#2563eb")
             return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla_html + _div(apertura_txt), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=dias_restantes)
 
         if es_extemporanea and val_ac_num <= 0:
-            apertura_txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR HABER SIDO NOTIFICADA DE MANERA EXTEMPORÁNEA ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO. SE EXIGE EL PAGO INMEDIATO."
+            apertura_txt = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR CONSIDERARLA INJUSTIFICADA DEBIDO A SU EXTEMPORANEIDAD. AL TRANSCURRIR {dias} DÍAS HÁBILES, OPERA DE PLENO DERECHO LA ACEPTACIÓN TÁCITA (ART. 57 LEY 1438/2011). SE EXIGE EL PAGO INMEDIATO."
             tabla_html = _tabla_simple(codigo_detectado, "EXTEMPORÁNEA", valor_obj_raw, "RE9502", "GLOSA INJUSTIFICADA")
             return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla_html + _div(apertura_txt), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo=color_tiempo, dias_restantes=0)
 
@@ -198,7 +202,7 @@ class GlosaService:
         valor_xml = self.xml("valor_objetado", res_ia, valor_obj_raw)
         if "$" not in valor_xml and not any(char.isdigit() for char in valor_xml): valor_xml = valor_obj_raw
         
-        argumento_ia = self.xml("argumento", res_ia, "").replace('\n', '<br/>')
+        argumento_ia = self.xml("argumento", res_ia, "").replace('\n\n', '<br/><br/>')
         
         if val_ac_num > 0:
             apertura = f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA {codigo_final} POR $ {val_ac_num:,.0f}."
