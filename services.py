@@ -1,20 +1,27 @@
+import os
 import io
 import re
 import asyncio
 import logging
 from datetime import datetime, timedelta
 
+import pdfplumber
 import PyPDF2
 from groq import AsyncGroq
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_RIGHT
 from reportlab.lib import colors
 
 from models import GlosaInput, GlosaResult
 
 logger = logging.getLogger("motor_glosas_v2")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 1. CONFIGURACIÓN Y CONSTANTES
+# ═════════════════════════════════════════════════════════════════════════════
 
 FERIADOS_CO = [
     "2025-01-01", "2025-01-06", "2025-03-24", "2025-04-17", "2025-04-18", "2025-05-01", "2025-06-02", "2025-06-23", "2025-06-30", "2025-07-20", "2025-08-07", "2025-08-18", "2025-10-13", "2025-11-03", "2025-11-17", "2025-12-08", "2025-12-25",
@@ -41,24 +48,37 @@ CONTRATOS_FIJOS = {
     "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
 }
 
-def _div(texto): 
-    return f'<div style="text-align:justify;line-height:1.6;font-size:11px;margin-top:10px;">{texto}</div>'
+ESTRATEGIAS = {
+    "TA": "ESTRATEGIA TARIFARIA: Citar contrato o Res. 054. Demostrar liquidación correcta. Invocar Art. 871 C.Co (Buena Fe).",
+    "SO": "ESTRATEGIA SOPORTES: Demostrar que la Historia Clínica es plena prueba (Res. 1995/99). Identificar envío de documentos.",
+    "PE": "ESTRATEGIA PERTINENCIA: Autonomía médica (Ley 1751/15). Justificar acto médico basado en diagnóstico.",
+    "AU": "ESTRATEGIA AUTORIZACIÓN: Urgencia vital (Art. 168 Ley 100/93). Trámite oportuno de autorizaciones."
+}
 
-def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_header="#1e3a8a", color_estado="#b91c1c"):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;"><tr style="background-color:{color_header};color:white;"><th style="padding:5px;">CÓDIGO GLOSA</th><th style="padding:5px;">ESTADO</th><th style="padding:5px;">VALOR OBJETADO</th><th style="padding:5px;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;text-align:center;">{codigo}</td><td style="padding:5px;text-align:center;background-color:{color_estado};color:white;"><b>{estado}</b></td><td style="padding:5px;text-align:center;">{valor}</td><td style="padding:5px;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
+# ═════════════════════════════════════════════════════════════════════════════
+# 2. FUNCIONES AUXILIARES (HTML Y DÍAS HÁBILES)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _div(texto): 
+    return f'<div style="text-align:justify;line-height:1.6;font-size:11px;margin-top:10px;color:#1e293b;">{texto}</div>'
+
+def _tabla_simple(codigo, estado, valor, cod_res, desc_res, color_h="#1e3a8a", color_e="#b91c1c"):
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;margin-bottom:10px;"><tr style="background-color:{color_h};color:white;"><th style="padding:5px;border:1px solid #ddd;">CÓDIGO GLOSA</th><th style="padding:5px;border:1px solid #ddd;">ESTADO</th><th style="padding:5px;border:1px solid #ddd;">VALOR OBJETADO</th><th style="padding:5px;border:1px solid #ddd;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;border:1px solid #ddd;text-align:center;">{codigo}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;background-color:{color_e};color:white;"><b>{estado}</b></td><td style="padding:5px;border:1px solid #ddd;text-align:center;">{valor}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
 
 def _tabla_defensa(codigo, servicio, valor, cod_res, desc_res):
-    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:5px;">CÓDIGO GLOSA</th><th style="padding:5px;">SERVICIO RECLAMADO</th><th style="padding:5px;">VALOR OBJ.</th><th style="padding:5px;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;text-align:center;">{codigo}</td><td style="padding:5px;">{servicio}</td><td style="padding:5px;text-align:center;">{valor}</td><td style="padding:5px;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
+    return f'<table border="1" style="width:100%;border-collapse:collapse;text-transform:uppercase;font-size:10px;margin-bottom:10px;"><tr style="background-color:#1e3a8a;color:white;"><th style="padding:5px;border:1px solid #ddd;">CÓDIGO GLOSA</th><th style="padding:5px;border:1px solid #ddd;">SERVICIO RECLAMADO</th><th style="padding:5px;border:1px solid #ddd;">VALOR OBJ.</th><th style="padding:5px;border:1px solid #ddd;background-color:#10b981;">CONCEPTO</th></tr><tr><td style="padding:5px;border:1px solid #ddd;text-align:center;">{codigo}</td><td style="padding:5px;border:1px solid #ddd;">{servicio}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;">{valor}</td><td style="padding:5px;border:1px solid #ddd;text-align:center;font-weight:bold;">{cod_res}<br>{desc_res}</td></tr></table>'
 
 def _procesar_pdf_sync(file_content: bytes) -> str:
     unido = ""
     try:
-        import pdfplumber
         with pdfplumber.open(io.BytesIO(file_content)) as pdf:
             for i, page in enumerate(pdf.pages):
                 txt = page.extract_text() or ""
+                for table in page.extract_tables() or []:
+                    for row in table:
+                        txt += " | ".join([str(c).replace('\n', ' ') if c else "" for c in row]) + "\n"
                 unido += f"\n--- PÁG {i+1} ---\n{txt}"
-    except Exception:
+    except:
         reader = PyPDF2.PdfReader(io.BytesIO(file_content))
         for i in range(len(reader.pages)):
             txt = reader.pages[i].extract_text()
@@ -74,6 +94,10 @@ def _calcular_dias_habiles(f_rad, f_rec):
             if current.weekday() < 5 and current.strftime("%Y-%m-%d") not in FERIADOS_CO: dias += 1
         return dias
     except: return 0
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 3. CLASE DE SERVICIO (LOGICA IA)
+# ═════════════════════════════════════════════════════════════════════════════
 
 class GlosaService:
     def __init__(self, api_key: str):
@@ -92,21 +116,19 @@ class GlosaService:
         texto_base = str(data.tabla_excel).strip().upper()
         val_ac_num = float(re.sub(r'[^\d]', '', str(data.valor_aceptado)) or 0)
         
-        # Detección de Código y Prefijo
         cod_m = re.search(r'\b([A-Z]{2,3}\d{0,4})\b', texto_base)
-        codigo_detectado = cod_m.group(1) if cod_m else "N/A"
-        if codigo_detectado == "N/A" and ("MCV" in texto_base or "MV" in texto_base):
-            codigo_detectado = "MCV"
+        codigo_det = cod_m.group(1) if cod_m else "N/A"
+        if codigo_det == "N/A" and ("MCV" in texto_base or "MV" in texto_base): codigo_det = "MCV"
         
-        prefijo = codigo_detectado[:2]
+        prefijo = codigo_det[:2]
         val_m = re.search(r'\$\s*([\d\.,]+)', texto_base)
-        valor_obj_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
+        valor_raw = f"$ {val_m.group(1)}" if val_m else "$ 0.00"
 
         dias = _calcular_dias_habiles(data.fecha_radicacion, data.fecha_recepcion) if data.fecha_radicacion and data.fecha_recepcion else 0
         es_extemporanea = dias > 20
         msg_tiempo = f"EXTEMPORÁNEA ({dias} DÍAS)" if es_extemporanea else f"EN TÉRMINOS ({dias} DÍAS)"
 
-        # 1. CASO RATIFICADA (PRIORIDAD ALTA)
+        # PRIORIDAD 1: RATIFICACIÓN (Texto legal solicitado)
         if "RATIF" in etapa_str:
             txt_ratif = ("ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA GLOSA INICIAL "
                          "Y CONTINUACIÓN DEL PROCESO DE ACUERDO CON LA NORMA. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE LA "
@@ -115,27 +137,25 @@ class GlosaService:
                          "LA ESE HUS CARRERA 33 NO. 28-126. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, "
                          "DE NO OBTENERSE LA RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR "
                          "LEVANTADA LA RESPECTIVA OBJECIÓN.")
-            tabla = _tabla_simple(codigo_detectado, "RATIFICACIÓN", valor_obj_raw, "RE9901", "GLOSA INJUSTIFICADA", color_estado="#2563eb")
-            return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla + _div(txt_ratif), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=max(0, 20-dias))
+            tabla = _tabla_simple(codigo_det, "RATIFICACIÓN", valor_raw, "RE9901", "GLOSA INJUSTIFICADA", color_e="#2563eb")
+            return GlosaResult(tipo="LEGAL - RATIFICADA", resumen="RECHAZO RATIFICACIÓN", dictamen=tabla + _div(txt_ratif), codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-blue-600", dias_restantes=max(0, 20-dias))
 
-        # 2. CASO EXTEMPORÁNEA
+        # PRIORIDAD 2: EXTEMPORÁNEA
         if es_extemporanea and val_ac_num <= 0:
-            nombre_tipo = "TARIFAS" if prefijo in ["TA", "MC", "MV"] else "OBJECIONES VARIAS"
-            txt_ext = f"ESE HUS NO ACEPTA LA GLOSA POR {nombre_tipo} ({codigo_detectado}) POR EXTEMPORANEIDAD ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO (ART. 57 LEY 1438/2011). SE EXIGE EL PAGO INMEDIATO."
-            tabla = _tabla_simple(codigo_detectado, "EXTEMPORÁNEA", valor_obj_raw, "RE9502", "GLOSA FUERA DE TIEMPOS")
-            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt_ext), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", dias_restantes=0)
+            txt_ext = f"ESE HUS NO ACEPTA LA GLOSA POR EXTEMPORANEIDAD ({dias} DÍAS HÁBILES). OPERA ACEPTACIÓN TÁCITA DE PLENO DERECHO (ART. 57 LEY 1438/2011). SE EXIGE EL PAGO INMEDIATO."
+            tabla = _tabla_simple(codigo_det, "EXTEMPORÁNEA", valor_raw, "RE9502", "GLOSA FUERA DE TIEMPOS")
+            return GlosaResult(tipo="LEGAL - EXTEMPORÁNEA", resumen="RECHAZO EXTEMPORANEIDAD", dictamen=tabla + _div(txt_ext), codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente="N/A", mensaje_tiempo=msg_tiempo, color_tiempo="bg-red-600", dias_restantes=0)
 
-        # 3. CASO INICIAL (IA)
+        # PRIORIDAD 3: CASO INICIAL (Análisis IA Pro)
         eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
         info_c = {**CONTRATOS_FIJOS, **(contratos_db or {})}.get(eps_key, CONTRATOS_FIJOS["OTRA / SIN DEFINIR"])
-        
-        system_prompt = f"""DIRECTOR JURÍDICO ESE HUS. TODO EN MAYÚSCULAS. XML. 
-        MARCO: {info_c}. ESTRATEGIA: Citar contrato, desvirtuar glosa tarifaria/mayor valor, exigir pago Buena Fe Art 871 C.Co.
-        XML: <paciente>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>."""
+        est_actual = ESTRATEGIAS.get(prefijo, ESTRATEGIAS["PE"])
+
+        sys_p = f"Eres el DIRECTOR JURÍDICO ESE HUS. TODO EN MAYÚSCULAS. XML. MARCO: {info_c}. ESTRATEGIA: {est_actual}. DEVUELVE: <paciente>, <codigo_glosa>, <valor_objetado>, <servicio_glosado>, <argumento>."
         
         try:
             comp = await self.cliente.chat.completions.create(
-                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": f"GLOSA: {texto_base}"}],
+                messages=[{"role": "system", "content": sys_p}, {"role": "user", "content": f"GLOSA: {texto_base}\nSOPORTES: {contexto_pdf[:3000]}"}],
                 model="llama-3.3-70b-versatile", temperature=0.2
             )
             res_ia = comp.choices[0].message.content
@@ -145,16 +165,56 @@ class GlosaService:
         servicio = self.xml("servicio_glosado", res_ia, "SERVICIOS ASISTENCIALES")
         arg = self.xml("argumento", res_ia, "SIN ARGUMENTO").replace('\n', '<br/>')
         
-        apertura = f"ESE HUS NO ACEPTA LA GLOSA POR CONSIDERARLA INJUSTIFICADA, SUSTENTANDO ASÍ:"
-        tabla = _tabla_defensa(codigo_detectado, servicio, valor_obj_raw, "RE9602", "GLOSA INJUSTIFICADA")
+        dictamen = _tabla_defensa(codigo_det, servicio, valor_raw, "RE9602", "GLOSA INJUSTIFICADA") + _div(f"<b>ESE HUS NO ACEPTA LA GLOSA POR CONSIDERARLA INJUSTIFICADA:</b><br/><br/>{arg}")
         
-        return GlosaResult(tipo="TÉCNICO-LEGAL", resumen=f"DEFENSA: {paciente}", dictamen=tabla + _div(f"<b>{apertura}</b><br/><br/>{arg}"), codigo_glosa=codigo_detectado, valor_objetado=valor_obj_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", score=95, dias_restantes=max(0, 20-dias))
+        return GlosaResult(tipo=f"TÉCNICO-LEGAL [{prefijo}]", resumen=f"DEFENSA: {paciente}", dictamen=dictamen, codigo_glosa=codigo_det, valor_objetado=valor_raw, paciente=paciente, mensaje_tiempo=msg_tiempo, color_tiempo="bg-emerald-500", score=95, dias_restantes=max(0, 20-dias))
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 4. GENERADOR DE OFICIO PDF PRO
+# ═════════════════════════════════════════════════════════════════════════════
 
 def crear_oficio_pdf(eps: str, resumen: str, conclusion: str) -> bytes:
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    elements = [Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", ParagraphStyle('h1', alignment=TA_CENTER, fontSize=14)), Spacer(1, 20)]
-    clean_text = re.sub(r'<table.*?>.*?</table>', '', conclusion, flags=re.IGNORECASE | re.DOTALL)
-    elements.append(Paragraph(clean_text.replace('<br/>', '\n'), ParagraphStyle('n', alignment=TA_JUSTIFY, fontSize=11)))
-    doc.build(elements)
-    return buffer.getvalue()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=2.4*cm, leftMargin=2.4*cm, topMargin=2.2*cm, bottomMargin=2.2*cm)
+    
+    navy, teal = colors.HexColor("#0b1829"), colors.HexColor("#0d9488")
+    st_body = ParagraphStyle('B', fontName='Helvetica', fontSize=10, leading=16, alignment=TA_JUSTIFY, textColor=navy)
+    st_bold = ParagraphStyle('Bo', fontName='Helvetica-Bold', fontSize=10, leading=16, textColor=navy)
+    
+    # Limpieza de HTML para el PDF
+    cuerpo = re.sub(r'<table.*?>.*?</table>', '', conclusion, flags=re.IGNORECASE | re.DOTALL)
+    cuerpo = re.sub(r'<br\s*/?>', '\n', re.sub(r'<[^>]+>', '', cuerpo)).strip()
+    
+    elems = []
+    elems.append(Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", ParagraphStyle('T', fontName='Helvetica-Bold', fontSize=13, alignment=TA_CENTER, textColor=navy)))
+    elems.append(Paragraph("NIT: 900006037-0 | Oficina de Auditoría Médica y Cuentas", ParagraphStyle('S', fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor("#64748b"))))
+    elems.append(HRFlowable(width="100%", thickness=2, color=navy))
+    elems.append(Spacer(1, 20))
+    
+    elems.append(Paragraph(f"Bucaramanga, {datetime.now().strftime('%d de %m de %Y')}", st_body))
+    elems.append(Spacer(1, 15))
+    elems.append(Paragraph(f"<b>Señores:</b><br/>{eps.upper()}<br/><b>Ref:</b> {resumen}", st_body))
+    elems.append(Spacer(1, 15))
+
+    for parr in cuerpo.split('\n'):
+        if parr.strip():
+            elems.append(Paragraph(parr.strip(), st_body))
+            elems.append(Spacer(1, 10))
+
+    elems.append(Spacer(1, 40))
+    firma = Table([[Paragraph("__________________________<br/><b>JEFE DE AUDITORÍA MÉDICA</b>", st_body), Paragraph("__________________________<br/><b>ASESOR JURÍDICO</b>", st_body)]], colWidths=[8.5*cm, 8.5*cm])
+    elems.append(firma)
+    
+    doc.build(elems)
+    buf.seek(0)
+    return buf.read()
+
+def exportar_excel_pro(glosas: list) -> bytes:
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["ID", "Fecha", "EPS", "Paciente", "Código", "Valor", "Estado"])
+    for g in glosas: ws.append([g.id, g.creado_en.strftime("%d/%m/%Y"), g.eps, g.paciente, g.codigo_glosa, g.valor_objetado, g.estado])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
