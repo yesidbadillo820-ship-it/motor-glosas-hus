@@ -1,49 +1,43 @@
 import os
-import re
 import io
+import re
 import csv
-from datetime import datetime
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
+import logging
+import asyncio
+from typing import List, Optional
+from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
+
+from fastapi import (
+    FastAPI, UploadFile, File, Form,
+    Depends, HTTPException, Request, Security
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, Response
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import Response, FileResponse, StreamingResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from jose import JWTError, jwt
-from pydantic import BaseModel
 
-from services import GlosaService, crear_oficio_pdf
-from models import GlosaInput, GlosaResult, PDFRequest, GlosaRecord, ContratoRecord, ContratoInput, UsuarioRecord
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+
+from services import GlosaService, crear_oficio_pdf, calcular_dias_habiles, exportar_excel_pro
+from models import GlosaRecord, ContratoRecord, UsuarioRecord, GlosaInput, GlosaResult, PDFRequest, ContratoInput
 from database import engine, Base, get_db, SessionLocal
 from auth import verify_password, get_password_hash, create_access_token, SECRET_KEY, ALGORITHM
-from dotenv import load_dotenv
 
-load_dotenv()
+logger = logging.getLogger("motor_glosas")
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Motor Glosas HUS - V2 Pro")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY"))
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-def get_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    if token == "HUS2026":
-        return UsuarioRecord(nombre="Admin", email="admin@hus.gov.co")
-        
-    credenciales_excepcion = HTTPException(
-        status_code=401, detail="No se pudieron validar las credenciales", headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None: raise credenciales_excepcion
-    except JWTError:
-        raise credenciales_excepcion
-    
-    usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
-    if usuario is None: raise credenciales_excepcion
-    return usuario
+# ═════════════════════════════════════════════════════════════════════════════
+# CONFIGURACIÓN INICIAL
+# ═════════════════════════════════════════════════════════════════════════════
 
 BASE_CONTRATOS_DEFAULT = {
     "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
@@ -65,122 +59,116 @@ BASE_CONTRATOS_DEFAULT = {
     "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
 }
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     db = SessionLocal()
-    if db.query(ContratoRecord).count() == 0:
-        for k, v in BASE_CONTRATOS_DEFAULT.items():
-            db.add(ContratoRecord(eps=k, detalles=v))
+    try:
+        if db.query(ContratoRecord).count() == 0:
+            for k, v in BASE_CONTRATOS_DEFAULT.items():
+                db.add(ContratoRecord(eps=k, detalles=v))
+        if db.query(UsuarioRecord).count() == 0:
+            db.add(UsuarioRecord(nombre="Auditor Principal", email="admin@hus.gov.co", password_hash=get_password_hash("admin123")))
         db.commit()
-    if db.query(UsuarioRecord).count() == 0:
-        admin_pwd = get_password_hash("admin123")
-        db.add(UsuarioRecord(nombre="Auditor Principal", email="admin@hus.gov.co", password_hash=admin_pwd))
-        db.commit()
-    db.close()
+    finally:
+        db.close()
+    yield
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+app = FastAPI(title="Motor Glosas HUS PRO v4.0", lifespan=lifespan)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-@app.post("/token")
-def login_para_token(req: LoginRequest, db: Session = Depends(get_db)):
-    usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == req.username.strip()).first()
-    if not usuario or not verify_password(req.password.strip(), usuario.password_hash):
-        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
-    return {"access_token": create_access_token(data={"sub": usuario.email}), "token_type": "bearer"}
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+glosa_service = GlosaService(api_key=os.getenv("GROQ_API_KEY", ""))
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SEGURIDAD
+# ═════════════════════════════════════════════════════════════════════════════
+
+def get_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    if token == "HUS2026":
+        return UsuarioRecord(nombre="Admin", email="admin@hus.gov.co")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        usuario = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
+        if not usuario: raise HTTPException(status_code=401)
+        return usuario
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ENDPOINTS
+# ═════════════════════════════════════════════════════════════════════════════
 
 @app.get("/")
-async def read_index():
-    try:
-        with open("static/index.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        return HTMLResponse(content="<h1>Error: No se encontró static/index.html</h1>", status_code=404)
+def root():
+    return FileResponse("static/index.html")
 
-def limpiar_numero(v: str) -> float:
-    c = re.sub(r'[^\d]', '', str(v))
-    return float(c) if c else 0.0
-
-@app.post("/analizar", response_model=GlosaResult)
+@app.post("/analizar")
+@limiter.limit("15/minute")
 async def analizar_endpoint(
-    eps: str = Form(...), etapa: str = Form(...), fecha_radicacion: str = Form(None),
-    fecha_recepcion: str = Form(None), valor_aceptado: str = Form("0"), tabla_excel: str = Form(...),
-    archivos: list[UploadFile] = File(None), db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    
+    request: Request,
+    eps: str = Form(...), etapa: str = Form(...), 
+    fecha_radicacion: str = Form(None), fecha_recepcion: str = Form(None),
+    valor_aceptado: str = Form("0"), tabla_excel: str = Form(...),
+    archivos: list[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    u: UsuarioRecord = Depends(get_usuario_actual)
+):
     contexto_pdf = ""
     if archivos:
         for arc in archivos:
             if arc.filename: contexto_pdf += await glosa_service.extraer_pdf(await arc.read())
+
+    data = GlosaInput(eps=eps, etapa=etapa, fecha_radicacion=fecha_radicacion, fecha_recepcion=fecha_recepcion, valor_aceptado=valor_aceptado, tabla_excel=tabla_excel)
+    contratos_db = {c.eps: c.detalles for c in db.query(ContratoRecord).all()}
     
-    input_data = GlosaInput(eps=eps, etapa=etapa, fecha_radicacion=fecha_radicacion, fecha_recepcion=fecha_recepcion, valor_aceptado=valor_aceptado, tabla_excel=tabla_excel)
-    dict_contratos = {c.eps: c.detalles for c in db.query(ContratoRecord).all()}
+    res = await glosa_service.analizar(data, contexto_pdf, contratos_db)
     
-    resultado = await glosa_service.analizar(input_data, contexto_pdf, dict_contratos)
-    val_obj, val_acep = limpiar_numero(resultado.valor_objetado), limpiar_numero(valor_aceptado)
+    val_obj = float(re.sub(r'[^\d]', '', res.valor_objetado) or 0)
+    val_acep = float(re.sub(r'[^\d]', '', valor_aceptado) or 0)
     
     db.add(GlosaRecord(
-        eps=eps, paciente=resultado.paciente, codigo_glosa=resultado.codigo_glosa, valor_objetado=val_obj, 
-        valor_aceptado=val_acep, etapa=etapa, estado="ACEPTADA" if val_acep > 0 else "LEVANTADA", dictamen=resultado.dictamen
+        eps=eps, paciente=res.paciente, codigo_glosa=res.codigo_glosa, valor_objetado=val_obj,
+        valor_aceptado=val_acep, etapa=etapa, estado="ACEPTADA" if val_acep > 0 else "LEVANTADA",
+        dictamen=res.dictamen, dias_restantes=res.dias_restantes
     ))
     db.commit()
-    return resultado
-
-@app.post("/descargar-pdf")
-async def descargar_pdf(req: PDFRequest, usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    pdf_bytes = crear_oficio_pdf(req.eps, req.resumen, req.dictamen)
-    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=Oficio_HUS.pdf"})
+    return res
 
 @app.get("/glosas")
-def obtener_historial(limit: int = 50, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
+def listar_historial(limit: int = 50, db: Session = Depends(get_db), u: UsuarioRecord = Depends(get_usuario_actual)):
     return db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).limit(limit).all()
 
 @app.get("/alertas")
-def obtener_alertas(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    return db.query(GlosaRecord).filter(GlosaRecord.dias_restantes <= 5, GlosaRecord.dias_restantes > 0).order_by(GlosaRecord.dias_restantes.asc()).all()
+def obtener_alertas(db: Session = Depends(get_db), u: UsuarioRecord = Depends(get_usuario_actual)):
+    return db.query(GlosaRecord).filter(GlosaRecord.dias_restantes <= 5, GlosaRecord.dias_restantes > 0).all()
 
 @app.get("/analytics")
-def obtener_analytics(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    hoy = datetime.now().date()
-    mes_actual = hoy.replace(day=1)
-    glosas_hoy = db.query(GlosaRecord).filter(func.date(GlosaRecord.creado_en) == hoy).count()
-    glosas_mes = db.query(GlosaRecord).filter(func.date(GlosaRecord.creado_en) >= mes_actual).count()
-    sumas = db.query(func.sum(GlosaRecord.valor_objetado).label('total_obj'), func.sum(GlosaRecord.valor_aceptado).label('total_acep')).filter(func.date(GlosaRecord.creado_en) >= mes_actual).first()
-    valor_obj_mes = sumas.total_obj or 0
-    valor_acep_mes = sumas.total_acep or 0
-    valor_recuperado_mes = valor_obj_mes - valor_acep_mes
-    tasa = round((valor_recuperado_mes / valor_obj_mes) * 100, 1) if valor_obj_mes > 0 else 0
-    top_eps_query = db.query(GlosaRecord.eps, func.count(GlosaRecord.id).label('total')).group_by(GlosaRecord.eps).order_by(func.count(GlosaRecord.id).desc()).limit(5).all()
-    top_eps = [{"eps": row.eps, "total": row.total} for row in top_eps_query]
-    top_codigos_query = db.query(GlosaRecord.codigo_glosa, func.count(GlosaRecord.id).label('total')).filter(GlosaRecord.codigo_glosa != "N/A").group_by(GlosaRecord.codigo_glosa).order_by(func.count(GlosaRecord.id).desc()).limit(5).all()
-    top_codigos = [{"codigo": row.codigo_glosa, "total": row.total} for row in top_codigos_query]
-    return {"glosas_hoy": glosas_hoy, "glosas_mes": glosas_mes, "valor_objetado_mes": valor_obj_mes, "valor_recuperado_mes": valor_recuperado_mes, "tasa_exito_pct": tasa, "top_eps": top_eps, "top_codigos": top_codigos}
+def obtener_analytics(db: Session = Depends(get_db), u: UsuarioRecord = Depends(get_usuario_actual)):
+    stats = db.query(func.count(GlosaRecord.id), func.sum(GlosaRecord.valor_objetado), func.sum(GlosaRecord.valor_aceptado)).first()
+    return {
+        "glosas_mes": stats[0] or 0,
+        "valor_objetado_mes": stats[1] or 0,
+        "valor_recuperado_mes": (stats[1] or 0) - (stats[2] or 0),
+        "tasa_exito_pct": round(((stats[1] or 0) - (stats[2] or 0)) / (stats[1] or 1) * 100, 1)
+    }
 
 @app.get("/contratos")
-def get_contratos(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    return db.query(ContratoRecord).order_by(ContratoRecord.eps).all()
+def get_contratos(db: Session = Depends(get_db), u: UsuarioRecord = Depends(get_usuario_actual)):
+    return db.query(ContratoRecord).all()
 
-@app.post("/contratos")
-def save_contrato(req: ContratoInput, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    c = db.query(ContratoRecord).filter(ContratoRecord.eps == req.eps.upper()).first()
-    if c: c.detalles = req.detalles.upper()
-    else: db.add(ContratoRecord(eps=req.eps.upper(), detalles=req.detalles.upper()))
-    db.commit()
-    return {"msg": "ok"}
-
-@app.delete("/contratos/{eps}")
-def delete_contrato(eps: str, db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    db.query(ContratoRecord).filter(ContratoRecord.eps == eps).delete()
-    db.commit()
-    return {"msg": "ok"}
+@app.post("/descargar-pdf")
+async def descargar_pdf(req: PDFRequest, u: UsuarioRecord = Depends(get_usuario_actual)):
+    pdf_bytes = crear_oficio_pdf(req.eps, req.resumen, req.dictamen)
+    return Response(content=pdf_bytes, media_type="application/pdf")
 
 @app.get("/exportar-historial")
-def exportar_historial(db: Session = Depends(get_db), usuario_actual: UsuarioRecord = Depends(get_usuario_actual)):
-    glosas = db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).all()
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-    writer.writerow(["ID", "Fecha Procesamiento", "EPS / Pagador", "Paciente", "Codigo Glosa", "Valor Objetado", "Valor Aceptado", "Etapa Procesal", "Estado Final"])
-    for g in glosas:
-        fecha_str = g.creado_en.strftime("%d/%m/%Y %H:%M")
-        writer.writerow([g.id, fecha_str, g.eps, g.paciente, g.codigo_glosa, g.valor_objetado, g.valor_aceptado, g.etapa, g.estado])
-    csv_bytes = output.getvalue().encode('utf-8-sig')
-    return Response(content=csv_bytes, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=Reporte_Glosas_HUS.csv"})
+def exportar_historial(db: Session = Depends(get_db), u: UsuarioRecord = Depends(get_usuario_actual)):
+    glosas = db.query(GlosaRecord).all()
+    excel_bytes = exportar_excel_pro(glosas)
+    return Response(content=excel_bytes, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
