@@ -20,7 +20,7 @@ ACCESS_TOKEN = os.getenv("ACCESS_TOKEN", "HUS2026") # Cambia esto en producción
 
 app = FastAPI(title="Motor Glosas IA HUS")
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="static")
 
 API_KEY = os.getenv("GROQ_API_KEY")
 glosa_service = GlosaService(api_key=API_KEY)
