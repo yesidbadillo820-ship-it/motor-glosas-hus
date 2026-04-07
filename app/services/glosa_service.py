@@ -24,28 +24,7 @@ FERIADOS_CO = [
     "2026-11-16","2026-12-08","2026-12-25",
 ]
 
-# ── 2. MARCO CONTRACTUAL INTEGRAL (17 ENTIDADES ESE HUS) ──
-_CONTRATOS_BASE = {
-    "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",
-    "COMPENSAR": "CONTRATO: CSS009-2024. TARIFA: SOAT -15% y Tarifas Propias. OBS: Excluye oncológicos. MAOS por EPS.",
-    "FAMISANAR": "CARTA DE INTENCIÓN. TARIFA: SOAT UVB -5% e Institucionales.",
-    "FOMAG": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15%, Institucionales y Paquetes (Tórax, IVE, Columna, Terapias, Gastro).",
-    "LA PREVISORA": "CONTRATO: 12076-359-2025. TARIFA: SOAT -15% y Paquetes.",
-    "DISPENSARIO MEDICO": "CONTRATO: 440-DIGSA/DMBUG-2025. TARIFA: SOAT SMLV -20% e Institucionales.",
-    "POLICIA NACIONAL": "CONTRATOS: 068-5-200004-26 y 068-5-200006-26. TARIFA: SOAT UVB -8% e Institucionales. OBS: Contrato 0006-26 INCLUYE medicamentos oncológicos.",
-    "NUEVA EPS": "CONTRATO: 02-01-06-00077-2017. TARIFA: SOAT -20% e Institucionales. OBS: Meds Oncológicos por HUS.",
-    "PPL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%. OBS: MAOS y Meds por HUS.",
-    "FIDUCIARIA CENTRAL": "CONTRATO: IPS-001B-2022 (Otrosí 26). TARIFA: SOAT -15%.",
-    "POSITIVA": "CONTRATO: 525 - OTROSÍ 3. TARIFA: SOAT SMLV -15%. OBS: Solo accidentes/laboral.",
-    "PRECIMED": "CONTRATO: 319 DE 2024. TARIFA: Tarifas anexos / Institucionales.",
-    "SALUD MIA": "CONTRATOS: SSA2025EVE3A005 y CSA2025EVE3A005. TARIFA: SOAT -15%. OBS: Urgencias Circular 019/2023.",
-    "AURORA": "CONTRATOS: GID ARL 0090 y GID AP 0090. TARIFA: SOAT -3%.",
-    "SECRETARIA DE SANTANDER": "MARCO LEGAL: Resolución 15997 de 2017 (Tarifas obligatorias ente territorial).",
-    "SUMIMEDICAL": "CONTRATO: FPS23-050. TARIFA: SOAT -15%. OBS: MAOS y Oncológicos por EPS.",
-    "OTRA / SIN DEFINIR": "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026_0001 / DECRETO 441 DE 2022)."
-}
-
-# ── 3. ESTRATEGIAS TÉCNICO-LEGALES (ANEXO 5 RES. 3047) ──
+# ── 2. ESTRATEGIAS TÉCNICO-LEGALES (ANEXO 5 RES. 3047) ──
 ESTRATEGIAS_HUS = {
     "TA": "RECHAZO POR TARIFA. El cobro cumple el contrato o el manual SOAT pleno. La EPS no puede aplicar descuentos unilaterales.",
     "SO": "SOPORTES SUFICIENTES. La Historia Clínica es plena prueba (Res. 1995/1999). El servicio se prestó y los anexos cumplen la norma.",
@@ -58,9 +37,9 @@ ESTRATEGIAS_HUS = {
 }
 
 class GlosaService:
-    def __init__(self, groq_api_key: str):
+    def __init__(self, groq_api_key: str = None, anthropic_api_key: str = None):
         self.groq = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
-        self.anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+        self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         texto_base = str(data.tabla_excel).strip().upper()
@@ -98,10 +77,10 @@ class GlosaService:
             else:
                 cod_res, desc_res = "RE9602", "EVIDENCIA QUE DEMUESTRA QUE LA GLOSA ES INJUSTIFICADA AL 100%"
 
-        # ── Contexto de Contratos (17 Entidades) ──
+        # ── Contexto de Contratos ──
         eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
-        todos_contratos = {**_CONTRATOS_BASE, **(contratos_db or {})}
-        info_contrato = todos_contratos.get(eps_key, todos_contratos["OTRA / SIN DEFINIR"])
+        todos_contratos = contratos_db or {}
+        info_contrato = todos_contratos.get(eps_key, "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO (RESOLUCIÓN 054 DE 2026).")
         
         # ── Prompt Jurídico Blindado ──
         estrategia = ESTRATEGIAS_HUS.get(prefijo, ESTRATEGIAS_HUS["DEFAULT"])

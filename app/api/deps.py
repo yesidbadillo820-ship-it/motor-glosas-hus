@@ -10,7 +10,7 @@ from app.core.config import get_settings
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_usuario_actual(
-    token: str = Depends(OAuth2PasswordBearer(tokenUrl="token")),
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> UsuarioRecord:
     """

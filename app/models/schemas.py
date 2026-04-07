@@ -8,12 +8,17 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class GlosaInput(BaseModel):
     eps: str                  = Field(..., min_length=2, max_length=100)
-    etapa: str                = Field(..., pattern=r"^(INICIAL|RATIFICACION|RESPUESTA)$")
+    etapa: str                = Field(..., pattern=r"^(INICIAL|RATIF| RATIFICACION|RESPUESTA)$")
     fecha_radicacion: Optional[date] = None
     fecha_recepcion:  Optional[date] = None
     valor_aceptado: str       = Field(default="0")
     tabla_excel: str          = Field(..., min_length=5,
                                       description="Texto copiado de la glosa en Excel")
+
+    @field_validator("etapa")
+    @classmethod
+    def etapa_uppercase(cls, v: str) -> str:
+        return v.strip().upper()
 
     @field_validator("eps")
     @classmethod

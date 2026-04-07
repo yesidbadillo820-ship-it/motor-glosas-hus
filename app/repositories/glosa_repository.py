@@ -56,7 +56,7 @@ class GlosaRepository:
             .filter(
                 GlosaRecord.dias_restantes <= dias_limite,
                 GlosaRecord.dias_restantes > 0,
-                GlosaRecord.estado == "LEVANTADA",
+                GlosaRecord.estado != "LEVANTADA",
             )
             .order_by(GlosaRecord.dias_restantes.asc())
             .all()
