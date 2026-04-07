@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from app.database import get_db
-from app.models.db import UsuarioRecord
+from app.infrastructure.db.models import UsuarioRecord
 from app.models.schemas import TokenResponse
 from app.auth import authenticate_user, create_access_token
 from app.core.config import get_settings

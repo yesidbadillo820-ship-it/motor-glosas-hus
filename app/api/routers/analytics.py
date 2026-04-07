@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual, get_db
 from app.models.schemas import AnalyticsResult
-from app.models.db import UsuarioRecord
-from app.repositories.glosa_repository import GlosaRepository
+from app.infrastructure.db.models import UsuarioRecord
+from app.infrastructure.repositories.glosa_repository import GlosaRepository
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -13,12 +13,32 @@ def obtener_metricas_desempeno(
     db: Session = Depends(get_db),
     usuario: UsuarioRecord = Depends(get_usuario_actual)
 ):
-    """
-    Calcula en tiempo real:
-    - Total de glosas procesadas.
-    - Valor total objetado.
-    - Valor recuperado (levantado).
-    - Tasa de éxito porcentual.
-    """
     repo = GlosaRepository(db)
-    return repo.analytics()
+    metrics = repo.metrics()
+    
+    return AnalyticsResult(
+        glosas_mes=metrics["total"],
+        valor_objetado_mes=metrics["valor_total"],
+        valor_recuperado_mes=metrics["valor_recuperado"],
+        tasa_exito_pct=metrics["tasa_recuperacion"],
+    )
+
+
+@router.get("/por-estado")
+def analytics_por_estado(
+    db: Session = Depends(get_db),
+    _: UsuarioRecord = Depends(get_usuario_actual),
+):
+    repo = GlosaRepository(db)
+    metrics = repo.metrics()
+    return metrics["por_estado"]
+
+
+@router.get("/por-eps")
+def analytics_por_eps(
+    db: Session = Depends(get_db),
+    _: UsuarioRecord = Depends(get_usuario_actual),
+):
+    repo = GlosaRepository(db)
+    metrics = repo.metrics()
+    return metrics["por_eps"]

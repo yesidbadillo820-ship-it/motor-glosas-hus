@@ -5,15 +5,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi import BackgroundTasks
 
 from app.database import engine, Base, SessionLocal
-from app.models.db import ContratoRecord, UsuarioRecord
+from app.infrastructure.db.models import ContratoRecord, UsuarioRecord
 from app.core.config import get_settings
 from app.auth import get_password_hash
+from app.infrastructure.external.observabilidad import observabilidad_logger
 
-# Routers
 from app.api.routers import glosas, contratos, analytics
 from app.api.routers.auth_router import router as auth_router
+from app.api.routers.workflow import router as workflow_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("motor_glosas")
@@ -75,6 +77,7 @@ app.include_router(auth_router)
 app.include_router(glosas.router)
 app.include_router(contratos.router)
 app.include_router(analytics.router)
+app.include_router(workflow_router)
 
 
 @app.get("/")
