@@ -1,5 +1,7 @@
 import logging
+import json
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +17,24 @@ from app.auth import get_password_hash
 from app.api.routers import glosas, contratos, analytics
 from app.api.routers.auth_router import router as auth_router
 
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_data)
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("motor_glosas")
+for h in logger.handlers:
+    h.setFormatter(JsonFormatter())
 
 CONTRATOS_DEFAULT = {
     "COOSALUD": "CONTRATOS: 68001S00060339-24 y 68001C00060340-24. TARIFA: SOAT -15% e Institucionales. OBS: MAOS por HUS, Oncológicos por EPS.",

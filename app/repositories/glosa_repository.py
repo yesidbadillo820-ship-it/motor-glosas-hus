@@ -1,15 +1,17 @@
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from app.models.db import GlosaRecord
 from app.models.schemas import AnalyticsResult
+from app.domain.entities.glosa import GlosaEntity, EstadoGlosa
+from app.domain.services.scoring import MotorScoring
 
 
 class GlosaRepository:
-    """Acceso a datos para glosas. Cero lógica de negocio aquí."""
-
     def __init__(self, db: Session):
         self.db = db
+        self.scoring = MotorScoring()
 
     def crear(
         self,
@@ -23,6 +25,9 @@ class GlosaRepository:
         dictamen: str,
         dias_restantes: int,
         modelo_ia: Optional[str] = None,
+        score: int = 0,
+        fecha_radicacion: Optional[datetime] = None,
+        fecha_recepcion: Optional[datetime] = None,
     ) -> GlosaRecord:
         record = GlosaRecord(
             eps=eps,
@@ -35,11 +40,61 @@ class GlosaRepository:
             dictamen=dictamen,
             dias_restantes=dias_restantes,
             modelo_ia=modelo_ia,
+            score=score,
+            fecha_radicacion=fecha_radicacion,
+            fecha_recepcion=fecha_recepcion,
         )
         self.db.add(record)
         self.db.commit()
         self.db.refresh(record)
         return record
+
+    def actualizar_estado(
+        self,
+        glosa_id: int,
+        nuevo_estado: str,
+        responsable: Optional[str] = None,
+    ) -> Optional[GlosaRecord]:
+        glosa = self.obtener_por_id(glosa_id)
+        if not glosa:
+            return None
+        
+        try:
+            estado_enum = EstadoGlosa[nuevo_estado.upper()]
+        except KeyError:
+            estado_enum = EstadoGlosa.RADICADA
+        
+        entity = self._to_entity(glosa)
+        if entity.transicionar(estado_enum, responsable):
+            glosa.estado = nuevo_estado
+            glosa.responsable = responsable
+            glosa.score = self.scoring.calcular_score(
+                GlosaEntity(
+                    valor_objetado=glosa.valor_objetado,
+                    dias_restantes=glosa.dias_restantes,
+                )
+            )
+            self.db.commit()
+            self.db.refresh(glosa)
+        return glosa
+
+    def _to_entity(self, record: GlosaRecord) -> GlosaEntity:
+        return GlosaEntity(
+            id=record.id,
+            eps=record.eps,
+            paciente=record.paciente,
+            factura=record.factura,
+            codigo_glosa=record.codigo_glosa,
+            valor_objetado=record.valor_objetado,
+            valor_aceptado=record.valor_aceptado,
+            etapa=record.etapa,
+            estado=EstadoGlosa(record.estado.upper()) if record.estado else EstadoGlosa.RADICADA,
+            dictamen=record.dictamen or "",
+            dias_restantes=record.dias_restantes,
+            score=record.score,
+            modelo_ia=record.modelo_ia,
+            responsable=record.responsable,
+        )
 
     def listar(self, limit: int = 50, eps: Optional[str] = None) -> list[GlosaRecord]:
         q = self.db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc())
