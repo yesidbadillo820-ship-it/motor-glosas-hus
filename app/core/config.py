@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Metadatos de la App
     app_name: str = "Motor Glosas HUS"
     app_version: str = "5.0.0"
+    debug: bool = False
 
     class Config:
         env_file = ".env"
