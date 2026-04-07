@@ -11,9 +11,8 @@ from app.models.db import ContratoRecord, UsuarioRecord
 from app.core.config import get_settings
 from app.auth import get_password_hash
 
-# Routers
-from app.api.routers import glosas, contratos, analytics
-from app.api.routers.auth_router import router as auth_router
+# Routers - Clean Architecture interfaces
+from app.interfaces.api import glosas_router, contratos_router, auth_router, analytics_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("motor_glosas")
@@ -70,11 +69,11 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Registrar todos los routers
+# Registrar todos los routers (Clean Architecture)
 app.include_router(auth_router)
-app.include_router(glosas.router)
-app.include_router(contratos.router)
-app.include_router(analytics.router)
+app.include_router(glosas_router)
+app.include_router(contratos_router)
+app.include_router(analytics_router)
 
 
 @app.get("/")

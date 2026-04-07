@@ -1,0 +1,1 @@
+# infrastructure layer - implementaciones técnicas (DB, repositorios, servicios externos)

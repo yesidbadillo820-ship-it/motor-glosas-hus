@@ -1,0 +1,1 @@
+# domain layer - núcleo de negocio puro sin dependencias técnicas

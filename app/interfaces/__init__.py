@@ -1,0 +1,1 @@
+# interfaces layer - adaptadores que exponen el sistema al exterior (API REST, CLI, etc)

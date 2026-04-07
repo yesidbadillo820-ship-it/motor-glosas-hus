@@ -1,0 +1,1 @@
+# application layer - casos de uso orquestan la lógica de negocio
