@@ -98,3 +98,110 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type:   str = "bearer"
     nombre:       str
+    rol:          Optional[str] = "auditor"
+    eps_asignadas: Optional[list[str]] = []
+
+
+class UsuarioCreate(BaseModel):
+    nombre:        str = Field(..., min_length=2)
+    email:         str = Field(..., email=True)
+    password:      str = Field(..., min_length=6)
+    rol:           str = Field(default="auditor")
+    eps_asignadas: Optional[list[str]] = []
+
+
+class UsuarioResponse(BaseModel):
+    id:             int
+    nombre:         str
+    email:          str
+    rol:            str
+    eps_asignadas:  Optional[list[str]] = []
+    activo:         bool
+    
+    model_config = {"from_attributes": True}
+
+
+class WorkflowTransition(BaseModel):
+    glosa_id:      int
+    nuevo_estado:   str
+    motivo:        Optional[str] = None
+    
+    @field_validator("nuevo_estado")
+    @classmethod
+    def validar_estado(cls, v: str) -> str:
+        estados_validos = ["RADICADA", "EN_REVISION", "RESPONDIDA", "ACEPTADA", "RECHAZADA", "CERRADA"]
+        v_upper = v.upper()
+        if v_upper not in estados_validos:
+            raise ValueError(f"Estado debe ser uno de: {estados_validos}")
+        return v_upper
+
+
+class GlosaDetail(BaseModel):
+    id:               int
+    eps:              str
+    paciente:         str
+    codigo_glosa:     str
+    valor_objetado:   float
+    valor_aceptado:   float
+    etapa:            str
+    estado:           str
+    estado_workflow:  str
+    prioridad:        str
+    score:            int
+    dias_restantes:   int
+    responsable_id:   Optional[int] = None
+    comentario:       Optional[str] = None
+    modelo_ia:        Optional[str] = None
+    created_at:       str
+    updated_at:       str
+    
+    model_config = {"from_attributes": True}
+
+
+class GlosaScoreRequest(BaseModel):
+    glosa_id: int
+
+
+class GlosaScoreResponse(BaseModel):
+    glosa_id: int
+    score: float
+    prioridad: str
+    valor_ajustado: float
+    probabilidad_recuperacion: float
+    dias_hasta_vencimiento: int
+
+
+class AsyncTaskResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+
+class ReglaEvaluacion(BaseModel):
+    nombre: str
+    cumple: bool
+    mensaje: str
+    severidad: str
+
+
+class ReglasResponse(BaseModel):
+    glosa_id: int
+    reglas: list[ReglaEvaluacion]
+    tiene_infracciones_criticas: bool
+
+
+class ContratoVersionInput(BaseModel):
+    eps:      str = Field(..., min_length=2)
+    version:  int
+    detalles: str = Field(..., min_length=10)
+
+
+class ContratoVersionResponse(BaseModel):
+    id:       int
+    eps:      str
+    version:  int
+    detalles: str
+    activo:   bool
+    creado_en: str
+    
+    model_config = {"from_attributes": True}

@@ -17,7 +17,6 @@ async def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     cfg = get_settings()
-    # Necesitas implementar authenticate_user en tu archivo auth.py
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -30,8 +29,15 @@ async def login_for_access_token(
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
+    
+    eps_list = []
+    if user.eps_asignadas:
+        eps_list = [e.strip() for e in user.eps_asignadas.split(",")]
+    
     return {
         "access_token": access_token, 
         "token_type": "bearer",
-        "nombre": user.nombre
+        "nombre": user.nombre,
+        "rol": user.rol,
+        "eps_asignadas": eps_list
     }

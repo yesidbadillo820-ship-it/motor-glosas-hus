@@ -7,13 +7,22 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import engine, Base, SessionLocal
-from app.models.db import ContratoRecord, UsuarioRecord
+from app.models.db import ContratoRecord, UsuarioRecord, ContratoVersionRecord, ReglaVersionRecord
 from app.core.config import get_settings
 from app.auth import get_password_hash
 
 # Routers
 from app.api.routers import glosas, contratos, analytics
 from app.api.routers.auth_router import router as auth_router
+
+# New interfaces
+from app.interfaces.api import (
+    workflow_router,
+    scoring_router,
+    reglas_router,
+    async_router,
+    usuarios_router,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("motor_glosas")
@@ -51,6 +60,7 @@ async def lifespan(app: FastAPI):
                 nombre="Auditor Principal",
                 email="admin@hus.gov.co",
                 password_hash=get_password_hash("admin123"),
+                rol="admin",
             ))
         db.commit()
     finally:
@@ -75,6 +85,13 @@ app.include_router(auth_router)
 app.include_router(glosas.router)
 app.include_router(contratos.router)
 app.include_router(analytics.router)
+
+# Nuevos routers (Clean Architecture)
+app.include_router(workflow_router)
+app.include_router(scoring_router)
+app.include_router(reglas_router)
+app.include_router(async_router)
+app.include_router(usuarios_router)
 
 
 @app.get("/")
