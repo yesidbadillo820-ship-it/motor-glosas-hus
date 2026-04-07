@@ -7,13 +7,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import engine, Base, SessionLocal
-from app.models.db import ContratoRecord, UsuarioRecord
+from app.domain.entities.db import ContratoRecord, UsuarioRecord
 from app.core.config import get_settings
 from app.auth import get_password_hash
 
 # Routers
-from app.api.routers import glosas, contratos, analytics
-from app.api.routers.auth_router import router as auth_router
+from app.interfaces.api.routers import glosas, contratos, analytics
+from app.interfaces.api.routers.auth_router import router as auth_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("motor_glosas")

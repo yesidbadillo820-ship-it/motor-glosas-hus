@@ -4,7 +4,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from app.models.db import UsuarioRecord
+from app.domain.entities.db import UsuarioRecord
 from app.core.config import get_settings
 
 # Configuración de hashing
