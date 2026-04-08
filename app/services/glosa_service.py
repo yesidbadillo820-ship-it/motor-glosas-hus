@@ -244,12 +244,22 @@ class GlosaService:
             cod_res, desc_res = "RE9502", "GLOSA EXTEMPORÁNEA - IMPROCEDENTE (Art. 56 Ley 1438/2011)"
         elif es_ratificacion:
             cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - NO ACEPTADA"
+        elif prefijo == "AU":
+            cod_res, desc_res = "RE0101", "NO SE ACEPTA GLOSA POR AUTORIZACIÓN"
+        elif prefijo == "SO":
+            cod_res, desc_res = "RE0201", "NO SE ACEPTA GLOSA POR SOPORTES"
+        elif prefijo == "CO":
+            cod_res, desc_res = "RE0401", "NO SE ACEPTA GLOSA POR COBERTURA"
+        elif prefijo == "FA":
+            cod_res, desc_res = "RE0601", "NO SE ACEPTA GLOSA POR FACTURACIÓN"
+        elif prefijo == "PE":
+            cod_res, desc_res = "RE0501", "NO SE ACEPTA GLOSA POR PERTINENCIA"
         elif es_tarifa and not tiene_contrato:
             cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - SIN CONTRATO"
         elif "DEVOLUCION" in texto_base or "DEV." in texto_base:
             cod_res, desc_res = "RE9601", "DEVOLUCIÓN INJUSTIFICADA"
         else:
-            cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA"
+            cod_res, desc_res = "RE9901", "NO SE ACEPTA LA GLOSA"
 
         plantilla = obtener_plantilla_por_codigo(codigo_det)
         usa_plantilla = plantilla is not None
