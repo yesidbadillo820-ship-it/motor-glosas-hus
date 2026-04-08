@@ -86,7 +86,37 @@ cfg = get_settings()
 # Rate limiter para proteger endpoints de IA
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="Motor Glosas HUS", version="5.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Motor Glosas HUS",
+    description="""
+## API del Motor de Glosas - ESE Hospital Universitario de Santander
+
+Sistema automatizado de defensa de glosas médicas con asistencia de IA.
+
+### Funcionalidades
+- **Análisis automático** de glosas mediante Groq/Anthropic
+- **Detección de extemporaneidad** (20 días hábiles - Art. 56 Ley 1438/2011)
+- **Plantillas especializadas** por tipo de glosa
+- **Gestión de contratos** EPS con tarifas específicas
+- **Historial y métricas** de glosas
+
+### Autenticación
+Todos los endpoints excepto `/health` requieren token JWT.
+Obtener token en `/api/auth/login`.
+
+### Códigos de Respuesta
+| Código | Descripción |
+|--------|-------------|
+| RE9502 | Glosa Extemporánea - Improcedente |
+| RE9901 | Glosa Ratificada - No aceptada |
+| RE9602 | Glosa Injustificada |
+| RE9601 | Devolución Injustificada |
+    """,
+    version="5.1.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -121,8 +151,44 @@ def get_glosa_service() -> GlosaService:
     return GlosaService(groq_api_key=cfg.groq_api_key, anthropic_api_key=cfg.anthropic_api_key)
 
 
-@app.post("/analizar", response_model=GlosaResult)
-@limiter.limit("30/minute")  # CORRECCIÓN: rate limiting para proteger APIs de IA
+@app.post(
+    "/analizar",
+    response_model=GlosaResult,
+    summary="Analizar Glosa",
+    description="""
+Analiza una glosa y genera respuesta técnico-jurídica automática.
+
+**Ejemplo de uso:**
+```bash
+curl -X POST http://localhost:8000/analizar \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -F "eps=EPS SANITAS" \\
+  -F "etapa=RESPUESTA A GLOSA" \\
+  -F "fecha_radicacion=2026-03-01" \\
+  -F "fecha_recepcion=2026-03-25" \\
+  -F "tabla_excel=TA0201 $1,500,000 Diferencia en consulta"
+```
+
+**Respuesta de ejemplo:**
+```json
+{
+  "tipo": "RESPUESTA RE9502",
+  "resumen": "DEFENSA TÉCNICA: EXTEMPORÁNEA",
+  "codigo_glosa": "TA0201",
+  "valor_objetado": "$ 1,500,000",
+  "mensaje_tiempo": "EXTEMPORÁNEA (25 DÍAS HÁBILES - LÍMITE: 20)",
+  "score": 99.0,
+  "modelo_ia": "groq/llama-3.3"
+}
+```
+    """,
+    responses={
+        200: {"description": "Análisis completado exitosamente"},
+        422: {"description": "Datos de entrada inválidos"},
+        429: {"description": "Límite de requests excedido (30/min)"},
+    },
+)
+@limiter.limit("30/minute")
 async def analizar(
     request: Request,
     eps: str = Form(...),

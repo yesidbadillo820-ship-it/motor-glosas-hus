@@ -23,25 +23,36 @@ except ImportError:
 _CACHE_TTL = 3600  # 1 hora
 
 FERIADOS_CO = [
+    # 2025
     "2025-01-01","2025-01-06","2025-03-24","2025-04-17","2025-04-18",
     "2025-05-01","2025-06-02","2025-06-23","2025-06-30","2025-07-20",
     "2025-08-07","2025-08-18","2025-10-13","2025-11-03","2025-11-17",
     "2025-12-08","2025-12-25",
+    # 2026
     "2026-01-01","2026-01-12","2026-03-23","2026-04-02","2026-04-03",
     "2026-05-01","2026-05-18","2026-06-08","2026-06-15","2026-06-29",
     "2026-07-20","2026-08-07","2026-08-17","2026-10-12","2026-11-02",
     "2026-11-16","2026-12-08","2026-12-25",
-    # 2027 — agregar cuando el gobierno colombiano los publique (Ley Emiliani)
+    # 2027 (Ley 1393/2010 - puentes psicológicos automáticos)
+    "2027-01-01","2027-01-11","2027-03-22","2027-04-01","2027-04-02",
+    "2027-05-01","2027-05-17","2027-06-07","2027-06-14","2027-06-28",
+    "2027-07-20","2027-08-07","2027-08-16","2027-10-11","2027-11-01",
+    "2027-11-15","2027-12-08","2027-12-25",
+    # 2028 (estimados - verificar publicado)
+    "2028-01-01","2028-01-10","2028-03-20","2028-04-13","2028-04-14",
+    "2028-05-01","2028-05-15","2028-06-05","2028-06-12","2028-06-26",
+    "2028-07-20","2028-08-07","2028-08-14","2028-10-09","2028-10-30",
+    "2028-11-06","2028-11-13","2028-12-08","2028-12-25",
 ]
 
-# CORRECCIÓN NORMATIVA: umbral de extemporaneidad es 30 días hábiles
-# según Art. 57 Ley 1438 de 2011, NO 20 días
-DIAS_HABILES_LIMITE_EXTEMPORANEA = 30
+# PLAZO LEGAL: 20 días hábiles según Art. 56 Ley 1438 de 2011
+# Las glosas extemporáneas son improcedentes, abusivas y no deben disminuir el pago a las IPS
+DIAS_HABILES_LIMITE_EXTEMPORANEA = 20
 
 NORMATIVA_COLOMBIA = """
 NORMATIVA APLICABLE:
 - Ley 100 de 1993: Sistema de Seguridad Social Integral (Art. 168 - Urgencias)
-- Ley 1438 de 2011: Reforma al Sistema de Salud (Artículo 57 - Glosas, plazo 30 días hábiles)
+- Ley 1438 de 2011: Reforma al Sistema de Salud (Artículo 56 - Plazo 20 días hábiles para glosas)
 - Ley 1751 de 2015: Ley Estatutaria de Salud (Derecho fundamental a la salud)
 - Decreto 4747 de 2007: Regulaciones sobre glosas y devoluciones (Art. 20 - Conciliación)
 - Resolución 3047 de 2008: Anexo Técnico 5 (Procedimiento glosas)
@@ -62,14 +73,14 @@ ESTRATEGIAS_TIPO = {
 - Mencionar que la EPS no puede aplicar descuentos unilaterales sin sustento
 - El IPC es un referente NO una obligación para la IPS
 - Si hay incremento institucional debidamente aprobado, citar acto administrativo""",
-    "SO_SOPORTES": "ESTRATEGIA SOPORTES: Historia clínica es plena prueba según Res. 1995/1999. Documentos cumplen norma. EPS tuvo 30 días hábiles para objetar (Art. 57 Ley 1438/2011).",
+    "SO_SOPORTES": "ESTRATEGIA SOPORTES: Historia clínica es plena prueba según Res. 1995/1999. Documentos cumplen norma. EPS tuvo 20 días hábiles para objetar (Art. 56 Ley 1438/2011).",
     "AU_AUTORIZACION": "ESTRATEGIA AUTORIZACIÓN: Atención por urgencia vital. No requiere autorización previa. Art. 168 Ley 100/1993 y Resolución 5269/2017.",
     "CO_COBERTURA": "ESTRATEGIA COBERTURA: Servicio dentro del Plan de Beneficios en Salud (Res. 5269/2017). EPS tiene obligación de pago. No hay exclusiones.",
     "PE_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
     "FA_FACTURACION": "ESTRATEGIA FACTURACIÓN: Error formal no es causal de glosa (Circular 030/2013). Los errores formales son subsanables. La prestación del servicio genera obligación de pago.",
     "IN_INSUMOS": "ESTRATEGIA INSUMOS: Inherentes al acto médico. Se facturan al costo de adquisición más porcentaje administrativo pactado. Factura de compra disponible como soporte.",
     "ME_MEDICAMENTOS": "ESTRATEGIA MEDICAMENTOS: Dispensados bajo fórmula médica. Plan de Beneficios los incluye (Res. 5269/2017). No existe alternativa terapéutica equivalente.",
-    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Operó aceptación tácita de pleno derecho. Art. 57 Ley 1438/2011 establece 30 días hábiles. EPS perdió definitivamente el derecho a glosar."
+    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Glosa improcedente por extemporaneidad. Art. 56 Ley 1438/2011 establece 20 días hábiles. EPS perdió el derecho a glosar. Estas glosas son abusivas y no pueden disminuir el pago a la IPS."
 }
 
 CODIGOS_GLOSA = {
@@ -95,11 +106,11 @@ PLANTILLAS_CODIGO = {
     },
     "SO0101": {
         "nombre": "Falta de orden médica",
-        "plantilla": """ESE HUS NO ACEPTA GLOSA POR FALTA DE ORDEN MÉDICA. LA ATENCIÓN PRESTADA SE ENCUENTRA AMPARADA EN LA HISTORIA CLÍNICA DEL PACIENTE, LA CUAL CONTIENE LA INDICACIÓN MÉDICA CORRESPONDIENTE Y CONSTITUYE PLENA PRUEBA DE LA ATENCIÓN BRINDADA (RESOLUCIÓN 1995/1999). ADEMÁS, LA EPS TUVO UN PLAZO DE 30 DÍAS HÁBILES PARA OBJETAR SEGÚN EL ARTÍCULO 57 DE LA LEY 1438/2011 Y NO EJERCIÓ SU DERECHO OPORTUNAMENTE. SE SOLICITA EL LEVANTAMIENTO INMEDIATO DE LA GLOSA."""
+        "plantilla": """ESE HUS NO ACEPTA GLOSA POR FALTA DE ORDEN MÉDICA. LA ATENCIÓN PRESTADA SE ENCUENTRA AMPARADA EN LA HISTORIA CLÍNICA DEL PACIENTE, LA CUAL CONTIENE LA INDICACIÓN MÉDICA CORRESPONDIENTE Y CONSTITUYE PLENA PRUEBA DE LA ATENCIÓN BRINDADA (RESOLUCIÓN 1995/1999). ADEMÁS, LA EPS TUVO UN PLAZO DE 20 DÍAS HÁBILES PARA OBJETAR SEGÚN EL ARTÍCULO 56 DE LA LEY 1438/2011 Y NO EJERCIÓ SU DERECHO OPORTUNAMENTE. SE SOLICITA EL LEVANTAMIENTO INMEDIATO DE LA GLOSA."""
     },
     "SO0102": {
         "nombre": "Soportes incompletos",
-        "plantilla": """ESE HUS RECHAZA LA GLOSA POR SOPORTES INCOMPLETOS. TODOS LOS DOCUMENTOS DE FACTURACIÓN CUMPLEN CON LA NORMATIVA VIGENTE Y FUERON RADICADOS EN TÉRMINO. LA EPS TUVO EL PLAZO LEGAL DE 30 DÍAS HÁBILES PARA SOLICITAR DOCUMENTACIÓN ADICIONAL (ART. 57 LEY 1438/2011 Y DECRETO 4747/2007) Y NO LO HIZO, OPERANDO LA ACEPTACIÓN TÁCITA. SE EXIGE EL PAGO ÍNTEGRO."""
+        "plantilla": """ESE HUS RECHAZA LA GLOSA POR SOPORTES INCOMPLETOS. TODOS LOS DOCUMENTOS DE FACTURACIÓN CUMPLEN CON LA NORMATIVA VIGENTE Y FUERON RADICADOS EN TÉRMINO. LA EPS TUVO EL PLAZO LEGAL DE 20 DÍAS HÁBILES PARA SOLICITAR DOCUMENTACIÓN ADICIONAL (ART. 56 LEY 1438/2011 Y DECRETO 4747/2007) Y NO LO HIZO. SE EXIGE EL PAGO ÍNTEGRO."""
     },
     "AU0101": {
         "nombre": "Falta de autorización previa",
@@ -153,16 +164,18 @@ TEXTO_RATIFICADA = (
 
 
 def generar_texto_extemporanea(dias: int) -> str:
-    # CORRECCIÓN NORMATIVA: el plazo correcto es 30 días hábiles (Art. 57 Ley 1438/2011)
     return (
-        f"ESE HUS NO ACEPTA GLOSA EXTEMPORÁNEA. AL HABERSE SUPERADO EL PLAZO LEGAL DE "
-        f"30 DÍAS HÁBILES ESTABLECIDO EN EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 "
-        f"(HAN TRANSCURRIDO {dias} DÍAS HÁBILES) SIN QUE NUESTRA INSTITUCIÓN RECIBIERA "
-        f"NOTIFICACIÓN FORMAL DE LAS OBJECIONES, HA OPERADO DE PLENO DERECHO EL FENÓMENO "
-        f"JURÍDICO DE LA ACEPTACIÓN TÁCITA DE LA FACTURA. EN CONSECUENCIA, HA PRECLUIDO "
-        f"DEFINITIVAMENTE LA OPORTUNIDAD LEGAL DE LA EPS PARA AUDITAR, GLOSAR O RETENER "
-        f"LOS RECURSOS. SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD "
-        f"DE LAS GLOSAS APLICADAS. CUALQUIER INFORMACIÓN A CARTERA@HUS.GOV.CO."
+        f"ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. SEGÚN EL ARTÍCULO 56 "
+        f"DE LA LEY 1438 DE 2011, EL PLAZO LEGAL PARA QUE LA EPS FORMULE GLOSAS ES DE "
+        f"20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA. AL HABERSE "
+        f"SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {dias} DÍAS HÁBILES), LA GLOSA CARECE "
+        f"DE TODO SUSTENTO LEGAL Y CONSTITUYE UN ACTO ABUSIVO E IMPROCEDENTE POR PARTE DE "
+        f"LA ENTIDAD PAGADORA. LA LEY 1751 DE 2015 Y EL PRINCIPIO DE BUENA FE CONTRACTUAL "
+        f"(ART. 871 CÓDIGO DE COMERCIO) PROTEGEN EL DERECHO DE LA IPS A RECIBIR EL PAGO "
+        f"ÍNTEGRO DE LOS SERVICIOS PRESTADOS. ESTAS GLOSAS EXTEMPORÁNEAS NO DEBEN DISMINUIR "
+        f"EL PAGO DEBIDO A LA IPS BAJO NINGUNA CIRCUNSTANCIA. SE EXIGE EL LEVANTAMIENTO "
+        f"INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN "
+        f"AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
     )
 
 
@@ -192,7 +205,7 @@ class GlosaService:
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
                 dias = self._calcular_dias_habiles(str(data.fecha_radicacion), str(data.fecha_recepcion))
-                # CORRECCIÓN NORMATIVA: 30 días hábiles según Art. 57 Ley 1438/2011
+                # PLAZO LEGAL: 20 días hábiles según Art. 56 Ley 1438/2011
                 es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
                 msg_tiempo = (
                     f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES - LÍMITE: {DIAS_HABILES_LIMITE_EXTEMPORANEA})"
@@ -228,7 +241,7 @@ class GlosaService:
             tipo_glosa = "TA_TARIFA"
 
         if es_extemporanea:
-            cod_res, desc_res = "RE9502", "GLOSA EXTEMPORÁNEA - ACEPTACIÓN TÁCITA (Art. 57 Ley 1438/2011)"
+            cod_res, desc_res = "RE9502", "GLOSA EXTEMPORÁNEA - IMPROCEDENTE (Art. 56 Ley 1438/2011)"
         elif es_ratificacion:
             cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - NO ACEPTADA"
         elif es_tarifa and not tiene_contrato:
@@ -387,7 +400,7 @@ CONTRATO: {contrato}
 
 {estrategia}
 
-NORMATIVA: Ley 100/1993, Ley 1438/2011 Art.57 (30 días hábiles), Ley 1751/2015,
+NORMATIVA: Ley 100/1993, Ley 1438/2011 Art.56 (20 días hábiles), Ley 1751/2015,
 Decreto 4747/2007, Resolución 3047/2008, Resolución 5269/2017.
 
 INSTRUCCIONES:
