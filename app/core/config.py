@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     # CORS — lista de orígenes permitidos (en producción NO usar "*")
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"
 
+    # Configuración email SMTP para alertas
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    alertas_email: str = ""
+
     # Metadatos de la app
     app_name: str = "Motor Glosas HUS"
     app_version: str = "5.2.0"
@@ -29,6 +36,7 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
 
     def get_allowed_origins(self) -> list[str]:

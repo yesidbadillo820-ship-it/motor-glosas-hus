@@ -311,8 +311,6 @@ class GlosaService:
                 arg_ia = arg_ia.split("</paciente>")[-1].strip()
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
-        else:
-            arg_limpio = ""
 
         score = self._calcular_score(tipo_glosa, es_extemporanea, es_ratificacion, tiene_pdf, es_urgencia, es_tarifa, arg_limpio)
 
