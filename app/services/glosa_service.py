@@ -263,6 +263,7 @@ class GlosaService:
 
         plantilla = obtener_plantilla_por_codigo(codigo_det)
         usa_plantilla = plantilla is not None
+        arg_limpio = ""
 
         if argumento_fijo:
             pac_ia = "N/A"
