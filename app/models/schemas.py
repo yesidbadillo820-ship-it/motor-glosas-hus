@@ -11,6 +11,13 @@ class GlosaInput(BaseModel):
     etapa: str                = Field(..., min_length=3)
     fecha_radicacion: Optional[date] = None
     fecha_recepcion:  Optional[date] = None
+
+    @field_validator("fecha_radicacion", "fecha_recepcion", mode="before")
+    @classmethod
+    def parse_fecha_vacia(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
     valor_aceptado: str       = Field(default="0")
     tabla_excel: str          = Field(..., min_length=3,
                                       description="Texto copiado de la glosa en Excel")
