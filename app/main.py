@@ -105,15 +105,18 @@ Sistema automatizado de defensa de glosas médicas con asistencia de IA.
 Todos los endpoints excepto `/health` requieren token JWT.
 Obtener token en `/api/auth/login`.
 
-### Códigos de Respuesta
+### Códigos de Respuesta (Resolución 3047/2008 - Normativa Colombiana)
 | Código | Descripción |
 |--------|-------------|
-| RE9502 | Glosa Extemporánea - Improcedente |
-| RE9901 | Glosa Ratificada - No aceptada |
-| RE9602 | Glosa Injustificada |
-| RE9601 | Devolución Injustificada |
+| RE9602 | Glosa Injustificada - Aporta evidencia de que la glosa es injustificada al 100% |
+| RE9701 | Devolución aceptada al 100% |
+| RE9702 | Glosa aceptada al 100% |
+| RE9801 | Glosa aceptada y subsanada parcialmente |
+| RE9901 | Glosa no aceptada - Subsanada en su totalidad |
+| RE2201 | Respuesta extemporánea a devolución - Aceptación tácita |
+| RE2202 | Respuesta extemporánea a glosa - Aceptación tácita |
     """,
-    version="5.1.0",
+    version="5.3.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -179,12 +182,12 @@ curl -X POST http://localhost:8000/analizar \\
 **Respuesta de ejemplo:**
 ```json
 {
-  "tipo": "RESPUESTA RE9502",
-  "resumen": "DEFENSA TÉCNICA: EXTEMPORÁNEA",
+  "tipo": "RESPUESTA RE9901",
+  "resumen": "DEFENSA TÉCNICA: Glosa No Aceptada - Subsanada",
   "codigo_glosa": "TA0201",
   "valor_objetado": "$ 1,500,000",
-  "mensaje_tiempo": "EXTEMPORÁNEA (25 DÍAS HÁBILES - LÍMITE: 20)",
-  "score": 99.0,
+  "mensaje_tiempo": "EN TÉRMINOS (10 DÍAS HÁBILES - LÍMITE: 20)",
+  "score": 85.5,
   "modelo_ia": "groq/llama-3.3"
 }
 ```

@@ -241,25 +241,14 @@ class GlosaService:
             tipo_glosa = "TA_TARIFA"
 
         if es_extemporanea:
-            cod_res, desc_res = "RE9502", "GLOSA EXTEMPORÁNEA - IMPROCEDENTE (Art. 56 Ley 1438/2011)"
-        elif es_ratificacion:
-            cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - NO ACEPTADA"
-        elif prefijo == "AU":
-            cod_res, desc_res = "RE0101", "NO SE ACEPTA GLOSA POR AUTORIZACIÓN"
-        elif prefijo == "SO":
-            cod_res, desc_res = "RE0201", "NO SE ACEPTA GLOSA POR SOPORTES"
-        elif prefijo == "CO":
-            cod_res, desc_res = "RE0401", "NO SE ACEPTA GLOSA POR COBERTURA"
-        elif prefijo == "FA":
-            cod_res, desc_res = "RE0601", "NO SE ACEPTA GLOSA POR FACTURACIÓN"
-        elif prefijo == "PE":
-            cod_res, desc_res = "RE0501", "NO SE ACEPTA GLOSA POR PERTINENCIA"
+            if "DEVOLUCION" in texto_base or "DEV." in texto_base:
+                cod_res, desc_res = "RE2201", "RESPUESTA EXTEMPORÁNEA - ACEPTACIÓN TÁCITA DEVOLUCIÓN"
+            else:
+                cod_res, desc_res = "RE2202", "RESPUESTA EXTEMPORÁNEA - ACEPTACIÓN TÁCITA GLOSA"
         elif es_tarifa and not tiene_contrato:
-            cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - SIN CONTRATO"
-        elif "DEVOLUCION" in texto_base or "DEV." in texto_base:
-            cod_res, desc_res = "RE9601", "DEVOLUCIÓN INJUSTIFICADA"
+            cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
         else:
-            cod_res, desc_res = "RE9901", "NO SE ACEPTA LA GLOSA"
+            cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
 
         plantilla = obtener_plantilla_por_codigo(codigo_det)
         usa_plantilla = plantilla is not None
