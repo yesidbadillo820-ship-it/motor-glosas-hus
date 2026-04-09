@@ -47,7 +47,10 @@ NORMATIVA APLICABLE:
 - Ley 100 de 1993: Sistema de Seguridad Social Integral (Art. 168 - Urgencias)
 - Ley 1438 de 2011: Reforma al Sistema de Salud (Artículo 56 - Plazo 20 días hábiles para glosas)
 - Ley 1751 de 2015: Ley Estatutaria de Salud (Derecho fundamental a la salud)
+- Ley 1122 de 2007: Flujo de recursos entre EPS e IPS (Art. 13)
 - Decreto 4747 de 2007: Regulaciones sobre glosas y devoluciones (Art. 20 - Conciliación)
+- Decreto 780 de 2016: Decreto Único Reglamentario del Sector Salud
+- Resolución 2175 de 2015: Procedimiento de conciliación de glosas médicas
 - Resolución 3047 de 2008: Anexo Técnico 5 (Procedimiento glosas)
 - Resolución 5269 de 2017: Plan de Beneficios en Salud
 - Resolución 054 de 2026: Tarifas SOAT Plenas
@@ -55,6 +58,9 @@ NORMATIVA APLICABLE:
 - Código de Comercio: Artículo 871 (Principio de Buena Fe)
 - Circular 030 de 2013: Subsanación de errores formales en facturación
 - Resolución 1995 de 1999: Historia clínica como prueba plena
+- Sentencia T-760 de 2008: Obligaciones de las EPS en prestación de servicios
+- Sentencia T-1025 de 2002: Urgencias no requieren autorización previa
+- Sentencia T-478 de 1995: Autonomía médica como derecho fundamental
 """
 
 ESTRATEGIAS_TIPO = {
@@ -144,15 +150,16 @@ def obtener_plantilla_por_codigo(codigo: str) -> Optional[dict]:
 TEXTO_RATIFICADA = (
     "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE "
     "DE LA GLOSA INICIAL Y SE DA CONTINUACIÓN AL PROCESO DE CONFORMIDAD CON EL ARTÍCULO "
-    "57 DE LA LEY 1438 DE 2011 Y EL ARTÍCULO 20 DEL DECRETO 4747 DE 2007. SE SOLICITA "
-    "LA PROGRAMACIÓN DE LA FECHA DE CONCILIACIÓN DE AUDITORÍA MÉDICA Y/O TÉCNICA ENTRE "
-    "LAS PARTES. DE NO LLEGARSE A ACUERDO, SE ELEVARÁ EL CONFLICTO ANTE LA "
-    "SUPERINTENDENCIA NACIONAL DE SALUD SEGÚN LO DISPUESTO EN EL ART. 126 DE LA LEY "
-    "1438/2011. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: "
-    "CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO, VENTANILLA ÚNICA DE LA ESE HUS "
-    "CARRERA 33 NO. 28-126. NOTA: DE ACUERDO CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, "
-    "DE NO OBTENERSE RESPUESTA A LA GLOSA RATIFICADA EN LOS TÉRMINOS ESTABLECIDOS, "
-    "SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN."
+    "56 DE LA LEY 1438 DE 2011, EL ARTÍCULO 20 DEL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN "
+    "2175 DE 2015. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE CONCILIACIÓN DE AUDITORÍA "
+    "MÉDICA Y/O TÉCNICA ENTRE LAS PARTES SEGÚN EL PROCEDIMIENTO ESTABLECIDO. DE NO "
+    "LLEGARSE A ACUERDO, SE ELEVARÁ EL CONFLICTO ANTE LA SUPERINTENDENCIA NACIONAL "
+    "DE SALUD SEGÚN LO DISPUESTO EN EL ART. 126 DE LA LEY 1438/2011. CUALQUIER "
+    "INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO, "
+    "GLOSASYDEVOLUCIONES@HUS.GOV.CO, VENTANILLA ÚNICA DE LA ESE HUS CARRERA 33 NO. 28-126. "
+    "NOTA: DE ACUERDO CON EL ARTÍCULO 56 DE LA LEY 1438 DE 2011, DE NO OBTENERSE "
+    "RESPUESTA A LA GLOSA RATIFICADA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR "
+    "LEVANTADA LA RESPECTIVA OBJECIÓN."
 )
 
 

@@ -22,14 +22,19 @@ MARCO NORMATIVO COMPLETO:
 2. Ley 1438 de 2011 — Art. 56 (procedimiento de glosas: 20 días hábiles para glosar, 15 días para responder, 10 días para ratificar)
 3. Ley 1751 de 2015 — Art. 2 (salud como derecho fundamental), Art. 17 (autonomía médica)
 4. Decreto 4747 de 2007 — Art. 20 (conciliación de diferencias), Art. 11 (documentos de cobro)
-5. Resolución 3047 de 2008 — Anexo Técnico 5 (formatos glosas), definición de códigos de respuesta
-6. Resolución 5269 de 2017 — Plan de Beneficios en Salud (PBS)
-7. Resolución 1995 de 1999 — Historia clínica como documento médico-legal
-8. Circular 030 de 2013 MINSALUD — Errores formales subsanables, no constituyen glosa
-9. Decreto 2423 de 1996 — Manual de Tarifas SOAT
-10. Resolución 054 de 2026 — Tarifas SOAT plenas vigentes
-11. Código de Comercio Art. 871 — Buena fe contractual
-12. Ley 1122 de 2007 — Art. 13 (flujo de recursos entre EPS e IPS)
+5. Decreto 780 de 2016 — Decreto Único Reglamentario del Sector Salud
+6. Resolución 2175 de 2015 — Procedimiento de conciliación de glosas médicas
+7. Resolución 3047 de 2008 — Anexo Técnico 5 (formatos glosas), definición de códigos de respuesta
+8. Resolución 5269 de 2017 — Plan de Beneficios en Salud (PBS)
+9. Resolución 1995 de 1999 — Historia clínica como documento médico-legal
+10. Circular 030 de 2013 MINSALUD — Errores formales subsanables, no constituyen glosa
+11. Decreto 2423 de 1996 — Manual de Tarifas SOAT
+12. Resolución 054 de 2026 — Tarifas SOAT plenas vigentes
+13. Código de Comercio Art. 871 — Buena fe contractual
+14. Ley 1122 de 2007 — Art. 13 (flujo de recursos entre EPS e IPS)
+15. Sentencia T-760 de 2008 — Obligaciones de las EPS en prestación de servicios
+16. Sentencia T-1025 de 2002 — Urgencias no requieren autorización previa
+17. Sentencia T-478 de 1995 — Autonomía médica como derecho fundamental
 
 REGLAS ABSOLUTAS:
 - Cita SIEMPRE el artículo específico, no solo la ley
@@ -82,6 +87,7 @@ MARCO LEGAL URGENCIAS:
 - Art. 168 Ley 100/1993: TODA IPS está obligada a prestar atención inicial de urgencias independientemente de la capacidad de pago o condición de aseguramiento
 - Art. 2 Ley 1751/2015: El derecho a la salud es fundamental e implica atención inmediata
 - Jurisprudencia Corte Constitucional T-760/2008: La falta de autorización no puede impedir la atención en urgencias
+- Jurisprudencia Corte Constitucional T-1025/2002: Las urgencias no requieren autorización previa de la EPS
 - Resolución 5269/2017: Define urgencias y el deber de atención sin autorización previa
 
 CUANDO NO HAY URGENCIA:
@@ -97,6 +103,7 @@ PRINCIPIO DE AUTONOMÍA MÉDICA (Art. 17 Ley 1751/2015):
 - El médico tratante es quien examina al paciente y toma decisiones clínicas
 - La EPS no puede reemplazar el criterio médico desde una revisión administrativa de soportes
 - La pertinencia médica es un juicio clínico, no administrativo
+- Jurisprudencia Corte Constitucional T-478/1995: La autonomía médica es un derecho fundamental protegido constitucionalmente
 
 ARGUMENTOS:
 1. La historia clínica documenta la evaluación del médico y su razonamiento diagnóstico
@@ -105,7 +112,7 @@ ARGUMENTOS:
 4. Toda la comunidad médica reconoce la indicación del procedimiento para el diagnóstico documentado
 5. Ante la duda clínica, el médico tiene el deber de hacer, no de omitir (principio de beneficencia)
 
-CIERRE: Solicitar conciliación de auditoría médica conjunta (Art. 20 Decreto 4747/2007)
+CIERRE: Solicitar conciliación de auditoría médica conjunta (Art. 20 Decreto 4747/2007, Res. 2175/2015)
 """
 
 SYSTEM_COBERTURA = SYSTEM_BASE + """
