@@ -7,10 +7,10 @@ class Settings(BaseSettings):
     # Base de datos
     database_url: str = "sqlite:///./glosas.db"
 
-    # Seguridad JWT — SIN valor por defecto para forzar configuración explícita
+    # Seguridad JWT — Token de 1 hora según recomendaciones OWASP
     secret_key: str = "dev-only-secret-key-change-in-production"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 1440
+    access_token_expire_minutes: int = 60  # 1 hora (antes: 24h)
 
     # Contraseña admin inicial — leer desde variable de entorno
     admin_password: str = "admin123"

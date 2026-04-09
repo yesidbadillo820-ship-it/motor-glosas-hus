@@ -25,6 +25,8 @@ class GlosaRepository:
         workflow_state: Optional[str] = "RADICADA",
         score: Optional[float] = 0.0,
         prioridad: Optional[str] = "BAJA",
+        numero_radicado: Optional[str] = None,
+        factura: Optional[str] = None,
     ) -> GlosaRecord:
         record = GlosaRecord(
             eps=eps,
@@ -41,6 +43,8 @@ class GlosaRepository:
             workflow_state=workflow_state,
             score=score,
             prioridad=prioridad,
+            numero_radicado=numero_radicado,
+            factura=factura,
         )
         self.db.add(record)
         self.db.commit()
@@ -66,7 +70,9 @@ class GlosaRepository:
             q = q.filter(
                 (GlosaRecord.paciente.ilike(f'%{search}%')) |
                 (GlosaRecord.eps.ilike(f'%{search}%')) |
-                (GlosaRecord.codigo_glosa.ilike(f'%{search}%'))
+                (GlosaRecord.codigo_glosa.ilike(f'%{search}%')) |
+                (GlosaRecord.numero_radicado.ilike(f'%{search}%')) |
+                (GlosaRecord.factura.ilike(f'%{search}%'))
             )
         
         # Total sin filtros para paginación
@@ -100,10 +106,17 @@ class GlosaRepository:
         )
 
     def analytics(self) -> AnalyticsResult:
+        from datetime import datetime
+        from sqlalchemy import extract
+        now = datetime.now()
+        
         stats = self.db.query(
             func.count(GlosaRecord.id),
             func.sum(GlosaRecord.valor_objetado),
             func.sum(GlosaRecord.valor_aceptado),
+        ).filter(
+            extract('year', GlosaRecord.creado_en) == now.year,
+            extract('month', GlosaRecord.creado_en) == now.month,
         ).first()
 
         total = stats[0] or 0

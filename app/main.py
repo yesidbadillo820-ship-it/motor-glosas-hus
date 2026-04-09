@@ -274,6 +274,8 @@ async def analizar(
         dias_restantes=resultado.dias_restantes,
         modelo_ia=resultado.modelo_ia,
         score=resultado.score,
+        numero_radicado=numero_radicado,
+        factura=numero_factura,
     )
 
     logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")

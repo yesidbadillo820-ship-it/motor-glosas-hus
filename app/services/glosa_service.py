@@ -6,21 +6,14 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 
 import httpx
+from cachetools import TTLCache
 from groq import AsyncGroq
 from app.models.schemas import GlosaInput, GlosaResult
 from app.core.logging_utils import logger
 from app.services.glosa_ia_prompts import get_system_prompt, build_user_prompt
 
-# Cache simple en memoria para evitar llamadas duplicadas a la IA
-# CORRECCIÓN: usar maxsize para evitar crecimiento ilimitado de memoria
-try:
-    from cachetools import TTLCache
-    _cache_ia: TTLCache = TTLCache(maxsize=500, ttl=3600)
-except ImportError:
-    # Fallback a dict con limpieza manual si cachetools no está instalado
-    _cache_ia: Dict[str, tuple] = {}
-
-_CACHE_TTL = 3600  # 1 hora
+_CACHE_IA: TTLCache = TTLCache(maxsize=500, ttl=3600)
+_CACHE_TTL = 3600
 
 FERIADOS_CO = [
     # 2025
@@ -501,8 +494,8 @@ INSTRUCCIONES:
         clave_cache = hashlib.sha256(f"{system}:{user}".encode()).hexdigest()
 
         # Verificar cache (TTLCache maneja expiración automáticamente)
-        if clave_cache in _cache_ia:
-            cached = _cache_ia[clave_cache]
+        if clave_cache in _CACHE_IA:
+            cached = _CACHE_IA[clave_cache]
             if isinstance(cached, tuple):
                 respuesta, modelo = cached[0], cached[1]
             else:
@@ -523,7 +516,7 @@ INSTRUCCIONES:
                 max_tokens=2500
             )
             content = resp.choices[0].message.content
-            _cache_ia[clave_cache] = (content, "groq/llama-3.3")
+            _CACHE_IA[clave_cache] = (content, "groq/llama-3.3")
             return content, "groq/llama-3.3"
         except Exception as e:
             logger.error(f"IA Error Groq: {e}")
@@ -547,7 +540,7 @@ INSTRUCCIONES:
                         data = resp.json()
                         if "content" in data:
                             content = data["content"][0]["text"]
-                            _cache_ia[clave_cache] = (content, "anthropic/claude")
+                            _CACHE_IA[clave_cache] = (content, "anthropic/claude")
                             return content, "anthropic/claude"
                 except Exception as e2:
                     logger.error(f"Fallback Anthropic error: {e2}")
