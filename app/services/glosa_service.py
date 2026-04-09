@@ -307,9 +307,12 @@ class GlosaService:
 
             if "<paciente>" in arg_ia:
                 arg_ia = arg_ia.split("</paciente>")[-1].strip()
+            arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
+        else:
+            arg_limpio = ""
 
-        score = self._calcular_score(tipo_glosa, es_extemporanea, es_ratificacion, tiene_pdf, es_urgencia, es_tarifa)
+        score = self._calcular_score(tipo_glosa, es_extemporanea, es_ratificacion, tiene_pdf, es_urgencia, es_tarifa, arg_limpio)
 
         dictamen = self._generar_dictamen_html(
             codigo_det, valor_raw, cod_res, desc_res, arg_ia, data.eps, tipo_glosa,
@@ -331,7 +334,8 @@ class GlosaService:
         )
 
     def _calcular_score(self, tipo_glosa: str, es_extemporanea: bool, es_ratificacion: bool,
-                        tiene_pdf: bool, es_urgencia: bool, es_tarifa: bool) -> float:
+                        tiene_pdf: bool, es_urgencia: bool, es_tarifa: bool,
+                        argumento_generado: str = "") -> float:
         if es_extemporanea:
             base = 99.0
         elif es_ratificacion:
@@ -342,8 +346,24 @@ class GlosaService:
             base = 75.0
         else:
             base = 85.0
+        
         if tiene_pdf:
             base = min(100.0, base + 5.0)
+        
+        if argumento_generado:
+            normas_citadas = len(re.findall(
+                r'(LEY\s*\d+|DECRETO\s*\d+|RESOLUCIÓN|RESOLUCIÓN\s*\d+|ART\.\s*\d+|ARTÍCULO\s*\d+|SENTENCIA)',
+                argumento_generado.upper()
+            ))
+            bonus_normas = min(5.0, normas_citadas * 0.5)
+            
+            bonus_longitud = min(3.0, len(argumento_generado) / 300)
+            
+            base = min(100.0, base + bonus_normas + bonus_longitud)
+            
+            if normas_citadas >= 3:
+                logger.info(f"Score bonus: {normas_citadas} normas citadas, {len(argumento_generado)} chars")
+        
         return round(base, 1)
 
     def _xml(self, tag: str, texto: str, default: str) -> str:
@@ -497,10 +517,37 @@ INSTRUCCIONES:
             <b>Nota:</b> Generado con asistencia de IA. Verificar antes de radicar ante la EPS.
         </div>"""
 
+    async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 3) -> tuple[str, str]:
+        """Llama a Groq con retry exponencial para manejar rate limits."""
+        import asyncio
+        
+        for intento in range(max_intentos):
+            try:
+                resp = await self.groq.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user}
+                    ],
+                    model="llama-3.3-70b-versatile",
+                    temperature=0.1,
+                    max_tokens=2500
+                )
+                content = resp.choices[0].message.content
+                return content, "groq/llama-3.3"
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "429" in error_msg or "rate" in error_msg or "limit" in error_msg:
+                    if intento < max_intentos - 1:
+                        espera = 2 ** intento
+                        logger.warning(f"Groq rate limit, reintento {intento + 2}/{max_intentos} en {espera}s")
+                        await asyncio.sleep(espera)
+                        continue
+                raise
+        raise Exception("Groq: todos los reintentos fallaron")
+
     async def _llamar_ia(self, system: str, user: str) -> tuple[str, str]:
         clave_cache = hashlib.sha256(f"{system}:{user}".encode()).hexdigest()
 
-        # Verificar cache (TTLCache maneja expiración automáticamente)
         if clave_cache in _CACHE_IA:
             cached = _CACHE_IA[clave_cache]
             if isinstance(cached, tuple):
@@ -516,15 +563,9 @@ INSTRUCCIONES:
             return "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>", "error"
 
         try:
-            resp = await self.groq.chat.completions.create(
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                model="llama-3.3-70b-versatile",
-                temperature=0.1,
-                max_tokens=2500
-            )
-            content = resp.choices[0].message.content
-            _CACHE_IA[clave_cache] = (content, "groq/llama-3.3")
-            return content, "groq/llama-3.3"
+            content, modelo = await self._llamar_groq_con_retry(system, user)
+            _CACHE_IA[clave_cache] = (content, modelo)
+            return content, modelo
         except Exception as e:
             logger.error(f"IA Error Groq: {e}")
             if self.anthropic_key:
