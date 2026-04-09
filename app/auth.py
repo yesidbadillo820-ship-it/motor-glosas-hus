@@ -18,7 +18,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Genera un hash seguro a partir de una contraseña."""
-    return pwd_context.hash(password.encode("utf-8"))
+    return pwd_context.hash(password)
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[UsuarioRecord]:

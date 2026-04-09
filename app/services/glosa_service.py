@@ -2,7 +2,6 @@ import os
 import re
 import logging
 import hashlib
-import asyncio
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 
@@ -10,6 +9,7 @@ import httpx
 from groq import AsyncGroq
 from app.models.schemas import GlosaInput, GlosaResult
 from app.core.logging_utils import logger
+from app.services.glosa_ia_prompts import get_system_prompt, build_user_prompt
 
 # Cache simple en memoria para evitar llamadas duplicadas a la IA
 # CORRECCIÓN: usar maxsize para evitar crecimiento ilimitado de memoria
@@ -273,10 +273,26 @@ class GlosaService:
             arg_ia = plantilla["plantilla"]
             modelo_usado = "plantilla"
         else:
-            estrategia = ESTRATEGIAS_TIPO.get(tipo_glosa, ESTRATEGIAS_TIPO["FA_FACTURACION"])
-            system_prompt = self._construir_prompt(cod_res, desc_res, data.eps, info_contrato, estrategia, tipo_glosa)
-            user_prompt = self._construir_user_prompt(texto_base, contexto_pdf, codigo_det)
+            system_prompt = get_system_prompt(
+                tipo_glosa=tipo_glosa,
+                eps=data.eps,
+                contrato=info_contrato,
+                cod_res=cod_res,
+                desc_res=desc_res
+            )
+            user_prompt = build_user_prompt(
+                texto_glosa=texto_base,
+                contexto_pdf=contexto_pdf,
+                codigo=codigo_det,
+                eps=data.eps,
+                numero_factura=data.numero_factura,
+                numero_radicado=data.numero_radicado
+            )
             res_ia, modelo_usado = await self._llamar_ia(system_prompt, user_prompt)
+            
+            razonamiento = self._xml("razonamiento", res_ia, "")
+            if razonamiento:
+                logger.info(f"IA razonamiento: {razonamiento[:200]}")
 
             pac_ia = self._xml("paciente", res_ia, "NO IDENTIFICADO")
             arg_ia = self._xml("argumento", res_ia, "")

@@ -19,6 +19,7 @@ from app.models.schemas import GlosaInput, GlosaResult
 from app.core.config import get_settings
 from app.auth import get_password_hash
 from app.core.logging_utils import set_request_id, logger
+from app.api.deps import get_usuario_actual
 
 logging.basicConfig(level=logging.INFO)
 
@@ -202,9 +203,10 @@ async def analizar(
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     req_id = set_request_id()
-    logger.info(f"[{req_id}] Iniciando análisis | eps={eps}")
+    logger.info(f"[{req_id}] Análisis solicitado por: {current_user.email} | eps={eps}")
 
     try:
         data = GlosaInput(
