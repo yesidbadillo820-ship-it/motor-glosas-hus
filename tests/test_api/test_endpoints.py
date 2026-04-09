@@ -29,7 +29,7 @@ class TestGlosasEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert "tipo" in data
-        assert data["tipo"] == "RESPUESTA RE2202"
+        assert data["tipo"] == "RESPUESTA RE9502"
 
     def test_analizar_glosa_dentro_terminos(self, client: TestClient):
         """Should handle glosa within time limits."""

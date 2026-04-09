@@ -241,10 +241,7 @@ class GlosaService:
             tipo_glosa = "TA_TARIFA"
 
         if es_extemporanea:
-            if "DEVOLUCION" in texto_base or "DEV." in texto_base:
-                cod_res, desc_res = "RE2201", "RESPUESTA EXTEMPORÁNEA - ACEPTACIÓN TÁCITA DEVOLUCIÓN"
-            else:
-                cod_res, desc_res = "RE2202", "RESPUESTA EXTEMPORÁNEA - ACEPTACIÓN TÁCITA GLOSA"
+            cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 56 Ley 1438/2011)"
         elif es_tarifa and not tiene_contrato:
             cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
         else:

@@ -108,13 +108,12 @@ Obtener token en `/api/auth/login`.
 ### Códigos de Respuesta (Resolución 3047/2008 - Normativa Colombiana)
 | Código | Descripción |
 |--------|-------------|
+| RE9502 | Glosa no procede - Aceptación tácita de la factura (Art. 56 Ley 1438/2011) |
 | RE9602 | Glosa Injustificada - Aporta evidencia de que la glosa es injustificada al 100% |
 | RE9701 | Devolución aceptada al 100% |
 | RE9702 | Glosa aceptada al 100% |
 | RE9801 | Glosa aceptada y subsanada parcialmente |
 | RE9901 | Glosa no aceptada - Subsanada en su totalidad |
-| RE2201 | Respuesta extemporánea a devolución - Aceptación tácita |
-| RE2202 | Respuesta extemporánea a glosa - Aceptación tácita |
     """,
     version="5.3.0",
     lifespan=lifespan,
