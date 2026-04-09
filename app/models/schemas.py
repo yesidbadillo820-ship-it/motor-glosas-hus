@@ -18,6 +18,7 @@ class GlosaInput(BaseModel):
         if v == "" or v is None:
             return None
         return v
+
     valor_aceptado: str       = Field(default="0")
     tabla_excel: str          = Field(..., min_length=3,
                                       description="Texto copiado de la glosa en Excel")
