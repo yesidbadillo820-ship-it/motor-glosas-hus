@@ -25,6 +25,7 @@ class GlosaRecord(Base):
     responsable     = Column(String(200))
     fecha_vencimiento = Column(DateTime(timezone=True))
     request_id      = Column(String(50))
+    nota_workflow   = Column(String(500))
 
     __table_args__ = (
         Index("ix_historial_alertas", "dias_restantes", "estado"),

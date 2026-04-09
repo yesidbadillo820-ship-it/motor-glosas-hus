@@ -12,12 +12,16 @@ El Motor de Glosas HUS es una aplicación web que automatiza la generación de r
 
 ### Características Principales
 
-- **Análisis automático de glosas** mediante IA (Groq/Anthropic)
+- **Análisis automático de glosas** mediante IA (Groq/Anthropic) con retry inteligente
 - **Detección de glosas extemporáneas** (20 días hábiles - Art. 56 Ley 1438/2011)
 - **Plantillas especializadas** por tipo de glosa (tarifa, soportes, autorización, cobertura, pertinencia)
-- **Cálculo de días hábiles** con calendario de festivos colombianos
+- **Cálculo de días hábiles** con calendario de festivos colombianos (2025-2028)
 - **Gestión de contratos EPS** con tarifas específicas
-- **Exportación de respuestas** en formato HTML listo para radicar
+- **Workflow completo** de estados (RADICADA → RESPONDIDA → RATIFICADA → CONCILIADA/LEVANTADA)
+- **Exportación Excel** con formato institucional HUS
+- **Alertas por correo** de glosas próximas a vencer
+- **Marco normativo completo** con 17 referencias (Leyes, Decretos, Resoluciones, Sentencias)
+- **Score dinámico** basado en calidad del argumento generado por IA
 
 ## Requisitos
 
