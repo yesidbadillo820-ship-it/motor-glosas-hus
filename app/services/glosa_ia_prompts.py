@@ -70,10 +70,13 @@ ESPECIALIZACIÓN: DEFENSA POR SOPORTES
 ARGUMENTOS CLAVES:
 1. La historia clínica es el documento médico-legal por excelencia (Res. 1995/1999)
    → Contiene diagnóstico, evolución, órdenes médicas y justificación clínica
-2. Si la EPS no solicitó documentos adicionales en los 20 días hábiles → glosa improcedente (Art. 56 Ley 1438/2011)
+   → NO ARGUMENTAR PLAZO DE 20 DÍAS SI LA GLOSA NO ES EXTEMPORÁNEA
+2. IMPORTANTE: Solo mencionar el plazo de 20 días hábiles (Art. 56 Ley 1438/2011) SI la glosa es EXTEMPORÁNEA (más de 20 días hábiles). Si está dentro de términos, enfocar en que los documentos CUMPLEN la norma
 3. Los errores formales (código incorrecto, fecha, firma) son SUBSANABLES, no causan glosa (Circular 030/2013 MINSALUD)
 4. La Resolución 3047/2008 define taxativamente cuáles son los documentos exigibles
 5. El incumplimiento de la EPS en solicitar documentos en tiempo no puede trasladarse a la IPS
+
+NUNCA digas "el plazo venció" o "no utilizó los 20 días" si la glosa está dentro de términos.
 
 CUANDO APLICA URGENCIA:
 - En urgencias, la documentación puede tramitarse con posterioridad a la atención
@@ -150,7 +153,8 @@ DATOS DEL CASO:
 """
 
 def build_user_prompt(texto_glosa: str, contexto_pdf: str, codigo: str,
-                      eps: str, numero_factura: str = None, numero_radicado: str = None) -> str:
+                      eps: str, numero_factura: str = None, numero_radicado: str = None,
+                      dias_habiles: int = None, es_extemporanea: bool = False) -> str:
     """
     Construye el prompt del usuario con instrucciones de chain-of-thought.
     El modelo razona primero (dentro de <razonamiento>) y luego genera el dictamen.
@@ -158,6 +162,13 @@ def build_user_prompt(texto_glosa: str, contexto_pdf: str, codigo: str,
     factura_info = f"Factura: {numero_factura}" if numero_factura else ""
     radicado_info = f"Radicado glosa: {numero_radicado}" if numero_radicado else ""
     trazabilidad = " | ".join(filter(None, [factura_info, radicado_info]))
+
+    contexto_tiempo = ""
+    if dias_habiles is not None:
+        if es_extemporanea:
+            contexto_tiempo = f"\n⚠️ IMPORTANTE: Esta glosa es EXTEMPORÁNEA ({dias_habiles} días hábiles). El plazo de 20 días venció. Argumentar aceptación tácita."
+        else:
+            contexto_tiempo = f"\n✓ NOTA: Esta glosa está DENTRO DE TÉRMINOS ({dias_habiles} días hábiles). NO argumentar plazo de 20 días."
 
     soportes = ""
     if contexto_pdf:
@@ -168,6 +179,7 @@ def build_user_prompt(texto_glosa: str, contexto_pdf: str, codigo: str,
 
 CÓDIGO DETECTADO: {codigo}
 {trazabilidad}
+{contexto_tiempo}
 {soportes}
 
 INSTRUCCIONES:
@@ -175,6 +187,7 @@ INSTRUCCIONES:
 2. Extrae el nombre del paciente si aparece en el texto (o usa "NO IDENTIFICADO")
 3. Redacta el argumento completo en MAYÚSCULAS SOSTENIDAS, sin placeholders ni corchetes
 4. El argumento debe ser ESPECÍFICO para este caso, NO genérico
+5. {"IMPORTANTE: Si la glosa NO es extemporánea, enfócate en que los documentos CUMPLEN la normativa vigente, NO en que el plazo venció." if not es_extemporanea else "Esta glosa es extemporánea. Argumentar aceptación tácita por vencimiento del plazo de 20 días hábiles (Art. 56 Ley 1438/2011)."}
 
 FORMATO DE RESPUESTA EXACTO:
 <razonamiento>Tu análisis rápido aquí</razonamiento>

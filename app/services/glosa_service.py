@@ -286,7 +286,9 @@ class GlosaService:
                 codigo=codigo_det,
                 eps=data.eps,
                 numero_factura=data.numero_factura,
-                numero_radicado=data.numero_radicado
+                numero_radicado=data.numero_radicado,
+                dias_habiles=dias,
+                es_extemporanea=es_extemporanea
             )
             res_ia, modelo_usado = await self._llamar_ia(system_prompt, user_prompt)
             
