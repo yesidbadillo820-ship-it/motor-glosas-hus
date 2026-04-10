@@ -165,7 +165,7 @@ def obtener_glosa(
         "estado": glosa.estado,
         "dictamen": glosa.dictamen,
         "dias_restantes": glosa.dias_restantes,
-        "creado_en": glosa.creado_en.isoformat() if g.creado_en else None,
+        "creado_en": glosa.creado_en.isoformat() if glosa.creado_en else None,
     }
 
 
