@@ -202,7 +202,7 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
     return filas
 
 
-async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id: str):
+async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id: str, eps_formulario: str):
     """Procesa una fila individual en segundo plano."""
     db = SessionLocal()
     try:
@@ -214,7 +214,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         texto_glosa = f"{fila_data['codigo']} {fila_data['valor']} {fila_data['descripcion']} {fila_data['cups']} {fila_data['motivo']}"
         
         data = GlosaInput(
-            eps=fila_data['eps'],
+            eps=eps_formulario,
             etapa="RESPUESTA A GLOSA",
             tabla_excel=texto_glosa,
             numero_factura=fila_data.get('factura'),
@@ -225,7 +225,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         
         repo = GlosaRepository(db)
         repo.crear(
-            eps=fila_data['eps'],
+            eps=eps_formulario,
             paciente="N/A",
             codigo_glosa=resultado.codigo_glosa,
             valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
@@ -277,7 +277,8 @@ async def importar_glosas_masiva(
             _procesar_fila_en_background,
             fila_data,
             servicio_id,
-            req_id
+            req_id,
+            request.eps
         )
     
     logger.info(f"[{req_id}] {len(filas)} filas enviadas a procesamiento | batch_id={servicio_id}")
