@@ -118,9 +118,9 @@ class TestExtraccionCodigo:
         assert result == "SO0101"
 
     def test_extraer_codigo_inexistente(self, glosa_service):
-        """Should return SE-N/A for unknown codes."""
+        """Should return N/A for unknown codes."""
         result = glosa_service._extraer_codigo_glosa("Sin código específico")
-        assert result == "SE-N/A"
+        assert result == "N/A"
 
 
 class TestExtraccionValor:

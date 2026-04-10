@@ -262,13 +262,13 @@ async def analizar(
     # RESPONDIDA = respuesta enviada, pendiente de resolución
     # ACEPTADA = la IPS acepta la glosa (valor_aceptado = valor total)
     # PARCIALMENTE_ACEPTADA = la IPS acepta parte
-    # LEVANTADA = la EPS retira la glosa
+    # Estado inicial RADICADA (flujo: RADICADA -> RESPONDIDA -> RATIFICADA/CONCILIADA/LEVANTADA)
     if val_ac >= val_obj and val_obj > 0:
         estado = "ACEPTADA"
     elif val_ac > 0:
         estado = "PARCIALMENTE_ACEPTADA"
     else:
-        estado = "RESPONDIDA"
+        estado = "RADICADA"
 
     glosa = glosa_repo.crear(
         eps=eps,
@@ -285,6 +285,9 @@ async def analizar(
         numero_radicado=numero_radicado,
         factura=numero_factura,
     )
+
+    if estado == "RADICADA":
+        glosa_repo.actualizar_estado(glosa.id, "RESPONDIDA", responsable=current_user.email)
 
     logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")
     return resultado

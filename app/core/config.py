@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Metadatos de la app
     app_name: str = "Motor Glosas HUS"
-    app_version: str = "5.2.0"
+    app_version: str = "5.4.0"
 
     model_config = {
         "env_file": ".env",

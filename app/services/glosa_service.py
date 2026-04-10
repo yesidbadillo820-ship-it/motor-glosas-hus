@@ -198,7 +198,7 @@ class GlosaService:
         texto_base = str(data.tabla_excel).strip().upper()
 
         codigo_det = self._extraer_codigo_glosa(texto_base)
-        prefijo = codigo_det[:2] if codigo_det and codigo_det != "N/A" else "SE"
+        prefijo = codigo_det[:2] if codigo_det and codigo_det != "N/A" else "XX"
         valor_raw = self._extraer_valor(texto_base)
 
         msg_tiempo, color_tiempo, dias = "Fechas no ingresadas", "bg-slate-500", 0
@@ -250,14 +250,17 @@ class GlosaService:
         plantilla = obtener_plantilla_por_codigo(codigo_det)
         usa_plantilla = plantilla is not None
         arg_limpio = ""
+        normas_clave = ""
 
         if argumento_fijo:
             pac_ia = "N/A"
             arg_ia = argumento_fijo
+            arg_limpio = argumento_fijo.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "texto_fijo"
         elif usa_plantilla:
             pac_ia = "N/A (PLANTILLA)"
             arg_ia = plantilla["plantilla"]
+            arg_limpio = plantilla["plantilla"].replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "plantilla"
         else:
             system_prompt = get_system_prompt(
@@ -285,6 +288,7 @@ class GlosaService:
 
             pac_ia = self._xml("paciente", res_ia, "NO IDENTIFICADO")
             arg_ia = self._xml("argumento", res_ia, "")
+            normas_clave = self._xml("normas_clave", res_ia, "")
 
             if not arg_ia or arg_ia == res_ia:
                 if "<argumento>" in res_ia:
@@ -293,6 +297,11 @@ class GlosaService:
                     arg_ia = res_ia[start:end].strip() if end > start else res_ia
                 else:
                     arg_ia = res_ia
+
+            if not normas_clave and "<normas_clave>" in res_ia:
+                start = res_ia.find("<normas_clave>") + len("<normas_clave>")
+                end = res_ia.find("</normas_clave>")
+                normas_clave = res_ia[start:end].strip() if end > start else ""
 
             if "<paciente>" in arg_ia:
                 arg_ia = arg_ia.split("</paciente>")[-1].strip()
@@ -303,7 +312,8 @@ class GlosaService:
 
         dictamen = self._generar_dictamen_html(
             codigo_det, valor_raw, cod_res, desc_res, arg_ia, data.eps, tipo_glosa,
-            numero_factura=data.numero_factura, numero_radicado=data.numero_radicado
+            numero_factura=data.numero_factura, numero_radicado=data.numero_radicado,
+            normas_clave=normas_clave if normas_clave else None
         )
 
         return GlosaResult(
@@ -367,6 +377,8 @@ class GlosaService:
         elif prefijo == "CO": return "CO_COBERTURA"
         elif prefijo == "PE": return "PE_PERTINENCIA"
         elif prefijo == "FA": return "FA_FACTURACION"
+        elif prefijo == "IN": return "IN_INSUMOS"
+        elif prefijo == "ME": return "ME_MEDICAMENTOS"
         if any(p in texto_lower for p in ["insumo", "material", "precio"]):
             return "IN_INSUMOS"
         if any(p in texto_lower for p in ["medicamento", "fármaco", "fórmula"]):
@@ -375,7 +387,7 @@ class GlosaService:
 
     def _extraer_codigo_glosa(self, texto: str) -> str:
         m = re.search(r"\b(TA|SO|AU|CO|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto)
-        return m.group(0) if m else "SE-N/A"
+        return m.group(0) if m else "N/A"
 
     def _extraer_valor(self, texto: str) -> str:
         m = re.search(r"\$\s*([\d\.,]+)", texto)
@@ -394,67 +406,11 @@ class GlosaService:
         except Exception:
             return 0
 
-    def _construir_prompt(self, cod_res: str, desc_res: str, eps: str, contrato: str, estrategia: str, tipo_glosa: str) -> str:
-        if tipo_glosa == "TA_TARIFA":
-            return f"""Eres el Abogado Director de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER.
-ESPECIALISTA EN DEFENSA DE OBJECIONES TARIFARIAS.
-
-CÓDIGO: {cod_res} - {desc_res}
-EPS: {eps}
-CONTRATO VIGENTE: {contrato}
-
-{estrategia}
-
-NORMATIVA TARIFARIA ESPECÍFICA:
-- Ley 100/1993 Art. 168: Obligación de pago de servicios de urgencias
-- Decreto 2423/1996: Manual de Tarifas SOAT
-- Resolución 054/2026: Tarifas SOAT Plenas vigentes
-- Resolución Interna HUS: Tarifario institucional actualizado
-- Principio de buena fe contractual (Art. 871 Código de Comercio)
-- Autonomía contractual de las partes (Art. 1601 Código Civil)
-- Ley 1751/2015 Art. 2: Derecho fundamental a la salud
-
-INSTRUCCIONES OBLIGATORIAS:
-1. REDACTA una defensa técnico-jurídica ESPECÍFICA para objeciones tarifarias
-2. NUNCA aceptes la glosa - recházala de plano
-3. Cita el contrato específico vigente y sus tarifas pactadas
-4. Argumenta que la factura se ajusta a la Resolución Interna de Precios
-5. Explica que el IPC es un referente NO una obligación legal
-6. La respuesta debe ser PROFESIONAL y DETALLADA - mínimo 3 párrafos
-7. Estructura: <paciente>Nombre</paciente><argumento>Tu defensa...</argumento>
-8. TODO en MAYÚSCULAS"""
-
-        return f"""Eres el Abogado Director de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER.
-Tu misión es DEFENDER el cobro y RECHAZAR las glosas de manera técnico-jurídica.
-
-CÓDIGO: {cod_res} - {desc_res}
-EPS: {eps}
-CONTRATO: {contrato}
-
-{estrategia}
-
-NORMATIVA: Ley 100/1993, Ley 1438/2011 Art.56 (20 días hábiles), Ley 1751/2015,
-Decreto 4747/2007, Resolución 3047/2008, Resolución 5269/2017.
-
-INSTRUCCIONES:
-1. Redacta DEFENSA LEGAL COMPLETA
-2. Usa lenguaje jurídico formal colombiano
-3. Cita normas específicas con artículos
-4. NUNCA aceptes la glosa
-5. Estructura: <paciente>Nombre</paciente><argumento>Tu defensa...</argumento>
-6. Argumento en PÁRRAFO CONTINUO en mayúsculas."""
-
-    def _construir_user_prompt(self, texto_glosa: str, contexto_pdf: str, codigo: str) -> str:
-        prompt = f"GLOSA: {texto_glosa}\n\nCÓDIGO: {codigo}"
-        if contexto_pdf:
-            prompt += f"\n\nSOPORTES: {contexto_pdf[:5000]}"
-        prompt += "\n\n<paciente>Nombre</paciente><argumento>TU DEFENSA...</argumento>"
-        return prompt
-
     def _generar_dictamen_html(self, codigo: str, valor: str, cod_res: str, desc_res: str,
                                argumento: str, eps: str, tipo: str,
                                numero_factura: Optional[str] = None,
-                               numero_radicado: Optional[str] = None) -> str:
+                               numero_radicado: Optional[str] = None,
+                               normas_clave: Optional[str] = None) -> str:
         colores = {
             "TA_TARIFA": "#1e40af", "SO_SOPORTES": "#7c3aed", "AU_AUTORIZACION": "#059669",
             "CO_COBERTURA": "#dc2626", "PE_PERTINENCIA": "#d97706", "FA_FACTURACION": "#0891b2",
@@ -463,7 +419,6 @@ INSTRUCCIONES:
         }
         color = colores.get(tipo, "#1e3a8a")
 
-        # NUEVOS: mostrar factura y radicado si están disponibles
         fila_trazabilidad = ""
         if numero_factura or numero_radicado:
             fila_trazabilidad = f"""
@@ -474,6 +429,15 @@ INSTRUCCIONES:
                     {'N° Radicado: <b>' + numero_radicado + '</b>' if numero_radicado else ''}
                 </td>
             </tr>"""
+
+        bloque_normas = ""
+        if normas_clave:
+            normas_html = normas_clave.replace("|", "<br>")
+            bloque_normas = f"""
+            <div style="background:#dbeafe;border:2px solid #3b82f6;border-radius:8px;padding:12px;margin-top:10px;">
+                <div style="font-weight:bold;color:#1e40af;margin-bottom:8px;">FUNDAMENTO NORMATIVO — 3 normas más relevantes para este caso:</div>
+                <div style="color:#1e3a8a;line-height:1.8;">{normas_html}</div>
+            </div>"""
 
         # CORRECCIÓN: nota de pie en español
         return f"""
@@ -500,6 +464,8 @@ INSTRUCCIONES:
             <div style="font-size:12px;line-height:1.9;color:#334155;white-space:pre-wrap;">{argumento}</div>
         </div>
 
+        {bloque_normas}
+
         <div style="margin-top:15px;padding:12px;background:#fef2f2;border-radius:8px;font-size:10px;color:#991b1b;">
             <b>Nota:</b> Generado con asistencia de IA. Verificar antes de radicar ante la EPS.
         </div>"""
@@ -516,8 +482,8 @@ INSTRUCCIONES:
                         {"role": "user", "content": user}
                     ],
                     model="llama-3.3-70b-versatile",
-                    temperature=0.1,
-                    max_tokens=2500
+                    temperature=0.15,
+                    max_tokens=3000
                 )
                 content = resp.choices[0].message.content
                 return content, "groq/llama-3.3"
@@ -566,8 +532,9 @@ INSTRUCCIONES:
                                 "content-type": "application/json"
                             },
                             json={
-                                "model": "claude-sonnet-4-5",
-                                "max_tokens": 2500,
+                                "model": "claude-sonnet-4-5-20250514",
+                                "max_tokens": 3000,
+                                "temperature": 0.15,
                                 "system": system,
                                 "messages": [{"role": "user", "content": user}]
                             }
@@ -575,8 +542,8 @@ INSTRUCCIONES:
                         data = resp.json()
                         if "content" in data:
                             content = data["content"][0]["text"]
-                            _CACHE_IA[clave_cache] = (content, "anthropic/claude")
-                            return content, "anthropic/claude"
+                            _CACHE_IA[clave_cache] = (content, "anthropic/claude-sonnet-4")
+                            return content, "anthropic/claude-sonnet-4"
                 except Exception as e2:
                     logger.error(f"Fallback Anthropic error: {e2}")
             return f"<paciente>ERROR</paciente><argumento>{str(e)}</argumento>", "error"

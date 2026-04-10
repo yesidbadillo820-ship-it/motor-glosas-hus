@@ -12,6 +12,8 @@ from app.services.glosa_service import GlosaService
 from app.services.pdf_service import PdfService
 from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, get_request_id, logger
+from app.api.deps import get_usuario_actual
+from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -21,6 +23,7 @@ def historial(
     limit: int = 50,
     eps:   Optional[str] = None,
     db:    Session        = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
     glosas = repo.listar(limit=limit, eps=eps)
@@ -50,6 +53,7 @@ def historial_paginado(
     estado: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Historial con paginación y filtros"""
     repo = GlosaRepository(db)
@@ -82,6 +86,7 @@ def historial_paginado(
 def alertas(
     dias: int = 5,
     db:   Session       = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
     alertas = repo.alertas_proximas(dias_limite=dias)
@@ -102,6 +107,7 @@ def alertas(
 @router.get("/metrics")
 def metrics(
     db:   Session       = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
     return repo.metrics()
@@ -112,6 +118,7 @@ def actualizar_estado(
     glosa_id: int,
     nuevo_estado: str,
     db:    Session        = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
     glosa = repo.actualizar_estado(glosa_id, nuevo_estado, responsable="sistema")
@@ -125,6 +132,7 @@ def actualizar_estado(
 def obtener_glosa(
     glosa_id: int,
     db:    Session       = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
     glosa = repo.obtener_por_id(glosa_id)

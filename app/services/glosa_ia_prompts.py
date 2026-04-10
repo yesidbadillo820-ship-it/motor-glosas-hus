@@ -36,10 +36,14 @@ MARCO NORMATIVO COMPLETO:
 16. Sentencia T-1025 de 2002 — Urgencias no requieren autorización previa
 17. Sentencia T-478 de 1995 — Autonomía médica como derecho fundamental
 
-REGLAS ABSOLUTAS:
-- Cita SIEMPRE el artículo específico, no solo la ley
+REGLAS ABSOLUTAS — ESTRUCTURA DEL ARGUMENTO:
+1. AUDITORÍA: Identifica qué alega la EPS y por qué está MAL su argumento
+2. DEFENSA TÉCNICA: Presenta los HECHOS CONCRETOS del caso que desmienten a la EPS
+3. EXIGENCIA DE PAGO: Cierre directo solicitando el pago íntegro
+4. FUNDAMENTO NORMATIVO: Al final, máximo 3 normas específicas (formato: Norma | Norma | Norma)
+
+REGLAS ADICIONALES:
 - NO repitas los mismos argumentos en cada párrafo
-- Estructura en 3 párrafos mínimo: (1) rechazo inicial + norma base, (2) argumento técnico-clínico, (3) exigencia de pago
 - El texto FINAL debe ser listo para copiar y radicar: sin placeholders, sin corchetes
 - Si el caso es urgencias: aplica la exención de autorización previa (Art. 168 Ley 100)
 - Si el plazo venció: glosa improcedente por extemporaneidad (Art. 56 Ley 1438/2011)
@@ -134,6 +138,28 @@ REGIMEN SUBSIDIADO vs CONTRIBUTIVO:
 EXCLUSIONES PBS: Solo aplican si el servicio está expresamente en el listado de exclusiones de la Res. 5269/2017
 """
 
+SYSTEM_INSUMOS = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR INSUMOS Y MATERIALES
+
+ARGUMENTOS CLAVES:
+1. Los insumos y materiales utilizados están listados en el tarifario institucional HUS
+2. El consumo se documenta en la historia clínica y la folha de consumo
+3. Los precios aplicados corresponden a la Resolución Interna de Precios vigente
+4. La EPS no puede objetar precios que están dentro del marco contractual pactado
+5. Los insumos necesarios para la atención fueron consumidos en beneficio del paciente
+"""
+
+SYSTEM_MEDICAMENTOS = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR MEDICAMENTOS
+
+ARGUMENTOS CLAVES:
+1. Los medicamentos dispensados están registrados en la historia clínica y el kardex farmacéutico
+2. La prescripción médica está sustentada en el diagnóstico documentado
+3. Los medicamentos aplicados corresponden al PBS según Resolución 5269/2017
+4. La dosificación y frecuencia corresponden a la evidencia médica vigente
+5. El farmacéutico verificó la prescripción antes de la dispensación (Doble Chequeo)
+"""
+
 def get_system_prompt(tipo_glosa: str, eps: str, contrato: str, cod_res: str, desc_res: str) -> str:
     """Selecciona el system prompt especializado según el tipo de glosa."""
     mapping = {
@@ -142,6 +168,8 @@ def get_system_prompt(tipo_glosa: str, eps: str, contrato: str, cod_res: str, de
         "AU_AUTORIZACION": SYSTEM_AUTORIZACION,
         "PE_PERTINENCIA": SYSTEM_PERTINENCIA,
         "CO_COBERTURA": SYSTEM_COBERTURA,
+        "IN_INSUMOS": SYSTEM_INSUMOS,
+        "ME_MEDICAMENTOS": SYSTEM_MEDICAMENTOS,
     }
     base = mapping.get(tipo_glosa, SYSTEM_BASE)
     return base + f"""
@@ -182,14 +210,28 @@ CÓDIGO DETECTADO: {codigo}
 {contexto_tiempo}
 {soportes}
 
-INSTRUCCIONES:
-1. Primero, en <razonamiento>, analiza en 2-3 líneas: ¿qué está alegando la EPS? ¿cuál es la norma exacta que rebate su argumento?
-2. Extrae el nombre del paciente si aparece en el texto (o usa "NO IDENTIFICADO")
-3. Redacta el argumento completo en MAYÚSCULAS SOSTENIDAS, sin placeholders ni corchetes
-4. El argumento debe ser ESPECÍFICO para este caso, NO genérico
-5. {"IMPORTANTE: Si la glosa NO es extemporánea, enfócate en que los documentos CUMPLEN la normativa vigente, NO en que el plazo venció." if not es_extemporanea else "Esta glosa es extemporánea. Argumentar aceptación tácita por vencimiento del plazo de 20 días hábiles (Art. 56 Ley 1438/2011)."}
+INSTRUCCIONES - PROCESO DE 3 PASOS:
+
+PASO 1 - AUDITORÍA:
+Analiza qué está alegando la EPS. Identifica exactamente qué norma, hecho o documento objeta. Explica por qué su argumento es incorrecto o incompleto.
+
+PASO 2 - DEFENSA TÉCNICA:
+Identifica los hechos concretos del caso que desmienten a la EPS. Presenta la evidencia de los hechos. Argumenta por qué la glosa no es procedente.
+
+PASO 3 - EXIGENCIA DE PAGO:
+Cierra con una exigencia directa de pago íntegro del valor objetado.
+
+PASO 4 - FUNDAMENTO NORMATIVO:
+Al final, lista las 3 normas más relevantes para este caso específico en formato:
+<normas_clave>Norma 1 | Norma 2 | Norma 3</normas_clave>
+
+NOTA: {"Si la glosa NO es extemporánea, enfócate en que los documentos CUMPLEN la normativa vigente, NO en que el plazo venció." if not es_extemporanea else "Esta glosa es extemporánea. Argumentar aceptación tácita por vencimiento del plazo de 20 días hábiles (Art. 56 Ley 1438/2011)."}
 
 FORMATO DE RESPUESTA EXACTO:
-<razonamiento>Tu análisis rápido aquí</razonamiento>
+<razonamiento>Tu análisis: qué alega la EPS y por qué está mal</razonamiento>
 <paciente>Nombre del paciente o NO IDENTIFICADO</paciente>
-<argumento>TEXTO COMPLETO DEL ARGUMENTO JURÍDICO AQUÍ. MÍNIMO 4 ORACIONES. CITA ARTÍCULOS ESPECÍFICOS. CIERRA CON EXIGENCIA EXPRESA DE PAGO ÍNTEGRO.</argumento>"""
+<argumento>TEXTO COMPLETO DEL ARGUMENTO JURÍDICO AQUÍ.
+MÍNIMO 4 ORACIONES.
+ESTRUCTURA: AUDITORÍA → DEFENSA TÉCNICA → EXIGENCIA DE PAGO.
+CIERRA CON EXIGENCIA EXPRESA DE PAGO ÍNTEGRO.</argumento>
+<normas_clave>Norma 1 | Norma 2 | Norma 3</normas_clave>"""
