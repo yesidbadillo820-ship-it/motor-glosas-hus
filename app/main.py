@@ -402,6 +402,11 @@ def root():
     return FileResponse("static/index.html")
 
 
+@app.get("/importar-masiva")
+def importar_masiva():
+    return FileResponse("static/importar-masiva.html")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "version": cfg.app_version}
