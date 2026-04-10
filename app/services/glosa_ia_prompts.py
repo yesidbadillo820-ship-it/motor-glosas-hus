@@ -184,75 +184,61 @@ def build_user_prompt(texto_glosa: str, contexto_pdf: str, codigo: str,
                       eps: str, numero_factura: str = None, numero_radicado: str = None,
                       dias_habiles: int = None, es_extemporanea: bool = False) -> str:
     """
-    Construye el prompt del usuario con instrucciones de chain-of-thought.
-    El modelo razona primero (dentro de <razonamiento>) y luego genera el dictamen.
+    Construye el prompt del usuario para generar dictámenes concisos y específicos.
     """
+    tipo_glosa_map = {
+        "TA": "TARIFAS",
+        "SO": "SOPORTES",
+        "AU": "AUTORIZACIÓN",
+        "CO": "COBERTURA",
+        "PE": "PERTINENCIA",
+        "FA": "FACTURACIÓN",
+        "IN": "INSUMOS",
+        "ME": "MEDICAMENTOS",
+        "EX": "EXTEMPORÁNEA"
+    }
+    prefijo = codigo[:2] if codigo and len(codigo) >= 2 else "TARIFAS"
+    tipo_nombre = tipo_glosa_map.get(prefijo, "TARIFAS")
+
     factura_info = f"Factura: {numero_factura}" if numero_factura else ""
-    radicado_info = f"Radicado glosa: {numero_radicado}" if numero_radicado else ""
+    radicado_info = f"Radicado: {numero_radicado}" if numero_radicado else ""
     trazabilidad = " | ".join(filter(None, [factura_info, radicado_info]))
 
     contexto_tiempo = ""
     if dias_habiles is not None:
         if es_extemporanea:
-            contexto_tiempo = f"\n⚠️ IMPORTANTE: Esta glosa es EXTEMPORÁNEA ({dias_habiles} días hábiles). El plazo de 20 días venció. Argumentar aceptación tácita."
+            contexto_tiempo = f"\n⚠️ GLOSA EXTEMPORÁNEA ({dias_habiles} días hábiles - límite: 20)."
         else:
-            contexto_tiempo = f"\n✓ NOTA: Esta glosa está DENTRO DE TÉRMINOS ({dias_habiles} días hábiles). NO argumentar plazo de 20 días."
+            contexto_tiempo = f"\n✓ DENTRO DE TÉRMINOS ({dias_habiles} días hábiles)."
 
     soportes = ""
     if contexto_pdf:
-        soportes = f"\n\nSOPORTES ADJUNTOS (extraídos de PDF):\n{contexto_pdf[:4000]}"
+        soportes = f"\n\nSOPORTES PDF:\n{contexto_pdf[:3000]}"
 
-    return f"""TEXTO COMPLETO DE LA GLOSA:
+    return f"""GLOSA A ANALIZAR:
 {texto_glosa}
 
-CÓDIGO DETECTADO: {codigo}
-{trazabilidad}
-{contexto_tiempo}
+CÓDIGO: {codigo} | {trazabilidad}{contexto_tiempo}
 {soportes}
 
-INSTRUCCIONES CRÍTICAS - DEBES SEGUIRLAS OBLIGATORIAMENTE:
+REGLAS DEL ARGUMENTO:
+1. PRIMER PÁRRAFO: "ESE HUS NO ACEPTA GLOSA POR {tipo_nombre}." + razón corta (1-2 oraciones)
+2. SEGUNDO PÁRRAFO: Cita el contrato con {eps}, el código CUPS/servicio específico y tarifa pactada
+3. TERCER PÁRRAFO: Fundamento legal (1-2 normas específicas con artículos)
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DEL SERVICIO DE [NOMBRE] (CUPS [código])"
 
-1. EXTRAE EL SERVICIO: Identifica el código CUPS y la descripción exacta del servicio objetado.
-   Ejemplo: "871040 - RADIOGRAFÍA DE COLUMNA LUMBOSACRA"
-   
-2. USA EL CONTRATO: El argumento DEBE citar:
-   - El contrato específico vigente con {eps}
-   - El código CUPS y descripción del servicio
-   - La tarifa pactada si está disponible
-   
-3. NUNCA uses argumentos genéricos como "la factura se ajusta a la Resolución Interna de Precios".
-   SIEMPRE refiere al servicio específico objestado.
+PROHIBIDO: No repetir palabras. No usar "en consecuencia", "por lo tanto", "de conformidad" repetidamente.
+Cada oración debe aportar información nueva.
 
-INSTRUCCIONES - PROCESO DE 3 PASOS:
-
-PASO 1 - AUDITORÍA:
-Analiza qué está alegando la EPS. Identifica exactamente:
-- Qué servicio específico glosa (código CUPS y descripción)
-- Qué valor objeta
-- Por qué considera que hay diferencia
-
-PASO 2 - DEFENSA TÉCNICA:
-Cita el contrato específico vigente con {eps}. Usa el código CUPS del servicio objentado.
-Argumenta por qué el valor facturado es correcto según el contrato.
-
-PASO 3 - EXIGENCIA DE PAGO:
-Cierra con una exigencia directa de pago íntegro del valor objetado,
-citando el servicio específico y el contrato.
-
-PASO 4 - FUNDAMENTO NORMATIVO:
-Al final, lista las 3 normas más relevantes para este caso específico en formato:
-<normas_clave>Norma 1 | Norma 2 | Norma 3</normas_clave>
-
-NOTA: {"Si la glosa NO es extemporánea, enfócate en que los documentos CUMPLEN la normativa vigente, NO en que el plazo venció." if not es_extemporanea else "Esta glosa es extemporánea. Argumentar aceptación tácita por vencimiento del plazo de 20 días hábiles (Art. 56 Ley 1438/2011)."}
-
-FORMATO DE RESPUESTA EXACTO:
-<razonamiento>Tu análisis: qué alega la EPS y por qué está mal</razonamiento>
-<paciente>Nombre del paciente o NO IDENTIFICADO</paciente>
-<servicio>Código CUPS - Descripción del servicio objetado</servicio>
-<contrato>Contrato vigente con {eps}: [número/descripción del contrato]</contrato>
-<tarifa>Tarifa pactada para el servicio objentado: [valor]</tarifa>
-<argumento>TEXTO COMPLETO DEL ARGUMENTO JURÍDICO AQUÍ.
-MÍNIMO 4 ORACIONES.
-DEBES CITAR EL SERVICIO ESPECÍFICO Y EL CONTRATO.
-CIERRA CON EXIGENCIA EXPRESA DE PAGO ÍNTEGRO DEL SERVICIO OBJETADO.</argumento>
-<normas_clave>Norma 1 | Norma 2 | Norma 3</normas_clave>"""
+FORMATO DE RESPUESTA:
+<servicio>CUPS - Nombre del servicio objetado</servicio>
+<contrato>Contrato con {eps}: [número/descripción]</contrato>
+<tarifa>Tarifa pactada: [valor o porcentaje]</tarifa>
+<argumento>
+ESE HUS NO ACEPTA GLOSA POR {tipo_nombre}.
+[PÁRRAFO 1: Razón breve de rechazo]
+[PÁRRAFO 2: Contrato, servicio y tarifa específica]
+[PÁRRAFO 3: Fundamento legal con artículos específicos]
+SE EXIGE EL PAGO ÍNTEGRO DEL SERVICIO DE [NOMBRE] (CUPS [código]).
+</argumento>
+<normas_clave>Ley/Decreto Art. X | Ley/Decreto Art. Y | Sentencia T-XXX</normas_clave>"""
