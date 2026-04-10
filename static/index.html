@@ -80,6 +80,7 @@ header{background:var(--c-navy);height:58px;flex-shrink:0;display:flex;align-ite
 .nb:hover{color:var(--text)}
 .nb.active{color:var(--c-teal2);border-bottom-color:var(--c-teal2)}
 .nb-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px}
+.nb-special{background:var(--c-teal2);color:#fff!important;border-radius:6px;padding:6px 12px!important;margin-left:auto}
 
 /* ─── LAYOUT ─────────────────────────────── */
 .workspace{flex:1;display:flex;overflow:hidden}
@@ -279,6 +280,7 @@ textarea{resize:vertical;min-height:80px}
     <button class="nb" onclick="tab(this,'historial')">Historial</button>
     <button class="nb" onclick="tab(this,'alertas')">Alertas <span class="nb-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nb" onclick="tab(this,'contratos')">Contratos</button>
+    <button class="nb nb-special" onclick="window.location.href='/importar-masiva.html'">📊 Importación Masiva</button>
   </div>
 
   <div class="workspace">
