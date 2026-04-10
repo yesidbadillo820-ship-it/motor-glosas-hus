@@ -211,6 +211,9 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         
         from app.models.schemas import GlosaInput
         
+        contrato_repo = ContratoRepository(db)
+        contratos = contrato_repo.como_dict()
+        
         texto_glosa = f"{fila_data['codigo']} {fila_data['valor']} {fila_data['descripcion']} {fila_data['cups']} {fila_data['motivo']}"
         
         data = GlosaInput(
@@ -221,7 +224,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             numero_radicado=servicio_id,
         )
         
-        resultado = await service.analizar(data)
+        resultado = await service.analizar(data, "", contratos)
         
         repo = GlosaRepository(db)
         repo.crear(
