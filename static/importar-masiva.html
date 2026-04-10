@@ -109,15 +109,14 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
     </main>
 
     <script>
-        let token = localStorage.getItem('token');
-        let resultados = [];
+        let token = localStorage.getItem('hus_token');
 
         if (!token) {
             alert('Debes iniciar sesión primero');
             window.location.href = '/';
         }
 
-        document.getElementById('userEmail').textContent = localStorage.getItem('email') || 'Usuario';
+        document.getElementById('userEmail').textContent = localStorage.getItem('hus_user') || 'Usuario';
 
         async function cargarEPS() {
             try {
@@ -295,7 +294,8 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA S.A.	FUS000484385	$ 6
         }
 
         function logout() {
-            localStorage.clear();
+            localStorage.removeItem('hus_token');
+            localStorage.removeItem('hus_user');
             window.location.href = '/';
         }
     </script>
