@@ -210,16 +210,34 @@ CÓDIGO DETECTADO: {codigo}
 {contexto_tiempo}
 {soportes}
 
+INSTRUCCIONES CRÍTICAS - DEBES SEGUIRLAS OBLIGATORIAMENTE:
+
+1. EXTRAE EL SERVICIO: Identifica el código CUPS y la descripción exacta del servicio objetado.
+   Ejemplo: "871040 - RADIOGRAFÍA DE COLUMNA LUMBOSACRA"
+   
+2. USA EL CONTRATO: El argumento DEBE citar:
+   - El contrato específico vigente con {eps}
+   - El código CUPS y descripción del servicio
+   - La tarifa pactada si está disponible
+   
+3. NUNCA uses argumentos genéricos como "la factura se ajusta a la Resolución Interna de Precios".
+   SIEMPRE refiere al servicio específico objestado.
+
 INSTRUCCIONES - PROCESO DE 3 PASOS:
 
 PASO 1 - AUDITORÍA:
-Analiza qué está alegando la EPS. Identifica exactamente qué norma, hecho o documento objeta. Explica por qué su argumento es incorrecto o incompleto.
+Analiza qué está alegando la EPS. Identifica exactamente:
+- Qué servicio específico glosa (código CUPS y descripción)
+- Qué valor objeta
+- Por qué considera que hay diferencia
 
 PASO 2 - DEFENSA TÉCNICA:
-Identifica los hechos concretos del caso que desmienten a la EPS. Presenta la evidencia de los hechos. Argumenta por qué la glosa no es procedente.
+Cita el contrato específico vigente con {eps}. Usa el código CUPS del servicio objentado.
+Argumenta por qué el valor facturado es correcto según el contrato.
 
 PASO 3 - EXIGENCIA DE PAGO:
-Cierra con una exigencia directa de pago íntegro del valor objetado.
+Cierra con una exigencia directa de pago íntegro del valor objetado,
+citando el servicio específico y el contrato.
 
 PASO 4 - FUNDAMENTO NORMATIVO:
 Al final, lista las 3 normas más relevantes para este caso específico en formato:
@@ -230,8 +248,11 @@ NOTA: {"Si la glosa NO es extemporánea, enfócate en que los documentos CUMPLEN
 FORMATO DE RESPUESTA EXACTO:
 <razonamiento>Tu análisis: qué alega la EPS y por qué está mal</razonamiento>
 <paciente>Nombre del paciente o NO IDENTIFICADO</paciente>
+<servicio>Código CUPS - Descripción del servicio objetado</servicio>
+<contrato>Contrato vigente con {eps}: [número/descripción del contrato]</contrato>
+<tarifa>Tarifa pactada para el servicio objentado: [valor]</tarifa>
 <argumento>TEXTO COMPLETO DEL ARGUMENTO JURÍDICO AQUÍ.
 MÍNIMO 4 ORACIONES.
-ESTRUCTURA: AUDITORÍA → DEFENSA TÉCNICA → EXIGENCIA DE PAGO.
-CIERRA CON EXIGENCIA EXPRESA DE PAGO ÍNTEGRO.</argumento>
+DEBES CITAR EL SERVICIO ESPECÍFICO Y EL CONTRATO.
+CIERRA CON EXIGENCIA EXPRESA DE PAGO ÍNTEGRO DEL SERVICIO OBJETADO.</argumento>
 <normas_clave>Norma 1 | Norma 2 | Norma 3</normas_clave>"""

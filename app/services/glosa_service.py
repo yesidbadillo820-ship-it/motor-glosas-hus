@@ -251,17 +251,26 @@ class GlosaService:
         usa_plantilla = plantilla is not None
         arg_limpio = ""
         normas_clave = ""
+        modelo_usado = "desconocido"
 
         if argumento_fijo:
             pac_ia = "N/A"
             arg_ia = argumento_fijo
             arg_limpio = argumento_fijo.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "texto_fijo"
+            servicio_ia = ""
+            contrato_ia = ""
+            tarifa_ia = ""
+            normas_clave = ""
         elif usa_plantilla:
             pac_ia = "N/A (PLANTILLA)"
             arg_ia = plantilla["plantilla"]
             arg_limpio = plantilla["plantilla"].replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "plantilla"
+            servicio_ia = ""
+            contrato_ia = ""
+            tarifa_ia = ""
+            normas_clave = ""
         else:
             system_prompt = get_system_prompt(
                 tipo_glosa=tipo_glosa,
@@ -287,6 +296,9 @@ class GlosaService:
                 logger.info(f"IA razonamiento: {razonamiento[:200]}")
 
             pac_ia = self._xml("paciente", res_ia, "NO IDENTIFICADO")
+            servicio_ia = self._xml("servicio", res_ia, "")
+            contrato_ia = self._xml("contrato", res_ia, "")
+            tarifa_ia = self._xml("tarifa", res_ia, "")
             arg_ia = self._xml("argumento", res_ia, "")
             normas_clave = self._xml("normas_clave", res_ia, "")
 
@@ -313,7 +325,10 @@ class GlosaService:
         dictamen = self._generar_dictamen_html(
             codigo_det, valor_raw, cod_res, desc_res, arg_ia, data.eps, tipo_glosa,
             numero_factura=data.numero_factura, numero_radicado=data.numero_radicado,
-            normas_clave=normas_clave if normas_clave else None
+            normas_clave=normas_clave if normas_clave else None,
+            servicio=servicio_ia if servicio_ia else None,
+            contrato=contrato_ia if contrato_ia else None,
+            tarifa=servicio_ia if tarifa_ia else None
         )
 
         return GlosaResult(
@@ -410,7 +425,10 @@ class GlosaService:
                                argumento: str, eps: str, tipo: str,
                                numero_factura: Optional[str] = None,
                                numero_radicado: Optional[str] = None,
-                               normas_clave: Optional[str] = None) -> str:
+                               normas_clave: Optional[str] = None,
+                               servicio: Optional[str] = None,
+                               contrato: Optional[str] = None,
+                               tarifa: Optional[str] = None) -> str:
         colores = {
             "TA_TARIFA": "#1e40af", "SO_SOPORTES": "#7c3aed", "AU_AUTORIZACION": "#059669",
             "CO_COBERTURA": "#dc2626", "PE_PERTINENCIA": "#d97706", "FA_FACTURACION": "#0891b2",
@@ -429,6 +447,16 @@ class GlosaService:
                     {'N° Radicado: <b>' + numero_radicado + '</b>' if numero_radicado else ''}
                 </td>
             </tr>"""
+
+        bloque_servicio = ""
+        if servicio or contrato or tarifa:
+            servicio_html = f"<div><b>Servicio objentado:</b> {servicio}</div>" if servicio else ""
+            contrato_html = f"<div><b>Contrato:</b> {contrato}</div>" if contrato else ""
+            tarifa_html = f"<div><b>Tarifa pactada:</b> {tarifa}</div>" if tarifa else ""
+            bloque_servicio = f"""
+            <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-top:10px;">
+                {servicio_html}{contrato_html}{tarifa_html}
+            </div>"""
 
         bloque_normas = ""
         if normas_clave:
@@ -464,6 +492,7 @@ class GlosaService:
             <div style="font-size:12px;line-height:1.9;color:#334155;white-space:pre-wrap;">{argumento}</div>
         </div>
 
+        {bloque_servicio}
         {bloque_normas}
 
         <div style="margin-top:15px;padding:12px;background:#fef2f2;border-radius:8px;font-size:10px;color:#991b1b;">
