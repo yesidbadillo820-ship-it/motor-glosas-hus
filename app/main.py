@@ -258,24 +258,38 @@ async def analizar(
     val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)
     val_ac = float(re.sub(r"[^\d]", "", valor_aceptado) or 0)
 
-    # CORRECCIÓN: lógica de estado correcta
-    # RESPONDIDA = respuesta enviada, pendiente de resolución
-    # ACEPTADA = la IPS acepta la glosa (valor_aceptado = valor total)
-    # PARCIALMENTE_ACEPTADA = la IPS acepta parte
-    # Estado inicial RADICADA (flujo: RADICADA -> RESPONDIDA -> RATIFICADA/CONCILIADA/LEVANTADA)
+    # Determinar estado y código de respuesta según aceptación
     if val_ac >= val_obj and val_obj > 0:
         estado = "ACEPTADA"
+        cod_res_aceptacion = "RE9702"
+        desc_res_aceptacion = "GLOSA ACEPTADA AL 100%"
+        texto_aceptacion = f"ESE HUS ACEPTA LA GLOSA POR VALOR DE ${val_obj:,.0f}"
     elif val_ac > 0:
         estado = "PARCIALMENTE_ACEPTADA"
+        cod_res_aceptacion = "RE9801"
+        desc_res_aceptacion = "GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE"
+        texto_aceptacion = f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA POR VALOR DE ${val_ac:,.0f}"
     else:
         estado = "RADICADA"
+        cod_res_aceptacion = None
+        desc_res_aceptacion = None
+        texto_aceptacion = None
 
+    # Si hay aceptación (parcial o total), reemplazar el dictamen
     dictamen_final = resultado.dictamen
-    if estado == "PARCIALMENTE_ACEPTADA" or estado == "ACEPTADA":
+    if estado in ("ACEPTADA", "PARCIALMENTE_ACEPTADA"):
         val_rechazado = val_obj - val_ac
-        addendum = f"""
+        
+        # Crear el nuevo dictamen con aceptación
+        texto_aceptacion_html = f"""
+        <div style="background:#dcfce7;border:2px solid #16a34a;border-radius:8px;padding:15px;margin-bottom:20px;">
+            <div style="font-weight:bold;color:#15803d;font-size:16px;text-align:center;">{texto_aceptacion}</div>
+        </div>"""
+        
+        # Tabla con valores
+        tabla_valores = f"""
         <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:15px;margin-top:20px;">
-            <div style="font-weight:bold;color:#92400e;margin-bottom:10px;font-size:14px;">⚠️ ACCEPTACIÓN PARCIAL DEL VALOR OBJETADO</div>
+            <div style="font-weight:bold;color:#92400e;margin-bottom:10px;font-size:14px;">RESUMEN DE VALORES</div>
             <table style="width:100%;border-collapse:collapse;font-size:12px;">
                 <tr style="background:#fde68a;">
                     <td style="padding:8px;font-weight:bold;">VALOR OBJETADO:</td>
@@ -284,18 +298,40 @@ async def analizar(
                 <tr>
                     <td style="padding:8px;font-weight:bold;">VALOR ACEPTADO:</td>
                     <td style="padding:8px;text-align:right;font-weight:bold;color:#059669;">$ {val_ac:,.0f}</td>
-                </tr>
+                </tr>"""
+        
+        if estado == "PARCIALMENTE_ACEPTADA":
+            tabla_valores += f"""
                 <tr style="background:#fee2e2;">
                     <td style="padding:8px;font-weight:bold;">VALOR RECHAZADO (EN TRÁMITE):</td>
                     <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_rechazado:,.0f}</td>
                 </tr>
+                <tr style="background:#e0e7ff;">
+                    <td style="padding:8px;font-weight:bold;">NOTA:</td>
+                    <td style="padding:8px;text-align:right;color:#3730a3;font-size:11px;">El valor rechazado permanece en trámite de glosa</td>
+                </tr>"""
+        
+        tabla_valores += """
             </table>
-            <div style="margin-top:10px;font-size:11px;color:#78350f;">
-                <b>Nota:</b> El valor rechazado permanece en tramite de glosa. La argumentación jurídica aplica para este valor.
-            </div>
         </div>"""
-        dictamen_final = resultado.dictamen + addendum
 
+        # Actualizar la tabla del dictamen original con el nuevo código
+        dictamen_final = resultado.dictamen.replace(
+            f">{resultado.tipo.split(' ')[-1]}<",
+            f">{cod_res_aceptacion}<"
+        ).replace(
+            resultado.tipo,
+            f"RESPUESTA {cod_res_aceptacion}"
+        ).replace(
+            f"<span style=\"font-size:10px\">{resultado.tipo.split('RESPUESTA ')[-1] if 'RESPUESTA ' in resultado.tipo else ''}</span>",
+            f"<span style=\"font-size:10px\">{desc_res_aceptacion}</span>"
+        )
+        
+        # Agregar el texto de aceptación y tabla de valores
+        dictamen_final = texto_aceptacion_html + dictamen_final + tabla_valores
+
+    # Crear glosa con el resultado
+    tipo_final = f"RESPUESTA {cod_res_aceptacion}" if cod_res_aceptacion else resultado.tipo
     glosa = glosa_repo.crear(
         eps=eps,
         paciente=resultado.paciente,
@@ -316,6 +352,10 @@ async def analizar(
         glosa_repo.actualizar_estado(glosa.id, "RESPONDIDA", responsable=current_user.email)
 
     logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")
+    
+    # Retornar resultado actualizado con el nuevo tipo
+    resultado.tipo = tipo_final
+    resultado.dictamen = dictamen_final
     return resultado
 
 
