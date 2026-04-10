@@ -155,7 +155,7 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
             document.getElementById('statusText').textContent = 'Enviando...';
 
             try {
-                const resp = await fetch('/api/glosas/importar-masiva', {
+                const resp = await fetch('/glosas/importar-masiva', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -192,7 +192,7 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
         async function verificarEstadoBatch(batchId) {
             const intervalo = setInterval(async () => {
                 try {
-                    const resp = await fetch(`/api/glosas/batch/${batchId}`, {
+                    const resp = await fetch(`/glosas/batch/${batchId}`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     const data = await resp.json();
@@ -244,7 +244,7 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
         }
 
         async function verDetalle(id) {
-            const resp = await fetch(`/api/glosas/${id}`, {
+            const resp = await fetch(`/glosas/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const g = await resp.json();
