@@ -270,7 +270,7 @@ async def importar_glosas_masiva(
     servicio_id = f"BATCH-{req_id}"
     
     contrato_repo = ContratoRepository(db)
-    contratos_db = {c.eps: f"Contrato: {c.numero} - Tarifa: {c.tarifa}" for c in contrato_repo.listar()}
+    contratos_db = {c.eps: c.detalles or "" for c in contrato_repo.listar()}
     
     for fila_data in filas:
         background_tasks.add_task(
