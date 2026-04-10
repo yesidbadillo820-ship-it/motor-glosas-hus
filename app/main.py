@@ -270,6 +270,32 @@ async def analizar(
     else:
         estado = "RADICADA"
 
+    dictamen_final = resultado.dictamen
+    if estado == "PARCIALMENTE_ACEPTADA" or estado == "ACEPTADA":
+        val_rechazado = val_obj - val_ac
+        addendum = f"""
+        <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:15px;margin-top:20px;">
+            <div style="font-weight:bold;color:#92400e;margin-bottom:10px;font-size:14px;">⚠️ ACCEPTACIÓN PARCIAL DEL VALOR OBJETADO</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <tr style="background:#fde68a;">
+                    <td style="padding:8px;font-weight:bold;">VALOR OBJETADO:</td>
+                    <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_obj:,.0f}</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px;font-weight:bold;">VALOR ACEPTADO:</td>
+                    <td style="padding:8px;text-align:right;font-weight:bold;color:#059669;">$ {val_ac:,.0f}</td>
+                </tr>
+                <tr style="background:#fee2e2;">
+                    <td style="padding:8px;font-weight:bold;">VALOR RECHAZADO (EN TRÁMITE):</td>
+                    <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_rechazado:,.0f}</td>
+                </tr>
+            </table>
+            <div style="margin-top:10px;font-size:11px;color:#78350f;">
+                <b>Nota:</b> El valor rechazado permanece en tramite de glosa. La argumentación jurídica aplica para este valor.
+            </div>
+        </div>"""
+        dictamen_final = resultado.dictamen + addendum
+
     glosa = glosa_repo.crear(
         eps=eps,
         paciente=resultado.paciente,
@@ -278,7 +304,7 @@ async def analizar(
         valor_aceptado=val_ac,
         etapa=etapa,
         estado=estado,
-        dictamen=resultado.dictamen,
+        dictamen=dictamen_final,
         dias_restantes=resultado.dias_restantes,
         modelo_ia=resultado.modelo_ia,
         score=resultado.score,
