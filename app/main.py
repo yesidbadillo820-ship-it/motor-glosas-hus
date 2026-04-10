@@ -1,6 +1,7 @@
 import logging
 import re
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, Form, Depends, HTTPException, UploadFile, File
@@ -275,60 +276,97 @@ async def analizar(
         desc_res_aceptacion = None
         texto_aceptacion = None
 
-    # Si hay aceptación (parcial o total), reemplazar el dictamen
+    # Si hay aceptación, generar dictamen completamente nuevo
     dictamen_final = resultado.dictamen
     if estado in ("ACEPTADA", "PARCIALMENTE_ACEPTADA"):
         val_rechazado = val_obj - val_ac
         
-        # Crear el nuevo dictamen con aceptación
-        texto_aceptacion_html = f"""
-        <div style="background:#dcfce7;border:2px solid #16a34a;border-radius:8px;padding:15px;margin-bottom:20px;">
-            <div style="font-weight:bold;color:#15803d;font-size:16px;text-align:center;">{texto_aceptacion}</div>
-        </div>"""
+        # Generar texto de aceptación apropiado
+        if estado == "ACEPTADA":
+            argumento_aceptacion = f"""
+            <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:15px 0;border-radius:8px;">
+                <h4 style="color:#15803d;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
+                <p style="font-size:13px;line-height:1.8;color:#166534;">
+                    EL HOSPITAL UNIVERSITARIO DE SANTANDER INFORMA A {eps.upper()} QUE ACEPTA LA PRESENTE GLOSA 
+                    POR VALOR DE <strong>${val_ac:,.0f}</strong> (VALOR TOTAL OBJETADO), 
+                    DE CONFORMIDAD CON LO ESTABLECIDO EN LA RESOLUCIÓN 3047 DE 2008 Y DEMÁS NORMATIVA VIGENTE.
+                </p>
+                <p style="font-size:13px;line-height:1.8;color:#166534;">
+                    SE SOLICITA PROCEDER CON EL RECONOCIMIENTO Y PAGO CORRESPONDIENTE EN EL PRÓXIMO CICLO DE PAGOS.
+                </p>
+            </div>"""
+        else:
+            argumento_aceptacion = f"""
+            <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:20px;margin:15px 0;border-radius:8px;">
+                <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
+                <p style="font-size:13px;line-height:1.8;color:#78350f;">
+                    EL HOSPITAL UNIVERSITARIO DE SANTANDER INFORMA A {eps.upper()} QUE ACEPTA PARCIALMENTE 
+                    LA PRESENTE GLOSA POR VALOR DE <strong>${val_ac:,.0f}</strong>, 
+                    QUEDANDO UN SALDO PENDIENTE DE <strong>${val_rechazado:,.0f}</strong>.
+                </p>
+                <p style="font-size:13px;line-height:1.8;color:#78350f;">
+                    EL VALOR RECHAZADO DE <strong>${val_rechazado:,.0f}</strong> SE MANTIENE EN TRÁMITE, 
+                    PARA LO CUAL SE ADJUNTAN LOS ARGUMENTOS TÉCNICOS Y JURÍDICOS RESPECTIVOS.
+                </p>
+            </div>"""
         
         # Tabla con valores
         tabla_valores = f"""
-        <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:15px;margin-top:20px;">
-            <div style="font-weight:bold;color:#92400e;margin-bottom:10px;font-size:14px;">RESUMEN DE VALORES</div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:15px;margin-top:15px;">
+            <div style="font-weight:bold;color:#475569;margin-bottom:10px;font-size:12px;">RESUMEN DE VALORES</div>
             <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                <tr style="background:#fde68a;">
-                    <td style="padding:8px;font-weight:bold;">VALOR OBJETADO:</td>
-                    <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_obj:,.0f}</td>
+                <tr style="background:#f1f5f9;">
+                    <td style="padding:8px;font-weight:bold;color:#64748b;">VALOR OBJETADO:</td>
+                    <td style="padding:8px;text-align:right;font-weight:bold;">$ {val_obj:,.0f}</td>
                 </tr>
-                <tr>
-                    <td style="padding:8px;font-weight:bold;">VALOR ACEPTADO:</td>
-                    <td style="padding:8px;text-align:right;font-weight:bold;color:#059669;">$ {val_ac:,.0f}</td>
+                <tr style="background:#dcfce7;">
+                    <td style="padding:8px;font-weight:bold;color:#166534;">VALOR ACEPTADO:</td>
+                    <td style="padding:8px;text-align:right;font-weight:bold;color:#16a34a;">$ {val_ac:,.0f}</td>
                 </tr>"""
         
         if estado == "PARCIALMENTE_ACEPTADA":
             tabla_valores += f"""
                 <tr style="background:#fee2e2;">
-                    <td style="padding:8px;font-weight:bold;">VALOR RECHAZADO (EN TRÁMITE):</td>
+                    <td style="padding:8px;font-weight:bold;color:#991b1b;">VALOR RECHAZADO (EN TRÁMITE):</td>
                     <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_rechazado:,.0f}</td>
-                </tr>
-                <tr style="background:#e0e7ff;">
-                    <td style="padding:8px;font-weight:bold;">NOTA:</td>
-                    <td style="padding:8px;text-align:right;color:#3730a3;font-size:11px;">El valor rechazado permanece en trámite de glosa</td>
                 </tr>"""
         
         tabla_valores += """
             </table>
         </div>"""
 
-        # Actualizar la tabla del dictamen original con el nuevo código
-        dictamen_final = resultado.dictamen.replace(
-            f">{resultado.tipo.split(' ')[-1]}<",
-            f">{cod_res_aceptacion}<"
-        ).replace(
-            resultado.tipo,
-            f"RESPUESTA {cod_res_aceptacion}"
-        ).replace(
-            f"<span style=\"font-size:10px\">{resultado.tipo.split('RESPUESTA ')[-1] if 'RESPUESTA ' in resultado.tipo else ''}</span>",
-            f"<span style=\"font-size:10px\">{desc_res_aceptacion}</span>"
-        )
-        
-        # Agregar el texto de aceptación y tabla de valores
-        dictamen_final = texto_aceptacion_html + dictamen_final + tabla_valores
+        # Generar dictamen nuevo completo
+        dictamen_final = f"""
+        <table border="1" style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:15px;background:white;">
+            <tr style="background-color:#16a34a;color:white;">
+                <th style="padding:10px;text-align:center;">CÓDIGO GLOSA</th>
+                <th style="padding:10px;text-align:center;">VALOR OBJETADO</th>
+                <th style="padding:10px;text-align:center;">CÓDIGO RESPUESTA</th>
+            </tr>
+            <tr>
+                <td style="padding:10px;text-align:center;font-weight:bold;">{resultado.codigo_glosa}</td>
+                <td style="padding:10px;text-align:center;font-weight:bold;color:#16a34a;">$ {val_obj:,.0f}</td>
+                <td style="padding:10px;text-align:center;"><b>{cod_res_aceptacion}</b><br><span style="font-size:10px">{desc_res_aceptacion}</span></td>
+            </tr>
+        </table>
+
+        <div style="background:#f8fafc;border-radius:12px;padding:20px;border-left:4px solid #16a34a;margin-top:15px;">
+            <div style="display:flex;gap:10px;margin-bottom:15px;">
+                <span style="background:#16a34a;color:white;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;">{eps.upper()}</span>
+                <span style="background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;">{resultado.codigo_glosa[:2]} {resultado.codigo_glosa[2:] if len(resultado.codigo_glosa) > 2 else ''}</span>
+            </div>
+        </div>
+
+        {argumento_aceptacion}
+        {tabla_valores}
+
+        <div style="margin-top:20px;padding:15px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;">
+            <b>FECHA DE RESPUESTA:</b> {datetime.now().strftime('%d de %B de %Y').upper()}
+        </div>
+
+        <div style="margin-top:15px;padding:12px;background:#f0fdf4;border-radius:8px;font-size:10px;color:#166534;">
+            <b>Nota:</b> Este documento constituye la respuesta formal a la glosa objetada, de conformidad con la normativa colombiana vigente.
+        </div>"""
 
     # Crear glosa con el resultado
     tipo_final = f"RESPUESTA {cod_res_aceptacion}" if cod_res_aceptacion else resultado.tipo
