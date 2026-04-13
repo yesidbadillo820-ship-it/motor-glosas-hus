@@ -1,7 +1,7 @@
 import re
 import uuid
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -64,7 +64,7 @@ def historial(
 @router.get("/historial-paginado")
 def historial_paginado(
     page: int = 1,
-    per_page: int = 20,
+    per_page: int = Query(20, ge=1, le=100),
     eps: Optional[str] = None,
     estado: Optional[str] = None,
     search: Optional[str] = None,

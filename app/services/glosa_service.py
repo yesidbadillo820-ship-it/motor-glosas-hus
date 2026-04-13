@@ -280,7 +280,7 @@ class GlosaService:
             normas_clave=normas_clave if normas_clave else None,
             servicio=servicio_ia if servicio_ia else None,
             contrato=contrato_ia if contrato_ia else None,
-            tarifa=servicio_ia if tarifa_ia else None
+            tarifa=tarifa_ia if tarifa_ia else None
         )
 
         return GlosaResult(
@@ -402,7 +402,7 @@ class GlosaService:
 
         bloque_servicio = ""
         if servicio or contrato or tarifa:
-            servicio_html = f"<div><b>Servicio objentado:</b> {servicio}</div>" if servicio else ""
+            servicio_html = f"<div><b>Servicio objetado:</b> {servicio}</div>" if servicio else ""
             contrato_html = f"<div><b>Contrato:</b> {contrato}</div>" if contrato else ""
             tarifa_html = f"<div><b>Tarifa pactada:</b> {tarifa}</div>" if tarifa else ""
             bloque_servicio = f"""

@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 from app.database import engine, Base, SessionLocal, get_db
 from app.models.db import ContratoRecord, UsuarioRecord
 from app.models.schemas import GlosaInput, GlosaResult
-from app.core.config import get_settings
+from app.core.config import get_settings, check_security_config
 from app.auth import get_password_hash
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual
@@ -58,6 +58,7 @@ CONTRATOS_DEFAULT = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=== INICIANDO APLICACIÓN ===")
+    check_security_config()
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     cfg = get_settings()
@@ -128,7 +129,7 @@ Obtener token en `/api/auth/login`.
 | RE9801 | Glosa aceptada y subsanada parcialmente |
 | RE9901 | Glosa no aceptada - Subsanada en su totalidad |
     """,
-    version="5.3.0",
+    version="5.4.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",

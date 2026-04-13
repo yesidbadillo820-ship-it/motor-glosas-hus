@@ -5,6 +5,8 @@ from typing import Optional
 
 from app.database import get_db
 from app.repositories.plantilla_repository import PlantillaRepository
+from app.api.deps import get_usuario_actual
+from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/plantillas", tags=["plantillas"])
 
@@ -24,6 +26,7 @@ class PlantillaUpdate(BaseModel):
 def listar_plantillas(
     activa_only: bool = True,
     db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Lista todas las plantillas disponibles"""
     repo = PlantillaRepository(db)
@@ -46,6 +49,7 @@ def listar_plantillas(
 def crear_plantilla(
     data: PlantillaCreate,
     db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Crea una nueva plantilla"""
     repo = PlantillaRepository(db)
@@ -62,6 +66,7 @@ def crear_plantilla(
 def obtener_plantilla(
     plantilla_id: int,
     db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Obtiene una plantilla por ID"""
     repo = PlantillaRepository(db)
@@ -83,6 +88,7 @@ def actualizar_plantilla(
     plantilla_id: int,
     data: PlantillaUpdate,
     db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Actualiza una plantilla"""
     repo = PlantillaRepository(db)
@@ -100,6 +106,7 @@ def actualizar_plantilla(
 def eliminar_plantilla(
     plantilla_id: int,
     db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Elimina (desactiva) una plantilla"""
     repo = PlantillaRepository(db)

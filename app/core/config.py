@@ -1,6 +1,9 @@
 import os
+import logging
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+logger = logging.getLogger("motor_glosas")
 
 
 class Settings(BaseSettings):
@@ -42,6 +45,23 @@ class Settings(BaseSettings):
     def get_allowed_origins(self) -> list[str]:
         """Retorna la lista de orígenes CORS permitidos."""
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+
+def check_security_config() -> None:
+    """Verifica configuración de seguridad y emite advertencias."""
+    settings = get_settings()
+    
+    if settings.secret_key == "dev-only-secret-key-change-in-production":
+        logger.warning(
+            "⚠️ SEGURIDAD: Usando SECRET_KEY por defecto en producción. "
+            "Configure la variable de entorno SECRET_KEY con un valor seguro."
+        )
+    
+    if settings.admin_password == "admin123":
+        logger.warning(
+            "⚠️ SEGURIDAD: Contraseña admin por defecto. "
+            "Configure ADMIN_PASSWORD con una contraseña segura."
+        )
 
 
 @lru_cache()
