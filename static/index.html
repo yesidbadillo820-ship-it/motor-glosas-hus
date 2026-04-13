@@ -714,6 +714,8 @@ async function initApp(){
   if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
   await loadContratos();
   loadAlertCount();
+  loadDash();
+  loadHist(1);
   checkHealth();
   setInterval(checkHealth,30000);
 }
