@@ -169,6 +169,23 @@ def obtener_glosa(
     }
 
 
+@router.delete("/{glosa_id}")
+def eliminar_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Elimina permanentemente una glosa del historial."""
+    repo = GlosaRepository(db)
+    glosa = repo.obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(status_code=404, detail="Glosa no encontrada")
+    db.delete(glosa)
+    db.commit()
+    logger.info(f"Glosa eliminada ID={glosa_id} por {current_user.email}")
+    return {"message": f"Glosa {glosa_id} eliminada"}
+
+
 def _parsear_filas_excel(texto: str) -> list[dict]:
     """
     Parsea el texto pegado de Excel y extrae cada fila como diccionario.

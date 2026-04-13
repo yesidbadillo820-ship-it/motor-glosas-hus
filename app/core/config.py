@@ -1,9 +1,12 @@
 import os
 import logging
+import warnings
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 logger = logging.getLogger("motor_glosas")
+
+_DEFAULT_SECRET = "dev-only-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -11,7 +14,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./glosas.db"
 
     # Seguridad JWT — Token de 1 hora según recomendaciones OWASP
-    secret_key: str = "dev-only-secret-key-change-in-production"
+    secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60  # 1 hora (antes: 24h)
 
@@ -51,19 +54,30 @@ def check_security_config() -> None:
     """Verifica configuración de seguridad y emite advertencias."""
     settings = get_settings()
     
-    if settings.secret_key == "dev-only-secret-key-change-in-production":
-        logger.warning(
-            "⚠️ SEGURIDAD: Usando SECRET_KEY por defecto en producción. "
-            "Configure la variable de entorno SECRET_KEY con un valor seguro."
+    if settings.secret_key == _DEFAULT_SECRET:
+        warnings.warn(
+            "ADVERTENCIA DE SEGURIDAD: Se está usando el SECRET_KEY por defecto. "
+            "Define la variable de entorno SECRET_KEY con un valor aleatorio seguro "
+            "(mínimo 32 caracteres) antes de desplegar en producción.",
+            stacklevel=2,
         )
     
     if settings.admin_password == "admin123":
-        logger.warning(
-            "⚠️ SEGURIDAD: Contraseña admin por defecto. "
-            "Configure ADMIN_PASSWORD con una contraseña segura."
+        warnings.warn(
+            "ADVERTENCIA DE SEGURIDAD: Contraseña admin por defecto. "
+            "Configure ADMIN_PASSWORD con una contraseña segura.",
+            stacklevel=2,
         )
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    settings = get_settings()
+    if settings.secret_key == _DEFAULT_SECRET:
+        warnings.warn(
+            "ADVERTENCIA DE SEGURIDAD: Se está usando el SECRET_KEY por defecto. "
+            "Define la variable de entorno SECRET_KEY con un valor aleatorio seguro "
+            "(mínimo 32 caracteres) antes de desplegar en producción.",
+            stacklevel=2,
+        )
+    return settings

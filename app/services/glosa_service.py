@@ -2,6 +2,8 @@ import os
 import re
 import logging
 import hashlib
+import asyncio
+import warnings
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 
@@ -14,6 +16,11 @@ from app.services.glosa_ia_prompts import get_system_prompt, build_user_prompt
 
 _CACHE_IA: TTLCache = TTLCache(maxsize=500, ttl=3600)
 _CACHE_TTL = 3600
+
+_ERRORES_REINTENTABLES = frozenset([
+    "429", "rate", "limit", "timeout", "stream", "idle",
+    "timed out", "connection", "503", "502", "reset", "eof",
+])
 
 FERIADOS_CO = [
     # 2025
@@ -143,7 +150,8 @@ def generar_texto_injustificada(eps: str) -> str:
 
 class GlosaService:
     def __init__(self, groq_api_key: str = None, anthropic_api_key: str = None):
-        self.groq = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
+        _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
+        self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
@@ -451,9 +459,9 @@ class GlosaService:
             <b>Nota:</b> Generado con asistencia de IA. Verificar antes de radicar ante la EPS.
         </div>"""
 
-    async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 3) -> tuple[str, str]:
-        """Llama a Groq con retry exponencial para manejar rate limits."""
-        import asyncio
+    async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 4) -> tuple[str, str]:
+        """Llama a Groq con retry exponencial para manejar rate limits y timeouts."""
+        ultimo_error: Exception = Exception("Groq: sin intentos")
         
         for intento in range(max_intentos):
             try:
@@ -464,20 +472,22 @@ class GlosaService:
                     ],
                     model="llama-3.3-70b-versatile",
                     temperature=0.15,
-                    max_tokens=3000
+                    max_tokens=2500,
+                    timeout=80.0,
                 )
                 content = resp.choices[0].message.content
                 return content, "groq/llama-3.3"
             except Exception as e:
+                ultimo_error = e
                 error_msg = str(e).lower()
-                if "429" in error_msg or "rate" in error_msg or "limit" in error_msg:
-                    if intento < max_intentos - 1:
-                        espera = 2 ** intento
-                        logger.warning(f"Groq rate limit, reintento {intento + 2}/{max_intentos} en {espera}s")
-                        await asyncio.sleep(espera)
-                        continue
+                es_reintentable = any(k in error_msg for k in _ERRORES_REINTENTABLES)
+                if es_reintentable and intento < max_intentos - 1:
+                    espera = min(2 ** intento, 16)
+                    logger.warning(f"Groq error reintentarable: {e}, reintento {intento + 2}/{max_intentos} en {espera}s")
+                    await asyncio.sleep(espera)
+                    continue
                 raise
-        raise Exception("Groq: todos los reintentos fallaron")
+        raise ultimo_error
 
     async def _llamar_ia(self, system: str, user: str) -> tuple[str, str]:
         clave_cache = hashlib.sha256(f"{system}:{user}".encode()).hexdigest()
@@ -504,7 +514,8 @@ class GlosaService:
             logger.error(f"IA Error Groq: {e}")
             if self.anthropic_key:
                 try:
-                    async with httpx.AsyncClient(timeout=60.0) as client:
+                    _timeout_anthropic = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
+                    async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
                         resp = await client.post(
                             "https://api.anthropic.com/v1/messages",
                             headers={

@@ -156,6 +156,7 @@ from app.api.routers.plantillas import router as plantillas_router
 from app.api.routers.exportar import router as exportar_router
 from app.api.routers.workflow import router as workflow_router
 from app.api.routers.alertas import router as alertas_router
+from app.api.routers.usuarios import router as usuarios_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -168,6 +169,7 @@ app.include_router(plantillas_router)
 app.include_router(exportar_router)
 app.include_router(workflow_router)
 app.include_router(alertas_router)
+app.include_router(usuarios_router)
 
 
 def get_glosa_service() -> GlosaService:
