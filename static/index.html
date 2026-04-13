@@ -1060,7 +1060,6 @@ async function cambiarRol(id,rolActual){
   toast(r.ok?'Rol actualizado':'Error',d.message||d.detail,r.ok?'success':'error');
   if(r.ok)loadUsuarios();
 }
-}
 
 async function crearUsuario(){
   var nombre=document.getElementById('u-nombre').value.trim();
