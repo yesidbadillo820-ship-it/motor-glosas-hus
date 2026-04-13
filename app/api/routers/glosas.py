@@ -1,6 +1,7 @@
 import re
 import uuid
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
@@ -9,11 +10,12 @@ from pydantic import BaseModel
 from app.database import get_db, SessionLocal
 from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.contrato_repository import ContratoRepository
+from app.repositories.audit_repository import AuditRepository
 from app.services.glosa_service import GlosaService
 from app.services.pdf_service import PdfService
 from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, get_request_id, logger
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.models.db import UsuarioRecord, GlosaRecord
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
@@ -173,7 +175,7 @@ def obtener_glosa(
 def eliminar_glosa(
     glosa_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Elimina permanentemente una glosa del historial."""
     repo = GlosaRepository(db)
@@ -184,6 +186,73 @@ def eliminar_glosa(
     db.commit()
     logger.info(f"Glosa eliminada ID={glosa_id} por {current_user.email}")
     return {"message": f"Glosa {glosa_id} eliminada"}
+
+
+class DecisionEPSInput(BaseModel):
+    decision_eps: str
+    valor_recuperado: float = 0.0
+    observacion_eps: Optional[str] = None
+
+
+class AsignarAuditorInput(BaseModel):
+    auditor_email: str
+
+
+@router.patch("/{glosa_id}/decision-eps")
+def registrar_decision_eps(glosa_id: int, data: DecisionEPSInput,
+                           db: Session = Depends(get_db),
+                           current_user: UsuarioRecord = Depends(get_auditor_o_superior)):
+    DECISIONES = {"LEVANTADA", "ACEPTADA", "RATIFICADA", "PENDIENTE"}
+    decision = data.decision_eps.upper()
+    if decision not in DECISIONES:
+        raise HTTPException(400, f"Decisión inválida. Use: {', '.join(DECISIONES)}")
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    glosa.decision_eps = decision
+    glosa.fecha_decision_eps = datetime.utcnow()
+    glosa.valor_recuperado = data.valor_recuperado
+    if data.observacion_eps:
+        glosa.observacion_eps = data.observacion_eps
+    if decision in ("LEVANTADA", "ACEPTADA", "RATIFICADA"):
+        glosa.estado = decision
+    db.commit()
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email, usuario_rol=current_user.rol,
+        accion="DECISION_EPS", tabla="glosas", registro_id=glosa_id,
+        campo="decision_eps", valor_nuevo=decision,
+        detalle=f"Decisión: {decision} | recuperado: ${data.valor_recuperado:,.0f}")
+    return {"message": "Decisión registrada", "glosa_id": glosa_id, "decision_eps": decision}
+
+
+@router.patch("/{glosa_id}/asignar")
+def asignar_auditor(glosa_id: int, data: AsignarAuditorInput,
+                    db: Session = Depends(get_db),
+                    current_user: UsuarioRecord = Depends(get_coordinador_o_admin)):
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    anterior = glosa.auditor_email
+    glosa.auditor_email = data.auditor_email
+    db.commit()
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email, usuario_rol=current_user.rol,
+        accion="ASIGNAR", tabla="glosas", registro_id=glosa_id,
+        campo="auditor_email", valor_anterior=anterior, valor_nuevo=data.auditor_email)
+    return {"message": f"Glosa #{glosa_id} asignada a {data.auditor_email}"}
+
+
+@router.get("/casos-similares/{glosa_id}")
+def casos_similares(glosa_id: int, db: Session = Depends(get_db),
+                    current_user: UsuarioRecord = Depends(get_usuario_actual)):
+    from app.services.rag_service import RAGService
+    glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    casos = RAGService().buscar_casos_similares(
+        texto_glosa=glosa.dictamen or "", eps=glosa.eps,
+        codigo_glosa=glosa.codigo_glosa or "", db=db, top_k=5, solo_exitosos=False)
+    return {"glosa_id": glosa_id, "casos_similares": casos}
 
 
 def _parsear_filas_excel(texto: str) -> list[dict]:

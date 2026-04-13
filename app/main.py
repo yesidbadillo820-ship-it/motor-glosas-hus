@@ -79,6 +79,8 @@ async def lifespan(app: FastAPI):
                 nombre="Auditor Principal",
                 email="admin@hus.gov.co",
                 password_hash=get_password_hash(admin_pass),
+                rol="SUPER_ADMIN",
+                activo=1,
             ))
             logger.warning(
                 "Usuario admin creado. Cambiar contraseña inmediatamente "
@@ -157,6 +159,8 @@ from app.api.routers.exportar import router as exportar_router
 from app.api.routers.workflow import router as workflow_router
 from app.api.routers.alertas import router as alertas_router
 from app.api.routers.usuarios import router as usuarios_router
+from app.api.routers.conciliacion import router as conciliacion_router
+from app.api.routers.audit import router as audit_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -170,6 +174,8 @@ app.include_router(exportar_router)
 app.include_router(workflow_router)
 app.include_router(alertas_router)
 app.include_router(usuarios_router)
+app.include_router(conciliacion_router)
+app.include_router(audit_router)
 
 
 def get_glosa_service() -> GlosaService:
