@@ -565,8 +565,21 @@ textarea{resize:vertical;min-height:80px}
               Seleccione un archivo TXT de Salud Total para generar respuestas automáticas.
             </p>
             <div class="field">
+              <label>Tipo de Respuesta</label>
+              <select id="st-tipo-respuesta" onchange="cambiarTipoRespuestaST()">
+                <option value="extemporanea">Extemporánea (Auto - fuera de términos)</option>
+                <option value="ratificada">Ratificada (Responder a glosa ratificada)</option>
+                <option value="ia">Analizar con IA (Análisis completo)</option>
+              </select>
+            </div>
+            <div class="field" id="st-field-archivo">
               <label>Archivo TXT</label>
               <input type="file" id="st-file" accept=".txt" style="padding:.4rem .6rem;font-size:.75rem"/>
+            </div>
+            <div class="field" id="st-field-fecha" style="display:none">
+              <label>Fecha de Recepción de Factura</label>
+              <input type="date" id="st-fecha-recepcion"/>
+              <p style="font-size:.7rem;color:var(--text3);margin-top:.3rem">Fecha en que la EPS recepcionó la factura (para calcular días hábiles)</p>
             </div>
             <div class="btn-row">
               <button class="btn btn-ghost" onclick="previewSaludTotal()">Vista Previa</button>
@@ -638,6 +651,7 @@ var loadInterval = null;
 // ─── HELPERS ─────────────────────────────────────────────────────────────
 var fmt = new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0});
 function cop(v){return fmt.format(v)}
+function fmtCOP(v){return v?fmt.format(v):'$0'}
 function authH(){return {'Authorization':'Bearer '+TOKEN}}
 function H(obj){return Object.assign({'Authorization':'Bearer '+TOKEN},obj||{})}
 
@@ -1251,12 +1265,31 @@ window.addEventListener('DOMContentLoaded',function(){
 });
 
 // ─── SALUD TOTAL ───────────────────────────────────────────────────────────
+function cambiarTipoRespuestaST(){
+  var tipo=document.getElementById('st-tipo-respuesta').value;
+  var fieldArchivo=document.getElementById('st-field-archivo');
+  var fieldFecha=document.getElementById('st-field-fecha');
+  if(tipo==='ia'){
+    fieldArchivo.style.display='none';
+    fieldFecha.style.display='block';
+  }else{
+    fieldArchivo.style.display='block';
+    fieldFecha.style.display='none';
+  }
+}
+
 async function previewSaludTotal(){
+  var tipo=document.getElementById('st-tipo-respuesta').value;
   var fileInput=document.getElementById('st-file');
   var file=fileInput.files[0];
+  if(tipo==='ia'){
+    toast('Seleccione archivo TXT para vista previa','error');
+    return;
+  }
   if(!file){toast('Seleccione un archivo','error');return;}
   var fd=new FormData();
   fd.append('file',file);
+  fd.append('tipo_respuesta',tipo);
   showLoading('Procesando...');
   try{
     var r=await fetch('/api/salud-total/preview',{method:'POST',headers:authH(),body:fd});
@@ -1277,12 +1310,22 @@ async function previewSaludTotal(){
 }
 
 async function procesarSaludTotal(){
+  var tipo=document.getElementById('st-tipo-respuesta').value;
   var fileInput=document.getElementById('st-file');
   var file=fileInput.files[0];
-  if(!file){toast('Seleccione un archivo','error');return;}
   var fd=new FormData();
-  fd.append('file',file);
-  showLoading('Generando respuesta...');
+  fd.append('tipo_respuesta',tipo);
+  if(tipo==='ia'){
+    if(!file){toast('Seleccione un archivo TXT','error');return;}
+    var fechaRec=document.getElementById('st-fecha-recepcion').value;
+    if(!fechaRec){toast('Ingrese fecha de recepción de factura','error');return;}
+    fd.append('file',file);
+    fd.append('fecha_recepcion',fechaRec);
+  }else{
+    if(!file){toast('Seleccione un archivo','error');return;}
+    fd.append('file',file);
+  }
+  showLoading(tipo==='ia'?'Analizando con IA...':'Generando respuesta...');
   try{
     var r=await fetch('/api/salud-total/procesar',{method:'POST',headers:authH(),body:fd});
     if(r.status===401){logout();return;}

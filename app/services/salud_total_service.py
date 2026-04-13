@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import re
 
 NIT_HUS = "900006037"
@@ -14,11 +14,13 @@ CONCEPTOS = {
     "RE9901": "Glosa no aceptada - Subsanada en su totalidad",
 }
 
-OBS_TA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. EL PLAZO LEGAL PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA. AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
+OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. EL PLAZO LEGAL PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA. AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
+
+OBS_RATIFICADA = "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE E INJUSTIFICADA. NO SE EVIDENCIA INCUMPLIMIENTO CONTRACTUAL NI NORMATIVO. SE REQUIERE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
 
 OBS_TA_POR_TIPO = {
-    "TA": OBS_TA,
-    "FA": OBS_TA,
+    "TA": "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. EL PLAZO LEGAL PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA. AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
+    "FA": "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. EL PLAZO LEGAL PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA. AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
     "IN": "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE. NO SE EVIDENCIA INCUMPLIMIENTO DEL CONTRATO O LA NORMATIVA VIGENTE. SE REQUIERE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
     "AU": "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE. NO SE EVIDENCIA AUTORIZACIÓN DEFICIENTE O INSUFICIENTE. SE REQUIERE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
     "NA": "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE. NO SE EVIDENCIA NO AFILIACIÓN O PROBLEMAS DE AFILIACIÓN. SE REQUIERE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
@@ -56,8 +58,10 @@ def parsear_fecha(fecha_str: str) -> datetime:
     raise ValueError(f"Formato de fecha no reconocido: {fecha_str}")
 
 class GlosaSaludTotal:
-    def __init__(self, campos: List[str]):
+    def __init__(self, campos: List[str], tipo_respuesta: str = "extemporanea", fecha_recepcion: Optional[datetime] = None):
         self.campos = campos
+        self.tipo_respuesta = tipo_respuesta
+        self.fecha_recepcion = fecha_recepcion
         self.fecha_rad = parsear_fecha(campos[0]) if campos[0] else None
         self.numero_rad = campos[1] if len(campos) > 1 else ""
         self.prefijo_fac = campos[2] if len(campos) > 2 else ""
@@ -89,6 +93,8 @@ class GlosaSaludTotal:
         return float(valor.replace(",", ""))
 
     def dias_transcurridos(self) -> int:
+        if self.fecha_recepcion and self.fecha_rad:
+            return calcular_dias_habiles(self.fecha_recepcion, self.fecha_rad)
         if not self.fecha_rad:
             return 0
         return calcular_dias_habiles(self.fecha_rad, datetime.now())
@@ -97,23 +103,41 @@ class GlosaSaludTotal:
         return self.dias_transcurridos() > DIAS_LIMITE
 
     def obtener_observacion(self) -> str:
+        dias = self.dias_transcurridos()
         prefijo_cod = self.cod_motv_glosa_general[:2].upper() if self.cod_motv_glosa_general else "TA"
-        base_obs = OBS_TA_POR_TIPO.get(prefijo_cod, OBS_TA)
-        return base_obs.replace("{DIAS}", str(self.dias_transcurridos()))
+        
+        if self.tipo_respuesta == "extemporanea":
+            base_obs = OBS_EXTEMPORANEA.replace("{DIAS}", str(dias))
+        elif self.tipo_respuesta == "ratificada":
+            base_obs = OBS_RATIFICADA
+        else:
+            base_obs = OBS_TA_POR_TIPO.get(prefijo_cod, OBS_EXTEMPORANEA).replace("{DIAS}", str(dias))
+        
+        return base_obs
 
     def generar_respuesta(self) -> Dict[str, Any]:
         dias = self.dias_transcurridos()
         
-        if dias > DIAS_LIMITE:
-            codigo_respuesta = "RE9502"
-            concepto = CONCEPTOS["RE9502"]
+        if self.tipo_respuesta == "extemporanea":
+            if dias > DIAS_LIMITE:
+                codigo_respuesta = "RE9502"
+                concepto = CONCEPTOS["RE9502"]
+                observacion = self.obtener_observacion()
+                valor_aceptado = 0
+            else:
+                codigo_respuesta = "RE9602"
+                concepto = CONCEPTOS["RE9602"]
+                observacion = self.obtener_observacion()
+                valor_aceptado = 0
+        elif self.tipo_respuesta == "ratificada":
+            codigo_respuesta = "RE9602"
+            concepto = CONCEPTOS["RE9602"]
             observacion = self.obtener_observacion()
             valor_aceptado = 0
         else:
-            codigo_respuesta = "RE9602"
-            concepto = CONCEPTOS["RE9602"]
-            prefijo_cod = self.cod_motv_glosa_general[:2].upper() if self.cod_motv_glosa_general else "TA"
-            observacion = OBS_TA_POR_TIPO.get(prefijo_cod, OBS_TA).replace("{DIAS}", str(dias))
+            codigo_respuesta = "RE9901"
+            concepto = CONCEPTOS["RE9901"]
+            observacion = "PENDIENTE DE ANÁLISIS CON IA"
             valor_aceptado = 0
 
         return {
@@ -129,9 +153,11 @@ class GlosaSaludTotal:
             "Codigo_Respuesta_a_glosas": codigo_respuesta,
             "ConceptoRespuesta": concepto,
             "Observacion_IPS": observacion,
+            "TipoRespuesta": self.tipo_respuesta,
+            "DiasTranscurridos": dias,
         }
 
-def procesar_glosas_salud_total(contenido_txt: str) -> List[Dict[str, Any]]:
+def procesar_glosas_salud_total(contenido_txt: str, tipo_respuesta: str = "extemporanea", fecha_recepcion: Optional[datetime] = None) -> List[Dict[str, Any]]:
     lineas = contenido_txt.strip().split("\n")
     if not lineas:
         return []
@@ -143,7 +169,7 @@ def procesar_glosas_salud_total(contenido_txt: str) -> List[Dict[str, Any]]:
         if not linea.strip():
             continue
         campos = linea.split("|")
-        glosa = GlosaSaludTotal(campos)
+        glosa = GlosaSaludTotal(campos, tipo_respuesta, fecha_recepcion)
         respuestas.append(glosa.generar_respuesta())
     
     return respuestas
@@ -174,7 +200,8 @@ def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
     
     return "\n".join(lineas)
 
-def generar_nombre_archivo() -> str:
+def generar_nombre_archivo(tipo_respuesta: str = "extemporanea") -> str:
     now = datetime.now()
     fecha_str = now.strftime("%d%m%Y")
-    return f"RTAGLOSA_{NIT_HUS}_{fecha_str}_1.txt"
+    sufijo = "1" if tipo_respuesta == "extemporanea" else "2" if tipo_respuesta == "ratificada" else "3"
+    return f"RTAGLOSA_{NIT_HUS}_{fecha_str}_{sufijo}.txt"
