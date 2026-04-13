@@ -72,12 +72,4 @@ def check_security_config() -> None:
 
 @lru_cache()
 def get_settings() -> Settings:
-    settings = get_settings()
-    if settings.secret_key == _DEFAULT_SECRET:
-        warnings.warn(
-            "ADVERTENCIA DE SEGURIDAD: Se está usando el SECRET_KEY por defecto. "
-            "Define la variable de entorno SECRET_KEY con un valor aleatorio seguro "
-            "(mínimo 32 caracteres) antes de desplegar en producción.",
-            stacklevel=2,
-        )
-    return settings
+    return Settings()
