@@ -131,7 +131,7 @@ Obtener token en `/api/auth/login`.
 | RE9801 | Glosa aceptada y subsanada parcialmente |
 | RE9901 | Glosa no aceptada - Subsanada en su totalidad |
     """,
-    version="5.4.0",
+    version="5.5.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -161,6 +161,7 @@ from app.api.routers.alertas import router as alertas_router
 from app.api.routers.usuarios import router as usuarios_router
 from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
+from app.api.routers.salud_total import router as salud_total_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -176,6 +177,7 @@ app.include_router(alertas_router)
 app.include_router(usuarios_router)
 app.include_router(conciliacion_router)
 app.include_router(audit_router)
+app.include_router(salud_total_router)
 
 
 def get_glosa_service() -> GlosaService:

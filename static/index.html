@@ -152,6 +152,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 /* ─── AUDITORÍA ───────────────────────────── */
 .audit-area{padding:1.5rem}
 .audit-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+
+/* ─── SALUD TOTAL ──────────────────────────── */
+.st-area{display:grid;grid-template-columns:350px 1fr;gap:1.5rem;align-items:start}
+.st-stats{display:flex;gap:1rem;margin-bottom:1rem}
+.st-stats .stat-mini{flex:1}
+.btn-row{display:flex;gap:.5rem;margin-top:1rem}
+.btn-row .btn{flex:1}
 .audit-toolbar select,.audit-toolbar input{width:auto;padding:.45rem .7rem;font-size:.78rem}
 
 /* ─── ROLES ─────────────────────────────────── */
@@ -334,6 +341,7 @@ textarea{resize:vertical;min-height:80px}
     <button class="nb" onclick="tab(this,'usuarios')">Usuarios</button>
     <button class="nb" onclick="tab(this,'conciliacion')">Conciliación</button>
     <button class="nb" onclick="tab(this,'audit')">Auditoría</button>
+    <button class="nb" onclick="tab(this,'salud-total')">Salud Total</button>
     <button class="nb nb-special" onclick="window.location.href='/importar-masiva'">📊 Importación Masiva</button>
   </div>
 
@@ -544,6 +552,45 @@ textarea{resize:vertical;min-height:80px}
           <tbody id="audit-body"></tbody>
         </table>
         <div class="pager" id="audit-pager" style="margin-top:1rem;display:flex;justify-content:center;gap:.5rem"></div>
+      </div>
+    </div>
+
+    <!-- SALUD TOTAL -->
+    <div class="panel" id="p-salud-total">
+      <div class="st-area">
+        <div class="st-upload-col">
+          <div class="form-card">
+            <h3>Procesar Glosas <span>Salud Total EPS</span></h3>
+            <p style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">
+              Seleccione un archivo TXT de Salud Total para generar respuestas automáticas.
+            </p>
+            <div class="field">
+              <label>Archivo TXT</label>
+              <input type="file" id="st-file" accept=".txt" style="padding:.4rem .6rem;font-size:.75rem"/>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-ghost" onclick="previewSaludTotal()">Vista Previa</button>
+              <button class="btn btn-primary" onclick="procesarSaludTotal()">Descargar Respuesta</button>
+            </div>
+          </div>
+        </div>
+        <div class="st-result-col">
+          <div class="st-stats">
+            <div class="stat-mini"><div class="stat-mini-num" id="st-total">—</div><div class="stat-mini-lbl">Registros</div></div>
+            <div class="stat-mini"><div class="stat-mini-num c-red" id="st-glosado">—</div><div class="stat-mini-lbl">Total Glosado</div></div>
+            <div class="stat-mini"><div class="stat-mini-num c-green" id="st-aceptado">—</div><div class="stat-mini-lbl">Aceptado</div></div>
+            <div class="stat-mini"><div class="stat-mini-num c-amber" id="st-rechazado">—</div><div class="stat-mini-lbl">Rechazado</div></div>
+          </div>
+          <div class="tbl-wrap" style="max-height:400px;overflow:auto">
+            <table>
+              <thead><tr>
+                <th>NumeroRad</th><th>NUMREG</th><th>Servicio</th>
+                <th>Valor Glosa</th><th>Cod. Respuesta</th><th>Concepto</th>
+              </tr></thead>
+              <tbody id="st-body"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1202,6 +1249,54 @@ window.addEventListener('DOMContentLoaded',function(){
   }
   if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
 });
-</script>
-</body>
-</html>
+
+// ─── SALUD TOTAL ───────────────────────────────────────────────────────────
+async function previewSaludTotal(){
+  var fileInput=document.getElementById('st-file');
+  var file=fileInput.files[0];
+  if(!file){toast('Seleccione un archivo','error');return;}
+  var fd=new FormData();
+  fd.append('file',file);
+  showLoading('Procesando...');
+  try{
+    var r=await fetch('/api/salud-total/preview',{method:'POST',headers:authH(),body:fd});
+    if(r.status===401){logout();return;}
+    var d=await r.json();
+    if(!r.ok){hideLoading();toast(d.detail||'Error','error');return;}
+    document.getElementById('st-total').textContent=d.total_registros;
+    document.getElementById('st-glosado').textContent=fmtCOP(d.total_glosado);
+    document.getElementById('st-aceptado').textContent=fmtCOP(d.total_aceptado);
+    document.getElementById('st-rechazado').textContent=fmtCOP(d.total_rechazado);
+    var tbody=document.getElementById('st-body');
+    tbody.innerHTML=d.glosas.map(function(g){
+      return '<tr><td style="font-size:.75rem">'+escHtml(g.NumeroRad||'')+'</td><td style="font-size:.75rem">'+escHtml(g.NUMREG||'')+'</td><td style="font-size:.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.NombreServicio||'')+'</td><td style="font-size:.75rem;text-align:right">'+fmtCOP(g.ValorGlosaTotalxServ)+'</td><td style="text-align:center"><code style="font-size:.7rem;background:var(--bg);padding:2px 6px;border-radius:4px">'+escHtml(g.Codigo_Respuesta_a_glosas||'')+'</code></td><td style="font-size:.7rem;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.ConceptoRespuesta||'')+'</td></tr>';
+    }).join('');
+    hideLoading();
+    toast('Vista previa cargada','success');
+  }catch(e){hideLoading();toast('Error: '+e.message,'error');}
+}
+
+async function procesarSaludTotal(){
+  var fileInput=document.getElementById('st-file');
+  var file=fileInput.files[0];
+  if(!file){toast('Seleccione un archivo','error');return;}
+  var fd=new FormData();
+  fd.append('file',file);
+  showLoading('Generando respuesta...');
+  try{
+    var r=await fetch('/api/salud-total/procesar',{method:'POST',headers:authH(),body:fd});
+    if(r.status===401){logout();return;}
+    if(!r.ok){var d=await r.json();hideLoading();toast(d.detail||'Error','error');return;}
+    var blob=await r.blob();
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download=r.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g,'')||'RTAGLOSA.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    hideLoading();
+    toast('Archivo descargado','success');
+  }catch(e){hideLoading();toast('Error: '+e.message,'error');}
+}
