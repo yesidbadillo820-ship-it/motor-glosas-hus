@@ -4,6 +4,18 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
+MESES_ES = {
+    "January": "ENERO", "February": "FEBRERO", "March": "MARZO",
+    "April": "ABRIL", "May": "MAYO", "June": "JUNIO",
+    "July": "JULIO", "August": "AGOSTO", "September": "SEPTIEMBRE",
+    "October": "OCTUBRE", "November": "NOVIEMBRE", "December": "DICIEMBRE"
+}
+
+def fecha_hoy_espanol() -> str:
+    now = datetime.now()
+    mes_en = now.strftime("%B")
+    return f"{now.day} DE {MESES_ES.get(mes_en, mes_en.upper())} DE {now.year}"
+
 from fastapi import FastAPI, Form, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -260,7 +272,14 @@ async def analizar(
     val_ac = float(re.sub(r"[^\d]", "", valor_aceptado) or 0)
 
     # Determinar estado y código de respuesta según aceptación
-    if val_ac >= val_obj and val_obj > 0:
+    # BUG 1 FIX: Si val_obj=0 y hay aceptacion, usar val_ac como referencia (aceptacion total)
+    if val_obj == 0 and val_ac > 0:
+        val_obj = val_ac
+        estado = "ACEPTADA"
+        cod_res_aceptacion = "RE9702"
+        desc_res_aceptacion = "GLOSA ACEPTADA AL 100%"
+        texto_aceptacion = f"ESE HUS ACEPTA LA GLOSA POR VALOR DE ${val_ac:,.0f}"
+    elif val_ac >= val_obj and val_obj > 0:
         estado = "ACEPTADA"
         cod_res_aceptacion = "RE9702"
         desc_res_aceptacion = "GLOSA ACEPTADA AL 100%"
@@ -296,17 +315,19 @@ async def analizar(
                 </p>
             </div>"""
         else:
+            # BUG 2 FIX: Usar "VALOR EN DISPUTA" en lugar de "SALDO PENDIENTE"
+            val_en_disputa = abs(val_rechazado)  # Garantizar valor positivo
             argumento_aceptacion = f"""
             <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:20px;margin:15px 0;border-radius:8px;">
                 <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
                     EL HOSPITAL UNIVERSITARIO DE SANTANDER INFORMA A {eps.upper()} QUE ACEPTA PARCIALMENTE 
                     LA PRESENTE GLOSA POR VALOR DE <strong>${val_ac:,.0f}</strong>, 
-                    QUEDANDO UN SALDO PENDIENTE DE <strong>${val_rechazado:,.0f}</strong>.
+                    QUEDANDO UN <strong>VALOR EN DISPUTA DE ${val_en_disputa:,.0f}</strong>.
                 </p>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                    EL VALOR RECHAZADO DE <strong>${val_rechazado:,.0f}</strong> SE MANTIENE EN TRÁMITE, 
-                    PARA LO CUAL SE ADJUNTAN LOS ARGUMENTOS TÉCNICOS Y JURÍDICOS RESPECTIVOS.
+                    EL VALOR EN DISPUTA DE <strong>${val_en_disputa:,.0f}</strong> NO ES ACEPTADO POR ESE HUS 
+                    Y SE MANTIENE EN TRÁMITE PARA LO CUAL SE ADJUNTAN LOS ARGUMENTOS TÉCNICOS Y JURÍDICOS RESPECTIVOS.
                 </p>
             </div>"""
         
@@ -327,8 +348,8 @@ async def analizar(
         if estado == "PARCIALMENTE_ACEPTADA":
             tabla_valores += f"""
                 <tr style="background:#fee2e2;">
-                    <td style="padding:8px;font-weight:bold;color:#991b1b;">VALOR RECHAZADO (EN TRÁMITE):</td>
-                    <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_rechazado:,.0f}</td>
+                    <td style="padding:8px;font-weight:bold;color:#991b1b;">VALOR EN DISPUTA:</td>
+                    <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_en_disputa:,.0f}</td>
                 </tr>"""
         
         tabla_valores += """
@@ -353,7 +374,7 @@ async def analizar(
         <div style="background:#f8fafc;border-radius:12px;padding:20px;border-left:4px solid #16a34a;margin-top:15px;">
             <div style="display:flex;gap:10px;margin-bottom:15px;">
                 <span style="background:#16a34a;color:white;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;">{eps.upper()}</span>
-                <span style="background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;">{resultado.codigo_glosa[:2]} {resultado.codigo_glosa[2:] if len(resultado.codigo_glosa) > 2 else ''}</span>
+                <span style="background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;">{resultado.codigo_glosa}</span>
             </div>
         </div>
 
@@ -361,7 +382,7 @@ async def analizar(
         {tabla_valores}
 
         <div style="margin-top:20px;padding:15px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;">
-            <b>FECHA DE RESPUESTA:</b> {datetime.now().strftime('%d de %B de %Y').upper()}
+            <b>FECHA DE RESPUESTA:</b> {fecha_hoy_espanol()}
         </div>
 
         <div style="margin-top:15px;padding:12px;background:#f0fdf4;border-radius:8px;font-size:10px;color:#166534;">
