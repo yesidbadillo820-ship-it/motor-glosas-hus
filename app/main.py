@@ -120,13 +120,29 @@ async def lifespan(app: FastAPI):
     try:
         result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='request_id'"))
         if not result.fetchone():
-            logger.warning("MIGRACIÓN: Agregando columnas a historial")
+            logger.warning("MIGRACIÓN: Agregando columna 'request_id' a historial")
             db.execute(text("ALTER TABLE historial ADD COLUMN request_id VARCHAR(50)"))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN request_id: {e}")
+
+    try:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='nota_workflow'"))
+        if not result.fetchone():
+            logger.warning("MIGRACIÓN: Agregando columna 'nota_workflow' a historial")
             db.execute(text("ALTER TABLE historial ADD COLUMN nota_workflow VARCHAR(500)"))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN nota_workflow historial: {e}")
+
+    try:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='prioridad'"))
+        if not result.fetchone():
+            logger.warning("MIGRACIÓN: Agregando columna 'prioridad' a historial")
             db.execute(text("ALTER TABLE historial ADD COLUMN prioridad VARCHAR(50) DEFAULT 'NORMAL'"))
             db.commit()
     except Exception as e:
-        logger.warning(f"MIGRACIÓN historial: {e}")
+        logger.warning(f"MIGRACIÓN prioridad: {e}")
 
     try:
         result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='numero_radicado'"))
