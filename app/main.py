@@ -128,6 +128,29 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"MIGRACIÓN historial: {e}")
 
+    _HISTORIAL_MISSING_COLUMNS = [
+        ("workflow_state", "VARCHAR(50) DEFAULT 'RADICADA'"),
+        ("responsable", "VARCHAR(200)"),
+        ("fecha_vencimiento", "TIMESTAMP WITH TIME ZONE"),
+        ("auditor_email", "VARCHAR(200)"),
+        ("decision_eps", "VARCHAR(50)"),
+        ("fecha_decision_eps", "TIMESTAMP WITH TIME ZONE"),
+        ("valor_recuperado", "DOUBLE PRECISION DEFAULT 0"),
+        ("observacion_eps", "TEXT"),
+    ]
+    for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
+        try:
+            result = db.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='historial' AND column_name=:col"
+            ), {"col": col_name})
+            if not result.fetchone():
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a historial")
+                db.execute(text(f"ALTER TABLE historial ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()
