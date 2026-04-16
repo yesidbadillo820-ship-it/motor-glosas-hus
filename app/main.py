@@ -136,6 +136,14 @@ async def lifespan(app: FastAPI):
 
     try:
         # Cargar contratos iniciales
+        # Primero eliminar contratos que ya no existen en la lista actual
+        eps_actuales = list(CONTRATOS_DEFAULT.keys())
+        contratos_existentes = db.query(ContratoRecord).all()
+        for contrato in contratos_existentes:
+            if contrato.eps not in eps_actuales:
+                logger.warning(f"ELIMINANDO contrato obsoleto: {contrato.eps}")
+                db.delete(contrato)
+
         for k, v in CONTRATOS_DEFAULT.items():
             existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
             if existente:
