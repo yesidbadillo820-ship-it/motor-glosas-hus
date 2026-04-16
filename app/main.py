@@ -66,9 +66,8 @@ async def lifespan(app: FastAPI):
     from sqlalchemy import text
 
     try:
-        try:
-            db.execute(text("SELECT rol FROM usuarios LIMIT 1"))
-        except Exception:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='rol'"))
+        if not result.fetchone():
             logger.warning("MIGRACIÓN: Agregando columna 'rol' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'AUDITOR'"))
             db.commit()
@@ -76,9 +75,8 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MIGRACIÓN rol: {e}")
 
     try:
-        try:
-            db.execute(text("SELECT workload FROM usuarios LIMIT 1"))
-        except Exception:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='workload'"))
+        if not result.fetchone():
             logger.warning("MIGRACIÓN: Agregando columna 'workload' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN workload INTEGER DEFAULT 100"))
             db.commit()
@@ -86,9 +84,8 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MIGRACIÓN workload: {e}")
 
     try:
-        try:
-            db.execute(text("SELECT nota_workflow FROM usuarios LIMIT 1"))
-        except Exception:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='nota_workflow'"))
+        if not result.fetchone():
             logger.warning("MIGRACIÓN: Agregando columna 'nota_workflow' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN nota_workflow TEXT"))
             db.commit()
@@ -96,9 +93,8 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MIGRACIÓN nota_workflow: {e}")
 
     try:
-        try:
-            db.execute(text("SELECT request_id FROM historial LIMIT 1"))
-        except Exception:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='request_id'"))
+        if not result.fetchone():
             logger.warning("MIGRACIÓN: Agregando columnas a historial")
             db.execute(text("ALTER TABLE historial ADD COLUMN request_id VARCHAR(50)"))
             db.execute(text("ALTER TABLE historial ADD COLUMN nota_workflow VARCHAR(500)"))
