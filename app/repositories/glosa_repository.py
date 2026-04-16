@@ -245,17 +245,29 @@ class GlosaRepository:
                 base[color] = int(cnt or 0)
         return base
 
-    def listar_por_gestor(self, gestor_email: str, limit: int = 100) -> list[GlosaRecord]:
-        """Glosas asignadas a un gestor (buscado por email o por nombre)."""
+    def listar_por_gestor(
+        self,
+        gestor_email: str,
+        gestor_nombre: Optional[str] = None,
+        limit: int = 200,
+    ) -> list[GlosaRecord]:
+        """Glosas asignadas a un gestor.
+
+        Matches, en orden:
+        - glosa.auditor_email == gestor_email
+        - glosa.gestor_nombre ILIKE '%<nombre del usuario>%'
+        - glosa.gestor_nombre ILIKE '%<prefijo-email>%' (fallback)
+        """
         from sqlalchemy import or_
+        condiciones = [GlosaRecord.auditor_email == gestor_email]
+        if gestor_nombre:
+            condiciones.append(GlosaRecord.gestor_nombre.ilike(f"%{gestor_nombre.strip()}%"))
+        prefijo_email = gestor_email.split("@")[0]
+        condiciones.append(GlosaRecord.gestor_nombre.ilike(f"%{prefijo_email}%"))
+
         return (
             self.db.query(GlosaRecord)
-            .filter(
-                or_(
-                    GlosaRecord.auditor_email == gestor_email,
-                    GlosaRecord.gestor_nombre.ilike(f"%{gestor_email.split('@')[0]}%"),
-                )
-            )
+            .filter(or_(*condiciones))
             .order_by(GlosaRecord.dias_restantes.asc())
             .limit(limit)
             .all()
