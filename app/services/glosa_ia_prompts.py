@@ -679,14 +679,16 @@ NORMAS: Res. 3047/2008 | Res. 1995/1999 | Circular 030/2013""",
     "CO": [
         """GLOSA: {texto_glosa}
 CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+TIPO PAGADOR: {tipo_contrato} | NORMA ESPECIAL APLICABLE: {norma_especial}
 TIPO ATENCIÓN: {tipo_atencion}
 
-INSTRUCCIONES VARIANTE A — PBS GENERAL:
+INSTRUCCIONES VARIANTE A — COBERTURA (PBS o RÉGIMEN ESPECIAL):
 1. INICIO: "ESE HUS NO ACEPTA GLOSA POR COBERTURA."
-2. PÁRRAFO 2: El servicio prestado está incluido en el Plan de Beneficios en Salud (PBS), definido por la Res. 5269/2017.
-3. PÁRRAFO 3: La EPS tiene la obligación de pagar todos los servicios incluidos en el PBS (Art. 177 Ley 100/1993).
+2. PÁRRAFO 2: Si el TIPO PAGADOR es PPL, FOMAG, POLICÍA NACIONAL, DISPENSARIO MILITAR, ARL o régimen especial, OBLIGATORIO citar la NORMA ESPECIAL APLICABLE indicada arriba ({norma_especial}) y NO solo el PBS regular. Si es EPS regular, cita Res. 5269/2017 y aplica PBS.
+3. PÁRRAFO 3: Indica el fundamento de obligación de pago según corresponda al régimen (Art. 177 Ley 100/1993 para EPS regulares; o el marco normativo especial si aplica).
 4. CIERRE: "SE EXIGE EL RECONOCIMIENTO Y PAGO ÍNTEGRO DEL SERVICIO PRESTADO."
-NORMAS: Res. 5269/2017 | Art. 177 Ley 100/1993 | Art. 15 Ley 1751/2015""",
+NORMAS: {norma_especial} | Res. 5269/2017 | Art. 15 Ley 1751/2015
+PROHIBIDO: Si es PPL/FOMAG/POLICÍA, NO digas "EPS" — usa "ENTIDAD PAGADORA" o "FONDO" o "FIDUCIARIA".""",
         """GLOSA: {texto_glosa}
 CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
 CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
@@ -817,10 +819,167 @@ SOPORTES:
 {contexto_pdf}
 
 INSTRUCCIONES VARIANTE D — ERROR DE CÓDIGO O DUPLICADO:
-1. INICIO: "ESE HUS RECHAZA LA GLOSA POR FACTURACIÓN. NO SE TRATA DE UN COBRO DUPLICADO NI DE UN ERRQR DE CÓDIGO INVALIDANTE."
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR FACTURACIÓN. NO SE TRATA DE UN COBRO DUPLICADO NI DE UN ERROR DE CÓDIGO INVALIDANTE."
 2. PÁRRAFO 2: El CUPS {cups} facturado corresponde exactamente al procedimiento realizado.
 3. CIERRE: "SE EXIGE EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LA FACTURA."
 NORMAS: Circular 030/2013 | Res. 866/2021 | Art. 56 Ley 1438/2011""",
+    ],
+    "AU": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+TIPO ATENCIÓN: {tipo_atencion}
+
+INSTRUCCIONES VARIANTE A — URGENCIA SIN AUTORIZACIÓN PREVIA:
+1. INICIO OBLIGATORIO: "ESE HUS NO ACEPTA GLOSA POR AUTORIZACIÓN PREVIA. LA ATENCIÓN PRESTADA CORRESPONDE A URGENCIA VITAL DE COBERTURA OBLIGATORIA."
+2. PÁRRAFO 2: El Art. 168 Ley 100/1993 obliga a TODA IPS a prestar atención de urgencias INDEPENDIENTEMENTE de la autorización previa. La Sentencia T-1025/2002 de la Corte Constitucional reitera que las urgencias son de cobertura obligatoria sin requisito de autorización.
+3. PÁRRAFO 3: La atención fue documentada en historia clínica conforme a Res. 1995/1999 y radicada en RIPS conforme a Res. 866/2021.
+4. CIERRE OBLIGATORIO: "SE EXIGE EL PAGO ÍNTEGRO POR TRATARSE DE URGENCIA OBLIGATORIA. LA AUTORIZACIÓN PREVIA NO ES REQUISITO LEGAL EN URGENCIAS."
+NORMAS: Art. 168 Ley 100/1993 | T-1025/2002 | Decreto 4747/2007 Art. 11
+PROHIBIDO: NO digas "FACTURACIÓN", "SOPORTES" ni "TARIFAS". Es por AUTORIZACIÓN.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — URGENCIA CON DATOS CLÍNICOS:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR AUTORIZACIÓN. LA EVIDENCIA CLÍNICA DOCUMENTADA RESPALDA LA URGENCIA VITAL."
+2. PÁRRAFO 2: La historia clínica acredita el diagnóstico {diagnostico} con CUPS {cups}. Si en los soportes aparecen Glasgow ≤8, hipotensión, sangrado activo, deterioro neurológico, RCP, dolor torácico irradiado, abdomen agudo, fractura abierta o hemorragia: CITA EL DATO CLÍNICO CONCRETO como evidencia de la gravedad.
+3. PÁRRAFO 3: Sentencia T-1025/2002 + Sentencia T-760/2008: la EPS no puede negar atenciones cuando hay riesgo vital documentado.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. LA AUTORIZACIÓN PREVIA NO APLICA EN URGENCIAS VITALES."
+NORMAS: Art. 168 Ley 100/1993 | T-1025/2002 | T-760/2008
+PROHIBIDO: NO digas "FACTURACIÓN" ni "SOPORTES". Es por AUTORIZACIÓN.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — PROCEDIMIENTO DE ALTA COMPLEJIDAD EN URGENCIAS:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR AUTORIZACIÓN. EL PROCEDIMIENTO {cups} FUE INDICACIÓN VITAL DEL MÉDICO TRATANTE."
+2. PÁRRAFO 2: El médico tratante {medico}, ejerciendo su autonomía profesional (Art. 17 Ley 1751/2015), ordenó el procedimiento ante la condición clínica documentada del paciente.
+3. PÁRRAFO 3: Decreto 4747/2007 Art. 11: la IPS está obligada a prestar la urgencia. El Decreto 780/2016 establece que la EPS debe gestionar la autorización a tiempo, no trasladar el problema a la IPS.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO."
+NORMAS: Art. 168 Ley 100/1993 | T-1025/2002 | Decreto 780/2016
+PROHIBIDO: NO digas "FACTURACIÓN" ni "SOPORTES". Es por AUTORIZACIÓN.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — ATENCIÓN PROGRAMADA SIN AUTORIZACIÓN OPORTUNA:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR AUTORIZACIÓN. LA EPS NO GESTIONÓ LA AUTORIZACIÓN EN TÉRMINOS LEGALES."
+2. PÁRRAFO 2: El Decreto 780/2016 establece que la responsabilidad de gestionar la autorización oportuna es de la EPS. La IPS prestó el servicio que el paciente requería clínicamente.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. LA EPS NO PUEDE TRASLADAR A LA IPS SU OMISIÓN ADMINISTRATIVA."
+NORMAS: Decreto 780/2016 | Decreto 4747/2007 Art. 11 | T-760/2008
+PROHIBIDO: NO digas "FACTURACIÓN" ni "SOPORTES". Es por AUTORIZACIÓN.""",
+    ],
+    "IN": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CONTRATO: {numero_contrato} | TARIFA: {tarifa}
+
+INSTRUCCIONES VARIANTE A — INSUMOS GENÉRICOS:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR INSUMOS. LOS INSUMOS UTILIZADOS SON INHERENTES AL ACTO MÉDICO."
+2. PÁRRAFO 2: Los insumos se facturan al costo de adquisición más el porcentaje administrativo pactado en el contrato {numero_contrato}.
+3. PÁRRAFO 3: Las facturas de compra y los registros de inventario hospitalario respaldan el insumo utilizado y obran en el expediente institucional.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO POR LOS INSUMOS UTILIZADOS EN LA ATENCIÓN."
+NORMAS: Decreto 780/2016 | Art. 871 C. Comercio | Res. 5269/2017
+PROHIBIDO: NO digas "FACTURACIÓN" ni "SOPORTES". Es por INSUMOS.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — INSUMOS CON DOCUMENTOS:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR INSUMOS. LOS INSUMOS UTILIZADOS ESTÁN DOCUMENTADOS Y JUSTIFICADOS CLÍNICAMENTE."
+2. PÁRRAFO 2: Los insumos asociados al CUPS {cups} para el DX {diagnostico} corresponden a los necesarios según la guía de práctica clínica institucional.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO."
+NORMAS: Res. 5269/2017 | Decreto 780/2016 | Circular 030/2013
+PROHIBIDO: NO digas "FACTURACIÓN". Es por INSUMOS.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — INSUMOS DE ALTO COSTO:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR INSUMOS DE ALTO COSTO. LA NECESIDAD CLÍNICA ESTÁ PLENAMENTE DOCUMENTADA."
+2. PÁRRAFO 2: La historia clínica documenta la necesidad clínica del insumo de alto costo (prótesis, dispositivo médico) prescrito por el médico tratante.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. SE ADJUNTAN FACTURAS DE COMPRA Y REGISTRO DE INVENTARIO."
+NORMAS: Res. 5269/2017 | Art. 17 Ley 1751/2015 | T-760/2008
+PROHIBIDO: NO digas "FACTURACIÓN". Es por INSUMOS.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — INSUMOS EN URGENCIAS:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR INSUMOS. LA ATENCIÓN DE URGENCIAS REQUIERE EL USO INMEDIATO DE INSUMOS DE SOPORTE VITAL."
+2. PÁRRAFO 2: En urgencias los insumos son consumidos en el acto médico y forman parte indivisible del procedimiento.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO POR LOS INSUMOS APLICADOS EN URGENCIAS."
+NORMAS: Art. 168 Ley 100/1993 | Res. 5269/2017 | Decreto 780/2016
+PROHIBIDO: NO digas "FACTURACIÓN". Es por INSUMOS.""",
+    ],
+    "ME": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+TIPO ATENCIÓN: {tipo_atencion}
+
+INSTRUCCIONES VARIANTE A — MEDICAMENTOS PBS:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR MEDICAMENTOS. EL MEDICAMENTO DISPENSADO CORRESPONDE A FÓRMULA MÉDICA AUTORIZADA."
+2. PÁRRAFO 2: La Res. 5269/2017 incluye este tipo de medicamento en el Plan de Beneficios en Salud. La fórmula médica fue expedida por médico tratante en ejercicio de su autonomía profesional (Art. 17 Ley 1751/2015).
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DEL MEDICAMENTO DISPENSADO."
+NORMAS: Res. 5269/2017 | Art. 17 Ley 1751/2015 | T-760/2008
+PROHIBIDO: NO digas "FACTURACIÓN" ni "SOPORTES". Es por MEDICAMENTOS.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — MEDICAMENTO CON FÓRMULA MÉDICA:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR MEDICAMENTOS. EL FÁRMACO FUE PRESCRITO POR EL MÉDICO TRATANTE {medico} POR INDICACIÓN CLÍNICA."
+2. PÁRRAFO 2: La fórmula médica está respaldada por el DX {diagnostico} documentado en la historia clínica institucional.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DEL MEDICAMENTO."
+NORMAS: Art. 17 Ley 1751/2015 | Res. 5269/2017 | Res. 1995/1999
+PROHIBIDO: NO digas "FACTURACIÓN". Es por MEDICAMENTOS.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — MEDICAMENTO NO PBS GESTIÓN ADRES:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR MEDICAMENTOS. LOS MEDICAMENTOS NO PBS DEBEN GESTIONARSE ANTE ADRES, NO GLOSARSE A LA IPS."
+2. PÁRRAFO 2: Decreto 780/2016: la EPS es la responsable de gestionar el reconocimiento de medicamentos no incluidos en el PBS ante la ADRES (Administradora de los Recursos del SGSSS).
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. LA EPS NO PUEDE TRASLADAR A LA IPS LA OBLIGACIÓN DE GESTIONAR ANTE ADRES."
+NORMAS: Decreto 780/2016 | T-760/2008 | Art. 17 Ley 1751/2015
+PROHIBIDO: NO digas "FACTURACIÓN". Es por MEDICAMENTOS.""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — MEDICAMENTO ONCOLÓGICO O ALTO COSTO:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR MEDICAMENTOS DE ALTO COSTO. LA INDICACIÓN MÉDICA ES INCUESTIONABLE."
+2. PÁRRAFO 2: El médico tratante {medico} prescribió el medicamento ante la condición clínica del paciente. La autonomía médica está protegida (T-478/1995).
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DEL MEDICAMENTO PRESCRITO."
+NORMAS: Art. 17 Ley 1751/2015 | T-478/1995 | T-760/2008
+PROHIBIDO: NO digas "FACTURACIÓN". Es por MEDICAMENTOS.""",
     ],
 }
 
