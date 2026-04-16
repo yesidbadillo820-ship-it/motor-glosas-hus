@@ -234,12 +234,10 @@ class GlosaService:
             tarifa_ia = ""
             normas_clave = ""
         else:
+            prefijo = tipo_glosa[:2].upper() if tipo_glosa else "FA"
             system_prompt = get_system_prompt(
-                tipo_glosa=tipo_glosa,
-                eps=data.eps,
-                contrato=info_contrato,
-                cod_res=cod_res,
-                desc_res=desc_res
+                prefijo=prefijo,
+                eps=data.eps
             )
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
