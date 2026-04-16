@@ -63,37 +63,39 @@ async def lifespan(app: FastAPI):
 
     db = SessionLocal()
     cfg = get_settings()
+    from sqlalchemy import text
+
     try:
-        from sqlalchemy import text
         try:
             db.execute(text("SELECT rol FROM usuarios LIMIT 1"))
         except Exception:
             logger.warning("MIGRACIÓN: Agregando columna 'rol' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'AUDITOR'"))
             db.commit()
-            logger.info("MIGRACIÓN: Columna 'rol' agregada")
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN rol: {e}")
 
+    try:
         try:
             db.execute(text("SELECT workload FROM usuarios LIMIT 1"))
         except Exception:
             logger.warning("MIGRACIÓN: Agregando columna 'workload' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN workload INTEGER DEFAULT 100"))
             db.commit()
-            logger.info("MIGRACIÓN: Columna 'workload' agregada")
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN workload: {e}")
 
+    try:
         try:
             db.execute(text("SELECT nota_workflow FROM usuarios LIMIT 1"))
         except Exception:
             logger.warning("MIGRACIÓN: Agregando columna 'nota_workflow' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN nota_workflow TEXT"))
             db.commit()
-            logger.info("MIGRACIÓN: Columna 'nota_workflow' agregada")
-        except Exception as e:
-            logger.warning(f"MIGRACIÓN usuarios: {e}")
-        finally:
-            db.close()
-            return
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN nota_workflow: {e}")
 
+    try:
         try:
             db.execute(text("SELECT request_id FROM historial LIMIT 1"))
         except Exception:
@@ -102,16 +104,15 @@ async def lifespan(app: FastAPI):
             db.execute(text("ALTER TABLE historial ADD COLUMN nota_workflow VARCHAR(500)"))
             db.execute(text("ALTER TABLE historial ADD COLUMN prioridad VARCHAR(50) DEFAULT 'NORMAL'"))
             db.commit()
-            logger.info("MIGRACIÓN: Columnas historial agregadas")
-        except Exception as e:
-            logger.warning(f"MIGRACIÓN historial: {e}")
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN historial: {e}")
 
-        db.close()
+    db.close()
 
-        db = SessionLocal()
+    db = SessionLocal()
 
-        try:
-            # Cargar contratos iniciales
+    try:
+        # Cargar contratos iniciales
         for k, v in CONTRATOS_DEFAULT.items():
             existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
             if existente:
