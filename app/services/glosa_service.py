@@ -208,10 +208,13 @@ class GlosaService:
             argumento_fijo = generar_texto_injustificada(eps_key)
             tipo_glosa = "TA_TARIFA"
 
-        if es_extemporanea:
-            cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 56 Ley 1438/2011)"
-        elif es_ratificacion:
+        # Ratificación tiene prioridad sobre extemporaneidad: si ya pasamos por
+        # respuesta inicial y la EPS ratificó, el flujo legal es ratificación,
+        # NO aceptación tácita.
+        if es_ratificacion:
             cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
+        elif es_extemporanea:
+            cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 56 Ley 1438/2011)"
         elif es_tarifa and not tiene_contrato:
             cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
         else:
