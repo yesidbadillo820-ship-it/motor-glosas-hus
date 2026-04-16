@@ -14,6 +14,30 @@ CONCEPTOS = {
     "RE9901": "Glosa no aceptada - Subsanada en su totalidad",
 }
 
+MOTIVOS_SALUD_TOTAL = {
+    "TARIFA": "ESE HUS RECHAZA LA GLOSA POR TARIFAS. LA LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE Y AL MANUAL TARIFARIO SOAT (RES. 054/2026). LA EPS NO PUEDE APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
+    "SOPORTE": "ESE HUS RECHAZA LA GLOSA POR SOPORTES. LOS DOCUMENTOS EXIGIDOS POR LA RES. 3047/2008 OBRAN EN LA HISTORIA CLÍNICA (RES. 1995/1999), PLENA PRUEBA MÉDICO-LEGAL. LOS ERRORES FORMALES SON SUBSANABLES (CIRCULAR 030/2013). SE EXIGE EL LEVANTAMIENTO INMEDIATO. CARTERA@HUS.GOV.CO",
+    "AUTORIZACION": "ESE HUS RECHAZA LA GLOSA POR AUTORIZACIÓN. LA ATENCIÓN PRESTADA CUMPLIÓ CON LOS PROTOCOLOS ESTABLECIDOS. ART. 168 LEY 100/1993 Y T-1025/2002. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
+    "PERTINENCIA": "ESE HUS RECHAZA LA GLOSA POR PERTINENCIA. EL CRITERIO MÉDICO ES AUTÓNOMO (ART. 17 LEY 1751/2015 - T-478/1995). LA HISTORIA CLÍNICA DOCUMENTA LA INDICACIÓN. EL AUDITOR DE LA EPS NO REEMPLAZA AL MÉDICO TRATANTE. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
+    "COBERTURA": "ESE HUS RECHAZA LA GLOSA POR COBERTURA. EL SERVICIO ESTÁ INCLUIDO EN EL PLAN DE BENEFICIOS (RES. 5269/2017). LAS EXCLUSIONES SON TAXATIVAS. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
+    "FACTURACION": "ESE HUS RECHAZA LA GLOSA POR FACTURACIÓN. LOS ERRORES FORMALES SON SUBSANABLES Y NO CONSTITUYEN CAUSAL DE GLOSA (CIRCULAR 030/2013). LA PRESTACIÓN DEL SERVICIO GENERA LA OBLIGACIÓN DE PAGO. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
+}
+
+def _detectar_tipo_motivo(descripcion_motivo: str, motv_glosa: str) -> str:
+    """Identifica el tipo de motivo desde la descripción real del archivo TXT."""
+    texto = (descripcion_motivo + ' ' + motv_glosa).upper()
+    if any(k in texto for k in ['TARIFA', 'PRECIO', 'VALOR', 'COSTO']):
+        return 'TARIFA'
+    if any(k in texto for k in ['SOPORTE', 'DOCUMENTO', 'HISTORIA', 'FACTURA', 'FIRMA']):
+        return 'SOPORTE'
+    if any(k in texto for k in ['AUTORIZA', 'ORDEN', 'REMISION']):
+        return 'AUTORIZACION'
+    if any(k in texto for k in ['PERTINEN', 'INDICACION', 'NECESIDAD', 'CLINICO']):
+        return 'PERTINENCIA'
+    if any(k in texto for k in ['COBERTURA', 'PBS', 'PLAN', 'BENEFICIO']):
+        return 'COBERTURA'
+    return 'FACTURACION'
+
 OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. EL PLAZO LEGAL PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA. AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
 
 OBS_RATIFICADA = "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE E INJUSTIFICADA. NO SE EVIDENCIA INCUMPLIMIENTO CONTRACTUAL NI NORMATIVO. SE REQUIERE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
@@ -104,16 +128,23 @@ class GlosaSaludTotal:
 
     def obtener_observacion(self) -> str:
         dias = self.dias_transcurridos()
-        prefijo_cod = self.cod_motv_glosa_general[:2].upper() if self.cod_motv_glosa_general else "TA"
         
-        if self.tipo_respuesta == "extemporanea":
-            base_obs = OBS_EXTEMPORANEA.replace("{DIAS}", str(dias))
-        elif self.tipo_respuesta == "ratificada":
-            base_obs = OBS_RATIFICADA
-        else:
-            base_obs = OBS_TA_POR_TIPO.get(prefijo_cod, OBS_EXTEMPORANEA).replace("{DIAS}", str(dias))
+        if self.tipo_respuesta == "extemporanea" and dias > DIAS_LIMITE:
+            return OBS_EXTEMPORANEA.replace("{DIAS}", str(dias))
         
-        return base_obs
+        if self.tipo_respuesta == "ratificada":
+            return OBS_RATIFICADA
+        
+        # NUEVO: detectar tipo desde el contenido REAL del archivo TXT
+        tipo_detectado = _detectar_tipo_motivo(
+            self.descripcion_motivo, self.motv_glosa_general
+        )
+        obs_base = MOTIVOS_SALUD_TOTAL.get(tipo_detectado, MOTIVOS_SALUD_TOTAL['FACTURACION'])
+        
+        # Personalizar con nombre del servicio
+        if self.nombre_servicio:
+            return f"{obs_base} SERVICIO: {self.nombre_servicio.upper()}."
+        return obs_base
 
     def generar_respuesta(self) -> Dict[str, Any]:
         dias = self.dias_transcurridos()

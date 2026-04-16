@@ -8,6 +8,24 @@ Cada prompt está diseñado para el contexto específico de la ESE HUS:
 - Instrucciones de razonamiento paso a paso (chain-of-thought)
 """
 
+import re
+
+TIPO_ATENCION = {"CONSULTA": ["consulta"], "URGENCIAS": ["urgencia", "emergencia"], "HOSPITALIZACION": ["hospitalizacion"]}
+def extraer_tipo(contexto, texto):
+    t = (contexto + " " + texto).lower()
+    for k, v in TIPO_ATENCION.items():
+        if any(p in t for p in v): return k
+    return "NO ESPECIFICADO"
+
+def extraer_datos(contexto):
+    d = {"cups": "", "diagnostico": ""}
+    if contexto:
+        m = re.search(r'\b([A-Z]\d{3,4})\b', contexto.upper())
+        if m: d["cups"] = m.group(1)
+    return d
+
+FALLBACK = "ESE HUS NO ACEPTA LA GLOSA. NO HAY SOPORTES. EL REGISTRO CLINICO RESPALDA LA ATENCION. SE EXIGE PAGO INTEGRO. CARTERA@HUS.GOV.CO"
+
 SYSTEM_BASE = """Eres el ABOGADO DIRECTOR DE CARTERA Y GLOSAS de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), Bucaramanga, Colombia. NIT 890.210.024-0.
 
 IDENTIDAD INSTITUCIONAL:
@@ -166,6 +184,7 @@ def get_system_prompt(tipo_glosa: str, eps: str, contrato: str, cod_res: str, de
         "TA_TARIFA": SYSTEM_TARIFA,
         "SO_SOPORTES": SYSTEM_SOPORTES,
         "AU_AUTORIZACION": SYSTEM_AUTORIZACION,
+        "CL_PERTINENCIA": SYSTEM_PERTINENCIA,
         "PE_PERTINENCIA": SYSTEM_PERTINENCIA,
         "CO_COBERTURA": SYSTEM_COBERTURA,
         "IN_INSUMOS": SYSTEM_INSUMOS,
@@ -186,12 +205,17 @@ def build_user_prompt(texto_glosa: str, contexto_pdf: str, codigo: str,
     """
     Construye el prompt del usuario para generar dictámenes concisos y específicos.
     """
+    tipo_atencion = extraer_tipo(contexto_pdf, texto_glosa)
+    datos = extraer_datos(contexto_pdf)
+    cups = datos.get('cups', '')
+
     tipo_glosa_map = {
         "TA": "TARIFAS",
         "SO": "SOPORTES",
         "AU": "AUTORIZACIÓN",
         "CO": "COBERTURA",
         "PE": "PERTINENCIA",
+        "CL": "PERTINENCIA",
         "FA": "FACTURACIÓN",
         "IN": "INSUMOS",
         "ME": "MEDICAMENTOS",
@@ -215,30 +239,15 @@ def build_user_prompt(texto_glosa: str, contexto_pdf: str, codigo: str,
     if contexto_pdf:
         soportes = f"\n\nSOPORTES PDF:\n{contexto_pdf[:3000]}"
 
-    return f"""GLOSA A ANALIZAR:
-{texto_glosa}
+    soporte = contexto_pdf[:3000] if contexto_pdf else FALLBACK
+    return f"""GLOSA: {texto_glosa}
+CODIGO: {codigo} | TIPO: {tipo_nombre} | {trazabilidad}{contexto_tiempo}
+TIPO ATENCION: {tipo_atencion} | CUPS: {cups}
+SOPORTES: {soporte}
 
-CÓDIGO: {codigo} | {trazabilidad}{contexto_tiempo}
-{soportes}
+REGLAS: 1) Si contexto dice CONSULTA -> NO URGENCIAS. Usar tipo_atencion={tipo_atencion}. 2) Cerrar con "SE EXIGE PAGO INTEGRO CUPS {cups}"
 
-REGLAS DEL ARGUMENTO:
-1. PRIMER PÁRRAFO: "ESE HUS NO ACEPTA GLOSA POR {tipo_nombre}." + razón corta (1-2 oraciones)
-2. SEGUNDO PÁRRAFO: Cita el contrato con {eps}, el código CUPS/servicio específico y tarifa pactada
-3. TERCER PÁRRAFO: Fundamento legal (1-2 normas específicas con artículos)
-4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DEL SERVICIO DE [NOMBRE] (CUPS [código])"
-
-PROHIBIDO: No repetir palabras. No usar "en consecuencia", "por lo tanto", "de conformidad" repetidamente.
-Cada oración debe aportar información nueva.
-
-FORMATO DE RESPUESTA:
-<servicio>CUPS - Nombre del servicio objetado</servicio>
-<contrato>Contrato con {eps}: [número/descripción]</contrato>
-<tarifa>Tarifa pactada: [valor o porcentaje]</tarifa>
-<argumento>
-ESE HUS NO ACEPTA GLOSA POR {tipo_nombre}.
-[PÁRRAFO 1: Razón breve de rechazo]
-[PÁRRAFO 2: Contrato, servicio y tarifa específica]
-[PÁRRAFO 3: Fundamento legal con artículos específicos]
-SE EXIGE EL PAGO ÍNTEGRO DEL SERVICIO DE [NOMBRE] (CUPS [código]).
-</argumento>
-<normas_clave>Ley/Decreto Art. X | Ley/Decreto Art. Y | Sentencia T-XXX</normas_clave>"""
+FORMATO:
+<servicio>{cups}</servicio>
+<argumento>ESE HUS NO ACEPTA GLOSA POR {tipo_nombre}. Tipo={tipo_atencion} CUPS={cups}. SE EXIGE PAGO INTEGRO CUPS {cups}</argumentado
+<normas>Ley Art</normas>"""

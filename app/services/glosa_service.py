@@ -82,6 +82,7 @@ ESTRATEGIAS_TIPO = {
     "SO_SOPORTES": "ESTRATEGIA SOPORTES: Historia clínica es plena prueba según Res. 1995/1999. Documentos cumplen norma. EPS tuvo 20 días hábiles para objetar (Art. 56 Ley 1438/2011).",
     "AU_AUTORIZACION": "ESTRATEGIA AUTORIZACIÓN: Atención por urgencia vital. No requiere autorización previa. Art. 168 Ley 100/1993 y Resolución 5269/2017.",
     "CO_COBERTURA": "ESTRATEGIA COBERTURA: Servicio dentro del Plan de Beneficios en Salud (Res. 5269/2017). EPS tiene obligación de pago. No hay exclusiones.",
+    "CL_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
     "PE_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
     "FA_FACTURACION": "ESTRATEGIA FACTURACIÓN: Error formal no es causal de glosa (Circular 030/2013). Los errores formales son subsanables. La prestación del servicio genera obligación de pago.",
     "IN_INSUMOS": "ESTRATEGIA INSUMOS: Inherentes al acto médico. Se facturan al costo de adquisición más porcentaje administrativo pactado. Factura de compra disponible como soporte.",
@@ -92,7 +93,8 @@ ESTRATEGIAS_TIPO = {
 CODIGOS_GLOSA = {
     "TA": "OBJECIÓN POR TARIFA", "SO": "OBJECIÓN POR SOPORTES",
     "AU": "OBJECIÓN POR AUTORIZACIÓN", "CO": "OBJECIÓN POR COBERTURA",
-    "PE": "OBJECIÓN POR PERTINENCIA", "FA": "OBJECIÓN POR FACTURACIÓN",
+    "CL": "OBJECIÓN POR PERTINENCIA", "PE": "OBJECIÓN POR PERTINENCIA",
+    "FA": "OBJECIÓN POR FACTURACIÓN",
     "IN": "OBJECIÓN POR INSUMOS", "ME": "OBJECIÓN POR MEDICAMENTOS",
     "SE": "OBJECIÓN SIN ESPECIFICACIÓN", "EX": "OBJECIÓN EXTEMPORÁNEA"
 }
@@ -350,7 +352,8 @@ class GlosaService:
         elif prefijo == "SO": return "SO_SOPORTES"
         elif prefijo == "AU": return "AU_AUTORIZACION"
         elif prefijo == "CO": return "CO_COBERTURA"
-        elif prefijo == "PE": return "PE_PERTINENCIA"
+        elif prefijo == "CL": return "CL_PERTINENCIA"
+        elif prefijo == "PE": return "CL_PERTINENCIA"  # retrocompatibilidad: PE → CL
         elif prefijo == "FA": return "FA_FACTURACION"
         elif prefijo == "IN": return "IN_INSUMOS"
         elif prefijo == "ME": return "ME_MEDICAMENTOS"
@@ -361,7 +364,7 @@ class GlosaService:
         return "FA_FACTURACION"
 
     def _extraer_codigo_glosa(self, texto: str) -> str:
-        m = re.search(r"\b(TA|SO|AU|CO|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto)
+        m = re.search(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto)
         return m.group(0) if m else "N/A"
 
     def _extraer_valor(self, texto: str) -> str:
@@ -391,7 +394,8 @@ class GlosaService:
                                tarifa: Optional[str] = None) -> str:
         colores = {
             "TA_TARIFA": "#1e40af", "SO_SOPORTES": "#7c3aed", "AU_AUTORIZACION": "#059669",
-            "CO_COBERTURA": "#dc2626", "PE_PERTINENCIA": "#d97706", "FA_FACTURACION": "#0891b2",
+            "CO_COBERTURA": "#dc2626", "CL_PERTINENCIA": "#d97706", "PE_PERTINENCIA": "#d97706",
+            "FA_FACTURACION": "#0891b2",
             "IN_INSUMOS": "#e11d48", "ME_MEDICAMENTOS": "#4f46e5", "EXT_EXTEMPORANEA": "#991b1b",
             "RATIFICADA": "#7c3aed", "EXTEMPORANEA": "#991b1b"
         }
