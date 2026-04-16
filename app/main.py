@@ -66,13 +66,20 @@ async def lifespan(app: FastAPI):
     from sqlalchemy import text
 
     try:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='creado_en'"))
+        if not result.fetchone():
+            logger.warning("MIGRACIÓN: Agregando columna 'creado_en' a tabla usuarios")
+            db.execute(text("ALTER TABLE usuarios ADD COLUMN creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN creado_en: {e}")
+
+    try:
         result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='activo'"))
         if not result.fetchone():
             logger.warning("MIGRACIÓN: Agregando columna 'activo' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN activo INTEGER DEFAULT 1"))
             db.commit()
-    except Exception as e:
-        logger.warning(f"MIGRACIÓN activo: {e}")
 
     try:
         result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='rol'"))
