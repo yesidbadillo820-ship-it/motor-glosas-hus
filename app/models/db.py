@@ -49,6 +49,10 @@ class GlosaRecord(Base):
     consecutivo_dgh = Column(String(50), index=True)
     es_devolucion = Column(String(1))
     radicado_info = Column(String(200))
+    referencia = Column(String(300))
+    observacion_tecnico = Column(Text)
+    tipo_glosa_excel = Column(String(50))
+    profesional_medico = Column(String(200))
 
     __table_args__ = (
         Index("ix_historial_alertas", "dias_restantes", "estado"),

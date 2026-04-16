@@ -67,6 +67,10 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "devolucion": ["devolucion s/n", "devolucion", "devolucion s", "s/n"],
     "dias_rad_rec": ["dias radicacion vs recepcion", "dias radicacion recepcion"],
     "radicado": ["radicado"],
+    "referencia": ["referencia"],
+    "observacion_tecnico": ["observacion tecnico", "observacion", "obs tecnico"],
+    "tipo_glosa": ["tipo glosa", "tipo de glosa"],
+    "profesional_medico": ["profesional(medico)", "profesional (medico)", "profesional medico", "profesional", "medico auditor"],
 }
 
 
@@ -139,10 +143,24 @@ def _semaforo(dias_restantes: int) -> str:
     return "VERDE"
 
 
-def _es_ratificada(radicado_valor: str) -> bool:
-    if not radicado_valor:
+def _es_ratificada(*valores: str) -> bool:
+    """True si CUALQUIERA de los valores contiene la palabra RATIFICADA."""
+    for v in valores:
+        if v and "RATIFICADA" in str(v).upper():
+            return True
+    return False
+
+
+def _no_aplicar_extemporaneidad(observacion: str) -> bool:
+    """True si la observación del técnico pide no aplicar extemporaneidad."""
+    if not observacion:
         return False
-    return "RATIFICADA" in str(radicado_valor).upper()
+    texto = str(observacion).upper()
+    return (
+        "NO APLICAR EXTEMPORANEIDAD" in texto
+        or "NO APLICA EXTEMPORANEIDAD" in texto
+        or "NO APLICAR EXTEMPORANEA" in texto
+    )
 
 
 def _dictamen_ratificada(eps: str, factura: str, radicado_info: str) -> str:
@@ -243,6 +261,10 @@ class RecepcionService:
                 consecutivo = str(_get("consecutivo_dgh") or "").strip()
                 gestor = str(_get("gestor") or "").strip().upper() or "SIN ASIGNAR"
                 radicado_info = str(_get("radicado") or "").strip()
+                referencia = str(_get("referencia") or "").strip()
+                observacion_tecnico = str(_get("observacion_tecnico") or "").strip()
+                tipo_glosa_excel = str(_get("tipo_glosa") or "").strip()
+                profesional_medico = str(_get("profesional_medico") or "").strip()
                 devolucion = str(_get("devolucion") or "").strip().upper()[:1]
 
                 fecha_entrega = _a_fecha(_get("fecha_entrega"))
@@ -256,23 +278,36 @@ class RecepcionService:
                     resumen.errores.append(f"Fila {num_fila}: fechas VENCE/RECEPCION inválidas")
                     continue
 
+                # Flag del técnico para saltar extemporaneidad (ej. PPL/FOMAG con régimen especial)
+                skip_extemporaneidad = _no_aplicar_extemporaneidad(observacion_tecnico)
+
                 # Extemporaneidad: días hábiles entre FECHA RADICACION y FECHA DOCUMENTO DGH
                 dias_transcurridos = 0
                 es_extemporanea = False
                 if fecha_rad and fecha_dgh:
                     dias_transcurridos = _dias_habiles(fecha_rad, fecha_dgh)
-                    es_extemporanea = dias_transcurridos > DIAS_HABILES_LIMITE_EXTEMPORANEA
+                    es_extemporanea = (
+                        dias_transcurridos > DIAS_HABILES_LIMITE_EXTEMPORANEA
+                        and not skip_extemporaneidad
+                    )
 
                 # Semáforo: días hábiles restantes hasta VENCE
                 dias_restantes = _dias_habiles(hoy, fecha_vence) if fecha_vence > hoy else 0
                 semaforo = _semaforo(dias_restantes)
 
-                # Ratificación
-                ratificada = _es_ratificada(radicado_info)
+                # Ratificación: revisar ambas columnas (RADICADO y REFERENCIA)
+                ratificada = _es_ratificada(radicado_info, referencia)
+
+                # numero_radicado: si RADICADO no es un texto de ratificación, es el radicado real
+                if ratificada:
+                    numero_radicado_real = None
+                else:
+                    numero_radicado_real = radicado_info or None
 
                 if ratificada:
                     estado = "RATIFICADA"
-                    dictamen = _dictamen_ratificada(entidad, factura, radicado_info)
+                    texto_ref = radicado_info or referencia
+                    dictamen = _dictamen_ratificada(entidad, factura, texto_ref)
                     resumen.ratificadas += 1
                 elif es_extemporanea:
                     estado = "EXTEMPORANEA"
@@ -280,10 +315,15 @@ class RecepcionService:
                     resumen.extemporaneas += 1
                 else:
                     estado = "RADICADA"
+                    nota_obs = (
+                        f'<div style="margin-top:10px;padding:10px;background:#fef3c7;border-left:3px solid #eab308;border-radius:6px;font-size:12px">'
+                        f'<b>⚠ Observación técnico:</b> {observacion_tecnico}</div>'
+                    ) if observacion_tecnico else ""
                     dictamen = (
                         f'<div style="padding:15px;background:#f8fafc;border-radius:8px;">'
                         f'<b>Glosa importada desde recepción.</b><br>'
                         f'Pendiente de análisis y respuesta por el gestor asignado.'
+                        f'{nota_obs}'
                         f'</div>'
                     )
 
@@ -297,6 +337,7 @@ class RecepcionService:
                     eps=entidad,
                     paciente="N/A",
                     factura=factura,
+                    numero_radicado=numero_radicado_real,
                     consecutivo_dgh=consecutivo or None,
                     gestor_nombre=gestor,
                     fecha_radicacion_factura=fecha_rad,
@@ -306,6 +347,10 @@ class RecepcionService:
                     fecha_vencimiento=fecha_vence,
                     es_devolucion=devolucion or None,
                     radicado_info=radicado_info or None,
+                    referencia=referencia or None,
+                    observacion_tecnico=observacion_tecnico or None,
+                    tipo_glosa_excel=tipo_glosa_excel or None,
+                    profesional_medico=profesional_medico or None,
                     valor_objetado=valor,
                     valor_aceptado=0.0,
                     etapa="RESPUESTA A GLOSA",
@@ -336,6 +381,8 @@ class RecepcionService:
                     "fecha_entrega": fecha_entrega.strftime("%d/%m/%Y") if fecha_entrega else "N/A",
                     "semaforo": semaforo,
                     "estado": estado,
+                    "tipo_glosa": tipo_glosa_excel or "-",
+                    "radicado": numero_radicado_real or "-",
                 })
 
             except Exception as e:

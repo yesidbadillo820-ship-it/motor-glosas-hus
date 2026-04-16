@@ -145,6 +145,10 @@ async def lifespan(app: FastAPI):
         ("consecutivo_dgh", "VARCHAR(50)"),
         ("es_devolucion", "VARCHAR(1)"),
         ("radicado_info", "VARCHAR(200)"),
+        ("referencia", "VARCHAR(300)"),
+        ("observacion_tecnico", "TEXT"),
+        ("tipo_glosa_excel", "VARCHAR(50)"),
+        ("profesional_medico", "VARCHAR(200)"),
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:
