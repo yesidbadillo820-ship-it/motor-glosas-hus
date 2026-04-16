@@ -40,6 +40,16 @@ class GlosaRecord(Base):
     valor_recuperado = Column(Float, default=0.0)
     observacion_eps = Column(Text)
 
+    # Campos de importación desde recepción
+    gestor_nombre = Column(String(200), index=True)
+    fecha_radicacion_factura = Column(DateTime(timezone=True))
+    fecha_documento_dgh = Column(DateTime(timezone=True))
+    fecha_recepcion = Column(DateTime(timezone=True))
+    fecha_entrega = Column(DateTime(timezone=True))
+    consecutivo_dgh = Column(String(50), index=True)
+    es_devolucion = Column(String(1))
+    radicado_info = Column(String(200))
+
     __table_args__ = (
         Index("ix_historial_alertas", "dias_restantes", "estado"),
         Index("ix_historial_auditor", "auditor_email"),
