@@ -131,6 +131,60 @@ def metrics(
     return repo.metrics()
 
 
+# Rutas estáticas (sin parámetros) ANTES que rutas dinámicas /{glosa_id}
+@router.get("/semaforo")
+def semaforo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Retorna el conteo de glosas activas agrupadas por color de semáforo
+    (VERDE / AMARILLO / ROJO / NEGRO). Útil para el dashboard."""
+    repo = GlosaRepository(db)
+    return repo.semaforo_counts()
+
+
+@router.get("/mis-asignaciones")
+def mis_asignaciones(
+    todas: bool = False,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista las glosas asignadas al usuario actual.
+
+    Los SUPER_ADMIN y COORDINADOR pueden pasar `?todas=true` para ver todas.
+    """
+    repo = GlosaRepository(db)
+    if todas and current_user.rol in ("SUPER_ADMIN", "COORDINADOR"):
+        from app.models.db import GlosaRecord as _GR
+        glosas = (
+            db.query(_GR)
+            .filter(_GR.estado.notin_(["LEVANTADA", "CONCILIADA"]))
+            .order_by(_GR.dias_restantes.asc())
+            .limit(500)
+            .all()
+        )
+    else:
+        glosas = repo.listar_por_gestor(current_user.email, current_user.nombre)
+    return [
+        {
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "consecutivo_dgh": g.consecutivo_dgh,
+            "gestor_nombre": g.gestor_nombre,
+            "valor_objetado": g.valor_objetado,
+            "estado": g.estado,
+            "prioridad": g.prioridad,
+            "dias_restantes": g.dias_restantes,
+            "fecha_vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
+            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
+            "radicado_info": g.radicado_info,
+            "dictamen": g.dictamen,
+        }
+        for g in glosas
+    ]
+
+
 @router.patch("/{glosa_id}/estado")
 def actualizar_estado(
     glosa_id: int,
@@ -436,59 +490,6 @@ async def importar_recepcion(
         resumen_dict["email_error"] = str(e)
 
     return resumen_dict
-
-
-@router.get("/semaforo")
-def semaforo(
-    db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
-):
-    """Retorna el conteo de glosas activas agrupadas por color de semáforo
-    (VERDE / AMARILLO / ROJO / NEGRO). Útil para el dashboard."""
-    repo = GlosaRepository(db)
-    return repo.semaforo_counts()
-
-
-@router.get("/mis-asignaciones")
-def mis_asignaciones(
-    todas: bool = False,
-    db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
-):
-    """Lista las glosas asignadas al usuario actual.
-
-    Los SUPER_ADMIN y COORDINADOR pueden pasar `?todas=true` para ver todas.
-    """
-    repo = GlosaRepository(db)
-    if todas and current_user.rol in ("SUPER_ADMIN", "COORDINADOR"):
-        from app.models.db import GlosaRecord as _GR
-        glosas = (
-            db.query(_GR)
-            .filter(_GR.estado.notin_(["LEVANTADA", "CONCILIADA"]))
-            .order_by(_GR.dias_restantes.asc())
-            .limit(500)
-            .all()
-        )
-    else:
-        glosas = repo.listar_por_gestor(current_user.email, current_user.nombre)
-    return [
-        {
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "consecutivo_dgh": g.consecutivo_dgh,
-            "gestor_nombre": g.gestor_nombre,
-            "valor_objetado": g.valor_objetado,
-            "estado": g.estado,
-            "prioridad": g.prioridad,
-            "dias_restantes": g.dias_restantes,
-            "fecha_vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
-            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
-            "radicado_info": g.radicado_info,
-            "dictamen": g.dictamen,
-        }
-        for g in glosas
-    ]
 
 
 @router.get("/batch/{batch_id}")
