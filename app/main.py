@@ -116,17 +116,6 @@ async def lifespan(app: FastAPI):
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN nota_workflow: {e}")
-    except Exception as e:
-        logger.warning(f"MIGRACIÓN nota_workflow: {e}")
-
-    try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='numero_radicado'"))
-        if not result.fetchone():
-            logger.warning("MIGRACIÓN: Agregando columna 'numero_radicado' a historial")
-            db.execute(text("ALTER TABLE historial ADD COLUMN numero_radicado VARCHAR(50)"))
-            db.commit()
-    except Exception as e:
-        logger.warning(f"MIGRACIÓN numero_radicado: {e}")
 
     try:
         result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='request_id'"))
@@ -138,6 +127,15 @@ async def lifespan(app: FastAPI):
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN historial: {e}")
+
+    try:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='numero_radicado'"))
+        if not result.fetchone():
+            logger.warning("MIGRACIÓN: Agregando columna 'numero_radicado' a historial")
+            db.execute(text("ALTER TABLE historial ADD COLUMN numero_radicado VARCHAR(50)"))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN numero_radicado: {e}")
 
     db.close()
 
