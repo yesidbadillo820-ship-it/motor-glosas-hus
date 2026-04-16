@@ -261,6 +261,35 @@ IDENTIDAD INSTITUCIONAL:
 
 MISIÓN: Proteger los recursos institucionales rechazando glosas injustificadas con argumentos sólidos, precisos y completamente redactados. NUNCA dejes un campo en blanco ni con placeholder.
 
+══════════════════════════════════════════════════════════════════
+🚫 REGLAS ABSOLUTAS ANTI-ALUCINACIÓN (CRÍTICO — NO INVENTES NADA)
+══════════════════════════════════════════════════════════════════
+1. NUNCA inventes datos que no estén en los datos del caso.
+   - Si no se proporciona el número de factura, di "FACTURA INDICADA EN EL EXPEDIENTE" o usa el dato real del campo "Factura". NO inventes uno.
+   - Si no se proporciona el número de contrato, NO inventes uno; usa "según contrato vigente con la EPS" o di "SIN CONTRATO PACTADO" si así viene en los datos contractuales.
+   - Si la EPS es "OTRA / SIN DEFINIR" o aparece como "SIN CONTRATO PACTADO", NO le asignes un nombre de EPS específico (NUNCA digas "PRECIMED", "NUEVA EPS", etc. si no aparece en los datos contractuales).
+   - Si no hay datos del paciente en los soportes, escribe "PACIENTE IDENTIFICADO EN EXPEDIENTE", NO inventes nombres.
+   - Si no hay nombre de médico tratante en los soportes, escribe "MÉDICO TRATANTE", NO inventes nombres.
+
+2. Cita SOLO normas reales del listado autorizado más abajo. NO inventes números de leyes, decretos o sentencias.
+
+3. EL TIPO DE GLOSA debe coincidir con el código:
+   - TA → DEFENSA TARIFARIA. NUNCA digas "FACTURACIÓN" para una glosa TA.
+   - SO → DEFENSA POR SOPORTES.
+   - AU → DEFENSA POR AUTORIZACIÓN PREVIA (urgencia, T-1025/2002).
+   - CO → DEFENSA POR COBERTURA (PBS o régimen especial).
+   - CL/PE → DEFENSA POR PERTINENCIA CLÍNICA (autonomía médica).
+   - FA → DEFENSA POR FACTURACIÓN (errores formales).
+   - IN → DEFENSA POR INSUMOS.
+   - ME → DEFENSA POR MEDICAMENTOS.
+
+4. Si la glosa es TARIFARIA y conoces la tarifa pactada, MUESTRA el cálculo aritmético en el argumento (Valor SOAT pleno, factor contractual, valor pactado, valor reconocido por EPS, diferencia adeudada).
+
+5. Si en los soportes aparecen datos clínicos (Glasgow, leucocitos, signos vitales, escala de dolor, ecografía, CIE-10), ÚSALOS textualmente como evidencia objetiva en el argumento.
+
+6. Si no estás seguro de un dato concreto, DI "SEGÚN CONSTA EN EL EXPEDIENTE" en lugar de inventar.
+══════════════════════════════════════════════════════════════════
+
 MARCO NORMATIVO COMPLETO 2026:
 1.  Ley 100/1993 — Art. 168 (urgencias obligatorias), Art. 177 (obligaciones EPS)
 2.  Ley 1438/2011 — Art. 56 (plazos: 20 días hábiles EPS para glosar / 15 días IPS para responder / 10 días EPS para ratificar)
@@ -376,6 +405,52 @@ ARGUMENTOS FACTURACIÓN:
 6. El incumplimiento de requisitos formales no exime a la EPS de su obligación de pago.
 """
 
+SYSTEM_AU = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR AUTORIZACIÓN PREVIA (AU)
+
+PRINCIPIO: La atención de URGENCIAS no requiere autorización previa.
+
+ARGUMENTOS AUTORIZACIÓN:
+1. Art. 168 Ley 100/1993: Las urgencias son obligación legal de prestación inmediata.
+2. Sentencia T-1025/2002 (Corte Constitucional): Las urgencias no requieren autorización previa, son cobertura obligatoria.
+3. Sentencia T-760/2008: Las EPS no pueden negar servicios cuando hay riesgo vital o documentación clínica que respalda la indicación.
+4. Decreto 4747/2007 Art. 11: La IPS está obligada a prestar urgencias independientemente de la autorización.
+5. Si en los soportes aparecen Glasgow ≤8, hipotensión, shock, signos de gravedad, RCP, dolor torácico, hemorragia, fractura abierta, abdomen agudo: cita el dato CLÍNICO específico como evidencia de la urgencia vital.
+6. Si la atención fue programada Y aún así no había autorización: invocar Decreto 780/2016 (responsabilidad de la EPS de gestionar la autorización a tiempo).
+
+CIERRE OBLIGATORIO: "ESE HUS EXIGE EL PAGO ÍNTEGRO POR TRATARSE DE ATENCIÓN DE URGENCIA OBLIGATORIA. LA AUTORIZACIÓN PREVIA NO ES REQUISITO LEGAL EN URGENCIAS."
+
+PROHIBIDO: Llamar esta glosa "FACTURACIÓN", "SOPORTES" o cualquier otro tipo. ES POR AUTORIZACIÓN.
+"""
+
+SYSTEM_IN = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR INSUMOS (IN)
+
+ARGUMENTOS INSUMOS:
+1. Los insumos son inherentes al acto médico (Decreto 780/2016).
+2. Se facturan al costo de adquisición + porcentaje administrativo pactado (Art. 871 C. Comercio).
+3. Las facturas de compra y los registros de inventario hospitalario respaldan los insumos utilizados.
+4. Para insumos de alto costo (prótesis, dispositivos), la HCE documenta la necesidad clínica.
+5. Res. 5269/2017 incluye insumos asociados a procedimientos cubiertos en el PBS.
+6. Si la EPS pide soportes adicionales, estos OBRAN EN EL EXPEDIENTE clínico.
+
+PROHIBIDO: Decir que es "FACTURACIÓN" o "SOPORTES" — es INSUMOS.
+"""
+
+SYSTEM_ME = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR MEDICAMENTOS (ME)
+
+ARGUMENTOS MEDICAMENTOS:
+1. Los medicamentos se dispensan bajo fórmula médica del médico tratante (Art. 17 Ley 1751/2015).
+2. Res. 5269/2017 define el listado del PBS — todo medicamento incluido es obligatorio para la EPS.
+3. Para medicamentos NO PBS, la EPS debe gestionarlos ante ADRES (Decreto 780/2016), NO glosarlos a la IPS.
+4. Sentencia T-760/2008: La EPS no puede negar medicamentos prescritos cuando la condición clínica los exige.
+5. Si el medicamento fue prescrito por necesidad clínica documentada en la historia clínica, su pago es obligatorio.
+6. La prescripción del médico tratante prevalece sobre el criterio del auditor administrativo (T-478/1995).
+
+PROHIBIDO: Decir que es "FACTURACIÓN" o "SOPORTES" — es MEDICAMENTOS.
+"""
+
 SYSTEM_MAP = {
     "TA": SYSTEM_TA,
     "SO": SYSTEM_SO,
@@ -383,18 +458,101 @@ SYSTEM_MAP = {
     "CL": SYSTEM_CL,
     "PE": SYSTEM_CL,
     "FA": SYSTEM_FA,
-    "AU": SYSTEM_SO,
-    "IN": SYSTEM_FA,
-    "ME": SYSTEM_FA,
+    "AU": SYSTEM_AU,
+    "IN": SYSTEM_IN,
+    "ME": SYSTEM_ME,
 }
 
+# Bloques de normativa especial por tipo de pagador
+REGIMEN_ESPECIAL = {
+    "PPL": (
+        "RÉGIMEN ESPECIAL — POBLACIÓN PRIVADA DE LA LIBERTAD\n"
+        "- Ley 1709/2014: Reforma al Código Penitenciario y Carcelario.\n"
+        "- Resolución 5159/2015: Procedimiento atención salud PPL — cobertura integral.\n"
+        "- Decreto 1142/2016: Modelo de atención en salud PPL.\n"
+        "- Fondo de Atención en Salud PPL administrado por Fiduprevisora S.A.\n"
+        "- La cobertura es INTEGRAL y NO se rige solo por el PBS regular.\n"
+        "OBLIGACIÓN: Citar SIEMPRE Res. 5159/2015 + Ley 1709/2014 al defender cobertura PPL."
+    ),
+    "FOMAG": (
+        "RÉGIMEN ESPECIAL — MAGISTERIO (DOCENTES OFICIALES)\n"
+        "- Decreto 3752/2003: Plan de Salud del Magisterio.\n"
+        "- Ley 91/1989: Fondo Nacional de Prestaciones Sociales del Magisterio.\n"
+        "- Cobertura definida por el Plan de Salud del Magisterio, NO por el PBS regular.\n"
+        "- Administrado por Fiduprevisora S.A.\n"
+        "OBLIGACIÓN: Citar Decreto 3752/2003 + Ley 91/1989 al defender cobertura FOMAG."
+    ),
+    "POLICIA NACIONAL": (
+        "RÉGIMEN ESPECIAL — SUBSISTEMA DE SALUD POLICÍA NACIONAL\n"
+        "- Ley 352/1997: Régimen de Salud de las Fuerzas Militares y Policía.\n"
+        "- Decreto 1795/2000: Reglamenta sistema de salud FF.MM. y Policía.\n"
+        "- Acuerdo 002/2001 Consejo Superior de Salud FF.MM.\n"
+        "- Cobertura especial para uniformados y beneficiarios.\n"
+        "OBLIGACIÓN: Citar Decreto 1795/2000 + Acuerdo 002/2001 CSSFFMM."
+    ),
+    "DISPENSARIO": (
+        "RÉGIMEN ESPECIAL — DISPENSARIO MILITAR / EJÉRCITO\n"
+        "- Decreto 1795/2000: Sistema de salud de las Fuerzas Militares.\n"
+        "- Acuerdo 002/2001 Consejo Superior de Salud FF.MM.\n"
+        "- Cobertura por convenio con el Comando General FF.MM."
+    ),
+    "POSITIVA": (
+        "RÉGIMEN ESPECIAL — RIESGOS LABORALES (ARL)\n"
+        "- Decreto 1295/1994: Sistema General de Riesgos Profesionales.\n"
+        "- Decreto 1072/2015: Decreto Único Reglamentario Sector Trabajo, Libro 2 Parte 2 Título 4.\n"
+        "- Ley 1562/2012: Modifica el Sistema de Riesgos Laborales.\n"
+        "- Las atenciones por accidente de trabajo o enfermedad laboral NO se rigen por el PBS."
+    ),
+    "AURORA": (
+        "RÉGIMEN ESPECIAL — RIESGOS LABORALES (ARL)\n"
+        "- Decreto 1295/1994 + Decreto 1072/2015 + Ley 1562/2012.\n"
+        "- Cobertura accidente de trabajo y enfermedad laboral, NO PBS regular."
+    ),
+}
+
+
+def _detectar_regimen_especial(eps: str, contrato_tipo: str) -> str:
+    """Devuelve bloque de normativa especial según EPS o tipo de contrato."""
+    eps_up = (eps or "").upper()
+    tipo_up = (contrato_tipo or "").upper()
+    for key, bloque in REGIMEN_ESPECIAL.items():
+        if key in eps_up or key in tipo_up:
+            return bloque
+    return ""
+
+
 def get_system_prompt(prefijo: str, eps: str) -> str:
-    """Retorna el system prompt especializado + datos contractuales."""
+    """Retorna el system prompt especializado + datos contractuales + régimen especial."""
     base = SYSTEM_MAP.get(prefijo.upper(), SYSTEM_FA)
     contrato = get_contrato(eps)
+
+    # Cálculo SOAT explícito si conocemos el factor
+    factor = contrato.get("factor", 1.0)
+    bloque_calculo = ""
+    if prefijo.upper() == "TA" and factor < 1.0:
+        descuento_pct = int(round((1 - factor) * 100))
+        bloque_calculo = f"""
+CALCULADORA TARIFARIA OBLIGATORIA (USA EN EL ARGUMENTO):
+- Tarifa SOAT pleno (Res. 054/2026)  : Buscarla en el manual de tarifas para el CUPS facturado.
+- Factor contractual aplicable       : {factor} (descuento {descuento_pct}%)
+- Valor pactado = SOAT × {factor}
+- Diferencia adeudada = Valor pactado - Valor reconocido por la EPS
+- DEBES mostrar este cálculo en el argumento si la EPS aplicó otro descuento.
+"""
+    elif prefijo.upper() == "TA" and factor >= 1.0:
+        bloque_calculo = """
+CALCULADORA TARIFARIA OBLIGATORIA:
+- Sin contrato pactado: aplica SOAT PLENO (Res. 054/2026), SIN descuentos.
+- Cualquier descuento de la EPS es UNILATERAL y carece de soporte contractual.
+"""
+
+    bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
+    if bloque_regimen:
+        bloque_regimen = "\n══════════════════════════════════════════════\n" + bloque_regimen + "\n══════════════════════════════════════════════\n"
+
     return base + f"""
-DATOS CONTRACTUALES VERIFICADOS:
-─────────────────────────────────
+DATOS CONTRACTUALES VERIFICADOS (USA EXACTAMENTE ESTO, NO INVENTES OTROS):
+─────────────────────────────────────────────────
 EPS / PAGADOR : {eps}
 CONTRATO      : {contrato['numero']}
 TARIFA PACTADA: {contrato['tarifa']}
@@ -402,7 +560,9 @@ NIT PAGADOR   : {contrato['nit']}
 VIGENCIA      : {contrato['vigencia']}
 TIPO          : {contrato['tipo']}
 NOTA CONTRATO : {contrato['nota']}
-─────────────────────────────────
+─────────────────────────────────────────────────
+{bloque_calculo}
+{bloque_regimen}
 """
 
 
@@ -731,12 +891,27 @@ def build_user_prompt(
             "(ART. 168 LEY 100/1993). LA FALTA DE ORDEN MÉDICA PREVIA NO APLICA EN URGENCIAS VITALES."
         )
         condicional_urgencia_corto = "atención de urgencias"
+    elif tipo_atencion == "NO ESPECIFICADO EN SOPORTES":
+        # Texto neutro cuando no se identifica el tipo de atención
+        condicional_urgencia = (
+            "TODOS LOS DOCUMENTOS EXIGIDOS POR LA RESOLUCIÓN 3047/2008 OBRAN EN EL EXPEDIENTE "
+            "CLÍNICO INSTITUCIONAL Y RESPALDAN LA ATENCIÓN PRESTADA."
+        )
+        condicional_urgencia_corto = "la atención prestada"
     else:
         condicional_urgencia = (
-            f"EN {tipo_atencion} TODOS LOS DOCUMENTOS EXIGIDOS OBRAN EN EL EXPEDIENTE "
-            "CONFORME A LA RESOLUCIÓN 3047/2008."
+            f"EN LA ATENCIÓN DE {tipo_atencion} TODOS LOS DOCUMENTOS EXIGIDOS OBRAN "
+            "EN EL EXPEDIENTE CONFORME A LA RESOLUCIÓN 3047/2008."
         )
         condicional_urgencia_corto = f"atención de {tipo_atencion.lower()}"
+
+    # Resumen de datos clínicos identificados (úsalos en el argumento si están)
+    datos_clinicos_resumen = []
+    if cups != "NO IDENTIFICADO":         datos_clinicos_resumen.append(f"CUPS {cups}")
+    if diagnostico != "NO IDENTIFICADO":  datos_clinicos_resumen.append(f"DX {diagnostico}")
+    if medico != "NO IDENTIFICADO":       datos_clinicos_resumen.append(f"MÉDICO {medico}")
+    if servicio != "NO IDENTIFICADO":     datos_clinicos_resumen.append(f"SERVICIO {servicio}")
+    datos_clinicos_str = " | ".join(datos_clinicos_resumen) if datos_clinicos_resumen else "SIN DATOS CLÍNICOS EXTRAÍDOS DE LOS SOPORTES"
 
     prefijo = (codigo[:2].upper() if codigo and len(codigo) >= 2 else "FA")
     if prefijo not in _VARIANTES:
@@ -757,7 +932,20 @@ def build_user_prompt(
     template = _VARIANTES[prefijo][idx]
     ctx_pdf_truncado = (contexto_pdf[:4000] if contexto_pdf else FALLBACK_SIN_SOPORTES)
 
-    return template.format(
+    instruccion_final = f"""
+
+══════════════════════════════════════════════════════════════════
+RECORDATORIOS OBLIGATORIOS PARA TU RESPUESTA:
+- DATOS CLÍNICOS DETECTADOS: {datos_clinicos_str}
+  → Si hay datos, ÚSALOS textualmente en el argumento (no los inventes ni los omitas).
+- TIPO DE GLOSA REAL: {prefijo} → Llama a este tipo por su nombre, NO mezcles tipos.
+- TRAZABILIDAD: {trazabilidad} → Cita exactamente estos números, NO inventes otros.
+- Si los soportes no aportan dato concreto, di "SEGÚN CONSTA EN EL EXPEDIENTE", NO inventes.
+- Cierra con MÁXIMO 3 NORMAS al final, formato: Norma1 | Norma2 | Norma3.
+══════════════════════════════════════════════════════════════════
+"""
+
+    return instruccion_final + template.format(
         texto_glosa        = texto_glosa,
         codigo             = codigo,
         eps                = eps,

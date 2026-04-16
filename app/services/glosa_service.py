@@ -159,7 +159,13 @@ class GlosaService:
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         texto_base = str(data.tabla_excel).strip().upper()
 
-        codigo_det = self._extraer_codigo_glosa(texto_base)
+        codigos_detectados = self._extraer_codigos_glosa(texto_base)
+        codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
+        if len(codigos_detectados) > 1:
+            logger.warning(
+                f"Multi-código detectado ({len(codigos_detectados)}): {codigos_detectados}. "
+                f"Se procesa solo el primero ({codigo_det})."
+            )
         prefijo = codigo_det[:2] if codigo_det and codigo_det != "N/A" else "XX"
         valor_raw = self._extraer_valor(texto_base)
 
@@ -204,6 +210,8 @@ class GlosaService:
 
         if es_extemporanea:
             cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 56 Ley 1438/2011)"
+        elif es_ratificacion:
+            cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
         elif es_tarifa and not tiene_contrato:
             cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
         else:
@@ -249,7 +257,9 @@ class GlosaService:
                 dias_habiles=dias,
                 es_extemporanea=es_extemporanea
             )
-            res_ia, modelo_usado = await self._llamar_ia(system_prompt, user_prompt)
+            res_ia, modelo_usado = await self._llamar_ia(
+                system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det
+            )
             
             razonamiento = self._xml("razonamiento", res_ia, "")
             if razonamiento:
@@ -362,8 +372,18 @@ class GlosaService:
         return "FA_FACTURACION"
 
     def _extraer_codigo_glosa(self, texto: str) -> str:
+        # Devuelve el primer código encontrado. Para detectar TODOS, usar _extraer_codigos_glosa.
         m = re.search(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto)
         return m.group(0) if m else "N/A"
+
+    def _extraer_codigos_glosa(self, texto: str) -> list[str]:
+        """Devuelve TODOS los códigos de glosa detectados (sin duplicados, en orden)."""
+        encontrados = re.findall(r"\b(?:TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto)
+        vistos: list[str] = []
+        for c in encontrados:
+            if c not in vistos:
+                vistos.append(c)
+        return vistos
 
     def _extraer_valor(self, texto: str) -> str:
         m = re.search(r"\$\s*([\d\.,]+)", texto)
@@ -491,8 +511,12 @@ class GlosaService:
                 raise
         raise ultimo_error
 
-    async def _llamar_ia(self, system: str, user: str) -> tuple[str, str]:
-        clave_cache = hashlib.sha256(f"{system}:{user}".encode()).hexdigest()
+    async def _llamar_ia(self, system: str, user: str, eps: str = "", codigo: str = "") -> tuple[str, str]:
+        # Clave de caché incluye EPS y código para evitar colisiones cruzadas
+        # entre glosas distintas que casualmente generen prompts similares
+        clave_cache = hashlib.sha256(
+            f"{eps}|{codigo}|{system}|{user}".encode()
+        ).hexdigest()
 
         if clave_cache in _CACHE_IA:
             cached = _CACHE_IA[clave_cache]
