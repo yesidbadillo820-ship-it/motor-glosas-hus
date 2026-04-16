@@ -469,6 +469,8 @@ textarea{resize:vertical;min-height:80px}
                 <th style="padding:10px">EPS</th>
                 <th style="padding:10px">Factura</th>
                 <th style="padding:10px">Consec.</th>
+                <th style="padding:10px">Radicado</th>
+                <th style="padding:10px">Tipo</th>
                 <th style="padding:10px;text-align:right">Valor</th>
                 <th style="padding:10px">Vence</th>
                 <th style="padding:10px">Días</th>
@@ -478,7 +480,7 @@ textarea{resize:vertical;min-height:80px}
               </tr>
             </thead>
             <tbody id="mis-body">
-              <tr><td colspan="10" style="padding:30px;text-align:center;color:#6b7280">Cargando...</td></tr>
+              <tr><td colspan="12" style="padding:30px;text-align:center;color:#6b7280">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -845,26 +847,31 @@ async function loadMisGlosas(){
     }
 
     if(data.length === 0){
-      body.innerHTML = '<tr><td colspan="10" style="padding:30px;text-align:center;color:#6b7280">No tienes glosas asignadas. Si esperabas ver alguna, pídele a un administrador que revise el campo "Nombre" de tu usuario — debe coincidir con el valor de la columna GESTOR del Excel (ej: "YESID PEREZ").</td></tr>';
+      body.innerHTML = '<tr><td colspan="12" style="padding:30px;text-align:center;color:#6b7280">No tienes glosas asignadas. Si esperabas ver alguna, pídele a un administrador que revise el campo "Nombre" de tu usuario — debe coincidir con el valor de la columna GESTOR del Excel (ej: "YESID PEREZ").</td></tr>';
       return;
     }
 
     var colores = {VERDE:'#16a34a',AMARILLO:'#eab308',ROJO:'#dc2626',NEGRO:'#111827'};
+    var tipoColores = {'Administrativo':'#3b82f6','Medico':'#059669','Mixta':'#d97706'};
     body.innerHTML = data.map(function(g){
       var color = colores[g.prioridad] || '#6b7280';
       var vence = g.fecha_vencimiento ? new Date(g.fecha_vencimiento).toLocaleDateString('es-CO') : 'N/A';
       var valor = (g.valor_objetado || 0).toLocaleString('es-CO', {minimumFractionDigits:0, maximumFractionDigits:0});
+      var radicadoTxt = g.numero_radicado ? '<span style="background:#e0e7ff;color:#3730a3;padding:2px 6px;border-radius:4px;font-size:11px;font-family:monospace">' + g.numero_radicado + '</span>' : '<span style="color:#9ca3af">-</span>';
+      var tipoTxt = g.tipo_glosa_excel ? '<span style="background:' + (tipoColores[g.tipo_glosa_excel] || '#6b7280') + ';color:white;padding:2px 8px;border-radius:4px;font-size:11px">' + g.tipo_glosa_excel + '</span>' : '<span style="color:#9ca3af">-</span>';
       return '<tr style="border-top:1px solid #f3f4f6">' +
         '<td style="padding:10px;font-size:12px">' + (g.gestor_nombre || '-') + '</td>' +
         '<td style="padding:10px;font-size:12px">' + (g.eps || '-') + '</td>' +
         '<td style="padding:10px;font-size:12px;font-family:monospace">' + (g.factura || '-') + '</td>' +
         '<td style="padding:10px;font-size:12px;font-family:monospace">' + (g.consecutivo_dgh || '-') + '</td>' +
+        '<td style="padding:10px">' + radicadoTxt + '</td>' +
+        '<td style="padding:10px">' + tipoTxt + '</td>' +
         '<td style="padding:10px;text-align:right;font-weight:bold">$' + valor + '</td>' +
         '<td style="padding:10px;font-size:12px">' + vence + '</td>' +
         '<td style="padding:10px;text-align:center;font-weight:bold">' + (g.dias_restantes || 0) + '</td>' +
         '<td style="padding:10px;font-size:11px"><span style="background:#eff6ff;color:#1e40af;padding:2px 8px;border-radius:4px">' + (g.estado || '-') + '</span></td>' +
         '<td style="padding:10px"><span style="background:' + color + ';color:white;padding:2px 8px;border-radius:4px;font-size:11px">' + (g.prioridad || '-') + '</span></td>' +
-        '<td style="padding:10px"><button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="verGlosa(' + g.id + ')">Ver / Responder</button></td>' +
+        '<td style="padding:10px"><button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="responderGlosa(' + g.id + ')">Responder</button></td>' +
         '</tr>';
     }).join('');
   }catch(e){
@@ -886,6 +893,84 @@ async function verGlosa(id){
       '</body></html>');
     w.document.close();
   }catch(e){ alert('Error: ' + e.message); }
+}
+
+// Cambia a la pestaña Analizar y pre-rellena los campos desde la glosa
+async function responderGlosa(id){
+  try{
+    var r = await fetch('/glosas/' + id, {headers: authH()});
+    if(!r.ok){ alert('No se pudo cargar la glosa'); return; }
+    var g = await r.json();
+
+    // 1. Cambiar a pestaña Analizar
+    var tabs = document.querySelectorAll('.nb');
+    tabs.forEach(function(b){ b.classList.remove('active'); });
+    var analizarBtn = Array.from(tabs).find(function(b){ return b.textContent.trim() === 'Analizar'; });
+    if(analizarBtn) analizarBtn.classList.add('active');
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    var panelAnalizar = document.getElementById('p-analizar');
+    if(panelAnalizar) panelAnalizar.classList.add('active');
+
+    // 2. Pre-rellenar campos
+    // EPS - intenta match en el select (incluye matches parciales porque la EPS puede venir con prefijo)
+    var epsSel = document.getElementById('eps-sel');
+    if(epsSel && g.eps){
+      var matched = null;
+      var epsUpper = (g.eps || '').toUpperCase();
+      for(var i = 0; i < epsSel.options.length; i++){
+        var opt = epsSel.options[i];
+        var optUpper = opt.value.toUpperCase();
+        if(optUpper === epsUpper || epsUpper.indexOf(optUpper) !== -1 || optUpper.indexOf(epsUpper) !== -1){
+          matched = opt.value;
+          break;
+        }
+      }
+      epsSel.value = matched || 'OTRA / SIN DEFINIR';
+    }
+
+    // Etapa: si ratificada -> "RATIFIC", si no -> "RESPUESTA"
+    var etapaVal = (g.estado === 'RATIFICADA') ? 'RATIFICACION' : 'RESPUESTA';
+    document.querySelectorAll('.etapa-btn').forEach(function(b){
+      b.classList.remove('sel');
+      if(b.dataset.v === etapaVal) b.classList.add('sel');
+    });
+    var etapaHidden = document.getElementById('etapa-v');
+    if(etapaHidden) etapaHidden.value = etapaVal;
+
+    // Fechas
+    function setFecha(idCampo, iso){
+      var el = document.getElementById(idCampo);
+      if(el && iso) el.value = iso.split('T')[0];
+    }
+    // La lógica original usa fecha_radicacion_factura (cuando se radicó la factura) y fecha_recepcion (cuando HUS recibió la glosa)
+    setFecha('f-rad', g.fecha_radicacion_factura);
+    setFecha('f-rec', g.fecha_recepcion);
+
+    // Factura, radicado
+    var fInp = document.getElementById('f-factura'); if(fInp) fInp.value = g.factura || '';
+    var rInp = document.getElementById('f-radicado'); if(rInp) rInp.value = g.numero_radicado || '';
+
+    // Construir un texto de glosa con el contexto para que la IA tenga info
+    var partes = [];
+    if(g.consecutivo_dgh) partes.push('CONSECUTIVO DGH: ' + g.consecutivo_dgh);
+    if(g.valor_objetado) partes.push('VALOR: $' + g.valor_objetado.toLocaleString('es-CO'));
+    if(g.tipo_glosa_excel) partes.push('TIPO GLOSA: ' + g.tipo_glosa_excel);
+    if(g.profesional_medico) partes.push('PROFESIONAL MÉDICO: ' + g.profesional_medico);
+    if(g.observacion_tecnico) partes.push('OBSERVACIÓN: ' + g.observacion_tecnico);
+    if(g.referencia) partes.push('REFERENCIA: ' + g.referencia);
+    var tablaInput = document.getElementById('f-glosa');
+    if(tablaInput){
+      tablaInput.value = partes.join('\n');
+    }
+
+    // Scroll arriba y avisar al usuario
+    window.scrollTo({top: 0, behavior: 'smooth'});
+    if(typeof toast === 'function'){
+      toast('Datos de glosa #' + id + ' pre-cargados. Revisa y haz clic en Analizar.', 'success');
+    }
+  }catch(e){
+    alert('Error al cargar la glosa: ' + e.message);
+  }
 }
 
 // ─── FORM ─────────────────────────────────────────────────────────────────
