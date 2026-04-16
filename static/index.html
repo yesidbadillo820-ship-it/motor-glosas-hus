@@ -1404,26 +1404,20 @@ window.addEventListener('DOMContentLoaded',function(){
 // ─── SALUD TOTAL ───────────────────────────────────────────────────────────
 function cambiarTipoRespuestaST(){
   var tipo=document.getElementById('st-tipo-respuesta').value;
-  var fieldArchivo=document.getElementById('st-field-archivo');
   var fieldFecha=document.getElementById('st-field-fecha');
-  if(tipo==='ia'){
-    fieldArchivo.style.display='none';
-    fieldFecha.style.display='block';
-  }else{
-    fieldArchivo.style.display='block';
-    fieldFecha.style.display='none';
-  }
+  // El archivo TXT siempre es requerido (no se oculta).
+  fieldFecha.style.display = (tipo==='ia') ? 'block' : 'none';
 }
 
 async function previewSaludTotal(){
   var tipo=document.getElementById('st-tipo-respuesta').value;
   var fileInput=document.getElementById('st-file');
   var file=fileInput.files[0];
+  if(!file){toast('Seleccione un archivo TXT primero','error');return;}
   if(tipo==='ia'){
-    toast('Seleccione archivo TXT para vista previa','error');
+    toast('La vista previa no está disponible para IA. Use Descargar Respuesta.','error');
     return;
   }
-  if(!file){toast('Seleccione un archivo','error');return;}
   var fd=new FormData();
   fd.append('file',file);
   fd.append('tipo_respuesta',tipo);
