@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Importar Recepción · Motor Glosas HUS</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f3f4f6;color:#111827;padding:20px}
+    .wrap{max-width:1000px;margin:0 auto}
+    h1{color:#0e1f3d;font-size:24px;margin-bottom:6px}
+    p.lead{color:#6b7280;margin-bottom:22px;font-size:13px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:24px;margin-bottom:18px}
+    label{display:block;font-weight:600;margin-bottom:8px;color:#374151}
+    input[type=file]{width:100%;padding:12px;border:2px dashed #9ca3af;border-radius:8px;background:#f9fafb;cursor:pointer}
+    input[type=file]:hover{border-color:#2563eb;background:#eff6ff}
+    button{background:#2563eb;color:#fff;border:0;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+    button:hover{background:#1e40af}
+    button:disabled{background:#9ca3af;cursor:not-allowed}
+    .back{display:inline-block;margin-bottom:12px;color:#2563eb;text-decoration:none;font-size:13px}
+    .back:hover{text-decoration:underline}
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:15px 0}
+    .stat{background:#eff6ff;border-radius:8px;padding:14px;text-align:center}
+    .stat .n{font-size:22px;font-weight:bold;color:#1e40af}
+    .stat .l{font-size:11px;color:#6b7280;margin-top:4px}
+    .semaforo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:15px 0}
+    .sem{border-radius:8px;padding:14px;text-align:center;color:#fff}
+    .sem .n{font-size:22px;font-weight:bold}
+    .sem .l{font-size:11px;margin-top:4px}
+    .sem.verde{background:#16a34a}
+    .sem.amarillo{background:#eab308}
+    .sem.rojo{background:#dc2626}
+    .sem.negro{background:#111827}
+    .gestor{background:#f9fafb;border-left:3px solid #3b82f6;border-radius:6px;padding:10px 14px;margin:10px 0}
+    .gestor-head{font-weight:bold;color:#1e40af;margin-bottom:4px}
+    .gestor ul{margin-left:18px;font-size:12px;color:#374151}
+    .badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;color:#fff;margin-left:4px}
+    .err{background:#fee2e2;color:#991b1b;padding:10px;border-radius:6px;margin:6px 0;font-size:12px}
+    .ok{background:#d1fae5;color:#065f46;padding:12px;border-radius:8px}
+    .hidden{display:none}
+    .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:sp 1s linear infinite;margin-right:8px;vertical-align:middle}
+    @keyframes sp{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← Volver al panel</a>
+  <h1>📥 Importar Excel de Recepción</h1>
+  <p class="lead">Sube el archivo Excel que envía el equipo de recepción. Cada fila se registrará como una glosa, se detectarán automáticamente ratificaciones y extemporaneidades, y se enviará una notificación a todos los gestores configurados.</p>
+
+  <div class="card">
+    <label for="file">Archivo Excel (.xlsx)</label>
+    <input id="file" type="file" accept=".xlsx,.xls" />
+    <div style="margin-top:16px">
+      <button id="btn">Subir y procesar</button>
+    </div>
+  </div>
+
+  <div id="result" class="card hidden">
+    <h2 id="result-title" style="color:#065f46;margin-bottom:10px"></h2>
+
+    <div class="stats">
+      <div class="stat"><div class="n" id="s-total">0</div><div class="l">TOTAL</div></div>
+      <div class="stat"><div class="n" id="s-nuevas" style="color:#15803d">0</div><div class="l">NUEVAS</div></div>
+      <div class="stat"><div class="n" id="s-act" style="color:#2563eb">0</div><div class="l">ACTUALIZADAS</div></div>
+      <div class="stat"><div class="n" id="s-rat" style="color:#7c3aed">0</div><div class="l">RATIFICADAS</div></div>
+      <div class="stat"><div class="n" id="s-ext" style="color:#dc2626">0</div><div class="l">EXTEMPORÁNEAS</div></div>
+    </div>
+
+    <h3 style="margin:20px 0 10px">Semáforo</h3>
+    <div class="semaforo">
+      <div class="sem verde"><div class="n" id="sv">0</div><div class="l">🟢 VERDE</div></div>
+      <div class="sem amarillo"><div class="n" id="sa">0</div><div class="l">🟡 AMARILLO</div></div>
+      <div class="sem rojo"><div class="n" id="sr">0</div><div class="l">🔴 ROJO</div></div>
+      <div class="sem negro"><div class="n" id="sn">0</div><div class="l">⚫ VENCIDAS</div></div>
+    </div>
+
+    <div id="email-box" class="ok" style="margin:15px 0">📧 Correos enviados: <b id="e-num">0</b></div>
+
+    <h3 style="margin:20px 0 10px">Asignaciones por gestor</h3>
+    <div id="gestores"></div>
+
+    <div id="errores" style="margin-top:20px"></div>
+  </div>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+if(!TOKEN){
+  alert('Debes iniciar sesión primero');
+  window.location.href = '/';
+}
+
+function colorSem(s){
+  return {VERDE:'#16a34a',AMARILLO:'#eab308',ROJO:'#dc2626',NEGRO:'#111827'}[s] || '#6b7280';
+}
+
+document.getElementById('btn').addEventListener('click', async ()=>{
+  const file = document.getElementById('file').files[0];
+  if(!file){ alert('Selecciona un archivo primero'); return; }
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Procesando...';
+
+  const fd = new FormData();
+  fd.append('archivo', file);
+
+  try{
+    const r = await fetch('/glosas/importar-recepcion', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN},
+      body:fd
+    });
+    if(r.status === 401){
+      alert('Sesión expirada. Vuelve a iniciar sesión.');
+      window.location.href = '/';
+      return;
+    }
+    const d = await r.json();
+    if(!r.ok){
+      alert('Error: '+(d.detail || r.status));
+      return;
+    }
+    mostrarResultado(d);
+  }catch(e){
+    alert('Error de red: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = 'Subir y procesar';
+  }
+});
+
+function mostrarResultado(d){
+  document.getElementById('result').classList.remove('hidden');
+  document.getElementById('result-title').textContent = '✅ Importación completada';
+  document.getElementById('s-total').textContent = d.total || 0;
+  document.getElementById('s-nuevas').textContent = d.creadas || 0;
+  document.getElementById('s-act').textContent = d.actualizadas || 0;
+  document.getElementById('s-rat').textContent = d.ratificadas || 0;
+  document.getElementById('s-ext').textContent = d.extemporaneas || 0;
+
+  const sem = d.semaforo || {};
+  document.getElementById('sv').textContent = sem.VERDE || 0;
+  document.getElementById('sa').textContent = sem.AMARILLO || 0;
+  document.getElementById('sr').textContent = sem.ROJO || 0;
+  document.getElementById('sn').textContent = sem.NEGRO || 0;
+
+  document.getElementById('e-num').textContent = d.correos_enviados || 0;
+
+  const cont = document.getElementById('gestores');
+  cont.innerHTML = '';
+  const porG = d.por_gestor || {};
+  Object.keys(porG).sort().forEach(g=>{
+    const div = document.createElement('div');
+    div.className = 'gestor';
+    const lista = porG[g].map(x=>
+      `<li>${x.factura} — ${x.eps} — $${(x.valor||0).toLocaleString('es-CO')} — vence ${x.vence} <span class="badge" style="background:${colorSem(x.semaforo)}">${x.semaforo}</span></li>`
+    ).join('');
+    div.innerHTML = `<div class="gestor-head">👤 ${g} <span style="color:#6b7280;font-weight:normal">(${porG[g].length})</span></div><ul>${lista}</ul>`;
+    cont.appendChild(div);
+  });
+
+  const errs = document.getElementById('errores');
+  errs.innerHTML = '';
+  if(d.errores && d.errores.length){
+    errs.innerHTML = '<h3 style="color:#991b1b;margin-bottom:6px">Errores</h3>' +
+      d.errores.map(e=>`<div class="err">${e}</div>`).join('');
+  }
+}
+</script>
+</body>
+</html>

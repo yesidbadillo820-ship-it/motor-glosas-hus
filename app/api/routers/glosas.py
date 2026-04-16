@@ -381,6 +381,101 @@ async def importar_glosas_masiva(
     }
 
 
+@router.post("/importar-recepcion")
+async def importar_recepcion(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Sube el Excel que envía el equipo de recepción (GESTOR, FECHAS, EPS,
+    FACTURA, CONSECUTIVO DGH, VALOR, VENCE, RADICADO, etc.) y registra cada
+    fila como una glosa, detectando automáticamente extemporaneidad y
+    ratificaciones. Al terminar envía un correo broadcast a ALERTAS_EMAIL.
+    """
+    req_id = set_request_id()
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(status_code=400, detail="Archivo vacío")
+    if len(contenido) > 15_000_000:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (>15 MB)")
+
+    from app.services.recepcion_service import RecepcionService
+    from app.services.email_service import enviar_resumen_importacion_recepcion
+    from app.repositories.audit_repository import AuditRepository
+
+    servicio = RecepcionService(db)
+    resumen = servicio.procesar_excel(contenido)
+
+    logger.info(
+        f"[{req_id}] Importación recepción por {current_user.email} | "
+        f"total={resumen.total} nuevas={resumen.creadas} actualizadas={resumen.actualizadas} "
+        f"ratificadas={resumen.ratificadas} extemporaneas={resumen.extemporaneas}"
+    )
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="IMPORTAR_RECEPCION",
+        tabla="historial",
+        detalle=(
+            f"total={resumen.total} nuevas={resumen.creadas} "
+            f"actualizadas={resumen.actualizadas} ratificadas={resumen.ratificadas} "
+            f"extemporaneas={resumen.extemporaneas}"
+        ),
+    )
+
+    resumen_dict = resumen.to_dict()
+
+    # Notificación broadcast (no bloquea la respuesta si falla)
+    try:
+        enviados = await enviar_resumen_importacion_recepcion(resumen_dict)
+        resumen_dict["correos_enviados"] = enviados
+    except Exception as e:
+        logger.error(f"[{req_id}] Error enviando correo: {e}")
+        resumen_dict["correos_enviados"] = 0
+        resumen_dict["email_error"] = str(e)
+
+    return resumen_dict
+
+
+@router.get("/semaforo")
+def semaforo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Retorna el conteo de glosas activas agrupadas por color de semáforo
+    (VERDE / AMARILLO / ROJO / NEGRO). Útil para el dashboard."""
+    repo = GlosaRepository(db)
+    return repo.semaforo_counts()
+
+
+@router.get("/mis-asignaciones")
+def mis_asignaciones(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista las glosas asignadas al usuario actual (por email o nombre de gestor)."""
+    repo = GlosaRepository(db)
+    glosas = repo.listar_por_gestor(current_user.email)
+    return [
+        {
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "consecutivo_dgh": g.consecutivo_dgh,
+            "gestor_nombre": g.gestor_nombre,
+            "valor_objetado": g.valor_objetado,
+            "estado": g.estado,
+            "prioridad": g.prioridad,
+            "dias_restantes": g.dias_restantes,
+            "fecha_vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
+            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
+            "radicado_info": g.radicado_info,
+        }
+        for g in glosas
+    ]
+
+
 @router.get("/batch/{batch_id}")
 def obtener_estado_batch(
     batch_id: str,

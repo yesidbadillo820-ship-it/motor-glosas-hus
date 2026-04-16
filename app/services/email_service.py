@@ -119,6 +119,130 @@ async def notificar_batch_completado(batch_id: str, total: int, exitosas: int, d
     await enviar_email(destinatario, asunto, _build_html_base(asunto, contenido))
 
 
+async def enviar_resumen_importacion_recepcion(resumen: dict) -> int:
+    """Envía un correo broadcast a todos los gestores listando las glosas importadas.
+
+    Retorna el número de destinatarios a los que se envió correctamente.
+    """
+    cfg = get_settings()
+    if not cfg.alertas_email:
+        logger.warning("ALERTAS_EMAIL vacío: no se envía resumen de importación")
+        return 0
+
+    destinatarios = [e.strip() for e in cfg.alertas_email.split(",") if e.strip()]
+    if not destinatarios:
+        return 0
+
+    total = resumen.get("total", 0)
+    creadas = resumen.get("creadas", 0)
+    actualizadas = resumen.get("actualizadas", 0)
+    ratificadas = resumen.get("ratificadas", 0)
+    extemporaneas = resumen.get("extemporaneas", 0)
+    semaforo = resumen.get("semaforo", {})
+    por_gestor = resumen.get("por_gestor", {})
+
+    # Tabla de semáforo
+    sem_html = f"""
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0">
+        <div style="background:#16a34a;color:white;border-radius:8px;padding:15px;text-align:center">
+            <div style="font-size:22px;font-weight:bold">{semaforo.get('VERDE', 0)}</div>
+            <div style="font-size:11px">🟢 VERDE (>10d)</div>
+        </div>
+        <div style="background:#eab308;color:white;border-radius:8px;padding:15px;text-align:center">
+            <div style="font-size:22px;font-weight:bold">{semaforo.get('AMARILLO', 0)}</div>
+            <div style="font-size:11px">🟡 AMARILLO (5-10d)</div>
+        </div>
+        <div style="background:#dc2626;color:white;border-radius:8px;padding:15px;text-align:center">
+            <div style="font-size:22px;font-weight:bold">{semaforo.get('ROJO', 0)}</div>
+            <div style="font-size:11px">🔴 ROJO (&lt;5d)</div>
+        </div>
+        <div style="background:#111827;color:white;border-radius:8px;padding:15px;text-align:center">
+            <div style="font-size:22px;font-weight:bold">{semaforo.get('NEGRO', 0)}</div>
+            <div style="font-size:11px">⚫ VENCIDAS</div>
+        </div>
+    </div>
+    """
+
+    # Tabla por gestor
+    filas_gestor = []
+    for gestor, glosas in sorted(por_gestor.items()):
+        lista_facturas = "".join(
+            f"<li>{g['factura']} — {g['eps']} — ${g['valor']:,.0f} — vence {g['vence']}"
+            f" <span style='padding:2px 6px;border-radius:4px;font-size:10px;background:{_color_semaforo(g['semaforo'])};color:white'>{g['semaforo']}</span></li>"
+            for g in glosas[:15]
+        )
+        extra = f"<li><i>...y {len(glosas) - 15} más</i></li>" if len(glosas) > 15 else ""
+        filas_gestor.append(f"""
+        <div style="margin:15px 0;padding:12px;background:#f9fafb;border-radius:8px;border-left:3px solid #3b82f6">
+            <div style="font-weight:bold;color:#1e40af;margin-bottom:8px">
+                👤 {gestor} <span style="color:#6b7280;font-weight:normal">({len(glosas)} glosa{'s' if len(glosas) != 1 else ''})</span>
+            </div>
+            <ul style="margin:0;padding-left:20px;font-size:12px;color:#374151">
+                {lista_facturas}{extra}
+            </ul>
+        </div>
+        """)
+
+    asunto = f"📥 Motor Glosas HUS — {total} glosas importadas desde recepción"
+    contenido = f"""
+    <p style="color:#374151;font-size:14px;line-height:1.6">
+        Se importó un nuevo archivo de recepción de glosas. A continuación el resumen:
+    </p>
+    <div style="background:#eff6ff;border-radius:8px;padding:15px;margin:15px 0">
+        <div style="display:flex;justify-content:space-around;text-align:center">
+            <div>
+                <div style="font-size:24px;font-weight:bold;color:#1e40af">{total}</div>
+                <div style="font-size:11px;color:#6b7280">TOTAL</div>
+            </div>
+            <div>
+                <div style="font-size:24px;font-weight:bold;color:#15803d">{creadas}</div>
+                <div style="font-size:11px;color:#6b7280">NUEVAS</div>
+            </div>
+            <div>
+                <div style="font-size:24px;font-weight:bold;color:#2563eb">{actualizadas}</div>
+                <div style="font-size:11px;color:#6b7280">ACTUALIZADAS</div>
+            </div>
+            <div>
+                <div style="font-size:24px;font-weight:bold;color:#7c3aed">{ratificadas}</div>
+                <div style="font-size:11px;color:#6b7280">RATIFICADAS</div>
+            </div>
+            <div>
+                <div style="font-size:24px;font-weight:bold;color:#dc2626">{extemporaneas}</div>
+                <div style="font-size:11px;color:#6b7280">EXTEMPORÁNEAS</div>
+            </div>
+        </div>
+    </div>
+
+    <h3 style="color:#111827;font-size:16px;margin:25px 0 10px">Semáforo de vencimientos</h3>
+    {sem_html}
+
+    <h3 style="color:#111827;font-size:16px;margin:25px 0 10px">Asignaciones por gestor</h3>
+    {''.join(filas_gestor) or '<p style="color:#6b7280">No hay asignaciones.</p>'}
+
+    <p style="margin-top:30px;padding:15px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
+        <b>Acción requerida:</b> ingresa al sistema para revisar las glosas asignadas y responderlas antes de su vencimiento.<br>
+        🔗 <a href="https://motor-glosas-hus.onrender.com/" style="color:#1e40af">Abrir Motor Glosas HUS</a>
+    </p>
+    """
+
+    html = _build_html_base(asunto, contenido)
+    exitos = 0
+    for destinatario in destinatarios:
+        if await enviar_email(destinatario, asunto, html):
+            exitos += 1
+    logger.info(f"Resumen de importación enviado a {exitos}/{len(destinatarios)} destinatarios")
+    return exitos
+
+
+def _color_semaforo(sem: str) -> str:
+    return {
+        "VERDE": "#16a34a",
+        "AMARILLO": "#eab308",
+        "ROJO": "#dc2626",
+        "NEGRO": "#111827",
+    }.get(sem, "#6b7280")
+
+
 async def enviar_resumen_semanal(destinatario: str, metricas: dict):
     cfg = get_settings()
     if not cfg.alertas_email:

@@ -230,3 +230,33 @@ class GlosaRepository:
 
     def listar_todos(self) -> list[GlosaRecord]:
         return self.db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc()).all()
+
+    def semaforo_counts(self) -> dict:
+        """Cuenta glosas agrupadas por color de semáforo (columna prioridad)."""
+        resultados = self.db.query(
+            GlosaRecord.prioridad,
+            func.count(GlosaRecord.id),
+        ).filter(
+            GlosaRecord.estado.notin_(["LEVANTADA", "CONCILIADA", "ACEPTADA"])
+        ).group_by(GlosaRecord.prioridad).all()
+        base = {"VERDE": 0, "AMARILLO": 0, "ROJO": 0, "NEGRO": 0}
+        for color, cnt in resultados:
+            if color in base:
+                base[color] = int(cnt or 0)
+        return base
+
+    def listar_por_gestor(self, gestor_email: str, limit: int = 100) -> list[GlosaRecord]:
+        """Glosas asignadas a un gestor (buscado por email o por nombre)."""
+        from sqlalchemy import or_
+        return (
+            self.db.query(GlosaRecord)
+            .filter(
+                or_(
+                    GlosaRecord.auditor_email == gestor_email,
+                    GlosaRecord.gestor_nombre.ilike(f"%{gestor_email.split('@')[0]}%"),
+                )
+            )
+            .order_by(GlosaRecord.dias_restantes.asc())
+            .limit(limit)
+            .all()
+        )

@@ -137,6 +137,14 @@ async def lifespan(app: FastAPI):
         ("fecha_decision_eps", "TIMESTAMP WITH TIME ZONE"),
         ("valor_recuperado", "DOUBLE PRECISION DEFAULT 0"),
         ("observacion_eps", "TEXT"),
+        ("gestor_nombre", "VARCHAR(200)"),
+        ("fecha_radicacion_factura", "TIMESTAMP WITH TIME ZONE"),
+        ("fecha_documento_dgh", "TIMESTAMP WITH TIME ZONE"),
+        ("fecha_recepcion", "TIMESTAMP WITH TIME ZONE"),
+        ("fecha_entrega", "TIMESTAMP WITH TIME ZONE"),
+        ("consecutivo_dgh", "VARCHAR(50)"),
+        ("es_devolucion", "VARCHAR(1)"),
+        ("radicado_info", "VARCHAR(200)"),
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:
@@ -187,6 +195,48 @@ async def lifespan(app: FastAPI):
                 "Usuario admin creado. Cambiar contraseña inmediatamente "
                 "usando la variable de entorno ADMIN_PASSWORD."
             )
+
+        # Asegurar que admin@hus.gov.co tenga rol SUPER_ADMIN
+        admin = db.query(UsuarioRecord).filter(UsuarioRecord.email == "admin@hus.gov.co").first()
+        if admin and admin.rol != "SUPER_ADMIN":
+            logger.warning("Actualizando rol de admin@hus.gov.co a SUPER_ADMIN")
+            admin.rol = "SUPER_ADMIN"
+
+        # Sembrar usuarios corporativos de gestores de glosas
+        # Contraseña inicial: ADMIN_PASSWORD (cambiar en primer login)
+        USUARIOS_CORPORATIVOS = [
+            ("glosashus09@sinacsc.com",      "SUPER_ADMIN", "Gestor Glosas 09 (Admin)"),
+            ("glosashus11@sinacsc.com",      "AUDITOR",     "Gestor Glosas 11"),
+            ("carterahus04@sinacsc.com",     "AUDITOR",     "Cartera HUS 04"),
+            ("glosashus02@sinacsc.com",      "AUDITOR",     "Gestor Glosas 02"),
+            ("glosashus04@sinacsc.com",      "AUDITOR",     "Gestor Glosas 04"),
+            ("glosashus05@sinacsc.com",      "AUDITOR",     "Gestor Glosas 05"),
+            ("carterahus01@sinacsc.com",     "AUDITOR",     "Cartera HUS 01"),
+            ("glosashus12@sinacsc.com",      "AUDITOR",     "Gestor Glosas 12"),
+            ("devoluciones02@sinacsc.com",   "AUDITOR",     "Devoluciones 02"),
+            ("glosashus10@sinacsc.com",      "AUDITOR",     "Gestor Glosas 10"),
+            ("glosashus16@sinacsc.com",      "AUDITOR",     "Gestor Glosas 16"),
+            ("radicadevoluciones@sinacsc.com","AUDITOR",    "Radica Devoluciones"),
+            ("devoluciones01@sinacsc.com",   "AUDITOR",     "Devoluciones 01"),
+            ("coordinacioncartera@hus.gov.co","AUDITOR",    "Coordinación Cartera"),
+            ("glosashus08@sinacsc.com",      "AUDITOR",     "Gestor Glosas 08"),
+            ("glosashus07@sinacsc.com",      "AUDITOR",     "Gestor Glosas 07"),
+        ]
+        password_hash_default = get_password_hash(cfg.admin_password)
+        for email, rol, nombre in USUARIOS_CORPORATIVOS:
+            existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
+            if not existente:
+                db.add(UsuarioRecord(
+                    nombre=nombre,
+                    email=email,
+                    password_hash=password_hash_default,
+                    rol=rol,
+                    activo=1,
+                ))
+                logger.warning(f"Usuario sembrado: {email} ({rol})")
+            elif existente.rol != rol:
+                logger.warning(f"Actualizando rol de {email}: {existente.rol} -> {rol}")
+                existente.rol = rol
 
         db.commit()
         logger.info("Base de datos inicializada correctamente")
@@ -538,6 +588,11 @@ def root():
 @app.get("/importar-masiva")
 def importar_masiva():
     return FileResponse("static/importar-masiva.html")
+
+
+@app.get("/importar-recepcion")
+def importar_recepcion_page():
+    return FileResponse("static/importar-recepcion.html")
 
 
 @app.get("/health")
