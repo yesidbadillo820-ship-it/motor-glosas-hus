@@ -1,253 +1,800 @@
 """
-Módulo de prompts especializados para el Motor de Glosas HUS.
+glosa_ia_prompts.py  —  Motor de Glosas HUS v6.0
+=======================================================
+Prompts especializados, contratos reales y 4 variantes de respuesta
+por concepto (FA · SO · CO · CL · TA) para la ESE HUS.
 
-Cada prompt está diseñado para el contexto específico de la ESE HUS:
-- Lenguaje jurídico colombiano real
-- Normativa citada con artículos precisos
-- Estrategias por tipo de glosa Y por EPS específica
-- Instrucciones de razonamiento paso a paso (chain-of-thought)
+CONTRATOS VIGENTES INDEXADOS
+─────────────────────────────
+EPS / PAGADOR              N° CONTRATO               TARIFA BASE
+─────────────────────────────────────────────────────────────────
+NUEVA EPS                  Acta 1388/2024 + 2025      SOAT – 20 %
+COOSALUD                   68001C00060340-24           SOAT – 15 %
+COMPENSAR                  Acuerdo Tarifario 2025      SOAT – 10 %
+POSITIVA                   0525 de 2017 + Otrosí 03   SOAT – 15 %
+PPL (Fiduprevisora)        IPS-001B-2022 / Otrosí 26  SOAT – 15 %
+FOMAG (Fiduprevisora)      12076-359-2025              SOAT – 15 %
+POLICÍA NAL. (Med/Alta)    068-5-200004-26 (SFI 004)  UVB – 8 %
+POLICÍA NAL. (Oncología)   068-5-200006-26             Inst. HUS
+SUMIMEDICAL                Tarifario 2025              SOAT – 15 %
+DISPENSARIO MÉD. (DMBUG)   440-DIGSA/DMBUG-2025       SOAT – 15 %
+SALUD MIA                  CSA2025EVE3A005             SOAT – 15 %
+PRECIMED                   Contrato 319 de 2024        SOAT – 15 %
+AURORA (ARL/Vida)          Minuta ARL firmada 2024     SOAT pleno
+SIN CONTRATO               —                           SOAT pleno
 """
 
 import re
+from typing import Optional
 
-TIPO_ATENCION = {"CONSULTA": ["consulta"], "URGENCIAS": ["urgencia", "emergencia"], "HOSPITALIZACION": ["hospitalizacion"]}
-def extraer_tipo(contexto, texto):
-    t = (contexto + " " + texto).lower()
-    for k, v in TIPO_ATENCION.items():
-        if any(p in t for p in v): return k
-    return "NO ESPECIFICADO"
+# ══════════════════════════════════════════════════════════════════
+#  1.  BASE DE CONOCIMIENTO CONTRACTUAL
+# ══════════════════════════════════════════════════════════════════
 
-def extraer_datos(contexto):
-    d = {"cups": "", "diagnostico": ""}
-    if contexto:
-        m = re.search(r'\b([A-Z]\d{3,4})\b', contexto.upper())
-        if m: d["cups"] = m.group(1)
-    return d
+CONTRATOS_HUS: dict[str, dict] = {
+    "NUEVA EPS": {
+        "numero":   "ACTA DE NEGOCIACIÓN No. 1388 DE 2024 / ACTA 2025",
+        "tarifa":   "SOAT -20 %",
+        "factor":   0.80,
+        "tipo":     "EPS CONTRIBUTIVO / RÉGIMEN SUBSIDIADO",
+        "nit":      "800.149.436-2",
+        "vigencia": "2025",
+        "contacto": "john.sanabria@nuevaeps.com.co — Coordinador Estructuración de Redes y Contratación, Regional Nororiente",
+        "nota":     "Incluye contrato MAOS No. 319 de 2024 para servicios oncológicos y de alta complejidad.",
+    },
+    "COOSALUD": {
+        "numero":   "68001C00060340-24 / 68001S00060339-24",
+        "tarifa":   "SOAT -15 %",
+        "factor":   0.85,
+        "tipo":     "EPS SUBSIDIADO / CONTRIBUTIVO",
+        "nit":      "800.250.119-4",
+        "vigencia": "2025",
+        "contacto": "Reunión de proveedores presencial — Acta 21-01-2025",
+        "nota":     "Dos contratos activos: contributivo C00060340 y subsidiado S00060339. Tarifario HUS 2025 en dos hojas: SOAT y Servicios Institucionales.",
+    },
+    "COMPENSAR": {
+        "numero":   "ACUERDO TARIFARIO ESE HUS — EPS COMPENSAR 2025",
+        "tarifa":   "SOAT -10 %",
+        "factor":   0.90,
+        "tipo":     "EPS CONTRIBUTIVO",
+        "nit":      "860.063.996-9",
+        "vigencia": "2025",
+        "contacto": "Notificación contrato septiembre 2025",
+        "nota":     "Acuerdo tarifario con dos componentes: SOAT homologado CUPS (descuento -10%) y servicios institucionales HUS valorados en tarifa propia.",
+    },
+    "POSITIVA": {
+        "numero":   "CONTRATO No. 0525 DE 2017 + OTROSÍ No. 03 (diciembre 2025)",
+        "tarifa":   "SOAT -15 %",
+        "factor":   0.85,
+        "tipo":     "ARL / RIESGOS LABORALES",
+        "nit":      "860.011.153-6",
+        "vigencia": "Extendida hasta diciembre 2025, prorrogada por Otrosí 03",
+        "contacto": "CHARLES RODOLFO BAYONA MOLANO — Vicepresidente Técnico Positiva",
+        "nota":     "Contrato de riesgos laborales. El Otrosí 03 modifica obligaciones del contratista, duración, interventoría y garantías.",
+    },
+    "PPL": {
+        "numero":   "CONTRATO IPS-001B-2022 — OTROSÍ No. 26 (2025)",
+        "tarifa":   "SOAT -15 % (homologación CUPS-SOAT HUS 2022)",
+        "factor":   0.85,
+        "tipo":     "POBLACIÓN PRIVADA DE LA LIBERTAD",
+        "nit":      "830.053.105-3",
+        "vigencia": "2025",
+        "contacto": "MARÍA FERNANDA JARAMILLO GUTIÉRREZ — Vicepresidente Negocios Fiduciarios, Fiduprevisora S.A.",
+        "nota":     "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora. Marco normativo especial: Resolución 5159/2015 y Ley 1709/2014.",
+    },
+    "FOMAG": {
+        "numero":   "CONTRATO No. 12076-359-2025",
+        "tarifa":   "SOAT -15 %",
+        "factor":   0.85,
+        "tipo":     "MAGISTERIO — DOCENTES OFICIALES",
+        "nit":      "830.053.105-3",
+        "vigencia": "2025",
+        "contacto": "CHRISTIAN RAMIRO FANDIÑO RIVEROS — Vicepresidente de Contratación, Fiduprevisora S.A. | notjudicial@fiduprevisora.com.co",
+        "nota":     "Patrimonio Autónomo FOMAG administrado por Fiduprevisora. Registro especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, Bucaramanga.",
+    },
+    "POLICIA NACIONAL": {
+        "numero":   "CONTRATO No. 068-5-200004-26 (SFI 004) — MEDIANA Y ALTA COMPLEJIDAD",
+        "tarifa":   "UVB 2026 – 8 %",
+        "factor":   0.92,
+        "tipo":     "POLICÍA NACIONAL — SUBSISTEMA DE SALUD",
+        "nit":      "804.012.688-5",
+        "vigencia": "2026",
+        "contacto": "TTE. CRNL. ANDREA CAROLINA CONTRERAS BOHORQUEZ — Jefe Regional de Aseguramiento en Salud N° 5",
+        "nota":     "Contrato interadministrativo. Cobertura: consulta ambulatoria, urgencias, hospitalización, UCI, procedimientos quirúrgicos, diagnósticos y terapéuticos. Resolución 00011 de enero 2025 y Orden Interna 26-055.",
+    },
+    "POLICIA NACIONAL ONCOLOGIA": {
+        "numero":   "CONTRATO No. 068-5-200006-26 — ONCOLOGÍA",
+        "tarifa":   "TARIFAS INSTITUCIONALES HUS",
+        "factor":   1.00,
+        "tipo":     "POLICÍA NACIONAL — ONCOLOGÍA",
+        "nit":      "804.012.688-5",
+        "vigencia": "2026",
+        "contacto": "MAYOR LEONARDO VEGA CALA — Jefe Regional Aseguramiento en Salud N° 5 | Delegación Res. 00011/2025 + Resolución 364/12-02-2025",
+        "nota":     "Contrato interadministrativo exclusivo oncología. Minuta firmada marzo 2026. Inicio de ejecución certificado.",
+    },
+    "SUMIMEDICAL": {
+        "numero":   "TARIFARIO ESE HUS 2025 — SUMIMEDICAL",
+        "tarifa":   "SOAT -15 %",
+        "factor":   0.85,
+        "tipo":     "EMPRESA COMPLEMENTARIA DE SALUD",
+        "nit":      "N/D",
+        "vigencia": "2025",
+        "contacto": "Correo contratación HUS",
+        "nota":     "Tarifario en dos hojas: SOAT homologado CUPS y servicios institucionales HUS.",
+    },
+    "DISPENSARIO MEDICO": {
+        "numero":   "CONTRATO No. 440-DIGSA/DMBUG-2025 (Proceso CD477)",
+        "tarifa":   "SOAT -15 % (Factor homologación CUPS-SOAT HUS)",
+        "factor":   0.85,
+        "tipo":     "FUERZAS MILITARES — EJÉRCITO NACIONAL",
+        "nit":      "901.541.137-1",
+        "vigencia": "Dic 2025 – Jul 2026 o hasta agotar presupuesto",
+        "contacto": "DIRECCIÓN DE SANIDAD EJÉRCITO — DISPENSARIO MÉDICO BUCARAMANGA | gerencia@hus.gov.co",
+        "nota":     "Contrato interadministrativo. Valor: $3.235.050.000 M/CTE. Cobertura: servicios de salud mediana y alta complejidad para afiliados Fuerzas Militares Regional 2. Objeto idéntico al ACUERDO 002 del 27-04-2001 del Consejo Superior de Salud FF.MM.",
+    },
+    "SALUD MIA": {
+        "numero":   "CONTRATO CSA2025EVE3A005",
+        "tarifa":   "SOAT -15 %",
+        "factor":   0.85,
+        "tipo":     "EPS / ASEGURADORA",
+        "nit":      "N/D",
+        "vigencia": "2025",
+        "contacto": "Correo contratación HUS",
+        "nota":     "Dos documentos firmados: CSA2025EVE3A005 y SSA2025EVE3A005.",
+    },
+    "PRECIMED": {
+        "numero":   "CONTRATO No. 319 DE 2024",
+        "tarifa":   "SOAT -15 %",
+        "factor":   0.85,
+        "tipo":     "EMPRESA DE MEDICINA PREPAGADA",
+        "nit":      "N/D",
+        "vigencia": "2024-2025",
+        "contacto": "Correo contratación HUS",
+        "nota":     "Contrato de prestación de servicios de salud.",
+    },
+    "AURORA": {
+        "numero":   "MINUTA ARL + MINUTA VIDA AP — FIRMADAS SEP 2024",
+        "tarifa":   "SOAT PLENO (sin descuento)",
+        "factor":   1.00,
+        "tipo":     "COMPAÑÍA DE SEGUROS — ARL Y VIDA",
+        "nit":      "N/D",
+        "vigencia": "2024-2025",
+        "contacto": "Compañía de Seguros de Vida Aurora S.A.",
+        "nota":     "Dos minutas: ARL y Vida AP. SOAT pleno aplicable.",
+    },
+}
 
-FALLBACK = "ESE HUS NO ACEPTA LA GLOSA. NO HAY SOPORTES. EL REGISTRO CLINICO RESPALDA LA ATENCION. SE EXIGE PAGO INTEGRO. CARTERA@HUS.GOV.CO"
+def get_contrato(eps: str) -> dict:
+    """Retorna los datos del contrato para una EPS dada (búsqueda flexible)."""
+    eps_upper = eps.upper().strip()
+    for key, val in CONTRATOS_HUS.items():
+        if key in eps_upper or eps_upper in key:
+            return val
+    return {
+        "numero":   "SIN CONTRATO PACTADO",
+        "tarifa":   "SOAT PLENO — Resolución 054 de 2026",
+        "factor":   1.00,
+        "tipo":     "SIN RELACIÓN CONTRACTUAL",
+        "nit":      "N/D",
+        "vigencia": "N/A",
+        "contacto": "cartera@hus.gov.co",
+        "nota":     "Sin contrato. Se aplica tarifa SOAT plena según Res. 054/2026 y Decreto 2423/1996.",
+    }
 
-SYSTEM_BASE = """Eres el ABOGADO DIRECTOR DE CARTERA Y GLOSAS de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), Bucaramanga, Colombia. NIT 890.210.024-0.
+
+# ══════════════════════════════════════════════════════════════════
+#  2.  DETECCIÓN DE CONTEXTO (tipo atención, CUPS, CIE-10, médico)
+# ══════════════════════════════════════════════════════════════════
+
+TIPO_ATENCION_KEYWORDS = {
+    "CONSULTA EXTERNA":   ["consulta externa", "consulta medica", "cita medica", "consulta ambulatoria", "valoracion ambulatoria"],
+    "URGENCIAS":          ["urgencia", "urgente", "emergencia", "triage", "reanimacion", "shock", "rcp"],
+    "HOSPITALIZACIÓN":    ["hospitalizacion", "hospitalizado", "cama hospitalaria", "internacion", "estancia hospitalaria", "dia cama"],
+    "CIRUGÍA":            ["cirugia", "quirurgico", "procedimiento quirurgico", "sala de cirugia", "procedimiento", "intervencion quirurgica"],
+    "UCI":                ["uci", "unidad de cuidados intensivos", "cuidado critico", "ventilacion mecanica", "cuidado intensivo"],
+    "ONCOLOGÍA":          ["oncologia", "quimioterapia", "radioterapia", "oncologico", "cancer", "tumor", "neoplasia"],
+    "PROCEDIMIENTO Dx":   ["imagen diagnostica", "ecografia", "tomografia", "resonancia", "endoscopia", "biopsia", "laboratorio"],
+}
+
+def extraer_tipo_atencion(contexto_pdf: str, texto_glosa: str) -> str:
+    texto = (contexto_pdf + " " + texto_glosa).lower()
+    for tipo, palabras in TIPO_ATENCION_KEYWORDS.items():
+        if any(p in texto for p in palabras):
+            return tipo
+    return "NO ESPECIFICADO EN SOPORTES"
+
+def extraer_datos_soporte(contexto_pdf: str) -> dict:
+    datos = {
+        "cups":          "NO IDENTIFICADO",
+        "diagnostico":   "NO IDENTIFICADO",
+        "medico":        "NO IDENTIFICADO",
+        "fecha_atencion":"NO IDENTIFICADA",
+        "servicio":      "NO IDENTIFICADO",
+    }
+    if not contexto_pdf:
+        return datos
+
+    m = re.search(r'\b(\d{5,6})\b', contexto_pdf)
+    if m:
+        datos["cups"] = m.group(1)
+
+    m = re.search(r'\b([A-Z]\d{2}\.?\d*)\b', contexto_pdf)
+    if m:
+        datos["diagnostico"] = m.group(1)
+
+    m = re.search(
+        r'(?:m[eé]dico|dr\.?|dra\.?|profesional|especialista)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+ [A-ZÁÉÍÓÚ][a-záéíóú]+)',
+        contexto_pdf, re.I
+    )
+    if m:
+        datos["medico"] = m.group(1).strip()
+
+    m = re.search(r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b', contexto_pdf)
+    if m:
+        datos["fecha_atencion"] = m.group(1)
+
+    m = re.search(
+        r'(?:servicio|procedimiento|actividad|descripci[oó]n)[:\s]+([A-ZÁÉÍÓÚ][^\n]{5,60})',
+        contexto_pdf, re.I
+    )
+    if m:
+        datos["servicio"] = m.group(1).strip()[:80]
+
+    return datos
+
+def tiene_soportes_reales(contexto_pdf: str) -> bool:
+    return bool(contexto_pdf and len(contexto_pdf.strip()) > 80)
+
+
+# ══════════════════════════════════════════════════════════════════
+#  3.  SYSTEM PROMPTS BASE Y ESPECIALIZADOS
+# ══════════════════════════════════════════════════════════════════
+
+SYSTEM_BASE = """\
+Eres el ABOGADO DIRECTOR DE CARTERA Y GLOSAS de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), NIT 890.210.024-0, Bucaramanga, Santander, Colombia.
 
 IDENTIDAD INSTITUCIONAL:
-- Representas a una IPS pública de alta complejidad, referente en Santander y nororiente colombiano
-- Tu misión es proteger los recursos institucionales rechazando glosas injustificadas
-- Usas lenguaje jurídico formal colombiano, con citas normativas precisas
-- NUNCA aceptas una glosa sin argumento contundente que la justifique
-- SIEMPRE redactas en mayúsculas sostenidas, como es el estilo de los documentos oficiales de glosas
+- IPS pública de alta complejidad, referente regional del nororiente colombiano.
+- Representante legal: RICARDO ARTURO HOYOS LANZIANO, C.C. 72.251.369.
+- Dirección: Carrera 33 No. 28-126, Bucaramanga. Tel. 6076912010.
+- Correo institucional: cartera@hus.gov.co | glosasydevoluciones@hus.gov.co
 
-MARCO NORMATIVO COMPLETO:
-1. Ley 100 de 1993 — Art. 168 (atención inicial de urgencias obligatoria), Art. 177 (obligaciones de las EPS)
-2. Ley 1438 de 2011 — Art. 56 (procedimiento de glosas: 20 días hábiles para glosar, 15 días para responder, 10 días para ratificar)
-3. Ley 1751 de 2015 — Art. 2 (salud como derecho fundamental), Art. 17 (autonomía médica)
-4. Decreto 4747 de 2007 — Art. 20 (conciliación de diferencias), Art. 11 (documentos de cobro)
-5. Decreto 780 de 2016 — Decreto Único Reglamentario del Sector Salud
-6. Resolución 2175 de 2015 — Procedimiento de conciliación de glosas médicas
-7. Resolución 3047 de 2008 — Anexo Técnico 5 (formatos glosas), definición de códigos de respuesta
-8. Resolución 5269 de 2017 — Plan de Beneficios en Salud (PBS)
-9. Resolución 1995 de 1999 — Historia clínica como documento médico-legal
-10. Circular 030 de 2013 MINSALUD — Errores formales subsanables, no constituyen glosa
-11. Decreto 2423 de 1996 — Manual de Tarifas SOAT
-12. Resolución 054 de 2026 — Tarifas SOAT plenas vigentes
-13. Código de Comercio Art. 871 — Buena fe contractual
-14. Ley 1122 de 2007 — Art. 13 (flujo de recursos entre EPS e IPS)
-15. Sentencia T-760 de 2008 — Obligaciones de las EPS en prestación de servicios
-16. Sentencia T-1025 de 2002 — Urgencias no requieren autorización previa
-17. Sentencia T-478 de 1995 — Autonomía médica como derecho fundamental
+MISIÓN: Proteger los recursos institucionales rechazando glosas injustificadas con argumentos sólidos, precisos y completamente redactados. NUNCA dejes un campo en blanco ni con placeholder.
 
-REGLAS ABSOLUTAS — ESTRUCTURA DEL ARGUMENTO:
-1. AUDITORÍA: Identifica qué alega la EPS y por qué está MAL su argumento
-2. DEFENSA TÉCNICA: Presenta los HECHOS CONCRETOS del caso que desmienten a la EPS
-3. EXIGENCIA DE PAGO: Cierre directo solicitando el pago íntegro
-4. FUNDAMENTO NORMATIVO: Al final, máximo 3 normas específicas (formato: Norma | Norma | Norma)
+MARCO NORMATIVO COMPLETO 2026:
+1.  Ley 100/1993 — Art. 168 (urgencias obligatorias), Art. 177 (obligaciones EPS)
+2.  Ley 1438/2011 — Art. 56 (plazos: 20 días hábiles EPS para glosar / 15 días IPS para responder / 10 días EPS para ratificar)
+3.  Ley 1751/2015 — Art. 2 (salud derecho fundamental), Art. 17 (autonomía médica)
+4.  Ley 1122/2007 — Art. 13 (flujo de recursos EPS→IPS)
+5.  Decreto 4747/2007 — Art. 20 (conciliación), Art. 11 (documentos de cobro)
+6.  Decreto 780/2016 — Decreto Único Reglamentario del Sector Salud
+7.  Resolución 3047/2008 — Anexo Técnico 5 (procedimiento glosas y respuestas)
+8.  Resolución 5269/2017 — Plan de Beneficios en Salud (PBS)
+9.  Resolución 1995/1999 — Historia clínica como documento médico-legal
+10. Resolución 054/2026 — Tarifas SOAT plenas vigentes 2026
+11. Decreto 2423/1996 — Manual de Tarifas SOAT (base de cálculo)
+12. Circular 030/2013 MINSALUD — Errores formales subsanables, no constituyen glosa
+13. Circular ADRES 016/2024 — Auditoría integral de cuentas médicas ADRES
+14. Circular 0000022/2023 — Facturación electrónica en salud
+15. Ley 2015/2020 — Historia Clínica Electrónica Interoperable
+16. Resolución 866/2021 — RIPS (Registros Individuales de Prestación de Servicios)
+17. Código de Comercio Art. 871 — Principio de buena fe contractual
+18. Sentencia T-760/2008 — Obligaciones de las EPS en prestación de servicios
+19. Sentencia T-1025/2002 — Urgencias no requieren autorización previa
+20. Sentencia T-478/1995 — Autonomía médica como derecho fundamental protegido
 
-REGLAS ADICIONALES:
-- NO repitas los mismos argumentos en cada párrafo
-- El texto FINAL debe ser listo para copiar y radicar: sin placeholders, sin corchetes
-- Si el caso es urgencias: aplica la exención de autorización previa (Art. 168 Ley 100)
-- Si el plazo venció: glosa improcedente por extemporaneidad (Art. 56 Ley 1438/2011)
+REGLAS ABSOLUTAS DE REDACCIÓN:
+- Escribir SIEMPRE en MAYÚSCULAS SOSTENIDAS (estilo oficial de glosas).
+- Cada párrafo debe aportar información NUEVA. Prohibido repetir.
+- Texto FINAL listo para copiar y radicar: sin corchetes, sin placeholders.
+- No usar "en consecuencia", "por lo tanto", "de conformidad con" repetidamente.
+- Máximo 3 normas al final en formato: Norma1 | Norma2 | Norma3.
 """
 
-SYSTEM_TARIFA = SYSTEM_BASE + """
-ESPECIALIZACIÓN: DEFENSA TARIFARIA
+SYSTEM_TA = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA TARIFARIA (TA)
 
-CONTEXTO TARIFARIO HUS:
-- La ESE HUS aplica su Resolución Interna de Precios actualizada anualmente mediante acto administrativo
-- El SOAT es el piso, no el techo tarifario; los contratos pueden acordar porcentajes sobre SOAT
-- El IPC es un referente macroeconómico, NO una obligación contractual para las IPS
-- Una EPS no puede modificar unilateralmente tarifas pactadas (Art. 871 C. Comercio)
-- La UVR/UVT no aplica para servicios de salud; aplica la tarifa SOAT Decreto 2423/96
-- Si no hay contrato: se aplica SOAT pleno Resolución 054/2026 sin descuentos
+CONTEXTO TARIFARIO HUS 2026:
+- Resolución 054/2026: Tarifas SOAT plenas vigentes (piso, no techo).
+- Consulta médica general: $35.800 | Especializada: $65.700 | Urgencias: $42.500
+- UCI/día: $892.400 | Hospitalización/día: $198.600 | SMLMV 2026: $1.423.500
+- El contrato y sus anexos son LEY entre las partes (Art. 1601 C. Civil).
+- La EPS no puede aplicar descuentos unilaterales sin soporte contractual (Art. 871 C. Comercio).
+- IPC: referente macroeconómico, NO obliga a la IPS a reducir tarifas.
+- Si no hay contrato: SOAT pleno sin descuentos.
 
-ARGUMENTOS TARIFARIOS PODEROSOS:
-1. La diferencia tarifaria no puede ser determinada unilateralmente por el auditor de la EPS
-2. El contrato vigente y sus anexos son la ley entre las partes (Art. 1601 C. Civil)
-3. Los descuentos que aplica la EPS deben estar expresamente pactados
-4. Si hay incremento institucional por acto administrativo, la EPS debe reconocerlo
-5. La glosa tarifaria sin soporte del contrato específico es infundada
+ARGUMENTOS TARIFARIOS:
+1. La diferencia tarifaria no puede determinarse unilateralmente por el auditor EPS.
+2. El descuento aplicado por la EPS debe estar expresamente pactado en el contrato.
+3. Si hay incremento institucional por acto administrativo, la EPS debe reconocerlo.
+4. Glosa tarifaria sin soporte del contrato específico es infundada.
+5. El SOAT es piso mínimo; los contratos pueden superar ese valor.
 """
 
-SYSTEM_SOPORTES = SYSTEM_BASE + """
-ESPECIALIZACIÓN: DEFENSA POR SOPORTES
+SYSTEM_SO = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR SOPORTES (SO)
 
-ARGUMENTOS CLAVES:
-1. La historia clínica es el documento médico-legal por excelencia (Res. 1995/1999)
-   → Contiene diagnóstico, evolución, órdenes médicas y justificación clínica
-   → NO ARGUMENTAR PLAZO DE 20 DÍAS SI LA GLOSA NO ES EXTEMPORÁNEA
-2. IMPORTANTE: Solo mencionar el plazo de 20 días hábiles (Art. 56 Ley 1438/2011) SI la glosa es EXTEMPORÁNEA (más de 20 días hábiles). Si está dentro de términos, enfocar en que los documentos CUMPLEN la norma
-3. Los errores formales (código incorrecto, fecha, firma) son SUBSANABLES, no causan glosa (Circular 030/2013 MINSALUD)
-4. La Resolución 3047/2008 define taxativamente cuáles son los documentos exigibles
-5. El incumplimiento de la EPS en solicitar documentos en tiempo no puede trasladarse a la IPS
-
-NUNCA digas "el plazo venció" o "no utilizó los 20 días" si la glosa está dentro de términos.
-
-CUANDO APLICA URGENCIA:
-- En urgencias, la documentación puede tramitarse con posterioridad a la atención
-- La falta de orden médica previa no aplica en urgencias vitales (Art. 168 Ley 100/93)
+ARGUMENTOS CLAVE:
+1. Historia clínica = documento médico-legal por excelencia (Res. 1995/1999).
+   Contiene diagnóstico, evolución, órdenes médicas y justificación clínica.
+2. Los errores formales (código incorrecto, fecha, firma) son SUBSANABLES,
+   NO causan glosa ni rechazo (Circular 030/2013 MINSALUD).
+3. La Res. 3047/2008 define TAXATIVAMENTE los documentos exigibles.
+4. El incumplimiento de la EPS al no solicitar documentos en tiempo no puede
+   trasladarse a la IPS.
+5. SOLO mencionar el plazo de 20 días hábiles (Art. 56 Ley 1438/2011) si la
+   glosa ES EXTEMPORÁNEA. Si está dentro de términos, NO mencionar el plazo.
+6. En urgencias: la documentación puede tramitarse con posterioridad (Art. 168 Ley 100/93).
 """
 
-SYSTEM_AUTORIZACION = SYSTEM_BASE + """
-ESPECIALIZACIÓN: DEFENSA POR AUTORIZACIÓN
-
-MARCO LEGAL URGENCIAS:
-- Art. 168 Ley 100/1993: TODA IPS está obligada a prestar atención inicial de urgencias independientemente de la capacidad de pago o condición de aseguramiento
-- Art. 2 Ley 1751/2015: El derecho a la salud es fundamental e implica atención inmediata
-- Jurisprudencia Corte Constitucional T-760/2008: La falta de autorización no puede impedir la atención en urgencias
-- Jurisprudencia Corte Constitucional T-1025/2002: Las urgencias no requieren autorización previa de la EPS
-- Resolución 5269/2017: Define urgencias y el deber de atención sin autorización previa
-
-CUANDO NO HAY URGENCIA:
-- Si existió comunicación prevía con la EPS sin respuesta oportuna, el HUS actuó de buena fe
-- Si la EPS aprobó la atención verbalmente, debe acreditarlo; si no puede, la glosa es infundada
-- El silencio de la EPS ante una solicitud de autorización puede considerarse autorización tácita
-"""
-
-SYSTEM_PERTINENCIA = SYSTEM_BASE + """
-ESPECIALIZACIÓN: DEFENSA POR PERTINENCIA MÉDICA
-
-PRINCIPIO DE AUTONOMÍA MÉDICA (Art. 17 Ley 1751/2015):
-- El médico tratante es quien examina al paciente y toma decisiones clínicas
-- La EPS no puede reemplazar el criterio médico desde una revisión administrativa de soportes
-- La pertinencia médica es un juicio clínico, no administrativo
-- Jurisprudencia Corte Constitucional T-478/1995: La autonomía médica es un derecho fundamental protegido constitucionalmente
-
-ARGUMENTOS:
-1. La historia clínica documenta la evaluación del médico y su razonamiento diagnóstico
-2. Un auditor de la EPS no puede invalidar el criterio del médico tratante sin examen presencial
-3. El procedimiento realizado estaba dentro de la guía de práctica clínica aplicable
-4. Toda la comunidad médica reconoce la indicación del procedimiento para el diagnóstico documentado
-5. Ante la duda clínica, el médico tiene el deber de hacer, no de omitir (principio de beneficencia)
-
-CIERRE: Solicitar conciliación de auditoría médica conjunta (Art. 20 Decreto 4747/2007, Res. 2175/2015)
-"""
-
-SYSTEM_COBERTURA = SYSTEM_BASE + """
-ESPECIALIZACIÓN: DEFENSA POR COBERTURA
+SYSTEM_CO = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR COBERTURA (CO)
 
 PLAN DE BENEFICIOS EN SALUD:
-- La Resolución 5269/2017 define el PBS. Los servicios dentro del PBS DEBEN ser pagados por la EPS
-- Ley 1751/2015 Art. 15: La exclusión de servicios del PBS es excepcional y debe estar expresamente listada
-- Si el servicio no está expresamente excluido, está incluido (principio de inclusión tácita)
+- Res. 5269/2017: Define el PBS. Todo servicio dentro del PBS DEBE ser pagado.
+- Ley 1751/2015 Art. 15: Exclusiones son EXCEPCIONALES y deben estar expresamente listadas.
+- Principio de inclusión tácita: si el servicio no está excluido, está incluido.
+- Para urgencias: la cobertura aplica independientemente del régimen (Art. 168 Ley 100/93).
+- Servicios NO PBS: la EPS debe gestionarlos ante ADRES, NO glosarlos a la IPS.
+- Población especial (PPL, FOMAG, PONAL, Fuerzas Militares): marco normativo propio.
 
-REGIMEN SUBSIDIADO vs CONTRIBUTIVO:
-- Para urgencias, la cobertura aplica independientemente del régimen (Art. 168 Ley 100)
-- Los servicios NO PBS deben ser gestionados ante el ADRES por la EPS (no glosados a la IPS)
-- Si el paciente era población especial (víctimas, PPL, migrantes), verificar el marco normativo específico
-
-EXCLUSIONES PBS: Solo aplican si el servicio está expresamente en el listado de exclusiones de la Res. 5269/2017
+REGÍMENES ESPECIALES SEGÚN EPS:
+- PPL: Res. 5159/2015 y Ley 1709/2014 (reclusos). Cobertura total.
+- FOMAG: Régimen docentes oficiales. Decreto 3752/2003.
+- POLICÍA/FF.MM.: Acuerdo 002/2001 Consejo Superior de Salud.
+- ARL (Positiva/Aurora): Decreto 1072/2015. Cobertura riesgos laborales.
 """
 
-SYSTEM_INSUMOS = SYSTEM_BASE + """
-ESPECIALIZACIÓN: DEFENSA POR INSUMOS Y MATERIALES
+SYSTEM_CL = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR PERTINENCIA CLÍNICA (CL)
 
-ARGUMENTOS CLAVES:
-1. Los insumos y materiales utilizados están listados en el tarifario institucional HUS
-2. El consumo se documenta en la historia clínica y la folha de consumo
-3. Los precios aplicados corresponden a la Resolución Interna de Precios vigente
-4. La EPS no puede objetar precios que están dentro del marco contractual pactado
-5. Los insumos necesarios para la atención fueron consumidos en beneficio del paciente
+PRINCIPIO DE AUTONOMÍA MÉDICA (Art. 17 Ley 1751/2015):
+- El médico tratante examina al paciente y toma decisiones clínicas.
+- La EPS NO puede reemplazar el criterio médico desde una revisión administrativa.
+- La pertinencia médica es un juicio CLÍNICO, no administrativo.
+- T-478/1995: La autonomía médica es derecho fundamental protegido.
+
+ARGUMENTOS:
+1. La historia clínica documenta la evaluación del médico y su razonamiento diagnóstico.
+2. Un auditor de la EPS no puede invalidar el criterio del médico tratante sin examen presencial.
+3. El procedimiento realizado está respaldado por las guías de práctica clínica aplicables.
+4. La comunidad médica reconoce la indicación del procedimiento para el diagnóstico documentado.
+5. El principio de benef inúmera obliga al médico a actuar ante la duda clínica, no a omitir.
+
+CIERRE: Solicitar conciliación de auditoría médica conjunta (Art. 20 Decreto 4747/2007, Res. 2175/2015).
 """
 
-SYSTEM_MEDICAMENTOS = SYSTEM_BASE + """
-ESPECIALIZACIÓN: DEFENSA POR MEDICAMENTOS
+SYSTEM_FA = SYSTEM_BASE + """
+ESPECIALIZACIÓN: DEFENSA POR FACTURACIÓN (FA)
 
-ARGUMENTOS CLAVES:
-1. Los medicamentos dispensados están registrados en la historia clínica y el kardex farmacéutico
-2. La prescripción médica está sustentada en el diagnóstico documentado
-3. Los medicamentos aplicados corresponden al PBS según Resolución 5269/2017
-4. La dosificación y frecuencia corresponden a la evidencia médica vigente
-5. El farmacéutico verificó la prescripción antes de la dispensación (Doble Chequeo)
+ARGUMENTOS FACTURACIÓN:
+1. Los errores formales de facturación son SUBSANABLES (Circular 030/2013 MINSALUD).
+2. La prestación real del servicio genera la obligación de pago independientemente de error formal.
+3. RIPS radicados conforme a Res. 866/2021 respaldan la atención prestada.
+4. Circular 0000022/2023: Requisitos de facturación electrónica cumplidos por la IPS.
+5. Art. 56 Ley 1438/2011: Los errores formales no constituyen causal válida de glosa.
+6. El incumplimiento de requisitos formales no exime a la EPS de su obligación de pago.
 """
 
-def get_system_prompt(tipo_glosa: str, eps: str, contrato: str, cod_res: str, desc_res: str) -> str:
-    """Selecciona el system prompt especializado según el tipo de glosa."""
-    mapping = {
-        "TA_TARIFA": SYSTEM_TARIFA,
-        "SO_SOPORTES": SYSTEM_SOPORTES,
-        "AU_AUTORIZACION": SYSTEM_AUTORIZACION,
-        "CL_PERTINENCIA": SYSTEM_PERTINENCIA,
-        "PE_PERTINENCIA": SYSTEM_PERTINENCIA,
-        "CO_COBERTURA": SYSTEM_COBERTURA,
-        "IN_INSUMOS": SYSTEM_INSUMOS,
-        "ME_MEDICAMENTOS": SYSTEM_MEDICAMENTOS,
-    }
-    base = mapping.get(tipo_glosa, SYSTEM_BASE)
+SYSTEM_MAP = {
+    "TA": SYSTEM_TA,
+    "SO": SYSTEM_SO,
+    "CO": SYSTEM_CO,
+    "CL": SYSTEM_CL,
+    "PE": SYSTEM_CL,
+    "FA": SYSTEM_FA,
+    "AU": SYSTEM_SO,
+    "IN": SYSTEM_FA,
+    "ME": SYSTEM_FA,
+}
+
+def get_system_prompt(prefijo: str, eps: str) -> str:
+    """Retorna el system prompt especializado + datos contractuales."""
+    base = SYSTEM_MAP.get(prefijo.upper(), SYSTEM_FA)
+    contrato = get_contrato(eps)
     return base + f"""
-DATOS DEL CASO:
-- EPS/PAGADOR: {eps}
-- CONTRATO VIGENTE: {contrato}
-- CÓDIGO DE RESPUESTA: {cod_res}
-- DESCRIPCIÓN: {desc_res}
+DATOS CONTRACTUALES VERIFICADOS:
+─────────────────────────────────
+EPS / PAGADOR : {eps}
+CONTRATO      : {contrato['numero']}
+TARIFA PACTADA: {contrato['tarifa']}
+NIT PAGADOR   : {contrato['nit']}
+VIGENCIA      : {contrato['vigencia']}
+TIPO          : {contrato['tipo']}
+NOTA CONTRATO : {contrato['nota']}
+─────────────────────────────────
 """
 
-def build_user_prompt(texto_glosa: str, contexto_pdf: str, codigo: str,
-                      eps: str, numero_factura: str = None, numero_radicado: str = None,
-                      dias_habiles: int = None, es_extemporanea: bool = False) -> str:
-    """
-    Construye el prompt del usuario para generar dictámenes concisos y específicos.
-    """
-    tipo_atencion = extraer_tipo(contexto_pdf, texto_glosa)
-    datos = extraer_datos(contexto_pdf)
-    cups = datos.get('cups', '')
 
-    tipo_glosa_map = {
-        "TA": "TARIFAS",
-        "SO": "SOPORTES",
-        "AU": "AUTORIZACIÓN",
-        "CO": "COBERTURA",
-        "PE": "PERTINENCIA",
-        "CL": "PERTINENCIA",
-        "FA": "FACTURACIÓN",
-        "IN": "INSUMOS",
-        "ME": "MEDICAMENTOS",
-        "EX": "EXTEMPORÁNEA"
+# ══════════════════════════════════════════════════════════════════════════
+#  4.  CUATRO VARIANTES DE RESPUESTA POR CONCEPTO
+# ═══════════════���══════════════════════════════════════════════════
+
+_VARIANTES: dict[str, list[str]] = {
+    "TA": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CONTRATO: {numero_contrato} | TARIFA: {tarifa}
+
+INSTRUCCIONES VARIANTE A — ARGUMENTO CONTRACTUAL:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR TARIFAS." + diferencia concreta entre lo glosado y lo pactado.
+2. PÁRRAFO 2: Citar el contrato {numero_contrato} con {eps}, la tarifa pactada ({tarifa}) y que la EPS aplica un descuento NO AUTORIZADO contractualmente.
+3. PÁRRAFO 3: Art. 871 Código de Comercio (buena fe contractual) + Art. 1601 C. Civil (el contrato es ley entre las partes). El IPC no es obligatorio para la IPS.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DE LA FACTURA CONFORME A LAS TARIFAS PACTADAS EN EL CONTRATO VIGENTE."
+NORMAS: Res. 054/2026 | Art. 871 C. Comercio | Decreto 2423/1996
+PROHIBIDO: No mencionar urgencias ni historia clínica (no aplica para glosa tarifaria).""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CONTRATO: {numero_contrato} | TARIFA: {tarifa}
+CUPS DETECTADO EN SOPORTES: {cups} | SERVICIO: {servicio} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES SUBIDOS:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — ARGUMENTO CUPS+TARIFA:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR TARIFAS PARA EL SERVICIO {servicio} (CUPS {cups})."
+2. PÁRRAFO 2: El contrato {numero_contrato} fija la tarifa {tarifa}. El valor facturado corresponde exactamente a este parámetro contractual.
+3. PÁRRAFO 3: La EPS aplica un descuento no pactado. Art. 1601 C. Civil + Art. 871 C. Comercio.
+4. CIERRE: "SE EXIGE EL PAGO CORRESPONDIENTE AL CUPS {cups} SEGÚN TARIFARIO CONTRACTUAL VIGENTE."
+NORMAS: Res. 054/2026 | Art. 1601 C. Civil | Art. 871 C. Comercio""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CONTRATO: {numero_contrato} | TARIFA: {tarifa}
+CUPS: {cups} | DX: {diagnostico} | SERVICIO: {servicio} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — ARGUMENTO ACTO ADMINISTRATIVO:
+1. INICIO: "ESE HUS RECHAZA EN SU TOTALIDAD LA GLOSA TARIFARIA POR IMPROCEDENTE."
+2. PÁRRAFO 2: La ESE HUS es una entidad pública que fija sus tarifas mediante RESOLUCIÓN INTERNA DE PRECIOS, expedida anualmente como acto administrativo.
+3. PÁRRAFO 3: El contrato {numero_contrato} reconoce estas tarifas institucionales.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. LA GLOSA CARECE DE FUNDAMENTO CONTRACTUAL Y NORMATIVO."
+NORMAS: Res. 054/2026 | Decreto 2423/1996 | Art. 871 C. Comercio""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CONTRATO: {numero_contrato} | TARIFA: {tarifa}
+CUPS: {cups} | SERVICIO: {servicio} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — ARGUMENTO HOMOLOGACIÓN CUPS-SOAT:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA TARIFARIA. LA HOMOLOGACIÓN CUPS-SOAT FUE CORRECTAMENTE APLICADA."
+2. PÁRRAFO 2: El Anexo Tarifario del contrato {numero_contrato} establece la tabla de homologación CUPS-SOAT.
+3. PÁRRAFO 3: La diferencia tarifaria que alega la EPS proviene de aplicar un código de homologación erróneo o un descuento distinto al pactado.
+4. CIERRE: "SE SOLICITA LA CORRECCIÓN INMEDIATA Y EL PAGO DEL SALDO GLOSADO CONFORME AL TARIFARIO PACTADO."
+NORMAS: Decreto 2423/1996 | Res. 054/2026 | Art. 1601 C. Civil""",
+    ],
+    "SO": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+TIPO ATENCIÓN: {tipo_atencion}
+
+INSTRUCCIONES VARIANTE A — DEFENSA NORMATIVA SOPORTES:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR SOPORTES."
+2. PÁRRAFO 2: La historia clínica del paciente constituye plena prueba médico-legal (Res. 1995/1999). {condicional_urgencia}
+3. PÁRRAFO 3: Los documentos solicitados por la EPS obran en el expediente. Los errores formales son subsanables (Circular 030/2013 MINSALUD).
+4. CIERRE: "SE EXIGE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA Y EL PAGO ÍNTEGRO DEL SERVICIO."
+NORMAS: Res. 1995/1999 | Circular 030/2013 | Res. 3047/2008""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES SUBIDOS POR EL AUDITOR:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — DEFENSA CON DOCUMENTOS:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR SOPORTES. LOS DOCUMENTOS REQUERIDOS OBRAN EN EL EXPEDIENTE."
+2. PÁRRAFO 2: En los soportes adjuntos se acredita: (a) historia clínica del {tipo_atencion} con diagnóstico {diagnostico}; (b) orden médica expedida por el Dr./Dra. {medico}.
+3. PÁRRAFO 3: La EPS alega falta de documentos que efectivamente existen.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO."
+NORMAS: Res. 1995/1999 | Res. 3047/2008 | Circular 030/2013""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | FECHA: {fecha_atencion} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — HISTORIA CLÍNICA ELECTRÓNICA:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR SOPORTES. LA HISTORIA CLÍNICA ELECTRÓNICA ACREDITA ÍNTEGRAMENTE LA ATENCIÓN."
+2. PÁRRAFO 2: La ESE HUS implementa historia clínica electrónica interoperable conforme a la Ley 2015/2020.
+3. CIERRE: "SE ALLEGAN SOPORTES COMPLEMENTARIOS. SE EXIGE EL PAGO ÍNTEGRO SIN DESCUENTO."
+NORMAS: Ley 2015/2020 | Res. 1995/1999 | Res. 866/2021""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — ATENCIÓN ESPECIAL:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR SOPORTES EN {tipo_atencion}."
+2. PÁRRAFO 2: La atención prestada corresponde a {tipo_atencion}. {condicional_urgencia}
+3. PÁRRAFO 3: El médico tratante {medico} realizó el procedimiento con CUPS {cups}.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. LA GLOSA ES IMPROCEDENTE."
+NORMAS: Res. 3047/2008 | Res. 1995/1999 | Circular 030/2013""",
+    ],
+    "CO": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+TIPO ATENCIÓN: {tipo_atencion}
+
+INSTRUCCIONES VARIANTE A — PBS GENERAL:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR COBERTURA."
+2. PÁRRAFO 2: El servicio prestado está incluido en el Plan de Beneficios en Salud (PBS), definido por la Res. 5269/2017.
+3. PÁRRAFO 3: La EPS tiene la obligación de pagar todos los servicios incluidos en el PBS (Art. 177 Ley 100/1993).
+4. CIERRE: "SE EXIGE EL RECONOCIMIENTO Y PAGO ÍNTEGRO DEL SERVICIO PRESTADO."
+NORMAS: Res. 5269/2017 | Art. 177 Ley 100/1993 | Art. 15 Ley 1751/2015""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — CUPS EN PBS:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR COBERTURA. EL CUPS {cups} ESTÁ INCLUIDO EN EL PBS."
+2. PÁRRAFO 2: El servicio con CUPS {cups} no figura en el listado de exclusiones de la Res. 5269/2017.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DEL CUPS {cups}."
+NORMAS: Res. 5269/2017 | Art. 177 Ley 100/1993 | Art. 15 Ley 1751/2015""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — RÉGIMEN ESPECIAL:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR COBERTURA BAJO EL MARCO NORMATIVO ESPECIAL DE {eps}."
+2. PÁRRAFO 2: Los beneficiarios del {tipo_contrato} gozan de cobertura integral conforme al marco normativo especial.
+3. CIERRE: "SE EXIGE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA Y EL PAGO DEL SERVICIO."
+NORMAS: Res. 5269/2017 | {norma_especial} | Contrato {numero_contrato}""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — URGENCIA Y COBERTURA:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR COBERTURA. LA ATENCIÓN DE {tipo_atencion} ES DE COBERTURA OBLIGATORIA."
+2. PÁRRAFO 2: El Art. 168 de la Ley 100/1993 establece que TODA IPS está obligación de prestar atención de urgencias.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. LA ESE HUS CUMPLIÓ SU DEBER LEGAL DE ATENCIÓN."
+NORMAS: Art. 168 Ley 100/1993 | Res. 5269/2017 | T-760/2008""",
+    ],
+    "CL": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+TIPO ATENCIÓN: {tipo_atencion}
+
+INSTRUCCIONES VARIANTE A — AUTONOMÍA MÉDICA:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR PERTINENCIA CLÍNICA."
+2. PÁRRAFO 2: El médico tratante es el único profesional que examina directamente al paciente (Art. 17 Ley 1751/2015).
+3. PÁRRAFO 3: La sentencia T-478/1995 protege la autonomía médica como derecho fundamental.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. SE SOLICITA CONCILIACIÓN DE AUDITORÍA MÉDICA CONJUNTA."
+NORMAS: Art. 17 Ley 1751/2015 | T-478/1995 | Art. 20 Decreto 4747/2007""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — PERTINENCIA CON HISTORIA CLÍNICA:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR PERTINENCIA CLÍNICA. LA HISTORIA CLÍNICA JUSTIFICA PLENAMENTE EL PROCEDIMIENTO."
+2. PÁRRAFO 2: El médico tratante {medico} indicó el procedimiento CUPS {cups} para el diagnóstico {diagnostico}.
+3. PÁRRAFO 3: El auditor de la EPS no examinó al paciente.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO. SE SOLICITA AUDITORÍA MÉDICA CONJUNTA."
+NORMAS: Art. 17 Ley 1751/2015 | T-478/1995 | Res. 2175/2015""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — GUÍAS DE PRÁCTICA CLÍNICA:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA DE PERTINENCIA. EL PROCEDIMIENTO SIGUE LA GUÍA DE PRÁCTICA CLÍNICA VIGENTE."
+2. PÁRRAFO 2: El procedimiento CUPS {cups} es la conducta estándar recomendada para el diagnóstico {diagnostico}.
+3. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO."
+NORMAS: Art. 17 Ley 1751/2015 | T-478/1995 | Decreto 4747/2007 Art. 20""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | MÉDICO: {medico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — PROCEDIMIENTO COMPLEJO:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR PERTINENCIA. EL PROCEDIMIENTO FUE MÉDICAMENTE NECESARIO E INDICADO."
+2. PÁRRAFO 2: La condición clínica del paciente justificó la realización del procedimiento {cups}.
+3. PÁRRAFO 3: La sentencia T-760/2008 reitera que las EPS no pueden negar servicios cuando la historia clínica soporta la indicación médica.
+4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO."
+NORMAS: Art. 17 Ley 1751/2015 | T-760/2008 | Art. 20 Decreto 4747/2007""",
+    ],
+    "FA": [
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+TIPO ATENCIÓN: {tipo_atencion}
+
+INSTRUCCIONES VARIANTE A — ERROR FORMAL SUBSANABLE:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR FACTURACIÓN."
+2. PÁRRAFO 2: El error de facturación alegado por la EPS es de naturaleza FORMAL y por tanto SUBSANABLE (Circular 030/2013).
+3. PÁRRAFO 3: Los RIPS radicados respaldan la atención prestada.
+4. CIERRE: "SE SUBSANA EL ERROR SEÑALADO Y SE EXIGE EL PAGO ÍNTEGRO DE LA FACTURA."
+NORMAS: Circular 030/2013 | Res. 866/2021 | Circular 0000022/2023""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | FECHA: {fecha_atencion} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE B — CORRECCIÓN DOCUMENTADA:
+1. INICIO: "ESE HUS NO ACEPTA GLOSA POR FACTURACIÓN. EL ERROR SEÑALADO ES SUBSANABLE Y SE CORRIGE MEDIANTE ESTE DOCUMENTO."
+2. PÁRRAFO 2: El servicio CUPS {cups} fue efectivamente prestado el {fecha_atencion}.
+3. CIERRE: "SE ALLEGA CORRECCIÓN. SE EXIGE EL PAGO ÍNTEGRO DEL SERVICIO CORREGIDO."
+NORMAS: Circular 030/2013 | Art. 13 Ley 1122/2007 | Res. 866/2021""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | FECHA: {fecha_atencion} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE C — FACTURA ELECTRÓNICA:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR FACTURACIÓN. LA FACTURA ELECTRÓNICA FUE EXPEDIDA CONFORME A LA NORMATIVA VIGENTE."
+2. PÁRRAFO 2: La factura electrónica fue expedida conforme a la Circular 0000022/2023.
+3. CIERRE: "SE ADJUNTA NOTE DE CORRECCIÓN ELECTRÓNICA. SE EXIGE PAGO ÍNTEGRO."
+NORMAS: Circular 0000022/2023 | Circular 030/2013 | Res. 866/2021""",
+        """GLOSA: {texto_glosa}
+CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
+CUPS: {cups} | DX: {diagnostico} | TIPO ATENCIÓN: {tipo_atencion}
+
+SOPORTES:
+{contexto_pdf}
+
+INSTRUCCIONES VARIANTE D — ERROR DE CÓDIGO O DUPLICADO:
+1. INICIO: "ESE HUS RECHAZA LA GLOSA POR FACTURACIÓN. NO SE TRATA DE UN COBRO DUPLICADO NI DE UN ERRQR DE CÓDIGO INVALIDANTE."
+2. PÁRRAFO 2: El CUPS {cups} facturado corresponde exactamente al procedimiento realizado.
+3. CIERRE: "SE EXIGE EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LA FACTURA."
+NORMAS: Circular 030/2013 | Res. 866/2021 | Art. 56 Ley 1438/2011""",
+    ],
+}
+
+FALLBACK_SIN_SOPORTES = (
+    "NO SE APORTARON DOCUMENTOS COMPLEMENTARIOS. EL REGISTRO CLÍNICO INSTITUCIONAL "
+    "RESPALDA ÍNTEGRAMENTE LA ATENCIÓN PRESTADA. LA HISTORIA CLÍNICA (RES. 1995/1999) Y "
+    "LOS RIPS (RES. 866/2021) DAN CUENTA DE LA PRESTACIÓN. SE EXIGE EL PAGO ÍNTEGRO. "
+    "CARTERA@HUS.GOV.CO | GLOSASYDEVOLUCIONES@HUS.GOV.CO"
+)
+
+
+def build_user_prompt(
+    texto_glosa: str,
+    contexto_pdf: str,
+    codigo: str,
+    eps: str,
+    numero_factura: Optional[str] = None,
+    numero_radicado: Optional[str] = None,
+    dias_habiles: Optional[int] = None,
+    es_extemporanea: bool = False,
+    variante: int = -1,
+) -> str:
+    tipo_atencion = extraer_tipo_atencion(contexto_pdf, texto_glosa)
+    datos = extraer_datos_soporte(contexto_pdf)
+    cups        = datos["cups"]
+    diagnostico = datos["diagnostico"]
+    medico      = datos["medico"]
+    fecha       = datos["fecha_atencion"]
+    servicio    = datos["servicio"]
+    hay_soportes = tiene_soportes_reales(contexto_pdf)
+
+    contrato = get_contrato(eps)
+    numero_contrato = contrato["numero"]
+    tarifa          = contrato["tarifa"]
+    tipo_contrato   = contrato["tipo"]
+
+    norma_especial_map = {
+        "PPL":    "Res. 5159/2015 + Ley 1709/2014",
+        "FOMAG":  "Decreto 3752/2003",
+        "POLICIA NACIONAL": "Acuerdo 002/2001 Consejo Superior de Salud FF.MM.",
+        "DISPENSARIO": "Acuerdo 002/2001 Consejo Superior de Salud FF.MM.",
     }
-    prefijo = codigo[:2] if codigo and len(codigo) >= 2 else "TARIFAS"
-    tipo_nombre = tipo_glosa_map.get(prefijo, "TARIFAS")
+    norma_especial = "Ley 100/1993 Art. 177"
+    for k, v in norma_especial_map.items():
+        if k in eps.upper():
+            norma_especial = v
+            break
 
-    factura_info = f"Factura: {numero_factura}" if numero_factura else ""
-    radicado_info = f"Radicado: {numero_radicado}" if numero_radicado else ""
-    trazabilidad = " | ".join(filter(None, [factura_info, radicado_info]))
+    partes = []
+    if numero_factura:  partes.append(f"Factura: {numero_factura}")
+    if numero_radicado: partes.append(f"Radicado: {numero_radicado}")
+    trazabilidad = " | ".join(partes) if partes else "SIN DATOS DE TRAZABILIDAD"
 
-    contexto_tiempo = ""
     if dias_habiles is not None:
         if es_extemporanea:
-            contexto_tiempo = f"\n⚠️ GLOSA EXTEMPORÁNEA ({dias_habiles} días hábiles - límite: 20)."
+            contexto_tiempo = f"⚠ GLOSA EXTEMPORÁNEA ({dias_habiles} días hábiles — límite: 20)"
+            plazo_dias = str(dias_habiles)
         else:
-            contexto_tiempo = f"\n✓ DENTRO DE TÉRMINOS ({dias_habiles} días hábiles)."
+            contexto_tiempo = f"✓ DENTRO DE TÉRMINOS ({dias_habiles} días hábiles)"
+            plazo_dias = str(dias_habiles)
+    else:
+        contexto_tiempo = "FECHAS NO INGRESADAS"
+        plazo_dias = "N/D"
 
-    soportes = ""
-    if contexto_pdf:
-        soportes = f"\n\nSOPORTES PDF:\n{contexto_pdf[:3000]}"
+    if "URGENCIA" in tipo_atencion:
+        condicional_urgencia = (
+            "EN URGENCIAS LA DOCUMENTACIÓN PUEDE TRAMITARSE CON POSTERIORIDAD A LA ATENCIÓN "
+            "(ART. 168 LEY 100/1993). LA FALTA DE ORDEN MÉDICA PREVIA NO APLICA EN URGENCIAS VITALES."
+        )
+        condicional_urgencia_corto = "atención de urgencias"
+    else:
+        condicional_urgencia = (
+            f"EN {tipo_atencion} TODOS LOS DOCUMENTOS EXIGIDOS OBRAN EN EL EXPEDIENTE "
+            "CONFORME A LA RESOLUCIÓN 3047/2008."
+        )
+        condicional_urgencia_corto = f"atención de {tipo_atencion.lower()}"
 
-    soporte = contexto_pdf[:3000] if contexto_pdf else FALLBACK
-    return f"""GLOSA: {texto_glosa}
-CODIGO: {codigo} | TIPO: {tipo_nombre} | {trazabilidad}{contexto_tiempo}
-TIPO ATENCION: {tipo_atencion} | CUPS: {cups}
-SOPORTES: {soporte}
+    prefijo = (codigo[:2].upper() if codigo and len(codigo) >= 2 else "FA")
+    if prefijo not in _VARIANTES:
+        prefijo = "FA"
 
-REGLAS: 1) Si contexto dice CONSULTA -> NO URGENCIAS. Usar tipo_atencion={tipo_atencion}. 2) Cerrar con "SE EXIGE PAGO INTEGRO CUPS {cups}"
+    if variante == -1:
+        if not hay_soportes:
+            idx = 0
+        elif cups != "NO IDENTIFICADO" and medico != "NO IDENTIFICADO":
+            idx = 1
+        elif cups != "NO IDENTIFICADO":
+            idx = 2
+        else:
+            idx = 3
+    else:
+        idx = max(0, min(3, variante))
 
-FORMATO:
-<servicio>{cups}</servicio>
-<argumento>ESE HUS NO ACEPTA GLOSA POR {tipo_nombre}. Tipo={tipo_atencion} CUPS={cups}. SE EXIGE PAGO INTEGRO CUPS {cups}</argumentado
-<normas>Ley Art</normas>"""
+    template = _VARIANTES[prefijo][idx]
+    ctx_pdf_truncado = (contexto_pdf[:4000] if contexto_pdf else FALLBACK_SIN_SOPORTES)
+
+    return template.format(
+        texto_glosa        = texto_glosa,
+        codigo             = codigo,
+        eps                = eps,
+        trazabilidad       = trazabilidad,
+        contexto_tiempo    = contexto_tiempo,
+        numero_contrato    = numero_contrato,
+        tarifa             = tarifa,
+        tipo_contrato      = tipo_contrato,
+        norma_especial     = norma_especial,
+        tipo_atencion      = tipo_atencion,
+        cups               = cups,
+        diagnostico        = diagnostico,
+        medico             = medico,
+        fecha_atencion     = fecha,
+        servicio           = servicio,
+        contexto_pdf       = ctx_pdf_truncado,
+        plazo_dias         = plazo_dias,
+        condicional_urgencia      = condicional_urgencia,
+        condicional_urgencia_corto= condicional_urgencia_corto,
+    )
+
+
+def build_all_variants(
+    texto_glosa: str,
+    contexto_pdf: str,
+    codigo: str,
+    eps: str,
+    numero_factura: Optional[str] = None,
+    numero_radicado: Optional[str] = None,
+    dias_habiles: Optional[int] = None,
+    es_extemporanea: bool = False,
+) -> list[str]:
+    return [
+        build_user_prompt(
+            texto_glosa, contexto_pdf, codigo, eps,
+            numero_factura, numero_radicado, dias_habiles, es_extemporanea,
+            variante=i
+        )
+        for i in range(4)
+    ]
