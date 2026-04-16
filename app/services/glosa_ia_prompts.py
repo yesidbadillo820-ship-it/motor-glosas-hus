@@ -17,7 +17,7 @@ FOMAG (Fiduprevisora)      12076-359-2025              SOAT – 15 %
 POLICÍA NAL. (Med/Alta)    068-5-200004-26 (SFI 004)  UVB – 8 %
 POLICÍA NAL. (Oncología)   068-5-200006-26             Inst. HUS
 SUMIMEDICAL                Tarifario 2025              SOAT – 15 %
-DISPENSARIO MÉD. (DMBUG)   440-DIGSA/DMBUG-2025       SOAT – 15 %
+DISPENSARIO MÉD. (DMBUG)   440-DIGSA/DMBUG-2025       SOAT/SMLV – 20 %
 SALUD MIA                  CSA2025EVE3A005             SOAT – 15 %
 PRECIMED                   Contrato 319 de 2024        SOAT – 15 %
 AURORA (ARL/Vida)          Minuta ARL firmada 2024     SOAT pleno
@@ -124,13 +124,13 @@ CONTRATOS_HUS: dict[str, dict] = {
     },
     "DISPENSARIO MEDICO": {
         "numero":   "CONTRATO No. 440-DIGSA/DMBUG-2025 (Proceso CD477)",
-        "tarifa":   "SOAT -15 % (Factor homologación CUPS-SOAT HUS)",
-        "factor":   0.85,
+        "tarifa":   "SOAT/SMLV -20 % (Manual tarifario homologado SOAT-SMLV con descuento del 20%)",
+        "factor":   0.80,
         "tipo":     "FUERZAS MILITARES — EJÉRCITO NACIONAL",
         "nit":      "901.541.137-1",
         "vigencia": "Dic 2025 – Jul 2026 o hasta agotar presupuesto",
         "contacto": "DIRECCIÓN DE SANIDAD EJÉRCITO — DISPENSARIO MÉDICO BUCARAMANGA | gerencia@hus.gov.co",
-        "nota":     "Contrato interadministrativo. Valor: $3.235.050.000 M/CTE. Cobertura: servicios de salud mediana y alta complejidad para afiliados Fuerzas Militares Regional 2. Objeto idéntico al ACUERDO 002 del 27-04-2001 del Consejo Superior de Salud FF.MM.",
+        "nota":     "Contrato interadministrativo. Valor: $3.235.050.000 M/CTE. Cobertura: servicios de salud mediana y alta complejidad para afiliados Fuerzas Militares Regional 2. Tarifa pactada: SOAT/SMLV -20%. Objeto idéntico al ACUERDO 002 del 27-04-2001 del Consejo Superior de Salud FF.MM.",
     },
     "SALUD MIA": {
         "numero":   "CONTRATO CSA2025EVE3A005",
