@@ -492,13 +492,15 @@ class GlosaService:
                         {"role": "system", "content": system},
                         {"role": "user", "content": user}
                     ],
-                    model="llama-3.3-70b-versatile",
+                    # gpt-oss-120b: 80% más rápido, 4x más barato y menor tasa de
+                    # alucinación que llama-3.3 en seguimiento de instrucciones legales.
+                    model="openai/gpt-oss-120b",
                     temperature=0.15,
                     max_tokens=2500,
                     timeout=80.0,
                 )
                 content = resp.choices[0].message.content
-                return content, "groq/llama-3.3"
+                return content, "groq/gpt-oss-120b"
             except Exception as e:
                 ultimo_error = e
                 error_msg = str(e).lower()
