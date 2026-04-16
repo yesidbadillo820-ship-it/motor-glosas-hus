@@ -212,21 +212,21 @@ async def lifespan(app: FastAPI):
         # para que cada gestor vea sus asignaciones (matching ILIKE).
         USUARIOS_CORPORATIVOS = [
             ("glosashus09@sinacsc.com",      "SUPER_ADMIN", "YESID PEREZ"),
-            ("glosashus11@sinacsc.com",      "AUDITOR",     "DIANEYDA"),
-            ("glosashus02@sinacsc.com",      "AUDITOR",     "CAROLINA"),
-            ("glosashus04@sinacsc.com",      "AUDITOR",     "JHON"),
-            ("glosashus05@sinacsc.com",      "AUDITOR",     "MARICELA"),
-            ("carterahus01@sinacsc.com",     "AUDITOR",     "IRMA"),
-            ("radicadevoluciones@sinacsc.com","AUDITOR",    "KAREN"),
+            ("glosashus11@sinacsc.com",      "AUDITOR",     "DIANEYDA QUINTERO"),
+            ("glosashus02@sinacsc.com",      "AUDITOR",     "CAROLINA CIFUENTES"),
+            ("glosashus04@sinacsc.com",      "AUDITOR",     "JHON JAIMES"),
+            ("glosashus05@sinacsc.com",      "AUDITOR",     "MARICELA ROJAS"),
+            ("carterahus01@sinacsc.com",     "AUDITOR",     "IRMA RIOS"),
+            ("radicadevoluciones@sinacsc.com","AUDITOR",    "KAREN ORTIZ"),
             ("devoluciones01@sinacsc.com",   "AUDITOR",     "YUDY"),
             ("coordinacioncartera@hus.gov.co","AUDITOR",    "YUDY"),
             ("glosashus08@sinacsc.com",      "AUDITOR",     "CLAUDIA"),
-            ("glosashus07@sinacsc.com",      "AUDITOR",     "YENFERSON"),
+            ("glosashus07@sinacsc.com",      "AUDITOR",     "YENFERSON ORTEGA"),
             ("carterahus04@sinacsc.com",     "AUDITOR",     "MILENA"),
-            ("glosashus12@sinacsc.com",      "AUDITOR",     "A_A_A_A"),
-            ("devoluciones02@sinacsc.com",   "AUDITOR",     "A_A_A_A"),
-            ("glosashus10@sinacsc.com",      "AUDITOR",     "A_A_A_A"),
-            ("glosashus16@sinacsc.com",      "AUDITOR",     "A_A_A_A"),
+            ("glosashus12@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            ("devoluciones02@sinacsc.com",   "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            ("glosashus10@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            ("glosashus16@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
         ]
         password_hash_default = get_password_hash(cfg.admin_password)
         for email, rol, nombre in USUARIOS_CORPORATIVOS:
