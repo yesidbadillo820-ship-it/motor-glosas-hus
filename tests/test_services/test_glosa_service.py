@@ -79,29 +79,24 @@ class TestGenerarTextoInjustificada:
 
 
 class TestPlantillas:
-    """Tests for glosa response templates."""
+    """Tests for glosa response templates lookup.
 
-    def test_obtener_plantilla_ta0201(self):
-        """TA0201 should return tariff template."""
-        plantilla = obtener_plantilla_por_codigo("TA0201")
-        assert plantilla is not None
-        assert "plantilla" in plantilla
-
-    def test_obtener_plantilla_so0101(self):
-        """SO0101 should return supports template."""
-        plantilla = obtener_plantilla_por_codigo("SO0101")
-        assert plantilla is not None
-        assert "TARIFA INSTITUCIONAL" in plantilla["plantilla"] or "orden" in plantilla["plantilla"].lower()
-
-    def test_obtener_plantilla_mayusculas(self):
-        """Should find template regardless of case."""
-        plantilla = obtener_plantilla_por_codigo("ta0201")
-        assert plantilla is not None
+    Built-in PLANTILLAS_CODIGO is intentionally empty — plantillas are stored
+    in the database and managed through PlantillaRepository. The code-level
+    lookup returns None for every key so the service falls back to IA.
+    """
 
     def test_obtener_plantilla_inexistente(self):
-        """Should return None for non-existent code."""
-        plantilla = obtener_plantilla_por_codigo("ZZ9999")
-        assert plantilla is None
+        """Should return None for any code when no built-ins are registered."""
+        assert obtener_plantilla_por_codigo("ZZ9999") is None
+
+    def test_obtener_plantilla_ta0201_devuelve_none(self):
+        """TA0201 has no built-in template — expect None (DB-managed)."""
+        assert obtener_plantilla_por_codigo("TA0201") is None
+
+    def test_obtener_plantilla_mayusculas(self):
+        """Lookup should be case-insensitive."""
+        assert obtener_plantilla_por_codigo("ta0201") == obtener_plantilla_por_codigo("TA0201")
 
 
 class TestExtraccionCodigo:
