@@ -335,6 +335,7 @@ textarea{resize:vertical;min-height:80px}
   <div class="nav-bar">
     <button class="nb active" onclick="tab(this,'analizar')">Analizar</button>
     <button class="nb" onclick="tab(this,'dashboard')">Dashboard</button>
+    <button class="nb" onclick="tab(this,'mis-glosas')">📋 Mis Glosas <span class="nb-badge" id="mis-badge" style="display:none">0</span></button>
     <button class="nb" onclick="tab(this,'historial')">Historial</button>
     <button class="nb" onclick="tab(this,'alertas')">Alertas <span class="nb-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="nb" onclick="tab(this,'contratos')">Contratos</button>
@@ -429,6 +430,61 @@ textarea{resize:vertical;min-height:80px}
     </div>
 
     <!-- HISTORIAL -->
+    <!-- MIS GLOSAS -->
+    <div class="panel" id="p-mis-glosas">
+      <div style="padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+          <div>
+            <h2 style="margin:0;color:#0e1f3d;font-size:20px">📋 Mis glosas pendientes</h2>
+            <p style="margin:4px 0 0;color:#6b7280;font-size:13px" id="mis-subtitle">Glosas asignadas a ti según el archivo de recepción.</p>
+          </div>
+          <div>
+            <label id="mis-todas-label" style="display:none;font-size:12px;color:#374151;cursor:pointer">
+              <input type="checkbox" id="mis-todas" onchange="loadMisGlosas()"/> Ver todas (admin)
+            </label>
+            <button class="btn btn-ghost" onclick="loadMisGlosas()">Actualizar</button>
+          </div>
+        </div>
+
+        <div id="mis-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px">
+          <div style="background:#16a34a;color:white;border-radius:8px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:bold" id="mis-v">0</div><div style="font-size:11px">🟢 VERDE</div>
+          </div>
+          <div style="background:#eab308;color:white;border-radius:8px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:bold" id="mis-a">0</div><div style="font-size:11px">🟡 AMARILLO</div>
+          </div>
+          <div style="background:#dc2626;color:white;border-radius:8px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:bold" id="mis-r">0</div><div style="font-size:11px">🔴 ROJO</div>
+          </div>
+          <div style="background:#111827;color:white;border-radius:8px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:bold" id="mis-n">0</div><div style="font-size:11px">⚫ VENCIDAS</div>
+          </div>
+        </div>
+
+        <div style="background:white;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:#f3f4f6;text-align:left">
+                <th style="padding:10px">Gestor</th>
+                <th style="padding:10px">EPS</th>
+                <th style="padding:10px">Factura</th>
+                <th style="padding:10px">Consec.</th>
+                <th style="padding:10px;text-align:right">Valor</th>
+                <th style="padding:10px">Vence</th>
+                <th style="padding:10px">Días</th>
+                <th style="padding:10px">Estado</th>
+                <th style="padding:10px">Semáforo</th>
+                <th style="padding:10px">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="mis-body">
+              <tr><td colspan="10" style="padding:30px;text-align:center;color:#6b7280">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="p-historial">
       <div class="hist-area">
         <div class="hist-toolbar">
@@ -690,9 +746,10 @@ async function doLogin(){
       err.style.display='block';
     } else {
       var d=await r.json();
-      TOKEN=d.access_token;USER_NAME=d.nombre||email;
+      TOKEN=d.access_token;USER_NAME=d.nombre||email;USER_ROL=d.rol||'';
       localStorage.setItem('hus_token',TOKEN);
       localStorage.setItem('hus_user',USER_NAME);
+      localStorage.setItem('hus_rol',USER_ROL);
       initApp();
     }
   } catch(e){err.textContent='Error de conexión con el servidor';err.style.display='block';}
@@ -700,8 +757,8 @@ async function doLogin(){
 }
 
 function logout(){
-  TOKEN='';USER_NAME='';
-  localStorage.removeItem('hus_token');localStorage.removeItem('hus_user');
+  TOKEN='';USER_NAME='';USER_ROL='';
+  localStorage.removeItem('hus_token');localStorage.removeItem('hus_user');localStorage.removeItem('hus_rol');
   document.getElementById('app').classList.remove('show');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-email').value='';
@@ -717,6 +774,7 @@ async function initApp(){
   loadAlertCount();
   loadDash();
   loadHist(1);
+  loadMisGlosas();
   checkHealth();
   setInterval(checkHealth,30000);
 }
@@ -752,6 +810,82 @@ function tab(btn,id){
   if(id==='usuarios') loadUsuarios();
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
+  if(id==='mis-glosas') loadMisGlosas();
+}
+
+// ─── MIS GLOSAS ───────────────────────────────────────────────────────────
+var USER_ROL = localStorage.getItem('hus_rol') || '';
+async function loadMisGlosas(){
+  var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
+  var url = '/glosas/mis-asignaciones' + (todas ? '?todas=true' : '');
+  var body = document.getElementById('mis-body');
+  body.innerHTML = '<tr><td colspan="10" style="padding:30px;text-align:center;color:#6b7280">Cargando...</td></tr>';
+  try{
+    var r = await fetch(url, {headers: authH()});
+    if(r.status === 401){ alert('Sesión expirada'); return; }
+    var data = await r.json();
+    var counts = {VERDE:0,AMARILLO:0,ROJO:0,NEGRO:0};
+    data.forEach(function(g){ if(counts[g.prioridad] !== undefined) counts[g.prioridad]++; });
+    document.getElementById('mis-v').textContent = counts.VERDE;
+    document.getElementById('mis-a').textContent = counts.AMARILLO;
+    document.getElementById('mis-r').textContent = counts.ROJO;
+    document.getElementById('mis-n').textContent = counts.NEGRO;
+
+    var badge = document.getElementById('mis-badge');
+    if(data.length > 0){
+      badge.style.display = 'inline-block';
+      badge.textContent = data.length;
+    } else {
+      badge.style.display = 'none';
+    }
+
+    // Mostrar toggle "ver todas" si es admin/coordinador
+    if(USER_ROL === 'SUPER_ADMIN' || USER_ROL === 'COORDINADOR'){
+      document.getElementById('mis-todas-label').style.display = 'inline-block';
+    }
+
+    if(data.length === 0){
+      body.innerHTML = '<tr><td colspan="10" style="padding:30px;text-align:center;color:#6b7280">No tienes glosas asignadas. Si esperabas ver alguna, pídele a un administrador que revise el campo "Nombre" de tu usuario — debe coincidir con el valor de la columna GESTOR del Excel (ej: "YESID PEREZ").</td></tr>';
+      return;
+    }
+
+    var colores = {VERDE:'#16a34a',AMARILLO:'#eab308',ROJO:'#dc2626',NEGRO:'#111827'};
+    body.innerHTML = data.map(function(g){
+      var color = colores[g.prioridad] || '#6b7280';
+      var vence = g.fecha_vencimiento ? new Date(g.fecha_vencimiento).toLocaleDateString('es-CO') : 'N/A';
+      var valor = (g.valor_objetado || 0).toLocaleString('es-CO', {minimumFractionDigits:0, maximumFractionDigits:0});
+      return '<tr style="border-top:1px solid #f3f4f6">' +
+        '<td style="padding:10px;font-size:12px">' + (g.gestor_nombre || '-') + '</td>' +
+        '<td style="padding:10px;font-size:12px">' + (g.eps || '-') + '</td>' +
+        '<td style="padding:10px;font-size:12px;font-family:monospace">' + (g.factura || '-') + '</td>' +
+        '<td style="padding:10px;font-size:12px;font-family:monospace">' + (g.consecutivo_dgh || '-') + '</td>' +
+        '<td style="padding:10px;text-align:right;font-weight:bold">$' + valor + '</td>' +
+        '<td style="padding:10px;font-size:12px">' + vence + '</td>' +
+        '<td style="padding:10px;text-align:center;font-weight:bold">' + (g.dias_restantes || 0) + '</td>' +
+        '<td style="padding:10px;font-size:11px"><span style="background:#eff6ff;color:#1e40af;padding:2px 8px;border-radius:4px">' + (g.estado || '-') + '</span></td>' +
+        '<td style="padding:10px"><span style="background:' + color + ';color:white;padding:2px 8px;border-radius:4px;font-size:11px">' + (g.prioridad || '-') + '</span></td>' +
+        '<td style="padding:10px"><button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="verGlosa(' + g.id + ')">Ver / Responder</button></td>' +
+        '</tr>';
+    }).join('');
+  }catch(e){
+    body.innerHTML = '<tr><td colspan="10" style="padding:20px;color:#991b1b">Error: ' + e.message + '</td></tr>';
+  }
+}
+
+async function verGlosa(id){
+  try{
+    var r = await fetch('/glosas/' + id, {headers: authH()});
+    if(!r.ok){ alert('No se pudo cargar la glosa'); return; }
+    var g = await r.json();
+    var w = window.open('', '_blank', 'width=900,height=700');
+    w.document.write('<html><head><title>Glosa ' + id + '</title><meta charset="utf-8"><style>body{font-family:Segoe UI,Arial;padding:20px;background:#f3f4f6}</style></head><body>' +
+      '<h2>Glosa #' + id + ' — ' + (g.eps || '') + '</h2>' +
+      '<p><b>Factura:</b> ' + (g.factura || '-') + ' | <b>Código:</b> ' + (g.codigo_glosa || '-') + ' | <b>Valor objetado:</b> $' + (g.valor_objetado || 0).toLocaleString('es-CO') + '</p>' +
+      '<hr>' +
+      (g.dictamen || '<p>Sin dictamen</p>') +
+      '</body></html>');
+    w.document.close();
+  }catch(e){ alert('Error: ' + e.message); }
 }
 
 // ─── FORM ─────────────────────────────────────────────────────────────────

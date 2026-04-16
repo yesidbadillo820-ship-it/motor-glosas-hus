@@ -117,3 +117,4 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type:   str = "bearer"
     nombre:       str
+    rol:          Optional[str] = None

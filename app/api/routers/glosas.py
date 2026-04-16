@@ -451,12 +451,26 @@ def semaforo(
 
 @router.get("/mis-asignaciones")
 def mis_asignaciones(
+    todas: bool = False,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Lista las glosas asignadas al usuario actual (por email o nombre de gestor)."""
+    """Lista las glosas asignadas al usuario actual.
+
+    Los SUPER_ADMIN y COORDINADOR pueden pasar `?todas=true` para ver todas.
+    """
     repo = GlosaRepository(db)
-    glosas = repo.listar_por_gestor(current_user.email)
+    if todas and current_user.rol in ("SUPER_ADMIN", "COORDINADOR"):
+        from app.models.db import GlosaRecord as _GR
+        glosas = (
+            db.query(_GR)
+            .filter(_GR.estado.notin_(["LEVANTADA", "CONCILIADA"]))
+            .order_by(_GR.dias_restantes.asc())
+            .limit(500)
+            .all()
+        )
+    else:
+        glosas = repo.listar_por_gestor(current_user.email, current_user.nombre)
     return [
         {
             "id": g.id,
@@ -471,6 +485,7 @@ def mis_asignaciones(
             "fecha_vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
             "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
             "radicado_info": g.radicado_info,
+            "dictamen": g.dictamen,
         }
         for g in glosas
     ]
