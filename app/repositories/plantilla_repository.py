@@ -51,3 +51,35 @@ class PlantillaRepository:
             self.db.commit()
             return True
         return False
+
+    def get_plantilla_eps(self, eps: str, tipo: str) -> Optional[str]:
+        """Busca plantilla específica para EPS+tipo, luego fallback por tipo, luego TODAS."""
+        if not eps:
+            return None
+        
+        eps_upper = eps.upper()
+        
+        # 1. Plantilla exacta EPS + tipo
+        rec = self.db.query(PlantillaRecord).filter(
+            PlantillaRecord.eps.ilike(f"%{eps_upper}%"),
+            PlantillaRecord.tipo == tipo,
+            PlantillaRecord.activa == 1
+        ).first()
+        if rec:
+            return rec.plantilla
+        
+        # 2. Fallback: plantilla genérica para el tipo (sin EPS específica)
+        rec = self.db.query(PlantillaRecord).filter(
+            PlantillaRecord.eps == "",
+            PlantillaRecord.tipo == tipo,
+            PlantillaRecord.activa == 1
+        ).first()
+        if rec:
+            return rec.plantilla
+        
+        # 3. Fallback global
+        rec = self.db.query(PlantillaRecord).filter(
+            PlantillaRecord.tipo == "FALLBACK",
+            PlantillaRecord.activa == 1
+        ).first()
+        return rec.plantilla if rec else None
