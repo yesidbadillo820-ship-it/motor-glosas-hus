@@ -763,7 +763,7 @@ function setEtapa(el){
 // ─── CONTRATOS ────────────────────────────────────────────────────────────
 async function loadContratos(){
   try{
-    var r=await fetch('/contratos',{headers:authH()});
+    var r=await fetch('/contratos/',{headers:authH()});
     var data=await r.json();
     var sel=document.getElementById('eps-sel');
     var hEps=document.getElementById('h-eps');
@@ -935,7 +935,7 @@ function hideLoading(){
 var charts={};
 async function loadDash(){
   try{
-    var r=await fetch('/analytics',{headers:authH()});
+    var r=await fetch('/analytics/',{headers:authH()});
     var a=await r.json();
     document.getElementById('k-total').textContent=a.glosas_mes.toLocaleString('es-CO');
     document.getElementById('k-obj').textContent=cop(a.valor_objetado_mes);
