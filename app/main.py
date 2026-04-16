@@ -208,23 +208,25 @@ async def lifespan(app: FastAPI):
 
         # Sembrar usuarios corporativos de gestores de glosas
         # Contraseña inicial: ADMIN_PASSWORD (cambiar en primer login)
+        # El 'nombre' debe coincidir con la columna GESTOR del Excel de recepción
+        # para que cada gestor vea sus asignaciones (matching ILIKE).
         USUARIOS_CORPORATIVOS = [
-            ("glosashus09@sinacsc.com",      "SUPER_ADMIN", "Gestor Glosas 09 (Admin)"),
-            ("glosashus11@sinacsc.com",      "AUDITOR",     "Gestor Glosas 11"),
-            ("carterahus04@sinacsc.com",     "AUDITOR",     "Cartera HUS 04"),
-            ("glosashus02@sinacsc.com",      "AUDITOR",     "Gestor Glosas 02"),
-            ("glosashus04@sinacsc.com",      "AUDITOR",     "Gestor Glosas 04"),
-            ("glosashus05@sinacsc.com",      "AUDITOR",     "Gestor Glosas 05"),
-            ("carterahus01@sinacsc.com",     "AUDITOR",     "Cartera HUS 01"),
-            ("glosashus12@sinacsc.com",      "AUDITOR",     "Gestor Glosas 12"),
-            ("devoluciones02@sinacsc.com",   "AUDITOR",     "Devoluciones 02"),
-            ("glosashus10@sinacsc.com",      "AUDITOR",     "Gestor Glosas 10"),
-            ("glosashus16@sinacsc.com",      "AUDITOR",     "Gestor Glosas 16"),
-            ("radicadevoluciones@sinacsc.com","AUDITOR",    "Radica Devoluciones"),
-            ("devoluciones01@sinacsc.com",   "AUDITOR",     "Devoluciones 01"),
-            ("coordinacioncartera@hus.gov.co","AUDITOR",    "Coordinación Cartera"),
-            ("glosashus08@sinacsc.com",      "AUDITOR",     "Gestor Glosas 08"),
-            ("glosashus07@sinacsc.com",      "AUDITOR",     "Gestor Glosas 07"),
+            ("glosashus09@sinacsc.com",      "SUPER_ADMIN", "YESID PEREZ"),
+            ("glosashus11@sinacsc.com",      "AUDITOR",     "DIANEYDA"),
+            ("glosashus02@sinacsc.com",      "AUDITOR",     "CAROLINA"),
+            ("glosashus04@sinacsc.com",      "AUDITOR",     "JHON"),
+            ("glosashus05@sinacsc.com",      "AUDITOR",     "MARICELA"),
+            ("carterahus01@sinacsc.com",     "AUDITOR",     "IRMA"),
+            ("radicadevoluciones@sinacsc.com","AUDITOR",    "KAREN"),
+            ("devoluciones01@sinacsc.com",   "AUDITOR",     "YUDY"),
+            ("coordinacioncartera@hus.gov.co","AUDITOR",    "YUDY"),
+            ("glosashus08@sinacsc.com",      "AUDITOR",     "CLAUDIA"),
+            ("glosashus07@sinacsc.com",      "AUDITOR",     "YENFERSON"),
+            ("carterahus04@sinacsc.com",     "AUDITOR",     "MILENA"),
+            ("glosashus12@sinacsc.com",      "AUDITOR",     "A_A_A_A"),
+            ("devoluciones02@sinacsc.com",   "AUDITOR",     "A_A_A_A"),
+            ("glosashus10@sinacsc.com",      "AUDITOR",     "A_A_A_A"),
+            ("glosashus16@sinacsc.com",      "AUDITOR",     "A_A_A_A"),
         ]
         password_hash_default = get_password_hash(cfg.admin_password)
         for email, rol, nombre in USUARIOS_CORPORATIVOS:
@@ -237,10 +239,17 @@ async def lifespan(app: FastAPI):
                     rol=rol,
                     activo=1,
                 ))
-                logger.warning(f"Usuario sembrado: {email} ({rol})")
-            elif existente.rol != rol:
-                logger.warning(f"Actualizando rol de {email}: {existente.rol} -> {rol}")
-                existente.rol = rol
+                logger.warning(f"Usuario sembrado: {email} ({rol}) nombre={nombre}")
+            else:
+                cambios = []
+                if existente.rol != rol:
+                    cambios.append(f"rol {existente.rol}->{rol}")
+                    existente.rol = rol
+                if existente.nombre != nombre:
+                    cambios.append(f"nombre '{existente.nombre}'->'{nombre}'")
+                    existente.nombre = nombre
+                if cambios:
+                    logger.warning(f"Usuario {email} actualizado: {', '.join(cambios)}")
 
         db.commit()
         logger.info("Base de datos inicializada correctamente")
