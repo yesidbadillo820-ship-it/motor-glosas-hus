@@ -36,22 +36,84 @@ from app.api.deps import get_usuario_actual
 from app.services.glosa_ia_prompts import get_contrato
 
 
-def _descripcion_servicio(codigo_glosa: str) -> str:
-    """Devuelve una descripción del servicio según el prefijo del código de glosa."""
+def _detectar_servicio_desde_texto(texto_glosa: str, contexto_pdf: str = "") -> Optional[str]:
+    """Intenta extraer el nombre del servicio/procedimiento y el CUPS desde el texto
+    de la glosa y/o los soportes adjuntos.
+
+    Retorna una cadena tipo "ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA (CUPS 898040)"
+    cuando puede identificarlo; None en caso contrario.
+    """
+    if not texto_glosa and not contexto_pdf:
+        return None
+    fuente = f"{texto_glosa}\n{contexto_pdf}".upper()
+
+    # 1. Buscar CUPS (código numérico de 5-6 dígitos)
+    cups_match = re.search(r"\b(\d{5,6})\b", fuente)
+    cups = cups_match.group(1) if cups_match else None
+
+    # 2. Buscar una descripción de servicio después de palabras clave comunes
+    desc = None
+    patrones = [
+        # Servicio explícito con etiqueta previa
+        r"(?:SERVICIO|PROCEDIMIENTO|DESCRIPCI[ÓO]N\s+DEL\s+SERVICIO|ACTIVIDAD)\s*[:\-]\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 ,\-/]{5,70})",
+        # Menciones clínicas típicas (cortadas antes de signos de puntuación o fin de oración)
+        r"\b(CONSULTA\s+(?:DE|EN|EXTERNA|CONTROL|URGENCIA|ESPECIALIZADA)[A-ZÁÉÍÓÚÑ ,\-]{0,50})",
+        r"\b(CIRUG[ÍI]A\s+(?:DE|POR|LAPAROSC[ÓO]PICA|ABIERTA)[A-ZÁÉÍÓÚÑ ,\-]{0,50})",
+        r"\b(ESTUDIO\s+(?:DE|DEL|POR|EN)[A-ZÁÉÍÓÚÑ ,\-]{5,60})",
+        r"\b(TOMOGRAF[ÍI]A\s+[A-ZÁÉÍÓÚÑ ,\-]{3,50})",
+        r"\b(RESONANCIA\s+[A-ZÁÉÍÓÚÑ ,\-]{3,50})",
+        r"\b(ECOGRAF[ÍI]A\s+[A-ZÁÉÍÓÚÑ ,\-]{3,50})",
+        r"\b(BIOPSIA\s+[A-ZÁÉÍÓÚÑ ,\-]{0,50})",
+        r"\b(RADIOGRAF[ÍI]A\s+[A-ZÁÉÍÓÚÑ ,\-]{3,50})",
+        r"\b(HEMOGRAMA[A-ZÁÉÍÓÚÑ ,\-]{0,40})",
+        r"\b(HOSPITALIZACI[ÓO]N\s+[A-ZÁÉÍÓÚÑ ,\-]{0,50})",
+        r"\b(CRANEOTOM[ÍI]A[A-ZÁÉÍÓÚÑ ,\-]{0,60})",
+        r"\b(APENDICECTOM[ÍI]A[A-ZÁÉÍÓÚÑ ,\-]{0,40})",
+        r"\b(COLECISTECTOM[ÍI]A[A-ZÁÉÍÓÚÑ ,\-]{0,40})",
+    ]
+    for pat in patrones:
+        m = re.search(pat, fuente)
+        if m:
+            desc = (m.group(1) if m.groups() else m.group(0)).strip()
+            # Cortar en separadores que indican fin natural de la descripción
+            desc = re.split(r"\s+(?:COBRO|DIFERENCIA|VALOR|SIN|CON|POR\s+VALOR|MOTIVO|OBSERVACI)", desc)[0]
+            desc = re.sub(r"\s+", " ", desc).strip().rstrip(",-.")
+            if 5 <= len(desc) <= 80:
+                break
+            desc = None
+
+    if desc and cups:
+        return f"{desc} (CUPS {cups})"
+    if desc:
+        return desc
+    if cups:
+        return f"CUPS {cups}"
+    return None
+
+
+def _descripcion_servicio(codigo_glosa: str, texto_glosa: str = "", contexto_pdf: str = "") -> str:
+    """Devuelve una descripción del servicio detectado en la glosa/soportes.
+    Si no logra detectar un servicio específico, devuelve una frase neutra según el
+    prefijo del código (TA, SO, AU...)."""
+    detectado = _detectar_servicio_desde_texto(texto_glosa, contexto_pdf)
+    if detectado:
+        return f"AL SERVICIO FACTURADO {detectado}"
+
+    # Fallback neutro según el tipo de glosa (sin ejemplos entre paréntesis)
     if not codigo_glosa:
-        return "LOS SERVICIOS FACTURADOS"
+        return "AL SERVICIO FACTURADO"
     prefijo = codigo_glosa[:2].upper()
     return {
-        "TA": "LOS SERVICIOS FACTURADOS (CONSULTA, PROCEDIMIENTO O AYUDA DIAGNÓSTICA)",
-        "SO": "LOS SOPORTES DOCUMENTALES DEL SERVICIO PRESTADO",
-        "AU": "LOS PROCEDIMIENTOS AUTORIZADOS",
-        "CO": "LOS SERVICIOS DE COBERTURA (CONSULTA, PROCEDIMIENTO O AYUDA DIAGNÓSTICA)",
-        "CL": "LOS PROCEDIMIENTOS MÉDICOS PRESTADOS",
-        "PE": "LOS PROCEDIMIENTOS MÉDICOS PRESTADOS",
-        "FA": "LOS CARGOS FACTURADOS",
-        "IN": "LOS INSUMOS Y DISPOSITIVOS MÉDICOS UTILIZADOS",
-        "ME": "LOS MEDICAMENTOS DISPENSADOS",
-    }.get(prefijo, "LOS SERVICIOS FACTURADOS")
+        "TA": "AL SERVICIO FACTURADO",
+        "SO": "AL SERVICIO FACTURADO Y SUS SOPORTES DOCUMENTALES",
+        "AU": "AL PROCEDIMIENTO AUTORIZADO",
+        "CO": "AL SERVICIO CUBIERTO",
+        "CL": "AL PROCEDIMIENTO MÉDICO PRESTADO",
+        "PE": "AL PROCEDIMIENTO MÉDICO PRESTADO",
+        "FA": "AL CARGO FACTURADO",
+        "IN": "AL INSUMO O DISPOSITIVO MÉDICO UTILIZADO",
+        "ME": "AL MEDICAMENTO DISPENSADO",
+    }.get(prefijo, "AL SERVICIO FACTURADO")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -498,7 +560,12 @@ async def analizar(
         # Obtener número de contrato vigente con la EPS para citar en el texto
         _contrato_info = get_contrato(eps)
         _num_contrato = _contrato_info.get("numero") or "CONTRATO VIGENTE ENTRE LAS PARTES"
-        _servicio_descr = _descripcion_servicio(resultado.codigo_glosa)
+        # Detectar el servicio concreto (nombre + CUPS) desde el texto de la glosa y el PDF
+        _servicio_descr = _descripcion_servicio(
+            resultado.codigo_glosa,
+            texto_glosa=tabla_excel,
+            contexto_pdf=contexto_pdf,
+        )
 
         # Generar texto de aceptación apropiado
         if estado == "ACEPTADA":
@@ -507,7 +574,7 @@ async def analizar(
                 <h4 style="color:#15803d;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
                 <p style="font-size:13px;line-height:1.8;color:#166534;">
                     ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
-                    EL CUAL CORRESPONDE A {_servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
+                    CORRESPONDIENTE {_servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
                     SEGÚN <strong>{_num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
                     DANDO CUMPLIMIENTO A ESTAS TARIFAS.
                 </p>
@@ -519,7 +586,7 @@ async def analizar(
                 <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
                     ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
-                    EL CUAL CORRESPONDE A {_servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
+                    CORRESPONDIENTE {_servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
                     SEGÚN <strong>{_num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
                     DANDO CUMPLIMIENTO A ESTAS TARIFAS.
                 </p>
@@ -530,63 +597,10 @@ async def analizar(
                 </p>
             </div>"""
         
-        # Tabla con valores
-        tabla_valores = f"""
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:15px;margin-top:15px;">
-            <div style="font-weight:bold;color:#475569;margin-bottom:10px;font-size:12px;">RESUMEN DE VALORES</div>
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                <tr style="background:#f1f5f9;">
-                    <td style="padding:8px;font-weight:bold;color:#64748b;">VALOR OBJETADO:</td>
-                    <td style="padding:8px;text-align:right;font-weight:bold;">$ {val_obj:,.0f}</td>
-                </tr>
-                <tr style="background:#dcfce7;">
-                    <td style="padding:8px;font-weight:bold;color:#166534;">VALOR ACEPTADO:</td>
-                    <td style="padding:8px;text-align:right;font-weight:bold;color:#16a34a;">$ {val_ac:,.0f}</td>
-                </tr>"""
-        
-        if estado == "PARCIALMENTE_ACEPTADA":
-            tabla_valores += f"""
-                <tr style="background:#fee2e2;">
-                    <td style="padding:8px;font-weight:bold;color:#991b1b;">VALOR EN DISPUTA:</td>
-                    <td style="padding:8px;text-align:right;font-weight:bold;color:#dc2626;">$ {val_en_disputa:,.0f}</td>
-                </tr>"""
-        
-        tabla_valores += """
-            </table>
-        </div>"""
-
-        # Generar dictamen nuevo completo
-        dictamen_final = f"""
-        <table border="1" style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:15px;background:white;">
-            <tr style="background-color:#16a34a;color:white;">
-                <th style="padding:10px;text-align:center;">CÓDIGO GLOSA</th>
-                <th style="padding:10px;text-align:center;">VALOR OBJETADO</th>
-                <th style="padding:10px;text-align:center;">CÓDIGO RESPUESTA</th>
-            </tr>
-            <tr>
-                <td style="padding:10px;text-align:center;font-weight:bold;">{resultado.codigo_glosa}</td>
-                <td style="padding:10px;text-align:center;font-weight:bold;color:#16a34a;">$ {val_obj:,.0f}</td>
-                <td style="padding:10px;text-align:center;"><b>{cod_res_aceptacion}</b><br><span style="font-size:10px">{desc_res_aceptacion}</span></td>
-            </tr>
-        </table>
-
-        <div style="background:#f8fafc;border-radius:12px;padding:20px;border-left:4px solid #16a34a;margin-top:15px;">
-            <div style="display:flex;gap:10px;margin-bottom:15px;">
-                <span style="background:#16a34a;color:white;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;">{eps.upper()}</span>
-                <span style="background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;">{resultado.codigo_glosa}</span>
-            </div>
-        </div>
-
-        {argumento_aceptacion}
-        {tabla_valores}
-
-        <div style="margin-top:20px;padding:15px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;">
-            <b>FECHA DE RESPUESTA:</b> {fecha_hoy_espanol()}
-        </div>
-
-        <div style="margin-top:15px;padding:12px;background:#f0fdf4;border-radius:8px;font-size:10px;color:#166534;">
-            <b>Nota:</b> Este documento constituye la respuesta formal a la glosa objetada, de conformidad con la normativa colombiana vigente.
-        </div>"""
+        # Dictamen simplificado: solo el bloque narrativo de aceptación (parcial o total).
+        # No se incluye tabla de códigos, ni "RESUMEN DE VALORES", ni notas al pie —
+        # el texto es autosuficiente y menciona los valores dentro del argumento.
+        dictamen_final = argumento_aceptacion
 
     # Crear glosa con el resultado
     tipo_final = f"RESPUESTA {cod_res_aceptacion}" if cod_res_aceptacion else resultado.tipo
