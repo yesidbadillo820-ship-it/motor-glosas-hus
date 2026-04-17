@@ -613,6 +613,12 @@ def importar_recepcion_page():
     return FileResponse("static/importar-recepcion.html")
 
 
+@app.get("/presentacion")
+def presentacion_ia():
+    """Presentación institucional del sistema IA (pública, sin login)."""
+    return FileResponse("static/presentacion-ia.html")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "version": cfg.app_version}
