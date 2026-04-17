@@ -310,6 +310,18 @@ def metrics(
     return repo.metrics()
 
 
+@router.get("/analitica-predictiva")
+def analitica_predictiva(
+    ventana_dias: int = Query(180, ge=7, le=730),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Analítica agregada: top EPS, tasa de éxito por código/tipo,
+    distribución semanal y recomendaciones automáticas."""
+    repo = GlosaRepository(db)
+    return repo.analitica_predictiva(ventana_dias=ventana_dias)
+
+
 # Rutas estáticas (sin parámetros) ANTES que rutas dinámicas /{glosa_id}
 @router.get("/semaforo")
 def semaforo(

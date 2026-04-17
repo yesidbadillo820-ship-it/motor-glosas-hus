@@ -265,6 +265,33 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .kpi-sub .trend-down{color:#dc2626;font-weight:600}
 .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;flex:1}
 .chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem}
+.analitica-block{margin-top:1.5rem}
+.analitica-hdr{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;margin-bottom:.9rem;flex-wrap:wrap}
+.analitica-title{font-size:1.05rem;font-weight:700;color:var(--text)}
+.analitica-sub{font-size:.78rem;color:var(--text3);margin-top:2px}
+.ap-select{padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.82rem}
+.ap-recos{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}
+.ap-reco{display:flex;gap:.65rem;padding:.7rem .9rem;background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--c-teal2);border-radius:8px;font-size:.83rem;color:var(--text2);line-height:1.45}
+.ap-reco-icon{flex-shrink:0;color:var(--c-teal2)}
+.ap-reco.warn{border-left-color:#f59e0b}
+.ap-reco.warn .ap-reco-icon{color:#f59e0b}
+.ap-reco.ok{border-left-color:var(--c-green)}
+.ap-reco.ok .ap-reco-icon{color:var(--c-green)}
+.analitica-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.ap-tbl-wrap{overflow-x:auto;margin-top:.6rem}
+.ap-tbl{width:100%;font-size:.78rem;border-collapse:collapse}
+.ap-tbl th{text-align:left;padding:.4rem .5rem;color:var(--text3);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
+.ap-tbl td{padding:.5rem;border-bottom:1px solid var(--border);color:var(--text2)}
+.ap-tbl tr:last-child td{border-bottom:none}
+.ap-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono);font-size:.76rem}
+.ap-bar{height:6px;background:var(--bg-subtle);border-radius:3px;overflow:hidden;margin-top:3px}
+.ap-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--c-teal),var(--c-teal2))}
+.ap-bar-fill.low{background:linear-gradient(90deg,#ef4444,#f59e0b)}
+.ap-bar-fill.mid{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.ap-pct{font-weight:600;min-width:38px;display:inline-block;text-align:right}
+.ap-pct.low{color:#ef4444}
+.ap-pct.mid{color:#f59e0b}
+.ap-pct.ok{color:var(--c-green)}
 .chart-card.full{grid-column:span 2}
 .chart-hdr{font-size:.75rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.4px;margin-bottom:1rem}
 
@@ -440,7 +467,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .nb-special{background:var(--c-teal2);color:#fff!important;border-radius:var(--r)!important;padding:5px 14px!important;margin-left:.35rem;height:28px;align-self:center;border-bottom-color:transparent!important;font-size:.72rem}
 .nb-special:hover{background:var(--c-teal);color:#fff!important}
 
-@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:span 1}}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:span 1}.analitica-grid{grid-template-columns:1fr}}
 @media(max-width:800px){.sidebar{width:280px}}
 </style>
 </head>
@@ -664,6 +691,43 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <div class="chart-card"><div class="chart-hdr">Distribución por Estado</div><canvas id="ch-estado" style="max-height:220px"></canvas></div>
           <div class="chart-card"><div class="chart-hdr">Tipo de Glosa</div><canvas id="ch-tipo" style="max-height:220px"></canvas></div>
           <div class="chart-card full"><div class="chart-hdr">Tendencia de Recuperación Mensual</div><canvas id="ch-trend" style="max-height:180px"></canvas></div>
+        </div>
+
+        <div class="analitica-block">
+          <div class="analitica-hdr">
+            <div>
+              <div class="analitica-title">Analítica predictiva</div>
+              <div class="analitica-sub">Recomendaciones automáticas a partir de los últimos <span id="ap-ventana-lbl">180</span> días</div>
+            </div>
+            <select id="ap-ventana" onchange="cargarAnaliticaPredictiva()" class="ap-select">
+              <option value="30">30 días</option>
+              <option value="90">90 días</option>
+              <option value="180" selected>180 días</option>
+              <option value="365">365 días</option>
+              <option value="730">2 años</option>
+            </select>
+          </div>
+
+          <div id="ap-recos" class="ap-recos"></div>
+
+          <div class="analitica-grid">
+            <div class="chart-card">
+              <div class="chart-hdr">Top EPS por valor objetado</div>
+              <div class="ap-tbl-wrap"><table class="ap-tbl" id="ap-top-eps"></table></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-hdr">Tasa de éxito por código de glosa</div>
+              <div class="ap-tbl-wrap"><table class="ap-tbl" id="ap-codigos"></table></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-hdr">Desempeño por tipo</div>
+              <div class="ap-tbl-wrap"><table class="ap-tbl" id="ap-tipos"></table></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-hdr">Distribución por día de la semana</div>
+              <canvas id="ch-dow" style="max-height:220px"></canvas>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1669,7 +1733,104 @@ async function loadDash(){
       {label:'Recuperado',data:tr.map(function(t){return t.recuperado}),borderColor:'#15803d',backgroundColor:'rgba(21,128,61,.08)',fill:true,tension:.4,pointRadius:4}
     ],{scales:{y:{beginAtZero:true,ticks:{callback:function(v){return cop(v)}},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom'}}});
 
+    // Analítica predictiva (últimos N días)
+    cargarAnaliticaPredictiva();
+
   } catch(e){console.error('Dashboard error',e);}
+}
+
+async function cargarAnaliticaPredictiva(){
+  var sel = document.getElementById('ap-ventana');
+  var ventana = sel ? sel.value : 180;
+  var lbl = document.getElementById('ap-ventana-lbl');
+  if(lbl) lbl.textContent = ventana;
+  try{
+    var r = await fetch('/glosas/analitica-predictiva?ventana_dias=' + ventana, {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    renderAPRecos(d.recomendaciones || []);
+    renderAPTopEps(d.top_eps || []);
+    renderAPCodigos(d.por_codigo || []);
+    renderAPTipos(d.por_tipo || []);
+    var dow = d.por_dia_semana || {labels:[], counts:[]};
+    mkChart('ch-dow','bar', dow.labels, [{
+      label:'Glosas', data:dow.counts, backgroundColor:'#0d9488', borderRadius:4
+    }], {scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}});
+  }catch(e){ console.error('Analitica predictiva:', e); }
+}
+
+function _apPctClass(p){
+  if(p >= 70) return 'ok';
+  if(p >= 40) return 'mid';
+  return 'low';
+}
+
+function renderAPRecos(recos){
+  var box = document.getElementById('ap-recos');
+  if(!recos.length){
+    box.innerHTML = '<div class="ap-reco ok"><span class="ap-reco-icon">✓</span><span>Sin alertas. El flujo de glosas opera con normalidad.</span></div>';
+    return;
+  }
+  box.innerHTML = recos.map(function(texto){
+    var cls = 'ap-reco';
+    var icon = 'ℹ';
+    var lower = texto.toLowerCase();
+    if(lower.indexOf('baja tasa') > -1 || lower.indexOf('reforzar') > -1 || lower.indexOf('sin datos') > -1){
+      cls += ' warn'; icon = '!';
+    } else if(lower.indexOf('excelente') > -1 || lower.indexOf('mantener') > -1){
+      cls += ' ok'; icon = '✓';
+    }
+    return '<div class="' + cls + '"><span class="ap-reco-icon">' + icon + '</span><span>' + escHtml(texto) + '</span></div>';
+  }).join('');
+}
+
+function renderAPTopEps(rows){
+  var t = document.getElementById('ap-top-eps');
+  if(!rows.length){ t.innerHTML = '<tr><td style="color:var(--text3)">Sin datos en la ventana seleccionada</td></tr>'; return; }
+  var head = '<thead><tr><th>EPS</th><th class="num">Glosas</th><th class="num">Objetado</th><th class="num">Éxito</th></tr></thead>';
+  var body = '<tbody>' + rows.map(function(r){
+    var cls = _apPctClass(r.tasa_exito);
+    return '<tr>' +
+      '<td>' + escHtml(r.eps) + '</td>' +
+      '<td class="num">' + r.glosas + '</td>' +
+      '<td class="num">' + cop(r.objetado) + '</td>' +
+      '<td class="num"><span class="ap-pct ' + cls + '">' + r.tasa_exito + '%</span></td>' +
+    '</tr>';
+  }).join('') + '</tbody>';
+  t.innerHTML = head + body;
+}
+
+function renderAPCodigos(rows){
+  var t = document.getElementById('ap-codigos');
+  if(!rows.length){ t.innerHTML = '<tr><td style="color:var(--text3)">Sin datos</td></tr>'; return; }
+  var head = '<thead><tr><th>Código</th><th class="num">Glosas</th><th style="min-width:120px">Tasa de éxito</th></tr></thead>';
+  var body = '<tbody>' + rows.map(function(r){
+    var cls = _apPctClass(r.tasa_exito);
+    return '<tr>' +
+      '<td class="mono">' + escHtml(r.codigo) + '</td>' +
+      '<td class="num">' + r.glosas + '</td>' +
+      '<td><span class="ap-pct ' + cls + '">' + r.tasa_exito + '%</span>' +
+        '<div class="ap-bar"><div class="ap-bar-fill ' + (cls==='ok'?'':cls) + '" style="width:' + Math.min(100, r.tasa_exito) + '%"></div></div>' +
+      '</td>' +
+    '</tr>';
+  }).join('') + '</tbody>';
+  t.innerHTML = head + body;
+}
+
+function renderAPTipos(rows){
+  var t = document.getElementById('ap-tipos');
+  if(!rows.length){ t.innerHTML = '<tr><td style="color:var(--text3)">Sin datos</td></tr>'; return; }
+  var head = '<thead><tr><th>Tipo</th><th class="num">Glosas</th><th class="num">Recuperado</th><th class="num">Éxito</th></tr></thead>';
+  var body = '<tbody>' + rows.map(function(r){
+    var cls = _apPctClass(r.tasa_exito);
+    return '<tr>' +
+      '<td>' + escHtml(r.tipo) + '</td>' +
+      '<td class="num">' + r.glosas + '</td>' +
+      '<td class="num">' + cop(r.recuperado) + '</td>' +
+      '<td class="num"><span class="ap-pct ' + cls + '">' + r.tasa_exito + '%</span></td>' +
+    '</tr>';
+  }).join('') + '</tbody>';
+  t.innerHTML = head + body;
 }
 
 function mkChart(id,type,labels,datasets,opts){

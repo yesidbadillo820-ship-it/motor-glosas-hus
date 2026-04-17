@@ -169,6 +169,197 @@ class GlosaRepository:
         """Lista sin paginación, aplicando los mismos filtros que listar_paginado."""
         return self._query_con_filtros(**filtros).limit(5000).all()
 
+    def analitica_predictiva(self, ventana_dias: int = 180) -> dict:
+        """Analítica agregada últimos N días:
+        - top EPS por valor y cantidad
+        - tasa de éxito por código de glosa
+        - tasa de éxito por tipo
+        - distribución por día de la semana
+        - recomendaciones automáticas
+        """
+        from datetime import datetime, timedelta
+        from sqlalchemy import case
+        desde = datetime.now() - timedelta(days=ventana_dias)
+
+        # Top EPS glosadoras
+        top_eps = (
+            self.db.query(
+                GlosaRecord.eps,
+                func.count(GlosaRecord.id).label("cnt"),
+                func.sum(GlosaRecord.valor_objetado).label("obj"),
+                func.sum(GlosaRecord.valor_aceptado).label("acept"),
+            )
+            .filter(GlosaRecord.creado_en >= desde)
+            .group_by(GlosaRecord.eps)
+            .order_by(func.sum(GlosaRecord.valor_objetado).desc())
+            .limit(10)
+            .all()
+        )
+        top_eps_data = []
+        for r in top_eps:
+            obj = float(r.obj or 0)
+            ace = float(r.acept or 0)
+            recuperado = obj - ace
+            exito = (recuperado / obj * 100) if obj > 0 else 0
+            top_eps_data.append({
+                "eps": r.eps or "—",
+                "glosas": int(r.cnt or 0),
+                "objetado": obj,
+                "aceptado": ace,
+                "recuperado": recuperado,
+                "tasa_exito": round(exito, 1),
+            })
+
+        # Tasa de éxito por código de glosa (top 15 por volumen)
+        por_codigo = (
+            self.db.query(
+                GlosaRecord.codigo_glosa,
+                func.count(GlosaRecord.id).label("cnt"),
+                func.sum(GlosaRecord.valor_objetado).label("obj"),
+                func.sum(GlosaRecord.valor_aceptado).label("acept"),
+            )
+            .filter(GlosaRecord.creado_en >= desde)
+            .filter(GlosaRecord.codigo_glosa.isnot(None))
+            .group_by(GlosaRecord.codigo_glosa)
+            .order_by(func.count(GlosaRecord.id).desc())
+            .limit(15)
+            .all()
+        )
+        codigos_data = []
+        for r in por_codigo:
+            obj = float(r.obj or 0)
+            ace = float(r.acept or 0)
+            rec = obj - ace
+            exito = (rec / obj * 100) if obj > 0 else 0
+            codigos_data.append({
+                "codigo": r.codigo_glosa,
+                "glosas": int(r.cnt or 0),
+                "objetado": obj,
+                "recuperado": rec,
+                "tasa_exito": round(exito, 1),
+            })
+
+        # Éxito por tipo (prefijo 2 letras)
+        tipo_case = case(
+            (GlosaRecord.codigo_glosa.like('TA%'), 'TARIFAS'),
+            (GlosaRecord.codigo_glosa.like('SO%'), 'SOPORTES'),
+            (GlosaRecord.codigo_glosa.like('AU%'), 'AUTORIZACIÓN'),
+            (GlosaRecord.codigo_glosa.like('CO%'), 'COBERTURA'),
+            (GlosaRecord.codigo_glosa.like('PE%'), 'PERTINENCIA'),
+            (GlosaRecord.codigo_glosa.like('FA%'), 'FACTURACIÓN'),
+            (GlosaRecord.codigo_glosa.like('IN%'), 'INSUMOS'),
+            (GlosaRecord.codigo_glosa.like('ME%'), 'MEDICAMENTOS'),
+            (GlosaRecord.codigo_glosa.like('CL%'), 'CLÍNICO'),
+            else_='OTROS'
+        )
+        por_tipo = (
+            self.db.query(
+                tipo_case.label("tipo"),
+                func.count(GlosaRecord.id).label("cnt"),
+                func.sum(GlosaRecord.valor_objetado).label("obj"),
+                func.sum(GlosaRecord.valor_aceptado).label("acept"),
+            )
+            .filter(GlosaRecord.creado_en >= desde)
+            .group_by(tipo_case)
+            .all()
+        )
+        tipos_data = []
+        for r in por_tipo:
+            obj = float(r.obj or 0)
+            ace = float(r.acept or 0)
+            rec = obj - ace
+            exito = (rec / obj * 100) if obj > 0 else 0
+            tipos_data.append({
+                "tipo": r.tipo,
+                "glosas": int(r.cnt or 0),
+                "objetado": obj,
+                "recuperado": rec,
+                "tasa_exito": round(exito, 1),
+            })
+        tipos_data.sort(key=lambda x: x["objetado"], reverse=True)
+
+        # Totales de la ventana
+        totales_q = self.db.query(
+            func.count(GlosaRecord.id),
+            func.sum(GlosaRecord.valor_objetado),
+            func.sum(GlosaRecord.valor_aceptado),
+        ).filter(GlosaRecord.creado_en >= desde).first()
+        total_cnt = int(totales_q[0] or 0)
+        total_obj = float(totales_q[1] or 0)
+        total_ace = float(totales_q[2] or 0)
+        total_rec = total_obj - total_ace
+        tasa_global = round((total_rec / total_obj * 100) if total_obj > 0 else 0, 1)
+
+        # Recomendaciones automáticas (simples)
+        recomendaciones = []
+        if top_eps_data:
+            peor = min(top_eps_data, key=lambda x: x["tasa_exito"])
+            if peor["tasa_exito"] < 50 and peor["glosas"] >= 3:
+                recomendaciones.append(
+                    f"Baja tasa de éxito con {peor['eps']} ({peor['tasa_exito']}%). "
+                    "Revisar plantillas y contrato vigente."
+                )
+            mayor = top_eps_data[0]
+            recomendaciones.append(
+                f"{mayor['eps']} concentra ${mayor['objetado']:,.0f} objetados "
+                f"({mayor['glosas']} glosas). Priorizar gestor senior."
+            )
+        if codigos_data:
+            codigo_critico = min(
+                [c for c in codigos_data if c["glosas"] >= 3] or codigos_data,
+                key=lambda x: x["tasa_exito"]
+            )
+            if codigo_critico["tasa_exito"] < 50:
+                recomendaciones.append(
+                    f"Código {codigo_critico['codigo']}: tasa {codigo_critico['tasa_exito']}% "
+                    f"en {codigo_critico['glosas']} casos. Reforzar argumentación."
+                )
+        if tipos_data:
+            mejor_tipo = max(tipos_data, key=lambda x: x["tasa_exito"])
+            if mejor_tipo["tasa_exito"] > 70 and mejor_tipo["glosas"] >= 3:
+                recomendaciones.append(
+                    f"Tipo {mejor_tipo['tipo']}: excelente tasa ({mejor_tipo['tasa_exito']}%). "
+                    "Mantener flujo actual."
+                )
+        if total_cnt == 0:
+            recomendaciones.append(
+                "Sin datos suficientes en la ventana seleccionada. "
+                "Amplía el rango o importa más glosas."
+            )
+
+        # Distribución día de la semana (0=lunes). SQLite y PostgreSQL
+        # no comparten función — iteramos en Python sobre las fechas.
+        dias_labels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        dias_counts = [0] * 7
+        try:
+            fechas = (
+                self.db.query(GlosaRecord.creado_en)
+                .filter(GlosaRecord.creado_en >= desde)
+                .all()
+            )
+            for (f,) in fechas:
+                if f:
+                    # Python weekday: 0=Monday, 6=Sunday — coincide con dias_labels
+                    dias_counts[f.weekday()] += 1
+        except Exception:  # nosec - mejor zeros que romper el endpoint
+            pass
+
+        return {
+            "ventana_dias": ventana_dias,
+            "totales": {
+                "glosas": total_cnt,
+                "objetado": total_obj,
+                "aceptado": total_ace,
+                "recuperado": total_rec,
+                "tasa_exito": tasa_global,
+            },
+            "top_eps": top_eps_data,
+            "por_codigo": codigos_data,
+            "por_tipo": tipos_data,
+            "por_dia_semana": {"labels": dias_labels, "counts": dias_counts},
+            "recomendaciones": recomendaciones,
+        }
+
     def obtener_por_id(self, glosa_id: int) -> Optional[GlosaRecord]:
         return self.db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
 
