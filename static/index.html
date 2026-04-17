@@ -710,11 +710,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           </select>
           <button class="btn btn-ghost" onclick="exportCSV()" style="margin-left:auto">Exportar CSV</button>
         </div>
-        <div class="tbl-wrap">
-          <table>
+        <div class="tbl-wrap" style="overflow-x:auto">
+          <table style="min-width:1600px;font-size:.78rem">
             <thead><tr>
-              <th>Fecha</th><th>EPS</th><th>Paciente</th><th>Código</th>
-              <th>Factura</th><th>Valor Obj.</th><th>Valor Acep.</th><th>Estado</th><th>Días Rest.</th>
+              <th>Fecha</th>
+              <th>Entidad</th>
+              <th>Factura</th>
+              <th>Código glosa</th>
+              <th style="min-width:260px">Concepto glosa</th>
+              <th>CUPS</th>
+              <th style="min-width:200px">Servicio</th>
+              <th style="text-align:right">Valor objetado</th>
+              <th style="min-width:200px">Glosa (texto)</th>
+              <th>Fecha recepción</th>
+              <th>Código respuesta</th>
+              <th style="text-align:right">Valor aceptado</th>
+              <th style="min-width:300px">Observación</th>
             </tr></thead>
             <tbody id="hist-body"></tbody>
           </table>
@@ -1563,22 +1574,34 @@ var estadoBadge={
   'LEVANTADA':'badge-levantada','PARCIALMENTE_ACEPTADA':'badge-parcial'
 };
 
+function _trunc(str, n){
+  if(!str) return '—';
+  return str.length>n ? escHtml(str.substring(0,n))+'…' : escHtml(str);
+}
+
 function renderHist(rows){
   var body=document.getElementById('hist-body');
-  if(!rows.length){body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">No se encontraron registros</td></tr>';return;}
+  if(!rows.length){
+    body.innerHTML='<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text3)">No se encontraron registros</td></tr>';
+    return;
+  }
   body.innerHTML=rows.map(function(g){
-    var bc=estadoBadge[g.estado]||'badge-respondida';
-    var dias=g.dias_restantes>0&&g.dias_restantes<=5?'<span class="badge badge-vence">'+g.dias_restantes+' días</span>':g.dias_restantes>0?g.dias_restantes+'d':'—';
+    var fechaCarga = g.creado_en ? g.creado_en.substring(0,10) : '—';
+    var fechaRec = g.fecha_recepcion ? g.fecha_recepcion.substring(0,10) : fechaCarga;
     return '<tr>'
-      +'<td>'+(g.creado_en?g.creado_en.substring(0,10):'—')+'</td>'
-      +'<td style="font-weight:500">'+g.eps+'</td>'
-      +'<td>'+(g.paciente||'—')+'</td>'
-      +'<td><span class="code-tag">'+g.codigo_glosa+'</span></td>'
-      +'<td>—</td>'
-      +'<td style="font-weight:600;color:var(--c-red)">'+cop(g.valor_objetado)+'</td>'
-      +'<td>'+cop(g.valor_aceptado)+'</td>'
-      +'<td><span class="badge '+bc+'">'+g.estado.replace('_',' ')+'</span></td>'
-      +'<td>'+dias+'</td>'
+      +'<td>'+fechaCarga+'</td>'
+      +'<td style="font-weight:500">'+escHtml(g.entidad||g.eps||'—')+'</td>'
+      +'<td class="mono">'+escHtml(g.factura||'—')+'</td>'
+      +'<td><span class="chip chip-estado">'+escHtml(g.codigo_glosa||'—')+'</span></td>'
+      +'<td style="font-size:.75rem;color:var(--text2)" title="'+escHtml(g.concepto_glosa||'')+'">'+_trunc(g.concepto_glosa,90)+'</td>'
+      +'<td class="mono">'+escHtml(g.cups||'—')+'</td>'
+      +'<td style="font-size:.75rem" title="'+escHtml(g.servicio||'')+'">'+_trunc(g.servicio,60)+'</td>'
+      +'<td class="num" style="color:var(--c-red)">'+cop(g.valor_objetado)+'</td>'
+      +'<td style="font-size:.75rem" title="'+escHtml(g.glosa_original||'')+'">'+_trunc(g.glosa_original,70)+'</td>'
+      +'<td>'+fechaRec+'</td>'
+      +'<td class="mono"><b>'+escHtml(g.codigo_respuesta||'—')+'</b></td>'
+      +'<td class="num" style="color:var(--c-green)">'+cop(g.valor_aceptado)+'</td>'
+      +'<td style="font-size:.72rem" title="'+escHtml(g.observacion||'')+'">'+_trunc(g.observacion,120)+'</td>'
       +'</tr>';
   }).join('');
 }
@@ -1594,9 +1617,36 @@ function renderPager(d){
 
 function exportCSV(){
   if(!histData.length){toast('Sin datos','No hay datos para exportar','warning');return;}
-  var csv='Fecha,EPS,Paciente,Código,Valor Objetado,Valor Aceptado,Estado,Etapa\n';
+  function esc(v){
+    if(v===null||v===undefined) return '';
+    var s=String(v);
+    // Quoting CSV: duplicar comillas y envolver si hay coma/salto/comilla
+    if(s.indexOf(',')>-1 || s.indexOf('"')>-1 || s.indexOf('\n')>-1){
+      return '"'+s.replace(/"/g,'""').replace(/\n/g,' ').replace(/\r/g,'')+'"';
+    }
+    return s;
+  }
+  var headers=['FECHA','ENTIDAD','FACTURA','CODIGO GLOSA','CONCEPTO GLOSA','CUPS','SERVICIO',
+               'VALOR OBJETADO','GLOSA','FECHA DE CARGUE','CODIGO RESPUESTA','VALOR ACEPTADO','OBSERVACION'];
+  var csv=headers.join(',')+'\n';
   histData.forEach(function(g){
-    csv+=[g.creado_en||'',g.eps,g.paciente||'',g.codigo_glosa,g.valor_objetado,g.valor_aceptado,g.estado,g.etapa||''].join(',')+'\n';
+    var fechaCarga = g.creado_en ? g.creado_en.substring(0,10) : '';
+    var fechaRec = g.fecha_recepcion ? g.fecha_recepcion.substring(0,10) : fechaCarga;
+    csv+=[
+      esc(fechaRec),
+      esc(g.entidad||g.eps||''),
+      esc(g.factura||''),
+      esc(g.codigo_glosa||''),
+      esc(g.concepto_glosa||''),
+      esc(g.cups||''),
+      esc(g.servicio||''),
+      esc(g.valor_objetado||0),
+      esc(g.glosa_original||''),
+      esc(fechaCarga),
+      esc(g.codigo_respuesta||''),
+      esc(g.valor_aceptado||0),
+      esc(g.observacion||''),
+    ].join(',')+'\n';
   });
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));

@@ -91,6 +91,108 @@ def _detectar_servicio_desde_texto(texto_glosa: str, contexto_pdf: str = "") -> 
     return None
 
 
+# Concepto oficial (Anexo Técnico 6 Res. 3047/2008) por código de glosa.
+# Se usa mostrar en la tabla de historial. Si no hay match exacto, se usa el
+# concepto por prefijo.
+CONCEPTOS_CODIGOS: dict[str, str] = {
+    # Tarifa (TA)
+    "TA01": "Los cargos por consulta, interconsulta o atención (visita) domiciliaria, presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA02": "Los cargos por estancia presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA03": "Los cargos por honorarios (médicos o quirúrgicos) presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA04": "Los cargos por derechos de sala presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA05": "Los cargos por materiales presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA06": "Los cargos por medicamentos o APME presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA07": "Los cargos por medicamentos o APME que vienen relacionados o justificados en los soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA08": "Los cargos por procedimientos quirúrgicos o no quirúrgicos presentan diferencias con los valores pactados o establecidos por la norma",
+    "TA09": "Los cargos por apoyo diagnóstico terapéutico presentan diferencias con los valores pactados o establecidos por la norma",
+    # Soportes (SO)
+    "SO01": "Faltan soportes de la atención, historia clínica o documentación exigida",
+    "SO02": "Los soportes presentan inconsistencias o están incompletos",
+    "SO42": "Lista de precios no aportada o insuficiente",
+    # Autorización (AU)
+    "AU01": "Servicio prestado sin autorización previa",
+    "AU02": "Diferencia con el servicio autorizado",
+    # Cobertura (CO)
+    "CO01": "Servicio no incluido en el PBS o régimen aplicable",
+    "CO02": "Servicio no cubierto por régimen especial",
+    "CO03": "Servicio no incluido en el PBS del régimen subsidiado o contributivo",
+    # Pertinencia (CL / PE)
+    "CL01": "Procedimiento no pertinente según criterio clínico",
+    "PE01": "Procedimiento no pertinente según criterio clínico",
+    # Facturación (FA)
+    "FA01": "Error formal en la facturación (código, fecha, firma)",
+    "FA02": "Error en código CUPS o código no corresponde",
+    # Insumos (IN)
+    "IN01": "Insumos no reconocidos o no pactados",
+    "IN02": "Diferencia en valor de insumos",
+    # Medicamentos (ME)
+    "ME01": "Medicamento no incluido en PBS o fuera de cobertura",
+    "ME02": "Medicamento no justificado por fórmula médica",
+}
+
+
+def _concepto_glosa(codigo_glosa: str) -> str:
+    """Devuelve la descripción oficial del código de glosa (Anexo Técnico 6)."""
+    if not codigo_glosa:
+        return ""
+    # Intentar match por los primeros 4 caracteres (ej. 'TA07' de 'TA0701')
+    key = codigo_glosa[:4].upper()
+    if key in CONCEPTOS_CODIGOS:
+        return CONCEPTOS_CODIGOS[key]
+    # Fallback por prefijo de 2 letras
+    prefijo = codigo_glosa[:2].upper()
+    fallbacks = {
+        "TA": "Diferencia tarifaria con los valores pactados o establecidos por la norma",
+        "SO": "Falta de soportes o documentación requerida",
+        "AU": "Ausencia o diferencia de autorización previa",
+        "CO": "Servicio no incluido en cobertura",
+        "CL": "Procedimiento no pertinente según criterio clínico",
+        "PE": "Procedimiento no pertinente según criterio clínico",
+        "FA": "Error formal en la facturación",
+        "IN": "Diferencia o no reconocimiento de insumos",
+        "ME": "Diferencia o no reconocimiento de medicamentos",
+    }
+    return fallbacks.get(prefijo, "Glosa sin concepto específico asignado")
+
+
+def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[str, str]:
+    """Extrae tupla (CUPS, descripción_servicio) desde el texto de la glosa/PDF.
+
+    Retorna ("", "") si no logra identificarlos.
+    """
+    if not texto_glosa and not contexto_pdf:
+        return "", ""
+    fuente = f"{texto_glosa}\n{contexto_pdf}"
+
+    cups = ""
+    # CUPS estándar: 5-6 dígitos, opcionalmente con sufijo -X
+    m = re.search(r"\b(\d{5,8}(?:-\d)?)\b", fuente)
+    if m:
+        cups = m.group(1)
+
+    servicio = ""
+    # Buscar descripción del servicio con patrones comunes
+    for pat in [
+        r"(?:SERVICIO|PROCEDIMIENTO|DESCRIPCI[ÓO]N)\s*[:\-]\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 ,\-/]{5,120})",
+        r"\b(CONSULTA\s+[A-ZÁÉÍÓÚÑ ,\-]{3,100})",
+        r"\b(CIRUG[ÍI]A\s+[A-ZÁÉÍÓÚÑ ,\-]{3,100})",
+        r"\b(ESTUDIO\s+[A-ZÁÉÍÓÚÑ ,\-]{3,100})",
+        r"\b(TOMOGRAF[ÍI]A\s+[A-ZÁÉÍÓÚÑ ,\-]{3,80})",
+        r"\b(RESONANCIA\s+[A-ZÁÉÍÓÚÑ ,\-]{3,80})",
+        r"\b(ECOGRAF[ÍI]A\s+[A-ZÁÉÍÓÚÑ ,\-]{3,80})",
+        r"\b(BIOPSIA[A-ZÁÉÍÓÚÑ ,\-]{0,80})",
+        r"\b(ACETAMINOFEN[A-ZÁÉÍÓÚÑ0-9 ,\-/]{0,80})",
+    ]:
+        m = re.search(pat, fuente, re.IGNORECASE)
+        if m:
+            servicio = (m.group(1) if m.groups() else m.group(0)).strip()
+            servicio = re.split(r"\s+(?:COBRO|DIFERENCIA|MAYOR|VALOR|MOTIVO)", servicio)[0]
+            servicio = re.sub(r"\s+", " ", servicio).strip().rstrip(",-.")[:200]
+            break
+
+    return cups, servicio
+
+
 def _descripcion_servicio(codigo_glosa: str, texto_glosa: str = "", contexto_pdf: str = "") -> str:
     """Devuelve una descripción del servicio detectado en la glosa/soportes.
     Si no logra detectar un servicio específico, devuelve una frase neutra según el
@@ -230,6 +332,11 @@ async def lifespan(app: FastAPI):
         ("observacion_tecnico", "TEXT"),
         ("tipo_glosa_excel", "VARCHAR(50)"),
         ("profesional_medico", "VARCHAR(200)"),
+        ("texto_glosa_original", "TEXT"),
+        ("codigo_respuesta", "VARCHAR(20)"),
+        ("cups_servicio", "VARCHAR(50)"),
+        ("servicio_descripcion", "VARCHAR(400)"),
+        ("concepto_glosa", "TEXT"),
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:
@@ -646,6 +753,11 @@ async def analizar(
 
     # Crear glosa con el resultado
     tipo_final = f"RESPUESTA {cod_res_aceptacion}" if cod_res_aceptacion else resultado.tipo
+    # Derivar campos nuevos para historial detallado
+    _cup_ext, _servicio_ext = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    # Extraer código de respuesta del tipo (ej. "RESPUESTA RE9901" -> "RE9901")
+    _cod_resp_m = re.search(r"\bRE\d{4}\b", tipo_final or "")
+    _cod_resp = _cod_resp_m.group(0) if _cod_resp_m else (cod_res_aceptacion or "")
     glosa = glosa_repo.crear(
         eps=eps,
         paciente=resultado.paciente,
@@ -660,6 +772,12 @@ async def analizar(
         score=resultado.score,
         numero_radicado=numero_radicado,
         factura=numero_factura,
+        texto_glosa_original=tabla_excel,
+        codigo_respuesta=_cod_resp,
+        cups_servicio=_cup_ext or None,
+        servicio_descripcion=_servicio_ext or None,
+        concepto_glosa=_concepto_glosa(resultado.codigo_glosa),
+        fecha_recepcion=data.fecha_recepcion,
     )
 
     if estado == "RADICADA":
