@@ -553,6 +553,189 @@ class GlosaService:
             <b>Nota:</b> Generado con asistencia de IA. Verificar antes de radicar ante la EPS.
         </div>"""
 
+    async def validar_pre_radicacion(
+        self,
+        dictamen_html: str,
+        eps: str,
+        codigo_glosa: str,
+        valor_objetado: float,
+        numero_factura: str = "",
+        dias_habiles: int = 0,
+    ) -> dict:
+        """Valida el dictamen antes de radicarlo ante la EPS.
+
+        Hace checks locales rápidos + un check con IA. Devuelve:
+        {
+            "puede_radicar": bool,
+            "score_calidad": 0-100,
+            "hallazgos": [{"nivel": "error|warn|info", "mensaje": "..."}],
+            "resumen": "..."
+        }
+        """
+        import re as _re
+        from html import unescape
+
+        # Extraer texto del dictamen
+        txt = _re.sub(r"<[^>]+>", " ", dictamen_html or "")
+        txt = _re.sub(r"\s+", " ", unescape(txt)).strip()
+
+        hallazgos: list[dict] = []
+
+        # 1. Checks locales (rápidos, sin IA)
+        if len(txt) < 200:
+            hallazgos.append({"nivel": "error", "mensaje": "El argumento es muy corto (menos de 200 caracteres)"})
+
+        # Placeholders típicos olvidados
+        placeholders = ["{EPS}", "{NOMBRE}", "{VALOR}", "XXXX", "[INSERTAR", "[COMPLETAR", "TODO:", "N/A NO APLICA"]
+        for ph in placeholders:
+            if ph in txt.upper():
+                hallazgos.append({"nivel": "error", "mensaje": f"Dictamen contiene placeholder sin rellenar: {ph}"})
+
+        # EPS mencionada
+        if eps and eps.upper() not in txt.upper() and "ESE HUS" in txt.upper():
+            # No critico pero vale warning
+            hallazgos.append({"nivel": "warn", "mensaje": f"El texto no menciona explícitamente a {eps}"})
+
+        # Número de factura
+        if numero_factura and numero_factura not in txt:
+            hallazgos.append({"nivel": "warn", "mensaje": f"No se encuentra el número de factura ({numero_factura}) en el texto"})
+
+        # Normas esperadas para el tipo
+        normas_esperadas = []
+        prefijo = (codigo_glosa or "")[:2].upper()
+        if prefijo in ("TA",):
+            normas_esperadas = ["871", "1602", "100 de 1993"]
+        elif prefijo in ("SO",):
+            normas_esperadas = ["1995", "1438"]
+        elif prefijo in ("AU",):
+            normas_esperadas = ["168", "5269"]
+        elif prefijo in ("CO",):
+            normas_esperadas = ["5269", "Beneficios"]
+        elif prefijo in ("CL", "PE"):
+            normas_esperadas = ["17", "1751"]
+        elif prefijo in ("FA",):
+            normas_esperadas = ["030", "Circular"]
+
+        normas_citadas = 0
+        for n in normas_esperadas:
+            if n in txt:
+                normas_citadas += 1
+        if normas_esperadas and normas_citadas == 0:
+            hallazgos.append({
+                "nivel": "warn",
+                "mensaje": f"No se cita ninguna norma típica para glosas {prefijo} ({', '.join(normas_esperadas)})",
+            })
+
+        # Detección de normas derogadas / incorrectas
+        derogadas = {
+            "1601 DEL CÓDIGO CIVIL": "Art. 1601 — posiblemente confusión con Art. 1602 (ley para las partes)",
+            "RESOLUCIÓN 5926": "Res. 5926 — verificar, parece inválida (¿5269?)",
+        }
+        for d, msg in derogadas.items():
+            if d in txt.upper():
+                hallazgos.append({"nivel": "error", "mensaje": f"Cita dudosa: {msg}"})
+
+        # Días hábiles / extemporaneidad
+        if dias_habiles > 20 and "EXTEMPOR" not in txt.upper():
+            hallazgos.append({
+                "nivel": "warn",
+                "mensaje": f"La glosa tiene {dias_habiles} días hábiles (extemporánea) pero no se argumenta como tal",
+            })
+
+        # 2. Validación normativa contra catálogo
+        from app.services.normativa import validar_citas
+        val_citas = validar_citas(txt)
+        for d in val_citas["derogadas"]:
+            msg = f"Cita derogada/confusa: {d['cita']}. {d['razon']}"
+            if d.get("reemplaza_por"):
+                msg += f" → usar {d['reemplaza_por']}"
+            hallazgos.append({"nivel": "error", "mensaje": msg})
+        if val_citas["no_catalogadas"]:
+            hallazgos.append({
+                "nivel": "info",
+                "mensaje": f"Citas no verificadas (pueden ser válidas): {', '.join(val_citas['no_catalogadas'][:5])}",
+            })
+
+        # 3. Check con IA (si hay proveedor)
+        ia_check = None
+        if self.groq or self.anthropic_key:
+            system_check = (
+                "Eres un revisor crítico de respuestas a glosas médicas en Colombia. "
+                "Revisas si el argumento es sólido antes de que la IPS lo radique ante la EPS. "
+                "Marcas inconsistencias, citas jurídicas inventadas, montos que no cuadran, "
+                "redacciones ambiguas o conclusiones débiles. Sé breve y directo."
+            )
+            user_check = (
+                f"EPS: {eps}\nCódigo glosa: {codigo_glosa}\n"
+                f"Valor objetado: ${valor_objetado:,.0f}\nFactura: {numero_factura}\n"
+                f"Días hábiles: {dias_habiles}\n\n"
+                f"ARGUMENTO A RADICAR:\n{txt[:4000]}\n\n"
+                "Responde SOLO con este formato (sin preámbulos):\n"
+                "PUEDE_RADICAR: SI|NO\n"
+                "CALIDAD: 0-100\n"
+                "RESUMEN: <una línea>\n"
+                "HALLAZGOS:\n"
+                "- NIVEL: ERROR|WARN|INFO — <descripción>\n"
+                "(Lista vacía si no hay)"
+            )
+            try:
+                res_ia, _modelo = await self._llamar_ia(
+                    system_check, user_check, eps=eps, codigo=codigo_glosa
+                )
+                ia_check = self._parsear_validacion_ia(res_ia)
+                for h in ia_check.get("hallazgos", []):
+                    hallazgos.append(h)
+            except Exception as e:
+                logger.warning(f"Validador IA fallo: {e}")
+
+        # Calcular score
+        errores = sum(1 for h in hallazgos if h["nivel"] == "error")
+        warnings_ = sum(1 for h in hallazgos if h["nivel"] == "warn")
+        score_local = max(0, 100 - (errores * 25) - (warnings_ * 8))
+        score = min(score_local, ia_check.get("calidad", 100)) if ia_check else score_local
+
+        puede_radicar = errores == 0 and score >= 60
+
+        resumen = (
+            ia_check.get("resumen")
+            if ia_check and ia_check.get("resumen")
+            else (f"{errores} error(es), {warnings_} advertencia(s)" if hallazgos else "Sin observaciones")
+        )
+
+        return {
+            "puede_radicar": puede_radicar,
+            "score_calidad": score,
+            "hallazgos": hallazgos,
+            "resumen": resumen,
+            "errores": errores,
+            "warnings": warnings_,
+            "validacion_normativa": val_citas,
+        }
+
+    @staticmethod
+    def _parsear_validacion_ia(texto: str) -> dict:
+        """Parsea la respuesta estructurada de la IA del validador."""
+        import re as _re
+        out = {"hallazgos": []}
+        m = _re.search(r"PUEDE_RADICAR:\s*(SI|NO)", texto, _re.IGNORECASE)
+        if m:
+            out["puede_radicar"] = m.group(1).upper() == "SI"
+        m = _re.search(r"CALIDAD:\s*(\d+)", texto)
+        if m:
+            out["calidad"] = int(m.group(1))
+        m = _re.search(r"RESUMEN:\s*(.+)", texto)
+        if m:
+            out["resumen"] = m.group(1).strip()[:200]
+        # Extraer hallazgos línea por línea
+        for linea in texto.split("\n"):
+            m = _re.match(r"\s*-\s*NIVEL:\s*(ERROR|WARN|INFO)\s*[-—]\s*(.+)", linea, _re.IGNORECASE)
+            if m:
+                out["hallazgos"].append({
+                    "nivel": m.group(1).lower(),
+                    "mensaje": m.group(2).strip()[:300],
+                })
+        return out
+
     async def refinar_dictamen(
         self,
         dictamen_actual_html: str,

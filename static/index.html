@@ -4,6 +4,11 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ESE HUS — Sistema de Glosas</title>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<meta name="theme-color" content="#0b5d8a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="HUS Glosas"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -312,6 +317,63 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .hist-area{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:1.25rem;gap:1rem}
 .hist-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
 .bulk-bar{display:flex;align-items:center;gap:.8rem;padding:.7rem 1rem;margin:.8rem 0;background:linear-gradient(90deg,rgba(13,148,136,.08),rgba(13,148,136,.02));border:1px solid rgba(13,148,136,.25);border-radius:10px;font-size:.85rem;flex-wrap:wrap}
+.validar-result{margin-top:1rem;padding:1rem 1.2rem;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);font-size:.85rem}
+.validar-result.ok{border-left:4px solid #047857}
+.validar-result.bad{border-left:4px solid #b91c1c}
+.validar-result.validar-err{border-left:4px solid #b91c1c;color:#b91c1c}
+.validar-result.validar-loading{border-left:4px solid #0d9488}
+.validar-hdr{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;padding-bottom:.6rem;border-bottom:1px dashed var(--border);margin-bottom:.5rem}
+.validar-estado{padding:.3rem .75rem;border-radius:14px;color:white;font-size:.72rem;font-weight:700;letter-spacing:.3px}
+.validar-score{font-size:.8rem;color:var(--text2)}
+.validar-resumen{font-size:.78rem;color:var(--text3);flex:1;min-width:200px;font-style:italic}
+.validar-normas{margin-top:.8rem;padding:.6rem .85rem;background:var(--bg-subtle);border-radius:8px;border:1px solid var(--border)}
+.validar-normas-hdr{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;margin-bottom:.4rem}
+.validar-normas-body{display:flex;flex-direction:column;gap:.3rem}
+.norm-chip{font-size:.72rem;padding:.25rem .55rem;border-radius:6px;display:inline-block}
+.norm-chip.ok{background:rgba(4,120,87,.1);color:#047857;border:1px solid rgba(4,120,87,.3)}
+.norm-chip.bad{background:rgba(185,28,28,.1);color:#b91c1c;border:1px solid rgba(185,28,28,.3)}
+.norm-chip.info{background:rgba(29,78,216,.1);color:#1d4ed8;border:1px solid rgba(29,78,216,.3)}
+.thread-box{margin-top:1rem;padding:1rem 1.1rem;border-radius:10px;background:var(--bg-card);border:1px solid var(--border)}
+.thread-hdr{display:flex;align-items:center;gap:.55rem;padding-bottom:.55rem;border-bottom:1px dashed var(--border);margin-bottom:.6rem;font-size:.85rem;color:var(--text)}
+.thread-count{background:var(--c-teal2);color:#fff;padding:1px 7px;border-radius:10px;font-size:.7rem;font-weight:600}
+.thread-list{display:flex;flex-direction:column;gap:.6rem;max-height:360px;overflow-y:auto}
+.thread-item{background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:.55rem .75rem}
+.thread-item.thread-resuelto{opacity:.55}
+.thread-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:.7rem;margin-bottom:.35rem}
+.thread-autor{font-weight:600;color:var(--text)}
+.thread-rol{padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--text3);font-size:.65rem;font-family:var(--font-mono)}
+.thread-mencion{color:var(--c-teal2);font-weight:600}
+.thread-fecha{color:var(--text3);margin-left:auto}
+.thread-acciones{display:flex;gap:3px}
+.thread-act{background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:1px 6px;font-size:.7rem;cursor:pointer}
+.thread-act:hover{background:var(--bg);color:var(--text)}
+.thread-text{font-size:.82rem;color:var(--text2);line-height:1.5}
+.thread-resuelto-lbl{margin-top:.35rem;font-size:.68rem;color:var(--c-green);font-style:italic}
+.thread-compose{display:flex;gap:.5rem;margin-top:.7rem;align-items:flex-end}
+.thread-compose textarea{flex:1;padding:.55rem .7rem;font-size:.82rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text);resize:vertical;font-family:inherit}
+.md-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin:1rem 0}
+.md-kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;position:relative;overflow:hidden}
+.md-kpi::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,var(--c-teal),var(--c-teal2))}
+.md-lbl{font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.md-num{font-size:1.5rem;font-weight:700;color:var(--text);margin-top:.35rem}
+.md-num.c-green{color:#047857}
+.md-sub{font-size:.7rem;color:var(--text3);margin-top:2px}
+.md-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+.md-logros{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem}
+.md-logro{display:flex;gap:.6rem;padding:.7rem .85rem;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fcd34d;border-radius:10px;align-items:center}
+.md-logro-icon{font-size:1.6rem}
+.md-logro-body b{display:block;color:#92400e;font-size:.8rem}
+.md-logro-body span{font-size:.7rem;color:#78350f}
+.md-alerta{padding:.6rem 1rem;border-radius:8px;margin:.4rem 0;font-size:.82rem}
+.md-alerta.critico{background:#fef2f2;border-left:4px solid #b91c1c;color:#991b1b}
+.md-alerta.alto{background:#fffbeb;border-left:4px solid #d97706;color:#92400e}
+.md-alerta.info{background:#eff6ff;border-left:4px solid #1d4ed8;color:#1e40af}
+.md-ranking-me{background:rgba(13,148,136,.14);font-weight:600}
+.md-bar{display:flex;align-items:center;gap:.6rem;padding:.4rem .1rem;font-size:.82rem}
+.md-bar-fill{flex:1;height:14px;background:var(--bg-subtle);border-radius:4px;overflow:hidden;position:relative}
+.md-bar-fill > span{display:block;height:100%;border-radius:4px}
+.md-bar-num{min-width:36px;text-align:right;font-weight:600;font-family:var(--font-mono);color:var(--text)}
+@media(max-width:1100px){.md-kpis{grid-template-columns:repeat(2,1fr)}.md-grid{grid-template-columns:1fr}.md-logros{grid-template-columns:1fr}}
 .gold-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;padding:1rem 0}
 .gold-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.55rem;transition:all .15s;position:relative;overflow:hidden}
 .gold-card::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,#f59e0b,#fbbf24)}
@@ -414,6 +476,9 @@ tbody tr:hover{background:var(--bg)}
 .spot-item-meta{font-size:.68rem;color:var(--text3);flex-shrink:0;font-family:var(--font-mono)}
 .spot-empty{padding:2rem 1.1rem;text-align:center;color:var(--text3);font-size:.82rem}
 .spot-icon{width:28px;height:28px;border-radius:6px;background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;color:var(--text3);flex-shrink:0}
+.spot-ia-hint{padding:.5rem 1rem;border-bottom:1px dashed var(--border)}
+.spot-ia-btn{width:100%;padding:.55rem .75rem;font-size:.78rem;background:linear-gradient(90deg,rgba(13,148,136,.1),rgba(13,148,136,.02));color:var(--c-teal2);border:1px solid rgba(13,148,136,.3);border-radius:8px;cursor:pointer;text-align:left;font-weight:500}
+.spot-ia-btn:hover{background:rgba(13,148,136,.18)}
 
 /* ─── MISC ────────────────────────────────── */
 .divider{height:1px;background:var(--border);margin:.5rem 0}
@@ -529,7 +594,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     </div>
     <div class="login-field">
       <label>Contraseña</label>
-      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="login-field" id="login-totp-field" style="display:none">
+      <label>🔐 Código 2FA (6 dígitos)</label>
+      <input type="text" id="login-totp" placeholder="000 000" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <small style="font-size:.7rem;color:var(--text3);margin-top:3px;display:block">Abre tu app (Google Authenticator / Authy) y escribe el código</small>
     </div>
     <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar</button>
   </div>
@@ -551,6 +621,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="hdr-right">
       <div class="status-pill"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span></div>
       <span class="hdr-user" id="hdr-user"></span>
+      <button class="hdr-btn" id="btn-install-pwa" onclick="instalarPWA()" title="Instalar app" style="display:none"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
       <button class="hdr-btn" onclick="toggleDark()" title="Modo oscuro" aria-label="Cambiar modo"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <button class="hdr-btn" onclick="logout()" title="Cerrar sesión" style="font-size:11px;font-weight:600">Salir</button>
     </div>
@@ -584,6 +655,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <button class="sn-item active" data-tip="Analizar" onclick="sidebarTab(this,'analizar')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
+        </button>
+        <button class="sn-item" data-tip="Mi desempeño" onclick="sidebarTab(this,'mi-desempeno')">
+          <svg class="i i-md" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span class="sn-item-label">Mi desempeño</span>
         </button>
         <button class="sn-item" data-tip="Mis glosas" onclick="sidebarTab(this,'mis-glosas')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H7A2 2 0 0 0 5 13V20A2 2 0 0 0 7 22H17A2 2 0 0 0 19 20V13A2 2 0 0 0 17 11H15"/><path d="M9 11V7A3 3 0 0 1 15 7V11"/><path d="M9 16H15"/></svg>
@@ -740,13 +815,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               <div class="analitica-title">Analítica predictiva</div>
               <div class="analitica-sub">Recomendaciones automáticas a partir de los últimos <span id="ap-ventana-lbl">180</span> días</div>
             </div>
-            <select id="ap-ventana" onchange="cargarAnaliticaPredictiva()" class="ap-select">
-              <option value="30">30 días</option>
-              <option value="90">90 días</option>
-              <option value="180" selected>180 días</option>
-              <option value="365">365 días</option>
-              <option value="730">2 años</option>
-            </select>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <button class="btn btn-ghost" onclick="generarInformeEjecutivo()" title="Informe ejecutivo PDF del mes actual">📊 Informe ejecutivo</button>
+              <select id="ap-ventana" onchange="cargarAnaliticaPredictiva()" class="ap-select">
+                <option value="30">30 días</option>
+                <option value="90">90 días</option>
+                <option value="180" selected>180 días</option>
+                <option value="365">365 días</option>
+                <option value="730">2 años</option>
+              </select>
+            </div>
           </div>
 
           <div id="ap-recos" class="ap-recos"></div>
@@ -775,6 +853,56 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
     <!-- HISTORIAL -->
     <!-- MIS GLOSAS -->
+    <!-- MI DESEMPEÑO -->
+    <div class="panel" id="p-mi-desempeno">
+      <div class="page-pad">
+        <div class="page-head">
+          <div>
+            <h2 class="page-title">🏆 Mi desempeño</h2>
+            <p class="page-sub" id="md-saludo">KPIs personales, logros y ranking del equipo</p>
+          </div>
+          <div class="page-actions toolbar-inline">
+            <select id="md-ventana" onchange="cargarMiDesempeno()" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text);font-size:.82rem">
+              <option value="7">Últimos 7 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+              <option value="180">Últimos 180 días</option>
+              <option value="365">Último año</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="md-alertas"></div>
+
+        <div class="md-kpis" id="md-kpis">
+          <div class="md-kpi"><div class="md-lbl">Mis glosas</div><div class="md-num" id="mk-total">—</div></div>
+          <div class="md-kpi"><div class="md-lbl">Valor recuperado</div><div class="md-num c-green" id="mk-rec">—</div></div>
+          <div class="md-kpi"><div class="md-lbl">Tasa de éxito</div><div class="md-num" id="mk-tasa">—</div></div>
+          <div class="md-kpi"><div class="md-lbl">Racha 🔥</div><div class="md-num" id="mk-racha">—</div><div class="md-sub">días consecutivos</div></div>
+          <div class="md-kpi"><div class="md-lbl">Mi posición</div><div class="md-num" id="mk-pos">—</div><div class="md-sub">en el ranking</div></div>
+        </div>
+
+        <div class="md-grid">
+          <div class="chart-card">
+            <div class="chart-hdr">Logros desbloqueados</div>
+            <div class="md-logros" id="md-logros"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">Ranking del equipo</div>
+            <div class="ap-tbl-wrap"><table class="ap-tbl" id="md-ranking"></table></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">Mis glosas por workflow</div>
+            <div id="md-wf"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">Mi semáforo</div>
+            <div id="md-sem"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="p-mis-glosas">
       <div class="page-pad">
         <div class="page-head">
@@ -927,6 +1055,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="panel" id="p-usuarios">
       <div class="usuarios-area">
         <div class="usuarios-form-col">
+          <div class="form-card">
+            <h3>🔐 Mi seguridad <span>2FA</span></h3>
+            <div id="dos-fa-estado" style="font-size:.8rem;color:var(--text2);margin-bottom:.8rem">Cargando…</div>
+            <div id="dos-fa-acciones" style="display:flex;flex-direction:column;gap:.5rem"></div>
+            <div id="dos-fa-qr-box" style="display:none;margin-top:.8rem;text-align:center;background:var(--bg-subtle);padding:1rem;border-radius:8px">
+              <img id="dos-fa-qr" alt="QR 2FA" style="max-width:200px;display:block;margin:0 auto;background:white;padding:8px;border-radius:6px"/>
+              <p style="font-size:.72rem;color:var(--text3);margin:.5rem 0">Escanea con Google Authenticator, Authy o 1Password</p>
+              <input type="text" id="dos-fa-codigo" placeholder="Código de 6 dígitos" maxlength="6" style="padding:.45rem .7rem;font-size:.9rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);width:120px;text-align:center;letter-spacing:4px"/>
+              <button class="btn btn-primary btn-sm" onclick="activar2FA()" style="margin-left:.5rem">Activar</button>
+            </div>
+          </div>
           <div class="form-card">
             <h3>Crear Usuario <span>Nuevo</span></h3>
             <div class="field"><label>Nombre completo</label><input type="text" id="u-nombre"/></div>
@@ -1209,17 +1348,29 @@ document.getElementById('login-pass').addEventListener('keydown',function(e){
 async function doLogin(){
   var email=document.getElementById('login-email').value.trim();
   var pass=document.getElementById('login-pass').value;
+  var totpEl = document.getElementById('login-totp');
+  var totp = totpEl ? totpEl.value.trim() : '';
   var btn=document.getElementById('btn-login');
   var err=document.getElementById('login-error');
   err.style.display='none';
   if(!email||!pass){err.textContent='Complete todos los campos';err.style.display='block';return;}
   btn.disabled=true;btn.textContent='Ingresando…';
   try{
-    var fd=new FormData();fd.append('username',email);fd.append('password',pass);
+    var fd=new FormData();
+    fd.append('username',email);
+    fd.append('password',pass);
+    if(totp) fd.append('totp', totp);
     var r=await fetch('/token',{method:'POST',body:fd});
     if(!r.ok){
       var d=await r.json().catch(function(){return{}});
-      err.textContent=d.detail||'Credenciales incorrectas';
+      // Si el servidor pide 2FA y el campo no estaba visible, mostrarlo
+      if(r.headers.get('X-2FA-Required') === 'true' || (d.detail||'').indexOf('2FA') > -1){
+        var field = document.getElementById('login-totp-field');
+        if(field){ field.style.display='block'; document.getElementById('login-totp').focus(); }
+        err.textContent = totp ? 'Código 2FA inválido' : 'Ingresa el código de 6 dígitos de tu app de autenticación';
+      } else {
+        err.textContent=d.detail||'Credenciales incorrectas';
+      }
       err.style.display='block';
     } else {
       var d=await r.json();
@@ -1304,6 +1455,166 @@ function tab(btn,id){
   if(id==='audit') loadAudit(1);
   if(id==='mis-glosas') loadMisGlosas();
   if(id==='gold') cargarPlantillasGold();
+  if(id==='mi-desempeno') cargarMiDesempeno();
+  if(id==='usuarios') cargar2FAEstado();
+}
+
+async function cargar2FAEstado(){
+  var box = document.getElementById('dos-fa-estado');
+  var acc = document.getElementById('dos-fa-acciones');
+  if(!box || !acc) return;
+  try{
+    var r = await fetch('/2fa/estado', {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    if(d.activo){
+      box.innerHTML = '<span style="color:var(--c-green);font-weight:600">✓ 2FA activo</span> — Tu cuenta está protegida con código de 6 dígitos.';
+      acc.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="desactivar2FA()">Desactivar 2FA</button>';
+    } else if(d.configurado){
+      box.innerHTML = '<span style="color:#b45309">⚠️ 2FA configurado pero no activo</span> — Completa la activación escaneando el QR.';
+      acc.innerHTML = '<button class="btn btn-primary btn-sm" onclick="mostrarQR2FA()">Mostrar QR y activar</button>';
+    } else {
+      var msg = d.obligatorio_rol
+        ? '<span style="color:#b91c1c;font-weight:600">⚠️ SUPER_ADMIN sin 2FA.</span> Por seguridad institucional se recomienda activarlo.'
+        : 'Habilita 2FA para proteger tu cuenta con un código adicional cada login.';
+      box.innerHTML = msg;
+      acc.innerHTML = '<button class="btn btn-primary btn-sm" onclick="setup2FA()">Configurar 2FA</button>';
+    }
+  }catch(e){ console.error('2FA estado:', e); }
+}
+
+async function setup2FA(){
+  try{
+    var r = await fetch('/2fa/setup', {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(!r.ok){ toast('Error', d.detail||'No se pudo iniciar','error'); return; }
+    mostrarQR2FA();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+function mostrarQR2FA(){
+  var box = document.getElementById('dos-fa-qr-box');
+  var img = document.getElementById('dos-fa-qr');
+  // Añadir timestamp al src para bustear caché
+  img.src = '/2fa/qr?t=' + Date.now();
+  img.onload = function(){
+    // El navegador necesita el header Authorization; como <img> no lo manda,
+    // descargamos el blob con fetch y ponemos blob URL
+  };
+  // Fetch con auth
+  fetch('/2fa/qr', {headers: authH()})
+    .then(r => r.ok ? r.blob() : Promise.reject())
+    .then(blob => { img.src = URL.createObjectURL(blob); box.style.display='block'; document.getElementById('dos-fa-codigo').focus(); })
+    .catch(() => toast('Error','No se pudo cargar el QR','error'));
+}
+
+async function activar2FA(){
+  var codigo = (document.getElementById('dos-fa-codigo').value||'').replace(/\s/g,'');
+  if(codigo.length !== 6){ toast('Código inválido','Debe ser de 6 dígitos','warning'); return; }
+  try{
+    var r = await fetch('/2fa/activar', {
+      method:'POST', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({codigo: codigo})
+    });
+    var d = await r.json();
+    if(r.ok){
+      toast('2FA activado','Tu cuenta está protegida ✓','success');
+      document.getElementById('dos-fa-qr-box').style.display='none';
+      cargar2FAEstado();
+    } else { toast('Error', d.detail||'Código inválido','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function desactivar2FA(){
+  var codigo = prompt('Ingresa tu código actual de 6 dígitos para desactivar 2FA:');
+  if(!codigo || codigo.length !== 6) return;
+  try{
+    var r = await fetch('/2fa/desactivar', {
+      method:'POST', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({codigo: codigo})
+    });
+    var d = await r.json();
+    if(r.ok){ toast('2FA desactivado','—','success'); cargar2FAEstado(); }
+    else { toast('Error', d.detail||'Código inválido','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function cargarMiDesempeno(){
+  var ventana = (document.getElementById('md-ventana')||{value:30}).value || 30;
+  try{
+    var r = await fetch('/mi-desempeno/?ventana_dias='+ventana, {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    document.getElementById('md-saludo').textContent = 'Hola ' + (d.usuario.nombre||'') + ' · Últimos ' + d.ventana_dias + ' días';
+    document.getElementById('mk-total').textContent = d.kpis.total_glosas.toLocaleString('es-CO');
+    document.getElementById('mk-rec').textContent = cop(d.kpis.valor_recuperado);
+    document.getElementById('mk-tasa').textContent = d.kpis.tasa_exito + '%';
+    document.getElementById('mk-racha').textContent = d.racha_dias;
+    document.getElementById('mk-pos').textContent = d.ranking.mi_posicion ? '#'+d.ranking.mi_posicion+' / '+d.ranking.total_participantes : '—';
+
+    // Alertas
+    var alertasBox = document.getElementById('md-alertas');
+    if(d.alertas && d.alertas.length){
+      alertasBox.innerHTML = d.alertas.map(function(a){
+        return '<div class="md-alerta ' + a.nivel + '">' + escHtml(a.msg) + '</div>';
+      }).join('');
+    } else { alertasBox.innerHTML = ''; }
+
+    // Logros
+    var logrosBox = document.getElementById('md-logros');
+    if(d.logros && d.logros.length){
+      logrosBox.innerHTML = d.logros.map(function(l){
+        return '<div class="md-logro"><div class="md-logro-icon">'+l.icono+'</div>' +
+          '<div class="md-logro-body"><b>'+escHtml(l.nombre)+'</b><span>'+escHtml(l.desc)+'</span></div></div>';
+      }).join('');
+    } else {
+      logrosBox.innerHTML = '<div style="color:var(--text3);font-size:.8rem;padding:1rem;text-align:center">Procesa más glosas para desbloquear logros 🚀</div>';
+    }
+
+    // Ranking
+    var rk = document.getElementById('md-ranking');
+    var topList = (d.ranking.top_5 || []);
+    if(topList.length){
+      var head = '<thead><tr><th>#</th><th>Gestor</th><th class="num">Glosas</th><th class="num">Recup.</th><th class="num">Éxito</th></tr></thead>';
+      var body = '<tbody>' + topList.map(function(r, i){
+        var esMio = r.email === d.usuario.email;
+        return '<tr class="'+(esMio?'md-ranking-me':'')+'">' +
+          '<td>'+(i+1)+'</td>' +
+          '<td>'+escHtml(r.nombre)+(esMio?' <b>(tú)</b>':'')+'</td>' +
+          '<td class="num">'+r.glosas+'</td>' +
+          '<td class="num">'+cop(r.recuperado)+'</td>' +
+          '<td class="num">'+r.tasa_exito+'%</td>' +
+        '</tr>';
+      }).join('') + '</tbody>';
+      rk.innerHTML = head + body;
+    } else {
+      rk.innerHTML = '<tr><td style="color:var(--text3);padding:1rem;text-align:center">Sin datos</td></tr>';
+    }
+
+    // Workflow bars
+    var wfBox = document.getElementById('md-wf');
+    var wfColors = {BORRADOR:'#6b7280', EN_REVISION:'#d97706', APROBADA:'#047857', RADICADA:'#1d4ed8'};
+    var wfTotal = Object.values(d.por_workflow).reduce(function(a,b){return a+b;}, 0) || 1;
+    wfBox.innerHTML = Object.keys(d.por_workflow).map(function(k){
+      var v = d.por_workflow[k] || 0;
+      var pct = (v / wfTotal * 100);
+      return '<div class="md-bar"><span style="min-width:90px;font-size:.72rem;color:var(--text2)">'+k.replace('_',' ')+'</span>' +
+        '<div class="md-bar-fill"><span style="width:'+pct+'%;background:'+wfColors[k]+'"></span></div>' +
+        '<span class="md-bar-num">'+v+'</span></div>';
+    }).join('');
+
+    // Semáforo bars
+    var semBox = document.getElementById('md-sem');
+    var semColors = {VERDE:'#047857', AMARILLO:'#d97706', ROJO:'#b91c1c', NEGRO:'#111827'};
+    var semTotal = Object.values(d.semaforo).reduce(function(a,b){return a+b;}, 0) || 1;
+    semBox.innerHTML = Object.keys(d.semaforo).map(function(k){
+      var v = d.semaforo[k] || 0;
+      var pct = (v / semTotal * 100);
+      return '<div class="md-bar"><span style="min-width:90px;font-size:.72rem;color:var(--text2)">'+k+'</span>' +
+        '<div class="md-bar-fill"><span style="width:'+pct+'%;background:'+semColors[k]+'"></span></div>' +
+        '<span class="md-bar-num">'+v+'</span></div>';
+    }).join('');
+  }catch(e){ console.error('mi-desempeno:', e); }
 }
 
 // Sidebar: activa el item, sincroniza con tab() y en mobile cierra el drawer
@@ -1698,9 +2009,19 @@ function renderResult(d){
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
     +'<button class="btn btn-ghost" onclick="copiarDictamen()">Copiar texto</button>'
+    +'<button class="btn btn-ghost" onclick="validarPreRadicacion()">🛡️ Validar</button>'
     +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
     +'<button class="btn btn-ghost" onclick="guardarComoPlantillaGoldInline()">⭐ Guardar como Gold</button>'
     +'<button class="btn btn-ghost" onclick="nuevaGlosa()">Nueva glosa</button>'
+    +'</div>'
+    +'<div id="validar-result" class="validar-result" style="display:none"></div>'
+    +'<div class="thread-box" id="thread-box">'
+    +'  <div class="thread-hdr"><b>💬 Comentarios del equipo</b><span id="thread-count" class="thread-count">0</span></div>'
+    +'  <div class="thread-list" id="thread-list"><div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sin comentarios todavía</div></div>'
+    +'  <div class="thread-compose">'
+    +'    <textarea id="thread-input" rows="2" placeholder="Escribe un comentario o @email para mencionar…"></textarea>'
+    +'    <button class="btn btn-primary btn-sm" onclick="enviarComentario()">Enviar</button>'
+    +'  </div>'
     +'</div>'
 
     +'<div class="refinar-panel" id="refinar-inline" style="display:none;margin-top:1rem;border-radius:10px;border:1px solid var(--border)">'
@@ -1721,6 +2042,80 @@ function renderResult(d){
     +'</div>';
 
   document.getElementById('result-area').innerHTML=html;
+  if(CURRENT_GLOSA_ID) cargarComentarios(CURRENT_GLOSA_ID);
+}
+
+async function cargarComentarios(glosaId){
+  var list = document.getElementById('thread-list');
+  var count = document.getElementById('thread-count');
+  if(!list) return;
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/comentarios/', {headers: authH()});
+    if(!r.ok){ return; }
+    var data = await r.json();
+    if(count) count.textContent = data.length;
+    if(!data.length){
+      list.innerHTML = '<div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sin comentarios todavía. Escribe el primero.</div>';
+      return;
+    }
+    list.innerHTML = data.map(function(c){
+      var fecha = c.creado_en ? new Date(c.creado_en).toLocaleString('es-CO',{dateStyle:'short',timeStyle:'short'}) : '';
+      var rolCls = (c.autor_rol||'').toLowerCase();
+      var resuelto = c.resuelto ? ' thread-resuelto' : '';
+      var mencion = c.mencion ? '<span class="thread-mencion">@'+escHtml(c.mencion)+'</span>' : '';
+      var actions = '';
+      if(!c.resuelto){
+        actions += '<button class="thread-act" onclick="resolverComentario('+glosaId+','+c.id+')" title="Marcar resuelto">✓</button>';
+      }
+      actions += '<button class="thread-act" onclick="eliminarComentario('+glosaId+','+c.id+')" title="Eliminar">✕</button>';
+      return '<div class="thread-item'+resuelto+'">' +
+        '<div class="thread-meta">' +
+          '<span class="thread-autor rol-'+rolCls+'">'+escHtml(c.autor_nombre||c.autor_email)+'</span>' +
+          '<span class="thread-rol">'+escHtml(c.autor_rol||'')+'</span>' +
+          mencion +
+          '<span class="thread-fecha">'+fecha+'</span>' +
+          '<span class="thread-acciones">'+actions+'</span>' +
+        '</div>' +
+        '<div class="thread-text">'+escHtml(c.texto).replace(/\n/g,'<br>')+'</div>' +
+        (c.resuelto ? '<div class="thread-resuelto-lbl">✓ Resuelto por '+escHtml(c.resuelto_por||'')+'</div>' : '') +
+      '</div>';
+    }).join('');
+  }catch(e){ console.error('comentarios:', e); }
+}
+
+async function enviarComentario(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Primero analiza una glosa','warning'); return; }
+  var ta = document.getElementById('thread-input');
+  var txt = (ta.value||'').trim();
+  if(txt.length < 1){ return; }
+  try{
+    var r = await fetch('/glosas/'+CURRENT_GLOSA_ID+'/comentarios/', {
+      method:'POST', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({texto: txt})
+    });
+    var d = await r.json();
+    if(r.ok){ ta.value=''; cargarComentarios(CURRENT_GLOSA_ID); }
+    else { toast('Error', d.detail||'No se pudo enviar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function resolverComentario(glosaId, comentarioId){
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/comentarios/'+comentarioId+'/resolver', {
+      method:'PATCH', headers: authH()
+    });
+    if(r.ok) cargarComentarios(glosaId);
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function eliminarComentario(glosaId, comentarioId){
+  if(!confirm('¿Eliminar este comentario?')) return;
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/comentarios/'+comentarioId, {
+      method:'DELETE', headers: authH()
+    });
+    if(r.ok) cargarComentarios(glosaId);
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 function toggleRefinarInline(){
@@ -1767,6 +2162,67 @@ async function aplicarRefinarInline(){
     st.className = 'refinar-status err';
     st.textContent = 'Conexión: ' + e.message;
   }
+}
+
+async function validarPreRadicacion(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Primero analiza una glosa','warning'); return; }
+  var box = document.getElementById('validar-result');
+  if(box){
+    box.style.display = 'block';
+    box.className = 'validar-result validar-loading';
+    box.innerHTML = '<div style="padding:14px;text-align:center">🛡️ Revisando con IA… ~15s</div>';
+    box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/validar', {
+      method: 'POST', headers: authH()
+    });
+    var d = await r.json();
+    if(!r.ok){ box.className='validar-result validar-err'; box.innerHTML='<div style="padding:14px">Error: '+(d.detail||'no se pudo validar')+'</div>'; return; }
+    renderValidacion(d);
+  }catch(e){ box.className='validar-result validar-err'; box.innerHTML='<div style="padding:14px">Conexión: '+e.message+'</div>'; }
+}
+
+function renderValidacion(d){
+  var box = document.getElementById('validar-result');
+  if(!box) return;
+  var estadoCls = d.puede_radicar ? 'ok' : 'bad';
+  var estadoTxt = d.puede_radicar ? '✓ PUEDE RADICARSE' : '⚠️ REVISAR ANTES DE RADICAR';
+  var color = d.score_calidad >= 80 ? '#047857' : d.score_calidad >= 60 ? '#b45309' : '#b91c1c';
+  var hallazgosHtml = '';
+  if(d.hallazgos && d.hallazgos.length){
+    hallazgosHtml = '<ul style="margin:.5rem 0 0;padding-left:1.2rem">' + d.hallazgos.map(function(h){
+      var ic = h.nivel === 'error' ? '🔴' : h.nivel === 'warn' ? '🟡' : '🔵';
+      return '<li style="margin:.25rem 0"><b>'+ic+' '+h.nivel.toUpperCase()+':</b> ' + escHtml(h.mensaje) + '</li>';
+    }).join('') + '</ul>';
+  } else {
+    hallazgosHtml = '<div style="color:var(--c-green);margin-top:.5rem">✓ Sin observaciones. El argumento pasa todos los checks.</div>';
+  }
+  // Validación normativa
+  var normHtml = '';
+  var vn = d.validacion_normativa || null;
+  if(vn && vn.citas_encontradas && vn.citas_encontradas.length){
+    var scoreN = vn.score_citas;
+    var colorN = scoreN >= 80 ? '#047857' : scoreN >= 50 ? '#b45309' : '#b91c1c';
+    normHtml = '<div class="validar-normas">' +
+      '<div class="validar-normas-hdr"><b>⚖️ Validación normativa</b>' +
+        '<span style="color:'+colorN+';font-weight:700">'+scoreN+'/100</span></div>' +
+      '<div class="validar-normas-body">' +
+        '<span class="norm-chip ok">✓ Vigentes ('+vn.validas.length+'): ' + escHtml((vn.validas||[]).slice(0,6).join(' · ') || 'ninguna detectada') + '</span>' +
+        (vn.derogadas.length ? vn.derogadas.map(function(d){ return '<span class="norm-chip bad">✗ '+escHtml(d.cita)+' → '+escHtml(d.reemplaza_por||'verificar')+'</span>'; }).join('') : '') +
+        (vn.no_catalogadas.length ? '<span class="norm-chip info">? No verificadas: '+escHtml(vn.no_catalogadas.slice(0,4).join(' · '))+'</span>' : '') +
+      '</div></div>';
+  }
+
+  box.className = 'validar-result ' + estadoCls;
+  box.innerHTML =
+    '<div class="validar-hdr">' +
+      '<span class="validar-estado" style="background:'+color+'">'+estadoTxt+'</span>' +
+      '<span class="validar-score">Calidad: <b style="color:'+color+'">'+d.score_calidad+'/100</b></span>' +
+      '<span class="validar-resumen">'+escHtml(d.resumen||'')+'</span>' +
+    '</div>' +
+    hallazgosHtml +
+    normHtml;
 }
 
 async function guardarComoPlantillaGoldInline(){
@@ -1958,6 +2414,21 @@ async function loadDash(){
     cargarAnaliticaPredictiva();
 
   } catch(e){console.error('Dashboard error',e);}
+}
+
+async function generarInformeEjecutivo(){
+  var now = new Date();
+  var year = prompt('Año del informe:', now.getFullYear());
+  if(!year) return;
+  var month = prompt('Mes (1-12):', now.getMonth()+1);
+  if(!month) return;
+  try{
+    var r = await fetch('/informes/ejecutivo-mensual?year='+year+'&month='+month, {headers: authH()});
+    if(!r.ok){ toast('Error','No se pudo generar','error'); return; }
+    var html = await r.text();
+    var w = window.open('', '_blank', 'width=980,height=820');
+    w.document.write(html); w.document.close();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function cargarAnaliticaPredictiva(){
@@ -2702,7 +3173,29 @@ window.addEventListener('DOMContentLoaded',function(){
     initApp();
   }
   if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
+  // Registrar service worker para PWA (solo si es servido por HTTPS o localhost)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  }
 });
+
+// PWA install prompt
+var DEFERRED_INSTALL = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  DEFERRED_INSTALL = e;
+  var btn = document.getElementById('btn-install-pwa');
+  if(btn) btn.style.display = 'inline-flex';
+});
+async function instalarPWA(){
+  if(!DEFERRED_INSTALL){ toast('Ya instalada','La app ya está instalada o tu navegador no lo soporta','info'); return; }
+  DEFERRED_INSTALL.prompt();
+  var res = await DEFERRED_INSTALL.userChoice;
+  if(res && res.outcome === 'accepted'){ toast('Instalada','HUS Glosas está lista en tu equipo','success'); }
+  DEFERRED_INSTALL = null;
+  var btn = document.getElementById('btn-install-pwa');
+  if(btn) btn.style.display = 'none';
+}
 
 // ─── SALUD TOTAL ───────────────────────────────────────────────────────────
 function cambiarTipoRespuestaST(){
@@ -2893,13 +3386,49 @@ function renderSpotlightResults(query){
     });
   }
 
+  // Si la query es larga (frase), ofrecer búsqueda IA semántica
+  var iaHint = '';
+  if(query && query.trim().length > 10){
+    iaHint = '<div class="spot-ia-hint"><button class="spot-ia-btn" onclick="busquedaSemanticaSpot(\''+ escJs(query) +'\')">🧠 Buscar con IA: "' + escHtml(query) + '"</button></div>';
+  }
+
   if(!html){
-    box.innerHTML = '<div class="spot-empty">Sin resultados para "<b>' + escHtml(query) + '</b>"</div>';
+    box.innerHTML = iaHint + '<div class="spot-empty">Sin resultados exactos para "<b>' + escHtml(query) + '</b>"</div>';
   } else {
-    box.innerHTML = html;
+    box.innerHTML = iaHint + html;
     SPOT_ACTIVE_IDX = 0;
     highlightSpotItem(0);
   }
+}
+
+async function busquedaSemanticaSpot(query){
+  var box = document.getElementById('spot-results');
+  box.innerHTML = '<div class="spot-empty">🧠 Buscando con IA…</div>';
+  try{
+    var r = await fetch('/busqueda-semantica/', {
+      method:'POST', headers:{...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({query: query, limite: 10})
+    });
+    var d = await r.json();
+    if(!r.ok || !d.resultados.length){
+      box.innerHTML = '<div class="spot-empty">Sin resultados IA para "<b>'+escHtml(query)+'</b>"</div>';
+      return;
+    }
+    var html = '<div class="spot-group-lbl">🧠 Resultados IA · método: ' + escHtml(d.metodo) + ' (' + d.resultados.length + ')</div>';
+    d.resultados.forEach(function(g, i){
+      html += '<div class="spot-item" data-idx="' + i + '" onclick="accionSpotGlosa(' + g.id + ')">' +
+        '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
+        '<div class="spot-item-main">' +
+          '<div class="spot-item-title">' + escHtml(g.codigo_glosa||'—') + ' · ' + escHtml(g.eps||'—') + '</div>' +
+          '<div class="spot-item-sub">' + escHtml(g.factura||'—') + ' · $' + (g.valor_objetado||0).toLocaleString('es-CO') + ' · ' + escHtml((g.servicio||'').substring(0,60)) + '</div>' +
+        '</div>' +
+        '<span class="spot-item-meta">ID ' + g.id + '</span>' +
+      '</div>';
+    });
+    box.innerHTML = html;
+    SPOT_ACTIVE_IDX = 0;
+    highlightSpotItem(0);
+  }catch(e){ box.innerHTML = '<div class="spot-empty">Error: '+escHtml(e.message)+'</div>'; }
 }
 
 function highlightSpotItem(idx){

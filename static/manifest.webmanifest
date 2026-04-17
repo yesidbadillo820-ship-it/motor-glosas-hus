@@ -1,0 +1,41 @@
+{
+  "name": "Motor Glosas HUS",
+  "short_name": "HUS Glosas",
+  "description": "Motor IA para gestión de glosas médicas — ESE Hospital Universitario de Santander",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b5d8a",
+  "theme_color": "#0b5d8a",
+  "lang": "es-CO",
+  "categories": ["medical", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mis glosas",
+      "short_name": "Mis glosas",
+      "url": "/?tab=mis-glosas",
+      "description": "Ver mis glosas asignadas"
+    },
+    {
+      "name": "Analizar nueva",
+      "short_name": "Analizar",
+      "url": "/?tab=analizar",
+      "description": "Analizar una nueva glosa"
+    }
+  ]
+}

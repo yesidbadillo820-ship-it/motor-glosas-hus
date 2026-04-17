@@ -385,6 +385,24 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
 
+    # Migraciones para usuarios - 2FA TOTP
+    _USUARIOS_MISSING_2FA = [
+        ("totp_secret", "VARCHAR(64)"),
+        ("totp_activo", "INTEGER DEFAULT 0"),
+    ]
+    for col_name, col_ddl in _USUARIOS_MISSING_2FA:
+        try:
+            result = db.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='usuarios' AND column_name=:col"
+            ), {"col": col_name})
+            if not result.fetchone():
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a usuarios")
+                db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
+
     # Migraciones para conciliaciones - trazabilidad bilateral
     _CONCILIACION_MISSING = [
         ("contra_respuesta_eps", "TEXT"),
@@ -573,6 +591,11 @@ from app.api.routers.audit import router as audit_router
 from app.api.routers.salud_total import router as salud_total_router
 from app.api.routers.admin import router as admin_router
 from app.api.routers.plantillas_gold import router as plantillas_gold_router
+from app.api.routers.comentarios import router as comentarios_router
+from app.api.routers.informes import router as informes_router
+from app.api.routers.mi_desempeno import router as mi_desempeno_router
+from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
+from app.api.routers.dos_fa import router as dos_fa_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -591,6 +614,11 @@ app.include_router(audit_router)
 app.include_router(salud_total_router)
 app.include_router(admin_router)
 app.include_router(plantillas_gold_router)
+app.include_router(comentarios_router)
+app.include_router(informes_router)
+app.include_router(mi_desempeno_router)
+app.include_router(busqueda_semantica_router)
+app.include_router(dos_fa_router)
 
 
 def get_glosa_service() -> GlosaService:
@@ -872,6 +900,54 @@ async def analizar(
 @app.get("/")
 def root():
     return FileResponse("static/index.html")
+
+
+@app.get("/manifest.webmanifest")
+def pwa_manifest():
+    return FileResponse("static/manifest.webmanifest", media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def pwa_service_worker():
+    return FileResponse("static/sw.js", media_type="application/javascript")
+
+
+def _generar_icono_pwa(size: int) -> bytes:
+    """Genera un icono PWA cuadrado con el azul institucional y 'HUS'."""
+    from PIL import Image, ImageDraw, ImageFont
+    from io import BytesIO
+    img = Image.new("RGB", (size, size), "#0b5d8a")
+    draw = ImageDraw.Draw(img)
+    # Círculo de acento
+    pad = int(size * 0.08)
+    draw.ellipse([pad, pad, size - pad, size - pad], outline="#ffffff", width=max(2, size // 80))
+    # Texto "HUS"
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", int(size * 0.42))
+    except Exception:
+        font = ImageFont.load_default()
+    texto = "HUS"
+    bbox = draw.textbbox((0, 0), texto, font=font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+    draw.text(((size - tw) // 2, (size - th) // 2 - int(size * 0.03)), texto, fill="#ffffff", font=font)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@app.get("/icon-192.png")
+def icon_192():
+    from fastapi.responses import Response
+    return Response(content=_generar_icono_pwa(192), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/icon-512.png")
+def icon_512():
+    from fastapi.responses import Response
+    return Response(content=_generar_icono_pwa(512), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/importar-masiva")
