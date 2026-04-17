@@ -9,31 +9,44 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
-  --c-navy:#0e1f3d;--c-navy2:#1a3560;--c-navy3:#2d508a;
-  --c-teal:#0b7c6e;--c-teal2:#0d9488;--c-teal-light:#e6f5f3;
-  --c-blue:#1a56db;--c-blue-light:#eff6ff;
-  --c-red:#b91c1c;--c-red-light:#fef2f2;
-  --c-amber:#b45309;--c-amber-light:#fffbeb;
-  --c-green:#15803d;--c-green-light:#f0fdf4;
-  --c-gray:#374151;--c-gray2:#6b7280;--c-gray3:#9ca3af;
-  --bg:#f3f6fb;--bg-card:#ffffff;
-  --border:#e5e9f0;--border2:#d1d9e6;
-  --text:#111827;--text2:#374151;--text3:#6b7280;
-  --r:10px;--r-lg:14px;
-  --sh:0 1px 3px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.05);
-  --sh-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.05);
-  --font:'Inter',system-ui,sans-serif;
-  --font-mono:'JetBrains Mono',monospace;
+  /* Paleta médico-administrativa refinada (inspirada en Epic/Linear) */
+  --navy:#0f172a; --navy2:#1e293b; --navy3:#334155;
+  --teal:#0284c7; --teal2:#0369a1; --teal-light:#e0f2fe;
+  --c-navy:#0f172a; --c-navy2:#1e293b; --c-navy3:#334155;
+  --c-teal:#0369a1; --c-teal2:#0284c7; --c-teal-light:#e0f2fe;
+  --c-blue:#1d4ed8; --c-blue-light:#eff6ff;
+  --c-red:#dc2626; --c-red-light:#fef2f2;
+  --c-amber:#ca8a04; --c-amber-light:#fefce8;
+  --c-green:#047857; --c-green-light:#ecfdf5;
+  --c-gray:#334155; --c-gray2:#64748b; --c-gray3:#94a3b8;
+  --bg:#fafafa; --bg-card:#ffffff; --bg-subtle:#f8fafc;
+  --border:#e2e8f0; --border2:#cbd5e1; --border-focus:#0284c7;
+  --text:#0f172a; --text2:#334155; --text3:#64748b; --text4:#94a3b8;
+  --r:8px; --r-lg:12px; --r-xl:16px;
+  --sh:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.06);
+  --sh-md:0 2px 4px rgba(15,23,42,.06),0 4px 12px rgba(15,23,42,.08);
+  --sh-lg:0 8px 16px rgba(15,23,42,.08),0 16px 40px rgba(15,23,42,.10);
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.4,0,.2,1);
 }
 body.dark{
-  --bg:#0f172a;--bg-card:#1e293b;--border:#2d3f55;--border2:#3b4f6b;
-  --text:#f1f5f9;--text2:#cbd5e1;--text3:#94a3b8;
-  --sh:0 1px 3px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.3);
-  --sh-md:0 4px 12px rgba(0,0,0,.4),0 2px 4px rgba(0,0,0,.3);
+  --bg:#0a0f1c; --bg-card:#0f172a; --bg-subtle:#131c2f;
+  --border:#1e293b; --border2:#334155;
+  --text:#f1f5f9; --text2:#cbd5e1; --text3:#94a3b8; --text4:#64748b;
+  --sh:0 1px 2px rgba(0,0,0,.3),0 1px 3px rgba(0,0,0,.4);
+  --sh-md:0 2px 4px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:14px}
-body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;transition:background .2s,color .2s}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;transition:background .2s var(--ease),color .2s var(--ease)}
+
+/* Sistema de iconos SVG inline */
+.i{display:inline-block;width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em}
+.i-sm{width:14px;height:14px}
+.i-md{width:16px;height:16px}
+.i-lg{width:20px;height:20px}
+.i-xl{width:24px;height:24px}
 
 /* ─── LOGIN ─────────────────────────────── */
 #login-screen{position:fixed;inset:0;background:var(--c-navy);display:flex;align-items:center;justify-content:center;z-index:9999}
@@ -61,9 +74,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 /* ─── HEADER ─────────────────────────────── */
 header{background:var(--c-navy);height:58px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;border-bottom:3px solid var(--c-teal2);z-index:200}
 .hdr-left{display:flex;align-items:center;gap:.75rem}
-.hdr-badge{width:36px;height:36px;background:var(--c-teal2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;letter-spacing:.5px;flex-shrink:0}
-.hdr-title{font-size:.9rem;font-weight:700;color:#fff}
-.hdr-sub{font-size:.68rem;color:rgba(255,255,255,.45);margin-top:1px}
+.hdr-badge{width:38px;height:38px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:4px}
+.hdr-badge img{width:100%;height:100%;object-fit:contain;filter:brightness(0) invert(1) contrast(1.1)}
+.hdr-title{font-size:.92rem;font-weight:700;color:#fff;letter-spacing:-.01em}
+.hdr-sub{font-size:.68rem;color:rgba(255,255,255,.55);margin-top:2px;font-weight:500}
 .hdr-right{display:flex;align-items:center;gap:.75rem}
 .status-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,255,255,.08);border-radius:20px;font-size:.7rem;color:rgba(255,255,255,.7)}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0}
@@ -198,20 +212,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .res-dictamen-body{padding:1.25rem;max-height:480px;overflow-y:auto;font-size:.8rem;line-height:2;color:var(--text2)}
 .res-actions{display:flex;gap:.6rem;flex-wrap:wrap}
 
-/* ─── DASHBOARD ──────────────────────────── */
-.dash-area{flex:1;overflow-y:auto;padding:1.5rem;display:flex;flex-direction:column;gap:1.25rem}
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
-.kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem;position:relative;overflow:hidden}
-.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
-.kpi.teal::before{background:var(--c-teal2)}
-.kpi.red::before{background:var(--c-red)}
-.kpi.green::before{background:var(--c-green)}
-.kpi.amber::before{background:var(--c-amber)}
-.kpi.blue::before{background:var(--c-blue)}
-.kpi-lbl{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:.4rem}
-.kpi-num{font-size:1.6rem;font-weight:800;color:var(--text);line-height:1.1}
-.kpi-num.c-red{color:var(--c-red)}.kpi-num.c-green{color:var(--c-green)}.kpi-num.c-amber{color:var(--c-amber)}.kpi-num.c-blue{color:var(--c-blue)}.kpi-num.c-teal{color:var(--c-teal2)}
-.kpi-sub{font-size:.68rem;color:var(--text3);margin-top:.3rem}
+/* ─── DASHBOARD (sobrio, mono-color con jerarquía) ──────────────────────────── */
+.dash-area{flex:1;overflow-y:auto;padding:1.75rem;display:flex;flex-direction:column;gap:1.25rem}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:.85rem}
+.kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.35rem;transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
+.kpi:hover{border-color:var(--border2);box-shadow:var(--sh)}
+.kpi::before{display:none}
+.kpi-lbl{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text3)}
+.kpi-num{font-size:1.75rem;font-weight:700;color:var(--text);line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi-num.c-red,.kpi-num.c-green,.kpi-num.c-amber,.kpi-num.c-blue,.kpi-num.c-teal{color:var(--text)}
+.kpi-sub{font-size:.72rem;color:var(--text3);display:flex;align-items:center;gap:.3rem}
+.kpi-sub .trend-up{color:#047857;font-weight:600}
+.kpi-sub .trend-down{color:#dc2626;font-weight:600}
 .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;flex:1}
 .chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem}
 .chart-card.full{grid-column:span 2}
@@ -306,48 +318,62 @@ textarea{resize:vertical;min-height:80px}
 .stat-card.accent-negro .n{color:#0f172a}
 body.dark .stat-card.accent-negro .n{color:#e2e8f0}
 
-/* Tabla moderna */
+/* Tabla moderna (pulida, estilo EMR pro) */
 .tbl-modern{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh)}
 .tbl-modern table{width:100%;border-collapse:collapse;font-size:.82rem}
-.tbl-modern thead tr{background:var(--bg);border-bottom:1px solid var(--border)}
-.tbl-modern th{padding:.7rem .85rem;text-align:left;font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
-.tbl-modern td{padding:.7rem .85rem;border-bottom:1px solid var(--border);color:var(--text2)}
-.tbl-modern tbody tr{transition:background .15s}
-.tbl-modern tbody tr:hover{background:var(--bg)}
+.tbl-modern thead tr{background:var(--bg-subtle);border-bottom:1px solid var(--border)}
+.tbl-modern th{padding:.9rem 1rem;text-align:left;font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px}
+.tbl-modern td{padding:.85rem 1rem;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle}
+.tbl-modern tbody tr{transition:background .15s var(--ease),box-shadow .15s var(--ease)}
+.tbl-modern tbody tr:hover{background:var(--bg-subtle)}
 .tbl-modern tbody tr:last-child td{border-bottom:none}
-.tbl-modern .mono{font-family:var(--font-mono);font-size:.76rem}
+.tbl-modern .mono{font-family:var(--font-mono);font-size:.76rem;color:var(--text2)}
 .tbl-modern .num{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;color:var(--text)}
 .tbl-modern .cell-center{text-align:center}
 
-/* Badges de semáforo y estado */
-.chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700;letter-spacing:.3px;line-height:1.4}
-.chip-verde{background:#d1fae5;color:#065f46}
-.chip-amarillo{background:#fef3c7;color:#92400e}
-.chip-rojo{background:#fee2e2;color:#991b1b}
-.chip-negro{background:#1f2937;color:#fff}
-.chip-estado{background:#dbeafe;color:#1e40af}
-.chip-tipo-administrativo{background:#eff6ff;color:#1d4ed8}
-.chip-tipo-medico{background:#ecfdf5;color:#047857}
-.chip-tipo-mixta{background:#fef3c7;color:#92400e}
-.chip-radicado{background:#eef2ff;color:#3730a3;font-family:var(--font-mono);font-size:.72rem;padding:2px 6px}
+/* Chips outlined (más profesionales que rellenos saturados) */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:.68rem;font-weight:600;letter-spacing:.3px;line-height:1.4;border:1px solid transparent}
+.chip-verde{background:transparent;color:#047857;border-color:#a7f3d0;background:#ecfdf5}
+.chip-amarillo{background:#fefce8;color:#a16207;border-color:#fde68a}
+.chip-rojo{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+.chip-negro{background:#0f172a;color:#fff;border-color:#0f172a}
+.chip-estado{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+.chip-tipo-administrativo{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+.chip-tipo-medico{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
+.chip-tipo-mixta{background:#fefce8;color:#a16207;border-color:#fde68a}
+.chip-radicado{background:#eef2ff;color:#3730a3;border-color:#c7d2fe;font-family:var(--font-mono);font-size:.72rem;padding:3px 8px}
 
-body.dark .chip-verde{background:rgba(34,197,94,.15);color:#86efac}
-body.dark .chip-amarillo{background:rgba(234,179,8,.15);color:#fde047}
-body.dark .chip-rojo{background:rgba(239,68,68,.15);color:#fca5a5}
-body.dark .chip-estado{background:rgba(30,64,175,.2);color:#93c5fd}
+body.dark .chip-verde{background:rgba(5,150,105,.15);color:#6ee7b7;border-color:rgba(16,185,129,.3)}
+body.dark .chip-amarillo{background:rgba(202,138,4,.15);color:#fde047;border-color:rgba(234,179,8,.3)}
+body.dark .chip-rojo{background:rgba(220,38,38,.15);color:#fca5a5;border-color:rgba(239,68,68,.3)}
+body.dark .chip-estado{background:rgba(29,78,216,.2);color:#93c5fd;border-color:rgba(59,130,246,.3)}
 
 /* Botón compacto para tabla */
-.btn-sm{padding:.35rem .75rem;font-size:.72rem;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);transition:all .2s;background:var(--c-teal2);color:#fff}
-.btn-sm:hover{background:var(--c-teal)}
+.btn-sm{padding:.4rem .85rem;font-size:.74rem;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);transition:all .15s var(--ease);background:var(--c-teal2);color:#fff;display:inline-flex;align-items:center;gap:.35rem}
+.btn-sm:hover{background:var(--c-teal);box-shadow:0 2px 6px rgba(2,132,199,.25)}
 .btn-sm.ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
-.btn-sm.ghost:hover{border-color:var(--c-teal2);color:var(--c-teal2)}
+.btn-sm.ghost:hover{border-color:var(--c-teal2);color:var(--c-teal2);background:var(--c-teal-light)}
 
 /* Toolbar inline para filtros/toggle */
 .toolbar-inline{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
 .toggle-lbl{font-size:.74rem;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:.4rem}
 .toggle-lbl input{width:auto}
 
-.empty-row td{padding:2.5rem 1rem !important;text-align:center;color:var(--text3);font-size:.8rem}
+.empty-row td{padding:3rem 1rem !important;text-align:center;color:var(--text3);font-size:.8rem}
+.empty-state-svg{width:96px;height:96px;margin:0 auto .75rem;opacity:.5}
+
+/* Skeleton loader */
+@keyframes skel-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+.skel{display:inline-block;background:linear-gradient(90deg,var(--bg-subtle) 0%,var(--border) 50%,var(--bg-subtle) 100%);background-size:400px 100%;animation:skel-shimmer 1.4s linear infinite;border-radius:4px;height:.9em;min-width:60px}
+.skel-row td{padding:.85rem 1rem}
+.skel-row .skel{display:block;width:100%;height:.9rem}
+
+/* Transiciones de panel */
+.panel.active{animation:fade-in .2s var(--ease)}
+@keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* Focus ring accesible */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nb:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px;border-radius:6px}
 
 /* nav-bar pulido */
 .nb-special{background:var(--c-teal2);color:#fff!important;border-radius:var(--r)!important;padding:5px 14px!important;margin-left:.35rem;height:28px;align-self:center;border-bottom-color:transparent!important;font-size:.72rem}
@@ -388,33 +414,33 @@ body.dark .chip-estado{background:rgba(30,64,175,.2);color:#93c5fd}
 <div id="app">
   <header>
     <div class="hdr-left">
-      <div class="hdr-badge">HUS</div>
+      <div class="hdr-badge"><img src="/static/logo.png" alt="HUS"/></div>
       <div>
-        <div class="hdr-title">Sistema de Glosas IA</div>
-        <div class="hdr-sub">ESE Hospital Universitario de Santander — Área de Cartera</div>
+        <div class="hdr-title">Motor de Glosas HUS</div>
+        <div class="hdr-sub">ESE Hospital Universitario de Santander · Área de Cartera</div>
       </div>
     </div>
     <div class="hdr-right">
       <div class="status-pill"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span></div>
       <span class="hdr-user" id="hdr-user"></span>
-      <button class="hdr-btn" onclick="toggleDark()" title="Modo oscuro">◐</button>
+      <button class="hdr-btn" onclick="toggleDark()" title="Modo oscuro" aria-label="Cambiar modo"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <button class="hdr-btn" onclick="logout()" title="Cerrar sesión" style="font-size:11px;font-weight:600">Salir</button>
     </div>
   </header>
 
   <div class="nav-bar">
-    <button class="nb active" onclick="tab(this,'analizar')">Analizar</button>
-    <button class="nb" onclick="tab(this,'dashboard')">Dashboard</button>
-    <button class="nb" onclick="tab(this,'mis-glosas')">📋 Mis Glosas <span class="nb-badge" id="mis-badge" style="display:none">0</span></button>
-    <button class="nb" onclick="tab(this,'historial')">Historial</button>
-    <button class="nb" onclick="tab(this,'alertas')">Alertas <span class="nb-badge" id="alert-badge" style="display:none">0</span></button>
-    <button class="nb" onclick="tab(this,'contratos')">Contratos</button>
-    <button class="nb" onclick="tab(this,'usuarios')">Usuarios</button>
-    <button class="nb" onclick="tab(this,'conciliacion')">Conciliación</button>
-    <button class="nb" onclick="tab(this,'audit')">Auditoría</button>
-    <button class="nb" onclick="tab(this,'salud-total')">Salud Total</button>
-    <button class="nb nb-special" onclick="window.location.href='/importar-masiva'">📊 Importación Masiva</button>
-    <button class="nb nb-special" onclick="window.location.href='/importar-recepcion'">📥 Importar Recepción</button>
+    <button class="nb active" onclick="tab(this,'analizar')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>Analizar</button>
+    <button class="nb" onclick="tab(this,'dashboard')"><svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</button>
+    <button class="nb" onclick="tab(this,'mis-glosas')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/><path d="M9 11V7a3 3 0 0 1 6 0v4"/><path d="M9 16h6"/></svg>Mis Glosas <span class="nb-badge" id="mis-badge" style="display:none">0</span></button>
+    <button class="nb" onclick="tab(this,'historial')"><svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</button>
+    <button class="nb" onclick="tab(this,'alertas')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Alertas <span class="nb-badge" id="alert-badge" style="display:none">0</span></button>
+    <button class="nb" onclick="tab(this,'contratos')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Contratos</button>
+    <button class="nb" onclick="tab(this,'usuarios')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Usuarios</button>
+    <button class="nb" onclick="tab(this,'conciliacion')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>Conciliación</button>
+    <button class="nb" onclick="tab(this,'audit')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>Auditoría</button>
+    <button class="nb" onclick="tab(this,'salud-total')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>Salud Total</button>
+    <button class="nb nb-special" onclick="window.location.href='/importar-masiva'"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="16 13 12 9 8 13"/><line x1="12" y1="9" x2="12" y2="17"/></svg>Importación Masiva</button>
+    <button class="nb nb-special" onclick="window.location.href='/importar-recepcion'"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Importar Recepción</button>
   </div>
 
   <div class="workspace">
@@ -472,9 +498,13 @@ body.dark .chip-estado{background:rgba(30,64,175,.2);color:#93c5fd}
       </div>
       <div class="result-area" id="result-area">
         <div class="empty-state">
-          <div class="empty-icon">⚖</div>
-          <div class="empty-h">Motor de Glosas IA</div>
-          <div class="empty-p">Complete los datos en el formulario y presione "Analizar" para generar la defensa jurídica automatizada</div>
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 11V5a4 4 0 0 0-8 0v6"/><rect x="3" y="11" width="18" height="11" rx="2"/>
+            </svg>
+          </div>
+          <div class="empty-h">Motor de Glosas HUS</div>
+          <div class="empty-p">Complete los datos del formulario y presione <b>Analizar</b> para generar la defensa técnico-jurídica automática.</div>
         </div>
       </div>
     </div>
@@ -483,12 +513,12 @@ body.dark .chip-estado{background:rgba(30,64,175,.2);color:#93c5fd}
     <div class="panel" id="p-dashboard">
       <div class="dash-area">
         <div class="kpi-grid" id="kpi-grid">
-          <div class="kpi teal"><div class="kpi-lbl">Total Glosas</div><div class="kpi-num c-teal" id="k-total">—</div><div class="kpi-sub">procesadas</div></div>
-          <div class="kpi red"><div class="kpi-lbl">Valor Objetado</div><div class="kpi-num c-red" id="k-obj">—</div><div class="kpi-sub">total acumulado</div></div>
-          <div class="kpi green"><div class="kpi-lbl">Valor Recuperado</div><div class="kpi-num c-green" id="k-rec">—</div><div class="kpi-sub">en favor de la IPS</div></div>
-          <div class="kpi amber"><div class="kpi-lbl">Tasa de Éxito</div><div class="kpi-num c-amber" id="k-exito">—</div><div class="kpi-sub">glosas defendidas</div></div>
-          <div class="kpi blue"><div class="kpi-lbl">Promedio Glosa</div><div class="kpi-num c-blue" id="k-prom">—</div><div class="kpi-sub">valor promedio</div></div>
-          <div class="kpi red"><div class="kpi-lbl">Pendientes</div><div class="kpi-num c-red" id="k-pend">—</div><div class="kpi-sub">sin resolver</div></div>
+          <div class="kpi"><div class="kpi-lbl">Total glosas</div><div class="kpi-num" id="k-total">—</div><div class="kpi-sub">procesadas en el mes</div></div>
+          <div class="kpi"><div class="kpi-lbl">Valor objetado</div><div class="kpi-num" id="k-obj">—</div><div class="kpi-sub">acumulado del mes</div></div>
+          <div class="kpi"><div class="kpi-lbl">Valor recuperado</div><div class="kpi-num" id="k-rec">—</div><div class="kpi-sub">en favor de la IPS</div></div>
+          <div class="kpi"><div class="kpi-lbl">Tasa de éxito</div><div class="kpi-num" id="k-exito">—</div><div class="kpi-sub">glosas defendidas</div></div>
+          <div class="kpi"><div class="kpi-lbl">Promedio por glosa</div><div class="kpi-num" id="k-prom">—</div><div class="kpi-sub">valor promedio</div></div>
+          <div class="kpi"><div class="kpi-lbl">Pendientes</div><div class="kpi-num" id="k-pend">—</div><div class="kpi-sub">sin resolver</div></div>
         </div>
         <div class="charts-grid">
           <div class="chart-card"><div class="chart-hdr">Glosas por EPS</div><canvas id="ch-eps" style="max-height:220px"></canvas></div>
@@ -517,9 +547,9 @@ body.dark .chip-estado{background:rgba(30,64,175,.2);color:#93c5fd}
         </div>
 
         <div class="stat-grid" id="mis-stats">
-          <div class="stat-card accent-verde"><div class="n" id="mis-v">0</div><div class="l">Verde · &gt;10 días</div></div>
-          <div class="stat-card accent-amarillo"><div class="n" id="mis-a">0</div><div class="l">Amarillo · 5-10 días</div></div>
-          <div class="stat-card accent-rojo"><div class="n" id="mis-r">0</div><div class="l">Rojo · &lt;5 días</div></div>
+          <div class="stat-card accent-verde"><div class="n" id="mis-v">0</div><div class="l">Óptimo · &gt;10 días</div></div>
+          <div class="stat-card accent-amarillo"><div class="n" id="mis-a">0</div><div class="l">Atención · 5-10 días</div></div>
+          <div class="stat-card accent-rojo"><div class="n" id="mis-r">0</div><div class="l">Crítico · &lt;5 días</div></div>
           <div class="stat-card accent-negro"><div class="n" id="mis-n">0</div><div class="l">Vencidas</div></div>
         </div>
 
@@ -909,7 +939,14 @@ async function loadMisGlosas(){
     }
 
     if(data.length === 0){
-      body.innerHTML = '<tr class="empty-row"><td colspan="12">No tienes glosas asignadas. Si esperabas ver alguna, pídele a un administrador que revise el campo "Nombre" de tu usuario — debe coincidir con el valor de la columna GESTOR del Excel (ej: "YESID PEREZ").</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="12">' +
+        '<svg class="empty-state-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M9 11H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/>' +
+        '<path d="M9 11V7a3 3 0 0 1 6 0v4"/><path d="M9 16h6"/>' +
+        '</svg>' +
+        '<div style="font-size:.95rem;font-weight:600;color:var(--text2);margin-bottom:.25rem">Sin glosas asignadas</div>' +
+        '<div style="max-width:420px;margin:0 auto;line-height:1.6">Si esperabas ver alguna, pídele a un administrador que revise el campo <b>Nombre</b> de tu usuario. Debe coincidir con la columna <code>GESTOR</code> del Excel (ej: "YESID PEREZ").</div>' +
+        '</td></tr>';
       return;
     }
 
