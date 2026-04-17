@@ -678,22 +678,18 @@ async def analizar(
         estado = "ACEPTADA"
         cod_res_aceptacion = "RE9702"
         desc_res_aceptacion = "GLOSA ACEPTADA AL 100%"
-        texto_aceptacion = f"ESE HUS ACEPTA LA GLOSA POR VALOR DE ${val_ac:,.0f}"
     elif val_ac >= val_obj and val_obj > 0:
         estado = "ACEPTADA"
         cod_res_aceptacion = "RE9702"
         desc_res_aceptacion = "GLOSA ACEPTADA AL 100%"
-        texto_aceptacion = f"ESE HUS ACEPTA LA GLOSA POR VALOR DE ${val_obj:,.0f}"
     elif val_ac > 0:
         estado = "PARCIALMENTE_ACEPTADA"
         cod_res_aceptacion = "RE9801"
         desc_res_aceptacion = "GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE"
-        texto_aceptacion = f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA POR VALOR DE ${val_ac:,.0f}"
     else:
         estado = "RADICADA"
         cod_res_aceptacion = None
         desc_res_aceptacion = None
-        texto_aceptacion = None
 
     # Si hay aceptación, generar dictamen completamente nuevo
     dictamen_final = resultado.dictamen

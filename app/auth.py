@@ -1,7 +1,7 @@
 import bcrypt as _bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import JWTError, jwt
+from jose import jwt
 from sqlalchemy.orm import Session
 
 from app.models.db import UsuarioRecord

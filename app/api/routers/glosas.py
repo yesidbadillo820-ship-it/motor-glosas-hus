@@ -2,9 +2,8 @@ import re
 import uuid
 from typing import Optional
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.database import get_db, SessionLocal
@@ -12,9 +11,8 @@ from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.audit_repository import AuditRepository
 from app.services.glosa_service import GlosaService
-from app.services.pdf_service import PdfService
 from app.core.config import get_settings
-from app.core.logging_utils import set_request_id, get_request_id, logger
+from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.models.db import UsuarioRecord, GlosaRecord
 
@@ -497,8 +495,9 @@ async def importar_glosas_masiva(
     servicio_id = f"BATCH-{req_id}"
     
     contrato_repo = ContratoRepository(db)
-    contratos_db = {c.eps: c.detalles or "" for c in contrato_repo.listar()}
-    
+    # Se consulta contratos solo para validar que la BD es accesible
+    # (no es requerido pasarlos al background task porque se obtienen allí).
+
     for fila_data in filas:
         background_tasks.add_task(
             _procesar_fila_en_background,
@@ -583,7 +582,6 @@ def obtener_estado_batch(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Obtiene el estado de un lote de importación."""
-    repo = GlosaRepository(db)
     glosas_batch = db.query(GlosaRecord).filter(
         GlosaRecord.numero_radicado == batch_id
     ).all()
