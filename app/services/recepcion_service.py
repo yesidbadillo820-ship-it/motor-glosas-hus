@@ -193,9 +193,11 @@ class ResumenImportacion:
         self.total = 0
         self.creadas = 0
         self.actualizadas = 0
+        self.duplicadas = 0  # mismo (factura+consecutivo+valor+fecha) — se saltan
         self.ratificadas = 0
         self.extemporaneas = 0
         self.errores: list[str] = []
+        self.duplicadas_detalle: list[dict] = []
         self.por_gestor: dict[str, list[dict]] = {}
         self.semaforo: dict[str, int] = {"VERDE": 0, "AMARILLO": 0, "ROJO": 0, "NEGRO": 0}
 
@@ -204,9 +206,11 @@ class ResumenImportacion:
             "total": self.total,
             "creadas": self.creadas,
             "actualizadas": self.actualizadas,
+            "duplicadas": self.duplicadas,
             "ratificadas": self.ratificadas,
             "extemporaneas": self.extemporaneas,
             "errores": self.errores,
+            "duplicadas_detalle": self.duplicadas_detalle[:50],
             "por_gestor": self.por_gestor,
             "semaforo": self.semaforo,
         }
@@ -363,6 +367,24 @@ class RecepcionService:
                 )
 
                 if existente:
+                    # Detectar duplicado exacto (misma factura+consecutivo+valor+fecha)
+                    es_duplicado_exacto = (
+                        abs(float(existente.valor_objetado or 0) - float(valor)) < 0.01
+                        and (existente.fecha_recepcion == fecha_rec)
+                        and ((existente.consecutivo_dgh or "") == (consecutivo or ""))
+                    )
+                    if es_duplicado_exacto:
+                        resumen.duplicadas += 1
+                        resumen.duplicadas_detalle.append({
+                            "fila": num_fila,
+                            "factura": factura,
+                            "consecutivo_dgh": consecutivo,
+                            "valor": valor,
+                            "glosa_existente_id": existente.id,
+                            "motivo": "Misma factura + consecutivo + valor + fecha recepción",
+                        })
+                        continue
+                    # Distinto en algún campo → actualizar (posible reimportación con correcciones)
                     for k, v in campos.items():
                         setattr(existente, k, v)
                     resumen.actualizadas += 1
