@@ -88,13 +88,51 @@ header{background:var(--c-navy);height:58px;flex-shrink:0;display:flex;align-ite
 .hdr-btn{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);padding:5px;border-radius:6px;font-size:13px;transition:all .2s}
 .hdr-btn:hover{color:#fff;background:rgba(255,255,255,.1)}
 
-/* ─── NAV TABS ───────────────────────────── */
-.nav-bar{background:var(--bg-card);border-bottom:1px solid var(--border);height:44px;display:flex;align-items:stretch;padding:0 1.5rem;gap:2px;flex-shrink:0;overflow-x:auto}
-.nb{border:none;background:none;cursor:pointer;font-family:var(--font);font-size:.75rem;font-weight:600;color:var(--text3);padding:0 1rem;border-bottom:2px solid transparent;position:relative;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:5px;text-transform:uppercase;letter-spacing:.4px}
-.nb:hover{color:var(--text)}
-.nb.active{color:var(--c-teal2);border-bottom-color:var(--c-teal2)}
-.nb-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px}
-.nb-special{background:var(--c-teal2);color:#fff!important;border-radius:6px;padding:6px 12px!important;margin-left:auto}
+/* ─── NAV TABS (fallback horizontal, ahora deprecado) ─── */
+.nav-bar{display:none}
+
+/* ─── SIDEBAR NAV (lateral, estilo Linear/Epic) ────────────── */
+.main-layout{flex:1;display:flex;overflow:hidden;min-height:0}
+.sidebar-nav{width:240px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;transition:width .2s var(--ease)}
+.sidebar-nav.collapsed{width:64px}
+.sn-toggle{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;border-bottom:1px solid var(--border);color:var(--text3);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.sidebar-nav.collapsed .sn-toggle-label{display:none}
+.sn-toggle button{background:transparent;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.sn-toggle button:hover{background:var(--bg-subtle);color:var(--text)}
+.sn-group{padding:.75rem 0;border-bottom:1px solid var(--border)}
+.sn-group:last-child{border-bottom:none}
+.sn-label{padding:.35rem 1.1rem;font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:.25rem}
+.sidebar-nav.collapsed .sn-label{display:none}
+.sn-item{width:100%;display:flex;align-items:center;gap:.7rem;padding:.55rem 1.1rem;background:transparent;border:none;cursor:pointer;font-family:var(--font);font-size:.82rem;font-weight:500;color:var(--text2);text-align:left;transition:background .1s var(--ease),color .1s var(--ease);position:relative}
+.sn-item:hover{background:var(--bg-subtle);color:var(--text)}
+.sn-item.active{background:var(--c-teal-light);color:var(--c-teal2);font-weight:600}
+.sn-item.active::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--c-teal2);border-radius:0 2px 2px 0}
+body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
+.sn-item svg{flex-shrink:0;color:var(--text3)}
+.sn-item.active svg{color:var(--c-teal2)}
+.sn-item-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-nav.collapsed .sn-item-label{display:none}
+.sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
+.sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:4px 10px;border-radius:6px;font-size:.72rem;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
+.sn-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0}
+.sidebar-nav.collapsed .sn-badge{position:absolute;top:4px;right:4px;margin-left:0;min-width:14px;height:14px;font-size:9px}
+.sn-highlight{background:var(--c-teal2);color:#fff !important}
+.sn-highlight svg{color:#fff !important}
+.sn-highlight:hover{background:var(--c-teal)}
+
+/* Mobile drawer */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:90}
+.sidebar-overlay.show{display:block}
+
+@media(max-width:900px){
+  .sidebar-nav{position:fixed;top:58px;left:0;bottom:0;z-index:100;width:240px;transform:translateX(-100%);transition:transform .25s var(--ease)}
+  .sidebar-nav.open{transform:translateX(0);box-shadow:var(--sh-lg)}
+  .sidebar-nav.collapsed{width:240px;transform:translateX(-100%)}
+  .workspace{width:100%}
+  .btn-menu-mobile{display:inline-flex !important}
+}
+
+.btn-menu-mobile{display:none;background:transparent;border:none;cursor:pointer;color:#fff;padding:6px;margin-right:6px}
 
 /* ─── LAYOUT ─────────────────────────────── */
 .workspace{flex:1;display:flex;overflow:hidden}
@@ -414,6 +452,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <div id="app">
   <header>
     <div class="hdr-left">
+      <button class="btn-menu-mobile" onclick="toggleSidebar()" aria-label="Menú">
+        <svg class="i i-lg" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <div class="hdr-badge"><img src="/static/logo.png" alt="HUS"/></div>
       <div>
         <div class="hdr-title">Motor de Glosas HUS</div>
@@ -429,19 +470,94 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </header>
 
   <div class="nav-bar">
-    <button class="nb active" onclick="tab(this,'analizar')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>Analizar</button>
-    <button class="nb" onclick="tab(this,'dashboard')"><svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</button>
-    <button class="nb" onclick="tab(this,'mis-glosas')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/><path d="M9 11V7a3 3 0 0 1 6 0v4"/><path d="M9 16h6"/></svg>Mis Glosas <span class="nb-badge" id="mis-badge" style="display:none">0</span></button>
-    <button class="nb" onclick="tab(this,'historial')"><svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</button>
-    <button class="nb" onclick="tab(this,'alertas')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Alertas <span class="nb-badge" id="alert-badge" style="display:none">0</span></button>
-    <button class="nb" onclick="tab(this,'contratos')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Contratos</button>
-    <button class="nb" onclick="tab(this,'usuarios')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Usuarios</button>
-    <button class="nb" onclick="tab(this,'conciliacion')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>Conciliación</button>
-    <button class="nb" onclick="tab(this,'audit')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>Auditoría</button>
-    <button class="nb" onclick="tab(this,'salud-total')"><svg class="i i-md" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>Salud Total</button>
-    <button class="nb nb-special" onclick="window.location.href='/importar-masiva'"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="16 13 12 9 8 13"/><line x1="12" y1="9" x2="12" y2="17"/></svg>Importación Masiva</button>
-    <button class="nb nb-special" onclick="window.location.href='/importar-recepcion'"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Importar Recepción</button>
+    <button class="nb active" onclick="tab(this,'analizar')" style="display:none">Analizar</button>
+    <button class="nb" onclick="tab(this,'dashboard')" style="display:none">Dashboard</button>
+    <button class="nb" onclick="tab(this,'mis-glosas')" style="display:none">Mis Glosas <span class="nb-badge" id="mis-badge" style="display:none">0</span></button>
+    <button class="nb" onclick="tab(this,'historial')" style="display:none">Historial</button>
+    <button class="nb" onclick="tab(this,'alertas')" style="display:none">Alertas <span class="nb-badge" id="alert-badge" style="display:none">0</span></button>
+    <button class="nb" onclick="tab(this,'contratos')" style="display:none">Contratos</button>
+    <button class="nb" onclick="tab(this,'usuarios')" style="display:none">Usuarios</button>
+    <button class="nb" onclick="tab(this,'conciliacion')" style="display:none">Conciliación</button>
+    <button class="nb" onclick="tab(this,'audit')" style="display:none">Auditoría</button>
+    <button class="nb" onclick="tab(this,'salud-total')" style="display:none">Salud Total</button>
   </div>
+
+  <div class="main-layout">
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+    <aside class="sidebar-nav" id="sidebar-nav">
+      <div class="sn-toggle">
+        <span class="sn-toggle-label">Navegación</span>
+        <button onclick="toggleSidebarCollapse()" title="Colapsar" aria-label="Colapsar sidebar">
+          <svg class="i i-md" viewBox="0 0 24 24"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+        </button>
+      </div>
+
+      <div class="sn-group">
+        <div class="sn-label">Análisis</div>
+        <button class="sn-item active" data-tip="Analizar" onclick="sidebarTab(this,'analizar')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
+          <span class="sn-item-label">Analizar glosa</span>
+        </button>
+        <button class="sn-item" data-tip="Mis glosas" onclick="sidebarTab(this,'mis-glosas')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H7A2 2 0 0 0 5 13V20A2 2 0 0 0 7 22H17A2 2 0 0 0 19 20V13A2 2 0 0 0 17 11H15"/><path d="M9 11V7A3 3 0 0 1 15 7V11"/><path d="M9 16H15"/></svg>
+          <span class="sn-item-label">Mis glosas</span>
+          <span class="sn-badge" id="mis-badge-side" style="display:none">0</span>
+        </button>
+        <button class="sn-item" data-tip="Historial" onclick="sidebarTab(this,'historial')">
+          <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span class="sn-item-label">Historial</span>
+        </button>
+        <button class="sn-item" data-tip="Alertas" onclick="sidebarTab(this,'alertas')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M6 8A6 6 0 0 1 18 8C18 15 21 17 21 17H3S6 15 6 8"/><path d="M10.3 21A1.94 1.94 0 0 0 13.7 21"/></svg>
+          <span class="sn-item-label">Alertas</span>
+          <span class="sn-badge" id="alert-badge-side" style="display:none">0</span>
+        </button>
+      </div>
+
+      <div class="sn-group">
+        <div class="sn-label">Gestión</div>
+        <button class="sn-item" data-tip="Contratos" onclick="sidebarTab(this,'contratos')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6A2 2 0 0 0 4 4V20A2 2 0 0 0 6 22H18A2 2 0 0 0 20 20V8Z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
+          <span class="sn-item-label">Contratos</span>
+        </button>
+        <button class="sn-item" data-tip="Usuarios" onclick="sidebarTab(this,'usuarios')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M17 21V19A4 4 0 0 0 13 15H5A4 4 0 0 0 1 19V21"/><circle cx="9" cy="7" r="4"/><path d="M23 21V19A4 4 0 0 0 20 15.13"/><path d="M16 3.13A4 4 0 0 1 16 11"/></svg>
+          <span class="sn-item-label">Usuarios</span>
+        </button>
+        <button class="sn-item" data-tip="Conciliación" onclick="sidebarTab(this,'conciliacion')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M17 3H21V7"/><path d="M21 3L13 11"/><path d="M7 21H3V17"/><path d="M3 21L11 13"/></svg>
+          <span class="sn-item-label">Conciliación</span>
+        </button>
+      </div>
+
+      <div class="sn-group">
+        <div class="sn-label">Reportes</div>
+        <button class="sn-item" data-tip="Dashboard" onclick="sidebarTab(this,'dashboard')">
+          <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <span class="sn-item-label">Dashboard</span>
+        </button>
+        <button class="sn-item" data-tip="Auditoría" onclick="sidebarTab(this,'audit')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M9 12L11 14L15 10"/></svg>
+          <span class="sn-item-label">Auditoría</span>
+        </button>
+      </div>
+
+      <div class="sn-group">
+        <div class="sn-label">Herramientas</div>
+        <button class="sn-item" data-tip="Salud Total" onclick="sidebarTab(this,'salud-total')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M20.84 4.61A5.5 5.5 0 0 0 13.06 4.61L12 5.67L10.94 4.61A5.5 5.5 0 0 0 3.16 12.39L12 21.23L20.84 12.39A5.5 5.5 0 0 0 20.84 4.61Z"/></svg>
+          <span class="sn-item-label">Salud Total</span>
+        </button>
+        <button class="sn-item sn-highlight" data-tip="Importar recepción" onclick="window.location.href='/importar-recepcion'">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="sn-item-label">Importar recepción</span>
+        </button>
+        <button class="sn-item sn-highlight" data-tip="Importación masiva" onclick="window.location.href='/importar-masiva'">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6A2 2 0 0 0 4 4V20A2 2 0 0 0 6 22H18A2 2 0 0 0 20 20V8Z"/><polyline points="14 2 14 8 20 8"/><polyline points="16 13 12 9 8 13"/><line x1="12" y1="9" x2="12" y2="17"/></svg>
+          <span class="sn-item-label">Importación masiva</span>
+        </button>
+      </div>
+    </aside>
 
   <div class="workspace">
 
@@ -759,6 +875,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     </div>
 
   </div>
+  </div> <!-- /main-layout -->
 </div>
 
 <!-- MODAL DICTAMEN -->
@@ -864,6 +981,11 @@ async function initApp(){
   document.getElementById('app').classList.add('show');
   document.getElementById('hdr-user').textContent=USER_NAME;
   if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
+  // Restaurar estado colapsado del sidebar
+  if(localStorage.getItem('hus_sidebar_collapsed')==='1'){
+    var sb=document.getElementById('sidebar-nav');
+    if(sb) sb.classList.add('collapsed');
+  }
   await loadContratos();
   loadAlertCount();
   loadDash();
@@ -871,6 +993,15 @@ async function initApp(){
   loadMisGlosas();
   checkHealth();
   setInterval(checkHealth,30000);
+  // Sincronizar badges del sidebar cada 5s
+  setInterval(function(){
+    syncSidebarBadge('mis-badge','mis-badge-side');
+    syncSidebarBadge('alert-badge','alert-badge-side');
+  }, 5000);
+  setTimeout(function(){
+    syncSidebarBadge('mis-badge','mis-badge-side');
+    syncSidebarBadge('alert-badge','alert-badge-side');
+  }, 800);
 }
 
 async function checkHealth(){
@@ -896,8 +1027,9 @@ function toggleDark(){
 function tab(btn,id){
   document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('active')});
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
-  btn.classList.add('active');
-  document.getElementById('p-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  var panel = document.getElementById('p-'+id);
+  if(panel) panel.classList.add('active');
   if(id==='dashboard') loadDash();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -905,6 +1037,43 @@ function tab(btn,id){
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
   if(id==='mis-glosas') loadMisGlosas();
+}
+
+// Sidebar: activa el item, sincroniza con tab() y en mobile cierra el drawer
+function sidebarTab(el, id){
+  document.querySelectorAll('.sn-item').forEach(function(b){b.classList.remove('active')});
+  if(el) el.classList.add('active');
+  // Delegar a la logica de tab() sin pasarle un boton .nb
+  tab(null, id);
+  // En mobile, cerrar el drawer tras la seleccion
+  if(window.innerWidth <= 900) toggleSidebar(false);
+}
+
+// Toggle colapsable del sidebar (persiste en localStorage)
+function toggleSidebarCollapse(){
+  var sb = document.getElementById('sidebar-nav');
+  sb.classList.toggle('collapsed');
+  localStorage.setItem('hus_sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
+}
+
+// Drawer mobile (open/close explicito, o toggle si no se pasa estado)
+function toggleSidebar(forceOpen){
+  var sb = document.getElementById('sidebar-nav');
+  var ov = document.getElementById('sidebar-overlay');
+  var shouldOpen = (typeof forceOpen === 'boolean') ? forceOpen : !sb.classList.contains('open');
+  sb.classList.toggle('open', shouldOpen);
+  if(ov) ov.classList.toggle('show', shouldOpen);
+}
+
+// Sincroniza el badge numerico del sidebar con el del nav-bar legacy
+function syncSidebarBadge(idLegacy, idSide){
+  var legacy = document.getElementById(idLegacy);
+  var side = document.getElementById(idSide);
+  if(!legacy || !side) return;
+  var txt = legacy.textContent;
+  var vis = legacy.style.display !== 'none' && txt && txt !== '0';
+  side.textContent = txt;
+  side.style.display = vis ? 'inline-flex' : 'none';
 }
 
 // ─── MIS GLOSAS ───────────────────────────────────────────────────────────
