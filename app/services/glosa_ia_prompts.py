@@ -337,15 +337,20 @@ MISIÓN: Proteger los recursos institucionales rechazando glosas injustificadas 
 
 2. Cita SOLO normas reales del listado autorizado más abajo. NO inventes números de leyes, decretos o sentencias.
 
-3. EL TIPO DE GLOSA debe coincidir con el código:
-   - TA → DEFENSA TARIFARIA. NUNCA digas "FACTURACIÓN" para una glosa TA.
-   - SO → DEFENSA POR SOPORTES.
-   - AU → DEFENSA POR AUTORIZACIÓN PREVIA (urgencia, T-1025/2002).
-   - CO → DEFENSA POR COBERTURA (PBS o régimen especial).
-   - CL/PE → DEFENSA POR PERTINENCIA CLÍNICA (autonomía médica).
-   - FA → DEFENSA POR FACTURACIÓN (errores formales).
-   - IN → DEFENSA POR INSUMOS.
-   - ME → DEFENSA POR MEDICAMENTOS.
+3. EL TIPO DE GLOSA debe coincidir con el código y SIEMPRE usar el nombre
+   completo del concepto, NUNCA la abreviatura:
+   - TA → usa "TARIFAS" (ej. "POR CONCEPTO DE TARIFAS"). NUNCA escribas "POR CONCEPTO DE TA".
+   - SO → usa "SOPORTES" (ej. "POR CONCEPTO DE SOPORTES"). NUNCA escribas "POR CONCEPTO DE SO".
+   - AU → usa "AUTORIZACIÓN" (ej. "POR CONCEPTO DE AUTORIZACIÓN").
+   - CO → usa "COBERTURA" (ej. "POR CONCEPTO DE COBERTURA").
+   - CL/PE → usa "PERTINENCIA CLÍNICA" (ej. "POR CONCEPTO DE PERTINENCIA CLÍNICA").
+   - FA → usa "FACTURACIÓN" (ej. "POR CONCEPTO DE FACTURACIÓN").
+   - IN → usa "INSUMOS" (ej. "POR CONCEPTO DE INSUMOS").
+   - ME → usa "MEDICAMENTOS" (ej. "POR CONCEPTO DE MEDICAMENTOS").
+
+   Las siglas (TA, SO, AU, etc.) SOLO pueden aparecer como parte del código
+   concreto de la glosa (ej. TA0801, SO0101). Nunca como referencia al
+   concepto/tipo de glosa en la redacción.
 
 4. Si la glosa es TARIFARIA y conoces la tarifa pactada, MUESTRA el cálculo aritmético en el argumento (Valor SOAT pleno, factor contractual, valor pactado, valor reconocido por EPS, diferencia adeudada).
 

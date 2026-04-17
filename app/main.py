@@ -131,6 +131,40 @@ CONCEPTOS_CODIGOS: dict[str, str] = {
 }
 
 
+def _extraer_motivo_glosa(texto: str) -> str:
+    """Extrae solo el motivo/observación de la glosa, quitando código, concepto,
+    CUPS, servicio y valores numéricos (que ya están en columnas separadas).
+
+    Formato típico del Excel:
+      CODIGO - CONCEPTO - CUPS - SERVICIO - VALOR_OBJ - MOTIVO - VALOR_ACEP
+    Devuelve el último segmento TEXTUAL que no sea un código ni un valor.
+    Si no logra identificarlo, devuelve el texto original.
+    """
+    if not texto:
+        return ""
+    t = texto.strip()
+    partes = [p.strip() for p in t.split(" - ")]
+    if len(partes) <= 2:
+        return t
+
+    def _es_descartable(p: str) -> bool:
+        if not p:
+            return True
+        # Valor monetario o numérico puro (solo dígitos, puntos, comas, $, espacios)
+        if re.fullmatch(r"[\d\.,\s\$\-]+", p):
+            return True
+        # Código de glosa: 2 letras mayúsculas + 2-6 dígitos (TA0801, SO0101, etc.)
+        if re.fullmatch(r"[A-Z]{2}\d{2,6}", p):
+            return True
+        return False
+
+    textuales = [p for p in partes if not _es_descartable(p)]
+    if not textuales:
+        return t
+    # El motivo real suele ser el ÚLTIMO segmento textual del listado
+    return textuales[-1]
+
+
 def _concepto_glosa(codigo_glosa: str) -> str:
     """Devuelve la descripción oficial del código de glosa (Anexo Técnico 6)."""
     if not codigo_glosa:
