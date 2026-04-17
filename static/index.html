@@ -1670,6 +1670,8 @@ async function analizar(){
 function renderResult(d){
   var isOk=!d.mensaje_tiempo.includes('EXTEMPOR');
   var scoreColor=d.score>=85?'#15803d':d.score>=65?'#b45309':'#b91c1c';
+  // Fijar la glosa actual para que los botones Refinar/Gold operen sobre ella
+  CURRENT_GLOSA_ID = d.glosa_id || null;
 
   var html='<div class="res-header">'
     +'<div class="res-title">'+d.resumen+'</div>'
@@ -1690,16 +1692,87 @@ function renderResult(d){
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'
     +'<span style="opacity:.6;font-weight:400">'+new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'})+'</span>'
     +'</div>'
-    +'<div class="res-dictamen-body">'+d.dictamen+'</div>'
+    +'<div id="res-dictamen-body" class="res-dictamen-body">'+d.dictamen+'</div>'
     +'</div>'
 
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
     +'<button class="btn btn-ghost" onclick="copiarDictamen()">Copiar texto</button>'
+    +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
+    +'<button class="btn btn-ghost" onclick="guardarComoPlantillaGoldInline()">⭐ Guardar como Gold</button>'
     +'<button class="btn btn-ghost" onclick="nuevaGlosa()">Nueva glosa</button>'
+    +'</div>'
+
+    +'<div class="refinar-panel" id="refinar-inline" style="display:none;margin-top:1rem;border-radius:10px;border:1px solid var(--border)">'
+    +'  <div class="refinar-hdr"><b>Refinar con IA</b><span class="refinar-sub">Dile qué cambiar: tono, longitud, citar otra norma…</span></div>'
+    +'  <div class="refinar-chips">'
+    +'    <button class="refinar-chip" onclick="setRefinarInline(\'Acorta el segundo párrafo a máximo 3 líneas\')">Acortar 2º párrafo</button>'
+    +'    <button class="refinar-chip" onclick="setRefinarInline(\'Usa un tono más firme y contundente\')">Tono más firme</button>'
+    +'    <button class="refinar-chip" onclick="setRefinarInline(\'Agrega cita al Decreto 4747 de 2007 artículo 20\')">Citar Dec. 4747</button>'
+    +'    <button class="refinar-chip" onclick="setRefinarInline(\'Agrega la Sentencia T-760 de 2008 como fundamento\')">Citar T-760</button>'
+    +'    <button class="refinar-chip" onclick="setRefinarInline(\'Simplifica el lenguaje técnico sin perder la base jurídica\')">Simplificar</button>'
+    +'  </div>'
+    +'  <textarea id="refinar-inline-msg" placeholder="Escribe la instrucción (ej: acorta la conclusión, cita también Ley 1751/2015 art. 17, tono más conciliador)…" rows="2"></textarea>'
+    +'  <div class="refinar-actions">'
+    +'    <label class="bulk-chk"><input type="checkbox" id="refinar-inline-guardar" checked/> Guardar al aplicar</label>'
+    +'    <button class="btn btn-primary btn-sm" onclick="aplicarRefinarInline()">Refinar</button>'
+    +'  </div>'
+    +'  <div id="refinar-inline-status" class="refinar-status"></div>'
     +'</div>';
 
   document.getElementById('result-area').innerHTML=html;
+}
+
+function toggleRefinarInline(){
+  var p = document.getElementById('refinar-inline');
+  if(!p) return;
+  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+  if(p.style.display !== 'none') setTimeout(function(){ document.getElementById('refinar-inline-msg').focus(); }, 50);
+}
+
+function setRefinarInline(texto){
+  var ta = document.getElementById('refinar-inline-msg');
+  if(ta){ ta.value = texto; ta.focus(); }
+}
+
+async function aplicarRefinarInline(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Primero analiza una glosa','warning'); return; }
+  var msg = document.getElementById('refinar-inline-msg').value.trim();
+  if(msg.length < 3){ toast('Instrucción muy corta','Escribe al menos unas palabras','warning'); return; }
+  var guardar = document.getElementById('refinar-inline-guardar').checked;
+  var st = document.getElementById('refinar-inline-status');
+  st.className = 'refinar-status';
+  st.textContent = 'Refinando con IA… ~15s';
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/refinar', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({mensaje: msg, guardar: guardar})
+    });
+    var d = await r.json();
+    if(!r.ok){ st.className='refinar-status err'; st.textContent='Error: '+(d.detail||'no se pudo refinar'); return; }
+    // Reemplazar el dictamen en pantalla con la versión refinada
+    var body = document.getElementById('res-dictamen-body');
+    if(body) body.innerHTML = d.dictamen_html;
+    st.className = 'refinar-status ok';
+    st.textContent = guardar ? 'Refinado y guardado ✓' : 'Refinado (no guardado)';
+    if(lastResult) lastResult.dictamen = d.dictamen_html;
+    if(guardar) toast('Dictamen actualizado','Cambios guardados','success');
+  }catch(e){
+    st.className = 'refinar-status err';
+    st.textContent = 'Conexión: ' + e.message;
+  }
+}
+
+async function guardarComoPlantillaGoldInline(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Primero analiza una glosa','warning'); return; }
+  if(!confirm('¿Guardar este argumento como plantilla GOLD? Se usará como ejemplo para mejorar futuras respuestas del mismo código/EPS.')) return;
+  try{
+    var r = await fetch('/plantillas-gold/desde-glosa/' + CURRENT_GLOSA_ID, {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(r.ok){ toast('Guardada','Plantilla gold creada ⭐','success'); }
+    else { toast('Error', d.detail || 'No se pudo guardar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 function nuevaGlosa(){
