@@ -194,10 +194,18 @@ def generar_texto_injustificada(eps: str) -> str:
 
 
 class GlosaService:
-    def __init__(self, groq_api_key: str = None, anthropic_api_key: str = None):
+    def __init__(
+        self,
+        groq_api_key: str = None,
+        anthropic_api_key: str = None,
+        primary_ai: str = "groq",
+        anthropic_model: str = "claude-sonnet-4-6",
+    ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
+        self.primary_ai = (primary_ai or "groq").lower()
+        self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
 
     async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
         texto_base = str(data.tabla_excel).strip().upper()
@@ -612,11 +620,39 @@ class GlosaService:
                 raise
         raise ultimo_error
 
+    async def _llamar_anthropic(self, system: str, user: str) -> tuple[str, str]:
+        """Llama a Claude vía API REST. Devuelve (texto, etiqueta_modelo)."""
+        if not self.anthropic_key:
+            raise RuntimeError("Anthropic API key no configurada")
+        _timeout_anthropic = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": self.anthropic_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": self.anthropic_model,
+                    "max_tokens": 4000,
+                    "temperature": 0.15,
+                    "system": system,
+                    "messages": [{"role": "user", "content": user}],
+                },
+            )
+            data = resp.json()
+            if "content" in data and data["content"]:
+                return data["content"][0]["text"], f"anthropic/{self.anthropic_model}"
+            # Respuestas de error de la API traen "error": {...}
+            err = data.get("error", {}).get("message", str(data)[:300])
+            raise RuntimeError(f"Anthropic devolvió sin 'content': {err}")
+
     async def _llamar_ia(self, system: str, user: str, eps: str = "", codigo: str = "") -> tuple[str, str]:
+        """Llama a la IA configurada (primary_ai) con fallback al otro proveedor."""
         # Clave de caché incluye EPS y código para evitar colisiones cruzadas
-        # entre glosas distintas que casualmente generen prompts similares
         clave_cache = hashlib.sha256(
-            f"{eps}|{codigo}|{system}|{user}".encode()
+            f"{self.primary_ai}|{self.anthropic_model}|{eps}|{codigo}|{system}|{user}".encode()
         ).hexdigest()
 
         if clave_cache in _CACHE_IA:
@@ -625,44 +661,36 @@ class GlosaService:
                 respuesta, modelo = cached[0], cached[1]
             else:
                 respuesta, modelo = cached, "cache"
-            logger.info(f"Cache: usando respuesta guardada ({len(respuesta)} chars)")
+            logger.info(f"Cache: usando respuesta guardada ({len(respuesta)} chars) [{modelo}]")
             return respuesta, modelo
 
-        logger.info(f"IA: {len(system)} + {len(user)} chars (sin cache)")
+        logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
-        if not self.groq:
+        if not self.groq and not self.anthropic_key:
             return "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>", "error"
 
-        try:
-            content, modelo = await self._llamar_groq_con_retry(system, user)
-            _CACHE_IA[clave_cache] = (content, modelo)
-            return content, modelo
-        except Exception as e:
-            logger.error(f"IA Error Groq: {e}")
+        # Orden de intento según configuración
+        if self.primary_ai == "anthropic" and self.anthropic_key:
+            intentos = [("anthropic", self._llamar_anthropic)]
+            if self.groq:
+                intentos.append(("groq", self._llamar_groq_con_retry))
+        else:
+            intentos = []
+            if self.groq:
+                intentos.append(("groq", self._llamar_groq_con_retry))
             if self.anthropic_key:
-                try:
-                    _timeout_anthropic = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
-                    async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
-                        resp = await client.post(
-                            "https://api.anthropic.com/v1/messages",
-                            headers={
-                                "x-api-key": self.anthropic_key,
-                                "anthropic-version": "2023-06-01",
-                                "content-type": "application/json"
-                            },
-                            json={
-                                "model": "claude-sonnet-4-5-20250514",
-                                "max_tokens": 3000,
-                                "temperature": 0.15,
-                                "system": system,
-                                "messages": [{"role": "user", "content": user}]
-                            }
-                        )
-                        data = resp.json()
-                        if "content" in data:
-                            content = data["content"][0]["text"]
-                            _CACHE_IA[clave_cache] = (content, "anthropic/claude-sonnet-4")
-                            return content, "anthropic/claude-sonnet-4"
-                except Exception as e2:
-                    logger.error(f"Fallback Anthropic error: {e2}")
-            return f"<paciente>ERROR</paciente><argumento>{str(e)}</argumento>", "error"
+                intentos.append(("anthropic", self._llamar_anthropic))
+
+        ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
+        for nombre, fn in intentos:
+            try:
+                content, modelo = await fn(system, user)
+                _CACHE_IA[clave_cache] = (content, modelo)
+                return content, modelo
+            except Exception as e:
+                ultimo_error = e
+                logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
+                continue
+
+        logger.error(f"Todos los proveedores IA fallaron: {ultimo_error}")
+        return f"<paciente>ERROR</paciente><argumento>{str(ultimo_error)}</argumento>", "error"

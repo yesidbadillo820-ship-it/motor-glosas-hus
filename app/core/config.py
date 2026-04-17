@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # Llaves de IA
     groq_api_key: str = ""
     anthropic_api_key: str = ""
+    # Cuál se usa primero: "groq" (rápido/barato) o "anthropic" (mejor calidad).
+    # Si falla el primario y hay key del otro, se intenta el fallback.
+    primary_ai: str = "groq"
+    # Modelo Anthropic por defecto (Sonnet 4.6 — última generación)
+    anthropic_model: str = "claude-sonnet-4-6"
 
     # CORS — lista de orígenes permitidos (en producción NO usar "*")
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"

@@ -570,7 +570,12 @@ app.include_router(admin_router)
 
 
 def get_glosa_service() -> GlosaService:
-    return GlosaService(groq_api_key=cfg.groq_api_key, anthropic_api_key=cfg.anthropic_api_key)
+    return GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+        anthropic_model=cfg.anthropic_model,
+    )
 
 
 @app.post(
