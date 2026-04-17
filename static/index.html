@@ -333,9 +333,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .norm-chip.ok{background:rgba(4,120,87,.1);color:#047857;border:1px solid rgba(4,120,87,.3)}
 .norm-chip.bad{background:rgba(185,28,28,.1);color:#b91c1c;border:1px solid rgba(185,28,28,.3)}
 .norm-chip.info{background:rgba(29,78,216,.1);color:#1d4ed8;border:1px solid rgba(29,78,216,.3)}
-.thread-box{margin-top:1rem;padding:1rem 1.1rem;border-radius:10px;background:var(--bg-card);border:1px solid var(--border)}
+.thread-box{margin-top:1rem;padding:.75rem 1.1rem;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);transition:padding .15s}
+.thread-box.thread-collapsed{padding:.55rem 1.1rem}
+.thread-box.thread-collapsed .thread-hdr{border-bottom:none;margin-bottom:0;padding-bottom:0}
 .thread-hdr{display:flex;align-items:center;gap:.55rem;padding-bottom:.55rem;border-bottom:1px dashed var(--border);margin-bottom:.6rem;font-size:.85rem;color:var(--text)}
-.thread-count{background:var(--c-teal2);color:#fff;padding:1px 7px;border-radius:10px;font-size:.7rem;font-weight:600}
+.thread-hdr:hover{color:var(--c-teal2)}
+.thread-count{background:transparent;color:var(--text3);padding:1px 7px;border-radius:10px;font-size:.7rem;font-weight:600;border:1px solid var(--border)}
+.thread-toggle{margin-left:auto;color:var(--text3);font-size:.9rem}
+.thread-body{display:block}
 .thread-list{display:flex;flex-direction:column;gap:.6rem;max-height:360px;overflow-y:auto}
 .thread-item{background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:.55rem .75rem}
 .thread-item.thread-resuelto{opacity:.55}
@@ -2015,12 +2020,17 @@ function renderResult(d){
     +'<button class="btn btn-ghost" onclick="nuevaGlosa()">Nueva glosa</button>'
     +'</div>'
     +'<div id="validar-result" class="validar-result" style="display:none"></div>'
-    +'<div class="thread-box" id="thread-box">'
-    +'  <div class="thread-hdr"><b>💬 Comentarios del equipo</b><span id="thread-count" class="thread-count">0</span></div>'
-    +'  <div class="thread-list" id="thread-list"><div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sin comentarios todavía</div></div>'
-    +'  <div class="thread-compose">'
-    +'    <textarea id="thread-input" rows="2" placeholder="Escribe un comentario o @email para mencionar…"></textarea>'
-    +'    <button class="btn btn-primary btn-sm" onclick="enviarComentario()">Enviar</button>'
+    +'<div class="thread-box thread-collapsed" id="thread-box">'
+    +'  <div class="thread-hdr" onclick="toggleThread()" style="cursor:pointer;user-select:none">'
+    +'    <b>💬 Comentarios del equipo</b><span id="thread-count" class="thread-count">0</span>'
+    +'    <span class="thread-toggle" id="thread-toggle">▾</span>'
+    +'  </div>'
+    +'  <div class="thread-body" id="thread-body" style="display:none">'
+    +'    <div class="thread-list" id="thread-list"><div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sin comentarios todavía</div></div>'
+    +'    <div class="thread-compose">'
+    +'      <textarea id="thread-input" rows="2" placeholder="Escribe un comentario o @email para mencionar…"></textarea>'
+    +'      <button class="btn btn-primary btn-sm" onclick="enviarComentario()">Enviar</button>'
+    +'    </div>'
     +'  </div>'
     +'</div>'
 
@@ -2045,6 +2055,24 @@ function renderResult(d){
   if(CURRENT_GLOSA_ID) cargarComentarios(CURRENT_GLOSA_ID);
 }
 
+function toggleThread(){
+  var box = document.getElementById('thread-box');
+  var body = document.getElementById('thread-body');
+  var tog = document.getElementById('thread-toggle');
+  if(!box || !body) return;
+  var abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : 'block';
+  box.classList.toggle('thread-collapsed', abierto);
+  if(tog) tog.textContent = abierto ? '▾' : '▴';
+  if(!abierto){
+    setTimeout(function(){
+      var inp = document.getElementById('thread-input');
+      if(inp) inp.focus();
+      box.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }, 50);
+  }
+}
+
 async function cargarComentarios(glosaId){
   var list = document.getElementById('thread-list');
   var count = document.getElementById('thread-count');
@@ -2053,7 +2081,12 @@ async function cargarComentarios(glosaId){
     var r = await fetch('/glosas/'+glosaId+'/comentarios/', {headers: authH()});
     if(!r.ok){ return; }
     var data = await r.json();
-    if(count) count.textContent = data.length;
+    if(count){
+      count.textContent = data.length;
+      // Si hay comentarios nuevos, resaltar el contador (pero no expandir auto)
+      count.style.background = data.length > 0 ? 'var(--c-teal2)' : 'transparent';
+      count.style.color = data.length > 0 ? '#fff' : 'var(--text3)';
+    }
     if(!data.length){
       list.innerHTML = '<div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sin comentarios todavía. Escribe el primero.</div>';
       return;
