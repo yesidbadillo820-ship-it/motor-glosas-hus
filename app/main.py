@@ -664,7 +664,14 @@ async def analizar(
                     if len(contenido) > 10_000_000:
                         logger.warning(f"[{req_id}] PDF muy grande: {archivo.filename}")
                         continue
-                    contexto_pdf += await pdf_svc.extraer(contenido)
+                    # OCR automático con Claude si el PDF es escaneado y hay key
+                    texto, metodo = await pdf_svc.extraer_con_ocr(
+                        contenido,
+                        anthropic_api_key=cfg.anthropic_api_key,
+                        anthropic_model=cfg.anthropic_model,
+                    )
+                    contexto_pdf += texto
+                    logger.info(f"[{req_id}] PDF {archivo.filename}: {metodo} ({len(texto)} chars)")
                 except Exception as e:
                     logger.warning(f"[{req_id}] Error extrayendo PDF {archivo.filename}: {e}")
 
@@ -863,3 +870,31 @@ def presentacion_ia():
 @app.get("/health")
 def health():
     return {"status": "ok", "version": cfg.app_version}
+
+
+@app.post("/pdf/ocr")
+async def pdf_ocr(
+    archivo: UploadFile = File(...),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Sube un PDF y devuelve su texto. Si el PDF es escaneado y hay
+    ANTHROPIC_API_KEY configurada, usa Claude Vision como OCR."""
+    contenido = await archivo.read()
+    if contenido[:4] != b"%PDF":
+        raise HTTPException(400, "El archivo no es un PDF válido")
+    if len(contenido) > 30_000_000:
+        raise HTTPException(400, "PDF muy grande (>30 MB)")
+
+    from app.services.pdf_service import PdfService
+    pdf_svc = PdfService()
+    texto, metodo = await pdf_svc.extraer_con_ocr(
+        contenido,
+        anthropic_api_key=cfg.anthropic_api_key,
+        anthropic_model=cfg.anthropic_model,
+    )
+    return {
+        "metodo": metodo,
+        "caracteres": len(texto),
+        "texto": texto,
+        "archivo": archivo.filename,
+    }
