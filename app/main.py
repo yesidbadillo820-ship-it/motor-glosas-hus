@@ -482,28 +482,32 @@ async def analizar(
             <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:15px 0;border-radius:8px;">
                 <h4 style="color:#15803d;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
                 <p style="font-size:13px;line-height:1.8;color:#166534;">
-                    EL HOSPITAL UNIVERSITARIO DE SANTANDER INFORMA A {eps.upper()} QUE ACEPTA LA PRESENTE GLOSA 
-                    POR VALOR DE <strong>${val_ac:,.0f}</strong> (VALOR TOTAL OBJETADO), 
-                    DE CONFORMIDAD CON LO ESTABLECIDO EN LA RESOLUCIÓN 3047 DE 2008 Y DEMÁS NORMATIVA VIGENTE.
+                    ESE HUS ACEPTA LA GLOSA EN SU TOTALIDAD POR VALOR DE <strong>${val_ac:,.0f}</strong>
+                    INTERPUESTA POR {eps.upper()}. LA OBJECIÓN PRESENTADA POR LA ENTIDAD PAGADORA
+                    ES PROCEDENTE Y SE ENCUENTRA JUSTIFICADA CONFORME AL ANEXO TÉCNICO 5 DE LA RESOLUCIÓN 3047
+                    DE 2008, POR LO QUE LA INSTITUCIÓN RECONOCE EL DEFECTO TÉCNICO Y/O ADMINISTRATIVO IDENTIFICADO.
                 </p>
                 <p style="font-size:13px;line-height:1.8;color:#166534;">
-                    SE SOLICITA PROCEDER CON EL RECONOCIMIENTO Y PAGO CORRESPONDIENTE EN EL PRÓXIMO CICLO DE PAGOS.
+                    EN CONSECUENCIA, ESE HUS PROCEDE CON LA SUBSANACIÓN CONTABLE DEL VALOR OBJETADO Y
+                    SOLICITA SE APLIQUE EL AJUSTE CORRESPONDIENTE EN EL PRÓXIMO CICLO DE CONCILIACIÓN DE CARTERA,
+                    SIN NECESIDAD DE MAYORES TRÁMITES.
                 </p>
             </div>"""
         else:
-            # BUG 2 FIX: Usar "VALOR EN DISPUTA" en lugar de "SALDO PENDIENTE"
             val_en_disputa = abs(val_rechazado)  # Garantizar valor positivo
             argumento_aceptacion = f"""
             <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:20px;margin:15px 0;border-radius:8px;">
                 <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                    EL HOSPITAL UNIVERSITARIO DE SANTANDER INFORMA A {eps.upper()} QUE ACEPTA PARCIALMENTE 
-                    LA PRESENTE GLOSA POR VALOR DE <strong>${val_ac:,.0f}</strong>, 
-                    QUEDANDO UN <strong>VALOR EN DISPUTA DE ${val_en_disputa:,.0f}</strong>.
+                    ESE HUS ACEPTA PARCIALMENTE LA GLOSA POR VALOR DE <strong>${val_ac:,.0f}</strong>
+                    INTERPUESTA POR {eps.upper()}. LA PORCIÓN ACEPTADA CORRESPONDE A UN DEFECTO PROCEDENTE Y
+                    DEBIDAMENTE JUSTIFICADO CONFORME AL ANEXO TÉCNICO 5 DE LA RESOLUCIÓN 3047 DE 2008,
+                    POR LO QUE LA INSTITUCIÓN RECONOCE DICHO AJUSTE Y AUTORIZA SU SUBSANACIÓN CONTABLE.
                 </p>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                    EL VALOR EN DISPUTA DE <strong>${val_en_disputa:,.0f}</strong> NO ES ACEPTADO POR ESE HUS 
-                    Y SE MANTIENE EN TRÁMITE PARA LO CUAL SE ADJUNTAN LOS ARGUMENTOS TÉCNICOS Y JURÍDICOS RESPECTIVOS.
+                    NO OBSTANTE, EL VALOR EN DISPUTA DE <strong>${val_en_disputa:,.0f}</strong> NO ES ACEPTADO
+                    POR ESE HUS Y SE MANTIENE EN TRÁMITE DE DEFENSA TÉCNICO-JURÍDICA, CONFORME A LOS ARGUMENTOS
+                    EXPUESTOS EN EL DICTAMEN ADJUNTO, POR LO QUE SE EXIGE SU RECONOCIMIENTO ÍNTEGRO.
                 </p>
             </div>"""
         

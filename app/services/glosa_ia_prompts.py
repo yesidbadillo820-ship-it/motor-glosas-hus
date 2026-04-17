@@ -379,24 +379,54 @@ MARCO NORMATIVO COMPLETO 2026:
 ══════════════════════════════════════════════════════════════════
 ESTÁNDAR DE REDACCIÓN TÉCNICO-JURÍDICA (OBLIGATORIO)
 ══════════════════════════════════════════════════════════════════
-1. REGISTRO: Escribir SIEMPRE en MAYÚSCULAS SOSTENIDAS. Tono formal de abogado de cartera hospitalaria.
-2. ESTRUCTURA: Usar numerales romanos para secciones (I, II, III, IV) cuando el argumento lo amerite. Cada numeral trata UN tema: (I) Antecedente del caso, (II) Fundamento contractual/tarifario, (III) Sustento normativo y jurisprudencial, (IV) Petición concreta.
-3. EXTENSIÓN: MÍNIMO 450 palabras en el argumento principal (no inflar con muletillas; usar sustancia). Máximo razonable: 900 palabras.
-4. CITAS NORMATIVAS ESPECÍFICAS: Cita SIEMPRE el ARTÍCULO concreto, no solo la norma. Ejemplo:
-   ✓ "El artículo 177 de la Ley 100 de 1993 establece que..."
-   ✗ "La Ley 100 establece que..."
-5. JURISPRUDENCIA: Cuando apliques una sentencia, menciona el CONCEPTO que decidió. Ejemplo:
-   ✓ "La Sentencia T-1025 de 2002 estableció que las EPS no pueden exigir autorización previa en urgencias."
-   ✗ "La T-1025 aplica."
-6. DATOS DEL CASO: Usa DATOS CLÍNICOS y números del caso concreto (paciente, CUPS, CIE-10, Glasgow, leucocitos, signos vitales, valor objetado, fechas, número de factura). NUNCA dejes frases abstractas sin anclarlas en el caso.
-7. CONCLUSIÓN: Cierra con una petición concreta: "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LA FACTURA N° [X] POR VALOR DE $[Y]".
-8. VARIEDAD LÉXICA: Evita repetir el mismo conector. Alterna entre "en ese sentido", "así las cosas", "adicionalmente", "complementariamente", "por su parte".
-9. NORMAS FINALES: Cierra con 3-5 normas en formato: Norma1 | Norma2 | Norma3 (las más pertinentes al caso).
+1. FORMATO: BLOQUE ÚNICO CONTINUO de párrafos técnico-argumentativos. NO uses numerales romanos (I, II, III, IV), NO uses títulos intermedios ("ANTECEDENTES", "FUNDAMENTO", etc.), NO uses separadores como "---" ni "═══".
+
+2. INICIO OBLIGATORIO: La primera frase DEBE comenzar EXACTAMENTE con:
+   - "ESE HUS NO ACEPTA LA GLOSA APLICADA POR [CONCEPTO]..." (si se rechaza)
+   - "ESE HUS ACEPTA PARCIALMENTE LA GLOSA..." (si es parcial)
+   - "ESE HUS ACEPTA LA GLOSA EN SU TOTALIDAD..." (si se acepta)
+   Seguida de la razón CONCRETA por la cual se rechaza/acepta (no genérica).
+
+3. CITAS NORMATIVAS INLINE (DENTRO del argumento, NO en bloque separado al final):
+   ✓ "...conforme a la Resolución 3280 de 2018 que regula la ruta materno-perinatal..."
+   ✓ "...el artículo 14 de la Ley 1751 de 2015 reconoce la salud como derecho fundamental..."
+   ✗ NO escribas al final "NORMAS RELEVANTES: Norma1 | Norma2"
+   ✗ NO listes normas numeradas (1., 2., 3.)
+   ✗ NO uses títulos como "SUSTENTO NORMATIVO"
+
+4. REFERENCIA A SOPORTES CLÍNICOS: Cuando el expediente/PDF aporte datos, INCORPÓRALOS textualmente como evidencia:
+   ✓ "...documentado en la epicrisis (folio 7), registro de procedimiento quirúrgico firmado por la DRA. MARÍA PINILLA (RM 1095811719)..."
+   ✓ "...consta en la hoja de administración de medicamentos (HAM) consecutivo 59385..."
+   Cuando no haya soportes, NO inventes folios ni nombres.
+
+5. PROHIBIDO MOSTRAR CÁLCULOS ARITMÉTICOS EXPLÍCITOS ("SOAT × 0.80 = $X"). Basta con mencionar que la diferencia proviene del descuento no pactado o del valor contractual pactado.
+
+6. PROHIBIDO REPETIR DATOS. Cada párrafo debe aportar información distinta. El valor de la glosa, la factura y el radicado se citan UNA vez (al inicio o en la exigencia final).
+
+7. VARIEDAD LÉXICA: Alterna entre "en ese sentido", "así las cosas", "por consiguiente", "adicionalmente", "complementariamente", "por su parte". Evita repetir el mismo conector más de dos veces.
+
+8. EXTENSIÓN: 250-500 palabras. Denso, sin relleno. Si te quedas corto, agrega ARGUMENTO TÉCNICO-CLÍNICO, no muletillas.
+
+9. CIERRE: Termina con una exigencia concreta del tipo:
+   "SE EXIGE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR DE $[X] CON SUJECIÓN A LOS TÉRMINOS CONTRACTUALES Y NORMATIVOS ANTES EXPUESTOS."
+   NO agregues bloque "NORMAS RELEVANTES:" al final. NO agregues "Plazo legal de 15 días hábiles..." salvo que sea relevante al caso.
+
 10. PROHIBIDO:
-   - Placeholders ([EPS], [FACTURA], etc.)
-   - Frases genéricas tipo "la EPS debe cumplir con la normativa vigente" sin citar cuál
-   - Muletillas repetidas: "en consecuencia", "por lo tanto" más de 2 veces
-   - Párrafos de relleno sin información jurídica ni clínica
+    - Separadores "---", "═══", "───"
+    - Títulos de sección (I., II., III., ANTECEDENTES, FUNDAMENTO, etc.)
+    - Bloque final numerado de normas
+    - Placeholders ([EPS], [FACTURA], [MÉDICO])
+    - Cálculos aritméticos visibles (SOAT × factor = X)
+    - Repetir el valor de la glosa en 3+ párrafos
+    - Frases de relleno sin información jurídica o clínica
+    - "Nota: generado con asistencia de IA" al final
+    - Referencias a ADRES/Superintendencia SALVO que la glosa lo amerite específicamente
+
+11. ORIGEN JURISPRUDENCIAL: Cuando cites una sentencia, indica su CONCEPTO (qué decidió) integrado al argumento:
+    ✓ "...la Sentencia T-1025 de 2002 reconoció que las atenciones de urgencia no requieren autorización previa..."
+    ✗ "SENTENCIA T-1025/2002 (Corte Constitucional)..."
+
+12. REGISTRO: MAYÚSCULAS SOSTENIDAS en todo el argumento. Tono formal-técnico de abogado de cartera hospitalaria. Evitar lenguaje académico o de manual.
 ══════════════════════════════════════════════════════════════════
 """
 
@@ -1194,45 +1224,31 @@ def build_user_prompt(
 
     instruccion_final = f"""
 
-══════════════════════════════════════════════════════════════════
-INSTRUCCIONES OBLIGATORIAS PARA ESTA RESPUESTA
-══════════════════════════════════════════════════════════════════
+INSTRUCCIONES OBLIGATORIAS PARA TU RESPUESTA:
 
-【 1 】 DATOS CLÍNICOS EXTRAÍDOS DEL EXPEDIENTE:
+FORMATO:
+- BLOQUE ÚNICO CONTINUO, sin separadores "---", sin títulos tipo "I. ANTECEDENTES", sin numeración de normas al final.
+- Empieza EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR [CONCEPTO]..." + razón concreta.
+- Cita normas y sentencias INLINE dentro del argumento (no en bloque aparte).
+- 250-500 palabras, denso y técnico.
+- Cierra con: "SE EXIGE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR DE $[VALOR]..."
+- NO escribas "NORMAS RELEVANTES:", "Plazo legal...", "Nota: generado con IA".
+
+DATOS CLÍNICOS EXTRAÍDOS DEL EXPEDIENTE:
 {datos_clinicos_str}
 
-  → Si aparecen datos arriba (paciente, CIE-10, CUPS, Glasgow, signos vitales,
-    laboratorios), DEBES incorporarlos literalmente en el argumento como
-    evidencia objetiva. Ejemplo correcto:
-    "EL PACIENTE [NOMBRE], [EDAD] DE SEXO [SEXO], INGRESÓ POR URGENCIAS CON
-     TA [VALOR], FC [VALOR] Y GLASGOW [VALOR], DIAGNÓSTICO [CIE-10]..."
-  → Si un dato dice "NO IDENTIFICADO", NO lo menciones (NO inventes valores).
+  → Si aparecen datos concretos (paciente, CIE-10, CUPS, Glasgow, laboratorios, nombre del médico, folios), INCORPÓRALOS textualmente al argumento como evidencia.
+  → Si un dato dice "NO IDENTIFICADO", NO lo menciones (NO inventes).
 
-【 2 】 TIPO DE GLOSA = {prefijo}
-  → Llama la glosa por su nombre correcto. NO mezcles tipos.
-  → Las secciones "PROHIBIDO" de la variante son de cumplimiento obligatorio.
+TIPO DE GLOSA: {prefijo}
+  → Menciona esta naturaleza específicamente en el primer párrafo: "...POR CONCEPTO DE {prefijo}...".
+  → NO mezcles tipos (ej. si es AU, NO digas "FACTURACIÓN").
 
-【 3 】 TRAZABILIDAD DEL CASO:
-  {trazabilidad}
-  → Si la trazabilidad indica factura o radicado concretos, cítalos
-    TEXTUALMENTE en la petición final.
-  → Si dice SIN DATOS, NO inventes números.
+TRAZABILIDAD: {trazabilidad}
+  → Cita TEXTUALMENTE factura y radicado en la exigencia final.
+  → Si dice "SIN DATOS", NO inventes números.
 
-【 4 】 ESTRUCTURA ESPERADA DEL ARGUMENTO (USA ROMANOS I-IV):
-   I.  ANTECEDENTES DEL CASO (resumen breve: paciente, servicio, valor objetado, motivo de glosa).
-  II.  FUNDAMENTO CONTRACTUAL Y/O TÉCNICO (contrato aplicable, tarifa pactada, cálculo aritmético si es TA, evidencia clínica si es AU/CL/SO).
- III.  SUSTENTO NORMATIVO Y JURISPRUDENCIAL (artículos específicos + sentencias con su concepto, NO solo citar números).
-  IV.  PETICIÓN CONCRETA (monto exacto, factura, radicado) + plazo legal de respuesta.
-
-【 5 】 EXTENSIÓN MÍNIMA: 450 palabras. MÁXIMA: 900 palabras.
-  → NO inflar con muletillas. Cada párrafo debe aportar un dato nuevo.
-
-【 6 】 CIERRE CON NORMAS: 3-5 normas más pertinentes al caso en formato
-  "Norma1 | Norma2 | Norma3 | Norma4"
-
-══════════════════════════════════════════════════════════════════
-CASO CONCRETO A RESOLVER (usa la plantilla de variante A–D abajo como guía):
-══════════════════════════════════════════════════════════════════
+CASO CONCRETO A RESOLVER (usa la plantilla de variante como guía estructural interna, pero NO muestres numerales ni títulos):
 """
 
     return instruccion_final + template.format(
