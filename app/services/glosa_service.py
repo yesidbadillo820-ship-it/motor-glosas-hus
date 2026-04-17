@@ -498,9 +498,11 @@ class GlosaService:
                     # gpt-oss-120b: 80% más rápido, 4x más barato y menor tasa de
                     # alucinación que llama-3.3 en seguimiento de instrucciones legales.
                     model="openai/gpt-oss-120b",
-                    temperature=0.15,
-                    max_tokens=2500,
-                    timeout=80.0,
+                    temperature=0.2,
+                    # 4000 tokens permiten argumentos de 700-900 palabras con
+                    # estructura I-IV y citas normativas específicas.
+                    max_tokens=4000,
+                    timeout=120.0,
                 )
                 content = resp.choices[0].message.content
                 return content, "groq/gpt-oss-120b"

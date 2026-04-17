@@ -283,6 +283,76 @@ tbody tr:hover{background:var(--bg)}
 .section-title{font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
 .section-title span{background:var(--c-teal-light);color:var(--c-teal2);padding:.2rem .6rem;border-radius:20px;font-size:.68rem;font-weight:700}
 textarea{resize:vertical;min-height:80px}
+
+/* ─── COMPONENTES UNIFICADOS (MIS GLOSAS + otros) ───────────────── */
+.page-pad{padding:1.5rem;overflow-y:auto;width:100%}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.25rem;flex-wrap:wrap;gap:1rem}
+.page-title{font-size:1.15rem;font-weight:700;color:var(--text);margin:0}
+.page-sub{font-size:.78rem;color:var(--text3);margin-top:4px}
+.page-actions{display:flex;align-items:center;gap:.6rem}
+
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh)}
+.card-pad{padding:1.25rem}
+
+/* KPI / stat cards sobrios */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.25rem}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;display:flex;flex-direction:column;gap:4px;transition:border-color .2s,transform .2s}
+.stat-card:hover{border-color:var(--c-teal2);transform:translateY(-1px)}
+.stat-card .n{font-size:1.4rem;font-weight:700;color:var(--text);line-height:1.1;font-variant-numeric:tabular-nums}
+.stat-card .l{font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.stat-card.accent-verde .n{color:#15803d}
+.stat-card.accent-amarillo .n{color:#a16207}
+.stat-card.accent-rojo .n{color:#b91c1c}
+.stat-card.accent-negro .n{color:#0f172a}
+body.dark .stat-card.accent-negro .n{color:#e2e8f0}
+
+/* Tabla moderna */
+.tbl-modern{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh)}
+.tbl-modern table{width:100%;border-collapse:collapse;font-size:.82rem}
+.tbl-modern thead tr{background:var(--bg);border-bottom:1px solid var(--border)}
+.tbl-modern th{padding:.7rem .85rem;text-align:left;font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.tbl-modern td{padding:.7rem .85rem;border-bottom:1px solid var(--border);color:var(--text2)}
+.tbl-modern tbody tr{transition:background .15s}
+.tbl-modern tbody tr:hover{background:var(--bg)}
+.tbl-modern tbody tr:last-child td{border-bottom:none}
+.tbl-modern .mono{font-family:var(--font-mono);font-size:.76rem}
+.tbl-modern .num{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;color:var(--text)}
+.tbl-modern .cell-center{text-align:center}
+
+/* Badges de semáforo y estado */
+.chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700;letter-spacing:.3px;line-height:1.4}
+.chip-verde{background:#d1fae5;color:#065f46}
+.chip-amarillo{background:#fef3c7;color:#92400e}
+.chip-rojo{background:#fee2e2;color:#991b1b}
+.chip-negro{background:#1f2937;color:#fff}
+.chip-estado{background:#dbeafe;color:#1e40af}
+.chip-tipo-administrativo{background:#eff6ff;color:#1d4ed8}
+.chip-tipo-medico{background:#ecfdf5;color:#047857}
+.chip-tipo-mixta{background:#fef3c7;color:#92400e}
+.chip-radicado{background:#eef2ff;color:#3730a3;font-family:var(--font-mono);font-size:.72rem;padding:2px 6px}
+
+body.dark .chip-verde{background:rgba(34,197,94,.15);color:#86efac}
+body.dark .chip-amarillo{background:rgba(234,179,8,.15);color:#fde047}
+body.dark .chip-rojo{background:rgba(239,68,68,.15);color:#fca5a5}
+body.dark .chip-estado{background:rgba(30,64,175,.2);color:#93c5fd}
+
+/* Botón compacto para tabla */
+.btn-sm{padding:.35rem .75rem;font-size:.72rem;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);transition:all .2s;background:var(--c-teal2);color:#fff}
+.btn-sm:hover{background:var(--c-teal)}
+.btn-sm.ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-sm.ghost:hover{border-color:var(--c-teal2);color:var(--c-teal2)}
+
+/* Toolbar inline para filtros/toggle */
+.toolbar-inline{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
+.toggle-lbl{font-size:.74rem;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:.4rem}
+.toggle-lbl input{width:auto}
+
+.empty-row td{padding:2.5rem 1rem !important;text-align:center;color:var(--text3);font-size:.8rem}
+
+/* nav-bar pulido */
+.nb-special{background:var(--c-teal2);color:#fff!important;border-radius:var(--r)!important;padding:5px 14px!important;margin-left:.35rem;height:28px;align-self:center;border-bottom-color:transparent!important;font-size:.72rem}
+.nb-special:hover{background:var(--c-teal);color:#fff!important}
+
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:span 1}}
 @media(max-width:800px){.sidebar{width:280px}}
 </style>
@@ -432,55 +502,47 @@ textarea{resize:vertical;min-height:80px}
     <!-- HISTORIAL -->
     <!-- MIS GLOSAS -->
     <div class="panel" id="p-mis-glosas">
-      <div style="padding:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+      <div class="page-pad">
+        <div class="page-head">
           <div>
-            <h2 style="margin:0;color:#0e1f3d;font-size:20px">📋 Mis glosas pendientes</h2>
-            <p style="margin:4px 0 0;color:#6b7280;font-size:13px" id="mis-subtitle">Glosas asignadas a ti según el archivo de recepción.</p>
+            <h2 class="page-title">Mis glosas pendientes</h2>
+            <p class="page-sub" id="mis-subtitle">Glosas asignadas según el archivo de recepción</p>
           </div>
-          <div>
-            <label id="mis-todas-label" style="display:none;font-size:12px;color:#374151;cursor:pointer">
+          <div class="page-actions toolbar-inline">
+            <label id="mis-todas-label" class="toggle-lbl" style="display:none">
               <input type="checkbox" id="mis-todas" onchange="loadMisGlosas()"/> Ver todas (admin)
             </label>
-            <button class="btn btn-ghost" onclick="loadMisGlosas()">Actualizar</button>
+            <button class="btn-sm ghost" onclick="loadMisGlosas()">Actualizar</button>
           </div>
         </div>
 
-        <div id="mis-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px">
-          <div style="background:#16a34a;color:white;border-radius:8px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:bold" id="mis-v">0</div><div style="font-size:11px">🟢 VERDE</div>
-          </div>
-          <div style="background:#eab308;color:white;border-radius:8px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:bold" id="mis-a">0</div><div style="font-size:11px">🟡 AMARILLO</div>
-          </div>
-          <div style="background:#dc2626;color:white;border-radius:8px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:bold" id="mis-r">0</div><div style="font-size:11px">🔴 ROJO</div>
-          </div>
-          <div style="background:#111827;color:white;border-radius:8px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:bold" id="mis-n">0</div><div style="font-size:11px">⚫ VENCIDAS</div>
-          </div>
+        <div class="stat-grid" id="mis-stats">
+          <div class="stat-card accent-verde"><div class="n" id="mis-v">0</div><div class="l">Verde · &gt;10 días</div></div>
+          <div class="stat-card accent-amarillo"><div class="n" id="mis-a">0</div><div class="l">Amarillo · 5-10 días</div></div>
+          <div class="stat-card accent-rojo"><div class="n" id="mis-r">0</div><div class="l">Rojo · &lt;5 días</div></div>
+          <div class="stat-card accent-negro"><div class="n" id="mis-n">0</div><div class="l">Vencidas</div></div>
         </div>
 
-        <div style="background:white;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden">
-          <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <div class="tbl-modern">
+          <table>
             <thead>
-              <tr style="background:#f3f4f6;text-align:left">
-                <th style="padding:10px">Gestor</th>
-                <th style="padding:10px">EPS</th>
-                <th style="padding:10px">Factura</th>
-                <th style="padding:10px">Consec.</th>
-                <th style="padding:10px">Radicado</th>
-                <th style="padding:10px">Tipo</th>
-                <th style="padding:10px;text-align:right">Valor</th>
-                <th style="padding:10px">Vence</th>
-                <th style="padding:10px">Días</th>
-                <th style="padding:10px">Estado</th>
-                <th style="padding:10px">Semáforo</th>
-                <th style="padding:10px">Acción</th>
+              <tr>
+                <th>Gestor</th>
+                <th>EPS</th>
+                <th>Factura</th>
+                <th>Consec.</th>
+                <th>Radicado</th>
+                <th>Tipo</th>
+                <th style="text-align:right">Valor</th>
+                <th>Vence</th>
+                <th class="cell-center">Días</th>
+                <th>Estado</th>
+                <th>Semáforo</th>
+                <th class="cell-center">Acción</th>
               </tr>
             </thead>
             <tbody id="mis-body">
-              <tr><td colspan="12" style="padding:30px;text-align:center;color:#6b7280">Cargando...</td></tr>
+              <tr class="empty-row"><td colspan="12">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -821,7 +883,7 @@ async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var url = '/glosas/mis-asignaciones' + (todas ? '?todas=true' : '');
   var body = document.getElementById('mis-body');
-  body.innerHTML = '<tr><td colspan="10" style="padding:30px;text-align:center;color:#6b7280">Cargando...</td></tr>';
+  body.innerHTML = '<tr class="empty-row"><td colspan="12">Cargando…</td></tr>';
   try{
     var r = await fetch(url, {headers: authH()});
     if(r.status === 401){ alert('Sesión expirada'); return; }
@@ -847,35 +909,35 @@ async function loadMisGlosas(){
     }
 
     if(data.length === 0){
-      body.innerHTML = '<tr><td colspan="12" style="padding:30px;text-align:center;color:#6b7280">No tienes glosas asignadas. Si esperabas ver alguna, pídele a un administrador que revise el campo "Nombre" de tu usuario — debe coincidir con el valor de la columna GESTOR del Excel (ej: "YESID PEREZ").</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="12">No tienes glosas asignadas. Si esperabas ver alguna, pídele a un administrador que revise el campo "Nombre" de tu usuario — debe coincidir con el valor de la columna GESTOR del Excel (ej: "YESID PEREZ").</td></tr>';
       return;
     }
 
-    var colores = {VERDE:'#16a34a',AMARILLO:'#eab308',ROJO:'#dc2626',NEGRO:'#111827'};
-    var tipoColores = {'Administrativo':'#3b82f6','Medico':'#059669','Mixta':'#d97706'};
+    var semChip = {VERDE:'chip-verde', AMARILLO:'chip-amarillo', ROJO:'chip-rojo', NEGRO:'chip-negro'};
     body.innerHTML = data.map(function(g){
-      var color = colores[g.prioridad] || '#6b7280';
-      var vence = g.fecha_vencimiento ? new Date(g.fecha_vencimiento).toLocaleDateString('es-CO') : 'N/A';
+      var vence = g.fecha_vencimiento ? new Date(g.fecha_vencimiento).toLocaleDateString('es-CO') : '—';
       var valor = (g.valor_objetado || 0).toLocaleString('es-CO', {minimumFractionDigits:0, maximumFractionDigits:0});
-      var radicadoTxt = g.numero_radicado ? '<span style="background:#e0e7ff;color:#3730a3;padding:2px 6px;border-radius:4px;font-size:11px;font-family:monospace">' + g.numero_radicado + '</span>' : '<span style="color:#9ca3af">-</span>';
-      var tipoTxt = g.tipo_glosa_excel ? '<span style="background:' + (tipoColores[g.tipo_glosa_excel] || '#6b7280') + ';color:white;padding:2px 8px;border-radius:4px;font-size:11px">' + g.tipo_glosa_excel + '</span>' : '<span style="color:#9ca3af">-</span>';
-      return '<tr style="border-top:1px solid #f3f4f6">' +
-        '<td style="padding:10px;font-size:12px">' + (g.gestor_nombre || '-') + '</td>' +
-        '<td style="padding:10px;font-size:12px">' + (g.eps || '-') + '</td>' +
-        '<td style="padding:10px;font-size:12px;font-family:monospace">' + (g.factura || '-') + '</td>' +
-        '<td style="padding:10px;font-size:12px;font-family:monospace">' + (g.consecutivo_dgh || '-') + '</td>' +
-        '<td style="padding:10px">' + radicadoTxt + '</td>' +
-        '<td style="padding:10px">' + tipoTxt + '</td>' +
-        '<td style="padding:10px;text-align:right;font-weight:bold">$' + valor + '</td>' +
-        '<td style="padding:10px;font-size:12px">' + vence + '</td>' +
-        '<td style="padding:10px;text-align:center;font-weight:bold">' + (g.dias_restantes || 0) + '</td>' +
-        '<td style="padding:10px;font-size:11px"><span style="background:#eff6ff;color:#1e40af;padding:2px 8px;border-radius:4px">' + (g.estado || '-') + '</span></td>' +
-        '<td style="padding:10px"><span style="background:' + color + ';color:white;padding:2px 8px;border-radius:4px;font-size:11px">' + (g.prioridad || '-') + '</span></td>' +
-        '<td style="padding:10px"><button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="responderGlosa(' + g.id + ')">Responder</button></td>' +
+      var radicadoTxt = g.numero_radicado ? '<span class="chip chip-radicado">' + g.numero_radicado + '</span>' : '<span style="color:var(--text3)">—</span>';
+      var tipoCls = g.tipo_glosa_excel ? 'chip-tipo-' + g.tipo_glosa_excel.toLowerCase() : '';
+      var tipoTxt = g.tipo_glosa_excel ? '<span class="chip ' + tipoCls + '">' + g.tipo_glosa_excel + '</span>' : '<span style="color:var(--text3)">—</span>';
+      var semCls = semChip[g.prioridad] || '';
+      return '<tr>' +
+        '<td>' + (g.gestor_nombre || '—') + '</td>' +
+        '<td>' + (g.eps || '—') + '</td>' +
+        '<td class="mono">' + (g.factura || '—') + '</td>' +
+        '<td class="mono">' + (g.consecutivo_dgh || '—') + '</td>' +
+        '<td>' + radicadoTxt + '</td>' +
+        '<td>' + tipoTxt + '</td>' +
+        '<td class="num">$' + valor + '</td>' +
+        '<td>' + vence + '</td>' +
+        '<td class="cell-center" style="font-weight:700">' + (g.dias_restantes || 0) + '</td>' +
+        '<td><span class="chip chip-estado">' + (g.estado || '—') + '</span></td>' +
+        '<td><span class="chip ' + semCls + '">' + (g.prioridad || '—') + '</span></td>' +
+        '<td class="cell-center"><button class="btn-sm" onclick="responderGlosa(' + g.id + ')">Responder</button></td>' +
         '</tr>';
     }).join('');
   }catch(e){
-    body.innerHTML = '<tr><td colspan="10" style="padding:20px;color:#991b1b">Error: ' + e.message + '</td></tr>';
+    body.innerHTML = '<tr class="empty-row"><td colspan="12" style="color:#991b1b">Error: ' + e.message + '</td></tr>';
   }
 }
 
