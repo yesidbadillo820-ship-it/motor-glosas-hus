@@ -117,6 +117,30 @@ def estadisticas_admin(
     }
 
 
+@router.post("/enviar-alertas-vencimiento")
+async def enviar_alertas_vencimiento(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Dispara el envío de correos masivos con glosas próximas a vencer
+    o vencidas a todos los gestores configurados en ALERTAS_EMAIL.
+    Solo SUPER_ADMIN."""
+    from app.services.email_service import enviar_alertas_vencimiento_masivo
+    try:
+        resumen = await enviar_alertas_vencimiento_masivo(db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {e}")
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="ENVIAR_ALERTAS",
+        tabla="historial",
+        detalle=f"Destinatarios={resumen.get('destinatarios',0)} Enviados={resumen.get('correos_enviados',0)} Glosas={resumen.get('glosas_alertadas',0)}",
+    )
+    return resumen
+
+
 @router.post("/backfill-historial")
 def backfill_historial(
     db: Session = Depends(get_db),
