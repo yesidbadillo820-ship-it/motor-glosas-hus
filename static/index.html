@@ -464,6 +464,9 @@ tbody tr:hover{background:var(--bg)}
 .spot-item-meta{font-size:.68rem;color:var(--text3);flex-shrink:0;font-family:var(--font-mono)}
 .spot-empty{padding:2rem 1.1rem;text-align:center;color:var(--text3);font-size:.82rem}
 .spot-icon{width:28px;height:28px;border-radius:6px;background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;color:var(--text3);flex-shrink:0}
+.spot-ia-hint{padding:.5rem 1rem;border-bottom:1px dashed var(--border)}
+.spot-ia-btn{width:100%;padding:.55rem .75rem;font-size:.78rem;background:linear-gradient(90deg,rgba(13,148,136,.1),rgba(13,148,136,.02));color:var(--c-teal2);border:1px solid rgba(13,148,136,.3);border-radius:8px;cursor:pointer;text-align:left;font-weight:500}
+.spot-ia-btn:hover{background:rgba(13,148,136,.18)}
 
 /* ─── MISC ────────────────────────────────── */
 .divider{height:1px;background:var(--border);margin:.5rem 0}
@@ -3222,13 +3225,49 @@ function renderSpotlightResults(query){
     });
   }
 
+  // Si la query es larga (frase), ofrecer búsqueda IA semántica
+  var iaHint = '';
+  if(query && query.trim().length > 10){
+    iaHint = '<div class="spot-ia-hint"><button class="spot-ia-btn" onclick="busquedaSemanticaSpot(\''+ escJs(query) +'\')">🧠 Buscar con IA: "' + escHtml(query) + '"</button></div>';
+  }
+
   if(!html){
-    box.innerHTML = '<div class="spot-empty">Sin resultados para "<b>' + escHtml(query) + '</b>"</div>';
+    box.innerHTML = iaHint + '<div class="spot-empty">Sin resultados exactos para "<b>' + escHtml(query) + '</b>"</div>';
   } else {
-    box.innerHTML = html;
+    box.innerHTML = iaHint + html;
     SPOT_ACTIVE_IDX = 0;
     highlightSpotItem(0);
   }
+}
+
+async function busquedaSemanticaSpot(query){
+  var box = document.getElementById('spot-results');
+  box.innerHTML = '<div class="spot-empty">🧠 Buscando con IA…</div>';
+  try{
+    var r = await fetch('/busqueda-semantica/', {
+      method:'POST', headers:{...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({query: query, limite: 10})
+    });
+    var d = await r.json();
+    if(!r.ok || !d.resultados.length){
+      box.innerHTML = '<div class="spot-empty">Sin resultados IA para "<b>'+escHtml(query)+'</b>"</div>';
+      return;
+    }
+    var html = '<div class="spot-group-lbl">🧠 Resultados IA · método: ' + escHtml(d.metodo) + ' (' + d.resultados.length + ')</div>';
+    d.resultados.forEach(function(g, i){
+      html += '<div class="spot-item" data-idx="' + i + '" onclick="accionSpotGlosa(' + g.id + ')">' +
+        '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
+        '<div class="spot-item-main">' +
+          '<div class="spot-item-title">' + escHtml(g.codigo_glosa||'—') + ' · ' + escHtml(g.eps||'—') + '</div>' +
+          '<div class="spot-item-sub">' + escHtml(g.factura||'—') + ' · $' + (g.valor_objetado||0).toLocaleString('es-CO') + ' · ' + escHtml((g.servicio||'').substring(0,60)) + '</div>' +
+        '</div>' +
+        '<span class="spot-item-meta">ID ' + g.id + '</span>' +
+      '</div>';
+    });
+    box.innerHTML = html;
+    SPOT_ACTIVE_IDX = 0;
+    highlightSpotItem(0);
+  }catch(e){ box.innerHTML = '<div class="spot-empty">Error: '+escHtml(e.message)+'</div>'; }
 }
 
 function highlightSpotItem(idx){

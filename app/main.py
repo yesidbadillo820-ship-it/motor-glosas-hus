@@ -576,6 +576,7 @@ from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
 from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
+from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -597,6 +598,7 @@ app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
 app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
+app.include_router(busqueda_semantica_router)
 
 
 def get_glosa_service() -> GlosaService:
