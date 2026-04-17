@@ -865,6 +865,7 @@ async def analizar(
     # Retornar resultado actualizado con el nuevo tipo
     resultado.tipo = tipo_final
     resultado.dictamen = dictamen_final
+    resultado.glosa_id = glosa.id
     return resultado
 
 
