@@ -189,6 +189,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .modal-hdr h3{font-size:1rem;font-weight:700}
 .modal-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)}
 .modal-body{padding:1.5rem;overflow-y:auto;flex:1}
+.refinar-panel{border-top:1px solid var(--border);padding:1rem 1.5rem;background:var(--bg-subtle);display:flex;flex-direction:column;gap:.6rem}
+.refinar-hdr{display:flex;flex-direction:column;gap:2px}
+.refinar-hdr b{font-size:.85rem;color:var(--text);display:flex;align-items:center;gap:.4rem}
+.refinar-hdr b::before{content:"🧠";font-size:1rem}
+.refinar-sub{font-size:.72rem;color:var(--text3)}
+.refinar-chips{display:flex;gap:.4rem;flex-wrap:wrap}
+.refinar-chip{padding:.3rem .65rem;font-size:.72rem;border:1px solid var(--border);background:var(--bg-card);border-radius:14px;cursor:pointer;color:var(--text2)}
+.refinar-chip:hover{background:var(--c-teal2);color:#fff;border-color:var(--c-teal2)}
+#refinar-msg{width:100%;padding:.55rem .7rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.82rem;resize:vertical;font-family:inherit}
+.refinar-actions{display:flex;justify-content:flex-end;gap:.6rem;align-items:center}
+.refinar-status{font-size:.78rem;color:var(--text3);min-height:1em}
+.refinar-status.ok{color:var(--c-green)}
+.refinar-status.err{color:#ef4444}
 
 /* ─── CONCILIACIÓN ─────────────────────────── */
 .concil-area{padding:1.5rem}
@@ -298,6 +311,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 /* ─── HISTORIAL ──────────────────────────── */
 .hist-area{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:1.25rem;gap:1rem}
 .hist-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.bulk-bar{display:flex;align-items:center;gap:.8rem;padding:.7rem 1rem;margin:.8rem 0;background:linear-gradient(90deg,rgba(13,148,136,.08),rgba(13,148,136,.02));border:1px solid rgba(13,148,136,.25);border-radius:10px;font-size:.85rem;flex-wrap:wrap}
+.bulk-bar b{color:var(--c-teal2);font-size:1rem}
+.bulk-chk{display:flex;align-items:center;gap:.4rem;color:var(--text2);font-size:.8rem;cursor:pointer}
+.bulk-chk input{cursor:pointer}
 .field-inline{display:flex;flex-direction:column;gap:2px}
 .field-inline label{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
 .field-inline input,.field-inline select{padding:.35rem .55rem;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);min-width:110px}
@@ -756,10 +773,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <div class="stat-card accent-negro"><div class="n" id="mis-n">0</div><div class="l">Vencidas</div></div>
         </div>
 
+        <div class="bulk-bar" id="bulk-bar" style="display:none">
+          <span><b id="bulk-count">0</b> glosas seleccionadas</span>
+          <label class="bulk-chk"><input type="checkbox" id="bulk-sobrescribir"/> Regenerar aunque ya tengan respuesta</label>
+          <button class="btn btn-primary" onclick="generarRespuestasLote()">Generar respuestas en lote</button>
+          <button class="btn btn-ghost" onclick="limpiarSeleccionLote()">Limpiar</button>
+        </div>
+
         <div class="tbl-modern">
           <table>
             <thead>
               <tr>
+                <th class="cell-center" style="width:34px"><input type="checkbox" id="bulk-chk-all" onchange="toggleSeleccionTodas(this.checked)" title="Seleccionar todas"/></th>
                 <th>Gestor</th>
                 <th>EPS</th>
                 <th>Factura</th>
@@ -775,7 +800,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               </tr>
             </thead>
             <tbody id="mis-body">
-              <tr class="empty-row"><td colspan="12">Cargando...</td></tr>
+              <tr class="empty-row"><td colspan="13">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1057,9 +1082,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <div class="modal">
     <div class="modal-hdr">
       <h3 id="modal-titulo">Dictamen Jurídico</h3>
-      <button class="modal-close" onclick="cerrarModal()">✕</button>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
+        <button class="modal-close" onclick="cerrarModal()">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="modal-body"></div>
+    <div class="refinar-panel" id="refinar-panel" style="display:none">
+      <div class="refinar-hdr">
+        <b>Refinar con IA</b>
+        <span class="refinar-sub">Dile a la IA qué cambiar: tono, longitud, citar otra norma, etc.</span>
+      </div>
+      <div class="refinar-chips">
+        <button class="refinar-chip" onclick="refinarSugerencia('Acorta el segundo párrafo a máximo 3 líneas')">Acortar 2º párrafo</button>
+        <button class="refinar-chip" onclick="refinarSugerencia('Usa un tono más firme y contundente')">Tono más firme</button>
+        <button class="refinar-chip" onclick="refinarSugerencia('Agrega cita al Decreto 4747 de 2007 artículo 20')">Citar Dec. 4747</button>
+        <button class="refinar-chip" onclick="refinarSugerencia('Agrega la Sentencia T-760 de 2008 como fundamento')">Citar T-760</button>
+        <button class="refinar-chip" onclick="refinarSugerencia('Simplifica el lenguaje técnico sin perder la base jurídica')">Simplificar</button>
+      </div>
+      <textarea id="refinar-msg" placeholder="Escribe la instrucción para refinar (ej: 'acorta la conclusión', 'cita también Ley 1751/2015 art. 17', 'tono más conciliador')…" rows="2"></textarea>
+      <div class="refinar-actions">
+        <label class="bulk-chk"><input type="checkbox" id="refinar-guardar"/> Guardar al aplicar</label>
+        <button class="btn btn-primary btn-sm" onclick="aplicarRefinar()">Refinar</button>
+      </div>
+      <div id="refinar-status" class="refinar-status"></div>
+    </div>
   </div>
 </div>
 
@@ -1256,7 +1303,7 @@ async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var url = '/glosas/mis-asignaciones' + (todas ? '?todas=true' : '');
   var body = document.getElementById('mis-body');
-  body.innerHTML = '<tr class="empty-row"><td colspan="12">Cargando…</td></tr>';
+  body.innerHTML = '<tr class="empty-row"><td colspan="13">Cargando…</td></tr>';
   try{
     var r = await fetch(url, {headers: authH()});
     if(r.status === 401){ alert('Sesión expirada'); return; }
@@ -1282,7 +1329,7 @@ async function loadMisGlosas(){
     }
 
     if(data.length === 0){
-      body.innerHTML = '<tr class="empty-row"><td colspan="12">' +
+      body.innerHTML = '<tr class="empty-row"><td colspan="13">' +
         '<svg class="empty-state-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M9 11H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/>' +
         '<path d="M9 11V7a3 3 0 0 1 6 0v4"/><path d="M9 16h6"/>' +
@@ -1319,6 +1366,7 @@ async function loadMisGlosas(){
       }
 
       return '<tr>' +
+        '<td class="cell-center"><input type="checkbox" class="bulk-chk" value="' + g.id + '" onchange="actualizarContadorLote()"/></td>' +
         '<td>' + (g.gestor_nombre || '—') + '</td>' +
         '<td>' + (g.eps || '—') + '</td>' +
         '<td class="mono">' + (g.factura || '—') + '</td>' +
@@ -1333,9 +1381,58 @@ async function loadMisGlosas(){
         '<td class="cell-center">' + acciones + '</td>' +
         '</tr>';
     }).join('');
+    actualizarContadorLote();
   }catch(e){
-    body.innerHTML = '<tr class="empty-row"><td colspan="12" style="color:#991b1b">Error: ' + e.message + '</td></tr>';
+    body.innerHTML = '<tr class="empty-row"><td colspan="13" style="color:#991b1b">Error: ' + e.message + '</td></tr>';
   }
+}
+
+function _idsSeleccionados(){
+  var ck = document.querySelectorAll('.bulk-chk:checked');
+  return Array.from(ck).map(function(c){ return parseInt(c.value, 10); }).filter(Boolean);
+}
+
+function actualizarContadorLote(){
+  var ids = _idsSeleccionados();
+  var bar = document.getElementById('bulk-bar');
+  var cnt = document.getElementById('bulk-count');
+  if(!bar || !cnt) return;
+  cnt.textContent = ids.length;
+  bar.style.display = ids.length > 0 ? 'flex' : 'none';
+}
+
+function toggleSeleccionTodas(checked){
+  document.querySelectorAll('.bulk-chk').forEach(function(c){ c.checked = checked; });
+  actualizarContadorLote();
+}
+
+function limpiarSeleccionLote(){
+  document.querySelectorAll('.bulk-chk').forEach(function(c){ c.checked = false; });
+  var all = document.getElementById('bulk-chk-all'); if(all) all.checked = false;
+  actualizarContadorLote();
+}
+
+async function generarRespuestasLote(){
+  var ids = _idsSeleccionados();
+  if(!ids.length){ toast('Nada seleccionado','Marca al menos una glosa','warning'); return; }
+  if(ids.length > 50){ toast('Demasiadas','Máximo 50 por lote','warning'); return; }
+  var sobre = document.getElementById('bulk-sobrescribir') && document.getElementById('bulk-sobrescribir').checked;
+  if(!confirm('Se generarán respuestas IA para ' + ids.length + ' glosa(s).\nEsto puede tardar ~' + Math.max(10, ids.length*3) + ' segundos.\n\n¿Continuar?')) return;
+  showLoading();
+  try{
+    var r = await fetch('/glosas/generar-lote', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({glosa_ids: ids, sobrescribir: !!sobre})
+    });
+    var d = await r.json();
+    hideLoading();
+    if(!r.ok){ toast('Error', d.detail || 'Error en lote', 'error'); return; }
+    var msg = 'Procesadas: ' + d.procesadas + ' · Saltadas: ' + d.saltadas + ' · Fallidas: ' + d.fallidas;
+    toast('Lote completado', msg, d.fallidas > 0 ? 'warning' : 'success');
+    limpiarSeleccionLote();
+    loadMisGlosas();
+  }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
 }
 
 // ─── WORKFLOW DE APROBACION ───────────────────────────────────────────────
@@ -2141,18 +2238,73 @@ async function eliminarUsuario(id,email){
 }
 
 // ─── MODAL DICTAMEN ──────────────────────────────────────────────────────
+var CURRENT_GLOSA_ID = null;
+
 async function verDictamen(id){
   try{
     var r=await fetch('/glosas/'+id,{headers:authH()});
     var g=await r.json();
+    CURRENT_GLOSA_ID = id;
     document.getElementById('modal-titulo').textContent='Dictamen de Glosa #'+id;
     document.getElementById('modal-body').innerHTML=g.dictamen||'No hay dictamen';
     document.getElementById('modal-dictamen').classList.add('show');
+    // Reset panel refinar
+    document.getElementById('refinar-panel').style.display = 'none';
+    document.getElementById('refinar-msg').value = '';
+    document.getElementById('refinar-status').textContent = '';
+    document.getElementById('refinar-status').className = 'refinar-status';
   }catch(e){toast('Error',e.message,'error');}
 }
 
 function cerrarModal(){
   document.getElementById('modal-dictamen').classList.remove('show');
+  CURRENT_GLOSA_ID = null;
+}
+
+function toggleRefinarPanel(){
+  var p = document.getElementById('refinar-panel');
+  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+  if(p.style.display !== 'none') setTimeout(function(){ document.getElementById('refinar-msg').focus(); }, 50);
+}
+
+function refinarSugerencia(texto){
+  var ta = document.getElementById('refinar-msg');
+  ta.value = texto;
+  ta.focus();
+}
+
+async function aplicarRefinar(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+  var msg = document.getElementById('refinar-msg').value.trim();
+  if(msg.length < 3){ toast('Instrucción muy corta','Escribe al menos unas palabras','warning'); return; }
+  var guardar = document.getElementById('refinar-guardar').checked;
+  var st = document.getElementById('refinar-status');
+  st.className = 'refinar-status';
+  st.textContent = 'Refinando con IA… ~15s';
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/refinar', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({mensaje: msg, guardar: guardar})
+    });
+    var d = await r.json();
+    if(!r.ok){
+      st.className = 'refinar-status err';
+      st.textContent = 'Error: ' + (d.detail || 'no se pudo refinar');
+      return;
+    }
+    // Actualizar contenido del modal con el HTML refinado
+    document.getElementById('modal-body').innerHTML = d.dictamen_html;
+    st.className = 'refinar-status ok';
+    st.textContent = guardar ? 'Refinado y guardado ✓' : 'Refinado (no guardado). Marca "Guardar" y vuelve a refinar para persistir.';
+    if(guardar){
+      toast('Dictamen actualizado','Cambios guardados','success');
+      if(typeof loadHist === 'function' && typeof histPage !== 'undefined') loadHist(histPage || 1);
+    }
+  }catch(e){
+    st.className = 'refinar-status err';
+    st.textContent = 'Conexión: ' + e.message;
+  }
 }
 
 // ─── ELIMINAR GLOSA ──────────────────────────────────────────────────────
