@@ -319,6 +319,8 @@ async def generar_lote(
     service = GlosaService(
         groq_api_key=cfg.groq_api_key,
         anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+        anthropic_model=cfg.anthropic_model,
     )
 
     sem = asyncio.Semaphore(5)
@@ -360,7 +362,12 @@ async def generar_lote(
                     numero_factura=g.factura,
                     numero_radicado=g.numero_radicado,
                 )
-                res = await service.analizar(gi, contexto_pdf="", contratos_db=contratos)
+                # Few-shots según (EPS, código)
+                from app.api.routers.plantillas_gold import obtener_few_shot, marcar_usos
+                pg = obtener_few_shot(db, eps=gi.eps, codigo_glosa=g.codigo_glosa or "", limite=2)
+                res = await service.analizar(gi, contexto_pdf="", contratos_db=contratos, few_shots=[p.argumento for p in pg])
+                if pg:
+                    marcar_usos(db, [p.id for p in pg])
                 g.dictamen = res.dictamen
                 g.score = res.score
                 g.modelo_ia = res.modelo_ia
@@ -413,6 +420,8 @@ async def refinar_dictamen_endpoint(
     service = GlosaService(
         groq_api_key=cfg.groq_api_key,
         anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+        anthropic_model=cfg.anthropic_model,
     )
     nuevo_argumento = await service.refinar_dictamen(
         dictamen_actual_html=glosa.dictamen,
@@ -840,7 +849,12 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
     db = SessionLocal()
     try:
         cfg = get_settings()
-        service = GlosaService(groq_api_key=cfg.groq_api_key, anthropic_api_key=cfg.anthropic_api_key)
+        service = GlosaService(
+            groq_api_key=cfg.groq_api_key,
+            anthropic_api_key=cfg.anthropic_api_key,
+            primary_ai=cfg.primary_ai,
+            anthropic_model=cfg.anthropic_model,
+        )
         
         from app.models.schemas import GlosaInput
         

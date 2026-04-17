@@ -385,6 +385,28 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
 
+    # Migraciones para conciliaciones - trazabilidad bilateral
+    _CONCILIACION_MISSING = [
+        ("contra_respuesta_eps", "TEXT"),
+        ("fecha_contra_respuesta_eps", "TIMESTAMP WITH TIME ZONE"),
+        ("postura_hus", "TEXT"),
+        ("fecha_acta", "TIMESTAMP WITH TIME ZONE"),
+        ("valor_ratificado_hus", "FLOAT DEFAULT 0"),
+        ("estado_bilateral", "VARCHAR(40) DEFAULT 'PROGRAMADA'"),
+    ]
+    for col_name, col_ddl in _CONCILIACION_MISSING:
+        try:
+            result = db.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='conciliaciones' AND column_name=:col"
+            ), {"col": col_name})
+            if not result.fetchone():
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a conciliaciones")
+                db.execute(text(f"ALTER TABLE conciliaciones ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()
@@ -550,6 +572,7 @@ from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
 from app.api.routers.salud_total import router as salud_total_router
 from app.api.routers.admin import router as admin_router
+from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -567,10 +590,16 @@ app.include_router(conciliacion_router)
 app.include_router(audit_router)
 app.include_router(salud_total_router)
 app.include_router(admin_router)
+app.include_router(plantillas_gold_router)
 
 
 def get_glosa_service() -> GlosaService:
-    return GlosaService(groq_api_key=cfg.groq_api_key, anthropic_api_key=cfg.anthropic_api_key)
+    return GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+        anthropic_model=cfg.anthropic_model,
+    )
 
 
 @app.post(
@@ -657,15 +686,31 @@ async def analizar(
                     if len(contenido) > 10_000_000:
                         logger.warning(f"[{req_id}] PDF muy grande: {archivo.filename}")
                         continue
-                    contexto_pdf += await pdf_svc.extraer(contenido)
+                    # OCR automático con Claude si el PDF es escaneado y hay key
+                    texto, metodo = await pdf_svc.extraer_con_ocr(
+                        contenido,
+                        anthropic_api_key=cfg.anthropic_api_key,
+                        anthropic_model=cfg.anthropic_model,
+                    )
+                    contexto_pdf += texto
+                    logger.info(f"[{req_id}] PDF {archivo.filename}: {metodo} ({len(texto)} chars)")
                 except Exception as e:
                     logger.warning(f"[{req_id}] Error extrayendo PDF {archivo.filename}: {e}")
 
     contrato_repo = ContratoRepository(db)
     contratos = contrato_repo.como_dict()
 
-    resultado = await service.analizar(data, contexto_pdf, contratos)
-    logger.info(f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia}")
+    # Few-shots de plantillas gold según (EPS, código) si las hay
+    from app.api.routers.plantillas_gold import obtener_few_shot, marcar_usos
+    codigo_match = re.search(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", tabla_excel.upper())
+    cod_pref = codigo_match.group(0) if codigo_match else ""
+    plantillas_gold = obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2) if cod_pref else []
+    few_shots = [p.argumento for p in plantillas_gold]
+
+    resultado = await service.analizar(data, contexto_pdf, contratos, few_shots=few_shots)
+    if plantillas_gold:
+        marcar_usos(db, [p.id for p in plantillas_gold])
+    logger.info(f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} | few_shots={len(few_shots)}")
 
     glosa_repo = GlosaRepository(db)
     val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)
@@ -847,3 +892,31 @@ def presentacion_ia():
 @app.get("/health")
 def health():
     return {"status": "ok", "version": cfg.app_version}
+
+
+@app.post("/pdf/ocr")
+async def pdf_ocr(
+    archivo: UploadFile = File(...),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Sube un PDF y devuelve su texto. Si el PDF es escaneado y hay
+    ANTHROPIC_API_KEY configurada, usa Claude Vision como OCR."""
+    contenido = await archivo.read()
+    if contenido[:4] != b"%PDF":
+        raise HTTPException(400, "El archivo no es un PDF válido")
+    if len(contenido) > 30_000_000:
+        raise HTTPException(400, "PDF muy grande (>30 MB)")
+
+    from app.services.pdf_service import PdfService
+    pdf_svc = PdfService()
+    texto, metodo = await pdf_svc.extraer_con_ocr(
+        contenido,
+        anthropic_api_key=cfg.anthropic_api_key,
+        anthropic_model=cfg.anthropic_model,
+    )
+    return {
+        "metodo": metodo,
+        "caracteres": len(texto),
+        "texto": texto,
+        "archivo": archivo.filename,
+    }
