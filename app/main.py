@@ -33,6 +33,25 @@ from app.core.config import get_settings, check_security_config
 from app.auth import get_password_hash
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual
+from app.services.glosa_ia_prompts import get_contrato
+
+
+def _descripcion_servicio(codigo_glosa: str) -> str:
+    """Devuelve una descripción del servicio según el prefijo del código de glosa."""
+    if not codigo_glosa:
+        return "LOS SERVICIOS FACTURADOS"
+    prefijo = codigo_glosa[:2].upper()
+    return {
+        "TA": "LOS SERVICIOS FACTURADOS (CONSULTA, PROCEDIMIENTO O AYUDA DIAGNÓSTICA)",
+        "SO": "LOS SOPORTES DOCUMENTALES DEL SERVICIO PRESTADO",
+        "AU": "LOS PROCEDIMIENTOS AUTORIZADOS",
+        "CO": "LOS SERVICIOS DE COBERTURA (CONSULTA, PROCEDIMIENTO O AYUDA DIAGNÓSTICA)",
+        "CL": "LOS PROCEDIMIENTOS MÉDICOS PRESTADOS",
+        "PE": "LOS PROCEDIMIENTOS MÉDICOS PRESTADOS",
+        "FA": "LOS CARGOS FACTURADOS",
+        "IN": "LOS INSUMOS Y DISPOSITIVOS MÉDICOS UTILIZADOS",
+        "ME": "LOS MEDICAMENTOS DISPENSADOS",
+    }.get(prefijo, "LOS SERVICIOS FACTURADOS")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -476,21 +495,21 @@ async def analizar(
     if estado in ("ACEPTADA", "PARCIALMENTE_ACEPTADA"):
         val_rechazado = val_obj - val_ac
         
+        # Obtener número de contrato vigente con la EPS para citar en el texto
+        _contrato_info = get_contrato(eps)
+        _num_contrato = _contrato_info.get("numero") or "CONTRATO VIGENTE ENTRE LAS PARTES"
+        _servicio_descr = _descripcion_servicio(resultado.codigo_glosa)
+
         # Generar texto de aceptación apropiado
         if estado == "ACEPTADA":
             argumento_aceptacion = f"""
             <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:15px 0;border-radius:8px;">
                 <h4 style="color:#15803d;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
                 <p style="font-size:13px;line-height:1.8;color:#166534;">
-                    ESE HUS ACEPTA LA GLOSA EN SU TOTALIDAD POR VALOR DE <strong>${val_ac:,.0f}</strong>
-                    INTERPUESTA POR {eps.upper()}. LA OBJECIÓN PRESENTADA POR LA ENTIDAD PAGADORA
-                    ES PROCEDENTE Y SE ENCUENTRA JUSTIFICADA CONFORME AL ANEXO TÉCNICO 5 DE LA RESOLUCIÓN 3047
-                    DE 2008, POR LO QUE LA INSTITUCIÓN RECONOCE EL DEFECTO TÉCNICO Y/O ADMINISTRATIVO IDENTIFICADO.
-                </p>
-                <p style="font-size:13px;line-height:1.8;color:#166534;">
-                    EN CONSECUENCIA, ESE HUS PROCEDE CON LA SUBSANACIÓN CONTABLE DEL VALOR OBJETADO Y
-                    SOLICITA SE APLIQUE EL AJUSTE CORRESPONDIENTE EN EL PRÓXIMO CICLO DE CONCILIACIÓN DE CARTERA,
-                    SIN NECESIDAD DE MAYORES TRÁMITES.
+                    ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
+                    EL CUAL CORRESPONDE A {_servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
+                    SEGÚN <strong>{_num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
+                    DANDO CUMPLIMIENTO A ESTAS TARIFAS.
                 </p>
             </div>"""
         else:
@@ -499,15 +518,15 @@ async def analizar(
             <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:20px;margin:15px 0;border-radius:8px;">
                 <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                    ESE HUS ACEPTA PARCIALMENTE LA GLOSA POR VALOR DE <strong>${val_ac:,.0f}</strong>
-                    INTERPUESTA POR {eps.upper()}. LA PORCIÓN ACEPTADA CORRESPONDE A UN DEFECTO PROCEDENTE Y
-                    DEBIDAMENTE JUSTIFICADO CONFORME AL ANEXO TÉCNICO 5 DE LA RESOLUCIÓN 3047 DE 2008,
-                    POR LO QUE LA INSTITUCIÓN RECONOCE DICHO AJUSTE Y AUTORIZA SU SUBSANACIÓN CONTABLE.
+                    ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
+                    EL CUAL CORRESPONDE A {_servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
+                    SEGÚN <strong>{_num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
+                    DANDO CUMPLIMIENTO A ESTAS TARIFAS.
                 </p>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                    NO OBSTANTE, EL VALOR EN DISPUTA DE <strong>${val_en_disputa:,.0f}</strong> NO ES ACEPTADO
-                    POR ESE HUS Y SE MANTIENE EN TRÁMITE DE DEFENSA TÉCNICO-JURÍDICA, CONFORME A LOS ARGUMENTOS
-                    EXPUESTOS EN EL DICTAMEN ADJUNTO, POR LO QUE SE EXIGE SU RECONOCIMIENTO ÍNTEGRO.
+                    EL VALOR EN DISPUTA DE <strong>${val_en_disputa:,.0f}</strong> NO ES ACEPTADO POR ESE HUS
+                    Y SE MANTIENE EN TRÁMITE DE DEFENSA TÉCNICO-JURÍDICA, CONFORME A LOS ARGUMENTOS EXPUESTOS
+                    EN EL DICTAMEN ADJUNTO, POR LO QUE SE EXIGE SU RECONOCIMIENTO ÍNTEGRO.
                 </p>
             </div>"""
         
