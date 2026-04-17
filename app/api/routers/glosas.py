@@ -36,6 +36,41 @@ class ImportacionMasivaRequest(BaseModel):
     fecha_recepcion: Optional[str] = None
 
 
+def _limpiar_observacion(dictamen_html: str) -> str:
+    """Extrae solo el texto del argumento jurídico del dictamen, quitando la
+    tabla superior (código/valor/respuesta), los badges, la tabla de resumen
+    de valores y la nota al pie de 'asistencia de IA'."""
+    if not dictamen_html:
+        return ""
+    from html import unescape
+    import re as _re
+    txt = _re.sub(r"<[^>]+>", " ", dictamen_html)
+    txt = _re.sub(r"\s+", " ", unescape(txt)).strip()
+
+    # Cortar desde "ARGUMENTACIÓN JURÍDICA" (siempre precede al argumento real)
+    for marker in ("ARGUMENTACIÓN JURÍDICA", "RESPUESTA A GLOSA"):
+        if marker in txt:
+            parts = txt.split(marker, 1)
+            # Solo tomar lo que va después si el marker está cerca del inicio
+            # (es el header de la tabla) o si hay muy poco texto antes.
+            if len(parts) == 2 and len(parts[0]) < 500:
+                txt = parts[1].strip()
+                break
+
+    # Cortar ANTES de la nota al pie de IA o del resumen de valores
+    for cierre in (
+        "Nota: Generado con asistencia",
+        "Nota: Este documento constituye",
+        "Nota: Generado con IA",
+        "RESUMEN DE VALORES",
+        "Valor objetado Valor aceptado",
+    ):
+        if cierre in txt:
+            txt = txt.split(cierre)[0].strip()
+
+    return txt.strip()
+
+
 @router.get("/historial", response_model=list)
 def historial(
     limit: int = 50,
@@ -44,15 +79,12 @@ def historial(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Historial detallado con todos los campos relevantes para vista IPS."""
+    from app.main import _extraer_motivo_glosa
     repo = GlosaRepository(db)
     glosas = repo.listar(limit=limit, eps=eps)
     items = []
     for g in glosas:
-        # Obtener texto limpio (sin HTML) del dictamen para columna OBSERVACIÓN
-        from html import unescape
-        import re as _re
-        obs_texto = _re.sub(r"<[^>]+>", " ", g.dictamen or "")
-        obs_texto = _re.sub(r"\s+", " ", unescape(obs_texto)).strip()
+        obs_texto = _limpiar_observacion(g.dictamen)
         items.append({
             "id": g.id,
             "fecha": g.creado_en.isoformat() if g.creado_en else None,
@@ -68,7 +100,7 @@ def historial(
             "servicio": g.servicio_descripcion,
             "valor_objetado": g.valor_objetado,
             "valor_aceptado": g.valor_aceptado,
-            "glosa_original": g.texto_glosa_original,
+            "glosa_original": _extraer_motivo_glosa(g.texto_glosa_original or ""),
             "codigo_respuesta": g.codigo_respuesta,
             "observacion": obs_texto,
             "etapa": g.etapa,
@@ -91,15 +123,13 @@ def historial_paginado(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Historial con paginación y filtros (vista detallada IPS)"""
-    from html import unescape
-    import re as _re
+    from app.main import _extraer_motivo_glosa
     repo = GlosaRepository(db)
     resultado = repo.listar_paginado(page=page, per_page=per_page, eps=eps, estado=estado, search=search)
 
     items = []
     for g in resultado["items"]:
-        obs_texto = _re.sub(r"<[^>]+>", " ", g.dictamen or "")
-        obs_texto = _re.sub(r"\s+", " ", unescape(obs_texto)).strip()
+        obs_texto = _limpiar_observacion(g.dictamen)
         items.append({
             "id": g.id,
             "eps": g.eps,
@@ -112,7 +142,7 @@ def historial_paginado(
             "servicio": g.servicio_descripcion,
             "valor_objetado": g.valor_objetado,
             "valor_aceptado": g.valor_aceptado,
-            "glosa_original": g.texto_glosa_original,
+            "glosa_original": _extraer_motivo_glosa(g.texto_glosa_original or ""),
             "codigo_respuesta": g.codigo_respuesta,
             "observacion": obs_texto,
             "etapa": g.etapa,

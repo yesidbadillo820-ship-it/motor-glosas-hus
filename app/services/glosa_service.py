@@ -108,6 +108,51 @@ def obtener_plantilla_por_codigo(codigo: str) -> Optional[dict]:
     return PLANTILLAS_CODIGO.get(codigo.upper())
 
 
+_ABREV_A_NOMBRE = {
+    "TA": "TARIFAS",
+    "SO": "SOPORTES",
+    "AU": "AUTORIZACIÓN",
+    "CO": "COBERTURA",
+    "CL": "PERTINENCIA CLÍNICA",
+    "PE": "PERTINENCIA CLÍNICA",
+    "FA": "FACTURACIÓN",
+    "IN": "INSUMOS",
+    "ME": "MEDICAMENTOS",
+}
+
+
+def _expandir_abreviaturas_tipo(texto: str) -> str:
+    """Reemplaza abreviaturas de tipo (TA, SO, AU, CO, CL/PE, FA, IN, ME) por
+    sus nombres completos cuando aparecen referidas al concepto de la glosa.
+
+    Solo reemplaza cuando la abreviatura va precedida por palabras como
+    'CONCEPTO DE', 'DEFENSA POR', 'POR' — para no alterar los códigos de
+    glosa concretos (TA0801, SO0101, etc.).
+    """
+    if not texto:
+        return texto
+    for abrev, nombre in _ABREV_A_NOMBRE.items():
+        # "CONCEPTO DE TA," "CONCEPTO DE TA." "CONCEPTO DE TA\n"
+        texto = re.sub(
+            rf"\bCONCEPTO\s+DE\s+{abrev}\b(?!\d)",
+            f"CONCEPTO DE {nombre}",
+            texto,
+        )
+        # "DEFENSA POR TA" / "GLOSA POR TA"
+        texto = re.sub(
+            rf"\bPOR\s+{abrev}\b(?!\d)",
+            f"POR {nombre}",
+            texto,
+        )
+        # "TIPO TA," "TIPO TA." al final de frase
+        texto = re.sub(
+            rf"\bTIPO\s+{abrev}\b(?!\d)",
+            f"TIPO {nombre}",
+            texto,
+        )
+    return texto
+
+
 TEXTO_RATIFICADA = (
     "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE "
     "DE LA GLOSA INICIAL Y SE DA CONTINUACIÓN AL PROCESO DE CONFORMIDAD CON EL ARTÍCULO "
@@ -290,6 +335,8 @@ class GlosaService:
 
             if "<paciente>" in arg_ia:
                 arg_ia = arg_ia.split("</paciente>")[-1].strip()
+            # Expandir abreviaturas de códigos a nombres completos
+            arg_ia = _expandir_abreviaturas_tipo(arg_ia)
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
