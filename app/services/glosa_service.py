@@ -1,11 +1,9 @@
 import os
 import re
-import logging
 import hashlib
 import asyncio
-import warnings
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List
+from typing import Optional
 
 import httpx
 from cachetools import TTLCache
