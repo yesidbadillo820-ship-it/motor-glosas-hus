@@ -117,13 +117,26 @@ def historial_paginado(
     eps: Optional[str] = None,
     estado: Optional[str] = None,
     search: Optional[str] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    valor_min: Optional[float] = None,
+    valor_max: Optional[float] = None,
+    tipo: Optional[str] = None,
+    semaforo: Optional[str] = None,
+    workflow: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Historial con paginación y filtros (vista detallada IPS)"""
+    """Historial con paginación y filtros avanzados (vista detallada IPS)."""
     from app.main import _extraer_motivo_glosa
     repo = GlosaRepository(db)
-    resultado = repo.listar_paginado(page=page, per_page=per_page, eps=eps, estado=estado, search=search)
+    resultado = repo.listar_paginado(
+        page=page, per_page=per_page,
+        eps=eps, estado=estado, search=search,
+        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        valor_min=valor_min, valor_max=valor_max,
+        tipo=tipo, semaforo=semaforo, workflow=workflow,
+    )
 
     items = []
     for g in resultado["items"]:
@@ -158,6 +171,112 @@ def historial_paginado(
         "per_page": resultado["per_page"],
         "pages": resultado["pages"],
     }
+
+
+@router.get("/exportar-xlsx")
+def exportar_xlsx(
+    eps: Optional[str] = None,
+    estado: Optional[str] = None,
+    search: Optional[str] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    valor_min: Optional[float] = None,
+    valor_max: Optional[float] = None,
+    tipo: Optional[str] = None,
+    semaforo: Optional[str] = None,
+    workflow: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Exporta el historial filtrado a XLSX con las 13 columnas IPS + observación."""
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from fastapi.responses import StreamingResponse
+    from app.main import _extraer_motivo_glosa
+
+    repo = GlosaRepository(db)
+    glosas = repo.listar_para_export(
+        eps=eps, estado=estado, search=search,
+        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        valor_min=valor_min, valor_max=valor_max,
+        tipo=tipo, semaforo=semaforo, workflow=workflow,
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Historial Glosas HUS"
+
+    headers = [
+        "ID", "Fecha Creación", "EPS/Entidad", "Paciente", "Factura",
+        "Código Glosa", "Concepto", "CUPS", "Servicio",
+        "Valor Objetado", "Valor Aceptado", "Valor Recuperado",
+        "Código Respuesta", "Observación", "Etapa", "Estado",
+        "Workflow", "Semáforo", "Días Restantes",
+        "Fecha Recepción", "Fecha Entrega",
+    ]
+    ws.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="0B5D8A", end_color="0B5D8A", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    for g in glosas:
+        obs = _limpiar_observacion(g.dictamen)
+        recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
+        ws.append([
+            g.id,
+            g.creado_en.strftime("%Y-%m-%d %H:%M") if g.creado_en else "",
+            g.eps or "",
+            g.paciente or "",
+            g.factura or "",
+            g.codigo_glosa or "",
+            g.concepto_glosa or "",
+            g.cups_servicio or "",
+            g.servicio_descripcion or "",
+            float(g.valor_objetado or 0),
+            float(g.valor_aceptado or 0),
+            float(recuperado),
+            g.codigo_respuesta or "",
+            obs[:500] if obs else "",
+            g.etapa or "",
+            g.estado or "",
+            g.workflow_state or "",
+            g.prioridad or "",
+            g.dias_restantes if g.dias_restantes is not None else "",
+            g.fecha_recepcion.strftime("%Y-%m-%d") if g.fecha_recepcion else "",
+            g.fecha_entrega.strftime("%Y-%m-%d") if g.fecha_entrega else "",
+        ])
+
+    # Ajuste de anchos
+    widths = [6, 18, 22, 28, 14, 12, 26, 10, 32, 14, 14, 14, 12, 60, 14, 14, 14, 10, 10, 14, 14]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    # Registrar auditoría de la exportación
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="EXPORTAR_XLSX",
+        tabla="historial",
+        detalle=f"Registros exportados: {len(glosas)}",
+    )
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"historial_glosas_hus_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/alertas")

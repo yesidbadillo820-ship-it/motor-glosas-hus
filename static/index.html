@@ -271,6 +271,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 /* ─── HISTORIAL ──────────────────────────── */
 .hist-area{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:1.25rem;gap:1rem}
 .hist-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.field-inline{display:flex;flex-direction:column;gap:2px}
+.field-inline label{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.field-inline input,.field-inline select{padding:.35rem .55rem;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);min-width:110px}
 .hist-toolbar input,.hist-toolbar select{width:auto;padding:.45rem .7rem;font-size:.78rem}
 .hist-toolbar input{width:180px}
 .tbl-wrap{flex:1;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
@@ -718,7 +721,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="panel" id="p-historial">
       <div class="hist-area">
         <div class="hist-toolbar">
-          <input id="h-search" type="text" placeholder="Buscar paciente, EPS, código…" oninput="debounceHist()"/>
+          <input id="h-search" type="text" placeholder="Buscar paciente, EPS, código, CUPS…" oninput="debounceHist()"/>
           <select id="h-eps" onchange="loadHist(1)"><option value="">Todas las EPS</option></select>
           <select id="h-estado" onchange="loadHist(1)">
             <option value="">Todos los estados</option>
@@ -727,7 +730,48 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
             <option value="PARCIALMENTE_ACEPTADA">Parcialmente aceptada</option>
             <option value="LEVANTADA">Levantada</option>
           </select>
-          <button class="btn btn-ghost" onclick="exportCSV()" style="margin-left:auto">Exportar CSV</button>
+          <button class="btn btn-ghost" onclick="toggleFiltrosAvanzados()" id="btn-filtros-adv">Filtros avanzados ▾</button>
+          <button class="btn btn-ghost" onclick="exportXLSX()" style="margin-left:auto" title="Exportar Excel con filtros aplicados">Exportar XLSX</button>
+          <button class="btn btn-ghost" onclick="exportCSV()">CSV</button>
+        </div>
+        <div class="hist-toolbar hist-filtros-adv" id="hist-filtros-adv" style="display:none;gap:.6rem;flex-wrap:wrap;padding-top:.2rem;border-top:1px dashed var(--border)">
+          <div class="field-inline"><label>Desde</label><input type="date" id="h-desde" onchange="loadHist(1)"/></div>
+          <div class="field-inline"><label>Hasta</label><input type="date" id="h-hasta" onchange="loadHist(1)"/></div>
+          <div class="field-inline"><label>Valor mín.</label><input type="number" id="h-vmin" placeholder="0" min="0" step="1000" oninput="debounceHist()"/></div>
+          <div class="field-inline"><label>Valor máx.</label><input type="number" id="h-vmax" placeholder="—" min="0" step="1000" oninput="debounceHist()"/></div>
+          <div class="field-inline"><label>Tipo</label>
+            <select id="h-tipo" onchange="loadHist(1)">
+              <option value="">Todos</option>
+              <option value="TA">TARIFAS</option>
+              <option value="SO">SOPORTES</option>
+              <option value="AU">AUTORIZACIÓN</option>
+              <option value="CO">COBERTURA</option>
+              <option value="PE">PERTINENCIA</option>
+              <option value="FA">FACTURACIÓN</option>
+              <option value="IN">INSUMOS</option>
+              <option value="ME">MEDICAMENTOS</option>
+              <option value="CL">CLÍNICO</option>
+            </select>
+          </div>
+          <div class="field-inline"><label>Semáforo</label>
+            <select id="h-semaforo" onchange="loadHist(1)">
+              <option value="">Todos</option>
+              <option value="VERDE">Verde</option>
+              <option value="AMARILLO">Amarillo</option>
+              <option value="ROJO">Rojo</option>
+              <option value="NEGRO">Vencido</option>
+            </select>
+          </div>
+          <div class="field-inline"><label>Workflow</label>
+            <select id="h-workflow" onchange="loadHist(1)">
+              <option value="">Todos</option>
+              <option value="BORRADOR">Borrador</option>
+              <option value="EN_REVISION">En revisión</option>
+              <option value="APROBADA">Aprobada</option>
+              <option value="RADICADA">Radicada</option>
+            </select>
+          </div>
+          <button class="btn btn-ghost" onclick="limpiarFiltrosAvanzados()" style="margin-left:auto">Limpiar</button>
         </div>
         <div class="tbl-wrap" style="overflow-x:auto">
           <table style="min-width:1600px;font-size:.78rem">
@@ -1640,15 +1684,28 @@ function debounceHist(){
   histDebounce=setTimeout(function(){loadHist(1);},320);
 }
 
+function _histQueryParams(){
+  var qs=[];
+  var map={
+    eps:'h-eps', estado:'h-estado', search:'h-search',
+    fecha_desde:'h-desde', fecha_hasta:'h-hasta',
+    valor_min:'h-vmin', valor_max:'h-vmax',
+    tipo:'h-tipo', semaforo:'h-semaforo', workflow:'h-workflow',
+  };
+  for(var k in map){
+    var el=document.getElementById(map[k]);
+    if(el && el.value !== '' && el.value !== null){
+      qs.push(k + '=' + encodeURIComponent(el.value));
+    }
+  }
+  return qs;
+}
+
 async function loadHist(page){
   histPage=page;
-  var eps=document.getElementById('h-eps').value;
-  var est=document.getElementById('h-estado').value;
-  var srch=document.getElementById('h-search').value;
   var url='/glosas/historial-paginado?page='+page+'&per_page=20';
-  if(eps) url+='&eps='+encodeURIComponent(eps);
-  if(est) url+='&estado='+encodeURIComponent(est);
-  if(srch) url+='&search='+encodeURIComponent(srch);
+  var params=_histQueryParams();
+  if(params.length) url += '&' + params.join('&');
   try{
     var r=await fetch(url,{headers:authH()});
     if(r.status===401){logout();return;}
@@ -1657,6 +1714,39 @@ async function loadHist(page){
     renderHist(d.items);
     renderPager(d);
   } catch(e){console.error(e);}
+}
+
+function toggleFiltrosAvanzados(){
+  var el=document.getElementById('hist-filtros-adv');
+  var btn=document.getElementById('btn-filtros-adv');
+  var visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'flex';
+  btn.innerHTML = 'Filtros avanzados ' + (visible ? '▾' : '▴');
+}
+
+function limpiarFiltrosAvanzados(){
+  ['h-desde','h-hasta','h-vmin','h-vmax','h-tipo','h-semaforo','h-workflow'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  loadHist(1);
+}
+
+async function exportXLSX(){
+  var params=_histQueryParams();
+  var url='/glosas/exportar-xlsx' + (params.length ? '?' + params.join('&') : '');
+  try{
+    showLoading();
+    var r=await fetch(url,{headers:authH()});
+    if(!r.ok){ hideLoading(); toast('Error','No se pudo exportar: '+r.status,'error'); return; }
+    var blob=await r.blob();
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='historial_glosas_hus_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href);}, 2000);
+    hideLoading();
+    toast('Descarga lista','Excel generado correctamente','success');
+  }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
 }
 
 var estadoBadge={

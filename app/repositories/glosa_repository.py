@@ -71,31 +71,33 @@ class GlosaRepository:
             q = q.filter(GlosaRecord.eps == eps.upper())
         return q.limit(limit).all()
 
-    def listar_paginado(self, page: int = 1, per_page: int = 20, eps: Optional[str] = None, 
-                        estado: Optional[str] = None, search: Optional[str] = None) -> dict:
-        """Lista glosas con paginación y filtros"""
-        q = self.db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc())
-        
-        if eps:
-            q = q.filter(GlosaRecord.eps == eps.upper())
-        if estado:
-            q = q.filter(GlosaRecord.estado == estado.upper())
-        if search:
-            q = q.filter(
-                (GlosaRecord.paciente.ilike(f'%{search}%')) |
-                (GlosaRecord.eps.ilike(f'%{search}%')) |
-                (GlosaRecord.codigo_glosa.ilike(f'%{search}%')) |
-                (GlosaRecord.numero_radicado.ilike(f'%{search}%')) |
-                (GlosaRecord.factura.ilike(f'%{search}%'))
-            )
-        
-        # Total sin filtros para paginación
+    def listar_paginado(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        eps: Optional[str] = None,
+        estado: Optional[str] = None,
+        search: Optional[str] = None,
+        fecha_desde: Optional[str] = None,
+        fecha_hasta: Optional[str] = None,
+        valor_min: Optional[float] = None,
+        valor_max: Optional[float] = None,
+        tipo: Optional[str] = None,
+        semaforo: Optional[str] = None,
+        workflow: Optional[str] = None,
+    ) -> dict:
+        """Lista glosas con paginación y filtros avanzados."""
+        q = self._query_con_filtros(
+            eps=eps, estado=estado, search=search,
+            fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+            valor_min=valor_min, valor_max=valor_max,
+            tipo=tipo, semaforo=semaforo, workflow=workflow,
+        )
+
         total = q.count()
-        
-        # Aplicar paginación
         offset = (page - 1) * per_page
         items = q.offset(offset).limit(per_page).all()
-        
+
         return {
             "items": items,
             "total": total,
@@ -103,6 +105,69 @@ class GlosaRepository:
             "per_page": per_page,
             "pages": (total + per_page - 1) // per_page
         }
+
+    def _query_con_filtros(
+        self,
+        eps: Optional[str] = None,
+        estado: Optional[str] = None,
+        search: Optional[str] = None,
+        fecha_desde: Optional[str] = None,
+        fecha_hasta: Optional[str] = None,
+        valor_min: Optional[float] = None,
+        valor_max: Optional[float] = None,
+        tipo: Optional[str] = None,
+        semaforo: Optional[str] = None,
+        workflow: Optional[str] = None,
+    ):
+        from datetime import datetime as _dt
+        q = self.db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc())
+
+        if eps:
+            # Soporta múltiples EPS separadas por coma
+            eps_list = [e.strip().upper() for e in eps.split(",") if e.strip()]
+            if len(eps_list) == 1:
+                q = q.filter(GlosaRecord.eps == eps_list[0])
+            elif eps_list:
+                q = q.filter(GlosaRecord.eps.in_(eps_list))
+        if estado:
+            q = q.filter(GlosaRecord.estado == estado.upper())
+        if semaforo:
+            q = q.filter(GlosaRecord.prioridad == semaforo.upper())
+        if workflow:
+            q = q.filter(GlosaRecord.workflow_state == workflow.upper())
+        if tipo:
+            # TA, SO, AU, CO, PE, FA, IN, ME, CL
+            q = q.filter(GlosaRecord.codigo_glosa.ilike(f"{tipo.upper()}%"))
+        if valor_min is not None:
+            q = q.filter(GlosaRecord.valor_objetado >= valor_min)
+        if valor_max is not None:
+            q = q.filter(GlosaRecord.valor_objetado <= valor_max)
+        if fecha_desde:
+            try:
+                d = _dt.fromisoformat(fecha_desde)
+                q = q.filter(GlosaRecord.creado_en >= d)
+            except ValueError:
+                pass
+        if fecha_hasta:
+            try:
+                d = _dt.fromisoformat(fecha_hasta)
+                q = q.filter(GlosaRecord.creado_en <= d)
+            except ValueError:
+                pass
+        if search:
+            q = q.filter(
+                (GlosaRecord.paciente.ilike(f'%{search}%')) |
+                (GlosaRecord.eps.ilike(f'%{search}%')) |
+                (GlosaRecord.codigo_glosa.ilike(f'%{search}%')) |
+                (GlosaRecord.numero_radicado.ilike(f'%{search}%')) |
+                (GlosaRecord.factura.ilike(f'%{search}%')) |
+                (GlosaRecord.cups_servicio.ilike(f'%{search}%'))
+            )
+        return q
+
+    def listar_para_export(self, **filtros) -> list[GlosaRecord]:
+        """Lista sin paginación, aplicando los mismos filtros que listar_paginado."""
+        return self._query_con_filtros(**filtros).limit(5000).all()
 
     def obtener_por_id(self, glosa_id: int) -> Optional[GlosaRecord]:
         return self.db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
