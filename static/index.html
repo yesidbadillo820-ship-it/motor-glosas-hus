@@ -321,6 +321,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .validar-estado{padding:.3rem .75rem;border-radius:14px;color:white;font-size:.72rem;font-weight:700;letter-spacing:.3px}
 .validar-score{font-size:.8rem;color:var(--text2)}
 .validar-resumen{font-size:.78rem;color:var(--text3);flex:1;min-width:200px;font-style:italic}
+.validar-normas{margin-top:.8rem;padding:.6rem .85rem;background:var(--bg-subtle);border-radius:8px;border:1px solid var(--border)}
+.validar-normas-hdr{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;margin-bottom:.4rem}
+.validar-normas-body{display:flex;flex-direction:column;gap:.3rem}
+.norm-chip{font-size:.72rem;padding:.25rem .55rem;border-radius:6px;display:inline-block}
+.norm-chip.ok{background:rgba(4,120,87,.1);color:#047857;border:1px solid rgba(4,120,87,.3)}
+.norm-chip.bad{background:rgba(185,28,28,.1);color:#b91c1c;border:1px solid rgba(185,28,28,.3)}
+.norm-chip.info{background:rgba(29,78,216,.1);color:#1d4ed8;border:1px solid rgba(29,78,216,.3)}
 .thread-box{margin-top:1rem;padding:1rem 1.1rem;border-radius:10px;background:var(--bg-card);border:1px solid var(--border)}
 .thread-hdr{display:flex;align-items:center;gap:.55rem;padding-bottom:.55rem;border-bottom:1px dashed var(--border);margin-bottom:.6rem;font-size:.85rem;color:var(--text)}
 .thread-count{background:var(--c-teal2);color:#fff;padding:1px 7px;border-radius:10px;font-size:.7rem;font-weight:600}
@@ -2076,6 +2083,22 @@ function renderValidacion(d){
   } else {
     hallazgosHtml = '<div style="color:var(--c-green);margin-top:.5rem">✓ Sin observaciones. El argumento pasa todos los checks.</div>';
   }
+  // Validación normativa
+  var normHtml = '';
+  var vn = d.validacion_normativa || null;
+  if(vn && vn.citas_encontradas && vn.citas_encontradas.length){
+    var scoreN = vn.score_citas;
+    var colorN = scoreN >= 80 ? '#047857' : scoreN >= 50 ? '#b45309' : '#b91c1c';
+    normHtml = '<div class="validar-normas">' +
+      '<div class="validar-normas-hdr"><b>⚖️ Validación normativa</b>' +
+        '<span style="color:'+colorN+';font-weight:700">'+scoreN+'/100</span></div>' +
+      '<div class="validar-normas-body">' +
+        '<span class="norm-chip ok">✓ Vigentes ('+vn.validas.length+'): ' + escHtml((vn.validas||[]).slice(0,6).join(' · ') || 'ninguna detectada') + '</span>' +
+        (vn.derogadas.length ? vn.derogadas.map(function(d){ return '<span class="norm-chip bad">✗ '+escHtml(d.cita)+' → '+escHtml(d.reemplaza_por||'verificar')+'</span>'; }).join('') : '') +
+        (vn.no_catalogadas.length ? '<span class="norm-chip info">? No verificadas: '+escHtml(vn.no_catalogadas.slice(0,4).join(' · '))+'</span>' : '') +
+      '</div></div>';
+  }
+
   box.className = 'validar-result ' + estadoCls;
   box.innerHTML =
     '<div class="validar-hdr">' +
@@ -2083,7 +2106,8 @@ function renderValidacion(d){
       '<span class="validar-score">Calidad: <b style="color:'+color+'">'+d.score_calidad+'/100</b></span>' +
       '<span class="validar-resumen">'+escHtml(d.resumen||'')+'</span>' +
     '</div>' +
-    hallazgosHtml;
+    hallazgosHtml +
+    normHtml;
 }
 
 async function guardarComoPlantillaGoldInline(){

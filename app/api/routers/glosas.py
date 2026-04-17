@@ -475,6 +475,21 @@ async def refinar_dictamen_endpoint(
     }
 
 
+@router.post("/validar-normas")
+def validar_normas_texto(
+    data: dict,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Valida citas normativas en un texto libre (sin persistir).
+    Body: {texto: str}. Útil para que el auditor chequee rápido un borrador.
+    """
+    texto = (data or {}).get("texto", "") if isinstance(data, dict) else ""
+    if not texto or len(texto) < 20:
+        raise HTTPException(400, "Texto demasiado corto")
+    from app.services.normativa import validar_citas
+    return validar_citas(texto)
+
+
 @router.post("/{glosa_id}/validar")
 async def validar_pre_radicacion(
     glosa_id: int,

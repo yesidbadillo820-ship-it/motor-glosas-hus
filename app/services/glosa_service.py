@@ -642,7 +642,21 @@ class GlosaService:
                 "mensaje": f"La glosa tiene {dias_habiles} días hábiles (extemporánea) pero no se argumenta como tal",
             })
 
-        # 2. Check con IA (si hay proveedor)
+        # 2. Validación normativa contra catálogo
+        from app.services.normativa import validar_citas
+        val_citas = validar_citas(txt)
+        for d in val_citas["derogadas"]:
+            msg = f"Cita derogada/confusa: {d['cita']}. {d['razon']}"
+            if d.get("reemplaza_por"):
+                msg += f" → usar {d['reemplaza_por']}"
+            hallazgos.append({"nivel": "error", "mensaje": msg})
+        if val_citas["no_catalogadas"]:
+            hallazgos.append({
+                "nivel": "info",
+                "mensaje": f"Citas no verificadas (pueden ser válidas): {', '.join(val_citas['no_catalogadas'][:5])}",
+            })
+
+        # 3. Check con IA (si hay proveedor)
         ia_check = None
         if self.groq or self.anthropic_key:
             system_check = (
@@ -695,6 +709,7 @@ class GlosaService:
             "resumen": resumen,
             "errores": errores,
             "warnings": warnings_,
+            "validacion_normativa": val_citas,
         }
 
     @staticmethod
