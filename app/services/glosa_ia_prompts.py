@@ -210,35 +210,99 @@ def extraer_datos_soporte(contexto_pdf: str) -> dict:
         "medico":        "NO IDENTIFICADO",
         "fecha_atencion":"NO IDENTIFICADA",
         "servicio":      "NO IDENTIFICADO",
+        "paciente":      "NO IDENTIFICADO",
+        "edad":          "NO IDENTIFICADA",
+        "sexo":          "NO IDENTIFICADO",
+        "signos_vitales":"NO IDENTIFICADOS",
+        "glasgow":       "NO IDENTIFICADO",
+        "laboratorios":  "NO IDENTIFICADOS",
+        "medicamentos":  "NO IDENTIFICADOS",
+        "evolucion":     "NO IDENTIFICADA",
     }
     if not contexto_pdf:
         return datos
 
+    # CUPS
     m = re.search(r'\b(\d{5,6})\b', contexto_pdf)
-    if m:
-        datos["cups"] = m.group(1)
+    if m: datos["cups"] = m.group(1)
 
+    # CIE-10
     m = re.search(r'\b([A-Z]\d{2}\.?\d*)\b', contexto_pdf)
-    if m:
-        datos["diagnostico"] = m.group(1)
+    if m: datos["diagnostico"] = m.group(1)
 
+    # Médico tratante
     m = re.search(
-        r'(?:m[eé]dico|dr\.?|dra\.?|profesional|especialista)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+ [A-ZÁÉÍÓÚ][a-záéíóú]+)',
+        r'(?:m[eé]dico|dr\.?|dra\.?|profesional|especialista|tratante)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-záéíóú]+){1,3})',
         contexto_pdf, re.I
     )
-    if m:
-        datos["medico"] = m.group(1).strip()
+    if m: datos["medico"] = m.group(1).strip()
 
+    # Fecha atención
     m = re.search(r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b', contexto_pdf)
-    if m:
-        datos["fecha_atencion"] = m.group(1)
+    if m: datos["fecha_atencion"] = m.group(1)
 
+    # Servicio / procedimiento
     m = re.search(
-        r'(?:servicio|procedimiento|actividad|descripci[oó]n)[:\s]+([A-ZÁÉÍÓÚ][^\n]{5,60})',
+        r'(?:servicio|procedimiento|actividad|descripci[oó]n)[:\s]+([A-ZÁÉÍÓÚ][^\n]{5,80})',
         contexto_pdf, re.I
     )
+    if m: datos["servicio"] = m.group(1).strip()[:100]
+
+    # Paciente
+    m = re.search(
+        r'(?:paciente|nombre\s+del\s+paciente|nombres?\s+y\s+apellidos?)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-záéíóú]+){1,4})',
+        contexto_pdf, re.I
+    )
+    if m: datos["paciente"] = m.group(1).strip()
+
+    # Edad
+    m = re.search(r'(?:edad|años)[:\s]*(\d{1,3})\s*(?:años?)?', contexto_pdf, re.I)
+    if m and int(m.group(1)) < 120:
+        datos["edad"] = f"{m.group(1)} años"
+
+    # Sexo
+    m = re.search(r'(?:sexo|g[eé]nero)[:\s]*(masculino|femenino|hombre|mujer|m|f)\b', contexto_pdf, re.I)
     if m:
-        datos["servicio"] = m.group(1).strip()[:80]
+        s = m.group(1).upper()
+        datos["sexo"] = "MASCULINO" if s in ("MASCULINO", "HOMBRE", "M") else "FEMENINO"
+
+    # Signos vitales
+    sv = []
+    m = re.search(r'(?:ta|tensi[oó]n\s+arterial|presi[oó]n)[:\s]*(\d{2,3}/\d{2,3})', contexto_pdf, re.I)
+    if m: sv.append(f"TA {m.group(1)} mmHg")
+    m = re.search(r'(?:fc|frecuencia\s+cardiaca)[:\s]*(\d{2,3})', contexto_pdf, re.I)
+    if m: sv.append(f"FC {m.group(1)} lpm")
+    m = re.search(r'(?:fr|frecuencia\s+respiratoria)[:\s]*(\d{2})', contexto_pdf, re.I)
+    if m: sv.append(f"FR {m.group(1)} rpm")
+    m = re.search(r'(?:t°|temp|temperatura)[:\s]*(\d{2}[\.,]?\d?)', contexto_pdf, re.I)
+    if m: sv.append(f"T° {m.group(1)}°C")
+    m = re.search(r'(?:sa?02|saturaci[oó]n)[:\s]*(\d{2,3})', contexto_pdf, re.I)
+    if m: sv.append(f"SatO2 {m.group(1)}%")
+    if sv: datos["signos_vitales"] = " | ".join(sv)
+
+    # Glasgow
+    m = re.search(r'(?:glasgow|gcs)[:\s]*(\d{1,2}\s*/\s*15|\d{1,2})', contexto_pdf, re.I)
+    if m: datos["glasgow"] = f"Glasgow {m.group(1).replace(' ', '')}"
+
+    # Laboratorios relevantes
+    labs = []
+    for pat, label in [
+        (r'(?:leucocitos?)[:\s]*(\d{3,6})', "leucocitos"),
+        (r'(?:hemoglobina|hb)[:\s]*(\d{1,2}[\.,]?\d?)', "Hb"),
+        (r'(?:pcr|prote[ií]na\s+c\s+reactiva)[:\s]*(\d+[\.,]?\d*)', "PCR"),
+        (r'(?:creatinina)[:\s]*(\d+[\.,]?\d*)', "creatinina"),
+        (r'(?:troponina)[:\s]*(\d+[\.,]?\d*)', "troponina"),
+    ]:
+        m = re.search(pat, contexto_pdf, re.I)
+        if m: labs.append(f"{label} {m.group(1)}")
+    if labs: datos["laboratorios"] = " | ".join(labs)
+
+    # Evolución / notas relevantes (primeras líneas tras "EVOLUCIÓN" o "NOTA")
+    m = re.search(
+        r'(?:evoluci[oó]n|nota\s+m[eé]dica|diagnostico\s+principal)[:\s]+([^\n]{20,250})',
+        contexto_pdf, re.I
+    )
+    if m: datos["evolucion"] = m.group(1).strip()[:300]
 
     return datos
 
@@ -312,12 +376,28 @@ MARCO NORMATIVO COMPLETO 2026:
 19. Sentencia T-1025/2002 — Urgencias no requieren autorización previa
 20. Sentencia T-478/1995 — Autonomía médica como derecho fundamental protegido
 
-REGLAS ABSOLUTAS DE REDACCIÓN:
-- Escribir SIEMPRE en MAYÚSCULAS SOSTENIDAS (estilo oficial de glosas).
-- Cada párrafo debe aportar información NUEVA. Prohibido repetir.
-- Texto FINAL listo para copiar y radicar: sin corchetes, sin placeholders.
-- No usar "en consecuencia", "por lo tanto", "de conformidad con" repetidamente.
-- Máximo 3 normas al final en formato: Norma1 | Norma2 | Norma3.
+══════════════════════════════════════════════════════════════════
+ESTÁNDAR DE REDACCIÓN TÉCNICO-JURÍDICA (OBLIGATORIO)
+══════════════════════════════════════════════════════════════════
+1. REGISTRO: Escribir SIEMPRE en MAYÚSCULAS SOSTENIDAS. Tono formal de abogado de cartera hospitalaria.
+2. ESTRUCTURA: Usar numerales romanos para secciones (I, II, III, IV) cuando el argumento lo amerite. Cada numeral trata UN tema: (I) Antecedente del caso, (II) Fundamento contractual/tarifario, (III) Sustento normativo y jurisprudencial, (IV) Petición concreta.
+3. EXTENSIÓN: MÍNIMO 450 palabras en el argumento principal (no inflar con muletillas; usar sustancia). Máximo razonable: 900 palabras.
+4. CITAS NORMATIVAS ESPECÍFICAS: Cita SIEMPRE el ARTÍCULO concreto, no solo la norma. Ejemplo:
+   ✓ "El artículo 177 de la Ley 100 de 1993 establece que..."
+   ✗ "La Ley 100 establece que..."
+5. JURISPRUDENCIA: Cuando apliques una sentencia, menciona el CONCEPTO que decidió. Ejemplo:
+   ✓ "La Sentencia T-1025 de 2002 estableció que las EPS no pueden exigir autorización previa en urgencias."
+   ✗ "La T-1025 aplica."
+6. DATOS DEL CASO: Usa DATOS CLÍNICOS y números del caso concreto (paciente, CUPS, CIE-10, Glasgow, leucocitos, signos vitales, valor objetado, fechas, número de factura). NUNCA dejes frases abstractas sin anclarlas en el caso.
+7. CONCLUSIÓN: Cierra con una petición concreta: "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LA FACTURA N° [X] POR VALOR DE $[Y]".
+8. VARIEDAD LÉXICA: Evita repetir el mismo conector. Alterna entre "en ese sentido", "así las cosas", "adicionalmente", "complementariamente", "por su parte".
+9. NORMAS FINALES: Cierra con 3-5 normas en formato: Norma1 | Norma2 | Norma3 (las más pertinentes al caso).
+10. PROHIBIDO:
+   - Placeholders ([EPS], [FACTURA], etc.)
+   - Frases genéricas tipo "la EPS debe cumplir con la normativa vigente" sin citar cuál
+   - Muletillas repetidas: "en consecuencia", "por lo tanto" más de 2 veces
+   - Párrafos de relleno sin información jurídica ni clínica
+══════════════════════════════════════════════════════════════════
 """
 
 SYSTEM_TA = SYSTEM_BASE + """
@@ -1064,13 +1144,34 @@ def build_user_prompt(
         )
         condicional_urgencia_corto = f"atención de {tipo_atencion.lower()}"
 
-    # Resumen de datos clínicos identificados (úsalos en el argumento si están)
-    datos_clinicos_resumen = []
-    if cups != "NO IDENTIFICADO":         datos_clinicos_resumen.append(f"CUPS {cups}")
-    if diagnostico != "NO IDENTIFICADO":  datos_clinicos_resumen.append(f"DX {diagnostico}")
-    if medico != "NO IDENTIFICADO":       datos_clinicos_resumen.append(f"MÉDICO {medico}")
-    if servicio != "NO IDENTIFICADO":     datos_clinicos_resumen.append(f"SERVICIO {servicio}")
-    datos_clinicos_str = " | ".join(datos_clinicos_resumen) if datos_clinicos_resumen else "SIN DATOS CLÍNICOS EXTRAÍDOS DE LOS SOPORTES"
+    # Resumen de datos clínicos identificados del PDF (úsalos en el argumento si están)
+    paciente_ex  = datos.get("paciente", "NO IDENTIFICADO")
+    edad_ex      = datos.get("edad", "NO IDENTIFICADA")
+    sexo_ex      = datos.get("sexo", "NO IDENTIFICADO")
+    signos_ex    = datos.get("signos_vitales", "NO IDENTIFICADOS")
+    glasgow_ex   = datos.get("glasgow", "NO IDENTIFICADO")
+    labs_ex      = datos.get("laboratorios", "NO IDENTIFICADOS")
+    evolucion_ex = datos.get("evolucion", "NO IDENTIFICADA")
+
+    resumen_lines = []
+    if paciente_ex != "NO IDENTIFICADO":  resumen_lines.append(f"  • PACIENTE       : {paciente_ex}")
+    if edad_ex != "NO IDENTIFICADA":      resumen_lines.append(f"  • EDAD           : {edad_ex}")
+    if sexo_ex != "NO IDENTIFICADO":      resumen_lines.append(f"  • SEXO           : {sexo_ex}")
+    if diagnostico != "NO IDENTIFICADO":  resumen_lines.append(f"  • CIE-10         : {diagnostico}")
+    if cups != "NO IDENTIFICADO":         resumen_lines.append(f"  • CUPS           : {cups}")
+    if servicio != "NO IDENTIFICADO":     resumen_lines.append(f"  • SERVICIO       : {servicio}")
+    if medico != "NO IDENTIFICADO":       resumen_lines.append(f"  • MÉDICO TRATANTE: {medico}")
+    if fecha != "NO IDENTIFICADA":        resumen_lines.append(f"  • FECHA ATENCIÓN : {fecha}")
+    if signos_ex != "NO IDENTIFICADOS":   resumen_lines.append(f"  • SIGNOS VITALES : {signos_ex}")
+    if glasgow_ex != "NO IDENTIFICADO":   resumen_lines.append(f"  • {glasgow_ex}")
+    if labs_ex != "NO IDENTIFICADOS":     resumen_lines.append(f"  • LABORATORIOS   : {labs_ex}")
+    if evolucion_ex != "NO IDENTIFICADA": resumen_lines.append(f"  • EVOLUCIÓN      : {evolucion_ex}")
+
+    datos_clinicos_str = (
+        "\n".join(resumen_lines)
+        if resumen_lines
+        else "  • NO SE EXTRAJERON DATOS CLÍNICOS DE LOS SOPORTES"
+    )
 
     prefijo = (codigo[:2].upper() if codigo and len(codigo) >= 2 else "FA")
     if prefijo not in _VARIANTES:
@@ -1094,13 +1195,43 @@ def build_user_prompt(
     instruccion_final = f"""
 
 ══════════════════════════════════════════════════════════════════
-RECORDATORIOS OBLIGATORIOS PARA TU RESPUESTA:
-- DATOS CLÍNICOS DETECTADOS: {datos_clinicos_str}
-  → Si hay datos, ÚSALOS textualmente en el argumento (no los inventes ni los omitas).
-- TIPO DE GLOSA REAL: {prefijo} → Llama a este tipo por su nombre, NO mezcles tipos.
-- TRAZABILIDAD: {trazabilidad} → Cita exactamente estos números, NO inventes otros.
-- Si los soportes no aportan dato concreto, di "SEGÚN CONSTA EN EL EXPEDIENTE", NO inventes.
-- Cierra con MÁXIMO 3 NORMAS al final, formato: Norma1 | Norma2 | Norma3.
+INSTRUCCIONES OBLIGATORIAS PARA ESTA RESPUESTA
+══════════════════════════════════════════════════════════════════
+
+【 1 】 DATOS CLÍNICOS EXTRAÍDOS DEL EXPEDIENTE:
+{datos_clinicos_str}
+
+  → Si aparecen datos arriba (paciente, CIE-10, CUPS, Glasgow, signos vitales,
+    laboratorios), DEBES incorporarlos literalmente en el argumento como
+    evidencia objetiva. Ejemplo correcto:
+    "EL PACIENTE [NOMBRE], [EDAD] DE SEXO [SEXO], INGRESÓ POR URGENCIAS CON
+     TA [VALOR], FC [VALOR] Y GLASGOW [VALOR], DIAGNÓSTICO [CIE-10]..."
+  → Si un dato dice "NO IDENTIFICADO", NO lo menciones (NO inventes valores).
+
+【 2 】 TIPO DE GLOSA = {prefijo}
+  → Llama la glosa por su nombre correcto. NO mezcles tipos.
+  → Las secciones "PROHIBIDO" de la variante son de cumplimiento obligatorio.
+
+【 3 】 TRAZABILIDAD DEL CASO:
+  {trazabilidad}
+  → Si la trazabilidad indica factura o radicado concretos, cítalos
+    TEXTUALMENTE en la petición final.
+  → Si dice SIN DATOS, NO inventes números.
+
+【 4 】 ESTRUCTURA ESPERADA DEL ARGUMENTO (USA ROMANOS I-IV):
+   I.  ANTECEDENTES DEL CASO (resumen breve: paciente, servicio, valor objetado, motivo de glosa).
+  II.  FUNDAMENTO CONTRACTUAL Y/O TÉCNICO (contrato aplicable, tarifa pactada, cálculo aritmético si es TA, evidencia clínica si es AU/CL/SO).
+ III.  SUSTENTO NORMATIVO Y JURISPRUDENCIAL (artículos específicos + sentencias con su concepto, NO solo citar números).
+  IV.  PETICIÓN CONCRETA (monto exacto, factura, radicado) + plazo legal de respuesta.
+
+【 5 】 EXTENSIÓN MÍNIMA: 450 palabras. MÁXIMA: 900 palabras.
+  → NO inflar con muletillas. Cada párrafo debe aportar un dato nuevo.
+
+【 6 】 CIERRE CON NORMAS: 3-5 normas más pertinentes al caso en formato
+  "Norma1 | Norma2 | Norma3 | Norma4"
+
+══════════════════════════════════════════════════════════════════
+CASO CONCRETO A RESOLVER (usa la plantilla de variante A–D abajo como guía):
 ══════════════════════════════════════════════════════════════════
 """
 
