@@ -597,10 +597,53 @@ async def analizar(
                 </p>
             </div>"""
         
-        # Dictamen simplificado: solo el bloque narrativo de aceptación (parcial o total).
-        # No se incluye tabla de códigos, ni "RESUMEN DE VALORES", ni notas al pie —
-        # el texto es autosuficiente y menciona los valores dentro del argumento.
-        dictamen_final = argumento_aceptacion
+        # Tabla de encabezado con código de glosa, valor objetado y código de respuesta
+        tabla_codigos = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:15px;background:white;border:1px solid #cbd5e1;">
+            <thead>
+                <tr style="background:#0f172a;color:white;">
+                    <th style="padding:10px;text-align:center;font-weight:700;letter-spacing:.3px;">CÓDIGO GLOSA</th>
+                    <th style="padding:10px;text-align:center;font-weight:700;letter-spacing:.3px;">VALOR OBJETADO</th>
+                    <th style="padding:10px;text-align:center;font-weight:700;letter-spacing:.3px;">CÓDIGO RESPUESTA</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding:10px;text-align:center;font-weight:700;border-bottom:1px solid #e2e8f0;">{resultado.codigo_glosa}</td>
+                    <td style="padding:10px;text-align:center;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;">$ {val_obj:,.0f}</td>
+                    <td style="padding:10px;text-align:center;border-bottom:1px solid #e2e8f0;">
+                        <b>{cod_res_aceptacion}</b><br>
+                        <span style="font-size:10px;color:#64748b;">{desc_res_aceptacion}</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>"""
+
+        # Tabla resumen de valores (VALOR OBJETADO / ACEPTADO / EN DISPUTA)
+        tabla_valores = f"""
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:15px;">
+            <div style="font-weight:700;color:#334155;margin-bottom:10px;font-size:11px;letter-spacing:.4px;text-transform:uppercase;">Resumen de valores</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <tr>
+                    <td style="padding:6px 8px;color:#475569;">Valor objetado</td>
+                    <td style="padding:6px 8px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">$ {val_obj:,.0f}</td>
+                </tr>
+                <tr>
+                    <td style="padding:6px 8px;color:#047857;">Valor aceptado</td>
+                    <td style="padding:6px 8px;text-align:right;font-weight:700;color:#047857;font-variant-numeric:tabular-nums;">$ {val_ac:,.0f}</td>
+                </tr>"""
+        if estado == "PARCIALMENTE_ACEPTADA":
+            tabla_valores += f"""
+                <tr>
+                    <td style="padding:6px 8px;color:#b91c1c;">Valor en disputa</td>
+                    <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">$ {val_en_disputa:,.0f}</td>
+                </tr>"""
+        tabla_valores += """
+            </table>
+        </div>"""
+
+        # Dictamen completo: tabla de códigos + argumento narrativo + resumen de valores
+        dictamen_final = tabla_codigos + argumento_aceptacion + tabla_valores
 
     # Crear glosa con el resultado
     tipo_final = f"RESPUESTA {cod_res_aceptacion}" if cod_res_aceptacion else resultado.tipo
