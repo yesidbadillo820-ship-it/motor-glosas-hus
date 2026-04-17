@@ -321,6 +321,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .validar-estado{padding:.3rem .75rem;border-radius:14px;color:white;font-size:.72rem;font-weight:700;letter-spacing:.3px}
 .validar-score{font-size:.8rem;color:var(--text2)}
 .validar-resumen{font-size:.78rem;color:var(--text3);flex:1;min-width:200px;font-style:italic}
+.thread-box{margin-top:1rem;padding:1rem 1.1rem;border-radius:10px;background:var(--bg-card);border:1px solid var(--border)}
+.thread-hdr{display:flex;align-items:center;gap:.55rem;padding-bottom:.55rem;border-bottom:1px dashed var(--border);margin-bottom:.6rem;font-size:.85rem;color:var(--text)}
+.thread-count{background:var(--c-teal2);color:#fff;padding:1px 7px;border-radius:10px;font-size:.7rem;font-weight:600}
+.thread-list{display:flex;flex-direction:column;gap:.6rem;max-height:360px;overflow-y:auto}
+.thread-item{background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:.55rem .75rem}
+.thread-item.thread-resuelto{opacity:.55}
+.thread-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:.7rem;margin-bottom:.35rem}
+.thread-autor{font-weight:600;color:var(--text)}
+.thread-rol{padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--text3);font-size:.65rem;font-family:var(--font-mono)}
+.thread-mencion{color:var(--c-teal2);font-weight:600}
+.thread-fecha{color:var(--text3);margin-left:auto}
+.thread-acciones{display:flex;gap:3px}
+.thread-act{background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:1px 6px;font-size:.7rem;cursor:pointer}
+.thread-act:hover{background:var(--bg);color:var(--text)}
+.thread-text{font-size:.82rem;color:var(--text2);line-height:1.5}
+.thread-resuelto-lbl{margin-top:.35rem;font-size:.68rem;color:var(--c-green);font-style:italic}
+.thread-compose{display:flex;gap:.5rem;margin-top:.7rem;align-items:flex-end}
+.thread-compose textarea{flex:1;padding:.55rem .7rem;font-size:.82rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text);resize:vertical;font-family:inherit}
 .gold-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;padding:1rem 0}
 .gold-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.55rem;transition:all .15s;position:relative;overflow:hidden}
 .gold-card::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,#f59e0b,#fbbf24)}
@@ -1713,6 +1731,14 @@ function renderResult(d){
     +'<button class="btn btn-ghost" onclick="nuevaGlosa()">Nueva glosa</button>'
     +'</div>'
     +'<div id="validar-result" class="validar-result" style="display:none"></div>'
+    +'<div class="thread-box" id="thread-box">'
+    +'  <div class="thread-hdr"><b>💬 Comentarios del equipo</b><span id="thread-count" class="thread-count">0</span></div>'
+    +'  <div class="thread-list" id="thread-list"><div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sin comentarios todavía</div></div>'
+    +'  <div class="thread-compose">'
+    +'    <textarea id="thread-input" rows="2" placeholder="Escribe un comentario o @email para mencionar…"></textarea>'
+    +'    <button class="btn btn-primary btn-sm" onclick="enviarComentario()">Enviar</button>'
+    +'  </div>'
+    +'</div>'
 
     +'<div class="refinar-panel" id="refinar-inline" style="display:none;margin-top:1rem;border-radius:10px;border:1px solid var(--border)">'
     +'  <div class="refinar-hdr"><b>Refinar con IA</b><span class="refinar-sub">Dile qué cambiar: tono, longitud, citar otra norma…</span></div>'
@@ -1732,6 +1758,80 @@ function renderResult(d){
     +'</div>';
 
   document.getElementById('result-area').innerHTML=html;
+  if(CURRENT_GLOSA_ID) cargarComentarios(CURRENT_GLOSA_ID);
+}
+
+async function cargarComentarios(glosaId){
+  var list = document.getElementById('thread-list');
+  var count = document.getElementById('thread-count');
+  if(!list) return;
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/comentarios/', {headers: authH()});
+    if(!r.ok){ return; }
+    var data = await r.json();
+    if(count) count.textContent = data.length;
+    if(!data.length){
+      list.innerHTML = '<div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sin comentarios todavía. Escribe el primero.</div>';
+      return;
+    }
+    list.innerHTML = data.map(function(c){
+      var fecha = c.creado_en ? new Date(c.creado_en).toLocaleString('es-CO',{dateStyle:'short',timeStyle:'short'}) : '';
+      var rolCls = (c.autor_rol||'').toLowerCase();
+      var resuelto = c.resuelto ? ' thread-resuelto' : '';
+      var mencion = c.mencion ? '<span class="thread-mencion">@'+escHtml(c.mencion)+'</span>' : '';
+      var actions = '';
+      if(!c.resuelto){
+        actions += '<button class="thread-act" onclick="resolverComentario('+glosaId+','+c.id+')" title="Marcar resuelto">✓</button>';
+      }
+      actions += '<button class="thread-act" onclick="eliminarComentario('+glosaId+','+c.id+')" title="Eliminar">✕</button>';
+      return '<div class="thread-item'+resuelto+'">' +
+        '<div class="thread-meta">' +
+          '<span class="thread-autor rol-'+rolCls+'">'+escHtml(c.autor_nombre||c.autor_email)+'</span>' +
+          '<span class="thread-rol">'+escHtml(c.autor_rol||'')+'</span>' +
+          mencion +
+          '<span class="thread-fecha">'+fecha+'</span>' +
+          '<span class="thread-acciones">'+actions+'</span>' +
+        '</div>' +
+        '<div class="thread-text">'+escHtml(c.texto).replace(/\n/g,'<br>')+'</div>' +
+        (c.resuelto ? '<div class="thread-resuelto-lbl">✓ Resuelto por '+escHtml(c.resuelto_por||'')+'</div>' : '') +
+      '</div>';
+    }).join('');
+  }catch(e){ console.error('comentarios:', e); }
+}
+
+async function enviarComentario(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Primero analiza una glosa','warning'); return; }
+  var ta = document.getElementById('thread-input');
+  var txt = (ta.value||'').trim();
+  if(txt.length < 1){ return; }
+  try{
+    var r = await fetch('/glosas/'+CURRENT_GLOSA_ID+'/comentarios/', {
+      method:'POST', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({texto: txt})
+    });
+    var d = await r.json();
+    if(r.ok){ ta.value=''; cargarComentarios(CURRENT_GLOSA_ID); }
+    else { toast('Error', d.detail||'No se pudo enviar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function resolverComentario(glosaId, comentarioId){
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/comentarios/'+comentarioId+'/resolver', {
+      method:'PATCH', headers: authH()
+    });
+    if(r.ok) cargarComentarios(glosaId);
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function eliminarComentario(glosaId, comentarioId){
+  if(!confirm('¿Eliminar este comentario?')) return;
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/comentarios/'+comentarioId, {
+      method:'DELETE', headers: authH()
+    });
+    if(r.ok) cargarComentarios(glosaId);
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 function toggleRefinarInline(){

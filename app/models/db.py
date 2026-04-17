@@ -82,6 +82,27 @@ class PlantillaRecord(Base):
     activa = Column(Integer, default=1)
 
 
+class ComentarioGlosaRecord(Base):
+    """Hilo de comentarios por glosa para discusión interna del equipo."""
+    __tablename__ = "comentarios_glosa"
+
+    id = Column(Integer, primary_key=True, index=True)
+    glosa_id = Column(Integer, ForeignKey("historial.id", ondelete="CASCADE"), index=True)
+    autor_email = Column(String(200), index=True)
+    autor_nombre = Column(String(200))
+    autor_rol = Column(String(50))
+    texto = Column(Text, nullable=False)
+    mencion = Column(String(200))   # email de quien se menciona con @
+    resuelto = Column(Integer, default=0)
+    resuelto_por = Column(String(200))
+    resuelto_en = Column(DateTime(timezone=True))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_comentarios_glosa", "glosa_id", "creado_en"),
+    )
+
+
 class PlantillaGoldRecord(Base):
     """Argumentos técnico-jurídicos que ganaron (EPS levantó la glosa).
 
