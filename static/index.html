@@ -1653,11 +1653,14 @@ async function loadUsuarios(){
       tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3)">No hay usuarios registrados</td></tr>';
       return;
     }
+    var isAdmin = USER_ROL === 'SUPER_ADMIN';
     tbody.innerHTML=data.map(function(u){
       var rolBadge='<span class="rol-badge '+(ROL_COLORS[u.rol]||'rol-viewer')+'">'+(u.rol||'AUDITOR')+'</span>';
       var activo=u.activo===1?'<span style="color:var(--c-green)">✓</span>':'<span style="color:var(--c-red)">✕</span>';
+      var btnEditar = isAdmin ? '<button class="btn-warn-sm" onclick="editarUsuario('+u.id+',\''+escJs(u.nombre)+'\',\''+escJs(u.email)+'\')">Editar</button> ' : '';
       return '<tr><td>'+u.id+'</td><td>'+escHtml(u.nombre)+'</td><td>'+escHtml(u.email)+'</td><td>'+rolBadge+'</td><td>'+activo+'</td>'
         +'<td style="white-space:nowrap">'
+        +btnEditar
         +'<button class="btn-warn-sm" onclick="cambiarRol('+u.id+',\''+escJs(u.rol||'AUDITOR')+'\')">Rol</button> '
         +'<button class="btn-warn-sm" onclick="cambiarPass('+u.id+',\''+escJs(u.email)+'\')">Pass</button> '
         +'<button class="btn-danger-sm" onclick="eliminarUsuario('+u.id+',\''+escJs(u.email)+'\')">X</button>'
@@ -1673,6 +1676,39 @@ async function cambiarRol(id,rolActual){
   var d=await r.json();
   toast(r.ok?'Rol actualizado':'Error',d.message||d.detail,r.ok?'success':'error');
   if(r.ok)loadUsuarios();
+}
+
+async function editarUsuario(id, nombreActual, emailActual){
+  var nuevoNombre = prompt('Nombre del usuario:\n(debe coincidir con la columna GESTOR del Excel de recepción)', nombreActual);
+  if(nuevoNombre === null) return;
+  var nuevoEmail = prompt('Correo electrónico del usuario:', emailActual);
+  if(nuevoEmail === null) return;
+  nuevoNombre = nuevoNombre.trim();
+  nuevoEmail = nuevoEmail.trim().toLowerCase();
+  if(!nuevoNombre){ toast('Error','El nombre no puede estar vacío','error'); return; }
+  if(!nuevoEmail || nuevoEmail.indexOf('@') < 0){ toast('Error','Email inválido','error'); return; }
+  // Si nada cambió, no llamamos al endpoint
+  if(nuevoNombre === nombreActual && nuevoEmail === emailActual.toLowerCase()){
+    toast('Sin cambios','No se modificó ningún dato','success');
+    return;
+  }
+  var body = {};
+  if(nuevoNombre !== nombreActual) body.nombre = nuevoNombre;
+  if(nuevoEmail !== emailActual.toLowerCase()) body.email = nuevoEmail;
+  try{
+    var r = await fetch('/usuarios/' + id, {
+      method:'PATCH',
+      headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    var d = await r.json();
+    if(r.ok){
+      toast('Usuario actualizado', 'Nombre y correo guardados correctamente', 'success');
+      loadUsuarios();
+    } else {
+      toast('Error', d.detail || 'No se pudo actualizar', 'error');
+    }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function crearUsuario(){

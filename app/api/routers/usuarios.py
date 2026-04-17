@@ -18,6 +18,11 @@ class UsuarioCreate(BaseModel):
     password: str
 
 
+class UsuarioUpdate(BaseModel):
+    nombre: Optional[str] = None
+    email: Optional[str] = None
+
+
 class PasswordChange(BaseModel):
     nueva_password: str
 
@@ -43,14 +48,36 @@ def listar_usuarios(
 
 
 @router.get("/roles/disponibles")
-def listar_rolesDisponibles():
-    """Lista los roles disponibles con descripción."""
+def listar_roles_disponibles(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista los roles disponibles con descripción (requiere autenticación)."""
     return [
         {"rol": ROL_SUPER_ADMIN, "descripcion": "Todo: usuarios, configuración, eliminar"},
         {"rol": ROL_COORDINADOR, "descripcion": "Ver todo, aprobar, exportar"},
         {"rol": ROL_AUDITOR, "descripcion": "Crear/responder glosas propias"},
         {"rol": ROL_VIEWER, "descripcion": "Solo lectura"},
     ]
+
+
+def _garantizar_al_menos_un_super_admin_activo(db: Session, excluir_id: int = None):
+    """Verifica que exista al menos un SUPER_ADMIN activo distinto al excluido.
+
+    Se llama antes de cambiar rol, desactivar o eliminar para no dejar la
+    instancia sin administrador alguno.
+    """
+    q = db.query(UsuarioRecord).filter(
+        UsuarioRecord.rol == ROL_SUPER_ADMIN,
+        UsuarioRecord.activo == 1,
+    )
+    if excluir_id is not None:
+        q = q.filter(UsuarioRecord.id != excluir_id)
+    if q.count() == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede dejar el sistema sin SUPER_ADMIN activo. "
+                   "Asigna este rol a otro usuario antes de proceder.",
+        )
 
 
 @router.post("/", status_code=201)
@@ -97,6 +124,74 @@ def crear_usuario(
         "nombre": usuario.nombre,
         "email": usuario.email,
         "message": "Usuario creado exitosamente"
+    }
+
+
+@router.patch("/{usuario_id}")
+def editar_usuario(
+    usuario_id: int,
+    data: UsuarioUpdate,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Edita nombre y/o email de un usuario (solo SUPER_ADMIN).
+
+    Al menos uno de los dos campos debe venir en el body. El email
+    se normaliza a minúsculas y se valida unicidad.
+    """
+    usuario = db.query(UsuarioRecord).filter(UsuarioRecord.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    cambios = []
+    if data.nombre is not None:
+        nuevo_nombre = data.nombre.strip()
+        if not nuevo_nombre:
+            raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+        if nuevo_nombre != usuario.nombre:
+            cambios.append(("nombre", usuario.nombre, nuevo_nombre))
+            usuario.nombre = nuevo_nombre
+
+    if data.email is not None:
+        nuevo_email = data.email.strip().lower()
+        if not nuevo_email or "@" not in nuevo_email:
+            raise HTTPException(status_code=400, detail="Email inválido")
+        if nuevo_email != usuario.email:
+            ya_existe = db.query(UsuarioRecord).filter(
+                UsuarioRecord.email == nuevo_email,
+                UsuarioRecord.id != usuario_id,
+            ).first()
+            if ya_existe:
+                raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
+            cambios.append(("email", usuario.email, nuevo_email))
+            usuario.email = nuevo_email
+
+    if not cambios:
+        return {"message": "Sin cambios", "id": usuario.id, "nombre": usuario.nombre, "email": usuario.email}
+
+    db.commit()
+    db.refresh(usuario)
+
+    for campo, anterior, nuevo in cambios:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="ACTUALIZAR",
+            tabla="usuarios",
+            registro_id=usuario_id,
+            campo=campo,
+            valor_anterior=anterior,
+            valor_nuevo=nuevo,
+            detalle=f"{campo.capitalize()} cambiado de '{anterior}' a '{nuevo}'",
+        )
+
+    return {
+        "message": "Usuario actualizado",
+        "id": usuario.id,
+        "nombre": usuario.nombre,
+        "email": usuario.email,
+        "rol": usuario.rol,
+        "activo": usuario.activo,
     }
 
 
@@ -148,9 +243,13 @@ def cambiar_rol(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     anterior = usuario.rol
+    # Si estamos degradando a un SUPER_ADMIN, validar que quede al menos otro activo
+    if anterior == ROL_SUPER_ADMIN and nuevo_rol != ROL_SUPER_ADMIN:
+        _garantizar_al_menos_un_super_admin_activo(db, excluir_id=usuario_id)
+
     usuario.rol = nuevo_rol
     db.commit()
-    
+
     AuditRepository(db).registrar(
         usuario_email=current_user.email,
         usuario_rol=current_user.rol,
@@ -177,6 +276,10 @@ def activar_desactivar(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     anterior = usuario.activo
+    # Si se va a desactivar a un SUPER_ADMIN, validar que quede al menos otro activo
+    if anterior == 1 and usuario.rol == ROL_SUPER_ADMIN:
+        _garantizar_al_menos_un_super_admin_activo(db, excluir_id=usuario_id)
+
     usuario.activo = 0 if anterior == 1 else 1
     db.commit()
     
@@ -203,11 +306,15 @@ def eliminar_usuario(
     """Elimina un usuario (solo SUPER_ADMIN)."""
     if usuario_id == current_user.id:
         raise HTTPException(status_code=400, detail="No puedes eliminar tu propio usuario mientras estás activo")
-    
+
     usuario = db.query(UsuarioRecord).filter(UsuarioRecord.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
+    # Si es el último SUPER_ADMIN activo, no permitir su eliminación
+    if usuario.rol == ROL_SUPER_ADMIN and usuario.activo == 1:
+        _garantizar_al_menos_un_super_admin_activo(db, excluir_id=usuario_id)
+
     email = usuario.email
     db.delete(usuario)
     db.commit()
