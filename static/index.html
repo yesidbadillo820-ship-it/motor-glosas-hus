@@ -683,9 +683,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
                 <th style="text-align:right">Valor</th>
                 <th>Vence</th>
                 <th class="cell-center">Días</th>
-                <th>Estado</th>
+                <th>Workflow</th>
                 <th>Semáforo</th>
-                <th class="cell-center">Acción</th>
+                <th class="cell-center">Acciones</th>
               </tr>
             </thead>
             <tbody id="mis-body">
@@ -1153,6 +1153,9 @@ async function loadMisGlosas(){
     }
 
     var semChip = {VERDE:'chip-verde', AMARILLO:'chip-amarillo', ROJO:'chip-rojo', NEGRO:'chip-negro'};
+    var wfColor = {BORRADOR:'#6b7280', EN_REVISION:'#ca8a04', APROBADA:'#047857', RADICADA:'#1d4ed8'};
+    var puedeAprobar = USER_ROL === 'SUPER_ADMIN' || USER_ROL === 'COORDINADOR';
+
     body.innerHTML = data.map(function(g){
       var vence = g.fecha_vencimiento ? new Date(g.fecha_vencimiento).toLocaleDateString('es-CO') : '—';
       var valor = (g.valor_objetado || 0).toLocaleString('es-CO', {minimumFractionDigits:0, maximumFractionDigits:0});
@@ -1160,6 +1163,20 @@ async function loadMisGlosas(){
       var tipoCls = g.tipo_glosa_excel ? 'chip-tipo-' + g.tipo_glosa_excel.toLowerCase() : '';
       var tipoTxt = g.tipo_glosa_excel ? '<span class="chip ' + tipoCls + '">' + g.tipo_glosa_excel + '</span>' : '<span style="color:var(--text3)">—</span>';
       var semCls = semChip[g.prioridad] || '';
+      var wfEstado = g.workflow_state || 'BORRADOR';
+      var wfChip = '<span class="chip" style="background:transparent;color:' + (wfColor[wfEstado]||'#6b7280') + ';border:1px solid ' + (wfColor[wfEstado]||'#6b7280') + '">' + wfEstado.replace('_', ' ') + '</span>';
+
+      // Construir botones de acción según estado y rol
+      var acciones = '<button class="btn-sm" onclick="responderGlosa(' + g.id + ')">Responder</button>';
+      if(wfEstado === 'BORRADOR'){
+        acciones += ' <button class="btn-sm ghost" style="color:#ca8a04;border-color:#fde68a" onclick="cambiarWorkflow(' + g.id + ',\'EN_REVISION\',\'Enviar a revisión\')">→ Revisar</button>';
+      } else if(wfEstado === 'EN_REVISION' && puedeAprobar){
+        acciones += ' <button class="btn-sm" style="background:#047857" onclick="cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')">✓ Aprobar</button>';
+        acciones += ' <button class="btn-sm ghost" onclick="cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')">← Devolver</button>';
+      } else if(wfEstado === 'APROBADA' && puedeAprobar){
+        acciones += ' <button class="btn-sm" style="background:#1d4ed8" onclick="cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')">Radicar</button>';
+      }
+
       return '<tr>' +
         '<td>' + (g.gestor_nombre || '—') + '</td>' +
         '<td>' + (g.eps || '—') + '</td>' +
@@ -1170,14 +1187,33 @@ async function loadMisGlosas(){
         '<td class="num">$' + valor + '</td>' +
         '<td>' + vence + '</td>' +
         '<td class="cell-center" style="font-weight:700">' + (g.dias_restantes || 0) + '</td>' +
-        '<td><span class="chip chip-estado">' + (g.estado || '—') + '</span></td>' +
+        '<td>' + wfChip + '</td>' +
         '<td><span class="chip ' + semCls + '">' + (g.prioridad || '—') + '</span></td>' +
-        '<td class="cell-center"><button class="btn-sm" onclick="responderGlosa(' + g.id + ')">Responder</button></td>' +
+        '<td class="cell-center">' + acciones + '</td>' +
         '</tr>';
     }).join('');
   }catch(e){
     body.innerHTML = '<tr class="empty-row"><td colspan="12" style="color:#991b1b">Error: ' + e.message + '</td></tr>';
   }
+}
+
+// ─── WORKFLOW DE APROBACION ───────────────────────────────────────────────
+async function cambiarWorkflow(id, nuevoEstado, etiqueta){
+  var comentario = prompt('Comentario opcional para esta transición a ' + etiqueta + ':') || '';
+  try{
+    var r = await fetch('/glosas/' + id + '/workflow', {
+      method: 'PATCH',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({nuevo_estado: nuevoEstado, comentario: comentario})
+    });
+    var d = await r.json();
+    if(r.ok){
+      toast('Estado actualizado', etiqueta + ' ✓', 'success');
+      if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    } else {
+      toast('Error', d.detail || 'No se pudo cambiar el estado', 'error');
+    }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function verGlosa(id){

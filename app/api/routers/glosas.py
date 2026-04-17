@@ -248,6 +248,8 @@ def mis_asignaciones(
             "tipo_glosa_excel": g.tipo_glosa_excel,
             "profesional_medico": g.profesional_medico,
             "dictamen": g.dictamen,
+            "workflow_state": g.workflow_state or "BORRADOR",
+            "nota_workflow": g.nota_workflow,
         }
         for g in glosas
     ]
@@ -332,6 +334,101 @@ class DecisionEPSInput(BaseModel):
 
 class AsignarAuditorInput(BaseModel):
     auditor_email: str
+
+
+class WorkflowTransicionInput(BaseModel):
+    nuevo_estado: str  # BORRADOR | EN_REVISION | APROBADA | RADICADA
+    comentario: Optional[str] = None
+
+
+# Transiciones válidas del workflow (from_estado -> set(to_estado))
+_WORKFLOW_TRANSICIONES = {
+    "BORRADOR": {"EN_REVISION"},
+    "EN_REVISION": {"BORRADOR", "APROBADA"},
+    "APROBADA": {"RADICADA", "EN_REVISION"},
+    "RADICADA": set(),  # estado final
+}
+
+
+@router.patch("/{glosa_id}/workflow")
+def cambiar_workflow(
+    glosa_id: int,
+    data: WorkflowTransicionInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Cambia el estado del workflow de aprobación.
+
+    Transiciones permitidas:
+      BORRADOR -> EN_REVISION       (auditor solicita revisión)
+      EN_REVISION -> APROBADA       (coordinador/admin aprueba)
+      EN_REVISION -> BORRADOR       (coordinador devuelve para corregir)
+      APROBADA -> RADICADA          (una vez radicada ante la EPS)
+      APROBADA -> EN_REVISION       (se detecta algo para revisar)
+
+    Permisos:
+    - AUDITOR puede mover BORRADOR -> EN_REVISION de sus propias glosas.
+    - COORDINADOR y SUPER_ADMIN pueden hacer cualquier transición.
+    """
+    nuevo = data.nuevo_estado.upper().strip()
+    if nuevo not in {"BORRADOR", "EN_REVISION", "APROBADA", "RADICADA"}:
+        raise HTTPException(400, f"Estado inválido: {nuevo}")
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    actual = (glosa.workflow_state or "BORRADOR").upper()
+
+    # Si no existe transición desde el estado actual, inicializar como BORRADOR
+    if actual not in _WORKFLOW_TRANSICIONES:
+        actual = "BORRADOR"
+
+    if nuevo not in _WORKFLOW_TRANSICIONES.get(actual, set()):
+        raise HTTPException(
+            400,
+            f"Transición no permitida: {actual} -> {nuevo}. "
+            f"Desde {actual} solo puedes ir a: {sorted(_WORKFLOW_TRANSICIONES.get(actual, set())) or 'ninguno (estado final)'}",
+        )
+
+    # Validar permisos por transición
+    if current_user.rol == "AUDITOR":
+        # Auditor solo puede enviar a revisión sus glosas
+        if nuevo != "EN_REVISION" or actual != "BORRADOR":
+            raise HTTPException(403, "Como AUDITOR solo puedes enviar glosas propias a revisión")
+        if glosa.auditor_email and glosa.auditor_email != current_user.email:
+            # Si está asignada a otro auditor, no puede
+            raise HTTPException(403, "Esta glosa está asignada a otro auditor")
+    elif current_user.rol == "VIEWER":
+        raise HTTPException(403, "VIEWER no puede cambiar estados")
+
+    glosa.workflow_state = nuevo
+    if data.comentario:
+        nota = (glosa.nota_workflow or "")
+        nueva_nota = f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} {current_user.email} {actual}->{nuevo}] {data.comentario}"
+        glosa.nota_workflow = (nota + " | " + nueva_nota)[-500:] if nota else nueva_nota[:500]
+
+    db.commit()
+    db.refresh(glosa)
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="WORKFLOW",
+        tabla="historial",
+        registro_id=glosa_id,
+        campo="workflow_state",
+        valor_anterior=actual,
+        valor_nuevo=nuevo,
+        detalle=data.comentario or f"Transición {actual} -> {nuevo}",
+    )
+    return {
+        "message": "Workflow actualizado",
+        "glosa_id": glosa_id,
+        "estado_anterior": actual,
+        "estado_nuevo": nuevo,
+        "nota_workflow": glosa.nota_workflow,
+    }
 
 
 @router.patch("/{glosa_id}/decision-eps")
