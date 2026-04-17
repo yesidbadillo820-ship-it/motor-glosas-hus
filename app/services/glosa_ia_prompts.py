@@ -382,56 +382,95 @@ MARCO NORMATIVO COMPLETO 2026:
 20. Sentencia T-478/1995 — Autonomía médica como derecho fundamental protegido
 
 ══════════════════════════════════════════════════════════════════
-ESTÁNDAR DE REDACCIÓN TÉCNICO-JURÍDICA (OBLIGATORIO)
+ESTÁNDAR DE REDACCIÓN TÉCNICO-JURÍDICA PREMIUM (OBLIGATORIO)
 ══════════════════════════════════════════════════════════════════
-1. FORMATO: BLOQUE ÚNICO CONTINUO de párrafos técnico-argumentativos. NO uses numerales romanos (I, II, III, IV), NO uses títulos intermedios ("ANTECEDENTES", "FUNDAMENTO", etc.), NO uses separadores como "---" ni "═══".
+Imita el estilo de un escrito notarial de defensa de cartera hospitalaria.
+Cumple TODAS las reglas siguientes — son criterios de auditoría:
 
-2. INICIO OBLIGATORIO: La primera frase DEBE comenzar EXACTAMENTE con:
-   - "ESE HUS NO ACEPTA LA GLOSA APLICADA POR [CONCEPTO]..." (si se rechaza)
-   - "ESE HUS ACEPTA PARCIALMENTE LA GLOSA..." (si es parcial)
-   - "ESE HUS ACEPTA LA GLOSA EN SU TOTALIDAD..." (si se acepta)
-   Seguida de la razón CONCRETA por la cual se rechaza/acepta (no genérica).
+1. FORMATO: BLOQUE ÚNICO CONTINUO (3-4 párrafos largos). NO numerales
+   romanos (I, II, III). NO títulos intermedios. NO separadores.
 
-3. CITAS NORMATIVAS INLINE (DENTRO del argumento, NO en bloque separado al final):
-   ✓ "...conforme a la Resolución 3280 de 2018 que regula la ruta materno-perinatal..."
-   ✓ "...el artículo 14 de la Ley 1751 de 2015 reconoce la salud como derecho fundamental..."
-   ✗ NO escribas al final "NORMAS RELEVANTES: Norma1 | Norma2"
-   ✗ NO listes normas numeradas (1., 2., 3.)
-   ✗ NO uses títulos como "SUSTENTO NORMATIVO"
+2. PRIMERA FRASE — IDENTIFICACIÓN COMPLETA DEL CASO. La oración inicial
+   DEBE empezar con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE
+   [NOMBRE_COMPLETO_DEL_TIPO]" (TARIFAS, SOPORTES, AUTORIZACIÓN,
+   COBERTURA, PERTINENCIA CLÍNICA, FACTURACIÓN, INSUMOS, MEDICAMENTOS),
+   seguido del CÓDIGO concreto (TA0801, SO0103, etc.), nombre de la
+   ENTIDAD pagadora completa, descripción del SERVICIO objeto de glosa
+   con su CUPS entre paréntesis, VALOR FACTURADO y VALOR RECONOCIDO POR
+   LA EPS si están disponibles. Ejemplo:
+   ✓ "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS SOBRE
+      EL CÓDIGO TA0801, INTERPUESTA POR EL DISPENSARIO MÉDICO BUCARAMANGA,
+      RESPECTO DEL ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA IDENTIFICADO
+      CON CUPS 898101, FACTURADO POR VALOR DE $190.964 Y RECONOCIDO SOLO
+      POR $45.411."
 
-4. REFERENCIA A SOPORTES CLÍNICOS: Cuando el expediente/PDF aporte datos, INCORPÓRALOS textualmente como evidencia:
-   ✓ "...documentado en la epicrisis (folio 7), registro de procedimiento quirúrgico firmado por la DRA. MARÍA PINILLA (RM 1095811719)..."
-   ✓ "...consta en la hoja de administración de medicamentos (HAM) consecutivo 59385..."
-   Cuando no haya soportes, NO inventes folios ni nombres.
+3. SEGUNDA FRASE — REFUTACIÓN DIRECTA DEL MOTIVO DE LA GLOSA. Toma
+   textualmente el argumento de la auditoría EPS y desmóntalo. Ejemplo:
+   ✓ "LA AFIRMACIÓN DE LA AUDITORÍA DE QUE EXISTE UN MAYOR VALOR COBRADO
+      EN PATOLOGÍA POR AUSENCIA DE COTIZACIÓN AVALADA POR SANIDAD MILITAR
+      NO SE AJUSTA A LA REALIDAD CONTRACTUAL..."
 
-5. PROHIBIDO MOSTRAR CÁLCULOS ARITMÉTICOS EXPLÍCITOS ("SOAT × 0.80 = $X"). Basta con mencionar que la diferencia proviene del descuento no pactado o del valor contractual pactado.
+4. CITA CONTRACTUAL EXHAUSTIVA cuando la glosa toque tarifa o cobertura:
+   debes mencionar NÚMERO de contrato, número de PROCESO si está, VIGENCIA
+   y TIPO DE PAGADOR. Ejemplo:
+   ✓ "EL CONTRATO INTERADMINISTRATIVO No. 440-DIGSA/DMBUG-2025 (PROCESO
+      CD477), SUSCRITO ENTRE LA ESE HUS Y LA DIRECCIÓN DE SANIDAD DEL
+      EJÉRCITO PARA LA VIGENCIA DICIEMBRE 2025 — JULIO 2026..."
 
-6. PROHIBIDO REPETIR DATOS. Cada párrafo debe aportar información distinta. El valor de la glosa, la factura y el radicado se citan UNA vez (al inicio o en la exigencia final).
+5. NORMATIVA INLINE — cita los ARTÍCULOS CORRECTOS:
+   ✓ "el artículo 871 del Código de Comercio consagra el principio de
+      buena fe contractual"
+   ✓ "el artículo 1602 del Código Civil dispone que el contrato legalmente
+      celebrado es una ley para los contratantes"
+   ✓ "el artículo 177 de la Ley 100 de 1993 obliga a la entidad pagadora
+      a reconocer los valores debidamente facturados"
+   ⚠ El artículo del Código Civil sobre fuerza vinculante del contrato es
+     el 1602, NO el 1601.
 
-7. VARIEDAD LÉXICA: Alterna entre "en ese sentido", "así las cosas", "por consiguiente", "adicionalmente", "complementariamente", "por su parte". Evita repetir el mismo conector más de dos veces.
+6. JURISPRUDENCIA SELECTIVA — solo cita una sentencia si su ratio aplica
+   al caso concreto. Si el caso es tarifario, NO cites T-1025/2002
+   (urgencias) ni T-478/1995 (autonomía médica). Si es de urgencias, SÍ
+   cita T-1025/2002. Si es de pertinencia, SÍ cita T-478/1995.
 
-8. EXTENSIÓN: 250-500 palabras. Denso, sin relleno. Si te quedas corto, agrega ARGUMENTO TÉCNICO-CLÍNICO, no muletillas.
+7. RÉGIMEN ESPECIAL CONTEXTUALIZADO. Si el pagador es PPL, FOMAG,
+   POLICÍA, DISPENSARIO MILITAR, ARL, etc., explica CÓMO la normativa
+   especial reafirma tu argumento. Ejemplo:
+   ✓ "TRATÁNDOSE DE POBLACIÓN AFILIADA AL SUBSISTEMA DE SALUD DE LAS
+      FUERZAS MILITARES, EL DECRETO 1795 DE 2000 Y EL ACUERDO 002 DE 2001
+      DEL CONSEJO SUPERIOR DE SALUD FF.MM. REAFIRMAN QUE LA REMUNERACIÓN
+      A LAS IPS PRESTADORAS SE RIGE ÍNTEGRAMENTE POR LAS TARIFAS
+      CONSIGNADAS EN LOS CONTRATOS INTERADMINISTRATIVOS."
 
-9. CIERRE: Termina con una exigencia concreta del tipo:
-   "SE EXIGE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR DE $[X] CON SUJECIÓN A LOS TÉRMINOS CONTRACTUALES Y NORMATIVOS ANTES EXPUESTOS."
-   NO agregues bloque "NORMAS RELEVANTES:" al final. NO agregues "Plazo legal de 15 días hábiles..." salvo que sea relevante al caso.
+8. CIERRE ANCLADO AL VALOR. Última frase debe cuantificar la retención
+   indebida y exigir el pago concreto. Ejemplo:
+   ✓ "EN ESE ORDEN DE IDEAS, LA RETENCIÓN DE $145.553 CONFIGURA UN
+      INCUMPLIMIENTO CONTRACTUAL INJUSTIFICADO QUE AFECTA DIRECTAMENTE EL
+      FLUJO DE RECURSOS DEL HOSPITAL. SE EXIGE EL LEVANTAMIENTO INMEDIATO
+      DE LA GLOSA TA0801 Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR DE
+      $190.964..."
 
-10. PROHIBIDO:
-    - Separadores "---", "═══", "───"
-    - Títulos de sección (I., II., III., ANTECEDENTES, FUNDAMENTO, etc.)
-    - Bloque final numerado de normas
-    - Placeholders ([EPS], [FACTURA], [MÉDICO])
-    - Cálculos aritméticos visibles (SOAT × factor = X)
-    - Repetir el valor de la glosa en 3+ párrafos
-    - Frases de relleno sin información jurídica o clínica
-    - "Nota: generado con asistencia de IA" al final
-    - Referencias a ADRES/Superintendencia SALVO que la glosa lo amerite específicamente
+9. CONTACTO INSTITUCIONAL al final. Cierra con:
+   ✓ "CUALQUIER COMUNICACIÓN SOBRE LA PRESENTE DEFENSA SE RECIBIRÁ EN LOS
+      CORREOS INSTITUCIONALES CARTERA@HUS.GOV.CO Y
+      GLOSASYDEVOLUCIONES@HUS.GOV.CO."
 
-11. ORIGEN JURISPRUDENCIAL: Cuando cites una sentencia, indica su CONCEPTO (qué decidió) integrado al argumento:
-    ✓ "...la Sentencia T-1025 de 2002 reconoció que las atenciones de urgencia no requieren autorización previa..."
-    ✗ "SENTENCIA T-1025/2002 (Corte Constitucional)..."
+10. CONECTORES VARIADOS — usa al menos 4 distintos a lo largo del texto:
+    "en ese sentido", "por su parte", "adicionalmente",
+    "complementariamente", "en idéntico sentido", "en ese orden de ideas",
+    "tratándose de", "así las cosas", "por consiguiente". NUNCA repitas
+    "en consecuencia" o "por lo tanto" más de una vez.
 
-12. REGISTRO: MAYÚSCULAS SOSTENIDAS en todo el argumento. Tono formal-técnico de abogado de cartera hospitalaria. Evitar lenguaje académico o de manual.
+11. EXTENSIÓN: 400-500 palabras. Cada párrafo aporta información NUEVA.
+    NO calcules aritmética visible (no escribas "SOAT × 0.80 = X").
+    NO uses placeholders ([EPS], [FACTURA]).
+    NO digas "Generado con IA" ni similares.
+
+12. ANTI-ALUCINACIÓN: si un dato no está en el caso (folio, médico,
+    Glasgow, etc.), NO lo inventes. Usa "según consta en el expediente"
+    o simplemente omítelo.
+
+13. REGISTRO: MAYÚSCULAS SOSTENIDAS en todo el argumento. Tono formal de
+    abogado director de cartera, no académico ni manual.
 ══════════════════════════════════════════════════════════════════
 """
 
@@ -442,7 +481,7 @@ CONTEXTO TARIFARIO HUS 2026:
 - Resolución 054/2026: Tarifas SOAT plenas vigentes (piso, no techo).
 - Consulta médica general: $35.800 | Especializada: $65.700 | Urgencias: $42.500
 - UCI/día: $892.400 | Hospitalización/día: $198.600 | SMLMV 2026: $1.423.500
-- El contrato y sus anexos son LEY entre las partes (Art. 1601 C. Civil).
+- El contrato y sus anexos son LEY entre las partes (Art. 1602 C. Civil).
 - La EPS no puede aplicar descuentos unilaterales sin soporte contractual (Art. 871 C. Comercio).
 - IPC: referente macroeconómico, NO obliga a la IPS a reducir tarifas.
 - Si no hay contrato: SOAT pleno sin descuentos.
@@ -694,7 +733,7 @@ CONTRATO: {numero_contrato} | TARIFA: {tarifa}
 INSTRUCCIONES VARIANTE A — ARGUMENTO CONTRACTUAL:
 1. INICIO: "ESE HUS NO ACEPTA GLOSA POR TARIFAS." + diferencia concreta entre lo glosado y lo pactado.
 2. PÁRRAFO 2: Citar el contrato {numero_contrato} con {eps}, la tarifa pactada ({tarifa}) y que la EPS aplica un descuento NO AUTORIZADO contractualmente.
-3. PÁRRAFO 3: Art. 871 Código de Comercio (buena fe contractual) + Art. 1601 C. Civil (el contrato es ley entre las partes). El IPC no es obligatorio para la IPS.
+3. PÁRRAFO 3: Art. 871 Código de Comercio (buena fe contractual) + Art. 1602 C. Civil (el contrato es ley entre las partes). El IPC no es obligatorio para la IPS.
 4. CIERRE: "SE EXIGE EL PAGO ÍNTEGRO DE LA FACTURA CONFORME A LAS TARIFAS PACTADAS EN EL CONTRATO VIGENTE."
 NORMAS: Res. 054/2026 | Art. 871 C. Comercio | Decreto 2423/1996
 PROHIBIDO: No mencionar urgencias ni historia clínica (no aplica para glosa tarifaria).""",
@@ -709,9 +748,9 @@ SOPORTES SUBIDOS:
 INSTRUCCIONES VARIANTE B — ARGUMENTO CUPS+TARIFA:
 1. INICIO: "ESE HUS NO ACEPTA GLOSA POR TARIFAS PARA EL SERVICIO {servicio} (CUPS {cups})."
 2. PÁRRAFO 2: El contrato {numero_contrato} fija la tarifa {tarifa}. El valor facturado corresponde exactamente a este parámetro contractual.
-3. PÁRRAFO 3: La EPS aplica un descuento no pactado. Art. 1601 C. Civil + Art. 871 C. Comercio.
+3. PÁRRAFO 3: La EPS aplica un descuento no pactado. Art. 1602 C. Civil + Art. 871 C. Comercio.
 4. CIERRE: "SE EXIGE EL PAGO CORRESPONDIENTE AL CUPS {cups} SEGÚN TARIFARIO CONTRACTUAL VIGENTE."
-NORMAS: Res. 054/2026 | Art. 1601 C. Civil | Art. 871 C. Comercio""",
+NORMAS: Res. 054/2026 | Art. 1602 C. Civil | Art. 871 C. Comercio""",
         """GLOSA: {texto_glosa}
 CÓDIGO: {codigo} | EPS: {eps} | {trazabilidad} | {contexto_tiempo}
 CONTRATO: {numero_contrato} | TARIFA: {tarifa}
@@ -739,7 +778,7 @@ INSTRUCCIONES VARIANTE D — ARGUMENTO HOMOLOGACIÓN CUPS-SOAT:
 2. PÁRRAFO 2: El Anexo Tarifario del contrato {numero_contrato} establece la tabla de homologación CUPS-SOAT.
 3. PÁRRAFO 3: La diferencia tarifaria que alega la EPS proviene de aplicar un código de homologación erróneo o un descuento distinto al pactado.
 4. CIERRE: "SE SOLICITA LA CORRECCIÓN INMEDIATA Y EL PAGO DEL SALDO GLOSADO CONFORME AL TARIFARIO PACTADO."
-NORMAS: Decreto 2423/1996 | Res. 054/2026 | Art. 1601 C. Civil""",
+NORMAS: Decreto 2423/1996 | Res. 054/2026 | Art. 1602 C. Civil""",
     ],
     "SO": [
         """GLOSA: {texto_glosa}
@@ -1227,33 +1266,90 @@ def build_user_prompt(
     template = _VARIANTES[prefijo][idx]
     ctx_pdf_truncado = (contexto_pdf[:4000] if contexto_pdf else FALLBACK_SIN_SOPORTES)
 
+    # Mapeo de prefijo a nombre completo del tipo (para forzar uso correcto)
+    _NOMBRE_TIPO = {
+        "TA": "TARIFAS", "SO": "SOPORTES", "AU": "AUTORIZACIÓN",
+        "CO": "COBERTURA", "CL": "PERTINENCIA CLÍNICA",
+        "PE": "PERTINENCIA CLÍNICA", "FA": "FACTURACIÓN",
+        "IN": "INSUMOS", "ME": "MEDICAMENTOS",
+    }
+    nombre_tipo = _NOMBRE_TIPO.get(prefijo.upper(), "FACTURACIÓN")
+
     instruccion_final = f"""
 
 INSTRUCCIONES OBLIGATORIAS PARA TU RESPUESTA:
 
-FORMATO:
-- BLOQUE ÚNICO CONTINUO, sin separadores "---", sin títulos tipo "I. ANTECEDENTES", sin numeración de normas al final.
-- Empieza EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR [CONCEPTO]..." + razón concreta.
-- Cita normas y sentencias INLINE dentro del argumento (no en bloque aparte).
-- 250-500 palabras, denso y técnico.
-- Cierra con: "SE EXIGE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR DE $[VALOR]..."
-- NO escribas "NORMAS RELEVANTES:", "Plazo legal...", "Nota: generado con IA".
+FORMATO PREMIUM:
+- BLOQUE ÚNICO CONTINUO de 3-4 párrafos largos. Sin separadores, sin
+  numerales romanos (I, II, III), sin títulos intermedios.
+- 400-500 palabras. Denso, sin relleno.
 
-DATOS CLÍNICOS EXTRAÍDOS DEL EXPEDIENTE:
+PRIMERA FRASE OBLIGATORIA (identificación completa del caso):
+- Debe empezar EXACTAMENTE con: "ESE HUS NO ACEPTA LA GLOSA APLICADA
+  POR CONCEPTO DE {nombre_tipo} SOBRE EL CÓDIGO {codigo}, INTERPUESTA
+  POR [NOMBRE COMPLETO DE LA ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO
+  CON CUPS [CUPS], FACTURADO POR VALOR DE $[VALOR_OBJETADO] Y RECONOCIDO
+  SOLO POR $[VALOR_RECONOCIDO]" (incluye los valores SI están disponibles
+  en el caso; si no hay valor reconocido por la EPS, omítelo).
+
+SEGUNDA FRASE OBLIGATORIA (refutación directa del motivo):
+- Toma el motivo de la auditoría EPS y desmóntalo:
+  "LA AFIRMACIÓN DE LA AUDITORÍA DE QUE [motivo de la EPS] NO SE AJUSTA
+  A [LA REALIDAD CONTRACTUAL / LOS SOPORTES CLÍNICOS / LA NORMATIVA APLICABLE]
+  POR LAS SIGUIENTES RAZONES..."
+
+CITA CONTRACTUAL EXHAUSTIVA (cuando aplique):
+- Menciona NÚMERO de contrato, PROCESO, VIGENCIA y partes contratantes.
+- Si la EPS está en régimen especial (PPL, FOMAG, POLICÍA, DISPENSARIO,
+  ARL), menciona la normativa especial (Decreto 1795/2000, Acuerdo
+  002/2001, Res. 5159/2015, Decreto 3752/2003 según corresponda) Y
+  EXPLICA cómo refuerza tu argumento, no solo la cites.
+
+ARTÍCULOS CLAVE (úsalos cuando sean pertinentes):
+- Art. 871 Código de Comercio (buena fe contractual)
+- Art. 1602 Código Civil (el contrato es ley para las partes) — ¡NO 1601!
+- Art. 177 Ley 100/1993 (obligación EPS de reconocer servicios)
+- Art. 56 Ley 1438/2011 (plazos de glosa y respuesta)
+
+JURISPRUDENCIA SELECTIVA — solo cita una sentencia si APLICA al caso:
+- T-1025/2002 → SOLO para urgencias (no aplica a tarifa o cobertura
+  programada).
+- T-478/1995 → SOLO para autonomía médica (pertinencia clínica).
+- T-760/2008 → para EPS que niegan servicios con riesgo vital.
+- Si el caso es puramente tarifario/contractual, NO cites jurisprudencia
+  forzada; basta con artículos del CC, Cco y Ley 100.
+
+CIERRE OBLIGATORIO ANCLADO AL VALOR:
+"EN ESE ORDEN DE IDEAS, LA RETENCIÓN DE $[diferencia] CONFIGURA UN
+INCUMPLIMIENTO CONTRACTUAL INJUSTIFICADO QUE AFECTA DIRECTAMENTE EL FLUJO
+DE RECURSOS DEL HOSPITAL. SE EXIGE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA
+{codigo} Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR DE $[total facturado],
+CONFORME AL CONTRATO [número] Y A LAS NORMAS ANTES CITADAS. CUALQUIER
+COMUNICACIÓN SOBRE LA PRESENTE DEFENSA SE RECIBIRÁ EN LOS CORREOS
+INSTITUCIONALES CARTERA@HUS.GOV.CO Y GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+
+CONECTORES VARIADOS (usa al menos 4 distintos):
+"en ese sentido", "por su parte", "adicionalmente", "complementariamente",
+"en idéntico sentido", "en ese orden de ideas", "tratándose de",
+"así las cosas". NUNCA repitas el mismo conector más de una vez.
+
+PROHIBIDO:
+- Cálculos aritméticos visibles (NO escribas "SOAT × 0.80 = X").
+- Placeholders ([EPS], [FACTURA], [MÉDICO]) en el texto final.
+- "Nota: Generado con IA" o similar.
+- Bloque "NORMAS RELEVANTES: ..." al final.
+- Repetir información ya dada en la primera frase.
+
+DATOS DE ESTE CASO CONCRETO:
+- Tipo de glosa: {nombre_tipo} (código {codigo})
+- Trazabilidad: {trazabilidad}
+- Datos clínicos del expediente:
 {datos_clinicos_str}
+  → Si aparecen datos concretos arriba, incorpóralos textualmente.
+  → Si un dato dice "NO IDENTIFICADO", omítelo (NO lo inventes).
 
-  → Si aparecen datos concretos (paciente, CIE-10, CUPS, Glasgow, laboratorios, nombre del médico, folios), INCORPÓRALOS textualmente al argumento como evidencia.
-  → Si un dato dice "NO IDENTIFICADO", NO lo menciones (NO inventes).
-
-TIPO DE GLOSA: {prefijo}
-  → Menciona esta naturaleza específicamente en el primer párrafo: "...POR CONCEPTO DE {prefijo}...".
-  → NO mezcles tipos (ej. si es AU, NO digas "FACTURACIÓN").
-
-TRAZABILIDAD: {trazabilidad}
-  → Cita TEXTUALMENTE factura y radicado en la exigencia final.
-  → Si dice "SIN DATOS", NO inventes números.
-
-CASO CONCRETO A RESOLVER (usa la plantilla de variante como guía estructural interna, pero NO muestres numerales ni títulos):
+CASO A RESOLVER (usa la plantilla de variante como guía estructural
+interna, pero NO muestres sus numerales ni títulos):
 """
 
     return instruccion_final + template.format(
