@@ -329,6 +329,25 @@ tbody tr:hover{background:var(--bg)}
 .toast-x{cursor:pointer;color:var(--text3);font-size:16px;padding:2px;flex-shrink:0}
 .toast-x:hover{color:var(--text)}
 
+/* ─── SPOTLIGHT (Cmd+K) ─────────────────────────────────────────── */
+.spot-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding-top:12vh}
+.spot-bg.show{display:flex}
+.spot-box{width:min(640px,90vw);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-lg);display:flex;flex-direction:column;overflow:hidden;max-height:70vh}
+.spot-input-wrap{display:flex;align-items:center;gap:.6rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--border)}
+.spot-input-wrap svg{color:var(--text3);flex-shrink:0}
+.spot-input{flex:1;border:none;background:transparent;outline:none;font-size:.95rem;color:var(--text);padding:0}
+.spot-kbd{font-size:.68rem;color:var(--text3);padding:2px 6px;border:1px solid var(--border2);border-radius:4px;background:var(--bg-subtle);font-family:var(--font-mono)}
+.spot-results{overflow-y:auto;max-height:55vh;padding:.4rem 0}
+.spot-group-lbl{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);padding:.5rem 1.1rem .25rem}
+.spot-item{display:flex;align-items:center;gap:.75rem;padding:.55rem 1.1rem;cursor:pointer;font-size:.82rem;color:var(--text2);border-left:2px solid transparent}
+.spot-item:hover,.spot-item.active{background:var(--bg-subtle);color:var(--text);border-left-color:var(--c-teal2)}
+.spot-item-main{flex:1;min-width:0}
+.spot-item-title{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spot-item-sub{font-size:.72rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spot-item-meta{font-size:.68rem;color:var(--text3);flex-shrink:0;font-family:var(--font-mono)}
+.spot-empty{padding:2rem 1.1rem;text-align:center;color:var(--text3);font-size:.82rem}
+.spot-icon{width:28px;height:28px;border-radius:6px;background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;color:var(--text3);flex-shrink:0}
+
 /* ─── MISC ────────────────────────────────── */
 .divider{height:1px;background:var(--border);margin:.5rem 0}
 .section-title{font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
@@ -909,6 +928,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
   </div>
   </div> <!-- /main-layout -->
+</div>
+
+<!-- SPOTLIGHT CMD+K -->
+<div class="spot-bg" id="spot-bg" onclick="if(event.target===this) cerrarSpotlight()">
+  <div class="spot-box">
+    <div class="spot-input-wrap">
+      <svg class="i i-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="spot-input" class="spot-input" type="text" placeholder="Buscar glosas, usuarios, contratos, EPS…" autocomplete="off" />
+      <span class="spot-kbd">ESC</span>
+    </div>
+    <div class="spot-results" id="spot-results">
+      <div class="spot-empty">Escribe para buscar en todo el sistema</div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL DICTAMEN -->
@@ -2059,6 +2092,162 @@ async function cargarEstadisticasAdmin(){
       'Audit log: ' + d.audit_log;
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
+
+// ─── SPOTLIGHT SEARCH (Cmd+K / Ctrl+K) ─────────────────────────────────────
+var SPOT_DATA = {glosas: [], usuarios: [], contratos: []};
+var SPOT_ACTIVE_IDX = 0;
+
+async function cargarDatosSpotlight(){
+  try{
+    var [g, u, c] = await Promise.all([
+      fetch('/glosas/historial?limit=200', {headers:authH()}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch('/usuarios/', {headers:authH()}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch('/contratos/', {headers:authH()}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+    ]);
+    SPOT_DATA.glosas = Array.isArray(g) ? g : [];
+    SPOT_DATA.usuarios = Array.isArray(u) ? u : [];
+    SPOT_DATA.contratos = Array.isArray(c) ? c : [];
+  }catch(e){ console.error('Spotlight data:', e); }
+}
+
+function abrirSpotlight(){
+  var bg = document.getElementById('spot-bg');
+  bg.classList.add('show');
+  var inp = document.getElementById('spot-input');
+  inp.value = '';
+  inp.focus();
+  renderSpotlightResults('');
+  cargarDatosSpotlight();  // refresca en background
+}
+
+function cerrarSpotlight(){
+  document.getElementById('spot-bg').classList.remove('show');
+}
+
+function renderSpotlightResults(query){
+  var q = (query||'').trim().toLowerCase();
+  var box = document.getElementById('spot-results');
+  if(!q){
+    box.innerHTML = '<div class="spot-empty">Escribe para buscar en todo el sistema. Atajos: <span class="spot-kbd">↑</span> <span class="spot-kbd">↓</span> <span class="spot-kbd">↵</span></div>';
+    return;
+  }
+
+  function match(str){ return str && String(str).toLowerCase().indexOf(q) > -1; }
+
+  var glosas = SPOT_DATA.glosas.filter(function(g){
+    return match(g.codigo_glosa) || match(g.factura) || match(g.entidad||g.eps) ||
+           match(g.observacion) || match(g.glosa_original) || match(g.servicio) ||
+           match(g.cups) || match(g.paciente);
+  }).slice(0, 8);
+
+  var usuarios = SPOT_DATA.usuarios.filter(function(u){
+    return match(u.nombre) || match(u.email) || match(u.rol);
+  }).slice(0, 5);
+
+  var contratos = SPOT_DATA.contratos.filter(function(c){
+    return match(c.eps) || match(c.detalles);
+  }).slice(0, 5);
+
+  var html = '';
+  if(glosas.length){
+    html += '<div class="spot-group-lbl">Glosas (' + glosas.length + ')</div>';
+    glosas.forEach(function(g, i){
+      html += '<div class="spot-item" data-idx="' + i + '" onclick="accionSpotGlosa(' + g.id + ')">' +
+        '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
+        '<div class="spot-item-main">' +
+          '<div class="spot-item-title">' + escHtml(g.codigo_glosa || '—') + ' · ' + escHtml(g.entidad||g.eps||'—') + '</div>' +
+          '<div class="spot-item-sub">' + escHtml(g.factura||'—') + ' · $' + (g.valor_objetado||0).toLocaleString('es-CO') + ' · ' + escHtml(g.estado||'') + '</div>' +
+        '</div>' +
+        '<span class="spot-item-meta">ID ' + g.id + '</span>' +
+      '</div>';
+    });
+  }
+  if(usuarios.length){
+    html += '<div class="spot-group-lbl">Usuarios (' + usuarios.length + ')</div>';
+    usuarios.forEach(function(u){
+      html += '<div class="spot-item" onclick="accionSpotUsuario(' + u.id + ')">' +
+        '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>' +
+        '<div class="spot-item-main">' +
+          '<div class="spot-item-title">' + escHtml(u.nombre||'—') + '</div>' +
+          '<div class="spot-item-sub">' + escHtml(u.email) + ' · ' + escHtml(u.rol||'AUDITOR') + '</div>' +
+        '</div>' +
+      '</div>';
+    });
+  }
+  if(contratos.length){
+    html += '<div class="spot-group-lbl">Contratos (' + contratos.length + ')</div>';
+    contratos.forEach(function(c){
+      html += '<div class="spot-item" onclick="accionSpotContrato(\'' + escJs(c.eps) + '\')">' +
+        '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg></div>' +
+        '<div class="spot-item-main">' +
+          '<div class="spot-item-title">' + escHtml(c.eps) + '</div>' +
+          '<div class="spot-item-sub">' + escHtml((c.detalles||'').substring(0,80)) + '</div>' +
+        '</div>' +
+      '</div>';
+    });
+  }
+
+  if(!html){
+    box.innerHTML = '<div class="spot-empty">Sin resultados para "<b>' + escHtml(query) + '</b>"</div>';
+  } else {
+    box.innerHTML = html;
+    SPOT_ACTIVE_IDX = 0;
+    highlightSpotItem(0);
+  }
+}
+
+function highlightSpotItem(idx){
+  var items = document.querySelectorAll('.spot-item');
+  items.forEach(function(el,i){ el.classList.toggle('active', i===idx); });
+  if(items[idx]) items[idx].scrollIntoView({block:'nearest'});
+}
+
+function accionSpotGlosa(id){
+  cerrarSpotlight();
+  if(typeof responderGlosa === 'function') responderGlosa(id);
+}
+function accionSpotUsuario(id){
+  cerrarSpotlight();
+  var tabs = document.querySelectorAll('.sn-item');
+  var usuariosItem = Array.from(tabs).find(function(b){ return b.textContent.trim() === 'Usuarios'; });
+  if(usuariosItem) usuariosItem.click();
+}
+function accionSpotContrato(eps){
+  cerrarSpotlight();
+  var tabs = document.querySelectorAll('.sn-item');
+  var cItem = Array.from(tabs).find(function(b){ return b.textContent.trim() === 'Contratos'; });
+  if(cItem) cItem.click();
+}
+
+// Keyboard listeners
+document.addEventListener('keydown', function(e){
+  var mod = e.ctrlKey || e.metaKey;
+  if(mod && (e.key === 'k' || e.key === 'K')){
+    e.preventDefault();
+    if(document.getElementById('spot-bg').classList.contains('show')) cerrarSpotlight();
+    else abrirSpotlight();
+  }
+  if(document.getElementById('spot-bg').classList.contains('show')){
+    var items = document.querySelectorAll('.spot-item');
+    if(e.key === 'Escape'){ e.preventDefault(); cerrarSpotlight(); }
+    else if(e.key === 'ArrowDown'){ e.preventDefault(); SPOT_ACTIVE_IDX = Math.min(items.length-1, SPOT_ACTIVE_IDX+1); highlightSpotItem(SPOT_ACTIVE_IDX); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); SPOT_ACTIVE_IDX = Math.max(0, SPOT_ACTIVE_IDX-1); highlightSpotItem(SPOT_ACTIVE_IDX); }
+    else if(e.key === 'Enter' && items[SPOT_ACTIVE_IDX]){ e.preventDefault(); items[SPOT_ACTIVE_IDX].click(); }
+  }
+});
+
+// Debounce de búsqueda mientras escribes
+var spotDebounce;
+document.addEventListener('DOMContentLoaded', function(){
+  var inp = document.getElementById('spot-input');
+  if(inp){
+    inp.addEventListener('input', function(e){
+      clearTimeout(spotDebounce);
+      spotDebounce = setTimeout(function(){ renderSpotlightResults(e.target.value); }, 120);
+    });
+  }
+});
+
 
 async function enviarAlertasVencimiento(){
   if(!confirm('Se enviará un correo con las glosas críticas (rojas y vencidas) a TODOS los gestores configurados en ALERTAS_EMAIL.\n\n¿Continuar?')) return;
