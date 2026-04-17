@@ -591,9 +591,8 @@ async def analizar(
                     DANDO CUMPLIMIENTO A ESTAS TARIFAS.
                 </p>
                 <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                    EL VALOR EN DISPUTA DE <strong>${val_en_disputa:,.0f}</strong> NO ES ACEPTADO POR ESE HUS
-                    Y SE MANTIENE EN TRÁMITE DE DEFENSA TÉCNICO-JURÍDICA, CONFORME A LOS ARGUMENTOS EXPUESTOS
-                    EN EL DICTAMEN ADJUNTO, POR LO QUE SE EXIGE SU RECONOCIMIENTO ÍNTEGRO.
+                    EL VALOR RESTANTE DE <strong>${val_en_disputa:,.0f}</strong> NO SE ACEPTA POR LA ESE HUS
+                    YA QUE SE EVIDENCIA QUE ESTE VALOR CORRESPONDE AL VALOR PACTADO ENTRE LAS PARTES.
                 </p>
             </div>"""
         
