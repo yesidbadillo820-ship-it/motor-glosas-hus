@@ -882,6 +882,54 @@ def root():
     return FileResponse("static/index.html")
 
 
+@app.get("/manifest.webmanifest")
+def pwa_manifest():
+    return FileResponse("static/manifest.webmanifest", media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def pwa_service_worker():
+    return FileResponse("static/sw.js", media_type="application/javascript")
+
+
+def _generar_icono_pwa(size: int) -> bytes:
+    """Genera un icono PWA cuadrado con el azul institucional y 'HUS'."""
+    from PIL import Image, ImageDraw, ImageFont
+    from io import BytesIO
+    img = Image.new("RGB", (size, size), "#0b5d8a")
+    draw = ImageDraw.Draw(img)
+    # Círculo de acento
+    pad = int(size * 0.08)
+    draw.ellipse([pad, pad, size - pad, size - pad], outline="#ffffff", width=max(2, size // 80))
+    # Texto "HUS"
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", int(size * 0.42))
+    except Exception:
+        font = ImageFont.load_default()
+    texto = "HUS"
+    bbox = draw.textbbox((0, 0), texto, font=font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+    draw.text(((size - tw) // 2, (size - th) // 2 - int(size * 0.03)), texto, fill="#ffffff", font=font)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@app.get("/icon-192.png")
+def icon_192():
+    from fastapi.responses import Response
+    return Response(content=_generar_icono_pwa(192), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/icon-512.png")
+def icon_512():
+    from fastapi.responses import Response
+    return Response(content=_generar_icono_pwa(512), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/importar-masiva")
 def importar_masiva():
     return FileResponse("static/importar-masiva.html")
