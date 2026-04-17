@@ -515,6 +515,7 @@ from app.api.routers.usuarios import router as usuarios_router
 from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
 from app.api.routers.salud_total import router as salud_total_router
+from app.api.routers.admin import router as admin_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -531,6 +532,7 @@ app.include_router(usuarios_router)
 app.include_router(conciliacion_router)
 app.include_router(audit_router)
 app.include_router(salud_total_router)
+app.include_router(admin_router)
 
 
 def get_glosa_service() -> GlosaService:

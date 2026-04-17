@@ -758,6 +758,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
             <div class="field"><label>Contraseña (mín. 6 caracteres)</label><input type="password" id="u-pass"/></div>
             <button class="btn btn-primary" onclick="crearUsuario()">Crear Usuario</button>
           </div>
+
+          <div id="admin-reset-card" class="form-card" style="display:none;margin-top:1rem;border:1px solid #fecaca;background:#fff5f5">
+            <h3 style="color:#991b1b">Zona peligrosa <span style="color:#dc2626">Solo SUPER_ADMIN</span></h3>
+            <p style="font-size:.78rem;color:#7f1d1d;line-height:1.55;margin-bottom:.85rem">
+              Borra <b>Dashboard, Historial, Alertas y Conciliaciones</b> de todos los usuarios. Se preservan usuarios, contratos y plantillas.<br>
+              Esta acción <b>no se puede deshacer</b>.
+            </p>
+            <div id="admin-stats" style="font-size:.75rem;color:#78350f;background:#fef3c7;padding:.6rem .8rem;border-radius:6px;margin-bottom:.75rem;display:none"></div>
+            <button class="btn-sm ghost" style="border-color:#fecaca;color:#b91c1c" onclick="cargarEstadisticasAdmin()">Ver conteos actuales</button>
+            <button class="btn-sm" style="background:#dc2626;margin-left:.5rem" onclick="resetDatos()">Borrar datos transaccionales</button>
+          </div>
         </div>
         <div class="usuarios-list-col">
           <div class="users-table-wrap">
@@ -1694,6 +1705,10 @@ function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
 var ROL_COLORS={'SUPER_ADMIN':'rol-super_admin','COORDINADOR':'rol-coordinador','AUDITOR':'rol-auditor','VIEWER':'rol-viewer'};
 
 async function loadUsuarios(){
+  // Mostrar la zona peligrosa solo si es SUPER_ADMIN
+  var resetCard = document.getElementById('admin-reset-card');
+  if(resetCard) resetCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
+
   var tbody=document.getElementById('usuarios-body');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3)">Cargando…</td></tr>';
   try{
@@ -1976,6 +1991,78 @@ async function procesarSaludTotal(){
     hideLoading();
     toast('Archivo descargado','success');
   }catch(e){hideLoading();toast('Error: '+e.message,'error');}
+}
+
+// ─── ADMIN: RESET DE DATOS ─────────────────────────────────────────────────
+async function cargarEstadisticasAdmin(){
+  try{
+    var r = await fetch('/admin/estadisticas', {headers: authH()});
+    if(!r.ok){
+      var e = await r.json().catch(function(){return{}});
+      toast('Error', e.detail || 'No se pudieron cargar los conteos', 'error');
+      return;
+    }
+    var d = await r.json();
+    var box = document.getElementById('admin-stats');
+    box.style.display = 'block';
+    box.innerHTML =
+      '<b>Estado actual:</b><br>' +
+      'Usuarios: ' + d.usuarios + ' · ' +
+      'Historial (glosas): ' + d.historial + ' · ' +
+      'Conciliaciones: ' + d.conciliaciones + ' · ' +
+      'Audit log: ' + d.audit_log;
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function resetDatos(){
+  var msg1 = 'Vas a BORRAR:\n' +
+             '  · Historial (todas las glosas)\n' +
+             '  · Conciliaciones\n' +
+             '  · Dashboard y alertas quedarán vacíos\n\n' +
+             'Se conservarán: usuarios, contratos y plantillas.\n\n' +
+             'Esta acción NO se puede deshacer.\n\n' +
+             '¿Continuar?';
+  if(!confirm(msg1)) return;
+
+  var phrase = prompt('Para confirmar, escribe exactamente:\n\nCONFIRMAR-BORRADO-TOTAL');
+  if(phrase !== 'CONFIRMAR-BORRADO-TOTAL'){
+    toast('Cancelado', 'La frase de confirmación no coincide. Operación abortada.', 'error');
+    return;
+  }
+
+  showLoading('Borrando datos…');
+  try{
+    var r = await fetch('/admin/reset-datos', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        confirmar: 'CONFIRMAR-BORRADO-TOTAL',
+        borrar_historial: true,
+        borrar_conciliaciones: true,
+        borrar_audit_log: false,
+      }),
+    });
+    var d = await r.json();
+    hideLoading();
+    if(r.ok){
+      var b = d.registros_borrados || {};
+      toast('Datos borrados',
+        'Historial: ' + (b.historial||0) + ' · Conciliaciones: ' + (b.conciliaciones||0),
+        'success');
+      // Refrescar todo lo que depende de estos datos
+      if(typeof loadDash === 'function') loadDash();
+      if(typeof loadHist === 'function') loadHist(1);
+      if(typeof loadAlertCount === 'function') loadAlertCount();
+      if(typeof loadMisGlosas === 'function') loadMisGlosas();
+      if(typeof loadConciliaciones === 'function') loadConciliaciones();
+      cargarEstadisticasAdmin();
+    } else {
+      toast('Error', d.detail || 'No se pudo completar el borrado', 'error');
+    }
+  }catch(e){
+    hideLoading();
+    toast('Error','Conexión: '+e.message,'error');
+  }
 }
 </script>
 </body>
