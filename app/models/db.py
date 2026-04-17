@@ -166,6 +166,15 @@ class ConciliacionRecord(Base):
     siguiente_paso = Column(String(200))
     acta_numero = Column(String(100))
 
+    # Trazabilidad bilateral (ciclo completo con EPS)
+    contra_respuesta_eps = Column(Text)            # Texto de la respuesta de la EPS antes de conciliar
+    fecha_contra_respuesta_eps = Column(DateTime(timezone=True))
+    postura_hus = Column(Text)                      # Posición final de HUS para la audiencia
+    fecha_acta = Column(DateTime(timezone=True))    # Fecha en que se firmó el acta
+    valor_ratificado_hus = Column(Float, default=0.0)  # Valor que HUS defendió
+    estado_bilateral = Column(String(40), default="PROGRAMADA")
+    # Estados: PROGRAMADA → EPS_RESPONDIO → AUDIENCIA_REALIZADA → ACTA_FIRMADA → CERRADA
+
     __table_args__ = (
         Index("ix_conciliacion_glosa", "glosa_id"),
     )

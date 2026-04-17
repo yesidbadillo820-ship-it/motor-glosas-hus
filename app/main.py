@@ -385,6 +385,28 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
 
+    # Migraciones para conciliaciones - trazabilidad bilateral
+    _CONCILIACION_MISSING = [
+        ("contra_respuesta_eps", "TEXT"),
+        ("fecha_contra_respuesta_eps", "TIMESTAMP WITH TIME ZONE"),
+        ("postura_hus", "TEXT"),
+        ("fecha_acta", "TIMESTAMP WITH TIME ZONE"),
+        ("valor_ratificado_hus", "FLOAT DEFAULT 0"),
+        ("estado_bilateral", "VARCHAR(40) DEFAULT 'PROGRAMADA'"),
+    ]
+    for col_name, col_ddl in _CONCILIACION_MISSING:
+        try:
+            result = db.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='conciliaciones' AND column_name=:col"
+            ), {"col": col_name})
+            if not result.fetchone():
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a conciliaciones")
+                db.execute(text(f"ALTER TABLE conciliaciones ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()

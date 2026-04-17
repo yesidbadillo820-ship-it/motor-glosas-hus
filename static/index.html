@@ -2474,10 +2474,102 @@ async function loadConciliaciones(){
   document.getElementById('cs-sin').textContent=(por['SIN_ACUERDO']||{}).total||0;
   var body=document.getElementById('concil-body');
   if(!d.items.length){body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:2rem">Sin conciliaciones</td></tr>';return;}
+  window._concilCache = {};
   body.innerHTML=d.items.map(function(c){
+    window._concilCache[c.id] = c;
     var cls='resultado-badge-'+(c.resultado||'pendiente').toLowerCase();
-    return '<tr><td>'+c.id+'</td><td>#'+c.glosa_id+'</td><td>'+(c.fecha_audiencia?c.fecha_audiencia.substring(0,10):'—')+'</td><td>'+escHtml(c.lugar||'—')+'</td><td><span class="'+cls+'">'+(c.resultado||'PENDIENTE')+'</span></td><td>'+(c.valor_conciliado?'$'+c.valor_conciliado.toLocaleString():'—')+'</td><td><button class="btn-warn-sm" onclick="registrarResultadoConciliacion('+c.id+')">Resultado</button></td></tr>';
+    var estadoBilateral = c.estado_bilateral || 'PROGRAMADA';
+    var colorEst = {
+      PROGRAMADA:'#6b7280', EPS_RESPONDIO:'#ca8a04',
+      AUDIENCIA_REALIZADA:'#1d4ed8', ACTA_FIRMADA:'#047857', CERRADA:'#047857'
+    }[estadoBilateral] || '#6b7280';
+    var acciones = '<div style="display:flex;gap:.25rem;flex-wrap:wrap">' +
+      '<button class="btn-sm ghost" onclick="panelContraRespEPS('+c.id+')" title="Registrar lo que respondió la EPS">EPS</button>' +
+      '<button class="btn-sm ghost" onclick="panelPosturaHUS('+c.id+')" title="Registrar postura HUS">HUS</button>' +
+      '<button class="btn-sm" style="background:#047857" onclick="panelCerrarActa('+c.id+')">Acta</button>' +
+      '<button class="btn-sm ghost" onclick="verPdfActa('+c.id+')" title="PDF del acta">PDF</button>' +
+      '</div>';
+    return '<tr>' +
+      '<td>'+c.id+'</td>' +
+      '<td>#'+c.glosa_id+'</td>' +
+      '<td>'+(c.fecha_audiencia?c.fecha_audiencia.substring(0,10):'—')+'</td>' +
+      '<td>'+escHtml(c.lugar||'—')+'</td>' +
+      '<td><span class="'+cls+'">'+(c.resultado||'PENDIENTE')+'</span><br/>' +
+        '<span class="chip" style="background:transparent;color:'+colorEst+';border:1px solid '+colorEst+';font-size:.65rem;margin-top:3px;display:inline-block">'+estadoBilateral.replace('_',' ')+'</span>' +
+      '</td>' +
+      '<td>'+(c.valor_conciliado?'$'+c.valor_conciliado.toLocaleString():'—')+'</td>' +
+      '<td>'+acciones+'</td>' +
+    '</tr>';
   }).join('');
+}
+
+function _cachedConcil(id){ return (window._concilCache||{})[id] || {}; }
+
+async function panelContraRespEPS(id){
+  var c = _cachedConcil(id);
+  var actual = c.contra_respuesta_eps || '';
+  var txt = prompt('Registra la CONTRA-RESPUESTA de la EPS (lo que respondió la EPS tras la radicación inicial):\n\n', actual);
+  if(!txt || txt.trim().length < 20){ if(txt!==null) toast('Texto muy corto','Mínimo 20 caracteres','warning'); return; }
+  try{
+    var r = await fetch('/conciliaciones/'+id+'/contra-respuesta-eps',{
+      method:'PATCH', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({texto: txt.trim()})
+    });
+    var d = await r.json();
+    if(r.ok){ toast('Contra-respuesta EPS','Registrada ✓','success'); loadConciliaciones(); }
+    else { toast('Error', d.detail||'No se pudo guardar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function panelPosturaHUS(id){
+  var c = _cachedConcil(id);
+  var actual = c.postura_hus || '';
+  var txt = prompt('Registra la POSTURA FINAL de HUS para la audiencia (tu defensa consolidada):\n\n', actual);
+  if(!txt || txt.trim().length < 20){ if(txt!==null) toast('Texto muy corto','Mínimo 20 caracteres','warning'); return; }
+  var valorStr = prompt('Valor que HUS ratifica defender ($, opcional):', c.valor_ratificado_hus || '');
+  var valor = valorStr === null ? null : parseFloat(valorStr.replace(/[^\d.]/g,''))||0;
+  try{
+    var body = {texto: txt.trim()};
+    if(valor !== null) body.valor_ratificado = valor;
+    var r = await fetch('/conciliaciones/'+id+'/postura-hus',{
+      method:'PATCH', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    var d = await r.json();
+    if(r.ok){ toast('Postura HUS','Registrada ✓','success'); loadConciliaciones(); }
+    else { toast('Error', d.detail||'No se pudo guardar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function panelCerrarActa(id){
+  var acta = prompt('N° del Acta de conciliación (ej: ACT-2026-0042):');
+  if(!acta) return;
+  var fecha = prompt('Fecha del acta (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+  if(!fecha) return;
+  var valor = parseFloat((prompt('Valor conciliado FINAL ($):','0')||'0').replace(/[^\d.]/g,''))||0;
+  var resultado = (prompt('Resultado:\nACUERDO_TOTAL\nACUERDO_PARCIAL\nSIN_ACUERDO','ACUERDO_PARCIAL')||'').toUpperCase().trim();
+  if(!['ACUERDO_TOTAL','ACUERDO_PARCIAL','SIN_ACUERDO'].includes(resultado)){ toast('Resultado inválido','error'); return; }
+  var obs = prompt('Observaciones del acta (opcional):','')||'';
+  try{
+    var r = await fetch('/conciliaciones/'+id+'/cerrar-acta',{
+      method:'PATCH', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({acta_numero:acta, fecha_acta:fecha, valor_conciliado:valor, resultado:resultado, observaciones:obs})
+    });
+    var d = await r.json();
+    if(r.ok){ toast('Acta firmada','Conciliación cerrada ✓','success'); loadConciliaciones(); }
+    else { toast('Error', d.detail||'No se pudo cerrar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function verPdfActa(id){
+  try{
+    var r = await fetch('/conciliaciones/'+id+'/pdf', {headers: authH()});
+    if(!r.ok){ var d = await r.json(); toast('Error', d.detail||'No se pudo generar','error'); return; }
+    var html = await r.text();
+    var w = window.open('', '_blank', 'width=900,height=800');
+    w.document.write(html);
+    w.document.close();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function crearConciliacion(){
