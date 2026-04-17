@@ -312,6 +312,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .hist-area{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:1.25rem;gap:1rem}
 .hist-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
 .bulk-bar{display:flex;align-items:center;gap:.8rem;padding:.7rem 1rem;margin:.8rem 0;background:linear-gradient(90deg,rgba(13,148,136,.08),rgba(13,148,136,.02));border:1px solid rgba(13,148,136,.25);border-radius:10px;font-size:.85rem;flex-wrap:wrap}
+.validar-result{margin-top:1rem;padding:1rem 1.2rem;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);font-size:.85rem}
+.validar-result.ok{border-left:4px solid #047857}
+.validar-result.bad{border-left:4px solid #b91c1c}
+.validar-result.validar-err{border-left:4px solid #b91c1c;color:#b91c1c}
+.validar-result.validar-loading{border-left:4px solid #0d9488}
+.validar-hdr{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;padding-bottom:.6rem;border-bottom:1px dashed var(--border);margin-bottom:.5rem}
+.validar-estado{padding:.3rem .75rem;border-radius:14px;color:white;font-size:.72rem;font-weight:700;letter-spacing:.3px}
+.validar-score{font-size:.8rem;color:var(--text2)}
+.validar-resumen{font-size:.78rem;color:var(--text3);flex:1;min-width:200px;font-style:italic}
 .gold-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;padding:1rem 0}
 .gold-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.55rem;transition:all .15s;position:relative;overflow:hidden}
 .gold-card::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,#f59e0b,#fbbf24)}
@@ -1698,10 +1707,12 @@ function renderResult(d){
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
     +'<button class="btn btn-ghost" onclick="copiarDictamen()">Copiar texto</button>'
+    +'<button class="btn btn-ghost" onclick="validarPreRadicacion()">🛡️ Validar</button>'
     +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
     +'<button class="btn btn-ghost" onclick="guardarComoPlantillaGoldInline()">⭐ Guardar como Gold</button>'
     +'<button class="btn btn-ghost" onclick="nuevaGlosa()">Nueva glosa</button>'
     +'</div>'
+    +'<div id="validar-result" class="validar-result" style="display:none"></div>'
 
     +'<div class="refinar-panel" id="refinar-inline" style="display:none;margin-top:1rem;border-radius:10px;border:1px solid var(--border)">'
     +'  <div class="refinar-hdr"><b>Refinar con IA</b><span class="refinar-sub">Dile qué cambiar: tono, longitud, citar otra norma…</span></div>'
@@ -1767,6 +1778,50 @@ async function aplicarRefinarInline(){
     st.className = 'refinar-status err';
     st.textContent = 'Conexión: ' + e.message;
   }
+}
+
+async function validarPreRadicacion(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Primero analiza una glosa','warning'); return; }
+  var box = document.getElementById('validar-result');
+  if(box){
+    box.style.display = 'block';
+    box.className = 'validar-result validar-loading';
+    box.innerHTML = '<div style="padding:14px;text-align:center">🛡️ Revisando con IA… ~15s</div>';
+    box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/validar', {
+      method: 'POST', headers: authH()
+    });
+    var d = await r.json();
+    if(!r.ok){ box.className='validar-result validar-err'; box.innerHTML='<div style="padding:14px">Error: '+(d.detail||'no se pudo validar')+'</div>'; return; }
+    renderValidacion(d);
+  }catch(e){ box.className='validar-result validar-err'; box.innerHTML='<div style="padding:14px">Conexión: '+e.message+'</div>'; }
+}
+
+function renderValidacion(d){
+  var box = document.getElementById('validar-result');
+  if(!box) return;
+  var estadoCls = d.puede_radicar ? 'ok' : 'bad';
+  var estadoTxt = d.puede_radicar ? '✓ PUEDE RADICARSE' : '⚠️ REVISAR ANTES DE RADICAR';
+  var color = d.score_calidad >= 80 ? '#047857' : d.score_calidad >= 60 ? '#b45309' : '#b91c1c';
+  var hallazgosHtml = '';
+  if(d.hallazgos && d.hallazgos.length){
+    hallazgosHtml = '<ul style="margin:.5rem 0 0;padding-left:1.2rem">' + d.hallazgos.map(function(h){
+      var ic = h.nivel === 'error' ? '🔴' : h.nivel === 'warn' ? '🟡' : '🔵';
+      return '<li style="margin:.25rem 0"><b>'+ic+' '+h.nivel.toUpperCase()+':</b> ' + escHtml(h.mensaje) + '</li>';
+    }).join('') + '</ul>';
+  } else {
+    hallazgosHtml = '<div style="color:var(--c-green);margin-top:.5rem">✓ Sin observaciones. El argumento pasa todos los checks.</div>';
+  }
+  box.className = 'validar-result ' + estadoCls;
+  box.innerHTML =
+    '<div class="validar-hdr">' +
+      '<span class="validar-estado" style="background:'+color+'">'+estadoTxt+'</span>' +
+      '<span class="validar-score">Calidad: <b style="color:'+color+'">'+d.score_calidad+'/100</b></span>' +
+      '<span class="validar-resumen">'+escHtml(d.resumen||'')+'</span>' +
+    '</div>' +
+    hallazgosHtml;
 }
 
 async function guardarComoPlantillaGoldInline(){

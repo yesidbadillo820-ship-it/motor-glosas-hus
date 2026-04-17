@@ -44,6 +44,10 @@ class RefinarRequest(BaseModel):
     guardar: bool = False  # si True persiste el dictamen refinado en la BD
 
 
+class ValidarRequest(BaseModel):
+    forzar: bool = False
+
+
 def _limpiar_observacion(dictamen_html: str) -> str:
     """Extrae solo el texto del argumento jurídico del dictamen, quitando la
     tabla superior (código/valor/respuesta), los badges, la tabla de resumen
@@ -469,6 +473,58 @@ async def refinar_dictamen_endpoint(
         "dictamen_html": nuevo_html,
         "guardado": data.guardar,
     }
+
+
+@router.post("/{glosa_id}/validar")
+async def validar_pre_radicacion(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Valida el dictamen antes de radicarlo ante la EPS.
+
+    Hace checks locales (placeholders, factura, normas esperadas,
+    citas derogadas) + consulta a la IA para verificar solidez.
+    Retorna score de calidad 0-100, hallazgos y si puede_radicar.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not glosa.dictamen:
+        raise HTTPException(400, "La glosa aún no tiene dictamen generado")
+
+    cfg = get_settings()
+    service = GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+        anthropic_model=cfg.anthropic_model,
+    )
+
+    # Calcular días hábiles si hay fechas
+    dias = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+    # dias_restantes es lo que queda; para el validador queremos días transcurridos
+    # cuando no es extemporánea. Si es 0 o negativo asumimos vencida.
+    dias_transcurridos = max(0, 20 - dias) if dias > 0 else 25
+
+    resultado = await service.validar_pre_radicacion(
+        dictamen_html=glosa.dictamen,
+        eps=glosa.eps or "",
+        codigo_glosa=glosa.codigo_glosa or "",
+        valor_objetado=float(glosa.valor_objetado or 0),
+        numero_factura=glosa.factura or "",
+        dias_habiles=dias_transcurridos,
+    )
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="VALIDAR_PRE_RADICACION",
+        tabla="historial",
+        registro_id=glosa_id,
+        detalle=f"score={resultado['score_calidad']} errores={resultado['errores']} warnings={resultado['warnings']}",
+    )
+    return resultado
 
 
 @router.get("/alertas")
