@@ -243,6 +243,121 @@ def _color_semaforo(sem: str) -> str:
     }.get(sem, "#6b7280")
 
 
+async def enviar_alertas_vencimiento_masivo(db) -> dict:
+    """Envía correo broadcast con glosas próximas a vencer o vencidas.
+
+    Contenido:
+    - Glosas ROJO (<5 días)
+    - Glosas VENCIDAS (0 o negativo)
+    - Agrupadas por gestor.
+
+    Retorna resumen {destinatarios, correos_enviados, glosas_alertadas}.
+    """
+    cfg = get_settings()
+    if not cfg.alertas_email:
+        return {"destinatarios": 0, "correos_enviados": 0, "glosas_alertadas": 0, "error": "ALERTAS_EMAIL vacío"}
+
+    destinatarios = [e.strip() for e in cfg.alertas_email.split(",") if e.strip()]
+    if not destinatarios:
+        return {"destinatarios": 0, "correos_enviados": 0, "glosas_alertadas": 0}
+
+    from app.models.db import GlosaRecord
+    rojas = db.query(GlosaRecord).filter(
+        GlosaRecord.prioridad == "ROJO",
+        GlosaRecord.estado.notin_(["LEVANTADA", "ACEPTADA", "CONCILIADA"]),
+    ).all()
+    negras = db.query(GlosaRecord).filter(
+        GlosaRecord.prioridad == "NEGRO",
+        GlosaRecord.estado.notin_(["LEVANTADA", "ACEPTADA", "CONCILIADA"]),
+    ).all()
+
+    if not rojas and not negras:
+        return {"destinatarios": len(destinatarios), "correos_enviados": 0, "glosas_alertadas": 0, "mensaje": "Sin glosas críticas"}
+
+    def _filas(lista, color_hex):
+        if not lista:
+            return ""
+        filas = []
+        for g in lista[:40]:
+            dias = g.dias_restantes if g.dias_restantes else 0
+            filas.append(
+                f'<tr><td style="padding:6px 10px;border-bottom:1px solid #e5e7eb">{g.gestor_nombre or "—"}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb">{g.eps or "—"}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:11px">{g.factura or "—"}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:bold">$ {(g.valor_objetado or 0):,.0f}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:{color_hex};font-weight:bold">{dias} días</td></tr>'
+            )
+        if len(lista) > 40:
+            filas.append(f'<tr><td colspan="5" style="padding:6px 10px;color:#6b7280;font-style:italic">...y {len(lista) - 40} glosas más</td></tr>')
+        return "".join(filas)
+
+    rojas_html = _filas(rojas, "#b91c1c")
+    negras_html = _filas(negras, "#0f172a")
+
+    total = len(rojas) + len(negras)
+    asunto = f"⚠ Motor Glosas HUS — {total} glosas críticas ({len(rojas)} rojas, {len(negras)} vencidas)"
+
+    contenido = f"""
+    <p style="color:#374151;font-size:14px;line-height:1.6">
+        Alerta automática: hay <strong>{total} glosas</strong> en estado crítico.
+        Por favor revísalas y responde cuanto antes para evitar aceptación tácita.
+    </p>
+    """
+
+    if negras:
+        contenido += f"""
+        <h3 style="color:#0f172a;margin-top:20px;font-size:16px">⚫ Glosas VENCIDAS ({len(negras)})</h3>
+        <p style="color:#991b1b;font-size:12px">Requieren acción inmediata — pueden derivar en aceptación tácita.</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb">
+            <thead><tr style="background:#0f172a;color:#fff">
+                <th style="padding:8px;text-align:left">Gestor</th>
+                <th style="padding:8px;text-align:left">EPS</th>
+                <th style="padding:8px;text-align:left">Factura</th>
+                <th style="padding:8px;text-align:right">Valor</th>
+                <th style="padding:8px;text-align:center">Días</th>
+            </tr></thead>
+            <tbody>{negras_html}</tbody>
+        </table>
+        """
+
+    if rojas:
+        contenido += f"""
+        <h3 style="color:#b91c1c;margin-top:25px;font-size:16px">🔴 Glosas en ROJO — menos de 5 días ({len(rojas)})</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb">
+            <thead><tr style="background:#b91c1c;color:#fff">
+                <th style="padding:8px;text-align:left">Gestor</th>
+                <th style="padding:8px;text-align:left">EPS</th>
+                <th style="padding:8px;text-align:left">Factura</th>
+                <th style="padding:8px;text-align:right">Valor</th>
+                <th style="padding:8px;text-align:center">Días</th>
+            </tr></thead>
+            <tbody>{rojas_html}</tbody>
+        </table>
+        """
+
+    contenido += """
+    <p style="margin-top:30px;padding:15px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
+        <b>Acción requerida:</b> ingresa al sistema, revisa las glosas asignadas a ti y responde.<br>
+        🔗 <a href="https://motor-glosas-hus.onrender.com/" style="color:#1e40af">Abrir Motor Glosas HUS</a>
+    </p>
+    """
+
+    html = _build_html_base(asunto, contenido)
+    enviados = 0
+    for d in destinatarios:
+        if await enviar_email(d, asunto, html):
+            enviados += 1
+
+    logger.info(f"Alertas de vencimiento enviadas: {enviados}/{len(destinatarios)} | {total} glosas críticas")
+    return {
+        "destinatarios": len(destinatarios),
+        "correos_enviados": enviados,
+        "glosas_alertadas": total,
+        "rojas": len(rojas),
+        "vencidas": len(negras),
+    }
+
+
 async def enviar_resumen_semanal(destinatario: str, metricas: dict):
     cfg = get_settings()
     if not cfg.alertas_email:

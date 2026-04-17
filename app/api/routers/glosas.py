@@ -117,13 +117,26 @@ def historial_paginado(
     eps: Optional[str] = None,
     estado: Optional[str] = None,
     search: Optional[str] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    valor_min: Optional[float] = None,
+    valor_max: Optional[float] = None,
+    tipo: Optional[str] = None,
+    semaforo: Optional[str] = None,
+    workflow: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Historial con paginación y filtros (vista detallada IPS)"""
+    """Historial con paginación y filtros avanzados (vista detallada IPS)."""
     from app.main import _extraer_motivo_glosa
     repo = GlosaRepository(db)
-    resultado = repo.listar_paginado(page=page, per_page=per_page, eps=eps, estado=estado, search=search)
+    resultado = repo.listar_paginado(
+        page=page, per_page=per_page,
+        eps=eps, estado=estado, search=search,
+        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        valor_min=valor_min, valor_max=valor_max,
+        tipo=tipo, semaforo=semaforo, workflow=workflow,
+    )
 
     items = []
     for g in resultado["items"]:
@@ -160,6 +173,112 @@ def historial_paginado(
     }
 
 
+@router.get("/exportar-xlsx")
+def exportar_xlsx(
+    eps: Optional[str] = None,
+    estado: Optional[str] = None,
+    search: Optional[str] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    valor_min: Optional[float] = None,
+    valor_max: Optional[float] = None,
+    tipo: Optional[str] = None,
+    semaforo: Optional[str] = None,
+    workflow: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Exporta el historial filtrado a XLSX con las 13 columnas IPS + observación."""
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from fastapi.responses import StreamingResponse
+    from app.main import _extraer_motivo_glosa
+
+    repo = GlosaRepository(db)
+    glosas = repo.listar_para_export(
+        eps=eps, estado=estado, search=search,
+        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        valor_min=valor_min, valor_max=valor_max,
+        tipo=tipo, semaforo=semaforo, workflow=workflow,
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Historial Glosas HUS"
+
+    headers = [
+        "ID", "Fecha Creación", "EPS/Entidad", "Paciente", "Factura",
+        "Código Glosa", "Concepto", "CUPS", "Servicio",
+        "Valor Objetado", "Valor Aceptado", "Valor Recuperado",
+        "Código Respuesta", "Observación", "Etapa", "Estado",
+        "Workflow", "Semáforo", "Días Restantes",
+        "Fecha Recepción", "Fecha Entrega",
+    ]
+    ws.append(headers)
+
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="0B5D8A", end_color="0B5D8A", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    for g in glosas:
+        obs = _limpiar_observacion(g.dictamen)
+        recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
+        ws.append([
+            g.id,
+            g.creado_en.strftime("%Y-%m-%d %H:%M") if g.creado_en else "",
+            g.eps or "",
+            g.paciente or "",
+            g.factura or "",
+            g.codigo_glosa or "",
+            g.concepto_glosa or "",
+            g.cups_servicio or "",
+            g.servicio_descripcion or "",
+            float(g.valor_objetado or 0),
+            float(g.valor_aceptado or 0),
+            float(recuperado),
+            g.codigo_respuesta or "",
+            obs[:500] if obs else "",
+            g.etapa or "",
+            g.estado or "",
+            g.workflow_state or "",
+            g.prioridad or "",
+            g.dias_restantes if g.dias_restantes is not None else "",
+            g.fecha_recepcion.strftime("%Y-%m-%d") if g.fecha_recepcion else "",
+            g.fecha_entrega.strftime("%Y-%m-%d") if g.fecha_entrega else "",
+        ])
+
+    # Ajuste de anchos
+    widths = [6, 18, 22, 28, 14, 12, 26, 10, 32, 14, 14, 14, 12, 60, 14, 14, 14, 10, 10, 14, 14]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    # Registrar auditoría de la exportación
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="EXPORTAR_XLSX",
+        tabla="historial",
+        detalle=f"Registros exportados: {len(glosas)}",
+    )
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"historial_glosas_hus_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/alertas")
 def alertas(
     dias: int = 5,
@@ -189,6 +308,18 @@ def metrics(
 ):
     repo = GlosaRepository(db)
     return repo.metrics()
+
+
+@router.get("/analitica-predictiva")
+def analitica_predictiva(
+    ventana_dias: int = Query(180, ge=7, le=730),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Analítica agregada: top EPS, tasa de éxito por código/tipo,
+    distribución semanal y recomendaciones automáticas."""
+    repo = GlosaRepository(db)
+    return repo.analitica_predictiva(ventana_dias=ventana_dias)
 
 
 # Rutas estáticas (sin parámetros) ANTES que rutas dinámicas /{glosa_id}
@@ -248,6 +379,8 @@ def mis_asignaciones(
             "tipo_glosa_excel": g.tipo_glosa_excel,
             "profesional_medico": g.profesional_medico,
             "dictamen": g.dictamen,
+            "workflow_state": g.workflow_state or "BORRADOR",
+            "nota_workflow": g.nota_workflow,
         }
         for g in glosas
     ]
@@ -332,6 +465,101 @@ class DecisionEPSInput(BaseModel):
 
 class AsignarAuditorInput(BaseModel):
     auditor_email: str
+
+
+class WorkflowTransicionInput(BaseModel):
+    nuevo_estado: str  # BORRADOR | EN_REVISION | APROBADA | RADICADA
+    comentario: Optional[str] = None
+
+
+# Transiciones válidas del workflow (from_estado -> set(to_estado))
+_WORKFLOW_TRANSICIONES = {
+    "BORRADOR": {"EN_REVISION"},
+    "EN_REVISION": {"BORRADOR", "APROBADA"},
+    "APROBADA": {"RADICADA", "EN_REVISION"},
+    "RADICADA": set(),  # estado final
+}
+
+
+@router.patch("/{glosa_id}/workflow")
+def cambiar_workflow(
+    glosa_id: int,
+    data: WorkflowTransicionInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Cambia el estado del workflow de aprobación.
+
+    Transiciones permitidas:
+      BORRADOR -> EN_REVISION       (auditor solicita revisión)
+      EN_REVISION -> APROBADA       (coordinador/admin aprueba)
+      EN_REVISION -> BORRADOR       (coordinador devuelve para corregir)
+      APROBADA -> RADICADA          (una vez radicada ante la EPS)
+      APROBADA -> EN_REVISION       (se detecta algo para revisar)
+
+    Permisos:
+    - AUDITOR puede mover BORRADOR -> EN_REVISION de sus propias glosas.
+    - COORDINADOR y SUPER_ADMIN pueden hacer cualquier transición.
+    """
+    nuevo = data.nuevo_estado.upper().strip()
+    if nuevo not in {"BORRADOR", "EN_REVISION", "APROBADA", "RADICADA"}:
+        raise HTTPException(400, f"Estado inválido: {nuevo}")
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    actual = (glosa.workflow_state or "BORRADOR").upper()
+
+    # Si no existe transición desde el estado actual, inicializar como BORRADOR
+    if actual not in _WORKFLOW_TRANSICIONES:
+        actual = "BORRADOR"
+
+    if nuevo not in _WORKFLOW_TRANSICIONES.get(actual, set()):
+        raise HTTPException(
+            400,
+            f"Transición no permitida: {actual} -> {nuevo}. "
+            f"Desde {actual} solo puedes ir a: {sorted(_WORKFLOW_TRANSICIONES.get(actual, set())) or 'ninguno (estado final)'}",
+        )
+
+    # Validar permisos por transición
+    if current_user.rol == "AUDITOR":
+        # Auditor solo puede enviar a revisión sus glosas
+        if nuevo != "EN_REVISION" or actual != "BORRADOR":
+            raise HTTPException(403, "Como AUDITOR solo puedes enviar glosas propias a revisión")
+        if glosa.auditor_email and glosa.auditor_email != current_user.email:
+            # Si está asignada a otro auditor, no puede
+            raise HTTPException(403, "Esta glosa está asignada a otro auditor")
+    elif current_user.rol == "VIEWER":
+        raise HTTPException(403, "VIEWER no puede cambiar estados")
+
+    glosa.workflow_state = nuevo
+    if data.comentario:
+        nota = (glosa.nota_workflow or "")
+        nueva_nota = f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} {current_user.email} {actual}->{nuevo}] {data.comentario}"
+        glosa.nota_workflow = (nota + " | " + nueva_nota)[-500:] if nota else nueva_nota[:500]
+
+    db.commit()
+    db.refresh(glosa)
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="WORKFLOW",
+        tabla="historial",
+        registro_id=glosa_id,
+        campo="workflow_state",
+        valor_anterior=actual,
+        valor_nuevo=nuevo,
+        detalle=data.comentario or f"Transición {actual} -> {nuevo}",
+    )
+    return {
+        "message": "Workflow actualizado",
+        "glosa_id": glosa_id,
+        "estado_anterior": actual,
+        "estado_nuevo": nuevo,
+        "nota_workflow": glosa.nota_workflow,
+    }
 
 
 @router.patch("/{glosa_id}/decision-eps")
