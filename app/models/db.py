@@ -147,6 +147,9 @@ class UsuarioRecord(Base):
     rol = Column(String(50), default=ROL_AUDITOR)
     activo = Column(Integer, default=1)
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    # 2FA TOTP (obligatorio para SUPER_ADMIN cuando está configurado)
+    totp_secret = Column(String(64))
+    totp_activo = Column(Integer, default=0)
 
 
 class AuditLogRecord(Base):

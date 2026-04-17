@@ -594,7 +594,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     </div>
     <div class="login-field">
       <label>Contraseña</label>
-      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="login-field" id="login-totp-field" style="display:none">
+      <label>🔐 Código 2FA (6 dígitos)</label>
+      <input type="text" id="login-totp" placeholder="000 000" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <small style="font-size:.7rem;color:var(--text3);margin-top:3px;display:block">Abre tu app (Google Authenticator / Authy) y escribe el código</small>
     </div>
     <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar</button>
   </div>
@@ -1051,6 +1056,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <div class="usuarios-area">
         <div class="usuarios-form-col">
           <div class="form-card">
+            <h3>🔐 Mi seguridad <span>2FA</span></h3>
+            <div id="dos-fa-estado" style="font-size:.8rem;color:var(--text2);margin-bottom:.8rem">Cargando…</div>
+            <div id="dos-fa-acciones" style="display:flex;flex-direction:column;gap:.5rem"></div>
+            <div id="dos-fa-qr-box" style="display:none;margin-top:.8rem;text-align:center;background:var(--bg-subtle);padding:1rem;border-radius:8px">
+              <img id="dos-fa-qr" alt="QR 2FA" style="max-width:200px;display:block;margin:0 auto;background:white;padding:8px;border-radius:6px"/>
+              <p style="font-size:.72rem;color:var(--text3);margin:.5rem 0">Escanea con Google Authenticator, Authy o 1Password</p>
+              <input type="text" id="dos-fa-codigo" placeholder="Código de 6 dígitos" maxlength="6" style="padding:.45rem .7rem;font-size:.9rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);width:120px;text-align:center;letter-spacing:4px"/>
+              <button class="btn btn-primary btn-sm" onclick="activar2FA()" style="margin-left:.5rem">Activar</button>
+            </div>
+          </div>
+          <div class="form-card">
             <h3>Crear Usuario <span>Nuevo</span></h3>
             <div class="field"><label>Nombre completo</label><input type="text" id="u-nombre"/></div>
             <div class="field"><label>Correo electrónico</label><input type="email" id="u-email"/></div>
@@ -1332,17 +1348,29 @@ document.getElementById('login-pass').addEventListener('keydown',function(e){
 async function doLogin(){
   var email=document.getElementById('login-email').value.trim();
   var pass=document.getElementById('login-pass').value;
+  var totpEl = document.getElementById('login-totp');
+  var totp = totpEl ? totpEl.value.trim() : '';
   var btn=document.getElementById('btn-login');
   var err=document.getElementById('login-error');
   err.style.display='none';
   if(!email||!pass){err.textContent='Complete todos los campos';err.style.display='block';return;}
   btn.disabled=true;btn.textContent='Ingresando…';
   try{
-    var fd=new FormData();fd.append('username',email);fd.append('password',pass);
+    var fd=new FormData();
+    fd.append('username',email);
+    fd.append('password',pass);
+    if(totp) fd.append('totp', totp);
     var r=await fetch('/token',{method:'POST',body:fd});
     if(!r.ok){
       var d=await r.json().catch(function(){return{}});
-      err.textContent=d.detail||'Credenciales incorrectas';
+      // Si el servidor pide 2FA y el campo no estaba visible, mostrarlo
+      if(r.headers.get('X-2FA-Required') === 'true' || (d.detail||'').indexOf('2FA') > -1){
+        var field = document.getElementById('login-totp-field');
+        if(field){ field.style.display='block'; document.getElementById('login-totp').focus(); }
+        err.textContent = totp ? 'Código 2FA inválido' : 'Ingresa el código de 6 dígitos de tu app de autenticación';
+      } else {
+        err.textContent=d.detail||'Credenciales incorrectas';
+      }
       err.style.display='block';
     } else {
       var d=await r.json();
@@ -1428,6 +1456,87 @@ function tab(btn,id){
   if(id==='mis-glosas') loadMisGlosas();
   if(id==='gold') cargarPlantillasGold();
   if(id==='mi-desempeno') cargarMiDesempeno();
+  if(id==='usuarios') cargar2FAEstado();
+}
+
+async function cargar2FAEstado(){
+  var box = document.getElementById('dos-fa-estado');
+  var acc = document.getElementById('dos-fa-acciones');
+  if(!box || !acc) return;
+  try{
+    var r = await fetch('/2fa/estado', {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    if(d.activo){
+      box.innerHTML = '<span style="color:var(--c-green);font-weight:600">✓ 2FA activo</span> — Tu cuenta está protegida con código de 6 dígitos.';
+      acc.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="desactivar2FA()">Desactivar 2FA</button>';
+    } else if(d.configurado){
+      box.innerHTML = '<span style="color:#b45309">⚠️ 2FA configurado pero no activo</span> — Completa la activación escaneando el QR.';
+      acc.innerHTML = '<button class="btn btn-primary btn-sm" onclick="mostrarQR2FA()">Mostrar QR y activar</button>';
+    } else {
+      var msg = d.obligatorio_rol
+        ? '<span style="color:#b91c1c;font-weight:600">⚠️ SUPER_ADMIN sin 2FA.</span> Por seguridad institucional se recomienda activarlo.'
+        : 'Habilita 2FA para proteger tu cuenta con un código adicional cada login.';
+      box.innerHTML = msg;
+      acc.innerHTML = '<button class="btn btn-primary btn-sm" onclick="setup2FA()">Configurar 2FA</button>';
+    }
+  }catch(e){ console.error('2FA estado:', e); }
+}
+
+async function setup2FA(){
+  try{
+    var r = await fetch('/2fa/setup', {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(!r.ok){ toast('Error', d.detail||'No se pudo iniciar','error'); return; }
+    mostrarQR2FA();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+function mostrarQR2FA(){
+  var box = document.getElementById('dos-fa-qr-box');
+  var img = document.getElementById('dos-fa-qr');
+  // Añadir timestamp al src para bustear caché
+  img.src = '/2fa/qr?t=' + Date.now();
+  img.onload = function(){
+    // El navegador necesita el header Authorization; como <img> no lo manda,
+    // descargamos el blob con fetch y ponemos blob URL
+  };
+  // Fetch con auth
+  fetch('/2fa/qr', {headers: authH()})
+    .then(r => r.ok ? r.blob() : Promise.reject())
+    .then(blob => { img.src = URL.createObjectURL(blob); box.style.display='block'; document.getElementById('dos-fa-codigo').focus(); })
+    .catch(() => toast('Error','No se pudo cargar el QR','error'));
+}
+
+async function activar2FA(){
+  var codigo = (document.getElementById('dos-fa-codigo').value||'').replace(/\s/g,'');
+  if(codigo.length !== 6){ toast('Código inválido','Debe ser de 6 dígitos','warning'); return; }
+  try{
+    var r = await fetch('/2fa/activar', {
+      method:'POST', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({codigo: codigo})
+    });
+    var d = await r.json();
+    if(r.ok){
+      toast('2FA activado','Tu cuenta está protegida ✓','success');
+      document.getElementById('dos-fa-qr-box').style.display='none';
+      cargar2FAEstado();
+    } else { toast('Error', d.detail||'Código inválido','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function desactivar2FA(){
+  var codigo = prompt('Ingresa tu código actual de 6 dígitos para desactivar 2FA:');
+  if(!codigo || codigo.length !== 6) return;
+  try{
+    var r = await fetch('/2fa/desactivar', {
+      method:'POST', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({codigo: codigo})
+    });
+    var d = await r.json();
+    if(r.ok){ toast('2FA desactivado','—','success'); cargar2FAEstado(); }
+    else { toast('Error', d.detail||'Código inválido','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function cargarMiDesempeno(){

@@ -385,6 +385,24 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
 
+    # Migraciones para usuarios - 2FA TOTP
+    _USUARIOS_MISSING_2FA = [
+        ("totp_secret", "VARCHAR(64)"),
+        ("totp_activo", "INTEGER DEFAULT 0"),
+    ]
+    for col_name, col_ddl in _USUARIOS_MISSING_2FA:
+        try:
+            result = db.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='usuarios' AND column_name=:col"
+            ), {"col": col_name})
+            if not result.fetchone():
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a usuarios")
+                db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
+
     # Migraciones para conciliaciones - trazabilidad bilateral
     _CONCILIACION_MISSING = [
         ("contra_respuesta_eps", "TEXT"),
@@ -577,6 +595,7 @@ from app.api.routers.comentarios import router as comentarios_router
 from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
+from app.api.routers.dos_fa import router as dos_fa_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -599,6 +618,7 @@ app.include_router(comentarios_router)
 app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
 app.include_router(busqueda_semantica_router)
+app.include_router(dos_fa_router)
 
 
 def get_glosa_service() -> GlosaService:
