@@ -43,24 +43,41 @@ def historial(
     db:    Session        = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
+    """Historial detallado con todos los campos relevantes para vista IPS."""
     repo = GlosaRepository(db)
     glosas = repo.listar(limit=limit, eps=eps)
-    return [
-        {
+    items = []
+    for g in glosas:
+        # Obtener texto limpio (sin HTML) del dictamen para columna OBSERVACIÓN
+        from html import unescape
+        import re as _re
+        obs_texto = _re.sub(r"<[^>]+>", " ", g.dictamen or "")
+        obs_texto = _re.sub(r"\s+", " ", unescape(obs_texto)).strip()
+        items.append({
             "id": g.id,
-            "eps": g.eps,
+            "fecha": g.creado_en.isoformat() if g.creado_en else None,
+            "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
+            "entidad": g.eps,
+            "eps": g.eps,  # alias para compatibilidad
             "paciente": g.paciente,
+            "factura": g.factura,
             "codigo_glosa": g.codigo_glosa,
+            "concepto_glosa": g.concepto_glosa,
+            "cups": g.cups_servicio,
+            "servicio": g.servicio_descripcion,
             "valor_objetado": g.valor_objetado,
             "valor_aceptado": g.valor_aceptado,
+            "glosa_original": g.texto_glosa_original,
+            "codigo_respuesta": g.codigo_respuesta,
+            "observacion": obs_texto,
             "etapa": g.etapa,
             "estado": g.estado,
             "dictamen": g.dictamen,
             "dias_restantes": g.dias_restantes,
             "creado_en": g.creado_en.isoformat() if g.creado_en else None,
-        }
-        for g in glosas
-    ]
+        })
+    return items
 
 
 @router.get("/historial-paginado")
@@ -73,26 +90,41 @@ def historial_paginado(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Historial con paginación y filtros"""
+    """Historial con paginación y filtros (vista detallada IPS)"""
+    from html import unescape
+    import re as _re
     repo = GlosaRepository(db)
     resultado = repo.listar_paginado(page=page, per_page=per_page, eps=eps, estado=estado, search=search)
-    
+
+    items = []
+    for g in resultado["items"]:
+        obs_texto = _re.sub(r"<[^>]+>", " ", g.dictamen or "")
+        obs_texto = _re.sub(r"\s+", " ", unescape(obs_texto)).strip()
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "entidad": g.eps,
+            "paciente": g.paciente,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "concepto_glosa": g.concepto_glosa,
+            "cups": g.cups_servicio,
+            "servicio": g.servicio_descripcion,
+            "valor_objetado": g.valor_objetado,
+            "valor_aceptado": g.valor_aceptado,
+            "glosa_original": g.texto_glosa_original,
+            "codigo_respuesta": g.codigo_respuesta,
+            "observacion": obs_texto,
+            "etapa": g.etapa,
+            "estado": g.estado,
+            "dias_restantes": g.dias_restantes,
+            "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
+            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+        })
+
     return {
-        "items": [
-            {
-                "id": g.id,
-                "eps": g.eps,
-                "paciente": g.paciente,
-                "codigo_glosa": g.codigo_glosa,
-                "valor_objetado": g.valor_objetado,
-                "valor_aceptado": g.valor_aceptado,
-                "etapa": g.etapa,
-                "estado": g.estado,
-                "dias_restantes": g.dias_restantes,
-                "creado_en": g.creado_en.isoformat() if g.creado_en else None,
-            }
-            for g in resultado["items"]
-        ],
+        "items": items,
         "total": resultado["total"],
         "page": resultado["page"],
         "per_page": resultado["per_page"],

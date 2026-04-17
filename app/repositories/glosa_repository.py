@@ -27,6 +27,13 @@ class GlosaRepository:
         prioridad: Optional[str] = "BAJA",
         numero_radicado: Optional[str] = None,
         factura: Optional[str] = None,
+        texto_glosa_original: Optional[str] = None,
+        codigo_respuesta: Optional[str] = None,
+        cups_servicio: Optional[str] = None,
+        servicio_descripcion: Optional[str] = None,
+        concepto_glosa: Optional[str] = None,
+        fecha_recepcion=None,
+        fecha_entrega=None,
     ) -> GlosaRecord:
         record = GlosaRecord(
             eps=eps,
@@ -45,6 +52,13 @@ class GlosaRepository:
             prioridad=prioridad,
             numero_radicado=numero_radicado,
             factura=factura,
+            texto_glosa_original=texto_glosa_original,
+            codigo_respuesta=codigo_respuesta,
+            cups_servicio=cups_servicio,
+            servicio_descripcion=servicio_descripcion,
+            concepto_glosa=concepto_glosa,
+            fecha_recepcion=fecha_recepcion,
+            fecha_entrega=fecha_entrega,
         )
         self.db.add(record)
         self.db.commit()

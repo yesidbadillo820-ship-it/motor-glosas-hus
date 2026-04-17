@@ -54,6 +54,13 @@ class GlosaRecord(Base):
     tipo_glosa_excel = Column(String(50))
     profesional_medico = Column(String(200))
 
+    # Campos para historial detallado (vista IPS estilo Excel)
+    texto_glosa_original = Column(Text)   # tabla_excel o input original del formulario
+    codigo_respuesta = Column(String(20)) # RE9901, RE9502, RE9801, RE9702, RE9602
+    cups_servicio = Column(String(50))    # CUPS extraído del servicio glosado
+    servicio_descripcion = Column(String(400))  # Descripción del servicio/procedimiento
+    concepto_glosa = Column(Text)         # Descripción oficial del código de glosa
+
     __table_args__ = (
         Index("ix_historial_alertas", "dias_restantes", "estado"),
         Index("ix_historial_auditor", "auditor_email"),
