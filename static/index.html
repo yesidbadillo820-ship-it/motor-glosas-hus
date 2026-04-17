@@ -767,13 +767,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               <div class="analitica-title">Analítica predictiva</div>
               <div class="analitica-sub">Recomendaciones automáticas a partir de los últimos <span id="ap-ventana-lbl">180</span> días</div>
             </div>
-            <select id="ap-ventana" onchange="cargarAnaliticaPredictiva()" class="ap-select">
-              <option value="30">30 días</option>
-              <option value="90">90 días</option>
-              <option value="180" selected>180 días</option>
-              <option value="365">365 días</option>
-              <option value="730">2 años</option>
-            </select>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <button class="btn btn-ghost" onclick="generarInformeEjecutivo()" title="Informe ejecutivo PDF del mes actual">📊 Informe ejecutivo</button>
+              <select id="ap-ventana" onchange="cargarAnaliticaPredictiva()" class="ap-select">
+                <option value="30">30 días</option>
+                <option value="90">90 días</option>
+                <option value="180" selected>180 días</option>
+                <option value="365">365 días</option>
+                <option value="730">2 años</option>
+              </select>
+            </div>
           </div>
 
           <div id="ap-recos" class="ap-recos"></div>
@@ -2113,6 +2116,21 @@ async function loadDash(){
     cargarAnaliticaPredictiva();
 
   } catch(e){console.error('Dashboard error',e);}
+}
+
+async function generarInformeEjecutivo(){
+  var now = new Date();
+  var year = prompt('Año del informe:', now.getFullYear());
+  if(!year) return;
+  var month = prompt('Mes (1-12):', now.getMonth()+1);
+  if(!month) return;
+  try{
+    var r = await fetch('/informes/ejecutivo-mensual?year='+year+'&month='+month, {headers: authH()});
+    if(!r.ok){ toast('Error','No se pudo generar','error'); return; }
+    var html = await r.text();
+    var w = window.open('', '_blank', 'width=980,height=820');
+    w.document.write(html); w.document.close();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function cargarAnaliticaPredictiva(){
