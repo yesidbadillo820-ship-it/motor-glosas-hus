@@ -339,6 +339,29 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .thread-resuelto-lbl{margin-top:.35rem;font-size:.68rem;color:var(--c-green);font-style:italic}
 .thread-compose{display:flex;gap:.5rem;margin-top:.7rem;align-items:flex-end}
 .thread-compose textarea{flex:1;padding:.55rem .7rem;font-size:.82rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text);resize:vertical;font-family:inherit}
+.md-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin:1rem 0}
+.md-kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;position:relative;overflow:hidden}
+.md-kpi::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,var(--c-teal),var(--c-teal2))}
+.md-lbl{font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.md-num{font-size:1.5rem;font-weight:700;color:var(--text);margin-top:.35rem}
+.md-num.c-green{color:#047857}
+.md-sub{font-size:.7rem;color:var(--text3);margin-top:2px}
+.md-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+.md-logros{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem}
+.md-logro{display:flex;gap:.6rem;padding:.7rem .85rem;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fcd34d;border-radius:10px;align-items:center}
+.md-logro-icon{font-size:1.6rem}
+.md-logro-body b{display:block;color:#92400e;font-size:.8rem}
+.md-logro-body span{font-size:.7rem;color:#78350f}
+.md-alerta{padding:.6rem 1rem;border-radius:8px;margin:.4rem 0;font-size:.82rem}
+.md-alerta.critico{background:#fef2f2;border-left:4px solid #b91c1c;color:#991b1b}
+.md-alerta.alto{background:#fffbeb;border-left:4px solid #d97706;color:#92400e}
+.md-alerta.info{background:#eff6ff;border-left:4px solid #1d4ed8;color:#1e40af}
+.md-ranking-me{background:rgba(13,148,136,.14);font-weight:600}
+.md-bar{display:flex;align-items:center;gap:.6rem;padding:.4rem .1rem;font-size:.82rem}
+.md-bar-fill{flex:1;height:14px;background:var(--bg-subtle);border-radius:4px;overflow:hidden;position:relative}
+.md-bar-fill > span{display:block;height:100%;border-radius:4px}
+.md-bar-num{min-width:36px;text-align:right;font-weight:600;font-family:var(--font-mono);color:var(--text)}
+@media(max-width:1100px){.md-kpis{grid-template-columns:repeat(2,1fr)}.md-grid{grid-template-columns:1fr}.md-logros{grid-template-columns:1fr}}
 .gold-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;padding:1rem 0}
 .gold-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.55rem;transition:all .15s;position:relative;overflow:hidden}
 .gold-card::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,#f59e0b,#fbbf24)}
@@ -612,6 +635,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
         </button>
+        <button class="sn-item" data-tip="Mi desempeño" onclick="sidebarTab(this,'mi-desempeno')">
+          <svg class="i i-md" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span class="sn-item-label">Mi desempeño</span>
+        </button>
         <button class="sn-item" data-tip="Mis glosas" onclick="sidebarTab(this,'mis-glosas')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H7A2 2 0 0 0 5 13V20A2 2 0 0 0 7 22H17A2 2 0 0 0 19 20V13A2 2 0 0 0 17 11H15"/><path d="M9 11V7A3 3 0 0 1 15 7V11"/><path d="M9 16H15"/></svg>
           <span class="sn-item-label">Mis glosas</span>
@@ -805,6 +832,56 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
     <!-- HISTORIAL -->
     <!-- MIS GLOSAS -->
+    <!-- MI DESEMPEÑO -->
+    <div class="panel" id="p-mi-desempeno">
+      <div class="page-pad">
+        <div class="page-head">
+          <div>
+            <h2 class="page-title">🏆 Mi desempeño</h2>
+            <p class="page-sub" id="md-saludo">KPIs personales, logros y ranking del equipo</p>
+          </div>
+          <div class="page-actions toolbar-inline">
+            <select id="md-ventana" onchange="cargarMiDesempeno()" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text);font-size:.82rem">
+              <option value="7">Últimos 7 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+              <option value="180">Últimos 180 días</option>
+              <option value="365">Último año</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="md-alertas"></div>
+
+        <div class="md-kpis" id="md-kpis">
+          <div class="md-kpi"><div class="md-lbl">Mis glosas</div><div class="md-num" id="mk-total">—</div></div>
+          <div class="md-kpi"><div class="md-lbl">Valor recuperado</div><div class="md-num c-green" id="mk-rec">—</div></div>
+          <div class="md-kpi"><div class="md-lbl">Tasa de éxito</div><div class="md-num" id="mk-tasa">—</div></div>
+          <div class="md-kpi"><div class="md-lbl">Racha 🔥</div><div class="md-num" id="mk-racha">—</div><div class="md-sub">días consecutivos</div></div>
+          <div class="md-kpi"><div class="md-lbl">Mi posición</div><div class="md-num" id="mk-pos">—</div><div class="md-sub">en el ranking</div></div>
+        </div>
+
+        <div class="md-grid">
+          <div class="chart-card">
+            <div class="chart-hdr">Logros desbloqueados</div>
+            <div class="md-logros" id="md-logros"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">Ranking del equipo</div>
+            <div class="ap-tbl-wrap"><table class="ap-tbl" id="md-ranking"></table></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">Mis glosas por workflow</div>
+            <div id="md-wf"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">Mi semáforo</div>
+            <div id="md-sem"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="p-mis-glosas">
       <div class="page-pad">
         <div class="page-head">
@@ -1334,6 +1411,85 @@ function tab(btn,id){
   if(id==='audit') loadAudit(1);
   if(id==='mis-glosas') loadMisGlosas();
   if(id==='gold') cargarPlantillasGold();
+  if(id==='mi-desempeno') cargarMiDesempeno();
+}
+
+async function cargarMiDesempeno(){
+  var ventana = (document.getElementById('md-ventana')||{value:30}).value || 30;
+  try{
+    var r = await fetch('/mi-desempeno/?ventana_dias='+ventana, {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    document.getElementById('md-saludo').textContent = 'Hola ' + (d.usuario.nombre||'') + ' · Últimos ' + d.ventana_dias + ' días';
+    document.getElementById('mk-total').textContent = d.kpis.total_glosas.toLocaleString('es-CO');
+    document.getElementById('mk-rec').textContent = cop(d.kpis.valor_recuperado);
+    document.getElementById('mk-tasa').textContent = d.kpis.tasa_exito + '%';
+    document.getElementById('mk-racha').textContent = d.racha_dias;
+    document.getElementById('mk-pos').textContent = d.ranking.mi_posicion ? '#'+d.ranking.mi_posicion+' / '+d.ranking.total_participantes : '—';
+
+    // Alertas
+    var alertasBox = document.getElementById('md-alertas');
+    if(d.alertas && d.alertas.length){
+      alertasBox.innerHTML = d.alertas.map(function(a){
+        return '<div class="md-alerta ' + a.nivel + '">' + escHtml(a.msg) + '</div>';
+      }).join('');
+    } else { alertasBox.innerHTML = ''; }
+
+    // Logros
+    var logrosBox = document.getElementById('md-logros');
+    if(d.logros && d.logros.length){
+      logrosBox.innerHTML = d.logros.map(function(l){
+        return '<div class="md-logro"><div class="md-logro-icon">'+l.icono+'</div>' +
+          '<div class="md-logro-body"><b>'+escHtml(l.nombre)+'</b><span>'+escHtml(l.desc)+'</span></div></div>';
+      }).join('');
+    } else {
+      logrosBox.innerHTML = '<div style="color:var(--text3);font-size:.8rem;padding:1rem;text-align:center">Procesa más glosas para desbloquear logros 🚀</div>';
+    }
+
+    // Ranking
+    var rk = document.getElementById('md-ranking');
+    var topList = (d.ranking.top_5 || []);
+    if(topList.length){
+      var head = '<thead><tr><th>#</th><th>Gestor</th><th class="num">Glosas</th><th class="num">Recup.</th><th class="num">Éxito</th></tr></thead>';
+      var body = '<tbody>' + topList.map(function(r, i){
+        var esMio = r.email === d.usuario.email;
+        return '<tr class="'+(esMio?'md-ranking-me':'')+'">' +
+          '<td>'+(i+1)+'</td>' +
+          '<td>'+escHtml(r.nombre)+(esMio?' <b>(tú)</b>':'')+'</td>' +
+          '<td class="num">'+r.glosas+'</td>' +
+          '<td class="num">'+cop(r.recuperado)+'</td>' +
+          '<td class="num">'+r.tasa_exito+'%</td>' +
+        '</tr>';
+      }).join('') + '</tbody>';
+      rk.innerHTML = head + body;
+    } else {
+      rk.innerHTML = '<tr><td style="color:var(--text3);padding:1rem;text-align:center">Sin datos</td></tr>';
+    }
+
+    // Workflow bars
+    var wfBox = document.getElementById('md-wf');
+    var wfColors = {BORRADOR:'#6b7280', EN_REVISION:'#d97706', APROBADA:'#047857', RADICADA:'#1d4ed8'};
+    var wfTotal = Object.values(d.por_workflow).reduce(function(a,b){return a+b;}, 0) || 1;
+    wfBox.innerHTML = Object.keys(d.por_workflow).map(function(k){
+      var v = d.por_workflow[k] || 0;
+      var pct = (v / wfTotal * 100);
+      return '<div class="md-bar"><span style="min-width:90px;font-size:.72rem;color:var(--text2)">'+k.replace('_',' ')+'</span>' +
+        '<div class="md-bar-fill"><span style="width:'+pct+'%;background:'+wfColors[k]+'"></span></div>' +
+        '<span class="md-bar-num">'+v+'</span></div>';
+    }).join('');
+
+    // Semáforo bars
+    var semBox = document.getElementById('md-sem');
+    var semColors = {VERDE:'#047857', AMARILLO:'#d97706', ROJO:'#b91c1c', NEGRO:'#111827'};
+    var semTotal = Object.values(d.semaforo).reduce(function(a,b){return a+b;}, 0) || 1;
+    semBox.innerHTML = Object.keys(d.semaforo).map(function(k){
+      var v = d.semaforo[k] || 0;
+      var pct = (v / semTotal * 100);
+      return '<div class="md-bar"><span style="min-width:90px;font-size:.72rem;color:var(--text2)">'+k+'</span>' +
+        '<div class="md-bar-fill"><span style="width:'+pct+'%;background:'+semColors[k]+'"></span></div>' +
+        '<span class="md-bar-num">'+v+'</span></div>';
+    }).join('');
+  }catch(e){ console.error('mi-desempeno:', e); }
 }
 
 // Sidebar: activa el item, sincroniza con tab() y en mobile cierra el drawer
