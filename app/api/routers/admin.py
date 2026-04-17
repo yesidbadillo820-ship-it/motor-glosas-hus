@@ -115,3 +115,82 @@ def estadisticas_admin(
         "conciliaciones": db.query(ConciliacionRecord).count(),
         "audit_log": db.query(AuditLogRecord).count(),
     }
+
+
+@router.post("/backfill-historial")
+def backfill_historial(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Rellena los campos nuevos (cups_servicio, servicio_descripcion,
+    concepto_glosa, codigo_respuesta, texto_glosa_original) en glosas
+    antiguas que fueron creadas antes de que existieran esas columnas.
+
+    Solo toca glosas con al menos UN campo nuevo vacío. No modifica el
+    dictamen ni los valores monetarios. Solo SUPER_ADMIN.
+    """
+    import re
+    from app.main import _concepto_glosa, _extraer_cups_servicio
+
+    # Query: glosas con al menos un campo nuevo en NULL
+    glosas = db.query(GlosaRecord).filter(
+        (GlosaRecord.concepto_glosa.is_(None)) |
+        (GlosaRecord.codigo_respuesta.is_(None)) |
+        (GlosaRecord.cups_servicio.is_(None)) |
+        (GlosaRecord.servicio_descripcion.is_(None))
+    ).all()
+
+    actualizadas = 0
+    for g in glosas:
+        cambios = False
+
+        # 1. Concepto por código (siempre derivable si hay código)
+        if not g.concepto_glosa and g.codigo_glosa:
+            g.concepto_glosa = _concepto_glosa(g.codigo_glosa)
+            cambios = True
+
+        # 2. CUPS y servicio desde el texto_glosa_original o desde el dictamen
+        if (not g.cups_servicio or not g.servicio_descripcion):
+            fuente = g.texto_glosa_original or ""
+            if not fuente and g.dictamen:
+                # Del dictamen HTML quitamos tags y tomamos texto
+                fuente = re.sub(r"<[^>]+>", " ", g.dictamen)
+            cups, servicio = _extraer_cups_servicio(fuente, "")
+            if not g.cups_servicio and cups:
+                g.cups_servicio = cups
+                cambios = True
+            if not g.servicio_descripcion and servicio:
+                g.servicio_descripcion = servicio[:400]
+                cambios = True
+
+        # 3. Código de respuesta: extraer del dictamen (ej. "RE9901") o de un
+        #    tipo guardado ("RESPUESTA RE9901")
+        if not g.codigo_respuesta and g.dictamen:
+            m = re.search(r"\bRE\d{4}\b", g.dictamen)
+            if m:
+                g.codigo_respuesta = m.group(0)
+                cambios = True
+
+        if cambios:
+            actualizadas += 1
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al guardar backfill: {e}")
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="BACKFILL_HISTORIAL",
+        tabla="historial",
+        detalle=f"Glosas actualizadas: {actualizadas} de {len(glosas)} con campos nulos",
+    )
+
+    return {
+        "message": "Backfill completado",
+        "glosas_con_campos_nulos": len(glosas),
+        "glosas_actualizadas": actualizadas,
+        "ejecutado_por": current_user.email,
+    }

@@ -766,8 +766,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               Esta acción <b>no se puede deshacer</b>.
             </p>
             <div id="admin-stats" style="font-size:.75rem;color:#78350f;background:#fef3c7;padding:.6rem .8rem;border-radius:6px;margin-bottom:.75rem;display:none"></div>
-            <button class="btn-sm ghost" style="border-color:#fecaca;color:#b91c1c" onclick="cargarEstadisticasAdmin()">Ver conteos actuales</button>
-            <button class="btn-sm" style="background:#dc2626;margin-left:.5rem" onclick="resetDatos()">Borrar datos transaccionales</button>
+
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem">
+              <button class="btn-sm ghost" style="border-color:#fecaca;color:#b91c1c" onclick="cargarEstadisticasAdmin()">Ver conteos</button>
+              <button class="btn-sm" style="background:#0284c7" onclick="backfillHistorial()">Rellenar datos antiguos</button>
+              <button class="btn-sm" style="background:#dc2626" onclick="resetDatos()">Borrar todo</button>
+            </div>
+            <p style="font-size:.7rem;color:#7f1d1d;line-height:1.4;margin:0">
+              <b>Rellenar datos antiguos</b>: completa CUPS, servicio, concepto y
+              código de respuesta en glosas creadas antes del último deploy.
+              No modifica dictámenes ni valores.
+            </p>
           </div>
         </div>
         <div class="usuarios-list-col">
@@ -2012,6 +2021,32 @@ async function cargarEstadisticasAdmin(){
       'Conciliaciones: ' + d.conciliaciones + ' · ' +
       'Audit log: ' + d.audit_log;
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function backfillHistorial(){
+  if(!confirm('Vas a recorrer TODAS las glosas existentes y completar los campos vacíos (CUPS, servicio, concepto, código respuesta).\n\nNo borra ni modifica valores monetarios ni dictámenes existentes.\n\n¿Continuar?')) return;
+  showLoading('Rellenando datos antiguos…');
+  try{
+    var r = await fetch('/admin/backfill-historial', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type': 'application/json'},
+    });
+    var d = await r.json();
+    hideLoading();
+    if(r.ok){
+      toast('Backfill completado',
+        'Glosas actualizadas: ' + (d.glosas_actualizadas||0) +
+        ' de ' + (d.glosas_con_campos_nulos||0) + ' con campos nulos',
+        'success');
+      if(typeof loadHist === 'function') loadHist(1);
+      cargarEstadisticasAdmin();
+    } else {
+      toast('Error', d.detail || 'No se pudo completar el backfill', 'error');
+    }
+  }catch(e){
+    hideLoading();
+    toast('Error','Conexión: '+e.message,'error');
+  }
 }
 
 async function resetDatos(){
