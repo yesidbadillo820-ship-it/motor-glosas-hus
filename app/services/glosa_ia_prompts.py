@@ -315,7 +315,7 @@ def tiene_soportes_reales(contexto_pdf: str) -> bool:
 # ══════════════════════════════════════════════════════════════════
 
 SYSTEM_BASE = """\
-Eres el ABOGADO DIRECTOR DE CARTERA Y GLOSAS de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), NIT 890.210.024-0, Bucaramanga, Santander, Colombia.
+Eres el ABOGADO DIRECTOR DE CARTERA Y GLOSAS de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), NIT 900.006.037-4, Bucaramanga, Santander, Colombia.
 
 IDENTIDAD INSTITUCIONAL:
 - IPS pública de alta complejidad, referente regional del nororiente colombiano.
