@@ -261,7 +261,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 
 .res-dictamen{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
 .res-dictamen-hdr{padding:.85rem 1.25rem;background:var(--c-navy);color:#fff;display:flex;align-items:center;justify-content:space-between;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
-.res-dictamen-body{padding:1.25rem;max-height:480px;overflow-y:auto;font-size:.8rem;line-height:2;color:var(--text2)}
+.res-dictamen-body{padding:1.25rem;font-size:.8rem;line-height:2;color:var(--text2)}
 .res-actions{display:flex;gap:.6rem;flex-wrap:wrap}
 
 /* ─── DASHBOARD (sobrio, mono-color con jerarquía) ──────────────────────────── */
@@ -1753,7 +1753,12 @@ async function aplicarRefinarInline(){
     if(!r.ok){ st.className='refinar-status err'; st.textContent='Error: '+(d.detail||'no se pudo refinar'); return; }
     // Reemplazar el dictamen en pantalla con la versión refinada
     var body = document.getElementById('res-dictamen-body');
-    if(body) body.innerHTML = d.dictamen_html;
+    if(body){
+      body.innerHTML = d.dictamen_html;
+      // Deseleccionar cualquier texto y llevar la vista al inicio del dictamen
+      if(window.getSelection) window.getSelection().removeAllRanges();
+      body.scrollIntoView({behavior:'smooth', block:'start'});
+    }
     st.className = 'refinar-status ok';
     st.textContent = guardar ? 'Refinado y guardado ✓' : 'Refinado (no guardado)';
     if(lastResult) lastResult.dictamen = d.dictamen_html;
