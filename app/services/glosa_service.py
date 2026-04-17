@@ -529,6 +529,55 @@ class GlosaService:
             <b>Nota:</b> Generado con asistencia de IA. Verificar antes de radicar ante la EPS.
         </div>"""
 
+    async def refinar_dictamen(
+        self,
+        dictamen_actual_html: str,
+        mensaje_usuario: str,
+        eps: str = "",
+        codigo: str = "",
+    ) -> str:
+        """Refina el dictamen existente según instrucciones del auditor.
+
+        Retorna el nuevo argumento (texto plano con <br/> para saltos),
+        listo para reemplazar la sección <div>…ARGUMENTACIÓN JURÍDICA…</div>.
+        """
+        # Extraer solo el argumento jurídico del HTML para no marear a la IA
+        import re as _re
+        from html import unescape
+        txt = _re.sub(r"<[^>]+>", " ", dictamen_actual_html or "")
+        txt = _re.sub(r"\s+", " ", unescape(txt)).strip()
+        for marker in ("ARGUMENTACIÓN JURÍDICA", "RESPUESTA A GLOSA"):
+            if marker in txt and len(txt.split(marker, 1)[0]) < 500:
+                txt = txt.split(marker, 1)[1].strip()
+                break
+        for cierre in ("Nota: Generado con asistencia", "RESUMEN DE VALORES"):
+            if cierre in txt:
+                txt = txt.split(cierre)[0].strip()
+
+        system = (
+            "Eres un auditor médico senior de la ESE Hospital Universitario de Santander (HUS). "
+            "Refinas argumentos técnico-jurídicos de respuesta a glosas conservando el estilo "
+            "mayúsculas-formal y las citas normativas colombianas (Ley 100/1993, Ley 1438/2011, "
+            "Res. 3047/2008, etc.). Responde SOLO con el texto refinado, sin preámbulos, sin "
+            "comillas, sin etiquetas XML. Mantén mayúsculas y saltos de línea donde convenga."
+        )
+        user = (
+            f"EPS: {eps}\nCÓDIGO: {codigo}\n\n"
+            f"ARGUMENTO ACTUAL:\n{txt}\n\n"
+            f"INSTRUCCIÓN DEL AUDITOR:\n{mensaje_usuario.strip()}\n\n"
+            "Devuelve el ARGUMENTO REFINADO completo según la instrucción. "
+            "No expliques qué cambiaste, solo escribe el texto final."
+        )
+        if not self.groq:
+            return txt  # sin IA disponible → devolver original
+
+        content, _modelo = await self._llamar_groq_con_retry(system, user, max_intentos=3)
+        # Limpiar mínimamente
+        out = content.strip()
+        # Eliminar cierres XML si la IA los metió por hábito
+        out = _re.sub(r"</?(argumento|answer|response)>", "", out, flags=_re.IGNORECASE).strip()
+        return _expandir_abreviaturas_tipo(out)
+
     async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 4) -> tuple[str, str]:
         """Llama a Groq con retry exponencial para manejar rate limits y timeouts."""
         ultimo_error: Exception = Exception("Groq: sin intentos")

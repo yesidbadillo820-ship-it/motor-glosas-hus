@@ -34,6 +34,16 @@ class ImportacionMasivaRequest(BaseModel):
     fecha_recepcion: Optional[str] = None
 
 
+class GenerarLoteRequest(BaseModel):
+    glosa_ids: list[int]
+    sobrescribir: bool = False  # si True regenera aunque ya tenga dictamen
+
+
+class RefinarRequest(BaseModel):
+    mensaje: str
+    guardar: bool = False  # si True persiste el dictamen refinado en la BD
+
+
 def _limpiar_observacion(dictamen_html: str) -> str:
     """Extrae solo el texto del argumento jurídico del dictamen, quitando la
     tabla superior (código/valor/respuesta), los badges, la tabla de resumen
@@ -277,6 +287,179 @@ def exportar_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/generar-lote")
+async def generar_lote(
+    data: GenerarLoteRequest,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Genera respuestas IA en lote para varias glosas pendientes.
+
+    Toma las glosas por ID, reconstruye el input a partir de los campos
+    guardados (texto_glosa_original, eps, etapa, fechas, factura) y llama
+    al servicio para producir el dictamen. Las glosas que ya tienen
+    dictamen se saltan salvo que `sobrescribir=True`.
+
+    Ejecuta hasta 5 en paralelo con `asyncio.Semaphore` para no saturar Groq.
+    """
+    import asyncio
+    from app.models.schemas import GlosaInput
+
+    if not data.glosa_ids:
+        raise HTTPException(400, "Lista de IDs vacía")
+    if len(data.glosa_ids) > 50:
+        raise HTTPException(400, "Máximo 50 glosas por lote")
+
+    repo = GlosaRepository(db)
+    contratos = ContratoRepository(db).como_dict()
+
+    cfg = get_settings()
+    service = GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+    )
+
+    sem = asyncio.Semaphore(5)
+    resumen = {
+        "total": len(data.glosa_ids),
+        "procesadas": 0,
+        "saltadas": 0,
+        "fallidas": 0,
+        "detalle_fallidas": [],
+    }
+
+    async def _procesar_una(gid: int):
+        async with sem:
+            g = repo.obtener_por_id(gid)
+            if not g:
+                resumen["fallidas"] += 1
+                resumen["detalle_fallidas"].append({"id": gid, "error": "no encontrada"})
+                return
+            if g.dictamen and not data.sobrescribir:
+                resumen["saltadas"] += 1
+                return
+            # Construir input desde los campos del registro
+            texto = g.texto_glosa_original or ""
+            if not texto and g.codigo_glosa:
+                # Fallback mínimo si no hay texto original
+                texto = f"{g.codigo_glosa} $ {int(g.valor_objetado or 0):,} {g.concepto_glosa or ''}".strip()
+            if not texto:
+                resumen["fallidas"] += 1
+                resumen["detalle_fallidas"].append({"id": gid, "error": "sin texto_glosa_original"})
+                return
+            try:
+                gi = GlosaInput(
+                    eps=g.eps or "SIN DEFINIR",
+                    etapa=g.etapa or "RESPUESTA A GLOSA",
+                    fecha_radicacion=g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,
+                    fecha_recepcion=g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+                    valor_aceptado=str(int(g.valor_aceptado or 0)),
+                    tabla_excel=texto,
+                    numero_factura=g.factura,
+                    numero_radicado=g.numero_radicado,
+                )
+                res = await service.analizar(gi, contexto_pdf="", contratos_db=contratos)
+                g.dictamen = res.dictamen
+                g.score = res.score
+                g.modelo_ia = res.modelo_ia
+                if not g.codigo_respuesta:
+                    g.codigo_respuesta = res.tipo.replace("RESPUESTA ", "").strip() or None
+                db.commit()
+                resumen["procesadas"] += 1
+            except Exception as e:
+                resumen["fallidas"] += 1
+                resumen["detalle_fallidas"].append({"id": gid, "error": str(e)[:200]})
+                logger.error(f"Lote: falló glosa {gid}: {e}")
+
+    await asyncio.gather(*[_procesar_una(gid) for gid in data.glosa_ids])
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="GENERAR_LOTE",
+        tabla="historial",
+        detalle=(
+            f"total={resumen['total']} procesadas={resumen['procesadas']} "
+            f"saltadas={resumen['saltadas']} fallidas={resumen['fallidas']}"
+        ),
+    )
+    return resumen
+
+
+@router.post("/{glosa_id}/refinar")
+async def refinar_dictamen_endpoint(
+    glosa_id: int,
+    data: RefinarRequest,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Refina el dictamen de una glosa con instrucciones en lenguaje natural.
+
+    Si `guardar=true`, reemplaza el argumento dentro del HTML actual y persiste.
+    Si no, solo devuelve el texto refinado para preview en el modal.
+    """
+    if not data.mensaje or len(data.mensaje.strip()) < 3:
+        raise HTTPException(400, "Mensaje demasiado corto")
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not glosa.dictamen:
+        raise HTTPException(400, "La glosa no tiene dictamen generado aún")
+
+    cfg = get_settings()
+    service = GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+    )
+    nuevo_argumento = await service.refinar_dictamen(
+        dictamen_actual_html=glosa.dictamen,
+        mensaje_usuario=data.mensaje,
+        eps=glosa.eps or "",
+        codigo=glosa.codigo_glosa or "",
+    )
+
+    # Reemplazar el bloque de argumento dentro del HTML existente
+    import re as _re
+    nuevo_html = glosa.dictamen
+    patron = _re.compile(
+        r'(<div style="font-size:12px;line-height:1\.9;[^"]*">)(.*?)(</div>)',
+        _re.DOTALL,
+    )
+    argumento_html = nuevo_argumento.replace("\n", "<br/>")
+    nuevo_html, n = patron.subn(
+        lambda m: m.group(1) + argumento_html + m.group(3),
+        nuevo_html,
+        count=1,
+    )
+    if n == 0:
+        # Si no encontramos el bloque esperado, adjuntamos al final como fallback
+        nuevo_html = glosa.dictamen + (
+            "<div style='margin-top:12px;padding:12px;background:#ecfeff;"
+            "border-left:4px solid #0891b2;border-radius:8px;font-size:12px;line-height:1.8;'>"
+            "<b>REFINADO:</b><br/>" + argumento_html + "</div>"
+        )
+
+    if data.guardar:
+        glosa.dictamen = nuevo_html
+        db.commit()
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="REFINAR_IA",
+            tabla="historial",
+            registro_id=glosa_id,
+            campo="dictamen",
+            detalle=f"instrucción: {data.mensaje[:200]}",
+        )
+
+    return {
+        "argumento_refinado": nuevo_argumento,
+        "dictamen_html": nuevo_html,
+        "guardado": data.guardar,
+    }
 
 
 @router.get("/alertas")
