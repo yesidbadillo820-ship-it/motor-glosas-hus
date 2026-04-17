@@ -312,6 +312,26 @@ input:focus,select:focus,textarea:focus{border-color:var(--c-teal2);box-shadow:0
 .hist-area{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:1.25rem;gap:1rem}
 .hist-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
 .bulk-bar{display:flex;align-items:center;gap:.8rem;padding:.7rem 1rem;margin:.8rem 0;background:linear-gradient(90deg,rgba(13,148,136,.08),rgba(13,148,136,.02));border:1px solid rgba(13,148,136,.25);border-radius:10px;font-size:.85rem;flex-wrap:wrap}
+.gold-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;padding:1rem 0}
+.gold-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.55rem;transition:all .15s;position:relative;overflow:hidden}
+.gold-card::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(180deg,#f59e0b,#fbbf24)}
+.gold-card:hover{border-color:#f59e0b;box-shadow:0 4px 12px rgba(245,158,11,.12);transform:translateY(-1px)}
+.gold-badges{display:flex;gap:.35rem;flex-wrap:wrap}
+.gold-chip{padding:.2rem .55rem;font-size:.7rem;border-radius:10px;font-weight:600;letter-spacing:.2px}
+.gold-chip.eps{background:rgba(6,182,212,.12);color:#0891b2}
+.gold-chip.cod{background:rgba(245,158,11,.14);color:#b45309;font-family:var(--font-mono)}
+.gold-chip.usos{background:rgba(13,148,136,.12);color:#0d9488}
+.gold-title{font-size:.9rem;font-weight:700;color:var(--text);margin:.15rem 0}
+.gold-text{font-size:.78rem;line-height:1.55;color:var(--text2);max-height:110px;overflow:hidden;position:relative;padding-bottom:6px}
+.gold-text.expanded{max-height:none}
+.gold-text::after{content:"";position:absolute;bottom:0;left:0;right:0;height:30px;background:linear-gradient(180deg,transparent,var(--bg-card));pointer-events:none}
+.gold-text.expanded::after{display:none}
+.gold-meta{display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:var(--text3);padding-top:.35rem;border-top:1px dashed var(--border)}
+.gold-actions{display:flex;gap:.35rem;flex-wrap:wrap}
+.gold-actions button{padding:.25rem .55rem;font-size:.7rem;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2)}
+.gold-actions button:hover{background:var(--bg-subtle);color:var(--text)}
+.gold-actions button.danger{color:#ef4444}
+.gold-actions button.danger:hover{background:#fef2f2;border-color:#fca5a5}
 .bulk-bar b{color:var(--c-teal2);font-size:1rem}
 .bulk-chk{display:flex;align-items:center;gap:.4rem;color:var(--text2);font-size:.8rem;cursor:pointer}
 .bulk-chk input{cursor:pointer}
@@ -594,6 +614,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <button class="sn-item" data-tip="Conciliación" onclick="sidebarTab(this,'conciliacion')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M17 3H21V7"/><path d="M21 3L13 11"/><path d="M7 21H3V17"/><path d="M3 21L11 13"/></svg>
           <span class="sn-item-label">Conciliación</span>
+        </button>
+        <button class="sn-item" data-tip="Plantillas Gold" onclick="sidebarTab(this,'gold')">
+          <svg class="i i-md" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span class="sn-item-label">Plantillas Gold</span>
         </button>
       </div>
 
@@ -978,6 +1002,26 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </div>
     </div>
 
+    <!-- PLANTILLAS GOLD -->
+    <div class="panel" id="p-gold">
+      <div class="page-pad">
+        <div class="page-head">
+          <div>
+            <h2 class="page-title">⭐ Biblioteca Gold</h2>
+            <p class="page-sub">Argumentos que ganaron. La IA los usa como ejemplo al generar respuestas del mismo código.</p>
+          </div>
+          <div class="page-actions toolbar-inline">
+            <input type="text" id="gold-search-eps" placeholder="Filtrar EPS…" oninput="debounceGold()" style="padding:.4rem .6rem;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text)"/>
+            <input type="text" id="gold-search-cod" placeholder="Código (ej TA0201)" oninput="debounceGold()" style="padding:.4rem .6rem;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);width:140px"/>
+            <button class="btn-sm ghost" onclick="cargarPlantillasGold()">Actualizar</button>
+          </div>
+        </div>
+        <div class="gold-grid" id="gold-grid">
+          <div style="grid-column:1/-1;text-align:center;color:var(--text3);padding:3rem 1rem">Cargando biblioteca…</div>
+        </div>
+      </div>
+    </div>
+
     <!-- AUDITORÍA -->
     <div class="panel" id="p-audit">
       <div class="audit-area">
@@ -1083,6 +1127,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="modal-hdr">
       <h3 id="modal-titulo">Dictamen Jurídico</h3>
       <div style="display:flex;gap:.5rem">
+        <button class="btn-sm ghost" onclick="guardarComoPlantillaGold()" title="Guardar este argumento como plantilla ganadora">⭐ Gold</button>
         <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
         <button class="modal-close" onclick="cerrarModal()">✕</button>
       </div>
@@ -1258,6 +1303,7 @@ function tab(btn,id){
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
   if(id==='mis-glosas') loadMisGlosas();
+  if(id==='gold') cargarPlantillasGold();
 }
 
 // Sidebar: activa el item, sincroniza con tab() y en mobile cierra el drawer
@@ -2271,6 +2317,93 @@ function refinarSugerencia(texto){
   var ta = document.getElementById('refinar-msg');
   ta.value = texto;
   ta.focus();
+}
+
+// ─── PLANTILLAS GOLD ────────────────────────────────────────────────────
+var goldDebounceT;
+function debounceGold(){
+  clearTimeout(goldDebounceT);
+  goldDebounceT = setTimeout(cargarPlantillasGold, 280);
+}
+
+async function cargarPlantillasGold(){
+  var grid = document.getElementById('gold-grid');
+  if(!grid) return;
+  var eps = (document.getElementById('gold-search-eps')||{}).value || '';
+  var cod = (document.getElementById('gold-search-cod')||{}).value || '';
+  var qs = [];
+  if(eps) qs.push('eps=' + encodeURIComponent(eps));
+  if(cod) qs.push('codigo=' + encodeURIComponent(cod.toUpperCase()));
+  var url = '/plantillas-gold/' + (qs.length ? '?' + qs.join('&') : '');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text3);padding:2rem 1rem">Cargando…</div>';
+  try{
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){ grid.innerHTML = '<div style="grid-column:1/-1;color:#ef4444;text-align:center;padding:2rem">Error ' + r.status + '</div>'; return; }
+    var data = await r.json();
+    if(!data.length){
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text3);padding:3rem 1rem">Aún no hay plantillas gold.<br/><span style="font-size:.75rem">Cuando una glosa gane, pulsa el botón <b>⭐ Gold</b> en el modal del dictamen para guardar su argumento como plantilla reutilizable.</span></div>';
+      return;
+    }
+    grid.innerHTML = data.map(function(p){
+      var argEsc = escHtml(p.argumento || '');
+      var recup = p.valor_recuperado ? '$' + Number(p.valor_recuperado).toLocaleString('es-CO',{maximumFractionDigits:0}) : '—';
+      var creado = p.creado_en ? new Date(p.creado_en).toLocaleDateString('es-CO') : '—';
+      return '<div class="gold-card">' +
+        '<div class="gold-badges">' +
+          '<span class="gold-chip eps">' + escHtml(p.eps||'—') + '</span>' +
+          '<span class="gold-chip cod">' + escHtml(p.codigo_glosa||'—') + '</span>' +
+          '<span class="gold-chip usos">' + (p.usos||0) + ' usos</span>' +
+        '</div>' +
+        '<div class="gold-title">' + escHtml(p.titulo||'—') + '</div>' +
+        '<div class="gold-text" id="gold-txt-' + p.id + '">' + argEsc.replace(/\n/g,'<br>') + '</div>' +
+        '<div class="gold-meta"><span>Creada ' + creado + '</span><span>Recuperado: ' + recup + '</span></div>' +
+        '<div class="gold-actions">' +
+          '<button onclick="toggleGoldText(' + p.id + ')">Ver completo</button>' +
+          '<button onclick="copiarGold(' + p.id + ')">Copiar</button>' +
+          (USER_ROL==='SUPER_ADMIN'||USER_ROL==='COORDINADOR' ? '<button class="danger" onclick="eliminarGold(' + p.id + ')">Eliminar</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+    // Guardar en caché los textos para copiar
+    window._goldTextCache = {};
+    data.forEach(function(p){ window._goldTextCache[p.id] = p.argumento || ''; });
+  }catch(e){ grid.innerHTML = '<div style="grid-column:1/-1;color:#ef4444;text-align:center;padding:2rem">Conexión: ' + e.message + '</div>'; }
+}
+
+function toggleGoldText(id){
+  var el = document.getElementById('gold-txt-' + id);
+  if(el) el.classList.toggle('expanded');
+}
+
+function copiarGold(id){
+  var txt = (window._goldTextCache||{})[id] || '';
+  if(!txt){ toast('Error','Texto no disponible','error'); return; }
+  navigator.clipboard.writeText(txt).then(function(){
+    toast('Copiado','Argumento al portapapeles','success');
+  });
+}
+
+async function eliminarGold(id){
+  if(!confirm('¿Eliminar esta plantilla gold? Dejará de influir en respuestas futuras.')) return;
+  try{
+    var r = await fetch('/plantillas-gold/' + id, {method:'DELETE', headers: authH()});
+    if(r.ok){ toast('Eliminada','Plantilla removida','success'); cargarPlantillasGold(); }
+    else { var d = await r.json(); toast('Error', d.detail||'No se pudo eliminar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function guardarComoPlantillaGold(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+  if(!confirm('¿Guardar el argumento de esta glosa como plantilla GOLD? Se usará como ejemplo para mejorar futuras respuestas del mismo código/EPS.')) return;
+  try{
+    var r = await fetch('/plantillas-gold/desde-glosa/' + CURRENT_GLOSA_ID, {
+      method: 'POST',
+      headers: authH()
+    });
+    var d = await r.json();
+    if(r.ok){ toast('Guardada','Plantilla gold creada ⭐','success'); }
+    else { toast('Error', d.detail || 'No se pudo guardar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function aplicarRefinar(){

@@ -362,7 +362,12 @@ async def generar_lote(
                     numero_factura=g.factura,
                     numero_radicado=g.numero_radicado,
                 )
-                res = await service.analizar(gi, contexto_pdf="", contratos_db=contratos)
+                # Few-shots según (EPS, código)
+                from app.api.routers.plantillas_gold import obtener_few_shot, marcar_usos
+                pg = obtener_few_shot(db, eps=gi.eps, codigo_glosa=g.codigo_glosa or "", limite=2)
+                res = await service.analizar(gi, contexto_pdf="", contratos_db=contratos, few_shots=[p.argumento for p in pg])
+                if pg:
+                    marcar_usos(db, [p.id for p in pg])
                 g.dictamen = res.dictamen
                 g.score = res.score
                 g.modelo_ia = res.modelo_ia

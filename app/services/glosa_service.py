@@ -207,7 +207,13 @@ class GlosaService:
         self.primary_ai = (primary_ai or "groq").lower()
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
 
-    async def analizar(self, data: GlosaInput, contexto_pdf: str = "", contratos_db: dict = None) -> GlosaResult:
+    async def analizar(
+        self,
+        data: GlosaInput,
+        contexto_pdf: str = "",
+        contratos_db: dict = None,
+        few_shots: list[str] = None,
+    ) -> GlosaResult:
         texto_base = str(data.tabla_excel).strip().upper()
 
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
@@ -301,6 +307,16 @@ class GlosaService:
                 prefijo=prefijo,
                 eps=data.eps
             )
+            # Inyectar few-shots de plantillas gold (si hay) al final del system
+            if few_shots:
+                bloque_ejemplos = "\n\nEJEMPLOS DE RESPUESTAS GANADORAS PREVIAS (usa el MISMO estilo, tono y nivel de detalle):\n"
+                for i, ej in enumerate(few_shots, start=1):
+                    # Recortar ejemplos largos para no desbordar ventana
+                    ej_corto = ej[:1200] + ("…" if len(ej) > 1200 else "")
+                    bloque_ejemplos += f"\n--- EJEMPLO #{i} (respuesta que logró levantar la glosa) ---\n{ej_corto}\n"
+                bloque_ejemplos += "\n--- FIN EJEMPLOS ---\n\nGenera una respuesta NUEVA para el caso actual inspirándote en el estilo anterior, adaptando a los datos específicos. No copies literal."
+                system_prompt = system_prompt + bloque_ejemplos
+                logger.info(f"Prompt enriquecido con {len(few_shots)} plantilla(s) gold")
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
                 contexto_pdf=contexto_pdf,

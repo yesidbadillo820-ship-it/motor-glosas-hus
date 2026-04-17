@@ -82,6 +82,34 @@ class PlantillaRecord(Base):
     activa = Column(Integer, default=1)
 
 
+class PlantillaGoldRecord(Base):
+    """Argumentos técnico-jurídicos que ganaron (EPS levantó la glosa).
+
+    Se usan como few-shot examples al llamar a la IA para nuevas glosas
+    del mismo (EPS, código) — mejoran calidad con el tiempo.
+    """
+    __tablename__ = "plantillas_gold"
+
+    id = Column(Integer, primary_key=True, index=True)
+    eps = Column(String(200), index=True)
+    codigo_glosa = Column(String(20), index=True)
+    tipo = Column(String(50))
+    titulo = Column(String(200))
+    argumento = Column(Text, nullable=False)
+    glosa_origen_id = Column(Integer)  # ID de GlosaRecord que ganó
+    valor_recuperado = Column(Float, default=0.0)
+    usos = Column(Integer, default=0)
+    creado_por = Column(String(200))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    ultima_uso_en = Column(DateTime(timezone=True))
+    notas = Column(Text)
+    activa = Column(Integer, default=1)
+
+    __table_args__ = (
+        Index("ix_plantilla_gold_lookup", "eps", "codigo_glosa", "activa"),
+    )
+
+
 class ContratoRecord(Base):
     __tablename__ = "contratos"
     eps = Column(String, primary_key=True, index=True)

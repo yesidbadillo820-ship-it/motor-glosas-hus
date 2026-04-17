@@ -550,6 +550,7 @@ from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
 from app.api.routers.salud_total import router as salud_total_router
 from app.api.routers.admin import router as admin_router
+from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -567,6 +568,7 @@ app.include_router(conciliacion_router)
 app.include_router(audit_router)
 app.include_router(salud_total_router)
 app.include_router(admin_router)
+app.include_router(plantillas_gold_router)
 
 
 def get_glosa_service() -> GlosaService:
@@ -669,8 +671,17 @@ async def analizar(
     contrato_repo = ContratoRepository(db)
     contratos = contrato_repo.como_dict()
 
-    resultado = await service.analizar(data, contexto_pdf, contratos)
-    logger.info(f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia}")
+    # Few-shots de plantillas gold según (EPS, código) si las hay
+    from app.api.routers.plantillas_gold import obtener_few_shot, marcar_usos
+    codigo_match = re.search(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", tabla_excel.upper())
+    cod_pref = codigo_match.group(0) if codigo_match else ""
+    plantillas_gold = obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2) if cod_pref else []
+    few_shots = [p.argumento for p in plantillas_gold]
+
+    resultado = await service.analizar(data, contexto_pdf, contratos, few_shots=few_shots)
+    if plantillas_gold:
+        marcar_usos(db, [p.id for p in plantillas_gold])
+    logger.info(f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} | few_shots={len(few_shots)}")
 
     glosa_repo = GlosaRepository(db)
     val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)
