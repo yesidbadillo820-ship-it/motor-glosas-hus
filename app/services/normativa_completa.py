@@ -76,15 +76,15 @@ LEYES = {
         "articulos": {
             "56": {
                 "titulo": "Trámite de pagos",
-                "texto": "Las entidades responsables del pago de los servicios de salud deberán pagar a los prestadores el monto total de las facturas dentro de los treinta (30) días hábiles siguientes a la presentación de la factura. Cuando existan glosas, se aplicará el procedimiento señalado en el artículo siguiente. Sin perjuicio de lo anterior, dentro del mismo término, deberán haber efectuado un pago mínimo del 50% del valor neto facturado no sujeto a glosas, según corresponda.",
-                "aplicacion": "Plazo de pago 30 días hábiles + anticipo 50%",
-                "keywords": ["pago", "30 días", "50%", "anticipo", "trámite de pagos"],
+                "texto": "Las entidades responsables del pago de los servicios de salud deberán pagar a los prestadores el monto total de las facturas dentro de los treinta (30) días hábiles siguientes a la presentación de la factura. Cuando existan glosas, se aplicará el procedimiento señalado en el artículo siguiente. Sin perjuicio de lo anterior, dentro del mismo término, deberán haber efectuado un pago mínimo del 50% del valor neto facturado no sujeto a glosas, según corresponda. Nota operativa (Manual Único de Glosas Res. 2284/2023 + Manual SIIFA 2026): una vez levantada o aceptada la glosa, el pago al prestador debe efectuarse dentro de los cinco (5) días hábiles siguientes.",
+                "aplicacion": "Pago total 30 días hábiles + anticipo 50% no sujeto a glosa + pago 5 días hábiles post-levantamiento",
+                "keywords": ["pago", "30 días", "50%", "anticipo", "trámite de pagos", "5 días pago"],
             },
             "57": {
                 "titulo": "Trámite de glosas",
-                "texto": "Las entidades responsables del pago de servicios de salud dentro de los treinta (30) días hábiles siguientes a la presentación de la factura con todos sus soportes, formularán y comunicarán a los prestadores de servicios de salud las glosas a cada factura, con base en la codificación y alcance definidos por el Ministerio de Salud y Protección Social. Una vez formuladas las glosas a una factura, no se podrán formular nuevas glosas a la misma factura, salvo las que surjan de hechos nuevos detectados en la respuesta dada a la glosa inicial. El prestador de servicios de salud deberá dar respuesta a las glosas presentadas por las entidades responsables del pago, dentro de los quince (15) días hábiles siguientes a su recepción. La entidad responsable del pago, dentro de los siete (7) días hábiles siguientes, decidirá si levanta total o parcialmente las glosas o las deja como definitivas. Si los prestadores no contestan en el plazo antes señalado, se entenderá aceptada la glosa. Si no hay acuerdo entre las partes, la entidad responsable del pago podrá optar por la conciliación, el arbitraje o acudir ante las autoridades judiciales.",
-                "aplicacion": "PLAZOS DE GLOSAS: 30 días EPS para formular / 15 días IPS para responder / 7 días EPS para decidir",
-                "keywords": ["glosa", "30 días", "15 días", "7 días", "plazo", "trámite de glosas", "extemporánea"],
+                "texto": "Las entidades responsables del pago de servicios de salud formularán y comunicarán a los prestadores de servicios de salud las glosas a cada factura, con base en la codificación y alcance definidos por el Ministerio de Salud y Protección Social. Una vez formuladas las glosas a una factura, no se podrán formular nuevas glosas a la misma factura, salvo las que surjan de hechos nuevos detectados en la respuesta dada a la glosa inicial. El prestador de servicios de salud deberá dar respuesta a las glosas presentadas por las entidades responsables del pago dentro del plazo fijado por la norma. Si los prestadores no contestan en el plazo señalado, se entenderá aceptada la glosa. Si no hay acuerdo entre las partes, la entidad responsable del pago podrá optar por la conciliación, el arbitraje o acudir ante las autoridades judiciales.\n\nPLAZOS OPERATIVOS VIGENTES (Ley 1438/2011 + Manual Único Res. 2284/2023 + Manual SIIFA 2026):\n• FORMULACIÓN (EPS/ERP): 20 días hábiles tras radicación de la factura.\n• RESPUESTA (IPS/Prestador): 15 días hábiles tras recepción de la glosa.\n• SUBSANACIÓN (IPS): 7 días hábiles adicionales si la glosa es subsanable.\n• DECISIÓN FINAL (EPS): 10 días hábiles tras la respuesta de la IPS para levantar o ratificar.\n• PAGO POST-LEVANTAMIENTO: 5 días hábiles siguientes al levantamiento de la glosa.\n\nCRITERIO INSTITUCIONAL HUS: toda glosa formulada después de 20 días hábiles es EXTEMPORÁNEA e improcedente (aceptación tácita).",
+                "aplicacion": "PLAZOS: 20 días EPS formular | 15 días IPS responder | 7 días IPS subsanar | 10 días EPS decidir | 5 días EPS pagar tras levantamiento",
+                "keywords": ["glosa", "20 días", "15 días", "7 días", "10 días", "5 días", "plazo", "trámite de glosas", "extemporánea", "subsanación", "SIIFA"],
             },
             "126": {
                 "titulo": "Supervisión, inspección y vigilancia",
@@ -434,6 +434,23 @@ CIRCULARES = {
         "ambito": "FEV en salud",
         "vigente": True,
         "keywords": ["FEV", "factura electrónica", "DIAN"],
+    },
+
+    "MANUAL SIIFA 2026": {
+        "nombre": "Manual SIIFA 2026",
+        "titulo": "Sistema Integrado de Información Financiera y Administrativa — Gestión de Cuentas Médicas",
+        "ambito": "Manual operativo plazos de cuentas médicas y glosas",
+        "vigente": True,
+        "notas": "Consolida y operacionaliza los plazos del Art. 57 Ley 1438/2011 y la Res. 2284/2023 (Manual Único). Plazos vigentes: 20 días EPS formular | 15 días IPS responder | 7 días subsanar | 10 días EPS decidir | 5 días pago post-levantamiento.",
+        "articulos": {
+            "plazos": {
+                "titulo": "Cronograma completo del trámite de glosas",
+                "texto": "1. FORMULACIÓN: La Entidad Responsable del Pago (EPS/ERP) dispone de 20 días hábiles desde la radicación de la factura para formular glosas. Vencido este plazo, se configura aceptación tácita. 2. RESPUESTA: La IPS dispone de 15 días hábiles desde la recepción de la glosa para presentar respuesta técnica. 3. SUBSANACIÓN: Si la glosa es subsanable, la IPS cuenta con 7 días hábiles adicionales para corregir y reenviar. 4. DECISIÓN FINAL: La EPS dispone de 10 días hábiles tras la respuesta de la IPS para levantar (parcial o total) o ratificar la glosa. 5. PAGO: Una vez levantada o aceptada la glosa, el pago debe efectuarse dentro de los 5 días hábiles siguientes. Nota: Una vez formulada la glosa inicial, no se pueden presentar nuevas glosas sobre la misma factura, salvo hechos nuevos detectados en la respuesta.",
+                "aplicacion": "Cronograma operativo completo vigente 2026",
+                "keywords": ["plazos", "cronograma", "20 días", "15 días", "7 días", "10 días", "5 días", "formulación", "respuesta", "subsanación", "decisión", "pago"],
+            },
+        },
+        "keywords": ["SIIFA", "manual SIIFA", "cuentas médicas", "plazos", "cronograma glosas", "2026"],
     },
 }
 
