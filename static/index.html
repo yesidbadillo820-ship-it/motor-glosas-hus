@@ -723,6 +723,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
       <div class="sn-group">
         <div class="sn-label">Herramientas</div>
+        <button class="sn-item" data-tip="Consulta Normativa" onclick="sidebarTab(this,'consulta-normativa')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zm0 12.5L4.21 10.6 2 11.65 12 17l10-5.35-2.21-1.05L12 14.5zM12 20L4.21 16.1 2 17.15 12 22l10-4.85-2.21-1.05L12 20z"/></svg>
+          <span class="sn-item-label">Consulta Normativa</span>
+        </button>
         <button class="sn-item" data-tip="Salud Total" onclick="sidebarTab(this,'salud-total')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M20.84 4.61A5.5 5.5 0 0 0 13.06 4.61L12 5.67L10.94 4.61A5.5 5.5 0 0 0 3.16 12.39L12 21.23L20.84 12.39A5.5 5.5 0 0 0 20.84 4.61Z"/></svg>
           <span class="sn-item-label">Salud Total</span>
@@ -1228,6 +1232,44 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </div>
     </div>
 
+    <!-- CONSULTA NORMATIVA -->
+    <div class="panel" id="p-consulta-normativa">
+      <div style="padding:2rem;max-width:1100px;margin:0 auto;">
+        <div class="form-card">
+          <h3>Consulta Normativa Colombiana en Cuentas Médicas</h3>
+          <p style="font-size:.85rem;color:var(--text3);margin-bottom:1.2rem">
+            Pregunte sobre cualquier norma, artículo, decreto, resolución, circular o sentencia relacionada con glosas,
+            facturación, tarifas, pertinencia, cobertura o régimen especial. La IA consultará la biblioteca legal
+            vigente y devolverá la respuesta exacta.
+          </p>
+
+          <div class="field">
+            <label>Pregunta</label>
+            <textarea id="cn-pregunta" rows="3" placeholder="Ej: ¿cuál es el plazo para formular una glosa? / ¿qué dice el Art. 57 de la Ley 1438? / ¿qué norma regula la historia clínica?"></textarea>
+          </div>
+
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+            <button class="btn-primary" onclick="consultarNormativa()">Consultar</button>
+            <button class="btn-secondary" onclick="listarNormas()">Ver todas las normas indexadas</button>
+          </div>
+
+          <div style="margin-top:1rem;">
+            <div style="font-size:.75rem;color:var(--text3);margin-bottom:.5rem;">Ejemplos rápidos:</div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+              <button class="etapa-btn" onclick="document.getElementById('cn-pregunta').value='¿Cuál es el plazo del Art. 57 de la Ley 1438?';consultarNormativa()">Plazos Art. 57</button>
+              <button class="etapa-btn" onclick="document.getElementById('cn-pregunta').value='¿Qué dice la Resolución 2284 de 2023?';consultarNormativa()">Res. 2284/2023</button>
+              <button class="etapa-btn" onclick="document.getElementById('cn-pregunta').value='¿Qué norma regula la historia clínica?';consultarNormativa()">Historia clínica</button>
+              <button class="etapa-btn" onclick="document.getElementById('cn-pregunta').value='¿Cuándo aplica la Circular 030 de 2013?';consultarNormativa()">Circular 030/2013</button>
+              <button class="etapa-btn" onclick="document.getElementById('cn-pregunta').value='¿Qué régimen regula la atención de PPL?';consultarNormativa()">Régimen PPL</button>
+              <button class="etapa-btn" onclick="document.getElementById('cn-pregunta').value='Autonomía médica en Colombia';consultarNormativa()">Autonomía médica</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="cn-resultados" style="margin-top:1.5rem;"></div>
+      </div>
+    </div>
+
     <!-- SALUD TOTAL -->
     <div class="panel" id="p-salud-total">
       <div class="st-area">
@@ -1624,6 +1666,69 @@ async function exportarERP(){
     hideLoading();
     toast('CSV listo','Descarga iniciada','success');
   }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function consultarNormativa(){
+  var pregunta = (document.getElementById('cn-pregunta').value || '').trim();
+  if(!pregunta){ toast('Info','Escribe una pregunta','info'); return; }
+  var cont = document.getElementById('cn-resultados');
+  cont.innerHTML = '<div style="padding:1rem;color:var(--text3);">Consultando biblioteca normativa…</div>';
+  try{
+    var r = await fetch('/consulta-normativa', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({pregunta: pregunta, limite: 8})
+    });
+    if(!r.ok){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Error ' + r.status + '</div>'; return; }
+    var data = await r.json();
+    if(!data.resultados || data.resultados.length === 0){
+      cont.innerHTML = '<div style="padding:1rem;color:var(--text3);">No se encontraron resultados. Intenta con otros términos.</div>';
+      return;
+    }
+    var html = '<div style="font-size:.85rem;color:var(--text3);margin-bottom:.8rem;"><b>' + data.total_encontrados + '</b> norma(s) encontrada(s) para: <i>"' + pregunta.replace(/</g,'&lt;') + '"</i></div>';
+    data.resultados.forEach(function(res){
+      var articuloStr = res.articulo ? ('Artículo ' + res.articulo) : '';
+      var tituloStr = res.titulo || '';
+      var textoStr = (res.texto || '').replace(/</g,'&lt;');
+      var aplicacionStr = res.aplicacion ? '<div style="margin-top:.5rem;padding:.5rem .7rem;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;font-size:.8rem;"><b>Aplicación práctica:</b> ' + res.aplicacion + '</div>' : '';
+      html += '<div class="form-card" style="margin-bottom:.8rem;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;margin-bottom:.4rem;">';
+      html += '<div><div style="font-weight:700;color:#1e40af;">' + res.norma + (articuloStr ? ' — ' + articuloStr : '') + '</div>';
+      html += '<div style="font-size:.85rem;color:var(--text2);margin-top:.2rem;">' + tituloStr + '</div></div>';
+      html += '</div>';
+      if(textoStr){ html += '<div style="font-size:.85rem;line-height:1.6;color:var(--text2);padding:.7rem .9rem;background:#f8fafc;border-radius:6px;border-left:3px solid #3b82f6;">' + textoStr + '</div>'; }
+      html += aplicacionStr;
+      html += '</div>';
+    });
+    cont.innerHTML = html;
+  }catch(e){
+    cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>';
+  }
+}
+
+async function listarNormas(){
+  var cont = document.getElementById('cn-resultados');
+  cont.innerHTML = '<div style="padding:1rem;color:var(--text3);">Cargando índice…</div>';
+  try{
+    var r = await fetch('/consulta-normativa/normas', {headers: authH()});
+    if(!r.ok){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Error ' + r.status + '</div>'; return; }
+    var data = await r.json();
+    var html = '<div style="font-size:.9rem;margin-bottom:.8rem;"><b>' + data.total + '</b> normas indexadas en la biblioteca:</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.6rem;">';
+    data.normas.forEach(function(n){
+      var badge = n.num_articulos > 0 ? '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:.7rem;">' + n.num_articulos + ' arts.</span>' : '';
+      html += '<div class="form-card" style="padding:.7rem .9rem;margin:0;">';
+      html += '<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:start;">';
+      html += '<div style="font-weight:600;font-size:.85rem;color:#1e40af;">' + n.nombre + '</div>' + badge;
+      html += '</div>';
+      html += '<div style="font-size:.75rem;color:var(--text3);margin-top:.25rem;">' + (n.titulo||'') + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    cont.innerHTML = html;
+  }catch(e){
+    cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>';
+  }
 }
 
 async function cargar2FAEstado(){
