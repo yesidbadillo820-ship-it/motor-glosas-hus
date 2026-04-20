@@ -3384,6 +3384,15 @@ async function crearConciliacion(){
   var glosaId=document.getElementById('c-glosa-id').value;
   var fecha=document.getElementById('c-fecha').value;
   if(!glosaId||!fecha){toast('Campos requeridos','Complete ID de glosa y fecha','warning');return;}
+  // Validar que la glosa exista antes de mandar
+  try{
+    var chk=await fetch('/glosas/'+glosaId,{headers:authH()});
+    if(chk.status===404){
+      toast('Glosa no existe','No encontré una glosa con ID '+glosaId+'. Verifícalo en Historial.','error');
+      return;
+    }
+    if(!chk.ok){ toast('Error','No pude verificar la glosa (HTTP '+chk.status+')','error'); return; }
+  }catch(e){ toast('Error','Conexión al verificar glosa: '+e.message,'error'); return; }
   var body={glosa_id:parseInt(glosaId),fecha_audiencia:fecha,lugar:document.getElementById('c-lugar').value,participantes_hus:document.getElementById('c-part-hus').value,participantes_eps:document.getElementById('c-part-eps').value,observaciones:document.getElementById('c-obs').value,acta_numero:document.getElementById('c-acta').value};
   var r=await fetch('/conciliaciones/',{method:'POST',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify(body)});
   var d=await r.json();
