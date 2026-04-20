@@ -762,10 +762,16 @@ class GlosaService:
 
         system = (
             "Eres un auditor médico senior de la ESE Hospital Universitario de Santander (HUS). "
-            "Refinas argumentos técnico-jurídicos de respuesta a glosas conservando el estilo "
-            "mayúsculas-formal y las citas normativas colombianas (Ley 100/1993, Ley 1438/2011, "
-            "Res. 3047/2008, etc.). Responde SOLO con el texto refinado, sin preámbulos, sin "
-            "comillas, sin etiquetas XML. Mantén mayúsculas y saltos de línea donde convenga."
+            "Refinas argumentos técnico-jurídicos de respuesta a glosas.\n\n"
+            "REGLAS CRÍTICAS:\n"
+            "1. La INSTRUCCIÓN DEL AUDITOR es la máxima prioridad: si pide cambiar "
+            "mayúsculas/minúsculas, longitud, tono, idioma o formato, OBEDÉCELA literalmente.\n"
+            "2. Por defecto mantén el estilo original (mayúsculas, saltos, citas normativas) "
+            "SOLO si la instrucción no pide cambiarlo.\n"
+            "3. Las citas normativas colombianas (Ley 100/1993, Ley 1438/2011, Art. 871 "
+            "C.Comercio, etc.) se conservan en su forma canónica salvo que el auditor las quite.\n"
+            "4. Responde SOLO con el texto refinado — sin preámbulos, sin comillas, sin "
+            "etiquetas XML, sin explicaciones de qué cambiaste."
         )
         user = (
             f"EPS: {eps}\nCÓDIGO: {codigo}\n\n"
@@ -774,14 +780,22 @@ class GlosaService:
             "Devuelve el ARGUMENTO REFINADO completo según la instrucción. "
             "No expliques qué cambiaste, solo escribe el texto final."
         )
-        if not self.groq:
+        if not self.groq and not self.anthropic_key:
             return txt  # sin IA disponible → devolver original
 
-        content, _modelo = await self._llamar_groq_con_retry(system, user, max_intentos=3)
-        # Limpiar mínimamente
+        # Usa _llamar_ia para respetar PRIMARY_AI (Groq o Anthropic)
+        content, _modelo = await self._llamar_ia(system, user, eps=eps, codigo=codigo)
         out = content.strip()
         # Eliminar cierres XML si la IA los metió por hábito
         out = _re.sub(r"</?(argumento|answer|response)>", "", out, flags=_re.IGNORECASE).strip()
+
+        # Si el auditor pidió minúsculas (o el texto quedó mayoritariamente en
+        # minúsculas), NO reaplicar la expansión de abreviaturas en MAYÚSCULAS.
+        letras = [c for c in out if c.isalpha()]
+        mayus = sum(1 for c in letras if c.isupper())
+        ratio_mayus = (mayus / len(letras)) if letras else 1.0
+        if ratio_mayus < 0.5:
+            return out
         return _expandir_abreviaturas_tipo(out)
 
     async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 4) -> tuple[str, str]:
