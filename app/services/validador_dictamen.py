@@ -145,22 +145,21 @@ def check_enumeracion(texto: str) -> dict:
     }
 
 
-def check_reserva_supersalud(texto: str) -> dict:
-    nombre = "Reserva de derechos ante SuperSalud"
+def check_invitacion_conciliacion(texto: str) -> dict:
+    nombre = "Invitación a conciliación de auditoría"
     peso = 10
     t = texto.upper()
     tiene = (
-        "SUPERSALUD" in t
-        or "SUPERINTENDENCIA NACIONAL DE SALUD" in t
-        or "ART. 126" in t
-        or "ART\u00cdCULO 126" in t
-        or "ARTÍCULO 126" in t
+        "CONCILIACI" in t
+        or "ART. 20 DEC. 4747" in t
+        or "ART\u00cdCULO 20 DEL DECRETO 4747" in t
+        or "ARTÍCULO 20 DEL DECRETO 4747" in t
     )
-    msg = "Reserva SuperSalud presente" if tiene else "Falta reserva de derechos ante SuperSalud"
+    msg = "Invitación a conciliación presente" if tiene else "Falta invitación a mesa de conciliación"
     return {
-        "id": "supersalud", "nombre": nombre, "peso": peso,
+        "id": "conciliacion", "nombre": nombre, "peso": peso,
         "aprobado": tiene, "mensaje": msg,
-        "sugerencia": "" if tiene else "Incluye cláusula de reserva Art. 126 Ley 1438/2011",
+        "sugerencia": "" if tiene else "Incluye invitación a mesa de conciliación (Art. 20 Dec. 4747/2007)",
     }
 
 
@@ -273,7 +272,7 @@ def evaluar_dictamen(
         check_sin_cifras_inventadas(texto, valor_original),
         check_normas_citadas(texto, codigo_glosa),
         check_enumeracion(texto),
-        check_reserva_supersalud(texto),
+        check_invitacion_conciliacion(texto),
         check_extension(texto),
         check_codigo_respuesta_coherente(texto, codigo_respuesta),
         check_contrato_mencionado(texto, eps),
