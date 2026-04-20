@@ -57,7 +57,28 @@ body.dark{
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:14px}
-body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;transition:background .2s var(--ease),color .2s var(--ease)}
+body{
+  font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  font-feature-settings:'ss01','ss02','cv11','liga','kern';
+  letter-spacing:-.003em;
+  transition:background .2s var(--ease),color .2s var(--ease);
+}
+/* Jerarquía tipográfica premium */
+h1,h2,h3,h4,h5,h6{font-family:var(--font-display);letter-spacing:-.02em;line-height:1.25}
+h1{font-size:1.75rem;font-weight:700}
+h2{font-size:1.35rem;font-weight:700}
+h3{font-size:1.1rem;font-weight:700}
+h4{font-size:.95rem;font-weight:600}
+.text-display{font-family:var(--font-display);letter-spacing:-.025em;font-weight:700}
+.text-mono{font-family:var(--font-mono);font-feature-settings:'ss02','zero'}
+.text-xs{font-size:.7rem}
+.text-sm{font-size:.8rem}
+.text-md{font-size:.9rem}
+.text-lg{font-size:1.05rem}
+.text-xl{font-size:1.25rem}
+.text-muted{color:var(--text3)}
+.text-subtle{color:var(--text4)}
 
 /* Sistema de iconos SVG inline */
 .i{display:inline-block;width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em}
@@ -67,24 +88,101 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .i-xl{width:24px;height:24px}
 
 /* ─── LOGIN ─────────────────────────────── */
-#login-screen{position:fixed;inset:0;background:var(--c-navy);display:flex;align-items:center;justify-content:center;z-index:9999}
+#login-screen{
+  position:fixed;inset:0;
+  background:var(--grad-navy);
+  display:flex;align-items:center;justify-content:center;z-index:9999;
+  overflow:hidden;
+}
+#login-screen::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(14,165,233,.15), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(212,160,23,.08), transparent 40%);
+  pointer-events:none;
+}
+#login-screen::after{
+  content:"";position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
+  background-size:48px 48px;
+  pointer-events:none;mask-image:radial-gradient(ellipse at center, #000 30%, transparent 70%);
+}
 #login-screen.hidden{display:none}
-.login-box{background:#fff;border-radius:var(--r-lg);padding:2.5rem;width:380px;box-shadow:0 25px 60px rgba(0,0,0,.4)}
-.login-logo{display:flex;align-items:center;gap:.85rem;margin-bottom:2rem}
-.login-badge{width:54px;height:54px;background:#fff;border:1px solid #e5e7eb;border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px;overflow:hidden;box-shadow:0 2px 6px rgba(15,23,42,.08)}
+
+.login-box{
+  background:#fff;border-radius:var(--r-xl);padding:2.5rem;width:420px;
+  box-shadow:0 24px 60px -12px rgba(0,0,0,.45),0 0 0 1px rgba(14,165,233,.08),inset 0 1px 0 rgba(255,255,255,1);
+  position:relative;z-index:1;
+  animation:fadeInUp .5s var(--ease-out);
+}
+.login-box::before{
+  content:"";position:absolute;top:0;left:2.5rem;right:2.5rem;height:3px;
+  background:linear-gradient(90deg,var(--c-teal2),var(--c-gold2),var(--c-teal2));
+  border-radius:0 0 3px 3px;
+}
+.login-logo{display:flex;align-items:center;gap:.9rem;margin-bottom:2rem}
+.login-badge{
+  width:56px;height:56px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px;overflow:hidden;
+  box-shadow:0 4px 12px rgba(15,23,42,.08),0 0 0 3px rgba(212,160,23,.08);
+}
 .login-badge img{width:100%;height:100%;object-fit:contain}
-.login-title{font-size:1rem;font-weight:700;color:var(--c-navy)}
-.login-sub{font-size:.75rem;color:var(--c-gray2);margin-top:1px}
-.login-h{font-size:1.25rem;font-weight:700;color:var(--c-navy);margin-bottom:.4rem}
-.login-p{font-size:.8rem;color:var(--c-gray2);margin-bottom:1.5rem}
-.login-field{margin-bottom:1rem}
-.login-field label{display:block;font-size:.72rem;font-weight:600;color:var(--c-gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem}
-.login-field input{width:100%;padding:.65rem .85rem;border:1.5px solid #e5e7eb;border-radius:var(--r);font-size:.875rem;font-family:var(--font);outline:none;transition:border .2s}
-.login-field input:focus{border-color:var(--c-teal2);box-shadow:0 0 0 3px rgba(13,148,136,.12)}
-#login-error{background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r);padding:.65rem .85rem;font-size:.8rem;color:#b91c1c;margin-bottom:1rem;display:none}
-.btn-login{width:100%;padding:.75rem;background:var(--c-teal2);color:#fff;border:none;border-radius:var(--r);font-size:.9rem;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .2s}
-.btn-login:hover{background:var(--c-teal)}
-.btn-login:disabled{opacity:.65;cursor:not-allowed}
+.login-title{font-size:1.05rem;font-weight:700;color:var(--c-navy);letter-spacing:-.015em;line-height:1.25}
+.login-sub{font-size:.72rem;color:var(--c-gray2);margin-top:3px;letter-spacing:.02em}
+.login-h{
+  font-size:1.45rem;font-weight:700;color:var(--c-navy);margin-bottom:.5rem;
+  letter-spacing:-.02em;line-height:1.2;
+}
+.login-p{font-size:.85rem;color:var(--c-gray2);margin-bottom:1.75rem;line-height:1.5}
+.login-field{margin-bottom:1.1rem}
+.login-field label{
+  display:block;font-size:.7rem;font-weight:700;color:var(--c-gray);
+  text-transform:uppercase;letter-spacing:.6px;margin-bottom:.5rem;
+}
+.login-field input{
+  width:100%;padding:.75rem .95rem;border:1.5px solid #e5e7eb;border-radius:10px;
+  font-size:.9rem;font-family:var(--font);outline:none;
+  transition:border-color .2s var(--ease-out),box-shadow .2s var(--ease-out),background .2s;
+  background:#fafbfc;
+}
+.login-field input:hover{border-color:#cbd5e1;background:#fff}
+.login-field input:focus{
+  border-color:var(--c-teal2);background:#fff;
+  box-shadow:0 0 0 4px rgba(14,165,233,.14),0 1px 2px rgba(15,23,42,.04);
+}
+#login-error{
+  background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca;
+  border-radius:10px;padding:.75rem .95rem;font-size:.8rem;color:#991b1b;
+  margin-bottom:1rem;display:none;font-weight:500;
+  animation:fadeInUp .3s var(--ease-out);
+}
+.btn-login{
+  width:100%;padding:.85rem;background:var(--grad-teal);color:#fff;border:none;
+  border-radius:10px;font-size:.95rem;font-weight:700;font-family:var(--font);
+  cursor:pointer;transition:all .25s var(--ease-out);letter-spacing:.01em;
+  box-shadow:0 4px 12px -2px rgba(14,165,233,.4),inset 0 1px 0 rgba(255,255,255,.2);
+  position:relative;overflow:hidden;
+}
+.btn-login::after{
+  content:"";position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+  transition:left .7s var(--ease-out);
+}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 8px 20px -4px rgba(14,165,233,.5),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-login:hover::after{left:100%}
+.btn-login:active{transform:translateY(0)}
+.btn-login:disabled{opacity:.65;cursor:not-allowed;transform:none;box-shadow:0 2px 4px rgba(14,165,233,.25)}
+.login-footer{
+  margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #f1f5f9;
+  display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+  font-size:.7rem;color:var(--c-gray3);
+}
+.login-footer .sec-badge{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 9px;
+  background:#f0f9ff;color:#0369a1;border-radius:10px;font-weight:600;letter-spacing:.02em;
+}
 
 /* ─── APP SHELL ──────────────────────────── */
 #app{display:none;flex-direction:column;height:100vh;overflow:hidden}
@@ -272,13 +370,46 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .btn-warn-sm{background:#fffbeb;color:#92400e;border:1px solid #fde68a;padding:.3rem .6rem;border-radius:var(--r);font-size:.7rem;cursor:pointer}
 
 /* ─── MODAL ───────────────────────────── */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:8000;display:none;align-items:center;justify-content:center}
-.modal-bg.show{display:flex}
-.modal{background:var(--bg-card);border-radius:var(--r-lg);max-width:820px;max-height:88vh;width:90%;overflow:hidden;display:flex;flex-direction:column}
-.modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid var(--border)}
-.modal-hdr h3{font-size:1rem;font-weight:700}
-.modal-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text3)}
-.modal-body{padding:1.5rem;overflow-y:auto;flex:1}
+.modal-bg{
+  position:fixed;inset:0;background:rgba(11,18,32,.6);z-index:8000;
+  display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+.modal-bg.show{display:flex;animation:fadeIn .2s var(--ease-out)}
+.modal{
+  background:var(--bg-card);border-radius:var(--r-xl);
+  max-width:880px;max-height:90vh;width:92%;overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:0 32px 80px -12px rgba(0,0,0,.4),0 0 0 1px rgba(15,23,42,.08);
+  animation:modalIn .35s var(--ease-spring);
+}
+@keyframes modalIn{
+  from{opacity:0;transform:scale(.96) translateY(12px)}
+  to{opacity:1;transform:scale(1) translateY(0)}
+}
+.modal-hdr{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:1.1rem 1.75rem;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#fafbfc 0%,#fff 100%);
+  flex-wrap:wrap;gap:.5rem;
+}
+.modal-hdr h3{
+  font-size:1.05rem;font-weight:700;color:var(--text);
+  letter-spacing:-.015em;line-height:1.3;
+  display:flex;align-items:center;gap:.6rem;
+}
+.modal-hdr h3::before{
+  content:"";width:4px;height:20px;background:var(--grad-teal);border-radius:2px;flex-shrink:0;
+}
+.modal-close{
+  background:var(--bg-subtle);border:1px solid var(--border);
+  font-size:1rem;cursor:pointer;color:var(--text2);
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s var(--ease-out);flex-shrink:0;
+}
+.modal-close:hover{background:var(--c-red-light);color:var(--c-red);border-color:#fecaca;transform:rotate(90deg)}
+.modal-body{padding:1.75rem;overflow-y:auto;flex:1;background:var(--bg)}
 .refinar-panel{border-top:1px solid var(--border);padding:1rem 1.5rem;background:var(--bg-subtle);display:flex;flex-direction:column;gap:.6rem}
 .refinar-hdr{display:flex;flex-direction:column;gap:2px}
 .refinar-hdr b{font-size:.85rem;color:var(--text);display:flex;align-items:center;gap:.4rem}
@@ -543,9 +674,22 @@ tbody tr:hover{background:var(--bg)}
 @keyframes dots{0%{content:'.'}33%{content:'..'}66%{content:'...'}100%{content:''}}
 
 /* ─── TOASTS ──────────────────────────────── */
-.toast-wrap{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.toast{pointer-events:auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-md);padding:12px 16px;display:flex;align-items:flex-start;gap:10px;min-width:280px;max-width:380px;animation:tslide .3s ease;border-left:4px solid}
-.toast.success{border-left-color:#22c55e}.toast.error{border-left-color:var(--c-red)}.toast.warning{border-left-color:var(--c-amber)}.toast.info{border-left-color:var(--c-blue)}
+.toast-wrap{position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{
+  pointer-events:auto;background:var(--bg-card);border:1px solid var(--border);
+  border-radius:12px;box-shadow:0 12px 32px -8px rgba(15,23,42,.18),0 4px 12px -4px rgba(15,23,42,.08);
+  padding:14px 18px;display:flex;align-items:flex-start;gap:12px;
+  min-width:300px;max-width:400px;animation:tslide .35s var(--ease-out);
+  border-left:4px solid;backdrop-filter:blur(8px);position:relative;overflow:hidden;
+}
+.toast::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:currentColor;opacity:.12;
+}
+.toast.success{border-left-color:#10b981;color:#10b981}
+.toast.error{border-left-color:var(--c-red);color:var(--c-red)}
+.toast.warning{border-left-color:var(--c-amber);color:var(--c-amber)}
+.toast.info{border-left-color:var(--c-teal2);color:var(--c-teal2)}
 @keyframes tslide{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
 .toast-icon{font-size:16px;flex-shrink:0;margin-top:1px}
 .toast-body{flex:1}.toast-title{font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:2px}.toast-msg{font-size:.73rem;color:var(--text3);line-height:1.4}
@@ -763,6 +907,171 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   background:linear-gradient(135deg,#fff 0%,#fff 60%,#fef3c7 100%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
 }
+
+/* ─── PANEL HERO HEADER (titular de sección) ───────────────── */
+.panel-hero{
+  padding:1.75rem 2rem 1.5rem;
+  background:linear-gradient(180deg,#fff 0%,var(--bg-subtle) 100%);
+  border-bottom:1px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.panel-hero::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,transparent 0%,var(--c-teal2) 30%,var(--c-gold2) 50%,var(--c-teal2) 70%,transparent 100%);
+  opacity:.8;
+}
+.panel-hero::after{
+  content:"";position:absolute;top:-50%;right:-10%;width:40%;height:200%;
+  background:radial-gradient(ellipse at center,rgba(14,165,233,.04),transparent 60%);
+  pointer-events:none;
+}
+.panel-hero-inner{max-width:1200px;margin:0 auto;position:relative;z-index:1}
+.panel-hero-tag{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 12px;
+  background:rgba(14,165,233,.08);color:var(--c-teal2);border-radius:12px;
+  font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  margin-bottom:.75rem;
+}
+.panel-hero-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+.panel-hero h1{
+  font-size:1.65rem;font-weight:700;color:var(--text);
+  letter-spacing:-.025em;line-height:1.2;margin-bottom:.4rem;
+}
+.panel-hero-sub{
+  font-size:.9rem;color:var(--text2);line-height:1.55;max-width:680px;
+}
+.panel-hero-actions{
+  display:flex;align-items:center;gap:.75rem;margin-top:1rem;flex-wrap:wrap;
+}
+
+/* ─── EMPTY STATES ───────────────────────────────────────────── */
+.empty-state{
+  padding:3rem 2rem;text-align:center;max-width:480px;margin:2rem auto;
+  background:var(--bg-card);border-radius:var(--r-xl);border:1px dashed var(--border2);
+  animation:fadeInUp .4s var(--ease-out);
+}
+.empty-state-icon{
+  width:72px;height:72px;margin:0 auto 1.25rem;border-radius:50%;
+  background:linear-gradient(135deg,var(--c-teal-light),var(--bg-subtle));
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--sh),inset 0 1px 0 rgba(255,255,255,.8);
+  font-size:2rem;
+}
+.empty-state h3{
+  font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:.4rem;
+  letter-spacing:-.015em;line-height:1.3;
+}
+.empty-state p{
+  font-size:.85rem;color:var(--text3);line-height:1.55;margin-bottom:1rem;
+}
+.empty-state-actions{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-top:1.2rem}
+
+/* ─── SKELETON LOADERS ─────────────────────────────────────── */
+.sk-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:1.25rem;margin-bottom:.75rem;
+}
+.sk-line{
+  height:12px;border-radius:4px;
+  background:linear-gradient(90deg,var(--bg-subtle) 0%,var(--border) 50%,var(--bg-subtle) 100%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;
+  margin-bottom:.6rem;
+}
+.sk-line.sk-short{width:40%}.sk-line.sk-med{width:65%}.sk-line.sk-long{width:100%}
+.sk-circle{
+  width:40px;height:40px;border-radius:50%;
+  background:linear-gradient(90deg,var(--bg-subtle) 0%,var(--border) 50%,var(--bg-subtle) 100%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;
+}
+
+/* ─── STAT CARDS PREMIUM (KPI) ─────────────────────────────── */
+.stat-card{
+  background:var(--grad-card);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:1.1rem 1.25rem;position:relative;overflow:hidden;
+  transition:transform .25s var(--ease-out),box-shadow .25s var(--ease-out),border-color .25s var(--ease-out);
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--sh-lg);border-color:var(--c-teal2)}
+.stat-card-label{
+  font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;
+  font-weight:700;margin-bottom:.35rem;
+}
+.stat-card-value{
+  font-family:var(--font-display);font-size:1.85rem;font-weight:700;
+  color:var(--text);letter-spacing:-.03em;line-height:1;
+}
+.stat-card-delta{
+  font-size:.72rem;font-weight:600;margin-top:.4rem;
+  display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;
+}
+.stat-card-delta.up{background:var(--c-green-light);color:var(--c-green)}
+.stat-card-delta.down{background:var(--c-red-light);color:var(--c-red)}
+.stat-card-delta.neutral{background:var(--bg-subtle);color:var(--text3)}
+.stat-card-accent{
+  position:absolute;right:-12px;top:-12px;width:56px;height:56px;border-radius:50%;
+  background:radial-gradient(circle,rgba(14,165,233,.08),transparent 70%);
+  pointer-events:none;
+}
+
+/* ─── COMMAND PALETTE (Cmd+K) ─────────────────────────────── */
+.cp-backdrop{
+  position:fixed;inset:0;background:rgba(11,18,32,.65);z-index:9998;
+  display:none;align-items:flex-start;justify-content:center;padding-top:15vh;
+  backdrop-filter:blur(4px);
+}
+.cp-backdrop.show{display:flex;animation:fadeIn .15s var(--ease-out)}
+.cp-box{
+  width:560px;max-width:92vw;background:#fff;border-radius:14px;
+  box-shadow:0 32px 80px -12px rgba(0,0,0,.5),0 0 0 1px rgba(15,23,42,.12);
+  overflow:hidden;animation:fadeInUp .25s var(--ease-out);
+}
+.cp-search{
+  display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;
+  border-bottom:1px solid var(--border);
+}
+.cp-search input{
+  flex:1;border:none;outline:none;font-size:1rem;background:transparent;
+  color:var(--text);font-family:var(--font);letter-spacing:-.01em;padding:0;
+}
+.cp-search input::placeholder{color:var(--text4)}
+.cp-search .kbd-hint{
+  padding:2px 7px;background:var(--bg-subtle);border:1px solid var(--border);
+  border-radius:5px;font-family:var(--font-mono);font-size:.7rem;color:var(--text3);
+  font-weight:600;
+}
+.cp-list{max-height:54vh;overflow-y:auto;padding:.5rem}
+.cp-section{
+  padding:.5rem .75rem;font-size:.65rem;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.08em;font-weight:700;
+}
+.cp-item{
+  display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;
+  border-radius:8px;cursor:pointer;transition:background .15s var(--ease-out);
+  font-size:.88rem;color:var(--text);
+}
+.cp-item:hover,.cp-item.active{background:rgba(14,165,233,.08);color:var(--c-teal2)}
+.cp-item-icon{
+  width:28px;height:28px;border-radius:6px;background:var(--bg-subtle);
+  display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;
+}
+.cp-item-sub{font-size:.72rem;color:var(--text3);margin-left:auto}
+
+/* ─── KEYBOARD HINT CHIP ─────────────────────────────────── */
+.kbd{
+  display:inline-flex;align-items:center;gap:2px;padding:2px 6px;
+  background:var(--bg-subtle);border:1px solid var(--border);border-bottom-width:2px;
+  border-radius:5px;font-family:var(--font-mono);font-size:.68rem;
+  color:var(--text2);font-weight:600;line-height:1;
+}
+
+/* ─── SEARCH HINT GLOBAL ─────────────────────────────────── */
+.search-trigger{
+  display:flex;align-items:center;gap:.5rem;padding:5px 10px;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;color:rgba(255,255,255,.55);font-size:.74rem;
+  cursor:pointer;transition:all .2s;
+}
+.search-trigger:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
+.search-trigger .kbd{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.8)}
 </style>
 </head>
 <body>
@@ -794,6 +1103,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <small style="font-size:.7rem;color:var(--text3);margin-top:3px;display:block">Abre tu app (Google Authenticator / Authy) y escribe el código</small>
     </div>
     <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar</button>
+    <div class="login-footer">
+      <span class="sec-badge">🔒 Conexión cifrada</span>
+      <span>v6.0 · Motor de Glosas Premium</span>
+    </div>
   </div>
 </div>
 
@@ -811,6 +1124,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </div>
     </div>
     <div class="hdr-right">
+      <button class="search-trigger" onclick="abrirCommandPalette()" title="Buscar acciones">
+        <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Buscar…</span>
+        <span class="kbd">⌘K</span>
+      </button>
       <div class="status-pill"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span></div>
       <span class="hdr-user" id="hdr-user"></span>
       <button class="hdr-btn" id="btn-install-pwa" onclick="instalarPWA()" title="Instalar app" style="display:none"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
@@ -1438,14 +1756,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
     <!-- CONSULTA NORMATIVA -->
     <div class="panel" id="p-consulta-normativa">
-      <div style="padding:2rem;max-width:1100px;margin:0 auto;height:100%;overflow-y:auto;overflow-x:hidden;width:100%;">
+      <div style="height:100%;overflow-y:auto;overflow-x:hidden;width:100%;">
+        <div class="panel-hero">
+          <div class="panel-hero-inner">
+            <span class="panel-hero-tag">Biblioteca legal</span>
+            <h1>Consulta Normativa Colombiana</h1>
+            <div class="panel-hero-sub">
+              Pregunte sobre cualquier norma, artículo, decreto, resolución, circular o sentencia relacionada con
+              cuentas médicas, glosas, facturación, tarifas, pertinencia, cobertura o régimen especial. Más de 40
+              normas indexadas con texto literal.
+            </div>
+          </div>
+        </div>
+        <div style="padding:1.75rem 2rem;max-width:1100px;margin:0 auto;">
         <div class="form-card">
-          <h3>Consulta Normativa Colombiana en Cuentas Médicas</h3>
-          <p style="font-size:.85rem;color:var(--text3);margin-bottom:1.2rem">
-            Pregunte sobre cualquier norma, artículo, decreto, resolución, circular o sentencia relacionada con glosas,
-            facturación, tarifas, pertinencia, cobertura o régimen especial. La IA consultará la biblioteca legal
-            vigente y devolverá la respuesta exacta.
-          </p>
+          <h3>Buscar en la biblioteca</h3>
 
           <div class="field">
             <label>Pregunta</label>
@@ -1476,90 +1801,105 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
     <!-- MULTI-CONCEPTO -->
     <div class="panel" id="p-multi-concepto">
-      <div style="padding:2rem;max-width:1100px;margin:0 auto;height:100%;overflow-y:auto;width:100%;">
-        <div class="card-premium" style="margin-bottom:1.2rem;">
-          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
-            <span class="badge-premium">NUEVO</span>
-            <h3 style="font-size:1.15rem;font-weight:700;margin:0;">Detector Multi-concepto</h3>
-          </div>
-          <p style="font-size:.85rem;color:var(--text2);margin:.3rem 0 1.2rem;line-height:1.6;">
-            Analiza el texto de una glosa para detectar si contiene <b>múltiples códigos de distintos conceptos</b>
-            (ej. TA0801 + SO0101 + FA0202) y sugiere un abordaje consolidado.
-          </p>
-          <div class="field">
-            <label>Texto de la glosa</label>
-            <textarea id="mc-texto" rows="5" placeholder="Pegue aquí el texto completo de la glosa con sus códigos..."></textarea>
-          </div>
-          <div style="display:flex;gap:.5rem;">
-            <button class="btn-primary" onclick="analizarMultiConcepto()">Analizar</button>
-            <button class="btn-secondary" onclick="document.getElementById('mc-texto').value='';document.getElementById('mc-resultado').innerHTML='';">Limpiar</button>
+      <div style="height:100%;overflow-y:auto;width:100%;">
+        <div class="panel-hero">
+          <div class="panel-hero-inner">
+            <span class="panel-hero-tag">Herramienta IA</span>
+            <h1>Detector Multi-concepto</h1>
+            <div class="panel-hero-sub">
+              Analiza el texto de una glosa para detectar si contiene <b>múltiples códigos de distintos conceptos</b>
+              (ej. TA0801 + SO0101 + FA0202) y sugiere un abordaje consolidado.
+            </div>
           </div>
         </div>
-        <div id="mc-resultado"></div>
+        <div style="padding:1.75rem 2rem;max-width:1100px;margin:0 auto;">
+          <div class="form-card">
+            <h3>Analizar texto</h3>
+            <div class="field">
+              <label>Texto de la glosa</label>
+              <textarea id="mc-texto" rows="5" placeholder="Pegue aquí el texto completo de la glosa con sus códigos..."></textarea>
+            </div>
+            <div style="display:flex;gap:.5rem;">
+              <button class="btn-primary" onclick="analizarMultiConcepto()">Analizar</button>
+              <button class="btn-secondary" onclick="document.getElementById('mc-texto').value='';document.getElementById('mc-resultado').innerHTML='';">Limpiar</button>
+            </div>
+          </div>
+          <div id="mc-resultado" style="margin-top:1.2rem;"></div>
+        </div>
       </div>
     </div>
 
     <!-- DETECTOR GLOSAS EN MASA -->
     <div class="panel" id="p-detector-masa">
-      <div style="padding:2rem;max-width:1100px;margin:0 auto;height:100%;overflow-y:auto;width:100%;">
-        <div class="card-premium" style="margin-bottom:1.2rem;">
-          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
-            <span class="badge-premium">NUEVO</span>
-            <h3 style="font-size:1.15rem;font-weight:700;margin:0;">Detector de Glosas en Masa</h3>
-          </div>
-          <p style="font-size:.85rem;color:var(--text2);margin:.3rem 0 1.2rem;line-height:1.6;">
-            Identifica <b>glosas duplicadas o casi idénticas</b> (misma EPS + mismo código + motivo similar)
-            para responder consolidadas y ahorrar tiempo.
-          </p>
-          <div style="display:flex;gap:.75rem;align-items:end;flex-wrap:wrap;">
-            <div class="field" style="flex:1;min-width:180px;margin-bottom:0;">
-              <label>Rango de análisis</label>
-              <select id="dm-dias">
-                <option value="7">Últimos 7 días</option>
-                <option value="15">Últimos 15 días</option>
-                <option value="30" selected>Últimos 30 días</option>
-                <option value="60">Últimos 60 días</option>
-                <option value="90">Últimos 90 días</option>
-              </select>
+      <div style="height:100%;overflow-y:auto;width:100%;">
+        <div class="panel-hero">
+          <div class="panel-hero-inner">
+            <span class="panel-hero-tag">Analítica avanzada</span>
+            <h1>Detector de Glosas en Masa</h1>
+            <div class="panel-hero-sub">
+              Identifica <b>glosas duplicadas o casi idénticas</b> (misma EPS + mismo código + motivo similar)
+              para responder consolidadas y ahorrar tiempo operativo.
             </div>
-            <button class="btn-primary" onclick="detectarGlosasMasa()">Detectar</button>
           </div>
         </div>
-        <div id="dm-resultado"></div>
+        <div style="padding:1.75rem 2rem;max-width:1100px;margin:0 auto;">
+          <div class="form-card">
+            <h3>Parámetros de análisis</h3>
+            <div style="display:flex;gap:.75rem;align-items:end;flex-wrap:wrap;">
+              <div class="field" style="flex:1;min-width:200px;margin-bottom:0;">
+                <label>Rango de análisis</label>
+                <select id="dm-dias">
+                  <option value="7">Últimos 7 días</option>
+                  <option value="15">Últimos 15 días</option>
+                  <option value="30" selected>Últimos 30 días</option>
+                  <option value="60">Últimos 60 días</option>
+                  <option value="90">Últimos 90 días</option>
+                </select>
+              </div>
+              <button class="btn-primary" onclick="detectarGlosasMasa()">Detectar duplicados</button>
+            </div>
+          </div>
+          <div id="dm-resultado" style="margin-top:1.2rem;"></div>
+        </div>
       </div>
     </div>
 
     <!-- SIMULADOR -->
     <div class="panel" id="p-simulador">
-      <div style="padding:2rem;max-width:1100px;margin:0 auto;height:100%;overflow-y:auto;width:100%;">
-        <div class="card-premium" style="margin-bottom:1.2rem;">
-          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
-            <span class="badge-premium">NUEVO</span>
-            <h3 style="font-size:1.15rem;font-weight:700;margin:0;">Simulador "¿Qué pasaría si...?"</h3>
-          </div>
-          <p style="font-size:.85rem;color:var(--text2);margin:.3rem 0 1.2rem;line-height:1.6;">
-            Calcula el <b>riesgo de ratificación</b> bajo distintos escenarios hipotéticos para ayudarte a
-            decidir qué refuerzos aportar antes de radicar.
-          </p>
-          <div class="field">
-            <label>Texto de la glosa</label>
-            <textarea id="sim-texto" rows="3" placeholder="Pegue aquí el texto de la glosa..."></textarea>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
-            <div class="field" style="margin-bottom:0;">
-              <label>Código de glosa</label>
-              <input type="text" id="sim-codigo" placeholder="Ej: TA0801, FA0202" maxlength="10"/>
+      <div style="height:100%;overflow-y:auto;width:100%;">
+        <div class="panel-hero">
+          <div class="panel-hero-inner">
+            <span class="panel-hero-tag">Simulación predictiva</span>
+            <h1>¿Qué pasaría si...?</h1>
+            <div class="panel-hero-sub">
+              Calcula el <b>riesgo de ratificación</b> bajo 5 escenarios hipotéticos (contrato, PDF, extemporaneidad,
+              ratificación, escenario óptimo) para decidir qué refuerzos aportar antes de radicar.
             </div>
-            <div class="field" style="margin-bottom:0;">
-              <label>EPS / Pagador</label>
-              <input type="text" id="sim-eps" placeholder="Ej: NUEVA EPS, DISPENSARIO MÉDICO"/>
-            </div>
-          </div>
-          <div style="margin-top:1rem;">
-            <button class="btn-primary" onclick="correrSimulador()">Simular 5 escenarios</button>
           </div>
         </div>
-        <div id="sim-resultado"></div>
+        <div style="padding:1.75rem 2rem;max-width:1100px;margin:0 auto;">
+          <div class="form-card">
+            <h3>Datos del caso</h3>
+            <div class="field">
+              <label>Texto de la glosa</label>
+              <textarea id="sim-texto" rows="3" placeholder="Pegue aquí el texto de la glosa..."></textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+              <div class="field" style="margin-bottom:0;">
+                <label>Código de glosa</label>
+                <input type="text" id="sim-codigo" placeholder="Ej: TA0801, FA0202" maxlength="10"/>
+              </div>
+              <div class="field" style="margin-bottom:0;">
+                <label>EPS / Pagador</label>
+                <input type="text" id="sim-eps" placeholder="Ej: NUEVA EPS, DISPENSARIO MÉDICO"/>
+              </div>
+            </div>
+            <div style="margin-top:1rem;">
+              <button class="btn-primary" onclick="correrSimulador()">Simular 5 escenarios</button>
+            </div>
+          </div>
+          <div id="sim-resultado" style="margin-top:1.2rem;"></div>
+        </div>
       </div>
     </div>
 
@@ -1677,6 +2017,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 <!-- TOASTS -->
 <div class="toast-wrap" id="toasts"></div>
+
+<!-- COMMAND PALETTE -->
+<div class="cp-backdrop" id="cp-backdrop" onclick="if(event.target===this)cerrarCommandPalette()">
+  <div class="cp-box">
+    <div class="cp-search">
+      <svg class="i i-md" viewBox="0 0 24 24" style="color:var(--text3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="cp-input" placeholder="Escribe para buscar acciones, secciones, herramientas…" oninput="filtrarCommandPalette(this.value)" onkeydown="handleCpKeyDown(event)"/>
+      <span class="kbd-hint">ESC</span>
+    </div>
+    <div class="cp-list" id="cp-list"></div>
+  </div>
+</div>
+
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────
@@ -2084,6 +2437,111 @@ function mostrarResultadoValidacion(d){
   html += '</div></div>';
   modalBody.innerHTML = html;
 }
+
+// ─── COMMAND PALETTE (Cmd+K) ─────────────────────────────────
+var CP_ACCIONES = [
+  // Navegación
+  {seccion:"Navegación", icono:"🏠", titulo:"Analizar glosa", hint:"Nueva glosa", tab:"analizar"},
+  {seccion:"Navegación", icono:"📊", titulo:"Mi desempeño", hint:"Tu productividad", tab:"mi-desempeno"},
+  {seccion:"Navegación", icono:"📋", titulo:"Mis glosas", hint:"Asignaciones", tab:"mis-glosas"},
+  {seccion:"Navegación", icono:"🕓", titulo:"Historial", hint:"Glosas anteriores", tab:"historial"},
+  {seccion:"Navegación", icono:"🔔", titulo:"Alertas", hint:"Próximas a vencer", tab:"alertas"},
+  {seccion:"Navegación", icono:"💼", titulo:"Contratos", hint:"EPS y tarifas", tab:"contratos"},
+  {seccion:"Navegación", icono:"📑", titulo:"Plantillas", hint:"Respuestas guardadas", tab:"plantillas"},
+  {seccion:"Navegación", icono:"⭐", titulo:"Plantillas Gold", hint:"Respuestas ganadoras", tab:"plantillas-gold"},
+  // Herramientas
+  {seccion:"Herramientas", icono:"📚", titulo:"Consulta Normativa", hint:"Biblioteca legal", tab:"consulta-normativa"},
+  {seccion:"Herramientas", icono:"🧩", titulo:"Multi-concepto", hint:"Detectar múltiples códigos", tab:"multi-concepto"},
+  {seccion:"Herramientas", icono:"🔲", titulo:"Detector en masa", hint:"Glosas duplicadas", tab:"detector-masa"},
+  {seccion:"Herramientas", icono:"⏱️", titulo:"Simulador", hint:"¿Qué pasaría si…?", tab:"simulador"},
+  {seccion:"Herramientas", icono:"💚", titulo:"Salud Total", hint:"Procesar TXT", tab:"salud-total"},
+  // Acciones rápidas
+  {seccion:"Acciones", icono:"📥", titulo:"Importar recepción", hint:"Excel recepción", accion:function(){window.location.href='/importar-recepcion'}},
+  {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
+  {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
+  {seccion:"Acciones", icono:"🌓", titulo:"Alternar modo oscuro", hint:"Light ↔ Dark", accion:function(){cerrarCommandPalette();toggleDark()}},
+  {seccion:"Acciones", icono:"🚪", titulo:"Cerrar sesión", hint:"Salir", accion:function(){cerrarCommandPalette();logout()}},
+];
+var CP_FILTERED = [];
+var CP_SEL = 0;
+
+function abrirCommandPalette(){
+  document.getElementById('cp-backdrop').classList.add('show');
+  setTimeout(function(){
+    var inp = document.getElementById('cp-input');
+    inp.value = '';
+    inp.focus();
+    filtrarCommandPalette('');
+  }, 50);
+}
+function cerrarCommandPalette(){
+  document.getElementById('cp-backdrop').classList.remove('show');
+}
+function filtrarCommandPalette(q){
+  q = (q||'').toLowerCase().trim();
+  CP_FILTERED = CP_ACCIONES.filter(function(a){
+    if(!q) return true;
+    return (a.titulo.toLowerCase().indexOf(q)>=0)
+        || (a.hint && a.hint.toLowerCase().indexOf(q)>=0)
+        || (a.seccion.toLowerCase().indexOf(q)>=0);
+  });
+  CP_SEL = 0;
+  renderCommandPalette();
+}
+function renderCommandPalette(){
+  var list = document.getElementById('cp-list');
+  if(CP_FILTERED.length === 0){
+    list.innerHTML = '<div style="padding:2rem 1rem;text-align:center;color:var(--text3);font-size:.85rem;">Sin resultados. Prueba con otro término.</div>';
+    return;
+  }
+  var html = '';
+  var currentSec = '';
+  CP_FILTERED.forEach(function(a, i){
+    if(a.seccion !== currentSec){
+      html += '<div class="cp-section">' + a.seccion + '</div>';
+      currentSec = a.seccion;
+    }
+    var active = i === CP_SEL ? ' active' : '';
+    html += '<div class="cp-item'+active+'" data-idx="'+i+'" onclick="ejecutarCpItem('+i+')" onmouseenter="CP_SEL='+i+';renderCommandPalette()">';
+    html += '<div class="cp-item-icon">'+a.icono+'</div>';
+    html += '<div style="flex:1;"><div>'+a.titulo+'</div></div>';
+    if(a.hint) html += '<div class="cp-item-sub">'+a.hint+'</div>';
+    html += '</div>';
+  });
+  list.innerHTML = html;
+  var activeEl = list.querySelector('.cp-item.active');
+  if(activeEl) activeEl.scrollIntoView({block:'nearest'});
+}
+function ejecutarCpItem(i){
+  var a = CP_FILTERED[i];
+  if(!a) return;
+  if(a.tab){
+    cerrarCommandPalette();
+    // Buscar y clickear el botón correspondiente en sidebar
+    var btn = document.querySelector('.sn-item[onclick*="'+a.tab+'"]');
+    if(btn) btn.click();
+  } else if(a.accion){
+    a.accion();
+  }
+}
+function handleCpKeyDown(e){
+  if(e.key === 'Escape'){ cerrarCommandPalette(); return; }
+  if(e.key === 'ArrowDown'){ e.preventDefault(); CP_SEL = Math.min(CP_SEL+1, CP_FILTERED.length-1); renderCommandPalette(); return; }
+  if(e.key === 'ArrowUp'){ e.preventDefault(); CP_SEL = Math.max(CP_SEL-1, 0); renderCommandPalette(); return; }
+  if(e.key === 'Enter'){ e.preventDefault(); ejecutarCpItem(CP_SEL); return; }
+}
+// Shortcut global Cmd+K / Ctrl+K
+document.addEventListener('keydown', function(e){
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){
+    e.preventDefault();
+    abrirCommandPalette();
+  }
+  // Shortcut adicional: / para abrir también (estilo GitHub)
+  if(e.key === '/' && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){
+    e.preventDefault();
+    abrirCommandPalette();
+  }
+});
 
 // ─── MULTI-CONCEPTO ─────────────────────────────────────────────
 async function analizarMultiConcepto(){
