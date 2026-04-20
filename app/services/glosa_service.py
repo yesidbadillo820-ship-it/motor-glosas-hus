@@ -316,6 +316,20 @@ class GlosaService:
                 bloque_ejemplos += "\n--- FIN EJEMPLOS ---\n\nGenera una respuesta NUEVA para el caso actual inspirándote en el estilo anterior, adaptando a los datos específicos. No copies literal."
                 system_prompt = system_prompt + bloque_ejemplos
                 logger.info(f"Prompt enriquecido con {len(few_shots)} plantilla(s) gold")
+            # CUPS verificado: extraer SOLO del texto de la glosa (no del PDF
+            # que trae números de ingreso/HC/folio que no son CUPS).
+            cups_verificado = ""
+            _m_cups = re.search(
+                r"(?:^|\s|[-·,])\s*(\d{4,8}(?:-\d)?)\s*(?:[-·,]|\s+[A-ZÁÉÍÓÚÑ])",
+                texto_base,
+            )
+            if _m_cups:
+                cups_verificado = _m_cups.group(1)
+            else:
+                _m2 = re.search(r"\b(\d{5,6}(?:-\d)?)\b", texto_base)
+                if _m2:
+                    cups_verificado = _m2.group(1)
+
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
                 contexto_pdf=contexto_pdf,
@@ -324,7 +338,8 @@ class GlosaService:
                 numero_factura=data.numero_factura,
                 numero_radicado=data.numero_radicado,
                 dias_habiles=dias,
-                es_extemporanea=es_extemporanea
+                es_extemporanea=es_extemporanea,
+                cups_verificado=cups_verificado or None,
             )
             res_ia, modelo_usado = await self._llamar_ia(
                 system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det
@@ -358,18 +373,46 @@ class GlosaService:
                 arg_ia = arg_ia.split("</paciente>")[-1].strip()
             # Expandir abreviaturas de códigos a nombres completos
             arg_ia = _expandir_abreviaturas_tipo(arg_ia)
-            # Safety net: reemplazar placeholders crudos "$VALOR ..." que la IA
-            # a veces deja sin renderizar cuando no hay monto numérico.
+            # Safety net: limpiar placeholders y construcciones gramaticales
+            # rotas que la IA suele producir cuando no tiene monto numérico.
+
+            # 1) "$EL VALOR INDICADO…" / "$VALOR FACTURADO…" → sin $
             arg_ia = re.sub(
-                r"\$\s*VALOR\s+(FACTURADO|OBJETADO|ACEPTADO)\s+EN\s+EL\s+EXPEDIENTE",
-                r"EL VALOR \1 SEGÚN CONSTA EN EL EXPEDIENTE",
+                r"\$\s*(EL\s+)?VALOR\s+(FACTURADO|OBJETADO|ACEPTADO|INDICADO)",
+                lambda m: (m.group(1) or "EL ") + f"VALOR {m.group(2)}",
                 arg_ia, flags=re.IGNORECASE,
             )
+
+            # 2) "VALOR DE EL VALOR INDICADO EN EL EXPEDIENTE" (redundancia)
             arg_ia = re.sub(
-                r"\$\s*VALOR\s+(FACTURADO|OBJETADO|ACEPTADO)\b",
-                r"EL VALOR \1",
+                r"VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
+                r"VALOR INDICADO EN EL EXPEDIENTE",
                 arg_ia, flags=re.IGNORECASE,
             )
+
+            # 3) "RETENCIÓN DE EL VALOR" / "RETENCIÓN DE $EL VALOR"
+            arg_ia = re.sub(
+                r"RETENCI[ÓO]N\s+DE\s+\$?\s*EL\s+VALOR",
+                r"RETENCIÓN DEL VALOR",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
+            # 4) "FACTURADO POR VALOR DE EL VALOR INDICADO..." → "FACTURADO SEGÚN CONSTA..."
+            arg_ia = re.sub(
+                r"FACTURAD[OA]\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
+                r"FACTURADO SEGÚN CONSTA EN EL EXPEDIENTE",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
+            # 5) "RECONOCIMIENTO ÍNTEGRO DEL VALOR DE EL VALOR INDICADO..."
+            arg_ia = re.sub(
+                r"RECONOCIMIENTO\s+(ÍNTEGRO\s+)?DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)",
+                r"RECONOCIMIENTO \1DEL VALOR \2",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
+            # 6) Preposición "DE EL" → "DEL"
+            arg_ia = re.sub(r"\bDE\s+EL\s+VALOR\b", "DEL VALOR", arg_ia, flags=re.IGNORECASE)
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 

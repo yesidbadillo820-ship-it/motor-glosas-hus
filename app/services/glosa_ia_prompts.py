@@ -1227,10 +1227,13 @@ def build_user_prompt(
     dias_habiles: Optional[int] = None,
     es_extemporanea: bool = False,
     variante: int = -1,
+    cups_verificado: Optional[str] = None,
 ) -> str:
     tipo_atencion = extraer_tipo_atencion(contexto_pdf, texto_glosa)
     datos = extraer_datos_soporte(contexto_pdf)
-    cups        = datos["cups"]
+    # Si se pasó CUPS verificado desde el servicio (extraído del texto de la
+    # glosa), úsalo. Si no, cae al que extrajo extraer_datos_soporte del PDF.
+    cups        = cups_verificado or datos["cups"]
     diagnostico = datos["diagnostico"]
     medico      = datos["medico"]
     fecha       = datos["fecha_atencion"]
