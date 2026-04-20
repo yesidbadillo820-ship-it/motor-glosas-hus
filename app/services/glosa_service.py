@@ -559,6 +559,7 @@ class GlosaService:
                 es_extemporanea=es_extemporanea,
                 cups_verificado=cups_verificado or None,
                 valor_objetado=valor_raw,
+                tono=getattr(data, "tono", "conciliador") or "conciliador",
             )
             res_ia, modelo_usado = await self._llamar_ia(
                 system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det
@@ -934,6 +935,62 @@ class GlosaService:
                 <div style="color:#1e3a8a;line-height:1.8;">{normas_html}</div>
             </div>"""
 
+        # Relación de soportes aportados (tabla) — solo si hay trazabilidad
+        bloque_adjuntos = ""
+        if numero_factura or numero_radicado:
+            filas_adj = [
+                '<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">1</td>'
+                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Historia clínica institucional</td>'
+                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Res. 1995/1999</td></tr>',
+                '<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">2</td>'
+                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">RIPS radicados</td>'
+                '<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Res. 866/2021</td></tr>',
+            ]
+            if numero_factura:
+                filas_adj.append(
+                    f'<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">3</td>'
+                    f'<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Factura electrónica No. {numero_factura}</td>'
+                    f'<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">Res. 2275/2023 (FEV)</td></tr>'
+                )
+            bloque_adjuntos = f"""
+            <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:8px;padding:12px;margin-top:10px;">
+                <div style="font-weight:bold;color:#15803d;margin-bottom:8px;">📎 RELACIÓN DE SOPORTES APORTADOS</div>
+                <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#dcfce7;">
+                            <th style="padding:6px 10px;text-align:left;border-bottom:2px solid #16a34a;width:40px;">#</th>
+                            <th style="padding:6px 10px;text-align:left;border-bottom:2px solid #16a34a;">Documento</th>
+                            <th style="padding:6px 10px;text-align:left;border-bottom:2px solid #16a34a;width:180px;">Marco legal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join(filas_adj)}
+                    </tbody>
+                </table>
+            </div>"""
+
+        # Bloque metadatos JSON oculto — legible por parsers EPS automatizados
+        import json as _json
+        from datetime import datetime as _dt
+        metadatos = {
+            "prestador_nit": "900006037-4",
+            "prestador_nombre": "ESE HOSPITAL UNIVERSITARIO DE SANTANDER",
+            "codigo_glosa": codigo,
+            "valor_objetado": valor,
+            "codigo_respuesta": cod_res,
+            "eps": eps,
+            "numero_factura": numero_factura or "",
+            "numero_radicado": numero_radicado or "",
+            "tipo_glosa": tipo,
+            "fecha_respuesta": _dt.now().strftime("%Y-%m-%d"),
+            "marco_normativo": "Res. 2284/2023 Manual Único + Ley 1438/2011 Art. 57",
+        }
+        bloque_metadatos = (
+            '<div style="display:none" data-metadatos-eps="1">'
+            f'<script type="application/json">{_json.dumps(metadatos, ensure_ascii=False)}</script>'
+            '</div>'
+        )
+
         # CORRECCIÓN: nota de pie en español
         return f"""
         <table border="1" style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:15px;background:white;">
@@ -961,6 +1018,8 @@ class GlosaService:
 
         {bloque_servicio}
         {bloque_normas}
+        {bloque_adjuntos}
+        {bloque_metadatos}
 
         <div style="margin-top:15px;padding:12px;background:#fef2f2;border-radius:8px;font-size:10px;color:#991b1b;">
             <b>Nota:</b> Generado con asistencia de IA. Verificar antes de radicar ante la EPS.

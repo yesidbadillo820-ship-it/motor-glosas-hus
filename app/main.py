@@ -652,6 +652,7 @@ from app.api.routers.push import router as push_router
 from app.api.routers.bandeja import router as bandeja_router
 from app.api.routers.adjuntos import router as adjuntos_router
 from app.api.routers.consulta_normativa import router as consulta_normativa_router
+from app.api.routers.validador import router as validador_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -684,6 +685,7 @@ app.include_router(push_router)
 app.include_router(bandeja_router)
 app.include_router(adjuntos_router)
 app.include_router(consulta_normativa_router)
+app.include_router(validador_router)
 
 
 def get_glosa_service() -> GlosaService:
@@ -744,13 +746,14 @@ async def analizar(
     tabla_excel: str = Form(...),
     numero_factura: Optional[str] = Form(None),
     numero_radicado: Optional[str] = Form(None),
+    tono: Optional[str] = Form("conciliador"),
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     req_id = set_request_id()
-    logger.info(f"[{req_id}] Análisis solicitado por: {current_user.email} | eps={eps}")
+    logger.info(f"[{req_id}] Análisis solicitado por: {current_user.email} | eps={eps} | tono={tono}")
 
     try:
         data = GlosaInput(
@@ -761,6 +764,7 @@ async def analizar(
             tabla_excel=tabla_excel,
             numero_factura=numero_factura,
             numero_radicado=numero_radicado,
+            tono=tono,
         )
     except Exception as e:
         logger.error(f"[{req_id}] Validación fallida: {e}")

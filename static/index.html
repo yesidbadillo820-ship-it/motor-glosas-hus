@@ -766,6 +766,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               </div>
               <input type="hidden" id="etapa-v" value="INICIAL"/>
             </div>
+            <div class="field">
+              <label>Tono de la respuesta</label>
+              <div class="etapa-btns">
+                <div class="etapa-btn sel" data-v="conciliador" onclick="setTono(this)" title="Etapa inicial — busca levantamiento sin ratificación">Conciliador</div>
+                <div class="etapa-btn" data-v="neutral" onclick="setTono(this)" title="Estrictamente técnico-jurídico">Neutral</div>
+                <div class="etapa-btn" data-v="firme" onclick="setTono(this)" title="Ratificación / segunda respuesta — más contundente">Firme</div>
+              </div>
+              <input type="hidden" id="tono-v" value="conciliador"/>
+            </div>
             <div class="date-row">
               <div class="field"><label>Fecha Radicación</label><input type="date" id="f-rad"/></div>
               <div class="field"><label>Fecha Recepción</label><input type="date" id="f-rec"/></div>
@@ -1349,6 +1358,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <button class="btn-sm ghost" onclick="verHistorialVersiones()" title="Historial de versiones del dictamen">📜 Versiones</button>
         <button class="btn-sm ghost" onclick="guardarComoPlantillaGold()" title="Guardar este argumento como plantilla ganadora">⭐ Gold</button>
         <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
+        <button class="btn-sm ghost" onclick="validarDictamen()" title="Checklist pre-radicación">✅ Validar</button>
         <button class="modal-close" onclick="cerrarModal()">✕</button>
       </div>
     </div>
@@ -1729,6 +1739,57 @@ async function listarNormas(){
   }catch(e){
     cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>';
   }
+}
+
+async function validarDictamen(){
+  var body = document.getElementById('modal-body');
+  if(!body){ return; }
+  var html = body.innerHTML || '';
+  var g = CURRENT_GLOSA_DATA || {};
+  var payload = {
+    argumento: html,
+    codigo_glosa: g.codigo_glosa || '',
+    cups: (g.codigo_glosa || '').match(/\d{5,6}/) ? g.codigo_glosa.match(/\d{5,6}/)[0] : '',
+    valor_original: g.valor_objetado || '',
+    codigo_respuesta: (g.tipo_respuesta || '').match(/RE\d{4}/) ? g.tipo_respuesta.match(/RE\d{4}/)[0] : '',
+    eps: g.eps || ''
+  };
+  try{
+    var r = await fetch('/validador/pre-radicacion', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok){ toast('Error','Validador: ' + r.status, 'error'); return; }
+    var d = await r.json();
+    mostrarResultadoValidacion(d);
+  }catch(e){ toast('Error','Conexión: ' + e.message, 'error'); }
+}
+
+function mostrarResultadoValidacion(d){
+  var modalBody = document.getElementById('modal-body');
+  var html = '<div style="padding:1rem;background:white;border-radius:10px;margin-bottom:1rem;border-left:5px solid ' + d.color + ';">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem;">';
+  html += '<div><div style="font-size:1.1rem;font-weight:700;color:' + d.color + ';">' + d.veredicto + '</div>';
+  html += '<div style="font-size:.8rem;color:var(--text3);">' + d.aprobados + '/' + d.total + ' checks aprobados · ' + d.palabras + ' palabras</div></div>';
+  html += '<div style="font-size:2rem;font-weight:800;color:' + d.color + ';">' + d.score + '</div>';
+  html += '</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.8rem;">';
+  d.checks.forEach(function(c){
+    var icon = c.aprobado ? '✅' : '❌';
+    var bg = c.aprobado ? '#ecfdf5' : '#fef2f2';
+    var bordc = c.aprobado ? '#10b981' : '#ef4444';
+    html += '<div style="padding:.6rem .8rem;background:' + bg + ';border-left:3px solid ' + bordc + ';border-radius:6px;font-size:.82rem;">';
+    html += '<div style="font-weight:600;">' + icon + ' ' + c.nombre + ' <span style="font-weight:400;color:#64748b;">(peso ' + c.peso + ')</span></div>';
+    html += '<div style="color:#475569;margin-top:.2rem;">' + c.mensaje + '</div>';
+    if(c.sugerencia){ html += '<div style="color:#7c2d12;margin-top:.2rem;font-style:italic;">💡 ' + c.sugerencia + '</div>'; }
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '<div style="margin-top:1rem;display:flex;gap:.5rem;">';
+  html += '<button class="btn-sm ghost" onclick="verDictamen(CURRENT_GLOSA_ID)">← Volver al dictamen</button>';
+  html += '</div></div>';
+  modalBody.innerHTML = html;
 }
 
 async function cargar2FAEstado(){
@@ -2179,9 +2240,19 @@ async function responderGlosa(id){
 
 // ─── FORM ─────────────────────────────────────────────────────────────────
 function setEtapa(el){
-  document.querySelectorAll('.etapa-btn').forEach(function(e){e.classList.remove('sel')});
+  var parent = el.parentElement;
+  if(!parent) return;
+  parent.querySelectorAll('.etapa-btn').forEach(function(e){e.classList.remove('sel')});
   el.classList.add('sel');
   document.getElementById('etapa-v').value=el.dataset.v;
+}
+
+function setTono(el){
+  var parent = el.parentElement;
+  if(!parent) return;
+  parent.querySelectorAll('.etapa-btn').forEach(function(e){e.classList.remove('sel')});
+  el.classList.add('sel');
+  document.getElementById('tono-v').value=el.dataset.v;
 }
 
 // ─── CONTRATOS ────────────────────────────────────────────────────────────
@@ -2224,6 +2295,7 @@ async function analizar(){
   fd.append('tabla_excel',glosa);
   fd.append('numero_factura',document.getElementById('f-factura').value||'');
   fd.append('numero_radicado',document.getElementById('f-radicado').value||'');
+  fd.append('tono',document.getElementById('tono-v').value||'conciliador');
 
   var files=document.getElementById('f-pdf').files;
   for(var i=0;i<files.length;i++){
@@ -3163,12 +3235,14 @@ async function eliminarUsuario(id,email){
 
 // ─── MODAL DICTAMEN ──────────────────────────────────────────────────────
 var CURRENT_GLOSA_ID = null;
+var CURRENT_GLOSA_DATA = null;
 
 async function verDictamen(id){
   try{
     var r=await fetch('/glosas/'+id,{headers:authH()});
     var g=await r.json();
     CURRENT_GLOSA_ID = id;
+    CURRENT_GLOSA_DATA = g;
     document.getElementById('modal-titulo').textContent='Dictamen de Glosa #'+id;
     document.getElementById('modal-body').innerHTML=g.dictamen||'No hay dictamen';
     document.getElementById('modal-dictamen').classList.add('show');
