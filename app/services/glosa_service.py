@@ -482,11 +482,31 @@ class GlosaService:
                 dias_habiles=dias,
                 es_extemporanea=es_extemporanea,
                 cups_verificado=cups_verificado or None,
+                valor_objetado=valor_raw,
             )
             res_ia, modelo_usado = await self._llamar_ia(
                 system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det
             )
-            
+
+            # XML validation retry: si no vino <argumento> en la respuesta,
+            # reintentamos UNA vez con un recordatorio explícito del contrato.
+            if "<argumento>" not in res_ia:
+                logger.warning("IA no devolvió <argumento>; reintentando con recordatorio XML")
+                user_retry = user_prompt + (
+                    "\n\nRECORDATORIO CRÍTICO: Tu respuesta anterior no incluyó los tags XML "
+                    "requeridos. Responde AHORA estrictamente en el formato XML definido "
+                    "(<paciente>, <servicio>, <contrato>, <tarifa>, <normas_clave>, "
+                    "<argumento>). Ningún texto fuera de los tags."
+                )
+                try:
+                    res_retry, modelo_usado = await self._llamar_ia(
+                        system_prompt, user_retry, eps=str(data.eps), codigo=codigo_det
+                    )
+                    if "<argumento>" in res_retry:
+                        res_ia = res_retry
+                except Exception as _e:
+                    logger.warning(f"Retry IA falló: {_e}")
+
             razonamiento = self._xml("razonamiento", res_ia, "")
             if razonamiento:
                 logger.info(f"IA razonamiento: {razonamiento[:200]}")
