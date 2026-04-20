@@ -49,8 +49,11 @@ class TestGenerarTextoExtemporanea:
         texto = generar_texto_extemporanea(25)
         assert "25 DÍAS HÁBILES" in texto
         assert "20 DÍAS HÁBILES" in texto
-        assert "ARTÍCULO 56" in texto
+        # Referencia actualizada: plazo del Art. 57 Ley 1438/2011 (30+15)
+        # + piso contractual de 20 días (Res. 3047/2008 + práctica HUS)
+        assert "ARTÍCULO 57" in texto
         assert "LEY 1438 DE 2011" in texto
+        assert "RESOLUCIÓN 3047" in texto
 
     def test_genera_texto_no_acepta_glosa(self):
         """Should reject the glosa."""
