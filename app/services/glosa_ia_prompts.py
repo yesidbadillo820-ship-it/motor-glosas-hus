@@ -722,6 +722,37 @@ def build_user_prompt(
     bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
     bloque_regimen_str = f"\n[RÉGIMEN ESPECIAL APLICABLE]\n{bloque_regimen}\n" if bloque_regimen else ""
 
+    # Normativa relevante para el código (inyectada de biblioteca comprehensiva)
+    bloque_normativa_str = ""
+    try:
+        from app.services.normativa_completa import (
+            normas_relevantes_para_codigo,
+            _TODAS_LAS_NORMAS,
+        )
+        claves_relevantes = normas_relevantes_para_codigo(codigo)
+        lineas = []
+        for clave in claves_relevantes[:5]:
+            n = _TODAS_LAS_NORMAS.get(clave)
+            if not n:
+                continue
+            nombre = n["nombre"]
+            titulo = n.get("titulo", "")
+            ratio = n.get("ratio", n.get("notas", n.get("ambito", "")))
+            lineas.append(f"  • {nombre} — {titulo}. {ratio}")
+            # Si tiene artículos, añade los 1-2 más relevantes
+            for art_num, art in list(n.get("articulos", {}).items())[:2]:
+                lineas.append(
+                    f"      - Art. {art_num}: {art['titulo']} — {art.get('aplicacion', '')}"
+                )
+        if lineas:
+            bloque_normativa_str = (
+                "\n[NORMATIVA RELEVANTE PARA ESTE TIPO DE GLOSA — cita SOLO las que apliquen al caso]\n"
+                + "\n".join(lineas)
+                + "\n"
+            )
+    except Exception:
+        pass
+
     # Datos clínicos (solo si aparecen)
     clinicos = []
     if paciente != "NO IDENTIFICADO":
@@ -750,7 +781,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}
+{bloque_regimen_str}{bloque_normativa_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
