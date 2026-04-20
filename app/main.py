@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -511,17 +512,25 @@ async def lifespan(app: FastAPI):
             ("glosashus04@sinacsc.com",      "AUDITOR",     "JHON JAIMES"),
             ("glosashus05@sinacsc.com",      "AUDITOR",     "MARICELA ROJAS"),
             ("carterahus01@sinacsc.com",     "AUDITOR",     "IRMA RIOS"),
-            ("carterahus04@sinacsc.com",     "AUDITOR",     "MILENA"),
+            ("carterahus04@sinacsc.com",     "AUDITOR",     "RUBY MILENA"),
             ("carterahus05@sinacsc.com",     "AUDITOR",     "PATRICIA QUIÑONES"),
             ("radicadevoluciones@sinacsc.com","AUDITOR",    "KAREN ORTIZ"),
-            ("devoluciones01@sinacsc.com",   "AUDITOR",     "YUDY"),
-            ("coordinacioncartera@hus.gov.co","AUDITOR",    "YUDY"),
-            ("glosashus08@sinacsc.com",      "AUDITOR",     "CLAUDIA"),
+            ("devoluciones01@sinacsc.com",   "AUDITOR",     "SEBASTIAN SANCHES"),
+            ("coordinacioncartera@hus.gov.co","AUDITOR",    "YUDY AMAYA"),
+            ("glosashus08@sinacsc.com",      "AUDITOR",     "CLAUDIA SUAREZ"),
             ("glosashus07@sinacsc.com",      "AUDITOR",     "YENFERSON ORTEGA"),
             ("glosashus12@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
             ("devoluciones02@sinacsc.com",   "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
             ("glosashus10@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
             ("glosashus16@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            # Usuarios adicionales creados desde la UI (añadidos al seed
+            # para que reaparezcan si alguna vez la DB se recrea desde cero):
+            ("auditorhus01@sinacsc.com",     "AUDITOR",     "LAURA DIAZ"),
+            ("auditorhus02@sinacsc.com",     "AUDITOR",     "LEIDY JHOANA SANGUINO"),
+            ("auditorhus03@sinacsc.com",     "AUDITOR",     "LEYDI ZULAY GONZALEZ"),
+            ("devoluciones03@sinacsc.com",   "AUDITOR",     "JOHANNA MORENO"),
+            ("devoluciones1@sinacsc.com",    "AUDITOR",     "EDGAR SILVA"),
+            ("glosashus03@sinacsc.com",      "AUDITOR",     "OSCAR VILLAMIZAR"),
         ]
         password_hash_default = get_password_hash(cfg.admin_password)
         for email, rol, nombre in USUARIOS_CORPORATIVOS:
@@ -535,7 +544,13 @@ async def lifespan(app: FastAPI):
                     activo=1,
                 ))
                 logger.warning(f"Usuario sembrado: {email} ({rol}) nombre={nombre}")
-            else:
+            # Si el usuario YA existe, la base de datos es la fuente de verdad:
+            # NO sobrescribimos nombre ni rol. Los cambios hechos por un
+            # SUPER_ADMIN desde la UI (Editar Rol, renombrar, etc.) deben
+            # persistir a través de redeploys. Para forzar una re-sincronización
+            # masiva desde el hardcoded, poner la variable de entorno
+            # FORCE_RESEED_USERS=1 antes del arranque.
+            elif os.getenv("FORCE_RESEED_USERS", "").lower() in ("1", "true", "yes"):
                 cambios = []
                 if existente.rol != rol:
                     cambios.append(f"rol {existente.rol}->{rol}")
@@ -544,7 +559,7 @@ async def lifespan(app: FastAPI):
                     cambios.append(f"nombre '{existente.nombre}'->'{nombre}'")
                     existente.nombre = nombre
                 if cambios:
-                    logger.warning(f"Usuario {email} actualizado: {', '.join(cambios)}")
+                    logger.warning(f"[FORCE_RESEED] {email}: {', '.join(cambios)}")
 
         db.commit()
         logger.info("Base de datos inicializada correctamente")
