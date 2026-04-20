@@ -27,6 +27,9 @@ class GlosaInput(BaseModel):
                                             description="Número de factura objetada")
     numero_radicado:  Optional[str] = Field(default=None, max_length=50,
                                             description="Número de radicado de la glosa")
+    # Tono de la respuesta: conciliador (default), neutral o firme
+    tono: Optional[str] = Field(default="conciliador", max_length=20,
+                                description="Tono de la respuesta: conciliador | neutral | firme")
 
     @field_validator("etapa")
     @classmethod

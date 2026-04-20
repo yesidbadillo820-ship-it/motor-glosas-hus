@@ -746,13 +746,14 @@ async def analizar(
     tabla_excel: str = Form(...),
     numero_factura: Optional[str] = Form(None),
     numero_radicado: Optional[str] = Form(None),
+    tono: Optional[str] = Form("conciliador"),
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     req_id = set_request_id()
-    logger.info(f"[{req_id}] Análisis solicitado por: {current_user.email} | eps={eps}")
+    logger.info(f"[{req_id}] Análisis solicitado por: {current_user.email} | eps={eps} | tono={tono}")
 
     try:
         data = GlosaInput(
@@ -763,6 +764,7 @@ async def analizar(
             tabla_excel=tabla_excel,
             numero_factura=numero_factura,
             numero_radicado=numero_radicado,
+            tono=tono,
         )
     except Exception as e:
         logger.error(f"[{req_id}] Validación fallida: {e}")

@@ -559,6 +559,7 @@ class GlosaService:
                 es_extemporanea=es_extemporanea,
                 cups_verificado=cups_verificado or None,
                 valor_objetado=valor_raw,
+                tono=getattr(data, "tono", "conciliador") or "conciliador",
             )
             res_ia, modelo_usado = await self._llamar_ia(
                 system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det

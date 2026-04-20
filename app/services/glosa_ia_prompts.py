@@ -679,6 +679,7 @@ def build_user_prompt(
     variante: int = -1,
     cups_verificado: Optional[str] = None,
     valor_objetado: Optional[str] = None,
+    tono: Optional[str] = "conciliador",
 ) -> str:
     """Construye el user prompt estructurado para la IA.
 
@@ -835,7 +836,28 @@ def build_user_prompt(
 
     pdf_texto = (contexto_pdf[:3000].strip() if contexto_pdf else FALLBACK_SIN_SOPORTES)
 
-    return f"""CASO A RESOLVER — GLOSA {codigo}
+    # Ajuste de tono según configuración (conciliador, neutral, firme)
+    tono_norm = (tono or "conciliador").lower().strip()
+    bloque_tono_str = ""
+    if tono_norm == "firme":
+        bloque_tono_str = (
+            "\n[AJUSTE DE TONO — FIRME]\n"
+            "  Este caso es ratificación o segunda respuesta. Sube la intensidad argumentativa:\n"
+            "  • Mantén el registro técnico-jurídico pero con mayor énfasis en el deber legal incumplido.\n"
+            "  • Usa expresiones como 'NO SE AJUSTA A DERECHO', 'CARECE DE RESPALDO NORMATIVO',\n"
+            "    'CONFIGURA UN DESCONOCIMIENTO DEL MARCO CONTRACTUAL', 'SE INSTA AL PRONUNCIAMIENTO'.\n"
+            "  • Refuerza la reserva SuperSalud: anuncia la intención firme de elevar el conflicto.\n"
+            "  • NO cruces la línea de lo hostil: sigue sin 'SE EXIGE', 'ACTO ABUSIVO', 'OBLIGA A'.\n"
+        )
+    elif tono_norm == "neutral":
+        bloque_tono_str = (
+            "\n[AJUSTE DE TONO — NEUTRAL]\n"
+            "  Registro estrictamente técnico-jurídico, sin suavizadores conciliadores\n"
+            "  ('RESPETUOSAMENTE', 'CORDIALMENTE'). Usa lenguaje directo pero institucional.\n"
+        )
+    # conciliador es el default — no añade bloque extra
+
+    return f"""CASO A RESOLVER — GLOSA {codigo}{bloque_tono_str}
 
 ═══ BLOQUE 1: DATOS DEL CASO ═══
 • Tipo de glosa     : {nombre_tipo} ({codigo})

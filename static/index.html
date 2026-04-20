@@ -766,6 +766,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               </div>
               <input type="hidden" id="etapa-v" value="INICIAL"/>
             </div>
+            <div class="field">
+              <label>Tono de la respuesta</label>
+              <div class="etapa-btns">
+                <div class="etapa-btn sel" data-v="conciliador" onclick="setTono(this)" title="Etapa inicial — busca levantamiento sin ratificación">Conciliador</div>
+                <div class="etapa-btn" data-v="neutral" onclick="setTono(this)" title="Estrictamente técnico-jurídico">Neutral</div>
+                <div class="etapa-btn" data-v="firme" onclick="setTono(this)" title="Ratificación / segunda respuesta — más contundente">Firme</div>
+              </div>
+              <input type="hidden" id="tono-v" value="conciliador"/>
+            </div>
             <div class="date-row">
               <div class="field"><label>Fecha Radicación</label><input type="date" id="f-rad"/></div>
               <div class="field"><label>Fecha Recepción</label><input type="date" id="f-rec"/></div>
@@ -2231,9 +2240,19 @@ async function responderGlosa(id){
 
 // ─── FORM ─────────────────────────────────────────────────────────────────
 function setEtapa(el){
-  document.querySelectorAll('.etapa-btn').forEach(function(e){e.classList.remove('sel')});
+  var parent = el.parentElement;
+  if(!parent) return;
+  parent.querySelectorAll('.etapa-btn').forEach(function(e){e.classList.remove('sel')});
   el.classList.add('sel');
   document.getElementById('etapa-v').value=el.dataset.v;
+}
+
+function setTono(el){
+  var parent = el.parentElement;
+  if(!parent) return;
+  parent.querySelectorAll('.etapa-btn').forEach(function(e){e.classList.remove('sel')});
+  el.classList.add('sel');
+  document.getElementById('tono-v').value=el.dataset.v;
 }
 
 // ─── CONTRATOS ────────────────────────────────────────────────────────────
@@ -2276,6 +2295,7 @@ async function analizar(){
   fd.append('tabla_excel',glosa);
   fd.append('numero_factura',document.getElementById('f-factura').value||'');
   fd.append('numero_radicado',document.getElementById('f-radicado').value||'');
+  fd.append('tono',document.getElementById('tono-v').value||'conciliador');
 
   var files=document.getElementById('f-pdf').files;
   for(var i=0;i<files.length;i++){
