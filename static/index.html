@@ -910,6 +910,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zm0 12.5L4.21 10.6 2 11.65 12 17l10-5.35-2.21-1.05L12 14.5zM12 20L4.21 16.1 2 17.15 12 22l10-4.85-2.21-1.05L12 20z"/></svg>
           <span class="sn-item-label">Consulta Normativa</span>
         </button>
+        <button class="sn-item" data-tip="Multi-concepto" onclick="sidebarTab(this,'multi-concepto')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          <span class="sn-item-label">Multi-concepto</span>
+        </button>
+        <button class="sn-item" data-tip="Detector en masa" onclick="sidebarTab(this,'detector-masa')">
+          <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span class="sn-item-label">Detector en masa</span>
+        </button>
+        <button class="sn-item" data-tip="Simulador de riesgo" onclick="sidebarTab(this,'simulador')">
+          <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span class="sn-item-label">Simulador</span>
+        </button>
         <button class="sn-item" data-tip="Salud Total" onclick="sidebarTab(this,'salud-total')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M20.84 4.61A5.5 5.5 0 0 0 13.06 4.61L12 5.67L10.94 4.61A5.5 5.5 0 0 0 3.16 12.39L12 21.23L20.84 12.39A5.5 5.5 0 0 0 20.84 4.61Z"/></svg>
           <span class="sn-item-label">Salud Total</span>
@@ -1462,6 +1474,95 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </div>
     </div>
 
+    <!-- MULTI-CONCEPTO -->
+    <div class="panel" id="p-multi-concepto">
+      <div style="padding:2rem;max-width:1100px;margin:0 auto;height:100%;overflow-y:auto;width:100%;">
+        <div class="card-premium" style="margin-bottom:1.2rem;">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+            <span class="badge-premium">NUEVO</span>
+            <h3 style="font-size:1.15rem;font-weight:700;margin:0;">Detector Multi-concepto</h3>
+          </div>
+          <p style="font-size:.85rem;color:var(--text2);margin:.3rem 0 1.2rem;line-height:1.6;">
+            Analiza el texto de una glosa para detectar si contiene <b>múltiples códigos de distintos conceptos</b>
+            (ej. TA0801 + SO0101 + FA0202) y sugiere un abordaje consolidado.
+          </p>
+          <div class="field">
+            <label>Texto de la glosa</label>
+            <textarea id="mc-texto" rows="5" placeholder="Pegue aquí el texto completo de la glosa con sus códigos..."></textarea>
+          </div>
+          <div style="display:flex;gap:.5rem;">
+            <button class="btn-primary" onclick="analizarMultiConcepto()">Analizar</button>
+            <button class="btn-secondary" onclick="document.getElementById('mc-texto').value='';document.getElementById('mc-resultado').innerHTML='';">Limpiar</button>
+          </div>
+        </div>
+        <div id="mc-resultado"></div>
+      </div>
+    </div>
+
+    <!-- DETECTOR GLOSAS EN MASA -->
+    <div class="panel" id="p-detector-masa">
+      <div style="padding:2rem;max-width:1100px;margin:0 auto;height:100%;overflow-y:auto;width:100%;">
+        <div class="card-premium" style="margin-bottom:1.2rem;">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+            <span class="badge-premium">NUEVO</span>
+            <h3 style="font-size:1.15rem;font-weight:700;margin:0;">Detector de Glosas en Masa</h3>
+          </div>
+          <p style="font-size:.85rem;color:var(--text2);margin:.3rem 0 1.2rem;line-height:1.6;">
+            Identifica <b>glosas duplicadas o casi idénticas</b> (misma EPS + mismo código + motivo similar)
+            para responder consolidadas y ahorrar tiempo.
+          </p>
+          <div style="display:flex;gap:.75rem;align-items:end;flex-wrap:wrap;">
+            <div class="field" style="flex:1;min-width:180px;margin-bottom:0;">
+              <label>Rango de análisis</label>
+              <select id="dm-dias">
+                <option value="7">Últimos 7 días</option>
+                <option value="15">Últimos 15 días</option>
+                <option value="30" selected>Últimos 30 días</option>
+                <option value="60">Últimos 60 días</option>
+                <option value="90">Últimos 90 días</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="detectarGlosasMasa()">Detectar</button>
+          </div>
+        </div>
+        <div id="dm-resultado"></div>
+      </div>
+    </div>
+
+    <!-- SIMULADOR -->
+    <div class="panel" id="p-simulador">
+      <div style="padding:2rem;max-width:1100px;margin:0 auto;height:100%;overflow-y:auto;width:100%;">
+        <div class="card-premium" style="margin-bottom:1.2rem;">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+            <span class="badge-premium">NUEVO</span>
+            <h3 style="font-size:1.15rem;font-weight:700;margin:0;">Simulador "¿Qué pasaría si...?"</h3>
+          </div>
+          <p style="font-size:.85rem;color:var(--text2);margin:.3rem 0 1.2rem;line-height:1.6;">
+            Calcula el <b>riesgo de ratificación</b> bajo distintos escenarios hipotéticos para ayudarte a
+            decidir qué refuerzos aportar antes de radicar.
+          </p>
+          <div class="field">
+            <label>Texto de la glosa</label>
+            <textarea id="sim-texto" rows="3" placeholder="Pegue aquí el texto de la glosa..."></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+            <div class="field" style="margin-bottom:0;">
+              <label>Código de glosa</label>
+              <input type="text" id="sim-codigo" placeholder="Ej: TA0801, FA0202" maxlength="10"/>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label>EPS / Pagador</label>
+              <input type="text" id="sim-eps" placeholder="Ej: NUEVA EPS, DISPENSARIO MÉDICO"/>
+            </div>
+          </div>
+          <div style="margin-top:1rem;">
+            <button class="btn-primary" onclick="correrSimulador()">Simular 5 escenarios</button>
+          </div>
+        </div>
+        <div id="sim-resultado"></div>
+      </div>
+    </div>
+
     <!-- SALUD TOTAL -->
     <div class="panel" id="p-salud-total">
       <div class="st-area">
@@ -1973,6 +2074,133 @@ function mostrarResultadoValidacion(d){
   html += '<button class="btn-sm ghost" onclick="verDictamen(CURRENT_GLOSA_ID)">← Volver al dictamen</button>';
   html += '</div></div>';
   modalBody.innerHTML = html;
+}
+
+// ─── MULTI-CONCEPTO ─────────────────────────────────────────────
+async function analizarMultiConcepto(){
+  var txt = (document.getElementById('mc-texto').value || '').trim();
+  if(txt.length < 10){ toast('Info','Pega texto de al menos 10 caracteres','info'); return; }
+  var cont = document.getElementById('mc-resultado');
+  cont.innerHTML = '<div style="padding:1rem;color:var(--text3);">Analizando…</div>';
+  try{
+    var r = await fetch('/herramientas/multi-concepto', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({texto: txt})
+    });
+    if(!r.ok){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Error ' + r.status + '</div>'; return; }
+    var d = await r.json();
+    var nombres = {TA:'TARIFAS',SO:'SOPORTES',AU:'AUTORIZACIÓN',CO:'COBERTURA',CL:'PERTINENCIA CLÍNICA',PE:'PERTINENCIA CLÍNICA',FA:'FACTURACIÓN',IN:'INSUMOS',ME:'MEDICAMENTOS',EX:'EXTEMPORÁNEA'};
+    var colores = {TA:'#1e40af',SO:'#7c3aed',AU:'#059669',CO:'#dc2626',CL:'#d97706',PE:'#d97706',FA:'#0891b2',IN:'#e11d48',ME:'#4f46e5',EX:'#991b1b'};
+    var html = '';
+    if(d.es_multi_concepto){
+      html += '<div class="form-card" style="margin-bottom:1rem;border-left:4px solid var(--c-amber);">';
+      html += '<div style="font-weight:700;color:var(--c-amber);font-size:.95rem;margin-bottom:.3rem;">⚠ Glosa con ' + d.num_conceptos + ' conceptos distintos</div>';
+      html += '<div style="font-size:.85rem;color:var(--text2);line-height:1.5;">' + d.recomendacion + '</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="form-card" style="margin-bottom:1rem;border-left:4px solid var(--c-green);">';
+      html += '<div style="font-weight:700;color:var(--c-green);font-size:.95rem;margin-bottom:.3rem;">✓ Glosa de un solo concepto</div>';
+      html += '<div style="font-size:.85rem;color:var(--text2);">' + d.recomendacion + '</div>';
+      html += '</div>';
+    }
+    if(d.codigos && d.codigos.length){
+      html += '<div class="form-card"><h3>Códigos detectados (' + d.codigos.length + ')</h3>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:.5rem;">';
+      d.codigos.forEach(function(c){
+        var pref = c.substring(0,2).toUpperCase();
+        var color = colores[pref] || '#64748b';
+        html += '<span style="padding:6px 12px;background:'+color+';color:white;border-radius:16px;font-size:.78rem;font-weight:700;box-shadow:var(--sh);">' + c + '</span>';
+      });
+      html += '</div></div>';
+
+      html += '<div class="form-card" style="margin-top:1rem;"><h3>Agrupación por concepto</h3>';
+      Object.keys(d.grupos).forEach(function(p){
+        var color = colores[p] || '#64748b';
+        html += '<div style="padding:.8rem 1rem;background:var(--bg-subtle);border-left:3px solid '+color+';margin-bottom:.5rem;border-radius:6px;">';
+        html += '<div style="font-weight:700;color:'+color+';font-size:.85rem;">' + (nombres[p]||p) + ' (' + d.grupos[p].length + ')</div>';
+        html += '<div style="font-size:.8rem;color:var(--text2);margin-top:.2rem;">' + d.grupos[p].join(', ') + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    cont.innerHTML = html;
+  }catch(e){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>'; }
+}
+
+// ─── DETECTOR GLOSAS EN MASA ────────────────────────────────────
+async function detectarGlosasMasa(){
+  var dias = document.getElementById('dm-dias').value || '30';
+  var cont = document.getElementById('dm-resultado');
+  cont.innerHTML = '<div style="padding:1rem;color:var(--text3);">Analizando glosas de los últimos ' + dias + ' días…</div>';
+  try{
+    var r = await fetch('/herramientas/detector-masa?dias_atras=' + dias, {headers: authH()});
+    if(!r.ok){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Error ' + r.status + '</div>'; return; }
+    var d = await r.json();
+    var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1rem;">';
+    html += '<div class="form-card" style="text-align:center;"><div style="font-size:2rem;font-weight:800;color:var(--c-teal2);">' + d.total_glosas_analizadas + '</div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem;">Glosas analizadas</div></div>';
+    html += '<div class="form-card" style="text-align:center;"><div style="font-size:2rem;font-weight:800;color:var(--c-amber);">' + d.grupos_encontrados + '</div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem;">Grupos duplicados</div></div>';
+    var ahorroTotal = (d.grupos||[]).reduce(function(s,g){return s + (g.count - 1)},0);
+    html += '<div class="form-card" style="text-align:center;"><div style="font-size:2rem;font-weight:800;color:var(--c-green);">' + ahorroTotal + '</div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem;">Respuestas ahorradas</div></div>';
+    html += '</div>';
+    if(!d.grupos || d.grupos.length === 0){
+      html += '<div class="form-card" style="text-align:center;padding:2rem;"><div style="font-size:3rem;">✓</div><div style="margin-top:.5rem;color:var(--text2);">No se encontraron glosas duplicadas en este rango.</div></div>';
+    } else {
+      d.grupos.forEach(function(g,i){
+        html += '<div class="form-card" style="margin-bottom:.8rem;border-left:4px solid var(--c-amber);">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;margin-bottom:.5rem;">';
+        html += '<div><div style="font-weight:700;font-size:.9rem;color:var(--text);">Grupo #' + (i+1) + ' — <span style="color:var(--c-amber);">' + g.count + ' glosas idénticas</span></div>';
+        html += '<div style="font-size:.78rem;color:var(--text3);margin-top:.15rem;"><b>EPS:</b> ' + (g.eps||'—') + ' | <b>Código:</b> ' + (g.codigo_ejemplo||'—') + '</div></div>';
+        html += '<div style="background:var(--c-green-light);color:var(--c-green);padding:4px 10px;border-radius:12px;font-size:.72rem;font-weight:700;white-space:nowrap;">' + g.ahorro_estimado + '</div>';
+        html += '</div>';
+        html += '<details style="margin-top:.5rem;"><summary style="cursor:pointer;font-size:.78rem;color:var(--c-teal2);font-weight:600;">Ver IDs y texto de ejemplo</summary>';
+        html += '<div style="margin-top:.5rem;padding:.6rem .8rem;background:var(--bg-subtle);border-radius:6px;font-size:.78rem;">';
+        html += '<div style="margin-bottom:.4rem;"><b>IDs:</b> ' + (g.ids||[]).join(', ') + '</div>';
+        html += '<div style="color:var(--text2);line-height:1.5;"><b>Texto ejemplo:</b> <i>' + (g.texto_ejemplo||'').replace(/</g,'&lt;') + '</i></div>';
+        html += '</div></details></div>';
+      });
+    }
+    cont.innerHTML = html;
+  }catch(e){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>'; }
+}
+
+// ─── SIMULADOR ───────────────────────────────────────────────────
+async function correrSimulador(){
+  var texto = (document.getElementById('sim-texto').value || '').trim();
+  var codigo = (document.getElementById('sim-codigo').value || '').trim().toUpperCase();
+  var eps = (document.getElementById('sim-eps').value || '').trim();
+  if(!texto || texto.length < 10){ toast('Info','Pega el texto de la glosa','info'); return; }
+  if(!codigo){ toast('Info','Indica el código (ej. TA0801)','info'); return; }
+  var cont = document.getElementById('sim-resultado');
+  cont.innerHTML = '<div style="padding:1rem;color:var(--text3);">Calculando 5 escenarios…</div>';
+  var escenarios = ['con_contrato','con_pdf','extemporanea','ratificacion','todo_favorable'];
+  var resultados = [];
+  try{
+    for(var i=0;i<escenarios.length;i++){
+      var r = await fetch('/herramientas/simulador', {
+        method:'POST',
+        headers: Object.assign({'Content-Type':'application/json'}, authH()),
+        body: JSON.stringify({texto_glosa: texto, codigo_glosa: codigo, eps: eps, escenario: escenarios[i]})
+      });
+      if(r.ok){ resultados.push(await r.json()); }
+    }
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;">';
+    resultados.forEach(function(res){
+      var ri = res.riesgo || {};
+      var bgBar = ri.score <= 30 ? '#ecfdf5' : (ri.score <= 60 ? '#fffbeb' : '#fef2f2');
+      html += '<div class="form-card" style="padding:1rem;background:'+bgBar+';border-left:4px solid '+ri.color+';">';
+      html += '<div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;">' + res.label + '</div>';
+      html += '<div style="display:flex;justify-content:space-between;align-items:end;margin-top:.4rem;">';
+      html += '<div><div style="font-family:var(--font-mono);font-size:1.8rem;font-weight:800;color:'+ri.color+';line-height:1;">' + ri.score + '</div>';
+      html += '<div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">pts riesgo</div></div>';
+      html += '<div style="text-align:right;font-size:1.4rem;">'+ri.icon+'</div>';
+      html += '</div>';
+      html += '<div style="font-size:.74rem;color:var(--text2);margin-top:.4rem;line-height:1.4;">' + ri.etiqueta + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    cont.innerHTML = html;
+  }catch(e){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>'; }
 }
 
 async function cargar2FAEstado(){
