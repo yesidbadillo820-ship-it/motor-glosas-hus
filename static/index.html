@@ -2288,11 +2288,39 @@ function copiarDictamen(){
   navigator.clipboard.writeText(tmp.innerText).then(function(){toast('Copiado','Texto copiado al portapapeles','success')});
 }
 
+function _extraerArgumentoLimpio(dictamenHtml){
+  // Extrae solo el argumento juridico del HTML del dictamen, quitando tabla
+  // superior, badges (EPS / tipo), "ARGUMENTACIÓN JURÍDICA" y nota de IA.
+  var tmp = document.createElement('div');
+  tmp.innerHTML = dictamenHtml || '';
+  var txt = (tmp.innerText || tmp.textContent || '').replace(/\s+/g, ' ').trim();
+  var marker = 'ARGUMENTACIÓN JURÍDICA';
+  var idx = txt.indexOf(marker);
+  if(idx > -1 && idx < 1000){
+    txt = txt.substring(idx + marker.length).trim();
+  } else {
+    var m2 = txt.indexOf('RESPUESTA A GLOSA');
+    if(m2 > -1 && m2 < 500) txt = txt.substring(m2 + 'RESPUESTA A GLOSA'.length).trim();
+  }
+  var cierres = [
+    'Nota: Generado con asistencia',
+    'Nota: Generado con IA',
+    'Nota: Este documento constituye',
+    'RESUMEN DE VALORES',
+    'Valor objetado Valor aceptado',
+    'FUNDAMENTO NORMATIVO',
+  ];
+  for(var i=0; i<cierres.length; i++){
+    var j = txt.indexOf(cierres[i]);
+    if(j > -1) txt = txt.substring(0, j).trim();
+  }
+  return txt;
+}
+
 function imprimirDictamen(){
   if(!lastResult) return;
   var w=window.open('','_blank');
-  var tmp=document.createElement('div');tmp.innerHTML=lastResult.dictamen;
-  var text=tmp.innerText;
+  var text = _extraerArgumentoLimpio(lastResult.dictamen);
   var fecha=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   var fechaCorta=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var eps = (document.getElementById('eps-sel') && document.getElementById('eps-sel').value) || '—';
