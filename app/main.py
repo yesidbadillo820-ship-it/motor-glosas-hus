@@ -166,14 +166,24 @@ def _extraer_motivo_glosa(texto: str) -> str:
 
 
 def _concepto_glosa(codigo_glosa: str) -> str:
-    """Devuelve la descripción oficial del código de glosa (Anexo Técnico 6)."""
+    """Devuelve la descripción oficial del Manual Único de Glosas (Anexo
+    Técnico No. 3) para el código dado. Usa el catálogo completo; si no
+    hay match exacto, cae al concepto interno legacy o a fallback."""
     if not codigo_glosa:
         return ""
-    # Intentar match por los primeros 4 caracteres (ej. 'TA07' de 'TA0701')
+    # 1) Catálogo oficial completo (nueva fuente de verdad)
+    try:
+        from app.services.catalogo_glosas import obtener_concepto
+        oficial = obtener_concepto(codigo_glosa)
+        if oficial:
+            return oficial
+    except Exception:
+        pass
+    # 2) Legacy CONCEPTOS_CODIGOS (compatibilidad)
     key = codigo_glosa[:4].upper()
     if key in CONCEPTOS_CODIGOS:
         return CONCEPTOS_CODIGOS[key]
-    # Fallback por prefijo de 2 letras
+    # 3) Fallback por prefijo de 2 letras
     prefijo = codigo_glosa[:2].upper()
     fallbacks = {
         "TA": "Diferencia tarifaria con los valores pactados o establecidos por la norma",
@@ -182,7 +192,8 @@ def _concepto_glosa(codigo_glosa: str) -> str:
         "CO": "Servicio no incluido en cobertura",
         "CL": "Procedimiento no pertinente según criterio clínico",
         "PE": "Procedimiento no pertinente según criterio clínico",
-        "FA": "Error formal en la facturación",
+        "FA": "Diferencia en cantidades o error administrativo en facturación",
+        "SA": "Glosa por incumplimiento de indicadores del acuerdo de voluntades",
         "IN": "Diferencia o no reconocimiento de insumos",
         "ME": "Diferencia o no reconocimiento de medicamentos",
     }
