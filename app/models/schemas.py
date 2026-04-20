@@ -92,6 +92,8 @@ class GlosaResult(BaseModel):
     score:           float         = Field(default=0.0, ge=0.0, le=100.0)
     dias_restantes:  int           = Field(default=0, ge=0)
     modelo_ia:       Optional[str] = None
+    # Indicador de riesgo de ratificación (0-100, más bajo = más probable levantamiento)
+    riesgo_ratificacion: Optional[dict] = None
     # ID en BD (llenado por main.py después de persistir) — permite refinar/gold
     glosa_id:        Optional[int] = None
 

@@ -783,6 +783,23 @@ class GlosaService:
             tarifa=tarifa_ia if tarifa_ia else None
         )
 
+        # Calcular riesgo de ratificación (heurística 0-100)
+        try:
+            from app.services.riesgo_ratificacion import calcular_riesgo
+            riesgo = calcular_riesgo(
+                codigo_glosa=codigo_det,
+                eps=str(data.eps),
+                tiene_contrato=tiene_contrato,
+                tiene_pdf_soportes=tiene_pdf,
+                texto_glosa=texto_base,
+                es_extemporanea=es_extemporanea,
+                es_ratificacion=es_ratificacion,
+                score_dictamen=score,
+            )
+        except Exception as _e:
+            logger.warning(f"Error calculando riesgo: {_e}")
+            riesgo = None
+
         return GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
@@ -794,7 +811,8 @@ class GlosaService:
             color_tiempo=color_tiempo,
             score=score,
             dias_restantes=max(0, DIAS_HABILES_LIMITE_EXTEMPORANEA - dias),
-            modelo_ia=modelo_usado
+            modelo_ia=modelo_usado,
+            riesgo_ratificacion=riesgo
         )
 
     def _calcular_score(self, tipo_glosa: str, es_extemporanea: bool, es_ratificacion: bool,
