@@ -664,6 +664,7 @@ def get_glosa_service() -> GlosaService:
         anthropic_api_key=cfg.anthropic_api_key,
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
+        groq_model=cfg.groq_model,
     )
 
 
