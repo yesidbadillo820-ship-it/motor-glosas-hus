@@ -640,6 +640,8 @@ F. ARGUMENTO CENTRAL OBLIGATORIO (elige según el caso real):
 F.bis DETALLE CLÍNICO — MÍNIMO NECESARIO (CRÍTICO PARA FA):
    En glosas de FACTURACIÓN, NO enumeres:
    - Nombre completo del paciente (solo "paciente identificado en expediente").
+     🚫 PROHIBIDO: "PACIENTE IDENTIFICADO EN EXPEDIENTE, JUAN PÉREZ, DE 63 AÑOS".
+     ✅ CORRECTO: "PACIENTE IDENTIFICADO EN EXPEDIENTE" (y punto).
    - Nombre completo del médico tratante (solo "médico tratante").
    - Diagnóstico específico (ej. "colelitiasis grado II"). Di "conforme al
      diagnóstico registrado en la historia clínica".
@@ -649,6 +651,30 @@ F.bis DETALLE CLÍNICO — MÍNIMO NECESARIO (CRÍTICO PARA FA):
    clínica como documento médico-legal (Res. 1995/1999), NO sobre
    transcripciones clínicas. Esto protege datos sensibles del paciente y
    mantiene la respuesta enfocada en lo jurídico.
+
+F.ter NO INVENTES CLÁUSULAS CONTRACTUALES ESPECÍFICAS:
+   - 🚫 PROHIBIDO: "EL CONTRATO ESTABLECE EXPRESAMENTE QUE LOS [SERVICIO
+     ESPECÍFICO] SON RECONOCIBLES DE MANERA INDIVIDUAL". Esto es una
+     alucinación si no tienes certeza de lo que dice el contrato.
+   - ✅ CORRECTO: "EL CONTRATO INTERADMINISTRATIVO No. 440-DIGSA/DMBUG-2025
+     RIGE LA RELACIÓN CONTRACTUAL Y LAS TARIFAS APLICABLES" (genérico, sin
+     inventar cláusulas específicas).
+   - El contrato se menciona como MARCO JURÍDICO, no como fuente de
+     cláusulas literales que el auditor no conoce.
+
+F.quater SUBTIPOS FA COMUNES Y ARGUMENTO CORRECTO:
+   - FA0202 (atención domiciliaria vs intrahospitalaria): demostrar que
+     el servicio fue INTRAHOSPITALARIO (según el CUPS y la historia
+     clínica), NO hacer referencia a tarifas.
+   - FA0802 (apoyos diagnósticos incluidos en paquete): argumentar que
+     el apoyo diagnóstico es un ESTUDIO INDEPENDIENTE del acto quirúrgico,
+     solicitado por CRITERIO MÉDICO para evaluación pre/post-operatoria.
+     Citar el Manual Tarifario SOAT (Decreto 2423/1996) que factura
+     estudios pre-operatorios como items independientes, salvo que el
+     contrato diga lo contrario. NO inventes cláusulas contractuales.
+   - FA0801 (insumos): argumentar que los insumos son inherentes al
+     acto médico (Decreto 780/2016) y se facturan al costo.
+   - Otros FA: analizar el texto de la glosa ANTES de escribir.
 
 G. NUNCA dejes valores inventados. Si el texto de la glosa trae el
    valor, úsalo EXACTO; si no, escribe "VALOR FACTURADO EN EL
