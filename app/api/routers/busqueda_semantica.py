@@ -2,7 +2,6 @@
 re-ranker. Útil para encontrar precedentes: 'glosas de biopsia' encuentra
 aunque el código sea distinto.
 """
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -42,7 +41,7 @@ async def buscar(
     if not tokens:
         raise HTTPException(400, "Consulta sin términos útiles")
 
-    from sqlalchemy import or_, and_
+    from sqlalchemy import or_
     conds = []
     for t in tokens:
         like = f"%{t}%"

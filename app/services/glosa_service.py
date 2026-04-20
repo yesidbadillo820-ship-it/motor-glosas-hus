@@ -252,7 +252,6 @@ class GlosaService:
 
         eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
         tiene_contrato = eps_key in (contratos_db or {})
-        info_contrato = (contratos_db or {}).get(eps_key, "SIN CONTRATO PACTADO. TARIFA: SOAT PLENO.")
 
         argumento_fijo = None
         if es_ratificacion:
