@@ -1,7 +1,7 @@
 """Informes ejecutivos PDF para Gerencia y Junta Directiva."""
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -9,7 +9,6 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord, ConciliacionRecord
 from app.api.deps import get_usuario_actual
-from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.audit_repository import AuditRepository
 
 router = APIRouter(prefix="/informes", tags=["informes"])

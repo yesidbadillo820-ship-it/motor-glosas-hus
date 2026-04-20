@@ -210,7 +210,6 @@ def cambiar_password(
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    anterior = usuario.password_hash[:20] + "..."
     usuario.password_hash = get_password_hash(data.nueva_password)
     db.commit()
     

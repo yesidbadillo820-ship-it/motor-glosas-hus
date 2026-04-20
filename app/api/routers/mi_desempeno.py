@@ -3,10 +3,10 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 
 from app.database import get_db
-from app.models.db import GlosaRecord, UsuarioRecord, AuditLogRecord
+from app.models.db import GlosaRecord, UsuarioRecord
 from app.api.deps import get_usuario_actual
 
 router = APIRouter(prefix="/mi-desempeno", tags=["mi-desempeno"])

@@ -6,9 +6,7 @@ Flujo:
   3. Llama POST /2fa/activar con el código de 6 dígitos → se activa
   4. En el login (si totp_activo=1) debe mandar el código junto con password
 """
-import base64
 import io
-import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session

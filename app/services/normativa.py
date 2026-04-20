@@ -4,7 +4,6 @@ Se usa para validar que los argumentos citen normas existentes y vigentes,
 y señalar cuando alguien cita una derogada o inexistente.
 """
 from __future__ import annotations
-from typing import Optional
 
 # Normas vigentes (2026). El formato de key es "LEY|DECRETO|RES|CIRC|ART|SENT + número"
 # Valor: {nombre, resumen, tipo, ambito, vigente, reemplaza_a?}

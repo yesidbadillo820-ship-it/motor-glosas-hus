@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.database import get_db, SessionLocal
 from app.repositories.glosa_repository import GlosaRepository
@@ -207,7 +207,6 @@ def exportar_xlsx(
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     from fastapi.responses import StreamingResponse
-    from app.main import _extraer_motivo_glosa
 
     repo = GlosaRepository(db)
     glosas = repo.listar_para_export(
@@ -475,19 +474,19 @@ async def refinar_dictamen_endpoint(
     }
 
 
+class ValidarNormasInput(BaseModel):
+    texto: str = Field(..., min_length=20, max_length=20000)
+
+
 @router.post("/validar-normas")
 def validar_normas_texto(
-    data: dict,
+    data: ValidarNormasInput,
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Valida citas normativas en un texto libre (sin persistir).
-    Body: {texto: str}. Útil para que el auditor chequee rápido un borrador.
-    """
-    texto = (data or {}).get("texto", "") if isinstance(data, dict) else ""
-    if not texto or len(texto) < 20:
-        raise HTTPException(400, "Texto demasiado corto")
+    Útil para que el auditor chequee rápido un borrador."""
     from app.services.normativa import validar_citas
-    return validar_citas(texto)
+    return validar_citas(data.texto)
 
 
 @router.post("/{glosa_id}/validar")
@@ -989,10 +988,6 @@ async def importar_glosas_masiva(
         raise HTTPException(status_code=400, detail="No se detectaron filas válidas en el texto")
     
     servicio_id = f"BATCH-{req_id}"
-    
-    contrato_repo = ContratoRepository(db)
-    # Se consulta contratos solo para validar que la BD es accesible
-    # (no es requerido pasarlos al background task porque se obtienen allí).
 
     for fila_data in filas:
         background_tasks.add_task(
