@@ -151,6 +151,41 @@ def _expandir_abreviaturas_tipo(texto: str) -> str:
     return texto
 
 
+def _truncar_runaway(texto: str, max_repeticiones: int = 3) -> str:
+    """Detecta loops degenerate de la IA (ej. "DEL X DEL X DEL X...") y
+    trunca el texto en el punto donde comienza el bucle.
+
+    Heurística: busca cualquier ngrama de 2-5 palabras que se repita más
+    de max_repeticiones veces seguidas. Si lo encuentra, corta ahí.
+    """
+    if not texto or len(texto) < 200:
+        return texto
+    palabras = texto.split()
+    if len(palabras) < 20:
+        return texto
+
+    for tam_ngrama in (2, 3, 4, 5):
+        i = 0
+        while i < len(palabras) - tam_ngrama * (max_repeticiones + 1):
+            ngrama = palabras[i:i + tam_ngrama]
+            # Contar repeticiones consecutivas
+            repes = 1
+            j = i + tam_ngrama
+            while j + tam_ngrama <= len(palabras) and palabras[j:j + tam_ngrama] == ngrama:
+                repes += 1
+                j += tam_ngrama
+                if repes > max_repeticiones:
+                    # ENCONTRAMOS LOOP — truncar en el inicio del bucle
+                    truncado = " ".join(palabras[:i + tam_ngrama])
+                    # Agregar cierre limpio
+                    if not truncado.rstrip().endswith(("."," ")):
+                        truncado += "."
+                    truncado += " [TEXTO TRUNCADO POR SISTEMA: LA IA ENTRÓ EN BUCLE — REVISAR Y RE-GENERAR]"
+                    return truncado
+            i += 1
+    return texto
+
+
 TEXTO_RATIFICADA = (
     "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE "
     "DE LA GLOSA INICIAL Y SE DA CONTINUACIÓN AL PROCESO DE CONFORMIDAD CON EL ARTÍCULO "
@@ -468,6 +503,13 @@ class GlosaService:
                 r"\1",
                 arg_ia, flags=re.IGNORECASE,
             )
+
+            # 13) Anti-runaway: detectar y truncar bucles de repetición
+            # (cuando la IA entra en degenerate state y repite "DEL X DEL X DEL X...")
+            arg_ia = _truncar_runaway(arg_ia)
+
+            # 14) Corregir "DISPOSICIONADO" inventado por IA → DISPENSARIO
+            arg_ia = re.sub(r"\bDISPOSICIONADO\b", "DISPENSARIO MÉDICO", arg_ia, flags=re.IGNORECASE)
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
@@ -921,9 +963,13 @@ class GlosaService:
                     # alucinación que llama-3.3 en seguimiento de instrucciones legales.
                     model="openai/gpt-oss-120b",
                     temperature=0.2,
-                    # 4000 tokens permiten argumentos de 700-900 palabras con
-                    # estructura I-IV y citas normativas específicas.
-                    max_tokens=4000,
+                    # 3000 tokens son suficientes para argumentos de 500-700 palabras
+                    # (reducido desde 4000 para limitar daño de bucles degenerativos).
+                    max_tokens=3000,
+                    # Penalización de frecuencia/presencia evita que el modelo
+                    # repita palabras/frases (anti-runaway degenerativo).
+                    frequency_penalty=0.3,
+                    presence_penalty=0.2,
                     timeout=120.0,
                 )
                 content = resp.choices[0].message.content
