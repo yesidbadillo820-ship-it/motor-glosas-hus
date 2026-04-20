@@ -420,26 +420,19 @@ class GlosaService:
             arg_ia = re.sub(r"FF\.MM\.\.", "FF.MM.", arg_ia)  # doble punto si aplicó 2 veces
 
             # 8) Verbos normativos en pretérito → presente (las normas vigentes rigen en presente)
-            arg_ia = re.sub(
-                r"\b(ART[ÍI]CULO\s+\d+[^\.]*?)\bCONSAGR[ÓO]\b",
-                r"\1CONSAGRA",
-                arg_ia, flags=re.IGNORECASE,
-            )
-            arg_ia = re.sub(
-                r"\b(ART[ÍI]CULO\s+\d+[^\.]*?)\bESTABLECI[ÓO]\b",
-                r"\1ESTABLECE",
-                arg_ia, flags=re.IGNORECASE,
-            )
-            arg_ia = re.sub(
-                r"\b(ART[ÍI]CULO\s+\d+[^\.]*?)\bREAFIRM[ÓO]\b",
-                r"\1REAFIRMA",
-                arg_ia, flags=re.IGNORECASE,
-            )
-            arg_ia = re.sub(
-                r"\b(LEY\s+\d+/\d+[^\.]*?)\bDISPUSIO\b",
-                r"\1DISPONE",
-                arg_ia, flags=re.IGNORECASE,
-            )
+            # Cubre: ARTÍCULO X, LEY X, RESOLUCIÓN X, DECRETO X, ACUERDO X, CIRCULAR X seguido de verbo en pretérito
+            _PRETERITO_PRESENTE = [
+                (r"\bCONSAGR[ÓO]\b", "CONSAGRA"),
+                (r"\bESTABLECI[ÓO]\b", "ESTABLECE"),
+                (r"\bREAFIRM[ÓO]\b", "REAFIRMA"),
+                (r"\bDISPUSO\b", "DISPONE"),
+                (r"\bRECONOCI[ÓO]\b(?!\s+COMO)", "RECONOCE"),
+                (r"\bOBLIG[ÓO]\b", "OBLIGA"),
+                (r"\bIMPUSO\b", "IMPONE"),
+                (r"\bCONFIRM[ÓO]\b", "CONFIRMA"),
+            ]
+            for pat, repl in _PRETERITO_PRESENTE:
+                arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
 
             # 9) Tipos de errores OCR / typos comunes de la IA
             arg_ia = re.sub(r"\bCONSAGR\s+A\b", "CONSAGRA", arg_ia, flags=re.IGNORECASE)
@@ -458,18 +451,54 @@ class GlosaService:
             for pat, repl in _TYPOS_IA.items():
                 arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
 
-            # 11) Quitar nombres propios pegados al patron "PACIENTE IDENTIFICADO EN EXPEDIENTE, <NOMBRE>, DE XX AÑOS"
-            # El prompt lo prohibe pero la IA a veces lo agrega. Lo cortamos.
+            # 11) Protección de PHI (datos personales/médicos)
+            # 11a) "PACIENTE IDENTIFICADO EN EXPEDIENTE, <NOMBRE>, DE XX AÑOS"
             arg_ia = re.sub(
                 r"(PACIENTE\s+IDENTIFICADO\s+EN\s+EXPEDIENTE)\s*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+(?:\s*,\s*DE\s+\d+\s+A[ÑN]OS)?",
                 r"\1",
                 arg_ia,
             )
-            # Variante: "EL PACIENTE, <NOMBRE>, DE 63 AÑOS"
+            # 11b) "EL PACIENTE, <NOMBRE>, DE 63 AÑOS"
             arg_ia = re.sub(
                 r"(EL\s+PACIENTE)\s*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+\s*,\s*DE\s+\d+\s+A[ÑN]OS",
                 r"\1",
                 arg_ia,
+            )
+            # 11c) Nombre del médico/profesional tratante expuesto
+            # Usamos {3,} letras por palabra para NO consumir preposiciones (DE, EN, CON, POR).
+            # "PROFESIONAL DE SALUD ANDRÉS FELIPE CHAPARRO ZARAZA" → "PROFESIONAL DE SALUD TRATANTE"
+            arg_ia = re.sub(
+                r"(PROFESIONAL\s+(?:DE\s+SALUD|M[ÉE]DICO)(?:\s+TRATANTE)?)\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,4}\b",
+                r"\1 TRATANTE",
+                arg_ia,
+            )
+            arg_ia = re.sub(
+                r"(M[ÉE]DICO\s+TRATANTE)\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,4}\b",
+                r"\1",
+                arg_ia,
+            )
+            arg_ia = re.sub(
+                r"\bDR[A]?\.?\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,4}\b",
+                "MÉDICO TRATANTE",
+                arg_ia,
+            )
+            # 11d) Historia clínica N° XXXXX (expone PHI)
+            arg_ia = re.sub(
+                r"HISTORIA\s+CL[ÍI]NICA\s+N[°º]?\s*\d{3,10}",
+                "HISTORIA CLÍNICA INSTITUCIONAL",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
+            # 12) Dobles conectores redundantes
+            arg_ia = re.sub(
+                r"\b(ADICIONALMENTE|ASIMISMO|IGUALMENTE),\s*(POR\s+SU\s+PARTE|EN\s+IDÉNTICO\s+SENTIDO)",
+                r"\1",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"\b(POR\s+SU\s+PARTE),\s*(ADICIONALMENTE|ASIMISMO|IGUALMENTE|EN\s+IDÉNTICO\s+SENTIDO)",
+                r"\1",
+                arg_ia, flags=re.IGNORECASE,
             )
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
