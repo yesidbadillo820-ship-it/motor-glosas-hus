@@ -763,15 +763,16 @@ class GlosaService:
         system = (
             "Eres un auditor médico senior de la ESE Hospital Universitario de Santander (HUS). "
             "Refinas argumentos técnico-jurídicos de respuesta a glosas.\n\n"
-            "REGLAS CRÍTICAS:\n"
-            "1. La INSTRUCCIÓN DEL AUDITOR es la máxima prioridad: si pide cambiar "
-            "mayúsculas/minúsculas, longitud, tono, idioma o formato, OBEDÉCELA literalmente.\n"
-            "2. Por defecto mantén el estilo original (mayúsculas, saltos, citas normativas) "
-            "SOLO si la instrucción no pide cambiarlo.\n"
-            "3. Las citas normativas colombianas (Ley 100/1993, Ley 1438/2011, Art. 871 "
+            "REGLAS CRÍTICAS (ESTRICTAS):\n"
+            "1. TODA LA RESPUESTA DEBE IR EN MAYÚSCULAS. Es el estándar institucional de "
+            "radicación ante EPS. No importa si el auditor pide minúsculas — MANTÉN MAYÚSCULAS. "
+            "Solo respeta la instrucción del auditor en tono, longitud, citas y contenido.\n"
+            "2. Las citas normativas colombianas (Ley 100/1993, Ley 1438/2011, Art. 871 "
             "C.Comercio, etc.) se conservan en su forma canónica salvo que el auditor las quite.\n"
-            "4. Responde SOLO con el texto refinado — sin preámbulos, sin comillas, sin "
-            "etiquetas XML, sin explicaciones de qué cambiaste."
+            "3. Responde SOLO con el texto refinado — sin preámbulos, sin comillas, sin "
+            "etiquetas XML, sin explicaciones de qué cambiaste.\n"
+            "4. NO inventes CUPS, folios, fechas, números de contrato ni nombres de médicos: "
+            "mantén solo los datos que ya aparecen en el argumento original."
         )
         user = (
             f"EPS: {eps}\nCÓDIGO: {codigo}\n\n"
@@ -789,13 +790,10 @@ class GlosaService:
         # Eliminar cierres XML si la IA los metió por hábito
         out = _re.sub(r"</?(argumento|answer|response)>", "", out, flags=_re.IGNORECASE).strip()
 
-        # Si el auditor pidió minúsculas (o el texto quedó mayoritariamente en
-        # minúsculas), NO reaplicar la expansión de abreviaturas en MAYÚSCULAS.
-        letras = [c for c in out if c.isalpha()]
-        mayus = sum(1 for c in letras if c.isupper())
-        ratio_mayus = (mayus / len(letras)) if letras else 1.0
-        if ratio_mayus < 0.5:
-            return out
+        # ESTÁNDAR INSTITUCIONAL: las respuestas a glosas SIEMPRE van en
+        # MAYÚSCULAS (radicación ante EPS). Si la IA devolvió lowercase o
+        # Title Case, forzamos upper. Preserva letras acentuadas y ñ.
+        out = out.upper()
         return _expandir_abreviaturas_tipo(out)
 
     async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 4) -> tuple[str, str]:

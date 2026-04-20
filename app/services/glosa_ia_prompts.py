@@ -550,13 +550,56 @@ CIERRE: Solicitar conciliación de auditoría médica conjunta (Art. 20 Decreto 
 SYSTEM_FA = SYSTEM_BASE + """
 ESPECIALIZACIÓN: DEFENSA POR FACTURACIÓN (FA)
 
-ARGUMENTOS FACTURACIÓN:
-1. Los errores formales de facturación son SUBSANABLES (Circular 030/2013 MINSALUD).
-2. La prestación real del servicio genera la obligación de pago independientemente de error formal.
-3. RIPS radicados conforme a Res. 866/2021 respaldan la atención prestada.
-4. Circular 0000022/2023: Requisitos de facturación electrónica cumplidos por la IPS.
-5. Art. 56 Ley 1438/2011: Los errores formales no constituyen causal válida de glosa.
-6. El incumplimiento de requisitos formales no exime a la EPS de su obligación de pago.
+REGLAS CRÍTICAS PARA FA (LEE ANTES DE REDACTAR):
+
+A. NUNCA inventes CUPS, folios, fechas de ingreso, números de historia
+   clínica, nombres de médicos ni tipos de paciente. Si no están en los
+   datos del caso, NO los menciones. Usa SOLO el CUPS que aparece en el
+   texto de la glosa original.
+
+B. FA NO ES TA. No introduzcas tarifa SOAT, factor contractual -20%,
+   valor pactado ni ningún cálculo tarifario SALVO que el texto de la
+   glosa lo invoque explícitamente. Si la entidad pagadora es el
+   DISPENSARIO MÉDICO / SANIDAD MILITAR, menciona el contrato 440-DIGSA
+   únicamente como marco de relación contractual, NO como argumento
+   tarifario.
+
+C. DISTINGUE DOS SUBTIPOS DE FA:
+   - "Error formal" (datos faltantes, firma ausente, número mal): aquí
+     SÍ aplica Circular 030/2013 (subsanable). No toda FA lo es.
+   - "Naturaleza del servicio / interpretación" (ej. FA0202 dice que se
+     cobra domiciliaria cuando fue intrahospitalaria; FA0801 dice que
+     no aplica tal insumo): NO es error formal. El argumento es que
+     la EPS interpreta mal el servicio y que la HC demuestra la
+     naturaleza real. NO cites Circular 030/2013 en estos casos.
+
+D. PROHIBIDO en TODOS los casos FA:
+   - Citar el Art. 56 Ley 1438/2011 como si regulara "errores formales".
+     El Art. 56 trata PLAZOS (20 días hábiles). Úsalo solo cuando el
+     plazo sea el argumento real.
+   - Citar Sentencia T-760/2008 si la entidad pagadora NO es una EPS
+     del régimen contributivo/subsidiado (Dispensario, PPL, FOMAG,
+     Policía, ARL → no aplica T-760).
+   - Mezclar FA con PERTINENCIA o COBERTURA.
+
+E. LENGUAJE SEGÚN PAGADOR:
+   - Si la entidad es "DISPENSARIO MÉDICO", "SANIDAD MILITAR", "FFMM",
+     "POLICÍA NACIONAL": usa "ENTIDAD PAGADORA" o el nombre literal.
+     NO digas "EPS". Cita Decreto 1795/2000 y Acuerdo 002/2001.
+   - Si es EPS regular: puedes decir "EPS" y citar Res. 5269/2017.
+
+F. ARGUMENTO CENTRAL OBLIGATORIO (elige según el caso real):
+   - Si la glosa alega "servicio no prestado" o "servicio distinto":
+     demuestra con la historia clínica (Res. 1995/1999 — documento
+     médico-legal) la naturaleza REAL del servicio facturado.
+   - Si la glosa alega "error formal": cita Circular 030/2013 y que la
+     prestación genera obligación de pago (Art. 177 Ley 100/1993).
+   - En ambos: Art. 871 C.Comercio (buena fe) + Art. 1602 C.Civil
+     (contrato como ley de las partes).
+
+G. NUNCA dejes valores inventados. Si el texto de la glosa trae el
+   valor, úsalo EXACTO; si no, escribe "VALOR FACTURADO EN EL
+   EXPEDIENTE".
 """
 
 SYSTEM_AU = SYSTEM_BASE + """
