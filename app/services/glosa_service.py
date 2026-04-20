@@ -528,11 +528,18 @@ class GlosaService:
                     # Re-aplicar expansión de abreviaturas por si falló
                     arg_ia = _expandir_abreviaturas_tipo(arg_ia)
 
-            # 16) ANTI-ALUCINACIÓN DE MONTOS (CRÍTICO):
-            # Si el texto original de la glosa NO traía un valor numérico
-            # (valor_raw == "$ 0.00"), la IA NO debe inventar cifras. Si lo
-            # hizo, reemplazamos cualquier monto específico por "EL VALOR
-            # INDICADO EN EL EXPEDIENTE".
+            # 16) ANTI-ALUCINACIÓN DE MONTOS + PLACEHOLDERS (CRÍTICO):
+            # 16a) Placeholders literales tipo "$[VALOR_OBJETADO]",
+            # "$[DIFERENCIA]", "$[TOTAL_FACTURADO]" que la IA a veces deja
+            # sin renderizar. Siempre se reemplazan, incluso si hay valor.
+            arg_ia = re.sub(
+                r"\$\s*\[[A-Z_ ]+\]",
+                "EL VALOR INDICADO EN EL EXPEDIENTE",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
+            # 16b) Si el texto original de la glosa NO traía un valor numérico,
+            # la IA NO debe inventar cifras. Reemplazamos montos específicos.
             _no_hay_valor_original = (not valor_raw) or valor_raw.strip() in ("$ 0.00", "$0.00", "$ 0")
             if _no_hay_valor_original:
                 # Patrón: $ seguido de cifras con separadores (. , ) opcionales
@@ -541,22 +548,74 @@ class GlosaService:
                     flags=re.IGNORECASE,
                 )
                 arg_ia = _patron_monto.sub("EL VALOR INDICADO EN EL EXPEDIENTE", arg_ia)
-                # Frases típicas que la IA genera con números inventados:
-                arg_ia = re.sub(
-                    r"FACTURADO\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
-                    "FACTURADO SEGÚN VALOR INDICADO EN EL EXPEDIENTE",
-                    arg_ia, flags=re.IGNORECASE,
-                )
-                arg_ia = re.sub(
-                    r"Y\s+RECONOCIDO\s+SOLO\s+POR\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
-                    "Y RECONOCIDO PARCIALMENTE POR LA ENTIDAD PAGADORA",
-                    arg_ia, flags=re.IGNORECASE,
-                )
-                arg_ia = re.sub(
-                    r"RETENCI[ÓO]N\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
-                    "RETENCIÓN DEL VALOR INDICADO EN EL EXPEDIENTE",
-                    arg_ia, flags=re.IGNORECASE,
-                )
+
+            # 16c) Limpieza de frases rotas post-reemplazo (con o sin valor)
+            arg_ia = re.sub(
+                r"FACTURADO\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+                "FACTURADO SEGÚN VALOR INDICADO EN EL EXPEDIENTE",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"Y\s+RECONOCIDO\s+SOLO\s+POR\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+                "Y RECONOCIDO PARCIALMENTE POR LA ENTIDAD PAGADORA",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"RETENCI[ÓO]N\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+                "LA DIFERENCIA INDICADA EN EL EXPEDIENTE",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"RECONOCIMIENTO\s+ÍNTEGRO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+                "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
+            # 17) TONO INSTITUCIONAL CONCILIADOR (safety net):
+            # Suaviza expresiones hostiles que bloquean la conciliación en
+            # etapa inicial. La defensa jurídica se mantiene pero el tono
+            # permite llegar a acuerdo sin ratificación.
+            _SUAVIZAR = [
+                # Exigir → Solicitar
+                (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\b",
+                 "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
+                (r"\bSE\s+EXIGE\s+EL\s+PAGO\s+[ÍI]NTEGRO\b",
+                 "SE SOLICITA EL RECONOCIMIENTO ÍNTEGRO"),
+                (r"\bSE\s+EXIGE\s+EL\s+RECONOCIMIENTO\b",
+                 "SE SOLICITA EL RECONOCIMIENTO"),
+                (r"\bSE\s+EXIGE\b(?!\s+EL\s+LEVANTAMIENTO)",
+                 "SE SOLICITA"),
+                # Obligar → refiere / establece el deber de
+                (r"\bOBLIGA\s+A\s+LA\s+ENTIDAD\s+PAGADORA\s+A\s+RECONOCER\b",
+                 "ESTABLECE EL DEBER DE RECONOCER"),
+                (r"\bOBLIGA\s+A\s+LA\s+EPS\s+A\s+RECONOCER\b",
+                 "ESTABLECE EL DEBER DE RECONOCER"),
+                (r"\bOBLIGA\s+A\s+LAS\s+ENTIDADES?\b",
+                 "ESTABLECE EL DEBER DE LAS ENTIDADES"),
+                # Incumplimiento hostil → diferencia susceptible
+                (r"\bCONFIGURA\s+UN\s+INCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
+                 "CORRESPONDE A UNA DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
+                (r"\bINCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
+                 "DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
+                # Acusaciones
+                (r"\bLO\s+CUAL\s+NO\s+SE\s+HA\s+CUMPLIDO\s+EN\s+ESTE\s+CASO\b\.?",
+                 "SE SOLICITA SU APLICACIÓN EN EL PRESENTE CASO."),
+                (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+ENTIDAD\s+PAGADORA\b",
+                 "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
+                (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+EPS\b",
+                 "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
+                (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\b",
+                 "AMERITA SER REVISADA"),
+                (r"\bACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b",
+                 "DIFERENCIA SUSCEPTIBLE DE CONCILIACIÓN"),
+                (r"\bCARECE\s+DE\s+TODO\s+SUSTENTO\s+LEGAL\b",
+                 "REQUIERE MAYOR SUSTENTO"),
+                # Frases redundantes
+                (r"\bSE\s+REFUERZA\s+LA\s+ARGUMENTACI[ÓO]N\s+DE\s+QUE\b",
+                 "SE RATIFICA QUE"),
+            ]
+            for pat, repl in _SUAVIZAR:
+                arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
 
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")

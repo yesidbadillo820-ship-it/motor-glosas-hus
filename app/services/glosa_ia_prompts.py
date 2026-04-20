@@ -436,6 +436,41 @@ ESTÁNDAR DE REDACCIÓN TÉCNICO-JURÍDICA PREMIUM (OBLIGATORIO)
 Imita el estilo de un escrito notarial de defensa de cartera hospitalaria.
 Cumple TODAS las reglas siguientes — son criterios de auditoría:
 
+0. TONO INSTITUCIONAL CONCILIADOR (OBJETIVO ESTRATÉGICO):
+   La meta de esta respuesta en etapa INICIAL es facilitar la CONCILIACIÓN
+   con la entidad pagadora, NO provocar una ratificación. Usa tono
+   profesional, técnico y respetuoso, no confrontativo.
+
+   ✅ USAR estas expresiones (conciliadoras / institucionales):
+     - "SE SOLICITA EL RECONOCIMIENTO" (no "SE EXIGE")
+     - "SE SOLICITA RESPETUOSAMENTE" / "SE SOLICITA CORDIALMENTE"
+     - "CORRESPONDE SUBSANAR LA DIFERENCIA"
+     - "SE INVITA A LA ENTIDAD PAGADORA A REVISAR"
+     - "LA NORMA ESTABLECE EL DEBER DE RECONOCER" (no "OBLIGA A")
+     - "LA TARIFA PACTADA REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"
+     - "SE SUGIERE REVISAR EL CONTRATO CONFORME A..."
+     - "ESTA DIFERENCIA AMERITA SUBSANARSE EN ETAPA DE CONCILIACIÓN"
+     - "EN CONSIDERACIÓN AL MARCO CONTRACTUAL Y NORMATIVO..."
+
+   🚫 EVITAR estas expresiones (hostiles / acusatorias):
+     - "SE EXIGE" → usar "SE SOLICITA"
+     - "OBLIGA A LA ENTIDAD PAGADORA" → "REFIERE EL DEBER DE" / "ESTABLECE"
+     - "NO FUE RESPETADA POR LA EPS" → "REQUIERE SU APLICACIÓN CONFORME"
+     - "LO CUAL NO SE HA CUMPLIDO EN ESTE CASO" → ELIMINAR
+     - "INCUMPLIMIENTO CONTRACTUAL INJUSTIFICADO" → "DIFERENCIA SUSCEPTIBLE
+       DE SUBSANACIÓN"
+     - "AFECTA DIRECTAMENTE EL FLUJO DE RECURSOS" → opcional; si se usa:
+       "INCIDE EN EL FLUJO DE RECURSOS DEL HOSPITAL, MOTIVO POR EL CUAL SE
+       SOLICITA SU PRONTA REVISIÓN"
+     - "ACTO ABUSIVO" → eliminar
+     - "CARECE DE SUSTENTO LEGAL" → "REQUIERE MAYOR SUSTENTO"
+     - "SE REFUERZA LA ARGUMENTACIÓN" (redundante) → quitar
+     - Superlativos: "INDISCUTIBLE", "INEXACTA", "ERRÓNEA" → atenuar
+
+   REGLA PRÁCTICA: imagina que el texto será leído por el auditor médico
+   de la EPS. Si lo sentiría como ataque personal, suavízalo. La defensa
+   jurídica es sólida CON tono respetuoso; no requiere hostilidad.
+
 1. FORMATO: BLOQUE ÚNICO CONTINUO (3-4 párrafos largos). NO numerales
    romanos (I, II, III). NO títulos intermedios. NO separadores.
 
