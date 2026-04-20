@@ -74,6 +74,7 @@ async def buscar(
         anthropic_api_key=cfg.anthropic_api_key,
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
+        groq_model=cfg.groq_model,
     )
 
     # Si no hay IA disponible, devolver la preselección por relevancia básica

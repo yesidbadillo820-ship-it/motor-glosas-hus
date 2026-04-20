@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     # Cuál se usa primero: "groq" (rápido/barato) o "anthropic" (mejor calidad).
     # Si falla el primario y hay key del otro, se intenta el fallback.
     primary_ai: str = "groq"
+    # Modelo Groq — default Llama 3.3 (estable, sin bucles degenerativos).
+    # Otros modelos soportados (cambiar con env GROQ_MODEL):
+    #   - "llama-3.3-70b-versatile"    (default, balanceado)
+    #   - "llama-3.1-70b-versatile"    (alternativa previa)
+    #   - "openai/gpt-oss-120b"        (más rápido/barato pero puede entrar en loops)
+    #   - "mixtral-8x7b-32768"         (contexto largo)
+    groq_model: str = "llama-3.3-70b-versatile"
     # Modelo Anthropic por defecto (Sonnet 4.6 — última generación)
     anthropic_model: str = "claude-sonnet-4-6"
 

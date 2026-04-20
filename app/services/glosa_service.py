@@ -235,12 +235,14 @@ class GlosaService:
         anthropic_api_key: str = None,
         primary_ai: str = "groq",
         anthropic_model: str = "claude-sonnet-4-6",
+        groq_model: str = "llama-3.3-70b-versatile",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
         self.primary_ai = (primary_ai or "groq").lower()
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
+        self.groq_model = groq_model or "llama-3.3-70b-versatile"
 
     async def analizar(
         self,
@@ -959,12 +961,13 @@ class GlosaService:
                         {"role": "system", "content": system},
                         {"role": "user", "content": user}
                     ],
-                    # gpt-oss-120b: 80% más rápido, 4x más barato y menor tasa de
-                    # alucinación que llama-3.3 en seguimiento de instrucciones legales.
-                    model="openai/gpt-oss-120b",
+                    # Modelo configurable via env GROQ_MODEL (default: llama-3.3-70b-versatile).
+                    # Llama 3.3 es mas estable que gpt-oss-120b (que entraba en loops
+                    # degenerativos repitiendo frases). gpt-oss es mas rapido/barato pero
+                    # menos predecible.
+                    model=self.groq_model,
                     temperature=0.2,
-                    # 3000 tokens son suficientes para argumentos de 500-700 palabras
-                    # (reducido desde 4000 para limitar daño de bucles degenerativos).
+                    # 3000 tokens son suficientes para argumentos de 500-700 palabras.
                     max_tokens=3000,
                     # Penalización de frecuencia/presencia evita que el modelo
                     # repita palabras/frases (anti-runaway degenerativo).
@@ -973,7 +976,7 @@ class GlosaService:
                     timeout=120.0,
                 )
                 content = resp.choices[0].message.content
-                return content, "groq/gpt-oss-120b"
+                return content, f"groq/{self.groq_model}"
             except Exception as e:
                 ultimo_error = e
                 error_msg = str(e).lower()

@@ -324,6 +324,7 @@ async def generar_lote(
         anthropic_api_key=cfg.anthropic_api_key,
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
+        groq_model=cfg.groq_model,
     )
 
     sem = asyncio.Semaphore(5)
@@ -425,6 +426,7 @@ async def refinar_dictamen_endpoint(
         anthropic_api_key=cfg.anthropic_api_key,
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
+        groq_model=cfg.groq_model,
     )
     nuevo_argumento = await service.refinar_dictamen(
         dictamen_actual_html=glosa.dictamen,
@@ -523,6 +525,7 @@ async def validar_pre_radicacion(
         anthropic_api_key=cfg.anthropic_api_key,
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
+        groq_model=cfg.groq_model,
     )
 
     # Calcular días hábiles si hay fechas
@@ -947,6 +950,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             anthropic_api_key=cfg.anthropic_api_key,
             primary_ai=cfg.primary_ai,
             anthropic_model=cfg.anthropic_model,
+            groq_model=cfg.groq_model,
         )
         
         from app.models.schemas import GlosaInput
