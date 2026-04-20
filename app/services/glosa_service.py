@@ -443,7 +443,34 @@ class GlosaService:
 
             # 9) Tipos de errores OCR / typos comunes de la IA
             arg_ia = re.sub(r"\bCONSAGR\s+A\b", "CONSAGRA", arg_ia, flags=re.IGNORECASE)
-            arg_ia = re.sub(r"\bGLosa\b", "GLOSA", arg_ia)  # capitalización rota
+            arg_ia = re.sub(r"\bGLosa\b", "GLOSA", arg_ia)
+            arg_ia = re.sub(r"\bGLosas\b", "GLOSAS", arg_ia)
+            arg_ia = re.sub(r"\bGLosA\b", "GLOSA", arg_ia)
+
+            # 10) Typos inventados por la IA (palabras que no existen)
+            _TYPOS_IA = {
+                r"\bSERJURAR\b": "ESTAR SUJETA A",
+                r"\bSERJUROS\b": "SUJETOS",
+                r"\bREINTEGRAMENTE\b": "ÍNTEGRAMENTE",
+                r"\bDISPUSIO\b": "DISPONE",
+                r"\bCONFIGURANDO\s+UN\s+INCUMPLIMIENTO\b": "CONFIGURA UN INCUMPLIMIENTO",
+            }
+            for pat, repl in _TYPOS_IA.items():
+                arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
+
+            # 11) Quitar nombres propios pegados al patron "PACIENTE IDENTIFICADO EN EXPEDIENTE, <NOMBRE>, DE XX AÑOS"
+            # El prompt lo prohibe pero la IA a veces lo agrega. Lo cortamos.
+            arg_ia = re.sub(
+                r"(PACIENTE\s+IDENTIFICADO\s+EN\s+EXPEDIENTE)\s*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+(?:\s*,\s*DE\s+\d+\s+A[ÑN]OS)?",
+                r"\1",
+                arg_ia,
+            )
+            # Variante: "EL PACIENTE, <NOMBRE>, DE 63 AÑOS"
+            arg_ia = re.sub(
+                r"(EL\s+PACIENTE)\s*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+\s*,\s*DE\s+\d+\s+A[ÑN]OS",
+                r"\1",
+                arg_ia,
+            )
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
