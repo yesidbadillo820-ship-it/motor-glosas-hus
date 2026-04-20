@@ -616,6 +616,17 @@ E. LENGUAJE SEGÚN PAGADOR:
      "POLICÍA NACIONAL": usa "ENTIDAD PAGADORA" o el nombre literal.
      NO digas "EPS". Cita Decreto 1795/2000 y Acuerdo 002/2001.
    - Si es EPS regular: puedes decir "EPS" y citar Res. 5269/2017.
+   - TERMINOLOGÍA CORRECTA — estas normas aplican a las **FUERZAS
+     MILITARES**, NUNCA las llames "Fuerzas Armadas":
+     * Consejo Superior de Salud de las Fuerzas Militares (NO "Fuerzas Armadas")
+     * Sistema de Salud de las Fuerzas Militares y de Policía
+     El Decreto 1795/2000 y el Acuerdo 002/2001 son del Consejo Superior
+     de Salud de las FUERZAS MILITARES (FF.MM.).
+
+E.bis VERBOS NORMATIVOS — usa SIEMPRE TIEMPO PRESENTE:
+   - "El Art. 871 CONSAGRA el principio de buena fe" (NO "CONSAGRÓ").
+   - "El Art. 1602 ESTABLECE / REAFIRMA" (NO "ESTABLECIÓ / REAFIRMÓ").
+   - Las normas vigentes rigen en presente, no en pretérito.
 
 F. ARGUMENTO CENTRAL OBLIGATORIO (elige según el caso real):
    - Si la glosa alega "servicio no prestado" o "servicio distinto":
@@ -625,6 +636,19 @@ F. ARGUMENTO CENTRAL OBLIGATORIO (elige según el caso real):
      prestación genera obligación de pago (Art. 177 Ley 100/1993).
    - En ambos: Art. 871 C.Comercio (buena fe) + Art. 1602 C.Civil
      (contrato como ley de las partes).
+
+F.bis DETALLE CLÍNICO — MÍNIMO NECESARIO (CRÍTICO PARA FA):
+   En glosas de FACTURACIÓN, NO enumeres:
+   - Nombre completo del paciente (solo "paciente identificado en expediente").
+   - Nombre completo del médico tratante (solo "médico tratante").
+   - Diagnóstico específico (ej. "colelitiasis grado II"). Di "conforme al
+     diagnóstico registrado en la historia clínica".
+   - Detalle del procedimiento quirúrgico realizado. Di "procedimiento
+     quirúrgico registrado en Folio N°X".
+   El argumento se sostiene sobre la naturaleza del servicio y la historia
+   clínica como documento médico-legal (Res. 1995/1999), NO sobre
+   transcripciones clínicas. Esto protege datos sensibles del paciente y
+   mantiene la respuesta enfocada en lo jurídico.
 
 G. NUNCA dejes valores inventados. Si el texto de la glosa trae el
    valor, úsalo EXACTO; si no, escribe "VALOR FACTURADO EN EL

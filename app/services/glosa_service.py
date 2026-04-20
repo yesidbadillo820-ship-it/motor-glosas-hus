@@ -413,6 +413,37 @@ class GlosaService:
 
             # 6) Preposición "DE EL" → "DEL"
             arg_ia = re.sub(r"\bDE\s+EL\s+VALOR\b", "DEL VALOR", arg_ia, flags=re.IGNORECASE)
+
+            # 7) Terminología Sanidad Militar: "FUERZAS ARMADAS" → "FUERZAS MILITARES"
+            arg_ia = re.sub(r"\bFUERZAS\s+ARMADAS\b", "FUERZAS MILITARES", arg_ia, flags=re.IGNORECASE)
+            arg_ia = re.sub(r"\bFF\.?\s*AA\b\.?", "FF.MM.", arg_ia)
+            arg_ia = re.sub(r"FF\.MM\.\.", "FF.MM.", arg_ia)  # doble punto si aplicó 2 veces
+
+            # 8) Verbos normativos en pretérito → presente (las normas vigentes rigen en presente)
+            arg_ia = re.sub(
+                r"\b(ART[ÍI]CULO\s+\d+[^\.]*?)\bCONSAGR[ÓO]\b",
+                r"\1CONSAGRA",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"\b(ART[ÍI]CULO\s+\d+[^\.]*?)\bESTABLECI[ÓO]\b",
+                r"\1ESTABLECE",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"\b(ART[ÍI]CULO\s+\d+[^\.]*?)\bREAFIRM[ÓO]\b",
+                r"\1REAFIRMA",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"\b(LEY\s+\d+/\d+[^\.]*?)\bDISPUSIO\b",
+                r"\1DISPONE",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
+            # 9) Tipos de errores OCR / typos comunes de la IA
+            arg_ia = re.sub(r"\bCONSAGR\s+A\b", "CONSAGRA", arg_ia, flags=re.IGNORECASE)
+            arg_ia = re.sub(r"\bGLosa\b", "GLOSA", arg_ia)  # capitalización rota
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
