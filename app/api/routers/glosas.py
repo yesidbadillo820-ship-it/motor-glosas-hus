@@ -466,6 +466,16 @@ async def refinar_dictamen_endpoint(
             campo="dictamen",
             detalle=f"instrucción: {data.mensaje[:200]}",
         )
+        # Guardar snapshot en historial de versiones
+        try:
+            from app.api.routers.versiones import guardar_version
+            guardar_version(
+                db=db, glosa_id=glosa_id, dictamen_html=nuevo_html,
+                accion="REFINAR", autor_email=current_user.email,
+                mensaje_refinar=data.mensaje[:500],
+            )
+        except Exception:
+            pass
 
     return {
         "argumento_refinado": nuevo_argumento,
@@ -705,18 +715,31 @@ def obtener_glosa(
 @router.delete("/{glosa_id}")
 def eliminar_glosa(
     glosa_id: int,
+    motivo: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
-    """Elimina permanentemente una glosa del historial."""
+    """Elimina una glosa del historial. Se mueve a la papelera (restaurable
+    por 30 días) antes de borrarla de la tabla principal."""
     repo = GlosaRepository(db)
     glosa = repo.obtener_por_id(glosa_id)
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
+    # Mover a papelera (soft-delete con snapshot)
+    try:
+        from app.api.routers.papelera import mover_a_papelera
+        pap_id = mover_a_papelera(db, glosa, eliminado_por=current_user.email, motivo=motivo or "")
+    except Exception as e:
+        logger.warning(f"No se pudo mover a papelera: {e}")
+        pap_id = None
     db.delete(glosa)
     db.commit()
-    logger.info(f"Glosa eliminada ID={glosa_id} por {current_user.email}")
-    return {"message": f"Glosa {glosa_id} eliminada"}
+    logger.info(f"Glosa eliminada ID={glosa_id} por {current_user.email} (papelera #{pap_id})")
+    return {
+        "message": f"Glosa {glosa_id} eliminada",
+        "papelera_id": pap_id,
+        "restaurable_hasta": "30 días",
+    }
 
 
 class DecisionEPSInput(BaseModel):

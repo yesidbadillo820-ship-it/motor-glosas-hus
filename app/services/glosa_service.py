@@ -451,43 +451,11 @@ class GlosaService:
             for pat, repl in _TYPOS_IA.items():
                 arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
 
-            # 11) Protección de PHI (datos personales/médicos)
-            # 11a) "PACIENTE IDENTIFICADO EN EXPEDIENTE, <NOMBRE>, DE XX AÑOS"
-            arg_ia = re.sub(
-                r"(PACIENTE\s+IDENTIFICADO\s+EN\s+EXPEDIENTE)\s*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+(?:\s*,\s*DE\s+\d+\s+A[ÑN]OS)?",
-                r"\1",
-                arg_ia,
-            )
-            # 11b) "EL PACIENTE, <NOMBRE>, DE 63 AÑOS"
-            arg_ia = re.sub(
-                r"(EL\s+PACIENTE)\s*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})+\s*,\s*DE\s+\d+\s+A[ÑN]OS",
-                r"\1",
-                arg_ia,
-            )
-            # 11c) Nombre del médico/profesional tratante expuesto
-            # Usamos {3,} letras por palabra para NO consumir preposiciones (DE, EN, CON, POR).
-            # "PROFESIONAL DE SALUD ANDRÉS FELIPE CHAPARRO ZARAZA" → "PROFESIONAL DE SALUD TRATANTE"
-            arg_ia = re.sub(
-                r"(PROFESIONAL\s+(?:DE\s+SALUD|M[ÉE]DICO)(?:\s+TRATANTE)?)\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,4}\b",
-                r"\1 TRATANTE",
-                arg_ia,
-            )
-            arg_ia = re.sub(
-                r"(M[ÉE]DICO\s+TRATANTE)\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,4}\b",
-                r"\1",
-                arg_ia,
-            )
-            arg_ia = re.sub(
-                r"\bDR[A]?\.?\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,4}\b",
-                "MÉDICO TRATANTE",
-                arg_ia,
-            )
-            # 11d) Historia clínica N° XXXXX (expone PHI)
-            arg_ia = re.sub(
-                r"HISTORIA\s+CL[ÍI]NICA\s+N[°º]?\s*\d{3,10}",
-                "HISTORIA CLÍNICA INSTITUCIONAL",
-                arg_ia, flags=re.IGNORECASE,
-            )
+            # 11) Limpieza minima de PHI: solo conectores o formatos rotos,
+            # PERO conservamos nombres y numero de HC porque son base argumental
+            # para la defensa ante la entidad pagadora.
+            # Nota: si quieres anonimizar para alguna glosa especifica, hazlo
+            # manualmente con "Refinar con IA" pidiendo el cambio.
 
             # 12) Dobles conectores redundantes
             arg_ia = re.sub(

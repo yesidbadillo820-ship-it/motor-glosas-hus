@@ -617,6 +617,14 @@ from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
+from app.api.routers.versiones import router as versiones_router
+from app.api.routers.papelera import router as papelera_router
+from app.api.routers.simulador import router as simulador_router
+from app.api.routers.export_erp import router as export_erp_router
+from app.api.routers.asignacion import router as asignacion_router
+from app.api.routers.push import router as push_router
+from app.api.routers.bandeja import router as bandeja_router
+from app.api.routers.adjuntos import router as adjuntos_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -640,6 +648,14 @@ app.include_router(informes_router)
 app.include_router(mi_desempeno_router)
 app.include_router(busqueda_semantica_router)
 app.include_router(dos_fa_router)
+app.include_router(versiones_router)
+app.include_router(papelera_router)
+app.include_router(simulador_router)
+app.include_router(export_erp_router)
+app.include_router(asignacion_router)
+app.include_router(push_router)
+app.include_router(bandeja_router)
+app.include_router(adjuntos_router)
 
 
 def get_glosa_service() -> GlosaService:
@@ -915,6 +931,15 @@ async def analizar(
     resultado.tipo = tipo_final
     resultado.dictamen = dictamen_final
     resultado.glosa_id = glosa.id
+    # Guardar snapshot inicial del dictamen en historial de versiones
+    try:
+        from app.api.routers.versiones import guardar_version
+        guardar_version(
+            db=db, glosa_id=glosa.id, dictamen_html=dictamen_final,
+            accion="CREAR", autor_email=current_user.email,
+        )
+    except Exception as _e:
+        logger.warning(f"No se pudo guardar version: {_e}")
     return resultado
 
 

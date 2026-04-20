@@ -703,6 +703,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
           <svg class="i i-md" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           <span class="sn-item-label">Plantillas Gold</span>
         </button>
+        <button class="sn-item" data-tip="Papelera" onclick="sidebarTab(this,'papelera')">
+          <svg class="i i-md" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <span class="sn-item-label">Papelera</span>
+        </button>
       </div>
 
       <div class="sn-group">
@@ -826,6 +830,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
             </div>
             <div style="display:flex;gap:.5rem;align-items:center">
               <button class="btn btn-ghost" onclick="generarInformeEjecutivo()" title="Informe ejecutivo PDF del mes actual">📊 Informe ejecutivo</button>
+              <button class="btn btn-ghost" onclick="exportarERP()" title="CSV contable SIIGO/Hélisa">💼 Export ERP</button>
               <select id="ap-ventana" onchange="cargarAnaliticaPredictiva()" class="ap-select">
                 <option value="30">30 días</option>
                 <option value="90">90 días</option>
@@ -1170,6 +1175,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </div>
     </div>
 
+    <!-- PAPELERA -->
+    <div class="panel" id="p-papelera">
+      <div class="page-pad">
+        <div class="page-head">
+          <div>
+            <h2 class="page-title">🗑️ Papelera</h2>
+            <p class="page-sub">Glosas eliminadas — restaurables dentro de 30 días</p>
+          </div>
+          <button class="btn-sm ghost" onclick="cargarPapelera()">Actualizar</button>
+        </div>
+        <div class="tbl-modern">
+          <table>
+            <thead><tr>
+              <th>EPS</th><th>Factura</th><th>Código</th>
+              <th class="num">Valor</th><th>Eliminado por</th>
+              <th>Fecha</th><th class="cell-center">Restante</th>
+              <th class="cell-center">Acciones</th>
+            </tr></thead>
+            <tbody id="papelera-body"><tr><td colspan="8" style="text-align:center;color:var(--text3);padding:2rem">Cargando…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- AUDITORÍA -->
     <div class="panel" id="p-audit">
       <div class="audit-area">
@@ -1466,6 +1495,81 @@ function tab(btn,id){
   if(id==='gold') cargarPlantillasGold();
   if(id==='mi-desempeno') cargarMiDesempeno();
   if(id==='usuarios') cargar2FAEstado();
+  if(id==='papelera') cargarPapelera();
+}
+
+async function cargarPapelera(){
+  var body = document.getElementById('papelera-body');
+  if(!body) return;
+  body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:2rem">Cargando…</td></tr>';
+  try{
+    var r = await fetch('/papelera/', {headers: authH()});
+    if(!r.ok){
+      if(r.status === 403){ body.innerHTML = '<tr><td colspan="8" style="color:#b45309;padding:2rem;text-align:center">Solo COORDINADOR/SUPER_ADMIN puede ver la papelera</td></tr>'; }
+      else { body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">Error ' + r.status + '</td></tr>'; }
+      return;
+    }
+    var d = await r.json();
+    if(!d.length){ body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:2rem">Papelera vacía</td></tr>'; return; }
+    body.innerHTML = d.map(function(p){
+      var fecha = p.eliminado_en ? new Date(p.eliminado_en).toLocaleDateString('es-CO') : '—';
+      var badge = p.dias_restantes_restaurar > 7
+        ? '<span class="chip chip-verde">'+p.dias_restantes_restaurar+' días</span>'
+        : p.dias_restantes_restaurar > 0
+          ? '<span class="chip chip-amarillo">'+p.dias_restantes_restaurar+' días</span>'
+          : '<span class="chip chip-negro">Expirado</span>';
+      return '<tr>' +
+        '<td>'+escHtml(p.eps||'—')+'</td>' +
+        '<td class="mono">'+escHtml(p.factura||'—')+'</td>' +
+        '<td><span class="chip chip-estado">'+escHtml(p.codigo_glosa||'—')+'</span></td>' +
+        '<td class="num">'+cop(p.valor_objetado||0)+'</td>' +
+        '<td>'+escHtml(p.eliminado_por||'—')+'</td>' +
+        '<td>'+fecha+'</td>' +
+        '<td class="cell-center">'+badge+'</td>' +
+        '<td class="cell-center">' +
+          '<button class="btn-sm" onclick="restaurarGlosa('+p.id+')">Restaurar</button> ' +
+          '<button class="btn-sm ghost" style="color:#b91c1c" onclick="purgarGlosa('+p.id+')">Purgar</button>' +
+        '</td></tr>';
+    }).join('');
+  }catch(e){ body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">'+escHtml(e.message)+'</td></tr>'; }
+}
+
+async function restaurarGlosa(papelera_id){
+  if(!confirm('¿Restaurar esta glosa desde la papelera?')) return;
+  try{
+    var r = await fetch('/papelera/'+papelera_id+'/restaurar', {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(r.ok){ toast('Restaurada','Nueva ID: '+d.nuevo_id,'success'); cargarPapelera(); }
+    else { toast('Error', d.detail||'No se pudo restaurar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function purgarGlosa(papelera_id){
+  if(!confirm('⚠️ PURGAR permanentemente esta glosa? No se podrá restaurar jamás.')) return;
+  try{
+    var r = await fetch('/papelera/'+papelera_id, {method:'DELETE', headers: authH()});
+    if(r.ok){ toast('Purgada','Eliminada definitivamente','success'); cargarPapelera(); }
+    else { toast('Error','No se pudo purgar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function exportarERP(){
+  var desde = prompt('Fecha desde (YYYY-MM-DD):', new Date(Date.now()-30*86400000).toISOString().slice(0,10));
+  if(!desde) return;
+  var hasta = prompt('Fecha hasta (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+  if(!hasta) return;
+  try{
+    showLoading();
+    var r = await fetch('/export-erp/recuperaciones?desde='+desde+'&hasta='+hasta, {headers: authH()});
+    if(!r.ok){ hideLoading(); toast('Error','No se pudo generar CSV','error'); return; }
+    var blob = await r.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'recuperaciones_'+desde+'_'+hasta+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    hideLoading();
+    toast('CSV listo','Descarga iniciada','success');
+  }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function cargar2FAEstado(){
@@ -3100,6 +3204,7 @@ async function loadConciliaciones(){
     var acciones = '<div style="display:flex;gap:.25rem;flex-wrap:wrap">' +
       '<button class="btn-sm ghost" onclick="panelContraRespEPS('+c.id+')" title="Registrar lo que respondió la EPS">EPS</button>' +
       '<button class="btn-sm ghost" onclick="panelPosturaHUS('+c.id+')" title="Registrar postura HUS">HUS</button>' +
+      '<button class="btn-sm" style="background:#7c3aed" onclick="simularConciliacion('+c.id+')" title="🧠 IA simula contraargumentos EPS">🧠 Simular</button>' +
       '<button class="btn-sm" style="background:#047857" onclick="panelCerrarActa('+c.id+')">Acta</button>' +
       '<button class="btn-sm ghost" onclick="verPdfActa('+c.id+')" title="PDF del acta">PDF</button>' +
       '</div>';
@@ -3173,6 +3278,40 @@ async function panelCerrarActa(id){
     if(r.ok){ toast('Acta firmada','Conciliación cerrada ✓','success'); loadConciliaciones(); }
     else { toast('Error', d.detail||'No se pudo cerrar','error'); }
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function simularConciliacion(id){
+  var c = _cachedConcil(id);
+  var postura = (c.postura_hus||'').trim();
+  if(!postura || postura.length < 20){
+    postura = prompt('Ingresa la postura de HUS que quieres simular (mín 20 caracteres):','');
+    if(!postura || postura.trim().length < 20){ toast('Sin postura','Registra primero la postura HUS','warning'); return; }
+  }
+  showLoading();
+  try{
+    var r = await fetch('/conciliaciones/'+id+'/simulador/', {
+      method:'POST', headers:{...authH(),'Content-Type':'application/json'},
+      body: JSON.stringify({postura_hus: postura})
+    });
+    var d = await r.json();
+    hideLoading();
+    if(!r.ok){ toast('Error', d.detail||'No se pudo simular','error'); return; }
+    // Abrir ventana con resultados
+    var w = window.open('', '_blank', 'width=900,height=800');
+    var html = '<html><head><meta charset="utf-8"><title>Simulador conciliación #'+id+'</title>' +
+      '<style>body{font-family:Segoe UI,Arial;padding:24px;background:#f8fafc;color:#1f2937;line-height:1.5}h1{color:#7c3aed}h2{color:#0b5d8a;margin-top:24px;border-bottom:1px solid #cbd5e1;padding-bottom:6px}.card{background:white;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:12px 0}.prob{background:#ede9fe;border-left:4px solid #7c3aed;padding:12px;border-radius:8px}.ca{border-left:4px solid #dc2626;padding-left:12px;margin:12px 0}.resp{background:#ecfdf5;border-left:4px solid #059669;padding:12px;margin-top:8px;border-radius:4px}</style>' +
+      '</head><body>' +
+      '<h1>🧠 Simulador de Conciliación #' + id + '</h1>' +
+      '<div class="prob"><b>Probabilidad de éxito HUS:</b> ' + (d.probabilidad_exito_hus||'—') + '% · <b>Modelo:</b> ' + escHtml(d._modelo||'') + '</div>' +
+      '<h2>Contra-argumentos probables de la EPS</h2>';
+    (d.contraargumentos||[]).forEach(function(ca, i){
+      html += '<div class="card"><div class="ca"><b>#'+(i+1)+' '+escHtml(ca.titulo||'')+'</b><div>'+escHtml(ca.texto||'')+'</div></div>' +
+        '<div class="resp"><b>Respuesta sugerida HUS:</b><br>'+escHtml(ca.respuesta_sugerida_hus||'')+'</div></div>';
+    });
+    html += '<h2>Consejo estratégico</h2><div class="card">'+escHtml(d.consejo_estrategico||'')+'</div>' +
+      '</body></html>';
+    w.document.write(html); w.document.close();
+  }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function verPdfActa(id){
