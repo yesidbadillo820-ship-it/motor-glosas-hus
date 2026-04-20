@@ -523,6 +523,37 @@ class GlosaService:
                     arg_ia = arg_ia.upper()
                     # Re-aplicar expansión de abreviaturas por si falló
                     arg_ia = _expandir_abreviaturas_tipo(arg_ia)
+
+            # 16) ANTI-ALUCINACIÓN DE MONTOS (CRÍTICO):
+            # Si el texto original de la glosa NO traía un valor numérico
+            # (valor_raw == "$ 0.00"), la IA NO debe inventar cifras. Si lo
+            # hizo, reemplazamos cualquier monto específico por "EL VALOR
+            # INDICADO EN EL EXPEDIENTE".
+            _no_hay_valor_original = (not valor_raw) or valor_raw.strip() in ("$ 0.00", "$0.00", "$ 0")
+            if _no_hay_valor_original:
+                # Patrón: $ seguido de cifras con separadores (. , ) opcionales
+                _patron_monto = re.compile(
+                    r"\$\s*\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?",
+                    flags=re.IGNORECASE,
+                )
+                arg_ia = _patron_monto.sub("EL VALOR INDICADO EN EL EXPEDIENTE", arg_ia)
+                # Frases típicas que la IA genera con números inventados:
+                arg_ia = re.sub(
+                    r"FACTURADO\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+                    "FACTURADO SEGÚN VALOR INDICADO EN EL EXPEDIENTE",
+                    arg_ia, flags=re.IGNORECASE,
+                )
+                arg_ia = re.sub(
+                    r"Y\s+RECONOCIDO\s+SOLO\s+POR\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+                    "Y RECONOCIDO PARCIALMENTE POR LA ENTIDAD PAGADORA",
+                    arg_ia, flags=re.IGNORECASE,
+                )
+                arg_ia = re.sub(
+                    r"RETENCI[ÓO]N\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+                    "RETENCIÓN DEL VALOR INDICADO EN EL EXPEDIENTE",
+                    arg_ia, flags=re.IGNORECASE,
+                )
+
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
