@@ -187,6 +187,9 @@ def _truncar_runaway(texto: str, max_repeticiones: int = 3) -> str:
 
 
 _SUAVIZAR_PATTERNS = [
+    # Apertura obligatoria: nunca "RESPETUOSAMENTE" en la primera frase
+    (r"\bESE\s+HUS\s+RESPETUOSAMENTE\s+NO\s+ACEPTA\b",
+     "ESE HUS NO ACEPTA"),
     # Exigir → Solicitar
     (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\s+Y\s+DEFINITIVO\b",
      "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
