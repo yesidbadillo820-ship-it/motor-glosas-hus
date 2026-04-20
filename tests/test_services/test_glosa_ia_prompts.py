@@ -16,12 +16,12 @@ class TestSystemPrompts:
         """Should return tariff-specific prompt."""
         prompt = get_system_prompt(prefijo="TA", eps="EPS TEST")
         assert "EPS TEST" in prompt
-        assert "DEFENSA TARIFARIA" in prompt
+        assert "MÓDULO: TARIFAS" in prompt
 
     def test_get_system_prompt_soportes(self):
         """Should return supports-specific prompt."""
         prompt = get_system_prompt(prefijo="SO", eps="EPS TEST")
-        assert "DEFENSA POR SOPORTES" in prompt
+        assert "MÓDULO: SOPORTES" in prompt
 
     def test_get_system_prompt_desconocido(self):
         """Unknown prefix should fall back to FA (facturación) prompt."""
@@ -35,9 +35,9 @@ class TestSystemPrompts:
         assert "Ley 1438" in SYSTEM_BASE
         assert "Ley 1751" in SYSTEM_BASE
 
-    def test_base_art_56(self):
-        """Base should reference Art. 56 (20 business days)."""
-        assert "Art. 56" in SYSTEM_BASE or "20 días hábiles" in SYSTEM_BASE
+    def test_base_art_57(self):
+        """Base should reference Art. 57 (30+15 days per Ley 1438/2011)."""
+        assert "Art. 57" in SYSTEM_BASE or "30 días" in SYSTEM_BASE
 
     def test_tarifa_contiene_contrato(self):
         """Tariff prompt should mention contract importance."""
@@ -118,5 +118,5 @@ class TestUserPrompt:
             codigo="FA0001",
             eps="EPS TEST"
         )
-        assert "INSTRUCCIONES" in prompt.upper()
+        assert "INSTRUCCIÓN" in prompt.upper() or "INSTRUCCIONES" in prompt.upper()
         assert "NORMAS" in prompt.upper()
