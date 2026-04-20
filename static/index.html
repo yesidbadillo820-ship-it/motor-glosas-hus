@@ -1304,6 +1304,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     <div class="modal-hdr">
       <h3 id="modal-titulo">Dictamen Jurídico</h3>
       <div style="display:flex;gap:.5rem">
+        <button class="btn-sm ghost" onclick="verHistorialVersiones()" title="Historial de versiones del dictamen">📜 Versiones</button>
         <button class="btn-sm ghost" onclick="guardarComoPlantillaGold()" title="Guardar este argumento como plantilla ganadora">⭐ Gold</button>
         <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
         <button class="modal-close" onclick="cerrarModal()">✕</button>
@@ -1550,6 +1551,59 @@ async function purgarGlosa(papelera_id){
     var r = await fetch('/papelera/'+papelera_id, {method:'DELETE', headers: authH()});
     if(r.ok){ toast('Purgada','Eliminada definitivamente','success'); cargarPapelera(); }
     else { toast('Error','No se pudo purgar','error'); }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function verHistorialVersiones(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Primero analiza una glosa','warning'); return; }
+  try{
+    var r = await fetch('/glosas/'+CURRENT_GLOSA_ID+'/versiones/', {headers: authH()});
+    if(!r.ok){ toast('Error','No se pudo cargar historial','error'); return; }
+    var versiones = await r.json();
+    if(!versiones.length){ toast('Sin historial','Aún no hay versiones guardadas','info'); return; }
+
+    var w = window.open('', '_blank', 'width=880,height=760');
+    var html = '<html><head><meta charset="utf-8"><title>Historial Glosa #'+CURRENT_GLOSA_ID+'</title>' +
+      '<style>body{font-family:Segoe UI,Arial;padding:20px;background:#f8fafc;color:#1f2937;line-height:1.5}' +
+      'h1{color:#0b5d8a;border-bottom:3px double #0b5d8a;padding-bottom:10px}' +
+      '.ver{background:white;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:12px 0;border-left:4px solid #0d9488}' +
+      '.ver.CREAR{border-left-color:#1d4ed8}' +
+      '.ver.REFINAR{border-left-color:#7c3aed}' +
+      '.ver.RESTAURAR{border-left-color:#047857}' +
+      '.meta{font-size:.75rem;color:#64748b;margin-bottom:8px;display:flex;gap:1rem;flex-wrap:wrap}' +
+      '.chip{padding:2px 8px;border-radius:10px;font-size:.65rem;font-weight:700;background:#e0e7ff;color:#1e40af}' +
+      '.msg{background:#fef3c7;border-left:3px solid #d97706;padding:6px 10px;margin:6px 0;font-size:.78rem;font-style:italic}' +
+      '.preview{background:#f1f5f9;padding:8px;border-radius:6px;font-size:.78rem;max-height:120px;overflow:hidden}' +
+      'button.restaurar{background:#047857;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;margin-top:8px}' +
+      '</style></head><body>' +
+      '<h1>📜 Historial de versiones — Glosa #' + CURRENT_GLOSA_ID + '</h1>' +
+      '<p style="font-size:.85rem;color:#64748b">Cada cambio al dictamen queda registrado. Puedes restaurar cualquier versión anterior.</p>';
+    versiones.forEach(function(v, i){
+      var fecha = v.creado_en ? new Date(v.creado_en).toLocaleString('es-CO') : '—';
+      html += '<div class="ver '+escHtml(v.accion||'')+'">' +
+        '<div class="meta">' +
+          '<span class="chip">'+escHtml(v.accion||'—')+'</span>' +
+          '<span>📧 '+escHtml(v.autor_email||'—')+'</span>' +
+          '<span>🕐 '+fecha+'</span>' +
+          (i === 0 ? '<span style="color:#047857;font-weight:600">● ACTUAL</span>' : '') +
+        '</div>' +
+        (v.mensaje_refinar ? '<div class="msg">💬 ' + escHtml(v.mensaje_refinar) + '</div>' : '') +
+        '<div class="preview">' + escHtml(v.preview||'') + '…</div>' +
+        (i > 0 ? '<button class="restaurar" onclick="window.opener.restaurarVersion('+CURRENT_GLOSA_ID+','+v.id+');window.close()">Restaurar esta versión</button>' : '') +
+      '</div>';
+    });
+    html += '</body></html>';
+    w.document.write(html); w.document.close();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+async function restaurarVersion(glosaId, versionId){
+  if(!confirm('¿Restaurar esta versión como la actual? (se guardará snapshot del dictamen actual antes)')) return;
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/versiones/'+versionId+'/restaurar', {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(r.ok){ toast('Restaurada','Versión '+versionId+' restaurada','success'); if(typeof loadHist === 'function') loadHist(histPage||1); if(typeof cerrarModal === 'function') cerrarModal(); }
+    else { toast('Error', d.detail||'No se pudo restaurar','error'); }
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
@@ -2124,6 +2178,7 @@ function renderResult(d){
     +'<button class="btn btn-ghost" onclick="copiarDictamen()">Copiar texto</button>'
     +'<button class="btn btn-ghost" onclick="validarPreRadicacion()">🛡️ Validar</button>'
     +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
+    +'<button class="btn btn-ghost" onclick="verHistorialVersiones()">📜 Versiones</button>'
     +'<button class="btn btn-ghost" onclick="guardarComoPlantillaGoldInline()">⭐ Guardar como Gold</button>'
     +'<button class="btn btn-ghost" onclick="nuevaGlosa()">Nueva glosa</button>'
     +'</div>'
