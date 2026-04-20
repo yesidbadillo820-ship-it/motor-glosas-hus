@@ -192,18 +192,39 @@ def _concepto_glosa(codigo_glosa: str) -> str:
 def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[str, str]:
     """Extrae tupla (CUPS, descripción_servicio) desde el texto de la glosa/PDF.
 
+    PRIORIDAD para el CUPS:
+      1. En el TEXTO DE LA GLOSA, buscar un número de 4-8 dígitos delimitado
+         por guiones/espacios después del código del tipo (FA0202 - ... - 890602 - ...).
+      2. Si no, cualquier número 5-6 dígitos EN EL TEXTO DE LA GLOSA.
+      3. Nunca como último recurso mirar el PDF (allí hay números de ingreso,
+         HC, folio que no son CUPS).
+
     Retorna ("", "") si no logra identificarlos.
     """
     if not texto_glosa and not contexto_pdf:
         return "", ""
-    fuente = f"{texto_glosa}\n{contexto_pdf}"
 
     cups = ""
-    # CUPS estándar: 5-6 dígitos, opcionalmente con sufijo -X
-    m = re.search(r"\b(\d{5,8}(?:-\d)?)\b", fuente)
-    if m:
-        cups = m.group(1)
+    # 1) Patrón específico del formato de glosa: "- 890602 -" o "- 890602 ESTUDIO…"
+    if texto_glosa:
+        m = re.search(
+            r"(?:^|\s|[-·,])\s*(\d{4,8}(?:-\d)?)\s*(?:[-·,]|\s+[A-ZÁÉÍÓÚÑ])",
+            texto_glosa,
+        )
+        if m:
+            cups = m.group(1)
 
+    # 2) Si no, cualquier número de 5-6 dígitos en el texto de la glosa
+    if not cups and texto_glosa:
+        m = re.search(r"\b(\d{5,6}(?:-\d)?)\b", texto_glosa)
+        if m:
+            cups = m.group(1)
+
+    # Nota: NO usamos el PDF para extraer CUPS porque contiene otros números
+    # (ingreso, historia clínica, folio) que no son CUPS. Si el texto de la
+    # glosa no lo tiene, mejor devolver vacío.
+
+    fuente = f"{texto_glosa}\n{contexto_pdf}"
     servicio = ""
     # Buscar descripción del servicio con patrones comunes
     for pat in [
