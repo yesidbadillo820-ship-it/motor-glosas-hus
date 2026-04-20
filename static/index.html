@@ -1124,6 +1124,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </div>
     </div>
     <div class="hdr-right">
+      <button class="search-trigger" onclick="abrirCommandPalette()" title="Buscar acciones">
+        <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Buscar…</span>
+        <span class="kbd">⌘K</span>
+      </button>
       <div class="status-pill"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span></div>
       <span class="hdr-user" id="hdr-user"></span>
       <button class="hdr-btn" id="btn-install-pwa" onclick="instalarPWA()" title="Instalar app" style="display:none"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
@@ -2013,6 +2018,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <!-- TOASTS -->
 <div class="toast-wrap" id="toasts"></div>
 
+<!-- COMMAND PALETTE -->
+<div class="cp-backdrop" id="cp-backdrop" onclick="if(event.target===this)cerrarCommandPalette()">
+  <div class="cp-box">
+    <div class="cp-search">
+      <svg class="i i-md" viewBox="0 0 24 24" style="color:var(--text3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="cp-input" placeholder="Escribe para buscar acciones, secciones, herramientas…" oninput="filtrarCommandPalette(this.value)" onkeydown="handleCpKeyDown(event)"/>
+      <span class="kbd-hint">ESC</span>
+    </div>
+    <div class="cp-list" id="cp-list"></div>
+  </div>
+</div>
+
+
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────
 var TOKEN = localStorage.getItem('hus_token') || '';
@@ -2419,6 +2437,111 @@ function mostrarResultadoValidacion(d){
   html += '</div></div>';
   modalBody.innerHTML = html;
 }
+
+// ─── COMMAND PALETTE (Cmd+K) ─────────────────────────────────
+var CP_ACCIONES = [
+  // Navegación
+  {seccion:"Navegación", icono:"🏠", titulo:"Analizar glosa", hint:"Nueva glosa", tab:"analizar"},
+  {seccion:"Navegación", icono:"📊", titulo:"Mi desempeño", hint:"Tu productividad", tab:"mi-desempeno"},
+  {seccion:"Navegación", icono:"📋", titulo:"Mis glosas", hint:"Asignaciones", tab:"mis-glosas"},
+  {seccion:"Navegación", icono:"🕓", titulo:"Historial", hint:"Glosas anteriores", tab:"historial"},
+  {seccion:"Navegación", icono:"🔔", titulo:"Alertas", hint:"Próximas a vencer", tab:"alertas"},
+  {seccion:"Navegación", icono:"💼", titulo:"Contratos", hint:"EPS y tarifas", tab:"contratos"},
+  {seccion:"Navegación", icono:"📑", titulo:"Plantillas", hint:"Respuestas guardadas", tab:"plantillas"},
+  {seccion:"Navegación", icono:"⭐", titulo:"Plantillas Gold", hint:"Respuestas ganadoras", tab:"plantillas-gold"},
+  // Herramientas
+  {seccion:"Herramientas", icono:"📚", titulo:"Consulta Normativa", hint:"Biblioteca legal", tab:"consulta-normativa"},
+  {seccion:"Herramientas", icono:"🧩", titulo:"Multi-concepto", hint:"Detectar múltiples códigos", tab:"multi-concepto"},
+  {seccion:"Herramientas", icono:"🔲", titulo:"Detector en masa", hint:"Glosas duplicadas", tab:"detector-masa"},
+  {seccion:"Herramientas", icono:"⏱️", titulo:"Simulador", hint:"¿Qué pasaría si…?", tab:"simulador"},
+  {seccion:"Herramientas", icono:"💚", titulo:"Salud Total", hint:"Procesar TXT", tab:"salud-total"},
+  // Acciones rápidas
+  {seccion:"Acciones", icono:"📥", titulo:"Importar recepción", hint:"Excel recepción", accion:function(){window.location.href='/importar-recepcion'}},
+  {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
+  {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
+  {seccion:"Acciones", icono:"🌓", titulo:"Alternar modo oscuro", hint:"Light ↔ Dark", accion:function(){cerrarCommandPalette();toggleDark()}},
+  {seccion:"Acciones", icono:"🚪", titulo:"Cerrar sesión", hint:"Salir", accion:function(){cerrarCommandPalette();logout()}},
+];
+var CP_FILTERED = [];
+var CP_SEL = 0;
+
+function abrirCommandPalette(){
+  document.getElementById('cp-backdrop').classList.add('show');
+  setTimeout(function(){
+    var inp = document.getElementById('cp-input');
+    inp.value = '';
+    inp.focus();
+    filtrarCommandPalette('');
+  }, 50);
+}
+function cerrarCommandPalette(){
+  document.getElementById('cp-backdrop').classList.remove('show');
+}
+function filtrarCommandPalette(q){
+  q = (q||'').toLowerCase().trim();
+  CP_FILTERED = CP_ACCIONES.filter(function(a){
+    if(!q) return true;
+    return (a.titulo.toLowerCase().indexOf(q)>=0)
+        || (a.hint && a.hint.toLowerCase().indexOf(q)>=0)
+        || (a.seccion.toLowerCase().indexOf(q)>=0);
+  });
+  CP_SEL = 0;
+  renderCommandPalette();
+}
+function renderCommandPalette(){
+  var list = document.getElementById('cp-list');
+  if(CP_FILTERED.length === 0){
+    list.innerHTML = '<div style="padding:2rem 1rem;text-align:center;color:var(--text3);font-size:.85rem;">Sin resultados. Prueba con otro término.</div>';
+    return;
+  }
+  var html = '';
+  var currentSec = '';
+  CP_FILTERED.forEach(function(a, i){
+    if(a.seccion !== currentSec){
+      html += '<div class="cp-section">' + a.seccion + '</div>';
+      currentSec = a.seccion;
+    }
+    var active = i === CP_SEL ? ' active' : '';
+    html += '<div class="cp-item'+active+'" data-idx="'+i+'" onclick="ejecutarCpItem('+i+')" onmouseenter="CP_SEL='+i+';renderCommandPalette()">';
+    html += '<div class="cp-item-icon">'+a.icono+'</div>';
+    html += '<div style="flex:1;"><div>'+a.titulo+'</div></div>';
+    if(a.hint) html += '<div class="cp-item-sub">'+a.hint+'</div>';
+    html += '</div>';
+  });
+  list.innerHTML = html;
+  var activeEl = list.querySelector('.cp-item.active');
+  if(activeEl) activeEl.scrollIntoView({block:'nearest'});
+}
+function ejecutarCpItem(i){
+  var a = CP_FILTERED[i];
+  if(!a) return;
+  if(a.tab){
+    cerrarCommandPalette();
+    // Buscar y clickear el botón correspondiente en sidebar
+    var btn = document.querySelector('.sn-item[onclick*="'+a.tab+'"]');
+    if(btn) btn.click();
+  } else if(a.accion){
+    a.accion();
+  }
+}
+function handleCpKeyDown(e){
+  if(e.key === 'Escape'){ cerrarCommandPalette(); return; }
+  if(e.key === 'ArrowDown'){ e.preventDefault(); CP_SEL = Math.min(CP_SEL+1, CP_FILTERED.length-1); renderCommandPalette(); return; }
+  if(e.key === 'ArrowUp'){ e.preventDefault(); CP_SEL = Math.max(CP_SEL-1, 0); renderCommandPalette(); return; }
+  if(e.key === 'Enter'){ e.preventDefault(); ejecutarCpItem(CP_SEL); return; }
+}
+// Shortcut global Cmd+K / Ctrl+K
+document.addEventListener('keydown', function(e){
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){
+    e.preventDefault();
+    abrirCommandPalette();
+  }
+  // Shortcut adicional: / para abrir también (estilo GitHub)
+  if(e.key === '/' && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){
+    e.preventDefault();
+    abrirCommandPalette();
+  }
+});
 
 // ─── MULTI-CONCEPTO ─────────────────────────────────────────────
 async function analizarMultiConcepto(){
