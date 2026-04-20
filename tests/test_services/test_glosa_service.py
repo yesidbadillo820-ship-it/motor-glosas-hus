@@ -56,14 +56,14 @@ class TestGenerarTextoExtemporanea:
         assert "RESOLUCIÓN 3047" in texto
 
     def test_genera_texto_no_acepta_glosa(self):
-        """Should reject the glosa."""
+        """Should reject the glosa (conciliatory tone)."""
         texto = generar_texto_extemporanea(25)
-        assert "RECHAZA" in texto or "NO ACEPTA" in texto.upper()
+        assert "NO ACEPTA" in texto.upper()
 
     def test_genera_texto_pago_integro(self):
-        """Should demand full payment."""
+        """Should request full recognition (conciliatory tone)."""
         texto = generar_texto_extemporanea(25)
-        assert "PAGO" in texto.upper()
+        assert "RECONOCIMIENTO ÍNTEGRO" in texto.upper()
         assert "IPS" in texto
 
 

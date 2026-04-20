@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import re
 
+from app.services.glosa_service import _suavizar_tono
+
 NIT_HUS = "900006037"
 DIAS_LIMITE = 20
 
@@ -268,6 +270,8 @@ class GlosaSaludTotal:
             concepto = CONCEPTOS["RE9901"]
             observacion = self._argumento_tecnico_por_codigo()
             valor_aceptado = 0
+
+        observacion = _suavizar_tono(observacion)
 
         return {
             "NumeroRad": self.numero_rad,

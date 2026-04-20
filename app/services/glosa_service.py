@@ -186,49 +186,150 @@ def _truncar_runaway(texto: str, max_repeticiones: int = 3) -> str:
     return texto
 
 
+_SUAVIZAR_PATTERNS = [
+    # Exigir → Solicitar
+    (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\s+Y\s+DEFINITIVO\b",
+     "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
+    (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\b",
+     "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
+    (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\b",
+     "SE SOLICITA EL LEVANTAMIENTO"),
+    (r"\bSE\s+EXIGE\s+EL\s+PAGO\s+[ÍI]NTEGRO\b",
+     "SE SOLICITA EL RECONOCIMIENTO ÍNTEGRO"),
+    (r"\bSE\s+EXIGE\s+EL\s+RECONOCIMIENTO\b",
+     "SE SOLICITA EL RECONOCIMIENTO"),
+    (r"\bSE\s+EXIGE\b(?!\s+EL)",
+     "SE SOLICITA"),
+    # Obligar → establece el deber
+    (r"\bOBLIGA\s+A\s+LA\s+ENTIDAD\s+PAGADORA\s+A\s+RECONOCER\b",
+     "ESTABLECE EL DEBER DE RECONOCER"),
+    (r"\bOBLIGA\s+A\s+LA\s+EPS\s+A\s+RECONOCER\b",
+     "ESTABLECE EL DEBER DE RECONOCER"),
+    (r"\bOBLIGA\s+A\s+LAS\s+ENTIDADES?\b",
+     "ESTABLECE EL DEBER DE LAS ENTIDADES"),
+    # Incumplimiento hostil → diferencia susceptible
+    (r"\bCONFIGURA\s+UN\s+INCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
+     "CORRESPONDE A UNA DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
+    (r"\bINCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
+     "DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
+    (r"\bAFECTA\s+DIRECTAMENTE\s+EL\s+FLUJO\s+DE\s+RECURSOS\s+DEL\s+HOSPITAL\b",
+     "AFECTA EL FLUJO DE RECURSOS INSTITUCIONALES"),
+    # Acusaciones
+    (r"\bLO\s+CUAL\s+NO\s+SE\s+HA\s+CUMPLIDO\s+EN\s+ESTE\s+CASO\b\.?",
+     "SE SOLICITA SU APLICACIÓN EN EL PRESENTE CASO."),
+    (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+ENTIDAD\s+PAGADORA\b",
+     "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
+    (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+EPS\b",
+     "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
+    (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b",
+     "AMERITA SER REVISADA"),
+    (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\b",
+     "AMERITA SER REVISADA"),
+    (r"\bACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b",
+     "OBJECIÓN SUSCEPTIBLE DE CONCILIACIÓN"),
+    (r"\bCARECE\s+DE\s+TODO\s+SUSTENTO\s+LEGAL\b",
+     "REQUIERE MAYOR SUSTENTO"),
+    (r"\bCARECE\s+DE\s+SUSTENTO\s+CONTRACTUAL\s+Y\s+LEGAL\b",
+     "REQUIERE MAYOR SUSTENTO CONTRACTUAL Y LEGAL"),
+    (r"\bCARECE\s+DE\s+SUSTENTO\b",
+     "REQUIERE MAYOR SUSTENTO"),
+    # Frases redundantes
+    (r"\bSE\s+REFUERZA\s+LA\s+ARGUMENTACI[ÓO]N\s+DE\s+QUE\b",
+     "SE RATIFICA QUE"),
+]
+
+_FRASES_ROTAS_PATTERNS = [
+    (r"RECONOCIMIENTO\s+[ÍI]NTEGRO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+     "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO"),
+    (r"RECONOCIMIENTO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+     "RECONOCIMIENTO DEL VALOR FACTURADO"),
+    (r"VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
+     r"VALOR \1 EN EL EXPEDIENTE"),
+    (r"FACTURAD[OA]\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
+     r"FACTURADO SEGÚN CONSTA EN EL EXPEDIENTE"),
+    (r"Y\s+RECONOCIDO\s+SOLO\s+POR\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+     "Y RECONOCIDO PARCIALMENTE POR LA ENTIDAD PAGADORA"),
+    (r"RETENCI[ÓO]N\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+     "LA DIFERENCIA INDICADA EN EL EXPEDIENTE"),
+    (r"\bDE\s+EL\s+VALOR\b",
+     "DEL VALOR"),
+]
+
+
+def _suavizar_tono(texto: str) -> str:
+    """Aplica patrones de tono conciliador y corrige frases rotas.
+
+    Se ejecuta en TODOS los caminos (texto fijo, plantilla, IA) para
+    garantizar un tono institucional uniforme. La defensa jurídica se
+    preserva; solo se cambia la forma.
+    """
+    if not texto:
+        return texto
+    # Placeholders literales residuales
+    texto = re.sub(
+        r"\$\s*\[[A-Z_ ]+\]",
+        "EL VALOR INDICADO EN EL EXPEDIENTE",
+        texto, flags=re.IGNORECASE,
+    )
+    # Frases rotas (primero, para que el suavizador no sobre-escriba)
+    for pat, repl in _FRASES_ROTAS_PATTERNS:
+        texto = re.sub(pat, repl, texto, flags=re.IGNORECASE)
+    # Tono hostil → conciliador
+    for pat, repl in _SUAVIZAR_PATTERNS:
+        texto = re.sub(pat, repl, texto, flags=re.IGNORECASE)
+    return texto
+
+
 TEXTO_RATIFICADA = (
-    "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA RESPUESTA DADA EN TRÁMITE "
-    "DE LA GLOSA INICIAL Y SE DA CONTINUACIÓN AL PROCESO DE CONFORMIDAD CON EL ARTÍCULO "
-    "56 DE LA LEY 1438 DE 2011, EL ARTÍCULO 20 DEL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN "
-    "2175 DE 2015. SE SOLICITA LA PROGRAMACIÓN DE LA FECHA DE CONCILIACIÓN DE AUDITORÍA "
-    "MÉDICA Y/O TÉCNICA ENTRE LAS PARTES SEGÚN EL PROCEDIMIENTO ESTABLECIDO. DE NO "
-    "LLEGARSE A ACUERDO, SE ELEVARÁ EL CONFLICTO ANTE LA SUPERINTENDENCIA NACIONAL "
-    "DE SALUD SEGÚN LO DISPUESTO EN EL ART. 126 DE LA LEY 1438/2011. CUALQUIER "
-    "INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO, "
-    "GLOSASYDEVOLUCIONES@HUS.GOV.CO, VENTANILLA ÚNICA DE LA ESE HUS CARRERA 33 NO. 28-126. "
-    "NOTA: DE ACUERDO CON EL ARTÍCULO 56 DE LA LEY 1438 DE 2011, DE NO OBTENERSE "
-    "RESPUESTA A LA GLOSA RATIFICADA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR "
-    "LEVANTADA LA RESPECTIVA OBJECIÓN."
+    "ESE HUS RESPETUOSAMENTE NO COMPARTE LA RATIFICACIÓN DE LA GLOSA Y MANTIENE LA "
+    "RESPUESTA DADA EN EL TRÁMITE DE LA GLOSA INICIAL, LA CUAL SE CONSIDERA "
+    "SUFICIENTEMENTE SUSTENTADA. EN ATENCIÓN AL ARTÍCULO 57 DE LA LEY 1438 DE 2011, "
+    "EL ARTÍCULO 20 DEL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN 2284 DE 2023 (MANUAL "
+    "ÚNICO DE GLOSAS), SE SOLICITA A LA ENTIDAD PAGADORA LA PROGRAMACIÓN DE LA MESA "
+    "DE CONCILIACIÓN DE AUDITORÍA MÉDICA Y/O TÉCNICA, CON EL ÁNIMO DE LLEGAR A UN "
+    "ACUERDO ENTRE LAS PARTES DENTRO DE LOS TÉRMINOS LEGALES. DE NO LLEGARSE A "
+    "ACUERDO EN DICHA INSTANCIA, LA ESE HUS SE RESERVA EL DERECHO DE ELEVAR EL "
+    "CONFLICTO ANTE LA SUPERINTENDENCIA NACIONAL DE SALUD CONFORME AL ARTÍCULO 126 "
+    "DE LA LEY 1438 DE 2011. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO "
+    "INSTITUCIONAL: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO, VENTANILLA "
+    "ÚNICA DE LA ESE HUS CARRERA 33 NO. 28-126. NOTA: DE CONFORMIDAD CON EL ARTÍCULO "
+    "57 DE LA LEY 1438 DE 2011, DE NO OBTENERSE RESPUESTA A LA GLOSA RATIFICADA EN "
+    "LOS TÉRMINOS ESTABLECIDOS, OPERARÁ EL LEVANTAMIENTO TÁCITO DE LA RESPECTIVA "
+    "OBJECIÓN."
 )
 
 
 def generar_texto_extemporanea(dias: int) -> str:
     return (
-        f"ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO "
-        f"CONTRACTUAL VIGENTE Y A LA RESOLUCIÓN 3047 DE 2008, EL PLAZO APLICABLE PARA QUE "
-        f"LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN "
-        f"DE LA FACTURA, CRITERIO INSTITUCIONAL ASUMIDO POR LA ESE HUS. EN TODO CASO, "
-        f"AUN CONSIDERANDO EL PLAZO DEL ARTÍCULO 57 DE LA LEY 1438 DE 2011 (30 DÍAS "
-        f"HÁBILES PARA LA ENTIDAD PAGADORA Y 15 DÍAS HÁBILES PARA LA IPS), LA GLOSA "
-        f"CONTINÚA SIENDO EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO "
-        f"{dias} DÍAS HÁBILES). LA GLOSA CARECE DE TODO SUSTENTO LEGAL Y CONSTITUYE UN "
-        f"ACTO ABUSIVO E IMPROCEDENTE. LA LEY 1751 DE 2015 Y EL PRINCIPIO DE BUENA FE "
-        f"CONTRACTUAL (ART. 871 CÓDIGO DE COMERCIO; ART. 1602 CÓDIGO CIVIL) PROTEGEN "
-        f"EL DERECHO DE LA IPS A RECIBIR EL PAGO ÍNTEGRO DE LOS SERVICIOS PRESTADOS. "
-        f"ESTAS GLOSAS EXTEMPORÁNEAS NO DEBEN DISMINUIR EL PAGO DEBIDO BAJO NINGUNA "
-        f"CIRCUNSTANCIA. SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA "
-        f"TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO "
-        f"INSTITUCIONAL: CARTERA@HUS.GOV.CO."
+        f"ESE HUS RESPETUOSAMENTE NO ACEPTA LA GLOSA POR CONSIDERARLA EXTEMPORÁNEA. "
+        f"CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RESOLUCIÓN 3047 DE 2008, EL "
+        f"PLAZO APLICABLE PARA QUE LA ENTIDAD PAGADORA FORMULE GLOSAS ES DE 20 DÍAS "
+        f"HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA, CRITERIO "
+        f"INSTITUCIONAL ASUMIDO POR LA ESE HUS. AUN APLICANDO EL PLAZO DEL ARTÍCULO "
+        f"57 DE LA LEY 1438 DE 2011 (30 DÍAS HÁBILES PARA LA ENTIDAD PAGADORA Y 15 "
+        f"DÍAS HÁBILES ADICIONALES PARA LA IPS), SE OBSERVA QUE HAN TRANSCURRIDO "
+        f"{dias} DÍAS HÁBILES, LO QUE SUPERA EL PLAZO LEGAL Y CONTRACTUAL. POR LO "
+        f"ANTERIOR, Y EN ATENCIÓN AL PRINCIPIO DE BUENA FE CONTRACTUAL (ART. 871 "
+        f"CÓDIGO DE COMERCIO; ART. 1602 CÓDIGO CIVIL) Y A LA LEY 1751 DE 2015, SE "
+        f"SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA "
+        f"GLOSA Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO, EVITANDO ASÍ "
+        f"AFECTACIONES AL FLUJO DE RECURSOS DEL HOSPITAL. CUALQUIER INFORMACIÓN AL "
+        f"CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
     )
 
 
 def generar_texto_injustificada(eps: str) -> str:
     return (
-        f"ESE HUS NO ACEPTA GLOSA INJUSTIFICADA. NO EXISTE CONTRATO PACTADO CON LA "
-        f"ENTIDAD {eps}. SE FACTURÓ BAJO TARIFA SOAT PLENA (RESOLUCIÓN 054/2026 - "
-        f"DECRETO 2423/1996). LA GLOSA CARECE DE SUSTENTO CONTRACTUAL Y LEGAL. "
-        f"SE EXIGE EL PAGO ÍNTEGRO DE LA FACTURA SEGÚN MANUAL TARIFARIO SOAT PLENO "
-        f"SIN DESCUENTOS. CUALQUIER INFORMACIÓN A CARTERA@HUS.GOV.CO."
+        f"ESE HUS RESPETUOSAMENTE NO ACEPTA LA GLOSA APLICADA POR LA ENTIDAD {eps}. "
+        f"NO EXISTE CONTRATO PACTADO ENTRE LAS PARTES, POR LO QUE LA FACTURACIÓN SE "
+        f"REALIZÓ BAJO TARIFA SOAT PLENA CONFORME A LA NORMATIVIDAD VIGENTE "
+        f"(RESOLUCIÓN 054/2026 - DECRETO 2423/1996). EN ESE SENTIDO, LA OBJECIÓN "
+        f"REQUIERE MAYOR SUSTENTO CONTRACTUAL, TODA VEZ QUE NO EXISTE TARIFA "
+        f"CONVENIDA DISTINTA A LA SOAT QUE JUSTIFIQUE EL DESCUENTO. POR LO ANTERIOR, "
+        f"SE SOLICITA EL RECONOCIMIENTO ÍNTEGRO DE LA FACTURA SEGÚN EL MANUAL "
+        f"TARIFARIO SOAT, EN ATENCIÓN AL PRINCIPIO DE BUENA FE CONTRACTUAL (ART. "
+        f"871 CÓDIGO DE COMERCIO) Y AL ARTÍCULO 177 DE LA LEY 100 DE 1993. "
+        f"CUALQUIER INFORMACIÓN A CARTERA@HUS.GOV.CO."
     )
 
 
@@ -325,8 +426,8 @@ class GlosaService:
 
         if argumento_fijo:
             pac_ia = "N/A"
-            arg_ia = argumento_fijo
-            arg_limpio = argumento_fijo.replace("<br/>", " ").replace("*", "").replace("\n", " ")
+            arg_ia = _suavizar_tono(argumento_fijo)
+            arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "texto_fijo"
             servicio_ia = ""
             contrato_ia = ""
@@ -334,8 +435,8 @@ class GlosaService:
             normas_clave = ""
         elif usa_plantilla:
             pac_ia = "N/A (PLANTILLA)"
-            arg_ia = plantilla["plantilla"]
-            arg_limpio = plantilla["plantilla"].replace("<br/>", " ").replace("*", "").replace("\n", " ")
+            arg_ia = _suavizar_tono(plantilla["plantilla"])
+            arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "plantilla"
             servicio_ia = ""
             contrato_ia = ""
@@ -571,51 +672,9 @@ class GlosaService:
                 arg_ia, flags=re.IGNORECASE,
             )
 
-            # 17) TONO INSTITUCIONAL CONCILIADOR (safety net):
-            # Suaviza expresiones hostiles que bloquean la conciliación en
-            # etapa inicial. La defensa jurídica se mantiene pero el tono
-            # permite llegar a acuerdo sin ratificación.
-            _SUAVIZAR = [
-                # Exigir → Solicitar
-                (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\b",
-                 "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
-                (r"\bSE\s+EXIGE\s+EL\s+PAGO\s+[ÍI]NTEGRO\b",
-                 "SE SOLICITA EL RECONOCIMIENTO ÍNTEGRO"),
-                (r"\bSE\s+EXIGE\s+EL\s+RECONOCIMIENTO\b",
-                 "SE SOLICITA EL RECONOCIMIENTO"),
-                (r"\bSE\s+EXIGE\b(?!\s+EL\s+LEVANTAMIENTO)",
-                 "SE SOLICITA"),
-                # Obligar → refiere / establece el deber de
-                (r"\bOBLIGA\s+A\s+LA\s+ENTIDAD\s+PAGADORA\s+A\s+RECONOCER\b",
-                 "ESTABLECE EL DEBER DE RECONOCER"),
-                (r"\bOBLIGA\s+A\s+LA\s+EPS\s+A\s+RECONOCER\b",
-                 "ESTABLECE EL DEBER DE RECONOCER"),
-                (r"\bOBLIGA\s+A\s+LAS\s+ENTIDADES?\b",
-                 "ESTABLECE EL DEBER DE LAS ENTIDADES"),
-                # Incumplimiento hostil → diferencia susceptible
-                (r"\bCONFIGURA\s+UN\s+INCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
-                 "CORRESPONDE A UNA DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
-                (r"\bINCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
-                 "DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
-                # Acusaciones
-                (r"\bLO\s+CUAL\s+NO\s+SE\s+HA\s+CUMPLIDO\s+EN\s+ESTE\s+CASO\b\.?",
-                 "SE SOLICITA SU APLICACIÓN EN EL PRESENTE CASO."),
-                (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+ENTIDAD\s+PAGADORA\b",
-                 "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
-                (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+EPS\b",
-                 "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
-                (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\b",
-                 "AMERITA SER REVISADA"),
-                (r"\bACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b",
-                 "DIFERENCIA SUSCEPTIBLE DE CONCILIACIÓN"),
-                (r"\bCARECE\s+DE\s+TODO\s+SUSTENTO\s+LEGAL\b",
-                 "REQUIERE MAYOR SUSTENTO"),
-                # Frases redundantes
-                (r"\bSE\s+REFUERZA\s+LA\s+ARGUMENTACI[ÓO]N\s+DE\s+QUE\b",
-                 "SE RATIFICA QUE"),
-            ]
-            for pat, repl in _SUAVIZAR:
-                arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
+            # 17) TONO INSTITUCIONAL CONCILIADOR + FRASES ROTAS (safety net
+            # compartido con el camino de texto fijo). Ver _suavizar_tono.
+            arg_ia = _suavizar_tono(arg_ia)
 
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
