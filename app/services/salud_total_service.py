@@ -8,13 +8,16 @@ NIT_HUS = "900006037"
 DIAS_LIMITE = 20
 
 CONCEPTOS = {
-    "RE9502": "La glosa no procede por haber sido generada fuera de los términos establecidos por la Ley configurándose la aceptación tácita de la factura de venta en salud",
-    "RE9602": "La glosa es injustificada - Se aporta evidencia de que la glosa es injustificada al 100%",
-    "RE9701": "Devolución aceptada al 100%",
-    "RE9702": "Glosa aceptada al 100%",
-    "RE9801": "Glosa aceptada y subsanada parcialmente",
-    "RE9901": "Glosa no aceptada - Subsanada en su totalidad",
+    "RE9502": "La glosa o devolución no procede por haber sido generada por fuera de los términos establecidos por la Ley, configurándose la aceptación tácita de la factura de venta en salud.",
+    "RE9602": "El prestador de servicios de salud o proveedor de tecnologías en salud aporta a la entidad responsable de pago la evidencia que demuestra que la glosa es injustificada al 100%.",
+    "RE9701": "La devolución es aceptada al 100% por el prestador de servicios de salud.",
+    "RE9702": "La glosa es aceptada al 100% por el prestador de servicios de salud.",
+    "RE9801": "La glosa es aceptada y subsanada parcialmente por el prestador de servicios de salud.",
+    "RE9901": "El prestador de servicios de salud o proveedor de tecnologías en salud informa a la entidad responsable de pago que la glosa siendo justificada ha podido ser subsanada totalmente.",
 }
+
+# Límite OBLIGATORIO según especificación Salud Total para Observacion IPS
+OBS_MAX_CARACTERES = 500
 
 MOTIVOS_SALUD_TOTAL = {
     "TARIFA": "ESE HUS RECHAZA LA GLOSA POR TARIFAS. LA LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE Y AL MANUAL TARIFARIO SOAT (RES. 054/2026). LA EPS NO PUEDE APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
@@ -149,86 +152,81 @@ class GlosaSaludTotal:
         return obs_base
 
     def _argumento_tecnico_por_codigo(self) -> str:
-        """Genera el argumento técnico-jurídico personalizado por código
-        de glosa Salud Total (TA, SO, AU, CO, CL, FA, IN, ME, etc.)
-        basado en el servicio específico que viene en el registro.
+        """Genera el argumento técnico-jurídico por código de glosa Salud Total.
 
-        Retorna texto listo para la columna Observacion IPS (sin placeholder).
+        REGLA: La Observación IPS debe caber en ≤500 caracteres (OBS_MAX_CARACTERES).
+        Las plantillas están calibradas para quedar dentro del límite incluso con
+        el nombre del servicio. Si el servicio es muy largo, se trunca.
         """
         cod = (self.cod_motv_glosa_general or "").upper().strip()
         cod_esp = (self.cod_motv_glosa_espc or "").upper().strip()
-        servicio = (self.nombre_servicio or "SERVICIO FACTURADO").upper().strip()
-        # Plantillas por tipo
+        codigo_glosa = cod_esp or cod or "GENERAL"
+        # Recortar servicio para no desbordar 500 chars
+        servicio_raw = (self.nombre_servicio or "EL SERVICIO FACTURADO").upper().strip()
+        servicio = servicio_raw[:80] if len(servicio_raw) > 80 else servicio_raw
+
+        # Plantillas calibradas ≤500 chars con tono conciliador y cita normativa
         plantillas = {
             "TA": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR TARIFAS SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. LA LIQUIDACIÓN SE EFECTUÓ CONFORME AL CONTRATO "
-                "VIGENTE ENTRE LAS PARTES Y AL MANUAL TARIFARIO SOAT UVB VIGENTE DESDE "
-                "01/01/2025 (CIRCULAR 025/2024 MINSALUD). LA EPS NO PUEDE APLICAR "
-                "DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL (ART. 871 CÓDIGO DE "
-                "COMERCIO; ART. 1602 CÓDIGO CIVIL). EL ART. 177 DE LA LEY 100 DE 1993 "
-                "OBLIGA A LA ENTIDAD PAGADORA A RECONOCER LOS VALORES DEBIDAMENTE "
-                "FACTURADOS. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR TARIFAS {codigo_glosa} SOBRE {servicio}. "
+                "NO EXISTE CONTRATO VIGENTE CON SALUD TOTAL EPS; LA FACTURACIÓN SE RIGE POR "
+                "SOAT PLENO (RES. 054/2026; DEC. 2423/1996). LA ENTIDAD PAGADORA NO PUEDE "
+                "APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL (ART. 871 C.COM.; "
+                "ART. 1602 C.CIVIL). ART. 177 LEY 100/1993 ESTABLECE EL DEBER DE "
+                "RECONOCIMIENTO ÍNTEGRO. CARTERA@HUS.GOV.CO"
             ),
             "SO": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR SOPORTES SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. LA HISTORIA CLÍNICA (RES. 1995/1999) CONSTITUYE "
-                "DOCUMENTO MÉDICO-LEGAL DE PLENA PRUEBA Y OBRA EN EL EXPEDIENTE "
-                "INSTITUCIONAL. LOS SOPORTES EXIGIDOS POR EL MANUAL ÚNICO (RES. 2284/2023 "
-                "MINSALUD) FUERON APORTADOS DENTRO DE TÉRMINOS. LOS ERRORES FORMALES SON "
-                "SUBSANABLES (CIRCULAR 030/2013). SE EXIGE EL LEVANTAMIENTO INMEDIATO. "
-                "CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR SOPORTES {codigo_glosa} SOBRE {servicio}. "
+                "LA HISTORIA CLÍNICA (RES. 1995/1999) CONSTITUYE DOCUMENTO MÉDICO-LEGAL DE "
+                "PLENA PRUEBA Y OBRA EN EL EXPEDIENTE. LOS SOPORTES DEL MANUAL ÚNICO "
+                "(RES. 2284/2023) FUERON APORTADOS; LOS ERRORES FORMALES SON SUBSANABLES "
+                "(CIRCULAR 030/2013). SE SOLICITA EL LEVANTAMIENTO. CARTERA@HUS.GOV.CO"
             ),
             "AU": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR AUTORIZACIÓN SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. LA ATENCIÓN PRESTADA CUMPLIÓ LOS PROTOCOLOS "
-                "INSTITUCIONALES Y LAS CONDICIONES CLÍNICAS LO EXIGIERON. EL ART. 168 DE "
-                "LA LEY 100 DE 1993 Y LA SENTENCIA T-1025/2002 DE LA CORTE CONSTITUCIONAL "
-                "ESTABLECEN QUE LAS URGENCIAS NO REQUIEREN AUTORIZACIÓN PREVIA. "
-                "SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR AUTORIZACIÓN {codigo_glosa} SOBRE {servicio}. "
+                "ART. 168 LEY 100/1993 Y SENTENCIA T-1025/2002 DE LA CORTE CONSTITUCIONAL "
+                "ESTABLECEN QUE LAS URGENCIAS NO REQUIEREN AUTORIZACIÓN PREVIA. LA IPS "
+                "CUMPLIÓ EL DEBER LEGAL DE ATENCIÓN. SE SOLICITA RECONOCIMIENTO ÍNTEGRO. "
+                "CARTERA@HUS.GOV.CO"
             ),
             "CO": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR COBERTURA SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. EL SERVICIO SE ENCUENTRA INCLUIDO EN EL PLAN DE "
-                "BENEFICIOS EN SALUD (RES. 5269/2017). LAS EXCLUSIONES SON TAXATIVAS "
-                "(ART. 15 LEY 1751/2015) Y NO APLICAN AL PRESENTE CASO. SE EXIGE EL PAGO "
-                "ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR COBERTURA {codigo_glosa} SOBRE {servicio}. "
+                "EL SERVICIO ESTÁ INCLUIDO EN EL PLAN DE BENEFICIOS EN SALUD "
+                "(RES. 5269/2017); LAS EXCLUSIONES SON TAXATIVAS (ART. 15 LEY 1751/2015) "
+                "Y NO APLICAN. ART. 177 LEY 100/1993 OBLIGA AL RECONOCIMIENTO. "
+                "CARTERA@HUS.GOV.CO"
             ),
             "CL": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR PERTINENCIA SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. LA AUTONOMÍA PROFESIONAL DEL MÉDICO TRATANTE "
-                "(ART. 17 LEY 1751/2015; SENTENCIA T-478/1995) ES DERECHO FUNDAMENTAL. "
-                "LA HISTORIA CLÍNICA DOCUMENTA LA INDICACIÓN CLÍNICA. EL AUDITOR "
-                "ADMINISTRATIVO NO REEMPLAZA EL CRITERIO CLÍNICO. SE EXIGE EL PAGO "
-                "ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
+                "LA AUTONOMÍA MÉDICA (ART. 17 LEY 1751/2015; SENTENCIA T-478/1995) ES "
+                "DERECHO FUNDAMENTAL. LA HISTORIA CLÍNICA (RES. 1995/1999) DOCUMENTA LA "
+                "INDICACIÓN CLÍNICA. EL AUDITOR NO SUSTITUYE AL MÉDICO TRATANTE. "
+                "CARTERA@HUS.GOV.CO"
             ),
             "PE": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR PERTINENCIA SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. LA AUTONOMÍA PROFESIONAL DEL MÉDICO TRATANTE "
-                "(ART. 17 LEY 1751/2015) ES DERECHO FUNDAMENTAL. LA HISTORIA CLÍNICA "
-                "SOPORTA LA INDICACIÓN. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
+                "ART. 17 LEY 1751/2015 Y SENTENCIA T-478/1995 PROTEGEN LA AUTONOMÍA DEL "
+                "MÉDICO TRATANTE. LA HISTORIA CLÍNICA (RES. 1995/1999) SOPORTA LA "
+                "INDICACIÓN. SE SOLICITA RECONOCIMIENTO ÍNTEGRO. CARTERA@HUS.GOV.CO"
             ),
             "FA": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR FACTURACIÓN SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. EL SERVICIO FUE EFECTIVAMENTE PRESTADO Y "
-                "DOCUMENTADO EN LA HISTORIA CLÍNICA (RES. 1995/1999). LOS ERRORES "
-                "FORMALES SON SUBSANABLES SEGÚN LA CIRCULAR 030/2013 DEL MINSALUD. LA "
-                "PRESTACIÓN REAL GENERA LA OBLIGACIÓN DE PAGO (ART. 177 LEY 100/1993). "
-                "SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR FACTURACIÓN {codigo_glosa} SOBRE {servicio}. "
+                "EL SERVICIO FUE EFECTIVAMENTE PRESTADO Y DOCUMENTADO EN HISTORIA CLÍNICA "
+                "(RES. 1995/1999). ART. 177 LEY 100/1993 ESTABLECE EL DEBER DE "
+                "RECONOCIMIENTO. LOS ERRORES FORMALES SON SUBSANABLES (CIRCULAR 030/2013). "
+                "CARTERA@HUS.GOV.CO"
             ),
             "IN": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR INSUMOS SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. LOS INSUMOS SON INHERENTES AL ACTO MÉDICO "
-                "(DECRETO 780/2016) Y SE FACTURAN AL COSTO DE ADQUISICIÓN MÁS PORCENTAJE "
-                "ADMINISTRATIVO PACTADO. LAS FACTURAS DE COMPRA OBRAN COMO SOPORTE. "
-                "SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR INSUMOS {codigo_glosa} SOBRE {servicio}. "
+                "LOS INSUMOS SON INHERENTES AL ACTO MÉDICO (DEC. 780/2016) Y SE FACTURAN "
+                "AL COSTO MÁS PORCENTAJE PACTADO (ART. 871 C.COMERCIO). LAS FACTURAS DE "
+                "COMPRA OBRAN COMO SOPORTE. CARTERA@HUS.GOV.CO"
             ),
             "ME": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR MEDICAMENTOS SOBRE EL CÓDIGO {cod_esp or cod} "
-                f"RESPECTO DE {servicio}. EL MEDICAMENTO FUE DISPENSADO BAJO FÓRMULA "
-                "MÉDICA DEL MÉDICO TRATANTE (ART. 17 LEY 1751/2015). LA PRESCRIPCIÓN "
-                "CLÍNICAMENTE DOCUMENTADA PREVALECE SOBRE EL CRITERIO ADMINISTRATIVO. "
-                "SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                f"ESE HUS NO ACEPTA LA GLOSA POR MEDICAMENTOS {codigo_glosa} SOBRE {servicio}. "
+                "EL MEDICAMENTO FUE DISPENSADO BAJO FÓRMULA DEL MÉDICO TRATANTE "
+                "(ART. 17 LEY 1751/2015). LA PRESCRIPCIÓN CLÍNICA PREVALECE SOBRE EL "
+                "CRITERIO ADMINISTRATIVO (T-478/1995). CARTERA@HUS.GOV.CO"
             ),
         }
         # Primero prueba por código específico (TA02, FA01, etc), luego general
@@ -245,33 +243,50 @@ class GlosaSaludTotal:
 
     def generar_respuesta(self) -> Dict[str, Any]:
         dias = self.dias_transcurridos()
-        
+
+        # REGLA SALUD TOTAL: NO hay contrato vigente con Salud Total EPS, por lo
+        # que las glosas por TARIFAS (TA*) son INJUSTIFICADAS al 100% → RE9602.
+        cod_general = (self.cod_motv_glosa_general or "").upper().strip()
+        cod_espc = (self.cod_motv_glosa_espc or "").upper().strip()
+        es_tarifa = cod_general.startswith("TA") or cod_espc.startswith("TA")
+
         if self.tipo_respuesta == "extemporanea":
             if dias > DIAS_LIMITE:
                 codigo_respuesta = "RE9502"
-                concepto = CONCEPTOS["RE9502"]
                 observacion = self.obtener_observacion()
                 valor_aceptado = 0
             else:
                 codigo_respuesta = "RE9602"
-                concepto = CONCEPTOS["RE9602"]
                 observacion = self.obtener_observacion()
                 valor_aceptado = 0
         elif self.tipo_respuesta == "ratificada":
             codigo_respuesta = "RE9602"
-            concepto = CONCEPTOS["RE9602"]
             observacion = self.obtener_observacion()
             valor_aceptado = 0
+        elif es_tarifa:
+            # Tarifas sin contrato → injustificada al 100%
+            codigo_respuesta = "RE9602"
+            observacion = self._argumento_tecnico_por_codigo()
+            valor_aceptado = 0
         else:
-            # Tipo "ia": generar argumento técnico basado en el tipo de glosa
-            # detectado en el motivo. Esto evita el placeholder "PENDIENTE..."
-            # y ya produce una respuesta lista para radicar.
+            # Otros tipos → glosa subsanada en su totalidad con argumento
             codigo_respuesta = "RE9901"
-            concepto = CONCEPTOS["RE9901"]
             observacion = self._argumento_tecnico_por_codigo()
             valor_aceptado = 0
 
+        concepto = CONCEPTOS[codigo_respuesta]
         observacion = _suavizar_tono(observacion)
+
+        # Límite OBLIGATORIO 500 caracteres para Observacion IPS (Salud Total).
+        # Recortamos de forma inteligente: buscamos último punto antes del límite
+        # para que el texto cierre correctamente.
+        if len(observacion) > OBS_MAX_CARACTERES:
+            recorte = observacion[:OBS_MAX_CARACTERES]
+            ultimo_punto = max(recorte.rfind(". "), recorte.rfind(".\n"))
+            if ultimo_punto > OBS_MAX_CARACTERES * 0.7:
+                observacion = recorte[:ultimo_punto + 1]
+            else:
+                observacion = recorte.rstrip() + "."
 
         return {
             "NumeroRad": self.numero_rad,
