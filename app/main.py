@@ -652,6 +652,7 @@ from app.api.routers.push import router as push_router
 from app.api.routers.bandeja import router as bandeja_router
 from app.api.routers.adjuntos import router as adjuntos_router
 from app.api.routers.consulta_normativa import router as consulta_normativa_router
+from app.api.routers.validador import router as validador_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -684,6 +685,7 @@ app.include_router(push_router)
 app.include_router(bandeja_router)
 app.include_router(adjuntos_router)
 app.include_router(consulta_normativa_router)
+app.include_router(validador_router)
 
 
 def get_glosa_service() -> GlosaService:
