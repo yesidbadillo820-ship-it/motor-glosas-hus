@@ -82,6 +82,65 @@ class PlantillaRecord(Base):
     activa = Column(Integer, default=1)
 
 
+class DictamenVersionRecord(Base):
+    """Snapshot del dictamen cada vez que se refina/regenera.
+    Permite ver el historial y restaurar una versión anterior."""
+    __tablename__ = "dictamen_versiones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    glosa_id = Column(Integer, ForeignKey("historial.id", ondelete="CASCADE"), index=True)
+    dictamen_html = Column(Text, nullable=False)
+    accion = Column(String(50))  # CREAR | REFINAR | REGENERAR | RESTAURAR
+    mensaje_refinar = Column(Text)  # instrucción cuando fue REFINAR
+    autor_email = Column(String(200))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_dictamen_ver_glosa", "glosa_id", "creado_en"),
+    )
+
+
+class GlosaEliminadaRecord(Base):
+    """Papelera: glosas eliminadas con soft-delete. Se pueden restaurar
+    dentro de 30 días. Después se purgan permanentemente."""
+    __tablename__ = "glosas_eliminadas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    glosa_id_original = Column(Integer, index=True)
+    snapshot_json = Column(Text, nullable=False)  # dump JSON del GlosaRecord
+    eliminado_por = Column(String(200))
+    eliminado_en = Column(DateTime(timezone=True), server_default=func.now())
+    motivo = Column(String(300))
+
+
+class PushSubscriptionRecord(Base):
+    """Suscripciones Web Push por usuario (para notificaciones al navegador)."""
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_email = Column(String(200), index=True)
+    endpoint = Column(Text, nullable=False, unique=True)
+    p256dh = Column(Text, nullable=False)
+    auth = Column(Text, nullable=False)
+    user_agent = Column(String(500))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    ultima_usada_en = Column(DateTime(timezone=True))
+
+
+class AdjuntoConciliacionRecord(Base):
+    """Screenshots/evidencia adjunta a una conciliación."""
+    __tablename__ = "adjuntos_conciliacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conciliacion_id = Column(Integer, ForeignKey("conciliaciones.id", ondelete="CASCADE"), index=True)
+    nombre = Column(String(300))
+    mime_type = Column(String(100))
+    tamano_bytes = Column(Integer)
+    contenido_b64 = Column(Text, nullable=False)  # base64 del archivo
+    subido_por = Column(String(200))
+    subido_en = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class ComentarioGlosaRecord(Base):
     """Hilo de comentarios por glosa para discusión interna del equipo."""
     __tablename__ = "comentarios_glosa"
