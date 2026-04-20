@@ -151,12 +151,17 @@ class GlosaSaludTotal:
             return f"{obs_base} SERVICIO: {self.nombre_servicio.upper()}."
         return obs_base
 
-    def _argumento_tecnico_por_codigo(self) -> str:
+    def _argumento_tecnico_por_codigo(self, codigo_respuesta: str = "RE9901") -> str:
         """Genera el argumento técnico-jurídico por código de glosa Salud Total.
 
         REGLA: La Observación IPS debe caber en ≤500 caracteres (OBS_MAX_CARACTERES).
         Las plantillas están calibradas para quedar dentro del límite incluso con
         el nombre del servicio. Si el servicio es muy largo, se trunca.
+
+        El calificativo inicial se alinea con el código de respuesta:
+          - RE9502 → "GLOSA EXTEMPORÁNEA"
+          - RE9602 → "GLOSA INJUSTIFICADA"
+          - RE9901 → "GLOSA" (subsanada en su totalidad)
         """
         cod = (self.cod_motv_glosa_general or "").upper().strip()
         cod_esp = (self.cod_motv_glosa_espc or "").upper().strip()
@@ -165,10 +170,21 @@ class GlosaSaludTotal:
         servicio_raw = (self.nombre_servicio or "EL SERVICIO FACTURADO").upper().strip()
         servicio = servicio_raw[:80] if len(servicio_raw) > 80 else servicio_raw
 
+        # Calificativo de apertura según código RE
+        CALIFICATIVO = {
+            "RE9502": "LA GLOSA EXTEMPORÁNEA",
+            "RE9602": "LA GLOSA INJUSTIFICADA",
+            "RE9701": "LA DEVOLUCIÓN",
+            "RE9702": "LA GLOSA",
+            "RE9801": "LA GLOSA",
+            "RE9901": "LA GLOSA",
+        }
+        cal = CALIFICATIVO.get(codigo_respuesta, "LA GLOSA")
+
         # Plantillas calibradas ≤500 chars con tono conciliador y cita normativa
         plantillas = {
             "TA": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR TARIFAS {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR TARIFAS {codigo_glosa} SOBRE {servicio}. "
                 "NO EXISTE CONTRATO VIGENTE CON SALUD TOTAL EPS; LA FACTURACIÓN SE RIGE POR "
                 "SOAT PLENO (RES. 054/2026; DEC. 2423/1996). LA ENTIDAD PAGADORA NO PUEDE "
                 "APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL (ART. 871 C.COM.; "
@@ -176,54 +192,54 @@ class GlosaSaludTotal:
                 "RECONOCIMIENTO ÍNTEGRO. CARTERA@HUS.GOV.CO"
             ),
             "SO": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR SOPORTES {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR SOPORTES {codigo_glosa} SOBRE {servicio}. "
                 "LA HISTORIA CLÍNICA (RES. 1995/1999) CONSTITUYE DOCUMENTO MÉDICO-LEGAL DE "
                 "PLENA PRUEBA Y OBRA EN EL EXPEDIENTE. LOS SOPORTES DEL MANUAL ÚNICO "
                 "(RES. 2284/2023) FUERON APORTADOS; LOS ERRORES FORMALES SON SUBSANABLES "
                 "(CIRCULAR 030/2013). SE SOLICITA EL LEVANTAMIENTO. CARTERA@HUS.GOV.CO"
             ),
             "AU": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR AUTORIZACIÓN {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR AUTORIZACIÓN {codigo_glosa} SOBRE {servicio}. "
                 "ART. 168 LEY 100/1993 Y SENTENCIA T-1025/2002 DE LA CORTE CONSTITUCIONAL "
                 "ESTABLECEN QUE LAS URGENCIAS NO REQUIEREN AUTORIZACIÓN PREVIA. LA IPS "
                 "CUMPLIÓ EL DEBER LEGAL DE ATENCIÓN. SE SOLICITA RECONOCIMIENTO ÍNTEGRO. "
                 "CARTERA@HUS.GOV.CO"
             ),
             "CO": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR COBERTURA {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR COBERTURA {codigo_glosa} SOBRE {servicio}. "
                 "EL SERVICIO ESTÁ INCLUIDO EN EL PLAN DE BENEFICIOS EN SALUD "
                 "(RES. 5269/2017); LAS EXCLUSIONES SON TAXATIVAS (ART. 15 LEY 1751/2015) "
                 "Y NO APLICAN. ART. 177 LEY 100/1993 OBLIGA AL RECONOCIMIENTO. "
                 "CARTERA@HUS.GOV.CO"
             ),
             "CL": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
                 "LA AUTONOMÍA MÉDICA (ART. 17 LEY 1751/2015; SENTENCIA T-478/1995) ES "
                 "DERECHO FUNDAMENTAL. LA HISTORIA CLÍNICA (RES. 1995/1999) DOCUMENTA LA "
                 "INDICACIÓN CLÍNICA. EL AUDITOR NO SUSTITUYE AL MÉDICO TRATANTE. "
                 "CARTERA@HUS.GOV.CO"
             ),
             "PE": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
                 "ART. 17 LEY 1751/2015 Y SENTENCIA T-478/1995 PROTEGEN LA AUTONOMÍA DEL "
                 "MÉDICO TRATANTE. LA HISTORIA CLÍNICA (RES. 1995/1999) SOPORTA LA "
                 "INDICACIÓN. SE SOLICITA RECONOCIMIENTO ÍNTEGRO. CARTERA@HUS.GOV.CO"
             ),
             "FA": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR FACTURACIÓN {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR FACTURACIÓN {codigo_glosa} SOBRE {servicio}. "
                 "EL SERVICIO FUE EFECTIVAMENTE PRESTADO Y DOCUMENTADO EN HISTORIA CLÍNICA "
                 "(RES. 1995/1999). ART. 177 LEY 100/1993 ESTABLECE EL DEBER DE "
                 "RECONOCIMIENTO. LOS ERRORES FORMALES SON SUBSANABLES (CIRCULAR 030/2013). "
                 "CARTERA@HUS.GOV.CO"
             ),
             "IN": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR INSUMOS {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR INSUMOS {codigo_glosa} SOBRE {servicio}. "
                 "LOS INSUMOS SON INHERENTES AL ACTO MÉDICO (DEC. 780/2016) Y SE FACTURAN "
                 "AL COSTO MÁS PORCENTAJE PACTADO (ART. 871 C.COMERCIO). LAS FACTURAS DE "
                 "COMPRA OBRAN COMO SOPORTE. CARTERA@HUS.GOV.CO"
             ),
             "ME": (
-                f"ESE HUS NO ACEPTA LA GLOSA POR MEDICAMENTOS {codigo_glosa} SOBRE {servicio}. "
+                f"ESE HUS NO ACEPTA {cal} POR MEDICAMENTOS {codigo_glosa} SOBRE {servicio}. "
                 "EL MEDICAMENTO FUE DISPENSADO BAJO FÓRMULA DEL MÉDICO TRATANTE "
                 "(ART. 17 LEY 1751/2015). LA PRESCRIPCIÓN CLÍNICA PREVALECE SOBRE EL "
                 "CRITERIO ADMINISTRATIVO (T-478/1995). CARTERA@HUS.GOV.CO"
@@ -266,12 +282,12 @@ class GlosaSaludTotal:
         elif es_tarifa:
             # Tarifas sin contrato → injustificada al 100%
             codigo_respuesta = "RE9602"
-            observacion = self._argumento_tecnico_por_codigo()
+            observacion = self._argumento_tecnico_por_codigo(codigo_respuesta)
             valor_aceptado = 0
         else:
             # Otros tipos → glosa subsanada en su totalidad con argumento
             codigo_respuesta = "RE9901"
-            observacion = self._argumento_tecnico_por_codigo()
+            observacion = self._argumento_tecnico_por_codigo(codigo_respuesta)
             valor_aceptado = 0
 
         concepto = CONCEPTOS[codigo_respuesta]
