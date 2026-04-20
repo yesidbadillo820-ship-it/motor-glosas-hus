@@ -358,6 +358,18 @@ class GlosaService:
                 arg_ia = arg_ia.split("</paciente>")[-1].strip()
             # Expandir abreviaturas de códigos a nombres completos
             arg_ia = _expandir_abreviaturas_tipo(arg_ia)
+            # Safety net: reemplazar placeholders crudos "$VALOR ..." que la IA
+            # a veces deja sin renderizar cuando no hay monto numérico.
+            arg_ia = re.sub(
+                r"\$\s*VALOR\s+(FACTURADO|OBJETADO|ACEPTADO)\s+EN\s+EL\s+EXPEDIENTE",
+                r"EL VALOR \1 SEGÚN CONSTA EN EL EXPEDIENTE",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"\$\s*VALOR\s+(FACTURADO|OBJETADO|ACEPTADO)\b",
+                r"EL VALOR \1",
+                arg_ia, flags=re.IGNORECASE,
+            )
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
