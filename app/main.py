@@ -532,32 +532,41 @@ async def lifespan(app: FastAPI):
             ("devoluciones1@sinacsc.com",    "AUDITOR",     "EDGAR SILVA"),
             ("glosashus03@sinacsc.com",      "AUDITOR",     "OSCAR VILLAMIZAR"),
         ]
-        password_hash_default = get_password_hash(cfg.admin_password)
+        # POLÍTICA DE PASSWORD INICIAL: cada usuario corporativo recibe como
+        # contraseña el prefijo de su correo (ej. glosashus04@sinacsc.com →
+        # password "glosashus04"). El usuario debe cambiarla en el primer login.
+        force_reseed = os.getenv("FORCE_RESEED_USERS", "").lower() in ("1", "true", "yes")
+        force_reset_pwd = os.getenv("FORCE_RESET_PASSWORDS", "").lower() in ("1", "true", "yes")
         for email, rol, nombre in USUARIOS_CORPORATIVOS:
+            password_inicial = email.split("@")[0]  # prefijo
+            password_hash_inicial = get_password_hash(password_inicial)
             existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
             if not existente:
                 db.add(UsuarioRecord(
                     nombre=nombre,
                     email=email,
-                    password_hash=password_hash_default,
+                    password_hash=password_hash_inicial,
                     rol=rol,
                     activo=1,
                 ))
-                logger.warning(f"Usuario sembrado: {email} ({rol}) nombre={nombre}")
+                logger.warning(f"Usuario sembrado: {email} ({rol}) nombre={nombre} password=<prefijo>")
             # Si el usuario YA existe, la base de datos es la fuente de verdad:
-            # NO sobrescribimos nombre ni rol. Los cambios hechos por un
-            # SUPER_ADMIN desde la UI (Editar Rol, renombrar, etc.) deben
-            # persistir a través de redeploys. Para forzar una re-sincronización
-            # masiva desde el hardcoded, poner la variable de entorno
-            # FORCE_RESEED_USERS=1 antes del arranque.
-            elif os.getenv("FORCE_RESEED_USERS", "").lower() in ("1", "true", "yes"):
+            # NO sobrescribimos nombre/rol/password. Los cambios hechos por un
+            # SUPER_ADMIN desde la UI deben persistir a través de redeploys.
+            # Toggles de re-sincronización masiva:
+            #   FORCE_RESEED_USERS=1 → resincroniza nombre y rol
+            #   FORCE_RESET_PASSWORDS=1 → resetea password al prefijo del email
+            elif force_reseed or force_reset_pwd:
                 cambios = []
-                if existente.rol != rol:
+                if force_reseed and existente.rol != rol:
                     cambios.append(f"rol {existente.rol}->{rol}")
                     existente.rol = rol
-                if existente.nombre != nombre:
+                if force_reseed and existente.nombre != nombre:
                     cambios.append(f"nombre '{existente.nombre}'->'{nombre}'")
                     existente.nombre = nombre
+                if force_reset_pwd:
+                    existente.password_hash = password_hash_inicial
+                    cambios.append(f"password reset a prefijo email")
                 if cambios:
                     logger.warning(f"[FORCE_RESEED] {email}: {', '.join(cambios)}")
 
