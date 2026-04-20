@@ -356,7 +356,7 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
 <tarifa>Tarifa pactada (ej: "SOAT -20%") o "SOAT PLENO"</tarifa>
 <normas_clave>3 normas más relevantes separadas por "|"</normas_clave>
-<argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS, 4 PÁRRAFOS CONTINUOS (sin numerales, sin títulos, sin separadores), 200-280 PALABRAS TOTAL (DENSO, SIN RELLENO), tono conciliador institucional</argumento>
+<argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS, 4 PÁRRAFOS CONTINUOS (sin numerales, sin títulos, sin separadores), 230-310 PALABRAS TOTAL (DENSO, SIN RELLENO), tono conciliador institucional. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas tomada del BLOQUE NORMATIVA CON TEXTO LITERAL.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
 PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], FACTURADO POR [VALOR o "EL VALOR INDICADO EN EL EXPEDIENTE"]". Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
@@ -365,8 +365,8 @@ PÁRRAFO 2 — REFUTACIÓN FÁCTICA (70-100 palabras, enumerada): Abre con "LA A
 
 PÁRRAFO 3 — FUNDAMENTO NORMATIVO (60-90 palabras): Cita 2-3 normas clave con conectores técnicos ("DE CONFORMIDAD CON", "POR SU PARTE", "TRATÁNDOSE DE"). Menciona contrato con número + vigencia en UNA frase. Régimen especial SOLO si aplica. Sin repetir información del párrafo 1.
 
-PÁRRAFO 4 — PETICIÓN + RESERVA + CONTACTO (35-50 palabras):
-"EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO. DE PERSISTIR LA OBJECIÓN, SE INVITA A MESA DE CONCILIACIÓN (ART. 20 DEC. 4747/2007), CON RESERVA DE ELEVAR EL CONFLICTO ANTE LA SUPERSALUD (ART. 126 LEY 1438/2011). COMUNICACIONES: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+PÁRRAFO 4 — PETICIÓN + ESCALERA PROCESAL + CONTACTO (50-75 palabras):
+"EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO. LA ENTIDAD PAGADORA CUENTA CON 10 DÍAS HÁBILES PARA PRONUNCIARSE CONFORME AL ARTÍCULO 57 DE LA LEY 1438 DE 2011; DE NO HACERLO, OPERARÁ EL SILENCIO A FAVOR DEL PRESTADOR. EN SUBSIDIO, SE INVITA A MESA DE CONCILIACIÓN DE AUDITORÍA (ART. 20 DEC. 4747/2007); EN SUBSIDIO ULTERIOR, LA ESE HUS SE RESERVA EL DERECHO DE ELEVAR EL CONFLICTO ANTE LA SUPERINTENDENCIA NACIONAL DE SALUD (ART. 126 LEY 1438/2011). COMUNICACIONES: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
 
 ═══════════════ REGISTRO TÉCNICO-JURÍDICO OBLIGATORIO ═══════════════
 ✅ USA SIEMPRE (conectores formales):
@@ -740,7 +740,7 @@ def build_user_prompt(
     bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
     bloque_regimen_str = f"\n[RÉGIMEN ESPECIAL APLICABLE]\n{bloque_regimen}\n" if bloque_regimen else ""
 
-    # Normativa relevante para el código (inyectada de biblioteca comprehensiva)
+    # Normativa relevante con TEXTO EXACTO de artículos (para citación literal)
     bloque_normativa_str = ""
     try:
         from app.services.normativa_completa import (
@@ -754,22 +754,72 @@ def build_user_prompt(
             if not n:
                 continue
             nombre = n["nombre"]
-            titulo = n.get("titulo", "")
-            ratio = n.get("ratio", n.get("notas", n.get("ambito", "")))
-            lineas.append(f"  • {nombre} — {titulo}. {ratio}")
-            # Si tiene artículos, añade los 1-2 más relevantes
+            # Texto literal para citación con comillas
+            if n.get("texto"):
+                texto_literal = n["texto"][:350]
+                lineas.append(f"  • {nombre}: «{texto_literal}»")
+            if n.get("ratio_literal"):
+                lineas.append(f"      ↳ Ratio decidendi: «{n['ratio_literal']}»")
+            # Artículos internos con texto literal
             for art_num, art in list(n.get("articulos", {}).items())[:2]:
-                lineas.append(
-                    f"      - Art. {art_num}: {art['titulo']} — {art.get('aplicacion', '')}"
-                )
+                txt = art.get("texto", "")[:300]
+                lineas.append(f"  • Art. {art_num} {nombre}: «{txt}»")
         if lineas:
             bloque_normativa_str = (
-                "\n[NORMATIVA RELEVANTE PARA ESTE TIPO DE GLOSA — cita SOLO las que apliquen al caso]\n"
+                "\n[NORMATIVA CON TEXTO LITERAL — cita entre comillas los extractos que apliquen]\n"
                 + "\n".join(lineas)
                 + "\n"
             )
     except Exception:
         pass
+
+    # Definición taxativa del código de glosa (Manual Único Res. 2284/2023)
+    # para refutación directa en párrafo 2
+    bloque_taxativo_str = ""
+    try:
+        from app.services.catalogo_glosas import obtener_concepto
+        concepto = obtener_concepto(codigo) or ""
+        if concepto:
+            bloque_taxativo_str = (
+                f"\n[DEFINICIÓN TAXATIVA DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023)]\n"
+                f"«{concepto}»\n"
+                f"⚠ Tu refutación en el párrafo 2 DEBE explicar por qué el supuesto fáctico "
+                f"del código NO concurre en el caso (o sí concurre parcialmente), atacando "
+                f"la definición taxativa punto por punto.\n"
+            )
+    except Exception:
+        pass
+
+    # Cláusulas anti-rebatimiento típicas por tipo de glosa (pre-anulan
+    # contra-argumentos comunes de la EPS)
+    bloque_antirebatimiento_str = ""
+    try:
+        from app.services.clausulas_anti_rebatimiento import clausulas_para_codigo
+        cls = clausulas_para_codigo(codigo, max_clausulas=2)
+        if cls:
+            lineas_cl = [f"  • {c}" for c in cls]
+            bloque_antirebatimiento_str = (
+                "\n[CLÁUSULAS ANTI-REBATIMIENTO — incorpora 1-2 en el párrafo 3 para blindar contra ratificación]\n"
+                + "\n".join(lineas_cl)
+                + "\n"
+            )
+    except Exception:
+        pass
+
+    # Cálculo aritmético para glosas TA con contrato (factor conocido)
+    bloque_calculo_str = ""
+    prefijo_upper = prefijo.upper()
+    factor = contrato.get("factor", 1.0) if contrato else 1.0
+    if prefijo_upper == "TA" and factor and factor < 1.0:
+        descuento_pct = int(round((1 - factor) * 100))
+        bloque_calculo_str = (
+            f"\n[CÁLCULO TARIFARIO OPCIONAL — usa SOLO si el texto de la glosa trae cifras exactas]\n"
+            f"  El contrato pactó factor {factor} (descuento -{descuento_pct}%).\n"
+            f"  Si conoces VALOR SOAT PLENO y VALOR RECONOCIDO POR LA EPS, puedes incluir en P3 una frase\n"
+            f"  tipo: «LA LIQUIDACIÓN CORRECTA CORRESPONDE A SOAT PLENO × {factor} = VALOR PACTADO. LA\n"
+            f"  ENTIDAD PAGADORA RECONOCIÓ $X, APLICANDO UN DESCUENTO UNILATERAL NO PACTADO DE $Y.»\n"
+            f"  🚫 Si NO tienes las cifras exactas, NO hagas cálculo — describe sin números.\n"
+        )
 
     # Datos clínicos (solo si aparecen)
     clinicos = []
@@ -799,7 +849,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_normativa_str}
+{bloque_regimen_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
@@ -818,7 +868,7 @@ Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 <contrato>...</contrato>
 <tarifa>...</tarifa>
 <normas_clave>Norma1 | Norma2 | Norma3</normas_clave>
-<argumento>[4 PÁRRAFOS EN MAYÚSCULAS, TONO CONCILIADOR, 200-280 PALABRAS TOTAL — DENSO, SIN RELLENO]</argumento>
+<argumento>[4 PÁRRAFOS EN MAYÚSCULAS, TONO CONCILIADOR, 230-310 PALABRAS TOTAL — DENSO, SIN RELLENO. Cita literal entre comillas cuando uses BLOQUE NORMATIVA CON TEXTO LITERAL]</argumento>
 
 RECUERDA:
 1. El <argumento> debe seguir la estructura de 4 párrafos del system prompt (Identificación → Refutación → Fundamento → Petición conciliadora).
