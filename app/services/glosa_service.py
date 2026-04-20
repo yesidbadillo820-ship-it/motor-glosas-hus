@@ -1035,23 +1035,15 @@ class GlosaService:
         except Exception:
             pass
 
-        # CARÁTULA LEGAL — firma institucional (ITEM #12)
-        # Bloque de firma formal al cierre del dictamen
+        # CARÁTULA INSTITUCIONAL (ITEM #12) — solo datos de la IPS, sin firma RL
         bloque_caratula = (
             '<div style="margin-top:20px;padding:14px 18px;background:linear-gradient(135deg,#fafbfc 0%,#fff 100%);border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 1px 2px rgba(15,23,42,.04);">'
-            '<div style="display:flex;justify-content:space-between;gap:1.5rem;align-items:flex-end;flex-wrap:wrap;">'
-            '<div style="flex:1;min-width:240px;">'
-            '<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Representante Legal</div>'
-            '<div style="font-weight:700;color:#0f172a;font-size:13px;">RICARDO ARTURO HOYOS LANZIANO</div>'
-            '<div style="font-size:11px;color:#334155;">C.C. 72.251.369</div>'
-            '<div style="font-size:11px;color:#334155;">Gerente General — ESE Hospital Universitario de Santander</div>'
-            '</div>'
-            '<div style="flex:1;min-width:240px;text-align:right;">'
+            '<div style="text-align:center;">'
             '<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Institución Prestadora de Servicios de Salud</div>'
             '<div style="font-weight:700;color:#0f172a;font-size:13px;">E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER</div>'
-            '<div style="font-size:11px;color:#334155;">NIT 900.006.037-4 | Res. Habilitación 002145/2015</div>'
+            '<div style="font-size:11px;color:#334155;margin-top:2px;">NIT 900.006.037-4 | Res. Habilitación 002145/2015</div>'
             '<div style="font-size:11px;color:#334155;">Carrera 33 No. 28-126, Bucaramanga | Tel. (607) 691 2010</div>'
-            '</div></div>'
+            '</div>'
             '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:10px;color:#64748b;text-align:center;">'
             'Documento generado electrónicamente con validación normativa. '
             f'Fecha de emisión: {_dt.now().strftime("%d/%m/%Y %H:%M")} · '

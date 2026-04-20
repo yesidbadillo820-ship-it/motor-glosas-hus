@@ -1914,8 +1914,17 @@ async function verHistorialVersiones(){
       '</style></head><body>' +
       '<h1>📜 Historial de versiones — Glosa #' + CURRENT_GLOSA_ID + '</h1>' +
       '<p style="font-size:.85rem;color:#64748b">Cada cambio al dictamen queda registrado. Puedes restaurar cualquier versión anterior.</p>';
+    // Helper: quita etiquetas HTML y decodifica entidades para preview legible
+    var stripHtml = function(h){
+      if(!h) return '';
+      var tmp = document.createElement('div');
+      tmp.innerHTML = h;
+      var txt = (tmp.textContent || tmp.innerText || '').replace(/\s+/g,' ').trim();
+      return txt.length > 450 ? txt.substring(0,450) : txt;
+    };
     versiones.forEach(function(v, i){
       var fecha = v.creado_en ? new Date(v.creado_en).toLocaleString('es-CO') : '—';
+      var previewTexto = stripHtml(v.preview || '');
       html += '<div class="ver '+escHtml(v.accion||'')+'">' +
         '<div class="meta">' +
           '<span class="chip">'+escHtml(v.accion||'—')+'</span>' +
@@ -1924,7 +1933,7 @@ async function verHistorialVersiones(){
           (i === 0 ? '<span style="color:#047857;font-weight:600">● ACTUAL</span>' : '') +
         '</div>' +
         (v.mensaje_refinar ? '<div class="msg">💬 ' + escHtml(v.mensaje_refinar) + '</div>' : '') +
-        '<div class="preview">' + escHtml(v.preview||'') + '…</div>' +
+        '<div class="preview">' + escHtml(previewTexto) + (previewTexto.length >= 450 ? '…' : '') + '</div>' +
         (i > 0 ? '<button class="restaurar" onclick="window.opener.restaurarVersion('+CURRENT_GLOSA_ID+','+v.id+');window.close()">Restaurar esta versión</button>' : '') +
       '</div>';
     });
