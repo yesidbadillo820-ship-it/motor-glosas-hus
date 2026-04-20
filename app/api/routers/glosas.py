@@ -292,6 +292,66 @@ def exportar_xlsx(
     )
 
 
+@router.get("/buscar/{termino}")
+def buscar_por_id_o_factura(
+    termino: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Busca una glosa por ID interno, factura, consecutivo DGH o radicado.
+    Útil para formularios donde el auditor no sabe el ID interno.
+
+    Devuelve lista de coincidencias (puede ser 0, 1 o varias)."""
+    termino = (termino or "").strip()
+    if not termino:
+        raise HTTPException(400, "Término vacío")
+
+    from sqlalchemy import or_
+    q = db.query(GlosaRecord)
+
+    # Si es número puro, intentar como ID interno primero
+    matches = []
+    if termino.isdigit():
+        g = q.filter(GlosaRecord.id == int(termino)).first()
+        if g:
+            matches.append(g)
+
+    # Además buscar por factura / consecutivo / radicado (incluye partial)
+    extra = (
+        db.query(GlosaRecord)
+        .filter(
+            or_(
+                GlosaRecord.factura.ilike(f"%{termino}%"),
+                GlosaRecord.consecutivo_dgh.ilike(f"%{termino}%"),
+                GlosaRecord.numero_radicado.ilike(f"%{termino}%"),
+            )
+        )
+        .order_by(GlosaRecord.creado_en.desc())
+        .limit(10)
+        .all()
+    )
+    ya = {m.id for m in matches}
+    for g in extra:
+        if g.id not in ya:
+            matches.append(g)
+
+    return [
+        {
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "consecutivo_dgh": g.consecutivo_dgh,
+            "numero_radicado": g.numero_radicado,
+            "codigo_glosa": g.codigo_glosa,
+            "paciente": g.paciente,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "estado": g.estado,
+            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+        }
+        for g in matches[:10]
+    ]
+
+
 @router.post("/generar-lote")
 async def generar_lote(
     data: GenerarLoteRequest,

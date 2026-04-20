@@ -1136,7 +1136,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <div class="concil-grid">
           <div class="form-card" style="height:fit-content">
             <h3>Nueva Conciliación <span>Programar</span></h3>
-            <div class="field"><label>ID de Glosa</label><input type="number" id="c-glosa-id" placeholder="123"/></div>
+            <div class="field"><label>ID, factura o consecutivo</label><input type="text" id="c-glosa-id" placeholder="42 | HUS0000491176 | DGH-12345"/><small style="font-size:.68rem;color:var(--text3);margin-top:2px;display:block">Acepta ID interno (ej: 42), número de factura (HUS000...) o consecutivo DGH</small></div>
             <div class="field"><label>Fecha y hora</label><input type="datetime-local" id="c-fecha"/></div>
             <div class="field"><label>Lugar</label><input type="text" id="c-lugar"/></div>
             <div class="field"><label>Participantes HUS</label><input type="text" id="c-part-hus"/></div>
@@ -3381,23 +3381,51 @@ async function verPdfActa(id){
 }
 
 async function crearConciliacion(){
-  var glosaId=document.getElementById('c-glosa-id').value;
+  var termino=(document.getElementById('c-glosa-id').value||'').trim();
   var fecha=document.getElementById('c-fecha').value;
-  if(!glosaId||!fecha){toast('Campos requeridos','Complete ID de glosa y fecha','warning');return;}
-  // Validar que la glosa exista antes de mandar
+  if(!termino||!fecha){toast('Campos requeridos','Complete ID/factura y fecha','warning');return;}
+
+  // Resolver: puede ser ID interno, factura o consecutivo DGH
+  var glosaResuelta=null;
   try{
-    var chk=await fetch('/glosas/'+glosaId,{headers:authH()});
-    if(chk.status===404){
-      toast('Glosa no existe','No encontré una glosa con ID '+glosaId+'. Verifícalo en Historial.','error');
+    var r0=await fetch('/glosas/buscar/'+encodeURIComponent(termino),{headers:authH()});
+    if(!r0.ok){ toast('Error','No pude buscar glosas (HTTP '+r0.status+')','error'); return; }
+    var matches=await r0.json();
+    if(!matches || matches.length===0){
+      toast('No encontrada','No existe glosa con "'+escHtml(termino)+'" (busqué por ID, factura y consecutivo).','error');
       return;
     }
-    if(!chk.ok){ toast('Error','No pude verificar la glosa (HTTP '+chk.status+')','error'); return; }
-  }catch(e){ toast('Error','Conexión al verificar glosa: '+e.message,'error'); return; }
-  var body={glosa_id:parseInt(glosaId),fecha_audiencia:fecha,lugar:document.getElementById('c-lugar').value,participantes_hus:document.getElementById('c-part-hus').value,participantes_eps:document.getElementById('c-part-eps').value,observaciones:document.getElementById('c-obs').value,acta_numero:document.getElementById('c-acta').value};
+    if(matches.length===1){
+      glosaResuelta=matches[0];
+    } else {
+      // Varios resultados: pedir al usuario que elija
+      var opciones=matches.map(function(g,i){
+        return (i+1)+') ID '+g.id+' — '+escHtml(g.eps||'—')+' — fac '+escHtml(g.factura||'—')+' — $'+(g.valor_objetado||0).toLocaleString('es-CO');
+      }).join('\n');
+      var sel=prompt('Varias coincidencias. Elige el número:\n\n'+opciones,'1');
+      var idx=parseInt(sel)-1;
+      if(isNaN(idx)||idx<0||idx>=matches.length){ toast('Cancelado','No se eligió ninguna','warning'); return; }
+      glosaResuelta=matches[idx];
+    }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); return; }
+
+  var body={
+    glosa_id: glosaResuelta.id,
+    fecha_audiencia: fecha,
+    lugar: document.getElementById('c-lugar').value,
+    participantes_hus: document.getElementById('c-part-hus').value,
+    participantes_eps: document.getElementById('c-part-eps').value,
+    observaciones: document.getElementById('c-obs').value,
+    acta_numero: document.getElementById('c-acta').value,
+  };
   var r=await fetch('/conciliaciones/',{method:'POST',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify(body)});
   var d=await r.json();
-  toast(r.ok?'Conciliación creada':'Error',d.message||d.detail,r.ok?'success':'error');
-  if(r.ok)loadConciliaciones();
+  if(r.ok){
+    toast('Conciliación creada','Glosa #'+glosaResuelta.id+' · '+escHtml(glosaResuelta.eps||''),'success');
+    loadConciliaciones();
+  } else {
+    toast('Error',d.message||d.detail||'No se pudo crear','error');
+  }
 }
 
 async function registrarResultadoConciliacion(id){
