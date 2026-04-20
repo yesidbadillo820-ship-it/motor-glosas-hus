@@ -512,6 +512,17 @@ class GlosaService:
 
             # 14) Corregir "DISPOSICIONADO" inventado por IA → DISPENSARIO
             arg_ia = re.sub(r"\bDISPOSICIONADO\b", "DISPENSARIO MÉDICO", arg_ia, flags=re.IGNORECASE)
+
+            # 15) ESTÁNDAR INSTITUCIONAL: respuestas a glosas SIEMPRE en MAYÚSCULAS
+            # Si la IA mezcló casing o devolvió en minúsculas, forzamos upper.
+            letras = [c for c in arg_ia if c.isalpha()]
+            if letras:
+                ratio_mayus = sum(1 for c in letras if c.isupper()) / len(letras)
+                # Si <80% está en mayúsculas, forzar todo a mayúsculas
+                if ratio_mayus < 0.80:
+                    arg_ia = arg_ia.upper()
+                    # Re-aplicar expansión de abreviaturas por si falló
+                    arg_ia = _expandir_abreviaturas_tipo(arg_ia)
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
