@@ -190,6 +190,38 @@ _SUAVIZAR_PATTERNS = [
     # Apertura obligatoria: nunca "RESPETUOSAMENTE" en la primera frase
     (r"\bESE\s+HUS\s+RESPETUOSAMENTE\s+NO\s+ACEPTA\b",
      "ESE HUS NO ACEPTA"),
+
+    # ═══ REGISTRO COLOQUIAL → TÉCNICO-JURÍDICO ═══
+    # (detectados en respuestas reales que debilitan la defensa)
+    (r"\bLAS\s+RAZONES\s+SON\s+CLARAS[:\.,]?",
+     "POR LAS SIGUIENTES RAZONES:"),
+    (r"\bLO\s+CUAL\s+NO\s+ES\s+V[ÁA]LIDO\b",
+     "LO CUAL NO SE AJUSTA AL MARCO CONTRACTUAL"),
+    (r"\bA\s+CONVENIENCIA\b",
+     "DE MANERA UNILATERAL"),
+    (r"\bPAGO\s+COMPLETO\s+DEL\s+VALOR\s+FACTURADO\b",
+     "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO"),
+    (r"\bEL\s+PAGO\s+COMPLETO\b",
+     "EL RECONOCIMIENTO ÍNTEGRO"),
+    (r"\bPAGAR\s+COMPLETO\b",
+     "RECONOCER ÍNTEGRAMENTE"),
+    (r"\bES\s+CLARO\s+QUE\b",
+     "RESULTA EVIDENTE QUE"),
+    (r"\b(?:SIMPLEMENTE|B[ÁA]SICAMENTE|OBVIAMENTE|CLARAMENTE)\s+",
+     ""),
+    (r"\bELLA\s+MISMA\s+FIRM[ÓO]\b",
+     "SUSCRITO POR LA ENTIDAD PAGADORA"),
+    (r"\bQUE\s+LA\s+EPS\s+ELLA\s+MISMA\b",
+     "QUE LA ENTIDAD PAGADORA"),
+    (r"\bNO\s+EST[ÁA]\s+BIEN\b",
+     "NO RESULTA PROCEDENTE"),
+    (r"\bNO\s+ES\s+BUENA\s+IDEA\b",
+     "NO RESULTA PROCEDENTE"),
+    (r"\bEST[ÁA]\s+USANDO\s+UNA\s+TARIFA\s+DIFERENTE\b",
+     "APLICA UNA TARIFA DIFERENTE A LA PACTADA"),
+    (r"\bSIN\s+APLICAR\s+DICHO\s+DESCUENTO\b",
+     "SIN APLICAR EL DESCUENTO CONTRACTUAL CONVENIDO"),
+
     # Exigir → Solicitar
     (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\s+Y\s+DEFINITIVO\b",
      "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
