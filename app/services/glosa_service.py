@@ -353,18 +353,59 @@ def generar_texto_extemporanea(dias: int) -> str:
     )
 
 
-def generar_texto_injustificada(eps: str) -> str:
+def _nombre_entidad_para_texto(eps: str) -> str:
+    """Sanitiza el nombre de EPS para uso en texto institucional.
+
+    Casos como "OTRA / SIN DEFINIR", "OTRA", "SIN DEFINIR", "SIN CONTRATO"
+    se reemplazan por "LA ENTIDAD PAGADORA" / "LA ENTIDAD RESPONSABLE DEL
+    PAGO" — una referencia genérica pero técnicamente correcta.
+    """
+    if not eps:
+        return "LA ENTIDAD PAGADORA"
+    e = str(eps).upper().strip()
+    if any(k in e for k in ("OTRA", "SIN DEFINIR", "SIN CONTRATO", "N/A", "DESCONOCID")):
+        return "LA ENTIDAD PAGADORA"
+    return f"LA ENTIDAD {e}"
+
+
+def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "") -> str:
+    """Argumento fijo para glosas de tarifas SIN contrato pactado (RE9602).
+
+    Estructura de 4 párrafos — apertura "GLOSA INJUSTIFICADA POR CONCEPTO DE
+    TARIFAS" alineada al código RE9602 del Manual Único. Incluye petición
+    conciliadora + reserva de derechos SuperSalud + contacto.
+    """
+    entidad = _nombre_entidad_para_texto(eps)
+    codigo_str = codigo if codigo else "DE TARIFAS"
+    valor_str = valor if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "") else "EL VALOR INDICADO EN EL EXPEDIENTE"
+
     return (
-        f"ESE HUS RESPETUOSAMENTE NO ACEPTA LA GLOSA APLICADA POR LA ENTIDAD {eps}. "
-        f"NO EXISTE CONTRATO PACTADO ENTRE LAS PARTES, POR LO QUE LA FACTURACIÓN SE "
-        f"REALIZÓ BAJO TARIFA SOAT PLENA CONFORME A LA NORMATIVIDAD VIGENTE "
-        f"(RESOLUCIÓN 054/2026 - DECRETO 2423/1996). EN ESE SENTIDO, LA OBJECIÓN "
-        f"REQUIERE MAYOR SUSTENTO CONTRACTUAL, TODA VEZ QUE NO EXISTE TARIFA "
-        f"CONVENIDA DISTINTA A LA SOAT QUE JUSTIFIQUE EL DESCUENTO. POR LO ANTERIOR, "
-        f"SE SOLICITA EL RECONOCIMIENTO ÍNTEGRO DE LA FACTURA SEGÚN EL MANUAL "
-        f"TARIFARIO SOAT, EN ATENCIÓN AL PRINCIPIO DE BUENA FE CONTRACTUAL (ART. "
-        f"871 CÓDIGO DE COMERCIO) Y AL ARTÍCULO 177 DE LA LEY 100 DE 1993. "
-        f"CUALQUIER INFORMACIÓN A CARTERA@HUS.GOV.CO."
+        f"ESE HUS NO ACEPTA LA GLOSA INJUSTIFICADA POR CONCEPTO DE TARIFAS "
+        f"APLICADA POR {entidad} BAJO EL CÓDIGO {codigo_str}, FACTURADA POR "
+        f"{valor_str}. "
+
+        f"LA OBJECIÓN NO SE AJUSTA AL MARCO CONTRACTUAL NI NORMATIVO POR LAS "
+        f"SIGUIENTES RAZONES: EN PRIMER LUGAR, NO EXISTE CONTRATO PACTADO ENTRE "
+        f"LAS PARTES QUE CONTEMPLE UNA TARIFA CONVENIDA DISTINTA A LA DEL MANUAL "
+        f"SOAT, POR LO QUE LA FACTURACIÓN SE REALIZÓ BAJO TARIFA SOAT PLENA. "
+        f"EN SEGUNDO LUGAR, NO ES ADMISIBLE APLICAR DESCUENTOS UNILATERALES SIN "
+        f"SOPORTE CONTRACTUAL. EN TERCER LUGAR, LA GLOSA CARECE DE EVIDENCIA DE "
+        f"UNA TARIFA DISTINTA QUE JUSTIFIQUE LA REDUCCIÓN APLICADA. "
+
+        f"DE CONFORMIDAD CON LA RESOLUCIÓN 054 DE 2026 Y EL DECRETO 2423 DE "
+        f"1996, EL MANUAL TARIFARIO SOAT RIGE SUPLETORIAMENTE A FALTA DE "
+        f"CONTRATO. POR SU PARTE, EL ARTÍCULO 871 DEL CÓDIGO DE COMERCIO "
+        f"CONSAGRA EL PRINCIPIO DE BUENA FE CONTRACTUAL, Y EL ARTÍCULO 177 DE "
+        f"LA LEY 100 DE 1993 ESTABLECE EL DEBER DE LA ENTIDAD PAGADORA DE "
+        f"RECONOCER LOS VALORES DEBIDAMENTE FACTURADOS POR LOS SERVICIOS "
+        f"PRESTADOS. "
+
+        f"EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO "
+        f"DE LA GLOSA Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO CONFORME "
+        f"AL MANUAL TARIFARIO SOAT. DE PERSISTIR LA OBJECIÓN, SE INVITA A MESA "
+        f"DE CONCILIACIÓN (ART. 20 DEC. 4747/2007), CON RESERVA DE ELEVAR EL "
+        f"CONFLICTO ANTE LA SUPERSALUD (ART. 126 LEY 1438/2011). "
+        f"COMUNICACIONES: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
     )
 
 
@@ -438,7 +479,7 @@ class GlosaService:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
         elif es_tarifa and not tiene_contrato:
-            argumento_fijo = generar_texto_injustificada(eps_key)
+            argumento_fijo = generar_texto_injustificada(eps_key, codigo_det, valor_raw)
             tipo_glosa = "TA_TARIFA"
 
         # Ratificación tiene prioridad sobre extemporaneidad: si ya pasamos por
