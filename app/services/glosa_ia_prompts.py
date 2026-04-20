@@ -1368,6 +1368,10 @@ def build_user_prompt(
     servicio    = datos["servicio"]
     hay_soportes = tiene_soportes_reales(contexto_pdf)
 
+    # Concepto OFICIAL del Manual Único para el código específico
+    from app.services.catalogo_glosas import obtener_concepto
+    concepto_oficial = obtener_concepto(codigo) or ""
+
     contrato = get_contrato(eps)
     numero_contrato = contrato["numero"]
     tarifa          = contrato["tarifa"]
@@ -1478,7 +1482,22 @@ def build_user_prompt(
     }
     nombre_tipo = _NOMBRE_TIPO.get(prefijo.upper(), "FACTURACIÓN")
 
-    instruccion_final = f"""
+    bloque_concepto = ""
+    if concepto_oficial:
+        bloque_concepto = f"""
+══════════════════════════════════════════════════════════════════
+📖 CONCEPTO OFICIAL DEL CÓDIGO {codigo} (MANUAL ÚNICO DE GLOSAS)
+══════════════════════════════════════════════════════════════════
+{concepto_oficial}
+
+⚠ USA ESTA DEFINICIÓN COMO FUENTE DE VERDAD. NO inventes qué
+significa el código. Si el Manual dice "INCLUIDAS EN PAQUETE", tu
+argumento debe atacar PRECISAMENTE esa premisa (demostrando que NO
+están incluidas, o que son servicios DISTINTOS, etc.).
+══════════════════════════════════════════════════════════════════
+"""
+
+    instruccion_final = bloque_concepto + f"""
 
 INSTRUCCIONES OBLIGATORIAS PARA TU RESPUESTA:
 
