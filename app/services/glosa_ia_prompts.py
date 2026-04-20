@@ -698,18 +698,39 @@ F.ter NO INVENTES CLÁUSULAS CONTRACTUALES ESPECÍFICAS:
      cláusulas literales que el auditor no conoce.
 
 F.quater SUBTIPOS FA COMUNES Y ARGUMENTO CORRECTO:
-   - FA0202 (atención domiciliaria vs intrahospitalaria): demostrar que
-     el servicio fue INTRAHOSPITALARIO (según el CUPS y la historia
-     clínica), NO hacer referencia a tarifas.
-   - FA0802 (apoyos diagnósticos incluidos en paquete): argumentar que
-     el apoyo diagnóstico es un ESTUDIO INDEPENDIENTE del acto quirúrgico,
-     solicitado por CRITERIO MÉDICO para evaluación pre/post-operatoria.
-     Citar el Manual Tarifario SOAT (Decreto 2423/1996) que factura
-     estudios pre-operatorios como items independientes, salvo que el
-     contrato diga lo contrario. NO inventes cláusulas contractuales.
+
+   IMPORTANTE: Para FA0202 y FA0802 NO ES ERROR FORMAL → 🚫 PROHIBIDO
+   citar la Circular 030/2013. Esa circular aplica a errores de
+   facturación formales (dato ausente, firma, código mal digitado).
+   FA0202 y FA0802 son disputas de naturaleza/alcance del servicio.
+
+   - FA0202 (atención domiciliaria vs intrahospitalaria):
+     ARGUMENTO OBLIGATORIO: "El servicio facturado con CUPS [X]
+     corresponde a CUIDADO INTRAHOSPITALARIO POR MEDICINA ESPECIALIZADA
+     (o la descripción exacta del CUPS), prestado DURANTE la hospitalización
+     del paciente. Es un servicio DISTINTO Y COMPLEMENTARIO de los
+     honorarios del cirujano tratante, quien factura la cirugía y su
+     seguimiento directo (CUPS de cirugía), no la atención intrahospitalaria
+     de otra especialidad (medicina interna, nefrología, cardiología,
+     etc.) que valora comorbilidades o complicaciones ajenas al acto
+     quirúrgico. La historia clínica (Res. 1995/1999) soporta la
+     naturaleza del servicio."
+     🚫 NO CITES: Circular 030/2013, SOAT, tarifas.
+
+   - FA0802 (apoyos diagnósticos incluidos en paquete):
+     ARGUMENTO OBLIGATORIO: "El apoyo diagnóstico [X] es un ESTUDIO
+     INDEPENDIENTE del acto quirúrgico, solicitado por CRITERIO MÉDICO
+     para evaluación [pre/post]-operatoria. No está incluido
+     automáticamente en el paquete quirúrgico contractual."
+     Citar Manual Tarifario SOAT (Dec 2423/1996) como referente de que
+     los estudios pre-operatorios se facturan independientemente.
+     🚫 NO CITES Circular 030/2013.
+
    - FA0801 (insumos): argumentar que los insumos son inherentes al
      acto médico (Decreto 780/2016) y se facturan al costo.
-   - Otros FA: analizar el texto de la glosa ANTES de escribir.
+
+   - OTROS FA: si realmente es error formal (firma, código, fecha),
+     entonces SÍ cita Circular 030/2013. Si no, NO la cites.
 
 G. NUNCA dejes valores inventados. Si el texto de la glosa trae el
    valor, úsalo EXACTO; si no, escribe "VALOR FACTURADO EN EL
