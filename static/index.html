@@ -2175,6 +2175,8 @@ async function initApp(){
   }
   // Aplicar restricciones de sidebar según rol del usuario
   aplicarRestriccionesRol();
+  // Filtrar acciones soloAdmin del command palette para no-admins
+  if(typeof filtrarAccionesPorRol === 'function') filtrarAccionesPorRol();
   await loadContratos();
   loadAlertCount();
   loadDash();
@@ -2482,6 +2484,27 @@ function mostrarResultadoValidacion(d){
   modalBody.innerHTML = html;
 }
 
+// ─── TEST SENTRY (solo SUPER_ADMIN) ─────────────────────────────
+async function dispararSentryTest(){
+  if(USER_ROL !== 'SUPER_ADMIN'){
+    toast('Acceso denegado','Solo SUPER_ADMIN puede correr este test','error');
+    return;
+  }
+  if(!confirm('Esto disparará un error 500 intencional para verificar que Sentry captura eventos. ¿Continuar?')) return;
+  toast('Ejecutando…','Lanzando evento de prueba a Sentry','info');
+  try{
+    var r = await fetch('/debug/sentry-test', { headers: authH() });
+    var txt = await r.text();
+    if(r.status === 500){
+      toast('✓ Test enviado','Evento llegó a Sentry (status 500 esperado). Revisa sentry.io → Issues en 30 segundos.','success');
+    } else {
+      toast('Respuesta inesperada','Status '+r.status+': '+txt.substring(0,120),'warning');
+    }
+  }catch(e){
+    toast('Error de red','No se pudo contactar el servidor: '+e.message,'error');
+  }
+}
+
 // ─── CAMBIO DE PASSWORD (primer login / reset) ─────────────────
 var CHPW_OBLIGATORIO = false;
 
@@ -2627,6 +2650,8 @@ var CP_ACCIONES = [
   {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
   {seccion:"Acciones", icono:"🌓", titulo:"Alternar modo oscuro", hint:"Light ↔ Dark", accion:function(){cerrarCommandPalette();toggleDark()}},
   {seccion:"Acciones", icono:"🚪", titulo:"Cerrar sesión", hint:"Salir", accion:function(){cerrarCommandPalette();logout()}},
+  // Acciones admin (solo SUPER_ADMIN)
+  {seccion:"Admin", icono:"🧪", titulo:"Test Sentry", hint:"Dispara error intencional", soloAdmin:true, accion:function(){cerrarCommandPalette();dispararSentryTest()}},
 ];
 var CP_FILTERED = [];
 var CP_SEL = 0;
@@ -4263,11 +4288,20 @@ function aplicarRestriccionesRol(){
   // 3) Filtrar también el Command Palette (Cmd+K)
   if(typeof CP_ACCIONES !== 'undefined'){
     CP_ACCIONES = CP_ACCIONES.filter(function(a){
+      // Items "soloAdmin" solo para SUPER_ADMIN
+      if(a.soloAdmin) return false;  // AUDITOR nunca los ve
       // Permitir siempre acciones sin tab (Importar, Export ERP, etc.)
       if(a.accion && !a.tab) return true;
       // Si tiene tab, permitir solo las del whitelist
       return a.tab ? !!AUDITOR_TABS_PERMITIDAS[a.tab] : true;
     });
+  }
+}
+
+// Filtrar items soloAdmin para roles que no son SUPER_ADMIN (global)
+function filtrarAccionesPorRol(){
+  if(USER_ROL !== 'SUPER_ADMIN' && typeof CP_ACCIONES !== 'undefined'){
+    CP_ACCIONES = CP_ACCIONES.filter(function(a){ return !a.soloAdmin; });
   }
 }
 
