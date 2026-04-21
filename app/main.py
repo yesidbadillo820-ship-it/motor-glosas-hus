@@ -783,16 +783,21 @@ async def analizar(
 
     from app.services.pdf_service import PdfService
     contexto_pdf = ""
+    archivos_procesados = 0
+    MAX_ARCHIVOS = 10  # Límite de soportes PDF por glosa
     if archivos:
         pdf_svc = PdfService()
         for archivo in archivos:
+            if archivos_procesados >= MAX_ARCHIVOS:
+                logger.warning(f"[{req_id}] Máximo {MAX_ARCHIVOS} archivos alcanzado, ignorando restantes")
+                break
             if archivo.filename:
                 try:
                     contenido = await archivo.read()
                     if contenido[:4] != b"%PDF":
                         logger.warning(f"[{req_id}] Archivo ignorado (no es PDF): {archivo.filename}")
                         continue
-                    if len(contenido) > 10_000_000:
+                    if len(contenido) > 15_000_000:  # 15MB por archivo
                         logger.warning(f"[{req_id}] PDF muy grande: {archivo.filename}")
                         continue
                     # OCR automático con Claude si el PDF es escaneado y hay key
@@ -801,10 +806,18 @@ async def analizar(
                         anthropic_api_key=cfg.anthropic_api_key,
                         anthropic_model=cfg.anthropic_model,
                     )
+                    # Separador claro entre PDFs para que la IA los distinga
+                    if contexto_pdf:
+                        contexto_pdf += f"\n\n═══ DOCUMENTO: {archivo.filename} ═══\n\n"
+                    else:
+                        contexto_pdf = f"═══ DOCUMENTO: {archivo.filename} ═══\n\n"
                     contexto_pdf += texto
+                    archivos_procesados += 1
                     logger.info(f"[{req_id}] PDF {archivo.filename}: {metodo} ({len(texto)} chars)")
                 except Exception as e:
                     logger.warning(f"[{req_id}] Error extrayendo PDF {archivo.filename}: {e}")
+        if archivos_procesados:
+            logger.info(f"[{req_id}] Total PDFs procesados: {archivos_procesados}/{MAX_ARCHIVOS} | {len(contexto_pdf)} chars")
 
     contrato_repo = ContratoRepository(db)
     contratos = contrato_repo.como_dict()
