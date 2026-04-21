@@ -452,6 +452,12 @@ async def lifespan(app: FastAPI):
         ("cups_servicio", "VARCHAR(50)"),
         ("servicio_descripcion", "VARCHAR(400)"),
         ("concepto_glosa", "TEXT"),
+        ("eps_codigo", "VARCHAR(20)"),
+        ("tecnico_recepcion", "VARCHAR(200)"),
+        ("fecha_objecion_eps", "TIMESTAMP WITH TIME ZONE"),
+        ("saldo_factura", "DOUBLE PRECISION DEFAULT 0"),
+        ("valor_factura", "DOUBLE PRECISION DEFAULT 0"),
+        ("tercero_nit", "VARCHAR(30)"),
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:

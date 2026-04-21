@@ -61,10 +61,62 @@ class GlosaRecord(Base):
     servicio_descripcion = Column(String(400))  # Descripción del servicio/procedimiento
     concepto_glosa = Column(Text)         # Descripción oficial del código de glosa
 
+    # Metadatos adicionales del Excel de recepción (hojas INICIAL/RATIFICADA/I/R)
+    eps_codigo = Column(String(20), index=True)   # "U220181", "C230051", ...
+    tecnico_recepcion = Column(String(200))        # TECNICO QUE RECEPCIONO
+    fecha_objecion_eps = Column(DateTime(timezone=True))  # FechaObjecion (hoja I/R)
+    saldo_factura = Column(Float, default=0.0)     # FacturaCartera.Saldo (hoja I/R)
+    valor_factura = Column(Float, default=0.0)     # FacturaCartera.Valor (hoja I/R)
+    tercero_nit = Column(String(30))               # FacturaCartera.Tercero.Documento (hoja I/R)
+
     __table_args__ = (
         Index("ix_historial_alertas", "dias_restantes", "estado"),
         Index("ix_historial_auditor", "auditor_email"),
         Index("ix_historial_decision", "decision_eps"),
+    )
+
+
+class ConceptoGlosaRecord(Base):
+    """Detalle de concepto-por-concepto de una glosa.
+
+    Una glosa (GlosaRecord) suele agrupar N conceptos (N servicios/CUPS
+    glosados). Los importadores del Excel de recepción cargan esta tabla
+    desde las hojas 'I' (Glosa_Inicial) y 'R' (Glosa_Ratificada) del DGH.
+    """
+    __tablename__ = "conceptos_glosa"
+
+    id = Column(Integer, primary_key=True, index=True)
+    glosa_id = Column(Integer, ForeignKey("historial.id", ondelete="CASCADE"), index=True, nullable=False)
+
+    # Identificadores del DGH (idempotencia)
+    oid_dgh = Column(String(50), index=True)       # ListadoConceptos.Oid (único por concepto)
+    consecutivo_dgh = Column(String(50), index=True)  # mismo CONSECUTIVO DGH que la glosa (denormalizado)
+    factura = Column(String(50), index=True)       # denormalizado para joins rápidos
+
+    # Código de glosa + motivo canónico
+    codigo_glosa = Column(String(20), index=True)  # TA0801, FA0603, TA0201, ...
+    nombre_glosa = Column(Text)                     # ConceptoObjecion.Nombre ("Los cargos por apoyo diagnóstico...")
+
+    # Servicio/CUPS glosado
+    cups_codigo = Column(String(50))               # 906625, FMQ0163-1, 39143A-10
+    cups_descripcion = Column(Text)                 # "GONADOTROPINA CORIONICA SUBUNIDAD BETA..."
+    centro_costo = Column(String(200))              # "734005 - LABORATORIO - INMUNOLOGIA"
+
+    # Valor y observaciones de la EPS para ESTE concepto específico
+    valor_objetado = Column(Float, default=0.0)    # ListadoConceptos.ValorObjecion
+    observacion_eps = Column(Text)                  # ListadoConceptos.Observaciones (motivo fino de la EPS)
+
+    # Respuesta del auditor (se llena cuando analiza el concepto)
+    dictamen_html = Column(Text)
+    score = Column(Float)
+    respondido_en = Column(DateTime(timezone=True))
+    respondido_por = Column(String(200))
+
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_concepto_glosa", "glosa_id", "codigo_glosa"),
+        Index("ix_concepto_oid", "oid_dgh"),
     )
 
 

@@ -14,7 +14,7 @@ from app.services.glosa_service import GlosaService
 from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
-from app.models.db import UsuarioRecord, GlosaRecord
+from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -1150,6 +1150,82 @@ def casos_similares(glosa_id: int, db: Session = Depends(get_db),
         texto_glosa=glosa.dictamen or "", eps=glosa.eps,
         codigo_glosa=glosa.codigo_glosa or "", db=db, top_k=5, solo_exitosos=False)
     return {"glosa_id": glosa_id, "casos_similares": casos}
+
+
+@router.get("/{glosa_id}/conceptos")
+def listar_conceptos_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista el detalle por concepto de una glosa (cargados desde hojas I/R).
+
+    Devuelve también el encabezado de la glosa para que el front pueda
+    pintar de una sola llamada la factura completa (fechas, vencimiento,
+    semáforo, y todos los conceptos precargados para analizar).
+    """
+    glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    conceptos = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.glosa_id == glosa_id)
+        .order_by(ConceptoGlosaRecord.codigo_glosa, ConceptoGlosaRecord.cups_codigo)
+        .all()
+    )
+
+    total_conceptos_valor = sum(float(c.valor_objetado or 0) for c in conceptos)
+
+    return {
+        "glosa": {
+            "id": glosa.id,
+            "factura": glosa.factura,
+            "consecutivo_dgh": glosa.consecutivo_dgh,
+            "eps": glosa.eps,
+            "eps_codigo": glosa.eps_codigo,
+            "gestor_nombre": glosa.gestor_nombre,
+            "tecnico_recepcion": glosa.tecnico_recepcion,
+            "tipo_glosa_excel": glosa.tipo_glosa_excel,
+            "profesional_medico": glosa.profesional_medico,
+            "estado": glosa.estado,
+            "valor_objetado": glosa.valor_objetado,
+            "valor_factura": glosa.valor_factura,
+            "saldo_factura": glosa.saldo_factura,
+            "tercero_nit": glosa.tercero_nit,
+            "fecha_radicacion_factura": glosa.fecha_radicacion_factura.isoformat() if glosa.fecha_radicacion_factura else None,
+            "fecha_documento_dgh": glosa.fecha_documento_dgh.isoformat() if glosa.fecha_documento_dgh else None,
+            "fecha_recepcion": glosa.fecha_recepcion.isoformat() if glosa.fecha_recepcion else None,
+            "fecha_entrega": glosa.fecha_entrega.isoformat() if glosa.fecha_entrega else None,
+            "fecha_vencimiento": glosa.fecha_vencimiento.isoformat() if glosa.fecha_vencimiento else None,
+            "fecha_objecion_eps": glosa.fecha_objecion_eps.isoformat() if glosa.fecha_objecion_eps else None,
+            "dias_restantes": glosa.dias_restantes,
+            "prioridad": glosa.prioridad,
+        },
+        "conceptos": [
+            {
+                "id": c.id,
+                "oid_dgh": c.oid_dgh,
+                "codigo_glosa": c.codigo_glosa,
+                "nombre_glosa": c.nombre_glosa,
+                "cups_codigo": c.cups_codigo,
+                "cups_descripcion": c.cups_descripcion,
+                "centro_costo": c.centro_costo,
+                "valor_objetado": c.valor_objetado,
+                "observacion_eps": c.observacion_eps,
+                "dictamen_html": c.dictamen_html,
+                "score": c.score,
+                "respondido_en": c.respondido_en.isoformat() if c.respondido_en else None,
+                "respondido_por": c.respondido_por,
+            }
+            for c in conceptos
+        ],
+        "totales": {
+            "conceptos": len(conceptos),
+            "valor_suma_conceptos": total_conceptos_valor,
+            "valor_glosa_cabecera": glosa.valor_objetado or 0,
+        },
+    }
 
 
 def _parsear_filas_excel(texto: str) -> list[dict]:

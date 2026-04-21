@@ -37,7 +37,7 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from app.core.logging_utils import logger
-from app.models.db import GlosaRecord
+from app.models.db import GlosaRecord, ConceptoGlosaRecord
 from app.services.glosa_service import (
     FERIADOS_CO,
     DIAS_HABILES_LIMITE_EXTEMPORANEA,
@@ -53,24 +53,71 @@ SEMAFORO_AMARILLO_MIN = 5  # 5-10 días
 
 
 # ─── Mapeo de columnas del Excel -> campo interno ────────────────────────────
+# Soporta dos hojas de cabecera:
+#   • INICIAL:    GESTOR | FECHA DE ENTREGA | FECHA RADICACION | FECHA DOCUMENTO
+#                  DGH | FECHA RECEPCION | ENTIDAD | FACTURA | ...
+#   • RATIFICADA: RESPONSABLE | FECHA ENTREGA | FECHA DE DOCUMENTO (DGH) |
+#                  FECHA NOTIFICACION OBJECION | EMPRESA | NUMERO DE FACTURA |
+#                  FECHA VENCIMIENTO | OBSERVACION RECEPCION | ...
 COLUMN_ALIASES: dict[str, list[str]] = {
-    "gestor": ["gestor"],
+    "gestor": ["gestor", "responsable"],
     "fecha_entrega": ["fecha de entrega", "fecha entrega"],
     "fecha_radicacion": ["fecha radicacion", "fecha de radicacion"],
-    "fecha_documento_dgh": ["fecha documento dgh", "fecha dgh"],
-    "fecha_recepcion": ["fecha recepcion", "fecha de recepcion"],
-    "entidad": ["entidad", "eps"],
-    "factura": ["factura"],
+    "fecha_documento_dgh": [
+        "fecha documento dgh", "fecha dgh",
+        "fecha de documento (dgh)", "fecha de documento dgh",
+        "fecha documento (dgh)",
+    ],
+    "fecha_recepcion": [
+        "fecha recepcion", "fecha de recepcion",
+        "fecha notificacion objecion", "fecha de notificacion objecion",
+    ],
+    "entidad": ["entidad", "eps", "empresa"],
+    "factura": ["factura", "numero de factura", "numero factura"],
     "consecutivo_dgh": ["consecutivo dgh", "consecutivo"],
     "valor_glosa": ["valor glosa", "valor"],
-    "vence": ["vence", "fecha vence"],
+    "vence": ["vence", "fecha vence", "fecha vencimiento", "fecha de vencimiento"],
     "devolucion": ["devolucion s/n", "devolucion", "devolucion s", "s/n"],
     "dias_rad_rec": ["dias radicacion vs recepcion", "dias radicacion recepcion"],
     "radicado": ["radicado"],
     "referencia": ["referencia"],
-    "observacion_tecnico": ["observacion tecnico", "observacion", "obs tecnico"],
+    "observacion_tecnico": [
+        "observacion tecnico", "observacion", "obs tecnico",
+        "observacion recepcion", "observacion de recepcion",
+    ],
+    "tecnico_recepcion": [
+        "tecnico que recepciono", "tecnico recepcion",
+        "tecnico recepciono", "tecnico que recepciona",
+    ],
     "tipo_glosa": ["tipo glosa", "tipo de glosa"],
     "profesional_medico": ["profesional(medico)", "profesional (medico)", "profesional medico", "profesional", "medico auditor"],
+}
+
+# ─── Columnas de las hojas DETALLE (I / R) del DGH ───────────────────────────
+# El DGH exporta los conceptos por factura en hojas con nombres literales
+# "I" (Glosa_Inicial) y "R" (Glosa_Ratificada). Estas columnas son las que
+# usa el parser de conceptos (procesar_hoja_conceptos).
+CONCEPTO_COLS: dict[str, list[str]] = {
+    "estado_dgh": ["estadocxcobjecion"],
+    "tipo_tramite": ["tipoobjeciontramite"],
+    "factura": ["facturacartera.factura"],
+    "consecutivo": ["consecutivo"],
+    "valor_factura": ["facturacartera.valor"],
+    "saldo_factura": ["facturacartera.saldo"],
+    "fecha_documento": ["fechadocumento"],
+    "fecha_objecion": ["fechaobjecion"],
+    "eps_plan": ["facturacartera.planbeneficio.codigonombreplanbeneficios"],
+    "eps_codigo_entidad": ["facturacartera.planbeneficio.contrato.entidad.codigoentidad"],
+    "eps_nombre": ["facturacartera.planbeneficio.contrato.entidad.nombreentidad"],
+    "tercero_nit": ["facturacartera.tercero.documento"],
+    "concepto_codigo": ["listadoconceptos.conceptoobjecion.codigo"],
+    "concepto_oid": ["listadoconceptos.oid"],
+    "concepto_nombre": ["listadoconceptos.conceptoobjecion.nombre"],
+    "cups_codigo": ["listadoconceptos.servicioproductofactura.codigo"],
+    "cups_descripcion": ["listadoconceptos.servicioproductofactura.descripcion"],
+    "concepto_valor": ["listadoconceptos.valorobjecion"],
+    "centro_costo": ["listadoconceptos.servicioproductofactura.centrocosto.codigonombrecentro"],
+    "concepto_observacion": ["listadoconceptos.observaciones"],
 }
 
 
@@ -80,18 +127,74 @@ def _normalizar(texto: str) -> str:
     return re.sub(r"\s+", " ", t).strip().lower()
 
 
-def _mapear_cabeceras(fila_encabezado: tuple) -> dict[str, int]:
-    """Devuelve {nombre_interno: índice_columna}."""
+def _fix_mojibake(texto: str) -> str:
+    """Arregla texto UTF-8 leído como Latin-1 (mojibake).
+
+    Ejemplo: "OBJECIÃ¿N" → "OBJECIÓN", "CÃ¿DIGO" → "CÓDIGO".
+    Si el texto ya está bien codificado, lo deja igual.
+    """
+    if not texto or not isinstance(texto, str):
+        return texto
+    # Heurística: si contiene los patrones típicos de mojibake latin1/utf8,
+    # intenta re-decodificar. Si falla, devuelve el original.
+    if "Ã" not in texto and "Â" not in texto:
+        return texto
+    try:
+        return texto.encode("latin1", errors="strict").decode("utf8", errors="strict")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return texto
+
+
+def _split_entidad(entidad: str) -> tuple[str, str]:
+    """Separa 'U220181 - FAMISANAR EPS SUBSIDIADO' en ('U220181', 'FAMISANAR EPS SUBSIDIADO').
+
+    Si no hay guion, el código queda vacío y todo va al nombre.
+    """
+    if not entidad:
+        return "", ""
+    m = re.match(r"^\s*([A-Z]\d{5,8})\s*[-–—]\s*(.+)$", entidad.strip())
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return "", entidad.strip()
+
+
+def _mapear_cabeceras(fila_encabezado: tuple, mapa: dict[str, list[str]] | None = None) -> dict[str, int]:
+    """Devuelve {nombre_interno: índice_columna}.
+
+    Por defecto usa COLUMN_ALIASES (hojas INICIAL/RATIFICADA). Pasa
+    ``mapa=CONCEPTO_COLS`` para parsear hojas I/R de detalle.
+    """
+    mapa = mapa if mapa is not None else COLUMN_ALIASES
     indices: dict[str, int] = {}
     for idx, celda in enumerate(fila_encabezado):
         valor = _normalizar(str(celda or ""))
         if not valor:
             continue
-        for nombre_interno, aliases in COLUMN_ALIASES.items():
+        for nombre_interno, aliases in mapa.items():
             if valor in aliases and nombre_interno not in indices:
                 indices[nombre_interno] = idx
                 break
     return indices
+
+
+def _buscar_fila_encabezado(
+    ws, max_filas: int, mapa: dict[str, list[str]], min_aciertos: int = 3
+) -> tuple[int, dict[str, int]]:
+    """Busca la primera fila que parezca encabezado.
+
+    Escanea hasta ``max_filas`` filas y devuelve (num_fila_1based, indices).
+    Si ninguna fila tiene al menos ``min_aciertos`` columnas mapeadas,
+    devuelve (0, {}).
+    """
+    for num_fila, fila in enumerate(ws.iter_rows(values_only=True), start=1):
+        if num_fila > max_filas:
+            break
+        if all(c is None or str(c).strip() == "" for c in fila):
+            continue
+        indices = _mapear_cabeceras(fila, mapa)
+        if len(indices) >= min_aciertos:
+            return num_fila, indices
+    return 0, {}
 
 
 def _a_fecha(valor) -> Optional[datetime]:
@@ -103,7 +206,11 @@ def _a_fecha(valor) -> Optional[datetime]:
     if isinstance(valor, date):
         return datetime(valor.year, valor.month, valor.day)
     s = str(valor).strip()
-    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y", "%m/%d/%Y"):
+    for fmt in (
+        "%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
+        "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y", "%m/%d/%Y",
+    ):
         try:
             return datetime.strptime(s, fmt)
         except ValueError:
@@ -200,6 +307,10 @@ class ResumenImportacion:
         self.duplicadas_detalle: list[dict] = []
         self.por_gestor: dict[str, list[dict]] = {}
         self.semaforo: dict[str, int] = {"VERDE": 0, "AMARILLO": 0, "ROJO": 0, "NEGRO": 0}
+        # Conceptos (hojas I/R)
+        self.conceptos_creados = 0
+        self.conceptos_actualizados = 0
+        self.conceptos_huerfanos: list[dict] = []  # sin GlosaRecord que los ancle
 
     def to_dict(self) -> dict:
         return {
@@ -213,6 +324,9 @@ class ResumenImportacion:
             "duplicadas_detalle": self.duplicadas_detalle[:50],
             "por_gestor": self.por_gestor,
             "semaforo": self.semaforo,
+            "conceptos_creados": self.conceptos_creados,
+            "conceptos_actualizados": self.conceptos_actualizados,
+            "conceptos_huerfanos": self.conceptos_huerfanos[:50],
         }
 
 
@@ -221,6 +335,18 @@ class RecepcionService:
         self.db = db
 
     def procesar_excel(self, contenido: bytes) -> ResumenImportacion:
+        """Procesa el archivo Excel completo (múltiples hojas).
+
+        Detecta automáticamente el tipo de cada hoja:
+          • "RECEPCION"  — hojas INICIAL/RATIFICADA con encabezados de gestor+factura.
+          • "CONCEPTOS"  — hojas I/R del DGH con columnas FacturaCartera.* y
+                           ListadoConceptos.* (detalle por concepto).
+          • "SALTAR"     — hoja vacía o sin columnas reconocibles.
+
+        Orden garantizado: primero RECEPCION (crea/actualiza GlosaRecord),
+        después CONCEPTOS (upsert sobre glosas existentes). Así los conceptos
+        siempre encuentran su glosa padre. Conceptos huérfanos se reportan.
+        """
         resumen = ResumenImportacion()
         try:
             wb = load_workbook(BytesIO(contenido), data_only=True, read_only=True)
@@ -228,59 +354,85 @@ class RecepcionService:
             resumen.errores.append(f"Archivo Excel inválido: {e}")
             return resumen
 
-        # Procesa TODAS las hojas del Excel. Si el nombre de la hoja contiene
-        # "RATIFIC" (p. ej. "RATIFICADAS", "Ratificadas 2026"), todas las filas
-        # de esa hoja se marcan como ratificadas automáticamente. Esto permite
-        # al equipo de recepción usar un solo archivo con dos hojas:
-        #   • "INICIAL" → glosas nuevas
-        #   • "RATIFICADA" → ratificaciones de la EPS
-        hojas_a_procesar = wb.sheetnames if wb.sheetnames else ["_default"]
-        hoy = datetime.now()
-        total_hojas_procesadas = 0
+        hojas_disponibles = wb.sheetnames if wb.sheetnames else []
+        if not hojas_disponibles:
+            resumen.errores.append("El archivo no tiene hojas")
+            return resumen
 
-        for nombre_hoja in hojas_a_procesar:
+        hoy = datetime.now()
+
+        # Clasificar hojas por tipo antes de procesar
+        plan: list[tuple[str, str, int, dict]] = []  # (tipo, nombre, fila_header, indices)
+        for nombre_hoja in hojas_disponibles:
             try:
-                ws = wb[nombre_hoja] if nombre_hoja != "_default" else wb.active
+                ws = wb[nombre_hoja]
             except KeyError:
                 continue
-            # Forzar ratificación si la hoja se llama RATIFICADA/RATIFICADAS
-            hoja_es_ratificada = "RATIFIC" in (nombre_hoja or "").upper()
 
-            filas = ws.iter_rows(values_only=True)
-            try:
-                cabecera = next(filas)
-            except StopIteration:
-                logger.info(f"Hoja '{nombre_hoja}' vacía — saltando")
-                continue
+            # Escaneo rápido de los primeros 5 encabezados para detectar tipo.
+            # CONCEPTOS gana si aparecen columnas ListadoConceptos.*;
+            # RECEPCION si aparecen factura+vence o factura+fecha_recepcion.
+            fila_h_rec, idx_rec = _buscar_fila_encabezado(ws, max_filas=5, mapa=COLUMN_ALIASES, min_aciertos=3)
+            fila_h_con, idx_con = _buscar_fila_encabezado(ws, max_filas=5, mapa=CONCEPTO_COLS, min_aciertos=4)
 
-            indices = _mapear_cabeceras(cabecera)
-            required = {"entidad", "factura", "vence", "fecha_recepcion"}
-            faltantes = required - set(indices.keys())
-            if faltantes:
+            if idx_con and "concepto_codigo" in idx_con and "factura" in idx_con:
+                plan.append(("CONCEPTOS", nombre_hoja, fila_h_con, idx_con))
+            elif idx_rec and {"factura", "vence"}.issubset(set(idx_rec.keys())):
+                plan.append(("RECEPCION", nombre_hoja, fila_h_rec, idx_rec))
+            else:
                 logger.warning(
-                    f"Hoja '{nombre_hoja}' faltan columnas: {', '.join(sorted(faltantes))} — saltando"
+                    f"Hoja '{nombre_hoja}' sin columnas reconocibles — saltando"
                 )
-                continue
 
-            total_hojas_procesadas += 1
-            logger.info(
-                f"Procesando hoja '{nombre_hoja}' "
-                f"{'(RATIFICADAS)' if hoja_es_ratificada else '(INICIALES)'}"
-            )
-            self._procesar_filas_hoja(
-                filas=filas,
-                indices=indices,
-                resumen=resumen,
-                hoy=hoy,
-                hoja_es_ratificada=hoja_es_ratificada,
-                nombre_hoja=nombre_hoja,
+        # Procesar RECEPCION primero, CONCEPTOS después
+        plan.sort(key=lambda p: 0 if p[0] == "RECEPCION" else 1)
+
+        total_procesadas = 0
+        for tipo, nombre_hoja, fila_header, indices in plan:
+            ws = wb[nombre_hoja]
+            # Re-iterar desde la fila siguiente al encabezado detectado
+            filas = ws.iter_rows(values_only=True)
+            for _ in range(fila_header):
+                try:
+                    next(filas)
+                except StopIteration:
+                    break
+
+            hoja_es_ratificada = (
+                "RATIFIC" in (nombre_hoja or "").upper()
+                or nombre_hoja.strip().upper() == "R"
             )
 
-        if total_hojas_procesadas == 0:
+            if tipo == "RECEPCION":
+                logger.info(
+                    f"Procesando hoja '{nombre_hoja}' como RECEPCION "
+                    f"{'(RATIFICADAS)' if hoja_es_ratificada else '(INICIALES)'}"
+                )
+                self._procesar_filas_hoja(
+                    filas=filas,
+                    indices=indices,
+                    resumen=resumen,
+                    hoy=hoy,
+                    hoja_es_ratificada=hoja_es_ratificada,
+                    nombre_hoja=nombre_hoja,
+                )
+            else:  # CONCEPTOS
+                logger.info(
+                    f"Procesando hoja '{nombre_hoja}' como CONCEPTOS "
+                    f"{'(RATIFICADOS)' if hoja_es_ratificada else '(INICIALES)'}"
+                )
+                self._procesar_filas_conceptos(
+                    filas=filas,
+                    indices=indices,
+                    resumen=resumen,
+                    nombre_hoja=nombre_hoja,
+                )
+            total_procesadas += 1
+
+        if total_procesadas == 0:
             resumen.errores.append(
-                "Ninguna hoja del archivo tiene las columnas obligatorias "
-                "(entidad, factura, vence, fecha recepción). Revisa los "
-                "encabezados de la fila 1."
+                "Ninguna hoja tiene columnas reconocibles. El parser busca hojas "
+                "tipo RECEPCION (con FACTURA+VENCE) o CONCEPTOS (con ListadoConceptos.*)."
             )
         return resumen
 
@@ -303,18 +455,23 @@ class RecepcionService:
                 return fila[i] if i is not None and i < len(fila) else None
 
             try:
-                entidad = str(_get("entidad") or "").strip().upper()
+                entidad_raw = _fix_mojibake(str(_get("entidad") or "").strip())
+                entidad = entidad_raw.upper()
                 factura = str(_get("factura") or "").strip()
                 if not entidad or not factura:
                     continue
+
+                # Separar código plan (U220181) del nombre para normalización
+                eps_codigo, eps_nombre_limpio = _split_entidad(entidad)
 
                 consecutivo = str(_get("consecutivo_dgh") or "").strip()
                 gestor = str(_get("gestor") or "").strip().upper() or "SIN ASIGNAR"
                 radicado_info = str(_get("radicado") or "").strip()
                 referencia = str(_get("referencia") or "").strip()
-                observacion_tecnico = str(_get("observacion_tecnico") or "").strip()
+                observacion_tecnico = _fix_mojibake(str(_get("observacion_tecnico") or "").strip())
                 tipo_glosa_excel = str(_get("tipo_glosa") or "").strip()
                 profesional_medico = str(_get("profesional_medico") or "").strip()
+                tecnico_recepcion = str(_get("tecnico_recepcion") or "").strip()
                 devolucion = str(_get("devolucion") or "").strip().upper()[:1]
 
                 fecha_entrega = _a_fecha(_get("fecha_entrega"))
@@ -386,11 +543,13 @@ class RecepcionService:
 
                 campos = dict(
                     eps=entidad,
+                    eps_codigo=eps_codigo or None,
                     paciente="N/A",
                     factura=factura,
                     numero_radicado=numero_radicado_real,
                     consecutivo_dgh=consecutivo or None,
                     gestor_nombre=gestor,
+                    tecnico_recepcion=tecnico_recepcion or None,
                     fecha_radicacion_factura=fecha_rad,
                     fecha_documento_dgh=fecha_dgh,
                     fecha_recepcion=fecha_rec,
@@ -467,3 +626,119 @@ class RecepcionService:
             resumen.errores.append(f"Error al guardar: {e}")
 
         return resumen
+
+    def _procesar_filas_conceptos(
+        self,
+        filas,
+        indices: dict,
+        resumen: "ResumenImportacion",
+        nombre_hoja: str,
+    ):
+        """Procesa hoja de conceptos (I/R del DGH).
+
+        Cada fila = 1 concepto asociado a una factura+consecutivo DGH. Se hace
+        upsert contra la tabla ``conceptos_glosa`` usando ``ListadoConceptos.Oid``
+        como clave de idempotencia. La glosa padre debe existir (cargada antes
+        desde INICIAL/RATIFICADA); si no, el concepto se reporta como huérfano.
+        """
+        for num_fila, fila in enumerate(filas, start=2):
+            if all(c is None or str(c).strip() == "" for c in fila):
+                continue
+
+            def _get(key: str):
+                i = indices.get(key)
+                return fila[i] if i is not None and i < len(fila) else None
+
+            try:
+                factura = str(_get("factura") or "").strip()
+                consecutivo = str(_get("consecutivo") or "").strip()
+                codigo_glosa = str(_get("concepto_codigo") or "").strip().upper()
+                oid = str(_get("concepto_oid") or "").strip()
+                if not factura or not consecutivo or not codigo_glosa:
+                    # Sin estos 3 campos mínimos, la fila no es un concepto válido
+                    continue
+
+                nombre_glosa = _fix_mojibake(str(_get("concepto_nombre") or "").strip())
+                cups_codigo = str(_get("cups_codigo") or "").strip()
+                cups_desc = _fix_mojibake(str(_get("cups_descripcion") or "").strip())
+                centro_costo = _fix_mojibake(str(_get("centro_costo") or "").strip())
+                observacion = _fix_mojibake(str(_get("concepto_observacion") or "").strip())
+                valor_obj = _a_float(_get("concepto_valor"))
+
+                # Buscar la glosa padre por factura + consecutivo
+                glosa_padre = (
+                    self.db.query(GlosaRecord)
+                    .filter(
+                        GlosaRecord.factura == factura,
+                        GlosaRecord.consecutivo_dgh == consecutivo,
+                    )
+                    .first()
+                )
+                if not glosa_padre:
+                    resumen.conceptos_huerfanos.append({
+                        "fila": num_fila,
+                        "hoja": nombre_hoja,
+                        "factura": factura,
+                        "consecutivo_dgh": consecutivo,
+                        "codigo_glosa": codigo_glosa,
+                        "cups": cups_codigo,
+                        "valor": valor_obj,
+                        "motivo": "No existe glosa con esa FACTURA+CONSECUTIVO DGH (carga primero INICIAL/RATIFICADA)",
+                    })
+                    continue
+
+                # Extra: completar metadatos de la glosa padre desde la hoja I/R
+                # (saldo, valor factura, NIT) si venían vacíos de INICIAL/RATIFICADA.
+                if _get("saldo_factura") is not None and not glosa_padre.saldo_factura:
+                    glosa_padre.saldo_factura = _a_float(_get("saldo_factura"))
+                if _get("valor_factura") is not None and not glosa_padre.valor_factura:
+                    glosa_padre.valor_factura = _a_float(_get("valor_factura"))
+                nit = str(_get("tercero_nit") or "").strip()
+                if nit and not glosa_padre.tercero_nit:
+                    glosa_padre.tercero_nit = nit
+                fecha_obj = _a_fecha(_get("fecha_objecion"))
+                if fecha_obj and not glosa_padre.fecha_objecion_eps:
+                    glosa_padre.fecha_objecion_eps = fecha_obj
+
+                # Upsert del concepto por OID (idempotente)
+                concepto_existente = None
+                if oid:
+                    concepto_existente = (
+                        self.db.query(ConceptoGlosaRecord)
+                        .filter(ConceptoGlosaRecord.oid_dgh == oid)
+                        .first()
+                    )
+
+                campos = dict(
+                    glosa_id=glosa_padre.id,
+                    oid_dgh=oid or None,
+                    consecutivo_dgh=consecutivo,
+                    factura=factura,
+                    codigo_glosa=codigo_glosa,
+                    nombre_glosa=nombre_glosa or None,
+                    cups_codigo=cups_codigo or None,
+                    cups_descripcion=cups_desc or None,
+                    centro_costo=centro_costo or None,
+                    valor_objetado=valor_obj,
+                    observacion_eps=observacion or None,
+                )
+
+                if concepto_existente:
+                    for k, v in campos.items():
+                        setattr(concepto_existente, k, v)
+                    resumen.conceptos_actualizados += 1
+                else:
+                    self.db.add(ConceptoGlosaRecord(**campos))
+                    resumen.conceptos_creados += 1
+
+            except Exception as e:
+                resumen.errores.append(f"[Conceptos {nombre_hoja}] Fila {num_fila}: {e}")
+                logger.warning(f"Error procesando concepto fila {num_fila}: {e}")
+                continue
+
+        try:
+            self.db.commit()
+        except Exception as e:
+            logger.error(f"Error guardando conceptos: {e}")
+            self.db.rollback()
+            resumen.errores.append(f"Error al guardar conceptos: {e}")
