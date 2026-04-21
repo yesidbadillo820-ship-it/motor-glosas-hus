@@ -284,7 +284,7 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 /* ─── LAYOUT ─────────────────────────────── */
 .workspace{flex:1;display:flex;overflow:hidden}
 .panel{display:none;flex:1;overflow:hidden}
-.panel.active{display:flex}
+.panel.active{display:flex;flex-direction:column;min-height:0}
 
 /* ─── SIDEBAR ────────────────────────────── */
 .sidebar{width:320px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
@@ -1853,7 +1853,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
     <!-- CONSULTA NORMATIVA -->
     <div class="panel" id="p-consulta-normativa">
-      <div style="height:100%;overflow-y:auto;overflow-x:hidden;width:100%;">
+      <div style="flex:1 1 auto;overflow-y:auto;overflow-x:hidden;width:100%;min-height:0;">
         <div class="panel-hero">
           <div class="panel-hero-inner">
             <span class="panel-hero-tag">Biblioteca legal</span>
@@ -1898,7 +1898,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
     <!-- MULTI-CONCEPTO -->
     <div class="panel" id="p-multi-concepto">
-      <div style="height:100%;overflow-y:auto;width:100%;">
+      <div style="flex:1 1 auto;overflow-y:auto;width:100%;min-height:0;">
         <div class="panel-hero">
           <div class="panel-hero-inner">
             <span class="panel-hero-tag">Herramienta IA</span>
@@ -1928,7 +1928,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
     <!-- DETECTOR GLOSAS EN MASA -->
     <div class="panel" id="p-detector-masa">
-      <div style="height:100%;overflow-y:auto;width:100%;">
+      <div style="flex:1 1 auto;overflow-y:auto;width:100%;min-height:0;">
         <div class="panel-hero">
           <div class="panel-hero-inner">
             <span class="panel-hero-tag">Analítica avanzada</span>
@@ -1963,7 +1963,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
     <!-- SIMULADOR -->
     <div class="panel" id="p-simulador">
-      <div style="height:100%;overflow-y:auto;width:100%;">
+      <div style="flex:1 1 auto;overflow-y:auto;width:100%;min-height:0;">
         <div class="panel-hero">
           <div class="panel-hero-inner">
             <span class="panel-hero-tag">Simulación predictiva</span>
@@ -2002,7 +2002,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
     <!-- SALUD TOTAL -->
     <div class="panel" id="p-salud-total">
-      <div style="height:100%;overflow-y:auto;width:100%;padding:1.5rem 2rem;">
+      <div style="flex:1 1 auto;overflow-y:auto;width:100%;padding:1.5rem 2rem;min-height:0;">
       <div class="st-area">
         <div class="st-upload-col">
           <div class="form-card">
