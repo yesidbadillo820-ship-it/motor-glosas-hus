@@ -284,7 +284,24 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 /* ─── LAYOUT ─────────────────────────────── */
 .workspace{flex:1;display:flex;overflow:hidden}
 .panel{display:none;flex:1;overflow:hidden}
-.panel.active{display:flex;flex-direction:column;min-height:0}
+.panel.active{display:flex}
+/* Paneles verticales (sin sidebar lateral) usan column-layout */
+.panel.active#p-consulta-normativa,
+.panel.active#p-multi-concepto,
+.panel.active#p-detector-masa,
+.panel.active#p-simulador,
+.panel.active#p-salud-total,
+.panel.active#p-historial,
+.panel.active#p-mis-glosas,
+.panel.active#p-alertas,
+.panel.active#p-mi-desempeno,
+.panel.active#p-usuarios,
+.panel.active#p-contratos,
+.panel.active#p-gold,
+.panel.active#p-papelera,
+.panel.active#p-conciliacion,
+.panel.active#p-audit,
+.panel.active#p-dashboard{flex-direction:column;min-height:0}
 
 /* ─── SIDEBAR ────────────────────────────── */
 .sidebar{width:320px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
@@ -2834,8 +2851,24 @@ function cargarConceptoDeFactura(glosaId){
   if(!g) return;
   var editor = document.getElementById('f-glosa');
   if(editor){
-    editor.value = g.texto_glosa_original || (g.codigo_glosa + ' - ' + (g.servicio || ''));
-    toast('Concepto cargado', 'Presiona Analizar para generar la respuesta', 'info');
+    // Construir texto enriquecido para que pase validación mínima (15 chars)
+    // y la IA tenga contexto completo: código + servicio + concepto + valor
+    var partes = [];
+    if(g.codigo_glosa) partes.push(g.codigo_glosa);
+    if(g.servicio) partes.push(g.servicio);
+    if(g.cups) partes.push('CUPS ' + g.cups);
+    if(g.valor_objetado && g.valor_objetado > 0) partes.push('$' + g.valor_objetado.toLocaleString('es-CO'));
+    if(g.concepto_glosa) partes.push('Motivo: ' + g.concepto_glosa);
+    var textoConstruido = partes.join(' - ');
+    // Priorizar texto original si es lo suficientemente descriptivo
+    var textoFinal = (g.texto_glosa_original && g.texto_glosa_original.length >= 20)
+                      ? g.texto_glosa_original
+                      : textoConstruido;
+    // Si aún es corto, añadir descripción del tipo de glosa
+    if(textoFinal.length < 20){
+      textoFinal += ' - Glosa objetada por la entidad pagadora, requiere respuesta técnico-jurídica';
+    }
+    editor.value = textoFinal;
   }
   // Auto-seleccionar la EPS si la conocemos
   if(g.eps){
@@ -2858,23 +2891,38 @@ function responderTodosLosConceptos(){
 }
 
 async function procesarConceptosSecuencial(conceptos, idx, total){
-  if(!conceptos.length){
-    toast('✓ Lote completado', total + ' conceptos procesados', 'success');
-    return;
+  var procesados = 0, fallidos = 0;
+  for(var i = 0; i < conceptos.length; i++){
+    var g = conceptos[i];
+    var n = i + 1;
+    // Cargar concepto en editor (enriquece texto para pasar validación 15 chars)
+    cargarConceptoDeFactura(g.id);
+    // Verificar que se cargó texto suficiente antes de analizar
+    var editor = document.getElementById('f-glosa');
+    if(!editor || !editor.value || editor.value.trim().length < 15){
+      fallidos++;
+      toast('⚠ Concepto '+n+'/'+total+' saltado', 'Texto insuficiente: ' + (g.codigo_glosa||'?'), 'warning');
+      continue;
+    }
+    // Esperar un tick para que el DOM se actualice
+    await new Promise(function(r){ setTimeout(r, 300); });
+    toast('Analizando '+n+'/'+total, 'Código ' + (g.codigo_glosa||'?'), 'info');
+    try{
+      await analizar();
+      procesados++;
+    }catch(e){
+      fallidos++;
+      console.error('Error procesando concepto ' + n + ':', e);
+    }
+    // Pausa entre análisis para no saturar IA (rate limiting)
+    await new Promise(function(r){ setTimeout(r, 1500); });
   }
-  var g = conceptos.shift();
-  idx++;
-  // Cargar concepto en editor
-  cargarConceptoDeFactura(g.id);
-  // Esperar un tick para que el DOM se actualice
-  await new Promise(function(r){ setTimeout(r, 300); });
-  toast('Analizando '+idx+'/'+total, 'Código ' + (g.codigo_glosa||'?'), 'info');
-  try{
-    await analizar();
-  }catch(e){}
-  // Pausa entre análisis para no saturar
-  await new Promise(function(r){ setTimeout(r, 1500); });
-  procesarConceptosSecuencial(conceptos, idx, total);
+  // Resumen final
+  if(fallidos > 0){
+    toast('Lote completado con errores', procesados + ' procesados, ' + fallidos + ' fallidos', 'warning');
+  } else {
+    toast('✓ Lote completado', total + ' conceptos procesados exitosamente', 'success');
+  }
 }
 
 // ─── LANDING KPIs (mini-dashboard en panel Analizar) ───────────
