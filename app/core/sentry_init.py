@@ -21,15 +21,46 @@ import logging
 logger = logging.getLogger("motor_glosas")
 
 
+def _dsn_es_valido(dsn: str) -> tuple[bool, str]:
+    """Valida rápido que el DSN tenga la forma esperada por Sentry.
+
+    Formato correcto: https://KEY@o123456.ingest.sentry.io/PROJECT
+    Retorna (valido, mensaje_error).
+    """
+    if not dsn:
+        return False, "DSN vacío"
+    if not (dsn.startswith("http://") or dsn.startswith("https://")):
+        return False, (
+            "DSN no inicia con http:// o https://. "
+            "Copia el DSN completo desde sentry.io, debe verse como: "
+            "https://abc123@o789.ingest.sentry.io/12345"
+        )
+    if "@" not in dsn or "ingest" not in dsn:
+        return False, (
+            "DSN con formato inválido. Copia el DSN completo desde "
+            "sentry.io/settings → Client Keys (DSN)."
+        )
+    return True, ""
+
+
 def init_sentry() -> bool:
     """Inicializa Sentry si hay DSN configurado.
 
     Returns:
-        True si Sentry quedó activo, False si no se configuró.
+        True si Sentry quedó activo, False si no se configuró o falló.
+
+    CRÍTICO: cualquier fallo aquí NUNCA debe tumbar la aplicación.
+    El error se loggea y se retorna False.
     """
     dsn = os.getenv("SENTRY_DSN", "").strip()
     if not dsn:
         logger.info("Sentry no configurado (sin SENTRY_DSN). Saltando inicialización.")
+        return False
+
+    # Validación del DSN antes de llamar init — evita BadDsn exception
+    valido, err_msg = _dsn_es_valido(dsn)
+    if not valido:
+        logger.warning(f"SENTRY_DSN inválido ({err_msg}). Sentry desactivado. Valor actual: '{dsn[:20]}...'")
         return False
 
     try:
@@ -74,25 +105,32 @@ def init_sentry() -> bool:
             request["data"] = "[REDACTED - contiene datos de glosa posiblemente con PHI]"
         return event
 
-    sentry_sdk.init(
-        dsn=dsn,
-        environment=environment,
-        release=release,
-        traces_sample_rate=traces_sample_rate,
-        profiles_sample_rate=0.0,  # desactivado por defecto (overhead)
-        send_default_pii=False,    # no enviar PII por defecto
-        integrations=[
-            FastApiIntegration(transaction_style="endpoint"),
-            StarletteIntegration(transaction_style="endpoint"),
-            SqlalchemyIntegration(),
-            logging_integration,
-        ],
-        before_send=before_send,
-        # Ignorar errores esperados (401/403/404 no son bugs)
-        ignore_errors=[
-            "HTTPException",  # Excepciones 4xx intencionales
-        ],
-    )
+    # Blindaje: cualquier error en init NO debe tumbar la app
+    try:
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=environment,
+            release=release,
+            traces_sample_rate=traces_sample_rate,
+            profiles_sample_rate=0.0,  # desactivado por defecto (overhead)
+            send_default_pii=False,    # no enviar PII por defecto
+            integrations=[
+                FastApiIntegration(transaction_style="endpoint"),
+                StarletteIntegration(transaction_style="endpoint"),
+                SqlalchemyIntegration(),
+                logging_integration,
+            ],
+            before_send=before_send,
+            # Ignorar errores esperados (401/403/404 no son bugs)
+            ignore_errors=[
+                "HTTPException",  # Excepciones 4xx intencionales
+            ],
+        )
+    except Exception as e:
+        logger.error(
+            f"Error inicializando Sentry (la app sigue funcionando sin tracking): {e}"
+        )
+        return False
     logger.info(
         f"Sentry activado | env={environment} | traces={traces_sample_rate} "
         f"| release={release or 'unspecified'}"
