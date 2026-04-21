@@ -2133,6 +2133,8 @@ async function initApp(){
     var sb=document.getElementById('sidebar-nav');
     if(sb) sb.classList.add('collapsed');
   }
+  // Aplicar restricciones de sidebar según rol del usuario
+  aplicarRestriccionesRol();
   await loadContratos();
   loadAlertCount();
   loadDash();
@@ -4065,6 +4067,59 @@ async function loadAlertas(){
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
 var ROL_COLORS={'SUPER_ADMIN':'rol-super_admin','COORDINADOR':'rol-coordinador','AUDITOR':'rol-auditor','VIEWER':'rol-viewer'};
+
+// ─── RESTRICCIONES POR ROL ──────────────────────────────────────
+// Para usuarios con rol AUDITOR, el sidebar muestra solamente:
+//   Análisis: Analizar glosa (único item)
+//   Gestión: Conciliación, Plantillas Gold, Papelera
+//   Herramientas: Consulta Normativa, Salud Total, Importar recepción,
+//                 Importación masiva
+// Los demás items (Mi desempeño, Mis glosas, Historial, Alertas,
+// Contratos, Usuarios, Dashboard, Auditoría, Multi-concepto,
+// Detector en masa, Simulador) quedan ocultos.
+// SUPER_ADMIN y COORDINADOR ven todo.
+var AUDITOR_TABS_PERMITIDAS = {
+  'analizar': true,
+  'conciliacion': true,
+  'gold': true,
+  'papelera': true,
+  'consulta-normativa': true,
+  'salud-total': true,
+};
+function aplicarRestriccionesRol(){
+  if(USER_ROL !== 'AUDITOR') return;
+  // 1) Ocultar items del sidebar que no estén permitidos
+  var items = document.querySelectorAll('.sn-item');
+  items.forEach(function(btn){
+    var onclickStr = btn.getAttribute('onclick') || '';
+    // Ignorar botones externos (importar recepción/masiva) — esos van a URLs
+    if(onclickStr.indexOf("window.location.href='/importar") >= 0) return;
+    var match = onclickStr.match(/sidebarTab\(this,'([^']+)'\)/);
+    if(!match) return;
+    var tab = match[1];
+    if(!AUDITOR_TABS_PERMITIDAS[tab]){
+      btn.style.display = 'none';
+    }
+  });
+  // 2) Ocultar headers de grupos vacíos (si todos los items de un grupo
+  //    quedaron ocultos, el label del grupo también debe ocultarse)
+  document.querySelectorAll('.sn-group').forEach(function(grupo){
+    var visibles = grupo.querySelectorAll('.sn-item:not([style*="display: none"]):not([style*="display:none"])');
+    if(visibles.length === 0){
+      var label = grupo.querySelector('.sn-label');
+      if(label) label.style.display = 'none';
+    }
+  });
+  // 3) Filtrar también el Command Palette (Cmd+K)
+  if(typeof CP_ACCIONES !== 'undefined'){
+    CP_ACCIONES = CP_ACCIONES.filter(function(a){
+      // Permitir siempre acciones sin tab (Importar, Export ERP, etc.)
+      if(a.accion && !a.tab) return true;
+      // Si tiene tab, permitir solo las del whitelist
+      return a.tab ? !!AUDITOR_TABS_PERMITIDAS[a.tab] : true;
+    });
+  }
+}
 
 async function loadUsuarios(){
   // Mostrar la zona peligrosa solo si es SUPER_ADMIN
