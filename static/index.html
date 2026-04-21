@@ -909,6 +909,64 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
 }
 
+/* ─── PRINT CSS GLOBAL (para cualquier pantalla) ───────────── */
+@media print{
+  @page{size:letter;margin:1.5cm}
+  body,html{background:#fff!important;color:#000!important;font-size:10pt}
+  header,.sidebar-nav,.nav-bar,.no-print,#toasts,.cp-backdrop,#chpw-backdrop,
+  .modal-bg,#loading,.hdr-btn,.btn,.btn-primary,.btn-secondary,.sn-item,
+  .toast-wrap,[onclick],.refinar-panel{display:none!important}
+  .panel,.panel-hero,.form-card,.card-premium{box-shadow:none!important;border:1px solid #ccc!important;background:#fff!important}
+  .panel{padding:0!important}
+  a{color:#000!important;text-decoration:underline!important}
+  table{page-break-inside:avoid}
+  h1,h2,h3,h4{page-break-after:avoid}
+  .dont-break{page-break-inside:avoid}
+  /* Encabezado institucional impreso */
+  body::before{
+    content:"ESE HOSPITAL UNIVERSITARIO DE SANTANDER · NIT 900.006.037-4";
+    display:block;text-align:center;font-size:9pt;font-weight:700;
+    padding:6px 0;border-bottom:1.5px solid #0b3d91;margin-bottom:12px;color:#0b3d91;
+  }
+}
+
+/* ─── ONBOARDING TOUR ──────────────────────────────────────── */
+.onb-backdrop{position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9998;display:none;backdrop-filter:blur(3px)}
+.onb-backdrop.show{display:block;animation:fadeIn .2s var(--ease-out)}
+.onb-spotlight{
+  position:fixed;border-radius:12px;box-shadow:0 0 0 4px rgba(14,165,233,.5),0 0 0 9999px rgba(11,18,32,.72);
+  pointer-events:none;z-index:9998;transition:all .35s var(--ease-spring);
+}
+.onb-card{
+  position:fixed;max-width:360px;background:#fff;border-radius:14px;
+  box-shadow:0 24px 48px -12px rgba(0,0,0,.45),0 0 0 1px rgba(15,23,42,.08);
+  padding:1.25rem 1.4rem;z-index:9999;
+  animation:fadeInUp .35s var(--ease-spring);
+}
+.onb-card h3{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:.5rem;letter-spacing:-.015em}
+.onb-card p{font-size:.85rem;color:var(--text2);line-height:1.5;margin-bottom:1rem}
+.onb-nav{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.9rem}
+.onb-dots{display:flex;gap:4px}
+.onb-dot{width:6px;height:6px;border-radius:50%;background:var(--border2)}
+.onb-dot.active{background:var(--c-teal2);width:18px;border-radius:3px}
+.onb-btns{display:flex;gap:.4rem}
+.onb-btns button{padding:.4rem .9rem;font-size:.75rem;font-weight:600;border:1px solid var(--border);background:var(--bg-card);color:var(--text2);border-radius:6px;cursor:pointer;font-family:var(--font);transition:all .2s}
+.onb-btns button:hover{background:var(--bg-subtle);color:var(--text)}
+.onb-btns .onb-next{background:var(--grad-teal);color:#fff;border:none;padding:.45rem 1rem}
+.onb-btns .onb-skip{color:var(--text3)}
+
+/* ─── MODO FOCUS ───────────────────────────────────────────── */
+body.focus-mode header,body.focus-mode .sidebar-nav,body.focus-mode .sidebar{display:none!important}
+body.focus-mode .workspace{margin:0!important;padding:0!important}
+body.focus-mode .panel.active{padding:2rem 3rem}
+body.focus-mode .focus-exit{
+  position:fixed;top:20px;right:20px;z-index:9999;
+  padding:10px 16px;background:var(--c-navy);color:#fff;
+  border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.82rem;
+  box-shadow:var(--sh-lg);font-family:var(--font);
+}
+body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
+
 /* ─── PANEL HERO HEADER (titular de sección) ───────────────── */
 .panel-hero{
   padding:1.75rem 2rem 1.5rem;
@@ -2086,6 +2144,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </div>
 </div>
 
+<!-- ONBOARDING TOUR -->
+<div class="onb-backdrop" id="onb-backdrop" onclick="if(event.target===this)cerrarOnboarding()"></div>
+<div class="onb-spotlight" id="onb-spotlight" style="display:none"></div>
+<div class="onb-card" id="onb-card" style="display:none">
+  <h3 id="onb-title">Bienvenido al Motor de Glosas</h3>
+  <p id="onb-text">Vamos a darte un recorrido rápido por las funciones principales.</p>
+  <div class="onb-nav">
+    <div class="onb-dots" id="onb-dots"></div>
+    <div class="onb-btns">
+      <button class="onb-skip" onclick="cerrarOnboarding()">Saltar</button>
+      <button onclick="onbPaso(-1)" id="onb-prev" style="display:none">Atrás</button>
+      <button class="onb-next" onclick="onbPaso(1)" id="onb-next">Siguiente →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Botón Modo Focus (aparece solo en focus-mode) -->
+<button class="focus-exit no-print" style="display:none" id="focus-exit" onclick="toggleModoFocus(false)">✕ Salir de Modo Focus (Esc)</button>
+
 <!-- COMMAND PALETTE -->
 <div class="cp-backdrop" id="cp-backdrop" onclick="if(event.target===this)cerrarCommandPalette()">
   <div class="cp-box">
@@ -2251,6 +2328,8 @@ async function initApp(){
   if(typeof filtrarAccionesPorRol === 'function') filtrarAccionesPorRol();
   // Poblar KPIs del landing hero del panel Analizar
   if(typeof poblarLandingKPIs === 'function') poblarLandingKPIs();
+  // Verificar si mostrar onboarding (primera vez)
+  if(typeof verificarOnboarding === 'function') verificarOnboarding();
   await loadContratos();
   loadAlertCount();
   loadDash();
@@ -2559,6 +2638,131 @@ function mostrarResultadoValidacion(d){
   modalBody.innerHTML = html;
 }
 
+// ─── ONBOARDING TOUR ─────────────────────────────────────────
+var ONB_PASOS = [
+  {
+    titulo: '👋 Bienvenido al Motor de Glosas HUS',
+    texto: 'Esta es tu herramienta para generar respuestas técnico-jurídicas a glosas con IA. Vamos a darte un recorrido rápido en 5 pasos (≈1 minuto).',
+    target: null,  // sin target = centrado
+  },
+  {
+    titulo: '📝 1. Panel de datos',
+    texto: 'Aquí ingresas los datos de la glosa: EPS, etapa, fechas, número de factura y radicado. Puedes adjuntar hasta 10 PDFs como soporte.',
+    target: '#p-analizar .sidebar',
+  },
+  {
+    titulo: '⚖️ 2. Análisis con IA',
+    texto: 'Pega el texto de la glosa y presiona "Analizar". La IA genera una respuesta adaptada: 2 párrafos si el caso es simple, 4 si es complejo.',
+    target: '.result-area',
+  },
+  {
+    titulo: '🔎 3. Command Palette (⌘K)',
+    texto: 'Presiona Cmd+K (o Ctrl+K) para abrir la paleta de comandos y navegar rápido a cualquier sección. También puedes abrir con "/".',
+    target: '.search-trigger',
+  },
+  {
+    titulo: '📚 4. Consulta normativa',
+    texto: 'En "Herramientas → Consulta Normativa" tienes una biblioteca de 40+ normas indexadas. Pregunta "¿qué dice el Art. 57 Ley 1438?" y obtén el texto literal.',
+    target: '.sn-item[data-tip="Consulta Normativa"]',
+  },
+  {
+    titulo: '🚀 ¡Listo!',
+    texto: 'Ya puedes comenzar. Si necesitas ayuda, usa ⌘K o consulta el manual de usuario.',
+    target: null,
+  },
+];
+var ONB_SEL = 0;
+
+function iniciarOnboarding(){
+  ONB_SEL = 0;
+  document.getElementById('onb-backdrop').classList.add('show');
+  renderizarOnboarding();
+}
+
+function cerrarOnboarding(){
+  document.getElementById('onb-backdrop').classList.remove('show');
+  document.getElementById('onb-card').style.display = 'none';
+  document.getElementById('onb-spotlight').style.display = 'none';
+  // Marcar como visto
+  localStorage.setItem('hus_onboarding_visto', '1');
+}
+
+function renderizarOnboarding(){
+  var paso = ONB_PASOS[ONB_SEL];
+  if(!paso){ cerrarOnboarding(); return; }
+  document.getElementById('onb-title').textContent = paso.titulo;
+  document.getElementById('onb-text').textContent = paso.texto;
+  // Dots
+  var dotsHtml = '';
+  for(var i=0;i<ONB_PASOS.length;i++){
+    dotsHtml += '<div class="onb-dot' + (i===ONB_SEL?' active':'') + '"></div>';
+  }
+  document.getElementById('onb-dots').innerHTML = dotsHtml;
+  document.getElementById('onb-prev').style.display = ONB_SEL === 0 ? 'none' : '';
+  document.getElementById('onb-next').textContent = ONB_SEL === ONB_PASOS.length - 1 ? 'Finalizar ✓' : 'Siguiente →';
+  // Spotlight sobre target
+  var spotlight = document.getElementById('onb-spotlight');
+  var card = document.getElementById('onb-card');
+  if(paso.target){
+    var target = document.querySelector(paso.target);
+    if(target){
+      var rect = target.getBoundingClientRect();
+      spotlight.style.display = 'block';
+      spotlight.style.top = (rect.top - 6) + 'px';
+      spotlight.style.left = (rect.left - 6) + 'px';
+      spotlight.style.width = (rect.width + 12) + 'px';
+      spotlight.style.height = (rect.height + 12) + 'px';
+      // Posicionar card cerca del target
+      card.style.display = 'block';
+      var cardTop = rect.bottom + 20;
+      if(cardTop + 300 > window.innerHeight) cardTop = rect.top - 300;
+      var cardLeft = rect.left;
+      if(cardLeft + 360 > window.innerWidth) cardLeft = window.innerWidth - 380;
+      card.style.top = Math.max(20, cardTop) + 'px';
+      card.style.left = Math.max(20, cardLeft) + 'px';
+      return;
+    }
+  }
+  // Sin target: centrar card
+  spotlight.style.display = 'none';
+  card.style.display = 'block';
+  card.style.top = '50%';
+  card.style.left = '50%';
+  card.style.transform = 'translate(-50%, -50%)';
+}
+
+function onbPaso(direccion){
+  document.getElementById('onb-card').style.transform = '';
+  ONB_SEL += direccion;
+  if(ONB_SEL >= ONB_PASOS.length){ cerrarOnboarding(); return; }
+  if(ONB_SEL < 0) ONB_SEL = 0;
+  renderizarOnboarding();
+}
+
+// Auto-iniciar onboarding si es primera vez
+function verificarOnboarding(){
+  if(!localStorage.getItem('hus_onboarding_visto')){
+    setTimeout(iniciarOnboarding, 1200);  // delay para que carguen los KPIs
+  }
+}
+
+// ─── MODO FOCUS ────────────────────────────────────────────────
+function toggleModoFocus(force){
+  var active = typeof force === 'boolean' ? force : !document.body.classList.contains('focus-mode');
+  document.body.classList.toggle('focus-mode', active);
+  document.getElementById('focus-exit').style.display = active ? '' : 'none';
+  if(active){
+    toast('Modo Focus activado','Presiona Esc para salir','info');
+  }
+}
+
+// Shortcut Esc para salir de focus
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && document.body.classList.contains('focus-mode')){
+    toggleModoFocus(false);
+  }
+});
+
 // ─── LANDING KPIs (mini-dashboard en panel Analizar) ───────────
 async function poblarLandingKPIs(){
   try{
@@ -2753,6 +2957,8 @@ var CP_ACCIONES = [
   {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
   {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
   {seccion:"Acciones", icono:"🌓", titulo:"Alternar modo oscuro", hint:"Light ↔ Dark", accion:function(){cerrarCommandPalette();toggleDark()}},
+  {seccion:"Acciones", icono:"🎯", titulo:"Modo Focus", hint:"Ocultar UI para análisis profundo (Esc para salir)", accion:function(){cerrarCommandPalette();toggleModoFocus(true)}},
+  {seccion:"Acciones", icono:"🧭", titulo:"Tour guiado de la app", hint:"Recorrido de 1 minuto por las funciones", accion:function(){cerrarCommandPalette();iniciarOnboarding()}},
   {seccion:"Acciones", icono:"🚪", titulo:"Cerrar sesión", hint:"Salir", accion:function(){cerrarCommandPalette();logout()}},
   // Acciones admin (solo SUPER_ADMIN)
   {seccion:"Admin", icono:"🧪", titulo:"Test Sentry", hint:"Dispara error intencional", soloAdmin:true, accion:function(){cerrarCommandPalette();dispararSentryTest()}},
