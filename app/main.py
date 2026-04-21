@@ -33,6 +33,11 @@ from app.models.schemas import GlosaInput, GlosaResult
 from app.core.config import get_settings, check_security_config
 from app.auth import get_password_hash
 from app.core.logging_utils import set_request_id, logger
+from app.core.sentry_init import init_sentry
+
+# Sentry debe inicializarse ANTES de cualquier import que pueda fallar.
+# Si SENTRY_DSN no está definido, no hace nada.
+init_sentry()
 from app.api.deps import get_usuario_actual
 from app.services.glosa_ia_prompts import get_contrato
 
@@ -1107,6 +1112,24 @@ def presentacion_ia():
 @app.get("/health")
 def health():
     return {"status": "ok", "version": cfg.app_version}
+
+
+@app.get("/debug/sentry-test", include_in_schema=False)
+def sentry_test(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Endpoint para verificar que Sentry captura errores.
+
+    Solo accesible por SUPER_ADMIN. Lanza una excepción intencional —
+    debería aparecer en el dashboard de Sentry a los pocos segundos.
+    """
+    if current_user.rol != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Solo SUPER_ADMIN puede correr este test")
+    # Excepción intencional para verificar integración Sentry
+    raise RuntimeError(
+        f"[SENTRY_TEST] Test de integración disparado por {current_user.email} "
+        f"en {datetime.now().isoformat()}. Si ves este mensaje en Sentry, funciona correctamente."
+    )
 
 
 @app.post("/pdf/ocr")
