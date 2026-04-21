@@ -1,5 +1,7 @@
 // Service Worker para Motor Glosas HUS - cache shell + estrategia red-primero para datos.
-const CACHE = 'hus-glosas-v1';
+// ⚠ IMPORTANTE: subir la versión del cache cada vez que cambie el HTML/CSS/JS
+//   estático para que los clientes existentes reciban la nueva versión.
+const CACHE = 'hus-glosas-v3';
 const SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -35,7 +37,26 @@ self.addEventListener('fetch', (e) => {
     return; // browser handles normally
   }
 
-  // Estáticos: cache-first con actualización en segundo plano
+  // Documentos HTML (páginas): RED-primero, con fallback al cache si no hay
+  // red. Esto garantiza que cambios recién desplegados se reflejen al instante
+  // sin obligar al usuario a limpiar caché.
+  const acceptsHTML = (req.headers.get('accept') || '').includes('text/html');
+  const esPagina = req.mode === 'navigate' || acceptsHTML;
+  if (esPagina) {
+    e.respondWith(
+      fetch(req).then((networkResp) => {
+        if (networkResp && networkResp.ok) {
+          const clone = networkResp.clone();
+          caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => {});
+        }
+        return networkResp;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Estáticos (imágenes, fuentes, íconos): cache-first con actualización
+  // en segundo plano.
   e.respondWith(
     caches.match(req).then((cached) => {
       const fetchPromise = fetch(req).then((networkResp) => {
