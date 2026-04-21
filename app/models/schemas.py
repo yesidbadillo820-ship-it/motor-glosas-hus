@@ -125,3 +125,12 @@ class TokenResponse(BaseModel):
     token_type:   str = "bearer"
     nombre:       str
     rol:          Optional[str] = None
+    # True si el usuario debe cambiar su password antes de operar
+    must_change_password: Optional[bool] = False
+
+
+class CambiarPasswordRequest(BaseModel):
+    password_actual: str = Field(..., min_length=1, max_length=200)
+    password_nueva: str = Field(..., min_length=8, max_length=200,
+                                 description="Mínimo 8 caracteres")
+    password_nueva_confirmacion: str = Field(..., min_length=8, max_length=200)

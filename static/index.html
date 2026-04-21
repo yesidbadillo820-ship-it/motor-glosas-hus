@@ -2020,6 +2020,41 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <!-- TOASTS -->
 <div class="toast-wrap" id="toasts"></div>
 
+<!-- MODAL CAMBIAR PASSWORD (primer login / reset) -->
+<div id="chpw-backdrop" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);">
+  <div class="card-premium" style="width:480px;max-width:92vw;padding:1.75rem 2rem;">
+    <div style="text-align:center;margin-bottom:1rem;">
+      <div style="width:56px;height:56px;margin:0 auto .8rem;border-radius:50%;background:linear-gradient(135deg,#fef3c7,#fde68a);display:flex;align-items:center;justify-content:center;font-size:1.75rem;box-shadow:0 4px 12px rgba(212,160,23,.25);">🔒</div>
+      <h2 style="font-size:1.25rem;font-weight:700;color:var(--text);margin-bottom:.3rem;letter-spacing:-.015em;">Cambio de contraseña requerido</h2>
+      <p style="font-size:.85rem;color:var(--text2);line-height:1.5;">
+        Por seguridad institucional, debes cambiar tu contraseña inicial antes
+        de operar el sistema. Elige una contraseña que no uses en otros sitios.
+      </p>
+    </div>
+    <div id="chpw-error" style="display:none;padding:.6rem .9rem;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:.8rem;margin-bottom:.9rem;"></div>
+    <div class="field">
+      <label>Contraseña actual</label>
+      <input type="password" id="chpw-actual" placeholder="La que usaste para entrar" autocomplete="current-password"/>
+    </div>
+    <div class="field">
+      <label>Nueva contraseña <span style="font-weight:400;color:var(--text3);font-size:.7rem;">(mín. 8 chars, con letra y número)</span></label>
+      <input type="password" id="chpw-nueva" placeholder="Nueva contraseña" autocomplete="new-password" oninput="validarFortalezaPassword(this.value)"/>
+      <div id="chpw-fortaleza" style="font-size:.72rem;margin-top:.3rem;color:var(--text3);"></div>
+    </div>
+    <div class="field">
+      <label>Confirmar nueva contraseña</label>
+      <input type="password" id="chpw-confirm" placeholder="Repite la nueva" autocomplete="new-password" onkeydown="if(event.key==='Enter')enviarCambioPassword()"/>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:1rem;">
+      <button class="btn-primary" id="chpw-btn" onclick="enviarCambioPassword()" style="flex:1;">Cambiar contraseña</button>
+      <button class="btn-secondary" onclick="cancelarCambioPassword()" id="chpw-cancel">Más tarde</button>
+    </div>
+    <div id="chpw-obligatorio-note" style="display:none;margin-top:.8rem;padding:.5rem .8rem;background:#fef3c7;color:#92400e;border-radius:8px;font-size:.72rem;text-align:center;">
+      ⚠ Este cambio es obligatorio. No podrás usar el sistema hasta completarlo.
+    </div>
+  </div>
+</div>
+
 <!-- COMMAND PALETTE -->
 <div class="cp-backdrop" id="cp-backdrop" onclick="if(event.target===this)cerrarCommandPalette()">
   <div class="cp-box">
@@ -2109,6 +2144,11 @@ async function doLogin(){
       localStorage.setItem('hus_user',USER_NAME);
       localStorage.setItem('hus_rol',USER_ROL);
       initApp();
+      // Si el usuario debe cambiar su password en el primer login,
+      // mostrar modal bloqueante inmediatamente tras initApp.
+      if(d.must_change_password){
+        setTimeout(function(){ abrirModalCambiarPassword(true); }, 300);
+      }
     }
   } catch(e){err.textContent='Error de conexión con el servidor';err.style.display='block';}
   btn.disabled=false;btn.textContent='Ingresar';
@@ -2440,6 +2480,109 @@ function mostrarResultadoValidacion(d){
   html += '<button class="btn-sm ghost" onclick="verDictamen(CURRENT_GLOSA_ID)">← Volver al dictamen</button>';
   html += '</div></div>';
   modalBody.innerHTML = html;
+}
+
+// ─── CAMBIO DE PASSWORD (primer login / reset) ─────────────────
+var CHPW_OBLIGATORIO = false;
+
+function abrirModalCambiarPassword(obligatorio){
+  CHPW_OBLIGATORIO = !!obligatorio;
+  document.getElementById('chpw-actual').value = '';
+  document.getElementById('chpw-nueva').value = '';
+  document.getElementById('chpw-confirm').value = '';
+  document.getElementById('chpw-error').style.display = 'none';
+  document.getElementById('chpw-fortaleza').textContent = '';
+  var cancelBtn = document.getElementById('chpw-cancel');
+  var noteOb = document.getElementById('chpw-obligatorio-note');
+  if(obligatorio){
+    cancelBtn.style.display = 'none';
+    noteOb.style.display = 'block';
+  } else {
+    cancelBtn.style.display = '';
+    cancelBtn.textContent = 'Cancelar';
+    noteOb.style.display = 'none';
+  }
+  document.getElementById('chpw-backdrop').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('chpw-actual').focus(); }, 100);
+}
+
+function cancelarCambioPassword(){
+  if(CHPW_OBLIGATORIO){
+    toast('Cambio obligatorio','No puedes cerrar este modal hasta cambiar tu contraseña','warning');
+    return;
+  }
+  document.getElementById('chpw-backdrop').style.display = 'none';
+}
+
+function validarFortalezaPassword(pass){
+  var el = document.getElementById('chpw-fortaleza');
+  if(!pass){ el.textContent=''; el.style.color='var(--text3)'; return; }
+  var errores = [];
+  if(pass.length < 8) errores.push('mínimo 8 caracteres');
+  if(!/[a-zA-Z]/.test(pass)) errores.push('al menos 1 letra');
+  if(!/[0-9]/.test(pass)) errores.push('al menos 1 número');
+  var debiles = ['admin','admin123','password','123456','hus2026','12345678','qwerty','abc123'];
+  if(debiles.indexOf(pass.toLowerCase()) >= 0) errores.push('no usar contraseñas comunes');
+  if(errores.length){
+    el.textContent = '⚠ Falta: ' + errores.join(', ');
+    el.style.color = '#b45309';
+  } else {
+    var fuerte = pass.length >= 12 && /[A-Z]/.test(pass) && /[^a-zA-Z0-9]/.test(pass);
+    el.textContent = fuerte ? '✓ Contraseña fuerte' : '✓ Aceptable (recomendado: agregar mayúsculas y símbolos)';
+    el.style.color = fuerte ? 'var(--c-green)' : 'var(--c-amber)';
+  }
+}
+
+async function enviarCambioPassword(){
+  var actual = document.getElementById('chpw-actual').value;
+  var nueva = document.getElementById('chpw-nueva').value;
+  var conf = document.getElementById('chpw-confirm').value;
+  var errEl = document.getElementById('chpw-error');
+  errEl.style.display = 'none';
+  if(!actual || !nueva || !conf){
+    errEl.textContent = 'Completa todos los campos';
+    errEl.style.display = 'block'; return;
+  }
+  if(nueva !== conf){
+    errEl.textContent = 'La nueva contraseña y la confirmación no coinciden';
+    errEl.style.display = 'block'; return;
+  }
+  if(nueva.length < 8){
+    errEl.textContent = 'La nueva contraseña debe tener al menos 8 caracteres';
+    errEl.style.display = 'block'; return;
+  }
+  if(!/[a-zA-Z]/.test(nueva) || !/[0-9]/.test(nueva)){
+    errEl.textContent = 'La nueva contraseña debe contener al menos 1 letra y 1 número';
+    errEl.style.display = 'block'; return;
+  }
+  var btn = document.getElementById('chpw-btn');
+  btn.disabled = true; btn.textContent = 'Cambiando...';
+  try{
+    var r = await fetch('/auth/cambiar-password', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({
+        password_actual: actual,
+        password_nueva: nueva,
+        password_nueva_confirmacion: conf
+      })
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){
+      errEl.textContent = d.detail || 'No se pudo cambiar la contraseña';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Cambiar contraseña';
+      return;
+    }
+    document.getElementById('chpw-backdrop').style.display = 'none';
+    CHPW_OBLIGATORIO = false;
+    toast('✓ Contraseña actualizada','Usa tu nueva contraseña la próxima vez que ingreses','success');
+    btn.disabled = false; btn.textContent = 'Cambiar contraseña';
+  }catch(e){
+    errEl.textContent = 'Error de conexión: ' + e.message;
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Cambiar contraseña';
+  }
 }
 
 // ─── VALIDACIÓN PDFs EN VIVO ─────────────────────────────────

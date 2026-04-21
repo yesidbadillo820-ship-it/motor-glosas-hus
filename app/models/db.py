@@ -209,6 +209,10 @@ class UsuarioRecord(Base):
     # 2FA TOTP (obligatorio para SUPER_ADMIN cuando está configurado)
     totp_secret = Column(String(64))
     totp_activo = Column(Integer, default=0)
+    # Forzar cambio de password en primer login (1=debe cambiar, 0=ok)
+    must_change_password = Column(Integer, default=0, nullable=False, server_default="0")
+    # Timestamp del último cambio de password (para auditoría)
+    password_changed_at = Column(DateTime(timezone=True))
 
 
 class AuditLogRecord(Base):
