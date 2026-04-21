@@ -21,6 +21,29 @@ import logging
 logger = logging.getLogger("motor_glosas")
 
 
+def _limpiar_dsn(raw: str) -> str:
+    """Limpia artefactos comunes al pegar DSN (prefijo dsn=, comillas, espacios).
+
+    Ejemplos de entrada → salida:
+      'dsn="https://abc@o123.ingest.sentry.io/456"' → 'https://abc@o123.ingest.sentry.io/456'
+      '"https://abc@..."' → 'https://abc@...'
+      'dsn=https://abc@...' → 'https://abc@...'
+      '  https://abc@... \n' → 'https://abc@...'
+    """
+    if not raw:
+        return ""
+    s = raw.strip()
+    # Quitar prefijo dsn= o DSN=
+    if s.lower().startswith("dsn="):
+        s = s[4:].strip()
+    # Quitar comillas simples o dobles que envuelvan el valor
+    if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+        s = s[1:-1].strip()
+    # Quitar coma o punto y coma al final (si copiaron con la línea completa)
+    s = s.rstrip(",;")
+    return s.strip()
+
+
 def _dsn_es_valido(dsn: str) -> tuple[bool, str]:
     """Valida rápido que el DSN tenga la forma esperada por Sentry.
 
@@ -52,7 +75,12 @@ def init_sentry() -> bool:
     CRÍTICO: cualquier fallo aquí NUNCA debe tumbar la aplicación.
     El error se loggea y se retorna False.
     """
-    dsn = os.getenv("SENTRY_DSN", "").strip()
+    dsn_raw = os.getenv("SENTRY_DSN", "")
+    dsn = _limpiar_dsn(dsn_raw)
+    if dsn != dsn_raw.strip() and dsn_raw.strip():
+        logger.warning(
+            f"SENTRY_DSN tenía artefactos (prefijo o comillas). Se limpió automáticamente."
+        )
     if not dsn:
         logger.info("Sentry no configurado (sin SENTRY_DSN). Saltando inicialización.")
         return False
@@ -60,7 +88,7 @@ def init_sentry() -> bool:
     # Validación del DSN antes de llamar init — evita BadDsn exception
     valido, err_msg = _dsn_es_valido(dsn)
     if not valido:
-        logger.warning(f"SENTRY_DSN inválido ({err_msg}). Sentry desactivado. Valor actual: '{dsn[:20]}...'")
+        logger.warning(f"SENTRY_DSN inválido ({err_msg}). Sentry desactivado. Valor actual: '{dsn[:30]}...'")
         return False
 
     try:
