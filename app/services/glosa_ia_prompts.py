@@ -771,8 +771,11 @@ def build_user_prompt(
             if n.get("texto"):
                 texto_literal = n["texto"][:350]
                 lineas.append(f"  • {nombre}: «{texto_literal}»")
+            # Ratio decidendi (resumen) y extracto judicial (párrafo literal)
             if n.get("ratio_literal"):
                 lineas.append(f"      ↳ Ratio decidendi: «{n['ratio_literal']}»")
+            if n.get("extracto_judicial"):
+                lineas.append(f"      ↳ Extracto judicial citable: {n['extracto_judicial']}")
             # Artículos internos con texto literal
             for art_num, art in list(n.get("articulos", {}).items())[:2]:
                 txt = art.get("texto", "")[:300]
@@ -833,6 +836,25 @@ def build_user_prompt(
             f"  ENTIDAD PAGADORA RECONOCIÓ $X, APLICANDO UN DESCUENTO UNILATERAL NO PACTADO DE $Y.»\n"
             f"  🚫 Si NO tienes las cifras exactas, NO hagas cálculo — describe sin números.\n"
         )
+
+    # Referencias documentales extraídas del PDF (folios, fechas, firmas)
+    # Permite a la IA citar elementos específicos del expediente, haciendo
+    # la respuesta casi imposible de ratificar por la EPS.
+    bloque_referencias_str = ""
+    try:
+        from app.services.extractor_folios import extraer_referencias_documentales
+        refs = extraer_referencias_documentales(contexto_pdf or "")
+        if refs["resumen_citable"]:
+            bloque_referencias_str = (
+                "\n[REFERENCIAS DOCUMENTALES EXTRAÍDAS DEL EXPEDIENTE]\n"
+                f"{refs['resumen_citable']}\n"
+                "⚠ Cuando sea pertinente, CITA en la respuesta estas referencias de forma "
+                "textual (ej. \"según consta en el folio 59 del expediente\", \"conforme a la "
+                "historia clínica N° 1234567 suscrita por el Dr. X\"). Esto hace la respuesta "
+                "casi imposible de ratificar.\n"
+            )
+    except Exception:
+        pass
 
     # Datos clínicos (solo si aparecen)
     clinicos = []
@@ -942,7 +964,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}
+{bloque_regimen_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
