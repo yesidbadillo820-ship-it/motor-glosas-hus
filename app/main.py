@@ -363,6 +363,26 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"MIGRACIÓN nota_workflow: {e}")
 
+    # Campo must_change_password (forzar cambio en primer login)
+    try:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='must_change_password'"))
+        if not result.fetchone():
+            logger.warning("MIGRACIÓN: Agregando columna 'must_change_password' a tabla usuarios")
+            db.execute(text("ALTER TABLE usuarios ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN must_change_password: {e}")
+
+    # Campo password_changed_at (timestamp último cambio)
+    try:
+        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='password_changed_at'"))
+        if not result.fetchone():
+            logger.warning("MIGRACIÓN: Agregando columna 'password_changed_at' a tabla usuarios")
+            db.execute(text("ALTER TABLE usuarios ADD COLUMN password_changed_at TIMESTAMP WITH TIME ZONE"))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN password_changed_at: {e}")
+
     try:
         result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='numero_radicado'"))
         if not result.fetchone():
@@ -529,11 +549,12 @@ async def lifespan(app: FastAPI):
                     )
                 else:
                     admin.password_hash = get_password_hash(nuevo_pass)
+                    admin.must_change_password = 1  # forzar cambio en primer login
                     logger.warning(
                         "[FORCE_RESET_ADMIN_PASSWORD] Password de admin@hus.gov.co "
-                        f"actualizado al valor de ADMIN_PASSWORD ({len(nuevo_pass)} chars). "
-                        "QUITAR la variable FORCE_RESET_ADMIN_PASSWORD del entorno "
-                        "después de este redeploy."
+                        f"actualizado al valor de ADMIN_PASSWORD ({len(nuevo_pass)} chars) "
+                        "+ must_change_password=1. QUITAR la variable "
+                        "FORCE_RESET_ADMIN_PASSWORD del entorno después de este redeploy."
                     )
             else:
                 logger.error(
@@ -588,6 +609,7 @@ async def lifespan(app: FastAPI):
                     password_hash=password_hash_inicial,
                     rol=rol,
                     activo=1,
+                    must_change_password=1,  # obligado a cambiar en primer login
                 ))
                 logger.warning(f"Usuario sembrado: {email} ({rol}) nombre={nombre} password=<prefijo>")
             # Si el usuario YA existe, la base de datos es la fuente de verdad:
@@ -595,7 +617,7 @@ async def lifespan(app: FastAPI):
             # SUPER_ADMIN desde la UI deben persistir a través de redeploys.
             # Toggles de re-sincronización masiva:
             #   FORCE_RESEED_USERS=1 → resincroniza nombre y rol
-            #   FORCE_RESET_PASSWORDS=1 → resetea password al prefijo del email
+            #   FORCE_RESET_PASSWORDS=1 → resetea password al prefijo + must_change=1
             elif force_reseed or force_reset_pwd:
                 cambios = []
                 if force_reseed and existente.rol != rol:
@@ -606,7 +628,8 @@ async def lifespan(app: FastAPI):
                     existente.nombre = nombre
                 if force_reset_pwd:
                     existente.password_hash = password_hash_inicial
-                    cambios.append(f"password reset a prefijo email")
+                    existente.must_change_password = 1
+                    cambios.append(f"password reset a prefijo email + must_change=1")
                 if cambios:
                     logger.warning(f"[FORCE_RESEED] {email}: {', '.join(cambios)}")
 
