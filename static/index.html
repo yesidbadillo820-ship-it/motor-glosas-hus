@@ -864,13 +864,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* Card premium con borde dorado sutil */
 .card-premium{
   background:var(--grad-card);border:1px solid var(--border);border-radius:var(--r-lg);
-  padding:1.5rem;position:relative;overflow:hidden;
+  padding:1.5rem;position:relative;
   box-shadow:var(--sh-premium);
 }
 .card-premium::before{
   content:"";position:absolute;top:0;left:0;right:0;height:3px;
   background:linear-gradient(90deg,var(--c-teal2),var(--c-gold2),var(--c-teal2));
   opacity:.7;
+  border-radius:var(--r-lg) var(--r-lg) 0 0;
 }
 
 /* Botón secundario refinado */
@@ -3236,23 +3237,27 @@ function renderRiesgoRatificacion(r){
   var factoresHtml = (r.factores||[]).map(function(f){
     return '<li style="padding:.3rem 0;color:var(--text2);font-size:.78rem;line-height:1.5;">• '+f+'</li>';
   }).join('');
-  return '<div class="card-premium" style="margin-top:1rem;padding:1.1rem 1.4rem;">'
-    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:1.2rem;flex-wrap:wrap;">'
-    +   '<div style="flex:1;min-width:240px;">'
-    +     '<div style="text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.06em;font-size:.7rem;margin-bottom:.5rem;">Indicador de Riesgo de Ratificación</div>'
-    +     '<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.4rem;">'
-    +       '<span class="risk-indicator '+nivelClass+'" style="font-size:.8rem;padding:5px 14px;">'+r.nivel+'</span>'
-    +       '<span style="font-weight:600;color:var(--text);font-size:.95rem;">'+r.etiqueta+'</span>'
+  return (
+    '<div class="card-premium" style="margin-top:1rem;padding:1.2rem 1.4rem;">'
+    +   '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;">'
+    +     '<div style="flex:1 1 300px;min-width:0;">'
+    +       '<div style="text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.06em;font-size:.7rem;margin-bottom:.6rem;">Indicador de Riesgo de Ratificación</div>'
+    +       '<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">'
+    +         '<span class="risk-indicator '+nivelClass+'" style="font-size:.8rem;padding:5px 14px;font-weight:800;">'+r.nivel+'</span>'
+    +         '<span style="font-weight:600;color:var(--text);font-size:.92rem;line-height:1.35;">'+r.etiqueta+'</span>'
+    +       '</div>'
+    +     '</div>'
+    +     '<div style="text-align:right;flex-shrink:0;">'
+    +       '<div style="font-family:var(--font-mono);font-size:2.6rem;font-weight:800;color:'+r.color+';line-height:1;">'+r.score+'</div>'
+    +       '<div style="font-size:.66rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-top:.25rem;">de 100 pts</div>'
     +     '</div>'
     +   '</div>'
-    +   '<div style="text-align:center;flex-shrink:0;padding-left:1rem;border-left:1px solid var(--border);">'
-    +     '<div style="font-family:var(--font-mono);font-size:2.4rem;font-weight:800;color:'+r.color+';line-height:1;">'+r.score+'</div>'
-    +     '<div style="font-size:.66rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-top:.2rem;">de 100</div>'
-    +   '</div>'
+    +   '<details style="margin-top:1rem;border-top:1px dashed var(--border);padding-top:.75rem;">'
+    +     '<summary style="cursor:pointer;font-size:.78rem;color:var(--c-teal2);font-weight:600;outline:none;">Ver '+(r.factores||[]).length+' factores considerados</summary>'
+    +     '<ul style="list-style:none;padding:.6rem 0 0 0;margin:0;">'+factoresHtml+'</ul>'
+    +   '</details>'
     + '</div>'
-    + '<details style="margin-top:.9rem;border-top:1px dashed var(--border);padding-top:.7rem;"><summary style="cursor:pointer;font-size:.78rem;color:var(--c-teal2);font-weight:600;">Ver '+(r.factores||[]).length+' factores considerados</summary>'
-    + '<ul style="list-style:none;padding:.5rem 0 0 0;margin:0;">'+factoresHtml+'</ul></details>'
-    + '</div>';
+  );
 }
 
 function renderResult(d){
