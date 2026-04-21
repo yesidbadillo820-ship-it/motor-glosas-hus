@@ -690,7 +690,14 @@ def mis_asignaciones(
             .all()
         )
     else:
-        glosas = repo.listar_por_gestor(current_user.email, current_user.nombre)
+        # Si el usuario pertenece a un equipo (ej. EQUIPO_ASEGURADORAS),
+        # agrupar asignaciones de todos los miembros del equipo.
+        equipo = getattr(current_user, "equipo", None)
+        emails_equipo = repo.emails_del_mismo_equipo(equipo) if equipo else None
+        glosas = repo.listar_por_gestor(
+            current_user.email, current_user.nombre,
+            emails_equipo=emails_equipo,
+        )
     return [
         {
             "id": g.id,

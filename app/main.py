@@ -399,6 +399,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"MIGRACIÓN password_changed_at: {e}")
 
+    # Campo equipo (agrupación de usuarios que comparten bandeja)
+    try:
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "equipo"):
+            logger.warning("MIGRACIÓN: Agregando columna 'equipo' a tabla usuarios")
+            db.execute(text("ALTER TABLE usuarios ADD COLUMN equipo VARCHAR(50)"))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN equipo: {e}")
+
     try:
         if _tiene_tabla("historial") and not _tiene_columna("historial", "numero_radicado"):
             logger.warning("MIGRACIÓN: Agregando columna 'numero_radicado' a historial")
@@ -654,6 +663,24 @@ async def lifespan(app: FastAPI):
                     cambios.append(f"password reset a prefijo email + must_change=1")
                 if cambios:
                     logger.warning(f"[FORCE_RESEED] {email}: {', '.join(cambios)}")
+
+        # EQUIPOS COMPARTIDOS: los 4 correos del EQUIPO ASEGURADORAS comparten
+        # bandeja de "Mis glosas" e "Historial". Seteamos campo equipo para
+        # que las queries los agrupen.
+        EQUIPOS_COMPARTIDOS = {
+            "EQUIPO_ASEGURADORAS": [
+                "glosashus12@sinacsc.com",
+                "devoluciones02@sinacsc.com",
+                "glosashus10@sinacsc.com",
+                "glosashus16@sinacsc.com",
+            ],
+        }
+        for equipo_codigo, emails_equipo in EQUIPOS_COMPARTIDOS.items():
+            for email_eq in emails_equipo:
+                u = db.query(UsuarioRecord).filter(UsuarioRecord.email == email_eq).first()
+                if u and u.equipo != equipo_codigo:
+                    u.equipo = equipo_codigo
+                    logger.info(f"Usuario {email_eq} asignado a equipo {equipo_codigo}")
 
         db.commit()
         logger.info("Base de datos inicializada correctamente")

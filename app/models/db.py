@@ -213,6 +213,10 @@ class UsuarioRecord(Base):
     must_change_password = Column(Integer, default=0, nullable=False, server_default="0")
     # Timestamp del último cambio de password (para auditoría)
     password_changed_at = Column(DateTime(timezone=True))
+    # Equipo al que pertenece el usuario (para compartir bandeja entre varios
+    # correos del mismo equipo, ej. EQUIPO_ASEGURADORAS con 4 emails). Si
+    # está seteado, las vistas "Mis glosas" e "Historial" agrupan por equipo.
+    equipo = Column(String(50), index=True, nullable=True)
 
 
 class AuditLogRecord(Base):
