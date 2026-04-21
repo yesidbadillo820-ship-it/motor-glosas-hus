@@ -501,6 +501,41 @@ async def lifespan(app: FastAPI):
             logger.warning("Actualizando rol de admin@hus.gov.co a SUPER_ADMIN")
             admin.rol = "SUPER_ADMIN"
 
+        # Reset controlado de password para admin@hus.gov.co.
+        # Toggle: FORCE_RESET_ADMIN_PASSWORD=1 en Render Environment.
+        # Al arrancar con este flag activo, el password del admin se actualiza
+        # al valor actual de ADMIN_PASSWORD env var. Usar UNA SOLA VEZ para el
+        # cambio inicial a un password fuerte, luego QUITAR la variable.
+        if os.getenv("FORCE_RESET_ADMIN_PASSWORD", "").lower() in ("1", "true", "yes"):
+            if admin:
+                nuevo_pass = cfg.admin_password
+                # Validación básica: no permitir passwords débiles conocidos
+                passwords_debiles = {"admin", "admin123", "password", "123456", "hus2026"}
+                if nuevo_pass.lower() in passwords_debiles:
+                    logger.error(
+                        "[FORCE_RESET_ADMIN_PASSWORD] ABORTADO: ADMIN_PASSWORD "
+                        f"coincide con un password débil conocido. Usa un password "
+                        f"de al menos 12 caracteres con mayúsculas, números y símbolos."
+                    )
+                elif len(nuevo_pass) < 10:
+                    logger.error(
+                        "[FORCE_RESET_ADMIN_PASSWORD] ABORTADO: ADMIN_PASSWORD "
+                        f"tiene solo {len(nuevo_pass)} caracteres. Mínimo requerido: 10."
+                    )
+                else:
+                    admin.password_hash = get_password_hash(nuevo_pass)
+                    logger.warning(
+                        "[FORCE_RESET_ADMIN_PASSWORD] Password de admin@hus.gov.co "
+                        f"actualizado al valor de ADMIN_PASSWORD ({len(nuevo_pass)} chars). "
+                        "QUITAR la variable FORCE_RESET_ADMIN_PASSWORD del entorno "
+                        "después de este redeploy."
+                    )
+            else:
+                logger.error(
+                    "[FORCE_RESET_ADMIN_PASSWORD] No se encontró admin@hus.gov.co "
+                    "en la base de datos."
+                )
+
         # Sembrar usuarios corporativos de gestores de glosas
         # Contraseña inicial: ADMIN_PASSWORD (cambiar en primer login)
         # El 'nombre' debe coincidir con la columna GESTOR del Excel de recepción
