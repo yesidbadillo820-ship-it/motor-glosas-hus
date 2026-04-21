@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Motor Glosas HUS - Importación Masiva</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -67,11 +70,11 @@
                     </label>
                     <textarea id="filasExcel" required rows="12"
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        placeholder="Pega aquí las filas de tu Excel. Formato esperado (8 columnas):
-ENTIDAD ⇥ FACTURA ⇥ VALOR ⇥ CODIGO ⇥ CONCEPTO GLOSA ⇥ CUPS ⇥ SERVICIO ⇥ MOTIVO
+                        placeholder="Pega aquí las filas de tu Excel. 8 columnas separadas por TAB o |
+Formato: ENTIDAD | FACTURA | VALOR | CODIGO | CONCEPTO | CUPS | SERVICIO | MOTIVO
 Ejemplo:
-ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S ⇥ HUS0000489632 ⇥ $ 32.600 ⇥ CL0601 ⇥ Los cargos por dispositivos médicos... ⇥ FMQ3121 ⇥ SISTEMA CERRADO ⇥ SISTEMA CERRADO NO FACTURABLE"></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Separa las columnas con tabulador (Tab). Cada línea = una glosa. La EPS y la factura se leen de las dos primeras columnas.</p>
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S|HUS0000489632|$ 32.600|CL0601|Los cargos por dispositivos médicos...|FMQ3121|SISTEMA CERRADO|NO FACTURABLE"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Separa las columnas con tabulador (Tab) o pipe (<code>|</code>). Cada línea = una glosa.</p>
                 </div>
 
                 <div class="flex items-center space-x-4">
@@ -312,15 +315,15 @@ ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S ⇥ HUS0000489632 ⇥ $ 32.600 ⇥ CL06
         function cargarEjemplo() {
             document.getElementById('eps').value = 'AUTO';
             document.getElementById('filasExcel').value =
-`DISPENSARIO MEDICO BUCARAMANGA	HUS0000496604	$ 3.480	TA0801	Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados o establecidos por la norma	897011	MONITORIA FETAL ANTEPARTO	SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN APOYO DX DADO QUE LOS VALORES FACTURADOS EXCEDEN LAS TARIFAS CONTRACTUALMENTE ESTABLECIDAS (CAQ-229-S20 OTRO SI NRO 001)
-DISPENSARIO MEDICO BUCARAMANGA	HUS0000496604	$ 16.403	TA0801	Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados	881434H	PERFIL BIOFISICO	SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN APOYO DX (CAQ-229-S20 OTRO SI NRO 001)
-DISPENSARIO MEDICO BUCARAMANGA	HUS0000496604	$ 7.618	TA0201	El cargo por consulta presenta diferencias con los valores pactados	890750	CONSULTA DE URGENCIAS, POR ESPECIALISTA EN GINECOLOGIA Y OBSTETRICIA	SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN INTERCONSULTA SEGÚN MT SOAT VIGENTE (UVB)
-SEGUROS COMERCIALES BOLIVAR S.A.	HUS0000464684	$ 9.000	TA2301	Los cargos por otros procedimientos no quirúrgicos presentan diferencias con los valores pactados	29112	TERAPIA FISICA INTEGRAL	Se ratifica glosa por diferencia de valor 9000 en código 29112 | Decreto 2423 de 1996
-ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 32.600	CL0601	Los cargos por dispositivos médicos no son pertinentes	FMQ3121	SISTEMA CERRADO CON GEL SOLIDIFICANTE DE SUCCION 1800 ML 71-318S	SISTEMA CERRADO CON GEL SOLIDIFICANTE DE SUCCION NO FACTURABLE, NO LUGAR A COBRO ADICIONAL
-ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 10.300	CL0601	Los cargos por dispositivos médicos no son pertinentes	FMQ3054	CANULA YANKAUER TIPO BULBO REF 8888505016	CANULA YANKAUER NO FACTURABLE, NO LUGAR A COBRO ADICIONAL
-ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 5.000	TA2301	Los cargos por otros procedimientos no quirúrgicos presentan diferencias con los valores pactados	903883H	GLUCOMETRIA GLUCOSA SEMIAUTOMATIZADA	TARIFAS - Prestacion no esta vigente en el modelo del prestador (12/03/2026)
-ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 1.693.100	SO0301	Ausencia total, parcial o inconsistencia en los soportes que evidencian los honorarios profesionales	275404	CORRECCION DE LABIO FISURADO BILATERAL	CORRECCION DE LABIO FISURADO BILATERAL - falta soporte honorarios
-ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 2.556.300	CO0301	Los honorarios profesionales no están incluidos en la cobertura	275404	CORRECCION DE LABIO FISURADO BILATERAL	CORRECCION DE LABIO FISURADO BILATERAL - fuera de cobertura`;
+`DISPENSARIO MEDICO BUCARAMANGA|HUS0000496604|$ 3.480,00|TA0801|Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados o establecidos por la norma|897011|MONITORIA FETAL ANTEPARTO|SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN APOYO DX (CAQ-229-S20 OTRO SI NRO 001)
+DISPENSARIO MEDICO BUCARAMANGA|HUS0000496604|$ 16.403,00|TA0801|Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados|881434H|PERFIL BIOFISICO|SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN APOYO DX (CAQ-229-S20 OTRO SI NRO 001)
+DISPENSARIO MEDICO BUCARAMANGA|HUS0000496604|$ 7.618,00|TA0201|El cargo por consulta presenta diferencias con los valores pactados|890750|CONSULTA DE URGENCIAS, POR ESPECIALISTA EN GINECOLOGIA Y OBSTETRICIA|SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN INTERCONSULTA SEGÚN MT SOAT VIGENTE (UVB)
+SEGUROS COMERCIALES BOLIVAR S.A.|HUS0000464684|$ 9.000,00|TA2301|Los cargos por otros procedimientos no quirúrgicos presentan diferencias con los valores pactados|29112|TERAPIA FISICA INTEGRAL|Se ratifica glosa por diferencia de valor 9000 en código 29112 (Decreto 2423 de 1996)
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S|HUS0000489632|$ 32.600,00|CL0601|Los cargos por dispositivos médicos no son pertinentes|FMQ3121|SISTEMA CERRADO CON GEL SOLIDIFICANTE DE SUCCION 1800 ML 71-318S|SISTEMA CERRADO NO FACTURABLE NO LUGAR A COBRO ADICIONAL
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S|HUS0000489632|$ 10.300,00|CL0601|Los cargos por dispositivos médicos no son pertinentes|FMQ3054|CANULA YANKAUER TIPO BULBO REF 8888505016|CANULA YANKAUER NO FACTURABLE NO LUGAR A COBRO ADICIONAL
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S|HUS0000489632|$ 5.000,00|TA2301|Los cargos por otros procedimientos no quirúrgicos presentan diferencias con los valores pactados|903883H|GLUCOMETRIA GLUCOSA SEMIAUTOMATIZADA|TARIFAS - Prestacion no esta vigente en el modelo del prestador (12/03/2026)
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S|HUS0000489632|$ 1.693.100,00|SO0301|Ausencia total, parcial o inconsistencia en los soportes que evidencian los honorarios profesionales|275404|CORRECCION DE LABIO FISURADO BILATERAL|CORRECCION DE LABIO FISURADO BILATERAL - falta soporte honorarios
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S|HUS0000489632|$ 2.556.300,00|CO0301|Los honorarios profesionales no están incluidos en la cobertura|275404|CORRECCION DE LABIO FISURADO BILATERAL|CORRECCION DE LABIO FISURADO BILATERAL - fuera de cobertura`;
         }
 
         function logout() {

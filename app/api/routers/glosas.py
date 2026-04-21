@@ -1155,33 +1155,60 @@ def casos_similares(glosa_id: int, db: Session = Depends(get_db),
 def _parsear_filas_excel(texto: str) -> list[dict]:
     """
     Parsea el texto pegado de Excel y extrae cada fila como diccionario.
-    Formato esperado: EPS | Factura | Valor | Codigo | Descripcion | CUPS | Motivo
+    Formato esperado (8 columnas): ENTIDAD | FACTURA | VALOR | CODIGO |
+    CONCEPTO GLOSA | CUPS | SERVICIO | MOTIVO
+
+    Acepta como separador **Tab** (copy/paste directo del Excel) o **"|"**
+    (pipe, cuando el usuario exporta desde Office y lo pega aquí). Si una
+    fila trae más columnas que las esperadas (porque el MOTIVO contiene el
+    mismo separador), las columnas extra se re-unen al final en `motivo`.
     """
-    filas = []
+    filas: list[dict] = []
+    if not texto:
+        return filas
+
     lineas = texto.strip().split('\n')
-    
+    CAMPOS = ['eps', 'factura', 'valor', 'codigo', 'descripcion', 'cups', 'servicio', 'motivo']
+
     for i, linea in enumerate(lineas):
         linea = linea.strip()
         if not linea:
             continue
-        
-        partes = [p.strip() for p in linea.split('\t')]
-        
-        if len(partes) >= 4:
-            fila_data = {
-                'fila': i + 1,
-                'eps': partes[0] if len(partes) > 0 else '',
-                'factura': partes[1] if len(partes) > 1 else '',
-                'valor': partes[2] if len(partes) > 2 else '',
-                'codigo': partes[3] if len(partes) > 3 else '',
-                'descripcion': partes[4] if len(partes) > 4 else '',
-                'cups': partes[5] if len(partes) > 5 else '',
-                'motivo': partes[6] if len(partes) > 6 else '',
-            }
-            
-            if fila_data['codigo'] and len(fila_data['codigo']) >= 2:
-                filas.append(fila_data)
-    
+
+        # Auto-detectar separador: Tab si existe, sino pipe.
+        if '\t' in linea:
+            partes = [p.strip() for p in linea.split('\t')]
+        elif '|' in linea:
+            partes = [p.strip() for p in linea.split('|')]
+        else:
+            # Sin separador válido → saltar
+            continue
+
+        if len(partes) < 4:
+            continue
+
+        # Si hay más de 8 columnas, re-unir el excedente al motivo (último campo)
+        if len(partes) > len(CAMPOS):
+            motivo_extendido = ' '.join(partes[len(CAMPOS) - 1:]).strip()
+            partes = partes[:len(CAMPOS) - 1] + [motivo_extendido]
+
+        fila_data: dict = {'fila': i + 1}
+        # Campo legacy 'servicio' (col 7) no existe en downstream — se mapea
+        # al 'descripcion' adicional cuando hay 8 columnas.
+        for idx, campo in enumerate(CAMPOS):
+            fila_data[campo] = partes[idx] if idx < len(partes) else ''
+
+        # Si hay columna 'servicio' (col 7) y la 'descripcion' está vacía,
+        # promover servicio a descripcion. Si ambas tienen valor, concatenar.
+        if fila_data.get('servicio'):
+            if fila_data.get('descripcion') and fila_data['descripcion'] != fila_data['servicio']:
+                fila_data['descripcion'] = f"{fila_data['descripcion']} — {fila_data['servicio']}"
+            else:
+                fila_data['descripcion'] = fila_data['servicio']
+
+        if fila_data['codigo'] and len(fila_data['codigo']) >= 2:
+            filas.append(fila_data)
+
     return filas
 
 
