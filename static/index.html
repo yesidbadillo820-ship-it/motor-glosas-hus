@@ -909,6 +909,64 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
 }
 
+/* ─── PRINT CSS GLOBAL (para cualquier pantalla) ───────────── */
+@media print{
+  @page{size:letter;margin:1.5cm}
+  body,html{background:#fff!important;color:#000!important;font-size:10pt}
+  header,.sidebar-nav,.nav-bar,.no-print,#toasts,.cp-backdrop,#chpw-backdrop,
+  .modal-bg,#loading,.hdr-btn,.btn,.btn-primary,.btn-secondary,.sn-item,
+  .toast-wrap,[onclick],.refinar-panel{display:none!important}
+  .panel,.panel-hero,.form-card,.card-premium{box-shadow:none!important;border:1px solid #ccc!important;background:#fff!important}
+  .panel{padding:0!important}
+  a{color:#000!important;text-decoration:underline!important}
+  table{page-break-inside:avoid}
+  h1,h2,h3,h4{page-break-after:avoid}
+  .dont-break{page-break-inside:avoid}
+  /* Encabezado institucional impreso */
+  body::before{
+    content:"ESE HOSPITAL UNIVERSITARIO DE SANTANDER · NIT 900.006.037-4";
+    display:block;text-align:center;font-size:9pt;font-weight:700;
+    padding:6px 0;border-bottom:1.5px solid #0b3d91;margin-bottom:12px;color:#0b3d91;
+  }
+}
+
+/* ─── ONBOARDING TOUR ──────────────────────────────────────── */
+.onb-backdrop{position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9998;display:none;backdrop-filter:blur(3px)}
+.onb-backdrop.show{display:block;animation:fadeIn .2s var(--ease-out)}
+.onb-spotlight{
+  position:fixed;border-radius:12px;box-shadow:0 0 0 4px rgba(14,165,233,.5),0 0 0 9999px rgba(11,18,32,.72);
+  pointer-events:none;z-index:9998;transition:all .35s var(--ease-spring);
+}
+.onb-card{
+  position:fixed;max-width:360px;background:#fff;border-radius:14px;
+  box-shadow:0 24px 48px -12px rgba(0,0,0,.45),0 0 0 1px rgba(15,23,42,.08);
+  padding:1.25rem 1.4rem;z-index:9999;
+  animation:fadeInUp .35s var(--ease-spring);
+}
+.onb-card h3{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:.5rem;letter-spacing:-.015em}
+.onb-card p{font-size:.85rem;color:var(--text2);line-height:1.5;margin-bottom:1rem}
+.onb-nav{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.9rem}
+.onb-dots{display:flex;gap:4px}
+.onb-dot{width:6px;height:6px;border-radius:50%;background:var(--border2)}
+.onb-dot.active{background:var(--c-teal2);width:18px;border-radius:3px}
+.onb-btns{display:flex;gap:.4rem}
+.onb-btns button{padding:.4rem .9rem;font-size:.75rem;font-weight:600;border:1px solid var(--border);background:var(--bg-card);color:var(--text2);border-radius:6px;cursor:pointer;font-family:var(--font);transition:all .2s}
+.onb-btns button:hover{background:var(--bg-subtle);color:var(--text)}
+.onb-btns .onb-next{background:var(--grad-teal);color:#fff;border:none;padding:.45rem 1rem}
+.onb-btns .onb-skip{color:var(--text3)}
+
+/* ─── MODO FOCUS ───────────────────────────────────────────── */
+body.focus-mode header,body.focus-mode .sidebar-nav,body.focus-mode .sidebar{display:none!important}
+body.focus-mode .workspace{margin:0!important;padding:0!important}
+body.focus-mode .panel.active{padding:2rem 3rem}
+body.focus-mode .focus-exit{
+  position:fixed;top:20px;right:20px;z-index:9999;
+  padding:10px 16px;background:var(--c-navy);color:#fff;
+  border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:.82rem;
+  box-shadow:var(--sh-lg);font-family:var(--font);
+}
+body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
+
 /* ─── PANEL HERO HEADER (titular de sección) ───────────────── */
 .panel-hero{
   padding:1.75rem 2rem 1.5rem;
@@ -1320,14 +1378,45 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         </div>
       </div>
       <div class="result-area" id="result-area">
-        <div class="empty-state">
-          <div class="empty-icon">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M16 11V5a4 4 0 0 0-8 0v6"/><rect x="3" y="11" width="18" height="11" rx="2"/>
-            </svg>
+        <div id="landing-hero" style="padding:1.5rem 2rem;">
+          <!-- Mini-dashboard KPIs -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin-bottom:1.5rem;">
+            <div class="stat-card">
+              <div class="stat-card-accent"></div>
+              <div class="stat-card-label">Glosas del mes</div>
+              <div class="stat-card-value" id="land-total">—</div>
+              <div class="stat-card-delta neutral" id="land-total-delta">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-accent"></div>
+              <div class="stat-card-label">Valor objetado</div>
+              <div class="stat-card-value" id="land-valor">—</div>
+              <div class="stat-card-delta neutral" id="land-valor-delta">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-accent"></div>
+              <div class="stat-card-label">Tasa de éxito</div>
+              <div class="stat-card-value" id="land-tasa">—</div>
+              <div class="stat-card-delta up" id="land-tasa-delta">&nbsp;</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-accent"></div>
+              <div class="stat-card-label">Próximas a vencer</div>
+              <div class="stat-card-value" id="land-alertas">—</div>
+              <div class="stat-card-delta neutral" id="land-alertas-delta">en 5 días</div>
+            </div>
           </div>
-          <div class="empty-h">Motor de Glosas HUS</div>
-          <div class="empty-p">Complete los datos del formulario y presione <b>Analizar</b> para generar la defensa técnico-jurídica automática.</div>
+          <!-- Empty state clásico -->
+          <div class="empty-state" style="margin:1rem auto;">
+            <div class="empty-state-icon">⚖️</div>
+            <h3>Motor de Glosas HUS</h3>
+            <p>Complete los datos en el panel izquierdo y presione <b>Analizar</b> para generar la defensa técnico-jurídica. Las estadísticas superiores se actualizan automáticamente con los datos de su gestión.</p>
+            <div class="empty-state-actions">
+              <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'alertas\']'),'alertas')">Ver alertas</button>
+              <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'historial\']'),'historial')">Historial</button>
+              <button class="btn-secondary" onclick="abrirCommandPalette()">⌘K Buscar</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2055,6 +2144,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </div>
 </div>
 
+<!-- ONBOARDING TOUR -->
+<div class="onb-backdrop" id="onb-backdrop" onclick="if(event.target===this)cerrarOnboarding()"></div>
+<div class="onb-spotlight" id="onb-spotlight" style="display:none"></div>
+<div class="onb-card" id="onb-card" style="display:none">
+  <h3 id="onb-title">Bienvenido al Motor de Glosas</h3>
+  <p id="onb-text">Vamos a darte un recorrido rápido por las funciones principales.</p>
+  <div class="onb-nav">
+    <div class="onb-dots" id="onb-dots"></div>
+    <div class="onb-btns">
+      <button class="onb-skip" onclick="cerrarOnboarding()">Saltar</button>
+      <button onclick="onbPaso(-1)" id="onb-prev" style="display:none">Atrás</button>
+      <button class="onb-next" onclick="onbPaso(1)" id="onb-next">Siguiente →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Botón Modo Focus (aparece solo en focus-mode) -->
+<button class="focus-exit no-print" style="display:none" id="focus-exit" onclick="toggleModoFocus(false)">✕ Salir de Modo Focus (Esc)</button>
+
 <!-- COMMAND PALETTE -->
 <div class="cp-backdrop" id="cp-backdrop" onclick="if(event.target===this)cerrarCommandPalette()">
   <div class="cp-box">
@@ -2093,16 +2201,57 @@ function fmtCOP(v){return v?fmt.format(v):'$0'}
 function authH(){return {'Authorization':'Bearer '+TOKEN}}
 function H(obj){return Object.assign({'Authorization':'Bearer '+TOKEN},obj||{})}
 
-function toast(title,msg,type){
+function toast(title,msg,type,opciones){
+  // opciones: {undo: function, undoLabel: 'Deshacer', duracion: 8000}
+  opciones = opciones || {};
+  var duracion = opciones.duracion || (opciones.undo ? 8000 : 5500);
   var icons={success:'✔',error:'✖',warning:'⚠',info:'ℹ'};
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var t=document.createElement('div');
   t.className='toast '+(type||'info');
-  t.innerHTML='<span class="toast-icon">'+icons[type||'info']+'</span>'
-    +'<div class="toast-body"><div class="toast-title">'+title+'</div>'
-    +(msg?'<div class="toast-msg">'+msg+'</div>':'')+'</div>'
-    +'<span class="toast-x" onclick="this.closest(\'.toast\').remove()">✕</span>';
+  var html = '<span class="toast-icon">'+icons[type||'info']+'</span>'
+    +'<div class="toast-body"><div class="toast-title">'+esc(title)+'</div>'
+    +(msg?'<div class="toast-msg">'+esc(msg)+'</div>':'')+'</div>';
+  if(opciones.undo){
+    html += '<button class="toast-undo" style="padding:4px 12px;background:rgba(14,165,233,.12);color:var(--c-teal2);border:1px solid rgba(14,165,233,.3);border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;margin-right:8px;font-family:var(--font)">'+esc(opciones.undoLabel||'Deshacer')+'</button>';
+  }
+  html += '<span class="toast-x" style="cursor:pointer;color:var(--text3);font-size:16px;padding:2px;flex-shrink:0">✕</span>';
+  t.innerHTML = html;
+  // Bind close
+  var xBtn = t.querySelector('.toast-x');
+  if(xBtn) xBtn.addEventListener('click', function(){ t.remove(); });
+  // Bind undo
+  if(opciones.undo){
+    var undoBtn = t.querySelector('.toast-undo');
+    if(undoBtn) undoBtn.addEventListener('click', function(){
+      try{ opciones.undo(); }catch(e){}
+      t.remove();
+    });
+  }
   document.getElementById('toasts').appendChild(t);
-  setTimeout(function(){t.remove()},5500);
+  var timer = setTimeout(function(){t.remove()}, duracion);
+  // Si hover sobre el toast, cancelar timer
+  t.addEventListener('mouseenter', function(){ clearTimeout(timer); });
+  t.addEventListener('mouseleave', function(){
+    timer = setTimeout(function(){t.remove()}, 2500);
+  });
+}
+
+// Helper: muestra "éxito instantáneo" en un botón por 1.5s y restaura
+function exitoBoton(btn, textoExito){
+  if(!btn) return;
+  var textoOriginal = btn.innerHTML;
+  var bgOriginal = btn.style.background;
+  btn.innerHTML = '✓ ' + (textoExito || '¡Listo!');
+  btn.style.background = '#10b981';
+  btn.style.color = '#fff';
+  btn.disabled = true;
+  setTimeout(function(){
+    btn.innerHTML = textoOriginal;
+    btn.style.background = bgOriginal;
+    btn.style.color = '';
+    btn.disabled = false;
+  }, 1500);
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────
@@ -2177,6 +2326,10 @@ async function initApp(){
   aplicarRestriccionesRol();
   // Filtrar acciones soloAdmin del command palette para no-admins
   if(typeof filtrarAccionesPorRol === 'function') filtrarAccionesPorRol();
+  // Poblar KPIs del landing hero del panel Analizar
+  if(typeof poblarLandingKPIs === 'function') poblarLandingKPIs();
+  // Verificar si mostrar onboarding (primera vez)
+  if(typeof verificarOnboarding === 'function') verificarOnboarding();
   await loadContratos();
   loadAlertCount();
   loadDash();
@@ -2485,6 +2638,160 @@ function mostrarResultadoValidacion(d){
   modalBody.innerHTML = html;
 }
 
+// ─── ONBOARDING TOUR ─────────────────────────────────────────
+var ONB_PASOS = [
+  {
+    titulo: '👋 Bienvenido al Motor de Glosas HUS',
+    texto: 'Esta es tu herramienta para generar respuestas técnico-jurídicas a glosas con IA. Vamos a darte un recorrido rápido en 5 pasos (≈1 minuto).',
+    target: null,  // sin target = centrado
+  },
+  {
+    titulo: '📝 1. Panel de datos',
+    texto: 'Aquí ingresas los datos de la glosa: EPS, etapa, fechas, número de factura y radicado. Puedes adjuntar hasta 10 PDFs como soporte.',
+    target: '#p-analizar .sidebar',
+  },
+  {
+    titulo: '⚖️ 2. Análisis con IA',
+    texto: 'Pega el texto de la glosa y presiona "Analizar". La IA genera una respuesta adaptada: 2 párrafos si el caso es simple, 4 si es complejo.',
+    target: '.result-area',
+  },
+  {
+    titulo: '🔎 3. Command Palette (⌘K)',
+    texto: 'Presiona Cmd+K (o Ctrl+K) para abrir la paleta de comandos y navegar rápido a cualquier sección. También puedes abrir con "/".',
+    target: '.search-trigger',
+  },
+  {
+    titulo: '📚 4. Consulta normativa',
+    texto: 'En "Herramientas → Consulta Normativa" tienes una biblioteca de 40+ normas indexadas. Pregunta "¿qué dice el Art. 57 Ley 1438?" y obtén el texto literal.',
+    target: '.sn-item[data-tip="Consulta Normativa"]',
+  },
+  {
+    titulo: '🚀 ¡Listo!',
+    texto: 'Ya puedes comenzar. Si necesitas ayuda, usa ⌘K o consulta el manual de usuario.',
+    target: null,
+  },
+];
+var ONB_SEL = 0;
+
+function iniciarOnboarding(){
+  ONB_SEL = 0;
+  document.getElementById('onb-backdrop').classList.add('show');
+  renderizarOnboarding();
+}
+
+function cerrarOnboarding(){
+  document.getElementById('onb-backdrop').classList.remove('show');
+  document.getElementById('onb-card').style.display = 'none';
+  document.getElementById('onb-spotlight').style.display = 'none';
+  // Marcar como visto
+  localStorage.setItem('hus_onboarding_visto', '1');
+}
+
+function renderizarOnboarding(){
+  var paso = ONB_PASOS[ONB_SEL];
+  if(!paso){ cerrarOnboarding(); return; }
+  document.getElementById('onb-title').textContent = paso.titulo;
+  document.getElementById('onb-text').textContent = paso.texto;
+  // Dots
+  var dotsHtml = '';
+  for(var i=0;i<ONB_PASOS.length;i++){
+    dotsHtml += '<div class="onb-dot' + (i===ONB_SEL?' active':'') + '"></div>';
+  }
+  document.getElementById('onb-dots').innerHTML = dotsHtml;
+  document.getElementById('onb-prev').style.display = ONB_SEL === 0 ? 'none' : '';
+  document.getElementById('onb-next').textContent = ONB_SEL === ONB_PASOS.length - 1 ? 'Finalizar ✓' : 'Siguiente →';
+  // Spotlight sobre target
+  var spotlight = document.getElementById('onb-spotlight');
+  var card = document.getElementById('onb-card');
+  if(paso.target){
+    var target = document.querySelector(paso.target);
+    if(target){
+      var rect = target.getBoundingClientRect();
+      spotlight.style.display = 'block';
+      spotlight.style.top = (rect.top - 6) + 'px';
+      spotlight.style.left = (rect.left - 6) + 'px';
+      spotlight.style.width = (rect.width + 12) + 'px';
+      spotlight.style.height = (rect.height + 12) + 'px';
+      // Posicionar card cerca del target
+      card.style.display = 'block';
+      var cardTop = rect.bottom + 20;
+      if(cardTop + 300 > window.innerHeight) cardTop = rect.top - 300;
+      var cardLeft = rect.left;
+      if(cardLeft + 360 > window.innerWidth) cardLeft = window.innerWidth - 380;
+      card.style.top = Math.max(20, cardTop) + 'px';
+      card.style.left = Math.max(20, cardLeft) + 'px';
+      return;
+    }
+  }
+  // Sin target: centrar card
+  spotlight.style.display = 'none';
+  card.style.display = 'block';
+  card.style.top = '50%';
+  card.style.left = '50%';
+  card.style.transform = 'translate(-50%, -50%)';
+}
+
+function onbPaso(direccion){
+  document.getElementById('onb-card').style.transform = '';
+  ONB_SEL += direccion;
+  if(ONB_SEL >= ONB_PASOS.length){ cerrarOnboarding(); return; }
+  if(ONB_SEL < 0) ONB_SEL = 0;
+  renderizarOnboarding();
+}
+
+// Auto-iniciar onboarding si es primera vez
+function verificarOnboarding(){
+  if(!localStorage.getItem('hus_onboarding_visto')){
+    setTimeout(iniciarOnboarding, 1200);  // delay para que carguen los KPIs
+  }
+}
+
+// ─── MODO FOCUS ────────────────────────────────────────────────
+function toggleModoFocus(force){
+  var active = typeof force === 'boolean' ? force : !document.body.classList.contains('focus-mode');
+  document.body.classList.toggle('focus-mode', active);
+  document.getElementById('focus-exit').style.display = active ? '' : 'none';
+  if(active){
+    toast('Modo Focus activado','Presiona Esc para salir','info');
+  }
+}
+
+// Shortcut Esc para salir de focus
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && document.body.classList.contains('focus-mode')){
+    toggleModoFocus(false);
+  }
+});
+
+// ─── LANDING KPIs (mini-dashboard en panel Analizar) ───────────
+async function poblarLandingKPIs(){
+  try{
+    var r = await fetch('/analytics/', {headers: authH()});
+    if(!r.ok) return;
+    var a = await r.json();
+    var $ = function(id){ return document.getElementById(id); };
+    if($('land-total')) $('land-total').textContent = (a.glosas_mes||0).toLocaleString('es-CO');
+    if($('land-valor')) $('land-valor').textContent = cop(a.valor_objetado_mes||0);
+    if($('land-tasa')){
+      var tasa = a.tasa_exito_pct||0;
+      $('land-tasa').textContent = tasa + '%';
+      var delta = $('land-tasa-delta');
+      if(delta){
+        delta.textContent = tasa >= 70 ? '↗ Excelente' : (tasa >= 50 ? '→ Estable' : '↘ Mejorable');
+        delta.className = 'stat-card-delta ' + (tasa >= 70 ? 'up' : (tasa >= 50 ? 'neutral' : 'down'));
+      }
+    }
+    // Alertas próximas
+    try{
+      var r2 = await fetch('/glosas/alertas', {headers: authH()});
+      if(r2.ok){
+        var alert = await r2.json();
+        if($('land-alertas')) $('land-alertas').textContent = (alert.alertas||[]).length;
+      }
+    }catch(e){}
+  }catch(e){ /* silent */ }
+}
+
 // ─── TEST SENTRY (solo SUPER_ADMIN) ─────────────────────────────
 async function dispararSentryTest(){
   if(USER_ROL !== 'SUPER_ADMIN'){
@@ -2650,6 +2957,8 @@ var CP_ACCIONES = [
   {seccion:"Acciones", icono:"📤", titulo:"Importación masiva", hint:"Excel masivo", accion:function(){window.location.href='/importar-masiva'}},
   {seccion:"Acciones", icono:"💼", titulo:"Exportar a ERP", hint:"CSV contable", accion:function(){cerrarCommandPalette();exportarERP()}},
   {seccion:"Acciones", icono:"🌓", titulo:"Alternar modo oscuro", hint:"Light ↔ Dark", accion:function(){cerrarCommandPalette();toggleDark()}},
+  {seccion:"Acciones", icono:"🎯", titulo:"Modo Focus", hint:"Ocultar UI para análisis profundo (Esc para salir)", accion:function(){cerrarCommandPalette();toggleModoFocus(true)}},
+  {seccion:"Acciones", icono:"🧭", titulo:"Tour guiado de la app", hint:"Recorrido de 1 minuto por las funciones", accion:function(){cerrarCommandPalette();iniciarOnboarding()}},
   {seccion:"Acciones", icono:"🚪", titulo:"Cerrar sesión", hint:"Salir", accion:function(){cerrarCommandPalette();logout()}},
   // Acciones admin (solo SUPER_ADMIN)
   {seccion:"Admin", icono:"🧪", titulo:"Test Sentry", hint:"Dispara error intencional", soloAdmin:true, accion:function(){cerrarCommandPalette();dispararSentryTest()}},
@@ -2669,8 +2978,12 @@ function abrirCommandPalette(){
 function cerrarCommandPalette(){
   document.getElementById('cp-backdrop').classList.remove('show');
 }
+var CP_BUSQUEDA_DEBOUNCE = null;
+var CP_HISTORIAL_RESULTS = [];
+
 function filtrarCommandPalette(q){
   q = (q||'').toLowerCase().trim();
+  // Filtro de acciones estáticas
   CP_FILTERED = CP_ACCIONES.filter(function(a){
     if(!q) return true;
     return (a.titulo.toLowerCase().indexOf(q)>=0)
@@ -2679,30 +2992,92 @@ function filtrarCommandPalette(q){
   });
   CP_SEL = 0;
   renderCommandPalette();
+
+  // Búsqueda asíncrona en histórico si query tiene 3+ chars
+  clearTimeout(CP_BUSQUEDA_DEBOUNCE);
+  CP_HISTORIAL_RESULTS = [];
+  if(q.length >= 3){
+    CP_BUSQUEDA_DEBOUNCE = setTimeout(function(){ buscarEnHistorial(q); }, 300);
+  } else {
+    renderCommandPalette();  // re-render sin sección historial
+  }
+}
+
+async function buscarEnHistorial(q){
+  try{
+    // Primero detectar si busca un CUPS o código específico
+    var esCodigo = /^[A-Z]{2}\d{4}$/i.test(q) || /^\d{5,6}$/.test(q);
+    var url = '/glosas/historial-paginado?page=1&per_page=8';
+    // Si es código/CUPS, añadir filtro (si el endpoint lo soporta)
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){ CP_HISTORIAL_RESULTS = []; renderCommandPalette(); return; }
+    var data = await r.json();
+    var todas = data.items || data.results || [];
+    // Filtro local por query
+    var matches = todas.filter(function(g){
+      var hay = [
+        g.codigo_glosa || '',
+        g.eps || '',
+        g.numero_factura || '',
+        g.numero_radicado || '',
+        (g.texto_glosa || '').substring(0, 200),
+      ].join(' ').toLowerCase();
+      return hay.indexOf(q) >= 0;
+    }).slice(0, 6);
+    CP_HISTORIAL_RESULTS = matches.map(function(g){
+      return {
+        seccion: "Historial de glosas",
+        icono: "📋",
+        titulo: (g.codigo_glosa || '?') + ' · ' + (g.eps || '—'),
+        hint: (g.numero_factura ? 'FV ' + g.numero_factura + ' · ' : '') + (g.valor_objetado ? cop(g.valor_objetado) : ''),
+        accion: function(){ cerrarCommandPalette(); if(typeof verDictamen === 'function') verDictamen(g.id); },
+      };
+    });
+    renderCommandPalette();
+  }catch(e){
+    CP_HISTORIAL_RESULTS = [];
+    renderCommandPalette();
+  }
 }
 function renderCommandPalette(){
   var list = document.getElementById('cp-list');
-  if(CP_FILTERED.length === 0){
+  var escCp = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  // Items combinados: acciones estáticas + historial dinámico
+  var items = CP_FILTERED.concat(CP_HISTORIAL_RESULTS);
+  if(items.length === 0){
     list.innerHTML = '<div style="padding:2rem 1rem;text-align:center;color:var(--text3);font-size:.85rem;">Sin resultados. Prueba con otro término.</div>';
     return;
   }
   var html = '';
   var currentSec = '';
-  CP_FILTERED.forEach(function(a, i){
+  items.forEach(function(a, i){
     if(a.seccion !== currentSec){
-      html += '<div class="cp-section">' + a.seccion + '</div>';
+      html += '<div class="cp-section">' + escCp(a.seccion) + '</div>';
       currentSec = a.seccion;
     }
     var active = i === CP_SEL ? ' active' : '';
-    html += '<div class="cp-item'+active+'" data-idx="'+i+'" onclick="ejecutarCpItem('+i+')" onmouseenter="CP_SEL='+i+';renderCommandPalette()">';
-    html += '<div class="cp-item-icon">'+a.icono+'</div>';
-    html += '<div style="flex:1;"><div>'+a.titulo+'</div></div>';
-    if(a.hint) html += '<div class="cp-item-sub">'+a.hint+'</div>';
+    html += '<div class="cp-item'+active+'" data-idx="'+i+'" onclick="ejecutarCpItemCombinado('+i+')" onmouseenter="CP_SEL='+i+';renderCommandPalette()">';
+    html += '<div class="cp-item-icon">'+escCp(a.icono)+'</div>';
+    html += '<div style="flex:1;min-width:0;"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escCp(a.titulo)+'</div></div>';
+    if(a.hint) html += '<div class="cp-item-sub">'+escCp(a.hint)+'</div>';
     html += '</div>';
   });
   list.innerHTML = html;
   var activeEl = list.querySelector('.cp-item.active');
   if(activeEl) activeEl.scrollIntoView({block:'nearest'});
+}
+
+function ejecutarCpItemCombinado(i){
+  var items = CP_FILTERED.concat(CP_HISTORIAL_RESULTS);
+  var a = items[i];
+  if(!a) return;
+  if(a.tab){
+    cerrarCommandPalette();
+    var btn = document.querySelector('.sn-item[onclick*="'+a.tab+'"]');
+    if(btn) btn.click();
+  } else if(a.accion){
+    a.accion();
+  }
 }
 function ejecutarCpItem(i){
   var a = CP_FILTERED[i];
@@ -2717,10 +3092,11 @@ function ejecutarCpItem(i){
   }
 }
 function handleCpKeyDown(e){
+  var totalItems = CP_FILTERED.length + CP_HISTORIAL_RESULTS.length;
   if(e.key === 'Escape'){ cerrarCommandPalette(); return; }
-  if(e.key === 'ArrowDown'){ e.preventDefault(); CP_SEL = Math.min(CP_SEL+1, CP_FILTERED.length-1); renderCommandPalette(); return; }
+  if(e.key === 'ArrowDown'){ e.preventDefault(); CP_SEL = Math.min(CP_SEL+1, totalItems-1); renderCommandPalette(); return; }
   if(e.key === 'ArrowUp'){ e.preventDefault(); CP_SEL = Math.max(CP_SEL-1, 0); renderCommandPalette(); return; }
-  if(e.key === 'Enter'){ e.preventDefault(); ejecutarCpItem(CP_SEL); return; }
+  if(e.key === 'Enter'){ e.preventDefault(); ejecutarCpItemCombinado(CP_SEL); return; }
 }
 // Shortcut global Cmd+K / Ctrl+K
 document.addEventListener('keydown', function(e){
@@ -3462,7 +3838,7 @@ function renderResult(d){
 
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
-    +'<button class="btn btn-ghost" onclick="copiarDictamen()">Copiar texto</button>'
+    +'<button class="btn btn-ghost" onclick="copiarDictamen(event)">Copiar texto</button>'
     +'<button class="btn btn-ghost" onclick="validarPreRadicacion()">🛡️ Validar</button>'
     +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
     +'<button class="btn btn-ghost" onclick="verHistorialVersiones()">📜 Versiones</button>'
@@ -3728,10 +4104,16 @@ function nuevaGlosa(){
   lastResult=null;
 }
 
-function copiarDictamen(){
+function copiarDictamen(event){
   if(!lastResult) return;
   var tmp=document.createElement('div');tmp.innerHTML=lastResult.dictamen;
-  navigator.clipboard.writeText(tmp.innerText).then(function(){toast('Copiado','Texto copiado al portapapeles','success')});
+  var btn = event && event.target ? event.target : null;
+  navigator.clipboard.writeText(tmp.innerText).then(function(){
+    if(btn) exitoBoton(btn, '¡Copiado!');
+    else toast('Copiado','Texto copiado al portapapeles','success');
+  }).catch(function(){
+    toast('Error','No se pudo copiar','error');
+  });
 }
 
 function _extraerArgumentoLimpio(dictamenHtml){
@@ -4660,10 +5042,30 @@ async function aplicarRefinar(){
 
 // ─── ELIMINAR GLOSA ──────────────────────────────────────────────────────
 async function eliminarGlosa(id){
-  if(!confirm('¿Eliminar glosa #'+id+'?'))return;
+  if(!confirm('¿Enviar glosa #'+id+' a la papelera?'))return;
   try{
     var r=await fetch('/glosas/'+id,{method:'DELETE',headers:authH()});
-    if(r.ok){toast('Éxito','Glosa eliminada','success');loadHist(1);}
+    if(r.ok){
+      // Recargar historial
+      loadHist(1);
+      // Toast con opción de deshacer (8 seg)
+      toast(
+        'Glosa #'+id+' movida a papelera',
+        'Se puede recuperar desde el módulo Papelera',
+        'success',
+        {
+          undo: async function(){
+            try{
+              // Intentar restaurar desde papelera — necesita el ID de papelera
+              // Por ahora, guiamos al usuario a la papelera
+              sidebarTab(document.querySelector('.sn-item[onclick*=\'papelera\']'),'papelera');
+              toast('Papelera abierta','Busca tu glosa y haz click en "Restaurar"','info');
+            }catch(e){ toast('Error','No se pudo restaurar: '+e.message,'error'); }
+          },
+          undoLabel: 'Ir a papelera',
+        }
+      );
+    }
     else{var d=await r.json();toast('Error',d.detail||'Error','error');}
   }catch(e){toast('Error',e.message,'error');}
 }
