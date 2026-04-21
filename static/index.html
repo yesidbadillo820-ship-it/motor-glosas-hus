@@ -2819,18 +2819,36 @@ function buscarConceptosFactura(numero){
       var n = data.glosas.length;
       hint.innerHTML = '✓ <b>'+n+' concepto'+(n>1?'s':'')+' detectado'+(n>1?'s':'')+'</b> · Total: '+cop(data.total_objetado||0);
       hint.style.color = 'var(--c-green)';
-      // Listar conceptos
+      // Listar conceptos con todos los datos del Excel
       var html = '<div style="font-size:.72rem;font-weight:700;color:var(--c-teal2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">📋 Conceptos vinculados a esta factura</div>';
       if(data.eps) html += '<div style="font-size:.78rem;color:var(--text2);margin-bottom:.5rem;">EPS: <b>'+esc(data.eps)+'</b></div>';
-      html += '<div style="display:flex;flex-direction:column;gap:.35rem;max-height:220px;overflow-y:auto;">';
-      data.glosas.forEach(function(g){
+      html += '<div style="display:flex;flex-direction:column;gap:.35rem;max-height:280px;overflow-y:auto;">';
+      data.glosas.forEach(function(g, idx){
         var tieneResp = g.dictamen_generado ? '✓' : '○';
         var color = g.dictamen_generado ? '#10b981' : 'var(--text4)';
-        html += '<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:.8rem;" onclick="cargarConceptoDeFactura('+g.id+')">';
+        var key = g.concepto_id != null ? ('c'+g.concepto_id) : ('g'+g.id);
+        html += '<div style="display:flex;flex-direction:column;gap:.15rem;padding:.5rem .6rem;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:.78rem;" onclick="cargarConceptoDeFactura(\''+key+'\')" title="Click para cargar este concepto en el editor">';
+        // Linea 1: código, OID, servicio, valor
+        html += '<div style="display:flex;align-items:center;gap:.5rem;">';
         html += '<span style="color:'+color+';font-weight:700;width:14px;">'+tieneResp+'</span>';
-        html += '<span style="font-family:var(--font-mono);font-weight:700;color:var(--c-teal2);min-width:62px;">'+esc(g.codigo_glosa)+'</span>';
+        html += '<span style="font-family:var(--font-mono);font-weight:700;color:var(--c-teal2);min-width:64px;">'+esc(g.codigo_glosa)+'</span>';
+        if(g.oid_dgh) html += '<span style="font-family:var(--font-mono);font-size:.7rem;color:var(--text3);">#'+esc(g.oid_dgh)+'</span>';
+        if(g.cups) html += '<span style="font-family:var(--font-mono);font-size:.72rem;color:var(--text2);background:#f1f5f9;padding:1px 5px;border-radius:4px;">'+esc(g.cups)+'</span>';
         html += '<span style="flex:1;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.servicio || g.concepto_glosa || '—')+'</span>';
-        html += '<span style="font-weight:700;color:var(--text);min-width:80px;text-align:right;font-size:.75rem;">'+cop(g.valor_objetado||0)+'</span>';
+        html += '<span style="font-weight:700;color:var(--text);min-width:88px;text-align:right;font-size:.76rem;">'+cop(g.valor_objetado||0)+'</span>';
+        html += '</div>';
+        // Linea 2: centro costo + motivo canónico
+        if(g.centro_costo || g.nombre_glosa){
+          html += '<div style="display:flex;gap:.6rem;font-size:.7rem;color:var(--text3);padding-left:20px;">';
+          if(g.centro_costo) html += '<span>🏥 '+esc(g.centro_costo)+'</span>';
+          if(g.nombre_glosa) html += '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 '+esc(g.nombre_glosa)+'</span>';
+          html += '</div>';
+        }
+        // Linea 3: observación específica de la EPS (si existe)
+        if(g.observacion_eps && g.observacion_eps.length > 5){
+          var obsCorta = g.observacion_eps.length > 160 ? g.observacion_eps.substring(0, 157) + '…' : g.observacion_eps;
+          html += '<div style="font-size:.7rem;color:#92400e;padding:3px 6px;background:#fef3c7;border-left:2px solid #f59e0b;border-radius:3px;margin-left:20px;">⚠ '+esc(obsCorta)+'</div>';
+        }
         html += '</div>';
       });
       html += '</div>';
@@ -2847,28 +2865,62 @@ function buscarConceptosFactura(numero){
   }, 450);
 }
 
-function cargarConceptoDeFactura(glosaId){
-  // Carga el texto de una glosa específica en el editor de glosa
-  var g = (window._factura_conceptos || []).find(function(x){ return x.id === glosaId; });
+function cargarConceptoDeFactura(keyOrId){
+  // Carga el texto de un concepto específico en el editor de glosa.
+  // Acepta key "c<concepto_id>" o "g<glosa_id>" (nuevo), o número (legacy).
+  var conceptos = window._factura_conceptos || [];
+  var g = null;
+  if(typeof keyOrId === 'string' && keyOrId.length > 1){
+    var prefix = keyOrId.charAt(0);
+    var id = parseInt(keyOrId.substring(1), 10);
+    if(prefix === 'c'){
+      g = conceptos.find(function(x){ return x.concepto_id === id; });
+    } else if(prefix === 'g'){
+      g = conceptos.find(function(x){ return x.concepto_id == null && x.id === id; });
+    }
+  }
+  if(!g){
+    // Fallback legacy: buscar por id directo
+    g = conceptos.find(function(x){ return x.id === keyOrId; });
+  }
   if(!g) return;
   var editor = document.getElementById('f-glosa');
   if(editor){
-    // Construir texto enriquecido para que pase validación mínima (15 chars)
-    // y la IA tenga contexto completo: código + servicio + concepto + valor
+    // Construir texto COMPLETO con todos los campos del Excel. La IA
+    // usa este texto como input, así que cuantos más datos estructurados,
+    // mejor respuesta técnico-jurídica genera.
+    //
+    // Formato esperado por el usuario:
+    //   CODIGO - Oid OID - Nombre glosa canónico - CUPS - Descripción servicio
+    //   - Centro costo - Observación específica de la EPS
     var partes = [];
     if(g.codigo_glosa) partes.push(g.codigo_glosa);
+    if(g.oid_dgh) partes.push('Oid ' + g.oid_dgh);
+    if(g.nombre_glosa) partes.push(g.nombre_glosa);
+    if(g.cups) partes.push(g.cups);
     if(g.servicio) partes.push(g.servicio);
-    if(g.cups) partes.push('CUPS ' + g.cups);
-    if(g.valor_objetado && g.valor_objetado > 0) partes.push('$' + g.valor_objetado.toLocaleString('es-CO'));
-    if(g.concepto_glosa) partes.push('Motivo: ' + g.concepto_glosa);
-    var textoConstruido = partes.join(' - ');
-    // Priorizar texto original si es lo suficientemente descriptivo
-    var textoFinal = (g.texto_glosa_original && g.texto_glosa_original.length >= 20)
-                      ? g.texto_glosa_original
-                      : textoConstruido;
-    // Si aún es corto, añadir descripción del tipo de glosa
-    if(textoFinal.length < 20){
-      textoFinal += ' - Glosa objetada por la entidad pagadora, requiere respuesta técnico-jurídica';
+    if(g.centro_costo) partes.push(g.centro_costo);
+    if(g.observacion_eps) partes.push(g.observacion_eps);
+    // Agregar valor objetado al final si no aparece ya en la observación
+    if(g.valor_objetado && g.valor_objetado > 0){
+      var valorFormateado = '$' + g.valor_objetado.toLocaleString('es-CO');
+      if(partes.join(' ').indexOf(String(g.valor_objetado)) === -1){
+        partes.push('Valor objetado: ' + valorFormateado);
+      }
+    }
+    var textoFinal = partes.filter(function(p){ return p && String(p).trim(); }).join(' - ');
+    // Fallback si no hay datos suficientes (flujo legacy sin conceptos)
+    if(textoFinal.length < 15){
+      var legacy = [];
+      if(g.codigo_glosa) legacy.push(g.codigo_glosa);
+      if(g.servicio) legacy.push(g.servicio);
+      if(g.cups) legacy.push('CUPS ' + g.cups);
+      if(g.valor_objetado) legacy.push('$' + g.valor_objetado.toLocaleString('es-CO'));
+      if(g.concepto_glosa) legacy.push('Motivo: ' + g.concepto_glosa);
+      textoFinal = legacy.join(' - ');
+      if(textoFinal.length < 15){
+        textoFinal += ' - Glosa objetada por la entidad pagadora, requiere respuesta técnico-jurídica';
+      }
     }
     editor.value = textoFinal;
   }
@@ -2898,7 +2950,9 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
     var g = conceptos[i];
     var n = i + 1;
     // Cargar concepto en editor (enriquece texto para pasar validación 15 chars)
-    cargarConceptoDeFactura(g.id);
+    // Usa concepto_id si viene del nuevo modelo, sino glosa id (legacy)
+    var key = g.concepto_id != null ? ('c'+g.concepto_id) : ('g'+g.id);
+    cargarConceptoDeFactura(key);
     // Verificar que se cargó texto suficiente antes de analizar
     var editor = document.getElementById('f-glosa');
     if(!editor || !editor.value || editor.value.trim().length < 15){

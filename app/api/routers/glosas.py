@@ -740,48 +740,100 @@ def glosas_por_factura(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Retorna todas las glosas asociadas a un número de factura.
+    """Retorna los conceptos asociados a un número de factura.
 
-    Útil para responder todos los conceptos (códigos de glosa) de una
-    misma factura en un solo flujo en lugar de ir uno por uno.
+    Dos fuentes posibles:
+      • Si la factura fue importada desde el Excel de recepción con sus
+        hojas I/R, cada fila del listado es un ConceptoGlosaRecord
+        (motivo, CUPS, servicio, valor parcial, observación de la EPS).
+      • Si no hay conceptos (flujo legacy de masiva), cada fila es un
+        GlosaRecord individual por concepto.
+
+    La UI del Analizar usa esto para precargar automáticamente cada
+    concepto al auditor sin pegar texto.
     """
     from app.models.db import GlosaRecord as _GR
     factura_limpio = numero_factura.strip()
     if not factura_limpio:
         return {"numero_factura": "", "glosas": []}
-    glosas = (
+    glosas_padre = (
         db.query(_GR)
         .filter(_GR.factura == factura_limpio)
-        .order_by(_GR.codigo_glosa.asc(), _GR.id.asc())
+        .order_by(_GR.id.asc())
         .limit(50)
         .all()
     )
-    items = []
-    for g in glosas:
-        items.append({
-            "id": g.id,
-            "codigo_glosa": g.codigo_glosa or "",
-            "concepto_glosa": g.concepto_glosa or "",
-            "cups": g.cups_servicio or "",
-            "servicio": g.servicio_descripcion or "",
-            "valor_objetado": g.valor_objetado or 0,
-            "valor_aceptado": g.valor_aceptado or 0,
-            "estado": g.estado or "",
-            "eps": g.eps or "",
-            "texto_glosa_original": (g.texto_glosa_original or "")[:400],
-            "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,
-            "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
-            "dictamen_generado": bool(g.dictamen),
-        })
-    # Extraer valores únicos (EPS debería ser uno solo para una misma factura)
-    eps_unicas = list({g.eps for g in glosas if g.eps})
-    total_objetado = sum(g.valor_objetado or 0 for g in glosas)
+    items: list[dict] = []
+    glosa_ids = [g.id for g in glosas_padre]
+
+    # Conceptos del nuevo modelo (importación recepción hojas I/R)
+    conceptos = []
+    if glosa_ids:
+        conceptos = (
+            db.query(ConceptoGlosaRecord)
+            .filter(ConceptoGlosaRecord.glosa_id.in_(glosa_ids))
+            .order_by(ConceptoGlosaRecord.codigo_glosa.asc(), ConceptoGlosaRecord.id.asc())
+            .all()
+        )
+    # Mapa glosa_id -> GlosaRecord para enriquecer cada concepto con eps/fechas
+    mapa_padre = {g.id: g for g in glosas_padre}
+
+    if conceptos:
+        # Caso normal: Excel de recepción completo con hojas I/R
+        for c in conceptos:
+            padre = mapa_padre.get(c.glosa_id)
+            items.append({
+                "id": c.glosa_id,                    # glosa padre (para analizar llamando al endpoint)
+                "concepto_id": c.id,                  # identificador del concepto específico
+                "oid_dgh": c.oid_dgh or "",
+                "codigo_glosa": c.codigo_glosa or "",
+                "nombre_glosa": c.nombre_glosa or "",
+                "cups": c.cups_codigo or "",
+                "servicio": c.cups_descripcion or "",
+                "centro_costo": c.centro_costo or "",
+                "observacion_eps": c.observacion_eps or "",
+                "valor_objetado": c.valor_objetado or 0,
+                "valor_aceptado": 0,
+                "estado": (padre.estado if padre else "") or "",
+                "eps": (padre.eps if padre else "") or "",
+                "concepto_glosa": c.nombre_glosa or "",
+                "texto_glosa_original": (c.observacion_eps or "")[:400],
+                "fecha_radicacion_factura": padre.fecha_radicacion_factura.isoformat() if padre and padre.fecha_radicacion_factura else None,
+                "fecha_recepcion": padre.fecha_recepcion.isoformat() if padre and padre.fecha_recepcion else None,
+                "dictamen_generado": bool(c.dictamen_html),
+            })
+    else:
+        # Fallback legacy: 1 GlosaRecord por concepto (flujo importación masiva)
+        for g in glosas_padre:
+            items.append({
+                "id": g.id,
+                "concepto_id": None,
+                "codigo_glosa": g.codigo_glosa or "",
+                "nombre_glosa": g.concepto_glosa or "",
+                "concepto_glosa": g.concepto_glosa or "",
+                "cups": g.cups_servicio or "",
+                "servicio": g.servicio_descripcion or "",
+                "centro_costo": "",
+                "observacion_eps": "",
+                "valor_objetado": g.valor_objetado or 0,
+                "valor_aceptado": g.valor_aceptado or 0,
+                "estado": g.estado or "",
+                "eps": g.eps or "",
+                "texto_glosa_original": (g.texto_glosa_original or "")[:400],
+                "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,
+                "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+                "dictamen_generado": bool(g.dictamen),
+            })
+
+    eps_unicas = list({g.eps for g in glosas_padre if g.eps})
+    total_objetado = sum(i["valor_objetado"] or 0 for i in items)
     return {
         "numero_factura": factura_limpio,
         "total_conceptos": len(items),
         "total_objetado": total_objetado,
         "eps": eps_unicas[0] if len(eps_unicas) == 1 else None,
         "eps_multiples": eps_unicas if len(eps_unicas) > 1 else None,
+        "glosa_id": glosa_ids[0] if glosa_ids else None,
         "glosas": items,
     }
 
