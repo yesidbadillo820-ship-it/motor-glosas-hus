@@ -2978,8 +2978,12 @@ function abrirCommandPalette(){
 function cerrarCommandPalette(){
   document.getElementById('cp-backdrop').classList.remove('show');
 }
+var CP_BUSQUEDA_DEBOUNCE = null;
+var CP_HISTORIAL_RESULTS = [];
+
 function filtrarCommandPalette(q){
   q = (q||'').toLowerCase().trim();
+  // Filtro de acciones estáticas
   CP_FILTERED = CP_ACCIONES.filter(function(a){
     if(!q) return true;
     return (a.titulo.toLowerCase().indexOf(q)>=0)
@@ -2988,30 +2992,92 @@ function filtrarCommandPalette(q){
   });
   CP_SEL = 0;
   renderCommandPalette();
+
+  // Búsqueda asíncrona en histórico si query tiene 3+ chars
+  clearTimeout(CP_BUSQUEDA_DEBOUNCE);
+  CP_HISTORIAL_RESULTS = [];
+  if(q.length >= 3){
+    CP_BUSQUEDA_DEBOUNCE = setTimeout(function(){ buscarEnHistorial(q); }, 300);
+  } else {
+    renderCommandPalette();  // re-render sin sección historial
+  }
+}
+
+async function buscarEnHistorial(q){
+  try{
+    // Primero detectar si busca un CUPS o código específico
+    var esCodigo = /^[A-Z]{2}\d{4}$/i.test(q) || /^\d{5,6}$/.test(q);
+    var url = '/glosas/historial-paginado?page=1&per_page=8';
+    // Si es código/CUPS, añadir filtro (si el endpoint lo soporta)
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){ CP_HISTORIAL_RESULTS = []; renderCommandPalette(); return; }
+    var data = await r.json();
+    var todas = data.items || data.results || [];
+    // Filtro local por query
+    var matches = todas.filter(function(g){
+      var hay = [
+        g.codigo_glosa || '',
+        g.eps || '',
+        g.numero_factura || '',
+        g.numero_radicado || '',
+        (g.texto_glosa || '').substring(0, 200),
+      ].join(' ').toLowerCase();
+      return hay.indexOf(q) >= 0;
+    }).slice(0, 6);
+    CP_HISTORIAL_RESULTS = matches.map(function(g){
+      return {
+        seccion: "Historial de glosas",
+        icono: "📋",
+        titulo: (g.codigo_glosa || '?') + ' · ' + (g.eps || '—'),
+        hint: (g.numero_factura ? 'FV ' + g.numero_factura + ' · ' : '') + (g.valor_objetado ? cop(g.valor_objetado) : ''),
+        accion: function(){ cerrarCommandPalette(); if(typeof verDictamen === 'function') verDictamen(g.id); },
+      };
+    });
+    renderCommandPalette();
+  }catch(e){
+    CP_HISTORIAL_RESULTS = [];
+    renderCommandPalette();
+  }
 }
 function renderCommandPalette(){
   var list = document.getElementById('cp-list');
-  if(CP_FILTERED.length === 0){
+  var escCp = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  // Items combinados: acciones estáticas + historial dinámico
+  var items = CP_FILTERED.concat(CP_HISTORIAL_RESULTS);
+  if(items.length === 0){
     list.innerHTML = '<div style="padding:2rem 1rem;text-align:center;color:var(--text3);font-size:.85rem;">Sin resultados. Prueba con otro término.</div>';
     return;
   }
   var html = '';
   var currentSec = '';
-  CP_FILTERED.forEach(function(a, i){
+  items.forEach(function(a, i){
     if(a.seccion !== currentSec){
-      html += '<div class="cp-section">' + a.seccion + '</div>';
+      html += '<div class="cp-section">' + escCp(a.seccion) + '</div>';
       currentSec = a.seccion;
     }
     var active = i === CP_SEL ? ' active' : '';
-    html += '<div class="cp-item'+active+'" data-idx="'+i+'" onclick="ejecutarCpItem('+i+')" onmouseenter="CP_SEL='+i+';renderCommandPalette()">';
-    html += '<div class="cp-item-icon">'+a.icono+'</div>';
-    html += '<div style="flex:1;"><div>'+a.titulo+'</div></div>';
-    if(a.hint) html += '<div class="cp-item-sub">'+a.hint+'</div>';
+    html += '<div class="cp-item'+active+'" data-idx="'+i+'" onclick="ejecutarCpItemCombinado('+i+')" onmouseenter="CP_SEL='+i+';renderCommandPalette()">';
+    html += '<div class="cp-item-icon">'+escCp(a.icono)+'</div>';
+    html += '<div style="flex:1;min-width:0;"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escCp(a.titulo)+'</div></div>';
+    if(a.hint) html += '<div class="cp-item-sub">'+escCp(a.hint)+'</div>';
     html += '</div>';
   });
   list.innerHTML = html;
   var activeEl = list.querySelector('.cp-item.active');
   if(activeEl) activeEl.scrollIntoView({block:'nearest'});
+}
+
+function ejecutarCpItemCombinado(i){
+  var items = CP_FILTERED.concat(CP_HISTORIAL_RESULTS);
+  var a = items[i];
+  if(!a) return;
+  if(a.tab){
+    cerrarCommandPalette();
+    var btn = document.querySelector('.sn-item[onclick*="'+a.tab+'"]');
+    if(btn) btn.click();
+  } else if(a.accion){
+    a.accion();
+  }
 }
 function ejecutarCpItem(i){
   var a = CP_FILTERED[i];
@@ -3026,10 +3092,11 @@ function ejecutarCpItem(i){
   }
 }
 function handleCpKeyDown(e){
+  var totalItems = CP_FILTERED.length + CP_HISTORIAL_RESULTS.length;
   if(e.key === 'Escape'){ cerrarCommandPalette(); return; }
-  if(e.key === 'ArrowDown'){ e.preventDefault(); CP_SEL = Math.min(CP_SEL+1, CP_FILTERED.length-1); renderCommandPalette(); return; }
+  if(e.key === 'ArrowDown'){ e.preventDefault(); CP_SEL = Math.min(CP_SEL+1, totalItems-1); renderCommandPalette(); return; }
   if(e.key === 'ArrowUp'){ e.preventDefault(); CP_SEL = Math.max(CP_SEL-1, 0); renderCommandPalette(); return; }
-  if(e.key === 'Enter'){ e.preventDefault(); ejecutarCpItem(CP_SEL); return; }
+  if(e.key === 'Enter'){ e.preventDefault(); ejecutarCpItemCombinado(CP_SEL); return; }
 }
 // Shortcut global Cmd+K / Ctrl+K
 document.addEventListener('keydown', function(e){
