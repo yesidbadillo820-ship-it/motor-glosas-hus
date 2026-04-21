@@ -837,6 +837,14 @@ def build_user_prompt(
             f"  🚫 Si NO tienes las cifras exactas, NO hagas cálculo — describe sin números.\n"
         )
 
+    # Perfil de estilo de la EPS (adapta tono y enfoque argumental)
+    bloque_perfil_str = ""
+    try:
+        from app.services.perfil_eps import bloque_perfil_para_prompt
+        bloque_perfil_str = bloque_perfil_para_prompt(str(eps or ""))
+    except Exception:
+        pass
+
     # Referencias documentales extraídas del PDF (folios, fechas, firmas)
     # Permite a la IA citar elementos específicos del expediente, haciendo
     # la respuesta casi imposible de ratificar por la EPS.
@@ -964,7 +972,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
