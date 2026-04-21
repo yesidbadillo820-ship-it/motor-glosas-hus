@@ -283,14 +283,14 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 
 /* ─── LAYOUT ─────────────────────────────── */
 .workspace{flex:1;display:flex;overflow:hidden}
-.panel{display:none;flex:1;overflow:hidden}
+.panel{display:none;flex:1;overflow:hidden;position:relative}
 .panel.active{display:flex}
-/* Paneles verticales (sin sidebar lateral) usan column-layout */
+/* Paneles verticales (sin sidebar lateral) usan column-layout.
+   Nota: p-salud-total usa position:absolute interno y no necesita esta regla. */
 .panel.active#p-consulta-normativa,
 .panel.active#p-multi-concepto,
 .panel.active#p-detector-masa,
 .panel.active#p-simulador,
-.panel.active#p-salud-total,
 .panel.active#p-historial,
 .panel.active#p-mis-glosas,
 .panel.active#p-alertas,
@@ -458,9 +458,11 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .audit-toolbar{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
 
 /* ─── SALUD TOTAL ──────────────────────────── */
-.st-area{display:grid;grid-template-columns:350px 1fr;gap:1.5rem;align-items:start}
-.st-stats{display:flex;gap:1rem;margin-bottom:1rem}
-.st-stats .stat-mini{flex:1}
+.st-area{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:1.5rem;align-items:start;width:100%}
+.st-upload-col,.st-result-col{min-width:0}
+@media (max-width:900px){.st-area{grid-template-columns:1fr}}
+.st-stats{display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+.st-stats .stat-mini{flex:1 1 150px;min-width:0}
 .btn-row{display:flex;gap:.5rem;margin-top:1rem}
 .btn-row .btn{flex:1}
 .audit-toolbar select,.audit-toolbar input{width:auto;padding:.45rem .7rem;font-size:.78rem}
@@ -2018,8 +2020,8 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     </div>
 
     <!-- SALUD TOTAL -->
-    <div class="panel" id="p-salud-total">
-      <div style="flex:1 1 auto;overflow-y:auto;width:100%;padding:1.5rem 2rem;min-height:0;">
+    <div class="panel" id="p-salud-total" style="position:relative">
+      <div style="position:absolute;inset:0;overflow-y:auto;padding:1.5rem 2rem;">
       <div class="st-area">
         <div class="st-upload-col">
           <div class="form-card">
