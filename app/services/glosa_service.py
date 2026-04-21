@@ -854,8 +854,10 @@ class GlosaService:
 
     def _determinar_tipo_glosa(self, prefijo: str, texto: str) -> str:
         texto_lower = texto.lower()
+        # 1) Extemporaneidad tiene prioridad absoluta
         if "extempor" in texto_lower or prefijo == "EX":
             return "EXT_EXTEMPORANEA"
+        # 2) Si el prefijo del código es explícito, usarlo
         if prefijo == "TA": return "TA_TARIFA"
         elif prefijo == "SO": return "SO_SOPORTES"
         elif prefijo == "AU": return "AU_AUTORIZACION"
@@ -865,10 +867,43 @@ class GlosaService:
         elif prefijo == "FA": return "FA_FACTURACION"
         elif prefijo == "IN": return "IN_INSUMOS"
         elif prefijo == "ME": return "ME_MEDICAMENTOS"
-        if any(p in texto_lower for p in ["insumo", "material", "precio"]):
+        # 3) Sin código reconocido → detectar por keywords del texto
+        #    Orden importa: SOPORTES antes que FACTURACIÓN porque "falta de
+        #    soporte" contiene "factura" implícito en muchos casos.
+        if any(p in texto_lower for p in [
+            "soporte", "historia clínica", "historia clinica", "rips",
+            "documento", "anexo", "epicrisis", "firma médica", "firma medica",
+            "ordenes médicas", "ordenes medicas", "sin adjuntar", "falta de evidencia",
+        ]):
+            return "SO_SOPORTES"
+        if any(p in texto_lower for p in [
+            "tarifa", "liquidación", "liquidacion", "manual tarifario",
+            "soat -", "soat menos", "homologación", "homologacion",
+            "diferencia en valor", "descuento unilateral", "uvb",
+        ]):
+            return "TA_TARIFA"
+        if any(p in texto_lower for p in [
+            "autorización", "autorizacion", "orden previa", "orden de servicio",
+            "sin autorización", "sin autorizacion", "urgencia sin autorización",
+            "remisión", "remision",
+        ]):
+            return "AU_AUTORIZACION"
+        if any(p in texto_lower for p in [
+            "cobertura", "pbs", "plan de beneficios", "no incluido",
+            "exclusión", "exclusion", "no pbs", "adres",
+        ]):
+            return "CO_COBERTURA"
+        if any(p in texto_lower for p in [
+            "pertinencia", "no pertinente", "indicación clínica", "indicacion clinica",
+            "criterio médico", "criterio medico", "autonomía médica",
+            "autonomia medica", "no justificado clínicamente",
+        ]):
+            return "CL_PERTINENCIA"
+        if any(p in texto_lower for p in ["insumo", "material", "precio", "prótesis", "protesis", "dispositivo médico", "dispositivo medico"]):
             return "IN_INSUMOS"
-        if any(p in texto_lower for p in ["medicamento", "fármaco", "fórmula"]):
+        if any(p in texto_lower for p in ["medicamento", "fármaco", "farmaco", "fórmula", "formula", "tocilizumab", "dosis", "vial"]):
             return "ME_MEDICAMENTOS"
+        # 4) Último recurso: FACTURACIÓN como fallback
         return "FA_FACTURACION"
 
     def _extraer_codigo_glosa(self, texto: str) -> str:
