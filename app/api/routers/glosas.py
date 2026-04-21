@@ -28,10 +28,75 @@ class GlosaFilaInput(BaseModel):
 
 
 class ImportacionMasivaRequest(BaseModel):
-    eps: str
+    # Si se deja vacío o "AUTO", la EPS se detecta de la primera columna de cada fila.
+    eps: Optional[str] = None
     texto_excel: str
     fecha_radicacion: Optional[str] = None
     fecha_recepcion: Optional[str] = None
+
+
+# ─── Normalizador de nombres de EPS ──────────────────────────────────────────
+# El Excel suele traer razones sociales completas (p. ej.
+# "ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S") que deben mapearse a la clave
+# canónica que usa el resto del sistema (contratos, perfiles, aseguradoras).
+_EPS_ALIASES: list[tuple[str, str]] = [
+    # (substring a buscar en el texto upper, clave canónica)
+    ("SANITAS",                      "SANITAS"),
+    ("NUEVA EPS",                    "NUEVA EPS"),
+    ("COOSALUD",                     "COOSALUD"),
+    ("COMPENSAR",                    "COMPENSAR"),
+    ("FAMISANAR",                    "FAMISANAR"),
+    ("SALUD TOTAL",                  "SALUD TOTAL"),
+    ("SURA",                         "SURA"),
+    ("MUTUAL SER",                   "MUTUAL SER"),
+    ("SAVIA SALUD",                  "SAVIA SALUD"),
+    ("CAPITAL SALUD",                "CAPITAL SALUD"),
+    ("ASMET SALUD",                  "ASMET SALUD"),
+    ("EMSSANAR",                     "EMSSANAR"),
+    ("CAJACOPI",                     "CAJACOPI"),
+    ("COMFAMILIAR",                  "COMFAMILIAR"),
+    ("COMFENALCO",                   "COMFENALCO"),
+    ("ECOOPSOS",                     "ECOOPSOS"),
+    ("ALIANSALUD",                   "ALIANSALUD"),
+    ("ANAS WAYUU",                   "ANAS WAYUU"),
+    ("DUSAKAWI",                     "DUSAKAWI"),
+    ("PIJAOS SALUD",                 "PIJAOS SALUD"),
+    ("MALLAMAS",                     "MALLAMAS"),
+    ("CAPRESOCA",                    "CAPRESOCA"),
+    ("SERVICIO OCCIDENTAL DE SALUD", "SOS"),
+    ("SOS ",                         "SOS"),
+    # Aseguradoras (SOAT / ARL / pólizas)
+    ("SEGUROS COMERCIALES BOLIVAR",  "SEGUROS BOLIVAR"),
+    ("SEGUROS BOLIVAR",              "SEGUROS BOLIVAR"),
+    ("SEGUROS DEL ESTADO",           "SEGUROS DEL ESTADO"),
+    ("SEGUROS GENERALES SURAMERICANA", "SURA"),
+    ("MAPFRE",                       "MAPFRE"),
+    ("AXA COLPATRIA",                "AXA COLPATRIA"),
+    ("LA PREVISORA",                 "FOMAG"),
+    ("FIDEICOMISOS PATRIMONIOS",     "FOMAG"),
+    ("FOMAG",                        "FOMAG"),
+    # Regímenes especiales
+    ("DISPENSARIO MEDICO",           "DISPENSARIO MEDICO"),
+    ("FUERZAS MILITARES",            "DISPENSARIO MEDICO"),
+    ("POLICIA NACIONAL",             "SANIDAD POLICIA"),
+    ("SANIDAD POLICIA",              "SANIDAD POLICIA"),
+    ("UNIDAD DE SERVICIOS PENITENCIARIOS", "USPEC"),
+    ("USPEC",                        "USPEC"),
+    ("MAGISTERIO",                   "FOMAG"),
+]
+
+
+def _normalizar_eps(valor: str) -> str:
+    """Convierte la razón social que viene en el Excel a la clave canónica
+    usada por el sistema. Si no encuentra match, devuelve el texto tal cual
+    en mayúsculas (sin perder información, el analizador luego trabaja con eso)."""
+    if not valor:
+        return ""
+    texto = re.sub(r"\s+", " ", str(valor).upper().strip())
+    for patron, clave in _EPS_ALIASES:
+        if patron in texto:
+            return clave
+    return texto
 
 
 class GenerarLoteRequest(BaseModel):
@@ -1121,7 +1186,10 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
 
 
 async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id: str, eps_formulario: str):
-    """Procesa una fila individual en segundo plano."""
+    """Procesa una fila individual en segundo plano.
+
+    Si `eps_formulario` viene vacío o "AUTO", se usa la EPS detectada de la
+    primera columna de la fila (razón social del Excel)."""
     db = SessionLocal()
     try:
         cfg = get_settings()
@@ -1132,16 +1200,24 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             anthropic_model=cfg.anthropic_model,
             groq_model=cfg.groq_model,
         )
-        
+
         from app.models.schemas import GlosaInput
-        
+
         contrato_repo = ContratoRepository(db)
         contratos = contrato_repo.como_dict()
-        
+
+        # Resolver EPS: formulario > detectada de la fila
+        eps_formulario_limpio = (eps_formulario or "").strip().upper()
+        usa_auto = (not eps_formulario_limpio) or eps_formulario_limpio == "AUTO"
+        if usa_auto:
+            eps_final = _normalizar_eps(fila_data.get('eps', '')) or "SIN EPS"
+        else:
+            eps_final = eps_formulario
+
         texto_glosa = f"{fila_data['codigo']} {fila_data['valor']} {fila_data['descripcion']} {fila_data['cups']} {fila_data['motivo']}"
-        
+
         data = GlosaInput(
-            eps=eps_formulario,
+            eps=eps_final,
             etapa="RESPUESTA A GLOSA",
             tabla_excel=texto_glosa,
             numero_factura=fila_data.get('factura'),
@@ -1165,7 +1241,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         kwargs_extra['texto_glosa_original'] = texto_glosa[:2000]
         try:
             repo.crear(
-                eps=eps_formulario,
+                eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
                 valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
@@ -1183,7 +1259,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         except TypeError:
             # Fallback si repo.crear no soporta los kwargs extra
             repo.crear(
-                eps=eps_formulario,
+                eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
                 valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
@@ -1214,17 +1290,36 @@ async def importar_glosas_masiva(
 ):
     """
     Importa glosas masivamente desde texto pegado de Excel.
-    Recibe: eps, texto_excel (con tabs), fechas opcionales
+
+    - Si se envía `eps` = nombre específico, todas las filas usan esa EPS.
+    - Si se envía `eps` = null, "" o "AUTO", la EPS se detecta de la primera
+      columna de cada fila (razón social) y se normaliza a la clave canónica.
+
+    Recibe: texto_excel (con tabs), fechas opcionales, eps opcional.
     Procesa en segundo plano y retorna el ID del lote para seguimiento.
     """
     req_id = uuid.uuid4().hex[:8]
-    logger.info(f"[{req_id}] Importación masiva iniciada | eps={request.eps} | filas detectadas: ?")
-    
+    eps_formulario = (request.eps or "").strip()
+    modo_auto = not eps_formulario or eps_formulario.upper() == "AUTO"
+    logger.info(
+        f"[{req_id}] Importación masiva iniciada | "
+        f"modo={'AUTO' if modo_auto else eps_formulario}"
+    )
+
     filas = _parsear_filas_excel(request.texto_excel)
-    
+
     if not filas:
         raise HTTPException(status_code=400, detail="No se detectaron filas válidas en el texto")
-    
+
+    # Detectar EPS/facturas únicas para dar feedback inmediato en el response
+    eps_detectadas: dict[str, int] = {}
+    facturas_detectadas: set[str] = set()
+    for f in filas:
+        clave = _normalizar_eps(f.get('eps', '')) if modo_auto else eps_formulario
+        eps_detectadas[clave or "SIN EPS"] = eps_detectadas.get(clave or "SIN EPS", 0) + 1
+        if f.get('factura'):
+            facturas_detectadas.add(f['factura'])
+
     servicio_id = f"BATCH-{req_id}"
 
     for fila_data in filas:
@@ -1233,17 +1328,22 @@ async def importar_glosas_masiva(
             fila_data,
             servicio_id,
             req_id,
-            request.eps
+            eps_formulario if not modo_auto else "AUTO",
         )
-    
-    logger.info(f"[{req_id}] {len(filas)} filas enviadas a procesamiento | batch_id={servicio_id}")
-    
+
+    logger.info(
+        f"[{req_id}] {len(filas)} filas enviadas | batch_id={servicio_id} | "
+        f"EPS detectadas: {dict(eps_detectadas)} | facturas: {len(facturas_detectadas)}"
+    )
+
     return {
         "message": f"{len(filas)} glosas procesándose en segundo plano",
         "batch_id": servicio_id,
         "total_filas": len(filas),
-        "eps": request.eps,
-        "estado": "PROCESANDO"
+        "eps": eps_formulario if not modo_auto else "AUTO",
+        "eps_detectadas": eps_detectadas,
+        "facturas_detectadas": sorted(facturas_detectadas),
+        "estado": "PROCESANDO",
     }
 
 

@@ -45,18 +45,19 @@
             <form id="importForm" class="space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">EPS / Entidad Pagadora *</label>
-                        <select id="eps" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                            <option value="">Seleccionar EPS...</option>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">EPS / Entidad Pagadora</label>
+                        <select id="eps" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="AUTO" selected>🔎 Detectar automáticamente (por fila)</option>
                         </select>
+                        <p class="text-xs text-gray-500 mt-1">La IA lee la primera columna de cada fila y detecta la EPS.</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Radicación *</label>
-                        <input type="date" id="fechaRadicacion" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Radicación</label>
+                        <input type="date" id="fechaRadicacion" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Recepción *</label>
-                        <input type="date" id="fechaRecepcion" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha Recepción</label>
+                        <input type="date" id="fechaRecepcion" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500">
                     </div>
                 </div>
 
@@ -64,12 +65,13 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Pegar filas del Excel (con tabs como separador) *
                     </label>
-                    <textarea id="filasExcel" required rows="12" 
+                    <textarea id="filasExcel" required rows="12"
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                        placeholder="Pega aquí las filas de tu Excel. Formato esperado:
-FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 11.818 | TA0201 | Descripción del motivo...
-FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripción..."></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Separa las columnas con tabulador (Tab). Cada línea = una glosa.</p>
+                        placeholder="Pega aquí las filas de tu Excel. Formato esperado (8 columnas):
+ENTIDAD ⇥ FACTURA ⇥ VALOR ⇥ CODIGO ⇥ CONCEPTO GLOSA ⇥ CUPS ⇥ SERVICIO ⇥ MOTIVO
+Ejemplo:
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S ⇥ HUS0000489632 ⇥ $ 32.600 ⇥ CL0601 ⇥ Los cargos por dispositivos médicos... ⇥ FMQ3121 ⇥ SISTEMA CERRADO ⇥ SISTEMA CERRADO NO FACTURABLE"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Separa las columnas con tabulador (Tab). Cada línea = una glosa. La EPS y la factura se leen de las dos primeras columnas.</p>
                 </div>
 
                 <div class="flex items-center space-x-4">
@@ -120,13 +122,20 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
 
         async function cargarEPS() {
             try {
-            const resp = await fetch('/contratos', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+                const resp = await fetch('/contratos', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 const contratos = await resp.json();
                 const epsSet = new Set(contratos.map(c => c.eps));
                 const select = document.getElementById('eps');
-                epsSet.forEach(eps => {
+                // Separador visual entre AUTO y las EPS del catálogo
+                if (epsSet.size) {
+                    const sep = document.createElement('option');
+                    sep.disabled = true;
+                    sep.textContent = '— O forzar una EPS específica —';
+                    select.appendChild(sep);
+                }
+                [...epsSet].sort().forEach(eps => {
                     const opt = document.createElement('option');
                     opt.value = eps;
                     opt.textContent = eps;
@@ -140,8 +149,8 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
 
         document.getElementById('importForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const eps = document.getElementById('eps').value;
+
+            const eps = document.getElementById('eps').value || 'AUTO';
             const filasExcel = document.getElementById('filasExcel').value.trim();
             const fechaRad = document.getElementById('fechaRadicacion').value;
             const fechaRec = document.getElementById('fechaRecepcion').value;
@@ -164,8 +173,8 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
                     body: JSON.stringify({
                         eps,
                         texto_excel: filasExcel,
-                        fecha_radicacion: fechaRad,
-                        fecha_recepcion: fechaRec
+                        fecha_radicacion: fechaRad || null,
+                        fecha_recepcion: fechaRec || null
                     })
                 });
 
@@ -176,6 +185,20 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
 
                 const data = await resp.json();
                 document.getElementById('batchIdText').textContent = `Batch ID: ${data.batch_id}`;
+
+                // Mostrar resumen de EPS detectadas y facturas si vino en AUTO
+                let detalle = '';
+                if (data.eps_detectadas && Object.keys(data.eps_detectadas).length) {
+                    const lista = Object.entries(data.eps_detectadas)
+                        .map(([k, v]) => `${k} (${v})`).join(' · ');
+                    detalle += `EPS detectadas: ${lista}. `;
+                }
+                if (data.facturas_detectadas && data.facturas_detectadas.length) {
+                    detalle += `Facturas: ${data.facturas_detectadas.join(', ')}`;
+                }
+                if (detalle) {
+                    document.getElementById('batchStatusText').textContent = detalle;
+                }
                 document.getElementById('batchStatus').classList.remove('hidden');
                 document.getElementById('statusText').textContent = `✓ ${data.total_filas} glosas enviadas`;
 
@@ -287,10 +310,17 @@ FIDEICOMISOS PATRIMONIOS AUTONOMOS | HUS0000484385 | $ 5.846 | TA0201 | Descripc
         }
 
         function cargarEjemplo() {
-            document.getElementById('eps').value = 'FOMAG';
-            document.getElementById('filasExcel').value = `FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA S.A.	FUS000484385	$ 11.818	TA0201	El cargo por consulta presenta diferencias con los valores pactados	871040	RADIOGRAFIA DE COLUMNA LUMBOSACRA	Se glosa por mayor valor cobrado
-FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA S.A.	FUS000484385	$ 5.846	TA0201	El cargo por consulta presenta diferencias con los valores pactados	873205	RADIOGRAFIA DE CODO	Se glosa por mayor valor cobrado
-FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA S.A.	FUS000484385	$ 6.943	TA0201	El cargo por consulta presenta diferencias con los valores pactados	890793	CONSULTA DE URGENCIAS	Se glosa por mayor valor cobrado`;
+            document.getElementById('eps').value = 'AUTO';
+            document.getElementById('filasExcel').value =
+`DISPENSARIO MEDICO BUCARAMANGA	HUS0000496604	$ 3.480	TA0801	Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados o establecidos por la norma	897011	MONITORIA FETAL ANTEPARTO	SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN APOYO DX DADO QUE LOS VALORES FACTURADOS EXCEDEN LAS TARIFAS CONTRACTUALMENTE ESTABLECIDAS (CAQ-229-S20 OTRO SI NRO 001)
+DISPENSARIO MEDICO BUCARAMANGA	HUS0000496604	$ 16.403	TA0801	Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados	881434H	PERFIL BIOFISICO	SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN APOYO DX (CAQ-229-S20 OTRO SI NRO 001)
+DISPENSARIO MEDICO BUCARAMANGA	HUS0000496604	$ 7.618	TA0201	El cargo por consulta presenta diferencias con los valores pactados	890750	CONSULTA DE URGENCIAS, POR ESPECIALISTA EN GINECOLOGIA Y OBSTETRICIA	SE GLOSA LA DIFERENCIA POR MAYOR VALOR COBRADO AL PACTADO EN INTERCONSULTA SEGÚN MT SOAT VIGENTE (UVB)
+SEGUROS COMERCIALES BOLIVAR S.A.	HUS0000464684	$ 9.000	TA2301	Los cargos por otros procedimientos no quirúrgicos presentan diferencias con los valores pactados	29112	TERAPIA FISICA INTEGRAL	Se ratifica glosa por diferencia de valor 9000 en código 29112 | Decreto 2423 de 1996
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 32.600	CL0601	Los cargos por dispositivos médicos no son pertinentes	FMQ3121	SISTEMA CERRADO CON GEL SOLIDIFICANTE DE SUCCION 1800 ML 71-318S	SISTEMA CERRADO CON GEL SOLIDIFICANTE DE SUCCION NO FACTURABLE, NO LUGAR A COBRO ADICIONAL
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 10.300	CL0601	Los cargos por dispositivos médicos no son pertinentes	FMQ3054	CANULA YANKAUER TIPO BULBO REF 8888505016	CANULA YANKAUER NO FACTURABLE, NO LUGAR A COBRO ADICIONAL
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 5.000	TA2301	Los cargos por otros procedimientos no quirúrgicos presentan diferencias con los valores pactados	903883H	GLUCOMETRIA GLUCOSA SEMIAUTOMATIZADA	TARIFAS - Prestacion no esta vigente en el modelo del prestador (12/03/2026)
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 1.693.100	SO0301	Ausencia total, parcial o inconsistencia en los soportes que evidencian los honorarios profesionales	275404	CORRECCION DE LABIO FISURADO BILATERAL	CORRECCION DE LABIO FISURADO BILATERAL - falta soporte honorarios
+ENTIDAD PROMOTORA DE SALUD SANITAS S.A.S	HUS0000489632	$ 2.556.300	CO0301	Los honorarios profesionales no están incluidos en la cobertura	275404	CORRECCION DE LABIO FISURADO BILATERAL	CORRECCION DE LABIO FISURADO BILATERAL - fuera de cobertura`;
         }
 
         function logout() {
