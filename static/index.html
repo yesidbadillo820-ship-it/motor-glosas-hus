@@ -1306,8 +1306,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
               <textarea id="f-glosa" rows="7" placeholder="Pegue aquí el texto completo de la glosa tal como aparece en el formato de la EPS. Incluya código, descripción, valores y justificación de la EPS..."></textarea>
             </div>
             <div class="field">
-              <label>Soportes PDF <span style="font-weight:400;color:var(--text3)">(opcional)</span></label>
-              <input type="file" id="f-pdf" multiple accept=".pdf" style="padding:.4rem .6rem;font-size:.75rem"/>
+              <label>Soportes PDF <span style="font-weight:400;color:var(--text3)">(hasta 10 archivos, 15MB c/u)</span></label>
+              <input type="file" id="f-pdf" multiple accept=".pdf" onchange="validarPDFs(this)" style="padding:.4rem .6rem;font-size:.75rem"/>
+              <div id="pdf-info" style="font-size:.72rem;color:var(--text3);margin-top:.25rem;"></div>
             </div>
           </div>
         </div>
@@ -2438,6 +2439,25 @@ function mostrarResultadoValidacion(d){
   modalBody.innerHTML = html;
 }
 
+// ─── VALIDACIÓN PDFs EN VIVO ─────────────────────────────────
+function validarPDFs(input){
+  var info = document.getElementById('pdf-info');
+  var files = input.files || [];
+  if(!files.length){ info.textContent = ''; info.style.color=''; return; }
+  var totalMB = 0;
+  for(var i=0;i<files.length;i++){ totalMB += files[i].size/(1024*1024); }
+  totalMB = Math.round(totalMB * 10) / 10;
+  var n = files.length;
+  if(n > 10){
+    info.innerHTML = '⚠ <b style="color:#dc2626">Máximo 10 archivos</b> — tienes '+n+'. Elimina '+(n-10)+'.';
+    info.style.color = '#dc2626';
+  } else {
+    var complejidad = (n >= 2 ? 'ALTA (respuesta 4 párrafos)' : 'ESTÁNDAR');
+    info.innerHTML = '✓ '+n+' archivo(s) · '+totalMB+' MB total · Complejidad: <b>'+complejidad+'</b>';
+    info.style.color = 'var(--c-green)';
+  }
+}
+
 // ─── COMMAND PALETTE (Cmd+K) ─────────────────────────────────
 var CP_ACCIONES = [
   // Navegación
@@ -3176,9 +3196,19 @@ async function analizar(){
   fd.append('tono',document.getElementById('tono-v').value||'conciliador');
 
   var files=document.getElementById('f-pdf').files;
+  if(files.length > 10){
+    toast('Demasiados archivos','Máximo 10 soportes por glosa. Seleccionaste '+files.length,'error');
+    hideLoading();btn.disabled=false;return;
+  }
+  var tamTotal = 0;
   for(var i=0;i<files.length;i++){
-    if(files[i].size>10*1024*1024){toast('Archivo muy grande',files[i].name+' supera 10MB','error');hideLoading();btn.disabled=false;return;}
+    if(files[i].size>15*1024*1024){toast('Archivo muy grande',files[i].name+' supera 15MB','error');hideLoading();btn.disabled=false;return;}
+    tamTotal += files[i].size;
     fd.append('archivos',files[i]);
+  }
+  if(tamTotal > 80*1024*1024){
+    toast('Tamaño total excesivo','La suma de archivos supera 80MB','error');
+    hideLoading();btn.disabled=false;return;
   }
 
   try{

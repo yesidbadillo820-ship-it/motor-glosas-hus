@@ -356,7 +356,10 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
 <tarifa>Tarifa pactada (ej: "SOAT -20%") o "SOAT PLENO"</tarifa>
 <normas_clave>3 normas más relevantes separadas por "|"</normas_clave>
-<argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS, 4 PÁRRAFOS CONTINUOS (sin numerales, sin títulos, sin separadores), 230-310 PALABRAS TOTAL (DENSO, SIN RELLENO), tono conciliador institucional. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas tomada del BLOQUE NORMATIVA CON TEXTO LITERAL.</argumento>
+<argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS. LONGITUD ADAPTATIVA según el BLOQUE COMPLEJIDAD del user prompt:
+  • COMPLEJIDAD BAJA (glosa simple, sin PDF): 2 PÁRRAFOS, 130-180 palabras. NO enumerar "EN PRIMER/SEGUNDO LUGAR". Ve directo.
+  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso): 4 PÁRRAFOS, 230-310 palabras, con enumeración técnica.
+En ambos casos: tono conciliador institucional, SIN repetir información entre párrafos, cada frase aporta argumento único. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
 PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], FACTURADO POR [VALOR o "EL VALOR INDICADO EN EL EXPEDIENTE"]". Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
@@ -369,6 +372,15 @@ PÁRRAFO 4 — PETICIÓN + ESCALERA PROCESAL + CONTACTO (45-65 palabras):
 "EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO. LA ENTIDAD PAGADORA CUENTA CON 10 DÍAS HÁBILES PARA PRONUNCIARSE CONFORME AL ARTÍCULO 57 DE LA LEY 1438 DE 2011; DE NO HACERLO, OPERARÁ EL SILENCIO A FAVOR DEL PRESTADOR. EN SUBSIDIO, SE INVITA A MESA DE CONCILIACIÓN DE AUDITORÍA CONFORME AL ARTÍCULO 20 DEL DECRETO 4747 DE 2007. COMUNICACIONES: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
 
 ═══════════════ REGISTRO TÉCNICO-JURÍDICO OBLIGATORIO ═══════════════
+═══════════════ EJEMPLO DE RESPUESTA CORTA (2 PÁRRAFOS, 150 palabras) ═══════════════
+Para glosas simples, sin PDF, sin valor alto. Usa ESTE estilo directo:
+
+"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN SOBRE EL CÓDIGO FA0401, INTERPUESTA POR COOSALUD, RESPECTO DEL SERVICIO IDENTIFICADO CON CUPS 890301, FACTURADO POR EL VALOR INDICADO EN EL EXPEDIENTE, DADO QUE EL SERVICIO FUE EFECTIVAMENTE PRESTADO Y DOCUMENTADO EN LA HISTORIA CLÍNICA INSTITUCIONAL, QUE CONSTITUYE PLENA PRUEBA MÉDICO-LEGAL CONFORME A LA RESOLUCIÓN 1995 DE 1999, NO SIENDO ADMISIBLE GLOSAR UNA PRESTACIÓN DEBIDAMENTE ACREDITADA.
+
+DE CONFORMIDAD CON EL ARTÍCULO 177 DE LA LEY 100 DE 1993, LA ENTIDAD PAGADORA TIENE EL DEBER DE RECONOCER LOS SERVICIOS EFECTIVAMENTE PRESTADOS, Y LOS ERRORES FORMALES DE FACTURACIÓN SON SUBSANABLES CONFORME A LA CIRCULAR 030 DE 2013 DEL MINISTERIO DE SALUD, SIN QUE CONSTITUYAN CAUSAL VÁLIDA DE OBJECIÓN. POR LO ANTERIOR, SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO DE LA GLOSA FA0401 Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO. COMUNICACIONES: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+
+Nota la economía: P1 condensa identificación + refutación en UNA oración larga conectada con "DADO QUE". P2 condensa fundamento + petición + contacto. Sin repetir código ni servicio.
+
 ✅ USA SIEMPRE (conectores formales):
 • "DE CONFORMIDAD CON" / "A LA LUZ DE" / "EN VIRTUD DE" / "AL TENOR DE"
 • "POR LAS SIGUIENTES RAZONES:" / "EN PRIMER LUGAR" / "EN SEGUNDO LUGAR" / "EN TERCER LUGAR"
@@ -834,7 +846,66 @@ def build_user_prompt(
         clinicos.append(f"  • Servicio (PDF): {servicio}")
     clinicos_str = "\n".join(clinicos) if clinicos else "  • (No se extrajeron datos clínicos del expediente)"
 
-    pdf_texto = (contexto_pdf[:3000].strip() if contexto_pdf else FALLBACK_SIN_SOPORTES)
+    # ═══ DETECCIÓN DE COMPLEJIDAD ═══
+    # Analiza señales para decidir si es caso SIMPLE (respuesta 2 párrafos,
+    # ~130-180 palabras) o COMPLEJO (4 párrafos, 230-310 palabras).
+    import re as _re
+    _texto_glosa_len = len(texto_glosa or "")
+    _pdf_len = len(contexto_pdf or "")
+    _num_docs_pdf = (contexto_pdf or "").count("═══ DOCUMENTO:")
+    _tiene_valor_especifico = bool(_re.search(r"\$\s*[\d.,]{4,}", texto_glosa or ""))
+    _tiene_cups_especifico = bool(_re.search(r"\b\d{6}\b", texto_glosa or ""))
+    _valor_numerico = 0
+    try:
+        _m = _re.search(r"\$\s*([\d.,]+)", valor_objetado or "")
+        if _m:
+            _valor_numerico = int(_re.sub(r"[^\d]", "", _m.group(1)) or 0)
+    except Exception:
+        pass
+
+    # Heurística de complejidad
+    _puntos_complejidad = 0
+    if _num_docs_pdf >= 2: _puntos_complejidad += 3
+    elif _num_docs_pdf == 1: _puntos_complejidad += 1
+    if _pdf_len > 5000: _puntos_complejidad += 2
+    if _texto_glosa_len > 400: _puntos_complejidad += 2
+    if _texto_glosa_len > 800: _puntos_complejidad += 2
+    if _tiene_valor_especifico and _valor_numerico > 500000: _puntos_complejidad += 2
+    if _tiene_cups_especifico: _puntos_complejidad += 1
+
+    es_complejo = _puntos_complejidad >= 4
+
+    # PDF: para casos COMPLEJOS enviamos hasta 40K chars (Claude Sonnet 4.6
+    # maneja 200K contexto sin problema). Para SIMPLES limitamos a 2000 para
+    # mantener respuestas concisas.
+    if es_complejo:
+        _max_pdf_chars = 40000
+    else:
+        _max_pdf_chars = 2000
+    pdf_texto = (contexto_pdf[:_max_pdf_chars].strip() if contexto_pdf else FALLBACK_SIN_SOPORTES)
+
+    # Instrucción adaptativa de longitud
+    if es_complejo:
+        bloque_complejidad_str = (
+            f"\n[COMPLEJIDAD DETECTADA: ALTA — puntaje {_puntos_complejidad}]\n"
+            f"  • {_num_docs_pdf} documento(s) PDF adjunto(s), {_pdf_len:,} caracteres totales.\n"
+            f"  • Texto de glosa: {_texto_glosa_len} caracteres.\n"
+            f"  LONGITUD DE RESPUESTA: 4 PÁRRAFOS, 230-310 palabras total.\n"
+            f"  Aprovecha los datos del PDF: cita folios, fechas, diagnósticos, médicos específicos.\n"
+        )
+    else:
+        bloque_complejidad_str = (
+            f"\n[COMPLEJIDAD DETECTADA: BAJA — puntaje {_puntos_complejidad}]\n"
+            f"  LONGITUD DE RESPUESTA OBLIGATORIA: SOLO 2 PÁRRAFOS, 130-180 palabras total.\n"
+            f"  Estructura condensada:\n"
+            f"    • P1 (60-80 palabras): Identificación + refutación del motivo en una sola oración enumerada\n"
+            f"      ('ESE HUS NO ACEPTA LA GLOSA... POR CONCEPTO DE [X] SOBRE [CÓDIGO]... DADO QUE...').\n"
+            f"    • P2 (70-100 palabras): Fundamento normativo (2 normas clave) + petición conciliadora\n"
+            f"      + contacto. TODO en un solo párrafo fluido.\n"
+            f"  ⚠ NO uses 'EN PRIMER LUGAR/SEGUNDO LUGAR/TERCER LUGAR' ni enumeración larga.\n"
+            f"  ⚠ NO repitas el código de glosa ni el servicio entre párrafos.\n"
+            f"  ⚠ Ve directo al punto. Cada frase debe aportar argumento único.\n"
+        )
 
     # Ajuste de tono según configuración (conciliador, neutral, firme)
     tono_norm = (tono or "conciliador").lower().strip()
@@ -871,7 +942,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}
+{bloque_regimen_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
@@ -890,7 +961,7 @@ Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 <contrato>...</contrato>
 <tarifa>...</tarifa>
 <normas_clave>Norma1 | Norma2 | Norma3</normas_clave>
-<argumento>[4 PÁRRAFOS EN MAYÚSCULAS, TONO CONCILIADOR, 230-310 PALABRAS TOTAL — DENSO, SIN RELLENO. Cita literal entre comillas cuando uses BLOQUE NORMATIVA CON TEXTO LITERAL]</argumento>
+<argumento>[EN MAYÚSCULAS, TONO CONCILIADOR. LONGITUD SEGÚN BLOQUE COMPLEJIDAD: simple=2 párrafos 130-180 palabras, complejo=4 párrafos 230-310 palabras. DENSO, SIN RELLENO, SIN REPETIR información. Cita literal entre comillas del BLOQUE NORMATIVA cuando aplique]</argumento>
 
 RECUERDA:
 1. El <argumento> debe seguir la estructura de 4 párrafos del system prompt (Identificación → Refutación → Fundamento → Petición conciliadora).
