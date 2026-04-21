@@ -2124,16 +2124,57 @@ function fmtCOP(v){return v?fmt.format(v):'$0'}
 function authH(){return {'Authorization':'Bearer '+TOKEN}}
 function H(obj){return Object.assign({'Authorization':'Bearer '+TOKEN},obj||{})}
 
-function toast(title,msg,type){
+function toast(title,msg,type,opciones){
+  // opciones: {undo: function, undoLabel: 'Deshacer', duracion: 8000}
+  opciones = opciones || {};
+  var duracion = opciones.duracion || (opciones.undo ? 8000 : 5500);
   var icons={success:'✔',error:'✖',warning:'⚠',info:'ℹ'};
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var t=document.createElement('div');
   t.className='toast '+(type||'info');
-  t.innerHTML='<span class="toast-icon">'+icons[type||'info']+'</span>'
-    +'<div class="toast-body"><div class="toast-title">'+title+'</div>'
-    +(msg?'<div class="toast-msg">'+msg+'</div>':'')+'</div>'
-    +'<span class="toast-x" onclick="this.closest(\'.toast\').remove()">✕</span>';
+  var html = '<span class="toast-icon">'+icons[type||'info']+'</span>'
+    +'<div class="toast-body"><div class="toast-title">'+esc(title)+'</div>'
+    +(msg?'<div class="toast-msg">'+esc(msg)+'</div>':'')+'</div>';
+  if(opciones.undo){
+    html += '<button class="toast-undo" style="padding:4px 12px;background:rgba(14,165,233,.12);color:var(--c-teal2);border:1px solid rgba(14,165,233,.3);border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;margin-right:8px;font-family:var(--font)">'+esc(opciones.undoLabel||'Deshacer')+'</button>';
+  }
+  html += '<span class="toast-x" style="cursor:pointer;color:var(--text3);font-size:16px;padding:2px;flex-shrink:0">✕</span>';
+  t.innerHTML = html;
+  // Bind close
+  var xBtn = t.querySelector('.toast-x');
+  if(xBtn) xBtn.addEventListener('click', function(){ t.remove(); });
+  // Bind undo
+  if(opciones.undo){
+    var undoBtn = t.querySelector('.toast-undo');
+    if(undoBtn) undoBtn.addEventListener('click', function(){
+      try{ opciones.undo(); }catch(e){}
+      t.remove();
+    });
+  }
   document.getElementById('toasts').appendChild(t);
-  setTimeout(function(){t.remove()},5500);
+  var timer = setTimeout(function(){t.remove()}, duracion);
+  // Si hover sobre el toast, cancelar timer
+  t.addEventListener('mouseenter', function(){ clearTimeout(timer); });
+  t.addEventListener('mouseleave', function(){
+    timer = setTimeout(function(){t.remove()}, 2500);
+  });
+}
+
+// Helper: muestra "éxito instantáneo" en un botón por 1.5s y restaura
+function exitoBoton(btn, textoExito){
+  if(!btn) return;
+  var textoOriginal = btn.innerHTML;
+  var bgOriginal = btn.style.background;
+  btn.innerHTML = '✓ ' + (textoExito || '¡Listo!');
+  btn.style.background = '#10b981';
+  btn.style.color = '#fff';
+  btn.disabled = true;
+  setTimeout(function(){
+    btn.innerHTML = textoOriginal;
+    btn.style.background = bgOriginal;
+    btn.style.color = '';
+    btn.disabled = false;
+  }, 1500);
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────
@@ -3524,7 +3565,7 @@ function renderResult(d){
 
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
-    +'<button class="btn btn-ghost" onclick="copiarDictamen()">Copiar texto</button>'
+    +'<button class="btn btn-ghost" onclick="copiarDictamen(event)">Copiar texto</button>'
     +'<button class="btn btn-ghost" onclick="validarPreRadicacion()">🛡️ Validar</button>'
     +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
     +'<button class="btn btn-ghost" onclick="verHistorialVersiones()">📜 Versiones</button>'
@@ -3790,10 +3831,16 @@ function nuevaGlosa(){
   lastResult=null;
 }
 
-function copiarDictamen(){
+function copiarDictamen(event){
   if(!lastResult) return;
   var tmp=document.createElement('div');tmp.innerHTML=lastResult.dictamen;
-  navigator.clipboard.writeText(tmp.innerText).then(function(){toast('Copiado','Texto copiado al portapapeles','success')});
+  var btn = event && event.target ? event.target : null;
+  navigator.clipboard.writeText(tmp.innerText).then(function(){
+    if(btn) exitoBoton(btn, '¡Copiado!');
+    else toast('Copiado','Texto copiado al portapapeles','success');
+  }).catch(function(){
+    toast('Error','No se pudo copiar','error');
+  });
 }
 
 function _extraerArgumentoLimpio(dictamenHtml){
@@ -4722,10 +4769,30 @@ async function aplicarRefinar(){
 
 // ─── ELIMINAR GLOSA ──────────────────────────────────────────────────────
 async function eliminarGlosa(id){
-  if(!confirm('¿Eliminar glosa #'+id+'?'))return;
+  if(!confirm('¿Enviar glosa #'+id+' a la papelera?'))return;
   try{
     var r=await fetch('/glosas/'+id,{method:'DELETE',headers:authH()});
-    if(r.ok){toast('Éxito','Glosa eliminada','success');loadHist(1);}
+    if(r.ok){
+      // Recargar historial
+      loadHist(1);
+      // Toast con opción de deshacer (8 seg)
+      toast(
+        'Glosa #'+id+' movida a papelera',
+        'Se puede recuperar desde el módulo Papelera',
+        'success',
+        {
+          undo: async function(){
+            try{
+              // Intentar restaurar desde papelera — necesita el ID de papelera
+              // Por ahora, guiamos al usuario a la papelera
+              sidebarTab(document.querySelector('.sn-item[onclick*=\'papelera\']'),'papelera');
+              toast('Papelera abierta','Busca tu glosa y haz click en "Restaurar"','info');
+            }catch(e){ toast('Error','No se pudo restaurar: '+e.message,'error'); }
+          },
+          undoLabel: 'Ir a papelera',
+        }
+      );
+    }
     else{var d=await r.json();toast('Error',d.detail||'Error','error');}
   }catch(e){toast('Error',e.message,'error');}
 }
