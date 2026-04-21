@@ -1354,7 +1354,13 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </div>
           <div class="sb-section">
             <div class="sb-label">Facturación</div>
-            <div class="field"><label>Número de Factura</label><input type="text" id="f-factura" placeholder="FV-2024-00001"/></div>
+            <div class="field">
+              <label>Número de Factura</label>
+              <input type="text" id="f-factura" placeholder="FV-2024-00001" oninput="buscarConceptosFactura(this.value)"/>
+              <div id="f-factura-hint" style="font-size:.72rem;color:var(--text3);margin-top:.25rem;min-height:1em;"></div>
+              <!-- Dropdown con conceptos detectados -->
+              <div id="f-factura-conceptos" style="display:none;margin-top:.6rem;padding:.7rem;background:var(--c-blue-light);border:1.5px solid var(--c-teal2);border-radius:8px;"></div>
+            </div>
             <div class="field"><label>Número de Radicado</label><input type="text" id="f-radicado" placeholder="GLS-2024-00001"/></div>
             <div class="field"><label>Valor Aceptado (COP)</label><input type="number" id="f-valacp" value="0" min="0" placeholder="0"/></div>
           </div>
@@ -2762,6 +2768,112 @@ document.addEventListener('keydown', function(e){
     toggleModoFocus(false);
   }
 });
+
+// ─── AUTOCOMPLETE FACTURA CON DETECCIÓN DE MULTI-CONCEPTOS ───────
+var _factura_debounce = null;
+function buscarConceptosFactura(numero){
+  clearTimeout(_factura_debounce);
+  var hint = document.getElementById('f-factura-hint');
+  var caja = document.getElementById('f-factura-conceptos');
+  numero = (numero||'').trim();
+  if(numero.length < 3){
+    hint.textContent = '';
+    caja.style.display = 'none';
+    caja.innerHTML = '';
+    return;
+  }
+  hint.textContent = 'Buscando…';
+  _factura_debounce = setTimeout(async function(){
+    try{
+      var r = await fetch('/glosas/por-factura?numero_factura=' + encodeURIComponent(numero), {headers: authH()});
+      if(!r.ok){ hint.textContent = ''; caja.style.display='none'; return; }
+      var data = await r.json();
+      if(!data.glosas || data.glosas.length === 0){
+        hint.innerHTML = '⓪ Sin conceptos previamente registrados para esta factura';
+        hint.style.color = 'var(--text3)';
+        caja.style.display = 'none';
+        return;
+      }
+      var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+      var n = data.glosas.length;
+      hint.innerHTML = '✓ <b>'+n+' concepto'+(n>1?'s':'')+' detectado'+(n>1?'s':'')+'</b> · Total: '+cop(data.total_objetado||0);
+      hint.style.color = 'var(--c-green)';
+      // Listar conceptos
+      var html = '<div style="font-size:.72rem;font-weight:700;color:var(--c-teal2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">📋 Conceptos vinculados a esta factura</div>';
+      if(data.eps) html += '<div style="font-size:.78rem;color:var(--text2);margin-bottom:.5rem;">EPS: <b>'+esc(data.eps)+'</b></div>';
+      html += '<div style="display:flex;flex-direction:column;gap:.35rem;max-height:220px;overflow-y:auto;">';
+      data.glosas.forEach(function(g){
+        var tieneResp = g.dictamen_generado ? '✓' : '○';
+        var color = g.dictamen_generado ? '#10b981' : 'var(--text4)';
+        html += '<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:.8rem;" onclick="cargarConceptoDeFactura('+g.id+')">';
+        html += '<span style="color:'+color+';font-weight:700;width:14px;">'+tieneResp+'</span>';
+        html += '<span style="font-family:var(--font-mono);font-weight:700;color:var(--c-teal2);min-width:62px;">'+esc(g.codigo_glosa)+'</span>';
+        html += '<span style="flex:1;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.servicio || g.concepto_glosa || '—')+'</span>';
+        html += '<span style="font-weight:700;color:var(--text);min-width:80px;text-align:right;font-size:.75rem;">'+cop(g.valor_objetado||0)+'</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+      html += '<div style="margin-top:.6rem;display:flex;gap:.4rem;flex-wrap:wrap;">';
+      html += '<button type="button" class="btn-secondary" style="flex:1;font-size:.75rem;" onclick="responderTodosLosConceptos()">⚡ Analizar todos ('+n+')</button>';
+      html += '<button type="button" class="btn-secondary" style="font-size:.75rem;" onclick="document.getElementById(\'f-factura-conceptos\').style.display=\'none\'">Ocultar</button>';
+      html += '</div>';
+      caja.innerHTML = html;
+      caja.style.display = 'block';
+      // Guardar lista para uso en "responder todos"
+      window._factura_conceptos = data.glosas;
+      window._factura_eps_detectada = data.eps;
+    }catch(e){ hint.textContent = ''; caja.style.display='none'; }
+  }, 450);
+}
+
+function cargarConceptoDeFactura(glosaId){
+  // Carga el texto de una glosa específica en el editor de glosa
+  var g = (window._factura_conceptos || []).find(function(x){ return x.id === glosaId; });
+  if(!g) return;
+  var editor = document.getElementById('f-glosa');
+  if(editor){
+    editor.value = g.texto_glosa_original || (g.codigo_glosa + ' - ' + (g.servicio || ''));
+    toast('Concepto cargado', 'Presiona Analizar para generar la respuesta', 'info');
+  }
+  // Auto-seleccionar la EPS si la conocemos
+  if(g.eps){
+    var sel = document.getElementById('eps-sel');
+    if(sel){
+      for(var i=0;i<sel.options.length;i++){
+        if(sel.options[i].value === g.eps){ sel.selectedIndex = i; break; }
+      }
+    }
+  }
+}
+
+function responderTodosLosConceptos(){
+  var conceptos = window._factura_conceptos || [];
+  if(!conceptos.length){ toast('Info','Sin conceptos para responder','info'); return; }
+  if(!confirm('¿Analizar los ' + conceptos.length + ' conceptos de esta factura en secuencia?\n\nEl sistema procesará cada uno y generará su dictamen individual.')) return;
+  // Arrancamos secuencialmente (evita saturar IA)
+  toast('Procesando lote','Analizando ' + conceptos.length + ' conceptos secuencialmente…','info');
+  procesarConceptosSecuencial(conceptos.slice(), 0, conceptos.length);
+}
+
+async function procesarConceptosSecuencial(conceptos, idx, total){
+  if(!conceptos.length){
+    toast('✓ Lote completado', total + ' conceptos procesados', 'success');
+    return;
+  }
+  var g = conceptos.shift();
+  idx++;
+  // Cargar concepto en editor
+  cargarConceptoDeFactura(g.id);
+  // Esperar un tick para que el DOM se actualice
+  await new Promise(function(r){ setTimeout(r, 300); });
+  toast('Analizando '+idx+'/'+total, 'Código ' + (g.codigo_glosa||'?'), 'info');
+  try{
+    await analizar();
+  }catch(e){}
+  // Pausa entre análisis para no saturar
+  await new Promise(function(r){ setTimeout(r, 1500); });
+  procesarConceptosSecuencial(conceptos, idx, total);
+}
 
 // ─── LANDING KPIs (mini-dashboard en panel Analizar) ───────────
 async function poblarLandingKPIs(){

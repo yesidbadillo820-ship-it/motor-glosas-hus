@@ -669,6 +669,119 @@ def semaforo(
     return repo.semaforo_counts()
 
 
+@router.get("/por-factura")
+def glosas_por_factura(
+    numero_factura: str = Query(..., min_length=1, max_length=60),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Retorna todas las glosas asociadas a un número de factura.
+
+    Útil para responder todos los conceptos (códigos de glosa) de una
+    misma factura en un solo flujo en lugar de ir uno por uno.
+    """
+    from app.models.db import GlosaRecord as _GR
+    factura_limpio = numero_factura.strip()
+    if not factura_limpio:
+        return {"numero_factura": "", "glosas": []}
+    glosas = (
+        db.query(_GR)
+        .filter(_GR.factura == factura_limpio)
+        .order_by(_GR.codigo_glosa.asc(), _GR.id.asc())
+        .limit(50)
+        .all()
+    )
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "codigo_glosa": g.codigo_glosa or "",
+            "concepto_glosa": g.concepto_glosa or "",
+            "cups": g.cups_servicio or "",
+            "servicio": g.servicio_descripcion or "",
+            "valor_objetado": g.valor_objetado or 0,
+            "valor_aceptado": g.valor_aceptado or 0,
+            "estado": g.estado or "",
+            "eps": g.eps or "",
+            "texto_glosa_original": (g.texto_glosa_original or "")[:400],
+            "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,
+            "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+            "dictamen_generado": bool(g.dictamen),
+        })
+    # Extraer valores únicos (EPS debería ser uno solo para una misma factura)
+    eps_unicas = list({g.eps for g in glosas if g.eps})
+    total_objetado = sum(g.valor_objetado or 0 for g in glosas)
+    return {
+        "numero_factura": factura_limpio,
+        "total_conceptos": len(items),
+        "total_objetado": total_objetado,
+        "eps": eps_unicas[0] if len(eps_unicas) == 1 else None,
+        "eps_multiples": eps_unicas if len(eps_unicas) > 1 else None,
+        "glosas": items,
+    }
+
+
+@router.get("/facturas-pendientes")
+def facturas_pendientes_agrupadas(
+    limite: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista facturas con glosas pendientes agrupadas.
+
+    Útil para el flujo "responder por factura" — muestra facturas con
+    N conceptos pendientes cada una, asignadas al usuario actual o su
+    equipo.
+    """
+    from app.models.db import GlosaRecord as _GR
+    from sqlalchemy import func as _func, or_ as _or
+    repo = GlosaRepository(db)
+    # Filtrar por gestor/equipo (igual que mis-asignaciones)
+    equipo = getattr(current_user, "equipo", None)
+    emails = repo.emails_del_mismo_equipo(equipo) if equipo else [current_user.email]
+    if not emails:
+        emails = [current_user.email]
+    prefijos_nombre = [e.split("@")[0] for e in emails]
+
+    # SUPER_ADMIN/COORDINADOR ve todas
+    if current_user.rol in ("SUPER_ADMIN", "COORDINADOR"):
+        base_q = db.query(_GR).filter(_GR.factura.isnot(None))
+    else:
+        condiciones = [_GR.auditor_email.in_(emails)]
+        if current_user.nombre:
+            condiciones.append(_GR.gestor_nombre.ilike(f"%{current_user.nombre.strip()}%"))
+        for p in prefijos_nombre:
+            condiciones.append(_GR.gestor_nombre.ilike(f"%{p}%"))
+        base_q = db.query(_GR).filter(_or(*condiciones), _GR.factura.isnot(None))
+    # Solo estados activos (no LEVANTADA ni CONCILIADA)
+    base_q = base_q.filter(_GR.estado.notin_(["LEVANTADA", "CONCILIADA"]))
+    # Agrupar por factura
+    agrupados: dict[str, list] = {}
+    for g in base_q.limit(500).all():
+        fact = g.factura
+        if not fact:
+            continue
+        agrupados.setdefault(fact, []).append(g)
+
+    resultado = []
+    for fact, glosas in agrupados.items():
+        eps_set = {g.eps for g in glosas if g.eps}
+        total = sum(g.valor_objetado or 0 for g in glosas)
+        codigos = [g.codigo_glosa for g in glosas if g.codigo_glosa]
+        fecha_mas_reciente = max((g.fecha_recepcion for g in glosas if g.fecha_recepcion), default=None)
+        resultado.append({
+            "numero_factura": fact,
+            "eps": list(eps_set)[0] if len(eps_set) == 1 else None,
+            "cantidad_conceptos": len(glosas),
+            "valor_total_objetado": total,
+            "codigos": codigos[:10],
+            "fecha_recepcion_mas_reciente": fecha_mas_reciente.isoformat() if fecha_mas_reciente else None,
+        })
+    # Orden: mas conceptos primero, luego mayor valor
+    resultado.sort(key=lambda x: (-x["cantidad_conceptos"], -x["valor_total_objetado"]))
+    return {"total_facturas": len(resultado), "facturas": resultado[:limite]}
+
+
 @router.get("/mis-asignaciones")
 def mis_asignaciones(
     todas: bool = False,
@@ -690,7 +803,14 @@ def mis_asignaciones(
             .all()
         )
     else:
-        glosas = repo.listar_por_gestor(current_user.email, current_user.nombre)
+        # Si el usuario pertenece a un equipo (ej. EQUIPO_ASEGURADORAS),
+        # agrupar asignaciones de todos los miembros del equipo.
+        equipo = getattr(current_user, "equipo", None)
+        emails_equipo = repo.emails_del_mismo_equipo(equipo) if equipo else None
+        glosas = repo.listar_por_gestor(
+            current_user.email, current_user.nombre,
+            emails_equipo=emails_equipo,
+        )
     return [
         {
             "id": g.id,
@@ -1029,23 +1149,54 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         )
         
         resultado = await service.analizar(data, "", contratos)
-        
+
         repo = GlosaRepository(db)
-        repo.crear(
-            eps=eps_formulario,
-            paciente="N/A",
-            codigo_glosa=resultado.codigo_glosa,
-            valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
-            valor_aceptado=0,
-            etapa="RESPUESTA A GLOSA",
-            estado="RESPONDIDA",
-            dictamen=resultado.dictamen,
-            dias_restantes=resultado.dias_restantes,
-            modelo_ia=resultado.modelo_ia,
-            score=resultado.score,
-            numero_radicado=servicio_id,
-            factura=fila_data.get('factura'),
-        )
+        # Campos adicionales para que el flujo "responder por factura"
+        # los pueda listar con contexto (servicio, CUPS, concepto).
+        concepto_excel = fila_data.get('motivo') or fila_data.get('descripcion') or ''
+        kwargs_extra = {}
+        if fila_data.get('descripcion'):
+            kwargs_extra['servicio_descripcion'] = fila_data['descripcion'][:400]
+        if concepto_excel:
+            kwargs_extra['concepto_glosa'] = concepto_excel[:500]
+        if fila_data.get('cups'):
+            kwargs_extra['cups_servicio'] = fila_data['cups'][:20]
+        # Texto glosa original para que el auditor pueda revisar
+        kwargs_extra['texto_glosa_original'] = texto_glosa[:2000]
+        try:
+            repo.crear(
+                eps=eps_formulario,
+                paciente="N/A",
+                codigo_glosa=resultado.codigo_glosa,
+                valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
+                valor_aceptado=0,
+                etapa="RESPUESTA A GLOSA",
+                estado="RESPONDIDA",
+                dictamen=resultado.dictamen,
+                dias_restantes=resultado.dias_restantes,
+                modelo_ia=resultado.modelo_ia,
+                score=resultado.score,
+                numero_radicado=servicio_id,
+                factura=fila_data.get('factura'),
+                **kwargs_extra,
+            )
+        except TypeError:
+            # Fallback si repo.crear no soporta los kwargs extra
+            repo.crear(
+                eps=eps_formulario,
+                paciente="N/A",
+                codigo_glosa=resultado.codigo_glosa,
+                valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
+                valor_aceptado=0,
+                etapa="RESPUESTA A GLOSA",
+                estado="RESPONDIDA",
+                dictamen=resultado.dictamen,
+                dias_restantes=resultado.dias_restantes,
+                modelo_ia=resultado.modelo_ia,
+                score=resultado.score,
+                numero_radicado=servicio_id,
+                factura=fila_data.get('factura'),
+            )
         
         logger.info(f"[{req_id}] Fila {fila_data['fila']} procesada: {resultado.codigo_glosa}")
     except Exception as e:

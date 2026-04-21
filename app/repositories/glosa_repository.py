@@ -520,20 +520,34 @@ class GlosaRepository:
         gestor_email: str,
         gestor_nombre: Optional[str] = None,
         limit: int = 200,
+        emails_equipo: Optional[list[str]] = None,
     ) -> list[GlosaRecord]:
-        """Glosas asignadas a un gestor.
+        """Glosas asignadas a un gestor o a su equipo completo.
 
         Matches, en orden:
-        - glosa.auditor_email == gestor_email
+        - glosa.auditor_email == gestor_email (o cualquiera de emails_equipo)
         - glosa.gestor_nombre ILIKE '%<nombre del usuario>%'
-        - glosa.gestor_nombre ILIKE '%<prefijo-email>%' (fallback)
+        - glosa.gestor_nombre ILIKE '%<prefijo-email>%' (fallback para cada email)
+
+        Cuando emails_equipo se pasa (ej. EQUIPO_ASEGURADORAS con 4 correos),
+        la consulta agrupa las asignaciones de todos esos correos en una
+        sola vista compartida.
         """
         from sqlalchemy import or_
-        condiciones = [GlosaRecord.auditor_email == gestor_email]
+        condiciones = []
+        # Incluir el email del usuario + todos los emails del equipo
+        emails_a_incluir = [gestor_email]
+        if emails_equipo:
+            for e in emails_equipo:
+                if e and e != gestor_email:
+                    emails_a_incluir.append(e)
+        condiciones.append(GlosaRecord.auditor_email.in_(emails_a_incluir))
         if gestor_nombre:
             condiciones.append(GlosaRecord.gestor_nombre.ilike(f"%{gestor_nombre.strip()}%"))
-        prefijo_email = gestor_email.split("@")[0]
-        condiciones.append(GlosaRecord.gestor_nombre.ilike(f"%{prefijo_email}%"))
+        # Fallback: prefijo de cada email del equipo
+        for e in emails_a_incluir:
+            prefijo = e.split("@")[0] if "@" in e else e
+            condiciones.append(GlosaRecord.gestor_nombre.ilike(f"%{prefijo}%"))
 
         return (
             self.db.query(GlosaRecord)
@@ -542,3 +556,11 @@ class GlosaRepository:
             .limit(limit)
             .all()
         )
+
+    def emails_del_mismo_equipo(self, equipo: Optional[str]) -> list[str]:
+        """Retorna la lista de emails de todos los usuarios de un equipo dado."""
+        if not equipo:
+            return []
+        from app.models.db import UsuarioRecord as _UR
+        usuarios = self.db.query(_UR).filter(_UR.equipo == equipo).all()
+        return [u.email for u in usuarios if u.email]
