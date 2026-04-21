@@ -3766,15 +3766,21 @@ function _extraerArgumentoLimpio(dictamenHtml){
 function imprimirDictamen(){
   if(!lastResult) return;
   var w=window.open('','_blank');
+  // Helper local: escape HTML para el print (no depender de escHtml global)
+  var escHtmlPrint = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var text = _extraerArgumentoLimpio(lastResult.dictamen);
   var fecha=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   var fechaCorta=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var hora=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
   var eps = (document.getElementById('eps-sel') && document.getElementById('eps-sel').value) || '—';
   var factura = (document.getElementById('f-factura') && document.getElementById('f-factura').value) || '—';
   var radicado = (document.getElementById('f-radicado') && document.getElementById('f-radicado').value) || '—';
   var etapa = (document.getElementById('etapa-v') && document.getElementById('etapa-v').value) || 'RESPUESTA A GLOSA';
   var tramite = Math.floor(100000 + Math.random()*900000);  // consecutivo ficticio para el doc
-  var elaborado = (USER_NAME || 'HUS').toUpperCase().substring(0,10);
+  var elaborado = (USER_NAME || 'HUS').toUpperCase().substring(0,20);
+  // Contar archivos PDF adjuntos
+  var nAdjuntos = 0;
+  try{ nAdjuntos = (document.getElementById('f-pdf') && document.getElementById('f-pdf').files || []).length; }catch(e){}
 
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
     +'<title>Dictamen Glosa '+lastResult.codigo_glosa+'</title>'
@@ -3810,8 +3816,89 @@ function imprimirDictamen(){
     +'.firmas{margin-top:30px;display:flex;justify-content:space-between;gap:40px}'
     +'.firma{flex:1;text-align:center;border-top:1px solid #333;padding-top:4px;font-size:8.5pt}'
     +'.footer-note{margin-top:14px;padding:8px 10px;background:#fff9db;border-left:3px solid #f59e0b;font-size:8pt;color:#78350f}'
-    +'@media print{.no-print{display:none}}'
+    +'@media print{.no-print{display:none}.page-break{page-break-before:always}}'
+    +'.caratula{height:100vh;display:flex;flex-direction:column;justify-content:space-between;padding:40px 0;page-break-after:always}'
+    +'.caratula-top{text-align:center}'
+    +'.caratula-top .sello{width:140px;height:140px;margin:0 auto 20px;border:4px solid #0b3d91;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:10px}'
+    +'.caratula-top .sello img{width:100%;height:100%;object-fit:contain}'
+    +'.caratula-top h1{font-size:18pt;font-weight:800;color:#0b3d91;letter-spacing:.5px;line-height:1.3;margin-bottom:8px}'
+    +'.caratula-top .subh{font-size:11pt;color:#444;margin-bottom:6px}'
+    +'.caratula-mid{text-align:center;padding:20px 60px}'
+    +'.caratula-mid .tipo-doc{display:inline-block;padding:10px 28px;background:#0b3d91;color:#fff;font-size:13pt;font-weight:700;letter-spacing:2px;border-radius:4px;margin-bottom:24px}'
+    +'.caratula-mid h2{font-size:22pt;font-weight:800;color:#0b3d91;letter-spacing:1.5px;margin:18px 0;line-height:1.3}'
+    +'.caratula-mid .codigo{font-size:32pt;color:#d4a017;font-weight:900;letter-spacing:3px;margin:28px 0;font-family:Consolas,monospace}'
+    +'.caratula-datos{margin:32px auto;width:520px;text-align:left;border:2px solid #0b3d91;border-radius:8px;overflow:hidden}'
+    +'.caratula-datos .row{display:flex;border-bottom:1px solid #cbd5e1;padding:10px 16px;font-size:10pt}'
+    +'.caratula-datos .row:last-child{border-bottom:0}'
+    +'.caratula-datos .row:nth-child(odd){background:#f8fafc}'
+    +'.caratula-datos .lbl{width:45%;font-weight:700;color:#444;text-transform:uppercase;font-size:8.5pt;letter-spacing:.5px}'
+    +'.caratula-datos .val{flex:1;color:#111}'
+    +'.caratula-bot{text-align:center;border-top:2px solid #0b3d91;padding-top:16px}'
+    +'.caratula-bot .linea1{font-size:9pt;font-weight:700;color:#0b3d91;margin-bottom:3px}'
+    +'.caratula-bot .linea2{font-size:8pt;color:#666}'
+    +'.indice{padding:18px 0}'
+    +'.indice h2{font-size:14pt;color:#0b3d91;border-bottom:2px solid #0b3d91;padding-bottom:6px;margin-bottom:14px;letter-spacing:1px}'
+    +'.indice-tbl{width:100%;border-collapse:collapse;font-size:9.5pt}'
+    +'.indice-tbl th{background:#0b3d91;color:#fff;padding:8px;text-align:left;font-size:8.5pt;letter-spacing:.5px}'
+    +'.indice-tbl td{padding:8px 10px;border-bottom:1px solid #e2e8f0}'
+    +'.indice-tbl tr:hover{background:#f8fafc}'
+    +'.indice-tbl .num{width:8%;text-align:center;font-weight:700;color:#0b3d91}'
+    +'.indice-tbl .pag{width:14%;text-align:center;font-weight:600}'
     +'</style></head><body>'
+    // PÁGINA 1: CARÁTULA INSTITUCIONAL
+    +'<div class="caratula">'
+    +'<div class="caratula-top">'
+    +'<div class="sello"><img src="/static/logo.png" alt="HUS"/></div>'
+    +'<h1>EMPRESA SOCIAL DEL ESTADO<br>HOSPITAL UNIVERSITARIO DE SANTANDER</h1>'
+    +'<div class="subh">NIT 900.006.037-4 · Res. Habilitación 002145/2015</div>'
+    +'<div class="subh">Carrera 33 No. 28-126, Bucaramanga (Santander) · Tel. (607) 691 2010</div>'
+    +'</div>'
+    +'<div class="caratula-mid">'
+    +'<div class="tipo-doc">'+etapa+'</div>'
+    +'<h2>RESPUESTA A GLOSA</h2>'
+    +'<div class="codigo">'+lastResult.codigo_glosa+'</div>'
+    +'<div style="font-size:10pt;color:#666;font-style:italic">Dictamen jurídico-administrativo</div>'
+    +'<div class="caratula-datos">'
+    +'<div class="row"><div class="lbl">Entidad pagadora</div><div class="val">'+escHtmlPrint(eps)+'</div></div>'
+    +'<div class="row"><div class="lbl">N° de factura</div><div class="val">'+escHtmlPrint(factura)+'</div></div>'
+    +'<div class="row"><div class="lbl">N° de radicado</div><div class="val">'+escHtmlPrint(radicado)+'</div></div>'
+    +'<div class="row"><div class="lbl">Trámite N°</div><div class="val">'+tramite+'</div></div>'
+    +'<div class="row"><div class="lbl">Valor objetado</div><div class="val"><b>'+lastResult.valor_objetado+'</b></div></div>'
+    +'<div class="row"><div class="lbl">Mensaje de tiempo</div><div class="val">'+escHtmlPrint(lastResult.mensaje_tiempo||'')+'</div></div>'
+    +'<div class="row"><div class="lbl">Modelo IA</div><div class="val">'+escHtmlPrint(lastResult.modelo_ia||'—')+'</div></div>'
+    +'<div class="row"><div class="lbl">Fecha emisión</div><div class="val">'+fechaCorta+' · '+hora+'</div></div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="caratula-bot">'
+    +'<div class="linea1">ÁREA DE CARTERA — GESTIÓN DE GLOSAS Y DEVOLUCIONES</div>'
+    +'<div class="linea2">cartera@hus.gov.co · glosasydevoluciones@hus.gov.co</div>'
+    +'<div class="linea2" style="margin-top:10px">Documento elaborado por: '+escHtmlPrint(elaborado)+' — '+fechaCorta+'</div>'
+    +'</div>'
+    +'</div>'
+    // PÁGINA 2: ÍNDICE DE CONTENIDO Y ANEXOS
+    +'<div class="indice">'
+    +'<h2>ÍNDICE DE CONTENIDO</h2>'
+    +'<table class="indice-tbl"><thead><tr><th class="num">#</th><th>Contenido</th><th class="pag">Pág.</th></tr></thead><tbody>'
+    +'<tr><td class="num">1</td><td><b>Carátula institucional</b> — Datos del trámite</td><td class="pag">1</td></tr>'
+    +'<tr><td class="num">2</td><td><b>Índice de contenido</b></td><td class="pag">2</td></tr>'
+    +'<tr><td class="num">3</td><td><b>Cuadro resumen</b> — código glosa, valor y código respuesta</td><td class="pag">3</td></tr>'
+    +'<tr><td class="num">4</td><td><b>Argumentación jurídica</b> — respuesta técnico-legal</td><td class="pag">3</td></tr>'
+    +'<tr><td class="num">5</td><td><b>Relación de soportes aportados</b></td><td class="pag">3</td></tr>'
+    +'<tr><td class="num">6</td><td><b>Marco normativo citado</b></td><td class="pag">3</td></tr>'
+    +'<tr><td class="num">7</td><td><b>Firmas institucionales</b></td><td class="pag">final</td></tr>'
+    +'</tbody></table>'
+    +'<h2 style="margin-top:30px">SOPORTES ANEXOS ('+nAdjuntos+')</h2>'
+    +(nAdjuntos > 0
+      ? '<table class="indice-tbl"><thead><tr><th class="num">#</th><th>Documento</th><th>Marco legal</th></tr></thead><tbody>'
+        +'<tr><td class="num">1</td><td>Historia clínica institucional</td><td>Res. 1995/1999</td></tr>'
+        +'<tr><td class="num">2</td><td>RIPS radicados</td><td>Res. 866/2021</td></tr>'
+        +'<tr><td class="num">3</td><td>Factura electrónica N° '+escHtmlPrint(factura)+'</td><td>Res. 2275/2023 (FEV)</td></tr>'
+        +'<tr><td class="num">4-'+(nAdjuntos+3)+'</td><td><i>'+nAdjuntos+' archivo(s) PDF adjunto(s) al presente trámite</i></td><td>Soporte técnico</td></tr>'
+        +'</tbody></table>'
+      : '<div style="padding:14px;background:#fef3c7;border-left:3px solid #f59e0b;font-size:9pt;color:#78350f">Sin archivos PDF adjuntos. Los soportes respaldatorios obran en el expediente institucional (Historia Clínica electrónica, RIPS y factura electrónica).</div>')
+    +'</div>'
+    // PÁGINA 3+: CONTENIDO PRINCIPAL (encabezado normal)
+    +'<div class="page-break"></div>'
     +'<div class="wrap">'
     +'<div class="hdr">'
     +'<div class="hdr-logo"><img src="/static/logo.png" alt="HUS"/></div>'
@@ -3819,7 +3906,7 @@ function imprimirDictamen(){
     +'<h1>EMPRESA SOCIAL DEL ESTADO<br>HOSPITAL UNIVERSITARIO DE SANTANDER E.S.E.</h1>'
     +'<div class="sub">NIT 900.006.037-4 · Carrera 33 No. 28-126, Bucaramanga (Santander)</div>'
     +'</div>'
-    +'<div class="hdr-right">Fecha actual: '+fechaCorta+'<div class="page">1 / 1</div></div>'
+    +'<div class="hdr-right">Fecha: '+fechaCorta+'<div class="page">Pág. 3</div></div>'
     +'</div>'
     +'<div class="meta-row">'
     +'<span>Elaboró: <b>'+elaborado+'</b></span>'

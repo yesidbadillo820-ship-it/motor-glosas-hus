@@ -771,8 +771,11 @@ def build_user_prompt(
             if n.get("texto"):
                 texto_literal = n["texto"][:350]
                 lineas.append(f"  • {nombre}: «{texto_literal}»")
+            # Ratio decidendi (resumen) y extracto judicial (párrafo literal)
             if n.get("ratio_literal"):
                 lineas.append(f"      ↳ Ratio decidendi: «{n['ratio_literal']}»")
+            if n.get("extracto_judicial"):
+                lineas.append(f"      ↳ Extracto judicial citable: {n['extracto_judicial']}")
             # Artículos internos con texto literal
             for art_num, art in list(n.get("articulos", {}).items())[:2]:
                 txt = art.get("texto", "")[:300]
@@ -833,6 +836,33 @@ def build_user_prompt(
             f"  ENTIDAD PAGADORA RECONOCIÓ $X, APLICANDO UN DESCUENTO UNILATERAL NO PACTADO DE $Y.»\n"
             f"  🚫 Si NO tienes las cifras exactas, NO hagas cálculo — describe sin números.\n"
         )
+
+    # Perfil de estilo de la EPS (adapta tono y enfoque argumental)
+    bloque_perfil_str = ""
+    try:
+        from app.services.perfil_eps import bloque_perfil_para_prompt
+        bloque_perfil_str = bloque_perfil_para_prompt(str(eps or ""))
+    except Exception:
+        pass
+
+    # Referencias documentales extraídas del PDF (folios, fechas, firmas)
+    # Permite a la IA citar elementos específicos del expediente, haciendo
+    # la respuesta casi imposible de ratificar por la EPS.
+    bloque_referencias_str = ""
+    try:
+        from app.services.extractor_folios import extraer_referencias_documentales
+        refs = extraer_referencias_documentales(contexto_pdf or "")
+        if refs["resumen_citable"]:
+            bloque_referencias_str = (
+                "\n[REFERENCIAS DOCUMENTALES EXTRAÍDAS DEL EXPEDIENTE]\n"
+                f"{refs['resumen_citable']}\n"
+                "⚠ Cuando sea pertinente, CITA en la respuesta estas referencias de forma "
+                "textual (ej. \"según consta en el folio 59 del expediente\", \"conforme a la "
+                "historia clínica N° 1234567 suscrita por el Dr. X\"). Esto hace la respuesta "
+                "casi imposible de ratificar.\n"
+            )
+    except Exception:
+        pass
 
     # Datos clínicos (solo si aparecen)
     clinicos = []
@@ -912,12 +942,19 @@ def build_user_prompt(
     bloque_tono_str = ""
     if tono_norm == "firme":
         bloque_tono_str = (
-            "\n[AJUSTE DE TONO — FIRME]\n"
-            "  Este caso es ratificación o segunda respuesta. Sube la intensidad argumentativa:\n"
-            "  • Mantén el registro técnico-jurídico pero con mayor énfasis en el deber legal incumplido.\n"
+            "\n[AJUSTE DE TONO — FIRME (ratificación / segunda respuesta)]\n"
+            "  Este caso es ratificación. Sube la intensidad argumentativa SIN cruzar a hostil:\n"
+            "  • Abre con REFERENCIA EXPRESA a la respuesta inicial:\n"
+            "    'Como se expuso en nuestra comunicación inicial radicada ante esa Entidad\n"
+            "     Pagadora, la GLOSA [CÓDIGO] fue ampliamente desvirtuada con fundamento en...'\n"
+            "  • Reforzar citas normativas con jurisprudencia reciente (2018-2026).\n"
             "  • Usa expresiones como 'NO SE AJUSTA A DERECHO', 'CARECE DE RESPALDO NORMATIVO',\n"
-            "    'CONFIGURA UN DESCONOCIMIENTO DEL MARCO CONTRACTUAL', 'SE INSTA AL PRONUNCIAMIENTO'.\n"
-            "  • Refuerza la reserva SuperSalud: anuncia la intención firme de elevar el conflicto.\n"
+            "    'CONFIGURA UN DESCONOCIMIENTO DEL MARCO CONTRACTUAL', 'SE INSTA AL PRONUNCIAMIENTO\n"
+            "    DEFINITIVO'.\n"
+            "  • Invoca explícitamente Art. 57 Ley 1438/2011: plazo para conciliación.\n"
+            "  • Cierre OBLIGATORIO con: 'De persistir la ratificación sin acuerdo en mesa de\n"
+            "    conciliación, la ESE HUS se reserva el derecho de acudir ante las autoridades\n"
+            "    competentes para resolver el conflicto en los términos de ley.'\n"
             "  • NO cruces la línea de lo hostil: sigue sin 'SE EXIGE', 'ACTO ABUSIVO', 'OBLIGA A'.\n"
         )
     elif tono_norm == "neutral":
@@ -942,7 +979,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
