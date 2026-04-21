@@ -1112,9 +1112,18 @@ async def analizar(
     return resultado
 
 
+_NO_STORE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
 @app.get("/")
 def root():
-    return FileResponse("static/index.html")
+    # no-store a nivel servidor: sortea service workers viejos que sirven
+    # HTML cacheado. Esto es crítico cuando se despliegan cambios de UI.
+    return FileResponse("static/index.html", headers=_NO_STORE_HEADERS)
 
 
 @app.get("/manifest.webmanifest")
@@ -1167,12 +1176,59 @@ def icon_512():
 
 @app.get("/importar-masiva")
 def importar_masiva():
-    return FileResponse("static/importar-masiva.html")
+    return FileResponse("static/importar-masiva.html", headers=_NO_STORE_HEADERS)
 
 
 @app.get("/importar-recepcion")
 def importar_recepcion_page():
-    return FileResponse("static/importar-recepcion.html")
+    return FileResponse("static/importar-recepcion.html", headers=_NO_STORE_HEADERS)
+
+
+@app.get("/sw.js")
+def service_worker():
+    """El SW debe servirse SIEMPRE con no-store; si el navegador cachea sw.js
+    viejo, los clientes quedan pegados en una versión anterior."""
+    return FileResponse(
+        "static/sw.js",
+        media_type="application/javascript",
+        headers=_NO_STORE_HEADERS,
+    )
+
+
+@app.get("/reset-sw.html")
+def reset_sw():
+    """Página de emergencia que desregistra cualquier service worker viejo y
+    limpia el cache del navegador. Útil cuando un usuario queda pegado con
+    una UI vieja. Uso: abrir https://.../reset-sw.html y esperar 3 seg."""
+    from fastapi.responses import HTMLResponse
+    html = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Limpiando cache…</title>
+<style>body{font-family:sans-serif;max-width:600px;margin:80px auto;padding:20px;
+text-align:center;color:#1f2937}h1{color:#059669}.ok{color:#059669;font-size:48px}</style>
+</head><body>
+<h1>🧹 Limpiando caché del navegador…</h1>
+<p id="status">Procesando…</p>
+<script>
+(async () => {
+  const log = (msg) => document.getElementById('status').innerHTML += '<br>' + msg;
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) { await r.unregister(); log('✓ SW desregistrado'); }
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      for (const k of keys) { await caches.delete(k); log('✓ Cache borrado: ' + k); }
+    }
+    log('<br><span class="ok">✅ Listo</span>');
+    log('<p>Redirigiendo a la aplicación en 2 segundos…</p>');
+    setTimeout(() => { location.href = '/'; }, 2000);
+  } catch (e) {
+    log('⚠ Error: ' + e.message);
+  }
+})();
+</script></body></html>"""
+    return HTMLResponse(content=html, headers=_NO_STORE_HEADERS)
 
 
 @app.get("/presentacion")

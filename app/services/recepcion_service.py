@@ -228,26 +228,72 @@ class RecepcionService:
             resumen.errores.append(f"Archivo Excel inválido: {e}")
             return resumen
 
-        ws = wb.active
-        filas = ws.iter_rows(values_only=True)
-
-        try:
-            cabecera = next(filas)
-        except StopIteration:
-            resumen.errores.append("Archivo vacío")
-            return resumen
-
-        indices = _mapear_cabeceras(cabecera)
-        required = {"entidad", "factura", "vence", "fecha_recepcion"}
-        faltantes = required - set(indices.keys())
-        if faltantes:
-            resumen.errores.append(
-                f"Faltan columnas obligatorias: {', '.join(sorted(faltantes))}"
-            )
-            return resumen
-
+        # Procesa TODAS las hojas del Excel. Si el nombre de la hoja contiene
+        # "RATIFIC" (p. ej. "RATIFICADAS", "Ratificadas 2026"), todas las filas
+        # de esa hoja se marcan como ratificadas automáticamente. Esto permite
+        # al equipo de recepción usar un solo archivo con dos hojas:
+        #   • "INICIAL" → glosas nuevas
+        #   • "RATIFICADA" → ratificaciones de la EPS
+        hojas_a_procesar = wb.sheetnames if wb.sheetnames else ["_default"]
         hoy = datetime.now()
+        total_hojas_procesadas = 0
 
+        for nombre_hoja in hojas_a_procesar:
+            try:
+                ws = wb[nombre_hoja] if nombre_hoja != "_default" else wb.active
+            except KeyError:
+                continue
+            # Forzar ratificación si la hoja se llama RATIFICADA/RATIFICADAS
+            hoja_es_ratificada = "RATIFIC" in (nombre_hoja or "").upper()
+
+            filas = ws.iter_rows(values_only=True)
+            try:
+                cabecera = next(filas)
+            except StopIteration:
+                logger.info(f"Hoja '{nombre_hoja}' vacía — saltando")
+                continue
+
+            indices = _mapear_cabeceras(cabecera)
+            required = {"entidad", "factura", "vence", "fecha_recepcion"}
+            faltantes = required - set(indices.keys())
+            if faltantes:
+                logger.warning(
+                    f"Hoja '{nombre_hoja}' faltan columnas: {', '.join(sorted(faltantes))} — saltando"
+                )
+                continue
+
+            total_hojas_procesadas += 1
+            logger.info(
+                f"Procesando hoja '{nombre_hoja}' "
+                f"{'(RATIFICADAS)' if hoja_es_ratificada else '(INICIALES)'}"
+            )
+            self._procesar_filas_hoja(
+                filas=filas,
+                indices=indices,
+                resumen=resumen,
+                hoy=hoy,
+                hoja_es_ratificada=hoja_es_ratificada,
+                nombre_hoja=nombre_hoja,
+            )
+
+        if total_hojas_procesadas == 0:
+            resumen.errores.append(
+                "Ninguna hoja del archivo tiene las columnas obligatorias "
+                "(entidad, factura, vence, fecha recepción). Revisa los "
+                "encabezados de la fila 1."
+            )
+        return resumen
+
+    def _procesar_filas_hoja(
+        self,
+        filas,
+        indices: dict,
+        resumen: "ResumenImportacion",
+        hoy: datetime,
+        hoja_es_ratificada: bool,
+        nombre_hoja: str,
+    ):
+        """Procesa las filas de una hoja individual."""
         for num_fila, fila in enumerate(filas, start=2):
             if all(c is None or str(c).strip() == "" for c in fila):
                 continue
@@ -299,8 +345,9 @@ class RecepcionService:
                 dias_restantes = _dias_habiles(hoy, fecha_vence) if fecha_vence > hoy else 0
                 semaforo = _semaforo(dias_restantes)
 
-                # Ratificación: revisar ambas columnas (RADICADO y REFERENCIA)
-                ratificada = _es_ratificada(radicado_info, referencia)
+                # Ratificación: la hoja entera puede ser de ratificaciones (nombre
+                # "RATIFICADA") o bien detectarse fila a fila en RADICADO/REFERENCIA.
+                ratificada = hoja_es_ratificada or _es_ratificada(radicado_info, referencia)
 
                 # numero_radicado: si RADICADO no es un texto de ratificación, es el radicado real
                 if ratificada:
