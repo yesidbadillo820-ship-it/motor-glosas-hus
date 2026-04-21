@@ -6,6 +6,10 @@ from functools import lru_cache
 logger = logging.getLogger("motor_glosas")
 
 _DEFAULT_SECRET = "dev-only-secret-key-change-in-production"
+# Sentinel explícito: si el admin_password equivale a esto, significa
+# que NO se ha configurado la variable de entorno. Cualquier uso en
+# producción debe disparar warning + rechazar setear/login.
+_UNCONFIGURED_ADMIN_PASSWORD = "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
 
 
 class Settings(BaseSettings):
@@ -17,8 +21,10 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60  # 1 hora (antes: 24h)
 
-    # Contraseña admin inicial — leer desde variable de entorno
-    admin_password: str = "admin123"
+    # Contraseña admin inicial — DEBE definirse con env var ADMIN_PASSWORD.
+    # Si queda con el sentinel, check_security_config() emite warning
+    # explícito y el endpoint de reset rechaza cualquier valor débil.
+    admin_password: str = _UNCONFIGURED_ADMIN_PASSWORD
 
     # Llaves de IA
     groq_api_key: str = ""
@@ -73,10 +79,19 @@ def check_security_config() -> None:
             stacklevel=2,
         )
     
-    if settings.admin_password == "admin123":
+    if settings.admin_password == _UNCONFIGURED_ADMIN_PASSWORD:
         warnings.warn(
-            "ADVERTENCIA DE SEGURIDAD: Contraseña admin por defecto. "
-            "Configure ADMIN_PASSWORD con una contraseña segura.",
+            "ADVERTENCIA DE SEGURIDAD: ADMIN_PASSWORD no configurada. "
+            "Define la variable de entorno ADMIN_PASSWORD con una contraseña "
+            "segura (mínimo 12 caracteres, con mayúsculas, números y símbolos) "
+            "antes de usar en producción. Sin esto, el reset controlado del "
+            "admin quedará deshabilitado.",
+            stacklevel=2,
+        )
+    elif settings.admin_password in {"admin", "admin123", "password", "123456"}:
+        warnings.warn(
+            f"ADVERTENCIA DE SEGURIDAD: ADMIN_PASSWORD usa un valor débil "
+            f"conocido. Cámbialo inmediatamente por una contraseña fuerte.",
             stacklevel=2,
         )
 

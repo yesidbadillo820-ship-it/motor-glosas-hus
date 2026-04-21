@@ -316,20 +316,41 @@ async def lifespan(app: FastAPI):
 
     db = SessionLocal()
     cfg = get_settings()
-    from sqlalchemy import text
+    from sqlalchemy import text, inspect
+
+    # Helper dialect-agnostic para verificar si una columna existe.
+    # Funciona tanto en SQLite (dev) como en PostgreSQL (prod).
+    inspector = inspect(engine)
+    def _tiene_columna(tabla: str, columna: str) -> bool:
+        try:
+            cols = [c["name"] for c in inspector.get_columns(tabla)]
+            return columna in cols
+        except Exception:
+            return False
+
+    def _tiene_tabla(tabla: str) -> bool:
+        try:
+            return inspector.has_table(tabla)
+        except Exception:
+            return False
+
+    # Tipo de timestamp compatible con ambos motores
+    from app.core.config import get_settings as _gs
+    _cfg_local = _gs()
+    _is_sqlite = _cfg_local.database_url.startswith("sqlite")
+    _TS_TIPO = "TIMESTAMP" if _is_sqlite else "TIMESTAMP WITH TIME ZONE"
+    _TS_DEFAULT = "CURRENT_TIMESTAMP" if _is_sqlite else "NOW()"
 
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='creado_en'"))
-        if not result.fetchone():
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "creado_en"):
             logger.warning("MIGRACIÓN: Agregando columna 'creado_en' a tabla usuarios")
-            db.execute(text("ALTER TABLE usuarios ADD COLUMN creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
+            db.execute(text(f"ALTER TABLE usuarios ADD COLUMN creado_en {_TS_TIPO} DEFAULT {_TS_DEFAULT}"))
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN creado_en: {e}")
 
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='activo'"))
-        if not result.fetchone():
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "activo"):
             logger.warning("MIGRACIÓN: Agregando columna 'activo' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN activo INTEGER DEFAULT 1"))
             db.commit()
@@ -337,8 +358,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MIGRACIÓN activo: {e}")
 
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='rol'"))
-        if not result.fetchone():
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "rol"):
             logger.warning("MIGRACIÓN: Agregando columna 'rol' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN rol VARCHAR(50) DEFAULT 'AUDITOR'"))
             db.commit()
@@ -346,8 +366,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MIGRACIÓN rol: {e}")
 
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='workload'"))
-        if not result.fetchone():
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "workload"):
             logger.warning("MIGRACIÓN: Agregando columna 'workload' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN workload INTEGER DEFAULT 100"))
             db.commit()
@@ -355,8 +374,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MIGRACIÓN workload: {e}")
 
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='nota_workflow'"))
-        if not result.fetchone():
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "nota_workflow"):
             logger.warning("MIGRACIÓN: Agregando columna 'nota_workflow' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN nota_workflow TEXT"))
             db.commit()
@@ -365,8 +383,7 @@ async def lifespan(app: FastAPI):
 
     # Campo must_change_password (forzar cambio en primer login)
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='must_change_password'"))
-        if not result.fetchone():
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "must_change_password"):
             logger.warning("MIGRACIÓN: Agregando columna 'must_change_password' a tabla usuarios")
             db.execute(text("ALTER TABLE usuarios ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"))
             db.commit()
@@ -375,17 +392,15 @@ async def lifespan(app: FastAPI):
 
     # Campo password_changed_at (timestamp último cambio)
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuarios' AND column_name='password_changed_at'"))
-        if not result.fetchone():
+        if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "password_changed_at"):
             logger.warning("MIGRACIÓN: Agregando columna 'password_changed_at' a tabla usuarios")
-            db.execute(text("ALTER TABLE usuarios ADD COLUMN password_changed_at TIMESTAMP WITH TIME ZONE"))
+            db.execute(text(f"ALTER TABLE usuarios ADD COLUMN password_changed_at {_TS_TIPO}"))
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN password_changed_at: {e}")
 
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='numero_radicado'"))
-        if not result.fetchone():
+        if _tiene_tabla("historial") and not _tiene_columna("historial", "numero_radicado"):
             logger.warning("MIGRACIÓN: Agregando columna 'numero_radicado' a historial")
             db.execute(text("ALTER TABLE historial ADD COLUMN numero_radicado VARCHAR(50)"))
             db.commit()
@@ -393,8 +408,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MIGRACIÓN numero_radicado: {e}")
 
     try:
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial' AND column_name='request_id'"))
-        if not result.fetchone():
+        if _tiene_tabla("historial") and not _tiene_columna("historial", "request_id"):
             logger.warning("MIGRACIÓN: Agregando columnas a historial")
             db.execute(text("ALTER TABLE historial ADD COLUMN request_id VARCHAR(50)"))
             db.execute(text("ALTER TABLE historial ADD COLUMN nota_workflow VARCHAR(500)"))
@@ -432,13 +446,12 @@ async def lifespan(app: FastAPI):
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:
-            result = db.execute(text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name='historial' AND column_name=:col"
-            ), {"col": col_name})
-            if not result.fetchone():
+            if _tiene_tabla("historial") and not _tiene_columna("historial", col_name):
                 logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a historial")
-                db.execute(text(f"ALTER TABLE historial ADD COLUMN {col_name} {col_ddl}"))
+                # Reemplazar TIMESTAMP WITH TIME ZONE por TIMESTAMP en SQLite
+                col_ddl_adapted = col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP") if _is_sqlite else col_ddl
+                col_ddl_adapted = col_ddl_adapted.replace("DOUBLE PRECISION", "REAL") if _is_sqlite else col_ddl_adapted
+                db.execute(text(f"ALTER TABLE historial ADD COLUMN {col_name} {col_ddl_adapted}"))
                 db.commit()
         except Exception as e:
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
@@ -450,11 +463,7 @@ async def lifespan(app: FastAPI):
     ]
     for col_name, col_ddl in _USUARIOS_MISSING_2FA:
         try:
-            result = db.execute(text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name='usuarios' AND column_name=:col"
-            ), {"col": col_name})
-            if not result.fetchone():
+            if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", col_name):
                 logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a usuarios")
                 db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
                 db.commit()
@@ -472,13 +481,10 @@ async def lifespan(app: FastAPI):
     ]
     for col_name, col_ddl in _CONCILIACION_MISSING:
         try:
-            result = db.execute(text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name='conciliaciones' AND column_name=:col"
-            ), {"col": col_name})
-            if not result.fetchone():
+            if _tiene_tabla("conciliaciones") and not _tiene_columna("conciliaciones", col_name):
                 logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a conciliaciones")
-                db.execute(text(f"ALTER TABLE conciliaciones ADD COLUMN {col_name} {col_ddl}"))
+                col_ddl_adapted = col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP") if _is_sqlite else col_ddl
+                db.execute(text(f"ALTER TABLE conciliaciones ADD COLUMN {col_name} {col_ddl_adapted}"))
                 db.commit()
         except Exception as e:
             logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
@@ -505,19 +511,35 @@ async def lifespan(app: FastAPI):
                 db.add(ContratoRecord(eps=k, detalles=v))
 
         # Crear admin solo si no existe
-        # CORRECCIÓN: contraseña desde variable de entorno, sin hardcodear "admin123"
+        # CORRECCIÓN: contraseña desde variable de entorno, sin hardcodear.
+        # Si ADMIN_PASSWORD no está configurada, usamos un fallback aleatorio
+        # distinto en cada arranque → obliga al operador a configurar la env.
         if db.query(UsuarioRecord).count() == 0:
+            from app.core.config import _UNCONFIGURED_ADMIN_PASSWORD
+            import secrets as _secrets
             admin_pass = cfg.admin_password
+            if admin_pass == _UNCONFIGURED_ADMIN_PASSWORD:
+                # Genera password aleatorio imposible de adivinar —
+                # operador DEBE configurar ADMIN_PASSWORD y correr el reset.
+                admin_pass = _secrets.token_urlsafe(32)
+                logger.error(
+                    "ADMIN_PASSWORD no configurada. Admin creado con password "
+                    "aleatorio IMPOSIBLE de adivinar. Define ADMIN_PASSWORD en "
+                    "Environment y usa FORCE_RESET_ADMIN_PASSWORD=1 para setear "
+                    "tu password conocido."
+                )
             db.add(UsuarioRecord(
                 nombre="Auditor Principal",
                 email="admin@hus.gov.co",
                 password_hash=get_password_hash(admin_pass),
                 rol="SUPER_ADMIN",
                 activo=1,
+                must_change_password=1,  # forzar cambio en primer login
             ))
             logger.warning(
                 "Usuario admin creado. Cambiar contraseña inmediatamente "
-                "usando la variable de entorno ADMIN_PASSWORD."
+                "usando la variable de entorno ADMIN_PASSWORD + "
+                "FORCE_RESET_ADMIN_PASSWORD=1."
             )
 
         # Asegurar que admin@hus.gov.co tenga rol SUPER_ADMIN
