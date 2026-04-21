@@ -942,12 +942,19 @@ def build_user_prompt(
     bloque_tono_str = ""
     if tono_norm == "firme":
         bloque_tono_str = (
-            "\n[AJUSTE DE TONO — FIRME]\n"
-            "  Este caso es ratificación o segunda respuesta. Sube la intensidad argumentativa:\n"
-            "  • Mantén el registro técnico-jurídico pero con mayor énfasis en el deber legal incumplido.\n"
+            "\n[AJUSTE DE TONO — FIRME (ratificación / segunda respuesta)]\n"
+            "  Este caso es ratificación. Sube la intensidad argumentativa SIN cruzar a hostil:\n"
+            "  • Abre con REFERENCIA EXPRESA a la respuesta inicial:\n"
+            "    'Como se expuso en nuestra comunicación inicial radicada ante esa Entidad\n"
+            "     Pagadora, la GLOSA [CÓDIGO] fue ampliamente desvirtuada con fundamento en...'\n"
+            "  • Reforzar citas normativas con jurisprudencia reciente (2018-2026).\n"
             "  • Usa expresiones como 'NO SE AJUSTA A DERECHO', 'CARECE DE RESPALDO NORMATIVO',\n"
-            "    'CONFIGURA UN DESCONOCIMIENTO DEL MARCO CONTRACTUAL', 'SE INSTA AL PRONUNCIAMIENTO'.\n"
-            "  • Refuerza la reserva SuperSalud: anuncia la intención firme de elevar el conflicto.\n"
+            "    'CONFIGURA UN DESCONOCIMIENTO DEL MARCO CONTRACTUAL', 'SE INSTA AL PRONUNCIAMIENTO\n"
+            "    DEFINITIVO'.\n"
+            "  • Invoca explícitamente Art. 57 Ley 1438/2011: plazo para conciliación.\n"
+            "  • Cierre OBLIGATORIO con: 'De persistir la ratificación sin acuerdo en mesa de\n"
+            "    conciliación, la ESE HUS se reserva el derecho de acudir ante las autoridades\n"
+            "    competentes para resolver el conflicto en los términos de ley.'\n"
             "  • NO cruces la línea de lo hostil: sigue sin 'SE EXIGE', 'ACTO ABUSIVO', 'OBLIGA A'.\n"
         )
     elif tono_norm == "neutral":

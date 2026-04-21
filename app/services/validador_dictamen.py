@@ -255,6 +255,52 @@ def check_placeholders(texto: str) -> dict:
     }
 
 
+def check_cita_literal_normativa(texto: str) -> dict:
+    """NUEVO: verifica que haya al menos una cita textual entre comillas.
+
+    Las respuestas con cita literal («...») son más difíciles de ratificar
+    porque no dejan margen a interpretación.
+    """
+    nombre = "Cita literal de normativa entre comillas"
+    peso = 8
+    tiene_cita_literal = bool(re.search(r"[«\"][^«»\"]{30,}[»\"]", texto))
+    aprobado = tiene_cita_literal
+    msg = (
+        "Al menos 1 cita literal de normativa entre comillas ✓"
+        if aprobado else "Ninguna cita textual detectada"
+    )
+    return {
+        "id": "cita_literal", "nombre": nombre, "peso": peso,
+        "aprobado": aprobado, "mensaje": msg,
+        "sugerencia": "" if aprobado else "Cita 1 fragmento textual entre « » de la norma clave",
+    }
+
+
+def check_anti_rebatimiento(texto: str) -> dict:
+    """NUEVO: verifica presencia de cláusula anti-rebatimiento."""
+    nombre = "Cláusula anti-rebatimiento preventiva"
+    peso = 7
+    t = texto.upper()
+    patrones = [
+        "SIN QUE SEA ADMISIBLE",
+        "NO SIENDO PROCEDENTE",
+        "NO PUEDE TRASLADARSE",
+        "CARECE DE RESPALDO CONTRACTUAL",
+        "NO RESULTA PROCEDENTE",
+        "SIN PERJUICIO DE LO ANTERIOR",
+    ]
+    aprobado = any(p in t for p in patrones)
+    msg = (
+        "Cláusula anti-rebatimiento presente ✓"
+        if aprobado else "Sin cláusula preventiva"
+    )
+    return {
+        "id": "anti_rebatimiento", "nombre": nombre, "peso": peso,
+        "aprobado": aprobado, "mensaje": msg,
+        "sugerencia": "" if aprobado else "Añade una cláusula anti-rebatimiento preventiva",
+    }
+
+
 def evaluar_dictamen(
     argumento_html: str,
     codigo_glosa: str = "",
@@ -277,6 +323,9 @@ def evaluar_dictamen(
         check_codigo_respuesta_coherente(texto, codigo_respuesta),
         check_contrato_mencionado(texto, eps),
         check_placeholders(texto),
+        # v2: checks adicionales de blindaje
+        check_cita_literal_normativa(texto),
+        check_anti_rebatimiento(texto),
     ]
 
     peso_total = sum(c["peso"] for c in checks)
