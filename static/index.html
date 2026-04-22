@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>ESE HUS — Sistema de Glosas</title>
+<title>IA GLOSAS SINAC SC — ESE HUS</title>
 <link rel="manifest" href="/manifest.webmanifest"/>
 <meta name="theme-color" content="#0b5d8a"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -263,6 +263,10 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 .sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:4px 10px;border-radius:6px;font-size:.72rem;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
 .sn-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0}
 .sidebar-nav.collapsed .sn-badge{position:absolute;top:4px;right:4px;margin-left:0;min-width:14px;height:14px;font-size:9px}
+.sn-brand-footer{margin-top:auto;padding:1rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
+.sidebar-nav.collapsed .sn-brand-footer{padding:.6rem .3rem}
+.sidebar-nav.collapsed .sn-brand-footer img{max-height:24px}
+.sidebar-nav.collapsed .sn-brand-footer div{display:none}
 .sn-highlight{background:var(--c-teal2);color:#fff !important}
 .sn-highlight svg{color:#fff !important}
 .sn-highlight:hover{background:var(--c-teal)}
@@ -1160,7 +1164,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     <div class="login-logo">
       <div class="login-badge"><img src="/static/logo.png" alt="HUS"/></div>
       <div>
-        <div class="login-title">Motor de Glosas</div>
+        <div class="login-title">IA GLOSAS SINAC SC</div>
         <div class="login-sub">ESE Hospital Universitario de Santander</div>
       </div>
     </div>
@@ -1183,7 +1187,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar</button>
     <div class="login-footer">
       <span class="sec-badge">🔒 Conexión cifrada</span>
-      <span>v6.0 · Motor de Glosas Premium</span>
+      <span>v6.0 · IA GLOSAS SINAC SC</span>
     </div>
   </div>
 </div>
@@ -1197,7 +1201,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       </button>
       <div class="hdr-badge"><img src="/static/logo.png" alt="HUS"/></div>
       <div>
-        <div class="hdr-title">Motor de Glosas HUS</div>
+        <div class="hdr-title">IA GLOSAS SINAC SC</div>
         <div class="hdr-sub">ESE Hospital Universitario de Santander · Área de Cartera</div>
       </div>
     </div>
@@ -1331,6 +1335,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <span class="sn-item-label">Importación masiva</span>
         </button>
       </div>
+      <div class="sn-brand-footer">
+        <img src="/static/sinac-logo.svg" alt="SINAC SC SAS" style="width:100%;max-height:48px;object-fit:contain;opacity:.9;"/>
+        <div style="font-size:.62rem;color:var(--text4);text-align:center;margin-top:.3rem;letter-spacing:.05em;">Powered by SINAC SC SAS</div>
+      </div>
     </aside>
 
   <div class="workspace">
@@ -1434,7 +1442,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <!-- Empty state clásico -->
           <div class="empty-state" style="margin:1rem auto;">
             <div class="empty-state-icon">⚖️</div>
-            <h3>Motor de Glosas HUS</h3>
+            <h3>IA GLOSAS SINAC SC</h3>
             <p>Complete los datos en el panel izquierdo y presione <b>Analizar</b> para generar la defensa técnico-jurídica. Las estadísticas superiores se actualizan automáticamente con los datos de su gestión.</p>
             <div class="empty-state-actions">
               <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'alertas\']'),'alertas')">Ver alertas</button>
@@ -2176,7 +2184,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 <div class="onb-backdrop" id="onb-backdrop" onclick="if(event.target===this)cerrarOnboarding()"></div>
 <div class="onb-spotlight" id="onb-spotlight" style="display:none"></div>
 <div class="onb-card" id="onb-card" style="display:none">
-  <h3 id="onb-title">Bienvenido al Motor de Glosas</h3>
+  <h3 id="onb-title">Bienvenido a IA GLOSAS SINAC SC</h3>
   <p id="onb-text">Vamos a darte un recorrido rápido por las funciones principales.</p>
   <div class="onb-nav">
     <div class="onb-dots" id="onb-dots"></div>
@@ -2669,7 +2677,7 @@ function mostrarResultadoValidacion(d){
 // ─── ONBOARDING TOUR ─────────────────────────────────────────
 var ONB_PASOS = [
   {
-    titulo: '👋 Bienvenido al Motor de Glosas HUS',
+    titulo: '👋 Bienvenido a IA GLOSAS SINAC SC',
     texto: 'Esta es tu herramienta para generar respuestas técnico-jurídicas a glosas con IA. Vamos a darte un recorrido rápido en 5 pasos (≈1 minuto).',
     target: null,  // sin target = centrado
   },
@@ -4319,7 +4327,7 @@ function nuevaGlosa(){
   document.getElementById('f-valacp').value='0';
   document.getElementById('f-factura').value='';
   document.getElementById('f-radicado').value='';
-  document.getElementById('result-area').innerHTML='<div class="empty-state"><div class="empty-icon">⚖</div><div class="empty-h">Motor de Glosas IA</div><div class="empty-p">Complete los datos y presione Analizar</div></div>';
+  document.getElementById('result-area').innerHTML='<div class="empty-state"><div class="empty-icon">⚖</div><div class="empty-h">IA GLOSAS SINAC SC</div><div class="empty-p">Complete los datos y presione Analizar</div></div>';
   lastResult=null;
 }
 
@@ -4418,10 +4426,12 @@ function imprimirDictamen(){
     +'.firma{flex:1;text-align:center;border-top:1px solid #333;padding-top:4px;font-size:8.5pt}'
     +'.footer-note{margin-top:14px;padding:8px 10px;background:#fff9db;border-left:3px solid #f59e0b;font-size:8pt;color:#78350f}'
     +'.sinac-footer{margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center}'
-    +'.sinac-footer img{max-width:100%;max-height:70px;height:auto;object-fit:contain}'
+    +'.sinac-footer img{max-width:200px;max-height:60px;height:auto;object-fit:contain}'
+    +'.sinac-tag{font-size:7.5pt;color:#64748b;margin-top:4px;letter-spacing:.03em}'
     +'@media print{.no-print{display:none}.page-break{page-break-before:always}'
-    +'.sinac-footer{position:fixed;bottom:0;left:0;right:0;background:#fff;padding:6px 0;border-top:1px solid #e2e8f0}'
-    +'.sinac-footer img{max-height:55px}}'
+    +'.sinac-footer{position:fixed;bottom:4mm;left:0;right:0;background:#fff;padding:4px 0;border-top:1px solid #e2e8f0}'
+    +'.sinac-footer img{max-height:38px;max-width:160px}'
+    +'.sinac-tag{font-size:7pt}}'
     +'.caratula{height:100vh;display:flex;flex-direction:column;justify-content:space-between;padding:40px 0;page-break-after:always}'
     +'.caratula-top{text-align:center}'
     +'.caratula-top .sello{width:140px;height:140px;margin:0 auto 20px;border:4px solid #0b3d91;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:10px}'
@@ -4496,7 +4506,7 @@ function imprimirDictamen(){
     +'<div class="firma">REVISÓ / FIRMÓ<br>&nbsp;</div>'
     +'</div>'
     +'<div class="footer-note"><b>Observación:</b> Documento generado automáticamente por el sistema. Verificar y firmar antes de radicar ante la EPS. Cualquier información a los correos institucionales: cartera@hus.gov.co · glosasydevoluciones@hus.gov.co.</div>'
-    +'<div class="sinac-footer"><img src="/static/sinac-footer.png" alt="SINAC SC SAS" onerror="this.style.display=\'none\'"/></div>'
+    +'<div class="sinac-footer"><img src="/static/sinac-logo.svg" alt="SINAC SC SAS"/><div class="sinac-tag">Documento generado por IA GLOSAS SINAC SC · Powered by SINAC SC SAS</div></div>'
     +'</div>'
     +'<script>window.onload=function(){window.print()}<\/script>'
     +'</body></html>');
