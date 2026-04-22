@@ -1327,13 +1327,66 @@ class GlosaService:
         from html import unescape
         txt = _re.sub(r"<[^>]+>", " ", dictamen_actual_html or "")
         txt = _re.sub(r"\s+", " ", unescape(txt)).strip()
-        for marker in ("ARGUMENTACIÓN JURÍDICA", "RESPUESTA A GLOSA"):
-            if marker in txt and len(txt.split(marker, 1)[0]) < 500:
-                txt = txt.split(marker, 1)[1].strip()
-                break
-        for cierre in ("Nota: Generado con asistencia", "RESUMEN DE VALORES"):
-            if cierre in txt:
-                txt = txt.split(cierre)[0].strip()
+
+        # Abrir por el argumento: buscar el primer marker canonico.
+        # Incluye markers de inicio de argumento para CUALQUIER tipo de dictamen:
+        # tarifaria/soportes (ARGUMENTACION JURIDICA), ratificada, extemporanea,
+        # injustificada, etc.
+        markers_inicio = (
+            "ARGUMENTACIÓN JURÍDICA",
+            "ARGUMENTACION JURIDICA",
+            "RESPUESTA A GLOSA",
+            "ESE HUS RESPETUOSAMENTE",  # ratificadas
+            "ESE HUS NO ACEPTA",         # tarifas/facturacion/IA normal
+            "ESE HUS RECHAZA",           # Salud Total
+            "ESE HUS NO COMPARTE",       # variante ratificada
+        )
+        for marker in markers_inicio:
+            if marker in txt:
+                # Si el marker aparece cerca del inicio (primeros 500 chars), cortamos por alli.
+                # Si aparece mas adentro, significa que ya estamos DENTRO del argumento y lo dejamos.
+                pos = txt.find(marker)
+                if pos < 500:
+                    # Para "ARGUMENTACIÓN JURÍDICA" y "RESPUESTA A GLOSA" son labels,
+                    # cortamos DESPUES del marker.
+                    if marker in ("ARGUMENTACIÓN JURÍDICA", "ARGUMENTACION JURIDICA", "RESPUESTA A GLOSA"):
+                        txt = txt[pos + len(marker):].strip()
+                    else:
+                        # Para "ESE HUS..." el marker ES el inicio del argumento, cortamos DESDE el marker.
+                        txt = txt[pos:].strip()
+                    break
+
+        # Cerrar por el primer marker de seccion auxiliar (soportes, QR, carátula,
+        # metadatos). Lista exhaustiva para que ningún apéndice se cuele al argumento.
+        cierres = (
+            "📎 RELACIÓN DE SOPORTES",
+            "RELACIÓN DE SOPORTES APORTADOS",
+            "RELACION DE SOPORTES",
+            "📲 TRAZABILIDAD",
+            "TRAZABILIDAD DIGITAL",
+            "CÓDIGO QR CON METADATOS",
+            "CODIGO QR CON METADATOS",
+            "INSTITUCIÓN PRESTADORA DE SERVICIOS",
+            "INSTITUCION PRESTADORA DE SERVICIOS",
+            "DOCUMENTO GENERADO ELECTRÓNICAMENTE",
+            "DOCUMENTO GENERADO ELECTRONICAMENTE",
+            "MARCO LEGAL: RESOLUCIÓN 2284",
+            'PRESTADOR_NIT',        # JSON de metadatos embebido
+            '"CODIGO_GLOSA"',
+            "Nota: Generado con asistencia",
+            "Nota: Generado con IA",
+            "RESUMEN DE VALORES",
+            "FUNDAMENTO NORMATIVO",  # por si quedó un header viejo
+        )
+        posiciones_cierre = [txt.find(c) for c in cierres if c in txt]
+        posiciones_cierre = [p for p in posiciones_cierre if p > 0]
+        if posiciones_cierre:
+            primer_cierre = min(posiciones_cierre)
+            txt = txt[:primer_cierre].strip()
+
+        # Limpieza final: quitar trailing spaces, puntos repetidos, etc.
+        txt = _re.sub(r"\s+\.", ".", txt)
+        txt = _re.sub(r"\s+", " ", txt).strip()
 
         system = (
             "Eres un auditor médico senior de la ESE Hospital Universitario de Santander (HUS). "
@@ -1344,8 +1397,11 @@ class GlosaService:
             "Solo respeta la instrucción del auditor en tono, longitud, citas y contenido.\n"
             "2. Las citas normativas colombianas (Ley 100/1993, Ley 1438/2011, Art. 871 "
             "C.Comercio, etc.) se conservan en su forma canónica salvo que el auditor las quite.\n"
-            "3. Responde SOLO con el texto refinado — sin preámbulos, sin comillas, sin "
-            "etiquetas XML, sin explicaciones de qué cambiaste.\n"
+            "3. Responde SOLO con el texto refinado del ARGUMENTO JURÍDICO — sin preámbulos, "
+            "sin comillas, sin etiquetas XML, sin explicaciones de qué cambiaste, SIN incluir "
+            "secciones auxiliares como 'RELACIÓN DE SOPORTES', 'TRAZABILIDAD DIGITAL', datos "
+            "de la institución prestadora, fecha de emisión, ni JSON de metadatos (PRESTADOR_NIT, "
+            "CODIGO_GLOSA, etc.). Esas secciones se agregan aparte por el sistema.\n"
             "4. NO inventes CUPS, folios, fechas, números de contrato ni nombres de médicos: "
             "mantén solo los datos que ya aparecen en el argumento original."
         )
@@ -1353,8 +1409,8 @@ class GlosaService:
             f"EPS: {eps}\nCÓDIGO: {codigo}\n\n"
             f"ARGUMENTO ACTUAL:\n{txt}\n\n"
             f"INSTRUCCIÓN DEL AUDITOR:\n{mensaje_usuario.strip()}\n\n"
-            "Devuelve el ARGUMENTO REFINADO completo según la instrucción. "
-            "No expliques qué cambiaste, solo escribe el texto final."
+            "Devuelve SOLO el argumento refinado. No incluyas títulos como 'Respuesta:', "
+            "'Argumento:', 'Relación de soportes', 'Trazabilidad', ni ningún JSON."
         )
         if not self.groq and not self.anthropic_key:
             return txt  # sin IA disponible → devolver original
@@ -1364,6 +1420,14 @@ class GlosaService:
         out = content.strip()
         # Eliminar cierres XML si la IA los metió por hábito
         out = _re.sub(r"</?(argumento|answer|response)>", "", out, flags=_re.IGNORECASE).strip()
+
+        # POST-LIMPIEZA: por si la IA de todas formas metió las secciones auxiliares,
+        # las podamos aquí antes de devolver.
+        for cierre in cierres:
+            if cierre in out:
+                pos = out.find(cierre)
+                if pos > 100:  # no cortar si aparece muy al principio (falso positivo)
+                    out = out[:pos].strip()
 
         # ESTÁNDAR INSTITUCIONAL: las respuestas a glosas SIEMPRE van en
         # MAYÚSCULAS (radicación ante EPS). Si la IA devolvió lowercase o
