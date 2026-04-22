@@ -2030,8 +2030,11 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     </div>
 
     <!-- SALUD TOTAL (layout block-based para evitar chain flex que dio problemas) -->
-    <div class="panel" id="p-salud-total">
-      <h2 style="font-size:1.1rem;font-weight:700;color:var(--text);margin:0 0 1rem 0;">💚 Salud Total EPS — Procesar archivo TXT</h2>
+    <div class="panel" id="p-salud-total" style="min-height:500px;background:#fff;">
+      <div style="background:#fef2f2;border:3px solid #dc2626;padding:16px;margin:0 0 16px 0;border-radius:10px;color:#991b1b;font-weight:700;font-size:14px;">
+        🩺 PANEL SALUD TOTAL — Si ves este recuadro rojo es que el panel SÍ está cargando.
+      </div>
+      <h2 style="font-size:1.1rem;font-weight:700;color:#0f172a;margin:0 0 1rem 0;">💚 Salud Total EPS — Procesar archivo TXT</h2>
       <div class="st-area">
         <div class="st-upload-col">
           <div class="form-card">
@@ -2406,10 +2409,20 @@ function toggleDark(){
 // ─── TABS ─────────────────────────────────────────────────────────────────
 function tab(btn,id){
   document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('active')});
-  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.panel').forEach(function(p){
+    p.classList.remove('active');
+    // Limpiar inline styles de diagnóstico de panels anteriores
+    if(p.id === 'p-salud-total') p.removeAttribute('style');
+  });
   if(btn) btn.classList.add('active');
   var panel = document.getElementById('p-'+id);
   if(panel) panel.classList.add('active');
+  // Fix brute-force para p-salud-total: inline styles que bypassan TODO
+  // el chain flex/CSS en caso de que siga fallando por algún conflicto.
+  if(id === 'salud-total' && panel){
+    panel.style.cssText = 'display:block !important;position:absolute;top:0;left:0;right:0;bottom:0;'
+      + 'overflow-y:auto;overflow-x:hidden;padding:1.5rem 2rem;background:#fff;z-index:5;';
+  }
   if(id==='dashboard') loadDash();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
