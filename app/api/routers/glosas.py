@@ -756,6 +756,30 @@ def glosas_por_factura(
     factura_limpio = numero_factura.strip()
     if not factura_limpio:
         return {"numero_factura": "", "glosas": []}
+
+    def _nombre_corto_entidad(plan_eps: str, tercero: str = "") -> str:
+        """Devuelve el nombre corto de la entidad:
+          1. tercero_nombre si existe (FacturaCartera.Tercero.NombreCompletoNA).
+          2. sino: último segmento del plan EPS tras " - " / " — " / " – ".
+          Ej: "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO
+               BUCARAMANG" → "DISPENSARIO MEDICO BUCARAMANG".
+        """
+        t = (tercero or "").strip()
+        if t:
+            return t
+        p = (plan_eps or "").strip()
+        if not p:
+            return ""
+        # Separar por guiones largos o cortos rodeados de espacios
+        import re as _rex
+        partes = _rex.split(r"\s+[-–—]\s+", p)
+        # Filtrar códigos tipo "U220311" (solo letras+digitos cortos) al inicio
+        filtradas = [x.strip() for x in partes if x.strip()]
+        if len(filtradas) >= 2:
+            # Último segmento suele ser el nombre comercial
+            return filtradas[-1]
+        return p
+
     glosas_padre = (
         db.query(_GR)
         .filter(_GR.factura == factura_limpio)
@@ -799,7 +823,10 @@ def glosas_por_factura(
                 # Nombre comercial corto (FacturaCartera.Tercero.NombreCompletoNA),
                 # ej: "DISPENSARIO MEDICO BUCARAMANGA". La UI lo prefiere sobre
                 # el plan EPS cuando existe.
-                "tercero_nombre": (getattr(padre, "tercero_nombre", None) or "") if padre else "",
+                "tercero_nombre": _nombre_corto_entidad(
+                    padre.eps if padre else "",
+                    getattr(padre, "tercero_nombre", None) if padre else "",
+                ),
                 "concepto_glosa": c.nombre_glosa or "",
                 "texto_glosa_original": (c.observacion_eps or "")[:400],
                 "fecha_radicacion_factura": padre.fecha_radicacion_factura.isoformat() if padre and padre.fecha_radicacion_factura else None,
@@ -833,7 +860,14 @@ def glosas_por_factura(
     # Nombre comercial corto de la entidad (Tercero.NombreCompletoNA). Si todas
     # las glosas padre apuntan al mismo tercero, exponemos ese nombre en la
     # cabecera de la respuesta. Si no, None (la UI cae al plan EPS).
-    terceros_unicos = list({getattr(g, "tercero_nombre", None) for g in glosas_padre if getattr(g, "tercero_nombre", None)})
+    # Usar el helper para fallback: si tercero_nombre esta vacio, extrae el
+    # nombre corto del plan EPS. Así las glosas importadas antes del campo
+    # tercero_nombre también muestran el nombre comercial limpio.
+    terceros_unicos = list({
+        _nombre_corto_entidad(g.eps, getattr(g, "tercero_nombre", None))
+        for g in glosas_padre if g.eps
+    })
+    terceros_unicos = [t for t in terceros_unicos if t]
     total_objetado = sum(i["valor_objetado"] or 0 for i in items)
     return {
         "numero_factura": factura_limpio,
