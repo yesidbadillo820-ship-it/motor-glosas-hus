@@ -282,11 +282,21 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 .btn-menu-mobile{display:none;background:transparent;border:none;cursor:pointer;color:#fff;padding:6px;margin-right:6px}
 
 /* ─── LAYOUT ─────────────────────────────── */
-.workspace{flex:1;display:flex;overflow:hidden}
+.workspace{flex:1;display:flex;overflow:hidden;position:relative}
 .panel{display:none;flex:1;overflow:hidden;position:relative}
 .panel.active{display:flex}
-/* Paneles verticales (sin sidebar lateral) usan column-layout.
-   Nota: p-salud-total usa position:absolute interno y no necesita esta regla. */
+/* p-salud-total usa un layout especial (block + absolute) para evitar
+   problemas que tuvo con el chain flex. Ver regla override abajo. */
+.panel.active#p-salud-total{
+  display:block !important;
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:1.5rem 2rem;
+  background:var(--bg);
+}
+/* Paneles verticales (sin sidebar lateral) usan column-layout. */
 .panel.active#p-consulta-normativa,
 .panel.active#p-multi-concepto,
 .panel.active#p-detector-masa,
@@ -2019,9 +2029,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       </div>
     </div>
 
-    <!-- SALUD TOTAL -->
-    <div class="panel" id="p-salud-total" style="position:relative">
-      <div style="position:absolute;inset:0;overflow-y:auto;padding:1.5rem 2rem;">
+    <!-- SALUD TOTAL (layout block-based para evitar chain flex que dio problemas) -->
+    <div class="panel" id="p-salud-total">
+      <h2 style="font-size:1.1rem;font-weight:700;color:var(--text);margin:0 0 1rem 0;">💚 Salud Total EPS — Procesar archivo TXT</h2>
       <div class="st-area">
         <div class="st-upload-col">
           <div class="form-card">
@@ -2069,7 +2079,6 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             </table>
           </div>
         </div>
-      </div>
       </div>
     </div>
 
