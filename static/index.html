@@ -289,15 +289,17 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
    problemas que tuvo con el chain flex. Ver regla override abajo. */
 .panel.active#p-salud-total{
   display:block !important;
-  position:absolute;
-  top:0;left:0;right:0;bottom:0;
-  overflow-y:auto;
+  position:absolute !important;
+  top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;
+  overflow-y:auto !important;
   overflow-x:hidden;
   padding:1.5rem 2rem;
   background:var(--bg);
-  animation:none !important;    /* Desactivar fadeInUp que dejaba opacity:0 */
+  animation:none !important;
   opacity:1 !important;
   transform:none !important;
+  width:auto !important;height:auto !important;  /* dejamos que top+bottom+left+right lo dimensionen */
+  z-index:5;
 }
 /* Paneles verticales (sin sidebar lateral) usan column-layout. */
 .panel.active#p-consulta-normativa,
@@ -2423,9 +2425,25 @@ function tab(btn,id){
   // Fix brute-force para p-salud-total: inline styles que bypassan TODO
   // el chain flex/CSS en caso de que siga fallando por algún conflicto.
   if(id === 'salud-total' && panel){
-    panel.style.cssText = 'display:block !important;position:absolute;top:0;left:0;right:0;bottom:0;'
-      + 'overflow-y:auto;overflow-x:hidden;padding:1.5rem 2rem;background:#fff;z-index:5;'
-      + 'opacity:1 !important;transform:none !important;animation:none !important;';
+    // Forzar !important en cada propiedad via setProperty para garantizar que gane
+    var s = panel.style;
+    s.setProperty('display','block','important');
+    s.setProperty('position','absolute','important');
+    s.setProperty('top','0','important');
+    s.setProperty('left','0','important');
+    s.setProperty('right','0','important');
+    s.setProperty('bottom','0','important');
+    s.setProperty('overflow-y','auto','important');
+    s.setProperty('overflow-x','hidden','important');
+    s.setProperty('padding','1.5rem 2rem','important');
+    s.setProperty('background','#fff','important');
+    s.setProperty('z-index','5','important');
+    s.setProperty('opacity','1','important');
+    s.setProperty('transform','none','important');
+    s.setProperty('animation','none','important');
+    s.setProperty('width','auto','important');
+    s.setProperty('height','auto','important');
+    console.log('[SALUD TOTAL] Panel activado con inline styles:', panel.getAttribute('style'));
   }
   if(id==='dashboard') loadDash();
   if(id==='historial') loadHist(1);
