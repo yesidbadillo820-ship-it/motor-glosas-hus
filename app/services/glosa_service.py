@@ -617,7 +617,11 @@ class GlosaService:
             val_ace_num = float(getattr(data, "valor_aceptado_parcial", 0.0) or 0.0)
             try:
                 import re as _rex
-                numeros = _rex.findall(r"\d+", str(valor_raw))
+                # Remover decimales tipo .00 antes de extraer digitos para
+                # que "$100.00" no se convierta en "10000" (concatenacion de
+                # "100" + "00"). Los valores del Excel son enteros COP.
+                sin_dec = _rex.sub(r"\.\d{1,2}(?=\s|$|[^\d])", "", str(valor_raw))
+                numeros = _rex.findall(r"\d+", sin_dec)
                 if numeros:
                     val_obj_num = float("".join(numeros))
             except Exception:
