@@ -300,6 +300,19 @@ def _suavizar_tono(texto: str) -> str:
     """
     if not texto:
         return texto
+    # Eliminar NIT del pagador en parentesis (bloque completo, con posibles
+    # espacios, comas, puntos). Patrones que la IA suele generar:
+    #   "(NIT 901.541.137-1)"  → quita el parentesis completo
+    #   "(NIT 901541137-1)"
+    #   ", NIT 901.541.137-1,"  → quita la clausula
+    #   " NIT 901.541.137-1"    → quita el token
+    # Usamos MAYUSCULAS/minúsculas para cubrir ambos.
+    texto = re.sub(r"\s*\([Nn][Ii][Tt][\s\.]*\d[\d\.\s\-]*\d\s*\)", "", texto)
+    texto = re.sub(r",?\s*[Nn][Ii][Tt][\s\.]*\d[\d\.\s\-]*\d,?", "", texto)
+    # Limpiar dobles espacios y dobles comas que quedan tras el recorte
+    texto = re.sub(r"\s+,", ",", texto)
+    texto = re.sub(r",\s*,", ",", texto)
+    texto = re.sub(r"\s{2,}", " ", texto)
     # Placeholders literales residuales
     texto = re.sub(
         r"\$\s*\[[A-Z_ ]+\]",
