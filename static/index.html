@@ -295,6 +295,9 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
   overflow-x:hidden;
   padding:1.5rem 2rem;
   background:var(--bg);
+  animation:none !important;    /* Desactivar fadeInUp que dejaba opacity:0 */
+  opacity:1 !important;
+  transform:none !important;
 }
 /* Paneles verticales (sin sidebar lateral) usan column-layout. */
 .panel.active#p-consulta-normativa,
@@ -2421,7 +2424,8 @@ function tab(btn,id){
   // el chain flex/CSS en caso de que siga fallando por algún conflicto.
   if(id === 'salud-total' && panel){
     panel.style.cssText = 'display:block !important;position:absolute;top:0;left:0;right:0;bottom:0;'
-      + 'overflow-y:auto;overflow-x:hidden;padding:1.5rem 2rem;background:#fff;z-index:5;';
+      + 'overflow-y:auto;overflow-x:hidden;padding:1.5rem 2rem;background:#fff;z-index:5;'
+      + 'opacity:1 !important;transform:none !important;animation:none !important;';
   }
   if(id==='dashboard') loadDash();
   if(id==='historial') loadHist(1);
