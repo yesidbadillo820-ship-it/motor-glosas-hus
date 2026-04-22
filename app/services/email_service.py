@@ -119,19 +119,67 @@ async def notificar_batch_completado(batch_id: str, total: int, exitosas: int, d
     await enviar_email(destinatario, asunto, _build_html_base(asunto, contenido))
 
 
-async def enviar_resumen_importacion_recepcion(resumen: dict) -> int:
+def _buscar_emails_por_gestor(gestores_nombres: list, db=None) -> list:
+    """Busca correos de UsuarioRecord cuyo nombre coincida con alguno de los
+    gestores dados (comparación case-insensitive, fuzzy por contains).
+
+    Sirve para que al importar recepción con gestores "EQUIPO ASEGURADORAS",
+    "IRMA RIOS", etc., se envíe el correo a TODOS los usuarios con ese
+    nombre (ej. los 4 correos del equipo aseguradoras).
+    """
+    if db is None:
+        return []
+    try:
+        from app.models.db import UsuarioRecord
+        usuarios = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all()
+        emails = set()
+        gestores_norm = [g.strip().upper() for g in gestores_nombres if g and g.strip()]
+        for u in usuarios:
+            if not u.nombre or not u.email:
+                continue
+            nombre_upper = u.nombre.strip().upper()
+            for g in gestores_norm:
+                # Match exacto O contains (para manejar prefijos tipo
+                # "A_A_A_A (EQUIPO ASEGURADORAS)" vs "EQUIPO ASEGURADORAS")
+                if nombre_upper == g or g in nombre_upper or nombre_upper in g:
+                    emails.add(u.email.strip().lower())
+                    break
+        return sorted(emails)
+    except Exception as e:
+        logger.warning(f"Error buscando usuarios por gestor: {e}")
+        return []
+
+
+async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     """Envía un correo broadcast a todos los gestores listando las glosas importadas.
+
+    Destinatarios = ALERTAS_EMAIL (broadcast global) UNION correos de
+    usuarios cuyo nombre matchee con los gestores del resumen. Así, si
+    se importa una glosa con gestor "EQUIPO ASEGURADORAS", los 4 usuarios
+    del sistema con ese nombre reciben el correo aunque no estén en
+    ALERTAS_EMAIL.
 
     Retorna el número de destinatarios a los que se envió correctamente.
     """
     cfg = get_settings()
-    if not cfg.alertas_email:
-        logger.warning("ALERTAS_EMAIL vacío: no se envía resumen de importación")
-        return 0
+    destinatarios_base = []
+    if cfg.alertas_email:
+        destinatarios_base = [e.strip() for e in cfg.alertas_email.split(",") if e.strip()]
 
-    destinatarios = [e.strip() for e in cfg.alertas_email.split(",") if e.strip()]
+    # Añadir correos de usuarios cuyo nombre matchea con los gestores del resumen
+    por_gestor_dict = resumen.get("por_gestor", {}) or {}
+    gestores = list(por_gestor_dict.keys())
+    emails_gestores = _buscar_emails_por_gestor(gestores, db=db) if db is not None else []
+
+    # Union sin duplicados
+    destinatarios = sorted({*(e.lower() for e in destinatarios_base), *emails_gestores})
     if not destinatarios:
+        logger.warning("Sin destinatarios: ni ALERTAS_EMAIL ni usuarios-gestor matcheados")
         return 0
+    logger.info(
+        f"Destinatarios importación recepción: {len(destinatarios)} "
+        f"(ALERTAS_EMAIL={len(destinatarios_base)}, por-gestor={len(emails_gestores)})"
+    )
 
     total = resumen.get("total", 0)
     creadas = resumen.get("creadas", 0)

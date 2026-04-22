@@ -462,7 +462,11 @@ class GlosaService:
         es_ratificacion = "RATIF" in str(data.etapa).upper()
         tiene_pdf = bool(contexto_pdf and len(contexto_pdf.strip()) > 0)
         es_urgencia = "URGENCIA" in texto_base or "URGENTE" in texto_base
-        es_tarifa = prefijo == "TA" or "TARIFA" in texto_base
+        # Es tarifa SOLO si el prefijo del código es TA. FA=facturación,
+        # SO=soportes, AU=autorización, CO=cobertura, etc. NO inferir
+        # "tarifa" del texto libre porque genera falsos positivos (ej.
+        # FA0801 cuyo motivo menciona "valores pactados" pero NO es TA).
+        es_tarifa = prefijo == "TA"
 
         eps_key = str(data.eps).upper().replace(" / SIN DEFINIR", "").strip()
         tiene_contrato = eps_key in (contratos_db or {})

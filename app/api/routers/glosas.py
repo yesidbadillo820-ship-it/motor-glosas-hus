@@ -1548,8 +1548,11 @@ async def importar_recepcion(
     resumen_dict = resumen.to_dict()
 
     # Notificación broadcast (no bloquea la respuesta si falla)
+    # Pasamos db para que la funcion busque usuarios cuyo nombre matchee
+    # con los gestores del resumen (ej. EQUIPO ASEGURADORAS) y los incluya
+    # en la lista de destinatarios aunque no esten en ALERTAS_EMAIL.
     try:
-        enviados = await enviar_resumen_importacion_recepcion(resumen_dict)
+        enviados = await enviar_resumen_importacion_recepcion(resumen_dict, db=db)
         resumen_dict["correos_enviados"] = enviados
     except Exception as e:
         logger.error(f"[{req_id}] Error enviando correo: {e}")
