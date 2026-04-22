@@ -2955,34 +2955,70 @@ function responderTodosLosConceptos(){
 
 async function procesarConceptosSecuencial(conceptos, idx, total){
   var procesados = 0, fallidos = 0;
+  // Acumular cada resultado generado (cada analizar() sobreescribe result-area,
+  // así que capturamos el HTML resultante tras cada iteración y al final los
+  // renderizamos todos juntos con separador y acordeón por concepto).
+  var resultadosHtml = [];
+  var area = document.getElementById('result-area');
+
   for(var i = 0; i < conceptos.length; i++){
     var g = conceptos[i];
     var n = i + 1;
-    // Cargar concepto en editor (enriquece texto para pasar validación 15 chars)
-    // Usa concepto_id si viene del nuevo modelo, sino glosa id (legacy)
     var key = g.concepto_id != null ? ('c'+g.concepto_id) : ('g'+g.id);
     cargarConceptoDeFactura(key);
-    // Verificar que se cargó texto suficiente antes de analizar
     var editor = document.getElementById('f-glosa');
     if(!editor || !editor.value || editor.value.trim().length < 15){
       fallidos++;
       toast('⚠ Concepto '+n+'/'+total+' saltado', 'Texto insuficiente: ' + (g.codigo_glosa||'?'), 'warning');
       continue;
     }
-    // Esperar un tick para que el DOM se actualice
     await new Promise(function(r){ setTimeout(r, 300); });
     toast('Analizando '+n+'/'+total, 'Código ' + (g.codigo_glosa||'?'), 'info');
     try{
       await analizar();
+      // Capturar el HTML que analizar() dejó en result-area + el lastResult
+      var htmlGenerado = area ? area.innerHTML : '';
+      if(htmlGenerado && htmlGenerado.length > 100){
+        resultadosHtml.push({
+          n: n,
+          codigo: (g.codigo_glosa || '—'),
+          cups: (g.cups || ''),
+          valor: (g.valor_objetado || 0),
+          glosa_id: (lastResult && lastResult.glosa_id) || null,
+          html: htmlGenerado,
+        });
+      }
       procesados++;
     }catch(e){
       fallidos++;
       console.error('Error procesando concepto ' + n + ':', e);
     }
-    // Pausa entre análisis para no saturar IA (rate limiting)
     await new Promise(function(r){ setTimeout(r, 1500); });
   }
-  // Resumen final
+
+  // Renderizado final: lista de TODOS los dictámenes generados con acordeón
+  if(resultadosHtml.length > 0 && area){
+    var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var out = '<div style="background:#f0f9ff;border:2px solid #0369a1;border-radius:10px;padding:16px;margin-bottom:18px;">';
+    out += '<h3 style="margin:0 0 8px 0;color:#0369a1;">✓ Lote completado — ' + resultadosHtml.length + ' dictámenes generados</h3>';
+    out += '<p style="margin:0;font-size:.85rem;color:#334155;">Cada concepto abajo tiene su propio dictamen. Haz click en la barra para expandir/colapsar. Todos quedaron guardados en Historial / Mis Glosas.</p>';
+    out += '</div>';
+    for(var j = 0; j < resultadosHtml.length; j++){
+      var r = resultadosHtml[j];
+      var valorFmt = '$' + (r.valor || 0).toLocaleString('es-CO');
+      var colOpen = (j === resultadosHtml.length - 1) ? 'open' : '';  // último abierto por defecto
+      out += '<details ' + colOpen + ' style="margin-bottom:14px;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;">';
+      out += '<summary style="padding:12px 16px;background:linear-gradient(90deg,#1e3a8a,#0369a1);color:#fff;cursor:pointer;font-weight:600;font-size:.95rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;">';
+      out += '<span>📋 Concepto ' + r.n + '/' + total + ' · <b>' + esc(r.codigo) + '</b>' + (r.cups ? ' · CUPS ' + esc(r.cups) : '') + '</span>';
+      out += '<span style="background:rgba(255,255,255,.2);padding:4px 10px;border-radius:20px;font-size:.8rem;">' + valorFmt + '</span>';
+      out += '</summary>';
+      out += '<div style="padding:14px;background:#fff">' + r.html + '</div>';
+      out += '</details>';
+    }
+    area.innerHTML = out;
+  }
+
+  // Resumen final (toast)
   if(fallidos > 0){
     toast('Lote completado con errores', procesados + ' procesados, ' + fallidos + ' fallidos', 'warning');
   } else {
