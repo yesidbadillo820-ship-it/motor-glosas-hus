@@ -315,6 +315,58 @@ def _suavizar_tono(texto: str) -> str:
     return texto
 
 
+def generar_texto_aceptacion_total(codigo_glosa: str = "", valor: str = "", servicio: str = "") -> str:
+    """Plantilla RE9702 — GLOSA ACEPTADA AL 100%.
+
+    El auditor decidió aceptar la glosa completa. ESE HUS reconoce la
+    objeción y aplicará nota crédito. No hay argumento jurídico; es
+    una declaración formal de aceptación.
+    """
+    cod = codigo_glosa or "INDICADO EN EL EXPEDIENTE"
+    val = valor if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "") else "EL VALOR INDICADO EN EL EXPEDIENTE"
+    srv_txt = f" RESPECTO DEL SERVICIO {servicio.upper()}" if servicio else ""
+    return (
+        f"ESE HUS ACEPTA LA GLOSA APLICADA BAJO EL CÓDIGO {cod} POR {val}"
+        f"{srv_txt}, RECONOCIENDO LA OBJECIÓN PLANTEADA POR LA ENTIDAD "
+        f"PAGADORA. SE PROCEDERÁ CON LA EMISIÓN DE LA CORRESPONDIENTE "
+        f"NOTA CRÉDITO Y AJUSTE DE LA FACTURACIÓN SEGÚN LA NORMATIVA "
+        f"VIGENTE (RESOLUCIÓN 2284 DE 2023 - MANUAL ÚNICO DE GLOSAS). "
+        f"CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: "
+        f"CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+    )
+
+
+def generar_texto_aceptacion_parcial(
+    codigo_glosa: str = "", valor_objetado: float = 0.0,
+    valor_aceptado: float = 0.0, servicio: str = "",
+) -> str:
+    """Plantilla RE9801 — GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE.
+
+    El auditor acepta parte de la glosa (valor_aceptado) y mantiene
+    la defensa sobre la diferencia. Requiere argumento hybrid pero
+    aquí generamos solo la sección de aceptación; la defensa de la
+    diferencia la genera la IA aparte.
+    """
+    cod = codigo_glosa or "INDICADO EN EL EXPEDIENTE"
+    val_obj = f"${valor_objetado:,.0f}".replace(",", ".") if valor_objetado else "EL VALOR INDICADO"
+    val_ace = f"${valor_aceptado:,.0f}".replace(",", ".") if valor_aceptado else "$0"
+    diferencia = max(0, valor_objetado - valor_aceptado)
+    val_dif = f"${diferencia:,.0f}".replace(",", ".")
+    srv_txt = f" RESPECTO DEL SERVICIO {servicio.upper()}" if servicio else ""
+    return (
+        f"ESE HUS ACEPTA PARCIALMENTE LA GLOSA APLICADA BAJO EL CÓDIGO "
+        f"{cod}{srv_txt}. DEL VALOR TOTAL OBJETADO ({val_obj}), SE "
+        f"RECONOCE COMO PROCEDENTE LA SUMA DE {val_ace}, SOBRE LA CUAL "
+        f"SE EMITIRÁ LA CORRESPONDIENTE NOTA CRÉDITO. LA DIFERENCIA DE "
+        f"{val_dif} NO ES ACEPTADA Y SE MANTIENE LA DEFENSA TÉCNICA "
+        f"CONFORME AL ARGUMENTO JURÍDICO DESARROLLADO EN LA RESPUESTA "
+        f"PRINCIPAL, CON FUNDAMENTO EN LA NORMATIVA VIGENTE (RESOLUCIÓN "
+        f"2284 DE 2023 - MANUAL ÚNICO DE GLOSAS, ART. 57 LEY 1438/2011). "
+        f"CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: "
+        f"CARTERA@HUS.GOV.CO."
+    )
+
+
 TEXTO_RATIFICADA = (
     "ESE HUS NO ACEPTA LA RATIFICACIÓN DE LA GLOSA Y MANTIENE LA "
     "RESPUESTA DADA EN EL TRÁMITE DE LA GLOSA INICIAL, LA CUAL SE CONSIDERA "
@@ -482,10 +534,42 @@ class GlosaService:
             argumento_fijo = generar_texto_injustificada(eps_key, codigo_det, valor_raw)
             tipo_glosa = "TA_TARIFA"
 
+        # Modo de respuesta explicito por concepto (Sprint 1):
+        # Si el auditor marco "aceptar_total" o "aceptar_parcial", sobreescribe
+        # el argumento con la plantilla correspondiente (RE9702 o RE9801).
+        # El flujo por defecto "defender" mantiene el comportamiento previo.
+        modo_resp = (getattr(data, "modo_respuesta", None) or "defender").lower()
+        if modo_resp == "aceptar_total":
+            argumento_fijo = generar_texto_aceptacion_total(
+                codigo_glosa=codigo_det, valor=valor_raw, servicio=""
+            )
+            tipo_glosa = "ACEPTADA_TOTAL"
+        elif modo_resp == "aceptar_parcial":
+            val_obj_num = 0.0
+            val_ace_num = float(getattr(data, "valor_aceptado_parcial", 0.0) or 0.0)
+            try:
+                import re as _rex
+                numeros = _rex.findall(r"\d+", str(valor_raw))
+                if numeros:
+                    val_obj_num = float("".join(numeros))
+            except Exception:
+                pass
+            argumento_fijo = generar_texto_aceptacion_parcial(
+                codigo_glosa=codigo_det,
+                valor_objetado=val_obj_num,
+                valor_aceptado=val_ace_num,
+                servicio="",
+            )
+            tipo_glosa = "ACEPTADA_PARCIAL"
+
         # Ratificación tiene prioridad sobre extemporaneidad: si ya pasamos por
         # respuesta inicial y la EPS ratificó, el flujo legal es ratificación,
         # NO aceptación tácita.
-        if es_ratificacion:
+        if modo_resp == "aceptar_total":
+            cod_res, desc_res = "RE9702", "GLOSA ACEPTADA AL 100% POR EL PRESTADOR"
+        elif modo_resp == "aceptar_parcial":
+            cod_res, desc_res = "RE9801", "GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE"
+        elif es_ratificacion:
             cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
         elif es_extemporanea:
             cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 56 Ley 1438/2011)"

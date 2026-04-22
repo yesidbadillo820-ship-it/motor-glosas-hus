@@ -2832,13 +2832,20 @@ function buscarConceptosFactura(numero){
       var html = '<div style="font-size:.72rem;font-weight:700;color:var(--c-teal2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">📋 Conceptos vinculados a esta factura</div>';
       if(data.eps) html += '<div style="font-size:.78rem;color:var(--text2);margin-bottom:.5rem;">EPS: <b>'+esc(data.eps)+'</b></div>';
       html += '<div style="display:flex;flex-direction:column;gap:.35rem;max-height:280px;overflow-y:auto;">';
+      // Inicializar estado de modo por concepto si no existe (por defecto "defender")
+      if(!window._concepto_modos) window._concepto_modos = {};
       data.glosas.forEach(function(g, idx){
         var tieneResp = g.dictamen_generado ? '✓' : '○';
         var color = g.dictamen_generado ? '#10b981' : 'var(--text4)';
         var key = g.concepto_id != null ? ('c'+g.concepto_id) : ('g'+g.id);
-        html += '<div style="display:flex;flex-direction:column;gap:.15rem;padding:.5rem .6rem;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:.78rem;" onclick="cargarConceptoDeFactura(\''+key+'\')" title="Click para cargar este concepto en el editor">';
-        // Linea 1: código, OID, servicio, valor
-        html += '<div style="display:flex;align-items:center;gap:.5rem;">';
+        var modoActual = window._concepto_modos[key] || 'defender';
+        // Color del borde según modo
+        var borderColor = modoActual === 'aceptar_total' ? '#10b981'
+                         : modoActual === 'aceptar_parcial' ? '#f59e0b'
+                         : 'var(--border)';
+        html += '<div data-key="'+key+'" class="concepto-row" style="display:flex;flex-direction:column;gap:.15rem;padding:.5rem .6rem;background:#fff;border:2px solid '+borderColor+';border-radius:6px;font-size:.78rem;">';
+        // Linea 1: código, OID, servicio, valor (click para cargar en editor)
+        html += '<div style="display:flex;align-items:center;gap:.5rem;cursor:pointer;" onclick="cargarConceptoDeFactura(\''+key+'\')" title="Click para cargar este concepto en el editor">';
         html += '<span style="color:'+color+';font-weight:700;width:14px;">'+tieneResp+'</span>';
         html += '<span style="font-family:var(--font-mono);font-weight:700;color:var(--c-teal2);min-width:64px;">'+esc(g.codigo_glosa)+'</span>';
         if(g.oid_dgh) html += '<span style="font-family:var(--font-mono);font-size:.7rem;color:var(--text3);">#'+esc(g.oid_dgh)+'</span>';
@@ -2853,11 +2860,25 @@ function buscarConceptosFactura(numero){
           if(g.nombre_glosa) html += '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 '+esc(g.nombre_glosa)+'</span>';
           html += '</div>';
         }
-        // Linea 3: observación específica de la EPS (si existe)
+        // Linea 3: observación específica de la EPS
         if(g.observacion_eps && g.observacion_eps.length > 5){
           var obsCorta = g.observacion_eps.length > 160 ? g.observacion_eps.substring(0, 157) + '…' : g.observacion_eps;
           html += '<div style="font-size:.7rem;color:#92400e;padding:3px 6px;background:#fef3c7;border-left:2px solid #f59e0b;border-radius:3px;margin-left:20px;">⚠ '+esc(obsCorta)+'</div>';
         }
+        // Linea 4: 3 botones de modo (Defender / Aceptar 100% / Aceptar parcial)
+        var btnDef = modoActual === 'defender' ? 'background:#1e3a8a;color:#fff;' : 'background:#fff;color:#1e3a8a;border:1px solid #1e3a8a;';
+        var btnTot = modoActual === 'aceptar_total' ? 'background:#10b981;color:#fff;' : 'background:#fff;color:#10b981;border:1px solid #10b981;';
+        var btnPar = modoActual === 'aceptar_parcial' ? 'background:#f59e0b;color:#fff;' : 'background:#fff;color:#f59e0b;border:1px solid #f59e0b;';
+        html += '<div style="display:flex;gap:.3rem;margin-left:20px;margin-top:4px;flex-wrap:wrap;align-items:center;">';
+        html += '<span style="font-size:.68rem;color:var(--text3);margin-right:.3rem;">Acción:</span>';
+        html += '<button type="button" onclick="setModoConcepto(\''+key+'\',\'defender\')" style="padding:3px 8px;border-radius:4px;font-size:.7rem;font-weight:600;cursor:pointer;border:none;'+btnDef+'">⚖ Defender</button>';
+        html += '<button type="button" onclick="setModoConcepto(\''+key+'\',\'aceptar_total\')" style="padding:3px 8px;border-radius:4px;font-size:.7rem;font-weight:600;cursor:pointer;border:none;'+btnTot+'">✓ Aceptar 100%</button>';
+        html += '<button type="button" onclick="setModoConcepto(\''+key+'\',\'aceptar_parcial\',this)" style="padding:3px 8px;border-radius:4px;font-size:.7rem;font-weight:600;cursor:pointer;border:none;'+btnPar+'">◐ Aceptar parcial</button>';
+        // Input para valor aceptado parcial (visible solo en modo aceptar_parcial)
+        var valorParcial = (window._concepto_parciales && window._concepto_parciales[key]) || '';
+        var showParcial = modoActual === 'aceptar_parcial' ? '' : 'display:none;';
+        html += '<input type="number" class="parcial-input" data-key="'+key+'" placeholder="Valor $ aceptado" value="'+valorParcial+'" onchange="setValorParcial(\''+key+'\',this.value)" style="padding:3px 6px;border:1px solid #f59e0b;border-radius:4px;font-size:.7rem;width:130px;'+showParcial+'"/>';
+        html += '</div>';
         html += '</div>';
       });
       html += '</div>';
@@ -2872,6 +2893,43 @@ function buscarConceptosFactura(numero){
       window._factura_eps_detectada = data.eps;
     }catch(e){ hint.textContent = ''; caja.style.display='none'; }
   }, 450);
+}
+
+// Estado de modo de respuesta por concepto (Sprint 1)
+// Posibles: "defender" (default) | "aceptar_total" | "aceptar_parcial"
+if(!window._concepto_modos) window._concepto_modos = {};
+if(!window._concepto_parciales) window._concepto_parciales = {};
+
+function setModoConcepto(key, modo, btn){
+  window._concepto_modos[key] = modo;
+  // Re-renderizar la caja de conceptos para reflejar el cambio visual
+  // (color de borde + botón activo + input parcial visible/oculto).
+  // Llamamos a buscarConceptosFactura con el valor actual del campo factura
+  // pero SIN el debounce (inmediato) — solo repinta lo que ya tenemos en memoria.
+  var fInp = document.getElementById('f-factura');
+  if(fInp && fInp.value){
+    // Trick: invocamos directo con window._factura_conceptos si existe
+    // pero el flujo natural es re-fetchear. Acá hacemos un repaint rápido:
+    var row = document.querySelector('.concepto-row[data-key="'+key+'"]');
+    if(row){
+      // Cambiar color de borde + botones
+      var borderColor = modo === 'aceptar_total' ? '#10b981'
+                       : modo === 'aceptar_parcial' ? '#f59e0b'
+                       : 'var(--border)';
+      row.style.borderColor = borderColor;
+      // Re-disparar el render completo para que los botones se actualicen con estilos
+      buscarConceptosFactura(fInp.value);
+    }
+  }
+  if(typeof toast === 'function'){
+    var mapa = {defender:'⚖ Defender', aceptar_total:'✓ Aceptar 100%', aceptar_parcial:'◐ Aceptar parcial'};
+    toast('Modo actualizado', mapa[modo] + ' para ' + key, 'success');
+  }
+}
+
+function setValorParcial(key, valor){
+  if(!window._concepto_parciales) window._concepto_parciales = {};
+  window._concepto_parciales[key] = valor;
 }
 
 function cargarConceptoDeFactura(keyOrId){
@@ -2893,6 +2951,13 @@ function cargarConceptoDeFactura(keyOrId){
     g = conceptos.find(function(x){ return x.id === keyOrId; });
   }
   if(!g) return;
+  // Guardar el modo y el valor parcial del concepto actual para que
+  // analizar() los envie al backend
+  var modoKey = (typeof keyOrId === 'string') ? keyOrId : null;
+  if(modoKey){
+    window._concepto_modo_actual = (window._concepto_modos && window._concepto_modos[modoKey]) || 'defender';
+    window._concepto_valor_parcial = (window._concepto_parciales && window._concepto_parciales[modoKey]) || 0;
+  }
   var editor = document.getElementById('f-glosa');
   if(editor){
     // Construir texto COMPLETO con todos los campos del Excel. La IA
@@ -4032,6 +4097,15 @@ async function analizar(){
   fd.append('numero_factura',document.getElementById('f-factura').value||'');
   fd.append('numero_radicado',document.getElementById('f-radicado').value||'');
   fd.append('tono',document.getElementById('tono-v').value||'conciliador');
+  // Modo de respuesta por concepto (Sprint 1). Si estamos analizando un
+  // concepto del cual el usuario marcó "aceptar_total" o "aceptar_parcial",
+  // el backend usa la plantilla correspondiente (RE9702 o RE9801).
+  if(window._concepto_modo_actual){
+    fd.append('modo_respuesta', window._concepto_modo_actual);
+  }
+  if(window._concepto_valor_parcial){
+    fd.append('valor_aceptado_parcial', String(window._concepto_valor_parcial));
+  }
 
   var files=document.getElementById('f-pdf').files;
   if(files.length > 10){

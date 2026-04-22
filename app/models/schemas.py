@@ -30,6 +30,15 @@ class GlosaInput(BaseModel):
     # Tono de la respuesta: conciliador (default), neutral o firme
     tono: Optional[str] = Field(default="conciliador", max_length=20,
                                 description="Tono de la respuesta: conciliador | neutral | firme")
+    # Modo de respuesta por concepto (Sprint 1):
+    #   "defender"       → argumento IA completo (default)
+    #   "aceptar_total"  → RE9702, sin IA, plantilla corta
+    #   "aceptar_parcial"→ RE9801, argumento IA sobre la diferencia + aceptacion parcial
+    modo_respuesta: Optional[str] = Field(default="defender", max_length=30,
+                                           description="defender | aceptar_total | aceptar_parcial")
+    # Para aceptar_parcial: valor que se acepta (el resto se defiende)
+    valor_aceptado_parcial: Optional[float] = Field(default=0.0, ge=0,
+                                                     description="Valor COP aceptado por el prestador (solo aplica en aceptar_parcial)")
 
     @field_validator("etapa")
     @classmethod
