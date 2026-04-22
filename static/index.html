@@ -1399,7 +1399,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             </div>
             <div class="field">
               <label>Soportes PDF <span style="font-weight:400;color:var(--text3)">(hasta 10 archivos, 15MB c/u)</span></label>
-              <input type="file" id="f-pdf" multiple accept=".pdf" onchange="validarPDFs(this)" style="padding:.4rem .6rem;font-size:.75rem"/>
+              <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
+                <input type="file" id="f-pdf" multiple accept=".pdf" onchange="validarPDFs(this)" style="flex:1;min-width:180px;padding:.4rem .6rem;font-size:.75rem"/>
+                <button type="button" class="btn-sm ghost" onclick="limpiarSoportesPDF()" title="Quitar todos los PDFs seleccionados y volver a empezar" style="padding:.4rem .7rem;font-size:.72rem;color:#b91c1c;border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;cursor:pointer;white-space:nowrap;">🗑 Eliminar soportes</button>
+              </div>
               <div id="pdf-info" style="font-size:.72rem;color:var(--text3);margin-top:.25rem;"></div>
             </div>
           </div>
@@ -3257,6 +3260,27 @@ async function enviarCambioPassword(){
 }
 
 // ─── VALIDACIÓN PDFs EN VIVO ─────────────────────────────────
+function limpiarSoportesPDF(){
+  var input = document.getElementById('f-pdf');
+  var info = document.getElementById('pdf-info');
+  if(!input) return;
+  // Reset del input de archivos (sin recargar la pagina)
+  try{ input.value = ''; }catch(e){}
+  // Fallback para browsers que no permiten input.value='' con type=file
+  if(input.value){
+    var form = document.createElement('form');
+    input.parentNode.insertBefore(form, input);
+    form.appendChild(input);
+    form.reset();
+    form.parentNode.insertBefore(input, form);
+    form.remove();
+  }
+  if(info){ info.textContent = ''; info.style.color = ''; }
+  if(typeof toast === 'function'){
+    toast('Soportes eliminados', 'Puedes subir nuevos archivos PDF', 'info');
+  }
+}
+
 function validarPDFs(input){
   var info = document.getElementById('pdf-info');
   var files = input.files || [];

@@ -415,29 +415,79 @@ def generar_texto_extemporanea(dias: int) -> str:
     )
 
 
-def _nombre_entidad_para_texto(eps: str) -> str:
+# Keywords que identifican ASEGURADORAS SOAT/ARL/PÓLIZAS sin contrato (pagos
+# bajo Manual Tarifario SOAT vigente Res. 054/2026 + Dec. 2423/1996).
+# Estas entidades son muy estrictas con tarifas; si no se cita la normativa
+# SOAT exacta, ratifican la glosa.
+_KEYWORDS_ASEGURADORAS_SOAT = (
+    "SEGUROS", "COMPAÑIA DE SEGUROS", "COMPANIA DE SEGUROS",
+    "BOLIVAR", "POSITIVA", "AXA", "MAPFRE", "MUNDIAL", "PREVISORA",
+    "SURAMERICANA S.A.", "COLPATRIA", "ESTADO", "ALLIANZ", "LIBERTY",
+    " SOAT", " ARL", "UVB", "UVT",  # sufijos tipicos en nombres de Excel
+    "DIRECCION DE SANIDAD",         # Sanidad Militar/Policia = SOAT plus
+    "DISPENSARIO MEDICO",
+    "SANIDAD NAVAL", "SANIDAD AEREA",
+)
+
+def _es_aseguradora_soat(nombre: str) -> bool:
+    """True si el nombre parece de aseguradora SOAT/ARL sin contrato pactado."""
+    if not nombre:
+        return False
+    n = str(nombre).upper()
+    return any(k in n for k in _KEYWORDS_ASEGURADORAS_SOAT)
+
+
+def _extraer_nombre_entidad_real(texto: str) -> str:
+    """Extrae el nombre de entidad de un texto que venga en formato
+    "CÓDIGO - NOMBRE" (típico del Excel de recepción o de la hoja I/R).
+
+    Ejemplo: "U220154 - COMPAÑIA MUNDIAL DE SEGUROS S.A.  SOAT UVB"
+    → "COMPAÑIA MUNDIAL DE SEGUROS S.A. SOAT UVB"
+    """
+    if not texto:
+        return ""
+    m = re.search(r"[A-Z]\d{5,8}\s*[-–—]\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9\.\s&/]+)", str(texto).upper())
+    if m:
+        return re.sub(r"\s+", " ", m.group(1)).strip()
+    return ""
+
+
+def _nombre_entidad_para_texto(eps: str, texto_contextual: str = "") -> str:
     """Sanitiza el nombre de EPS para uso en texto institucional.
 
-    Casos como "OTRA / SIN DEFINIR", "OTRA", "SIN DEFINIR", "SIN CONTRATO"
-    se reemplazan por "LA ENTIDAD PAGADORA" / "LA ENTIDAD RESPONSABLE DEL
-    PAGO" — una referencia genérica pero técnicamente correcta.
+    Casos como "OTRA / SIN DEFINIR" intentan primero extraer el nombre
+    REAL del texto_contextual (ej. tabla_excel que trae la EPS del
+    Excel: "U220154 - COMPAÑIA MUNDIAL DE SEGUROS S.A. SOAT UVB").
+    Si no hay nombre real, cae a "LA ENTIDAD PAGADORA" (genérico).
     """
     if not eps:
-        return "LA ENTIDAD PAGADORA"
-    e = str(eps).upper().strip()
-    if any(k in e for k in ("OTRA", "SIN DEFINIR", "SIN CONTRATO", "N/A", "DESCONOCID")):
+        e = ""
+    else:
+        e = str(eps).upper().strip()
+    es_generica = (not e) or any(
+        k in e for k in ("OTRA", "SIN DEFINIR", "SIN CONTRATO", "N/A", "DESCONOCID")
+    )
+    if es_generica:
+        # Intentar extraer el nombre real del texto contextual
+        nombre_real = _extraer_nombre_entidad_real(texto_contextual or "")
+        if nombre_real:
+            return f"LA ENTIDAD {nombre_real}"
         return "LA ENTIDAD PAGADORA"
     return f"LA ENTIDAD {e}"
 
 
-def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "") -> str:
+def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "", texto_contextual: str = "") -> str:
     """Argumento fijo para glosas de tarifas SIN contrato pactado (RE9602).
 
     Estructura de 4 párrafos — apertura "GLOSA INJUSTIFICADA POR CONCEPTO DE
     TARIFAS" alineada al código RE9602 del Manual Único. Incluye petición
     conciliadora + reserva de derechos SuperSalud + contacto.
+
+    Si la EPS es genérica ("OTRA / SIN DEFINIR"), se intenta extraer el
+    nombre real del texto_contextual (ej. el texto_base con la tabla Excel)
+    para personalizar la respuesta con el nombre verdadero de la aseguradora.
     """
-    entidad = _nombre_entidad_para_texto(eps)
+    entidad = _nombre_entidad_para_texto(eps, texto_contextual=texto_contextual)
     codigo_str = codigo if codigo else "DE TARIFAS"
     valor_str = valor if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "") else "EL VALOR INDICADO EN EL EXPEDIENTE"
 
@@ -544,7 +594,12 @@ class GlosaService:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
         elif es_tarifa and not tiene_contrato:
-            argumento_fijo = generar_texto_injustificada(eps_key, codigo_det, valor_raw)
+            # Pasamos texto_base como contexto — si eps_key es "OTRA / SIN DEFINIR",
+            # la funcion extrae el nombre real del Excel (ej. COMPAÑIA MUNDIAL DE
+            # SEGUROS S.A. SOAT UVB) y lo usa en el texto.
+            argumento_fijo = generar_texto_injustificada(
+                eps_key, codigo_det, valor_raw, texto_contextual=texto_base,
+            )
             tipo_glosa = "TA_TARIFA"
 
         # Modo de respuesta explicito por concepto (Sprint 1):
@@ -621,6 +676,37 @@ class GlosaService:
                 prefijo=prefijo,
                 eps=data.eps
             )
+            # Detectar si es aseguradora SOAT (sin contrato o con contrato UVB)
+            # para que el prompt IA agregue obligatoriamente la cita al Manual
+            # Tarifario SOAT vigente. Revisa eps + texto_base (por si la EPS
+            # es "OTRA / SIN DEFINIR" pero el Excel trae aseguradora real).
+            es_asegura_soat = (
+                _es_aseguradora_soat(str(data.eps))
+                or _es_aseguradora_soat(texto_base)
+            )
+            if es_asegura_soat:
+                nombre_real = _extraer_nombre_entidad_real(texto_base) or str(data.eps)
+                hint_aseguradora = (
+                    "\n\n═══════════════════════════════════════════════════════\n"
+                    "⚠ ALERTA CRÍTICA: ASEGURADORA SOAT / ARL / PÓLIZA SIN CONTRATO\n"
+                    f"Entidad detectada: {nombre_real}\n"
+                    "═══════════════════════════════════════════════════════\n"
+                    "Esta entidad paga bajo MANUAL TARIFARIO SOAT VIGENTE. DEBES:\n"
+                    "1. Citar EXPLÍCITAMENTE la Resolución 054 de 2026 (vigente,\n"
+                    "   tarifas SOAT 2026) y el Decreto 2423 de 1996 (manual base).\n"
+                    "2. Argumentar que NO HAY CONTRATO PACTADO, por lo que rige\n"
+                    "   SOAT PLENO y no es admisible descontar UVB/UVT sin soporte.\n"
+                    "3. Citar Art. 177 Ley 100/1993 (deber de reconocimiento).\n"
+                    "4. NO aceptar descuentos unilaterales — Art. 871 C.Comercio\n"
+                    "   exige consentimiento mutuo para modificar tarifas.\n"
+                    "5. Para régimen especial FF.MM./Policía: Decreto 1795/2000.\n"
+                    "   Para FOMAG/PPL: Decreto 1398/2020.\n"
+                    "6. Usar el nombre EXACTO de la entidad en la respuesta\n"
+                    f"   (\"{nombre_real}\"), no genéricos como \"LA ENTIDAD PAGADORA\".\n"
+                    "═══════════════════════════════════════════════════════"
+                )
+                system_prompt = system_prompt + hint_aseguradora
+                logger.info(f"[ASEGURADORA SOAT] detectada: {nombre_real} — prompt reforzado")
             # Inyectar few-shots de plantillas gold (si hay) al final del system
             if few_shots:
                 bloque_ejemplos = "\n\nEJEMPLOS DE RESPUESTAS GANADORAS PREVIAS (usa el MISMO estilo, tono y nivel de detalle):\n"
