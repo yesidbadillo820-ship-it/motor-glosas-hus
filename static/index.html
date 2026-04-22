@@ -2999,9 +2999,14 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
   // Renderizado final: lista de TODOS los dictámenes generados con acordeón
   if(resultadosHtml.length > 0 && area){
     var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-    var out = '<div style="background:#f0f9ff;border:2px solid #0369a1;border-radius:10px;padding:16px;margin-bottom:18px;">';
+    // Wrapper con scroll propio + flex:1 para ocupar todo el alto del result-area.
+    // Esto GARANTIZA que el scroll funcione aunque haya muchos dictamenes largos,
+    // independiente del chain flex del padre .result-area.
+    var out = '<div class="batch-results-wrap" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:1rem 1.5rem;min-height:0;max-height:100%;width:100%;">';
+    out += '<div style="background:#f0f9ff;border:2px solid #0369a1;border-radius:10px;padding:16px;margin-bottom:18px;position:sticky;top:0;z-index:10;">';
     out += '<h3 style="margin:0 0 8px 0;color:#0369a1;">✓ Lote completado — ' + resultadosHtml.length + ' dictámenes generados</h3>';
     out += '<p style="margin:0;font-size:.85rem;color:#334155;">Cada concepto abajo tiene su propio dictamen. Haz click en la barra para expandir/colapsar. Todos quedaron guardados en Historial / Mis Glosas.</p>';
+    out += '<p style="margin:.5rem 0 0 0;font-size:.8rem;color:#0369a1;"><b>💡 Tip:</b> desplázate con la rueda del mouse (o Page Down) para ver todos los dictámenes.</p>';
     out += '</div>';
     for(var j = 0; j < resultadosHtml.length; j++){
       var r = resultadosHtml[j];
@@ -3015,7 +3020,14 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
       out += '<div style="padding:14px;background:#fff">' + r.html + '</div>';
       out += '</details>';
     }
+    out += '<div style="height:40px;"></div>';  // espacio extra abajo para scroll cómodo
+    out += '</div>';
     area.innerHTML = out;
+    // Forzar que el wrapper se posicione al tope para ver el resumen primero
+    setTimeout(function(){
+      var w = area.querySelector('.batch-results-wrap');
+      if(w) w.scrollTop = 0;
+    }, 50);
   }
 
   // Resumen final (toast)
