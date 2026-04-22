@@ -940,6 +940,7 @@ def mis_asignaciones(
             "estado": g.estado,
             "prioridad": g.prioridad,
             "dias_restantes": g.dias_restantes,
+            "dias_radicacion_dgh": getattr(g, "dias_radicacion_dgh", None),
             "fecha_vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
             "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
             "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,

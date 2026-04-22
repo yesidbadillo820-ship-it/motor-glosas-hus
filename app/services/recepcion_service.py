@@ -572,6 +572,10 @@ class RecepcionService:
                     estado=estado,
                     dictamen=dictamen,
                     dias_restantes=dias_restantes,
+                    # Dias habiles FECHA RADICACION -> FECHA DOCUMENTO DGH (excl. findes/festivos).
+                    # Es lo que el auditor ve en la columna "Dias" de Mis glosas, usado como
+                    # indicador de extemporaneidad (si > 20, EPS gloso fuera de termino).
+                    dias_radicacion_dgh=dias_transcurridos,
                     prioridad=semaforo,
                     workflow_state=estado,
                     modelo_ia="importacion_recepcion",

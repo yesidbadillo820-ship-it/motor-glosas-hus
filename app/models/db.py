@@ -68,6 +68,10 @@ class GlosaRecord(Base):
     saldo_factura = Column(Float, default=0.0)     # FacturaCartera.Saldo (hoja I/R)
     valor_factura = Column(Float, default=0.0)     # FacturaCartera.Valor (hoja I/R)
     tercero_nit = Column(String(30))               # FacturaCartera.Tercero.Documento (hoja I/R)
+    # Días hábiles entre FECHA RADICACION y FECHA DOCUMENTO DGH (excluye
+    # sábados, domingos y festivos). Clave para detectar extemporaneidad:
+    # si > 20 días hábiles, la EPS glosó fuera de término (Art. 57 Ley 1438/2011).
+    dias_radicacion_dgh = Column(Integer, default=0)
 
     __table_args__ = (
         Index("ix_historial_alertas", "dias_restantes", "estado"),

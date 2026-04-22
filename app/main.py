@@ -458,6 +458,7 @@ async def lifespan(app: FastAPI):
         ("saldo_factura", "DOUBLE PRECISION DEFAULT 0"),
         ("valor_factura", "DOUBLE PRECISION DEFAULT 0"),
         ("tercero_nit", "VARCHAR(30)"),
+        ("dias_radicacion_dgh", "INTEGER DEFAULT 0"),
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:

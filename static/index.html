@@ -3851,7 +3851,10 @@ async function loadMisGlosas(){
         '<td>' + tipoTxt + '</td>' +
         '<td class="num">$' + valor + '</td>' +
         '<td>' + vence + '</td>' +
-        '<td class="cell-center" style="font-weight:700">' + (g.dias_restantes || 0) + '</td>' +
+        // Dias = dias habiles RADICACION -> DOCUMENTO DGH (indicador de extemporaneidad).
+        // Si > 20 → la EPS glosó fuera de termino. Fallback a dias_restantes si el
+        // campo nuevo no esta poblado (ej. glosa legacy antes de la migracion).
+        '<td class="cell-center" style="font-weight:700" title="Días hábiles entre fecha de radicación de la factura y fecha del documento DGH">' + (g.dias_radicacion_dgh != null ? g.dias_radicacion_dgh : (g.dias_restantes || 0)) + '</td>' +
         '<td>' + wfChip + '</td>' +
         '<td><span class="chip ' + semCls + '">' + (g.prioridad || '—') + '</span></td>' +
         '<td class="cell-center">' + acciones + '</td>' +
