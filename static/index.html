@@ -2872,27 +2872,35 @@ function buscarConceptosFactura(numero){
         var borderColor = modoActual === 'aceptar_total' ? '#10b981'
                          : modoActual === 'aceptar_parcial' ? '#f59e0b'
                          : 'var(--border)';
-        html += '<div data-key="'+key+'" class="concepto-row" style="display:flex;flex-direction:column;gap:.15rem;padding:.5rem .6rem;background:#fff;border:2px solid '+borderColor+';border-radius:6px;font-size:.78rem;">';
-        // Linea 1: código, OID, servicio, valor (click para cargar en editor)
-        html += '<div style="display:flex;align-items:center;gap:.5rem;cursor:pointer;" onclick="cargarConceptoDeFactura(\''+key+'\')" title="Click para cargar este concepto en el editor">';
-        html += '<span style="color:'+color+';font-weight:700;width:14px;">'+tieneResp+'</span>';
-        html += '<span style="font-family:var(--font-mono);font-weight:700;color:var(--c-teal2);min-width:64px;">'+esc(g.codigo_glosa)+'</span>';
-        if(g.oid_dgh) html += '<span style="font-family:var(--font-mono);font-size:.7rem;color:var(--text3);">#'+esc(g.oid_dgh)+'</span>';
-        if(g.cups) html += '<span style="font-family:var(--font-mono);font-size:.72rem;color:var(--text2);background:#f1f5f9;padding:1px 5px;border-radius:4px;">'+esc(g.cups)+'</span>';
-        html += '<span style="flex:1;color:var(--text2);min-width:0;word-break:break-word;line-height:1.35;">'+esc(g.servicio || g.concepto_glosa || '—')+'</span>';
-        html += '<span style="font-weight:700;color:var(--text);min-width:88px;text-align:right;font-size:.76rem;">'+cop(g.valor_objetado||0)+'</span>';
+        html += '<div data-key="'+key+'" class="concepto-row" style="display:flex;flex-direction:column;gap:.25rem;padding:.5rem .6rem;background:#fff;border:2px solid '+borderColor+';border-radius:6px;font-size:.78rem;">';
+        // Linea 1 (HEADER compacto): código, OID, CUPS, valor. SIN el servicio
+        // largo aqui — ese va en linea 2 propia para no destrozar el layout
+        // cuando la caja vive en el sidebar angosto (~300px).
+        html += '<div style="display:flex;align-items:center;gap:.4rem;cursor:pointer;flex-wrap:wrap;" onclick="cargarConceptoDeFactura(\''+key+'\')" title="Click para cargar este concepto en el editor">';
+        html += '<span style="color:'+color+';font-weight:700;width:14px;flex-shrink:0;">'+tieneResp+'</span>';
+        html += '<span style="font-family:var(--font-mono);font-weight:700;color:var(--c-teal2);flex-shrink:0;">'+esc(g.codigo_glosa)+'</span>';
+        if(g.oid_dgh) html += '<span style="font-family:var(--font-mono);font-size:.7rem;color:var(--text3);flex-shrink:0;">#'+esc(g.oid_dgh)+'</span>';
+        if(g.cups) html += '<span style="font-family:var(--font-mono);font-size:.72rem;color:var(--text2);background:#f1f5f9;padding:1px 5px;border-radius:4px;flex-shrink:0;">'+esc(g.cups)+'</span>';
+        html += '<span style="flex:1;min-width:40px;"></span>';  // spacer
+        html += '<span style="font-weight:700;color:var(--text);text-align:right;font-size:.76rem;flex-shrink:0;">'+cop(g.valor_objetado||0)+'</span>';
         html += '</div>';
-        // Linea 2: centro costo + motivo canónico
-        if(g.centro_costo || g.nombre_glosa){
-          html += '<div style="display:flex;gap:.6rem;font-size:.7rem;color:var(--text3);padding-left:20px;">';
-          if(g.centro_costo) html += '<span>🏥 '+esc(g.centro_costo)+'</span>';
-          if(g.nombre_glosa) html += '<span style="flex:1;min-width:0;word-break:break-word;line-height:1.4;">📝 '+esc(g.nombre_glosa)+'</span>';
-          html += '</div>';
+        // Linea 2: servicio (nombre del CUPS) — linea propia, con overflow-wrap
+        // que solo rompe en limites de palabra si cabe, y en letra si no.
+        var servicioTxt = (g.servicio || g.concepto_glosa || '').trim();
+        if(servicioTxt){
+          html += '<div style="padding-left:20px;color:var(--text2);font-size:.76rem;line-height:1.35;overflow-wrap:anywhere;word-break:normal;">'+esc(servicioTxt)+'</div>';
         }
-        // Linea 3: observación específica de la EPS
+        // Linea 3: centro costo + motivo canónico en bloques separados
+        if(g.centro_costo){
+          html += '<div style="padding-left:20px;font-size:.7rem;color:var(--text3);overflow-wrap:anywhere;">🏥 '+esc(g.centro_costo)+'</div>';
+        }
+        if(g.nombre_glosa){
+          html += '<div style="padding-left:20px;font-size:.7rem;color:var(--text3);line-height:1.4;overflow-wrap:anywhere;word-break:normal;">📝 '+esc(g.nombre_glosa)+'</div>';
+        }
+        // Linea 4: observación específica de la EPS
         if(g.observacion_eps && g.observacion_eps.length > 5){
-          var obsCorta = g.observacion_eps.length > 160 ? g.observacion_eps.substring(0, 157) + '…' : g.observacion_eps;
-          html += '<div style="font-size:.7rem;color:#92400e;padding:3px 6px;background:#fef3c7;border-left:2px solid #f59e0b;border-radius:3px;margin-left:20px;">⚠ '+esc(obsCorta)+'</div>';
+          var obsCorta = g.observacion_eps.length > 240 ? g.observacion_eps.substring(0, 237) + '…' : g.observacion_eps;
+          html += '<div style="font-size:.7rem;color:#92400e;padding:4px 6px;background:#fef3c7;border-left:2px solid #f59e0b;border-radius:3px;margin-left:20px;overflow-wrap:anywhere;word-break:normal;line-height:1.35;">⚠ '+esc(obsCorta)+'</div>';
         }
         // Linea 4: 3 botones de modo (Defender / Aceptar 100% / Aceptar parcial)
         var btnDef = modoActual === 'defender' ? 'background:#1e3a8a;color:#fff;' : 'background:#fff;color:#1e3a8a;border:1px solid #1e3a8a;';
