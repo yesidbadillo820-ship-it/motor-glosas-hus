@@ -948,6 +948,9 @@ def mis_asignaciones(
             "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
             "radicado_info": g.radicado_info,
             "referencia": g.referencia,
+            # Flag para que el front muestre el boton "Marcar Respondida" solo
+            # si ya hay un dictamen generado (sino no hay nada que cerrar).
+            "dictamen_generado": bool(g.dictamen),
             "observacion_tecnico": g.observacion_tecnico,
             "tipo_glosa_excel": g.tipo_glosa_excel,
             "profesional_medico": g.profesional_medico,

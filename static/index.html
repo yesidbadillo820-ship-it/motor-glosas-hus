@@ -4003,14 +4003,27 @@ function _renderMisGlosas(dataRaw){
       var wfChip = '<span class="chip" style="background:transparent;color:' + (wfColor[wfEstado]||'#6b7280') + ';border:1px solid ' + (wfColor[wfEstado]||'#6b7280') + '">' + wfEstado.replace('_', ' ') + '</span>';
 
       // Construir botones de acción según estado y rol
-      var acciones = '<button class="btn-sm" onclick="responderGlosa(' + g.id + ')">Responder</button>';
-      if(wfEstado === 'BORRADOR'){
-        acciones += ' <button class="btn-sm ghost" style="color:#ca8a04;border-color:#fde68a" onclick="cambiarWorkflow(' + g.id + ',\'EN_REVISION\',\'Enviar a revisión\')">→ Revisar</button>';
-      } else if(wfEstado === 'EN_REVISION' && puedeAprobar){
-        acciones += ' <button class="btn-sm" style="background:#047857" onclick="cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')">✓ Aprobar</button>';
-        acciones += ' <button class="btn-sm ghost" onclick="cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')">← Devolver</button>';
-      } else if(wfEstado === 'APROBADA' && puedeAprobar){
-        acciones += ' <button class="btn-sm" style="background:#1d4ed8" onclick="cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')">Radicar</button>';
+      var estadoUpper = (g.estado || '').toUpperCase();
+      var yaRespondida = estadoUpper === 'RESPONDIDA' || wfEstado === 'RESPONDIDA';
+      var acciones = '';
+      if(yaRespondida){
+        acciones = '<span style="color:#059669;font-weight:700;font-size:.78rem;">✓ Respondida</span>';
+        acciones += ' <button class="btn-sm ghost" onclick="responderGlosa(' + g.id + ')">Ver/Re-abrir</button>';
+      } else {
+        acciones = '<button class="btn-sm" onclick="responderGlosa(' + g.id + ')">Responder</button>';
+        // Boton "Marcar respondida" visible siempre que tenga dictamen generado
+        // (g.dictamen_generado viene del backend). Evita tener que abrir y re-analizar.
+        if(g.dictamen_generado){
+          acciones += ' <button class="btn-sm" style="background:#10b981;color:#fff;border:none" title="Marcar esta glosa como respondida (mueve a tab Respondidas)" onclick="marcarFacturaRespondida(' + g.id + ',\'' + ((g.factura||'').replace(/\'/g,"\\'")) + '\',this)">✓ Respondida</button>';
+        }
+        if(wfEstado === 'BORRADOR'){
+          acciones += ' <button class="btn-sm ghost" style="color:#ca8a04;border-color:#fde68a" onclick="cambiarWorkflow(' + g.id + ',\'EN_REVISION\',\'Enviar a revisión\')">→ Revisar</button>';
+        } else if(wfEstado === 'EN_REVISION' && puedeAprobar){
+          acciones += ' <button class="btn-sm" style="background:#047857" onclick="cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')">✓ Aprobar</button>';
+          acciones += ' <button class="btn-sm ghost" onclick="cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')">← Devolver</button>';
+        } else if(wfEstado === 'APROBADA' && puedeAprobar){
+          acciones += ' <button class="btn-sm" style="background:#1d4ed8" onclick="cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')">Radicar</button>';
+        }
       }
 
       return '<tr>' +
@@ -4415,6 +4428,17 @@ function renderResult(d){
     +'  </div>'
     +'  <div id="refinar-inline-status" class="refinar-status"></div>'
     +'</div>';
+
+  // Botón para marcar esta glosa como RESPONDIDA (sacar de Mis glosas pendientes)
+  // Solo se muestra si la glosa se guardó con id (CURRENT_GLOSA_ID). Si no hay id
+  // (caso raro donde fallo el save), se omite para evitar confusiones.
+  if(CURRENT_GLOSA_ID){
+    var facturaActual = (document.getElementById('f-factura') || {}).value || '';
+    html += '<div style="margin-top:1.2rem;padding:14px 16px;background:#ecfdf5;border:2px solid #10b981;border-radius:10px;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;">'
+         +   '<button type="button" id="btn-indiv-respondida" onclick="marcarFacturaRespondida('+CURRENT_GLOSA_ID+',\''+facturaActual+'\',this)" style="padding:.55rem 1.1rem;background:#10b981;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;box-shadow:0 2px 6px rgba(16,185,129,.3);">✅ Marcar esta glosa como RESPONDIDA</button>'
+         +   '<span style="font-size:.8rem;color:#065f46;flex:1;min-width:200px;">Se moverá a la bandeja <b>Respondidas</b> en Mis glosas. Ya la respondiste — el dictamen quedó guardado.</span>'
+         + '</div>';
+  }
 
   document.getElementById('result-area').innerHTML=html;
   if(CURRENT_GLOSA_ID) cargarComentarios(CURRENT_GLOSA_ID);
