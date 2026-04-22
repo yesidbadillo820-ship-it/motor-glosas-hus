@@ -316,7 +316,7 @@ def _suavizar_tono(texto: str) -> str:
 
 
 TEXTO_RATIFICADA = (
-    "ESE HUS RESPETUOSAMENTE NO COMPARTE LA RATIFICACIÓN DE LA GLOSA Y MANTIENE LA "
+    "ESE HUS NO ACEPTA LA RATIFICACIÓN DE LA GLOSA Y MANTIENE LA "
     "RESPUESTA DADA EN EL TRÁMITE DE LA GLOSA INICIAL, LA CUAL SE CONSIDERA "
     "SUFICIENTEMENTE SUSTENTADA. EN ATENCIÓN AL ARTÍCULO 57 DE LA LEY 1438 DE 2011, "
     "EL ARTÍCULO 20 DEL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN 2284 DE 2023 (MANUAL "
@@ -1336,10 +1336,11 @@ class GlosaService:
             "ARGUMENTACIÓN JURÍDICA",
             "ARGUMENTACION JURIDICA",
             "RESPUESTA A GLOSA",
-            "ESE HUS RESPETUOSAMENTE",  # ratificadas
-            "ESE HUS NO ACEPTA",         # tarifas/facturacion/IA normal
-            "ESE HUS RECHAZA",           # Salud Total
-            "ESE HUS NO COMPARTE",       # variante ratificada
+            "ESE HUS NO ACEPTA LA RATIFICACIÓN",  # ratificadas (nuevo)
+            "ESE HUS NO ACEPTA",                    # tarifas/facturacion/IA normal
+            "ESE HUS RESPETUOSAMENTE",              # ratificadas (legacy, antes del cambio)
+            "ESE HUS RECHAZA",                      # Salud Total
+            "ESE HUS NO COMPARTE",                  # variante ratificada
         )
         for marker in markers_inicio:
             if marker in txt:
