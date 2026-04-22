@@ -3888,23 +3888,38 @@ async function responderGlosa(id){
     var fInp = document.getElementById('f-factura'); if(fInp) fInp.value = g.factura || '';
     var rInp = document.getElementById('f-radicado'); if(rInp) rInp.value = g.numero_radicado || '';
 
-    // Construir un texto de glosa con el contexto para que la IA tenga info
-    var partes = [];
-    if(g.consecutivo_dgh) partes.push('CONSECUTIVO DGH: ' + g.consecutivo_dgh);
-    if(g.valor_objetado) partes.push('VALOR: $' + g.valor_objetado.toLocaleString('es-CO'));
-    if(g.tipo_glosa_excel) partes.push('TIPO GLOSA: ' + g.tipo_glosa_excel);
-    if(g.profesional_medico) partes.push('PROFESIONAL MÉDICO: ' + g.profesional_medico);
-    if(g.observacion_tecnico) partes.push('OBSERVACIÓN: ' + g.observacion_tecnico);
-    if(g.referencia) partes.push('REFERENCIA: ' + g.referencia);
+    // Limpiar editor de glosa (el usuario lo llenará al elegir un concepto)
     var tablaInput = document.getElementById('f-glosa');
-    if(tablaInput){
-      tablaInput.value = partes.join('\n');
+    if(tablaInput) tablaInput.value = '';
+
+    // DISPARAR el autocompletado que muestra los N conceptos vinculados
+    // a esta factura (SO2101 TA0201 etc con sus CUPS/motivo/valor/observacion).
+    // Esto hace que aparezca la caja "📋 Conceptos vinculados a esta factura"
+    // con la lista completa de 43 conceptos (o los que sean).
+    if(g.factura && typeof buscarConceptosFactura === 'function'){
+      // Espera a que la UI renderice la factura antes de disparar el fetch
+      setTimeout(function(){ buscarConceptosFactura(g.factura); }, 100);
+      // Si tras 1s no hay conceptos en el nuevo modelo, deja texto contextual
+      // como fallback para que la IA tenga algo con que trabajar.
+      setTimeout(function(){
+        var lista = window._factura_conceptos || [];
+        if(lista.length === 0 && tablaInput && !tablaInput.value){
+          var partes = [];
+          if(g.consecutivo_dgh) partes.push('CONSECUTIVO DGH: ' + g.consecutivo_dgh);
+          if(g.valor_objetado) partes.push('VALOR: $' + g.valor_objetado.toLocaleString('es-CO'));
+          if(g.tipo_glosa_excel) partes.push('TIPO GLOSA: ' + g.tipo_glosa_excel);
+          if(g.profesional_medico) partes.push('PROFESIONAL MÉDICO: ' + g.profesional_medico);
+          if(g.observacion_tecnico) partes.push('OBSERVACIÓN: ' + g.observacion_tecnico);
+          if(g.referencia) partes.push('REFERENCIA: ' + g.referencia);
+          tablaInput.value = partes.join('\n');
+        }
+      }, 1200);
     }
 
     // Scroll arriba y avisar al usuario
     window.scrollTo({top: 0, behavior: 'smooth'});
     if(typeof toast === 'function'){
-      toast('Datos de glosa #' + id + ' pre-cargados. Revisa y haz clic en Analizar.', 'success');
+      toast('Glosa #' + id + ' cargada', 'Selecciona un concepto de la lista o usa "Analizar todos"', 'success');
     }
   }catch(e){
     alert('Error al cargar la glosa: ' + e.message);

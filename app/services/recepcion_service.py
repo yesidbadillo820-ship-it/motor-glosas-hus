@@ -128,21 +128,26 @@ def _normalizar(texto: str) -> str:
 
 
 def _fix_mojibake(texto: str) -> str:
-    """Arregla texto UTF-8 leído como Latin-1 (mojibake).
+    """Arregla texto UTF-8 leído como Latin-1 (mojibake) y limpia artefactos.
 
-    Ejemplo: "OBJECIÃ¿N" → "OBJECIÓN", "CÃ¿DIGO" → "CÓDIGO".
-    Si el texto ya está bien codificado, lo deja igual.
+    - Mojibake: "OBJECIÃ³N" → "OBJECIÓN".
+    - Artefactos Excel: "_x000D_" (Windows CRLF escapado por openpyxl) → " ".
+    - Multiples espacios/saltos: colapsados a un solo espacio.
     """
     if not texto or not isinstance(texto, str):
         return texto
-    # Heurística: si contiene los patrones típicos de mojibake latin1/utf8,
-    # intenta re-decodificar. Si falla, devuelve el original.
-    if "Ã" not in texto and "Â" not in texto:
-        return texto
-    try:
-        return texto.encode("latin1", errors="strict").decode("utf8", errors="strict")
-    except (UnicodeDecodeError, UnicodeEncodeError):
-        return texto
+    # 1. Fix mojibake latin1/utf8 si aplica
+    if "Ã" in texto or "Â" in texto:
+        try:
+            texto = texto.encode("latin1", errors="strict").decode("utf8", errors="strict")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+    # 2. Limpiar artefactos comunes de export desde Excel
+    # openpyxl a veces deja literal "_x000D_" donde había \r (retorno de carro).
+    texto = texto.replace("_x000D_", " ").replace("_x000A_", " ")
+    # Quitar saltos de línea intermedios y espacios redundantes
+    texto = re.sub(r"\s+", " ", texto).strip()
+    return texto
 
 
 def _split_entidad(entidad: str) -> tuple[str, str]:
