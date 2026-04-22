@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import re
 
-from app.services.glosa_service import _suavizar_tono, TEXTO_RATIFICADA
+from app.services.glosa_service import _suavizar_tono
 
 NIT_HUS = "900006037"
 DIAS_LIMITE = 20
@@ -16,11 +16,11 @@ CONCEPTOS = {
     "RE9901": "El prestador de servicios de salud o proveedor de tecnologías en salud informa a la entidad responsable de pago que la glosa siendo justificada ha podido ser subsanada totalmente.",
 }
 
-# Límite de caracteres para Observacion IPS del archivo TXT de Salud Total.
-# Se subió de 500 a 900 para permitir el texto canónico de ratificadas
-# (TEXTO_RATIFICADA = 883 chars). Si Salud Total EPS rechaza el archivo por
-# longitud, bajar a 500 y usar una version compacta de la observacion.
-OBS_MAX_CARACTERES = 900
+# Límite OBLIGATORIO según especificación Salud Total para Observacion IPS.
+# Salud Total EPS rechaza el archivo TXT si cualquier fila supera los 500
+# caracteres en este campo. Para ratificadas se usa una versión COMPACTA
+# (OBS_RATIFICADA abajo) adaptada a este tope.
+OBS_MAX_CARACTERES = 500
 
 MOTIVOS_SALUD_TOTAL = {
     "TARIFA": "ESE HUS RECHAZA LA GLOSA POR TARIFAS. LA LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE Y AL MANUAL TARIFARIO SOAT (RES. 054/2026). LA EPS NO PUEDE APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
@@ -48,11 +48,25 @@ def _detectar_tipo_motivo(descripcion_motivo: str, motv_glosa: str) -> str:
 
 OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RES. 3047/2008, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). AUN CONSIDERANDO EL ART. 57 LEY 1438/2011 (30 DÍAS EPS + 15 DÍAS IPS), LA GLOSA SIGUE SIENDO EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO."
 
-# Texto canónico para ratificadas. Fuente unica de verdad: glosa_service.TEXTO_RATIFICADA
-# (mantiene la respuesta de la glosa inicial, solicita mesa de conciliacion,
-# cita Art. 57 Ley 1438/2011 + Art. 20 Decreto 4747/2007 + Res. 2284/2023,
-# advierte levantamiento tacito si la EPS no responde en terminos).
-OBS_RATIFICADA = TEXTO_RATIFICADA
+# Version COMPACTA del texto de ratificadas para Salud Total (≤500 chars).
+# El texto canonico completo (TEXTO_RATIFICADA, 883 chars) se usa en PDF y
+# UI via _dictamen_ratificada. Aqui se adapta para caber en el campo
+# Observacion IPS del TXT que exige max 500 chars.
+# Mantiene los 4 puntos clave:
+#   1. No acepta la glosa ratificada, mantiene respuesta inicial.
+#   2. Cita normativa (Art. 57 Ley 1438, Art. 20 Dec. 4747, Res. 2284/2023).
+#   3. Solicita mesa de conciliacion.
+#   4. Advierte levantamiento tacito + correo institucional.
+OBS_RATIFICADA = (
+    "ESE HUS NO ACEPTA GLOSA RATIFICADA Y MANTIENE LA RESPUESTA DE LA GLOSA "
+    "INICIAL, SUFICIENTEMENTE SUSTENTADA. ART. 57 LEY 1438/2011, ART. 20 DEC. "
+    "4747/2007 Y RES. 2284/2023 (MANUAL ÚNICO DE GLOSAS): SE SOLICITA MESA DE "
+    "CONCILIACIÓN DE AUDITORÍA MÉDICA/TÉCNICA PARA LLEGAR A UN ACUERDO EN "
+    "TÉRMINOS LEGALES. DE NO OBTENERSE RESPUESTA, OPERA EL LEVANTAMIENTO "
+    "TÁCITO DE LA OBJECIÓN. CONTACTO: CARTERA@HUS.GOV.CO, "
+    "GLOSASYDEVOLUCIONES@HUS.GOV.CO. VENTANILLA: CRA. 33 NO. 28-126 "
+    "BUCARAMANGA."
+)
 
 OBS_TA_POR_TIPO = {
     "TA": "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RES. 3047/2008, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). AUN CONSIDERANDO EL ART. 57 LEY 1438/2011 (30 DÍAS EPS + 15 DÍAS IPS), LA GLOSA SIGUE SIENDO EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO.",
