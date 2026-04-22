@@ -796,6 +796,10 @@ def glosas_por_factura(
                 "valor_aceptado": 0,
                 "estado": (padre.estado if padre else "") or "",
                 "eps": (padre.eps if padre else "") or "",
+                # Nombre comercial corto (FacturaCartera.Tercero.NombreCompletoNA),
+                # ej: "DISPENSARIO MEDICO BUCARAMANGA". La UI lo prefiere sobre
+                # el plan EPS cuando existe.
+                "tercero_nombre": (getattr(padre, "tercero_nombre", None) or "") if padre else "",
                 "concepto_glosa": c.nombre_glosa or "",
                 "texto_glosa_original": (c.observacion_eps or "")[:400],
                 "fecha_radicacion_factura": padre.fecha_radicacion_factura.isoformat() if padre and padre.fecha_radicacion_factura else None,
@@ -826,6 +830,10 @@ def glosas_por_factura(
             })
 
     eps_unicas = list({g.eps for g in glosas_padre if g.eps})
+    # Nombre comercial corto de la entidad (Tercero.NombreCompletoNA). Si todas
+    # las glosas padre apuntan al mismo tercero, exponemos ese nombre en la
+    # cabecera de la respuesta. Si no, None (la UI cae al plan EPS).
+    terceros_unicos = list({getattr(g, "tercero_nombre", None) for g in glosas_padre if getattr(g, "tercero_nombre", None)})
     total_objetado = sum(i["valor_objetado"] or 0 for i in items)
     return {
         "numero_factura": factura_limpio,
@@ -833,6 +841,7 @@ def glosas_por_factura(
         "total_objetado": total_objetado,
         "eps": eps_unicas[0] if len(eps_unicas) == 1 else None,
         "eps_multiples": eps_unicas if len(eps_unicas) > 1 else None,
+        "tercero_nombre": terceros_unicos[0] if len(terceros_unicos) == 1 else None,
         "glosa_id": glosa_ids[0] if glosa_ids else None,
         "glosas": items,
     }

@@ -110,6 +110,13 @@ CONCEPTO_COLS: dict[str, list[str]] = {
     "eps_codigo_entidad": ["facturacartera.planbeneficio.contrato.entidad.codigoentidad"],
     "eps_nombre": ["facturacartera.planbeneficio.contrato.entidad.nombreentidad"],
     "tercero_nit": ["facturacartera.tercero.documento"],
+    # Nombre comercial corto de la entidad (Tercero.NombreCompletoNA).
+    # Ej: "DISPENSARIO MEDICO BUCARAMANGA" en vez del plan EPS completo.
+    "tercero_nombre": [
+        "facturacartera.tercero.nombrecompletona",
+        "facturacartera.tercero.nombrecompletoan",
+        "facturacartera.tercero.nombre",
+    ],
     "concepto_codigo": ["listadoconceptos.conceptoobjecion.codigo"],
     "concepto_oid": ["listadoconceptos.oid"],
     "concepto_nombre": ["listadoconceptos.conceptoobjecion.nombre"],
@@ -705,6 +712,11 @@ class RecepcionService:
                 nit = str(_get("tercero_nit") or "").strip()
                 if nit and not glosa_padre.tercero_nit:
                     glosa_padre.tercero_nit = nit
+                # Nombre corto de la entidad (desde Tercero.NombreCompletoNA).
+                # Limpiar trailing spaces y _x000D_ via _fix_mojibake.
+                nombre_corto = _fix_mojibake(str(_get("tercero_nombre") or "").strip())
+                if nombre_corto and not getattr(glosa_padre, "tercero_nombre", None):
+                    glosa_padre.tercero_nombre = nombre_corto
                 fecha_obj = _a_fecha(_get("fecha_objecion"))
                 if fecha_obj and not glosa_padre.fecha_objecion_eps:
                     glosa_padre.fecha_objecion_eps = fecha_obj

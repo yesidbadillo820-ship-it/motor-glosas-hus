@@ -2848,8 +2848,19 @@ function buscarConceptosFactura(numero){
       hint.style.color = 'var(--c-green)';
       // Listar conceptos con todos los datos del Excel
       var html = '<div style="font-size:.72rem;font-weight:700;color:var(--c-teal2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">📋 Conceptos vinculados a esta factura</div>';
-      if(data.eps) html += '<div style="font-size:.78rem;color:var(--text2);margin-bottom:.5rem;">EPS: <b>'+esc(data.eps)+'</b></div>';
-      html += '<div style="display:flex;flex-direction:column;gap:.35rem;max-height:280px;overflow-y:auto;">';
+      // Priorizar tercero_nombre (nombre comercial corto, ej "DISPENSARIO MEDICO
+      // BUCARAMANGA") sobre data.eps (plan EPS completo). Si solo tenemos plan,
+      // mostrar ambos: Entidad + (plan).
+      if(data.tercero_nombre){
+        html += '<div style="font-size:.78rem;color:var(--text2);margin-bottom:.5rem;">Entidad: <b>'+esc(data.tercero_nombre)+'</b>';
+        if(data.eps && data.eps !== data.tercero_nombre){
+          html += ' <span style="color:var(--text3);font-size:.72rem;"> · Plan: '+esc(data.eps)+'</span>';
+        }
+        html += '</div>';
+      } else if(data.eps){
+        html += '<div style="font-size:.78rem;color:var(--text2);margin-bottom:.5rem;">EPS: <b>'+esc(data.eps)+'</b></div>';
+      }
+      html += '<div style="display:flex;flex-direction:column;gap:.35rem;max-height:480px;overflow-y:auto;overflow-x:hidden;">';
       // Inicializar estado de modo por concepto si no existe (por defecto "defender")
       if(!window._concepto_modos) window._concepto_modos = {};
       data.glosas.forEach(function(g, idx){
@@ -2868,14 +2879,14 @@ function buscarConceptosFactura(numero){
         html += '<span style="font-family:var(--font-mono);font-weight:700;color:var(--c-teal2);min-width:64px;">'+esc(g.codigo_glosa)+'</span>';
         if(g.oid_dgh) html += '<span style="font-family:var(--font-mono);font-size:.7rem;color:var(--text3);">#'+esc(g.oid_dgh)+'</span>';
         if(g.cups) html += '<span style="font-family:var(--font-mono);font-size:.72rem;color:var(--text2);background:#f1f5f9;padding:1px 5px;border-radius:4px;">'+esc(g.cups)+'</span>';
-        html += '<span style="flex:1;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(g.servicio || g.concepto_glosa || '—')+'</span>';
+        html += '<span style="flex:1;color:var(--text2);min-width:0;word-break:break-word;line-height:1.35;">'+esc(g.servicio || g.concepto_glosa || '—')+'</span>';
         html += '<span style="font-weight:700;color:var(--text);min-width:88px;text-align:right;font-size:.76rem;">'+cop(g.valor_objetado||0)+'</span>';
         html += '</div>';
         // Linea 2: centro costo + motivo canónico
         if(g.centro_costo || g.nombre_glosa){
           html += '<div style="display:flex;gap:.6rem;font-size:.7rem;color:var(--text3);padding-left:20px;">';
           if(g.centro_costo) html += '<span>🏥 '+esc(g.centro_costo)+'</span>';
-          if(g.nombre_glosa) html += '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 '+esc(g.nombre_glosa)+'</span>';
+          if(g.nombre_glosa) html += '<span style="flex:1;min-width:0;word-break:break-word;line-height:1.4;">📝 '+esc(g.nombre_glosa)+'</span>';
           html += '</div>';
         }
         // Linea 3: observación específica de la EPS

@@ -68,6 +68,12 @@ class GlosaRecord(Base):
     saldo_factura = Column(Float, default=0.0)     # FacturaCartera.Saldo (hoja I/R)
     valor_factura = Column(Float, default=0.0)     # FacturaCartera.Valor (hoja I/R)
     tercero_nit = Column(String(30))               # FacturaCartera.Tercero.Documento (hoja I/R)
+    # Nombre comercial corto de la entidad pagadora (FacturaCartera.Tercero.
+    # NombreCompletoNA). Mas corto y limpio que el plan EPS, ej.
+    # "DISPENSARIO MEDICO BUCARAMANGA" vs el plan
+    # "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANG".
+    # Se usa en la UI de conceptos y en el texto del dictamen.
+    tercero_nombre = Column(String(300))
     # Días hábiles entre FECHA RADICACION y FECHA DOCUMENTO DGH (excluye
     # sábados, domingos y festivos). Clave para detectar extemporaneidad:
     # si > 20 días hábiles, la EPS glosó fuera de término (Art. 57 Ley 1438/2011).
