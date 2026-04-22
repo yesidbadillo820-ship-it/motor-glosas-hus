@@ -74,10 +74,23 @@ def calcular_dias_habiles(fecha_inicio: datetime, fecha_fin: datetime) -> int:
 def parsear_fecha(fecha_str: str) -> datetime:
     fecha_str = fecha_str.strip()
     formatos = [
+        # Con AM/PM
         "%m/%d/%Y %I:%M:%S %p",
+        "%m/%d/%Y %I:%M %p",
+        "%d/%m/%Y %I:%M:%S %p",
+        "%d/%m/%Y %I:%M %p",
+        # 24h con segundos
+        "%m/%d/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        # 24h sin segundos (ej. "3/11/2026 6:53")
+        "%m/%d/%Y %H:%M",
+        "%d/%m/%Y %H:%M",
+        "%Y-%m-%d %H:%M",
+        # Solo fecha
         "%m/%d/%Y",
-        "%Y-%m-%d",
         "%d/%m/%Y",
+        "%Y-%m-%d",
     ]
     for fmt in formatos:
         try:
@@ -321,21 +334,61 @@ class GlosaSaludTotal:
             "DiasTranscurridos": dias,
         }
 
+def _detectar_separador(primera_linea: str) -> str:
+    """Auto-detecta el separador del archivo TXT.
+
+    Salud Total acepta 2 formatos:
+      • Pipe "|" (formato canónico histórico).
+      • Tab "\\t" (export directo desde Excel con los headers FechaRad_,
+        NumeroRad_, etc.).
+    Se prefiere el que más ocurrencias tenga en la primera línea.
+    """
+    tabs = primera_linea.count("\t")
+    pipes = primera_linea.count("|")
+    if tabs > pipes:
+        return "\t"
+    if pipes > 0:
+        return "|"
+    # Fallback: si no hay ni tabs ni pipes, intenta tab (común en export Excel)
+    return "\t"
+
+
 def procesar_glosas_salud_total(contenido_txt: str, tipo_respuesta: str = "extemporanea", fecha_recepcion: Optional[datetime] = None) -> List[Dict[str, Any]]:
     lineas = contenido_txt.strip().split("\n")
     if not lineas:
         return []
-    
-    header = lineas[0].split("|")
-    
+
+    # Auto-detectar separador (pipe "|" o tab "\t")
+    sep = _detectar_separador(lineas[0])
+
+    header = lineas[0].split(sep)
+
     respuestas = []
-    for linea in lineas[1:]:
+    errores: list[str] = []
+    for idx, linea in enumerate(lineas[1:], start=2):
         if not linea.strip():
             continue
-        campos = linea.split("|")
-        glosa = GlosaSaludTotal(campos, tipo_respuesta, fecha_recepcion)
-        respuestas.append(glosa.generar_respuesta())
-    
+        campos = linea.split(sep)
+        # Validación: mínimo 14 columnas para que la glosa tenga datos básicos
+        # (fecha + factura + servicio + valor_glosa_final).
+        if len(campos) < 14:
+            errores.append(f"Fila {idx}: solo {len(campos)} columnas (esperadas ≥14, separador detectado: {'TAB' if sep == chr(9) else 'PIPE'})")
+            continue
+        try:
+            glosa = GlosaSaludTotal(campos, tipo_respuesta, fecha_recepcion)
+            respuestas.append(glosa.generar_respuesta())
+        except Exception as e:
+            errores.append(f"Fila {idx}: {type(e).__name__}: {e}")
+            continue
+
+    # Si NADA se pudo parsear, arrojar con detalle para que el front no caiga
+    # en un 500 sin información útil.
+    if not respuestas and errores:
+        raise ValueError(
+            "No se pudo procesar ninguna línea del archivo. "
+            "Separador detectado: " + ("TAB" if sep == "\t" else "PIPE") +
+            ". Primeros errores: " + " | ".join(errores[:3])
+        )
     return respuestas
 
 def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
