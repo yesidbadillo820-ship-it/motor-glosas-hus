@@ -1574,7 +1574,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       <div class="page-pad">
         <div class="page-head">
           <div>
-            <h2 class="page-title">Mis glosas pendientes</h2>
+            <h2 class="page-title" id="mis-title">Mis glosas pendientes</h2>
             <p class="page-sub" id="mis-subtitle">Glosas asignadas según el archivo de recepción</p>
           </div>
           <div class="page-actions toolbar-inline">
@@ -1583,6 +1583,21 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             </label>
             <button class="btn-sm ghost" onclick="loadMisGlosas()">Actualizar</button>
           </div>
+        </div>
+        <!-- Tabs de filtro por estado -->
+        <div id="mis-tabs" style="display:flex;gap:.4rem;margin-bottom:1rem;border-bottom:2px solid var(--border);padding-bottom:0;flex-wrap:wrap;">
+          <button type="button" class="mis-tab active" data-filter="pendientes" onclick="setMisFiltro('pendientes')"
+                  style="padding:.5rem 1rem;border:none;background:transparent;border-bottom:3px solid var(--c-teal2);color:var(--c-teal2);font-weight:700;cursor:pointer;font-size:.85rem;margin-bottom:-2px;">
+            📋 Pendientes <span id="mis-count-pendientes" style="background:var(--c-teal2);color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem;margin-left:.3rem;">0</span>
+          </button>
+          <button type="button" class="mis-tab" data-filter="respondidas" onclick="setMisFiltro('respondidas')"
+                  style="padding:.5rem 1rem;border:none;background:transparent;border-bottom:3px solid transparent;color:var(--text3);font-weight:600;cursor:pointer;font-size:.85rem;margin-bottom:-2px;">
+            ✓ Respondidas <span id="mis-count-respondidas" style="background:#10b981;color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem;margin-left:.3rem;">0</span>
+          </button>
+          <button type="button" class="mis-tab" data-filter="todas" onclick="setMisFiltro('todas')"
+                  style="padding:.5rem 1rem;border:none;background:transparent;border-bottom:3px solid transparent;color:var(--text3);font-weight:600;cursor:pointer;font-size:.85rem;margin-bottom:-2px;">
+            🔍 Todas <span id="mis-count-todas" style="background:var(--text3);color:#fff;padding:1px 8px;border-radius:10px;font-size:.7rem;margin-left:.3rem;">0</span>
+          </button>
         </div>
 
         <div class="stat-grid" id="mis-stats">
@@ -2903,6 +2918,41 @@ function buscarConceptosFactura(numero){
 if(!window._concepto_modos) window._concepto_modos = {};
 if(!window._concepto_parciales) window._concepto_parciales = {};
 
+async function marcarFacturaRespondida(glosaId, factura, btn){
+  if(!glosaId) return;
+  if(!confirm('¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?\n\nSe moverá a la bandeja Respondidas y se quitará de las pendientes de Mis glosas.')) return;
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = '⏳ Guardando...';
+    btn.style.opacity = '.7';
+  }
+  try{
+    var r = await fetch('/workflow/'+glosaId+'/transicionar', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({hacia: 'RESPONDIDA', nota: 'Marcada como respondida desde el botón de lote completado'}),
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){
+      if(btn){ btn.disabled = false; btn.textContent = '✅ Marcar factura como RESPONDIDA'; btn.style.opacity = '1'; }
+      toast('No se pudo marcar como respondida', d.detail || ('Error ' + r.status), 'error');
+      return;
+    }
+    if(btn){
+      btn.textContent = '✓ Factura respondida';
+      btn.style.background = '#059669';
+      btn.disabled = true;
+      btn.style.opacity = '.9';
+    }
+    toast('✓ Factura respondida', factura + ' quedó en la bandeja Respondidas', 'success');
+    // Refrescar Mis glosas si está cargada (para que desaparezca de pendientes)
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+  }catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = '✅ Marcar factura como RESPONDIDA'; btn.style.opacity = '1'; }
+    toast('Error de conexión', e.message, 'error');
+  }
+}
+
 function setModoConcepto(key, modo, btn){
   window._concepto_modos[key] = modo;
   // Re-renderizar la caja de conceptos para reflejar el cambio visual
@@ -3070,11 +3120,27 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
     // Wrapper con scroll propio + flex:1 para ocupar todo el alto del result-area.
     // Esto GARANTIZA que el scroll funcione aunque haya muchos dictamenes largos,
     // independiente del chain flex del padre .result-area.
+    // Guardar glosa_id para que el boton "Marcar respondida" sepa a quien cerrar
+    var glosaPadreId = null;
+    try{
+      if(window._factura_conceptos && window._factura_conceptos.length){
+        glosaPadreId = window._factura_conceptos[0].id || null;
+      }
+    }catch(e){}
+    var facturaActual = (document.getElementById('f-factura') || {}).value || '';
+
     var out = '<div class="batch-results-wrap" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:1rem 1.5rem;min-height:0;max-height:100%;width:100%;">';
     out += '<div style="background:#f0f9ff;border:2px solid #0369a1;border-radius:10px;padding:16px;margin-bottom:18px;position:sticky;top:0;z-index:10;">';
     out += '<h3 style="margin:0 0 8px 0;color:#0369a1;">✓ Lote completado — ' + resultadosHtml.length + ' dictámenes generados</h3>';
     out += '<p style="margin:0;font-size:.85rem;color:#334155;">Cada concepto abajo tiene su propio dictamen. Haz click en la barra para expandir/colapsar. Todos quedaron guardados en Historial / Mis Glosas.</p>';
     out += '<p style="margin:.5rem 0 0 0;font-size:.8rem;color:#0369a1;"><b>💡 Tip:</b> desplázate con la rueda del mouse (o Page Down) para ver todos los dictámenes.</p>';
+    // Boton para marcar la factura completa como RESPONDIDA y sacarla de Mis glosas
+    if(glosaPadreId){
+      out += '<div style="margin-top:.8rem;padding-top:.8rem;border-top:1px solid #bae6fd;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">';
+      out += '<button type="button" id="btn-marcar-respondida" onclick="marcarFacturaRespondida('+glosaPadreId+',\''+facturaActual+'\',this)" style="padding:.55rem 1rem;background:#10b981;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 2px 6px rgba(16,185,129,.3);">✅ Marcar factura como RESPONDIDA</button>';
+      out += '<span style="font-size:.75rem;color:var(--text3);">Se moverá a la bandeja <b>Respondidas</b> y se quitará de <b>Mis glosas</b> pendientes.</span>';
+      out += '</div>';
+    }
     out += '</div>';
     for(var j = 0; j < resultadosHtml.length; j++){
       var r = resultadosHtml[j];
@@ -3799,6 +3865,60 @@ function syncSidebarBadge(idLegacy, idSide){
 
 // ─── MIS GLOSAS ───────────────────────────────────────────────────────────
 var USER_ROL = localStorage.getItem('hus_rol') || '';
+// Filtro activo para Mis glosas: "pendientes" (default) | "respondidas" | "todas"
+window._mis_filtro = window._mis_filtro || 'pendientes';
+
+function setMisFiltro(filtro){
+  window._mis_filtro = filtro;
+  // Reset estilos de todos los tabs
+  document.querySelectorAll('.mis-tab').forEach(function(b){
+    b.classList.remove('active');
+    b.style.borderBottomColor = 'transparent';
+    b.style.color = 'var(--text3)';
+    b.style.fontWeight = '600';
+  });
+  // Activar el seleccionado
+  var activo = document.querySelector('.mis-tab[data-filter="'+filtro+'"]');
+  if(activo){
+    activo.classList.add('active');
+    activo.style.borderBottomColor = 'var(--c-teal2)';
+    activo.style.color = 'var(--c-teal2)';
+    activo.style.fontWeight = '700';
+  }
+  // Actualizar titulo
+  var t = document.getElementById('mis-title');
+  if(t){
+    t.textContent = filtro === 'respondidas' ? 'Mis glosas respondidas'
+                  : filtro === 'todas' ? 'Todas mis glosas'
+                  : 'Mis glosas pendientes';
+  }
+  // Re-renderizar con data ya cargada (evita refetch)
+  if(window._mis_data_raw){
+    _renderMisGlosas(window._mis_data_raw);
+  } else {
+    loadMisGlosas();
+  }
+}
+
+function _filtrarPorEstado(data){
+  var filtro = window._mis_filtro || 'pendientes';
+  if(filtro === 'todas') return data;
+  if(filtro === 'respondidas'){
+    return data.filter(function(g){
+      var e = (g.estado || '').toUpperCase();
+      var wf = (g.workflow_state || '').toUpperCase();
+      return e === 'RESPONDIDA' || wf === 'RESPONDIDA';
+    });
+  }
+  // pendientes: todo lo que NO este en estado terminal (respondida/conciliada/levantada)
+  return data.filter(function(g){
+    var e = (g.estado || '').toUpperCase();
+    var wf = (g.workflow_state || '').toUpperCase();
+    var terminales = ['RESPONDIDA','CONCILIADA','LEVANTADA'];
+    return terminales.indexOf(e) === -1 && terminales.indexOf(wf) === -1;
+  });
+}
+
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var url = '/glosas/mis-asignaciones' + (todas ? '?todas=true' : '');
@@ -3808,7 +3928,34 @@ async function loadMisGlosas(){
     var r = await fetch(url, {headers: authH()});
     if(r.status === 401){ alert('Sesión expirada'); return; }
     var data = await r.json();
-    var counts = {VERDE:0,AMARILLO:0,ROJO:0,NEGRO:0};
+    // Guardar data cruda para poder re-filtrar sin refetch
+    window._mis_data_raw = data;
+
+    // Contadores por estado para los tabs
+    var countPend = 0, countResp = 0;
+    data.forEach(function(g){
+      var e = (g.estado || '').toUpperCase();
+      var wf = (g.workflow_state || '').toUpperCase();
+      var terminales = ['RESPONDIDA','CONCILIADA','LEVANTADA'];
+      if(terminales.indexOf(e) !== -1 || terminales.indexOf(wf) !== -1) countResp++;
+      else countPend++;
+    });
+    var setCount = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = v; };
+    setCount('mis-count-pendientes', countPend);
+    setCount('mis-count-respondidas', countResp);
+    setCount('mis-count-todas', data.length);
+
+    _renderMisGlosas(data);
+  }catch(e){ body.innerHTML = '<tr class="empty-row"><td colspan="13">Error: '+escHtml(e.message)+'</td></tr>'; }
+}
+
+function _renderMisGlosas(dataRaw){
+  var body = document.getElementById('mis-body');
+  if(!body) return;
+  // Aplicar filtro por tab activo
+  var data = _filtrarPorEstado(dataRaw || []);
+  var counts = {VERDE:0,AMARILLO:0,ROJO:0,NEGRO:0};
+  try{
     data.forEach(function(g){ if(counts[g.prioridad] !== undefined) counts[g.prioridad]++; });
     document.getElementById('mis-v').textContent = counts.VERDE;
     document.getElementById('mis-a').textContent = counts.AMARILLO;
@@ -3819,13 +3966,14 @@ async function loadMisGlosas(){
     if(data.length > 0){
       badge.style.display = 'inline-block';
       badge.textContent = data.length;
-    } else {
+    } else if(badge){
       badge.style.display = 'none';
     }
 
     // Mostrar toggle "ver todas" si es admin/coordinador
     if(USER_ROL === 'SUPER_ADMIN' || USER_ROL === 'COORDINADOR'){
-      document.getElementById('mis-todas-label').style.display = 'inline-block';
+      var lbl = document.getElementById('mis-todas-label');
+      if(lbl) lbl.style.display = 'inline-block';
     }
 
     if(data.length === 0){
@@ -3885,8 +4033,8 @@ async function loadMisGlosas(){
         '</tr>';
     }).join('');
     actualizarContadorLote();
-  }catch(e){
-    body.innerHTML = '<tr class="empty-row"><td colspan="13" style="color:#991b1b">Error: ' + e.message + '</td></tr>';
+  } catch(e){
+    body.innerHTML = '<tr class="empty-row"><td colspan="13" style="color:#991b1b">Error: ' + (e && e.message ? e.message : e) + '</td></tr>';
   }
 }
 
