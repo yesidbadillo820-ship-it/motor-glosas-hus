@@ -282,30 +282,15 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 .btn-menu-mobile{display:none;background:transparent;border:none;cursor:pointer;color:#fff;padding:6px;margin-right:6px}
 
 /* ─── LAYOUT ─────────────────────────────── */
-.workspace{flex:1;display:flex;overflow:hidden;position:relative}
-.panel{display:none;flex:1;overflow:hidden;position:relative}
+.workspace{flex:1;display:flex;overflow:hidden}
+.panel{display:none;flex:1;overflow:hidden}
 .panel.active{display:flex}
-/* p-salud-total usa un layout especial (block + absolute) para evitar
-   problemas que tuvo con el chain flex. Ver regla override abajo. */
-.panel.active#p-salud-total{
-  display:block !important;
-  position:absolute !important;
-  top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;
-  overflow-y:auto !important;
-  overflow-x:hidden;
-  padding:1.5rem 2rem;
-  background:var(--bg);
-  animation:none !important;
-  opacity:1 !important;
-  transform:none !important;
-  width:auto !important;height:auto !important;  /* dejamos que top+bottom+left+right lo dimensionen */
-  z-index:5;
-}
 /* Paneles verticales (sin sidebar lateral) usan column-layout. */
 .panel.active#p-consulta-normativa,
 .panel.active#p-multi-concepto,
 .panel.active#p-detector-masa,
 .panel.active#p-simulador,
+.panel.active#p-salud-total,
 .panel.active#p-historial,
 .panel.active#p-mis-glosas,
 .panel.active#p-alertas,
@@ -1927,6 +1912,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         </div>
 
         <div id="cn-resultados" style="margin-top:1.5rem;"></div>
+        </div>
       </div>
     </div>
 
@@ -2034,12 +2020,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       </div>
     </div>
 
-    <!-- SALUD TOTAL (layout block-based para evitar chain flex que dio problemas) -->
-    <div class="panel" id="p-salud-total" style="min-height:500px;background:#fff;">
-      <div style="background:#fef2f2;border:3px solid #dc2626;padding:16px;margin:0 0 16px 0;border-radius:10px;color:#991b1b;font-weight:700;font-size:14px;">
-        🩺 PANEL SALUD TOTAL — Si ves este recuadro rojo es que el panel SÍ está cargando.
-      </div>
-      <h2 style="font-size:1.1rem;font-weight:700;color:#0f172a;margin:0 0 1rem 0;">💚 Salud Total EPS — Procesar archivo TXT</h2>
+    <!-- SALUD TOTAL -->
+    <div class="panel" id="p-salud-total">
+      <div style="flex:1 1 auto;overflow-y:auto;width:100%;padding:1.5rem 2rem;min-height:0;">
       <div class="st-area">
         <div class="st-upload-col">
           <div class="form-card">
@@ -2088,9 +2071,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </div>
         </div>
       </div>
+      </div>
     </div>
 
-  </div>
+  </div> <!-- /workspace -->
   </div> <!-- /main-layout -->
 </div>
 
@@ -2414,37 +2398,10 @@ function toggleDark(){
 // ─── TABS ─────────────────────────────────────────────────────────────────
 function tab(btn,id){
   document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('active')});
-  document.querySelectorAll('.panel').forEach(function(p){
-    p.classList.remove('active');
-    // Limpiar inline styles de diagnóstico de panels anteriores
-    if(p.id === 'p-salud-total') p.removeAttribute('style');
-  });
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
   if(btn) btn.classList.add('active');
   var panel = document.getElementById('p-'+id);
   if(panel) panel.classList.add('active');
-  // Fix brute-force para p-salud-total: inline styles que bypassan TODO
-  // el chain flex/CSS en caso de que siga fallando por algún conflicto.
-  if(id === 'salud-total' && panel){
-    // Forzar !important en cada propiedad via setProperty para garantizar que gane
-    var s = panel.style;
-    s.setProperty('display','block','important');
-    s.setProperty('position','absolute','important');
-    s.setProperty('top','0','important');
-    s.setProperty('left','0','important');
-    s.setProperty('right','0','important');
-    s.setProperty('bottom','0','important');
-    s.setProperty('overflow-y','auto','important');
-    s.setProperty('overflow-x','hidden','important');
-    s.setProperty('padding','1.5rem 2rem','important');
-    s.setProperty('background','#fff','important');
-    s.setProperty('z-index','5','important');
-    s.setProperty('opacity','1','important');
-    s.setProperty('transform','none','important');
-    s.setProperty('animation','none','important');
-    s.setProperty('width','auto','important');
-    s.setProperty('height','auto','important');
-    console.log('[SALUD TOTAL] Panel activado con inline styles:', panel.getAttribute('style'));
-  }
   if(id==='dashboard') loadDash();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
