@@ -349,6 +349,37 @@ def exportar_xlsx(
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
 
+    # Formato condicional premium (requirement #8 del user):
+    # - Días Restantes columna S (col 19): rojo si ≤ 3, amarillo si ≤ 7, verde si > 7
+    # - Estado columna P (col 16): resaltado según valor
+    # - Valor Recuperado columna L (col 12): verde si > 0, rojo si negativo
+    try:
+        from openpyxl.styles import PatternFill
+        from openpyxl.formatting.rule import CellIsRule, FormulaRule
+        # Aplicar desde fila 2 hasta el final
+        last_row = ws.max_row
+        if last_row > 1:
+            rango_dias = f"S2:S{last_row}"
+            rango_recup = f"L2:L{last_row}"
+            rango_estado = f"P2:P{last_row}"
+            fill_rojo = PatternFill(start_color="FECACA", end_color="FECACA", fill_type="solid")
+            fill_amarillo = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+            fill_verde = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
+            fill_verde_fuerte = PatternFill(start_color="A7F3D0", end_color="A7F3D0", fill_type="solid")
+            # Días restantes — semáforo
+            ws.conditional_formatting.add(rango_dias, CellIsRule(operator="lessThanOrEqual", formula=["3"], fill=fill_rojo))
+            ws.conditional_formatting.add(rango_dias, CellIsRule(operator="between", formula=["4", "7"], fill=fill_amarillo))
+            ws.conditional_formatting.add(rango_dias, CellIsRule(operator="greaterThan", formula=["7"], fill=fill_verde))
+            # Valor recuperado
+            ws.conditional_formatting.add(rango_recup, CellIsRule(operator="greaterThan", formula=["0"], fill=fill_verde_fuerte))
+            # Estado
+            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=[f'EXACT(P2,"CERRADA")'], fill=fill_verde))
+            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=[f'EXACT(P2,"RATIFICADA")'], fill=fill_rojo))
+            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=[f'EXACT(P2,"EXTEMPORANEA")'], fill=fill_amarillo))
+    except Exception as _e:
+        # Sin formato condicional el Excel sigue siendo válido.
+        pass
+
     # Registrar auditoría de la exportación
     AuditRepository(db).registrar(
         usuario_email=current_user.email,
