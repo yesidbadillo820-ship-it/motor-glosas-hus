@@ -1833,6 +1833,34 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       <div class="usuarios-area">
         <div class="usuarios-form-col">
           <div class="form-card">
+            <h3>🎨 Tema festivo <span>UI</span></h3>
+            <p style="font-size:.78rem;color:var(--text3);margin-bottom:.7rem">
+              Por defecto el sistema detecta fechas especiales automáticamente.
+              Podés forzar un tema (ej. día de la madre) para capacitaciones o demos.
+              La selección queda guardada en este navegador.
+            </p>
+            <div class="field">
+              <label>Seleccionar tema</label>
+              <select id="selector-festivo" onchange="cambiarTemaFestivo(this.value)" style="width:100%;padding:.5rem .7rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);font-size:.85rem;">
+                <option value="">Auto (detectar por fecha real)</option>
+                <option value="lanzamiento">🚀 Lanzamiento / Capacitación</option>
+                <option value="madre">💐 Día de la Madre</option>
+                <option value="padre">👔 Día del Padre</option>
+                <option value="navidad">🎄 Navidad</option>
+                <option value="anio_nuevo">🎆 Año Nuevo</option>
+                <option value="valentin">❤️ San Valentín</option>
+                <option value="trabajador">🛠️ Día del Trabajador</option>
+                <option value="independencia">🇨🇴 20 de Julio</option>
+                <option value="boyaca">🎖️ Batalla de Boyacá</option>
+                <option value="halloween">🎃 Día de los Niños</option>
+                <option value="off">✕ Desactivar tema</option>
+              </select>
+            </div>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:.4rem">
+              Tip: para una demo rápida podés usar la URL con <code>?festivo=madre</code>.
+            </div>
+          </div>
+          <div class="form-card">
             <h3>🔐 Mi seguridad <span>2FA</span></h3>
             <div id="dos-fa-estado" style="font-size:.8rem;color:var(--text2);margin-bottom:.8rem">Cargando…</div>
             <div id="dos-fa-acciones" style="display:flex;flex-direction:column;gap:.5rem"></div>
@@ -3627,16 +3655,25 @@ var TEMAS_FESTIVOS = {
 function aplicarTemaFestivo(){
   try{
     // 1) Query string: ?festivo=madre → fuerza un tema para preview
+    //    y lo persiste en localStorage para que dure la sesión.
     var params = new URLSearchParams(window.location.search || '');
     var forzado = (params.get('festivo') || '').toLowerCase().trim();
     var tema = null;
-    if(forzado && TEMAS_FESTIVOS[forzado]){
+    if(forzado === 'off' || forzado === 'none'){
+      try{ localStorage.removeItem('_festivo_override'); }catch(e){}
+    } else if(forzado && TEMAS_FESTIVOS[forzado]){
       tema = TEMAS_FESTIVOS[forzado];
+      try{ localStorage.setItem('_festivo_override', forzado); }catch(e){}
     } else {
-      // 2) Detector por fecha real
-      tema = getTemaFestivoHoy();
+      // 2) Rescatar override persistido
+      var guardado = '';
+      try{ guardado = localStorage.getItem('_festivo_override') || ''; }catch(e){}
+      if(guardado && TEMAS_FESTIVOS[guardado]) tema = TEMAS_FESTIVOS[guardado];
+      // 3) Si nada forzado, detector por fecha
+      if(!tema) tema = getTemaFestivoHoy();
     }
     if(!tema) return;
+    // Pintar landing (si existe el empty-state)
     var fest = document.getElementById('landing-festivo');
     var icon = document.getElementById('landing-icon');
     var msg = document.getElementById('landing-festivo-msg');
@@ -3649,7 +3686,144 @@ function aplicarTemaFestivo(){
       msg.style.border = '1px solid ' + tema.color + '33';
       msg.innerHTML = '<b>'+tema.titulo+'</b><br><span style="font-weight:400;font-size:.82rem;">'+tema.mensaje+'</span>';
     }
+    // Banner global visible en toda la app (sticky arriba del todo)
+    _mostrarBannerFestivoGlobal(tema);
   }catch(e){ console.warn('Tema festivo:', e); }
+}
+
+// Inyecta un <style> dinámico que tiñe SUTILMENTE toda la UI con el color
+// del tema festivo activo (header, botones primarios, sidebar activo,
+// acentos). Mantiene la legibilidad. Si cambias de tema, el style se
+// reemplaza; si desactivas, se remueve.
+function _aplicarColoresTema(tema){
+  if(!tema || !tema.color) return;
+  var c = tema.color;
+  // Mezclar con gris para variantes
+  var bg = tema.bg || '#f8fafc';
+  // Opacidades para overlays
+  var c30 = c + '30';  // ~19% transparente
+  var c15 = c + '26';
+  var existing = document.getElementById('tema-festivo-style');
+  if(existing) existing.remove();
+  var st = document.createElement('style');
+  st.id = 'tema-festivo-style';
+  st.textContent = (
+    // Header superior: borde inferior del tema
+    '.hdr{border-bottom:3px solid ' + c + ' !important}' +
+    // Botón primario (Analizar con IA, etc.)
+    '.btn-primary,button.btn-primary{background:' + c + ' !important;border-color:' + c + ' !important}' +
+    '.btn-primary:hover{filter:brightness(0.92)}' +
+    // Sidebar item activo
+    '.sn-item.active{background:' + c15 + ' !important;color:' + c + ' !important;border-left-color:' + c + ' !important}' +
+    '.sn-item.active .sn-item-label{color:' + c + ' !important;font-weight:700}' +
+    // Tab activo en barra superior
+    '.nb.active{border-bottom-color:' + c + ' !important;color:' + c + ' !important}' +
+    // Acentos de análisis (valor, porcentaje de éxito)
+    '.stat-card-value{color:' + c + ' !important}' +
+    // Badge status (conectado)
+    '.status-pill{background:' + c15 + ' !important}' +
+    // Empty-state icono
+    '.empty-state-icon{color:' + c + ' !important}' +
+    // Títulos de página
+    '.page-title{color:' + c + ' !important}' +
+    // Footer sidebar
+    '.sb-footer-tag{color:' + c + ' !important}' +
+    // Highlight sutil en login
+    '.login-title{color:' + c + ' !important}'
+  );
+  document.head.appendChild(st);
+}
+
+function _quitarColoresTema(){
+  var existing = document.getElementById('tema-festivo-style');
+  if(existing) existing.remove();
+}
+
+// Cambia el tema festivo desde el selector del panel Usuarios.
+// Persiste en localStorage y refresca la UI sin recargar la página.
+function cambiarTemaFestivo(clave){
+  try{
+    clave = (clave || '').toLowerCase().trim();
+    if(!clave || clave === 'off'){
+      localStorage.removeItem('_festivo_override');
+      // Quitar banner global + colores inyectados
+      var b = document.getElementById('banner-festivo-global');
+      if(b){ b.remove(); document.body.style.paddingTop=''; }
+      _quitarColoresTema();
+      // Restaurar landing
+      var msg = document.getElementById('landing-festivo-msg');
+      var icon = document.getElementById('landing-icon');
+      var fest = document.getElementById('landing-festivo');
+      if(msg) msg.style.display = 'none';
+      if(icon) icon.textContent = '⚖️';
+      if(fest) fest.textContent = '';
+      toast('Tema desactivado','Volviste a la detección automática por fecha','info');
+      // Si hoy cae en festividad, aplicar de nuevo
+      aplicarTemaFestivo();
+      return;
+    }
+    if(!TEMAS_FESTIVOS[clave]){
+      toast('Tema desconocido','Clave inválida: '+clave,'warning');
+      return;
+    }
+    localStorage.setItem('_festivo_override', clave);
+    sessionStorage.removeItem('_festivo_cerrado'); // reset "cerré el banner"
+    aplicarTemaFestivo();
+    toast('Tema aplicado', TEMAS_FESTIVOS[clave].titulo, 'success');
+  }catch(e){ console.warn('cambiarTemaFestivo:', e); }
+}
+
+// Inicializar selector en el panel Usuarios con valor guardado
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(function(){
+    try{
+      var sel = document.getElementById('selector-festivo');
+      if(sel){
+        var cur = localStorage.getItem('_festivo_override') || '';
+        sel.value = cur;
+      }
+    }catch(e){}
+  }, 1000);
+});
+
+function _mostrarBannerFestivoGlobal(tema){
+  // 1) Inyectar overrides CSS en TODA la UI (no solo el landing).
+  //    Esto cambia sutilmente el color de acento de: header, botones primarios,
+  //    sidebar activo, badges, links. La paleta sigue siendo legible.
+  _aplicarColoresTema(tema);
+
+  // 2) Banner sticky arriba
+  var b = document.getElementById('banner-festivo-global');
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'banner-festivo-global';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;'
+      + 'padding:.5rem 1rem;font-size:.82rem;font-weight:600;text-align:center;'
+      + 'box-shadow:0 2px 6px rgba(0,0,0,.08);letter-spacing:.15px;'
+      + 'cursor:default;transition:transform .3s;';
+    // Botón X para cerrar el banner por sesión
+    var close = document.createElement('span');
+    close.textContent = '✕';
+    close.style.cssText = 'position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:.6;font-weight:400;';
+    close.onclick = function(){
+      b.style.display = 'none';
+      document.body.style.paddingTop = '';
+      try{ sessionStorage.setItem('_festivo_cerrado', '1'); }catch(e){}
+    };
+    b.appendChild(close);
+    b.appendChild(document.createElement('span'));
+    document.body.appendChild(b);
+    document.body.style.paddingTop = '36px';
+  }
+  // Respetar si el usuario cerró el banner en esta sesión
+  try{ if(sessionStorage.getItem('_festivo_cerrado') === '1'){ b.style.display='none'; document.body.style.paddingTop=''; return; } }catch(e){}
+  b.style.background = tema.bg;
+  b.style.color = tema.color;
+  b.style.borderBottom = '2px solid ' + tema.color;
+  // Contenido: emoji + título + mensaje corto
+  var textSpan = b.querySelector('span:not(:first-child)') || b.appendChild(document.createElement('span'));
+  textSpan.innerHTML = tema.emoji + ' <b>' + tema.titulo + '</b> · ' +
+    tema.mensaje.replace(/^[^\s]+\s/, ''); // quitar emoji duplicado al inicio
 }
 // Aplicar al cargar
 document.addEventListener('DOMContentLoaded', function(){
