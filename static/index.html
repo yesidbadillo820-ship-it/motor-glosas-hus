@@ -5544,6 +5544,14 @@ function _extraerArgumentoLimpio(dictamenHtml){
   // superior, badges (EPS / tipo), "ARGUMENTACIÓN JURÍDICA" y nota de IA.
   var tmp = document.createElement('div');
   tmp.innerHTML = dictamenHtml || '';
+  // Antes de extraer texto, eliminar bloques claramente no-imprimibles:
+  // metadata JSON, tablas de soportes, QR, trazabilidad, botones.
+  try{
+    tmp.querySelectorAll(
+      'script, style, button, [data-trazabilidad], .no-print, ' +
+      '.qr-trazabilidad, .thread-box, .refinar-panel'
+    ).forEach(function(el){ el.remove(); });
+  }catch(e){}
   var txt = (tmp.innerText || tmp.textContent || '').replace(/\s+/g, ' ').trim();
   var marker = 'ARGUMENTACIÓN JURÍDICA';
   var idx = txt.indexOf(marker);
@@ -5560,12 +5568,23 @@ function _extraerArgumentoLimpio(dictamenHtml){
     'RESUMEN DE VALORES',
     'Valor objetado Valor aceptado',
     'FUNDAMENTO NORMATIVO',
+    // Cierres adicionales para el PDF consolidado
+    '📎 RELACIÓN DE SOPORTES',
+    'RELACIÓN DE SOPORTES',
+    'Servicio objetado:',
+    'SINAC SC SAS',
+    'Documento generado por',
   ];
   for(var i=0; i<cierres.length; i++){
     var j = txt.indexOf(cierres[i]);
     if(j > -1) txt = txt.substring(0, j).trim();
   }
-  return txt;
+  // Quitar cualquier JSON inline tipo {"prestador_nit": ...} que haya
+  // quedado embebido del QR/trazabilidad.
+  txt = txt.replace(/\{\s*"prestador_nit"[^}]*\}/g, '');
+  txt = txt.replace(/\{\s*"nit"[^}]*\}/g, '');
+  // Normalizar espacios finales
+  return txt.replace(/\s+/g, ' ').trim();
 }
 
 function imprimirDictamen(){

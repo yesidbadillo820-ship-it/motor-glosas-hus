@@ -1335,27 +1335,12 @@ class GlosaService:
                 </table>
             </div>"""
 
-        # Bloque metadatos JSON oculto — legible por parsers EPS automatizados
-        import json as _json
-        from datetime import datetime as _dt
-        metadatos = {
-            "prestador_nit": "900006037-4",
-            "prestador_nombre": "ESE HOSPITAL UNIVERSITARIO DE SANTANDER",
-            "codigo_glosa": codigo,
-            "valor_objetado": valor,
-            "codigo_respuesta": cod_res,
-            "eps": eps,
-            "numero_factura": numero_factura or "",
-            "numero_radicado": numero_radicado or "",
-            "tipo_glosa": tipo,
-            "fecha_respuesta": _dt.now().strftime("%Y-%m-%d"),
-            "marco_normativo": "Res. 2284/2023 Manual Único + Ley 1438/2011 Art. 57",
-        }
-        bloque_metadatos = (
-            '<div style="display:none" data-metadatos-eps="1">'
-            f'<script type="application/json">{_json.dumps(metadatos, ensure_ascii=False)}</script>'
-            '</div>'
-        )
+        # Bloque metadatos JSON REMOVIDO — antes se incluía para parsers
+        # automatizados pero aparecía como texto crudo en el PDF consolidado
+        # y confundía a los lectores. Si en el futuro se necesita exponer
+        # metadata a la EPS, hacerlo vía response header (p.ej. X-HUS-Meta)
+        # o un endpoint JSON dedicado, no inline en el HTML del dictamen.
+        bloque_metadatos = ""
 
         # QR de trazabilidad y carátula institucional removidos del
         # dictamen en pantalla (ruido visual). La información institucional
