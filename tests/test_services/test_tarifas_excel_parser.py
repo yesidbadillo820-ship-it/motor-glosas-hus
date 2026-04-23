@@ -342,3 +342,127 @@ class TestParsearExcelDispensario:
         """Dispensario no trae metadata de EPS; se espera eps=None."""
         r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
         assert r["eps"] is None
+
+
+# ─── Casos reales de Famisanar: preamble largo + descripción fallback ──────
+
+def _crear_excel_anexo3_con_preamble_largo() -> bytes:
+    """Simula el Anexo 3 real donde hay ~55 filas de metadata antes del header."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Anexo 3"
+
+    # Rellenar 55 filas de ruido (directorio, sedes, agrupadores, etc.)
+    ws["A1"] = "DIRECTORIO DEL PRESTADOR"
+    ws["A2"] = "CANALES DE ATENCIÓN AL USUARIO"
+    ws["A15"] = "SEDES DE PRESTACIÓN DEL SERVICIO"
+    ws["A20"] = "INFORMACIÓN EPS"
+    ws["A21"] = "NOMBRE DE LA EPS"
+    ws["F21"] = "FAMISANAR EPS"
+    ws["A35"] = "AGRUPADORES OBJETO R. 2335/2023 - RIAS"
+    ws["A36"] = "COD"
+    ws["B36"] = "DESCRIPCIÓN"
+    ws["C36"] = "MARCA"
+    for i in range(12):
+        ws.cell(row=37 + i, column=1, value=i + 1)
+        ws.cell(row=37 + i, column=2, value=f"AGRUPADOR RIAS {i+1}")
+    ws["A50"] = "AGRUPADORES OBJETO R. 2335/2023 - SERVICIOS"
+    ws["A53"] = "DETALLE DE SERVICIOS CONTRATADOS (Servicios y Paquetes)"
+
+    # Header real en fila 54 (más allá del viejo límite de 50)
+    headers = [
+        "CUPS / CUMS / MIPRES", "DESCRIPCIÓN CUPS / CUMS / MIPRES",
+        "COD. REPS", "DESCRIPCIÓN REPS",
+        "CÓDIGO PROPIO", "DESCRIPCIÓN CÓDIGO PROPIO",
+        "INTERDEPENDENCIA", "TIPO TARIFA",
+        "HOSPITALARIO", "AMBULATORIO", "URGENCIA",
+        "CÓDIGO DE LA SEDE", "MARCA POR LISTADO SI/NO", "OBSERVACIÓN",
+    ]
+    for i, h in enumerate(headers, start=1):
+        ws.cell(row=54, column=i, value=h)
+    # Dato real
+    ws.cell(row=55, column=1, value="010101")
+    ws.cell(row=55, column=2, value="PUNCION CISTERNAL VIA LATERAL")
+    ws.cell(row=55, column=3, value=245)
+    ws.cell(row=55, column=4, value="NEUROCIRUGIA")
+    ws.cell(row=55, column=8, value="SOAT UVB VIGENTE")
+    ws.cell(row=55, column=9, value="-5%")
+    ws.cell(row=55, column=10, value="-5%")
+    ws.cell(row=55, column=11, value="-5%")
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+class TestAnexo3ConPreambleLargo:
+    def test_detecta_header_mas_alla_de_fila_50(self):
+        data = _crear_excel_anexo3_con_preamble_largo()
+        r = parsear_excel_tarifas(data, "famisanar.xlsx")
+        tipos = [h.split(":")[0] for h in r["hojas_detectadas"]]
+        assert "ANEXO3" in tipos, f"ANEXO3 no detectado. Hojas: {r['hojas_detectadas']}"
+
+    def test_parsea_servicio_del_preamble_largo(self):
+        data = _crear_excel_anexo3_con_preamble_largo()
+        r = parsear_excel_tarifas(data, "famisanar.xlsx")
+        servicios = [f for f in r["filas"] if f["codigo_cups"] == "010101"]
+        assert len(servicios) == 1
+        s = servicios[0]
+        assert s["tipo_tarifa"] == "SOAT_PORCENTAJE"
+        assert s["factor_ajuste"] == -5.0
+        assert "PUNCION" in (s["descripcion"] or "")
+
+
+def _crear_excel_medicamento_sin_desc_dci() -> bytes:
+    """Medicamento donde 'DESCRIPCIÓN DCI' está vacía pero sí hay DESCRIPCIÓN general."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Anexo 3.1"
+    ws["A3"] = "NOMBRE DE LA EPS"
+    ws["F3"] = "FAMISANAR EPS"
+    headers = [
+        "CONSECUTIVO", "CÓDIGO DCI", "DESCRIPCIÓN DCI",
+        "CÓDIGO DEL PRESTADOR", "COD. REPS", "DESCRIPCIÓN REPS",
+        "MAPIISS", "CUM/IUM", "DESCRIPCIÓN",
+        "AGRUPADOR", "TARIFA UNITARIA", "APLICA IVA (SI-NO)",
+        "TIPO PLAN", "OBSERVACIONES",
+    ]
+    for i, h in enumerate(headers, start=1):
+        ws.cell(row=10, column=i, value=h)
+    # Fila con DCI vacía pero DESCRIPCIÓN general llena
+    ws.cell(row=11, column=1, value=1)
+    ws.cell(row=11, column=2, value=None)  # DCI vacío
+    ws.cell(row=11, column=3, value=None)  # DESC DCI vacío
+    ws.cell(row=11, column=4, value="130105")
+    ws.cell(row=11, column=6, value="SERVICIO FARMACÉUTICO")
+    ws.cell(row=11, column=9, value="ACETAMINOFEN 500MG TABLETA")
+    ws.cell(row=11, column=10, value="MEDICAMENTOS")
+    ws.cell(row=11, column=11, value=42600)
+    ws.cell(row=11, column=12, value="NO")
+    # Fila donde DCI y DESCRIPCIÓN están vacías pero hay DESCRIPCIÓN REPS
+    ws.cell(row=12, column=1, value=2)
+    ws.cell(row=12, column=4, value="130106")
+    ws.cell(row=12, column=6, value="SERVICIO FARMACÉUTICO - IBUPROFENO 400 MG")
+    ws.cell(row=12, column=10, value="MEDICAMENTOS")
+    ws.cell(row=12, column=11, value=20100)
+    ws.cell(row=12, column=12, value="NO")
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+class TestDescripcionFallback:
+    def test_fallback_dci_a_descripcion(self):
+        data = _crear_excel_medicamento_sin_desc_dci()
+        r = parsear_excel_tarifas(data, "med.xlsx")
+        m1 = next((f for f in r["filas"] if f["codigo_cups"] == "130105"), None)
+        assert m1 is not None
+        assert m1["descripcion"] == "ACETAMINOFEN 500MG TABLETA"
+
+    def test_fallback_dci_a_descripcion_reps(self):
+        data = _crear_excel_medicamento_sin_desc_dci()
+        r = parsear_excel_tarifas(data, "med.xlsx")
+        m2 = next((f for f in r["filas"] if f["codigo_cups"] == "130106"), None)
+        assert m2 is not None
+        assert "IBUPROFENO" in (m2["descripcion"] or "")

@@ -175,18 +175,31 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
 
 
 def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[None, None]:
-    """Escanea las primeras 50 filas buscando la fila de encabezados."""
-    keywords = [
-        "CUPS", "TARIFA", "MAPIISS", "CODIGO DEL PRESTADOR",
-        "CODIGO DCI", "CUM/IUM", "TIPO TARIFA", "DESCRIPCION DEL PRESTADOR",
-        "PRECIO DE REFERENCIA", "CODIGO IPS",
+    """Escanea las primeras 200 filas buscando la fila de encabezados.
+
+    Famisanar Anexo 3 tiene ~50 filas de metadata (directorio, sedes,
+    agrupadores RIAS, agrupadores servicios) antes del encabezado real
+    de la tabla CUPS. Además, la fila de encabezados tiene que contener
+    palabras clave SUFICIENTES (≥2) para evitar falsos positivos de
+    tablas auxiliares como AGRUPADORES (que tiene COD + DESCRIPCION).
+    """
+    keywords_fuertes = [
+        "CUPS", "MAPIISS", "TIPO TARIFA",
+        "CODIGO DEL PRESTADOR", "CODIGO DCI", "CUM/IUM",
+        "DESCRIPCION DEL PRESTADOR", "PRECIO DE REFERENCIA",
+        "TARIFA UNITARIA", "TARIFA FINAL",
     ]
-    for idx, fila in enumerate(rows[:50]):
+    limite = min(200, len(rows))
+    for idx, fila in enumerate(rows[:limite]):
         no_vacios = [c for c in fila if c is not None and str(c).strip()]
-        if len(no_vacios) < 3:
+        if len(no_vacios) < 4:
             continue
         fila_norm = [_normalizar_texto(c) for c in fila]
-        if any(any(kw in celda for kw in keywords) for celda in fila_norm):
+        matches = sum(
+            1 for celda in fila_norm
+            if any(kw in celda for kw in keywords_fuertes)
+        )
+        if matches >= 2:
             return idx, fila_norm
     return None, None
 
@@ -240,7 +253,10 @@ def _extraer_metadata(rows: list[tuple]) -> dict:
 def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
     """Anexo 3 — Servicios CUPS con fórmula SOAT ± %."""
     idx_cups = _indice_columna(headers, "CUPS / CUMS / MIPRES", "CUPS/CUMS/MIPRES", "CUPS")
-    idx_desc = _indice_columna(headers, "DESCRIPCION CUPS", "DESCRIPCION", "DESCRIPCIÓN")
+    idx_desc_cups = _indice_columna(headers, "DESCRIPCION CUPS / CUMS / MIPRES", "DESCRIPCION CUPS")
+    idx_desc_propio = _indice_columna(headers, "DESCRIPCION CODIGO PROPIO")
+    idx_desc_reps = _indice_columna(headers, "DESCRIPCION REPS")
+    idx_desc = _indice_columna(headers, "DESCRIPCION", "DESCRIPCIÓN")
     idx_tipo = _indice_columna(headers, "TIPO TARIFA")
     idx_hosp = _indice_columna(headers, "HOSPITALARIO")
     idx_amb = _indice_columna(headers, "AMBULATORIO")
@@ -258,8 +274,10 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
         cups = str(cups_raw).strip()
         if not cups or not re.search(r"[A-Za-z0-9]", cups):
             continue
-        desc = str(_celda(fila, idx_desc) or "").strip()
-        tipo = str(_celda(fila, idx_tipo) or "").strip()
+        desc = _primera_desc_no_vacia(
+            fila, idx_desc_cups, idx_desc_propio, idx_desc_reps, idx_desc
+        )
+        tipo = _limpiar_descripcion(str(_celda(fila, idx_tipo) or ""))
         factor = 0.0
         for idx in (idx_hosp, idx_amb, idx_urg):
             if idx is None:
@@ -268,7 +286,7 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
             if f != 0:
                 factor = f
                 break
-        obs = str(_celda(fila, idx_obs) or "").strip()
+        obs = _limpiar_descripcion(str(_celda(fila, idx_obs) or ""))
         filas.append({
             "codigo_cups": cups,
             "descripcion": desc[:500] if desc else None,
@@ -281,6 +299,28 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
     return filas
 
 
+def _limpiar_descripcion(s: str) -> str:
+    """Normaliza una descripción: vacía si es 'N/A', '-', 'NINGUNO' o similar."""
+    if not s:
+        return ""
+    t = s.strip()
+    if t.upper() in ("N/A", "NA", "-", "NINGUNO", "NONE", "#N/A"):
+        return ""
+    return t
+
+
+def _primera_desc_no_vacia(fila: tuple, *indices: int | None) -> str:
+    """Devuelve la primera descripción no-vacía entre los índices dados."""
+    for idx in indices:
+        if idx is None:
+            continue
+        v = _celda(fila, idx)
+        d = _limpiar_descripcion(str(v) if v is not None else "")
+        if d:
+            return d
+    return ""
+
+
 def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
     """Anexo 3.1 — Medicamentos, valor fijo."""
     idx_cod_prest = _indice_columna(headers, "CODIGO DEL PRESTADOR")
@@ -288,6 +328,7 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
     idx_mapiiss = _indice_columna(headers, "MAPIISS")
     idx_desc_dci = _indice_columna(headers, "DESCRIPCION DCI")
     idx_desc = _indice_columna(headers, "DESCRIPCION", "DESCRIPCIÓN")
+    idx_desc_reps = _indice_columna(headers, "DESCRIPCION REPS")
     idx_agrup = _indice_columna(headers, "AGRUPADOR")
     idx_tarifa = _indice_columna(headers, "TARIFA UNITARIA")
     idx_iva = _indice_columna(headers, "APLICA IVA")
@@ -295,7 +336,6 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
     idx_codigo = idx_cod_prest if idx_cod_prest is not None else (
         idx_cum if idx_cum is not None else idx_mapiiss
     )
-    idx_descripcion = idx_desc_dci if idx_desc_dci is not None else idx_desc
     if idx_codigo is None or idx_tarifa is None:
         return []
 
@@ -307,7 +347,8 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         codigo = str(cod_raw).strip()
         if not codigo or not re.search(r"[A-Za-z0-9]", codigo):
             continue
-        desc = str(_celda(fila, idx_descripcion) or "").strip()
+        # Fallback: DCI → DESCRIPCION → DESCRIPCION REPS
+        desc = _primera_desc_no_vacia(fila, idx_desc_dci, idx_desc, idx_desc_reps)
         tarifa = _normalizar_valor(_celda(fila, idx_tarifa))
         if tarifa <= 0:
             continue
@@ -333,9 +374,9 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
     """Anexo 3.2 — Suministros, valor fijo (TARIFA FINAL si trae IVA)."""
     idx_cod_prest = _indice_columna(headers, "CODIGO DEL PRESTADOR")
     idx_mapiiss = _indice_columna(headers, "MAPIISS")
-    idx_desc = _indice_columna(
-        headers, "DESCRIPCION DEL PRESTADOR", "DESCRIPCION", "DESCRIPCIÓN"
-    )
+    idx_desc_prest = _indice_columna(headers, "DESCRIPCION DEL PRESTADOR")
+    idx_desc = _indice_columna(headers, "DESCRIPCION", "DESCRIPCIÓN")
+    idx_desc_reps = _indice_columna(headers, "DESCRIPCION REPS")
     idx_agrup = _indice_columna(headers, "AGRUPADOR")
     idx_unitaria = _indice_columna(headers, "TARIFA UNITARIA")
     idx_final = _indice_columna(headers, "TARIFA FINAL")
@@ -353,7 +394,7 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         codigo = str(cod_raw).strip()
         if not codigo or not re.search(r"[A-Za-z0-9]", codigo):
             continue
-        desc = str(_celda(fila, idx_desc) or "").strip()
+        desc = _primera_desc_no_vacia(fila, idx_desc_prest, idx_desc, idx_desc_reps)
         iva_si = False
         if idx_iva is not None:
             iva_val = str(_celda(fila, idx_iva) or "").strip().upper()
@@ -368,7 +409,7 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         if valor <= 0:
             continue
 
-        agrup = str(_celda(fila, idx_agrup) or "").strip()
+        agrup = _limpiar_descripcion(str(_celda(fila, idx_agrup) or ""))
         filas.append({
             "codigo_cups": codigo,
             "descripcion": desc[:500] if desc else None,
@@ -416,8 +457,8 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
         valor = _normalizar_valor(_celda(fila, idx_valor))
         if valor <= 0:
             continue
-        desc = str(_celda(fila, idx_desc) or "").strip()
-        modalidad = str(_celda(fila, idx_modalidad) or "").strip()
+        desc = _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
+        modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
         # Si hay código IPS propio, guardarlo en observación (útil para trazabilidad)
         cod_ips = str(_celda(fila, idx_cod_ips) or "").strip() if idx_cod_ips is not None else ""
         obs = f"Código IPS: {cod_ips}" if cod_ips and cod_ips != cups else None
