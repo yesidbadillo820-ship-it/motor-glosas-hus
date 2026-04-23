@@ -211,6 +211,25 @@ def firmar_glosa(
     }
 
 
+@router.get("/{glosa_id}/prediccion-ratificacion")
+def predecir_ratificacion_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Predice si la EPS ratificará esta glosa (Ronda 12).
+
+    Usa regresión logística manual sobre 13 features del dominio
+    (histórico EPS, tipo glosa, calidad dictamen, plantilla, match
+    perfecto, régimen, valor objetado, ratificaciones previas...).
+    """
+    glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    from app.services.ml_ratificacion import predecir_ratificacion
+    return predecir_ratificacion(db, glosa)
+
+
 @router.post("/verificar-firma")
 def verificar(
     payload: dict,
