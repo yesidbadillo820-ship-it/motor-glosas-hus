@@ -51,3 +51,23 @@ class TestExtraerValoresGlosa:
         txt = "FACTURADO POR $20.000,50"
         v = _extraer_valores_glosa(txt)
         assert v["facturado"] == 20_000.5
+
+    def test_famisanar_facturado_por_ips(self):
+        """Caso real: 'VALOR UNITARIO FACTURADO POR IPS $ 206,400'."""
+        txt = (
+            "SE REALIZA OBJECIÓN POR MAYOR VALOR COBRADO DE ACUERDO A TARIFA "
+            "CONTRATADA CON EPS FAMISANAR. SE OBJETA DIFERENCIA DE $ 38400 DE "
+            "1 UNIDAD(ES), VALOR UNITARIO CONTRATADO PARA LA FECHA DE "
+            "PRESTACIÓN DEL SERVICIO CON EPS FAMISANAR 168,000 EQUIVALENTE "
+            "A TARIFA VALOR UNITARIO FACTURADO POR IPS $ 206,400"
+        )
+        v = _extraer_valores_glosa(txt)
+        assert v["facturado"] == 206_400.0
+        assert v["reconocido"] == 168_000.0
+        assert v["objetado"] == 38_400.0
+
+    def test_contratado_sin_palabra_por(self):
+        """'VALOR UNITARIO CONTRATADO ... CON EPS FAMISANAR 168,000'."""
+        txt = "VALOR UNITARIO CONTRATADO PARA LA FECHA CON EPS FAMISANAR 168,000"
+        v = _extraer_valores_glosa(txt)
+        assert v["reconocido"] == 168_000.0

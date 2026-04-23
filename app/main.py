@@ -244,20 +244,30 @@ def _extraer_valores_glosa(texto: str) -> dict:
             return 0.0
 
     patrones_fact = [
-        r"FACTURAD[OA]S?\s+(?:POR\s+|EN\s+|:\s*)?\$?\s*([\d\.,]+)",
-        r"VALOR\s+FACTURADO[:\s]+\$?\s*([\d\.,]+)",
-        r"COBRAD[OA]\s+(?:POR\s+)?\$?\s*([\d\.,]+)",
+        # Forma explícita de HUS: "VALOR UNITARIO FACTURADO POR IPS $ 206,400"
+        # o "FACTURADO POR IPS $XXX" (tolera hasta 3 palabras entre POR y el valor)
+        r"FACTURAD[OA]S?\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
+        r"VALOR\s+(?:UNITARIO\s+)?FACTURADO[:\s]+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
+        r"COBRAD[OA]\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
+        r"FACTURA[:\s]+\$?\s*([\d][\d\.,]{3,})",
     ]
     patrones_rec = [
-        r"RECONOCID[OA]S?\s+(?:SOLO\s+)?(?:POR\s+|EN\s+|:\s*)?\$?\s*([\d\.,]+)",
-        r"ACEPTAD[OA]S?\s+(?:POR\s+|EN\s+)?\$?\s*([\d\.,]+)",
-        r"VALOR\s+ACEPTADO[:\s]+\$?\s*([\d\.,]+)",
+        # Patrón Famisanar/similar: "VALOR UNITARIO CONTRATADO PARA LA FECHA
+        # DE PRESTACIÓN DEL SERVICIO CON EPS FAMISANAR 168,000"
+        # La palabra "VALOR" o "UNITARIO" antes de CONTRATADO evita falsos
+        # positivos con "TARIFA CONTRATADA CON EPS" (mención general).
+        r"(?:VALOR|UNITARIO)\s+(?:UNITARIO\s+)?CONTRATAD[OA][^\d$]{0,140}\$?\s*([\d][\d\.,]{3,})",
+        r"RECONOCID[OA]S?\s+(?:SOLO\s+)?(?:POR\s+|EN\s+|:\s*)?\$?\s*([\d][\d\.,]{3,})",
+        r"ACEPTAD[OA]S?\s+(?:POR\s+|EN\s+)?\$?\s*([\d][\d\.,]{3,})",
+        r"VALOR\s+ACEPTADO[:\s]+\$?\s*([\d][\d\.,]{3,})",
+        # "PAGA $X", "CUBRE $X"
+        r"PAGAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
     ]
     patrones_obj = [
-        r"OBJET[ÁA]NDOSE\s+(?:UNA\s+DIFERENCIA\s+DE\s+)?\$?\s*([\d\.,]+)",
-        r"OBJETAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d\.,]+)",
-        r"DIFERENCIA\s+(?:DE\s+)?\$?\s*([\d\.,]+)",
-        r"GLOSAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d\.,]+)",
+        r"OBJET[ÁA]NDOSE\s+(?:UNA\s+DIFERENCIA\s+DE\s+)?\$?\s*([\d][\d\.,]{3,})",
+        r"OBJETAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
+        r"DIFERENCIA\s+(?:DE\s+)?\$?\s*([\d][\d\.,]{3,})",
+        r"GLOSAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
     ]
 
     def _primer_match(patrones: list) -> float:
@@ -1261,9 +1271,9 @@ async def analizar(
             vals_txt = _extraer_valores_glosa(tabla_excel or "")
             val_fact = vals_txt["facturado"]
             val_rec = vals_txt["reconocido"]
-            # Fallback: si no se extrajo facturado, estimar como pactado + obj
-            if val_fact <= 0 and val_obj > 0:
-                val_fact = val_obj * 2  # placeholder conservador
+            # Si no se extrajo facturado del texto, val_fact = 0.
+            # El banner mostrará los datos que sí tiene sin inventar valores
+            # falsos; la IA decide con los datos reales del BLOQUE 1.
             info_tarifa = evaluar_glosa_tarifa(
                 db,
                 eps=eps,
