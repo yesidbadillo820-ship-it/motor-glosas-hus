@@ -334,10 +334,16 @@ async def importar_excel(
         raise HTTPException(413, "Archivo demasiado grande (>20 MB)")
 
     resultado = parsear_excel_tarifas(contenido, archivo.filename or "")
-    if resultado["errores"] and not resultado["filas"]:
+    if not resultado["filas"]:
+        hojas_info = ", ".join(resultado.get("hojas_detectadas", [])) or "ninguna"
+        err_info = ""
+        if resultado["errores"]:
+            err_info = f" Errores: {'; '.join(resultado['errores'][:2])}"
         raise HTTPException(
             400,
-            f"No se pudo procesar el Excel. Errores: {'; '.join(resultado['errores'][:3])}"
+            f"No se detectaron tarifas en el Excel. Hojas reconocidas: {hojas_info}. "
+            f"Verifica que las columnas incluyan CUPS y un campo de valor "
+            f"(PRECIO DE REFERENCIA, TARIFA UNITARIA, CODIGO DEL PRESTADOR, etc.).{err_info}"
         )
 
     eps_val = eps_override or resultado.get("eps") or ""

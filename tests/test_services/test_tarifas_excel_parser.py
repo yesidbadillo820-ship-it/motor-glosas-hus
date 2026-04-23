@@ -263,3 +263,82 @@ class TestParsearExcelTarifas:
         r = parsear_excel_tarifas(b"not an xlsx", "bad.xlsx")
         assert r["filas"] == []
         assert r["errores"] != []
+
+
+# ─── Formato Dispensario (hoja plana: CUPS + PRECIO DE REFERENCIA) ─────────
+
+def _crear_excel_dispensario() -> bytes:
+    """Layout plano tal como lo envía DISPENSARIO MEDICO BUCARAMANGA."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Tarifas"
+    # Sin metadata de encabezado: la tabla arranca en la fila 1 directamente
+    headers = [
+        "ITEM", "CUPS", "DESCRIPCION CUPS", "CODIGO IPS", "DESCRIPCION IPS",
+        "PRECIO DE REFERENCIA", "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
+    ]
+    for i, h in enumerate(headers, start=1):
+        ws.cell(row=1, column=i, value=h)
+
+    # Filas de ejemplo reales del user
+    datos = [
+        (5081, "039001", "INSERCION DE CATETER EPIDURAL EN CANAL ESPINAL", "039001H",
+         "INSERCION DE CATETER EPIDURAL EN CANAL ESPINAL", 1689585, "PROPIA"),
+        (5082, "039002", "INSERCION DE CATETER EPIDURAL CON PUERTO IMPLANTABLE", "039002H",
+         "INSERCION DE CATETER EPIDURAL CON PUERTO IMPLANTABLE", 1580085, "PROPIA"),
+        (5086, "039204", "NEUROLISIS DE NERVIOS PERIFERICOS POR RADIOFRECUENCIA",
+         "039204H", "NEUROLISIS DE NERVIOS PERIFERICOS", 5081895, "PROPIA"),
+        (5087, "039306", "IMPLANTACION DE ELECTRODOS DE NEUROESTIMULACION ESPINAL",
+         "039306H1", "IMPLANTACION DE ELECTRODOS", 8103986, "PROPIA"),
+    ]
+    for row_idx, tup in enumerate(datos, start=2):
+        for col_idx, val in enumerate(tup, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=val)
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+class TestParsearExcelDispensario:
+    @pytest.fixture
+    def excel_bytes(self) -> bytes:
+        return _crear_excel_dispensario()
+
+    def test_detecta_simple_fijo(self, excel_bytes):
+        r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
+        tipos = [h.split(":")[0] for h in r["hojas_detectadas"]]
+        assert "SIMPLE_FIJO" in tipos
+
+    def test_numero_total_filas(self, excel_bytes):
+        r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
+        assert len(r["filas"]) == 4
+
+    def test_valores_fijos(self, excel_bytes):
+        r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
+        for f in r["filas"]:
+            assert f["tipo_tarifa"] == "VALOR_FIJO"
+            assert f["factor_ajuste"] == 0.0
+
+    def test_primer_cups_valor(self, excel_bytes):
+        r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
+        primero = next((f for f in r["filas"] if f["codigo_cups"] == "039001"), None)
+        assert primero is not None
+        assert primero["valor_pactado"] == 1689585.0
+        assert "EPIDURAL" in (primero["descripcion"] or "")
+
+    def test_modalidad_propia(self, excel_bytes):
+        r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
+        for f in r["filas"]:
+            assert f["modalidad"] == "PROPIA"
+
+    def test_codigo_ips_en_observacion(self, excel_bytes):
+        r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
+        primero = next((f for f in r["filas"] if f["codigo_cups"] == "039001"), None)
+        # El código IPS "039001H" difiere del CUPS, debe guardarse
+        assert "039001H" in (primero["observacion"] or "")
+
+    def test_sin_eps_detectada(self, excel_bytes):
+        """Dispensario no trae metadata de EPS; se espera eps=None."""
+        r = parsear_excel_tarifas(excel_bytes, "dispensario.xlsx")
+        assert r["eps"] is None
