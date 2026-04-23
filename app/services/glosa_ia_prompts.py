@@ -624,27 +624,38 @@ def _detectar_regimen_especial(eps: str, contrato_tipo: str) -> str:
 
 
 def get_system_prompt(prefijo: str, eps: str) -> str:
-    """Retorna el system prompt especializado + datos contractuales + régimen especial."""
+    """Retorna el system prompt especializado + régimen especial.
+
+    **Optimización #2 (token saving)**: este prompt ahora es ESTABLE por
+    (prefijo, régimen_especial). Los datos contractuales específicos de cada
+    EPS (número de contrato, NIT, vigencia, nota) se inyectan en el USER
+    prompt vía `build_user_prompt()`, no acá. Así Anthropic puede cachear
+    el system 1 vez por combinación prefijo+régimen y reusarlo para todas
+    las glosas de distintas EPS que caigan en esa combinación.
+
+    Antes: ~3400 tokens por llamada, cache hit 0% (EPS cambiante).
+    Después: ~3000 tokens por llamada, cache hit ≥90% después del warm-up.
+    """
     base = SYSTEM_MAP.get(prefijo.upper(), SYSTEM_FA)
     contrato = get_contrato(eps)
 
-    # Cálculo SOAT explícito si conocemos el factor
-    factor = contrato.get("factor", 1.0)
+    # Calculadora tarifaria: texto ESTÁTICO por tipo de factor (pactado/no).
+    # No incluye el factor numérico específico para no romper cache.
     bloque_calculo = ""
-    if prefijo.upper() == "TA" and factor < 1.0:
-        descuento_pct = int(round((1 - factor) * 100))
-        bloque_calculo = f"""
+    if prefijo.upper() == "TA":
+        factor = contrato.get("factor", 1.0)
+        if factor < 1.0:
+            bloque_calculo = """
 CALCULADORA TARIFARIA OBLIGATORIA (USA EN EL ARGUMENTO):
 - Marco normativo       : Manual SOAT 2026 — Circular 047/2025 MinSalud (tarifas en UVB)
 - UVB 2026              : $12.110 (Res. MinHacienda 31/12/2025)
-- Fórmula SOAT pleno    : valor = Tarifa_UVB_del_CUPS × $12.110 → ajustar a centena
-- Factor contractual    : {factor} (descuento {descuento_pct}%)
-- Valor pactado         = SOAT_pleno × {factor}
+- Fórmula SOAT pleno    : valor = Tarifa_UVB_del_CUPS × $12.110 → centena más próxima
+- Valor pactado         = SOAT_pleno × factor_contractual (usa el factor indicado en DATOS DEL CASO)
 - Diferencia adeudada   = Valor pactado - Valor reconocido por la EPS
 - DEBES mostrar este cálculo en el argumento si la EPS aplicó otro descuento.
 """
-    elif prefijo.upper() == "TA" and factor >= 1.0:
-        bloque_calculo = """
+        else:
+            bloque_calculo = """
 CALCULADORA TARIFARIA OBLIGATORIA:
 - Sin contrato pactado: aplica SOAT PLENO (Manual Tarifario SOAT 2026 — Circular 047/2025 MinSalud, UVB 2026 = $12.110), SIN descuentos.
 - Cualquier descuento de la EPS es UNILATERAL y carece de soporte contractual.
@@ -654,20 +665,31 @@ CALCULADORA TARIFARIA OBLIGATORIA:
     if bloque_regimen:
         bloque_regimen = "\n══════════════════════════════════════════════\n" + bloque_regimen + "\n══════════════════════════════════════════════\n"
 
-    return base + f"""
-DATOS CONTRACTUALES VERIFICADOS (USA EXACTAMENTE ESTO, NO INVENTES OTROS):
-─────────────────────────────────────────────────
-EPS / PAGADOR : {eps}
-CONTRATO      : {contrato['numero']}
-TARIFA PACTADA: {contrato['tarifa']}
-NIT PAGADOR   : {contrato['nit']}
-VIGENCIA      : {contrato['vigencia']}
-TIPO          : {contrato['tipo']}
-NOTA CONTRATO : {contrato['nota']}
-─────────────────────────────────────────────────
-{bloque_calculo}
-{bloque_regimen}
-"""
+    return base + bloque_calculo + bloque_regimen
+
+
+def build_contrato_context(eps: str) -> str:
+    """Devuelve un bloque con los datos contractuales específicos de la EPS.
+    Se inyecta en el USER prompt (no en system), para que el caché del system
+    se mantenga estable entre EPS. Ver get_system_prompt() para contexto."""
+    contrato = get_contrato(eps)
+    factor = contrato.get("factor", 1.0)
+    descuento_txt = ""
+    if factor < 1.0:
+        descuento_txt = f"\nFACTOR PACTADO: {factor} (descuento {int(round((1 - factor) * 100))}% sobre SOAT)"
+    return (
+        "DATOS CONTRACTUALES VERIFICADOS (USA EXACTAMENTE ESTO, NO INVENTES OTROS):\n"
+        "─────────────────────────────────────────────────\n"
+        f"EPS / PAGADOR : {eps}\n"
+        f"CONTRATO      : {contrato['numero']}\n"
+        f"TARIFA PACTADA: {contrato['tarifa']}\n"
+        f"NIT PAGADOR   : {contrato['nit']}\n"
+        f"VIGENCIA      : {contrato['vigencia']}\n"
+        f"TIPO          : {contrato['tipo']}\n"
+        f"NOTA CONTRATO : {contrato['nota']}"
+        f"{descuento_txt}\n"
+        "─────────────────────────────────────────────────\n"
+    )
 
 
 
@@ -982,17 +1004,29 @@ def build_user_prompt(
         )
     # conciliador es el default — no añade bloque extra
 
+    # Regla de oro para la IA: los datos del BLOQUE 1 son AUTORITATIVOS.
+    # La EPS a veces menciona CUPS o valores alternativos en el texto de
+    # la glosa ("se reconoce tarifa SOAT UVB vigente código 39143") — eso
+    # es lo que PROPONE pagar, NO lo que facturó HUS. La IA debe usar
+    # siempre el CUPS y valor listados abajo, que vienen del campo oficial.
     return f"""CASO A RESOLVER — GLOSA {codigo}{bloque_tono_str}
 
-═══ BLOQUE 1: DATOS DEL CASO ═══
+═══ BLOQUE 1: DATOS DEL CASO (AUTORITATIVOS — usa EXACTAMENTE estos) ═══
 • Tipo de glosa     : {nombre_tipo} ({codigo})
 • Entidad pagadora  : {eps}
 • Contrato vigente  : {numero_contrato}
 • Tarifa pactada    : {tarifa}
-• CUPS              : {cups}
-• Valor objetado    : {valor_fmt}
+• CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
+• Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
 • Trazabilidad      : {trazabilidad}
 • Tiempo transcurrido: {contexto_tiempo}
+
+⚠ REGLA CRÍTICA DE DATOS:
+  Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar
+  literalmente en el argumento (NO escribas "EL VALOR INDICADO EN EL EXPEDIENTE").
+  Si la EPS menciona un CUPS alternativo dentro del texto de la glosa (ej.
+  "se reconoce SOAT código 39143"), IGNÓRALO; el CUPS oficial es el que está
+  arriba en DATOS DEL CASO.
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}

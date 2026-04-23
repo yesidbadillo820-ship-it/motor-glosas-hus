@@ -10,13 +10,20 @@ from app.services.glosa_ia_prompts import (
 
 
 class TestSystemPrompts:
-    """Tests for system prompt generation."""
+    """Tests for system prompt generation.
+
+    Nota: desde la optimización #2 de tokens, el system prompt es ESTABLE
+    por (prefijo, régimen). Los datos específicos de EPS (contrato, NIT,
+    vigencia) se inyectan en el USER prompt vía build_user_prompt para
+    maximizar el hit rate del prompt caching de Anthropic.
+    """
 
     def test_get_system_prompt_tarifa(self):
         """Should return tariff-specific prompt."""
         prompt = get_system_prompt(prefijo="TA", eps="EPS TEST")
-        assert "EPS TEST" in prompt
         assert "MÓDULO: TARIFAS" in prompt
+        # La calculadora tarifaria se queda en system (es lógica, no dato)
+        assert "CALCULADORA TARIFARIA" in prompt
 
     def test_get_system_prompt_soportes(self):
         """Should return supports-specific prompt."""
@@ -26,8 +33,28 @@ class TestSystemPrompts:
     def test_get_system_prompt_desconocido(self):
         """Unknown prefix should fall back to FA (facturación) prompt."""
         prompt = get_system_prompt(prefijo="XX", eps="EPS TEST")
-        assert "EPS TEST" in prompt
-        assert "DATOS CONTRACTUALES" in prompt
+        # Los DATOS CONTRACTUALES ahora se inyectan al USER prompt, no al system.
+        # El system prompt debe contener el módulo FA (fallback) con su
+        # argumento central de facturación.
+        assert "MÓDULO: FACTURACIÓN" in prompt or "Ley 100" in prompt
+
+    def test_get_system_prompt_no_contiene_datos_eps_especificos(self):
+        """Optimización #2: el system NO debe variar por EPS (cache hit)."""
+        p1 = get_system_prompt(prefijo="TA", eps="FAMISANAR EPS")
+        p2 = get_system_prompt(prefijo="TA", eps="NUEVA EPS")
+        # Ignorando el régimen especial (que sí depende de la EPS pero solo
+        # para régimenes taxativos como SANIDAD MILITAR/PPL), el resto del
+        # prompt debe ser idéntico para EPS "regulares".
+        # Verificamos que al menos el encabezado es idéntico.
+        assert p1[:2000] == p2[:2000]
+
+    def test_build_contrato_context_incluye_eps_y_contrato(self):
+        """Los datos contractuales se inyectan al USER vía build_contrato_context."""
+        from app.services.glosa_ia_prompts import build_contrato_context
+        ctx = build_contrato_context("FAMISANAR EPS")
+        assert "FAMISANAR EPS" in ctx
+        assert "S-13-1-03-1-04958" in ctx
+        assert "DATOS CONTRACTUALES" in ctx
 
     def test_base_contiene_normativa(self):
         """Base prompt should include Colombian legal framework."""

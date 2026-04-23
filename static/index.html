@@ -3427,7 +3427,9 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
     toast('Analizando '+n+'/'+total, 'Código ' + (g.codigo_glosa||'?'), 'info');
     try{
       await analizar();
-      // Capturar el HTML que analizar() dejó en result-area + el lastResult
+      // Capturar el HTML que analizar() dejó en result-area + snapshot
+      // completo de lastResult (necesario para el PDF consolidado que usa
+      // la misma plantilla que imprimirDictamen: dictamen, codigo, paciente).
       var htmlGenerado = area ? area.innerHTML : '';
       if(htmlGenerado && htmlGenerado.length > 100){
         resultadosHtml.push({
@@ -3437,6 +3439,15 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
           valor: (g.valor_objetado || 0),
           glosa_id: (lastResult && lastResult.glosa_id) || null,
           html: htmlGenerado,
+          // Snapshot del lastResult: dictamen HTML + texto limpio + metadata
+          snap: lastResult ? {
+            codigo_glosa: lastResult.codigo_glosa || g.codigo_glosa || '—',
+            valor_objetado: lastResult.valor_objetado || ('$ ' + (g.valor_objetado||0).toLocaleString('es-CO')),
+            dictamen: lastResult.dictamen || '',
+            paciente: lastResult.paciente || '',
+            tipo: lastResult.tipo || '',
+            glosa_id: lastResult.glosa_id || null,
+          } : null,
         });
       }
       procesados++;
@@ -3547,90 +3558,84 @@ function _tercerDomingoMes(anio, mes0){
   return d;
 }
 function getTemaFestivoHoy(){
+  // Busca coincidencia de la fecha actual con las festividades del catálogo.
+  // Los textos/colores están en TEMAS_FESTIVOS; acá solo la lógica de fecha.
   var hoy = new Date();
   var anio = hoy.getFullYear();
   var mes = hoy.getMonth();     // 0-11
   var dia = hoy.getDate();
 
-  // Día de la Madre (2º domingo de mayo, Colombia)
+  // Día de la Madre Colombia: 2º domingo de mayo (móvil)
   var madre = _segundoDomingoMes(anio, 4);
-  if(mes === 4 && dia === madre.getDate()){
-    return {
-      emoji: '💐', icono: '💐', color: '#ec4899', bg: '#fdf2f8',
-      titulo: '¡Feliz Día de la Madre!',
-      mensaje: '💐 SINAC SC desea un feliz Día de la Madre a todas las mamás del equipo HUS. Gracias por todo lo que hacen.',
-    };
-  }
-  // Día del Padre (3º domingo de junio, Colombia)
+  if(mes === 4 && dia === madre.getDate()) return TEMAS_FESTIVOS.madre;
+  // Día del Padre Colombia: 3er domingo de junio (móvil)
   var padre = _tercerDomingoMes(anio, 5);
-  if(mes === 5 && dia === padre.getDate()){
-    return {
-      emoji: '👔', icono: '👔', color: '#0369a1', bg: '#eff6ff',
-      titulo: '¡Feliz Día del Padre!',
-      mensaje: '👔 SINAC SC desea un feliz Día del Padre a todos los papás del equipo HUS.',
-    };
-  }
-  // Navidad (24 y 25 diciembre)
-  if(mes === 11 && (dia === 24 || dia === 25)){
-    return {
-      emoji: '🎄', icono: '🎄', color: '#dc2626', bg: '#fef2f2',
-      titulo: '¡Feliz Navidad!',
-      mensaje: '🎄 SINAC SC les desea una Navidad llena de paz y unión familiar.',
-    };
-  }
-  // Año Nuevo (31 dic / 1 ene)
-  if((mes === 11 && dia === 31) || (mes === 0 && dia === 1)){
-    return {
-      emoji: '🎆', icono: '🎆', color: '#7c3aed', bg: '#f5f3ff',
-      titulo: '¡Feliz Año Nuevo!',
-      mensaje: '🎆 SINAC SC les desea un '+anio+' lleno de éxitos y recuperaciones exitosas.',
-    };
-  }
-  // San Valentín (Día del Amor y la Amistad Colombia: 3er sábado septiembre; aquí 14 feb global)
-  if(mes === 1 && dia === 14){
-    return {
-      emoji: '❤️', icono: '❤️', color: '#e11d48', bg: '#fff1f2',
-      titulo: '¡Feliz Día del Amor y la Amistad!',
-      mensaje: '❤️ SINAC SC les desea un día lleno de amor y amistad.',
-    };
-  }
-  // Día del Trabajador (1 mayo)
-  if(mes === 4 && dia === 1){
-    return {
-      emoji: '🛠️', icono: '🛠️', color: '#ea580c', bg: '#fff7ed',
-      titulo: '¡Feliz Día del Trabajador!',
-      mensaje: '🛠️ SINAC SC reconoce el trabajo y compromiso del equipo HUS.',
-    };
-  }
-  // Independencia Colombia (20 julio)
-  if(mes === 6 && dia === 20){
-    return {
-      emoji: '🇨🇴', icono: '🇨🇴', color: '#eab308', bg: '#fefce8',
-      titulo: '¡Feliz 20 de Julio!',
-      mensaje: '🇨🇴 SINAC SC celebra con ustedes el Día de la Independencia.',
-    };
-  }
-  // Batalla de Boyacá (7 agosto)
-  if(mes === 7 && dia === 7){
-    return {
-      emoji: '🎖️', icono: '🎖️', color: '#1d4ed8', bg: '#eff6ff',
-      titulo: 'Batalla de Boyacá',
-      mensaje: '🎖️ En memoria de la gesta libertaria de 1819.',
-    };
-  }
-  // Halloween / Día de los Niños (31 octubre — en Colombia es día de niños)
-  if(mes === 9 && dia === 31){
-    return {
-      emoji: '🎃', icono: '🎃', color: '#ea580c', bg: '#fff7ed',
-      titulo: '¡Feliz Día de los Niños!',
-      mensaje: '🎃 SINAC SC les desea un día mágico a los peques del equipo.',
-    };
-  }
+  if(mes === 5 && dia === padre.getDate()) return TEMAS_FESTIVOS.padre;
+  // Navidad: 24 y 25 diciembre
+  if(mes === 11 && (dia === 24 || dia === 25)) return TEMAS_FESTIVOS.navidad;
+  // Año Nuevo: 31 diciembre / 1 enero
+  if((mes === 11 && dia === 31) || (mes === 0 && dia === 1)) return TEMAS_FESTIVOS.anio_nuevo;
+  // San Valentín internacional (14 feb) — Colombia tiene su propio día de amor
+  // y amistad en septiembre, pero muchos equipos usan el 14 feb.
+  if(mes === 1 && dia === 14) return TEMAS_FESTIVOS.valentin;
+  // Día del Trabajador: 1 mayo
+  if(mes === 4 && dia === 1) return TEMAS_FESTIVOS.trabajador;
+  // Independencia Colombia: 20 julio
+  if(mes === 6 && dia === 20) return TEMAS_FESTIVOS.independencia;
+  // Batalla de Boyacá: 7 agosto
+  if(mes === 7 && dia === 7) return TEMAS_FESTIVOS.boyaca;
+  // Día de los Niños / Halloween: 31 octubre
+  if(mes === 9 && dia === 31) return TEMAS_FESTIVOS.halloween;
   return null;
 }
+// Catálogo de temas festivos — permite preview y fácil mantenimiento.
+// Claves usadas también en el query ?festivo=<clave> para probar.
+var TEMAS_FESTIVOS = {
+  madre:        {emoji:'💐', icono:'💐', color:'#ec4899', bg:'#fdf2f8',
+                 titulo:'¡Feliz Día de la Madre!',
+                 mensaje:'💐 SINAC SC desea un feliz Día de la Madre a todas las mamás del equipo HUS. Gracias por todo lo que hacen.'},
+  padre:        {emoji:'👔', icono:'👔', color:'#0369a1', bg:'#eff6ff',
+                 titulo:'¡Feliz Día del Padre!',
+                 mensaje:'👔 SINAC SC desea un feliz Día del Padre a todos los papás del equipo HUS.'},
+  navidad:      {emoji:'🎄', icono:'🎄', color:'#dc2626', bg:'#fef2f2',
+                 titulo:'¡Feliz Navidad!',
+                 mensaje:'🎄 SINAC SC les desea una Navidad llena de paz y unión familiar.'},
+  anio_nuevo:   {emoji:'🎆', icono:'🎆', color:'#7c3aed', bg:'#f5f3ff',
+                 titulo:'¡Feliz Año Nuevo!',
+                 mensaje:'🎆 SINAC SC les desea un año lleno de éxitos y recuperaciones exitosas.'},
+  valentin:     {emoji:'❤️', icono:'❤️', color:'#e11d48', bg:'#fff1f2',
+                 titulo:'¡Feliz Día del Amor y la Amistad!',
+                 mensaje:'❤️ SINAC SC les desea un día lleno de amor y amistad.'},
+  trabajador:   {emoji:'🛠️', icono:'🛠️', color:'#ea580c', bg:'#fff7ed',
+                 titulo:'¡Feliz Día del Trabajador!',
+                 mensaje:'🛠️ SINAC SC reconoce el trabajo y compromiso del equipo HUS.'},
+  independencia:{emoji:'🇨🇴', icono:'🇨🇴', color:'#eab308', bg:'#fefce8',
+                 titulo:'¡Feliz 20 de Julio!',
+                 mensaje:'🇨🇴 SINAC SC celebra con ustedes el Día de la Independencia.'},
+  boyaca:       {emoji:'🎖️', icono:'🎖️', color:'#1d4ed8', bg:'#eff6ff',
+                 titulo:'Batalla de Boyacá',
+                 mensaje:'🎖️ En memoria de la gesta libertaria de 1819.'},
+  halloween:    {emoji:'🎃', icono:'🎃', color:'#ea580c', bg:'#fff7ed',
+                 titulo:'¡Feliz Día de los Niños!',
+                 mensaje:'🎃 SINAC SC les desea un día mágico a los peques del equipo.'},
+  // Tema demo neutro para mostrar siempre en capacitación o demos
+  lanzamiento:  {emoji:'🚀', icono:'🚀', color:'#0ea5e9', bg:'#f0f9ff',
+                 titulo:'¡Bienvenido a IA GLOSAS SINAC SC!',
+                 mensaje:'🚀 Sistema inteligente de defensa de glosas · Powered by SINAC SC SAS'},
+};
+
 function aplicarTemaFestivo(){
   try{
-    var tema = getTemaFestivoHoy();
+    // 1) Query string: ?festivo=madre → fuerza un tema para preview
+    var params = new URLSearchParams(window.location.search || '');
+    var forzado = (params.get('festivo') || '').toLowerCase().trim();
+    var tema = null;
+    if(forzado && TEMAS_FESTIVOS[forzado]){
+      tema = TEMAS_FESTIVOS[forzado];
+    } else {
+      // 2) Detector por fecha real
+      tema = getTemaFestivoHoy();
+    }
     if(!tema) return;
     var fest = document.getElementById('landing-festivo');
     var icon = document.getElementById('landing-icon');
@@ -3646,7 +3651,7 @@ function aplicarTemaFestivo(){
     }
   }catch(e){ console.warn('Tema festivo:', e); }
 }
-// Aplicar al cargar (se llama desde checkHealth o init)
+// Aplicar al cargar
 document.addEventListener('DOMContentLoaded', function(){
   setTimeout(aplicarTemaFestivo, 800);
 });
@@ -5056,81 +5061,175 @@ async function aplicarRefinarLote(glosaId, indice){
   }
 }
 
-// Genera un PDF consolidado con TODOS los dictámenes del lote en una sola
-// impresión. Cada concepto va en su propia página (page-break-before:always)
-// y comparte el encabezado institucional.
+// Genera un PDF consolidado reutilizando la MISMA plantilla del PDF
+// individual (imprimirDictamen) por cada concepto, con page-break entre
+// ellos y una portada inicial con el resumen de la factura. Así el
+// consolidado conserva el encabezado institucional (Elaboró/Confirmó,
+// Nº OBJECIÓN, VALOR OBJETADO, FACTURA, RADICADO, EPS/PAGADOR) y no
+// incluye los botones de UI ni duplicados.
 function imprimirLoteConsolidado(){
   var lote = window._lote_resultados || [];
   if(!lote.length){ toast('Sin lote','No hay dictámenes consolidados','warning'); return; }
+
   var factura = (document.getElementById('f-factura') && document.getElementById('f-factura').value) || '—';
+  var radicado = (document.getElementById('f-radicado') && document.getElementById('f-radicado').value) || '—';
   var eps = (document.getElementById('eps-sel') && document.getElementById('eps-sel').value) || '—';
+  var etapa = (document.getElementById('etapa-v') && document.getElementById('etapa-v').value) || 'RESPUESTA A GLOSA';
   var fecha = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  var fechaCorta = new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var hora = new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var elaborado = (USER_NAME || 'HUS').toUpperCase().substring(0,20);
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var totalObj = lote.reduce(function(a,r){ return a + (r.valor||0); }, 0);
 
-  var w = window.open('', '_blank');
+  // Mismo CSS que imprimirDictamen (plantilla oficial) + ajustes de lote
   var style = '<style>'
     + '@page{margin:1.5cm;size:letter}'
     + '*{box-sizing:border-box;margin:0;padding:0}'
     + 'body{font-family:"Segoe UI",Arial,sans-serif;font-size:10pt;line-height:1.45;color:#111}'
-    + '.cover{text-align:center;padding:3cm 1cm 1cm 1cm;page-break-after:always}'
-    + '.cover-logo img{max-width:220px;margin-bottom:20px}'
-    + '.cover h1{font-size:20pt;color:#0b3d91;letter-spacing:.5px;margin-bottom:8px}'
-    + '.cover .sub{font-size:11pt;color:#334155;margin-bottom:30px}'
-    + '.cover .meta{display:inline-block;text-align:left;margin-top:24px;border:2px solid #0b3d91;padding:16px 20px;border-radius:6px;font-size:10pt}'
-    + '.cover .meta div{margin-bottom:6px}'
+    + '.wrap{max-width:100%}'
+    + '.hdr{display:flex;align-items:center;border:2px solid #0b3d91;padding:10px 14px;margin-bottom:2px}'
+    + '.hdr-logo{width:90px;flex-shrink:0}'
+    + '.hdr-logo img{max-width:100%;height:auto}'
+    + '.hdr-center{flex:1;text-align:center;padding:0 10px}'
+    + '.hdr-center h1{font-size:12.5pt;font-weight:800;color:#0b3d91;line-height:1.15;letter-spacing:.3px}'
+    + '.hdr-center .sub{font-size:8pt;color:#444;margin-top:3px}'
+    + '.hdr-right{text-align:right;font-size:8pt;color:#333;width:140px}'
+    + '.hdr-right .page{font-weight:700;margin-top:3px}'
+    + '.meta-row{display:flex;justify-content:space-between;padding:6px 14px;font-size:8.5pt;border:2px solid #0b3d91;border-top:0}'
+    + '.title{text-align:center;font-size:14pt;font-weight:800;color:#0b3d91;letter-spacing:1.5px;margin:14px 0 10px}'
+    + '.info-tbl{width:100%;border-collapse:collapse;border:1px dashed #666;margin-bottom:8px;font-size:8.5pt}'
+    + '.info-tbl td{padding:3px 8px;vertical-align:top}'
+    + '.info-tbl .k{font-weight:700;width:22%;color:#222}'
+    + '.info-tbl .k2{font-weight:700;width:14%;color:#222;text-align:right}'
+    + '.dictamen-tbl{width:100%;border-collapse:collapse;margin-top:10px;font-size:8.5pt}'
+    + '.dictamen-tbl th{background:#f1f5f9;color:#0b3d91;font-weight:700;padding:6px 8px;border:1px solid #94a3b8;text-align:center;font-size:8pt;text-transform:uppercase;letter-spacing:.3px}'
+    + '.dictamen-tbl td{border:1px solid #cbd5e1;padding:8px;vertical-align:top}'
+    + '.dictamen-tbl .col-cod{width:10%;text-align:center;font-weight:700}'
+    + '.dictamen-tbl .col-resp{width:10%;text-align:center;font-weight:700}'
+    + '.dictamen-tbl .col-val{width:11%;text-align:right;font-weight:700}'
+    + '.dictamen-tbl .arg{font-size:9pt;line-height:1.6;text-align:justify;padding:12px}'
+    + '.totales{margin-top:4px;background:#0b3d91;color:#fff;padding:8px 12px;font-weight:700;display:flex;justify-content:space-between;font-size:9pt}'
+    + '.firmas{margin-top:22px;display:flex;justify-content:space-between;gap:40px}'
+    + '.firma{flex:1;text-align:center;border-top:1px solid #333;padding-top:4px;font-size:8.5pt}'
+    + '.footer-note{margin-top:12px;padding:8px 10px;background:#fff9db;border-left:3px solid #f59e0b;font-size:8pt;color:#78350f}'
+    + '.sinac-footer{margin-top:20px;padding-top:10px;border-top:1px solid #e2e8f0;text-align:center}'
+    + '.sinac-footer img{max-width:180px;max-height:50px;height:auto;object-fit:contain}'
+    + '.sinac-tag{font-size:7.5pt;color:#64748b;margin-top:4px;letter-spacing:.03em}'
+    // ─── Portada del lote ────────────────────────────────────────────────
+    + '.cover{text-align:center;padding:2cm 1cm 1cm;page-break-after:always}'
+    + '.cover img{max-width:180px;margin-bottom:16px}'
+    + '.cover h1{font-size:18pt;color:#0b3d91;letter-spacing:.5px;margin-bottom:6px}'
+    + '.cover .sub{font-size:11pt;color:#334155;margin-bottom:24px}'
+    + '.cover .meta{display:inline-block;text-align:left;margin-top:20px;border:2px solid #0b3d91;padding:14px 18px;border-radius:6px;font-size:10pt}'
+    + '.cover .meta div{margin-bottom:5px}'
     + '.cover .meta b{color:#0b3d91;display:inline-block;min-width:160px}'
-    + '.cover .resumen{margin-top:30px;font-size:10pt}'
-    + '.cover .resumen table{margin:0 auto;border-collapse:collapse;font-size:9pt}'
-    + '.cover .resumen th{background:#0b3d91;color:#fff;padding:6px 12px;text-align:left}'
-    + '.cover .resumen td{border:1px solid #cbd5e1;padding:5px 10px}'
-    + '.concepto-page{page-break-before:always;padding-top:8px}'
-    + '.concepto-hdr{background:linear-gradient(90deg,#1e3a8a,#0369a1);color:#fff;padding:10px 14px;border-radius:6px;margin-bottom:12px;display:flex;justify-content:space-between;font-size:11pt;font-weight:700}'
-    + '.concepto-body *{max-width:100%!important}'
-    + '.concepto-body{font-size:9pt}'
-    + '.concepto-body table{width:100%;border-collapse:collapse;font-size:8.5pt;margin:8px 0}'
-    + '.concepto-body td,.concepto-body th{padding:4px 6px;border:1px solid #cbd5e1}'
-    + '.concepto-body h3{font-size:11pt;margin:8px 0 4px}'
-    + '.no-print{display:none!important}'
-    + '@media print{'
-    + '  .no-print{display:none!important}'
-    + '}'
+    + '.cover .resumen{margin-top:22px}'
+    + '.cover .resumen table{margin:0 auto;border-collapse:collapse;font-size:9pt;min-width:60%}'
+    + '.cover .resumen th{background:#0b3d91;color:#fff;padding:5px 10px;text-align:left}'
+    + '.cover .resumen td{border:1px solid #cbd5e1;padding:4px 8px}'
+    // Cada concepto arranca en nueva página
+    + '.concepto-page{page-break-before:always}'
+    + '@media print{.no-print{display:none}}'
     + '</style>';
+
+  // Portada con resumen del lote
   var cover = '<div class="cover">'
-    + '<div class="cover-logo"><img src="/static/logo.png" alt="ESE HUS"/></div>'
+    + '<img src="/static/logo.png" alt="ESE HUS"/>'
     + '<h1>RESPUESTA CONSOLIDADA A GLOSAS</h1>'
-    + '<div class="sub">ESE Hospital Universitario de Santander</div>'
+    + '<div class="sub">ESE Hospital Universitario de Santander · Área de Cartera</div>'
     + '<div class="meta">'
     +   '<div><b>N° Factura:</b> ' + esc(factura) + '</div>'
     +   '<div><b>EPS / Entidad:</b> ' + esc(eps) + '</div>'
+    +   '<div><b>Etapa:</b> ' + esc(etapa) + '</div>'
     +   '<div><b>Fecha de emisión:</b> ' + esc(fecha) + ' · ' + esc(hora) + '</div>'
     +   '<div><b>Conceptos:</b> ' + lote.length + '</div>'
     +   '<div><b>Valor total objetado:</b> $' + totalObj.toLocaleString('es-CO') + '</div>'
+    +   '<div><b>Elaboró:</b> ' + esc(elaborado) + '</div>'
     + '</div>'
     + '<div class="resumen">'
     +   '<table>'
     +     '<thead><tr><th>#</th><th>Código</th><th>CUPS</th><th style="text-align:right">Valor objetado</th></tr></thead>'
     +     '<tbody>';
   for(var i = 0; i < lote.length; i++){
-    var r = lote[i];
-    cover += '<tr><td>' + r.n + '</td><td>' + esc(r.codigo) + '</td><td>' + esc(r.cups||'—') + '</td><td style="text-align:right">$' + (r.valor||0).toLocaleString('es-CO') + '</td></tr>';
+    var rc = lote[i];
+    cover += '<tr><td>' + rc.n + '</td><td>' + esc(rc.codigo) + '</td><td>' + esc(rc.cups||'—') + '</td><td style="text-align:right">$' + (rc.valor||0).toLocaleString('es-CO') + '</td></tr>';
   }
-  cover += '</tbody></table>'
-    + '</div>'
-    + '</div>';
+  cover += '</tbody></table></div></div>';
 
+  // Para cada concepto, generamos la MISMA plantilla oficial usada en
+  // imprimirDictamen. Si el lote trajo `snap` (lastResult completo), se
+  // usa texto limpio del argumento; si no, fallback a extraerlo del html.
   var conceptos = '';
   for(var k = 0; k < lote.length; k++){
     var rr = lote[k];
-    conceptos += '<div class="concepto-page">'
-      + '<div class="concepto-hdr"><span>📋 Concepto ' + rr.n + '/' + lote.length + ' · <b>' + esc(rr.codigo) + '</b>' + (rr.cups ? ' · CUPS ' + esc(rr.cups) : '') + '</span>'
-      + '<span>$' + (rr.valor||0).toLocaleString('es-CO') + '</span></div>'
-      + '<div class="concepto-body">' + rr.html + '</div>'
+    var s = rr.snap || {};
+    var codigoGlosa = s.codigo_glosa || rr.codigo || '—';
+    var valorObj = s.valor_objetado || ('$ ' + (rr.valor||0).toLocaleString('es-CO'));
+    var tipoRes = s.tipo || '';
+    var codResp = tipoRes.replace(/RESPUESTA\s*/i,'').trim() || '—';
+    var resumen = s.codigo_glosa ? ('RESPUESTA A GLOSA ' + s.codigo_glosa) : '';
+    var argumento = s.dictamen ? _extraerArgumentoLimpio(s.dictamen) : '';
+    if(!argumento){
+      // Fallback: tomar el texto del HTML capturado
+      var tmpDiv = document.createElement('div');
+      tmpDiv.innerHTML = rr.html || '';
+      // Quitar botones y paneles interactivos antes de extraer texto
+      tmpDiv.querySelectorAll('button, [class*="refinar-"], .btn-row, [id^="lote-"]').forEach(function(el){ el.remove(); });
+      argumento = tmpDiv.innerText.replace(/\s+/g, ' ').trim();
+    }
+    var tramite = Math.floor(100000 + Math.random()*900000);
+    conceptos += '<div class="concepto-page wrap">'
+      + '<div class="hdr">'
+      +   '<div class="hdr-logo"><img src="/static/logo.png" alt="HUS"/></div>'
+      +   '<div class="hdr-center"><h1>EMPRESA SOCIAL DEL ESTADO<br>HOSPITAL UNIVERSITARIO DE SANTANDER E.S.E.</h1>'
+      +   '<div class="sub">NIT 900.006.037-4 · Carrera 33 No. 28-126, Bucaramanga (Santander)</div></div>'
+      +   '<div class="hdr-right">Fecha: ' + esc(fechaCorta) + '<div class="page">Pág. ' + (k+2) + ' / ' + (lote.length+1) + '</div></div>'
+      + '</div>'
+      + '<div class="meta-row">'
+      +   '<span>Elaboró: <b>' + esc(elaborado) + '</b></span>'
+      +   '<span>Confirmó: <b>' + esc(elaborado) + '</b></span>'
+      +   '<span>' + esc(etapa) + '</span>'
+      +   '<span>Área: Cartera / Glosas</span>'
+      + '</div>'
+      + '<table class="info-tbl"><tbody>'
+      +   '<tr><td class="k">FECHA DOCUMENTO:</td><td>' + esc(fechaCorta) + '</td>'
+      +   '<td class="k2">ESTADO:</td><td>' + esc(tipoRes || 'RESPUESTA') + '</td></tr>'
+      +   '<tr><td class="k">Nº OBJECIÓN:</td><td>' + tramite + '</td>'
+      +   '<td class="k2">VALOR OBJETADO:</td><td><b>' + esc(valorObj) + '</b></td></tr>'
+      +   '<tr><td class="k">FACTURA:</td><td>' + esc(factura) + '</td>'
+      +   '<td class="k2">RADICADO:</td><td>' + esc(radicado) + '</td></tr>'
+      +   '<tr><td class="k">EPS / PAGADOR:</td><td colspan="3">' + esc(eps) + '</td></tr>'
+      +   '<tr><td class="k">CONCEPTO:</td><td colspan="3">' + rr.n + ' / ' + lote.length + ' · CUPS: ' + esc(rr.cups || '—') + '</td></tr>'
+      + '</tbody></table>'
+      + '<table class="dictamen-tbl">'
+      +   '<thead><tr>'
+      +     '<th class="col-cod">CÓDIGO GLOSA</th>'
+      +     '<th>CONCEPTO RESPUESTA</th>'
+      +     '<th class="col-val">VALOR OBJETADO</th>'
+      +     '<th class="col-resp">CÓDIGO RESP.</th>'
+      +   '</tr></thead>'
+      +   '<tbody><tr>'
+      +     '<td class="col-cod">' + esc(codigoGlosa) + '</td>'
+      +     '<td>' + esc(resumen) + '</td>'
+      +     '<td class="col-val">' + esc(valorObj) + '</td>'
+      +     '<td class="col-resp">' + esc(codResp) + '</td>'
+      +   '</tr>'
+      +   '<tr><td colspan="4" class="arg">' + esc(argumento).replace(/\n/g, '<br/>') + '</td></tr>'
+      + '</tbody></table>'
+      + '<div class="firmas">'
+      +   '<div class="firma">ÁREA DE CARTERA · GLOSAS Y DEVOLUCIONES<br>ESE HUS</div>'
+      +   '<div class="firma">REVISÓ / FIRMÓ<br>&nbsp;</div>'
+      + '</div>'
+      + (k === lote.length - 1 ? (''
+        + '<div class="footer-note"><b>Observación:</b> Documento generado automáticamente por el sistema. Verificar y firmar antes de radicar ante la EPS. Cualquier información a los correos institucionales: cartera@hus.gov.co · glosasydevoluciones@hus.gov.co.</div>'
+        + '<div class="sinac-footer"><img src="/static/sinac-logo.png" alt="SINAC SC SAS"/><div class="sinac-tag">Documento generado por IA GLOSAS SINAC SC · Powered by SINAC SC SAS</div></div>'
+      ) : '')
       + '</div>';
   }
 
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Respuesta consolidada · Factura ' + esc(factura) + '</title>' + style + '</head><body>' + cover + conceptos + '<script>window.onload=function(){setTimeout(function(){window.print();},300)}<\/script></body></html>');
+  var w = window.open('', '_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Respuesta consolidada · Factura ' + esc(factura) + '</title>' + style + '</head><body>' + cover + conceptos + '<script>window.onload=function(){setTimeout(function(){window.print();},400)}<\/script></body></html>');
   w.document.close();
 }
 
