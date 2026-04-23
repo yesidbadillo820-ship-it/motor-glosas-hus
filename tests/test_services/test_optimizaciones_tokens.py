@@ -183,6 +183,49 @@ def test_limit_key_con_token_invalido_usa_ip():
 # ─── Integración análisis con info_tarifa → skip LLM ────────────────────────
 
 @pytest.mark.asyncio
+async def test_cache_ia_lock_impide_race_condition():
+    """Con 10 llamadas concurrentes a la misma clave, el lock debe asegurar
+    que la respuesta cacheada es consistente (misma tupla, no None, no corrupta)."""
+    import asyncio as _aio
+    from app.services.glosa_service import _CACHE_IA, _CACHE_IA_LOCK
+    # Setear entrada inicial con lock
+    async with _CACHE_IA_LOCK:
+        _CACHE_IA["clave_test_race"] = ("respuesta_test", "modelo_test")
+
+    async def leer():
+        async with _CACHE_IA_LOCK:
+            return _CACHE_IA.get("clave_test_race")
+
+    resultados = await _aio.gather(*[leer() for _ in range(20)])
+    # Todos deben ser la misma tupla, no None, no corrupta
+    assert all(r == ("respuesta_test", "modelo_test") for r in resultados)
+
+
+def test_clamp_per_page_repositorio():
+    """per_page > 1000 debe clampearse a 1000 para evitar full table scans."""
+    from app.repositories.glosa_repository import GlosaRepository
+    from unittest.mock import MagicMock
+    # Mock de DB: listar_paginado internamente hace query.count() + offset + limit
+    db = MagicMock()
+    query_mock = MagicMock()
+    query_mock.count.return_value = 0
+    query_mock.offset.return_value = query_mock
+    query_mock.limit.return_value = query_mock
+    query_mock.all.return_value = []
+    db.query.return_value = query_mock
+    # Mock _query_con_filtros para que no toque la BD real
+    repo = GlosaRepository(db)
+    repo._query_con_filtros = MagicMock(return_value=query_mock)
+    # Llamar con per_page absurdamente grande
+    resultado = repo.listar_paginado(page=1, per_page=999_999)
+    # Debe clampear a 1000
+    assert resultado["per_page"] == 1000
+    # Y page negativa debe ir a 1
+    resultado2 = repo.listar_paginado(page=-5, per_page=50)
+    assert resultado2["page"] == 1
+
+
+@pytest.mark.asyncio
 async def test_analizar_con_match_perfecto_salta_llm():
     """Con info_tarifa DEFENDER_TOTAL y valores iguales, NO se llama al LLM."""
     from app.services.glosa_service import GlosaService

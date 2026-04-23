@@ -14,6 +14,14 @@ from app.services.glosa_ia_prompts import get_system_prompt, build_user_prompt
 
 _CACHE_IA: TTLCache = TTLCache(maxsize=500, ttl=3600)
 _CACHE_TTL = 3600
+# Lock para evitar races cuando N requests concurrentes tocan la misma clave.
+# TTLCache NO es thread-safe por default; con 10 usuarios paralelos escribiendo
+# la misma tupla (respuesta, modelo) dos threads pueden corromper el dict.
+_CACHE_IA_LOCK = asyncio.Lock()
+# Límite máximo de tamaño de respuesta IA persistida en BD (~500KB).
+# Protege contra respuestas gigantes que saturen el INSERT o consuman
+# tiempo excesivo en networks lentos.
+_CACHE_MAX_RESP_LEN = 500_000
 
 _ERRORES_REINTENTABLES = frozenset([
     "429", "rate", "limit", "timeout", "stream", "idle",
@@ -1848,9 +1856,14 @@ class GlosaService:
             f"{self.primary_ai}|{self.anthropic_model}|{eps}|{codigo}|{system}|{user}".encode()
         ).hexdigest()
 
-        # 1) Caché en memoria
-        if clave_cache in _CACHE_IA:
-            cached = _CACHE_IA[clave_cache]
+        # 1) Caché en memoria (lock asyncio para evitar race condition con
+        #    múltiples requests concurrentes escribiendo la misma clave)
+        async with _CACHE_IA_LOCK:
+            if clave_cache in _CACHE_IA:
+                cached = _CACHE_IA[clave_cache]
+            else:
+                cached = None
+        if cached is not None:
             if isinstance(cached, tuple):
                 respuesta, modelo = cached[0], cached[1]
             else:
@@ -1862,7 +1875,8 @@ class GlosaService:
         cached_db = _buscar_cache_ia_db(clave_cache)
         if cached_db is not None:
             respuesta, modelo = cached_db
-            _CACHE_IA[clave_cache] = (respuesta, modelo)  # rellenar caché memoria
+            async with _CACHE_IA_LOCK:
+                _CACHE_IA[clave_cache] = (respuesta, modelo)  # rellenar caché memoria
             logger.info(f"Cache DB: {len(respuesta)} chars [{modelo}]")
             return respuesta, modelo
 
@@ -1887,7 +1901,8 @@ class GlosaService:
         for nombre, fn in intentos:
             try:
                 content, modelo = await fn(system, user)
-                _CACHE_IA[clave_cache] = (content, modelo)
+                async with _CACHE_IA_LOCK:
+                    _CACHE_IA[clave_cache] = (content, modelo)
                 _guardar_cache_ia_db(clave_cache, content, modelo)
                 return content, modelo
             except Exception as e:
@@ -1937,8 +1952,19 @@ def _buscar_cache_ia_db(clave: str) -> tuple[str, str] | None:
 
 
 def _guardar_cache_ia_db(clave: str, respuesta: str, modelo: str) -> None:
-    """Persiste una respuesta de IA en BD. Si ya existe (carrera), actualiza."""
+    """Persiste una respuesta de IA en BD. Si ya existe (carrera), actualiza.
+
+    Trunca respuestas extremadamente grandes (>500KB) para proteger el
+    INSERT contra respuestas runaway del LLM. Logea cuando aplica truncado
+    para poder investigar el prompt problemático.
+    """
     try:
+        if respuesta and len(respuesta) > _CACHE_MAX_RESP_LEN:
+            logger.warning(
+                f"_guardar_cache_ia_db: respuesta truncada de {len(respuesta)} "
+                f"a {_CACHE_MAX_RESP_LEN} chars [modelo={modelo}]"
+            )
+            respuesta = respuesta[:_CACHE_MAX_RESP_LEN]
         from app.database import SessionLocal
         from app.models.db import AICacheRecord
         db = SessionLocal()

@@ -87,6 +87,15 @@ class GlosaRepository:
         workflow: Optional[str] = None,
     ) -> dict:
         """Lista glosas con paginación y filtros avanzados."""
+        # Clamp de parámetros para evitar full table scans accidentales
+        # (ej. per_page=999999 → timeout) o páginas negativas que invertirían
+        # el offset. Máximo 1000 por página, mínimo 1.
+        try:
+            per_page = max(1, min(int(per_page), 1000))
+            page = max(1, int(page))
+        except (TypeError, ValueError):
+            per_page, page = 20, 1
+
         q = self._query_con_filtros(
             eps=eps, estado=estado, search=search,
             fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
