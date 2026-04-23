@@ -368,3 +368,29 @@ class TarifaContratadaRecord(Base):
     __table_args__ = (
         Index("ix_tarifa_eps_cups", "eps", "codigo_cups", "activa"),
     )
+
+
+class AICacheRecord(Base):
+    """Caché persistente de respuestas de IA (Groq / Anthropic).
+
+    Evita pagar tokens dos veces por el mismo análisis (mismo EPS + código +
+    system + user prompt). Sobrevive a reinicios/deploys de Render.
+
+    Estrategia:
+      - Clave SHA256 calculada sobre (primary_ai|modelo|eps|codigo|system|user)
+      - TTL por defecto 30 días (se purga al acceder si creado_en + 30d < now)
+      - hit_count: cuántas veces se reutilizó esta respuesta (métrica ahorro)
+    """
+    __tablename__ = "ai_cache"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    clave = Column(String(64), unique=True, nullable=False, index=True)  # SHA256 hex
+    modelo = Column(String(80))                                           # "groq/llama-3.3..." | "anthropic/..."
+    respuesta = Column(Text, nullable=False)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    ultimo_hit = Column(DateTime(timezone=True), server_default=func.now())
+    hit_count = Column(Integer, default=0, nullable=False)
+
+    __table_args__ = (
+        Index("ix_aicache_clave_creado", "clave", "creado_en"),
+    )

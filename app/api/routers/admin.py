@@ -117,6 +117,85 @@ def estadisticas_admin(
     }
 
 
+@router.get("/tokens-hoy")
+def consumo_tokens_hoy(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Monitor de consumo de IA del día actual (optimización #9).
+
+    Cuenta llamadas al motor que gastan tokens y compara contra las que
+    fueron servidas desde caché o plantilla fija. Ideal para detectar
+    spikes de consumo en tiempo real durante la capacitación.
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import func as _func
+    from app.models.db import AICacheRecord
+
+    ahora = datetime.utcnow()
+    hoy_ini = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Análisis del día que tocaron la IA (crean glosa con modelo_ia)
+    glosas_hoy = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= hoy_ini).all()
+    total = len(glosas_hoy)
+    # Desglose por modelo usado
+    desglose: dict[str, int] = {}
+    ahorro_tpl = 0       # plantillas fijas (extemp, ratif, aceptadas, match)
+    ahorro_cache = 0     # respuestas de caché
+    llamadas_ia = 0      # llamadas reales a Groq/Claude
+    for g in glosas_hoy:
+        mod = (g.modelo_ia or "desconocido").strip()
+        desglose[mod] = desglose.get(mod, 0) + 1
+        if mod in ("texto_fijo", "plantilla"):
+            ahorro_tpl += 1
+        elif mod in ("cache", "db-cache"):
+            ahorro_cache += 1
+        else:
+            llamadas_ia += 1
+
+    # Consumo del caché BD del día (cuántas veces se sirvieron respuestas cacheadas)
+    try:
+        cache_hits_hoy = db.query(_func.sum(AICacheRecord.hit_count)).filter(
+            AICacheRecord.ultimo_hit >= hoy_ini
+        ).scalar() or 0
+        cache_total_entradas = db.query(AICacheRecord).count()
+    except Exception:
+        cache_hits_hoy = 0
+        cache_total_entradas = 0
+
+    # Top usuarios (para detectar abuso)
+    from app.models.db import AuditLogRecord
+    try:
+        top_users_rows = (
+            db.query(
+                AuditLogRecord.usuario_email,
+                _func.count(AuditLogRecord.id).label("n"),
+            )
+            .filter(AuditLogRecord.timestamp >= hoy_ini)
+            .filter(AuditLogRecord.accion.in_(["GENERAR_LOTE", "REFINAR_IA", "ANALIZAR_GLOSA"]))
+            .group_by(AuditLogRecord.usuario_email)
+            .order_by(_func.count(AuditLogRecord.id).desc())
+            .limit(10)
+            .all()
+        )
+        top_users = [{"email": e, "acciones": int(n)} for e, n in top_users_rows]
+    except Exception:
+        top_users = []
+
+    return {
+        "fecha": ahora.isoformat(),
+        "glosas_analizadas_hoy": total,
+        "llamadas_ia_reales": llamadas_ia,
+        "ahorro_por_plantilla": ahorro_tpl,
+        "ahorro_por_cache": ahorro_cache,
+        "pct_ahorro": round(100 * (ahorro_tpl + ahorro_cache) / total, 1) if total else 0.0,
+        "desglose_por_modelo": desglose,
+        "cache_bd_hits_hoy": int(cache_hits_hoy or 0),
+        "cache_bd_entradas_totales": int(cache_total_entradas or 0),
+        "top_usuarios_hoy": top_users,
+    }
+
+
 @router.post("/enviar-alertas-vencimiento")
 async def enviar_alertas_vencimiento(
     db: Session = Depends(get_db),

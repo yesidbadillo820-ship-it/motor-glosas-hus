@@ -10,7 +10,11 @@ logger = logging.getLogger("motor_glosas")
 
 # Umbral por debajo del cual consideramos que el PDF es escaneado (sin
 # texto extraíble nativamente) y vale la pena intentar OCR con Claude.
-UMBRAL_TEXTO_MINIMO = 150
+# Elevado de 150 → 300 para evitar gastar tokens de Claude en PDFs con
+# un mínimo de texto legible (ej. una sola página con encabezado).
+# Si falta detalle se detecta por feedback del auditor, pero la mayoría
+# de soportes (historias clínicas, RIPS, facturas) traen >>300 chars.
+UMBRAL_TEXTO_MINIMO = 300
 
 class PdfService:
     """

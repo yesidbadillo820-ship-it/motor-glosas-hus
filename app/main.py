@@ -915,8 +915,32 @@ async def lifespan(app: FastAPI):
 
 cfg = get_settings()
 
+
+def _limit_key_user_or_ip(request):
+    """Key-func del rate limiter: prioriza el email del usuario autenticado
+    (JWT) sobre la IP. Evita que un usuario abra varias pestañas/VPN y se
+    escape del límite; y evita que una oficina compartiendo NAT tumbe a
+    todos sus usuarios por un solo spammer. Optimización #6.
+    """
+    try:
+        auth = (request.headers.get("authorization") or "").strip()
+        if auth.lower().startswith("bearer ") and len(auth) > 16:
+            from jose import jwt as _jwt
+            payload = _jwt.decode(
+                auth.split(" ", 1)[1].strip(),
+                cfg.secret_key,
+                algorithms=[cfg.algorithm],
+            )
+            email = (payload or {}).get("sub") or (payload or {}).get("email")
+            if email:
+                return f"user:{email}"
+    except Exception:
+        pass
+    return get_remote_address(request)
+
+
 # Rate limiter para proteger endpoints de IA
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=_limit_key_user_or_ip)
 
 app = FastAPI(
     title="Motor Glosas HUS",
@@ -1170,10 +1194,53 @@ async def analizar(
     plantillas_gold = obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2) if cod_pref else []
     few_shots = [p.argumento for p in plantillas_gold]
 
-    resultado = await service.analizar(data, contexto_pdf, contratos, few_shots=few_shots)
+    # Pre-lookup de tarifa pactada: si hay match perfecto, el service
+    # puede saltarse la llamada al LLM (optimización #7, ahorro ~8k tokens).
+    info_tarifa_pre = None
+    try:
+        _cod_pref_ta = cod_pref.upper() if cod_pref else ""
+        if _cod_pref_ta.startswith("TA"):
+            cups_pre, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+            if cups_pre:
+                from app.services.tarifa_lookup_service import evaluar_glosa_tarifa as _evaltar
+                vals_pre = _extraer_valores_glosa(tabla_excel or "")
+                info_tarifa_pre = _evaltar(
+                    db, eps=eps, cups=cups_pre,
+                    valor_facturado=vals_pre.get("facturado", 0.0),
+                    valor_objetado=0.0,
+                    valor_reconocido=vals_pre.get("reconocido", 0.0),
+                )
+                if not info_tarifa_pre.get("encontrada"):
+                    # Fallback a catálogo oficial HUS/SOAT si no hay en BD
+                    from app.services.tarifas_oficiales import tarifa_a_banner_dict as _tbd
+                    ofic = _tbd(cups_pre)
+                    if ofic:
+                        info_tarifa_pre = {
+                            "encontrada": True,
+                            "tarifa": ofic,
+                            "valor_facturado": vals_pre.get("facturado", 0.0),
+                            "valor_objetado": 0.0,
+                            "valor_reconocido": vals_pre.get("reconocido", 0.0),
+                            "valor_pactado_calc": ofic["valor_pactado"],
+                            "recomendacion": {
+                                "accion": "DEFENDER_TOTAL" if abs(vals_pre.get("facturado", 0.0) - ofic["valor_pactado"]) < max(1.0, ofic["valor_pactado"] * 0.005) else "REVISAR",
+                                "titulo": "Valor oficial conocido",
+                                "razon": "",
+                            },
+                        }
+    except Exception as e:
+        logger.warning(f"[{req_id}] pre-lookup tarifa falló: {e}")
+
+    resultado = await service.analizar(
+        data, contexto_pdf, contratos,
+        few_shots=few_shots, info_tarifa=info_tarifa_pre,
+    )
     if plantillas_gold:
         marcar_usos(db, [p.id for p in plantillas_gold])
-    logger.info(f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} | few_shots={len(few_shots)}")
+    logger.info(
+        f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} "
+        f"| few_shots={len(few_shots)} | tarifa_match={bool(info_tarifa_pre and info_tarifa_pre.get('encontrada'))}"
+    )
 
     glosa_repo = GlosaRepository(db)
     val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)

@@ -331,6 +331,55 @@ def _suavizar_tono(texto: str) -> str:
     return texto
 
 
+def generar_texto_tarifa_match(
+    codigo_glosa: str,
+    valor_objetado: float,
+    info_tarifa: dict,
+) -> str:
+    """Plantilla determinística cuando existe match perfecto entre el valor
+    facturado por HUS y la tarifa pactada en el contrato con la EPS.
+
+    Se usa cuando el banner de tarifa pactada detecta DEFENDER_TOTAL
+    con tolerancia < $1. Evita llamar al LLM (ahorro ~8k tokens por
+    glosa) y genera un argumento sólido con los datos duros del contrato.
+
+    info_tarifa viene de tarifa_lookup_service.evaluar_glosa_tarifa() y
+    contiene: tarifa.codigo_cups/descripcion/contrato_numero/modalidad,
+    valor_pactado_calc, etc.
+    """
+    t = info_tarifa.get("tarifa") or {}
+    pact = float(info_tarifa.get("valor_pactado_calc") or 0.0)
+    val_fact = float(info_tarifa.get("valor_facturado") or 0.0)
+    val_obj_fmt = f"$ {int(valor_objetado):,}".replace(",", ".")
+    pact_fmt = f"$ {int(pact):,}".replace(",", ".")
+    fact_fmt = f"$ {int(val_fact):,}".replace(",", ".") if val_fact > 0 else pact_fmt
+    contrato = t.get("contrato_numero") or "contrato vigente entre las partes"
+    eps = t.get("eps") or "la entidad pagadora"
+    cups = t.get("codigo_cups") or "—"
+    desc = (t.get("descripcion") or "el servicio facturado").upper()
+    modalidad = t.get("modalidad") or "pactada"
+    fuente = t.get("fuente_archivo") or "catálogo oficial"
+
+    return (
+        f"ESE HUS NO ACEPTA LA GLOSA {codigo_glosa} INTERPUESTA POR {eps.upper()} "
+        f"POR VALOR DE {val_obj_fmt}, TODA VEZ QUE EL VALOR FACTURADO ({fact_fmt}) "
+        f"COINCIDE EXACTAMENTE CON LA TARIFA PACTADA EN EL {contrato} PARA EL CUPS "
+        f"{cups} — {desc} — BAJO LA MODALIDAD {modalidad}. "
+        f"LA IDENTIDAD ENTRE VALOR FACTURADO Y VALOR PACTADO CONVIERTE ESTA GLOSA "
+        f"EN INJUSTIFICADA: LA ENTIDAD PAGADORA NO PUEDE DESCONOCER UNILATERALMENTE "
+        f"EL VALOR QUE ELLA MISMA PACTÓ, POR APLICACIÓN DEL ARTÍCULO 871 DEL CÓDIGO "
+        f"DE COMERCIO («LOS CONTRATOS DEBERÁN CELEBRARSE Y EJECUTARSE DE BUENA FE») "
+        f"Y DEL ARTÍCULO 1602 DEL CÓDIGO CIVIL («TODO CONTRATO LEGALMENTE CELEBRADO "
+        f"ES UNA LEY PARA LOS CONTRATANTES»). EN CONSECUENCIA, SE SOLICITA "
+        f"RESPETUOSAMENTE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA Y EL RECONOCIMIENTO "
+        f"ÍNTEGRO DEL VALOR FACTURADO ({fact_fmt}). LA ENTIDAD PAGADORA CUENTA CON "
+        f"10 DÍAS HÁBILES PARA PRONUNCIARSE CONFORME AL ARTÍCULO 57 DE LA LEY 1438 "
+        f"DE 2011; DE NO HACERLO, OPERARÁ EL SILENCIO A FAVOR DEL PRESTADOR. "
+        f"FUENTE DEL VALOR PACTADO: {fuente}. COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+        f"GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+    )
+
+
 def generar_texto_aceptacion_total(codigo_glosa: str = "", valor: str = "", servicio: str = "") -> str:
     """Plantilla RE9702 — GLOSA ACEPTADA AL 100%.
 
@@ -550,6 +599,7 @@ class GlosaService:
         contexto_pdf: str = "",
         contratos_db: dict = None,
         few_shots: list[str] = None,
+        info_tarifa: dict = None,
     ) -> GlosaResult:
         texto_base = str(data.tabla_excel).strip().upper()
 
@@ -642,6 +692,39 @@ class GlosaService:
             )
             tipo_glosa = "ACEPTADA_PARCIAL"
 
+        # Optimización #7: si hay match perfecto de tarifa pactada
+        # (DEFENDER_TOTAL con valor_pactado > 0 y facturado ≈ pactado),
+        # generar dictamen determinístico SIN llamar al LLM. Ahorra ~8k
+        # tokens por glosa. Solo se activa si no hay ya un argumento_fijo
+        # (extemporánea/ratificada/aceptada tienen prioridad).
+        if (argumento_fijo is None and es_tarifa and info_tarifa
+                and info_tarifa.get("encontrada")):
+            rec = info_tarifa.get("recomendacion") or {}
+            pact = float(info_tarifa.get("valor_pactado_calc") or 0.0)
+            fact = float(info_tarifa.get("valor_facturado") or 0.0)
+            # Match perfecto: DEFENDER_TOTAL + valor_pactado real + fact ≈ pact
+            if (rec.get("accion") == "DEFENDER_TOTAL"
+                    and pact > 0 and abs(fact - pact) < max(1.0, pact * 0.005)):
+                val_obj_mt = 0.0
+                try:
+                    import re as _rem
+                    sin_dec_m = _rem.sub(r"\.\d{1,2}(?=\s|$|[^\d])", "", str(valor_raw))
+                    nums_m = _rem.findall(r"\d+", sin_dec_m)
+                    if nums_m:
+                        val_obj_mt = float("".join(nums_m))
+                except Exception:
+                    pass
+                argumento_fijo = generar_texto_tarifa_match(
+                    codigo_glosa=codigo_det,
+                    valor_objetado=val_obj_mt,
+                    info_tarifa=info_tarifa,
+                )
+                tipo_glosa = "TARIFA_MATCH_PERFECTO"
+                logger.info(
+                    f"[AHORRO-IA] Match perfecto detectado: cups={info_tarifa.get('tarifa',{}).get('codigo_cups')} "
+                    f"pactado=${pact:,.0f} facturado=${fact:,.0f} — plantilla fija usada (0 tokens)"
+                )
+
         # Ratificación tiene prioridad sobre extemporaneidad: si ya pasamos por
         # respuesta inicial y la EPS ratificó, el flujo legal es ratificación,
         # NO aceptación tácita.
@@ -674,6 +757,7 @@ class GlosaService:
             _saltar_suavizar = tipo_glosa in (
                 "EXTEMPORANEA", "RATIFICADA",
                 "ACEPTADA_TOTAL", "ACEPTADA_PARCIAL",
+                "TARIFA_MATCH_PERFECTO",
             )
             arg_ia = argumento_fijo if _saltar_suavizar else _suavizar_tono(argumento_fijo)
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "").replace("\n", " ")
@@ -1664,10 +1748,31 @@ class GlosaService:
         raise ultimo_error
 
     async def _llamar_anthropic(self, system: str, user: str) -> tuple[str, str]:
-        """Llama a Claude vía API REST. Devuelve (texto, etiqueta_modelo)."""
+        """Llama a Claude vía API REST. Devuelve (texto, etiqueta_modelo).
+
+        Usa **prompt caching** (optimización #3) cuando el system prompt tiene
+        al menos 1024 tokens (~4000 chars). Anthropic cobra 10% del precio en
+        llamadas subsecuentes con el mismo system. Para activarlo se pasa
+        `system` como lista con `cache_control: {"type": "ephemeral"}`.
+        Ref: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+        """
         if not self.anthropic_key:
             raise RuntimeError("Anthropic API key no configurada")
         _timeout_anthropic = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+
+        # Decidir si usar caching: solo si el system es suficientemente largo
+        # (requisito mínimo ~1024 tokens, heurística: ≥4000 chars).
+        if system and len(system) >= 4000:
+            system_payload = [
+                {
+                    "type": "text",
+                    "text": system,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+        else:
+            system_payload = system
+
         async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
             resp = await client.post(
                 "https://api.anthropic.com/v1/messages",
@@ -1680,31 +1785,55 @@ class GlosaService:
                     "model": self.anthropic_model,
                     "max_tokens": 4000,
                     "temperature": 0.15,
-                    "system": system,
+                    "system": system_payload,
                     "messages": [{"role": "user", "content": user}],
                 },
             )
             data = resp.json()
             if "content" in data and data["content"]:
+                # Log métricas de caching si Anthropic las devuelve
+                usage = data.get("usage", {})
+                cache_read = usage.get("cache_read_input_tokens", 0)
+                cache_write = usage.get("cache_creation_input_tokens", 0)
+                if cache_read or cache_write:
+                    logger.info(
+                        f"[ANTHROPIC-CACHE] read={cache_read}t write={cache_write}t "
+                        f"normal={usage.get('input_tokens', 0)}t output={usage.get('output_tokens', 0)}t"
+                    )
                 return data["content"][0]["text"], f"anthropic/{self.anthropic_model}"
             # Respuestas de error de la API traen "error": {...}
             err = data.get("error", {}).get("message", str(data)[:300])
             raise RuntimeError(f"Anthropic devolvió sin 'content': {err}")
 
     async def _llamar_ia(self, system: str, user: str, eps: str = "", codigo: str = "") -> tuple[str, str]:
-        """Llama a la IA configurada (primary_ai) con fallback al otro proveedor."""
+        """Llama a la IA configurada (primary_ai) con fallback al otro proveedor.
+
+        Orden de consulta de caché:
+          1. Caché en memoria (_CACHE_IA, TTL 1h) — rapidísimo
+          2. Caché persistente BD (ai_cache, TTL 30 días) — sobrevive reinicios
+          3. Llamar a la IA y guardar en ambos cachés
+        """
         # Clave de caché incluye EPS y código para evitar colisiones cruzadas
         clave_cache = hashlib.sha256(
             f"{self.primary_ai}|{self.anthropic_model}|{eps}|{codigo}|{system}|{user}".encode()
         ).hexdigest()
 
+        # 1) Caché en memoria
         if clave_cache in _CACHE_IA:
             cached = _CACHE_IA[clave_cache]
             if isinstance(cached, tuple):
                 respuesta, modelo = cached[0], cached[1]
             else:
                 respuesta, modelo = cached, "cache"
-            logger.info(f"Cache: usando respuesta guardada ({len(respuesta)} chars) [{modelo}]")
+            logger.info(f"Cache MEM: {len(respuesta)} chars [{modelo}]")
+            return respuesta, modelo
+
+        # 2) Caché persistente en BD (si hay sesión global disponible)
+        cached_db = _buscar_cache_ia_db(clave_cache)
+        if cached_db is not None:
+            respuesta, modelo = cached_db
+            _CACHE_IA[clave_cache] = (respuesta, modelo)  # rellenar caché memoria
+            logger.info(f"Cache DB: {len(respuesta)} chars [{modelo}]")
             return respuesta, modelo
 
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
@@ -1729,6 +1858,7 @@ class GlosaService:
             try:
                 content, modelo = await fn(system, user)
                 _CACHE_IA[clave_cache] = (content, modelo)
+                _guardar_cache_ia_db(clave_cache, content, modelo)
                 return content, modelo
             except Exception as e:
                 ultimo_error = e
@@ -1737,3 +1867,60 @@ class GlosaService:
 
         logger.error(f"Todos los proveedores IA fallaron: {ultimo_error}")
         return f"<paciente>ERROR</paciente><argumento>{str(ultimo_error)}</argumento>", "error"
+
+
+# ─── Caché persistente en BD (optimización #1) ───────────────────────────────
+# TTL 30 días. Las funciones abren sesión SQLAlchemy propia para desacoplar
+# del request, de modo que fallas de BD NO rompan el análisis (solo degradan
+# performance). Si la BD no está disponible, el flujo sigue con el caché en
+# memoria + llamada a IA.
+
+_CACHE_IA_TTL_DIAS = 30
+
+
+def _buscar_cache_ia_db(clave: str) -> tuple[str, str] | None:
+    """Busca una respuesta cacheada en BD. Si existe y no expiró, incrementa
+    hit_count + actualiza ultimo_hit y la devuelve. Si expiró, la borra."""
+    try:
+        from datetime import datetime, timedelta
+        from app.database import SessionLocal
+        from app.models.db import AICacheRecord
+        db = SessionLocal()
+        try:
+            r = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
+            if not r:
+                return None
+            if r.creado_en and (datetime.utcnow() - r.creado_en.replace(tzinfo=None)) > timedelta(days=_CACHE_IA_TTL_DIAS):
+                db.delete(r)
+                db.commit()
+                return None
+            r.hit_count = (r.hit_count or 0) + 1
+            from sqlalchemy.sql import func as _func
+            r.ultimo_hit = _func.now()
+            db.commit()
+            return (r.respuesta, r.modelo or "db-cache")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug(f"_buscar_cache_ia_db fallo (se ignora): {e}")
+        return None
+
+
+def _guardar_cache_ia_db(clave: str, respuesta: str, modelo: str) -> None:
+    """Persiste una respuesta de IA en BD. Si ya existe (carrera), actualiza."""
+    try:
+        from app.database import SessionLocal
+        from app.models.db import AICacheRecord
+        db = SessionLocal()
+        try:
+            existente = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
+            if existente:
+                existente.respuesta = respuesta
+                existente.modelo = modelo
+            else:
+                db.add(AICacheRecord(clave=clave, respuesta=respuesta, modelo=modelo, hit_count=0))
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug(f"_guardar_cache_ia_db fallo (se ignora): {e}")
