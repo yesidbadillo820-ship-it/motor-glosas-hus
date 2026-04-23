@@ -348,12 +348,17 @@ class TarifaContratadaRecord(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     eps = Column(String(200), nullable=False, index=True)    # Ej: "FAMISANAR EPS"
-    contrato_numero = Column(String(100))                     # Ej: "CSA2025EVE3A005"
-    codigo_cups = Column(String(30), nullable=False, index=True)  # Ej: "890202"
+    contrato_numero = Column(String(100))                     # Ej: "S-13-1-03-1-04958"
+    codigo_cups = Column(String(30), nullable=False, index=True)  # Ej: "890202" / "FMQ6296"
     descripcion = Column(Text)                                # "CONSULTA DE PRIMERA VEZ..."
-    valor_pactado = Column(Float, nullable=False, default=0.0)    # COP, sin decimales
-    modalidad = Column(String(80))                            # "SOAT -15%" / "UVB" / "MANUAL"
-    fuente_archivo = Column(String(300))                      # "famisanar_2026.csv"
+    valor_pactado = Column(Float, nullable=False, default=0.0)    # COP (solo tipo VALOR_FIJO)
+    modalidad = Column(String(80))                            # "SOAT UVB VIGENTE" / "MEDICAMENTOS" / "SUMINISTROS CARDIOVASCULAR"
+    # Tipo de tarifa: VALOR_FIJO (medicamentos/suministros) | SOAT_PORCENTAJE (servicios CUPS pactados como % sobre SOAT)
+    tipo_tarifa = Column(String(30), nullable=False, default="VALOR_FIJO", index=True)
+    # Factor de ajuste sobre SOAT vigente. Solo aplica si tipo_tarifa=SOAT_PORCENTAJE.
+    # Ej: -5 → SOAT × 0.95; 0 → SOAT plano; +10 → SOAT × 1.10
+    factor_ajuste = Column(Float, default=0.0)
+    fuente_archivo = Column(String(300))                      # "famisanar_2026.xlsx"
     vigencia_desde = Column(DateTime(timezone=True))
     vigencia_hasta = Column(DateTime(timezone=True))
     creado_en = Column(DateTime(timezone=True), server_default=func.now())

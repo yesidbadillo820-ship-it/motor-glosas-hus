@@ -506,6 +506,21 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
 
+    # Migraciones para tarifas_contratadas - soporte formulaic (SOAT %)
+    _TARIFAS_MISSING = [
+        ("tipo_tarifa", "VARCHAR(30) DEFAULT 'VALOR_FIJO'"),
+        ("factor_ajuste", "DOUBLE PRECISION DEFAULT 0"),
+    ]
+    for col_name, col_ddl in _TARIFAS_MISSING:
+        try:
+            if _tiene_tabla("tarifas_contratadas") and not _tiene_columna("tarifas_contratadas", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a tarifas_contratadas")
+                col_ddl_adapted = col_ddl.replace("DOUBLE PRECISION", "REAL") if _is_sqlite else col_ddl
+                db.execute(text(f"ALTER TABLE tarifas_contratadas ADD COLUMN {col_name} {col_ddl_adapted}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN tarifas_contratadas {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()

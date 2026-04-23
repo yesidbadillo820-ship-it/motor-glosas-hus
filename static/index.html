@@ -1750,17 +1750,39 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </div>
         </div>
 
-        <!-- Bloque de carga CSV -->
-        <div class="form-card" style="margin-bottom:1rem;">
-          <h3 style="display:flex;align-items:center;gap:.5rem;">📤 Subir CSV de tarifas</h3>
-          <p style="font-size:.82rem;color:var(--text3);margin-bottom:.8rem;">
-            Columnas esperadas (en cualquier orden): <code>eps</code>, <code>cups</code>,
-            <code>descripcion</code>, <code>valor</code>, <code>contrato</code> (opcional),
-            <code>modalidad</code> (opcional), <code>vigencia_desde</code> / <code>vigencia_hasta</code> (opcional).
-            Separador tab, coma o punto-y-coma. Upsert por (eps + cups + contrato).
+        <!-- Bloque de carga Excel (Famisanar 3 hojas) -->
+        <div class="form-card" style="margin-bottom:1rem;border:2px solid #0ea5e9;">
+          <h3 style="display:flex;align-items:center;gap:.5rem;">📊 Subir Excel de tarifas <span style="background:#0ea5e9;color:#fff;font-size:.68rem;padding:.1rem .45rem;border-radius:4px;">RECOMENDADO</span></h3>
+          <p style="font-size:.82rem;color:var(--text3);margin-bottom:.8rem;line-height:1.5;">
+            Sube directo el Excel que envía la EPS (tipo Famisanar) con 3 hojas:
+            <b>Anexo 3</b> (Servicios CUPS con SOAT ± %), <b>Anexo 3.1</b> (Medicamentos valor fijo)
+            y <b>Anexo 3.2</b> (Suministros con IVA).
+            El sistema auto-detecta EPS, contrato y vigencia desde el encabezado.
           </p>
           <div class="field">
-            <label>EPS por defecto <span style="color:var(--text3);font-weight:400;">(opcional; se usa si el CSV no trae columna eps)</span></label>
+            <label>EPS (opcional, solo si el Excel no la trae clara)</label>
+            <input type="text" id="tar-xlsx-eps-override" placeholder="Ej: FAMISANAR EPS"/>
+          </div>
+          <div class="field">
+            <label>Archivo Excel (.xlsx)</label>
+            <input type="file" id="tar-xlsx-file" accept=".xlsx,.xlsm"/>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="subirTarifasExcel()">📊 Importar Excel</button>
+          </div>
+          <div id="tar-xlsx-result" style="margin-top:.8rem;"></div>
+        </div>
+
+        <!-- Bloque de carga CSV (alternativo) -->
+        <details class="form-card" style="margin-bottom:1rem;">
+          <summary style="cursor:pointer;font-weight:600;">📤 Opción alternativa: subir CSV manual</summary>
+          <p style="font-size:.82rem;color:var(--text3);margin:.8rem 0;">
+            Columnas: <code>eps, cups, descripcion, valor, contrato, modalidad,
+            vigencia_desde, vigencia_hasta</code>. Separador tab, coma o punto-y-coma.
+            Todas las filas se guardan como <code>VALOR_FIJO</code>.
+          </p>
+          <div class="field">
+            <label>EPS por defecto (si el CSV no trae columna eps)</label>
             <input type="text" id="tar-eps-default" placeholder="Ej: FAMISANAR EPS"/>
           </div>
           <div class="field">
@@ -1768,11 +1790,11 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <input type="file" id="tar-file" accept=".csv,.txt"/>
           </div>
           <div class="btn-row">
-            <button class="btn btn-primary" onclick="subirTarifasCSV()">📤 Importar</button>
-            <a href="/static/plantilla_tarifas.csv" download class="btn btn-ghost" style="text-decoration:none;">📋 Descargar plantilla</a>
+            <button class="btn btn-primary" onclick="subirTarifasCSV()">📤 Importar CSV</button>
+            <a href="/static/plantilla_tarifas.csv" download class="btn btn-ghost" style="text-decoration:none;">📋 Plantilla CSV</a>
           </div>
           <div id="tar-import-result" style="margin-top:.8rem;"></div>
-        </div>
+        </details>
 
         <!-- Filtros -->
         <div style="display:flex;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap;">
@@ -1786,11 +1808,12 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <div class="tbl-wrap" style="overflow:auto;max-height:600px;">
           <table>
             <thead><tr>
-              <th>EPS</th><th>CUPS</th><th>Descripción</th><th class="num">Valor pactado</th>
-              <th>Modalidad</th><th>Contrato</th><th>Fuente</th><th>Acciones</th>
+              <th>EPS</th><th>Código</th><th>Descripción</th><th>Tipo</th>
+              <th class="num">Valor / Fórmula</th><th>Modalidad</th>
+              <th>Contrato</th><th>Fuente</th><th>Acciones</th>
             </tr></thead>
             <tbody id="tar-body">
-              <tr class="empty-row"><td colspan="8">Sin tarifas cargadas. Sube un CSV arriba.</td></tr>
+              <tr class="empty-row"><td colspan="9">Sin tarifas cargadas. Sube un Excel o CSV arriba.</td></tr>
             </tbody>
           </table>
         </div>
@@ -2572,7 +2595,7 @@ async function cargarTarifas(){
   if(epsFiltro.trim()) qs.push('eps=' + encodeURIComponent(epsFiltro.trim()));
   if(cupsFiltro.trim()) qs.push('cups=' + encodeURIComponent(cupsFiltro.trim()));
   qs.push('limite=500');
-  body.innerHTML = '<tr class="empty-row"><td colspan="8">Cargando…</td></tr>';
+  body.innerHTML = '<tr class="empty-row"><td colspan="9">Cargando…</td></tr>';
   try{
     // Stats globales
     var rs = await fetch('/tarifas-contratadas/stats', {headers: authH()});
@@ -2584,19 +2607,31 @@ async function cargarTarifas(){
     }
     var r = await fetch('/tarifas-contratadas?' + qs.join('&'), {headers: authH()});
     if(r.status === 401){ alert('Sesión expirada'); return; }
-    if(!r.ok){ body.innerHTML = '<tr><td colspan="8" style="color:#991b1b">Error '+r.status+'</td></tr>'; return; }
+    if(!r.ok){ body.innerHTML = '<tr><td colspan="9" style="color:#991b1b">Error '+r.status+'</td></tr>'; return; }
     var data = await r.json();
     if(!data.length){
-      body.innerHTML = '<tr class="empty-row"><td colspan="8">Sin tarifas que coincidan con los filtros.</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="9">Sin tarifas que coincidan con los filtros.</td></tr>';
       return;
     }
     body.innerHTML = data.map(function(t){
-      var valor = (t.valor_pactado || 0).toLocaleString('es-CO', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+      var tipo = t.tipo_tarifa || 'VALOR_FIJO';
+      var factor = t.factor_ajuste || 0;
+      var celdaValor, celdaTipo;
+      if(tipo === 'SOAT_PORCENTAJE'){
+        var signo = factor > 0 ? '+' : '';
+        celdaValor = '<span style="color:#0369a1;"><b>SOAT ' + signo + factor + '%</b></span>';
+        celdaTipo = '<span style="background:#dbeafe;color:#1e40af;padding:.15rem .4rem;border-radius:4px;font-size:.7rem;">SOAT%</span>';
+      } else {
+        var valor = (t.valor_pactado || 0).toLocaleString('es-CO', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+        celdaValor = '<b>$' + valor + '</b>';
+        celdaTipo = '<span style="background:#dcfce7;color:#166534;padding:.15rem .4rem;border-radius:4px;font-size:.7rem;">FIJO</span>';
+      }
       return '<tr>' +
         '<td>' + escHtml(t.eps || '—') + '</td>' +
         '<td class="mono">' + escHtml(t.codigo_cups || '—') + '</td>' +
         '<td style="max-width:300px;overflow-wrap:anywhere;">' + escHtml(t.descripcion || '—') + '</td>' +
-        '<td class="num"><b>$' + valor + '</b></td>' +
+        '<td>' + celdaTipo + '</td>' +
+        '<td class="num">' + celdaValor + '</td>' +
         '<td>' + escHtml(t.modalidad || '—') + '</td>' +
         '<td>' + escHtml(t.contrato_numero || '—') + '</td>' +
         '<td style="font-size:.72rem;color:var(--text3);">' + escHtml(t.fuente_archivo || '—') + '</td>' +
@@ -2604,7 +2639,52 @@ async function cargarTarifas(){
       '</tr>';
     }).join('');
   }catch(e){
-    body.innerHTML = '<tr><td colspan="8" style="color:#991b1b">'+ escHtml(e.message) +'</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" style="color:#991b1b">'+ escHtml(e.message) +'</td></tr>';
+  }
+}
+
+async function subirTarifasExcel(){
+  var input = document.getElementById('tar-xlsx-file');
+  var epsOverride = (document.getElementById('tar-xlsx-eps-override') || {}).value || '';
+  var resultDiv = document.getElementById('tar-xlsx-result');
+  if(!input || !input.files || !input.files.length){
+    toast('Sin archivo', 'Selecciona un .xlsx primero', 'warning');
+    return;
+  }
+  var fd = new FormData();
+  fd.append('archivo', input.files[0]);
+  var url = '/tarifas-contratadas/import-excel';
+  if(epsOverride.trim()) url += '?eps_override=' + encodeURIComponent(epsOverride.trim());
+  if(resultDiv) resultDiv.innerHTML = '<div style="color:var(--text3);">⏳ Leyendo hojas y parseando filas…</div>';
+  try{
+    var r = await fetch(url, {method: 'POST', headers: authH(), body: fd});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){
+      if(resultDiv) resultDiv.innerHTML = '<div style="color:#b91c1c;padding:10px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:6px;">❌ ' + escHtml(d.detail || ('Error ' + r.status)) + '</div>';
+      return;
+    }
+    var msg = '<div style="padding:12px;background:#ecfdf5;border-left:3px solid #10b981;border-radius:6px;line-height:1.6;">';
+    msg += '<b>✓ Import Excel terminado</b><br>';
+    msg += '<b>EPS:</b> ' + escHtml(d.eps_usada || '—') + ' · <b>Contrato:</b> ' + escHtml(d.contrato || '—') + '<br>';
+    if(d.hojas_detectadas && d.hojas_detectadas.length){
+      msg += '<b>Hojas:</b> ' + d.hojas_detectadas.map(escHtml).join(', ') + '<br>';
+    }
+    msg += '<b>' + d.creadas + '</b> creadas · <b>' + d.actualizadas + '</b> actualizadas · ' + d.total_filas_leidas + ' filas leídas';
+    if(d.total_errores){
+      msg += ' · <b style="color:#ca8a04">' + d.total_errores + ' errores</b>';
+      if(d.errores && d.errores.length){
+        msg += '<details style="margin-top:6px;font-size:.78rem;"><summary>Ver errores</summary><ul>';
+        d.errores.forEach(function(e){ msg += '<li>' + escHtml(e) + '</li>'; });
+        msg += '</ul></details>';
+      }
+    }
+    msg += '</div>';
+    if(resultDiv) resultDiv.innerHTML = msg;
+    toast('Excel importado', d.creadas + ' creadas, ' + d.actualizadas + ' actualizadas', 'success');
+    input.value = '';
+    cargarTarifas();
+  }catch(e){
+    if(resultDiv) resultDiv.innerHTML = '<div style="color:#b91c1c">Error de red: ' + escHtml(e.message) + '</div>';
   }
 }
 

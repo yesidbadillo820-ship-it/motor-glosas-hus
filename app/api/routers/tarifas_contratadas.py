@@ -22,6 +22,7 @@ from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import TarifaContratadaRecord, UsuarioRecord
 from app.repositories.audit_repository import AuditRepository
+from app.services.tarifas_excel_parser import parsear_excel_tarifas
 
 router = APIRouter(prefix="/tarifas-contratadas", tags=["Tarifas Contratadas"])
 
@@ -98,6 +99,8 @@ def listar_tarifas(
             "descripcion": r.descripcion,
             "valor_pactado": r.valor_pactado,
             "modalidad": r.modalidad,
+            "tipo_tarifa": r.tipo_tarifa or "VALOR_FIJO",
+            "factor_ajuste": r.factor_ajuste or 0.0,
             "fuente_archivo": r.fuente_archivo,
             "vigencia_desde": r.vigencia_desde.isoformat() if r.vigencia_desde else None,
             "vigencia_hasta": r.vigencia_hasta.isoformat() if r.vigencia_hasta else None,
@@ -140,6 +143,8 @@ def buscar_tarifa(
         "descripcion": r.descripcion,
         "valor_pactado": r.valor_pactado,
         "modalidad": r.modalidad,
+        "tipo_tarifa": r.tipo_tarifa or "VALOR_FIJO",
+        "factor_ajuste": r.factor_ajuste or 0.0,
         "fuente_archivo": r.fuente_archivo,
     }
 
@@ -260,6 +265,8 @@ async def importar_csv(
                 descripcion=descripcion or None,
                 valor_pactado=valor,
                 modalidad=modalidad or None,
+                tipo_tarifa="VALOR_FIJO",
+                factor_ajuste=0.0,
                 fuente_archivo=fuente,
                 vigencia_desde=vig_desde,
                 vigencia_hasta=vig_hasta,
@@ -300,6 +307,129 @@ async def importar_csv(
         "creadas": creadas,
         "actualizadas": actualizadas,
         "errores": errores[:30],  # primeras 30 filas con error
+        "total_errores": len(errores),
+    }
+
+
+@router.post("/import-excel")
+async def importar_excel(
+    archivo: UploadFile = File(...),
+    eps_override: Optional[str] = Query(None, description="Nombre EPS (si Excel no lo trae claro)"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Importa un Excel de tarifas contratadas (tipo Famisanar) con hasta 3 hojas:
+
+    - **Anexo 3** — Servicios CUPS con fórmula SOAT ± % (tipo_tarifa=SOAT_PORCENTAJE)
+    - **Anexo 3.1** — Medicamentos, valor fijo (tipo_tarifa=VALOR_FIJO)
+    - **Anexo 3.2** — Suministros, valor fijo, con IVA opcional (tipo_tarifa=VALOR_FIJO)
+
+    Auto-detecta EPS, nº de contrato y vigencia desde el encabezado de cada hoja.
+    Upsert por (eps + cups + contrato).
+    """
+    if not archivo.filename.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(400, "Solo se aceptan archivos .xlsx")
+    contenido = await archivo.read()
+    if len(contenido) > 20_000_000:
+        raise HTTPException(413, "Archivo demasiado grande (>20 MB)")
+
+    resultado = parsear_excel_tarifas(contenido, archivo.filename or "")
+    if resultado["errores"] and not resultado["filas"]:
+        raise HTTPException(
+            400,
+            f"No se pudo procesar el Excel. Errores: {'; '.join(resultado['errores'][:3])}"
+        )
+
+    eps_val = eps_override or resultado.get("eps") or ""
+    eps_val = eps_val.strip()
+    if not eps_val:
+        raise HTTPException(
+            400,
+            "No se pudo identificar la EPS en el Excel. Pase eps_override=NOMBRE como query param."
+        )
+
+    contrato_val = resultado.get("contrato") or None
+    vig_desde = resultado.get("vigencia_desde")
+    vig_hasta = resultado.get("vigencia_hasta")
+    fuente = (archivo.filename or "famisanar.xlsx")[:300]
+
+    creadas = 0
+    actualizadas = 0
+    errores: list[str] = list(resultado.get("errores", []))
+
+    for fila in resultado["filas"]:
+        try:
+            cups_val = (fila.get("codigo_cups") or "").strip()
+            if not cups_val:
+                continue
+            existente = (
+                db.query(TarifaContratadaRecord)
+                .filter(TarifaContratadaRecord.eps == eps_val)
+                .filter(TarifaContratadaRecord.codigo_cups == cups_val)
+                .filter(TarifaContratadaRecord.contrato_numero == (contrato_val or None))
+                .first()
+            )
+            campos = dict(
+                eps=eps_val,
+                contrato_numero=contrato_val,
+                codigo_cups=cups_val,
+                descripcion=fila.get("descripcion"),
+                valor_pactado=float(fila.get("valor_pactado") or 0.0),
+                modalidad=fila.get("modalidad"),
+                tipo_tarifa=fila.get("tipo_tarifa") or "VALOR_FIJO",
+                factor_ajuste=float(fila.get("factor_ajuste") or 0.0),
+                fuente_archivo=fuente,
+                vigencia_desde=vig_desde,
+                vigencia_hasta=vig_hasta,
+                creado_por=current_user.email,
+                activa=1,
+            )
+            if existente:
+                for k, v in campos.items():
+                    setattr(existente, k, v)
+                actualizadas += 1
+            else:
+                db.add(TarifaContratadaRecord(**campos))
+                creadas += 1
+        except Exception as e:
+            errores.append(f"CUPS {fila.get('codigo_cups')}: {type(e).__name__}: {e}")
+            continue
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Error al guardar: {e}")
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="IMPORTAR_TARIFAS_EXCEL",
+        tabla="tarifas_contratadas",
+        detalle=(
+            f"archivo={fuente} eps={eps_val} contrato={contrato_val} "
+            f"hojas={','.join(resultado.get('hojas_detectadas', []))} "
+            f"creadas={creadas} actualizadas={actualizadas} errores={len(errores)}"
+        ),
+    )
+
+    logger.info(
+        f"[TARIFAS] Import Excel '{fuente}' eps={eps_val} por {current_user.email}: "
+        f"hojas={resultado.get('hojas_detectadas')} creadas={creadas} "
+        f"actualizadas={actualizadas} errores={len(errores)}"
+    )
+    return {
+        "archivo": fuente,
+        "eps_detectada": resultado.get("eps"),
+        "eps_usada": eps_val,
+        "contrato": contrato_val,
+        "vigencia_desde": vig_desde.isoformat() if vig_desde else None,
+        "vigencia_hasta": vig_hasta.isoformat() if vig_hasta else None,
+        "hojas_detectadas": resultado.get("hojas_detectadas", []),
+        "total_filas_leidas": len(resultado["filas"]),
+        "creadas": creadas,
+        "actualizadas": actualizadas,
+        "errores": errores[:30],
         "total_errores": len(errores),
     }
 
