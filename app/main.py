@@ -1092,13 +1092,18 @@ async def analizar(
     numero_factura: Optional[str] = Form(None),
     numero_radicado: Optional[str] = Form(None),
     tono: Optional[str] = Form("conciliador"),
+    modo_respuesta: Optional[str] = Form("defender"),
+    valor_aceptado_parcial: Optional[float] = Form(0.0),
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     req_id = set_request_id()
-    logger.info(f"[{req_id}] Análisis solicitado por: {current_user.email} | eps={eps} | tono={tono}")
+    logger.info(
+        f"[{req_id}] Análisis solicitado por: {current_user.email} | "
+        f"eps={eps} | tono={tono} | modo={modo_respuesta}"
+    )
 
     try:
         data = GlosaInput(
@@ -1110,6 +1115,8 @@ async def analizar(
             numero_factura=numero_factura,
             numero_radicado=numero_radicado,
             tono=tono,
+            modo_respuesta=modo_respuesta or "defender",
+            valor_aceptado_parcial=valor_aceptado_parcial or 0.0,
         )
     except Exception as e:
         logger.error(f"[{req_id}] Validación fallida: {e}")

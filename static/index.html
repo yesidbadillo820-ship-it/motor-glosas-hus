@@ -1446,15 +1446,22 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <div class="stat-card-delta neutral" id="land-alertas-delta">en 5 días</div>
             </div>
           </div>
-          <!-- Empty state clásico -->
-          <div class="empty-state" style="margin:1rem auto;">
-            <div class="empty-state-icon">⚖️</div>
-            <h3>IA GLOSAS SINAC SC</h3>
-            <p>Complete los datos en el panel izquierdo y presione <b>Analizar</b> para generar la defensa técnico-jurídica. Las estadísticas superiores se actualizan automáticamente con los datos de su gestión.</p>
-            <div class="empty-state-actions">
-              <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'alertas\']'),'alertas')">Ver alertas</button>
-              <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'historial\']'),'historial')">Historial</button>
-              <button class="btn-secondary" onclick="abrirCommandPalette()">⌘K Buscar</button>
+          <!-- Empty state con logo SINAC de fondo -->
+          <div class="empty-state" style="margin:1rem auto;position:relative;overflow:hidden;">
+            <img src="/static/sinac-logo.png" alt=""
+                 style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                        width:min(60%,380px);opacity:.07;pointer-events:none;z-index:0;
+                        filter:grayscale(.3);"/>
+            <div style="position:relative;z-index:1;">
+              <div class="empty-state-icon">⚖️</div>
+              <h3>IA GLOSAS SINAC SC</h3>
+              <p>Complete los datos en el panel izquierdo y presione <b>Analizar</b> para generar la defensa técnico-jurídica. Las estadísticas superiores se actualizan automáticamente con los datos de su gestión.</p>
+              <div class="empty-state-actions" style="flex-wrap:wrap;gap:.5rem;justify-content:center;">
+                <button class="btn-secondary" onclick="nuevaGlosa()" title="Limpia el formulario para analizar una nueva glosa">🆕 Nueva glosa</button>
+                <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'mis-glosas\']'),'mis-glosas')" title="Ver glosas asignadas pendientes">📋 Mis glosas</button>
+                <button class="btn-secondary" onclick="window.location.href='/importar-recepcion'" title="Subir Excel de recepción DGH">📥 Importar factura</button>
+                <button class="btn-secondary" onclick="location.reload()" title="Recarga la página para traer últimos datos">🔄 Refrescar</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1767,16 +1774,14 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <label>Archivo Excel (.xlsx)</label>
             <input type="file" id="tar-xlsx-file" accept=".xlsx,.xlsm"/>
           </div>
-          <div class="field" style="background:#fef3c7;border-left:3px solid #d97706;padding:.6rem .8rem;border-radius:6px;margin-top:.5rem;">
-            <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-weight:600;color:#7c2d12;">
-              <input type="checkbox" id="tar-xlsx-reemplazar" style="margin-top:.2rem;"/>
-              <span>
-                🗑️ <b>Reemplazar tarifas existentes de esta EPS</b>
-                <span style="font-weight:400;display:block;font-size:.75rem;color:#92400e;margin-top:.2rem;">
-                  Borra TODAS las tarifas actuales de la EPS antes de cargar el Excel nuevo.
-                  Útil para renovaciones de contrato o si subiste mal antes.
-                  <b>Irreversible.</b>
-                </span>
+          <div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;margin-top:.8rem;display:flex;gap:.7rem;align-items:flex-start;">
+            <input type="checkbox" id="tar-xlsx-reemplazar" style="margin-top:.25rem;flex-shrink:0;width:16px;height:16px;cursor:pointer;"/>
+            <label for="tar-xlsx-reemplazar" style="flex:1;cursor:pointer;font-size:.82rem;line-height:1.45;color:#7c2d12;text-transform:none;letter-spacing:0;font-weight:400;margin:0;">
+              <span style="font-weight:600;display:block;margin-bottom:.15rem;">🗑️ Reemplazar tarifas existentes de esta EPS</span>
+              <span style="font-size:.75rem;color:#92400e;">
+                Borra todas las tarifas actuales de la EPS antes de cargar el Excel nuevo.
+                Útil para renovaciones de contrato o si se subió mal antes.
+                <b>Acción irreversible.</b>
               </span>
             </label>
           </div>
