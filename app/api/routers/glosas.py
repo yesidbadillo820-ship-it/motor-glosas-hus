@@ -289,7 +289,8 @@ def exportar_xlsx(
         "ID", "Fecha Creación", "EPS/Entidad", "Paciente", "Factura",
         "Código Glosa", "Concepto", "CUPS", "Servicio",
         "Valor Objetado", "Valor Aceptado", "Valor Recuperado",
-        "Código Respuesta", "Observación", "Etapa", "Estado",
+        "Código Respuesta", "Observación EPS", "Dictamen HUS",
+        "Etapa", "Estado",
         "Workflow", "Semáforo", "Días Restantes",
         "Fecha Recepción", "Fecha Entrega",
     ]
@@ -304,7 +305,17 @@ def exportar_xlsx(
         cell.alignment = header_align
 
     for g in glosas:
-        obs = _limpiar_observacion(g.dictamen)
+        # Observación EPS: lo que la EPS registró al glosar (lo que el
+        # auditor VE y REGISTRA en el sistema). Prioridad:
+        # observacion_eps (campo explícito) → texto_glosa_original (texto del
+        # Excel DGH o del editor) → concepto_glosa (descripción canónica).
+        obs_eps_raw = (
+            (getattr(g, "observacion_eps", None) or "").strip()
+            or (g.texto_glosa_original or "").strip()
+            or (g.concepto_glosa or "").strip()
+        )
+        # Dictamen: el texto limpio (sin HTML) generado por la defensa.
+        dictamen_txt = _limpiar_observacion(g.dictamen) or ""
         recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
         ws.append([
             g.id,
@@ -320,7 +331,8 @@ def exportar_xlsx(
             float(g.valor_aceptado or 0),
             float(recuperado),
             g.codigo_respuesta or "",
-            obs[:500] if obs else "",
+            obs_eps_raw[:600] if obs_eps_raw else "",
+            dictamen_txt[:800] if dictamen_txt else "",
             g.etapa or "",
             g.estado or "",
             g.workflow_state or "",
@@ -330,8 +342,8 @@ def exportar_xlsx(
             g.fecha_entrega.strftime("%Y-%m-%d") if g.fecha_entrega else "",
         ])
 
-    # Ajuste de anchos
-    widths = [6, 18, 22, 28, 14, 12, 26, 10, 32, 14, 14, 14, 12, 60, 14, 14, 14, 10, 10, 14, 14]
+    # Ajuste de anchos (22 columnas: Observación EPS 60, Dictamen HUS 80)
+    widths = [6, 18, 22, 28, 14, 12, 26, 10, 32, 14, 14, 14, 12, 60, 80, 14, 14, 14, 10, 10, 14, 14]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     ws.freeze_panes = "A2"
