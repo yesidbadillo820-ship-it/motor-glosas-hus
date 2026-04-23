@@ -1482,6 +1482,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
                 <button class="btn-secondary" onclick="cargarCasoEjemplo()" title="Carga una glosa de prueba para ver cómo funciona el motor">🧪 Caso de ejemplo</button>
                 <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'mis-glosas\']'),'mis-glosas')" title="Ver glosas asignadas pendientes">📋 Mis glosas</button>
                 <button class="btn-secondary" onclick="window.location.href='/importar-recepcion'" title="Subir Excel de recepción DGH">📥 Importar factura</button>
+                <button class="btn-secondary" onclick="_iniciarVoiceUI()" title="Comandos de voz (Ctrl+Shift+V)">🎤 Voz</button>
                 <button class="btn-secondary" onclick="location.reload()" title="Recarga la página para traer últimos datos">🔄 Refrescar</button>
               </div>
             </div>
@@ -2758,7 +2759,62 @@ document.addEventListener('DOMContentLoaded', function(){
   }catch(_){}
 });
 
-// Atajos de teclado premium (Ctrl+N nueva glosa, Ctrl+K buscar, Ctrl+/ refrescar)
+// ─── VOICE UI (Ronda 15) — comandos de voz opcionales ───────────────────
+// Usa Web Speech API (built-in en Chrome/Edge). Sin servidor externo.
+// Activación: botón 🎤 en el landing o atajo Ctrl+Shift+V.
+function _iniciarVoiceUI(){
+  try{
+    var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SpeechRec){
+      toast('Voz no disponible','Tu navegador no soporta Web Speech API. Usa Chrome/Edge.','warning');
+      return null;
+    }
+    var r = new SpeechRec();
+    r.lang = 'es-CO';
+    r.continuous = false;
+    r.interimResults = false;
+    r.onstart = function(){ toast('🎤 Escuchando','Di un comando (ej: "nueva glosa", "analizar", "mis glosas")','info'); };
+    r.onerror = function(e){ toast('Error voz', e.error || 'desconocido', 'error'); };
+    r.onresult = function(ev){
+      if(!ev.results || !ev.results.length) return;
+      var txt = ev.results[0][0].transcript.toLowerCase();
+      _procesarComandoVoz(txt);
+    };
+    r.start();
+    return r;
+  }catch(e){
+    toast('Error voz', e.message, 'error');
+    return null;
+  }
+}
+function _procesarComandoVoz(txt){
+  txt = (txt || '').toLowerCase();
+  if(/nueva\s+glosa|nuevo\s+an.lisis/.test(txt)){
+    nuevaGlosa(); toast('🎤 Comando','Nueva glosa iniciada','success'); return;
+  }
+  if(/mis\s+glosas|bandeja/.test(txt)){
+    var el = document.querySelector('.sn-item[onclick*=mis-glosas]');
+    if(el) el.click(); toast('🎤 Comando','Mis glosas','success'); return;
+  }
+  if(/historial/.test(txt)){
+    var el = document.querySelector('.sn-item[onclick*=historial]');
+    if(el) el.click(); toast('🎤 Comando','Historial','success'); return;
+  }
+  if(/analizar|enviar|analizalo/.test(txt)){
+    var btn = document.getElementById('btn-analizar');
+    if(btn && !btn.disabled){ btn.click(); toast('🎤 Comando','Análisis en curso','success'); return; }
+  }
+  if(/caso\s+de?\s+ejemplo|ejemplo/.test(txt)){
+    if(typeof cargarCasoEjemplo === 'function'){ cargarCasoEjemplo(); return; }
+  }
+  if(/refrescar|actualizar/.test(txt)){
+    if(typeof refrescarKpisHeader === 'function') refrescarKpisHeader();
+    toast('🎤 Comando','Datos refrescados','success'); return;
+  }
+  toast('🎤 No entendí', 'Dijiste: "' + txt.slice(0, 60) + '"', 'warning');
+}
+
+// Atajos de teclado premium (Ctrl+N nueva glosa, Ctrl+K buscar, Ctrl+/ refrescar, Ctrl+Shift+V voz)
 document.addEventListener('keydown', function(e){
   var ctrl = e.ctrlKey || e.metaKey;
   if(!ctrl) return;
@@ -2771,6 +2827,9 @@ document.addEventListener('keydown', function(e){
   } else if(e.key === 'k' || e.key === 'K'){
     e.preventDefault();
     if(typeof abrirCommandPalette === 'function') abrirCommandPalette();
+  } else if(e.shiftKey && (e.key === 'v' || e.key === 'V')){
+    e.preventDefault();
+    _iniciarVoiceUI();
   } else if(e.key === '/'){
     e.preventDefault();
     if(typeof refrescarKpisHeader === 'function') refrescarKpisHeader();
