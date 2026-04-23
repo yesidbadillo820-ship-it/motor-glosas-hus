@@ -272,31 +272,77 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
         if not cups_raw:
             continue
         cups = str(cups_raw).strip()
-        if not cups or not re.search(r"[A-Za-z0-9]", cups):
+        # Filtro estricto: CUPS reales tienen letras/dígitos y ≤30 chars.
+        # Filas de cierre como "SE SUSCRIBE EL PRESENTE ANEXO..." caen acá.
+        if not _es_codigo_cups_valido(cups):
             continue
         desc = _primera_desc_no_vacia(
             fila, idx_desc_cups, idx_desc_propio, idx_desc_reps, idx_desc
         )
         tipo = _limpiar_descripcion(str(_celda(fila, idx_tipo) or ""))
-        factor = 0.0
-        for idx in (idx_hosp, idx_amb, idx_urg):
-            if idx is None:
-                continue
-            f = _parsear_porcentaje(_celda(fila, idx))
-            if f != 0:
-                factor = f
-                break
+        tipo_norm = _normalizar_texto(tipo)
+        # Distinguir contrato SOAT (porcentajes) vs PROPIAS (valores absolutos).
+        # Familia SOAT: "SOAT UVB VIGENTE", "SOAT UVB", "SOAT ISS", "SOAT"
+        # Familia absoluta: "PROPIAS", "PROPIA", "MANUAL HUS", "NEGOCIADA", "TARIFA PLENA"
+        es_soat = "SOAT" in tipo_norm or "UVB" in tipo_norm or "ISS" in tipo_norm
+        if es_soat:
+            # Los cols HOSP/AMB/URG son PORCENTAJES (-5%, +10%, 0%)
+            factor = 0.0
+            for idx in (idx_hosp, idx_amb, idx_urg):
+                if idx is None:
+                    continue
+                f = _parsear_porcentaje(_celda(fila, idx))
+                if f != 0:
+                    factor = f
+                    break
+            tipo_tarifa = "SOAT_PORCENTAJE"
+            valor_pactado = 0.0
+            factor_ajuste = factor
+        else:
+            # Los cols HOSP/AMB/URG son VALORES ABSOLUTOS en COP
+            valor = 0.0
+            for idx in (idx_hosp, idx_amb, idx_urg):
+                if idx is None:
+                    continue
+                v = _normalizar_valor(_celda(fila, idx))
+                if v > 0:
+                    valor = v
+                    break
+            if valor <= 0:
+                continue  # sin valor, fila inválida
+            tipo_tarifa = "VALOR_FIJO"
+            valor_pactado = round(valor, 2)
+            factor_ajuste = 0.0
         obs = _limpiar_descripcion(str(_celda(fila, idx_obs) or ""))
         filas.append({
-            "codigo_cups": cups,
+            "codigo_cups": cups[:30],
             "descripcion": desc[:500] if desc else None,
-            "valor_pactado": 0.0,
+            "valor_pactado": valor_pactado,
             "modalidad": (tipo or "SOAT UVB VIGENTE")[:80],
-            "tipo_tarifa": "SOAT_PORCENTAJE",
-            "factor_ajuste": factor,
+            "tipo_tarifa": tipo_tarifa,
+            "factor_ajuste": factor_ajuste,
             "observacion": obs[:300] if obs else None,
         })
     return filas
+
+
+def _es_codigo_cups_valido(cups: str) -> bool:
+    """True si el string parece un código CUPS/CUM/MAPIISS/MIPRES real.
+
+    Reglas:
+      - No vacío
+      - ≤30 chars (límite BD, ya no cabe en VARCHAR(30))
+      - Sin espacios internos (los reales son tokens como '890202', 'FMQ6296',
+        '19914262-04'). Excluye filas de cierre tipo 'SE SUSCRIBE...'.
+      - Tiene al menos 1 letra o dígito
+    """
+    if not cups or len(cups) > 30:
+        return False
+    if " " in cups.strip():
+        return False
+    if not re.search(r"[A-Za-z0-9]", cups):
+        return False
+    return True
 
 
 def _limpiar_descripcion(s: str) -> str:
@@ -345,7 +391,7 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         if not cod_raw:
             continue
         codigo = str(cod_raw).strip()
-        if not codigo or not re.search(r"[A-Za-z0-9]", codigo):
+        if not _es_codigo_cups_valido(codigo):
             continue
         # Fallback: DCI → DESCRIPCION → DESCRIPCION REPS
         desc = _primera_desc_no_vacia(fila, idx_desc_dci, idx_desc, idx_desc_reps)
@@ -357,9 +403,9 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
             iva_val = str(_celda(fila, idx_iva) or "").strip().upper()
             iva_si = iva_val in ("SI", "SÍ", "S", "YES", "Y", "1")
         valor_final = tarifa * 1.19 if iva_si else tarifa
-        agrup = str(_celda(fila, idx_agrup) or "").strip()
+        agrup = _limpiar_descripcion(str(_celda(fila, idx_agrup) or ""))
         filas.append({
-            "codigo_cups": codigo,
+            "codigo_cups": codigo[:30],
             "descripcion": desc[:500] if desc else None,
             "valor_pactado": round(valor_final, 2),
             "modalidad": (agrup or "MEDICAMENTOS")[:80],
@@ -392,7 +438,7 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         if not cod_raw:
             continue
         codigo = str(cod_raw).strip()
-        if not codigo or not re.search(r"[A-Za-z0-9]", codigo):
+        if not _es_codigo_cups_valido(codigo):
             continue
         desc = _primera_desc_no_vacia(fila, idx_desc_prest, idx_desc, idx_desc_reps)
         iva_si = False
@@ -411,7 +457,7 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
 
         agrup = _limpiar_descripcion(str(_celda(fila, idx_agrup) or ""))
         filas.append({
-            "codigo_cups": codigo,
+            "codigo_cups": codigo[:30],
             "descripcion": desc[:500] if desc else None,
             "valor_pactado": round(valor, 2),
             "modalidad": (agrup or "SUMINISTROS")[:80],
@@ -452,7 +498,7 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
         if not cups_raw:
             continue
         cups = str(cups_raw).strip()
-        if not cups or not re.search(r"[A-Za-z0-9]", cups):
+        if not _es_codigo_cups_valido(cups):
             continue
         valor = _normalizar_valor(_celda(fila, idx_valor))
         if valor <= 0:
@@ -464,13 +510,13 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
         obs = f"Código IPS: {cod_ips}" if cod_ips and cod_ips != cups else None
 
         filas.append({
-            "codigo_cups": cups,
+            "codigo_cups": cups[:30],
             "descripcion": desc[:500] if desc else None,
             "valor_pactado": round(valor, 2),
             "modalidad": (modalidad or "TARIFA PROPIA")[:80],
             "tipo_tarifa": "VALOR_FIJO",
             "factor_ajuste": 0.0,
-            "observacion": obs,
+            "observacion": obs[:300] if obs else None,
         })
     return filas
 

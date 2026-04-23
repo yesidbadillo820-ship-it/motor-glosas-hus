@@ -466,3 +466,113 @@ class TestDescripcionFallback:
         m2 = next((f for f in r["filas"] if f["codigo_cups"] == "130106"), None)
         assert m2 is not None
         assert "IBUPROFENO" in (m2["descripcion"] or "")
+
+
+# ─── Bug real Famisanar: PROPIAS con valor absoluto + fila fantasma ────────
+
+def _crear_excel_anexo3_propias_y_fantasma() -> bytes:
+    """Anexo 3 real con filas TIPO TARIFA=PROPIAS (valor absoluto) y una
+    fila final tipo 'SE SUSCRIBE EL PRESENTE ANEXO...' que debe ignorarse.
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Anexo 3"
+    ws["A1"] = "INFORMACIÓN EPS"
+    ws["A2"] = "NOMBRE DE LA EPS"
+    ws["F2"] = "FAMISANAR EPS"
+    headers = [
+        "CUPS / CUMS / MIPRES", "DESCRIPCIÓN CUPS",
+        "COD. REPS", "DESCRIPCIÓN REPS",
+        "CÓDIGO PROPIO", "DESCRIPCIÓN CÓDIGO PROPIO",
+        "INTERDEPENDENCIA", "TIPO TARIFA",
+        "HOSPITALARIO", "AMBULATORIO", "URGENCIA",
+        "SEDE", "MARCA", "OBSERVACIÓN",
+    ]
+    for i, h in enumerate(headers, start=1):
+        ws.cell(row=10, column=i, value=h)
+
+    # Fila 1: TIPO TARIFA=SOAT → porcentaje
+    ws.cell(row=11, column=1, value="010101")
+    ws.cell(row=11, column=2, value="PUNCION CISTERNAL")
+    ws.cell(row=11, column=8, value="SOAT UVB VIGENTE")
+    ws.cell(row=11, column=9, value="-5%")
+
+    # Fila 2: TIPO TARIFA=PROPIAS → valor absoluto en pesos
+    ws.cell(row=12, column=1, value="372301")
+    ws.cell(row=12, column=2, value="ESTUDIO ELECTROFISIOLOGICO CARDIACO")
+    ws.cell(row=12, column=8, value="PROPIAS")
+    ws.cell(row=12, column=9, value=2601000)  # absoluto, no %
+    ws.cell(row=12, column=10, value=2601000)
+    ws.cell(row=12, column=11, value=2601000)
+
+    # Fila 3: TIPO TARIFA=PROPIAS con otro valor
+    ws.cell(row=13, column=1, value="373406")
+    ws.cell(row=13, column=2, value="ABLACION CARDIACA")
+    ws.cell(row=13, column=8, value="PROPIAS")
+    ws.cell(row=13, column=9, value=5007300)
+
+    # Fila fantasma: texto de cierre en la columna CUPS
+    ws.cell(
+        row=14, column=1,
+        value="SE SUSCRIBE EL PRESENTE ANEXO EN SEÑAL DE APROBACIÓN DE LAS TARIFAS Y SERVICIOS INCLUIDOS",
+    )
+    ws.cell(row=14, column=8, value="SOAT UVB VIGENTE")
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+class TestAnexo3PropiasYFantasma:
+    def test_ignora_fila_fantasma(self):
+        data = _crear_excel_anexo3_propias_y_fantasma()
+        r = parsear_excel_tarifas(data, "fam.xlsx")
+        cups_list = [f["codigo_cups"] for f in r["filas"]]
+        assert not any("SUSCRIBE" in c or "APROBACIÓN" in c.upper() for c in cups_list)
+
+    def test_cups_nunca_supera_30_chars(self):
+        data = _crear_excel_anexo3_propias_y_fantasma()
+        r = parsear_excel_tarifas(data, "fam.xlsx")
+        for f in r["filas"]:
+            assert len(f["codigo_cups"]) <= 30
+
+    def test_soat_es_porcentaje(self):
+        data = _crear_excel_anexo3_propias_y_fantasma()
+        r = parsear_excel_tarifas(data, "fam.xlsx")
+        f = next((x for x in r["filas"] if x["codigo_cups"] == "010101"), None)
+        assert f is not None
+        assert f["tipo_tarifa"] == "SOAT_PORCENTAJE"
+        assert f["factor_ajuste"] == -5.0
+        assert f["valor_pactado"] == 0.0
+
+    def test_propias_es_valor_fijo(self):
+        data = _crear_excel_anexo3_propias_y_fantasma()
+        r = parsear_excel_tarifas(data, "fam.xlsx")
+        f = next((x for x in r["filas"] if x["codigo_cups"] == "372301"), None)
+        assert f is not None
+        assert f["tipo_tarifa"] == "VALOR_FIJO"
+        assert f["valor_pactado"] == 2601000.0
+        assert f["factor_ajuste"] == 0.0
+        assert f["modalidad"] == "PROPIAS"
+
+    def test_propias_sin_valor_se_descarta(self):
+        """Si TIPO=PROPIAS pero todos los HOSP/AMB/URG están vacíos → skip."""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "A"
+        headers = [
+            "CUPS", "DESCRIPCION", "TIPO TARIFA",
+            "HOSPITALARIO", "AMBULATORIO", "URGENCIA",
+        ]
+        for i, h in enumerate(headers, start=1):
+            ws.cell(row=1, column=i, value=h)
+        ws.cell(row=2, column=1, value="999999")
+        ws.cell(row=2, column=2, value="SIN VALOR")
+        ws.cell(row=2, column=3, value="PROPIAS")
+        # HOSP/AMB/URG vacíos
+        buf = BytesIO()
+        wb.save(buf)
+        data = buf.getvalue()
+        r = parsear_excel_tarifas(data, "x.xlsx")
+        cups = [f["codigo_cups"] for f in r["filas"]]
+        assert "999999" not in cups
