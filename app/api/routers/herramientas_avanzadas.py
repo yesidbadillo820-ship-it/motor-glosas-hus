@@ -201,3 +201,41 @@ def learning_mis_patrones(
             })
 
     return patrones
+
+
+
+# ─── PREDICTOR DE GLOSAS (Ronda 4) ──────────────────────────────────────────
+
+class PredictorInput(BaseModel):
+    eps: str = Field(..., min_length=2, max_length=200)
+    cups: str = Field(..., min_length=1, max_length=30)
+    valor_facturado: float = Field(default=0.0, ge=0)
+    tipo_servicio: Optional[str] = Field(default="", max_length=100)
+    tiene_autorizacion: bool = True
+    tiene_historia_clinica: bool = True
+    tiene_soportes: bool = True
+
+
+@router.post("/predecir-glosa")
+def predecir_glosa_endpoint(
+    data: PredictorInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Estima la probabilidad de que una factura sea glosada antes de radicar.
+
+    Usa histórico de glosas similares + reglas determinísticas. No consume
+    tokens IA. Retorna score 0-1, nivel de riesgo, códigos probables,
+    motivos y recomendaciones para mitigar.
+    """
+    from app.services.predictor_glosas import predecir_glosa
+    return predecir_glosa(
+        db=db,
+        eps=data.eps,
+        cups=data.cups,
+        valor_facturado=data.valor_facturado,
+        tipo_servicio=data.tipo_servicio or "",
+        tiene_autorizacion=data.tiene_autorizacion,
+        tiene_historia_clinica=data.tiene_historia_clinica,
+        tiene_soportes=data.tiene_soportes,
+    )
