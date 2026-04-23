@@ -280,3 +280,33 @@ async def extraer_factura_endpoint(
     campos["_metodo_extraccion"] = metodo
     campos["_texto_chars"] = len(texto or "")
     return campos
+
+
+# ─── RAG de normativa (Ronda 7) ────────────────────────────────────────────
+
+@router.get("/normativa/buscar")
+def buscar_normativa(
+    q: str,
+    top_k: int = 5,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Búsqueda semántica TF-IDF en el catálogo normativo colombiano.
+
+    Ejemplo: /herramientas/normativa/buscar?q=tarifa+soat+diferencia
+    """
+    from app.services.rag_normativa import buscar_normas
+    return {"consulta": q, "resultados": buscar_normas(q, top_k=top_k)}
+
+
+@router.post("/normativa/validar-citas")
+def validar_citas(
+    payload: dict,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Recibe {"texto": "..."} con un dictamen y retorna qué citas
+    normativas fueron verificadas contra nuestro índice vs cuáles son
+    'dudosas' (posible alucinación de la IA).
+    """
+    from app.services.rag_normativa import validar_citas_en_dictamen
+    texto = (payload or {}).get("texto", "")
+    return validar_citas_en_dictamen(texto)
