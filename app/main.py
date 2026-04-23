@@ -378,6 +378,7 @@ def _descripcion_servicio(codigo_glosa: str, texto_glosa: str = "", contexto_pdf
 logging.basicConfig(level=logging.INFO)
 
 CONTRATOS_DEFAULT = {
+    "FAMISANAR EPS": "CONTRATO S-13-1-03-1-04958 (vig. 15/04/2026 — 14/04/2027). TARIFA: SOAT UVB VIGENTE -5% para servicios CUPS (Anexo 3) / VALOR FIJO para medicamentos (Anexo 3.1) y suministros (Anexo 3.2). Catálogo completo cargado en panel Tarifas.",
     "NUEVA EPS": "ACTA DE NEGOCIACIÓN No. 1388 DE 2024 / ACTA 2025. TARIFA: SOAT -20%.",
     "COOSALUD": "68001C00060340-24 / 68001S00060339-24. TARIFA: SOAT -15%.",
     "COMPENSAR": "ACUERDO TARIFARIO ESE HUS — EPS COMPENSAR 2025. TARIFA: SOAT -10%.",
