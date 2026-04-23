@@ -331,3 +331,35 @@ class ConciliacionRecord(Base):
     __table_args__ = (
         Index("ix_conciliacion_glosa", "glosa_id"),
     )
+
+
+class TarifaContratadaRecord(Base):
+    """Catálogo de tarifas pactadas por contrato con cada EPS.
+
+    Carga masiva por CSV desde el panel admin /tarifas. El motor de glosas
+    consulta esta tabla cuando una glosa es por TARIFAS (TA*) para decidir
+    si el valor facturado coincide con lo pactado. Si coincide → glosa
+    no procede. Si hay diferencia → evaluar.
+
+    No aplica a aseguradoras SOAT (Mundial, Bolívar, etc) ni a EPS sin
+    contrato (Sanitas, etc); esas siguen con lógica actual.
+    """
+    __tablename__ = "tarifas_contratadas"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    eps = Column(String(200), nullable=False, index=True)    # Ej: "FAMISANAR EPS"
+    contrato_numero = Column(String(100))                     # Ej: "CSA2025EVE3A005"
+    codigo_cups = Column(String(30), nullable=False, index=True)  # Ej: "890202"
+    descripcion = Column(Text)                                # "CONSULTA DE PRIMERA VEZ..."
+    valor_pactado = Column(Float, nullable=False, default=0.0)    # COP, sin decimales
+    modalidad = Column(String(80))                            # "SOAT -15%" / "UVB" / "MANUAL"
+    fuente_archivo = Column(String(300))                      # "famisanar_2026.csv"
+    vigencia_desde = Column(DateTime(timezone=True))
+    vigencia_hasta = Column(DateTime(timezone=True))
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    creado_por = Column(String(200))                          # email del COORDINADOR/SUPER_ADMIN
+    activa = Column(Integer, default=1, nullable=False)       # 1=activa, 0=archivada
+
+    __table_args__ = (
+        Index("ix_tarifa_eps_cups", "eps", "codigo_cups", "activa"),
+    )

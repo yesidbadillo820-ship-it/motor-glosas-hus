@@ -1274,6 +1274,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6A2 2 0 0 0 4 4V20A2 2 0 0 0 6 22H18A2 2 0 0 0 20 20V8Z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
           <span class="sn-item-label">Contratos</span>
         </button>
+        <button class="sn-item" data-tip="Tarifas contratadas" onclick="sidebarTab(this,'tarifas')">
+          <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="sn-item-label">Tarifas</span>
+        </button>
         <button class="sn-item" data-tip="Usuarios" onclick="sidebarTab(this,'usuarios')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M17 21V19A4 4 0 0 0 13 15H5A4 4 0 0 0 1 19V21"/><circle cx="9" cy="7" r="4"/><path d="M23 21V19A4 4 0 0 0 20 15.13"/><path d="M16 3.13A4 4 0 0 1 16 11"/></svg>
           <span class="sn-item-label">Usuarios</span>
@@ -1730,6 +1734,66 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       <div class="contratos-area">
         <div class="section-title">Contratos vigentes <span id="n-contratos">0</span></div>
         <div class="contratos-grid" id="contratos-grid"></div>
+      </div>
+    </div>
+
+    <!-- TARIFAS CONTRATADAS (admin) -->
+    <div class="panel" id="p-tarifas">
+      <div class="page-pad">
+        <div class="page-head">
+          <div>
+            <h2 class="page-title">💰 Tarifas contratadas por EPS</h2>
+            <p class="page-sub">Base de conocimiento para validar glosas por tarifas contra valores pactados en contratos.</p>
+          </div>
+          <div class="page-actions toolbar-inline">
+            <button class="btn-sm ghost" onclick="cargarTarifas()">Actualizar</button>
+          </div>
+        </div>
+
+        <!-- Bloque de carga CSV -->
+        <div class="form-card" style="margin-bottom:1rem;">
+          <h3 style="display:flex;align-items:center;gap:.5rem;">📤 Subir CSV de tarifas</h3>
+          <p style="font-size:.82rem;color:var(--text3);margin-bottom:.8rem;">
+            Columnas esperadas (en cualquier orden): <code>eps</code>, <code>cups</code>,
+            <code>descripcion</code>, <code>valor</code>, <code>contrato</code> (opcional),
+            <code>modalidad</code> (opcional), <code>vigencia_desde</code> / <code>vigencia_hasta</code> (opcional).
+            Separador tab, coma o punto-y-coma. Upsert por (eps + cups + contrato).
+          </p>
+          <div class="field">
+            <label>EPS por defecto <span style="color:var(--text3);font-weight:400;">(opcional; se usa si el CSV no trae columna eps)</span></label>
+            <input type="text" id="tar-eps-default" placeholder="Ej: FAMISANAR EPS"/>
+          </div>
+          <div class="field">
+            <label>Archivo CSV</label>
+            <input type="file" id="tar-file" accept=".csv,.txt"/>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="subirTarifasCSV()">📤 Importar</button>
+            <a href="/static/plantilla_tarifas.csv" download class="btn btn-ghost" style="text-decoration:none;">📋 Descargar plantilla</a>
+          </div>
+          <div id="tar-import-result" style="margin-top:.8rem;"></div>
+        </div>
+
+        <!-- Filtros -->
+        <div style="display:flex;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap;">
+          <input type="text" id="tar-filtro-eps" placeholder="Filtrar por EPS..." style="flex:1;min-width:200px;"/>
+          <input type="text" id="tar-filtro-cups" placeholder="Filtrar por CUPS..." style="flex:1;min-width:150px;"/>
+          <button class="btn-sm" onclick="cargarTarifas()">Buscar</button>
+        </div>
+
+        <!-- Stats + tabla -->
+        <div id="tar-stats" style="margin-bottom:.6rem;font-size:.85rem;color:var(--text2);"></div>
+        <div class="tbl-wrap" style="overflow:auto;max-height:600px;">
+          <table>
+            <thead><tr>
+              <th>EPS</th><th>CUPS</th><th>Descripción</th><th class="num">Valor pactado</th>
+              <th>Modalidad</th><th>Contrato</th><th>Fuente</th><th>Acciones</th>
+            </tr></thead>
+            <tbody id="tar-body">
+              <tr class="empty-row"><td colspan="8">Sin tarifas cargadas. Sube un CSV arriba.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -2439,6 +2503,7 @@ function tab(btn,id){
   if(id==='mi-desempeno') cargarMiDesempeno();
   if(id==='usuarios') cargar2FAEstado();
   if(id==='papelera') cargarPapelera();
+  if(id==='tarifas') cargarTarifas();
 }
 
 async function cargarPapelera(){
@@ -2494,6 +2559,103 @@ async function purgarGlosa(papelera_id){
     if(r.ok){ toast('Purgada','Eliminada definitivamente','success'); cargarPapelera(); }
     else { toast('Error','No se pudo purgar','error'); }
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// ─── TARIFAS CONTRATADAS (admin) ──────────────────────────────────────────
+async function cargarTarifas(){
+  var body = document.getElementById('tar-body');
+  var stats = document.getElementById('tar-stats');
+  if(!body) return;
+  var epsFiltro = (document.getElementById('tar-filtro-eps') || {}).value || '';
+  var cupsFiltro = (document.getElementById('tar-filtro-cups') || {}).value || '';
+  var qs = [];
+  if(epsFiltro.trim()) qs.push('eps=' + encodeURIComponent(epsFiltro.trim()));
+  if(cupsFiltro.trim()) qs.push('cups=' + encodeURIComponent(cupsFiltro.trim()));
+  qs.push('limite=500');
+  body.innerHTML = '<tr class="empty-row"><td colspan="8">Cargando…</td></tr>';
+  try{
+    // Stats globales
+    var rs = await fetch('/tarifas-contratadas/stats', {headers: authH()});
+    if(rs.ok){
+      var s = await rs.json();
+      var porEps = (s.por_eps || []).slice(0, 5).map(function(x){ return escHtml(x.eps) + ': ' + x.cantidad; }).join(' · ');
+      if(stats) stats.innerHTML = '📊 <b>' + (s.total_activas || 0) + '</b> tarifas activas' +
+        (porEps ? ' · Top EPS: ' + porEps : '');
+    }
+    var r = await fetch('/tarifas-contratadas?' + qs.join('&'), {headers: authH()});
+    if(r.status === 401){ alert('Sesión expirada'); return; }
+    if(!r.ok){ body.innerHTML = '<tr><td colspan="8" style="color:#991b1b">Error '+r.status+'</td></tr>'; return; }
+    var data = await r.json();
+    if(!data.length){
+      body.innerHTML = '<tr class="empty-row"><td colspan="8">Sin tarifas que coincidan con los filtros.</td></tr>';
+      return;
+    }
+    body.innerHTML = data.map(function(t){
+      var valor = (t.valor_pactado || 0).toLocaleString('es-CO', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+      return '<tr>' +
+        '<td>' + escHtml(t.eps || '—') + '</td>' +
+        '<td class="mono">' + escHtml(t.codigo_cups || '—') + '</td>' +
+        '<td style="max-width:300px;overflow-wrap:anywhere;">' + escHtml(t.descripcion || '—') + '</td>' +
+        '<td class="num"><b>$' + valor + '</b></td>' +
+        '<td>' + escHtml(t.modalidad || '—') + '</td>' +
+        '<td>' + escHtml(t.contrato_numero || '—') + '</td>' +
+        '<td style="font-size:.72rem;color:var(--text3);">' + escHtml(t.fuente_archivo || '—') + '</td>' +
+        '<td class="cell-center"><button class="btn-sm" style="color:#b91c1c" onclick="eliminarTarifa(' + t.id + ')">✕ Archivar</button></td>' +
+      '</tr>';
+    }).join('');
+  }catch(e){
+    body.innerHTML = '<tr><td colspan="8" style="color:#991b1b">'+ escHtml(e.message) +'</td></tr>';
+  }
+}
+
+async function subirTarifasCSV(){
+  var input = document.getElementById('tar-file');
+  var epsDefault = (document.getElementById('tar-eps-default') || {}).value || '';
+  var resultDiv = document.getElementById('tar-import-result');
+  if(!input || !input.files || !input.files.length){
+    toast('Sin archivo', 'Selecciona un CSV primero', 'warning');
+    return;
+  }
+  var fd = new FormData();
+  fd.append('archivo', input.files[0]);
+  var url = '/tarifas-contratadas/import-csv';
+  if(epsDefault.trim()) url += '?eps_default=' + encodeURIComponent(epsDefault.trim());
+  if(resultDiv) resultDiv.innerHTML = '<div style="color:var(--text3);">⏳ Procesando...</div>';
+  try{
+    var r = await fetch(url, {method: 'POST', headers: authH(), body: fd});
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){
+      if(resultDiv) resultDiv.innerHTML = '<div style="color:#b91c1c;padding:10px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:6px;">❌ ' + escHtml(d.detail || ('Error ' + r.status)) + '</div>';
+      return;
+    }
+    var msg = '<div style="padding:12px;background:#ecfdf5;border-left:3px solid #10b981;border-radius:6px;">';
+    msg += '<b>✓ Import terminado:</b> ' + d.creadas + ' creadas, ' + d.actualizadas + ' actualizadas';
+    if(d.total_errores){
+      msg += ' · <b style="color:#ca8a04">' + d.total_errores + ' filas con error</b>';
+      if(d.errores && d.errores.length){
+        msg += '<details style="margin-top:6px;font-size:.78rem;"><summary>Ver errores</summary><ul>';
+        d.errores.forEach(function(e){ msg += '<li>' + escHtml(e) + '</li>'; });
+        msg += '</ul></details>';
+      }
+    }
+    msg += '</div>';
+    if(resultDiv) resultDiv.innerHTML = msg;
+    toast('Importación OK', d.creadas + ' creadas, ' + d.actualizadas + ' actualizadas', 'success');
+    input.value = '';
+    cargarTarifas();
+  }catch(e){
+    if(resultDiv) resultDiv.innerHTML = '<div style="color:#b91c1c">Error de red: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function eliminarTarifa(id){
+  if(!confirm('¿Archivar esta tarifa? (soft-delete: queda inactiva pero no se pierde)')) return;
+  try{
+    var r = await fetch('/tarifas-contratadas/' + id, {method: 'DELETE', headers: authH()});
+    if(!r.ok){ var d = await r.json().catch(function(){return {};}); toast('Error', d.detail || 'No se pudo archivar', 'error'); return; }
+    toast('Archivada', 'Tarifa #' + id + ' quedó inactiva', 'success');
+    cargarTarifas();
+  }catch(e){ toast('Error', e.message, 'error'); }
 }
 
 async function verHistorialVersiones(){

@@ -222,12 +222,14 @@ class GlosaSaludTotal:
         plantillas = {
             "TA": (
                 # TARIFAS — NO hay contrato con Salud Total / entidad similar
-                f"ESE HUS NO ACEPTA {cal} POR TARIFAS {codigo_glosa} SOBRE {servicio}. "
-                "No existe contrato vigente con la entidad pagadora; la facturación "
-                "se realiza bajo tarifa SOAT plena vigente (Resolución 054/2026). "
-                "El valor cobrado corresponde al Manual Tarifario sin descuentos "
-                "unilaterales. Se solicita el reconocimiento íntegro del valor "
-                "facturado. CARTERA@HUS.GOV.CO"
+                # SIEMPRE INJUSTIFICADA: no existe tarifa pactada, rige SOAT pleno.
+                f"ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE TARIFAS {codigo_glosa} "
+                f"SOBRE {servicio}, CONSIDERADA INJUSTIFICADA al no existir "
+                "contrato vigente entre las partes que contemple tarifas pactadas "
+                "distintas al Manual SOAT vigente (Resolución 054/2026; Decreto "
+                "2423/1996). El valor cobrado corresponde a tarifa SOAT plena, "
+                "sin descuentos unilaterales admisibles (Art. 871 C.Comercio). "
+                "Se solicita el reconocimiento íntegro. CARTERA@HUS.GOV.CO"
             ),
             "SO": (
                 # SOPORTES — evidencia en HC + RIPS
