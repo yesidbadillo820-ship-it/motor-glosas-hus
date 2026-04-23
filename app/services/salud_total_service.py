@@ -215,68 +215,89 @@ class GlosaSaludTotal:
         }
         cal = CALIFICATIVO.get(codigo_respuesta, "LA GLOSA")
 
-        # Plantillas calibradas ≤500 chars con tono conciliador y cita normativa
+        # Plantillas NUEVAS (abr 2026) con estilo TÉCNICO ESPECÍFICO al caso:
+        # mencionan los soportes reales del expediente clínico (notas enfermería,
+        # kardex, evoluciones, HC, RIPS) en vez de solo citar leyes genericas.
+        # Todas ≤ 500 chars incluso con servicio de 80 chars + codigo corto.
         plantillas = {
             "TA": (
+                # TARIFAS — NO hay contrato con Salud Total / entidad similar
                 f"ESE HUS NO ACEPTA {cal} POR TARIFAS {codigo_glosa} SOBRE {servicio}. "
-                "NO EXISTE CONTRATO VIGENTE CON SALUD TOTAL EPS; LA FACTURACIÓN SE RIGE POR "
-                "SOAT PLENO (RES. 054/2026; DEC. 2423/1996). LA ENTIDAD PAGADORA NO PUEDE "
-                "APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL (ART. 871 C.COM.; "
-                "ART. 1602 C.CIVIL). ART. 177 LEY 100/1993 ESTABLECE EL DEBER DE "
-                "RECONOCIMIENTO ÍNTEGRO. CARTERA@HUS.GOV.CO"
+                "No existe contrato vigente con la entidad pagadora; la facturación "
+                "se realiza bajo tarifa SOAT plena vigente (Resolución 054/2026). "
+                "El valor cobrado corresponde al Manual Tarifario sin descuentos "
+                "unilaterales. Se solicita el reconocimiento íntegro del valor "
+                "facturado. CARTERA@HUS.GOV.CO"
             ),
             "SO": (
-                f"ESE HUS NO ACEPTA {cal} POR SOPORTES {codigo_glosa} SOBRE {servicio}. "
-                "LA HISTORIA CLÍNICA (RES. 1995/1999) CONSTITUYE DOCUMENTO MÉDICO-LEGAL DE "
-                "PLENA PRUEBA Y OBRA EN EL EXPEDIENTE. LOS SOPORTES DEL MANUAL ÚNICO "
-                "(RES. 2284/2023) FUERON APORTADOS; LOS ERRORES FORMALES SON SUBSANABLES "
-                "(CIRCULAR 030/2013). SE SOLICITA EL LEVANTAMIENTO. CARTERA@HUS.GOV.CO"
+                # SOPORTES — evidencia en HC + RIPS
+                f"ESE HUS NO ACEPTA {cal} POR SOPORTES {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en historia clínica, RIPS y evoluciones médicas del "
+                "expediente clínico, donde consta la prestación efectiva del "
+                "servicio y todos los soportes requeridos conforme a la Resolución "
+                "3047/2008. Se solicita el levantamiento de la glosa. "
+                "CARTERA@HUS.GOV.CO"
             ),
             "AU": (
-                f"ESE HUS NO ACEPTA {cal} POR AUTORIZACIÓN {codigo_glosa} SOBRE {servicio}. "
-                "ART. 168 LEY 100/1993 Y SENTENCIA T-1025/2002 DE LA CORTE CONSTITUCIONAL "
-                "ESTABLECEN QUE LAS URGENCIAS NO REQUIEREN AUTORIZACIÓN PREVIA. LA IPS "
-                "CUMPLIÓ EL DEBER LEGAL DE ATENCIÓN. SE SOLICITA RECONOCIMIENTO ÍNTEGRO. "
+                # AUTORIZACION — urgencia documentada
+                f"ESE HUS NO ACEPTA {cal} POR AUTORIZACIÓN {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en nota de urgencias y evoluciones del expediente "
+                "clínico que documentan la atención prestada bajo condición de "
+                "urgencia vital. La atención no requiere autorización previa "
+                "(Art. 168 Ley 100/1993). Se solicita el levantamiento. "
                 "CARTERA@HUS.GOV.CO"
             ),
             "CO": (
-                f"ESE HUS NO ACEPTA {cal} POR COBERTURA {codigo_glosa} SOBRE {servicio}. "
-                "EL SERVICIO ESTÁ INCLUIDO EN EL PLAN DE BENEFICIOS EN SALUD "
-                "(RES. 5269/2017); LAS EXCLUSIONES SON TAXATIVAS (ART. 15 LEY 1751/2015) "
-                "Y NO APLICAN. ART. 177 LEY 100/1993 OBLIGA AL RECONOCIMIENTO. "
+                # COBERTURA — PBS
+                f"ESE HUS NO ACEPTA {cal} POR COBERTURA {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en historia clínica y orden médica del expediente "
+                "clínico, donde consta que el servicio facturado está incluido en "
+                "el Plan de Beneficios en Salud (Res. 5269/2017) y no corresponde "
+                "a exclusión taxativa. Se solicita el levantamiento. "
                 "CARTERA@HUS.GOV.CO"
             ),
             "CL": (
-                f"ESE HUS NO ACEPTA {cal} POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
-                "LA AUTONOMÍA MÉDICA (ART. 17 LEY 1751/2015; SENTENCIA T-478/1995) ES "
-                "DERECHO FUNDAMENTAL. LA HISTORIA CLÍNICA (RES. 1995/1999) DOCUMENTA LA "
-                "INDICACIÓN CLÍNICA. EL AUDITOR NO SUSTITUYE AL MÉDICO TRATANTE. "
-                "CARTERA@HUS.GOV.CO"
+                # PERTINENCIA (clínica)
+                f"ESE HUS NO ACEPTA {cal} POR PERTINENCIA {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en historia clínica, evoluciones médicas y órdenes "
+                "del médico tratante en el expediente, donde consta la indicación "
+                "clínica del servicio. La autonomía médica (Art. 17 Ley 1751/2015) "
+                "prevalece. Se solicita el levantamiento. CARTERA@HUS.GOV.CO"
             ),
             "PE": (
-                f"ESE HUS NO ACEPTA {cal} POR PERTINENCIA {codigo_glosa} SOBRE {servicio}. "
-                "ART. 17 LEY 1751/2015 Y SENTENCIA T-478/1995 PROTEGEN LA AUTONOMÍA DEL "
-                "MÉDICO TRATANTE. LA HISTORIA CLÍNICA (RES. 1995/1999) SOPORTA LA "
-                "INDICACIÓN. SE SOLICITA RECONOCIMIENTO ÍNTEGRO. CARTERA@HUS.GOV.CO"
-            ),
-            "FA": (
-                f"ESE HUS NO ACEPTA {cal} POR FACTURACIÓN {codigo_glosa} SOBRE {servicio}. "
-                "EL SERVICIO FUE EFECTIVAMENTE PRESTADO Y DOCUMENTADO EN HISTORIA CLÍNICA "
-                "(RES. 1995/1999). ART. 177 LEY 100/1993 ESTABLECE EL DEBER DE "
-                "RECONOCIMIENTO. LOS ERRORES FORMALES SON SUBSANABLES (CIRCULAR 030/2013). "
+                # PERTINENCIA (variante)
+                f"ESE HUS NO ACEPTA {cal} POR PERTINENCIA {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en historia clínica y evoluciones médicas del "
+                "expediente que documentan la indicación clínica suscrita por el "
+                "médico tratante. La autonomía profesional (Art. 17 Ley 1751/2015) "
+                "respalda la conducta. Se solicita el levantamiento. "
                 "CARTERA@HUS.GOV.CO"
             ),
+            "FA": (
+                # FACTURACION — notas enfermería + kardex + evoluciones
+                f"ESE HUS NO ACEPTA {cal} POR FACTURACIÓN {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en notas de enfermería, kardex de medicamentos y "
+                "evoluciones médicas del expediente clínico, donde consta la "
+                "prescripción, preparación y aplicación del servicio facturado, "
+                "conforme a Resolución 3047/2008. Se solicita el levantamiento "
+                "de la glosa. CARTERA@HUS.GOV.CO"
+            ),
             "IN": (
-                f"ESE HUS NO ACEPTA {cal} POR INSUMOS {codigo_glosa} SOBRE {servicio}. "
-                "LOS INSUMOS SON INHERENTES AL ACTO MÉDICO (DEC. 780/2016) Y SE FACTURAN "
-                "AL COSTO MÁS PORCENTAJE PACTADO (ART. 871 C.COMERCIO). LAS FACTURAS DE "
-                "COMPRA OBRAN COMO SOPORTE. CARTERA@HUS.GOV.CO"
+                # INSUMOS — nota operatoria + kardex
+                f"ESE HUS NO ACEPTA {cal} POR INSUMOS {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en nota operatoria, historia clínica y kardex del "
+                "expediente, donde consta el uso efectivo del insumo durante el "
+                "procedimiento. Los insumos son inherentes al acto médico "
+                "(Dec. 780/2016). Se solicita el levantamiento. "
+                "CARTERA@HUS.GOV.CO"
             ),
             "ME": (
-                f"ESE HUS NO ACEPTA {cal} POR MEDICAMENTOS {codigo_glosa} SOBRE {servicio}. "
-                "EL MEDICAMENTO FUE DISPENSADO BAJO FÓRMULA DEL MÉDICO TRATANTE "
-                "(ART. 17 LEY 1751/2015). LA PRESCRIPCIÓN CLÍNICA PREVALECE SOBRE EL "
-                "CRITERIO ADMINISTRATIVO (T-478/1995). CARTERA@HUS.GOV.CO"
+                # MEDICAMENTOS — fórmula + kardex + notas + evoluciones
+                f"ESE HUS NO ACEPTA {cal} POR MEDICAMENTOS {codigo_glosa} SOBRE {servicio}, "
+                "evidenciado en fórmula médica, kardex, notas de enfermería y "
+                "evoluciones del expediente clínico, donde consta la prescripción, "
+                "dispensación y administración del medicamento facturado. "
+                "Se solicita el levantamiento. CARTERA@HUS.GOV.CO"
             ),
         }
         # Primero prueba por código específico (TA02, FA01, etc), luego general
