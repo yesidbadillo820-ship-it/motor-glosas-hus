@@ -397,21 +397,25 @@ TEXTO_RATIFICADA = (
 
 
 def generar_texto_extemporanea(dias: int) -> str:
+    """Texto FIJO para glosas extemporáneas (RE9502).
+
+    Es IMPORTANTE que sea 100% fijo — no pasa por IA ni por suavizador —
+    para (1) garantizar tono firme consistente y (2) no gastar tokens de
+    IA en un caso cuyo argumento es mecánico. El suavizador tambien se
+    salta cuando el `arg_limpio` coincide con esta plantilla.
+    """
     return (
-        f"ESE HUS RESPETUOSAMENTE NO ACEPTA LA GLOSA POR CONSIDERARLA EXTEMPORÁNEA. "
-        f"CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RESOLUCIÓN 3047 DE 2008, EL "
-        f"PLAZO APLICABLE PARA QUE LA ENTIDAD PAGADORA FORMULE GLOSAS ES DE 20 DÍAS "
-        f"HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA, CRITERIO "
-        f"INSTITUCIONAL ASUMIDO POR LA ESE HUS. AUN APLICANDO EL PLAZO DEL ARTÍCULO "
-        f"57 DE LA LEY 1438 DE 2011 (30 DÍAS HÁBILES PARA LA ENTIDAD PAGADORA Y 15 "
-        f"DÍAS HÁBILES ADICIONALES PARA LA IPS), SE OBSERVA QUE HAN TRANSCURRIDO "
-        f"{dias} DÍAS HÁBILES, LO QUE SUPERA EL PLAZO LEGAL Y CONTRACTUAL. POR LO "
-        f"ANTERIOR, Y EN ATENCIÓN AL PRINCIPIO DE BUENA FE CONTRACTUAL (ART. 871 "
-        f"CÓDIGO DE COMERCIO; ART. 1602 CÓDIGO CIVIL) Y A LA LEY 1751 DE 2015, SE "
-        f"SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA "
-        f"GLOSA Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO, EVITANDO ASÍ "
-        f"AFECTACIONES AL FLUJO DE RECURSOS DEL HOSPITAL. CUALQUIER INFORMACIÓN AL "
-        f"CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO."
+        "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. SEGÚN EL ARTÍCULO 56 "
+        f"DE LA LEY 1438 DE 2011, EL PLAZO LEGAL PARA QUE LA EPS FORMULE GLOSAS ES DE "
+        f"20 DÍAS HÁBILES CONTADOS A PARTIR DE LA RECEPCIÓN DE LA FACTURA. AL HABERSE "
+        f"SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {dias} DÍAS HÁBILES), LA GLOSA CARECE "
+        f"DE TODO SUSTENTO LEGAL Y CONSTITUYE UN ACTO ABUSIVO E IMPROCEDENTE POR PARTE DE "
+        f"LA ENTIDAD PAGADORA. LA LEY 1751 DE 2015 Y EL PRINCIPIO DE BUENA FE CONTRACTUAL "
+        f"(ART. 871 CÓDIGO DE COMERCIO) PROTEGEN EL DERECHO DE LA IPS A RECIBIR EL PAGO "
+        f"ÍNTEGRO DE LOS SERVICIOS PRESTADOS. ESTAS GLOSAS EXTEMPORÁNEAS NO DEBEN DISMINUIR "
+        f"EL PAGO DEBIDO A LA IPS BAJO NINGUNA CIRCUNSTANCIA. SE EXIGE EL LEVANTAMIENTO "
+        f"INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CUALQUIER INFORMACIÓN AL "
+        f"CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
     )
 
 
@@ -658,7 +662,16 @@ class GlosaService:
 
         if argumento_fijo:
             pac_ia = "N/A"
-            arg_ia = _suavizar_tono(argumento_fijo)
+            # EXTEMPORANEA y ACEPTADA_* usan textos 100% fijos curados por el
+            # equipo juridico — NO pasan por _suavizar_tono() porque ese
+            # reemplaza frases como "SE EXIGE EL LEVANTAMIENTO" o "CARECE DE
+            # TODO SUSTENTO LEGAL" que son intencionales en estos textos.
+            # Las ratificadas tampoco deben tocarse (TEXTO_RATIFICADA es fijo).
+            _saltar_suavizar = tipo_glosa in (
+                "EXTEMPORANEA", "RATIFICADA",
+                "ACEPTADA_TOTAL", "ACEPTADA_PARCIAL",
+            )
+            arg_ia = argumento_fijo if _saltar_suavizar else _suavizar_tono(argumento_fijo)
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "texto_fijo"
             servicio_ia = ""

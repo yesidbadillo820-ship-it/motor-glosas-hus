@@ -29,6 +29,7 @@ class TransicionWorkflow:
 
 
 TRANSICIONES_PERMITIDAS = [
+    # Flujo normal
     TransicionWorkflow("RADICADA", "RESPONDIDA", "Responder glosa"),
     TransicionWorkflow("RESPONDIDA", "RATIFICADA", "EPS ratifica glosa"),
     TransicionWorkflow("RESPONDIDA", "LEVANTADA", "EPS retira glosa"),
@@ -37,6 +38,16 @@ TRANSICIONES_PERMITIDAS = [
     TransicionWorkflow("RATIFICADA", "LEVANTADA", "EPS retira glosa"),
     TransicionWorkflow("RATIFICADA", "ESCALADA_SNS", "Escalar a Superintendencia"),
     TransicionWorkflow("CONCILIADA", "LEVANTADA", "Confirmar levantamiento"),
+    # Desde estados iniciales no-RADICADA al haber respondido (permiten
+    # marcar como respondida aunque la glosa venga importada con estado
+    # EXTEMPORANEA o RATIFICADA desde recepción):
+    TransicionWorkflow("EXTEMPORANEA", "RESPONDIDA", "Responder glosa extemporánea"),
+    TransicionWorkflow("RATIFICADA", "RESPONDIDA", "Responder glosa ratificada"),
+    # Desde BORRADOR / EN_REVISION (estados internos del workflow de aprobacion
+    # de dictamenes) tambien se permite marcar como respondida directamente.
+    TransicionWorkflow("BORRADOR", "RESPONDIDA", "Marcar como respondida"),
+    TransicionWorkflow("EN_REVISION", "RESPONDIDA", "Marcar como respondida"),
+    TransicionWorkflow("APROBADA", "RESPONDIDA", "Marcar como respondida"),
 ]
 
 

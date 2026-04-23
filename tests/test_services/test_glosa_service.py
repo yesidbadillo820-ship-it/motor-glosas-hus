@@ -49,22 +49,24 @@ class TestGenerarTextoExtemporanea:
         texto = generar_texto_extemporanea(25)
         assert "25 DÍAS HÁBILES" in texto
         assert "20 DÍAS HÁBILES" in texto
-        # Referencia actualizada: plazo del Art. 57 Ley 1438/2011 (30+15)
-        # + piso contractual de 20 días (Res. 3047/2008 + práctica HUS)
-        assert "ARTÍCULO 57" in texto
+        # El texto fijo usa el Art. 56 de la Ley 1438/2011 (plazo 20 dias)
+        # como referencia principal por directriz del equipo juridico HUS.
+        assert "ARTÍCULO 56" in texto
         assert "LEY 1438 DE 2011" in texto
-        assert "RESOLUCIÓN 3047" in texto
 
-    def test_genera_texto_no_acepta_glosa(self):
-        """Should reject the glosa (conciliatory tone)."""
+    def test_genera_texto_rechaza_glosa(self):
+        """Should reject the glosa with firm tone."""
         texto = generar_texto_extemporanea(25)
-        assert "NO ACEPTA" in texto.upper()
+        assert "RECHAZA LA GLOSA" in texto.upper()
+        assert "EXTEMPORÁNEA" in texto
 
     def test_genera_texto_pago_integro(self):
-        """Should request full recognition (conciliatory tone)."""
+        """Should demand immediate and definitive lifting of the glosa."""
         texto = generar_texto_extemporanea(25)
-        assert "RECONOCIMIENTO ÍNTEGRO" in texto.upper()
+        assert "LEVANTAMIENTO INMEDIATO Y DEFINITIVO" in texto.upper()
         assert "IPS" in texto
+        # Correo institucional siempre incluido
+        assert "CARTERA@HUS.GOV.CO" in texto
 
 
 class TestGenerarTextoInjustificada:

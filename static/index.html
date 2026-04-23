@@ -3032,28 +3032,24 @@ function cargarConceptoDeFactura(keyOrId){
   }
   var editor = document.getElementById('f-glosa');
   if(editor){
-    // Construir texto COMPLETO con todos los campos del Excel. La IA
-    // usa este texto como input, así que cuantos más datos estructurados,
-    // mejor respuesta técnico-jurídica genera.
+    // Construir texto COMPLETO con los campos del Excel que SIRVEN para
+    // que la IA genere argumento juridico:
+    //   CODIGO - Nombre glosa canónico - CUPS - Descripción servicio
+    //   - Valor objetado - Observación específica de la EPS
     //
-    // Formato esperado por el usuario:
-    //   CODIGO - Oid OID - Nombre glosa canónico - CUPS - Descripción servicio
-    //   - Centro costo - Observación específica de la EPS
+    // NO se incluye OID (metadato interno del DGH, sin valor juridico) ni
+    // centro de costo (dato operativo, la IA no lo necesita para argumentar
+    // tarifas/facturacion/cobertura).
     var partes = [];
     if(g.codigo_glosa) partes.push(g.codigo_glosa);
-    if(g.oid_dgh) partes.push('Oid ' + g.oid_dgh);
     if(g.nombre_glosa) partes.push(g.nombre_glosa);
-    if(g.cups) partes.push(g.cups);
+    if(g.cups) partes.push('CUPS ' + g.cups);
     if(g.servicio) partes.push(g.servicio);
-    if(g.centro_costo) partes.push(g.centro_costo);
-    if(g.observacion_eps) partes.push(g.observacion_eps);
-    // Agregar valor objetado al final si no aparece ya en la observación
+    // Agregar valor objetado antes de la observación
     if(g.valor_objetado && g.valor_objetado > 0){
-      var valorFormateado = '$' + g.valor_objetado.toLocaleString('es-CO');
-      if(partes.join(' ').indexOf(String(g.valor_objetado)) === -1){
-        partes.push('Valor objetado: ' + valorFormateado);
-      }
+      partes.push('Valor objetado: $' + g.valor_objetado.toLocaleString('es-CO'));
     }
+    if(g.observacion_eps) partes.push(g.observacion_eps);
     var textoFinal = partes.filter(function(p){ return p && String(p).trim(); }).join(' - ');
     // Fallback si no hay datos suficientes (flujo legacy sin conceptos)
     if(textoFinal.length < 15){
