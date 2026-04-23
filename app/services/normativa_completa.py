@@ -371,12 +371,26 @@ RESOLUCIONES = {
         "keywords": ["RIPS", "registros individuales", "866"],
     },
 
-    "RESOLUCION 054 DE 2026": {
-        "nombre": "Resolución 054 de 2026 (MinSalud)",
-        "titulo": "Tarifas SOAT Plenas vigentes 2026",
-        "ambito": "Tarifas SOAT expresadas en UVB",
+    "CIRCULAR 047 DE 2025": {
+        "nombre": "Circular Externa 047 de 2025 (MinSalud)",
+        "titulo": "Manual Tarifario SOAT 2026 indexado a UVB",
+        "ambito": "Tarifas SOAT 2026 expresadas en UVB. UVB 2026 = $12.110. Fórmula: Tarifa_UVB × $12.110 → centena más próxima.",
         "vigente": True,
-        "keywords": ["SOAT", "tarifa 2026", "UVB", "054"],
+        "keywords": ["SOAT", "tarifa 2026", "UVB", "047", "circular externa", "manual tarifario"],
+    },
+    "RESOLUCION 054 DE 2026": {
+        "nombre": "Resolución 054 de enero 30 de 2026 (ESE HUS)",
+        "titulo": "Listado unificado de tarifas institucionales propias del HUS",
+        "ambito": "Tarifas propias expresadas en FACTOR SMDLV. Aplica cuando el contrato dice 'TIPO TARIFA = PROPIAS'",
+        "vigente": True,
+        "keywords": ["tarifas propias", "HUS", "054", "propia", "manual HUS", "SMDLV", "institucional"],
+    },
+    "RESOLUCION 124 DE 2026": {
+        "nombre": "Resolución 124 de marzo 25 de 2026 (ESE HUS)",
+        "titulo": "Nuevas tarifas institucionales HUS + modificaciones Res. 054",
+        "ambito": "Laboratorio clínico, quirúrgicos, electrofisiología, patología, gineco-oncológicos. Fórmula: FACTOR × SMDLV 2026 (≈ $58.375)",
+        "vigente": True,
+        "keywords": ["tarifas propias", "HUS", "124", "institucional", "SMDLV", "laboratorio", "quirurgicos"],
     },
 
     "RESOLUCION 2175 DE 2015": {
@@ -777,7 +791,7 @@ def normas_relevantes_para_codigo(codigo_glosa: str) -> List[str]:
     """
     prefijo = (codigo_glosa or "")[:2].upper()
     mapping = {
-        "TA": ["LEY 100 DE 1993", "CODIGO CIVIL - ARTICULO 1602", "CODIGO DE COMERCIO - ARTICULO 871", "RESOLUCION 054 DE 2026", "CIRCULAR 025 DE 2024"],
+        "TA": ["LEY 100 DE 1993", "CODIGO CIVIL - ARTICULO 1602", "CODIGO DE COMERCIO - ARTICULO 871", "CIRCULAR 047 DE 2025", "RESOLUCION 054 DE 2026", "RESOLUCION 124 DE 2026"],
         "SO": ["RESOLUCION 1995 DE 1999", "RESOLUCION 866 DE 2021", "CIRCULAR 030 DE 2013", "RESOLUCION 2284 DE 2023"],
         "AU": ["LEY 100 DE 1993", "SENTENCIA T-1025 DE 2002", "DECRETO 4747 DE 2007"],
         "CO": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-760 DE 2008"],

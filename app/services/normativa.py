@@ -96,9 +96,19 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "resumen": "Procedimiento de conciliación de glosas médicas.",
         "tipo": "RESOLUCION", "vigente": True,
     },
-    "RESOLUCION 054/2026": {
-        "nombre": "Resolución 054 de 2026",
-        "resumen": "Tarifas SOAT plenas vigentes 2026 (expresadas en UVB).",
+    "CIRCULAR 047/2025": {
+        "nombre": "Circular Externa 047 de 2025 (MinSalud)",
+        "resumen": "Manual Tarifario SOAT 2026 indexado a UVB. Fórmula: valor_pesos = Tarifa_UVB × UVB_vigente (UVB 2026 = $12.110, Res. MinHacienda 31/12/2025), ajustado a centena más próxima. Aplica a accidentes de tránsito SOAT, desastres, atentados, eventos catastróficos y atención inicial de urgencias sin acuerdo tarifario.",
+        "tipo": "CIRCULAR", "vigente": True,
+    },
+    "RESOLUCION 054/2026 HUS": {
+        "nombre": "Resolución 054 de enero 30 de 2026 (ESE HUS)",
+        "resumen": "Listado unificado de tarifas institucionales propias del Hospital Universitario de Santander. Expresadas en FACTOR SMDLV. Aplica cuando el contrato dice 'TIPO TARIFA = PROPIAS' o 'MANUAL HUS'. Fundamento: Decreto 780/2016 Anexo Técnico 1, Decreto 2423/1996 Art. 87 y 89, Acuerdo Junta Directiva HUS No. 002 y 003 de 2018.",
+        "tipo": "RESOLUCION", "vigente": True,
+    },
+    "RESOLUCION 124/2026 HUS": {
+        "nombre": "Resolución 124 de marzo 25 de 2026 (ESE HUS)",
+        "resumen": "Crea códigos y tarifas institucionales complementarias a la Res. 054/2026 (lab clínico, procedimientos quirúrgicos, electrofisiología, gineco-oncológicos, patología, hematología, etc.) y modifica algunas tarifas existentes. Fórmula: valor_pesos = FACTOR_SMDLV × SMDLV_vigente (SMDLV 2026 ≈ $58.375) → centena más próxima.",
         "tipo": "RESOLUCION", "vigente": True,
     },
     "RESOLUCION 2284/2023": {

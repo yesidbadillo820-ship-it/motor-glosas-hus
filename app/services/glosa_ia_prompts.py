@@ -172,13 +172,13 @@ def get_contrato(eps: str) -> dict:
             return val
     return {
         "numero":   "SIN CONTRATO PACTADO",
-        "tarifa":   "SOAT PLENO — Resolución 054 de 2026",
+        "tarifa":   "SOAT PLENO — Manual Tarifario SOAT 2026 (Circular 047/2025 MinSalud + UVB 2026 = $12.110)",
         "factor":   1.00,
         "tipo":     "SIN RELACIÓN CONTRACTUAL",
         "nit":      "N/D",
         "vigencia": "N/A",
         "contacto": "cartera@hus.gov.co",
-        "nota":     "Sin contrato. Se aplica tarifa SOAT plena según Res. 054/2026 y Decreto 2423/1996.",
+        "nota":     "Sin contrato. Se aplica tarifa SOAT plena según Circular Externa 047 de 2025 del MinSalud (Manual SOAT 2026 indexado a UVB — UVB 2026 = $12.110) y Decreto 780 de 2016.",
     }
 
 
@@ -338,8 +338,10 @@ MISIÓN: Redactar respuestas técnico-jurídicas a glosas de EPS y entidades pag
    • Decreto 780/2016, Decreto 2423/1996 (SOAT)
    • Resolución 2284/2023 (Manual Único de Glosas — CÓDIGOS TAXATIVOS)
    • Resolución 1995/1999 (historia clínica como plena prueba)
-   • Resolución 5269/2017 (PBS), Resolución 054/2026 (SOAT 2026)
-   • Circular 025/2024 (UVB), Circular 030/2013 (errores formales subsanables)
+   • Resolución 5269/2017 (PBS), Circular 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB)
+   • UVB 2026 = $12.110 (Res. MinHacienda 31/12/2025). Fórmula: Tarifa_UVB × $12.110 → centena más próxima
+   • Resolución 054/2026 ESE HUS (tarifas propias del hospital, aplica cuando contrato dice "PROPIAS")
+   • Circular 030/2013 (errores formales subsanables)
    • Art. 871 C.Comercio (buena fe), Art. 1602 C.Civil (contrato = ley) — ¡NO 1601!
    • T-478/1995 (autonomía médica), T-1025/2002 (urgencias sin autorización)
    • Sanidad Militar: Decreto 1795/2000 + Acuerdo 002/2001 Consejo Superior de Salud FUERZAS MILITARES (nunca "Fuerzas Armadas"). NO cites T-760/2008 para FF.MM./PPL/FOMAG.
@@ -427,7 +429,10 @@ Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
 
 SYSTEM_TA = SYSTEM_BASE + """
 ═══════════════ MÓDULO: TARIFAS (TA) ═══════════════
-ARGUMENTO CENTRAL: La tarifa facturada corresponde al contrato vigente y/o al Manual SOAT (Res. 054/2026 + Circular 025/2024 UVB). La entidad pagadora no puede aplicar descuentos unilaterales no pactados (Art. 871 C.Comercio; Art. 1602 C.Civil).
+ARGUMENTO CENTRAL: La tarifa facturada corresponde al contrato vigente y/o al Manual Tarifario aplicable:
+• MANUAL SOAT 2026: Circular Externa 047 de 2025 MinSalud — valores indexados a UVB. UVB 2026 = $12.110 (Res. MinHacienda 31/12/2025). Fórmula: valor_pesos = Tarifa_UVB × $12.110, ajustado a la centena más próxima.
+• TARIFAS PROPIAS HUS (cuando contrato dice "TIPO TARIFA = PROPIAS"): Resolución 054 de enero 30/2026 ESE HUS (listado unificado) + Resolución 124 de marzo 25/2026 ESE HUS (nuevos códigos y modificaciones). Expresadas en FACTOR SMDLV (SMDLV 2026 ≈ $58.375). Fórmula: valor_pesos = FACTOR × SMDLV vigente.
+La entidad pagadora no puede aplicar descuentos unilaterales no pactados (Art. 871 C.Comercio; Art. 1602 C.Civil).
 
 REGLAS:
 • Si hay contrato con factor (SOAT -X%): menciona el descuento pactado pero NO hagas cálculos aritméticos visibles.
@@ -620,16 +625,18 @@ def get_system_prompt(prefijo: str, eps: str) -> str:
         descuento_pct = int(round((1 - factor) * 100))
         bloque_calculo = f"""
 CALCULADORA TARIFARIA OBLIGATORIA (USA EN EL ARGUMENTO):
-- Tarifa SOAT pleno (Res. 054/2026)  : Buscarla en el manual de tarifas para el CUPS facturado.
-- Factor contractual aplicable       : {factor} (descuento {descuento_pct}%)
-- Valor pactado = SOAT × {factor}
-- Diferencia adeudada = Valor pactado - Valor reconocido por la EPS
+- Marco normativo       : Manual SOAT 2026 — Circular 047/2025 MinSalud (tarifas en UVB)
+- UVB 2026              : $12.110 (Res. MinHacienda 31/12/2025)
+- Fórmula SOAT pleno    : valor = Tarifa_UVB_del_CUPS × $12.110 → ajustar a centena
+- Factor contractual    : {factor} (descuento {descuento_pct}%)
+- Valor pactado         = SOAT_pleno × {factor}
+- Diferencia adeudada   = Valor pactado - Valor reconocido por la EPS
 - DEBES mostrar este cálculo en el argumento si la EPS aplicó otro descuento.
 """
     elif prefijo.upper() == "TA" and factor >= 1.0:
         bloque_calculo = """
 CALCULADORA TARIFARIA OBLIGATORIA:
-- Sin contrato pactado: aplica SOAT PLENO (Res. 054/2026), SIN descuentos.
+- Sin contrato pactado: aplica SOAT PLENO (Manual Tarifario SOAT 2026 — Circular 047/2025 MinSalud, UVB 2026 = $12.110), SIN descuentos.
 - Cualquier descuento de la EPS es UNILATERAL y carece de soporte contractual.
 """
 

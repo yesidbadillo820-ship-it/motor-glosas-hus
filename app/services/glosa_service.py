@@ -58,8 +58,11 @@ NORMATIVA APLICABLE:
 - Resolución 2175 de 2015: Procedimiento de conciliación de glosas médicas
 - Resolución 3047 de 2008: Anexo Técnico 5 (Procedimiento glosas)
 - Resolución 5269 de 2017: Plan de Beneficios en Salud
-- Resolución 054 de 2026: Tarifas SOAT Plenas
-- Decreto 2423 de 1996: Manual de Tarifas SOAT
+- Circular Externa 047 de 2025 (MinSalud): Manual Tarifario SOAT 2026 indexado a UVB
+- UVB 2026: $12.110 (Resolución MinHacienda 31/12/2025). Fórmula: valor = Tarifa_UVB × $12.110 → centena más próxima
+- Decreto 780 de 2016 (Anexo Técnico 1): regla de redondeo a centena + marco general
+- Decreto 2423 de 1996: Manual tarifario SOAT histórico (base para servicios no incluidos en Circular 047)
+- Resolución 054 de 2026 (ESE HUS): Tarifas propias del hospital (aplican cuando el contrato dice "TIPO TARIFA = PROPIAS")
 - Código de Comercio: Artículo 871 (Principio de Buena Fe)
 - Circular 030 de 2013: Subsanación de errores formales en facturación
 - Resolución 1995 de 1999: Historia clínica como prueba plena
@@ -420,7 +423,7 @@ def generar_texto_extemporanea(dias: int) -> str:
 
 
 # Keywords que identifican ASEGURADORAS SOAT/ARL/PÓLIZAS sin contrato (pagos
-# bajo Manual Tarifario SOAT vigente Res. 054/2026 + Dec. 2423/1996).
+# bajo Manual Tarifario SOAT vigente — Circular 047/2025 MinSalud + UVB 2026 $12.110).
 # Estas entidades son muy estrictas con tarifas; si no se cita la normativa
 # SOAT exacta, ratifican la glosa.
 _KEYWORDS_ASEGURADORAS_SOAT = (
@@ -508,8 +511,9 @@ def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "", tex
         f"SOPORTE CONTRACTUAL. EN TERCER LUGAR, LA GLOSA CARECE DE EVIDENCIA DE "
         f"UNA TARIFA DISTINTA QUE JUSTIFIQUE LA REDUCCIÓN APLICADA. "
 
-        f"DE CONFORMIDAD CON LA RESOLUCIÓN 054 DE 2026 Y EL DECRETO 2423 DE "
-        f"1996, EL MANUAL TARIFARIO SOAT RIGE SUPLETORIAMENTE A FALTA DE "
+        f"DE CONFORMIDAD CON LA CIRCULAR EXTERNA 047 DE 2025 DEL MINISTERIO DE "
+        f"SALUD (MANUAL TARIFARIO SOAT 2026 INDEXADO A UVB — VALOR UVB 2026: $12.110) Y "
+        f"EL DECRETO 780 DE 2016, EL MANUAL TARIFARIO SOAT RIGE SUPLETORIAMENTE A FALTA DE "
         f"CONTRATO. POR SU PARTE, EL ARTÍCULO 871 DEL CÓDIGO DE COMERCIO "
         f"CONSAGRA EL PRINCIPIO DE BUENA FE CONTRACTUAL, Y EL ARTÍCULO 177 DE "
         f"LA LEY 100 DE 1993 ESTABLECE EL DEBER DE LA ENTIDAD PAGADORA DE "

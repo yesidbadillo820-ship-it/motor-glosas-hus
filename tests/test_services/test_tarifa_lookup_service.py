@@ -127,9 +127,11 @@ class TestEvaluarGlosaTarifa:
         db = self._db_mock(t)
         r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890202",
                                   valor_facturado=95_000, valor_objetado=10_000,
-                                  valor_soat_base=100_000)
+                                  valor_soat_base=100_000,
+                                  valor_reconocido=85_000)
         assert r["valor_pactado_calc"] == 95_000.0
-        # facturado==pactado → DEFENDER
+        # SOAT_PORCENTAJE con facturado y reconocido → DEFENDER (discrepancia
+        # sobre SOAT base, no sobre el descuento pactado).
         assert r["recomendacion"]["accion"] == "DEFENDER_TOTAL"
 
 
@@ -193,3 +195,57 @@ class TestFormatoTextoBanner:
         }
         txt = formato_texto_banner(info)
         assert "SOAT -5%" in txt or "SOAT - 5%" in txt or "-5" in txt
+
+
+class TestSoatPorcentajeSinBase:
+    """Caso real Famisanar: SOAT_PORCENTAJE sin conocer SOAT base oficial,
+    pero con valor_facturado y valor_reconocido extraídos del texto."""
+
+    def _db_mock(self, tarifa):
+        db = MagicMock()
+        q = MagicMock()
+        q.filter.return_value = q
+        q.order_by.return_value = q
+        q.first.return_value = tarifa
+        db.query.return_value = q
+        return db
+
+    def test_sin_valores_solo_soat_revisar(self):
+        t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0, valor_pactado=0)
+        db = self._db_mock(t)
+        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890750",
+                                  valor_facturado=0, valor_objetado=24_900)
+        rec = r["recomendacion"]
+        assert rec["accion"] == "REVISAR"
+        assert "SOAT base" in rec["razon"]
+
+    def test_con_facturado_y_reconocido_defender(self):
+        """Caso real: facturado $114.900, reconocido $90.000, SOAT -5%.
+        HUS implica SOAT base = $120.947; EPS implica $94.737.
+        Como HUS interpreta SOAT base MAYOR → defender."""
+        t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0, valor_pactado=0)
+        db = self._db_mock(t)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "890750",
+            valor_facturado=114_900,
+            valor_objetado=24_900,
+            valor_reconocido=90_000,
+        )
+        rec = r["recomendacion"]
+        assert rec["accion"] == "DEFENDER_TOTAL"
+        # SOAT base implícito HUS ≈ 114_900 / 0.95 ≈ 120_947
+        assert abs(rec["soat_base_hus"] - 120_947.37) < 1
+        # SOAT base implícito EPS ≈ 90_000 / 0.95 ≈ 94_737
+        assert abs(rec["soat_base_eps"] - 94_736.84) < 1
+
+    def test_calcula_pactado_desde_facturado(self):
+        """Si solo tengo facturado, el pactado_calc debería ser ≈ facturado."""
+        t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0, valor_pactado=0)
+        db = self._db_mock(t)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "890750",
+            valor_facturado=114_900,
+            valor_objetado=24_900,
+        )
+        # valor_pactado_calc = (114_900/0.95) × 0.95 = 114_900
+        assert abs(r["valor_pactado_calc"] - 114_900) < 1

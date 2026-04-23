@@ -66,17 +66,77 @@ def calcular_valor_pactado(tarifa: TarifaContratadaRecord, valor_soat_base: floa
     return round(valor_soat_base * (1 + factor / 100.0), 2)
 
 
-def _recomendacion(valor_facturado: float, valor_pactado: float, valor_objetado: float) -> dict:
+def _recomendacion(
+    valor_facturado: float,
+    valor_pactado: float,
+    valor_objetado: float,
+    *,
+    es_soat_pct: bool = False,
+    factor_pct: float = 0.0,
+    valor_reconocido: float = 0.0,
+) -> dict:
     """Compara facturado vs pactado y sugiere acción.
 
-    Reglas:
-      - Si facturado == pactado (±$1) → glosa INJUSTIFICADA (defender 100%)
-      - Si facturado > pactado y la diferencia cabe en valor_objetado →
-        aceptar parcial por la diferencia (defender el pactado)
-      - Si facturado < pactado → defender (el hospital cobró menos del pactado)
-      - Cualquier otro caso → revisar manualmente
+    Reglas VALOR_FIJO:
+      - facturado == pactado (±$1) → glosa INJUSTIFICADA (defender 100%)
+      - facturado > pactado, diferencia cabe en objetado → aceptar parcial
+      - facturado < pactado → defender (cobró menos del pactado)
+      - diferencia excede objetado → revisar manualmente
+
+    Reglas SOAT_PORCENTAJE:
+      - Si no conocemos valor SOAT base, no podemos calcular el pactado
+        absoluto; pero si tenemos `valor_facturado` y `valor_reconocido`
+        podemos comparar las **interpretaciones** de SOAT base de cada parte
+        y recomendar DEFENDER (ambas aplican el mismo factor; la
+        discrepancia es sobre la tarifa SOAT oficial del CUPS).
     """
-    tolerancia = 1.0  # $1 de margen por redondeos
+    tolerancia = 1.0
+
+    # Rama SOAT_PORCENTAJE: siempre inferir SOAT base implícito de HUS y EPS
+    # desde los valores facturado/reconocido, y explicar la discrepancia.
+    if es_soat_pct:
+        multiplicador = 1 + factor_pct / 100.0
+        soat_base_hus = (valor_facturado / multiplicador) if (valor_facturado > 0 and multiplicador > 0) else 0.0
+        soat_base_eps = (valor_reconocido / multiplicador) if (valor_reconocido > 0 and multiplicador > 0) else 0.0
+        signo = "+" if factor_pct > 0 else ""
+        if valor_facturado > 0 and valor_reconocido > 0:
+            return {
+                "accion": "DEFENDER_TOTAL",
+                "titulo": "✅ Defender (discrepancia sobre SOAT base, no sobre descuento)",
+                "razon": (
+                    f"Contrato pactado: SOAT {signo}{factor_pct:.0f}%. HUS facturó "
+                    f"${valor_facturado:,.0f}, lo que implica valor SOAT base "
+                    f"${soat_base_hus:,.0f} para el CUPS. La EPS reconoce "
+                    f"${valor_reconocido:,.0f} (implica SOAT base ${soat_base_eps:,.0f}). "
+                    "Ambas partes aplican el mismo descuento pactado — el conflicto "
+                    "es sobre la tarifa SOAT oficial del CUPS. Verificar Circular "
+                    "Externa 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB — "
+                    "UVB 2026 = $12.110) y el Decreto 780/2016; si HUS aplicó el "
+                    f"SOAT correcto, defender íntegramente los ${valor_facturado:,.0f}."
+                ),
+                "valor_a_defender": valor_objetado,
+                "valor_a_aceptar": 0.0,
+                "diferencia": valor_objetado,
+                "soat_base_hus": soat_base_hus,
+                "soat_base_eps": soat_base_eps,
+            }
+        return {
+            "accion": "REVISAR",
+            "titulo": "❔ SOAT base no identificado",
+            "razon": (
+                f"Contrato pactado: SOAT {signo}{factor_pct:.0f}%. No se extrajo "
+                "facturado/reconocido del texto y el valor SOAT base del CUPS no "
+                "está cargado. Revisar manualmente la Circular 047/2025 MinSalud "
+                "(Manual SOAT 2026 indexado a UVB — UVB 2026 = $12.110) y "
+                f"calcular tarifa pactada = Tarifa_UVB × $12.110 × {multiplicador:.3f}."
+            ),
+            "valor_a_defender": valor_objetado,
+            "valor_a_aceptar": 0.0,
+            "diferencia": 0.0,
+            "soat_base_hus": soat_base_hus,
+            "soat_base_eps": soat_base_eps,
+        }
+
     diferencia_abs = round(valor_facturado - valor_pactado, 2)
 
     if abs(diferencia_abs) <= tolerancia and valor_pactado > 0:
@@ -108,7 +168,6 @@ def _recomendacion(valor_facturado: float, valor_pactado: float, valor_objetado:
         }
 
     if valor_pactado > 0 and diferencia_abs > tolerancia:
-        # Facturado > pactado: lo correcto es defender el pactado y aceptar la diferencia
         valor_a_aceptar = min(diferencia_abs, valor_objetado) if valor_objetado > 0 else diferencia_abs
         valor_a_defender = max(0.0, valor_objetado - valor_a_aceptar) if valor_objetado > 0 else 0.0
         cabe_en_objetado = valor_objetado > 0 and diferencia_abs <= valor_objetado + tolerancia
@@ -161,24 +220,13 @@ def evaluar_glosa_tarifa(
     valor_facturado: float = 0.0,
     valor_objetado: float = 0.0,
     valor_soat_base: float = 0.0,
+    valor_reconocido: float = 0.0,
 ) -> dict:
-    """Evalúa una glosa TA contra la tarifa pactada. Devuelve siempre un dict
-    con la clave `encontrada` que indica si hubo match.
+    """Evalúa una glosa TA contra la tarifa pactada.
 
-    Estructura del dict:
-      {
-        "encontrada": bool,
-        "tarifa": {id, eps, cups, descripcion, contrato_numero,
-                   valor_pactado, tipo_tarifa, factor_ajuste, modalidad,
-                   fuente_archivo, vigencia_desde, vigencia_hasta},
-        "valor_facturado": float,     # lo que el hospital cobró
-        "valor_objetado": float,      # lo que la EPS glosa
-        "valor_pactado_calc": float,  # tarifa final ya calculada
-        "recomendacion": { accion, titulo, razon, valor_a_defender,
-                           valor_a_aceptar, diferencia },
-      }
-
-    Si `encontrada=False`, solo vienen valor_facturado/valor_objetado.
+    Cuando el tipo es SOAT_PORCENTAJE y no conocemos el SOAT base, pero sí
+    tenemos valor_facturado (lo que HUS cobró), asumimos que HUS aplicó
+    correctamente el manual SOAT y calculamos pactado implícito.
     """
     tarifa = _buscar(db, eps, cups)
     if tarifa is None:
@@ -187,12 +235,31 @@ def evaluar_glosa_tarifa(
             "tarifa": None,
             "valor_facturado": valor_facturado,
             "valor_objetado": valor_objetado,
+            "valor_reconocido": valor_reconocido,
             "valor_pactado_calc": 0.0,
             "recomendacion": None,
         }
 
+    tipo = tarifa.tipo_tarifa or "VALOR_FIJO"
+    factor_pct = float(tarifa.factor_ajuste or 0.0)
+    es_soat_pct = tipo == "SOAT_PORCENTAJE"
+
+    # Para SOAT%, si no pasaron SOAT base pero sí tenemos facturado,
+    # asumir facturado = SOAT_base × (1+factor/100) → pactado = facturado
+    # (porque HUS ya aplicó el descuento al facturar).
+    if es_soat_pct and valor_soat_base <= 0 and valor_facturado > 0:
+        valor_soat_base = valor_facturado / (1 + factor_pct / 100.0)
+
     valor_pactado_calc = calcular_valor_pactado(tarifa, valor_soat_base=valor_soat_base)
-    recomendacion = _recomendacion(valor_facturado, valor_pactado_calc, valor_objetado)
+
+    recomendacion = _recomendacion(
+        valor_facturado,
+        valor_pactado_calc,
+        valor_objetado,
+        es_soat_pct=es_soat_pct,
+        factor_pct=factor_pct,
+        valor_reconocido=valor_reconocido,
+    )
 
     return {
         "encontrada": True,
@@ -203,8 +270,8 @@ def evaluar_glosa_tarifa(
             "descripcion": tarifa.descripcion,
             "contrato_numero": tarifa.contrato_numero,
             "valor_pactado": float(tarifa.valor_pactado or 0.0),
-            "tipo_tarifa": tarifa.tipo_tarifa or "VALOR_FIJO",
-            "factor_ajuste": float(tarifa.factor_ajuste or 0.0),
+            "tipo_tarifa": tipo,
+            "factor_ajuste": factor_pct,
             "modalidad": tarifa.modalidad,
             "fuente_archivo": tarifa.fuente_archivo,
             "vigencia_desde": tarifa.vigencia_desde.isoformat() if tarifa.vigencia_desde else None,
@@ -212,6 +279,7 @@ def evaluar_glosa_tarifa(
         },
         "valor_facturado": valor_facturado,
         "valor_objetado": valor_objetado,
+        "valor_reconocido": valor_reconocido,
         "valor_pactado_calc": valor_pactado_calc,
         "recomendacion": recomendacion,
     }
