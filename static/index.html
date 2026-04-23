@@ -5545,17 +5545,31 @@ function _extraerArgumentoLimpio(dictamenHtml){
   var tmp = document.createElement('div');
   tmp.innerHTML = dictamenHtml || '';
   // Antes de extraer texto, eliminar bloques claramente no-imprimibles:
-  // metadata JSON, tablas de soportes, QR, trazabilidad, botones.
+  // metadata JSON, tablas de soportes, QR, trazabilidad, botones, banner
+  // de tarifa pactada (ese se muestra por separado en la UI; en el PDF
+  // queremos solo el argumento jurídico).
   try{
     tmp.querySelectorAll(
       'script, style, button, [data-trazabilidad], .no-print, ' +
       '.qr-trazabilidad, .thread-box, .refinar-panel'
     ).forEach(function(el){ el.remove(); });
+    // Remover explícitamente el banner de tarifa pactada (div con el título
+    // "📋 Tarifa pactada encontrada en el contrato"). Busca por heurística
+    // en divs con ese texto y elimina el bloque completo.
+    tmp.querySelectorAll('div').forEach(function(d){
+      var t = (d.textContent || '').trim();
+      if(t.indexOf('Tarifa pactada encontrada en el contrato') === 0 ||
+         t.indexOf('📋 Tarifa pactada') === 0){
+        d.remove();
+      }
+    });
   }catch(e){}
   var txt = (tmp.innerText || tmp.textContent || '').replace(/\s+/g, ' ').trim();
   var marker = 'ARGUMENTACIÓN JURÍDICA';
   var idx = txt.indexOf(marker);
-  if(idx > -1 && idx < 1000){
+  // El banner de tarifa pactada (cuando existe) puede empujar el marker
+  // más allá de 1000 chars. Usamos 8000 como tope seguro.
+  if(idx > -1 && idx < 8000){
     txt = txt.substring(idx + marker.length).trim();
   } else {
     var m2 = txt.indexOf('RESPUESTA A GLOSA');
