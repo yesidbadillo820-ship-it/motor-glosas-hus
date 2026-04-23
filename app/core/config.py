@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     app_name: str = "Motor Glosas HUS"
     app_version: str = "5.4.0"
 
+    # Banner informativo en la UI (mantenimiento, capacitación, etc.)
+    # Si está vacío no se muestra. Ejemplo de uso en Render:
+    #   BANNER_CAPACITACION="Sistema en capacitación · Soporte: soporte@sinacsc.com"
+    banner_capacitacion: str = ""
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

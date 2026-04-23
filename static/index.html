@@ -2508,16 +2508,63 @@ async function initApp(){
 }
 
 async function checkHealth(){
+  var dot=document.getElementById('sdot');
+  var txt=document.getElementById('stxt');
+  if(!dot || !txt) return;
+  var t0=performance.now();
+  var ctrl=new AbortController();
+  var to=setTimeout(function(){ ctrl.abort(); }, 6000);
   try{
-    var r=await fetch('/health');
+    var r=await fetch('/health', {signal: ctrl.signal});
+    clearTimeout(to);
+    var ms=Math.round(performance.now()-t0);
     if(r.ok){
-      document.getElementById('sdot').classList.remove('off');
-      document.getElementById('stxt').textContent='Conectado';
+      dot.classList.remove('off');
+      dot.style.background = ms < 800 ? '#10b981' : (ms < 2500 ? '#f59e0b' : '#dc2626');
+      txt.textContent = ms < 800 ? 'Operativo' : (ms < 2500 ? 'Lento ('+ms+'ms)' : 'Degradado');
+      txt.title = 'Última respuesta /health: '+ms+'ms · '+new Date().toLocaleTimeString('es-CO');
+      // Banner informativo (capacitación/mantenimiento) si está configurado
+      try{
+        var d = await r.clone().json();
+        if(d && typeof d.banner === 'string' && d.banner){
+          _mostrarBannerCapacitacion(d.banner);
+        } else {
+          _ocultarBannerCapacitacion();
+        }
+      }catch(_){}
+    } else {
+      dot.classList.add('off');
+      dot.style.background = '#dc2626';
+      txt.textContent = 'Error '+r.status;
     }
   } catch(e){
-    document.getElementById('sdot').classList.add('off');
-    document.getElementById('stxt').textContent='Sin conexión';
+    clearTimeout(to);
+    dot.classList.add('off');
+    dot.style.background = '#dc2626';
+    txt.textContent = 'Sin conexión';
   }
+}
+
+function _mostrarBannerCapacitacion(mensaje){
+  var b = document.getElementById('banner-capacitacion');
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'banner-capacitacion';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;'
+      + 'background:linear-gradient(90deg,#fbbf24,#f59e0b);color:#78350f;'
+      + 'padding:.45rem 1rem;font-size:.82rem;font-weight:600;text-align:center;'
+      + 'box-shadow:0 2px 6px rgba(0,0,0,.15);letter-spacing:.2px;';
+    document.body.appendChild(b);
+    // Empujar el layout hacia abajo
+    document.body.style.paddingTop = '32px';
+  }
+  b.textContent = '⚠ ' + mensaje;
+  b.style.display = 'block';
+}
+
+function _ocultarBannerCapacitacion(){
+  var b = document.getElementById('banner-capacitacion');
+  if(b){ b.style.display = 'none'; document.body.style.paddingTop = ''; }
 }
 
 // ─── DARK MODE ────────────────────────────────────────────────────────────

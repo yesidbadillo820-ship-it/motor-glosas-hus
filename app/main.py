@@ -1080,7 +1080,7 @@ curl -X POST http://localhost:8000/analizar \\
         429: {"description": "Límite de requests excedido (30/min)"},
     },
 )
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 async def analizar(
     request: Request,
     eps: str = Form(...),
@@ -1534,7 +1534,11 @@ def presentacion_ia():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": cfg.app_version}
+    return {
+        "status": "ok",
+        "version": cfg.app_version,
+        "banner": (cfg.banner_capacitacion or "").strip(),
+    }
 
 
 @app.get("/debug/sentry-test", include_in_schema=False)
