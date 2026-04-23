@@ -239,3 +239,44 @@ def predecir_glosa_endpoint(
         tiene_historia_clinica=data.tiene_historia_clinica,
         tiene_soportes=data.tiene_soportes,
     )
+
+
+# ─── EXTRACTOR AUTOMÁTICO DE FACTURA DESDE PDF (Ronda 5) ────────────────────
+
+from fastapi import UploadFile, File  # noqa: E402
+
+
+@router.post("/extraer-factura")
+async def extraer_factura_endpoint(
+    archivo: UploadFile = File(...),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Sube un PDF de glosa/factura y extrae automáticamente los campos
+    clave (factura, CUPS, EPS, valores, códigos de glosa, paciente).
+
+    Primero intenta extracción nativa (pdfplumber, gratis). Si el texto
+    es pobre y hay ANTHROPIC_API_KEY, usa Claude Vision como OCR. Retorna
+    los campos + confianza + campos_faltantes para que el frontend sepa
+    qué preguntar al usuario solo cuando falta algo.
+    """
+    from app.services.pdf_service import PdfService
+    from app.services.extractor_factura import extraer_de_texto
+    from app.core.config import get_settings
+
+    cfg = get_settings()
+    contenido = await archivo.read()
+    if contenido[:4] != b"%PDF":
+        raise HTTPException(400, "El archivo no es un PDF válido")
+    if len(contenido) > 20_000_000:
+        raise HTTPException(400, "PDF muy grande (>20 MB)")
+
+    pdf_svc = PdfService()
+    texto, metodo = await pdf_svc.extraer_con_ocr(
+        contenido,
+        anthropic_api_key=cfg.anthropic_api_key,
+        anthropic_model=cfg.anthropic_model,
+    )
+    campos = extraer_de_texto(texto or "")
+    campos["_metodo_extraccion"] = metodo
+    campos["_texto_chars"] = len(texto or "")
+    return campos
