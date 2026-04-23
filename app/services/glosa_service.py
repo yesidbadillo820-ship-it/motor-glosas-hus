@@ -927,6 +927,43 @@ class GlosaService:
                 )
                 user_prompt = user_prompt + bloque_tarifa
 
+            # Ronda 6: agregar bloque multi-agente (Jurídico + Clínico +
+            # Tarifario + Conciliador) al user_prompt. Les da a la IA
+            # inputs curados por cada especialidad antes de redactar.
+            try:
+                from app.services.multi_agente import orquestar_dictamen
+                _mod_agente = ""
+                _fac_agente = 0.0
+                _pact_agente = 0.0
+                _tipo_t_agente = "VALOR_FIJO"
+                _fact_agente = 0.0
+                _rec_agente = 0.0
+                if info_tarifa and info_tarifa.get("encontrada"):
+                    _t = info_tarifa.get("tarifa") or {}
+                    _mod_agente = _t.get("modalidad") or ""
+                    _fac_agente = float(_t.get("factor_ajuste") or 0.0)
+                    _pact_agente = float(info_tarifa.get("valor_pactado_calc") or 0.0)
+                    _tipo_t_agente = _t.get("tipo_tarifa", "VALOR_FIJO")
+                    _fact_agente = float(info_tarifa.get("valor_facturado") or 0.0)
+                    _rec_agente = float(info_tarifa.get("valor_reconocido") or 0.0)
+                bloque_agentes = orquestar_dictamen(
+                    codigo_glosa=codigo_det, eps=str(data.eps),
+                    cups=cups_verificado or "",
+                    servicio="",
+                    etapa=str(data.etapa or "Inicial"),
+                    tono=getattr(data, "tono", "conciliador") or "conciliador",
+                    modalidad=_mod_agente,
+                    factor_ajuste=_fac_agente,
+                    valor_pactado=_pact_agente,
+                    tipo_tarifa=_tipo_t_agente,
+                    valor_facturado=_fact_agente,
+                    valor_reconocido=_rec_agente,
+                )
+                if bloque_agentes:
+                    user_prompt = user_prompt + bloque_agentes
+            except Exception as _e:
+                logger.debug(f"Multi-agente no inyectado (se ignora): {_e}")
+
             res_ia, modelo_usado = await self._llamar_ia(
                 system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det
             )
