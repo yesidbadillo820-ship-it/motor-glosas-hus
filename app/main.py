@@ -945,7 +945,23 @@ async def lifespan(app: FastAPI):
         db.rollback()
     finally:
         db.close()
+
+    # Ronda 2: iniciar scheduler de IA auditora proactiva (6 AM diario).
+    # No bloquea el startup si falla; sólo deja logs.
+    try:
+        from app.services.ia_auditora_proactiva import iniciar_scheduler
+        iniciar_scheduler()
+    except Exception as _e:
+        logger.warning(f"No se pudo iniciar scheduler de pre-análisis: {_e}")
+
     yield
+
+    # Shutdown: detener scheduler limpiamente
+    try:
+        from app.services.ia_auditora_proactiva import detener_scheduler
+        detener_scheduler()
+    except Exception:
+        pass
     logger.info("=== APLICACIÓN CERRADA ===")
 
 

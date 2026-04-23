@@ -117,6 +117,39 @@ def estadisticas_admin(
     }
 
 
+@router.post("/pre-analisis")
+async def disparar_pre_analisis(
+    limite: int = 20,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Dispara manualmente el pre-análisis de glosas pendientes.
+
+    Por defecto corre automáticamente cada día a las 6 AM, pero este
+    endpoint permite forzarlo sobre demanda (ej. antes de una capacitación
+    para pre-calentar respuestas).
+    """
+    from app.services.ia_auditora_proactiva import ejecutar_pre_analisis_background
+    stats = await ejecutar_pre_analisis_background(limite=limite)
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="PRE_ANALISIS_MANUAL",
+        tabla="historial",
+        detalle=f"stats={stats}",
+    )
+    return {"ok": True, "stats": stats}
+
+
+@router.get("/pre-analisis/estado")
+def estado_pre_analisis(
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Estado del scheduler de pre-análisis (activo, última ejecución)."""
+    from app.services.ia_auditora_proactiva import obtener_estado
+    return obtener_estado()
+
+
 @router.get("/tokens-hoy")
 def consumo_tokens_hoy(
     db: Session = Depends(get_db),
