@@ -1767,6 +1767,19 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <label>Archivo Excel (.xlsx)</label>
             <input type="file" id="tar-xlsx-file" accept=".xlsx,.xlsm"/>
           </div>
+          <div class="field" style="background:#fef3c7;border-left:3px solid #d97706;padding:.6rem .8rem;border-radius:6px;margin-top:.5rem;">
+            <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-weight:600;color:#7c2d12;">
+              <input type="checkbox" id="tar-xlsx-reemplazar" style="margin-top:.2rem;"/>
+              <span>
+                🗑️ <b>Reemplazar tarifas existentes de esta EPS</b>
+                <span style="font-weight:400;display:block;font-size:.75rem;color:#92400e;margin-top:.2rem;">
+                  Borra TODAS las tarifas actuales de la EPS antes de cargar el Excel nuevo.
+                  Útil para renovaciones de contrato o si subiste mal antes.
+                  <b>Irreversible.</b>
+                </span>
+              </span>
+            </label>
+          </div>
           <div class="btn-row">
             <button class="btn btn-primary" onclick="subirTarifasExcel()">📊 Importar Excel</button>
           </div>
@@ -2646,16 +2659,31 @@ async function cargarTarifas(){
 async function subirTarifasExcel(){
   var input = document.getElementById('tar-xlsx-file');
   var epsOverride = (document.getElementById('tar-xlsx-eps-override') || {}).value || '';
+  var reemplazarEl = document.getElementById('tar-xlsx-reemplazar');
+  var reemplazar = !!(reemplazarEl && reemplazarEl.checked);
   var resultDiv = document.getElementById('tar-xlsx-result');
   if(!input || !input.files || !input.files.length){
     toast('Sin archivo', 'Selecciona un .xlsx primero', 'warning');
     return;
   }
+  if(reemplazar){
+    var epsConfirm = epsOverride.trim() || '(la EPS que detecte el Excel)';
+    if(!confirm(
+      '⚠️ ATENCIÓN: Estás a punto de BORRAR todas las tarifas existentes de ' +
+      epsConfirm + ' antes de subir el archivo nuevo.\n\n' +
+      'Esta acción es IRREVERSIBLE. ¿Continuar?'
+    )){
+      return;
+    }
+  }
   var fd = new FormData();
   fd.append('archivo', input.files[0]);
-  var url = '/tarifas-contratadas/import-excel';
-  if(epsOverride.trim()) url += '?eps_override=' + encodeURIComponent(epsOverride.trim());
-  if(resultDiv) resultDiv.innerHTML = '<div style="color:var(--text3);">⏳ Leyendo hojas y parseando filas…</div>';
+  var params = [];
+  if(epsOverride.trim()) params.push('eps_override=' + encodeURIComponent(epsOverride.trim()));
+  if(reemplazar) params.push('reemplazar=true');
+  var url = '/tarifas-contratadas/import-excel' + (params.length ? '?' + params.join('&') : '');
+  if(resultDiv) resultDiv.innerHTML = '<div style="color:var(--text3);">⏳ ' +
+    (reemplazar ? 'Borrando existentes y cargando nuevas…' : 'Leyendo hojas y parseando filas…') + '</div>';
   try{
     var r = await fetch(url, {method: 'POST', headers: authH(), body: fd});
     var d = await r.json().catch(function(){ return {}; });
@@ -2669,6 +2697,9 @@ async function subirTarifasExcel(){
     if(d.hojas_detectadas && d.hojas_detectadas.length){
       msg += '<b>Hojas:</b> ' + d.hojas_detectadas.map(escHtml).join(', ') + '<br>';
     }
+    if(d.reemplazar && d.eliminadas > 0){
+      msg += '<b style="color:#b45309">🗑️ ' + d.eliminadas + ' tarifas previas eliminadas.</b><br>';
+    }
     msg += '<b>' + d.creadas + '</b> creadas · <b>' + d.actualizadas + '</b> actualizadas · ' + d.total_filas_leidas + ' filas leídas';
     if(d.total_errores){
       msg += ' · <b style="color:#ca8a04">' + d.total_errores + ' errores</b>';
@@ -2680,8 +2711,11 @@ async function subirTarifasExcel(){
     }
     msg += '</div>';
     if(resultDiv) resultDiv.innerHTML = msg;
-    toast('Excel importado', d.creadas + ' creadas, ' + d.actualizadas + ' actualizadas', 'success');
+    var toastMsg = d.creadas + ' creadas, ' + d.actualizadas + ' actualizadas';
+    if(d.eliminadas > 0) toastMsg = d.eliminadas + ' eliminadas · ' + toastMsg;
+    toast('Excel importado', toastMsg, 'success');
     input.value = '';
+    if(reemplazarEl) reemplazarEl.checked = false;
     cargarTarifas();
   }catch(e){
     if(resultDiv) resultDiv.innerHTML = '<div style="color:#b91c1c">Error de red: ' + escHtml(e.message) + '</div>';

@@ -315,6 +315,14 @@ async def importar_csv(
 async def importar_excel(
     archivo: UploadFile = File(...),
     eps_override: Optional[str] = Query(None, description="Nombre EPS (si Excel no lo trae claro)"),
+    reemplazar: bool = Query(
+        False,
+        description=(
+            "Si es true, elimina TODAS las tarifas activas existentes de la "
+            "EPS antes de insertar las nuevas. Útil para renovaciones anuales "
+            "de contrato o cuando el Excel anterior quedó mal."
+        ),
+    ),
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
@@ -325,7 +333,8 @@ async def importar_excel(
     - **Anexo 3.2** — Suministros, valor fijo, con IVA opcional (tipo_tarifa=VALOR_FIJO)
 
     Auto-detecta EPS, nº de contrato y vigencia desde el encabezado de cada hoja.
-    Upsert por (eps + cups + contrato).
+    Upsert por (eps + cups + contrato). Si `reemplazar=true`, hace hard-delete
+    de las existentes para la EPS antes de insertar.
     """
     if not archivo.filename.lower().endswith((".xlsx", ".xlsm")):
         raise HTTPException(400, "Solo se aceptan archivos .xlsx")
@@ -358,6 +367,25 @@ async def importar_excel(
     vig_desde = resultado.get("vigencia_desde")
     vig_hasta = resultado.get("vigencia_hasta")
     fuente = (archivo.filename or "famisanar.xlsx")[:300]
+
+    # Reemplazar: hard-delete de todas las tarifas de la EPS antes de insertar.
+    # Usa la misma comparación case-insensitive que la búsqueda del motor.
+    eliminadas = 0
+    if reemplazar:
+        try:
+            eliminadas = (
+                db.query(TarifaContratadaRecord)
+                .filter(TarifaContratadaRecord.eps.ilike(eps_val))
+                .delete(synchronize_session=False)
+            )
+            db.commit()
+            logger.warning(
+                f"[TARIFAS] Reemplazar=true · eliminadas {eliminadas} tarifas "
+                f"de eps='{eps_val}' por {current_user.email}"
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(500, f"Error al borrar tarifas previas: {e}")
 
     creadas = 0
     actualizadas = 0
@@ -415,14 +443,15 @@ async def importar_excel(
         detalle=(
             f"archivo={fuente} eps={eps_val} contrato={contrato_val} "
             f"hojas={','.join(resultado.get('hojas_detectadas', []))} "
+            f"reemplazar={reemplazar} eliminadas={eliminadas} "
             f"creadas={creadas} actualizadas={actualizadas} errores={len(errores)}"
         ),
     )
 
     logger.info(
         f"[TARIFAS] Import Excel '{fuente}' eps={eps_val} por {current_user.email}: "
-        f"hojas={resultado.get('hojas_detectadas')} creadas={creadas} "
-        f"actualizadas={actualizadas} errores={len(errores)}"
+        f"reemplazar={reemplazar} eliminadas={eliminadas} hojas={resultado.get('hojas_detectadas')} "
+        f"creadas={creadas} actualizadas={actualizadas} errores={len(errores)}"
     )
     return {
         "archivo": fuente,
@@ -433,6 +462,8 @@ async def importar_excel(
         "vigencia_hasta": vig_hasta.isoformat() if vig_hasta else None,
         "hojas_detectadas": resultado.get("hojas_detectadas", []),
         "total_filas_leidas": len(resultado["filas"]),
+        "reemplazar": reemplazar,
+        "eliminadas": eliminadas,
         "creadas": creadas,
         "actualizadas": actualizadas,
         "errores": errores[:30],
