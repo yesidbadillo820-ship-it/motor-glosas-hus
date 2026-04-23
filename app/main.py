@@ -1198,6 +1198,33 @@ async def analizar(
                 valor_objetado=val_obj,
                 valor_reconocido=val_rec,
             )
+            # Fallback: si no hay tarifa cargada por el coordinador, consultar
+            # el catálogo oficial HUS (Res. 124/2026) + SOAT (Circular 047/2025)
+            if not info_tarifa.get("encontrada"):
+                from app.services.tarifas_oficiales import tarifa_a_banner_dict
+                oficial = tarifa_a_banner_dict(cups_ext)
+                if oficial:
+                    # Construir info_tarifa sintético desde el catálogo
+                    info_tarifa = {
+                        "encontrada": True,
+                        "tarifa": oficial,
+                        "valor_facturado": val_fact,
+                        "valor_objetado": val_obj,
+                        "valor_reconocido": val_rec,
+                        "valor_pactado_calc": oficial["valor_pactado"],
+                        "recomendacion": {
+                            "accion": "DEFENDER_TOTAL" if val_fact <= oficial["valor_pactado"] + 1 else "REVISAR",
+                            "titulo": "✅ Valor oficial HUS/SOAT conocido — defender",
+                            "razon": (
+                                f"El valor oficial publicado para este CUPS es "
+                                f"${oficial['valor_pactado']:,.0f} según {oficial['contrato_numero']}. "
+                                "Defender este valor citando la norma institucional."
+                            ),
+                            "valor_a_defender": val_obj,
+                            "valor_a_aceptar": 0.0,
+                            "diferencia": 0.0,
+                        },
+                    }
             if info_tarifa.get("encontrada"):
                 banner = _generar_banner_tarifa_html(info_tarifa)
                 if banner:

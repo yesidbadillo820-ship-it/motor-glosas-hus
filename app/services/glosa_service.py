@@ -697,6 +697,31 @@ class GlosaService:
                 prefijo=prefijo,
                 eps=data.eps
             )
+            # Fase 3: inyectar contexto de tarifa oficial si es TA con CUPS
+            # conocido. Le da a la IA el valor EXACTO publicado (Res. 124/2026
+            # HUS o Circular 047/2025 SOAT) para que arme un dictamen con
+            # números duros, no con suposiciones.
+            if prefijo == "TA":
+                try:
+                    import re as _re_ta
+                    from app.services.tarifas_oficiales import (
+                        contexto_tarifa_oficial,
+                    )
+                    m_cups = _re_ta.search(
+                        r"\b(\d{4,7}[A-Z]?\d*)\b", texto_base
+                    )
+                    if m_cups:
+                        ctx_oficial = contexto_tarifa_oficial(m_cups.group(1))
+                        if ctx_oficial:
+                            system_prompt += (
+                                "\n\n═══ VALOR OFICIAL CONOCIDO DEL CUPS ═══\n"
+                                + ctx_oficial
+                                + "\n═══════════════════════════════════════\n"
+                                "USA ESTE VALOR EXACTO EN EL DICTAMEN. Cita la "
+                                "resolución en el argumento. No inventes cifras."
+                            )
+                except Exception:
+                    pass
             # Detectar si es aseguradora SOAT (sin contrato o con contrato UVB)
             # para que el prompt IA agregue obligatoriamente la cita al Manual
             # Tarifario SOAT vigente. Revisa eps + texto_base (por si la EPS
