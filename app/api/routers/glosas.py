@@ -1256,6 +1256,22 @@ def registrar_decision_eps(glosa_id: int, data: DecisionEPSInput,
     if decision in ("LEVANTADA", "ACEPTADA", "RATIFICADA"):
         glosa.estado = decision
     db.commit()
+
+    # Ronda 3 — Aprendizaje por retroalimentación:
+    # Si la EPS LEVANTÓ la glosa, promover el argumento exitoso a Plantilla
+    # Gold automáticamente (si no existe ya una para esa combinación EPS+código).
+    # Si RATIFICÓ, desactivar cualquier Gold previa de esa combinación para
+    # que la IA no la sugiera más.
+    try:
+        from app.services.aprendizaje_feedback import aprender_de_decision_eps
+        aprender_de_decision_eps(
+            db=db, glosa=glosa, decision=decision, creado_por=current_user.email,
+        )
+    except Exception as _e:
+        # El aprendizaje nunca debe bloquear la decisión; solo logear.
+        import logging as _l
+        _l.getLogger("motor_glosas").warning(f"Aprendizaje feedback falló: {_e}")
+
     AuditRepository(db).registrar(
         usuario_email=current_user.email, usuario_rol=current_user.rol,
         accion="DECISION_EPS", tabla="glosas", registro_id=glosa_id,
