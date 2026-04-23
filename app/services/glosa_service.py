@@ -1273,52 +1273,11 @@ class GlosaService:
             '</div>'
         )
 
-        # QR CODE con trazabilidad del expediente (ITEM #17)
-        # Genera un QR que codifica el JSON de metadatos — escaneable desde PDF
+        # QR de trazabilidad y carátula institucional removidos del
+        # dictamen en pantalla (ruido visual). La información institucional
+        # sigue presente en el PDF imprimible.
         bloque_qr = ""
-        try:
-            import qrcode as _qr
-            import io as _io, base64 as _b64
-            qr_payload = _json.dumps({
-                "nit": "900006037-4",
-                "fac": numero_factura or "",
-                "rad": numero_radicado or "",
-                "cod": codigo,
-                "res": cod_res,
-                "fec": _dt.now().strftime("%Y-%m-%d"),
-            }, ensure_ascii=False)
-            img = _qr.make(qr_payload, box_size=4, border=2)
-            buf = _io.BytesIO()
-            img.save(buf, format="PNG")
-            qr_b64 = _b64.b64encode(buf.getvalue()).decode("ascii")
-            bloque_qr = (
-                '<div style="margin-top:12px;padding:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;gap:12px;">'
-                f'<img src="data:image/png;base64,{qr_b64}" alt="QR trazabilidad" style="width:96px;height:96px;background:white;padding:4px;border-radius:6px;"/>'
-                '<div style="flex:1;font-size:10px;color:#64748b;line-height:1.5;">'
-                '<b style="color:#1e40af;display:block;margin-bottom:3px;">📲 TRAZABILIDAD DIGITAL</b>'
-                'Código QR con metadatos de la respuesta para radicación digital ante la EPS y consulta ante la SuperSalud. '
-                'Contiene NIT prestador, factura, radicado, código de glosa, código de respuesta y fecha.'
-                '</div></div>'
-            )
-        except Exception:
-            pass
-
-        # CARÁTULA INSTITUCIONAL (ITEM #12) — solo datos de la IPS, sin firma RL
-        bloque_caratula = (
-            '<div style="margin-top:20px;padding:14px 18px;background:linear-gradient(135deg,#fafbfc 0%,#fff 100%);border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 1px 2px rgba(15,23,42,.04);">'
-            '<div style="text-align:center;">'
-            '<div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Institución Prestadora de Servicios de Salud</div>'
-            '<div style="font-weight:700;color:#0f172a;font-size:13px;">E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER</div>'
-            '<div style="font-size:11px;color:#334155;margin-top:2px;">NIT 900.006.037-4 | Res. Habilitación 002145/2015</div>'
-            '<div style="font-size:11px;color:#334155;">Carrera 33 No. 28-126, Bucaramanga | Tel. (607) 691 2010</div>'
-            '</div>'
-            '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:10px;color:#64748b;text-align:center;">'
-            'Documento generado electrónicamente con validación normativa. '
-            f'Fecha de emisión: {_dt.now().strftime("%d/%m/%Y %H:%M")} · '
-            'Marco legal: Resolución 2284 de 2023 (Manual Único) — Ley 1438 de 2011 Art. 57'
-            '</div>'
-            '</div>'
-        )
+        bloque_caratula = ""
 
         # CORRECCIÓN: nota de pie en español
         return f"""
