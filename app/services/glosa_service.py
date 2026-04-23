@@ -874,6 +874,51 @@ class GlosaService:
                 valor_objetado=valor_raw,
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
             )
+
+            # Si hay tarifa pactada específica encontrada en el catálogo del
+            # cliente (tarifas_contratadas), inyectar los datos reales al
+            # user prompt para que la IA NO use el "tarifa genérica del contrato"
+            # del get_contrato(). Esto evita incoherencias tipo
+            # "contrato dice SOAT -5%" cuando el catálogo carga modalidad
+            # PROPIAS con valor fijo $254.500 para este CUPS específico.
+            if info_tarifa and info_tarifa.get("encontrada"):
+                t = info_tarifa.get("tarifa") or {}
+                rec = info_tarifa.get("recomendacion") or {}
+                val_pact = info_tarifa.get("valor_pactado_calc") or 0.0
+                val_fact = info_tarifa.get("valor_facturado") or 0.0
+                val_rec = info_tarifa.get("valor_reconocido") or 0.0
+                modalidad_real = t.get("modalidad") or ""
+                contrato_real = t.get("contrato_numero") or ""
+                cups_real = t.get("codigo_cups") or cups_verificado or ""
+                tipo_t = t.get("tipo_tarifa", "VALOR_FIJO")
+                if tipo_t == "SOAT_PORCENTAJE":
+                    factor_t = float(t.get("factor_ajuste") or 0.0)
+                    signo = "+" if factor_t > 0 else ""
+                    pact_txt = f"SOAT {signo}{factor_t:.0f}%"
+                else:
+                    pact_txt = f"${val_pact:,.0f}"
+                bloque_tarifa = (
+                    "\n═══ BLOQUE EXTRA: TARIFA ESPECÍFICA DEL CUPS (autoritativa) ═══\n"
+                    "El catálogo contractual cargado en el sistema tiene el valor\n"
+                    f"pactado para este CUPS EXACTO. USA ESTOS DATOS, NO otros:\n"
+                    f"  • CUPS contractual : {cups_real}\n"
+                    f"  • Modalidad real   : {modalidad_real}\n"
+                    f"  • Tarifa pactada   : {pact_txt}\n"
+                    f"  • Contrato         : {contrato_real}\n"
+                    f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
+                    f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
+                    f"  • Recomendación sistema: {rec.get('titulo','')}\n\n"
+                    "REGLAS:\n"
+                    "  1. Cita el contrato y la modalidad REALES del catálogo,\n"
+                    "     NO los genéricos del contrato EPS.\n"
+                    "  2. Si la modalidad es 'PROPIAS' o 'MANUAL HUS', cita la\n"
+                    "     Resolución 054/2026 ESE HUS (tarifas propias HUS).\n"
+                    "  3. Si la modalidad contiene 'SOAT' o 'UVB', cita la\n"
+                    "     Circular 047/2025 MinSalud + UVB 2026 $12.110.\n"
+                    "  4. Usa el VALOR facturado y reconocido EXACTOS de arriba.\n"
+                )
+                user_prompt = user_prompt + bloque_tarifa
+
             res_ia, modelo_usado = await self._llamar_ia(
                 system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det
             )

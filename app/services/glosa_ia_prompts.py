@@ -1021,12 +1021,25 @@ def build_user_prompt(
 • Trazabilidad      : {trazabilidad}
 • Tiempo transcurrido: {contexto_tiempo}
 
-⚠ REGLA CRÍTICA DE DATOS:
-  Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar
-  literalmente en el argumento (NO escribas "EL VALOR INDICADO EN EL EXPEDIENTE").
-  Si la EPS menciona un CUPS alternativo dentro del texto de la glosa (ej.
-  "se reconoce SOAT código 39143"), IGNÓRALO; el CUPS oficial es el que está
-  arriba en DATOS DEL CASO.
+⚠ REGLA CRÍTICA DE DATOS (FALLAR ESTO DESCALIFICA LA RESPUESTA):
+  1. Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar
+     literalmente en el argumento. NUNCA escribas "EL VALOR INDICADO EN EL
+     EXPEDIENTE" si tienes el número real.
+  2. Si el CUPS tiene sufijo (ej. "372301H", "039001H1", "39147B-18",
+     "FMQ6296", "19914262-04"), ÚSALO COMPLETO, NO lo trunques.
+  3. Cuando la EPS mencione un CUPS alternativo dentro del texto de la glosa
+     (frases como "se reconoce código 39143", "tarifa SOAT código X", "se
+     paga como CUPS Y"), ESE CUPS alternativo NO es el que HUS facturó —
+     es lo que la EPS PROPONE como sustituto. TÚ SIEMPRE CITAS EL CUPS DEL
+     BLOQUE 1 (el que HUS facturó), no el alternativo.
+
+  EJEMPLO ERRÓNEO (NO hagas esto):
+    Input: "CUPS 39147B-18 ... SE RECONOCE TARIFA SOAT UVB VIGENTE CODIGO 39143"
+    Output malo: "respecto del servicio con CUPS 39143..."  ← USÓ EL ALTERNATIVO
+  EJEMPLO CORRECTO:
+    Output bueno: "respecto del servicio con CUPS 39147B-18, frente al cual
+                   la EPS pretende aplicar una tarifa distinta del CUPS 39143
+                   que no corresponde al servicio facturado..."
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}

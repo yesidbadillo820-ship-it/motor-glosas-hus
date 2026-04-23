@@ -428,20 +428,46 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
         return "", ""
 
     cups = ""
-    # 1) Patrón específico del formato de glosa: "- 890602 -" o "- 890602 ESTUDIO…"
-    if texto_glosa:
-        m = re.search(
-            r"(?:^|\s|[-·,])\s*(\d{4,8}(?:-\d)?)\s*(?:[-·,]|\s+[A-ZÁÉÍÓÚÑ])",
-            texto_glosa,
-        )
-        if m:
-            cups = m.group(1)
+    # Códigos de glosa (NO son CUPS) — TA0801, SO0101, FA0202, CO0301, etc.
+    # Si el regex captura uno de estos, lo descartamos y seguimos buscando.
+    GLOSA_CODES = re.compile(r"^(TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX)\d{2,4}$")
 
-    # 2) Si no, cualquier número de 5-6 dígitos en el texto de la glosa
+    def _es_cups_valido(token: str) -> bool:
+        if not token or GLOSA_CODES.match(token):
+            return False
+        # Debe tener al menos 4 dígitos (CUPS reales son 4-8 dígitos)
+        digitos = sum(1 for c in token if c.isdigit())
+        return digitos >= 4
+
+    # 1) Patrón específico del formato de glosa: "- 890602 -" o "- 890602 ESTUDIO…"
+    # Acepta también sufijos alfanuméricos del HUS: "372301H", "039001H1",
+    # "39147B-18", "FMQ6296", "19914262-04" (medicamentos CUM), etc.
+    if texto_glosa:
+        # Itera todos los matches; toma el primero que NO sea código de glosa
+        for m in re.finditer(
+            r"(?:^|\s|[-·,])\s*([A-Z]{0,3}\d{4,8}[A-Z]?\d{0,2}(?:-\d{1,3})?)\s*(?:[-·,]|\s+[A-ZÁÉÍÓÚÑ])",
+            texto_glosa,
+        ):
+            cand = m.group(1)
+            if _es_cups_valido(cand):
+                cups = cand
+                break
+
+    # 2) Si no, cualquier número de 5-6 dígitos (con sufijo opcional) en el
+    # texto de la glosa. Acepta "890202", "372301H", "39147B-18".
     if not cups and texto_glosa:
-        m = re.search(r"\b(\d{5,6}(?:-\d)?)\b", texto_glosa)
-        if m:
-            cups = m.group(1)
+        for m in re.finditer(r"\b(\d{5,6}[A-Z]?\d{0,2}(?:-\d{1,3})?)\b", texto_glosa):
+            cand = m.group(1)
+            if _es_cups_valido(cand):
+                cups = cand
+                break
+        if not cups:
+            # Medicamentos tipo "19914262-04" o "FMQ6296"
+            for m in re.finditer(r"\b([A-Z]{3}\d{4,8}|\d{7,10}-\d{1,3})\b", texto_glosa):
+                cand = m.group(1)
+                if _es_cups_valido(cand):
+                    cups = cand
+                    break
 
     # Nota: NO usamos el PDF para extraer CUPS porque contiene otros números
     # (ingreso, historia clínica, folio) que no son CUPS. Si el texto de la
