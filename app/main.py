@@ -206,6 +206,92 @@ def _concepto_glosa(codigo_glosa: str) -> str:
     return fallbacks.get(prefijo, "Glosa sin concepto específico asignado")
 
 
+def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
+    """Construye un banner HTML con los datos de la tarifa pactada y
+    la recomendación de acción para el auditor. Se prepend al dictamen.
+
+    Estilo: caja destacada verde/amarillo/rojo según la recomendación.
+    """
+    if not info_tarifa or not info_tarifa.get("encontrada"):
+        return ""
+    t = info_tarifa.get("tarifa") or {}
+    rec = info_tarifa.get("recomendacion") or {}
+    val_fact = info_tarifa.get("valor_facturado") or 0.0
+    val_obj = info_tarifa.get("valor_objetado") or 0.0
+    val_pact = info_tarifa.get("valor_pactado_calc") or 0.0
+
+    accion = (rec.get("accion") or "REVISAR").upper()
+    color_bg = {
+        "DEFENDER_TOTAL": "#ecfdf5",
+        "ACEPTAR_PARCIAL": "#fef3c7",
+        "REVISAR": "#fee2e2",
+    }.get(accion, "#f1f5f9")
+    color_border = {
+        "DEFENDER_TOTAL": "#10b981",
+        "ACEPTAR_PARCIAL": "#d97706",
+        "REVISAR": "#dc2626",
+    }.get(accion, "#64748b")
+
+    tipo = t.get("tipo_tarifa", "VALOR_FIJO")
+    if tipo == "SOAT_PORCENTAJE":
+        factor = float(t.get("factor_ajuste") or 0.0)
+        signo = "+" if factor > 0 else ""
+        pact_txt = f"SOAT {signo}{factor:.0f}% (calculado: ${val_pact:,.0f})"
+    else:
+        pact_txt = f"${val_pact:,.0f}"
+
+    import html as _html
+    esc = _html.escape
+
+    return f"""
+<div style="margin:0 0 1rem 0;padding:14px 18px;background:{color_bg};
+            border-left:5px solid {color_border};border-radius:8px;
+            font-family:system-ui,sans-serif;line-height:1.5;">
+  <div style="font-size:1rem;font-weight:700;margin-bottom:.5rem;color:#1e293b;">
+    📋 Tarifa pactada encontrada en el contrato · {esc(rec.get('titulo', ''))}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+              gap:.4rem .9rem;font-size:.85rem;margin-bottom:.5rem;">
+    <div><b>CUPS:</b> {esc(str(t.get('codigo_cups') or '—'))}</div>
+    <div><b>EPS:</b> {esc(str(t.get('eps') or '—'))}</div>
+    <div><b>Contrato:</b> {esc(str(t.get('contrato_numero') or '—'))}</div>
+    <div><b>Modalidad:</b> {esc(str(t.get('modalidad') or '—'))}</div>
+  </div>
+  <div style="font-size:.82rem;color:#334155;margin-bottom:.6rem;">
+    <b>Descripción contrato:</b> {esc(str(t.get('descripcion') or '—'))}
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:.85rem;
+                background:white;border-radius:6px;overflow:hidden;
+                margin-bottom:.6rem;">
+    <tr style="background:#f8fafc;">
+      <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Concepto</th>
+      <th style="padding:6px 10px;text-align:right;border-bottom:1px solid #e2e8f0;">Valor</th>
+    </tr>
+    <tr>
+      <td style="padding:6px 10px;">Tarifa pactada en contrato</td>
+      <td style="padding:6px 10px;text-align:right;"><b style="color:#059669;">{pact_txt}</b></td>
+    </tr>
+    <tr style="background:#fafafa;">
+      <td style="padding:6px 10px;">Valor facturado HUS (estimado = pactado + objetado)</td>
+      <td style="padding:6px 10px;text-align:right;">${val_fact:,.0f}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 10px;">Valor objetado EPS</td>
+      <td style="padding:6px 10px;text-align:right;"><b style="color:#b91c1c;">${val_obj:,.0f}</b></td>
+    </tr>
+  </table>
+  <div style="padding:10px 12px;background:white;border-radius:6px;
+              font-size:.85rem;color:#0f172a;">
+    <b>💡 Recomendación:</b> {esc(rec.get('razon', ''))}
+  </div>
+  <div style="font-size:.72rem;color:#64748b;margin-top:.5rem;">
+    Fuente: {esc(str(t.get('fuente_archivo') or 'contrato'))}
+    {("· Vigencia hasta: " + esc(t['vigencia_hasta'][:10])) if t.get('vigencia_hasta') else ""}
+  </div>
+</div>
+"""
+
+
 def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[str, str]:
     """Extrae tupla (CUPS, descripción_servicio) desde el texto de la glosa/PDF.
 
@@ -974,6 +1060,52 @@ async def analizar(
     glosa_repo = GlosaRepository(db)
     val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)
     val_ac = float(re.sub(r"[^\d]", "", valor_aceptado) or 0)
+
+    # Fase 3: consultar tarifa pactada en el contrato de la EPS.
+    # Solo aplica a glosas TA (tarifas) donde tengamos CUPS identificado.
+    # El banner se prepend al dictamen para guiar al auditor con datos duros
+    # del contrato (pactado vs facturado vs objetado + recomendación).
+    try:
+        es_ta = (resultado.codigo_glosa or "").upper().startswith("TA")
+        cups_ext, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+        if es_ta and cups_ext:
+            from app.services.tarifa_lookup_service import (
+                evaluar_glosa_tarifa,
+            )
+            # Aproximación: si el hospital factura pactado + extra, la EPS
+            # objeta el extra. Entonces valor_facturado ≈ pactado + objetado.
+            # Es solo estimación para la recomendación; el banner también
+            # muestra los dos valores por separado para que el auditor decida.
+            info_tarifa = evaluar_glosa_tarifa(
+                db,
+                eps=eps,
+                cups=cups_ext,
+                valor_facturado=0.0,  # se recalcula abajo con pactado+objetado
+                valor_objetado=val_obj,
+            )
+            if info_tarifa.get("encontrada"):
+                pactada = info_tarifa.get("valor_pactado_calc") or 0.0
+                # Re-evaluar usando pactado+objetado como facturado estimado
+                if pactada > 0 and val_obj > 0:
+                    info_tarifa = evaluar_glosa_tarifa(
+                        db,
+                        eps=eps,
+                        cups=cups_ext,
+                        valor_facturado=pactada + val_obj,
+                        valor_objetado=val_obj,
+                    )
+                banner = _generar_banner_tarifa_html(info_tarifa)
+                if banner:
+                    resultado.dictamen = banner + (resultado.dictamen or "")
+                    logger.info(
+                        f"[{req_id}] Tarifa pactada encontrada: "
+                        f"cups={cups_ext} pactado=${pactada:,.0f} "
+                        f"objetado=${val_obj:,.0f} "
+                        f"accion={info_tarifa['recomendacion']['accion']}"
+                    )
+    except Exception as e:
+        # Nunca fallar el análisis por el banner
+        logger.warning(f"[{req_id}] No se pudo agregar banner de tarifa: {e}")
 
     # Determinar estado y código de respuesta según aceptación
     # BUG 1 FIX: Si val_obj=0 y hay aceptacion, usar val_ac como referencia (aceptacion total)
