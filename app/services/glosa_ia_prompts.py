@@ -32,6 +32,16 @@ from typing import Optional
 # ══════════════════════════════════════════════════════════════════
 
 CONTRATOS_HUS: dict[str, dict] = {
+    "FAMISANAR": {
+        "numero":   "CONTRATO S-13-1-03-1-04958",
+        "tarifa":   "SOAT UVB VIGENTE -5 % (servicios CUPS) / VALOR FIJO (medicamentos y suministros)",
+        "factor":   0.95,
+        "tipo":     "EPS CONTRIBUTIVO / RÉGIMEN SUBSIDIADO",
+        "nit":      "830003564-7",
+        "vigencia": "15/04/2026 — 14/04/2027 (prórroga automática)",
+        "contacto": "mhernandez@famisanar.com.co (Martha Biviana Hernández, Glosas) · cadarme@famisanar.com.co (Auditoría Médica)",
+        "nota":     "Estructura mixta: Anexo 3 servicios CUPS = SOAT UVB VIGENTE -5%; Anexo 3.1 medicamentos y 3.2 suministros = valores fijos pactados. Catálogo completo cargado en tabla tarifas_contratadas (panel Tarifas).",
+    },
     "NUEVA EPS": {
         "numero":   "ACTA DE NEGOCIACIÓN No. 1388 DE 2024 / ACTA 2025",
         "tarifa":   "SOAT -20 %",
