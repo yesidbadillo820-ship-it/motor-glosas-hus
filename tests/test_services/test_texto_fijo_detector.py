@@ -177,6 +177,28 @@ class TestAplicar:
         assert "texto_fijo" in g.modelo_ia
         assert "RATIFICADA" in g.modelo_ia
 
+    def test_marca_workflow_respondida_automaticamente(self):
+        """Hotfix Ronda 34: al aplicar texto fijo, workflow_state debe pasar
+        a RESPONDIDA para que la glosa salga de la bandeja de pendientes."""
+        g = _mock_glosa(estado="PENDIENTE", workflow_state="RATIFICADA")
+        r = aplicar_texto_fijo_si_corresponde(g)
+        assert r is not None
+        assert g.workflow_state == "RESPONDIDA"
+        assert g.fecha_decision_eps is not None
+        assert "automáticamente" in (g.nota_workflow or "").lower()
+
+    def test_extemporanea_tambien_queda_respondida(self):
+        g = _mock_glosa(dias_radicacion_dgh=30, workflow_state="BORRADOR")
+        r = aplicar_texto_fijo_si_corresponde(g)
+        assert r is not None
+        assert r["tipo"] == "EXTEMPORANEA"
+        assert g.workflow_state == "RESPONDIDA"
+
+    def test_no_revierte_workflow_ya_terminal(self):
+        g = _mock_glosa(estado="RATIFICADA", workflow_state="CONCILIADA")
+        aplicar_texto_fijo_si_corresponde(g)
+        assert g.workflow_state == "CONCILIADA"  # no se reescribe
+
     def test_no_sobreescribe_dictamen_IA_existente(self):
         g = _mock_glosa(
             estado="PENDIENTE",

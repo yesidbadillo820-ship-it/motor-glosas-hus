@@ -242,12 +242,35 @@ def aplicar_texto_fijo_si_corresponde(glosa) -> Optional[dict]:
 
     # Aplicar
     try:
+        from datetime import datetime, timezone as _tz
         glosa.dictamen = clase["dictamen_html"]
         glosa.modelo_ia = clase["modelo_ia"]
         # Solo actualizamos estado si está vacío o si es una transición válida
         estado_actual = (getattr(glosa, "estado", "") or "").upper()
         if not estado_actual or estado_actual in ("PENDIENTE", "RADICADA", "EN_REVISION", "BORRADOR"):
             glosa.estado = clase["estado_sugerido"]
+        # ⚡ Ronda 21+34 (fix): marcar workflow_state como RESPONDIDA para que
+        # salga de la bandeja de pendientes. Las RATIFICADAS y EXTEMPORÁNEAS
+        # no necesitan que el auditor haga click en "Responder" — el texto
+        # canónico ya está aplicado y es un caso mecánico.
+        wf_actual = (getattr(glosa, "workflow_state", "") or "").upper()
+        if wf_actual not in ("RESPONDIDA", "CONCILIADA", "LEVANTADA"):
+            try:
+                glosa.workflow_state = "RESPONDIDA"
+            except Exception:
+                pass
+        # Timestamp de decisión si aún no está
+        try:
+            if getattr(glosa, "fecha_decision_eps", None) is None:
+                glosa.fecha_decision_eps = datetime.now(_tz.utc)
+        except Exception:
+            pass
+        # Nota trazable para auditoría
+        try:
+            if not (getattr(glosa, "nota_workflow", "") or "").strip():
+                glosa.nota_workflow = f"Respondida automáticamente: texto fijo {clase['tipo']}"
+        except Exception:
+            pass
     except Exception:
         # No bloqueamos flujos — si el objeto no permite asignación, devolvemos
         # la clasificación igual para que el llamador decida.

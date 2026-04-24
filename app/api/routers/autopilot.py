@@ -22,10 +22,19 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_usuario_actual, get_coordinador_o_admin
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord, ROL_COORDINADOR, ROL_SUPER_ADMIN
+from pydantic import BaseModel, Field
+
 from app.services.autopilot_service import (
     evaluar_bandeja,
     evaluar_glosa_autopilot,
 )
+
+
+class BatchAprobarBody(BaseModel):
+    """Ronda 34: payload para aprobar en lote glosas LISTA_ENVIAR."""
+    ids: list[int] = Field(..., description="IDs de glosas a marcar respondidas")
+    confianza_minima: float = Field(0.85, ge=0.0, le=1.0)
+    dry_run: bool = False
 from app.services.texto_fijo_detector import (
     aplicar_texto_fijo_si_corresponde,
     clasificar_texto_fijo,
@@ -102,6 +111,152 @@ def previsualizar_texto_fijo(
             "mensaje": "La glosa no es RATIFICADA ni EXTEMPORÁNEA — requiere análisis IA.",
         }
     return {"glosa_id": glosa_id, "aplica": True, **clase}
+
+
+@router.post("/texto-fijo/marcar-respondidas")
+def marcar_respondidas_texto_fijo(
+    dry_run: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Hotfix Ronda 34: barre TODAS las glosas que tienen dictamen texto fijo
+    aplicado (RATIFICADA o EXTEMPORÁNEA) pero aún están en workflow pendiente,
+    y las mueve a RESPONDIDA. Es lo que permite que los casos mecánicos salgan
+    de 'Pendientes' sin que el auditor haga click.
+
+    Idempotente — corrida múltiples veces no duplica nada.
+    """
+    from datetime import datetime, timezone as _tz
+    q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.modelo_ia.ilike("%texto_fijo%"))
+        .filter(~GlosaRecord.workflow_state.in_(["RESPONDIDA", "CONCILIADA", "LEVANTADA"]))
+    )
+    candidatas = q.all()
+    stats = {
+        "dry_run": bool(dry_run),
+        "total_candidatas": len(candidatas),
+        "marcadas": 0,
+        "errores": 0,
+        "ids": [],
+    }
+    if dry_run:
+        stats["ids"] = [g.id for g in candidatas[:200]]
+        return stats
+    for g in candidatas:
+        try:
+            g.workflow_state = "RESPONDIDA"
+            if not g.fecha_decision_eps:
+                g.fecha_decision_eps = datetime.now(_tz.utc)
+            if not (g.nota_workflow or "").strip():
+                tipo = ""
+                m = (g.modelo_ia or "").lower()
+                if "ratificada" in m: tipo = "RATIFICADA"
+                elif "extemporanea" in m: tipo = "EXTEMPORANEA"
+                g.nota_workflow = f"Respondida automáticamente: texto fijo {tipo}".strip()
+            stats["marcadas"] += 1
+            stats["ids"].append(g.id)
+        except Exception:
+            stats["errores"] += 1
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)[:200], **stats}
+    return stats
+
+
+@router.post("/batch-aprobar")
+def batch_aprobar(
+    body: BatchAprobarBody,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Aprueba en lote las glosas LISTA_ENVIAR con alta confianza (Ronda 34).
+
+    Revalida cada glosa contra el autopilot. Solo marca RESPONDIDA si:
+      - estado_autopilot == 'LISTA_ENVIAR'
+      - confianza >= confianza_minima
+      - el usuario es dueño de la glosa (o coordinador/super_admin)
+
+    dry_run=True solo reporta qué se HARÍA sin mutar.
+    Devuelve estadísticas por id.
+    """
+    from datetime import datetime, timezone
+    resultados = []
+    aprobadas = 0
+    saltadas = 0
+    errores = 0
+    es_coord = current_user.rol in (ROL_COORDINADOR, ROL_SUPER_ADMIN)
+
+    for gid in body.ids[:200]:  # safety cap
+        g = db.query(GlosaRecord).filter(GlosaRecord.id == gid).first()
+        if not g:
+            resultados.append({"id": gid, "accion": "no_encontrada"})
+            errores += 1
+            continue
+        if not es_coord and g.auditor_email and g.auditor_email != current_user.email:
+            resultados.append({"id": gid, "accion": "sin_permiso"})
+            saltadas += 1
+            continue
+        try:
+            res = evaluar_glosa_autopilot(db, g)
+        except Exception as e:
+            resultados.append({"id": gid, "accion": "error_evaluando", "error": str(e)[:100]})
+            errores += 1
+            continue
+
+        if res.estado != "LISTA_ENVIAR" or res.confianza < body.confianza_minima:
+            resultados.append({
+                "id": gid,
+                "accion": "saltada",
+                "estado_autopilot": res.estado,
+                "confianza": res.confianza,
+            })
+            saltadas += 1
+            continue
+
+        if body.dry_run:
+            resultados.append({
+                "id": gid,
+                "accion": "aprobaria",
+                "confianza": res.confianza,
+            })
+            aprobadas += 1
+            continue
+
+        try:
+            g.estado = "RESPONDIDA"
+            g.workflow_state = "RESPONDIDA"
+            g.fecha_decision_eps = g.fecha_decision_eps or datetime.now(timezone.utc)
+            g.nota_workflow = "Batch autopilot LISTA_ENVIAR"
+            aprobadas += 1
+            resultados.append({
+                "id": gid,
+                "accion": "aprobada",
+                "confianza": res.confianza,
+            })
+        except Exception as e:
+            errores += 1
+            resultados.append({"id": gid, "accion": "error_mutando", "error": str(e)[:100]})
+            db.rollback()
+
+    if not body.dry_run:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            return {"error": str(e)[:200], "resultados": resultados}
+
+    return {
+        "dry_run": body.dry_run,
+        "aprobadas": aprobadas,
+        "saltadas": saltadas,
+        "errores": errores,
+        "confianza_minima": body.confianza_minima,
+        "total_pedidas": len(body.ids),
+        "resultados": resultados[:50],  # no saturar respuesta
+    }
 
 
 @router.get("/metricas")
