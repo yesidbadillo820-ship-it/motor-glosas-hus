@@ -2697,37 +2697,17 @@ async function refrescarKpisHeader(){
 // ─── Centro Premium (Ronda 27) — UI visible de rondas 16-25 ─────────────
 // Modal con pestañas que consumen los endpoints nuevos para que el usuario
 // vea y pruebe cada feature desde el navegador.
-async function abrirCentroPremium(){
-  var ex = document.getElementById('modal-premium');
-  if(ex){ ex.remove(); return; }
-
-  var html = ''
-    + '<div id="modal-premium" style="position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">'
-    + '  <div style="background:#fff;border-radius:16px;max-width:1100px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
-    + '    <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,#1e3a8a,#3b82f6);color:#fff;">'
-    + '      <div><b style="font-size:18px;">⭐ Centro Premium SINAC</b><div style="font-size:11px;opacity:.85;">Dashboard unificado · Autopilot IA · Digest · Anomalías · Reportes</div></div>'
-    + '      <button onclick="document.getElementById(\'modal-premium\').remove()" style="background:transparent;border:0;color:#fff;font-size:24px;cursor:pointer;">×</button>'
-    + '    </div>'
-    + '    <div id="premium-tabs" style="display:flex;gap:2px;padding:0 22px;border-bottom:1px solid #e5e7eb;background:#f9fafb;overflow-x:auto;">'
-    + '      <button class="ptab active" data-tab="resumen" onclick="premiumTab(\'resumen\')">📊 Resumen</button>'
-    + '      <button class="ptab" data-tab="autopilot" onclick="premiumTab(\'autopilot\')">🤖 Autopilot</button>'
-    + '      <button class="ptab" data-tab="digest" onclick="premiumTab(\'digest\')">📨 Digest</button>'
-    + '      <button class="ptab" data-tab="anomalias" onclick="premiumTab(\'anomalias\')">🚨 Anomalías</button>'
-    + '      <button class="ptab" data-tab="salud" onclick="premiumTab(\'salud\')">❤️ Salud</button>'
-    + '      <button class="ptab" data-tab="reportes" onclick="premiumTab(\'reportes\')">📥 Reportes</button>'
-    + '    </div>'
-    + '    <div id="premium-body" style="padding:22px;overflow-y:auto;flex:1;">Cargando…</div>'
-    + '  </div>'
-    + '</div>'
-    + '<style>'
-    + '.ptab{padding:12px 18px;background:transparent;border:0;border-bottom:3px solid transparent;cursor:pointer;font-size:13px;color:#6b7280;font-weight:500;white-space:nowrap;}'
-    + '.ptab:hover{color:#1e40af;}'
-    + '.ptab.active{color:#1e40af;border-bottom-color:#1e40af;font-weight:700;}'
-    + '.ptile{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;}'
-    + '.ptile-label{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}'
-    + '.ptile-value{font-size:22px;font-weight:700;color:#1e40af;}'
-    + '.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;}'
-    + '.pstate-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;}'
+function _inyectarEstilosPremium(){
+  if(document.getElementById('premium-styles')) return;
+  var css = ''
+    + '.ptab{padding:10px 16px;background:transparent;border:0;border-bottom:3px solid transparent;cursor:pointer;font-size:13px;color:#6b7280;font-weight:500;white-space:nowrap;}'
+    + '.ptab:hover{color:#1e40af;background:rgba(30,64,175,.04);}'
+    + '.ptab.active{color:#1e40af;border-bottom-color:#1e40af;font-weight:700;background:#fff;}'
+    + '.ptile{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;min-height:70px;}'
+    + '.ptile-label{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;font-weight:600;}'
+    + '.ptile-value{font-size:22px;font-weight:700;color:#1e40af;line-height:1.1;}'
+    + '.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px;}'
+    + '.pstate-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px;}'
     + '.pstate-LISTA_ENVIAR{background:#dcfce7;color:#166534;}'
     + '.pstate-CASI_LISTA{background:#d1fae5;color:#065f46;}'
     + '.pstate-REVISAR{background:#fef3c7;color:#92400e;}'
@@ -2735,12 +2715,56 @@ async function abrirCentroPremium(){
     + '.pstate-OK{background:#dcfce7;color:#166534;}'
     + '.pstate-ATENCION{background:#fef3c7;color:#92400e;}'
     + '.pstate-CRITICO{background:#fee2e2;color:#991b1b;}'
-    + '.prow{padding:8px 10px;border-bottom:1px solid #f3f4f6;font-size:12px;display:flex;justify-content:space-between;gap:10px;}'
+    + '.prow{padding:10px 14px;border-bottom:1px solid #f3f4f6;font-size:12.5px;display:flex;justify-content:space-between;gap:10px;align-items:center;}'
     + '.prow:last-child{border-bottom:0;}'
-    + '</style>';
-  var wrap = document.createElement('div');
-  wrap.innerHTML = html;
-  document.body.appendChild(wrap.firstElementChild);
+    + '.prow:hover{background:#f9fafb;}'
+    + '.pcard{background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:14px;}'
+    + '.pcard-head{padding:10px 14px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:700;color:#374151;display:flex;align-items:center;gap:8px;}'
+    + '.phint{margin-top:14px;padding:10px 12px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:6px;font-size:11px;color:#1e3a8a;line-height:1.5;}'
+    + '.phint code{background:#fff;padding:1px 5px;border-radius:3px;border:1px solid #dbeafe;font-size:10.5px;}'
+    + '.ptile-ok .ptile-value{color:#166534;}'
+    + '.ptile-warn .ptile-value{color:#b45309;}'
+    + '.ptile-err .ptile-value{color:#b91c1c;}';
+  var s = document.createElement('style');
+  s.id = 'premium-styles';
+  s.textContent = css;
+  document.head.appendChild(s);
+}
+
+function _soyCoordinador(){
+  try{
+    var u = window.usuarioActual || {};
+    var rol = (u.rol || '').toUpperCase();
+    return rol === 'COORDINADOR' || rol === 'SUPER_ADMIN';
+  }catch(_){ return false; }
+}
+
+async function abrirCentroPremium(){
+  var ex = document.getElementById('modal-premium');
+  if(ex){ ex.remove(); return; }
+  _inyectarEstilosPremium();
+
+  var modal = document.createElement('div');
+  modal.id = 'modal-premium';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.onclick = function(e){ if(e.target === modal) modal.remove(); };
+  modal.innerHTML = ''
+    + '<div style="background:#fff;border-radius:16px;max-width:1100px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+    + '  <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,#1e3a8a,#3b82f6);color:#fff;">'
+    + '    <div><b style="font-size:18px;">⭐ Centro Premium SINAC</b><div style="font-size:11px;opacity:.85;">Dashboard unificado · Autopilot IA · Digest · Anomalías · Reportes</div></div>'
+    + '    <button onclick="document.getElementById(\'modal-premium\').remove()" style="background:transparent;border:0;color:#fff;font-size:28px;cursor:pointer;line-height:1;padding:0 8px;">×</button>'
+    + '  </div>'
+    + '  <div id="premium-tabs" style="display:flex;gap:0;padding:0 22px;border-bottom:1px solid #e5e7eb;background:#f9fafb;overflow-x:auto;">'
+    + '    <button class="ptab active" data-tab="resumen" onclick="premiumTab(\'resumen\')">📊 Resumen</button>'
+    + '    <button class="ptab" data-tab="autopilot" onclick="premiumTab(\'autopilot\')">🤖 Autopilot</button>'
+    + '    <button class="ptab" data-tab="digest" onclick="premiumTab(\'digest\')">📨 Digest</button>'
+    + '    <button class="ptab" data-tab="anomalias" onclick="premiumTab(\'anomalias\')">🚨 Anomalías</button>'
+    + '    <button class="ptab" data-tab="salud" onclick="premiumTab(\'salud\')">❤️ Salud</button>'
+    + '    <button class="ptab" data-tab="reportes" onclick="premiumTab(\'reportes\')">📥 Reportes</button>'
+    + '  </div>'
+    + '  <div id="premium-body" style="padding:22px;overflow-y:auto;flex:1;background:#fff;">Cargando…</div>'
+    + '</div>';
+  document.body.appendChild(modal);
   premiumTab('resumen');
 }
 
@@ -2769,50 +2793,73 @@ async function premiumTab(nombre){
     if(d.error){ body.innerHTML = _premiumError(d.error, 'coordinador'); return; }
     var s = d.salud || {}, b = d.bandeja || {}, dg = d.digest_dia || {};
     var ind = (dg.indicadores || {}), ap = (b.conteo_por_estado || {});
+    var estClass = (d.estado_general === 'CRITICO') ? 'err' : (d.estado_general === 'ATENCION') ? 'warn' : 'ok';
     body.innerHTML = ''
+      + '<h4 style="margin:0 0 10px 0;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">Indicadores del día</h4>'
       + '<div class="pgrid">'
-      + _ptile('Estado general', '<span class="pstate-badge pstate-' + (d.estado_general||'OK') + '">' + (d.estado_general||'OK') + '</span>')
-      + _ptile('Radicadas hoy', ind.radicadas || 0)
-      + _ptile('Respondidas hoy', ind.respondidas || 0)
-      + _ptile('Recuperado', '$' + (ind.valor_recuperado||0).toLocaleString('es-CO'))
-      + _ptile('Tasa recup.', ((ind.tasa_recuperacion||0)*100).toFixed(1) + '%')
-      + _ptile('Pendientes', (b.total_evaluadas||0))
+      + _ptile('Estado general', '<span class="pstate-badge pstate-' + (d.estado_general||'OK') + '">' + (d.estado_general||'OK') + '</span>', estClass)
+      + _ptile('Radicadas hoy', (ind.radicadas || 0).toLocaleString('es-CO'))
+      + _ptile('Respondidas hoy', (ind.respondidas || 0).toLocaleString('es-CO'))
+      + _ptile('Objetado hoy', '$' + (ind.valor_objetado||0).toLocaleString('es-CO'))
+      + _ptile('Recuperado hoy', '$' + (ind.valor_recuperado||0).toLocaleString('es-CO'), 'ok')
+      + _ptile('Tasa recuperación', ((ind.tasa_recuperacion||0)*100).toFixed(1) + '%')
+      + _ptile('Pendientes bandeja', (b.total_evaluadas||0))
       + '</div>'
+      + '<h4 style="margin:16px 0 10px 0;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">Autopilot — triage automático</h4>'
       + '<div class="pgrid">'
-      + _ptile('LISTA_ENVIAR', '<span class="pstate-badge pstate-LISTA_ENVIAR">' + (ap.LISTA_ENVIAR||0) + '</span>')
-      + _ptile('CASI_LISTA', '<span class="pstate-badge pstate-CASI_LISTA">' + (ap.CASI_LISTA||0) + '</span>')
-      + _ptile('REVISAR', '<span class="pstate-badge pstate-REVISAR">' + (ap.REVISAR||0) + '</span>')
-      + _ptile('INTERVENIR', '<span class="pstate-badge pstate-INTERVENIR">' + (ap.INTERVENIR||0) + '</span>')
+      + _ptile('✅ Lista enviar', '<span class="pstate-badge pstate-LISTA_ENVIAR">' + (ap.LISTA_ENVIAR||0) + '</span>', 'ok')
+      + _ptile('🟢 Casi lista', '<span class="pstate-badge pstate-CASI_LISTA">' + (ap.CASI_LISTA||0) + '</span>', 'ok')
+      + _ptile('🟡 Revisar', '<span class="pstate-badge pstate-REVISAR">' + (ap.REVISAR||0) + '</span>', 'warn')
+      + _ptile('🔴 Intervenir', '<span class="pstate-badge pstate-INTERVENIR">' + (ap.INTERVENIR||0) + '</span>', 'err')
       + '</div>'
-      + '<div style="padding:12px 14px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:12px;color:#0c4a6e;">'
-      + '💡 Este resumen viene de <code>/control-center/resumen</code> — un único fetch que combina salud, bandeja autopilot, digest y schedulers.'
+      + '<div class="phint">💡 Un único fetch a <code>/control-center/resumen</code> combina salud + bandeja + digest + schedulers. '
+      +   'Usalo como primer dato de la mañana — si aparece <b>CRITICO</b> abrí la pestaña "❤️ Salud" para ver el detalle.'
       + '</div>';
     return;
   }
 
   if(nombre === 'autopilot'){
-    var d = await _premiumFetch('/autopilot/mi-bandeja?limite=50');
+    // Coordinadores/admin → bandeja global; auditores → solo la propia
+    var url = _soyCoordinador() ? '/autopilot/bandeja?limite=50' : '/autopilot/mi-bandeja?limite=50';
+    var d = await _premiumFetch(url);
     if(d.error){ body.innerHTML = _premiumError(d.error); return; }
     var c = d.conteo_por_estado || {};
+    var ambito = _soyCoordinador() ? 'Bandeja GLOBAL (coordinador)' : 'Mi bandeja personal';
     var rows = (d.glosas||[]).map(function(g){
-      return '<div class="prow">'
-        + '<span><span class="pstate-badge pstate-' + g.estado_autopilot + '">' + g.estado_autopilot + '</span> '
-        + ' #' + g.glosa_id + ' · ' + (g.codigo||'—') + ' · ' + (g.eps||'—') + '</span>'
-        + '<span style="color:#6b7280;">$' + (g.valor||0).toLocaleString('es-CO') + ' · ' + ((g.confianza||0)*100).toFixed(0) + '%</span>'
+      var razones_pro = (g.razones_a_favor || []).slice(0,2).join(' · ');
+      var razones_con = (g.razones_en_contra || []).slice(0,2).join(' · ');
+      var tooltip = razones_pro + (razones_con ? ' // ' + razones_con : '');
+      return '<div class="prow" title="' + _h(tooltip) + '">'
+        + '<div style="flex:1;min-width:0;">'
+        +   '<span class="pstate-badge pstate-' + g.estado_autopilot + '">' + g.estado_autopilot + '</span>'
+        +   '<span style="margin-left:10px;font-weight:600;color:#111827;">#' + g.glosa_id + '</span>'
+        +   '<span style="margin-left:8px;color:#6b7280;">' + (g.codigo||'—') + '</span>'
+        +   '<span style="margin-left:8px;color:#6b7280;">·</span>'
+        +   '<span style="margin-left:8px;color:#374151;">' + _h(g.eps||'—') + '</span>'
+        + '</div>'
+        + '<div style="text-align:right;min-width:170px;">'
+        +   '<div style="color:#111827;font-weight:600;">$' + (g.valor||0).toLocaleString('es-CO') + '</div>'
+        +   '<div style="color:#6b7280;font-size:11px;">confianza ' + ((g.confianza||0)*100).toFixed(0) + '% · ' + (g.dias_restantes||0) + 'd</div>'
+        + '</div>'
         + '</div>';
     }).join('');
     body.innerHTML = ''
+      + '<div style="font-size:11px;color:#6b7280;margin-bottom:10px;">Ámbito: <b>' + ambito + '</b> · Total: ' + (d.total_evaluadas||0) + '</div>'
       + '<div class="pgrid">'
-      + _ptile('LISTA_ENVIAR','<span class="pstate-badge pstate-LISTA_ENVIAR">'+(c.LISTA_ENVIAR||0)+'</span>')
-      + _ptile('CASI_LISTA','<span class="pstate-badge pstate-CASI_LISTA">'+(c.CASI_LISTA||0)+'</span>')
-      + _ptile('REVISAR','<span class="pstate-badge pstate-REVISAR">'+(c.REVISAR||0)+'</span>')
-      + _ptile('INTERVENIR','<span class="pstate-badge pstate-INTERVENIR">'+(c.INTERVENIR||0)+'</span>')
+      + _ptile('LISTA ENVIAR','<span class="pstate-badge pstate-LISTA_ENVIAR">'+(c.LISTA_ENVIAR||0)+'</span>', 'ok')
+      + _ptile('CASI LISTA','<span class="pstate-badge pstate-CASI_LISTA">'+(c.CASI_LISTA||0)+'</span>', 'ok')
+      + _ptile('REVISAR','<span class="pstate-badge pstate-REVISAR">'+(c.REVISAR||0)+'</span>', 'warn')
+      + _ptile('INTERVENIR','<span class="pstate-badge pstate-INTERVENIR">'+(c.INTERVENIR||0)+'</span>', 'err')
       + '</div>'
-      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;max-height:50vh;overflow-y:auto;">'
-      + (rows || '<div style="padding:30px;text-align:center;color:#9ca3af;">Bandeja vacía</div>')
+      + '<div class="pcard">'
+      +   '<div class="pcard-head">🎯 Glosas priorizadas por días restantes</div>'
+      +   '<div style="max-height:50vh;overflow-y:auto;">'
+      +     (rows || '<div style="padding:30px;text-align:center;color:#9ca3af;">Bandeja vacía — asignate glosas desde "Mis glosas".</div>')
+      +   '</div>'
       + '</div>'
-      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
-      + 'Endpoint: <code>/autopilot/mi-bandeja</code> (o <code>/autopilot/bandeja</code> para coordinadores).'
+      + '<div class="phint">'
+      +   'Endpoint: <code>' + url + '</code>. '
+      +   'Estados: <b>LISTA_ENVIAR</b> (texto fijo o MUY_BAJO riesgo + Gold) → <b>CASI_LISTA</b> → <b>REVISAR</b> → <b>INTERVENIR</b> (dictamen vacío, anomalía ALTA o MUY_ALTO riesgo).'
       + '</div>';
     return;
   }
@@ -2821,16 +2868,17 @@ async function premiumTab(nombre){
     var d = await _premiumFetch('/digest/texto?periodo=dia');
     if(d.error){ body.innerHTML = _premiumError(d.error,'coordinador'); return; }
     body.innerHTML = ''
-      + '<div style="display:flex;gap:8px;margin-bottom:14px;">'
-      + '  <button onclick="_premiumVerDigest(\'dia\')" class="btn-secondary" style="font-size:12px;">Hoy</button>'
-      + '  <button onclick="_premiumVerDigest(\'semana\')" class="btn-secondary" style="font-size:12px;">Semana</button>'
-      + '  <button onclick="_premiumVerDigest(\'mes\')" class="btn-secondary" style="font-size:12px;">Mes</button>'
+      + '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">'
+      +   '<span style="font-size:12px;color:#6b7280;font-weight:600;">Periodo:</span>'
+      +   '<button onclick="_premiumVerDigest(\'dia\')" class="btn-secondary" style="font-size:12px;padding:6px 14px;">📅 Hoy</button>'
+      +   '<button onclick="_premiumVerDigest(\'semana\')" class="btn-secondary" style="font-size:12px;padding:6px 14px;">📆 Semana</button>'
+      +   '<button onclick="_premiumVerDigest(\'mes\')" class="btn-secondary" style="font-size:12px;padding:6px 14px;">🗓️ Mes</button>'
+      +   '<button onclick="_premiumCopiarDigest()" class="btn-secondary" style="font-size:12px;padding:6px 14px;margin-left:auto;">📋 Copiar</button>'
       + '</div>'
-      + '<pre id="digest-pre" style="background:#f9fafb;padding:16px;border-radius:8px;border:1px solid #e5e7eb;white-space:pre-wrap;font-size:12px;line-height:1.6;">'
+      + '<pre id="digest-pre" style="background:#0f172a;color:#e2e8f0;padding:18px;border-radius:10px;border:1px solid #1e293b;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;max-height:50vh;overflow-y:auto;">'
       + _h(d.texto||'—') + '</pre>'
-      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
-      + 'Endpoints: <code>/digest/preview</code> (JSON) · <code>/digest/texto</code> (bot) · <code>/digest/html</code> (email).<br>'
-      + 'Programado automático: env vars <code>DIGEST_DESTINATARIOS</code>, <code>DIGEST_CANAL</code>, <code>DIGEST_HORA</code>.'
+      + '<div class="phint">Endpoints: <code>/digest/preview</code> (JSON) · <code>/digest/texto</code> (bot) · <code>/digest/html</code> (email).<br>'
+      +   'Scheduler automático (Ronda 20): configurá en el servidor <code>DIGEST_DESTINATARIOS</code>, <code>DIGEST_CANAL</code>, <code>DIGEST_HORA</code>. El coordinador recibirá el resumen a la hora indicada sin clicks.'
       + '</div>';
     return;
   }
@@ -2839,29 +2887,43 @@ async function premiumTab(nombre){
     var d = await _premiumFetch('/anomalias/dashboard?ventana_dias=30');
     if(d.error){ body.innerHTML = _premiumError(d.error, 'coordinador'); return; }
     var t = d.totales || {};
-    var dupHtml = (d.duplicados||[]).slice(0,20).map(function(a){
-      return '<div class="prow"><span><span class="pstate-badge pstate-' + (a.severidad==='ALTA'?'CRITICO':'REVISAR') + '">' + a.severidad + '</span> ' + _h(a.descripcion||'') + '</span></div>';
+    var dupHtml = (d.duplicados||[]).slice(0,30).map(function(a){
+      var sevClass = (a.severidad==='ALTA') ? 'CRITICO' : 'REVISAR';
+      var ent = a.entidad || {};
+      return '<div class="prow">'
+        + '<div style="flex:1;min-width:0;">'
+        +   '<span class="pstate-badge pstate-' + sevClass + '">' + a.severidad + '</span>'
+        +   '<span style="margin-left:10px;font-size:12px;color:#374151;">' + _h(a.descripcion||'') + '</span>'
+        + '</div>'
+        + (ent.n ? '<div style="color:#6b7280;font-size:11px;">×' + ent.n + '</div>' : '')
+        + '</div>';
     }).join('');
     var patHtml = (d.patrones_eps||[]).slice(0,20).map(function(a){
-      return '<div class="prow"><span><span class="pstate-badge pstate-' + (a.severidad==='ALTA'?'CRITICO':'REVISAR') + '">' + a.severidad + '</span> ' + _h(a.descripcion||'') + '</span></div>';
+      var sevClass = (a.severidad==='ALTA') ? 'CRITICO' : 'REVISAR';
+      return '<div class="prow">'
+        + '<div style="flex:1;min-width:0;">'
+        +   '<span class="pstate-badge pstate-' + sevClass + '">' + a.severidad + '</span>'
+        +   '<span style="margin-left:10px;font-size:12px;color:#374151;">' + _h(a.descripcion||'') + '</span>'
+        + '</div>'
+        + '</div>';
     }).join('');
     body.innerHTML = ''
       + '<div class="pgrid">'
-      + _ptile('Duplicados', t.duplicados||0)
-      + _ptile('Patrones EPS', t.patrones_eps||0)
-      + _ptile('Severidad ALTA', '<span class="pstate-badge pstate-CRITICO">'+(t.alta||0)+'</span>')
-      + _ptile('Severidad MEDIA', '<span class="pstate-badge pstate-REVISAR">'+(t.media||0)+'</span>')
+      +   _ptile('Duplicados', t.duplicados||0, 'warn')
+      +   _ptile('Patrones EPS', t.patrones_eps||0)
+      +   _ptile('Severidad ALTA', (t.alta||0), 'err')
+      +   _ptile('Severidad MEDIA', (t.media||0), 'warn')
       + '</div>'
-      + '<h4 style="margin-top:8px;font-size:13px;color:#374151;">Duplicados detectados</h4>'
-      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px;">'
-      + (dupHtml || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">Sin duplicados</div>')
+      + '<div class="pcard">'
+      +   '<div class="pcard-head">📌 Duplicados detectados (misma factura + CUPS + EPS)</div>'
+      +   (dupHtml || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">Sin duplicados</div>')
       + '</div>'
-      + '<h4 style="font-size:13px;color:#374151;">Patrones EPS sospechosos</h4>'
-      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;">'
-      + (patHtml || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">Sin patrones sospechosos</div>')
+      + '<div class="pcard">'
+      +   '<div class="pcard-head">📈 Patrones EPS sospechosos (salto de volumen/ratif)</div>'
+      +   (patHtml || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">Sin patrones sospechosos</div>')
       + '</div>'
-      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
-      + 'Endpoint: <code>/anomalias/dashboard</code> · z-score por glosa: <code>/anomalias/glosa/{id}/valor-anomalo</code>.'
+      + '<div class="phint">Endpoint: <code>/anomalias/dashboard?ventana_dias=30</code>. '
+      +   'Severidad <b>ALTA</b> = ≥3 duplicaciones o salto ≥60% vs periodo previo. <b>MEDIA</b> = 2 duplicaciones o salto ≥30%.'
       + '</div>';
     return;
   }
@@ -2870,68 +2932,102 @@ async function premiumTab(nombre){
     var d = await _premiumFetch('/sistema/salud');
     if(d.error){ body.innerHTML = _premiumError(d.error, 'coordinador'); return; }
     var c = d.componentes || {};
+
+    var labels = {
+      bd: '🗄️ Base de datos',
+      scheduler_ia_proactiva: '🤖 Scheduler IA proactiva',
+      cache_ia: '💾 Caché IA',
+      glosas_hoy: '📋 Glosas hoy',
+      anomalias: '🚨 Anomalías',
+      bots: '📨 Bots mensajería',
+      actividad_reciente: '👥 Actividad reciente',
+    };
+
     var pills = Object.keys(c).map(function(k){
       var comp = c[k] || {};
       var est = comp.estado || 'OK';
       var cls = (est === 'CRITICO') ? 'pstate-CRITICO' : (est === 'OK') ? 'pstate-OK' : 'pstate-ATENCION';
-      var extra = Object.keys(comp).filter(function(x){return x!=='estado';}).map(function(x){
+      var extraItems = Object.keys(comp).filter(function(x){return x!=='estado' && x!=='detalle';}).map(function(x){
         var v = comp[x];
-        if(typeof v === 'object') v = JSON.stringify(v);
-        return '<div style="font-size:11px;color:#6b7280;">' + x + ': ' + _h(String(v).slice(0,60)) + '</div>';
+        if(v === null || v === undefined) return '';
+        if(Array.isArray(v)) v = v.join(', ') || '—';
+        else if(typeof v === 'object') v = JSON.stringify(v);
+        var nombre = x.replace(/_/g,' ');
+        return '<div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-top:3px;">'
+          + '<span>' + _h(nombre) + '</span>'
+          + '<span style="color:#111827;font-weight:600;">' + _h(String(v).slice(0,40)) + '</span>'
+          + '</div>';
       }).join('');
-      return '<div class="ptile">'
-        + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">' + k + '</div>'
-        + '<span class="pstate-badge ' + cls + '">' + est + '</span>'
-        + '<div style="margin-top:8px;">' + extra + '</div>'
+      return '<div class="ptile" style="display:flex;flex-direction:column;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">'
+        +   '<span style="font-size:12px;font-weight:700;color:#374151;">' + (labels[k] || k) + '</span>'
+        +   '<span class="pstate-badge ' + cls + '">' + est + '</span>'
+        + '</div>'
+        + extraItems
         + '</div>';
     }).join('');
+
     var alerts = (d.alertas||[]).map(function(a){
-      return '<div class="prow"><span><b style="color:#b91c1c;">' + (a.nivel||'?') + '</b> · ' + _h(a.mensaje||'') + '</span></div>';
+      var cls = (a.nivel === 'CRITICO') ? 'pstate-CRITICO' : 'pstate-ATENCION';
+      return '<div class="prow">'
+        + '<span class="pstate-badge ' + cls + '">' + (a.nivel||'?') + '</span>'
+        + '<span style="flex:1;margin-left:10px;color:#374151;font-size:12px;">' + _h(a.mensaje||'') + '</span>'
+        + '</div>';
     }).join('');
+
     body.innerHTML = ''
-      + '<div style="margin-bottom:14px;padding:14px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;">'
-      + '<b>Estado general:</b> <span class="pstate-badge pstate-' + (d.estado_general||'OK') + '">' + (d.estado_general||'OK') + '</span>'
+      + '<div style="margin-bottom:14px;padding:14px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">'
+      +   '<b style="font-size:14px;">Estado general:</b>'
+      +   '<span class="pstate-badge pstate-' + (d.estado_general||'OK') + '" style="font-size:13px;padding:6px 14px;">' + (d.estado_general||'OK') + '</span>'
       + '</div>'
       + '<div class="pgrid">' + pills + '</div>'
-      + (alerts ? '<h4 style="font-size:13px;color:#b91c1c;margin-top:14px;">Alertas activas</h4><div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;">' + alerts + '</div>' : '')
-      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
-      + 'Endpoints: <code>/sistema/salud</code> (detallado) · <code>/sistema/salud/publico</code> (uptime monitor).'
-      + '</div>';
+      + (alerts ? '<div class="pcard"><div class="pcard-head" style="color:#b91c1c;">🚨 Alertas activas</div>' + alerts + '</div>' : '')
+      + '<div class="phint">Endpoints: <code>/sistema/salud</code> (coordinador) · <code>/sistema/salud/publico</code> (uptime monitor, sin auth).</div>';
     return;
   }
 
   if(nombre === 'reportes'){
     body.innerHTML = ''
-      + '<div style="display:grid;gap:12px;">'
-      + '  <div class="ptile">'
-      + '    <b>Reporte Gerencial Excel</b>'
-      + '    <p style="font-size:12px;color:#6b7280;margin:6px 0 10px 0;">4 hojas: Resumen · Top EPS · Autopilot · Anomalías. Formato institucional HUS con color por estado.</p>'
+      + '<div style="display:flex;flex-direction:column;gap:14px;">'
+      + '  <div class="ptile" style="min-height:auto;">'
+      + '    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+      + '      <span style="font-size:22px;">📥</span>'
+      + '      <b style="font-size:14px;">Reporte Gerencial Excel (Ronda 24)</b>'
+      + '    </div>'
+      + '    <p style="font-size:12px;color:#6b7280;margin:0 0 12px 0;">4 hojas: <b>Resumen</b> · <b>Top EPS</b> · <b>Autopilot</b> · <b>Anomalías</b>. Formato institucional HUS con color por estado (verde LISTA_ENVIAR → rojo INTERVENIR).</p>'
       + '    <div style="display:flex;gap:8px;flex-wrap:wrap;">'
-      + '      <button class="btn-primary" onclick="_descargarGerencial(\'dia\')">📥 Descargar (hoy)</button>'
-      + '      <button class="btn-secondary" onclick="_descargarGerencial(\'semana\')">📥 Semana</button>'
-      + '      <button class="btn-secondary" onclick="_descargarGerencial(\'mes\')">📥 Mes</button>'
+      + '      <button class="btn-primary" style="padding:8px 14px;" onclick="_descargarGerencial(\'dia\')">📥 Descargar (hoy)</button>'
+      + '      <button class="btn-secondary" style="padding:8px 14px;" onclick="_descargarGerencial(\'semana\')">📥 Semana</button>'
+      + '      <button class="btn-secondary" style="padding:8px 14px;" onclick="_descargarGerencial(\'mes\')">📥 Mes</button>'
       + '    </div>'
       + '  </div>'
-      + '  <div class="ptile">'
-      + '    <b>Aplicar texto fijo automático al backlog</b>'
-      + '    <p style="font-size:12px;color:#6b7280;margin:6px 0 10px 0;">Barre todas las glosas pendientes y aplica respuesta fija a las RATIFICADAS y EXTEMPORÁNEAS. <b>RATIFICADA tiene prioridad y nunca menciona extemporaneidad.</b></p>'
-      + '    <div style="display:flex;gap:8px;flex-wrap:wrap;">'
-      + '      <button class="btn-secondary" onclick="_batchTextoFijo(true)">👁 Previsualizar (dry-run)</button>'
-      + '      <button class="btn-primary" onclick="_batchTextoFijo(false)">✓ Aplicar</button>'
+      + '  <div class="ptile" style="min-height:auto;">'
+      + '    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+      + '      <span style="font-size:22px;">🔁</span>'
+      + '      <b style="font-size:14px;">Aplicar texto fijo al backlog (Ronda 22)</b>'
       + '    </div>'
-      + '    <pre id="batch-result" style="display:none;margin-top:10px;padding:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;"></pre>'
+      + '    <p style="font-size:12px;color:#6b7280;margin:0 0 12px 0;">Barre glosas pendientes y aplica respuesta fija a las <b>RATIFICADAS</b> y <b>EXTEMPORÁNEAS</b>. '
+      +       '<span style="color:#b91c1c;">Regla dura</span>: RATIFICADA tiene prioridad y nunca menciona extemporaneidad.</p>'
+      + '    <div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + '      <button class="btn-secondary" style="padding:8px 14px;" onclick="_batchTextoFijo(true)">👁 Previsualizar (dry-run)</button>'
+      + '      <button class="btn-primary" style="padding:8px 14px;" onclick="_batchTextoFijo(false)">✓ Aplicar ahora</button>'
+      + '    </div>'
+      + '    <pre id="batch-result" style="display:none;margin-top:12px;padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;max-height:220px;overflow-y:auto;white-space:pre-wrap;font-family:ui-monospace,monospace;"></pre>'
       + '  </div>'
-      + '  <div class="ptile">'
-      + '    <b>Envío manual del digest por bot</b>'
-      + '    <p style="font-size:12px;color:#6b7280;margin:6px 0 10px 0;">Envía el resumen a WhatsApp/Telegram. Sin credenciales configuradas se usa modo mock (sí devuelve OK pero no envía realmente).</p>'
-      + '    <input id="digest-dest" placeholder="+573001234567 o chat_id" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;width:100%;font-size:12px;margin-bottom:8px;">'
-      + '    <div style="display:flex;gap:8px;">'
-      + '      <select id="digest-canal" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">'
-      + '        <option value="mock">mock</option><option value="whatsapp">whatsapp</option><option value="telegram">telegram</option>'
+      + '  <div class="ptile" style="min-height:auto;">'
+      + '    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+      + '      <span style="font-size:22px;">📨</span>'
+      + '      <b style="font-size:14px;">Envío manual del digest por bot (Ronda 13+19+20)</b>'
+      + '    </div>'
+      + '    <p style="font-size:12px;color:#6b7280;margin:0 0 12px 0;">Enviá el resumen del día por WhatsApp/Telegram. Sin credenciales reales se usa <code>mock</code> (devuelve OK pero no transmite).</p>'
+      + '    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '      <input id="digest-dest" placeholder="+573001234567 o chat_id" style="padding:9px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;flex:1;min-width:220px;">'
+      + '      <select id="digest-canal" style="padding:9px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">'
+      + '        <option value="mock">mock (prueba)</option><option value="whatsapp">whatsapp</option><option value="telegram">telegram</option>'
       + '      </select>'
-      + '      <button class="btn-primary" onclick="_enviarDigestManual()">📨 Enviar</button>'
+      + '      <button class="btn-primary" style="padding:9px 16px;" onclick="_enviarDigestManual()">📨 Enviar</button>'
       + '    </div>'
-      + '    <pre id="digest-result" style="display:none;margin-top:10px;padding:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;"></pre>'
+      + '    <pre id="digest-result" style="display:none;margin-top:12px;padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;max-height:220px;overflow-y:auto;white-space:pre-wrap;font-family:ui-monospace,monospace;"></pre>'
       + '  </div>'
       + '</div>';
     return;
@@ -2944,6 +3040,17 @@ async function _premiumVerDigest(periodo){
   pre.textContent = 'Cargando…';
   var d = await _premiumFetch('/digest/texto?periodo=' + periodo);
   pre.textContent = d.error ? ('ERROR: ' + d.error) : (d.texto||'—');
+}
+
+function _premiumCopiarDigest(){
+  var pre = document.getElementById('digest-pre');
+  if(!pre) return;
+  try{
+    navigator.clipboard.writeText(pre.textContent || '');
+    toast('Copiado', 'El digest está en tu portapapeles', 'success');
+  }catch(_){
+    toast('Error al copiar','Tu navegador bloquea clipboard','warning');
+  }
 }
 
 async function _descargarGerencial(periodo){
@@ -2994,8 +3101,9 @@ async function _enviarDigestManual(){
   }catch(e){ if(pre) pre.textContent = 'ERROR: ' + e.message; }
 }
 
-function _ptile(label, value){
-  return '<div class="ptile"><div class="ptile-label">' + _h(label) + '</div><div class="ptile-value">' + value + '</div></div>';
+function _ptile(label, value, variant){
+  var extra = variant ? (' ptile-' + variant) : '';
+  return '<div class="ptile' + extra + '"><div class="ptile-label">' + _h(label) + '</div><div class="ptile-value">' + value + '</div></div>';
 }
 
 function _h(s){
