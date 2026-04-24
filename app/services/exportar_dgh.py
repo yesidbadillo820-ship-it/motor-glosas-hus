@@ -462,7 +462,7 @@ def generar_filas_dgh(
                 "FacturaCartera.Tercero.NombreCompletoAN": nombre_an,
                 "FechaObjecion": fecha_obj,
                 "FacturaCartera.Tercero.NombreCompletoNA": nombre_na,
-                "ListadoConceptos.ConceptoObjecion.Codigo": c.codigo_glosa or "",
+                "ListadoConceptos.ConceptoObjecion.Codigo": (getattr(c, "codigo_syscafe", None) or c.codigo_glosa or ""),
                 "ListadoConceptos.Oid": c.oid_dgh or "",
                 "ListadoConceptos.ConceptoObjecion.Nombre": c.nombre_glosa or "",
                 "ListadoConceptos.ServicioProductoFactura.Codigo": c.cups_codigo or "",

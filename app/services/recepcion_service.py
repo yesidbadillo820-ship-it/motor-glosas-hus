@@ -262,6 +262,42 @@ def _semaforo(dias_restantes: int) -> str:
     return "VERDE"
 
 
+# Mapa de palabras clave del nombre de glosa → prefijo canónico (Res. 2284/2023).
+# Si el DGH trae código numérico (Syscafe) sin el canónico, usamos el nombre
+# para inferirlo. Los genéricos se eligen como punto de partida — el auditor
+# puede ajustar el código específico (TA0201, TA0801, etc.) si hace falta.
+_MAPEO_NOMBRE_A_PREFIJO = [
+    ("AUTORIZACION", "AU0101"),
+    ("AUTORIZACIÓN", "AU0101"),
+    ("TARIFAS", "TA0201"),
+    ("TARIFA", "TA0201"),
+    ("SOPORTES", "SO0101"),
+    ("SOPORTE", "SO0101"),
+    ("COBERTURA", "CO0101"),
+    ("PERTINENCIA", "PE0101"),
+    ("FACTURACION", "FA0101"),
+    ("FACTURACIÓN", "FA0101"),
+    ("CALIDAD", "CL0101"),
+    ("INCONSISTENCIA", "IN0101"),
+    ("MEDICAMENTOS", "ME0101"),
+    ("INSUMOS", "IN0201"),
+    ("SERVICIO", "SE0101"),
+]
+
+
+def _inferir_codigo_canonico(nombre_glosa: str) -> str | None:
+    """Dada 'AUTORIZACION - PROCEDIMIENTO' devuelve 'AU0101'. Si no detecta
+    ningún concepto conocido, devuelve None y el caller usa el código
+    numérico como fallback."""
+    if not nombre_glosa:
+        return None
+    texto = nombre_glosa.upper()
+    for keyword, codigo in _MAPEO_NOMBRE_A_PREFIJO:
+        if keyword in texto:
+            return codigo
+    return None
+
+
 def _es_ratificada(*valores: str) -> bool:
     """True si CUALQUIERA de los valores contiene la palabra RATIFICADA."""
     for v in valores:
@@ -668,13 +704,24 @@ class RecepcionService:
             try:
                 factura = str(_get("factura") or "").strip()
                 consecutivo = str(_get("consecutivo") or "").strip()
-                codigo_glosa = str(_get("concepto_codigo") or "").strip().upper()
+                raw_codigo = str(_get("concepto_codigo") or "").strip().upper()
                 oid = str(_get("concepto_oid") or "").strip()
-                if not factura or not consecutivo or not codigo_glosa:
+                if not factura or not consecutivo or not raw_codigo:
                     # Sin estos 3 campos mínimos, la fila no es un concepto válido
                     continue
 
                 nombre_glosa = _fix_mojibake(str(_get("concepto_nombre") or "").strip())
+
+                # Ronda 50 (Bug #4): distinguir código Syscafe numérico del
+                # canónico Res. 2284/2023. Si viene puramente numérico (ej.
+                # "423"), lo guardamos como codigo_syscafe y derivamos el
+                # canónico desde el nombre del concepto. Si viene canónico
+                # (TA0201, SO0101...), lo dejamos donde está.
+                codigo_syscafe = None
+                codigo_glosa = raw_codigo
+                if raw_codigo.isdigit():
+                    codigo_syscafe = raw_codigo
+                    codigo_glosa = _inferir_codigo_canonico(nombre_glosa) or raw_codigo
                 cups_codigo = str(_get("cups_codigo") or "").strip()
                 cups_desc = _fix_mojibake(str(_get("cups_descripcion") or "").strip())
                 centro_costo = _fix_mojibake(str(_get("centro_costo") or "").strip())
@@ -736,6 +783,7 @@ class RecepcionService:
                     consecutivo_dgh=consecutivo,
                     factura=factura,
                     codigo_glosa=codigo_glosa,
+                    codigo_syscafe=codigo_syscafe,
                     nombre_glosa=nombre_glosa or None,
                     cups_codigo=cups_codigo or None,
                     cups_descripcion=cups_desc or None,
