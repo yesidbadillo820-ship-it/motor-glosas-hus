@@ -30,6 +30,7 @@ from app.services.texto_fijo_detector import (
     aplicar_texto_fijo_si_corresponde,
     clasificar_texto_fijo,
 )
+from app.services.texto_fijo_batch import retro_aplicar
 
 router = APIRouter(prefix="/autopilot", tags=["autopilot"])
 
@@ -100,6 +101,24 @@ def previsualizar_texto_fijo(
             "mensaje": "La glosa no es RATIFICADA ni EXTEMPORÁNEA — requiere análisis IA.",
         }
     return {"glosa_id": glosa_id, "aplica": True, **clase}
+
+
+@router.post("/texto-fijo/batch")
+def batch_texto_fijo(
+    dry_run: bool = Query(True, description="Si True, solo reporta — no muta."),
+    limite: Optional[int] = Query(None, ge=1, le=5000),
+    ventana_dias: int = Query(365, ge=1, le=3650),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Retro-aplica el detector a todas las glosas candidatas (Ronda 22).
+
+    Corre una sola vez después del deploy para limpiar el backlog. Es
+    idempotente — corridas posteriores no duplican efectos. Recomendado
+    correr primero con dry_run=true para revisar los conteos, y luego
+    con dry_run=false para ejecutar.
+    """
+    return retro_aplicar(db, dry_run=dry_run, limite=limite, ventana_dias=ventana_dias)
 
 
 @router.post("/texto-fijo/{glosa_id}/aplicar")
