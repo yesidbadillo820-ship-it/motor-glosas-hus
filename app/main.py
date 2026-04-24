@@ -1092,6 +1092,7 @@ from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
 from app.api.routers.autopilot import router as autopilot_router
 from app.api.routers.digest import router as digest_router
+from app.api.routers.control_center import router as control_center_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -1134,6 +1135,7 @@ app.include_router(anomalias_router)
 app.include_router(sistema_router)
 app.include_router(autopilot_router)
 app.include_router(digest_router)
+app.include_router(control_center_router)
 
 
 def get_glosa_service() -> GlosaService:
