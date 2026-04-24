@@ -756,6 +756,22 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN tarifas_contratadas {col_name}: {e}")
 
+    # Migraciones para conceptos_glosa (Ronda 50 — bug #4 DGH)
+    # codigo_syscafe: código interno numérico del DGH (ej. "423") distinto
+    # del código canónico Res. 2284/2023 (ej. "TA0201"). Se guarda al
+    # importar si viene, y se usa al exportar para DGH.
+    _CONCEPTOS_GLOSA_MISSING = [
+        ("codigo_syscafe", "VARCHAR(20)"),
+    ]
+    for col_name, col_ddl in _CONCEPTOS_GLOSA_MISSING:
+        try:
+            if _tiene_tabla("conceptos_glosa") and not _tiene_columna("conceptos_glosa", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a conceptos_glosa")
+                db.execute(text(f"ALTER TABLE conceptos_glosa ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN conceptos_glosa {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()

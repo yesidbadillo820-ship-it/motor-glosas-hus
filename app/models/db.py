@@ -105,6 +105,11 @@ class ConceptoGlosaRecord(Base):
 
     # Código de glosa + motivo canónico
     codigo_glosa = Column(String(20), index=True)  # TA0801, FA0603, TA0201, ...
+    # Ronda 50 (Bug #4): código interno del DGH/Syscafe (ej. "423", "223"
+    # cuando Excel del DGH no trae el canónico Res. 2284/2023). Se guarda
+    # al importar si viene y se usa al exportar en el campo
+    # 'ListadoConceptos.ConceptoObjecion.Codigo' del formato DGH.
+    codigo_syscafe = Column(String(20), index=True)
     nombre_glosa = Column(Text)                     # ConceptoObjecion.Nombre ("Los cargos por apoyo diagnóstico...")
 
     # Servicio/CUPS glosado
