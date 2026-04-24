@@ -5350,6 +5350,25 @@ function _filtrarPorEstado(data){
   });
 }
 
+async function _cargarMapaAutopilot(){
+  // Ronda 29: enriquece la lista con el estado autopilot por glosa_id.
+  // Un solo fetch; si falla no rompe la UI.
+  try{
+    var url = _soyCoordinador() ? '/autopilot/bandeja?limite=300' : '/autopilot/mi-bandeja?limite=300';
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok) return {};
+    var d = await r.json();
+    var mapa = {};
+    (d.glosas || []).forEach(function(g){
+      mapa[g.glosa_id] = {
+        estado: g.estado_autopilot,
+        confianza: g.confianza,
+      };
+    });
+    return mapa;
+  }catch(_){ return {}; }
+}
+
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var url = '/glosas/mis-asignaciones' + (todas ? '?todas=true' : '');
@@ -5359,6 +5378,11 @@ async function loadMisGlosas(){
     var r = await fetch(url, {headers: authH()});
     if(r.status === 401){ alert('Sesión expirada'); return; }
     var data = await r.json();
+    // Enriquecer con mapa autopilot (Ronda 29)
+    try{
+      var mapa = await _cargarMapaAutopilot();
+      window._autopilot_map = mapa;
+    }catch(_){ window._autopilot_map = {}; }
     // Guardar data cruda para poder re-filtrar sin refetch
     window._mis_data_raw = data;
 
@@ -5433,6 +5457,21 @@ function _renderMisGlosas(dataRaw){
       var wfEstado = g.workflow_state || 'BORRADOR';
       var wfChip = '<span class="chip" style="background:transparent;color:' + (wfColor[wfEstado]||'#6b7280') + ';border:1px solid ' + (wfColor[wfEstado]||'#6b7280') + '">' + wfEstado.replace('_', ' ') + '</span>';
 
+      // Ronda 29: chip autopilot al lado del workflow (si hay data)
+      var apInfo = (window._autopilot_map || {})[g.id];
+      var apChip = '';
+      if(apInfo && apInfo.estado){
+        var apColor = {
+          LISTA_ENVIAR: ['#dcfce7','#166534'],
+          CASI_LISTA:   ['#d1fae5','#065f46'],
+          REVISAR:      ['#fef3c7','#92400e'],
+          INTERVENIR:   ['#fee2e2','#991b1b'],
+        }[apInfo.estado] || ['#f3f4f6','#374151'];
+        var apLabel = apInfo.estado.replace('_',' ');
+        var conf = Math.round((apInfo.confianza || 0) * 100);
+        apChip = '<br><span class="chip" title="Autopilot · confianza ' + conf + '%" style="margin-top:4px;display:inline-block;background:' + apColor[0] + ';color:' + apColor[1] + ';font-size:.68rem;font-weight:700;padding:2px 8px;">🤖 ' + apLabel + '</span>';
+      }
+
       // Construir botones de acción según estado y rol
       var estadoUpper = (g.estado || '').toUpperCase();
       var yaRespondida = estadoUpper === 'RESPONDIDA' || wfEstado === 'RESPONDIDA';
@@ -5471,7 +5510,7 @@ function _renderMisGlosas(dataRaw){
         // Si > 20 → la EPS glosó fuera de termino. Fallback a dias_restantes si el
         // campo nuevo no esta poblado (ej. glosa legacy antes de la migracion).
         '<td class="cell-center" style="font-weight:700" title="Días hábiles entre fecha de radicación de la factura y fecha del documento DGH">' + (g.dias_radicacion_dgh != null ? g.dias_radicacion_dgh : (g.dias_restantes || 0)) + '</td>' +
-        '<td>' + wfChip + '</td>' +
+        '<td>' + wfChip + apChip + '</td>' +
         '<td><span class="chip ' + semCls + '">' + (g.prioridad || '—') + '</span></td>' +
         '<td class="cell-center">' + acciones + '</td>' +
         '</tr>';
