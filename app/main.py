@@ -740,9 +740,11 @@ async def lifespan(app: FastAPI):
             logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
 
     # Migraciones para tarifas_contratadas - soporte formulaic (SOAT %)
+    # + Ronda 45: codigo_ips para homologación Res. 2641/2025
     _TARIFAS_MISSING = [
         ("tipo_tarifa", "VARCHAR(30) DEFAULT 'VALOR_FIJO'"),
         ("factor_ajuste", "DOUBLE PRECISION DEFAULT 0"),
+        ("codigo_ips", "VARCHAR(30)"),
     ]
     for col_name, col_ddl in _TARIFAS_MISSING:
         try:

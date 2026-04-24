@@ -407,6 +407,7 @@ async def importar_excel(
                 eps=eps_val,
                 contrato_numero=contrato_val,
                 codigo_cups=cups_val,
+                codigo_ips=(fila.get("codigo_ips") or None),
                 descripcion=fila.get("descripcion"),
                 valor_pactado=float(fila.get("valor_pactado") or 0.0),
                 modalidad=fila.get("modalidad"),
