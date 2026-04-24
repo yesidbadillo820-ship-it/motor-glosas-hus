@@ -1283,6 +1283,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
         </button>
+        <button class="sn-item" data-tip="Centro Premium (IA, autopilot, digest, anomalías)" onclick="abrirCentroPremium()">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8Z"/></svg>
+          <span class="sn-item-label">Centro Premium</span>
+        </button>
         <button class="sn-item" data-tip="Mi desempeño" onclick="sidebarTab(this,'mi-desempeno')">
           <svg class="i i-md" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           <span class="sn-item-label">Mi desempeño</span>
@@ -2688,6 +2692,322 @@ async function refrescarKpisHeader(){
       }
     }catch(_){}
   }catch(e){/* silencioso, no bloquear UX */}
+}
+
+// ─── Centro Premium (Ronda 27) — UI visible de rondas 16-25 ─────────────
+// Modal con pestañas que consumen los endpoints nuevos para que el usuario
+// vea y pruebe cada feature desde el navegador.
+async function abrirCentroPremium(){
+  var ex = document.getElementById('modal-premium');
+  if(ex){ ex.remove(); return; }
+
+  var html = ''
+    + '<div id="modal-premium" style="position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">'
+    + '  <div style="background:#fff;border-radius:16px;max-width:1100px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+    + '    <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,#1e3a8a,#3b82f6);color:#fff;">'
+    + '      <div><b style="font-size:18px;">⭐ Centro Premium SINAC</b><div style="font-size:11px;opacity:.85;">Dashboard unificado · Autopilot IA · Digest · Anomalías · Reportes</div></div>'
+    + '      <button onclick="document.getElementById(\'modal-premium\').remove()" style="background:transparent;border:0;color:#fff;font-size:24px;cursor:pointer;">×</button>'
+    + '    </div>'
+    + '    <div id="premium-tabs" style="display:flex;gap:2px;padding:0 22px;border-bottom:1px solid #e5e7eb;background:#f9fafb;overflow-x:auto;">'
+    + '      <button class="ptab active" data-tab="resumen" onclick="premiumTab(\'resumen\')">📊 Resumen</button>'
+    + '      <button class="ptab" data-tab="autopilot" onclick="premiumTab(\'autopilot\')">🤖 Autopilot</button>'
+    + '      <button class="ptab" data-tab="digest" onclick="premiumTab(\'digest\')">📨 Digest</button>'
+    + '      <button class="ptab" data-tab="anomalias" onclick="premiumTab(\'anomalias\')">🚨 Anomalías</button>'
+    + '      <button class="ptab" data-tab="salud" onclick="premiumTab(\'salud\')">❤️ Salud</button>'
+    + '      <button class="ptab" data-tab="reportes" onclick="premiumTab(\'reportes\')">📥 Reportes</button>'
+    + '    </div>'
+    + '    <div id="premium-body" style="padding:22px;overflow-y:auto;flex:1;">Cargando…</div>'
+    + '  </div>'
+    + '</div>'
+    + '<style>'
+    + '.ptab{padding:12px 18px;background:transparent;border:0;border-bottom:3px solid transparent;cursor:pointer;font-size:13px;color:#6b7280;font-weight:500;white-space:nowrap;}'
+    + '.ptab:hover{color:#1e40af;}'
+    + '.ptab.active{color:#1e40af;border-bottom-color:#1e40af;font-weight:700;}'
+    + '.ptile{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;}'
+    + '.ptile-label{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}'
+    + '.ptile-value{font-size:22px;font-weight:700;color:#1e40af;}'
+    + '.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;}'
+    + '.pstate-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;}'
+    + '.pstate-LISTA_ENVIAR{background:#dcfce7;color:#166534;}'
+    + '.pstate-CASI_LISTA{background:#d1fae5;color:#065f46;}'
+    + '.pstate-REVISAR{background:#fef3c7;color:#92400e;}'
+    + '.pstate-INTERVENIR{background:#fee2e2;color:#991b1b;}'
+    + '.pstate-OK{background:#dcfce7;color:#166534;}'
+    + '.pstate-ATENCION{background:#fef3c7;color:#92400e;}'
+    + '.pstate-CRITICO{background:#fee2e2;color:#991b1b;}'
+    + '.prow{padding:8px 10px;border-bottom:1px solid #f3f4f6;font-size:12px;display:flex;justify-content:space-between;gap:10px;}'
+    + '.prow:last-child{border-bottom:0;}'
+    + '</style>';
+  var wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstElementChild);
+  premiumTab('resumen');
+}
+
+function _premiumActivarTab(nombre){
+  document.querySelectorAll('.ptab').forEach(function(b){
+    b.classList.toggle('active', b.dataset.tab === nombre);
+  });
+}
+
+async function _premiumFetch(url){
+  try{
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){ return {error: 'HTTP ' + r.status + ' (' + url + ')'}; }
+    return await r.json();
+  }catch(e){ return {error: e.message || 'fallo de red'}; }
+}
+
+async function premiumTab(nombre){
+  _premiumActivarTab(nombre);
+  var body = document.getElementById('premium-body');
+  if(!body) return;
+  body.innerHTML = '<div style="text-align:center;color:#6b7280;padding:40px;">Cargando ' + nombre + '…</div>';
+
+  if(nombre === 'resumen'){
+    var d = await _premiumFetch('/control-center/resumen');
+    if(d.error){ body.innerHTML = _premiumError(d.error, 'coordinador'); return; }
+    var s = d.salud || {}, b = d.bandeja || {}, dg = d.digest_dia || {};
+    var ind = (dg.indicadores || {}), ap = (b.conteo_por_estado || {});
+    body.innerHTML = ''
+      + '<div class="pgrid">'
+      + _ptile('Estado general', '<span class="pstate-badge pstate-' + (d.estado_general||'OK') + '">' + (d.estado_general||'OK') + '</span>')
+      + _ptile('Radicadas hoy', ind.radicadas || 0)
+      + _ptile('Respondidas hoy', ind.respondidas || 0)
+      + _ptile('Recuperado', '$' + (ind.valor_recuperado||0).toLocaleString('es-CO'))
+      + _ptile('Tasa recup.', ((ind.tasa_recuperacion||0)*100).toFixed(1) + '%')
+      + _ptile('Pendientes', (b.total_evaluadas||0))
+      + '</div>'
+      + '<div class="pgrid">'
+      + _ptile('LISTA_ENVIAR', '<span class="pstate-badge pstate-LISTA_ENVIAR">' + (ap.LISTA_ENVIAR||0) + '</span>')
+      + _ptile('CASI_LISTA', '<span class="pstate-badge pstate-CASI_LISTA">' + (ap.CASI_LISTA||0) + '</span>')
+      + _ptile('REVISAR', '<span class="pstate-badge pstate-REVISAR">' + (ap.REVISAR||0) + '</span>')
+      + _ptile('INTERVENIR', '<span class="pstate-badge pstate-INTERVENIR">' + (ap.INTERVENIR||0) + '</span>')
+      + '</div>'
+      + '<div style="padding:12px 14px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:12px;color:#0c4a6e;">'
+      + '💡 Este resumen viene de <code>/control-center/resumen</code> — un único fetch que combina salud, bandeja autopilot, digest y schedulers.'
+      + '</div>';
+    return;
+  }
+
+  if(nombre === 'autopilot'){
+    var d = await _premiumFetch('/autopilot/mi-bandeja?limite=50');
+    if(d.error){ body.innerHTML = _premiumError(d.error); return; }
+    var c = d.conteo_por_estado || {};
+    var rows = (d.glosas||[]).map(function(g){
+      return '<div class="prow">'
+        + '<span><span class="pstate-badge pstate-' + g.estado_autopilot + '">' + g.estado_autopilot + '</span> '
+        + ' #' + g.glosa_id + ' · ' + (g.codigo||'—') + ' · ' + (g.eps||'—') + '</span>'
+        + '<span style="color:#6b7280;">$' + (g.valor||0).toLocaleString('es-CO') + ' · ' + ((g.confianza||0)*100).toFixed(0) + '%</span>'
+        + '</div>';
+    }).join('');
+    body.innerHTML = ''
+      + '<div class="pgrid">'
+      + _ptile('LISTA_ENVIAR','<span class="pstate-badge pstate-LISTA_ENVIAR">'+(c.LISTA_ENVIAR||0)+'</span>')
+      + _ptile('CASI_LISTA','<span class="pstate-badge pstate-CASI_LISTA">'+(c.CASI_LISTA||0)+'</span>')
+      + _ptile('REVISAR','<span class="pstate-badge pstate-REVISAR">'+(c.REVISAR||0)+'</span>')
+      + _ptile('INTERVENIR','<span class="pstate-badge pstate-INTERVENIR">'+(c.INTERVENIR||0)+'</span>')
+      + '</div>'
+      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;max-height:50vh;overflow-y:auto;">'
+      + (rows || '<div style="padding:30px;text-align:center;color:#9ca3af;">Bandeja vacía</div>')
+      + '</div>'
+      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
+      + 'Endpoint: <code>/autopilot/mi-bandeja</code> (o <code>/autopilot/bandeja</code> para coordinadores).'
+      + '</div>';
+    return;
+  }
+
+  if(nombre === 'digest'){
+    var d = await _premiumFetch('/digest/texto?periodo=dia');
+    if(d.error){ body.innerHTML = _premiumError(d.error,'coordinador'); return; }
+    body.innerHTML = ''
+      + '<div style="display:flex;gap:8px;margin-bottom:14px;">'
+      + '  <button onclick="_premiumVerDigest(\'dia\')" class="btn-secondary" style="font-size:12px;">Hoy</button>'
+      + '  <button onclick="_premiumVerDigest(\'semana\')" class="btn-secondary" style="font-size:12px;">Semana</button>'
+      + '  <button onclick="_premiumVerDigest(\'mes\')" class="btn-secondary" style="font-size:12px;">Mes</button>'
+      + '</div>'
+      + '<pre id="digest-pre" style="background:#f9fafb;padding:16px;border-radius:8px;border:1px solid #e5e7eb;white-space:pre-wrap;font-size:12px;line-height:1.6;">'
+      + _h(d.texto||'—') + '</pre>'
+      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
+      + 'Endpoints: <code>/digest/preview</code> (JSON) · <code>/digest/texto</code> (bot) · <code>/digest/html</code> (email).<br>'
+      + 'Programado automático: env vars <code>DIGEST_DESTINATARIOS</code>, <code>DIGEST_CANAL</code>, <code>DIGEST_HORA</code>.'
+      + '</div>';
+    return;
+  }
+
+  if(nombre === 'anomalias'){
+    var d = await _premiumFetch('/anomalias/dashboard?ventana_dias=30');
+    if(d.error){ body.innerHTML = _premiumError(d.error, 'coordinador'); return; }
+    var t = d.totales || {};
+    var dupHtml = (d.duplicados||[]).slice(0,20).map(function(a){
+      return '<div class="prow"><span><span class="pstate-badge pstate-' + (a.severidad==='ALTA'?'CRITICO':'REVISAR') + '">' + a.severidad + '</span> ' + _h(a.descripcion||'') + '</span></div>';
+    }).join('');
+    var patHtml = (d.patrones_eps||[]).slice(0,20).map(function(a){
+      return '<div class="prow"><span><span class="pstate-badge pstate-' + (a.severidad==='ALTA'?'CRITICO':'REVISAR') + '">' + a.severidad + '</span> ' + _h(a.descripcion||'') + '</span></div>';
+    }).join('');
+    body.innerHTML = ''
+      + '<div class="pgrid">'
+      + _ptile('Duplicados', t.duplicados||0)
+      + _ptile('Patrones EPS', t.patrones_eps||0)
+      + _ptile('Severidad ALTA', '<span class="pstate-badge pstate-CRITICO">'+(t.alta||0)+'</span>')
+      + _ptile('Severidad MEDIA', '<span class="pstate-badge pstate-REVISAR">'+(t.media||0)+'</span>')
+      + '</div>'
+      + '<h4 style="margin-top:8px;font-size:13px;color:#374151;">Duplicados detectados</h4>'
+      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px;">'
+      + (dupHtml || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">Sin duplicados</div>')
+      + '</div>'
+      + '<h4 style="font-size:13px;color:#374151;">Patrones EPS sospechosos</h4>'
+      + '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;">'
+      + (patHtml || '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">Sin patrones sospechosos</div>')
+      + '</div>'
+      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
+      + 'Endpoint: <code>/anomalias/dashboard</code> · z-score por glosa: <code>/anomalias/glosa/{id}/valor-anomalo</code>.'
+      + '</div>';
+    return;
+  }
+
+  if(nombre === 'salud'){
+    var d = await _premiumFetch('/sistema/salud');
+    if(d.error){ body.innerHTML = _premiumError(d.error, 'coordinador'); return; }
+    var c = d.componentes || {};
+    var pills = Object.keys(c).map(function(k){
+      var comp = c[k] || {};
+      var est = comp.estado || 'OK';
+      var cls = (est === 'CRITICO') ? 'pstate-CRITICO' : (est === 'OK') ? 'pstate-OK' : 'pstate-ATENCION';
+      var extra = Object.keys(comp).filter(function(x){return x!=='estado';}).map(function(x){
+        var v = comp[x];
+        if(typeof v === 'object') v = JSON.stringify(v);
+        return '<div style="font-size:11px;color:#6b7280;">' + x + ': ' + _h(String(v).slice(0,60)) + '</div>';
+      }).join('');
+      return '<div class="ptile">'
+        + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">' + k + '</div>'
+        + '<span class="pstate-badge ' + cls + '">' + est + '</span>'
+        + '<div style="margin-top:8px;">' + extra + '</div>'
+        + '</div>';
+    }).join('');
+    var alerts = (d.alertas||[]).map(function(a){
+      return '<div class="prow"><span><b style="color:#b91c1c;">' + (a.nivel||'?') + '</b> · ' + _h(a.mensaje||'') + '</span></div>';
+    }).join('');
+    body.innerHTML = ''
+      + '<div style="margin-bottom:14px;padding:14px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;">'
+      + '<b>Estado general:</b> <span class="pstate-badge pstate-' + (d.estado_general||'OK') + '">' + (d.estado_general||'OK') + '</span>'
+      + '</div>'
+      + '<div class="pgrid">' + pills + '</div>'
+      + (alerts ? '<h4 style="font-size:13px;color:#b91c1c;margin-top:14px;">Alertas activas</h4><div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;">' + alerts + '</div>' : '')
+      + '<div style="margin-top:12px;padding:10px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:6px;font-size:11px;color:#0c4a6e;">'
+      + 'Endpoints: <code>/sistema/salud</code> (detallado) · <code>/sistema/salud/publico</code> (uptime monitor).'
+      + '</div>';
+    return;
+  }
+
+  if(nombre === 'reportes'){
+    body.innerHTML = ''
+      + '<div style="display:grid;gap:12px;">'
+      + '  <div class="ptile">'
+      + '    <b>Reporte Gerencial Excel</b>'
+      + '    <p style="font-size:12px;color:#6b7280;margin:6px 0 10px 0;">4 hojas: Resumen · Top EPS · Autopilot · Anomalías. Formato institucional HUS con color por estado.</p>'
+      + '    <div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + '      <button class="btn-primary" onclick="_descargarGerencial(\'dia\')">📥 Descargar (hoy)</button>'
+      + '      <button class="btn-secondary" onclick="_descargarGerencial(\'semana\')">📥 Semana</button>'
+      + '      <button class="btn-secondary" onclick="_descargarGerencial(\'mes\')">📥 Mes</button>'
+      + '    </div>'
+      + '  </div>'
+      + '  <div class="ptile">'
+      + '    <b>Aplicar texto fijo automático al backlog</b>'
+      + '    <p style="font-size:12px;color:#6b7280;margin:6px 0 10px 0;">Barre todas las glosas pendientes y aplica respuesta fija a las RATIFICADAS y EXTEMPORÁNEAS. <b>RATIFICADA tiene prioridad y nunca menciona extemporaneidad.</b></p>'
+      + '    <div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + '      <button class="btn-secondary" onclick="_batchTextoFijo(true)">👁 Previsualizar (dry-run)</button>'
+      + '      <button class="btn-primary" onclick="_batchTextoFijo(false)">✓ Aplicar</button>'
+      + '    </div>'
+      + '    <pre id="batch-result" style="display:none;margin-top:10px;padding:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;"></pre>'
+      + '  </div>'
+      + '  <div class="ptile">'
+      + '    <b>Envío manual del digest por bot</b>'
+      + '    <p style="font-size:12px;color:#6b7280;margin:6px 0 10px 0;">Envía el resumen a WhatsApp/Telegram. Sin credenciales configuradas se usa modo mock (sí devuelve OK pero no envía realmente).</p>'
+      + '    <input id="digest-dest" placeholder="+573001234567 o chat_id" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;width:100%;font-size:12px;margin-bottom:8px;">'
+      + '    <div style="display:flex;gap:8px;">'
+      + '      <select id="digest-canal" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">'
+      + '        <option value="mock">mock</option><option value="whatsapp">whatsapp</option><option value="telegram">telegram</option>'
+      + '      </select>'
+      + '      <button class="btn-primary" onclick="_enviarDigestManual()">📨 Enviar</button>'
+      + '    </div>'
+      + '    <pre id="digest-result" style="display:none;margin-top:10px;padding:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;"></pre>'
+      + '  </div>'
+      + '</div>';
+    return;
+  }
+}
+
+async function _premiumVerDigest(periodo){
+  var pre = document.getElementById('digest-pre');
+  if(!pre) return;
+  pre.textContent = 'Cargando…';
+  var d = await _premiumFetch('/digest/texto?periodo=' + periodo);
+  pre.textContent = d.error ? ('ERROR: ' + d.error) : (d.texto||'—');
+}
+
+async function _descargarGerencial(periodo){
+  try{
+    var r = await fetch('/exportar/gerencial?periodo=' + periodo, {headers: authH()});
+    if(!r.ok){ toast('Error', 'No se pudo descargar (' + r.status + ')', 'error'); return; }
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'reporte_gerencial_hus_' + periodo + '.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Descargado','Abrí el Excel en tu gestor de descargas','success');
+  }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+async function _batchTextoFijo(dryRun){
+  var pre = document.getElementById('batch-result');
+  if(pre){ pre.style.display='block'; pre.textContent='Procesando…'; }
+  try{
+    var r = await fetch('/autopilot/texto-fijo/batch?dry_run=' + (dryRun?'true':'false'), {
+      method:'POST', headers: authH(),
+    });
+    var d = await r.json();
+    if(pre) pre.textContent = JSON.stringify(d, null, 2);
+    if(!dryRun){
+      toast('Batch aplicado', 'Aplicadas: ' + (d.aplicadas||0), 'success');
+      refrescarBadgeNotif();
+    }
+  }catch(e){ if(pre) pre.textContent = 'ERROR: ' + e.message; }
+}
+
+async function _enviarDigestManual(){
+  var dest = (document.getElementById('digest-dest')||{}).value;
+  var canal = (document.getElementById('digest-canal')||{}).value || 'mock';
+  if(!dest || !dest.trim()){ toast('Falta destinatario','Ingresá un número o chat_id','warning'); return; }
+  var pre = document.getElementById('digest-result');
+  if(pre){ pre.style.display='block'; pre.textContent='Enviando…'; }
+  try{
+    var r = await fetch('/digest/enviar?periodo=dia', {
+      method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({destinatario: dest.trim(), canal: canal}),
+    });
+    var d = await r.json();
+    if(pre) pre.textContent = JSON.stringify(d, null, 2);
+    toast('Digest enviado', 'Revisá la respuesta del bot abajo', 'success');
+  }catch(e){ if(pre) pre.textContent = 'ERROR: ' + e.message; }
+}
+
+function _ptile(label, value){
+  return '<div class="ptile"><div class="ptile-label">' + _h(label) + '</div><div class="ptile-value">' + value + '</div></div>';
+}
+
+function _h(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _premiumError(msg, requiere){
+  return '<div style="padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#991b1b;font-size:13px;">'
+    + '<b>No se pudo cargar esta sección.</b><br><br>'
+    + '<code style="font-size:11px;background:#fff;padding:4px 6px;border-radius:4px;">' + _h(msg) + '</code>'
+    + (requiere ? '<br><br>⚠️ Este panel requiere rol <b>' + requiere + '</b>.' : '')
+    + '</div>';
 }
 
 // ─── Notificaciones personales (Ronda 26) ───────────────────────────────
