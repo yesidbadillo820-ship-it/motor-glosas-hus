@@ -1156,6 +1156,8 @@ app.include_router(autopilot_router)
 app.include_router(digest_router)
 app.include_router(control_center_router)
 app.include_router(notificaciones_router)
+from app.api.routers.cups import router as cups_router
+app.include_router(cups_router)
 
 
 def get_glosa_service() -> GlosaService:
