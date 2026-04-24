@@ -2726,10 +2726,17 @@ async function prepararElDia(){
     banner.innerHTML = detalle + '<br><br><button onclick="this.parentElement.remove()" style="padding:6px 14px;background:#065f46;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer;">✓ Entendido</button>';
     document.body.appendChild(banner);
     setTimeout(function(){ try{ banner.remove(); }catch(_){} }, 15000);
-    // Refrescar UI
+    // Refrescar UI — Ronda 42: invalidar mapa autopilot para que los chips se
+    // recalculen con los nuevos workflow_state (RESPONDIDA).
+    window._autopilot_map = null;
     if(typeof loadMisGlosas === 'function') loadMisGlosas();
     if(typeof refrescarBadgeNotif === 'function') refrescarBadgeNotif();
     if(typeof refrescarKpisHeader === 'function') refrescarKpisHeader();
+    // Si el historial está visible, recargarlo también para refrescar los chips
+    var panelHist = document.getElementById('p-historial');
+    if(panelHist && panelHist.classList.contains('active') && typeof loadHist === 'function'){
+      loadHist(window.histPage || 1);
+    }
     toast('✓ Día preparado', (d.marcadas_respondidas||0) + ' glosa(s) cerradas automáticamente', 'success');
   }catch(e){
     hideLoading && hideLoading();

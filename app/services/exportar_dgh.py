@@ -404,6 +404,10 @@ def generar_filas_dgh(
         conceptos = conceptos_por_glosa.get(g.id, [])
         if not conceptos:
             # Fallback: 1 fila con los datos de la glosa misma
+            # Ronda 42: también aplicar extracción de descripción de servicio
+            desc_fallback = (g.servicio_descripcion or "").strip()
+            if not desc_fallback:
+                desc_fallback = extraer_descripcion_servicio(g.texto_glosa_original or g.observacion_eps or "")
             fila = {
                 "EstadoCxCObjecion": estado_cxc,
                 "TipoObjecionTramite": tipo_objecion_tramite(g.codigo_glosa or ""),
@@ -422,7 +426,7 @@ def generar_filas_dgh(
                 "ListadoConceptos.Oid": "",
                 "ListadoConceptos.ConceptoObjecion.Nombre": g.concepto_glosa or "",
                 "ListadoConceptos.ServicioProductoFactura.Codigo": g.cups_servicio or "",
-                "ListadoConceptos.ServicioProductoFactura.Descripcion": g.servicio_descripcion or "",
+                "ListadoConceptos.ServicioProductoFactura.Descripcion": desc_fallback,
                 "ListadoConceptos.ValorObjecion": float(g.valor_objetado or 0.0),
                 "ListadoConceptos.ServicioProductoFactura.CentroCosto.CodigoNombreCentro": "",
                 "ListadoConceptos.Observaciones": g.texto_glosa_original or g.observacion_eps or "",
