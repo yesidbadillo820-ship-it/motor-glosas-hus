@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_usuario_actual
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord
+from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
 
 router = APIRouter(prefix="/chat-glosa", tags=["chat-glosa"])
 
@@ -129,6 +130,7 @@ async def enviar_mensaje(
     data: ChatMensajeIn,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
+    _cupo_ia: None = Depends(_consumir_cupo_ia),
 ):
     """Procesa un mensaje del gestor sobre una glosa.
 
