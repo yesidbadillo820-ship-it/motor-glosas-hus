@@ -91,6 +91,33 @@ def evaluar_glosa_autopilot(db: Session, glosa: GlosaRecord) -> AutopilotResult:
     razones_contra: list[str] = []
     acciones: list[str] = []
 
+    # 0) Atajo texto fijo: si el dictamen fue pre-rellenado como RATIFICADA
+    # o EXTEMPORÁNEA (Ronda 21), el caso es mecánico y no requiere revisión
+    # IA — LISTA_ENVIAR directo con confianza alta. Respeta la regla de
+    # prioridad: RATIFICADA gana sobre EXTEMPORÁNEA.
+    modelo_actual = (getattr(glosa, "modelo_ia", "") or "").lower()
+    if "texto_fijo" in modelo_actual and (getattr(glosa, "dictamen", "") or "").strip():
+        if "ratificada" in modelo_actual:
+            tipo_tf = "RATIFICADA"
+        elif "extemporanea" in modelo_actual:
+            tipo_tf = "EXTEMPORANEA"
+        else:
+            tipo_tf = "TEXTO_FIJO"
+        return AutopilotResult(
+            estado="LISTA_ENVIAR",
+            confianza=0.95,
+            razones_a_favor=[
+                f"Dictamen fijo {tipo_tf} — texto canónico institucional.",
+                "No requiere revisión IA ni validación manual adicional.",
+            ],
+            razones_en_contra=[],
+            acciones_sugeridas=["Revisar visualmente y enviar."],
+            detalle={
+                "texto_fijo": tipo_tf,
+                "modelo_ia": modelo_actual,
+            },
+        )
+
     # 1) Predictor ML
     try:
         pred = predecir_ratificacion(db, glosa)

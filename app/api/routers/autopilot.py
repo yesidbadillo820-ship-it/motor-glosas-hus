@@ -26,6 +26,10 @@ from app.services.autopilot_service import (
     evaluar_bandeja,
     evaluar_glosa_autopilot,
 )
+from app.services.texto_fijo_detector import (
+    aplicar_texto_fijo_si_corresponde,
+    clasificar_texto_fijo,
+)
 
 router = APIRouter(prefix="/autopilot", tags=["autopilot"])
 
@@ -76,3 +80,44 @@ def mi_bandeja(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     return evaluar_bandeja(db, auditor_email=current_user.email, limite=limite)
+
+
+@router.get("/texto-fijo/{glosa_id}")
+def previsualizar_texto_fijo(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Muestra qué texto fijo aplicaría (Ronda 21). No muta la BD."""
+    g = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if not g:
+        raise HTTPException(status_code=404, detail="Glosa no encontrada")
+    clase = clasificar_texto_fijo(g)
+    if clase is None:
+        return {
+            "glosa_id": glosa_id,
+            "aplica": False,
+            "mensaje": "La glosa no es RATIFICADA ni EXTEMPORÁNEA — requiere análisis IA.",
+        }
+    return {"glosa_id": glosa_id, "aplica": True, **clase}
+
+
+@router.post("/texto-fijo/{glosa_id}/aplicar")
+def aplicar_texto_fijo(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Aplica el texto fijo a la glosa (muta). Solo coordinador/super_admin."""
+    g = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if not g:
+        raise HTTPException(status_code=404, detail="Glosa no encontrada")
+    clase = aplicar_texto_fijo_si_corresponde(g)
+    if clase is None:
+        return {
+            "glosa_id": glosa_id,
+            "aplicado": False,
+            "mensaje": "No aplica texto fijo para esta glosa (o ya tiene dictamen IA).",
+        }
+    db.commit()
+    return {"glosa_id": glosa_id, "aplicado": True, **clase}
