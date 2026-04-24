@@ -857,17 +857,26 @@ class GlosaService:
                 logger.info(f"Prompt enriquecido con {len(few_shots)} plantilla(s) gold")
             # CUPS verificado: extraer SOLO del texto de la glosa (no del PDF
             # que trae números de ingreso/HC/folio que no son CUPS).
+            # Ronda 47 fix: aceptar códigos alfanuméricos con sufijos tipo
+            # '39147B-18', '372301H', 'FMQ6296', '19914262-04' (CUM medicamentos).
             cups_verificado = ""
-            _m_cups = re.search(
-                r"(?:^|\s|[-·,])\s*(\d{4,8}(?:-\d)?)\s*(?:[-·,]|\s+[A-ZÁÉÍÓÚÑ])",
-                texto_base,
-            )
-            if _m_cups:
-                cups_verificado = _m_cups.group(1)
-            else:
-                _m2 = re.search(r"\b(\d{5,6}(?:-\d)?)\b", texto_base)
-                if _m2:
-                    cups_verificado = _m2.group(1)
+            try:
+                from app.main import _extraer_cups_servicio as _extcups
+                _c, _ = _extcups(texto_base, "")
+                cups_verificado = _c or ""
+            except Exception:
+                # Fallback al regex viejo (solo dígitos) — no bloquear si hay
+                # un problema de import circular durante startup.
+                _m_cups = re.search(
+                    r"(?:^|\s|[-·,])\s*([A-Z]{0,3}\d{4,8}[A-Z]?\d{0,2}(?:-\d{1,3})?)\s*(?:[-·,]|\s+[A-ZÁÉÍÓÚÑ])",
+                    texto_base,
+                )
+                if _m_cups:
+                    cups_verificado = _m_cups.group(1)
+                else:
+                    _m2 = re.search(r"\b(\d{5,6}[A-Z]?\d{0,2}(?:-\d{1,3})?)\b", texto_base)
+                    if _m2:
+                        cups_verificado = _m2.group(1)
 
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
@@ -916,14 +925,19 @@ class GlosaService:
                     f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
                     f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
                     f"  • Recomendación sistema: {rec.get('titulo','')}\n\n"
-                    "REGLAS:\n"
-                    "  1. Cita el contrato y la modalidad REALES del catálogo,\n"
-                    "     NO los genéricos del contrato EPS.\n"
-                    "  2. Si la modalidad es 'PROPIAS' o 'MANUAL HUS', cita la\n"
-                    "     Resolución 054/2026 ESE HUS (tarifas propias HUS).\n"
-                    "  3. Si la modalidad contiene 'SOAT' o 'UVB', cita la\n"
-                    "     Circular 047/2025 MinSalud + UVB 2026 $12.110.\n"
+                    "REGLAS OBLIGATORIAS:\n"
+                    "  1. Cita SIEMPRE el contrato y la modalidad REALES del catálogo,\n"
+                    "     NO los genéricos de la ficha EPS global.\n"
+                    "  2. Si la modalidad contiene 'PROPIA', 'PROPIAS', 'MANUAL HUS',\n"
+                    "     'INSTITUCIONAL' o no dice 'SOAT': la tarifa es PROPIA de la\n"
+                    "     ESE HUS (Res. 054/2026 + 124/2026 HUS, SMDLV × factor).\n"
+                    "     En este caso NO digas 'SOAT/SMLV -20%' ni menciones\n"
+                    "     descuento SOAT — es una tarifa propia institucional fija.\n"
+                    "  3. Si la modalidad contiene 'SOAT' o 'UVB': cita la Circular\n"
+                    "     047/2025 MinSalud + UVB 2026 $12.110.\n"
                     "  4. Usa el VALOR facturado y reconocido EXACTOS de arriba.\n"
+                    "  5. Si tarifa pactada > valor facturado: la glosa es\n"
+                    "     INJUSTIFICADA (facturamos por DEBAJO de lo pactado).\n"
                 )
                 user_prompt = user_prompt + bloque_tarifa
 

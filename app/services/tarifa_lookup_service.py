@@ -282,6 +282,13 @@ def evaluar_glosa_tarifa(
             "recomendacion": None,
         }
 
+    # Ronda 47 fix: si la glosa solo trae valor_objetado (lo que la EPS
+    # reconoció de menos) y no el facturado, asumimos facturado = objetado
+    # porque lo típico es que la EPS objete el monto completo. Esto corrige
+    # el mensaje engañoso "El hospital facturó $0".
+    if valor_facturado <= 0 and valor_objetado > 0:
+        valor_facturado = valor_objetado
+
     tipo = tarifa.tipo_tarifa or "VALOR_FIJO"
     factor_pct = float(tarifa.factor_ajuste or 0.0)
     es_soat_pct = tipo == "SOAT_PORCENTAJE"
