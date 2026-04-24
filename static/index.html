@@ -5604,9 +5604,50 @@ async function verGlosa(id){
   }catch(e){ alert('Error: ' + e.message); }
 }
 
+// Ronda 30: consulta el autopilot para la glosa y muestra un banner
+// visible en la parte superior del panel analizar con el resultado.
+async function _mostrarBannerAutopilot(glosaId){
+  try{
+    var r = await fetch('/autopilot/glosa/' + glosaId, {headers: authH()});
+    if(!r.ok) return;
+    var a = await r.json();
+    var estado = a.estado_autopilot || '';
+    var conf = Math.round((a.confianza || 0) * 100);
+    var colores = {
+      LISTA_ENVIAR: ['#dcfce7','#166534','✅'],
+      CASI_LISTA:   ['#d1fae5','#065f46','🟢'],
+      REVISAR:      ['#fef3c7','#92400e','🟡'],
+      INTERVENIR:   ['#fee2e2','#991b1b','🔴'],
+    };
+    var c = colores[estado] || ['#f3f4f6','#374151','🤖'];
+    var pro = (a.razones_a_favor||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
+    var con = (a.razones_en_contra||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
+    var acc = (a.acciones_sugeridas||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
+    var html = ''
+      + '<div id="ap-banner" style="background:' + c[0] + ';border:1px solid ' + c[1] + '33;border-left:4px solid ' + c[1] + ';border-radius:10px;padding:14px 18px;margin:12px 0;color:' + c[1] + ';">'
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      +     '<div style="font-size:14px;font-weight:700;">' + c[2] + ' Autopilot: ' + estado.replace("_"," ") + ' <span style="font-weight:500;opacity:.8;">(confianza ' + conf + '%)</span></div>'
+      +     '<button onclick="var b=document.getElementById(\'ap-banner\');if(b)b.remove()" style="background:transparent;border:0;color:' + c[1] + ';cursor:pointer;font-size:18px;line-height:1;">×</button>'
+      +   '</div>'
+      +   (pro ? '<div style="margin-top:8px;font-size:12px;"><b>A favor:</b><ul style="margin:4px 0 0 18px;padding:0;">' + pro + '</ul></div>' : '')
+      +   (con ? '<div style="margin-top:6px;font-size:12px;"><b>En contra:</b><ul style="margin:4px 0 0 18px;padding:0;">' + con + '</ul></div>' : '')
+      +   (acc ? '<div style="margin-top:6px;font-size:12px;"><b>Acciones sugeridas:</b><ul style="margin:4px 0 0 18px;padding:0;">' + acc + '</ul></div>' : '')
+      + '</div>';
+    // Insertar al inicio del panel analizar
+    var panel = document.getElementById('p-analizar');
+    if(!panel) return;
+    // Remover banner previo si existe
+    var prev = document.getElementById('ap-banner');
+    if(prev) prev.remove();
+    panel.insertAdjacentHTML('afterbegin', html);
+  }catch(_){/* silencioso */}
+}
+
 // Cambia a la pestaña Analizar y pre-rellena los campos desde la glosa
 async function responderGlosa(id){
   try{
+    // Ronda 30: consultar autopilot en paralelo — no bloqueante
+    _mostrarBannerAutopilot(id);
     var r = await fetch('/glosas/' + id, {headers: authH()});
     if(!r.ok){ alert('No se pudo cargar la glosa'); return; }
     var g = await r.json();
