@@ -245,6 +245,17 @@ def aplicar_texto_fijo_si_corresponde(glosa) -> Optional[dict]:
         from datetime import datetime, timezone as _tz
         glosa.dictamen = clase["dictamen_html"]
         glosa.modelo_ia = clase["modelo_ia"]
+        # Ronda 38: grabar también codigo_respuesta para el export DGH.
+        # RE9901 = no acepta ratificación; RE9501 = rechaza por extemporaneidad.
+        try:
+            codigo_resp_existente = (getattr(glosa, "codigo_respuesta", "") or "").strip()
+            if not codigo_resp_existente:
+                if clase["tipo"] == "RATIFICADA":
+                    glosa.codigo_respuesta = "RE9901"
+                elif clase["tipo"] == "EXTEMPORANEA":
+                    glosa.codigo_respuesta = "RE9501"
+        except Exception:
+            pass
         # Solo actualizamos estado si está vacío o si es una transición válida
         estado_actual = (getattr(glosa, "estado", "") or "").upper()
         if not estado_actual or estado_actual in ("PENDIENTE", "RADICADA", "EN_REVISION", "BORRADOR"):
