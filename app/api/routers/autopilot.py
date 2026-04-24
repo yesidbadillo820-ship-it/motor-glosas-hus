@@ -62,6 +62,14 @@ def evaluar_glosa(
                 detail="Solo podés evaluar glosas asignadas a vos.",
             )
     res = evaluar_glosa_autopilot(db, g)
+    # Ronda 40 fix: incluir workflow_state/estado actuales para que el frontend
+    # sepa si la glosa ya está cerrada y no muestre el botón one-click.
+    wf_actual = (getattr(g, "workflow_state", "") or "").upper()
+    estado_actual = (getattr(g, "estado", "") or "").upper()
+    ya_cerrada = (
+        wf_actual in ("RESPONDIDA", "CONCILIADA", "LEVANTADA")
+        or estado_actual in ("RESPONDIDA", "CONCILIADA", "LEVANTADA")
+    )
     return {
         "glosa_id": glosa_id,
         "estado_autopilot": res.estado,
@@ -70,6 +78,9 @@ def evaluar_glosa(
         "razones_en_contra": res.razones_en_contra,
         "acciones_sugeridas": res.acciones_sugeridas,
         "detalle": res.detalle,
+        "workflow_state": wf_actual,
+        "estado": estado_actual,
+        "ya_cerrada": ya_cerrada,
     }
 
 
