@@ -113,6 +113,79 @@ def previsualizar_texto_fijo(
     return {"glosa_id": glosa_id, "aplica": True, **clase}
 
 
+@router.post("/preparar-dia")
+def preparar_dia(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Ronda 37: master action que corre toda la higiene matinal en un
+    solo click. Ideal para el coordinador apenas abre el sistema.
+
+    Ejecuta en orden:
+      1. Aplicar texto fijo a todas las glosas RATIFICADAS/EXTEMPORÁNEAS
+         sin dictamen (Ronda 22).
+      2. Marcar RESPONDIDAS las que ya tienen texto fijo pero seguían
+         en workflow pendiente (Ronda 34 hotfix).
+      3. Contabilizar el impacto total.
+
+    Idempotente. Seguro correrlo muchas veces al día.
+    """
+    from datetime import datetime, timezone as _tz
+    from app.services.texto_fijo_batch import retro_aplicar
+
+    # Paso 1: aplicar texto fijo al backlog
+    stats_aplicar = retro_aplicar(db, dry_run=False, ventana_dias=365)
+
+    # Paso 2: marcar respondidas las que tienen texto fijo pero están pendientes
+    q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.modelo_ia.ilike("%texto_fijo%"))
+        .filter(~GlosaRecord.workflow_state.in_(["RESPONDIDA", "CONCILIADA", "LEVANTADA"]))
+    )
+    candidatas = q.all()
+    marcadas_respondidas = 0
+    for g in candidatas:
+        try:
+            g.workflow_state = "RESPONDIDA"
+            if not g.fecha_decision_eps:
+                g.fecha_decision_eps = datetime.now(_tz.utc)
+            if not (g.nota_workflow or "").strip():
+                m = (g.modelo_ia or "").lower()
+                tipo = "RATIFICADA" if "ratificada" in m else ("EXTEMPORANEA" if "extemporanea" in m else "texto_fijo")
+                g.nota_workflow = f"Respondida automáticamente: texto fijo {tipo}"
+            marcadas_respondidas += 1
+        except Exception:
+            pass
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return {
+            "error": str(e)[:200],
+            "aplicar_texto_fijo": stats_aplicar,
+            "marcadas_respondidas": marcadas_respondidas,
+        }
+
+    return {
+        "ok": True,
+        "timestamp": datetime.now(_tz.utc).isoformat(),
+        "aplicar_texto_fijo": {
+            "total_analizadas": stats_aplicar.get("total_analizadas", 0),
+            "aplicadas": stats_aplicar.get("aplicadas", 0),
+            "ratificadas_detectadas": stats_aplicar.get("aplicarian_ratificada", 0),
+            "extemporaneas_detectadas": stats_aplicar.get("aplicarian_extemporanea", 0),
+            "skip_por_idempotencia": stats_aplicar.get("skip_por_idempotencia", 0),
+        },
+        "marcadas_respondidas": marcadas_respondidas,
+        "resumen_humano": (
+            f"Se aplicó texto fijo a {stats_aplicar.get('aplicadas', 0)} glosa(s). "
+            f"Se marcaron como RESPONDIDAS {marcadas_respondidas} que ya tenían el texto. "
+            f"El equipo puede empezar el día sin tocar casos mecánicos."
+        ),
+    }
+
+
 @router.post("/texto-fijo/marcar-respondidas")
 def marcar_respondidas_texto_fijo(
     dry_run: bool = Query(False),
