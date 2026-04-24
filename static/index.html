@@ -5604,6 +5604,35 @@ async function verGlosa(id){
   }catch(e){ alert('Error: ' + e.message); }
 }
 
+// Ronda 31: envío rápido (one-click) cuando autopilot da LISTA_ENVIAR + confianza alta
+async function _apEnviarRapido(glosaId, ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  if(!confirm('✓ Marcar la glosa #' + glosaId + ' como RESPONDIDA sin abrir su detalle?\n\nEl autopilot la clasificó LISTA_ENVIAR con alta confianza. Solo hacé esto si confiás en el triage automático.')) return;
+  var btn = ev && ev.target;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Enviando…'; }
+  try{
+    var r = await fetch('/workflow/' + glosaId + '/transicionar', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({hacia: 'RESPONDIDA', nota: 'Envío rápido desde banner autopilot (LISTA_ENVIAR, confianza ≥85%)'}),
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){
+      if(btn){ btn.disabled = false; btn.textContent = '✓ Marcar como RESPONDIDA (sin revisar)'; }
+      toast('No se pudo marcar', d.detail || ('Error ' + r.status), 'error');
+      return;
+    }
+    toast('✓ Glosa respondida','#' + glosaId + ' quedó en bandeja Respondidas','success');
+    var banner = document.getElementById('ap-banner');
+    if(banner) banner.remove();
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    if(typeof refrescarBadgeNotif === 'function') refrescarBadgeNotif();
+  }catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = '✓ Marcar como RESPONDIDA (sin revisar)'; }
+    toast('Error', e.message || 'fallo de red', 'error');
+  }
+}
+
 // Ronda 30: consulta el autopilot para la glosa y muestra un banner
 // visible en la parte superior del panel analizar con el resultado.
 async function _mostrarBannerAutopilot(glosaId){
@@ -5623,8 +5652,18 @@ async function _mostrarBannerAutopilot(glosaId){
     var pro = (a.razones_a_favor||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
     var con = (a.razones_en_contra||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
     var acc = (a.acciones_sugeridas||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
+
+    // Ronda 31: acción one-click si autopilot dice LISTA_ENVIAR con alta confianza
+    var oneClick = '';
+    if(estado === 'LISTA_ENVIAR' && conf >= 85){
+      oneClick = '<button onclick="_apEnviarRapido(' + glosaId + ',event)" style="margin-top:10px;padding:9px 16px;background:' + c[1] + ';color:#fff;border:0;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 2px 6px ' + c[1] + '40;">'
+        + '✓ Marcar como RESPONDIDA (sin revisar)'
+        + '</button>'
+        + '<div style="font-size:10.5px;color:' + c[1] + ';opacity:.8;margin-top:4px;">⚡ Atajo del autopilot — confianza ' + conf + '%. La glosa pasa directo a bandeja Respondidas.</div>';
+    }
+
     var html = ''
-      + '<div id="ap-banner" style="background:' + c[0] + ';border:1px solid ' + c[1] + '33;border-left:4px solid ' + c[1] + ';border-radius:10px;padding:14px 18px;margin:12px 0;color:' + c[1] + ';">'
+      + '<div id="ap-banner" data-glosa="' + glosaId + '" style="background:' + c[0] + ';border:1px solid ' + c[1] + '33;border-left:4px solid ' + c[1] + ';border-radius:10px;padding:14px 18px;margin:12px 0;color:' + c[1] + ';">'
       +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
       +     '<div style="font-size:14px;font-weight:700;">' + c[2] + ' Autopilot: ' + estado.replace("_"," ") + ' <span style="font-weight:500;opacity:.8;">(confianza ' + conf + '%)</span></div>'
       +     '<button onclick="var b=document.getElementById(\'ap-banner\');if(b)b.remove()" style="background:transparent;border:0;color:' + c[1] + ';cursor:pointer;font-size:18px;line-height:1;">×</button>'
@@ -5632,6 +5671,7 @@ async function _mostrarBannerAutopilot(glosaId){
       +   (pro ? '<div style="margin-top:8px;font-size:12px;"><b>A favor:</b><ul style="margin:4px 0 0 18px;padding:0;">' + pro + '</ul></div>' : '')
       +   (con ? '<div style="margin-top:6px;font-size:12px;"><b>En contra:</b><ul style="margin:4px 0 0 18px;padding:0;">' + con + '</ul></div>' : '')
       +   (acc ? '<div style="margin-top:6px;font-size:12px;"><b>Acciones sugeridas:</b><ul style="margin:4px 0 0 18px;padding:0;">' + acc + '</ul></div>' : '')
+      +   oneClick
       + '</div>';
     // Insertar al inicio del panel analizar
     var panel = document.getElementById('p-analizar');
