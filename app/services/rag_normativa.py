@@ -38,6 +38,77 @@ def _tokenizar(texto: str) -> list[str]:
     return [t for t in norm.split() if t not in STOP and len(t) >= 3]
 
 
+# Ronda 50 Paso 5: sinónimos del dominio. Se expande el query antes de
+# tokenizar para que "plazo" matchee normas que solo usan "término", etc.
+# Todos minúsculas sin tildes (post _normalizar).
+_SINONIMOS_DOMINIO: dict[str, list[str]] = {
+    "plazo": ["termino", "tiempo"],
+    "termino": ["plazo", "tiempo"],
+    "ips": ["prestador", "hospital", "clinica"],
+    "prestador": ["ips", "hospital", "clinica"],
+    "eps": ["pagador", "entidad", "asegurador"],
+    "pagador": ["eps", "entidad", "asegurador"],
+    "glosa": ["objecion", "reparo"],
+    "objecion": ["glosa", "reparo"],
+    "glosas": ["objeciones", "reparos"],
+    "factura": ["cobro", "facturacion"],
+    "factura": ["cobro", "facturacion"],
+    "soporte": ["documento", "anexo"],
+    "historia": ["clinica", "epicrisis", "registro"],
+    "tarifa": ["valor", "precio", "pactado"],
+    "tarifas": ["valores", "precios", "pactados"],
+    "consulta": ["atencion", "visita"],
+    "cups": ["procedimiento", "codigo"],
+    "ratificada": ["mantenida", "reiterada"],
+    "extemporanea": ["tardia", "vencida"],
+    "conciliacion": ["acuerdo", "negociacion"],
+    "levantamiento": ["aceptacion", "desistimiento"],
+    "respuesta": ["replica", "contestacion"],
+    "autorizacion": ["aval", "orden"],
+    "rips": ["registro", "reporte"],
+    "fev": ["factura", "electronica"],
+}
+
+
+def _expandir_con_sinonimos(tokens: list[str]) -> list[str]:
+    """Expande la lista de tokens con sus sinónimos conocidos del dominio.
+
+    No duplica: si 'plazo' ya está y se expande 'termino', se agrega una
+    sola vez. Los sinónimos tienen peso 0.5 del original (se duplican con
+    ese factor — el caller puede leer las frecuencias para ponderar).
+    """
+    expandidos = list(tokens)  # copia
+    vistos = set(tokens)
+    for t in tokens:
+        for sin in _SINONIMOS_DOMINIO.get(t, []):
+            if sin not in vistos:
+                expandidos.append(sin)
+                vistos.add(sin)
+    return expandidos
+
+
+# Patrones para detectar citas literales en la consulta — boost cuando
+# matchean exactamente con el documento.
+_CITA_LITERAL_RE = re.compile(
+    r"(art[íi]culo|art\.|ley|resoluci[oó]n|res\.|decreto|dec\.|circular|sentencia|acuerdo)\s*"
+    r"([tcsu]?-?\s*\d+(?:[/\-]\d+)?)",
+    re.IGNORECASE,
+)
+
+
+def _extraer_citas_literales(consulta: str) -> list[str]:
+    """Encuentra citas normativas formales en la consulta ('Art. 57',
+    'Ley 1438', 'Res. 2284'). Útil para boost en scoring."""
+    if not consulta:
+        return []
+    citas = []
+    for m in _CITA_LITERAL_RE.finditer(consulta):
+        tipo = _normalizar(m.group(1))
+        numero = _normalizar(m.group(2))
+        citas.append(f"{tipo}_{numero}".replace(" ", ""))
+    return citas
+
+
 def _cargar_indice() -> dict:
     """Construye índice TF-IDF sobre _TODAS_LAS_NORMAS.
 
@@ -101,18 +172,31 @@ def buscar_normas(consulta: str, top_k: int = 5, min_score: float = 0.05) -> lis
     """Busca normas relevantes para una consulta libre.
 
     Ej: 'tarifa soat diferencia contrato' → [Circular 047/2025, Art. 871, ...]
+
+    Ronda 50 Paso 5: agrega sinónimos del dominio (plazo↔término, IPS↔
+    prestador, glosa↔objeción...) y boost por citas literales ('Art. 57',
+    'Res. 2284').
     """
     idx = _get_indice()
     if not idx.get("docs"):
         return []
-    q_tokens = _tokenizar(consulta)
-    if not q_tokens:
+    q_tokens_originales = _tokenizar(consulta)
+    if not q_tokens_originales:
         return []
-    q_tf = {}
-    for t in q_tokens:
-        q_tf[t] = q_tf.get(t, 0) + 1
+
+    # Expandir con sinónimos: sinónimos pesan 0.5 del original.
+    q_tokens_expandidos = _expandir_con_sinonimos(q_tokens_originales)
+    q_tf: dict[str, float] = {}
+    peso_sinonimo = 0.5
+    set_originales = set(q_tokens_originales)
+    for t in q_tokens_expandidos:
+        peso = 1.0 if t in set_originales else peso_sinonimo
+        q_tf[t] = q_tf.get(t, 0) + peso
     longi = sum(q_tf.values()) or 1
     q_tf = {k: v / longi for k, v in q_tf.items()}
+
+    # Citas literales en la consulta — para boost
+    citas_query = set(_extraer_citas_literales(consulta))
 
     scores = []
     idf = idx["idf"]
@@ -121,6 +205,16 @@ def buscar_normas(consulta: str, top_k: int = 5, min_score: float = 0.05) -> lis
         for tok, w_q in q_tf.items():
             if tok in d["tf"]:
                 score += w_q * d["tf"][tok] * (idf.get(tok, 1.0) ** 2)
+        # Boost ×2 si el nombre de la norma contiene una cita literal del query
+        # (ej. query '¿qué dice Art. 57 Ley 1438?' boostea Ley 1438).
+        if citas_query:
+            clave_norm = _normalizar(clave)
+            for cita in citas_query:
+                # Cita ya viene normalizada ('ley_1438', 'resolucion_2284')
+                numero = cita.split("_", 1)[-1] if "_" in cita else cita
+                if numero and numero in clave_norm:
+                    score *= 2.0
+                    break
         if score > min_score:
             scores.append((clave, score, d["metadata"]))
     scores.sort(key=lambda x: x[1], reverse=True)
