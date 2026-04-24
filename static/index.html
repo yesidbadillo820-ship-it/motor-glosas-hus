@@ -1698,7 +1698,8 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <option value="LEVANTADA">Levantada</option>
           </select>
           <button class="btn btn-ghost" onclick="toggleFiltrosAvanzados()" id="btn-filtros-adv">Filtros avanzados ▾</button>
-          <button class="btn btn-ghost" onclick="exportXLSX()" style="margin-left:auto" title="Exportar Excel con filtros aplicados">Exportar XLSX</button>
+          <button class="btn" onclick="exportarFormatoDGH()" style="margin-left:auto;background:#0f766e;color:#fff;border:0;font-weight:700;" title="Descarga el Excel con la estructura EXACTA que exige el DGH para cargar al sistema (26 columnas canónicas + dictamen limpio en OBSERVACION)">📥 Formato DGH</button>
+          <button class="btn btn-ghost" onclick="exportXLSX()" title="Exportar Excel simple con filtros aplicados">Exportar XLSX</button>
           <button class="btn btn-ghost" onclick="exportCSV()">CSV</button>
         </div>
         <div class="hist-toolbar hist-filtros-adv" id="hist-filtros-adv" style="display:none;gap:.6rem;flex-wrap:wrap;padding-top:.2rem;border-top:1px dashed var(--border)">
@@ -3155,6 +3156,14 @@ async function premiumTab(nombre){
   if(nombre === 'reportes'){
     body.innerHTML = ''
       + '<div style="display:flex;flex-direction:column;gap:14px;">'
+      + '  <div class="ptile" style="min-height:auto;background:#ecfdf5;border-color:#6ee7b7;">'
+      + '    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+      + '      <span style="font-size:22px;">🏛️</span>'
+      + '      <b style="font-size:14px;color:#065f46;">Formato DGH para cargar al sistema (Ronda 35) ⭐ NUEVO</b>'
+      + '    </div>'
+      + '    <p style="font-size:12px;color:#065f46;margin:0 0 12px 0;">Descarga el Excel con la <b>estructura exacta</b> que exige el DGH: 26 columnas canónicas + 4 HUS (FECHA DE CARGUE · CODIGO RESPUESTA · VALOR ACEPTADO · OBSERVACION). Una fila por concepto. Dictamen limpio sin emojis ni texto debug. EPS completa con código interno.</p>'
+      + '    <button class="btn-primary" style="padding:8px 14px;background:#0f766e;" onclick="exportarFormatoDGH()">📥 Descargar formato DGH (todas las respondidas)</button>'
+      + '  </div>'
       + '  <div class="ptile" style="min-height:auto;">'
       + '    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
       + '      <span style="font-size:22px;">📥</span>'
@@ -7149,6 +7158,44 @@ async function exportXLSX(){
     hideLoading();
     toast('Descarga lista','Excel generado correctamente','success');
   }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// Ronda 35: descarga con la estructura EXACTA que exige DGH (26 columnas
+// canónicas + 4 HUS), una fila por concepto, dictamen LIMPIO en OBSERVACION.
+async function exportarFormatoDGH(){
+  // Reutiliza los filtros de la vista Historial
+  var parts = [];
+  var eps = (document.getElementById('h-eps')||{}).value || '';
+  var estado = (document.getElementById('h-estado')||{}).value || '';
+  var desde = (document.getElementById('h-desde')||{}).value || '';
+  var hasta = (document.getElementById('h-hasta')||{}).value || '';
+  if(eps) parts.push('eps=' + encodeURIComponent(eps));
+  if(estado) parts.push('estado=' + encodeURIComponent(estado));
+  if(desde) parts.push('desde=' + encodeURIComponent(desde));
+  if(hasta) parts.push('hasta=' + encodeURIComponent(hasta));
+  parts.push('solo_respondidas=true');
+  var url = '/exportar/dgh' + (parts.length ? '?' + parts.join('&') : '');
+  try{
+    showLoading();
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){
+      hideLoading();
+      var txt = await r.text().catch(function(){ return ''; });
+      toast('Error','No se pudo exportar formato DGH: ' + r.status + ' ' + txt.slice(0,100),'error');
+      return;
+    }
+    var blob = await r.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'glosas_dgh_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    hideLoading();
+    toast('✓ Formato DGH listo','Archivo con 26 columnas canónicas + 4 HUS. Cárgalo al DGH.','success');
+  }catch(e){
+    hideLoading();
+    toast('Error','Conexión: ' + e.message,'error');
+  }
 }
 
 var estadoBadge={
