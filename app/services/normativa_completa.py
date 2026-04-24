@@ -408,6 +408,67 @@ RESOLUCIONES = {
         "vigente": True,
         "keywords": ["PPL", "reclusos", "5159"],
     },
+
+    # Ronda 48: Resolución 2641 de 2025 — Clasificación CUPS y tabla de
+    # homologación oficial entre códigos internos de prestadores y la
+    # numeración vigente (CUPS 2025).
+    "RESOLUCION 2641 DE 2025": {
+        "nombre": "Resolución 2641 de 2025 (MinSalud)",
+        "titulo": "Clasificación Única de Procedimientos en Salud (CUPS) versión 2025 — Tabla de homologación oficial",
+        "ambito": (
+            "Reemplaza la Res. 2341 de 2024 (CUPS 2024) y establece la "
+            "TABLA DE HOMOLOGACIÓN entre códigos internos de prestadores "
+            "(ej. códigos institucionales HUS con sufijo H, H1, H2, o con "
+            "versión -18/-16/-19) y la numeración CUPS oficial vigente. "
+            "De OBLIGATORIO CUMPLIMIENTO para RIPS, FEV y todo reporte "
+            "de cuentas médicas. En el sistema IA GLOSAS SINAC la "
+            "equivalencia se aplica automáticamente cuando la EPS glosa "
+            "con el código viejo — ver homologador_cups.py."
+        ),
+        "vigente": True,
+        "articulos": {
+            "uso_obligatorio": {
+                "titulo": "Uso obligatorio de CUPS 2025",
+                "texto": (
+                    "Todos los prestadores y entidades responsables del pago "
+                    "deberán emplear la numeración CUPS 2025 establecida en "
+                    "esta resolución para la facturación, glosa, conciliación "
+                    "y reporte al Registro Individual de Prestación de "
+                    "Servicios de Salud (RIPS, Res. 202/2021 y 2275/2023 FEV). "
+                    "Cuando el Excel del contrato o la factura traiga el "
+                    "código interno del prestador (ej. '39147B-18', '890348H', "
+                    "'372301H'), se entenderá equivalente al CUPS 2025 oficial "
+                    "según la tabla de homologación del Anexo Técnico."
+                ),
+                "aplicacion": (
+                    "Ante glosas con código viejo, aplicar homologación "
+                    "Res. 2641/2025 antes de evaluar la tarifa pactada. "
+                    "El sistema lo hace automáticamente vía codigo_ips + "
+                    "homologador_cups.py."
+                ),
+                "keywords": [
+                    "CUPS 2025", "homologación", "equivalencia", "código interno",
+                    "código viejo", "2641", "RIPS", "FEV",
+                ],
+            },
+        },
+        "keywords": [
+            "CUPS", "2641", "homologación", "clasificación única",
+            "procedimientos", "código interno", "MinSalud 2025",
+        ],
+    },
+
+    "RESOLUCION 2341 DE 2024": {
+        "nombre": "Resolución 2341 de 2024 (MinSalud)",
+        "titulo": "Clasificación Única de Procedimientos en Salud (CUPS) versión 2024 (antecedente)",
+        "ambito": (
+            "Antecesora de la Res. 2641/2025. Vigente hasta la entrada de "
+            "CUPS 2025. Los archivos históricos pueden traer referencia a "
+            "'CUPS 2341/24'."
+        ),
+        "vigente": False,
+        "keywords": ["CUPS 2024", "2341", "clasificación única"],
+    },
 }
 
 
