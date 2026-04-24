@@ -107,6 +107,18 @@ _EMOJI_RE = re.compile(
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
+# Marcadores donde empieza el ARGUMENTO jurídico real (ignorar todo lo anterior)
+_INICIO_ARGUMENTO = re.compile(r"ARGUMENTACI[ÓO]N\s+JUR[ÍI]DICA\s*", re.IGNORECASE)
+
+# Marcadores donde termina el argumento (todo lo siguiente es decoración/footer)
+_FIN_ARGUMENTO = re.compile(
+    r"(RELACI[ÓO]N\s+DE\s+SOPORTES\s+APORTADOS|"
+    r"#\s*Documento\s+Marco\s+legal|"
+    r"Nota:\s*Generado\s+con\s+asistencia\s+de\s+IA|"
+    r"Generado\s+con\s+asistencia\s+de\s+IA)",
+    re.IGNORECASE,
+)
+
 # Headers que debemos ELIMINAR del inicio del dictamen (no son argumento)
 _HEADERS_BASURA = (
     re.compile(r"^\s*RATIFICADA\s+EPS:.*?Observaci[óo]n\s+recepci[óo]n:\s*", re.IGNORECASE | re.DOTALL),
@@ -121,7 +133,43 @@ _HEADERS_BASURA = (
     re.compile(r"^\s*EPS:\s*.*?\|\s*Factura:\s*.*?\|\s*Observaci[óo]n\s+recepci[óo]n:\s*", re.IGNORECASE | re.DOTALL),
     # Línea tipo "CUPS: 890750 EPS: ... Contrato: ..."
     re.compile(r"CUPS:\s*\S+\s+EPS:\s*[^|]*?\s+Contrato:\s*\S+.*?(?=ESE\s+HUS|DE\s+CONFORMIDAD|$)", re.IGNORECASE | re.DOTALL),
+    # Tabla encabezado "CÓDIGO GLOSA VALOR OBJETADO CÓDIGO RESPUESTA TA0201 $ N RE9901"
+    re.compile(r"C[ÓO]DIGO\s+GLOSA\s+VALOR\s+OBJETADO\s+C[ÓO]DIGO\s+RESPUESTA\s+\S+\s+\$\s*[\d\.,]+\s+RE\d+", re.IGNORECASE),
+    # Banner "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
+    re.compile(r"GLOSA\s+RATIFICADA\s*[-–]\s*SE\s+MANTIENE\s+RESPUESTA\s+INICIAL.*?CONCILIACI[ÓO]N", re.IGNORECASE),
+    # Meta "N° Factura: HUS000... [EPS] RATIFICADA"
+    re.compile(r"N[°º]\s*Factura:\s*\S+\s+.*?\s+RATIFICADA", re.IGNORECASE),
+    # Nota pie "Generado con asistencia de IA. Verificar antes de radicar..."
+    re.compile(r"Nota:\s*Generado\s+con\s+asistencia\s+de\s+IA.*", re.IGNORECASE | re.DOTALL),
+    # Sección "RELACIÓN DE SOPORTES APORTADOS ... tabla ... Res. XXX/XXXX"
+    re.compile(r"RELACI[ÓO]N\s+DE\s+SOPORTES\s+APORTADOS.*", re.IGNORECASE | re.DOTALL),
+    # Título "ARGUMENTACIÓN JURÍDICA" suelto
+    re.compile(r"ARGUMENTACI[ÓO]N\s+JUR[ÍI]DICA\s*(?=[A-Z])", re.IGNORECASE),
 )
+
+
+# Para extraer descripción de servicio desde observacion_eps
+# Patrón típico: "CUPS 881434H - PERFIL BIOFISICO - Valor objetado"
+_DESCRIPCION_SERVICIO_RE = re.compile(
+    r"CUPS\s+[\w\-]+\s*-\s*(.+?)\s*-\s*Valor\s+objetado",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def extraer_descripcion_servicio(obs: str) -> str:
+    """Ronda 39 fix: si el ConceptoGlosaRecord no tiene `cups_descripcion`
+    pero la observación sí contiene 'CUPS NNN - NOMBRE SERVICIO - Valor objetado',
+    extraer el nombre del servicio."""
+    if not obs:
+        return ""
+    m = _DESCRIPCION_SERVICIO_RE.search(str(obs))
+    if not m:
+        return ""
+    desc = m.group(1).strip()
+    # Sacar saltos de línea internos
+    desc = re.sub(r"\s+", " ", desc)
+    # Limit razonable
+    return desc[:300]
 
 
 def _strip_html(s: str) -> str:
@@ -162,6 +210,17 @@ def limpiar_dictamen_para_dgh(dictamen_html: str, glosa: GlosaRecord) -> str:
     # Caso general: HTML → texto + quitar emojis + quitar headers de debug
     txt = _strip_html(dictamen_html)
     txt = _EMOJI_RE.sub("", txt)
+
+    # Estrategia 1: si existe marcador 'ARGUMENTACIÓN JURÍDICA', cortar desde ahí
+    m_inicio = _INICIO_ARGUMENTO.search(txt)
+    if m_inicio:
+        txt = txt[m_inicio.end():]
+    # Estrategia 2: cortar antes de 'RELACIÓN DE SOPORTES APORTADOS' o 'Nota: Generado...'
+    m_fin = _FIN_ARGUMENTO.search(txt)
+    if m_fin:
+        txt = txt[:m_fin.start()]
+
+    # Remover headers sueltos residuales
     for rx in _HEADERS_BASURA:
         txt = rx.sub("", txt)
     txt = re.sub(r"\s{2,}", " ", txt).strip()
@@ -377,6 +436,14 @@ def generar_filas_dgh(
 
         # Una fila por concepto (formato canónico DGH)
         for c in conceptos:
+            # Ronda 39: fallback para descripción del servicio
+            desc_servicio = (c.cups_descripcion or "").strip()
+            if not desc_servicio:
+                desc_servicio = extraer_descripcion_servicio(c.observacion_eps or "")
+            if not desc_servicio:
+                # Último fallback: intentar desde el nombre_glosa del concepto
+                desc_servicio = extraer_descripcion_servicio(g.texto_glosa_original or "")
+
             fila = {
                 "EstadoCxCObjecion": estado_cxc,
                 "TipoObjecionTramite": tipo_objecion_tramite(c.codigo_glosa or g.codigo_glosa or ""),
@@ -395,7 +462,7 @@ def generar_filas_dgh(
                 "ListadoConceptos.Oid": c.oid_dgh or "",
                 "ListadoConceptos.ConceptoObjecion.Nombre": c.nombre_glosa or "",
                 "ListadoConceptos.ServicioProductoFactura.Codigo": c.cups_codigo or "",
-                "ListadoConceptos.ServicioProductoFactura.Descripcion": c.cups_descripcion or "",
+                "ListadoConceptos.ServicioProductoFactura.Descripcion": desc_servicio,
                 "ListadoConceptos.ValorObjecion": float(c.valor_objetado or 0.0),
                 "ListadoConceptos.ServicioProductoFactura.CentroCosto.CodigoNombreCentro": c.centro_costo or "",
                 "ListadoConceptos.Observaciones": c.observacion_eps or "",
