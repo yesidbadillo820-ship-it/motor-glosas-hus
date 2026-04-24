@@ -7166,10 +7166,13 @@ async function loadHist(page){
   var params=_histQueryParams();
   if(params.length) url += '&' + params.join('&');
   try{
+    // Ronda 39: cargar mapa autopilot en paralelo para enriquecer la tabla
+    var promMapa = (typeof _cargarMapaAutopilot === 'function') ? _cargarMapaAutopilot() : Promise.resolve({});
     var r=await fetch(url,{headers:authH()});
     if(r.status===401){logout();return;}
     var d=await r.json();
     histData=d.items;
+    try{ window._autopilot_map = await promMapa; }catch(_){}
     renderHist(d.items);
     renderPager(d);
   } catch(e){console.error(e);}
@@ -7262,6 +7265,21 @@ function renderHist(rows){
     body.innerHTML='<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text3)">No se encontraron registros</td></tr>';
     return;
   }
+  // Ronda 39: chip autopilot inline usando el mapa cacheado
+  var apMap = window._autopilot_map || {};
+  var apColor = {
+    LISTA_ENVIAR: ['#dcfce7','#166534'],
+    CASI_LISTA:   ['#d1fae5','#065f46'],
+    REVISAR:      ['#fef3c7','#92400e'],
+    INTERVENIR:   ['#fee2e2','#991b1b'],
+  };
+  function _apChip(id){
+    var info = apMap[id];
+    if(!info || !info.estado) return '';
+    var col = apColor[info.estado] || ['#f3f4f6','#374151'];
+    var conf = Math.round((info.confianza||0)*100);
+    return '<span class="chip" title="Autopilot · confianza '+conf+'%" style="display:inline-block;background:'+col[0]+';color:'+col[1]+';font-size:.62rem;font-weight:700;padding:1px 6px;margin-left:4px;">🤖 '+info.estado.replace('_',' ')+'</span>';
+  }
   body.innerHTML=rows.map(function(g){
     var fechaCarga = g.creado_en ? g.creado_en.substring(0,10) : '—';
     var fechaRec = g.fecha_recepcion ? g.fecha_recepcion.substring(0,10) : fechaCarga;
@@ -7276,7 +7294,7 @@ function renderHist(rows){
       +'<td class="num" style="color:var(--c-red)">'+cop(g.valor_objetado)+'</td>'
       +'<td style="font-size:.75rem" title="'+escHtml(g.glosa_original||'')+'">'+_trunc(g.glosa_original,70)+'</td>'
       +'<td>'+fechaRec+'</td>'
-      +'<td class="mono"><b>'+escHtml(g.codigo_respuesta||'—')+'</b></td>'
+      +'<td class="mono"><b>'+escHtml(g.codigo_respuesta||'—')+'</b>'+_apChip(g.id)+'</td>'
       +'<td class="num" style="color:var(--c-green)">'+cop(g.valor_aceptado)+'</td>'
       +'<td style="font-size:.72rem" title="'+escHtml(g.observacion||'')+'">'+_trunc(g.observacion,120)+'</td>'
       +'</tr>';

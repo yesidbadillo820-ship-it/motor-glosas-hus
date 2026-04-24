@@ -15,6 +15,7 @@ from app.services.exportar_dgh import (
     COLUMNAS_DGH,
     codigo_respuesta_efectivo,
     estado_cxc_objecion,
+    extraer_descripcion_servicio,
     generar_excel_dgh,
     generar_filas_dgh,
     limpiar_dictamen_para_dgh,
@@ -99,6 +100,42 @@ class TestLimpiarDictamen:
         assert "Tarifa pactada encontrada" not in r
         assert "ESE HUS NO ACEPTA" in r
 
+    def test_extrae_solo_argumento_juridico_entre_marcadores(self):
+        """Ronda 39 fix: dictamen IA tiene muchas decoraciones.
+        Solo debe quedar el texto entre ARGUMENTACIÓN JURÍDICA y RELACIÓN DE SOPORTES."""
+        g = GlosaRecord(modelo_ia="anthropic/claude")
+        html = (
+            "CÓDIGO GLOSA VALOR OBJETADO CÓDIGO RESPUESTA TA0801 $ 26.591 RE9901 "
+            "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN "
+            "N° Factura: HUS0000496089 DISPENSARIO MEDICO RATIFICADA "
+            "ARGUMENTACIÓN JURÍDICA "
+            "ESE HUS NO ACEPTA LA RATIFICACIÓN DE LA GLOSA Y MANTIENE LA RESPUESTA. "
+            "RELACIÓN DE SOPORTES APORTADOS # Documento Marco legal 1 Historia clínica "
+            "Nota: Generado con asistencia de IA. Verificar antes de radicar ante la EPS."
+        )
+        r = limpiar_dictamen_para_dgh(html, g)
+        # Debe estar el argumento real
+        assert "ESE HUS NO ACEPTA LA RATIFICACIÓN" in r
+        # No debe estar el encabezado tabla
+        assert "CÓDIGO GLOSA VALOR OBJETADO" not in r
+        # No debe estar el banner
+        assert "SE SOLICITA CONCILIACIÓN" not in r
+        # No debe estar la meta de factura
+        assert "N° Factura:" not in r
+        # No debe estar el footer
+        assert "RELACIÓN DE SOPORTES" not in r
+        assert "Historia clínica" not in r
+        assert "Generado con asistencia" not in r
+
+    def test_remueve_nota_ia_sin_marcador_argumento(self):
+        """Si no hay marcador 'ARGUMENTACIÓN JURÍDICA' explícito, igual
+        debe remover el footer de 'Nota: Generado con asistencia'."""
+        g = GlosaRecord(modelo_ia="anthropic/claude")
+        html = "ESE HUS NO ACEPTA la glosa. Nota: Generado con asistencia de IA. Verificar."
+        r = limpiar_dictamen_para_dgh(html, g)
+        assert "ESE HUS NO ACEPTA" in r
+        assert "Generado con asistencia" not in r
+
     def test_strip_html(self):
         g = GlosaRecord(modelo_ia="anthropic/claude")
         html = "<div><p>Linea uno</p><br><b>Linea dos</b></div>"
@@ -106,6 +143,33 @@ class TestLimpiarDictamen:
         assert "<" not in r
         assert ">" not in r
         assert "Linea uno" in r and "Linea dos" in r
+
+
+# ─── extraer_descripcion_servicio ──────────────────────────────────────────
+
+class TestExtraerDescripcionServicio:
+    def test_extrae_de_observacion_con_cups_nombre_valor(self):
+        """Caso real reportado: 'CUPS 881434H - PERFIL BIOFISICO - Valor objetado: $26.591'"""
+        obs = ("TA0801 - Los cargos por apoyo diagnóstico... "
+               "- CUPS 881434H - PERFIL BIOFISICO - Valor objetado: $26.591 "
+               "- SE GLOSA LA DIFERENCIA")
+        assert extraer_descripcion_servicio(obs) == "PERFIL BIOFISICO"
+
+    def test_extrae_monitoria_fetal(self):
+        obs = "CUPS 897011 - MONITORIA FETAL ANTEPARTO - Valor objetado: $3.568"
+        assert extraer_descripcion_servicio(obs) == "MONITORIA FETAL ANTEPARTO"
+
+    def test_vacio_retorna_vacio(self):
+        assert extraer_descripcion_servicio("") == ""
+        assert extraer_descripcion_servicio(None) == ""
+
+    def test_sin_patron_retorna_vacio(self):
+        assert extraer_descripcion_servicio("texto arbitrario sin cups") == ""
+
+    def test_cups_con_guion(self):
+        """CUPS puede tener formato '39143A-16' con guión."""
+        obs = "CUPS 39143A-16 - CONSULTA DE PRIMERA VEZ - Valor objetado: $48.486"
+        assert extraer_descripcion_servicio(obs) == "CONSULTA DE PRIMERA VEZ"
 
 
 # ─── resolver_tercero ──────────────────────────────────────────────────────
