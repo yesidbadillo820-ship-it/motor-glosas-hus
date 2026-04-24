@@ -157,18 +157,24 @@ def historial(
 ):
     """Historial detallado con todos los campos relevantes para vista IPS."""
     from app.main import _extraer_motivo_glosa
+    from app.services.resolver_entidad import resolver_entidad_mostrar
     repo = GlosaRepository(db)
     glosas = repo.listar(limit=limit, eps=eps)
     items = []
     for g in glosas:
         obs_texto = _limpiar_observacion(g.dictamen)
+        entidad_real = resolver_entidad_mostrar(
+            eps=g.eps,
+            tercero_nombre=getattr(g, "tercero_nombre", None),
+            eps_codigo=getattr(g, "eps_codigo", None),
+        )
         items.append({
             "id": g.id,
             "fecha": g.creado_en.isoformat() if g.creado_en else None,
             "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
             "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
-            "entidad": g.eps,
-            "eps": g.eps,  # alias para compatibilidad
+            "entidad": entidad_real,
+            "eps": g.eps,  # alias para compatibilidad (valor raw, sin resolver)
             "paciente": g.paciente,
             "factura": g.factura,
             "codigo_glosa": g.codigo_glosa,
@@ -217,13 +223,19 @@ def historial_paginado(
         tipo=tipo, semaforo=semaforo, workflow=workflow,
     )
 
+    from app.services.resolver_entidad import resolver_entidad_mostrar
     items = []
     for g in resultado["items"]:
         obs_texto = _limpiar_observacion(g.dictamen)
+        entidad_real = resolver_entidad_mostrar(
+            eps=g.eps,
+            tercero_nombre=getattr(g, "tercero_nombre", None),
+            eps_codigo=getattr(g, "eps_codigo", None),
+        )
         items.append({
             "id": g.id,
             "eps": g.eps,
-            "entidad": g.eps,
+            "entidad": entidad_real,
             "paciente": g.paciente,
             "factura": g.factura,
             "codigo_glosa": g.codigo_glosa,
@@ -1014,10 +1026,16 @@ def mis_asignaciones(
             current_user.email, current_user.nombre,
             emails_equipo=emails_equipo,
         )
+    from app.services.resolver_entidad import resolver_entidad_mostrar
     return [
         {
             "id": g.id,
-            "eps": g.eps,
+            "eps": resolver_entidad_mostrar(
+                eps=g.eps,
+                tercero_nombre=getattr(g, "tercero_nombre", None),
+                eps_codigo=getattr(g, "eps_codigo", None),
+            ),
+            "eps_raw": g.eps,
             "factura": g.factura,
             "numero_radicado": g.numero_radicado,
             "consecutivo_dgh": g.consecutivo_dgh,
