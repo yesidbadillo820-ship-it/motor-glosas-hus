@@ -5808,6 +5808,12 @@ function _renderMisGlosas(dataRaw){
         }
       }
 
+      // Ronda 43: botones admin para reasignar o eliminar (solo coord/super_admin)
+      if(puedeAprobar){
+        acciones += ' <button class="btn-sm ghost" style="color:#7c3aed;border-color:#ddd6fe" title="Reasignar esta glosa a otro gestor" onclick="reasignarGlosaUI(' + g.id + ',\'' + ((g.gestor_nombre||'').replace(/\'/g,"\\\\'")) + '\')">↪ Reasignar</button>';
+        acciones += ' <button class="btn-sm ghost" style="color:#b91c1c;border-color:#fecaca" title="Mover esta glosa a la papelera (restaurable 30 días)" onclick="eliminarGlosaUI(' + g.id + ',\'' + ((g.factura||'').replace(/\'/g,"\\\\'")) + '\')">🗑 Eliminar</button>';
+      }
+
       return '<tr>' +
         '<td class="cell-center"><input type="checkbox" class="bulk-chk" value="' + g.id + '" onchange="actualizarContadorLote()"/></td>' +
         '<td>' + (g.gestor_nombre || '—') + '</td>' +
@@ -5898,6 +5904,89 @@ async function cambiarWorkflow(id, nuevoEstado, etiqueta){
       toast('Error', d.detail || 'No se pudo cambiar el estado', 'error');
     }
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// Ronda 43: reasignar glosa a otro gestor (por ej. cuando se cargó al usuario equivocado)
+async function reasignarGlosaUI(glosaId, gestorActual){
+  // Primero traer lista de auditores disponibles
+  var lista = [];
+  try{
+    var r = await fetch('/usuarios/', {headers: authH()});
+    if(r.ok){
+      lista = await r.json();
+    }
+  }catch(_){}
+  // Filtrar a AUDITOR/COORDINADOR/SUPER_ADMIN activos
+  lista = (lista || []).filter(function(u){
+    var rol = (u.rol || '').toUpperCase();
+    var activo = u.activo === undefined ? true : !!u.activo;
+    return activo && ['AUDITOR','COORDINADOR','SUPER_ADMIN'].indexOf(rol) >= 0;
+  });
+  if(!lista.length){
+    // Fallback: dejar que el admin escriba el email libremente
+    var nuevo = prompt('Email del nuevo gestor:');
+    if(!nuevo) return;
+    await _reasignarGlosa(glosaId, nuevo.trim());
+    return;
+  }
+  // Armar modal con select
+  var html = ''
+    + '<div id="reasignar-modal" style="position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">'
+    + '  <div style="background:#fff;border-radius:12px;max-width:440px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.25);">'
+    + '    <h3 style="margin:0 0 6px 0;font-size:16px;color:#111827;">↪ Reasignar glosa #' + glosaId + '</h3>'
+    + '    <p style="font-size:12.5px;color:#6b7280;margin:0 0 14px 0;">Gestor actual: <b>' + (gestorActual || '—') + '</b>. Elegí el nuevo responsable:</p>'
+    + '    <select id="reasignar-sel" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;margin-bottom:14px;">'
+    +        lista.map(function(u){
+                var txt = (u.nombre || u.email || '?') + ' (' + (u.email||'') + ') — ' + (u.rol||'');
+                return '<option value="' + (u.email||'') + '">' + _h(txt) + '</option>';
+             }).join('')
+    + '    </select>'
+    + '    <div style="display:flex;gap:8px;justify-content:flex-end;">'
+    + '      <button onclick="document.getElementById(\'reasignar-modal\').remove()" style="padding:8px 14px;background:transparent;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:12px;">Cancelar</button>'
+    + '      <button id="btn-reasignar-ok" style="padding:8px 18px;background:#7c3aed;color:#fff;border:0;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">✓ Reasignar</button>'
+    + '    </div>'
+    + '  </div>'
+    + '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('btn-reasignar-ok').onclick = async function(){
+    var nuevo = (document.getElementById('reasignar-sel')||{}).value;
+    if(!nuevo) return;
+    document.getElementById('reasignar-modal').remove();
+    await _reasignarGlosa(glosaId, nuevo);
+  };
+}
+
+async function _reasignarGlosa(glosaId, nuevoEmail){
+  try{
+    var r = await fetch('/glosas/' + glosaId + '/asignar', {
+      method:'PATCH',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({auditor_email: nuevoEmail}),
+    });
+    var d = await r.json();
+    if(!r.ok){ toast('No se pudo reasignar', d.detail || ('Error ' + r.status), 'error'); return; }
+    toast('✓ Glosa reasignada', 'Ahora la ve ' + nuevoEmail, 'success');
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+  }catch(e){ toast('Error','Conexión: ' + e.message, 'error'); }
+}
+
+// Ronda 43: eliminar glosa (mueve a papelera, restaurable 30d)
+async function eliminarGlosaUI(glosaId, factura){
+  var motivo = prompt(
+    '🗑 ELIMINAR glosa #' + glosaId + (factura ? ' (factura ' + factura + ')' : '') + '\n\n' +
+    'Se mueve a la PAPELERA, no se borra definitivamente. Podés restaurarla en 30 días desde el panel Papelera.\n\n' +
+    'Escribí una razón (recomendado):'
+  );
+  if(motivo === null) return; // cancel
+  try{
+    var url = '/glosas/' + glosaId + (motivo ? ('?motivo=' + encodeURIComponent(motivo)) : '');
+    var r = await fetch(url, {method:'DELETE', headers: authH()});
+    var d = await r.json();
+    if(!r.ok){ toast('No se pudo eliminar', d.detail || ('Error ' + r.status), 'error'); return; }
+    toast('✓ Movida a papelera', 'Glosa #' + glosaId + ' se puede restaurar desde el panel Papelera', 'success');
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    if(typeof refrescarBadgeNotif === 'function') refrescarBadgeNotif();
+  }catch(e){ toast('Error','Conexión: ' + e.message, 'error'); }
 }
 
 async function verGlosa(id){
