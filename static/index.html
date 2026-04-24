@@ -2761,6 +2761,7 @@ async function abrirCentroPremium(){
     + '    <button class="ptab" data-tab="anomalias" onclick="premiumTab(\'anomalias\')">🚨 Anomalías</button>'
     + '    <button class="ptab" data-tab="salud" onclick="premiumTab(\'salud\')">❤️ Salud</button>'
     + '    <button class="ptab" data-tab="reportes" onclick="premiumTab(\'reportes\')">📥 Reportes</button>'
+    + '    <button class="ptab" data-tab="impacto" onclick="premiumTab(\'impacto\')">💎 Impacto</button>'
     + '  </div>'
     + '  <div id="premium-body" style="padding:22px;overflow-y:auto;flex:1;background:#fff;">Cargando…</div>'
     + '</div>';
@@ -2983,6 +2984,48 @@ async function premiumTab(nombre){
       + '<div class="pgrid">' + pills + '</div>'
       + (alerts ? '<div class="pcard"><div class="pcard-head" style="color:#b91c1c;">🚨 Alertas activas</div>' + alerts + '</div>' : '')
       + '<div class="phint">Endpoints: <code>/sistema/salud</code> (coordinador) · <code>/sistema/salud/publico</code> (uptime monitor, sin auth).</div>';
+    return;
+  }
+
+  if(nombre === 'impacto'){
+    var periodos = ['hoy','semana','mes'];
+    var cargas = await Promise.all(periodos.map(function(p){ return _premiumFetch('/autopilot/metricas?periodo=' + p); }));
+    var [hoy, semana, mes] = cargas;
+
+    function _fmtMetrica(d, label){
+      if(d.error) return '<div class="ptile"><div class="ptile-label">' + label + '</div><div style="color:#991b1b;font-size:11px;">' + _h(d.error) + '</div></div>';
+      var c = d.cerradas_por_ia || {};
+      var a = d.ahorro || {};
+      var desg = d.desglose || {};
+      return '<div class="pcard">'
+        + '<div class="pcard-head">📅 ' + label + ' · ' + (c.total||0) + ' glosas cerradas por la IA <span style="margin-left:auto;font-size:11px;color:#6b7280;font-weight:400;">' + ((c.pct_sobre_creadas||0)*100).toFixed(0) + '% sobre el total</span></div>'
+        + '<div style="padding:14px;">'
+        +   '<div class="pgrid" style="margin-bottom:10px;">'
+        +     _ptile('Valor cerrado', '$' + (c.valor_objetado||0).toLocaleString('es-CO'), 'ok')
+        +     _ptile('Tokens ahorrados', (a.tokens_estimados||0).toLocaleString('es-CO'))
+        +     _ptile('USD ahorrados', '$' + (a.usd_estimados||0).toFixed(2), 'ok')
+        +     _ptile('Horas ahorradas', (a.horas_ahorradas_aprox||0).toFixed(1) + 'h', 'ok')
+        +   '</div>'
+        +   '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">'
+        +     '<div style="padding:8px 10px;background:#eff6ff;border-radius:6px;"><b>Tarifa match</b><br>' + (desg.tarifa_match_perfecto||{}).cantidad + ' glosas</div>'
+        +     '<div style="padding:8px 10px;background:#f3e8ff;border-radius:6px;"><b>Ratificada</b><br>' + (desg.texto_fijo_ratificada||{}).cantidad + ' glosas</div>'
+        +     '<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;"><b>Extemporánea</b><br>' + (desg.texto_fijo_extemporanea||{}).cantidad + ' glosas</div>'
+        +   '</div>'
+        + '</div></div>';
+    }
+
+    body.innerHTML = ''
+      + '<div style="margin-bottom:12px;padding:14px 16px;background:linear-gradient(90deg,#1e3a8a,#3b82f6);color:#fff;border-radius:10px;">'
+      +   '<div style="font-size:16px;font-weight:700;">💎 Impacto del Autopilot</div>'
+      +   '<div style="font-size:12px;opacity:.9;margin-top:4px;">Glosas resueltas automáticamente por la IA (texto fijo RATIFICADA/EXTEMPORÁNEA, match perfecto de tarifa).</div>'
+      + '</div>'
+      + _fmtMetrica(hoy, 'Hoy')
+      + _fmtMetrica(semana, 'Últimos 7 días')
+      + _fmtMetrica(mes, 'Últimos 30 días')
+      + '<div class="phint">'
+      +   'Endpoint: <code>/autopilot/metricas?periodo=hoy|semana|mes</code>. '
+      +   'Estimados: 8.000 tokens / $0.012 USD / 3 min ahorrados por glosa que la IA cerró sin intervención humana.'
+      + '</div>';
     return;
   }
 

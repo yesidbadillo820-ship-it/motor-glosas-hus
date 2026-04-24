@@ -31,6 +31,7 @@ from app.services.texto_fijo_detector import (
     clasificar_texto_fijo,
 )
 from app.services.texto_fijo_batch import retro_aplicar
+from app.services.metricas_autopilot import metricas_autopilot
 
 router = APIRouter(prefix="/autopilot", tags=["autopilot"])
 
@@ -101,6 +102,18 @@ def previsualizar_texto_fijo(
             "mensaje": "La glosa no es RATIFICADA ni EXTEMPORÁNEA — requiere análisis IA.",
         }
     return {"glosa_id": glosa_id, "aplica": True, **clase}
+
+
+@router.get("/metricas")
+def metricas(
+    periodo: str = Query("hoy", pattern="^(hoy|semana|mes)$"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Impacto del autopilot (Ronda 32): cuántas glosas cerró la IA sola,
+    cuánto ahorró en tokens/USD/horas. Sirve para demostrar valor del
+    sistema en capacitaciones y comités."""
+    return metricas_autopilot(db, periodo=periodo)
 
 
 @router.post("/texto-fijo/batch")
