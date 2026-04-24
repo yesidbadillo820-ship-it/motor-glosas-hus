@@ -32,6 +32,10 @@ from app.services.digest_ejecutivo import (
     formatear_digest_texto,
     generar_digest,
 )
+from app.services.digest_scheduler import (
+    ejecutar_envio_digest as _ejecutar_envio_digest,
+    obtener_estado as _obtener_estado_scheduler,
+)
 
 router = APIRouter(prefix="/digest", tags=["digest"])
 
@@ -71,6 +75,23 @@ def digest_html(
 ):
     d = generar_digest(db, periodo=periodo)
     return {"periodo": periodo, "html": formatear_digest_html(d)}
+
+
+@router.get("/scheduler/estado")
+def scheduler_estado(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Estado del scheduler automático del digest (Ronda 20)."""
+    return _obtener_estado_scheduler()
+
+
+@router.post("/scheduler/disparar")
+async def scheduler_disparar(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Fuerza la ejecución del scheduler ahora mismo (útil para probar
+    que los destinatarios están correctamente configurados)."""
+    return await _ejecutar_envio_digest()
 
 
 @router.post("/enviar")

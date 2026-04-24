@@ -954,12 +954,25 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de pre-análisis: {_e}")
 
+    # Ronda 20: scheduler del digest ejecutivo (sólo si DIGEST_DESTINATARIOS
+    # está configurado). No bloquea startup si falla.
+    try:
+        from app.services.digest_scheduler import iniciar_scheduler as iniciar_digest_scheduler
+        iniciar_digest_scheduler()
+    except Exception as _e:
+        logger.warning(f"No se pudo iniciar scheduler del digest: {_e}")
+
     yield
 
-    # Shutdown: detener scheduler limpiamente
+    # Shutdown: detener schedulers limpiamente
     try:
         from app.services.ia_auditora_proactiva import detener_scheduler
         detener_scheduler()
+    except Exception:
+        pass
+    try:
+        from app.services.digest_scheduler import detener_scheduler as detener_digest_scheduler
+        detener_digest_scheduler()
     except Exception:
         pass
     logger.info("=== APLICACIÓN CERRADA ===")
