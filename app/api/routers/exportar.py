@@ -6,8 +6,9 @@ from app.database import get_db
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.excel_service import ExcelExporter, EXCEL_DISPONIBLE
 from app.services.exportar_gerencial import generar_reporte_gerencial
+from app.services.exportar_dgh import generar_excel_dgh
 from app.api.deps import get_usuario_actual, get_coordinador_o_admin
-from app.models.db import UsuarioRecord
+from app.models.db import UsuarioRecord, GlosaRecord
 
 router = APIRouter(prefix="/exportar", tags=["exportar"])
 
@@ -107,6 +108,70 @@ def exportar_reporte_gerencial(
         return {"error": "openpyxl no instalado. Ejecute: pip install openpyxl"}
     output = generar_reporte_gerencial(db, periodo=periodo, ventana_anomalias_dias=ventana_anomalias)
     filename = f"reporte_gerencial_hus_{periodo}_{__import__('datetime').date.today().isoformat()}.xlsx"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/dgh")
+def exportar_formato_dgh(
+    eps: str = Query(None, description="Filtrar por EPS (substring match)"),
+    estado: str = Query(None, description="Filtrar por estado (RESPONDIDA, RATIFICADA, etc.)"),
+    desde: str = Query(None, description="Fecha desde YYYY-MM-DD (creado_en)"),
+    hasta: str = Query(None, description="Fecha hasta YYYY-MM-DD"),
+    solo_respondidas: bool = Query(True, description="Solo glosas ya respondidas"),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Export Excel en formato DGH listo para recargar al sistema (Ronda 35).
+
+    Estructura EXACTA de 26 columnas con encabezados canónicos DGH:
+      EstadoCxCObjecion · TipoObjecionTramite · FacturaCartera.Factura · ...
+      + 4 columnas HUS: FECHA DE CARGUE · CODIGO RESPUESTA · VALOR ACEPTADO · OBSERVACION
+
+    Una fila por CONCEPTO (si la glosa tiene múltiples CUPS, una fila cada una).
+    La columna OBSERVACION contiene el dictamen LIMPIO: sin emojis, sin headers
+    de debug, respetando el texto canónico de RATIFICADA / EXTEMPORÁNEA.
+    """
+    if not EXCEL_DISPONIBLE:
+        return {"error": "openpyxl no instalado. Ejecute: pip install openpyxl"}
+
+    from datetime import datetime as _dt
+    q = db.query(GlosaRecord)
+    if eps:
+        q = q.filter(GlosaRecord.eps.ilike(f"%{eps}%"))
+    if estado:
+        q = q.filter(GlosaRecord.estado == estado.upper())
+    if solo_respondidas:
+        # Respondidas vía workflow o estado
+        from sqlalchemy import or_
+        q = q.filter(
+            or_(
+                GlosaRecord.workflow_state == "RESPONDIDA",
+                GlosaRecord.estado == "RESPONDIDA",
+                GlosaRecord.dictamen.isnot(None),
+            )
+        )
+    if desde:
+        try:
+            dd = _dt.fromisoformat(desde)
+            q = q.filter(GlosaRecord.creado_en >= dd)
+        except Exception:
+            pass
+    if hasta:
+        try:
+            dh = _dt.fromisoformat(hasta)
+            q = q.filter(GlosaRecord.creado_en <= dh)
+        except Exception:
+            pass
+
+    glosas = q.order_by(GlosaRecord.id.desc()).limit(limit).all()
+    output = generar_excel_dgh(db, glosas)
+    fecha = _dt.now().strftime("%Y%m%d")
+    filename = f"glosas_dgh_{fecha}.xlsx"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
