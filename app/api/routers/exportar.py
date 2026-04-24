@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.excel_service import ExcelExporter, EXCEL_DISPONIBLE
-from app.api.deps import get_usuario_actual
+from app.services.exportar_gerencial import generar_reporte_gerencial
+from app.api.deps import get_usuario_actual, get_coordinador_o_admin
 from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/exportar", tags=["exportar"])
@@ -82,9 +83,32 @@ def exportar_resumen_mensual(
     
     filename = f"resumen_mensual_hus_{eps or 'todos'}.xlsx"
     filename = filename.replace(" ", "_")
-    
+
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.get("/gerencial")
+def exportar_reporte_gerencial(
+    periodo: str = Query("semana", pattern="^(dia|semana|mes)$"),
+    ventana_anomalias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Export Excel gerencial multi-hoja (Ronda 24).
+
+    Hojas: Resumen · Top EPS · Autopilot · Anomalías.
+    Solo coordinador / super_admin. Diseñado para Comité de Cartera.
+    """
+    if not EXCEL_DISPONIBLE:
+        return {"error": "openpyxl no instalado. Ejecute: pip install openpyxl"}
+    output = generar_reporte_gerencial(db, periodo=periodo, ventana_anomalias_dias=ventana_anomalias)
+    filename = f"reporte_gerencial_hus_{periodo}_{__import__('datetime').date.today().isoformat()}.xlsx"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
