@@ -14,6 +14,7 @@ from app.services.glosa_service import GlosaService
 from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
+from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
 from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
@@ -585,6 +586,7 @@ async def refinar_dictamen_endpoint(
     data: RefinarRequest,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+    _cupo_ia: None = Depends(_consumir_cupo_ia),
 ):
     """Refina el dictamen de una glosa con instrucciones en lenguaje natural.
 
