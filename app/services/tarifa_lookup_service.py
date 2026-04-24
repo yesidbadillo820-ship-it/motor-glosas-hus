@@ -30,7 +30,12 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
 
     Match case-insensitive en EPS (ilike %X%) porque puede venir
     'FAMISANAR' vs 'FAMISANAR EPS' vs 'U220181 - FAMISANAR EPS'.
-    Match exacto en CUPS (tras strip).
+
+    Orden de matching (Ronda 45 — Res. 2641/2025):
+      1. Match directo por codigo_cups
+      2. Match por codigo_ips (código interno del prestador cargado
+         desde el Excel del contrato, ej. '39147B-18' del HUS)
+      3. Homologación Res. 2641/2025 → rebusca por CUPS oficial
     """
     if not eps or not cups:
         return None
@@ -38,7 +43,9 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
     cups = cups.strip()
     if not eps or not cups:
         return None
-    return (
+
+    # 1) Match directo por CUPS oficial
+    fila = (
         db.query(TarifaContratadaRecord)
         .filter(TarifaContratadaRecord.activa == 1)
         .filter(TarifaContratadaRecord.eps.ilike(f"%{eps}%"))
@@ -46,6 +53,41 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
         .order_by(TarifaContratadaRecord.creado_en.desc())
         .first()
     )
+    if fila:
+        return fila
+
+    # 2) Match por codigo_ips (cargado desde columna 'CODIGO IPS' del Excel)
+    fila = (
+        db.query(TarifaContratadaRecord)
+        .filter(TarifaContratadaRecord.activa == 1)
+        .filter(TarifaContratadaRecord.eps.ilike(f"%{eps}%"))
+        .filter(TarifaContratadaRecord.codigo_ips == cups)
+        .order_by(TarifaContratadaRecord.creado_en.desc())
+        .first()
+    )
+    if fila:
+        return fila
+
+    # 3) Homologación Res. 2641/2025 — si el código entrada es viejo, lo
+    # traducimos al CUPS oficial y reintentamos.
+    try:
+        from app.services.homologador_cups import homologar_cups
+        homo = homologar_cups(cups, db=db, eps=eps)
+        if homo and homo.get("cups_oficial") and homo["cups_oficial"] != cups:
+            fila = (
+                db.query(TarifaContratadaRecord)
+                .filter(TarifaContratadaRecord.activa == 1)
+                .filter(TarifaContratadaRecord.eps.ilike(f"%{eps}%"))
+                .filter(TarifaContratadaRecord.codigo_cups == homo["cups_oficial"])
+                .order_by(TarifaContratadaRecord.creado_en.desc())
+                .first()
+            )
+            if fila:
+                return fila
+    except Exception:
+        pass
+
+    return None
 
 
 def calcular_valor_pactado(tarifa: TarifaContratadaRecord, valor_soat_base: float = 0.0) -> float:
@@ -261,12 +303,22 @@ def evaluar_glosa_tarifa(
         valor_reconocido=valor_reconocido,
     )
 
+    # Ronda 45: detectar si el match fue por homologación (el cups del auditor
+    # no coincide con codigo_cups de la tarifa encontrada → sí es homologación).
+    homologado = False
+    cups_entrada = (cups or "").strip().upper()
+    cups_encontrado = (tarifa.codigo_cups or "").upper()
+    cod_ips_encontrado = (getattr(tarifa, "codigo_ips", None) or "").upper()
+    if cups_entrada and cups_entrada != cups_encontrado:
+        homologado = True
+
     return {
         "encontrada": True,
         "tarifa": {
             "id": tarifa.id,
             "eps": tarifa.eps,
             "codigo_cups": tarifa.codigo_cups,
+            "codigo_ips": getattr(tarifa, "codigo_ips", None),
             "descripcion": tarifa.descripcion,
             "contrato_numero": tarifa.contrato_numero,
             "valor_pactado": float(tarifa.valor_pactado or 0.0),
@@ -282,6 +334,13 @@ def evaluar_glosa_tarifa(
         "valor_reconocido": valor_reconocido,
         "valor_pactado_calc": valor_pactado_calc,
         "recomendacion": recomendacion,
+        "homologacion_2641": {
+            "aplicada": homologado,
+            "codigo_entrada": cups_entrada,
+            "codigo_ips_contrato": cod_ips_encontrado,
+            "cups_oficial": cups_encontrado,
+            "norma": "Res. 2641/2025 MinSalud — CUPS 2025",
+        } if homologado else None,
     }
 
 

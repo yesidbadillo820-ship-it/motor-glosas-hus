@@ -350,6 +350,11 @@ class TarifaContratadaRecord(Base):
     eps = Column(String(200), nullable=False, index=True)    # Ej: "FAMISANAR EPS"
     contrato_numero = Column(String(100))                     # Ej: "S-13-1-03-1-04958"
     codigo_cups = Column(String(30), nullable=False, index=True)  # Ej: "890202" / "FMQ6296"
+    # Ronda 45: código interno IPS (ej. '39147B-18' del HUS) para que cuando
+    # la EPS glose con el código viejo podamos homologarlo al CUPS oficial
+    # (Res. 2641/2025). El parser Excel llena este campo cuando hay columna
+    # 'CODIGO IPS'/'CODIGO PROPIO'.
+    codigo_ips = Column(String(30), index=True)
     descripcion = Column(Text)                                # "CONSULTA DE PRIMERA VEZ..."
     valor_pactado = Column(Float, nullable=False, default=0.0)    # COP (solo tipo VALOR_FIJO)
     modalidad = Column(String(80))                            # "SOAT UVB VIGENTE" / "MEDICAMENTOS" / "SUMINISTROS CARDIOVASCULAR"

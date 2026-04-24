@@ -316,6 +316,7 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
         obs = _limpiar_descripcion(str(_celda(fila, idx_obs) or ""))
         filas.append({
             "codigo_cups": cups[:30],
+            "codigo_ips": None,  # formato Famisanar no trae codigo_ips propio
             "descripcion": desc[:500] if desc else None,
             "valor_pactado": valor_pactado,
             "modalidad": (tipo or "SOAT UVB VIGENTE")[:80],
@@ -406,6 +407,7 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         agrup = _limpiar_descripcion(str(_celda(fila, idx_agrup) or ""))
         filas.append({
             "codigo_cups": codigo[:30],
+            "codigo_ips": None,
             "descripcion": desc[:500] if desc else None,
             "valor_pactado": round(valor_final, 2),
             "modalidad": (agrup or "MEDICAMENTOS")[:80],
@@ -458,6 +460,7 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         agrup = _limpiar_descripcion(str(_celda(fila, idx_agrup) or ""))
         filas.append({
             "codigo_cups": codigo[:30],
+            "codigo_ips": None,
             "descripcion": desc[:500] if desc else None,
             "valor_pactado": round(valor, 2),
             "modalidad": (agrup or "SUMINISTROS")[:80],
@@ -511,6 +514,10 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
 
         filas.append({
             "codigo_cups": cups[:30],
+            # Ronda 45: guardar el código IPS propio en campo indexado para
+            # que el lookup pueda encontrar la tarifa cuando la EPS glose con
+            # el código viejo (ej. '39147B-18' en vez de '890348').
+            "codigo_ips": cod_ips[:30] if cod_ips and cod_ips != cups else None,
             "descripcion": desc[:500] if desc else None,
             "valor_pactado": round(valor, 2),
             "modalidad": (modalidad or "TARIFA PROPIA")[:80],
