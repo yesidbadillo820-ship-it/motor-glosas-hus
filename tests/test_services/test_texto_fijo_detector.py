@@ -177,6 +177,27 @@ class TestAplicar:
         assert "texto_fijo" in g.modelo_ia
         assert "RATIFICADA" in g.modelo_ia
 
+    def test_ratificada_asigna_codigo_respuesta_RE9901(self):
+        """Ronda 38: el codigo_respuesta debe grabarse automáticamente."""
+        g = _mock_glosa(estado="RATIFICADA")
+        # Agregar atributo codigo_respuesta vacío
+        g.codigo_respuesta = ""
+        aplicar_texto_fijo_si_corresponde(g)
+        assert g.codigo_respuesta == "RE9901"
+
+    def test_extemporanea_asigna_codigo_respuesta_RE9501(self):
+        g = _mock_glosa(dias_radicacion_dgh=25)
+        g.codigo_respuesta = ""
+        aplicar_texto_fijo_si_corresponde(g)
+        assert g.codigo_respuesta == "RE9501"
+
+    def test_codigo_respuesta_existente_se_respeta(self):
+        """Si el auditor ya puso un código manualmente, no lo sobreescribimos."""
+        g = _mock_glosa(estado="RATIFICADA")
+        g.codigo_respuesta = "RE9702"  # aceptación total
+        aplicar_texto_fijo_si_corresponde(g)
+        assert g.codigo_respuesta == "RE9702"  # NO cambió
+
     def test_marca_workflow_respondida_automaticamente(self):
         """Hotfix Ronda 34: al aplicar texto fijo, workflow_state debe pasar
         a RESPONDIDA para que la glosa salga de la bandeja de pendientes."""
