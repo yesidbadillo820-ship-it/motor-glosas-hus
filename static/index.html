@@ -1237,6 +1237,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <span style="opacity:.3">·</span>
         <span id="hdr-kpi-pendientes" style="color:#fbbf24" title="Glosas pendientes de responder">⏳ —</span>
       </div>
+      <button id="hdr-notif-btn" onclick="toggleDrawerNotif()" title="Mis notificaciones" style="position:relative;background:rgba(255,255,255,.08);border:0;color:#fff;border-radius:50%;width:34px;height:34px;cursor:pointer;margin-right:.5rem;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:17px;">🔔</span>
+        <span id="hdr-notif-badge" style="display:none;position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;border-radius:999px;padding:1px 5px;font-size:9px;font-weight:700;line-height:1.1;min-width:13px;text-align:center;">0</span>
+      </button>
       <button class="search-trigger" onclick="abrirCommandPalette()" title="Buscar acciones">
         <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <span>Buscar…</span>
@@ -2685,6 +2689,101 @@ async function refrescarKpisHeader(){
     }catch(_){}
   }catch(e){/* silencioso, no bloquear UX */}
 }
+
+// ─── Notificaciones personales (Ronda 26) ───────────────────────────────
+// Pollea /notificaciones/badge cada 60s. Solo pide el conteo total para
+// minimizar carga en BD. El drawer completo se carga on-demand al click.
+async function refrescarBadgeNotif(){
+  try{
+    var r = await fetch('/notificaciones/badge', {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    var badge = document.getElementById('hdr-notif-badge');
+    if(!badge) return;
+    var total = Number(d.total || 0);
+    if(total > 0){
+      badge.textContent = total > 99 ? '99+' : String(total);
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }catch(_){/* silencioso */}
+}
+
+async function toggleDrawerNotif(){
+  var d = document.getElementById('drawer-notif');
+  if(d){ d.remove(); return; }
+  try{
+    var r = await fetch('/notificaciones/mias', {headers: authH()});
+    if(!r.ok){ toast('Error','No se pudieron cargar notificaciones','error'); return; }
+    var data = await r.json();
+    _renderDrawerNotif(data);
+  }catch(e){
+    toast('Error', e.message || 'fallo de red', 'error');
+  }
+}
+
+function _renderDrawerNotif(data){
+  var it = (data && data.items) || {};
+  var html = '';
+  html += '<div style="padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">'
+        + '<b>Mis notificaciones</b>'
+        + '<span style="font-size:11px;color:#6b7280;">Total: ' + (data.total || 0) + '</span>'
+        + '</div>';
+
+  function seccion(titulo, obj, fmt){
+    if(!obj || (obj.conteo === 0 && !(obj.top||[]).length)) return '';
+    var color = obj.nivel === 'critica' ? '#b91c1c' :
+                obj.nivel === 'alta' ? '#d97706' :
+                obj.nivel === 'media' ? '#ca8a04' : '#2563eb';
+    var s = '<div style="padding:10px 14px;border-bottom:1px solid #f3f4f6;">'
+          + '<div style="font-size:12px;font-weight:600;color:' + color + ';margin-bottom:4px;">'
+          + titulo + ' · ' + obj.conteo
+          + '</div>';
+    (obj.top || []).slice(0,5).forEach(function(x){
+      s += '<div style="font-size:11px;color:#374151;padding:3px 0;">• ' + fmt(x) + '</div>';
+    });
+    s += '</div>';
+    return s;
+  }
+
+  html += seccion('⏰ Críticas (<48h)', it.criticas_48h || {conteo: 0},
+    function(){ return ''; });
+  html += seccion('🚨 Vencidas', it.vencidas || {conteo: 0},
+    function(){ return ''; });
+  html += seccion('✅ Listas para enviar', it.listas_para_enviar || {conteo: 0},
+    function(g){ return 'Glosa #' + g.glosa_id + ' · ' + g.codigo + ' · ' + g.eps; });
+  html += seccion('💬 Menciones', it.menciones || {conteo: 0},
+    function(m){ return (m.autor || '—') + ': ' + (m.texto || ''); });
+  html += seccion('⭐ Gold nuevas', it.gold_nuevas || {conteo: 0},
+    function(p){ return p.eps + ' · ' + p.codigo + (p.titulo ? ' — ' + p.titulo : ''); });
+
+  if(!html.includes('<div style="padding:10px')){
+    html += '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">Sin notificaciones pendientes 🎉</div>';
+  }
+
+  var d = document.createElement('div');
+  d.id = 'drawer-notif';
+  d.style.cssText = 'position:fixed;top:60px;right:16px;width:340px;max-height:70vh;overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);z-index:2000;font-family:inherit;';
+  d.innerHTML = html;
+  d.addEventListener('click', function(e){ e.stopPropagation(); });
+  document.body.appendChild(d);
+  // Cerrar al click fuera
+  setTimeout(function(){
+    document.addEventListener('click', _onceCloseDrawerNotif, {once: true});
+  }, 100);
+}
+
+function _onceCloseDrawerNotif(e){
+  var d = document.getElementById('drawer-notif');
+  if(d && !d.contains(e.target)) d.remove();
+}
+
+// Arrancar polling cuando hay sesión
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(refrescarBadgeNotif, 2500);
+  setInterval(refrescarBadgeNotif, 60000);
+});
 
 // Caso de ejemplo para capacitación: pre-llena el formulario con una
 // glosa real de Famisanar (CUPS con match perfecto → verás la IA generar
