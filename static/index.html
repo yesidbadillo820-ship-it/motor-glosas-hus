@@ -5869,10 +5869,20 @@ function limpiarSeleccionLote(){
 async function generarRespuestasLote(){
   var ids = _idsSeleccionados();
   if(!ids.length){ toast('Nada seleccionado','Marca al menos una glosa','warning'); return; }
-  if(ids.length > 50){ toast('Demasiadas','Máximo 50 por lote','warning'); return; }
+  if(ids.length > 100){ toast('Demasiadas','Máximo 100 por lote','warning'); return; }
   var sobre = document.getElementById('bulk-sobrescribir') && document.getElementById('bulk-sobrescribir').checked;
-  if(!confirm('Se generarán respuestas IA para ' + ids.length + ' glosa(s).\nEsto puede tardar ~' + Math.max(10, ids.length*3) + ' segundos.\n\n¿Continuar?')) return;
-  showLoading();
+  var segs = Math.max(10, Math.ceil(ids.length * 2.5));
+  if(!confirm('⚡ Procesamiento en lote\n\n' +
+    '• ' + ids.length + ' glosa(s) seleccionadas\n' +
+    '• Tiempo estimado: ~' + Math.ceil(segs/60) + ' min ' + (segs%60) + ' seg\n' +
+    '• Concurrencia IA: 5 paralelas\n' +
+    '• Regenerar aunque ya tengan dictamen: ' + (sobre ? 'SÍ' : 'NO') + '\n\n' +
+    '¿Continuar?')) return;
+
+  // Barra de progreso determinística simulada (el endpoint no hace streaming
+  // pero sabemos el total y el tiempo estimado).
+  _bulkMostrarProgreso(ids.length, segs);
+
   try{
     var r = await fetch('/glosas/generar-lote', {
       method: 'POST',
@@ -5880,13 +5890,74 @@ async function generarRespuestasLote(){
       body: JSON.stringify({glosa_ids: ids, sobrescribir: !!sobre})
     });
     var d = await r.json();
-    hideLoading();
+    _bulkOcultarProgreso();
     if(!r.ok){ toast('Error', d.detail || 'Error en lote', 'error'); return; }
-    var msg = 'Procesadas: ' + d.procesadas + ' · Saltadas: ' + d.saltadas + ' · Fallidas: ' + d.fallidas;
-    toast('Lote completado', msg, d.fallidas > 0 ? 'warning' : 'success');
+    _bulkMostrarResultado(d);
     limpiarSeleccionLote();
     loadMisGlosas();
-  }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
+  }catch(e){
+    _bulkOcultarProgreso();
+    toast('Error','Conexión: '+e.message,'error');
+  }
+}
+
+// Ronda 50 Paso 7: UI de progreso durante el lote
+function _bulkMostrarProgreso(total, seg_estimados){
+  var prev = document.getElementById('bulk-progress');
+  if(prev) prev.remove();
+  var el = document.createElement('div');
+  el.id = 'bulk-progress';
+  el.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:20px 30px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);z-index:5000;min-width:360px;font-family:inherit;';
+  el.innerHTML = ''
+    + '<div style="font-size:14px;font-weight:700;margin-bottom:10px;">⚡ Procesando ' + total + ' glosa(s)...</div>'
+    + '<div style="height:6px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden;margin-bottom:10px;">'
+    +   '<div id="bulk-bar-fill" style="height:6px;background:linear-gradient(90deg,#10b981,#3b82f6);width:0%;transition:width .5s ease;"></div>'
+    + '</div>'
+    + '<div id="bulk-bar-txt" style="font-size:11px;color:#94a3b8;">Iniciando...</div>';
+  document.body.appendChild(el);
+  // Progreso simulado: avanza 90% en el tiempo estimado, deja 10% para el final real
+  var inicio = Date.now();
+  window._bulkProgressInterval = setInterval(function(){
+    var transcurrido = (Date.now() - inicio) / 1000;
+    var pct = Math.min(90, (transcurrido / seg_estimados) * 90);
+    var fill = document.getElementById('bulk-bar-fill');
+    var txt = document.getElementById('bulk-bar-txt');
+    if(fill) fill.style.width = pct.toFixed(1) + '%';
+    if(txt) txt.textContent = 'Transcurrido ' + Math.floor(transcurrido) + 's · IA generando dictámenes...';
+  }, 500);
+}
+function _bulkOcultarProgreso(){
+  if(window._bulkProgressInterval){ clearInterval(window._bulkProgressInterval); window._bulkProgressInterval = null; }
+  var el = document.getElementById('bulk-progress');
+  if(el) el.remove();
+}
+function _bulkMostrarResultado(d){
+  var tieneFallos = (d.fallidas || 0) > 0;
+  var bg = tieneFallos ? '#fef3c7' : '#dcfce7';
+  var border = tieneFallos ? '#f59e0b' : '#10b981';
+  var icono = tieneFallos ? '⚠️' : '✅';
+  var html = ''
+    + '<div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:10px;">' + icono + ' Lote finalizado</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">'
+    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#059669;">' + (d.procesadas||0) + '</div><div style="font-size:11px;color:#6b7280;">Procesadas</div></div>'
+    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6b7280;">' + (d.saltadas||0) + '</div><div style="font-size:11px;color:#6b7280;">Saltadas</div></div>'
+    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:' + (tieneFallos ? '#b91c1c' : '#6b7280') + ';">' + (d.fallidas||0) + '</div><div style="font-size:11px;color:#6b7280;">Fallidas</div></div>'
+    + '</div>';
+  if(tieneFallos && Array.isArray(d.detalle_fallidas) && d.detalle_fallidas.length){
+    html += '<div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:6px;">Detalle de fallos:</div>'
+         +  '<div style="max-height:180px;overflow-y:auto;background:#fff;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:11px;">';
+    d.detalle_fallidas.slice(0, 30).forEach(function(f){
+      html += '<div style="padding:3px 0;border-bottom:1px solid #fef3f2;"><b>#' + f.id + ':</b> ' + (f.error||'').substring(0,160) + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '<div style="text-align:right;margin-top:14px;"><button onclick="document.getElementById(\'bulk-result\').remove()" style="padding:8px 18px;background:' + border + ';color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600;">Cerrar</button></div>';
+  var el = document.createElement('div');
+  el.id = 'bulk-result';
+  el.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:' + bg + ';border:2px solid ' + border + ';padding:20px 26px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);z-index:5000;min-width:440px;max-width:560px;';
+  el.innerHTML = html;
+  document.body.appendChild(el);
+  setTimeout(function(){ var x=document.getElementById('bulk-result'); if(x && !tieneFallos) x.remove(); }, 8000);
 }
 
 // ─── WORKFLOW DE APROBACION ───────────────────────────────────────────────

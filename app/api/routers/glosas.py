@@ -493,8 +493,8 @@ async def generar_lote(
 
     if not data.glosa_ids:
         raise HTTPException(400, "Lista de IDs vacía")
-    if len(data.glosa_ids) > 50:
-        raise HTTPException(400, "Máximo 50 glosas por lote")
+    if len(data.glosa_ids) > 100:
+        raise HTTPException(400, "Máximo 100 glosas por lote")
 
     repo = GlosaRepository(db)
     contratos = ContratoRepository(db).como_dict()
