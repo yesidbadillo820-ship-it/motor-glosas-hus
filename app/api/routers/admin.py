@@ -6,7 +6,6 @@ Cada operación queda registrada en audit_log para trazabilidad.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
 
 from app.database import get_db
 from app.models.db import (
@@ -161,7 +160,7 @@ def consumo_tokens_hoy(
     fueron servidas desde caché o plantilla fija. Ideal para detectar
     spikes de consumo en tiempo real durante la capacitación.
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime
     from sqlalchemy import func as _func
     from app.models.db import AICacheRecord
 

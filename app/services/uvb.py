@@ -70,9 +70,11 @@ MARCO_PROPIAS_HUS_COMPACTO = f"Res. 054/2026 + Res. 124/2026 HUS · SMDLV ${SMDL
 
 
 def valor_uvb_vigente(anio: int = 2026) -> int:
-    """UVB vigente para el año dado; fallback al último conocido."""
+    """Devuelve el valor de la UVB vigente para el año solicitado.
+    Si no hay dato, cae al último conocido."""
     if anio in UVB_POR_VIGENCIA:
         return UVB_POR_VIGENCIA[anio]
+    # Fallback al mayor año conocido
     return UVB_POR_VIGENCIA[max(UVB_POR_VIGENCIA.keys())]
 
 
@@ -84,6 +86,13 @@ def valor_smdlv_vigente(anio: int = 2026) -> int:
 
 
 def _redondear_a_centena(v: float) -> int:
+    """Redondea a la centena más próxima (reglas Anexo Técnico 1, Dec. 780/2016).
+
+    Ejemplos:
+      71_812.3 → 71_800
+      71_850.0 → 71_900 (punto medio sube — regla bancaria estándar)
+      6_866.37 → 6_900
+    """
     return int(round(v / 100.0) * 100)
 
 
@@ -142,61 +151,3 @@ def marco_normativo_segun_modalidad(modalidad: str) -> str:
     return "Valor pactado en el contrato vigente entre las partes."
 
 
-def valor_uvb_vigente(anio: int = 2026) -> int:
-    """Devuelve el valor de la UVB vigente para el año solicitado.
-    Si no hay dato, cae al último conocido."""
-    if anio in UVB_POR_VIGENCIA:
-        return UVB_POR_VIGENCIA[anio]
-    # Fallback al mayor año conocido
-    return UVB_POR_VIGENCIA[max(UVB_POR_VIGENCIA.keys())]
-
-
-def _redondear_a_centena(v: float) -> int:
-    """Redondea a la centena más próxima (reglas Anexo Técnico 1, Dec. 780/2016).
-
-    Ejemplos:
-      71_812.3 → 71_800
-      71_850.0 → 71_900 (punto medio sube — regla bancaria estándar)
-      6_866.37 → 6_900
-    """
-    return int(round(v / 100.0) * 100)
-
-
-def calcular_valor_pesos(tarifa_uvb: float, anio: int = 2026) -> int:
-    """Convierte una tarifa en UVB a pesos con la fórmula oficial.
-
-    Ejemplos (con UVB 2026 = $12.110):
-      acetaminofén   5,93 UVB × 12.110 = 71.812,3 → 71.800
-      hematocrito    0,567 UVB × 12.110 = 6.866,37 → 6.900
-      histocompat.   305,70 UVB × 12.110 = 3.702.027 → 3.702.000
-    """
-    if tarifa_uvb is None or tarifa_uvb <= 0:
-        return 0
-    uvb = valor_uvb_vigente(anio)
-    return _redondear_a_centena(float(tarifa_uvb) * uvb)
-
-
-def calcular_soat_con_factor(
-    tarifa_uvb: float, factor_pct: float = 0.0, anio: int = 2026
-) -> int:
-    """Calcula la tarifa pactada cuando el contrato dice 'SOAT ± X%'.
-
-    Ejemplo: Famisanar CUPS 890750 = 5,93 UVB con factor -5% →
-    5,93 × 12.110 × 0.95 = 68.221,68 → 68.200
-    """
-    if tarifa_uvb is None or tarifa_uvb <= 0:
-        return 0
-    uvb = valor_uvb_vigente(anio)
-    valor_pesos_bruto = float(tarifa_uvb) * uvb * (1 + factor_pct / 100.0)
-    return _redondear_a_centena(valor_pesos_bruto)
-
-
-def inferir_uvb_desde_pesos(valor_pesos: float, anio: int = 2026) -> float:
-    """Inverso de calcular_valor_pesos: dado un valor en pesos, infiere la UVB.
-    Útil para explicar en el banner qué UVB asume HUS vs EPS cuando hay
-    discrepancia. El resultado puede no ser entero si la tarifa no está
-    redondeada exactamente a centena."""
-    if valor_pesos <= 0:
-        return 0.0
-    uvb = valor_uvb_vigente(anio)
-    return round(valor_pesos / uvb, 3)

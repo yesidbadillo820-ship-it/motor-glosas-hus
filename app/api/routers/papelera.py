@@ -7,7 +7,7 @@ from sqlalchemy import inspect
 
 from app.database import get_db
 from app.models.db import GlosaEliminadaRecord, GlosaRecord, UsuarioRecord
-from app.api.deps import get_usuario_actual, get_coordinador_o_admin
+from app.api.deps import get_coordinador_o_admin
 from app.repositories.audit_repository import AuditRepository
 
 router = APIRouter(prefix="/papelera", tags=["papelera"])

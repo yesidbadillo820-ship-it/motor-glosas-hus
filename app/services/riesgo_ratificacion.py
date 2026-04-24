@@ -10,7 +10,6 @@ Score 0-100 donde:
   • 61-100: ALTO (rojo) — alta probabilidad de ratificación
 """
 from __future__ import annotations
-import re
 from typing import Optional
 
 
@@ -59,7 +58,7 @@ def calcular_riesgo(
     eps_up = (eps or "").upper()
     if any(d in eps_up for d in EPS_HISTORICAMENTE_DIFICILES):
         score += 10
-        factores.append(f"EPS con historial de ratificaciones frecuentes (+10)")
+        factores.append("EPS con historial de ratificaciones frecuentes (+10)")
 
     # Ajuste por contrato
     if tiene_contrato:

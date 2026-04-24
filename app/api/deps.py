@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from typing import Optional, Callable
 
 from app.database import get_db
-from app.models.db import UsuarioRecord, ROL_SUPER_ADMIN, ROL_COORDINADOR, ROL_AUDITOR, ROL_VIEWER
+from app.models.db import UsuarioRecord, ROL_SUPER_ADMIN, ROL_COORDINADOR, ROL_AUDITOR
 from app.core.config import get_settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", auto_error=False)

@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-import re
 
 from app.services.glosa_service import _suavizar_tono
 
@@ -405,8 +404,6 @@ def procesar_glosas_salud_total(contenido_txt: str, tipo_respuesta: str = "extem
 
     # Auto-detectar separador (pipe "|" o tab "\t")
     sep = _detectar_separador(lineas[0])
-
-    header = lineas[0].split(sep)
 
     respuestas = []
     errores: list[str] = []

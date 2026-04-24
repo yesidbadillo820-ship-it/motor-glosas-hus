@@ -6,7 +6,6 @@ este módulo los detecta y permite generar respuestas separadas coherentes.
 """
 from __future__ import annotations
 import re
-from typing import Optional
 
 
 _PATRON_CODIGO = re.compile(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b")
@@ -16,7 +15,6 @@ def extraer_todos_los_codigos(texto: str) -> list[str]:
     """Retorna TODOS los códigos de glosa detectados, sin duplicados, en orden."""
     if not texto:
         return []
-    encontrados = _PATRON_CODIGO.findall(texto)
     # findall con grupos devuelve solo el grupo; usamos finditer para texto completo
     matches = [m.group(0) for m in _PATRON_CODIGO.finditer(texto)]
     vistos: list[str] = []

@@ -36,11 +36,7 @@ def exportar_glosas(
         glosas = [g for g in glosas if g.estado == estado.upper()]
     
     exportador = ExcelExporter()
-    
-    fecha_texto = ""
-    if eps:
-        fecha_texto = f"EPS: {eps}"
-    
+
     output = exportador.generar_reporte_glosas(
         glosas=glosas,
         titulo="Reporte de Glosas",

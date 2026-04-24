@@ -3,7 +3,6 @@ import json
 import uuid
 from datetime import datetime
 from typing import Optional
-from fastapi import Request
 from contextvars import ContextVar
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")

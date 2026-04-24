@@ -1,8 +1,6 @@
-import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
