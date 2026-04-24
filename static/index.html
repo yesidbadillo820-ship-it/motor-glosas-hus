@@ -1486,6 +1486,8 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <p id="landing-desc">Complete los datos en el panel izquierdo y presione <b>Analizar</b> para generar la defensa técnico-jurídica. Las estadísticas superiores se actualizan automáticamente con los datos de su gestión.</p>
               <div id="landing-festivo-msg" style="display:none;margin:.8rem auto;padding:.7rem 1.2rem;border-radius:10px;font-size:.9rem;font-weight:600;max-width:420px;"></div>
               <div class="empty-state-actions" style="flex-wrap:wrap;gap:.5rem;justify-content:center;">
+                <button style="padding:.55rem 1.1rem;background:linear-gradient(90deg,#1e3a8a,#3b82f6);color:#fff;border:0;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 2px 8px rgba(30,58,138,.35);" onclick="abrirCentroPremium()" title="Dashboard unificado · Autopilot · Digest · Anomalías · Salud · Reportes · Impacto">⭐ Centro Premium</button>
+                <button class="btn-secondary" onclick="iniciarTourPremium()" title="Tour guiado de las features premium en 60s">🎓 Tour guiado</button>
                 <button class="btn-secondary" onclick="nuevaGlosa()" title="Limpia el formulario para analizar una nueva glosa (Ctrl+N)">🆕 Nueva glosa</button>
                 <button class="btn-secondary" onclick="cargarCasoEjemplo()" title="Carga una glosa de prueba para ver cómo funciona el motor">🧪 Caso de ejemplo</button>
                 <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'mis-glosas\']'),'mis-glosas')" title="Ver glosas asignadas pendientes">📋 Mis glosas</button>
@@ -2693,6 +2695,117 @@ async function refrescarKpisHeader(){
     }catch(_){}
   }catch(e){/* silencioso, no bloquear UX */}
 }
+
+// ─── Tour guiado (Ronda 33) — demo de 60s de las features premium ──────
+// Secuencia de "pasos": cada uno muestra una tarjeta centrada con título,
+// descripción, y opcionalmente ejecuta una acción antes/después.
+var TOUR_PASOS = [
+  {
+    t: '⭐ Bienvenido al Centro Premium SINAC',
+    d: 'Este tour te muestra en 60s las 6 áreas premium del sistema: autopilot IA, dashboard, reportes, digest, anomalías y métricas de impacto. Podés salir con Esc cuando quieras.',
+  },
+  {
+    t: '🔔 Notificaciones personales (en el header)',
+    d: 'El icono de campana muestra el total de glosas vencidas, críticas (<48h), listas para enviar, menciones y plantillas Gold nuevas de tus EPS. Se refresca solo cada 60 segundos.',
+    accion: function(){ try{ refrescarBadgeNotif(); }catch(_){} },
+  },
+  {
+    t: '🤖 Autopilot: triage automático',
+    d: 'La IA clasifica cada glosa en LISTA_ENVIAR (verde), CASI_LISTA, REVISAR (amarillo) o INTERVENIR (rojo). Lo verás como chip en "Mis glosas" y como banner grande al abrir una glosa. Las marcadas LISTA_ENVIAR con ≥85% confianza tienen un botón "✓ Marcar RESPONDIDA" de un solo click.',
+  },
+  {
+    t: '📋 Texto fijo RATIFICADA / EXTEMPORÁNEA',
+    d: 'Las glosas RATIFICADAS y EXTEMPORÁNEAS se pre-rellenan AUTOMÁTICAMENTE a las 6 AM con el texto institucional. Regla dura: RATIFICADA gana SIEMPRE sobre EXTEMPORÁNEA y nunca menciona extemporaneidad aunque las dos apliquen.',
+  },
+  {
+    t: '📊 Resumen ejecutivo en 1 fetch',
+    d: 'El Centro Premium tiene una pestaña "Resumen" que combina salud del sistema + bandeja autopilot + digest + schedulers en un único endpoint /control-center/resumen. Todo en 5 segundos al abrir el sistema.',
+    accion: function(){ setTimeout(abrirCentroPremium, 300); },
+    espera: 400,
+  },
+  {
+    t: '💎 Impacto del Autopilot',
+    d: 'La pestaña "Impacto" te muestra en vivo cuántas glosas cerró la IA sola hoy/semana/mes y cuántos dólares + horas ahorró. Perfecto para reportar al comité.',
+    accion: function(){ try{ premiumTab('impacto'); }catch(_){} },
+  },
+  {
+    t: '📥 Reporte gerencial Excel',
+    d: 'Un Excel con 4 hojas (Resumen · Top EPS · Autopilot · Anomalías), branding HUS, colores por estado. Perfecto para llevar al Comité de Cartera.',
+    accion: function(){ try{ premiumTab('reportes'); }catch(_){} },
+  },
+  {
+    t: '🚨 Detector de anomalías',
+    d: 'El sistema detecta solo: duplicados (misma factura+CUPS+EPS), patrones sospechosos de EPS (salto súbito de volumen o ratificación) y valores atípicos (z-score). Severidad ALTA o MEDIA según umbrales.',
+    accion: function(){ try{ premiumTab('anomalias'); }catch(_){} },
+  },
+  {
+    t: '📨 Digest para bot',
+    d: 'Un resumen listo para enviar por WhatsApp o Telegram. Configurá DIGEST_DESTINATARIOS en el servidor y se envía solo cada mañana a la hora que elijas. Podés probar manualmente desde la pestaña Digest.',
+    accion: function(){ try{ premiumTab('digest'); }catch(_){} },
+  },
+  {
+    t: '¡Listo! 🎉',
+    d: 'Ya conocés las 7 áreas premium. Siempre podés volver abriendo ⭐ Centro Premium desde el sidebar. Buena capacitación.',
+  },
+];
+var _tourPaso = 0;
+
+function iniciarTourPremium(){
+  _tourPaso = 0;
+  _renderTourPaso();
+}
+
+function _renderTourPaso(){
+  var existing = document.getElementById('tour-overlay');
+  if(existing) existing.remove();
+  var step = TOUR_PASOS[_tourPaso];
+  if(!step){ return; }
+  var n = _tourPaso + 1, total = TOUR_PASOS.length;
+  var overlay = document.createElement('div');
+  overlay.id = 'tour-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);';
+  overlay.innerHTML = ''
+    + '<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:24px 26px;box-shadow:0 20px 60px rgba(0,0,0,.35);">'
+    +   '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6b7280;margin-bottom:10px;">'
+    +     '<span>Paso ' + n + ' de ' + total + '</span>'
+    +     '<button onclick="_cerrarTour()" style="background:transparent;border:0;color:#6b7280;cursor:pointer;font-size:18px;line-height:1;">×</button>'
+    +   '</div>'
+    +   '<div style="height:4px;background:#e5e7eb;border-radius:2px;margin-bottom:18px;overflow:hidden;">'
+    +     '<div style="height:4px;background:linear-gradient(90deg,#1e40af,#3b82f6);width:' + Math.round(n/total*100) + '%;transition:width .3s;"></div>'
+    +   '</div>'
+    +   '<h3 style="margin:0 0 12px 0;font-size:17px;color:#111827;">' + _h(step.t) + '</h3>'
+    +   '<p style="margin:0 0 18px 0;font-size:13.5px;line-height:1.6;color:#374151;">' + _h(step.d) + '</p>'
+    +   '<div style="display:flex;justify-content:space-between;gap:10px;">'
+    +     '<button onclick="_cerrarTour()" style="padding:8px 14px;background:transparent;border:1px solid #d1d5db;border-radius:6px;font-size:12px;cursor:pointer;color:#374151;">Salir</button>'
+    +     '<div style="display:flex;gap:8px;">'
+    +       (n > 1 ? '<button onclick="_tourPrev()" style="padding:8px 14px;background:transparent;border:1px solid #d1d5db;border-radius:6px;font-size:12px;cursor:pointer;color:#374151;">← Anterior</button>' : '')
+    +       '<button onclick="_tourNext()" style="padding:8px 18px;background:#1e40af;color:#fff;border:0;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">' + (n < total ? 'Siguiente →' : '✓ Terminar') + '</button>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>';
+  overlay.addEventListener('keydown', function(e){ if(e.key === 'Escape') _cerrarTour(); });
+  document.body.appendChild(overlay);
+  if(typeof step.accion === 'function'){
+    try{ step.accion(); }catch(_){}
+  }
+}
+
+function _tourNext(){
+  _tourPaso++;
+  if(_tourPaso >= TOUR_PASOS.length){ _cerrarTour(); return; }
+  _renderTourPaso();
+}
+function _tourPrev(){
+  if(_tourPaso > 0) _tourPaso--;
+  _renderTourPaso();
+}
+function _cerrarTour(){
+  var o = document.getElementById('tour-overlay');
+  if(o) o.remove();
+}
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && document.getElementById('tour-overlay')) _cerrarTour();
+});
 
 // ─── Centro Premium (Ronda 27) — UI visible de rondas 16-25 ─────────────
 // Modal con pestañas que consumen los endpoints nuevos para que el usuario
