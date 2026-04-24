@@ -2298,6 +2298,8 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     <div class="modal-hdr">
       <h3 id="modal-titulo">Dictamen Jurídico</h3>
       <div style="display:flex;gap:.5rem">
+        <button class="btn-sm" style="background:#2563eb;color:#fff;border:0;" onclick="imprimirDictamenModal()" title="Imprimir o descargar PDF del dictamen">📄 PDF</button>
+        <button class="btn-sm ghost" onclick="copiarDictamenModal()" title="Copiar texto del dictamen al portapapeles">📋 Copiar</button>
         <button class="btn-sm ghost" onclick="verHistorialVersiones()" title="Historial de versiones del dictamen">📜 Versiones</button>
         <button class="btn-sm ghost" onclick="guardarComoPlantillaGold()" title="Guardar este argumento como plantilla ganadora">⭐ Gold</button>
         <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
@@ -7714,6 +7716,79 @@ async function verDictamen(id){
 function cerrarModal(){
   document.getElementById('modal-dictamen').classList.remove('show');
   CURRENT_GLOSA_ID = null;
+}
+
+// Ronda 50 · Bug #1: PDF visible desde el modal verDictamen
+// (Historial + Mis Glosas → click en glosa → modal abre con dictamen).
+// Reusa la misma plantilla institucional de imprimirDictamen().
+function imprimirDictamenModal(){
+  var body = document.getElementById('modal-body');
+  if(!body){ return; }
+  var dictamenHtml = body.innerHTML || '';
+  var g = CURRENT_GLOSA_DATA || {};
+  var codigo = g.codigo_glosa || '—';
+  var eps = g.eps || '—';
+  var factura = g.factura || '—';
+  var cups = g.cups_servicio || '—';
+  var paciente = g.paciente || '—';
+  var valorObj = g.valor_objetado || 0;
+  var fechaDoc = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  var w = window.open('', '_blank');
+  if(!w){ toast('Bloqueado','Permite pop-ups para descargar el PDF','warning'); return; }
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    + '<title>Dictamen Glosa #' + (CURRENT_GLOSA_ID||'') + ' · ESE HUS</title>'
+    + '<style>'
+    + '@page{size:letter;margin:20mm 18mm}'
+    + 'body{font-family:Georgia,"Times New Roman",serif;font-size:11pt;line-height:1.55;color:#111;margin:0;padding:0}'
+    + '.hdr{border-bottom:3px double #1e3a8a;padding-bottom:14px;margin-bottom:18px}'
+    + '.hdr h1{font-size:15pt;color:#1e3a8a;margin:0 0 4px}'
+    + '.hdr h2{font-size:11pt;color:#555;margin:0;font-weight:400}'
+    + '.meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:10pt;padding:10px 14px;background:#f1f5f9;border-left:4px solid #1e3a8a;margin-bottom:18px}'
+    + '.meta b{color:#334155}'
+    + '.dict{text-align:justify;font-size:11pt}'
+    + '.dict p{margin:0 0 10px}'
+    + '.dict h1,.dict h2,.dict h3,.dict h4{color:#1e3a8a;margin-top:14px}'
+    + '.firma{margin-top:60px;border-top:1px solid #333;width:300px;padding-top:6px;font-size:9.5pt}'
+    + '.pie{margin-top:24px;border-top:1px solid #ccc;padding-top:10px;font-size:8.5pt;color:#64748b;text-align:center}'
+    + '@media print{.no-print{display:none}}'
+    + '.no-print{position:fixed;top:10px;right:10px;background:#1e40af;color:#fff;padding:8px 14px;border-radius:6px;border:0;cursor:pointer;font-family:Arial;font-size:11pt}'
+    + '</style></head><body>'
+    + '<button class="no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>'
+    + '<div class="hdr">'
+    +   '<h1>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</h1>'
+    +   '<h2>Área de Cartera — Dictamen de Respuesta a Glosa</h2>'
+    + '</div>'
+    + '<div class="meta">'
+    +   '<div><b>Glosa #:</b> ' + (CURRENT_GLOSA_ID||'—') + '</div>'
+    +   '<div><b>Fecha dictamen:</b> ' + fechaDoc + '</div>'
+    +   '<div><b>Entidad pagadora:</b> ' + _h(eps) + '</div>'
+    +   '<div><b>Factura:</b> ' + _h(factura) + '</div>'
+    +   '<div><b>Código glosa:</b> ' + _h(codigo) + '</div>'
+    +   '<div><b>CUPS:</b> ' + _h(cups) + '</div>'
+    +   '<div><b>Paciente:</b> ' + _h(paciente) + '</div>'
+    +   '<div><b>Valor objetado:</b> $' + (valorObj||0).toLocaleString('es-CO') + '</div>'
+    + '</div>'
+    + '<div class="dict">' + dictamenHtml + '</div>'
+    + '<div class="firma">Firma autorizada ESE HUS — Área de Cartera</div>'
+    + '<div class="pie">'
+    +   'Carrera 33 No. 28-126 · Bucaramanga, Santander · Tel. (607) 691 2010<br>'
+    +   'cartera@hus.gov.co · glosasydevoluciones@hus.gov.co · NIT 900.006.037-4'
+    + '</div>'
+    + '</body></html>';
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ try{ w.focus(); }catch(_){} }, 300);
+}
+
+function copiarDictamenModal(){
+  var body = document.getElementById('modal-body');
+  if(!body) return;
+  try{
+    navigator.clipboard.writeText(body.innerText || body.textContent || '');
+    toast('Copiado','Dictamen en tu portapapeles','success');
+  }catch(_){
+    toast('Error','Tu navegador bloquea clipboard','warning');
+  }
 }
 
 function toggleRefinarPanel(){
