@@ -128,6 +128,27 @@ async def _procesar_glosas_pendientes(limite: int = 20) -> dict:
 
         for g in candidatas:
             try:
+                # Intento cero: si es RATIFICADA o EXTEMPORÁNEA, aplicar texto
+                # fijo. No gasta tokens, respeta la regla de prioridad
+                # (RATIFICADA gana sobre EXTEMPORÁNEA y nunca menciona
+                # extemporaneidad si ambas aplican). Ronda 21.
+                try:
+                    from app.services.texto_fijo_detector import (
+                        aplicar_texto_fijo_si_corresponde,
+                    )
+                    clase = aplicar_texto_fijo_si_corresponde(g)
+                    if clase is not None:
+                        db.commit()
+                        match_perfecto += 1
+                        procesadas += 1
+                        logger.info(
+                            f"[PRE-ANALISIS] Glosa {g.id} pre-rellenada como {clase['tipo']}"
+                        )
+                        continue
+                except Exception as _e_tf:
+                    logger.warning(f"[PRE-ANALISIS] Glosa {g.id} texto_fijo falló: {_e_tf}")
+                    db.rollback()
+
                 # Solo procesamos glosas con texto original disponible
                 if not g.texto_glosa_original or len(g.texto_glosa_original) < 20:
                     saltadas += 1
