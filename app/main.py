@@ -828,8 +828,8 @@ async def lifespan(app: FastAPI):
                 if nuevo_pass.lower() in passwords_debiles:
                     logger.error(
                         "[FORCE_RESET_ADMIN_PASSWORD] ABORTADO: ADMIN_PASSWORD "
-                        f"coincide con un password débil conocido. Usa un password "
-                        f"de al menos 12 caracteres con mayúsculas, números y símbolos."
+                        "coincide con un password débil conocido. Usa un password "
+                        "de al menos 12 caracteres con mayúsculas, números y símbolos."
                     )
                 elif len(nuevo_pass) < 10:
                     logger.error(
@@ -918,7 +918,7 @@ async def lifespan(app: FastAPI):
                 if force_reset_pwd:
                     existente.password_hash = password_hash_inicial
                     existente.must_change_password = 1
-                    cambios.append(f"password reset a prefijo email + must_change=1")
+                    cambios.append("password reset a prefijo email + must_change=1")
                 if cambios:
                     logger.warning(f"[FORCE_RESEED] {email}: {', '.join(cambios)}")
 
