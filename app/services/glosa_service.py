@@ -1847,7 +1847,12 @@ class GlosaService:
         """
         if not self.anthropic_key:
             raise RuntimeError("Anthropic API key no configurada")
-        _timeout_anthropic = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+        # Ronda 49 fix: timeout más generoso para dictámenes largos con
+        # max_tokens=2000. read_timeout 120s era justo y cortaba con
+        # 'Stream idle timeout' en respuestas que rondaban los 100s.
+        # Subimos a 180s para dar margen y activamos keepalive / retries
+        # implícitos del cliente.
+        _timeout_anthropic = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
 
         # Decidir si usar caching: solo si el system es suficientemente largo
         # (requisito mínimo ~1024 tokens, heurística: ≥4000 chars).
@@ -1862,37 +1867,73 @@ class GlosaService:
         else:
             system_payload = system
 
-        async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": self.anthropic_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": self.anthropic_model,
-                    "max_tokens": 4000,
-                    "temperature": 0.15,
-                    "system": system_payload,
-                    "messages": [{"role": "user", "content": user}],
-                },
-            )
-            data = resp.json()
-            if "content" in data and data["content"]:
-                # Log métricas de caching si Anthropic las devuelve
-                usage = data.get("usage", {})
-                cache_read = usage.get("cache_read_input_tokens", 0)
-                cache_write = usage.get("cache_creation_input_tokens", 0)
-                if cache_read or cache_write:
-                    logger.info(
-                        f"[ANTHROPIC-CACHE] read={cache_read}t write={cache_write}t "
-                        f"normal={usage.get('input_tokens', 0)}t output={usage.get('output_tokens', 0)}t"
+        # Ronda 49: retry con backoff para timeouts transitorios de red
+        # (connection reset, stream idle timeout, protocolo). Hasta 3 intentos.
+        _ERRORES_TRANSITORIOS = (
+            httpx.ReadTimeout,
+            httpx.ConnectTimeout,
+            httpx.PoolTimeout,
+            httpx.RemoteProtocolError,
+            httpx.ReadError,
+        )
+        ultimo_error = None
+        for intento in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
+                    resp = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": self.anthropic_key,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json",
+                        },
+                        json={
+                            "model": self.anthropic_model,
+                            # Ronda 49: 3000 tokens es suficiente para dictamen
+                            # de 800-1200 palabras; reduce latencia vs 4000.
+                            "max_tokens": 3000,
+                            "temperature": 0.15,
+                            "system": system_payload,
+                            "messages": [{"role": "user", "content": user}],
+                        },
                     )
-                return data["content"][0]["text"], f"anthropic/{self.anthropic_model}"
-            # Respuestas de error de la API traen "error": {...}
-            err = data.get("error", {}).get("message", str(data)[:300])
-            raise RuntimeError(f"Anthropic devolvió sin 'content': {err}")
+                    data = resp.json()
+                    if "content" in data and data["content"]:
+                        usage = data.get("usage", {})
+                        cache_read = usage.get("cache_read_input_tokens", 0)
+                        cache_write = usage.get("cache_creation_input_tokens", 0)
+                        if cache_read or cache_write:
+                            logger.info(
+                                f"[ANTHROPIC-CACHE] read={cache_read}t write={cache_write}t "
+                                f"normal={usage.get('input_tokens', 0)}t output={usage.get('output_tokens', 0)}t"
+                            )
+                        return data["content"][0]["text"], f"anthropic/{self.anthropic_model}"
+                    err = data.get("error", {}).get("message", str(data)[:300])
+                    # Si es error 529 (overloaded) o 429 (rate limit), reintentar
+                    status = resp.status_code
+                    if status in (429, 529, 500, 502, 503, 504):
+                        ultimo_error = RuntimeError(f"Anthropic HTTP {status}: {err[:200]}")
+                        import asyncio as _aio
+                        espera = 2.0 * (intento + 1)
+                        logger.warning(f"[ANTHROPIC] HTTP {status}, reintentando en {espera}s (intento {intento+1}/3)")
+                        await _aio.sleep(espera)
+                        continue
+                    raise RuntimeError(f"Anthropic devolvió sin 'content' (status={status}): {err}")
+            except _ERRORES_TRANSITORIOS as e:
+                ultimo_error = e
+                import asyncio as _aio
+                espera = 2.0 * (intento + 1)
+                logger.warning(
+                    f"[ANTHROPIC] timeout/red {type(e).__name__}, "
+                    f"reintentando en {espera}s (intento {intento+1}/3): {str(e)[:120]}"
+                )
+                await _aio.sleep(espera)
+                continue
+        # Después de 3 intentos fallidos
+        raise RuntimeError(
+            f"Anthropic falló tras 3 intentos por timeout/red: "
+            f"{type(ultimo_error).__name__}: {str(ultimo_error)[:200]}"
+        )
 
     async def _llamar_ia(self, system: str, user: str, eps: str = "", codigo: str = "") -> tuple[str, str]:
         """Llama a la IA configurada (primary_ai) con fallback al otro proveedor.
