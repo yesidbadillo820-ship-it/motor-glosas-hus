@@ -1076,6 +1076,7 @@ from app.api.routers.chat_glosa import router as chat_glosa_router
 from app.api.routers.dashboard_ejecutivo import router as dashboard_ejecutivo_router
 from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
+from app.api.routers.sistema import router as sistema_router
 from app.services.glosa_service import GlosaService
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
@@ -1115,6 +1116,7 @@ app.include_router(chat_glosa_router)
 app.include_router(dashboard_ejecutivo_router)
 app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
+app.include_router(sistema_router)
 
 
 def get_glosa_service() -> GlosaService:
