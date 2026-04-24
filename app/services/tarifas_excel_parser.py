@@ -113,12 +113,16 @@ def _celda(fila: tuple, idx: int | None) -> Any:
 def _indice_columna(headers: list[str], *candidatos: str) -> int | None:
     """Busca el índice del primer header que coincida con algún candidato.
 
-    Dos pasadas:
+    Tres pasadas:
       1. Match exacto normalizado (ej. header "CUPS" == candidato "CUPS").
       2. Candidato aparece como palabra/frase completa dentro del header
          (ej. header "APLICA IVA (SI-NO)" contiene candidato "APLICA IVA").
          Solo aplica para candidatos de ≥6 caracteres, para evitar que
          "CUPS" (4 chars) coincida con "DESCRIPCION CUPS".
+      3. Ronda 46: match por prefijo de palabra clave — si el candidato es
+         uno de los típicos ('VALOR', 'TARIFA', 'PRECIO', 'CUPS'), aceptar
+         cualquier header que **empiece** con esa palabra + espacio + algo
+         (ej. candidato 'VALOR' matchea header 'VALOR 2025', 'VALOR PACTADO').
     """
     cands_norm = [_normalizar_texto(c) for c in candidatos if c]
     # Pasada 1: match exacto
@@ -132,6 +136,17 @@ def _indice_columna(headers: list[str], *candidatos: str) -> int | None:
         pat = re.compile(r"(?:^|\s|/|-)" + re.escape(cand) + r"(?:$|\s|/|-|\()")
         for i, h in enumerate(headers):
             if h and pat.search(h):
+                return i
+    # Pasada 3 (Ronda 46): match por prefijo para palabras típicas cortas.
+    # Solo para candidatos cortos específicos que pueden venir con sufijos
+    # como año, modalidad, etc. Ej: candidato 'VALOR' → matchea 'VALOR 2025'.
+    PREFIJOS_ACEPTABLES = {"VALOR", "TARIFA", "PRECIO", "CUPS"}
+    for cand in cands_norm:
+        if cand not in PREFIJOS_ACEPTABLES:
+            continue
+        pat = re.compile(r"^" + re.escape(cand) + r"\s+\S")
+        for i, h in enumerate(headers):
+            if h and pat.match(h):
                 return i
     return None
 
@@ -168,7 +183,13 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
     )
     has_value = any(k in hunion for k in value_keywords)
     if not has_value:
+        # Match exacto simple
         has_value = any(h in {"VALOR", "PRECIO", "TARIFA"} for h in hset)
+    if not has_value:
+        # Match por prefijo — "VALOR 2025", "TARIFA 2025", "VALOR 2026", etc.
+        # (Ronda 46: soporte para tarifarios DMBUG y similares con año en header)
+        _AGNOS_PATRON = re.compile(r"^(VALOR|TARIFA|PRECIO)\s*(\d{4})?\s*$")
+        has_value = any(_AGNOS_PATRON.match(h) for h in hset if h)
     if cups_like and has_value:
         return "SIMPLE_FIJO"
     return None
@@ -484,11 +505,16 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
     )
     idx_valor = _indice_columna(
         headers, "PRECIO DE REFERENCIA", "TARIFA UNITARIA", "VALOR PACTADO",
-        "VALOR UNITARIO", "PRECIO UNITARIO", "VALOR", "PRECIO", "TARIFA"
+        "VALOR UNITARIO", "PRECIO UNITARIO",
+        # Ronda 46: soporte para tarifarios con año en el header (DMBUG, HUS)
+        "TARIFA 2025", "TARIFA 2026", "VALOR 2025", "VALOR 2026",
+        "TARIFA 2024", "VALOR 2024",
+        "VALOR", "PRECIO", "TARIFA",
     )
     idx_modalidad = _indice_columna(
         headers, "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
-        "TARIFA A LA QUE CORRESPONDE", "MODALIDAD", "TIPO TARIFA"
+        "TARIFA A LA QUE CORRESPONDE", "MODALIDAD", "TIPO TARIFA",
+        "SERVICIO", "ESPECIALIDAD",  # Ronda 46: hojas AMBULATORIO/PAQUETES del HUS
     )
     idx_cod_ips = _indice_columna(headers, "CODIGO IPS", "CODIGO PROPIO")
 
