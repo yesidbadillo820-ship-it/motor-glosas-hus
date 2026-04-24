@@ -2957,6 +2957,15 @@ async function premiumTab(nombre){
         + '</div>'
         + '</div>';
     }).join('');
+    // IDs LISTA_ENVIAR con confianza ≥85% para el botón batch
+    var idsAprobables = (d.glosas||[])
+      .filter(function(g){ return g.estado_autopilot === 'LISTA_ENVIAR' && (g.confianza||0) >= 0.85; })
+      .map(function(g){ return g.glosa_id; });
+
+    var botonBatch = idsAprobables.length
+      ? '<button onclick="_apBatchAprobar(' + JSON.stringify(idsAprobables).replace(/"/g,'&quot;') + ')" style="padding:9px 16px;background:#166534;color:#fff;border:0;border-radius:8px;font-weight:700;font-size:12.5px;cursor:pointer;box-shadow:0 2px 6px rgba(22,101,52,.3);">⚡ Aprobar en lote las ' + idsAprobables.length + ' LISTA_ENVIAR (≥85%)</button>'
+      : '<span style="font-size:11.5px;color:#9ca3af;">Sin glosas LISTA_ENVIAR con confianza ≥85% para aprobar en lote.</span>';
+
     body.innerHTML = ''
       + '<div style="font-size:11px;color:#6b7280;margin-bottom:10px;">Ámbito: <b>' + ambito + '</b> · Total: ' + (d.total_evaluadas||0) + '</div>'
       + '<div class="pgrid">'
@@ -2965,6 +2974,7 @@ async function premiumTab(nombre){
       + _ptile('REVISAR','<span class="pstate-badge pstate-REVISAR">'+(c.REVISAR||0)+'</span>', 'warn')
       + _ptile('INTERVENIR','<span class="pstate-badge pstate-INTERVENIR">'+(c.INTERVENIR||0)+'</span>', 'err')
       + '</div>'
+      + '<div style="margin-bottom:12px;">' + botonBatch + '</div>'
       + '<div class="pcard">'
       +   '<div class="pcard-head">🎯 Glosas priorizadas por días restantes</div>'
       +   '<div style="max-height:50vh;overflow-y:auto;">'
@@ -2972,8 +2982,8 @@ async function premiumTab(nombre){
       +   '</div>'
       + '</div>'
       + '<div class="phint">'
-      +   'Endpoint: <code>' + url + '</code>. '
-      +   'Estados: <b>LISTA_ENVIAR</b> (texto fijo o MUY_BAJO riesgo + Gold) → <b>CASI_LISTA</b> → <b>REVISAR</b> → <b>INTERVENIR</b> (dictamen vacío, anomalía ALTA o MUY_ALTO riesgo).'
+      +   'Endpoint: <code>' + url + '</code> · Batch: <code>POST /autopilot/batch-aprobar</code>. '
+      +   'Estados: <b>LISTA_ENVIAR</b> (texto fijo o MUY_BAJO riesgo + Gold) → <b>CASI_LISTA</b> → <b>REVISAR</b> → <b>INTERVENIR</b>.'
       + '</div>';
     return;
   }
@@ -3157,6 +3167,15 @@ async function premiumTab(nombre){
       + '      <button class="btn-secondary" style="padding:8px 14px;" onclick="_descargarGerencial(\'mes\')">📥 Mes</button>'
       + '    </div>'
       + '  </div>'
+      + '  <div class="ptile" style="min-height:auto;background:#fef2f2;border-color:#fecaca;">'
+      + '    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+      + '      <span style="font-size:22px;">⚡</span>'
+      + '      <b style="font-size:14px;color:#991b1b;">Hotfix: Marcar RATIFICADAS/EXTEMPORÁNEAS como RESPONDIDAS</b>'
+      + '    </div>'
+      + '    <p style="font-size:12px;color:#7f1d1d;margin:0 0 12px 0;">Si tenés glosas con texto fijo aplicado pero aún pendientes en bandeja, esta acción las mueve a RESPONDIDAS en bloque. Las RATIFICADAS y EXTEMPORÁNEAS son casos mecánicos que no necesitan revisión manual.</p>'
+      + '    <button class="btn-primary" style="padding:8px 14px;background:#991b1b;" onclick="_marcarRespondidasTextoFijo()">⚡ Marcar backlog como RESPONDIDAS</button>'
+      + '    <pre id="batch-respondidas-result" style="display:none;margin-top:12px;padding:12px;background:#fff;border:1px solid #fecaca;border-radius:6px;font-size:11px;max-height:220px;overflow-y:auto;white-space:pre-wrap;font-family:ui-monospace,monospace;"></pre>'
+      + '  </div>'
       + '  <div class="ptile" style="min-height:auto;">'
       + '    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
       + '      <span style="font-size:22px;">🔁</span>'
@@ -3253,8 +3272,71 @@ async function _enviarDigestManual(){
     });
     var d = await r.json();
     if(pre) pre.textContent = JSON.stringify(d, null, 2);
-    toast('Digest enviado', 'Revisá la respuesta del bot abajo', 'success');
+    // Ronda 34 fix: si pedimos whatsapp/telegram pero el provider degradó a mock,
+    // el mensaje NO se envió — avisar al usuario con claridad, no celebrar falso éxito.
+    var envio = d && d.envio || {};
+    var providerUsado = envio.provider || '';
+    if((canal === 'whatsapp' || canal === 'telegram') && providerUsado === 'mock'){
+      _mostrarAvisoMock(canal);
+    } else if(envio.ok){
+      toast('✓ Digest enviado', 'Canal: ' + providerUsado + ' → ' + dest, 'success');
+    } else {
+      toast('⚠ Error del bot', envio.error || 'No se pudo enviar', 'error');
+    }
   }catch(e){ if(pre) pre.textContent = 'ERROR: ' + e.message; }
+}
+
+function _mostrarAvisoMock(canal){
+  var env = canal === 'whatsapp'
+    ? 'WHATSAPP_META_TOKEN + WHATSAPP_META_PHONE_ID'
+    : 'TELEGRAM_BOT_TOKEN';
+  var doc = canal === 'whatsapp'
+    ? 'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started'
+    : 'https://core.telegram.org/bots/tutorial';
+  // Reemplazar resultado visible con advertencia
+  var pre = document.getElementById('digest-result');
+  if(pre){
+    pre.style.display = 'block';
+    pre.style.background = '#fef2f2';
+    pre.style.borderColor = '#fecaca';
+    pre.style.color = '#991b1b';
+    pre.innerHTML = ''
+      + '<b>⚠️ EL MENSAJE NO SE ENVIÓ</b><br><br>'
+      + 'El provider respondió <code>mock</code>, que significa que las credenciales reales de <b>' + canal + '</b> no están configuradas en el servidor (Render).<br><br>'
+      + '<b>Para enviar de verdad:</b><br>'
+      + '1. Andá al dashboard de Render → Environment Variables<br>'
+      + '2. Agregá <code>' + env + '</code> con los valores reales<br>'
+      + '3. Clickeá "Manual Deploy" para recargar con las nuevas credenciales<br>'
+      + '4. Volvé acá y probá de nuevo<br><br>'
+      + 'Documentación: <a href="' + doc + '" target="_blank" style="color:#b91c1c;text-decoration:underline;">' + doc + '</a>';
+  }
+  toast('⚠ No se envió — modo mock', 'Faltan credenciales en Render. Ver detalles abajo.', 'warning');
+}
+
+// Hotfix: marca todas las glosas texto_fijo (RATIFICADA/EXTEMPORÁNEA) pendientes
+// como RESPONDIDA de una vez. Útil para limpiar el backlog.
+async function _marcarRespondidasTextoFijo(){
+  if(!confirm('¿Marcar todas las glosas RATIFICADAS/EXTEMPORÁNEAS con texto fijo aplicado como RESPONDIDAS?\n\nEsto las saca de la bandeja de pendientes de inmediato. Idempotente (podés ejecutarlo varias veces).')) return;
+  var pre = document.getElementById('batch-respondidas-result');
+  if(pre){ pre.style.display='block'; pre.textContent='Procesando…'; }
+  try{
+    // Dry-run primero
+    var dry = await fetch('/autopilot/texto-fijo/marcar-respondidas?dry_run=true', {
+      method:'POST', headers: authH(),
+    }).then(function(r){ return r.json(); });
+    if(dry.error){ toast('Error dry-run', dry.error, 'error'); return; }
+    if(!confirm('Dry-run: se marcarían ' + (dry.total_candidatas||0) + ' glosa(s) como RESPONDIDAS.\n\n¿Confirmar y APLICAR?')) return;
+    var r = await fetch('/autopilot/texto-fijo/marcar-respondidas?dry_run=false', {
+      method:'POST', headers: authH(),
+    });
+    var d = await r.json();
+    if(pre) pre.textContent = JSON.stringify(d, null, 2);
+    toast('✓ Hotfix aplicado', 'Marcadas: ' + (d.marcadas||0) + ' · Errores: ' + (d.errores||0), 'success');
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    if(typeof refrescarBadgeNotif === 'function') refrescarBadgeNotif();
+  }catch(e){
+    if(pre) pre.textContent = 'ERROR: ' + e.message;
+  }
 }
 
 function _ptile(label, value, variant){
@@ -5758,6 +5840,34 @@ async function verGlosa(id){
       '</body></html>');
     w.document.close();
   }catch(e){ alert('Error: ' + e.message); }
+}
+
+// Ronda 34: aprobar en lote LISTA_ENVIAR desde el Centro Premium
+async function _apBatchAprobar(ids){
+  if(!ids || !ids.length) return;
+  if(!confirm('⚡ Aprobar en lote ' + ids.length + ' glosa(s) LISTA_ENVIAR con confianza ≥85%?\n\nEl sistema revalida cada una contra el autopilot antes de marcar RESPONDIDA. Si una bajó de confianza, se salta automáticamente.\n\nEsto cierra el ciclo: la IA trabajó, vos confirmás en bloque.')) return;
+  try{
+    // Primero dry-run para mostrar qué pasaría
+    var dry = await fetch('/autopilot/batch-aprobar', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({ids: ids, confianza_minima: 0.85, dry_run: true}),
+    }).then(function(r){ return r.json(); });
+    if(dry.error){ toast('Error dry-run', dry.error, 'error'); return; }
+    if(!confirm('Dry-run: se aprobarían ' + (dry.aprobadas||0) + '. Se saltarían ' + (dry.saltadas||0) + '. Errores ' + (dry.errores||0) + '.\n\n¿Confirmar y APLICAR?')) return;
+
+    var r = await fetch('/autopilot/batch-aprobar', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({ids: ids, confianza_minima: 0.85, dry_run: false}),
+    });
+    var d = await r.json();
+    if(d.error){ toast('Error', d.error, 'error'); return; }
+    toast('⚡ Batch aplicado','Aprobadas: '+(d.aprobadas||0)+' · Saltadas: '+(d.saltadas||0)+' · Errores: '+(d.errores||0), 'success');
+    // Refrescar UI
+    try{ premiumTab('autopilot'); }catch(_){}
+    if(typeof refrescarBadgeNotif === 'function') refrescarBadgeNotif();
+  }catch(e){ toast('Error', e.message || 'fallo de red', 'error'); }
 }
 
 // Ronda 31: envío rápido (one-click) cuando autopilot da LISTA_ENVIAR + confianza alta
