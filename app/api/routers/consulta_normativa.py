@@ -1,7 +1,6 @@
 """Endpoint para consulta de normativa colombiana en cuentas médicas."""
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from typing import Optional
 
 from app.api.deps import get_usuario_actual
 from app.models.db import UsuarioRecord

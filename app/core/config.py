@@ -95,8 +95,8 @@ def check_security_config() -> None:
         )
     elif settings.admin_password in {"admin", "admin123", "password", "123456"}:
         warnings.warn(
-            f"ADVERTENCIA DE SEGURIDAD: ADMIN_PASSWORD usa un valor débil "
-            f"conocido. Cámbialo inmediatamente por una contraseña fuerte.",
+            "ADVERTENCIA DE SEGURIDAD: ADMIN_PASSWORD usa un valor débil "
+            "conocido. Cámbialo inmediatamente por una contraseña fuerte.",
             stacklevel=2,
         )
 

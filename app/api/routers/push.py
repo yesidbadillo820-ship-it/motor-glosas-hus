@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.db import PushSubscriptionRecord, UsuarioRecord
-from app.api.deps import get_usuario_actual, get_coordinador_o_admin
+from app.api.deps import get_usuario_actual
 
 router = APIRouter(prefix="/push", tags=["push"])
 

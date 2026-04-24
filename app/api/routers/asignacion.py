@@ -8,7 +8,6 @@ Heurística basada en:
 Devuelve el mejor gestor recomendado. El endpoint puede ejecutar la
 asignación directa (auditor_email + gestor_nombre) o solo sugerir.
 """
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_

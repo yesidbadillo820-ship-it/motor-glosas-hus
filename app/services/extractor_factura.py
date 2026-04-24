@@ -152,12 +152,9 @@ def extraer_de_texto(texto: str) -> dict:
     if m:
         resultado["cups"] = m.group(1)
 
-    # Códigos de glosa
-    codigos = set(_CODIGOS_GLOSA.findall(t_upper))
-    # Los findall devuelve el grupo (prefijo), reconstruimos el código completo
-    codigos_completos = []
-    for mm in _CODIGOS_GLOSA.finditer(t_upper):
-        codigos_completos.append(mm.group(0))
+    # Códigos de glosa — findall devuelve solo el grupo (prefijo),
+    # por eso usamos finditer para obtener el código completo.
+    codigos_completos = [mm.group(0) for mm in _CODIGOS_GLOSA.finditer(t_upper)]
     resultado["codigos_glosa"] = sorted(set(codigos_completos))
 
     # Fechas tipo "RADICACIÓN: 15/04/2026" o "RECEPCIÓN: 20/04/2026"

@@ -18,7 +18,6 @@ Diseñada para ser barata: cada sub-query está indexada.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -32,9 +31,8 @@ from app.models.db import (
 
 
 def _glosas_criticas(db: Session, email: str, horas: int = 48) -> int:
-    """Mis glosas con dias_restantes <= ceil(horas/24) y > 0."""
-    ahora = datetime.now(timezone.utc)
-    # Aproximación: dias_restantes ≤ 2 y > 0
+    """Mis glosas con dias_restantes <= ceil(horas/24) y > 0.
+    Aproximación: dias_restantes ≤ 2 y > 0."""
     return (
         db.query(func.count(GlosaRecord.id))
         .filter(GlosaRecord.auditor_email == email)

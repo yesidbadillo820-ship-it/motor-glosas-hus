@@ -15,8 +15,6 @@ Output: timeline cronológico listo para mostrar como <ol> en UI forense.
 """
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 

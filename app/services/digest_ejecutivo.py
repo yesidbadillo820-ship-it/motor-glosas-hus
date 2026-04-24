@@ -145,7 +145,7 @@ def formatear_digest_texto(digest: dict) -> str:
         f"• Recuperado: ${int(ind['valor_recuperado']):,} ({ind['tasa_recuperacion']*100:.1f}%)",
         f"• Pendientes: {op['pendientes_total']}  · Vencidas: {op['vencidas']}",
         "",
-        f"🤖 Autopilot:",
+        "🤖 Autopilot:",
         f"   LISTA_ENVIAR: {ap.get('LISTA_ENVIAR', 0)}",
         f"   CASI_LISTA:   {ap.get('CASI_LISTA', 0)}",
         f"   REVISAR:      {ap.get('REVISAR', 0)}",

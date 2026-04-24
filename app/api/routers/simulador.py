@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.models.db import ConciliacionRecord, GlosaRecord, UsuarioRecord
-from app.api.deps import get_usuario_actual, get_auditor_o_superior
+from app.api.deps import get_auditor_o_superior
 from app.services.glosa_service import GlosaService
 from app.core.config import get_settings
 from app.repositories.audit_repository import AuditRepository

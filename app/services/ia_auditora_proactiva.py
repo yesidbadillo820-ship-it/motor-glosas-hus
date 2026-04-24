@@ -23,8 +23,6 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy.orm import Session
-
 from app.core.logging_utils import logger
 from app.database import SessionLocal
 from app.models.db import GlosaRecord

@@ -79,7 +79,7 @@ def init_sentry() -> bool:
     dsn = _limpiar_dsn(dsn_raw)
     if dsn != dsn_raw.strip() and dsn_raw.strip():
         logger.warning(
-            f"SENTRY_DSN tenía artefactos (prefijo o comillas). Se limpió automáticamente."
+            "SENTRY_DSN tenía artefactos (prefijo o comillas). Se limpió automáticamente."
         )
     if not dsn:
         logger.info("Sentry no configurado (sin SENTRY_DSN). Saltando inicialización.")

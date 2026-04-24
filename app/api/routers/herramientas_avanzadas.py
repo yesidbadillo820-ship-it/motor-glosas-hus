@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
 
 from app.api.deps import get_usuario_actual
 from app.database import get_db

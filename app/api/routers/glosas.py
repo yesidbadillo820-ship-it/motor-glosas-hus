@@ -385,9 +385,9 @@ def exportar_xlsx(
             # Valor recuperado
             ws.conditional_formatting.add(rango_recup, CellIsRule(operator="greaterThan", formula=["0"], fill=fill_verde_fuerte))
             # Estado
-            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=[f'EXACT(P2,"CERRADA")'], fill=fill_verde))
-            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=[f'EXACT(P2,"RATIFICADA")'], fill=fill_rojo))
-            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=[f'EXACT(P2,"EXTEMPORANEA")'], fill=fill_amarillo))
+            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"CERRADA")'], fill=fill_verde))
+            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"RATIFICADA")'], fill=fill_rojo))
+            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"EXTEMPORANEA")'], fill=fill_amarillo))
     except Exception as _e:
         # Sin formato condicional el Excel sigue siendo válido.
         pass
