@@ -57,7 +57,7 @@ def crear_conciliacion(data: ConciliacionCreate, db: Session = Depends(get_db),
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
     try:
-        fecha = datetime.fromisoformat(data.fecha_audiencia)
+        fecha = a_utc(datetime.fromisoformat(data.fecha_audiencia))
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use ISO: 2026-05-10T10:00:00")
     c = ConciliacionRepository(db).crear(
@@ -211,7 +211,7 @@ def cerrar_acta(
     if data.resultado.upper() not in RES_VALIDOS:
         raise HTTPException(400, f"Resultado inválido. Use: {', '.join(RES_VALIDOS)}")
     try:
-        fecha_acta = datetime.fromisoformat(data.fecha_acta)
+        fecha_acta = a_utc(datetime.fromisoformat(data.fecha_acta))
     except ValueError:
         raise HTTPException(400, "fecha_acta inválida, use ISO")
     c = _obtener_o_404(db, conciliacion_id)

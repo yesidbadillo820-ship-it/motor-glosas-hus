@@ -104,13 +104,15 @@ def restaurar(
     except Exception:
         raise HTTPException(500, "Snapshot corrupto")
 
-    # Convertir ISO strings de vuelta a datetime
+    # Convertir ISO strings de vuelta a datetime — TZ-aware UTC para que
+    # SQLAlchemy las acepte en columnas DateTime(timezone=True) sin lanzar
+    # 'TypeError: can't subtract offset-naive and offset-aware'.
     for campo in ("creado_en", "fecha_recepcion", "fecha_entrega",
                   "fecha_vencimiento", "fecha_radicacion_factura",
                   "fecha_documento_dgh", "fecha_decision_eps"):
         if isinstance(snap.get(campo), str):
             try:
-                snap[campo] = datetime.fromisoformat(snap[campo])
+                snap[campo] = _normalizar_tz(datetime.fromisoformat(snap[campo]))
             except Exception:
                 snap[campo] = None
 
