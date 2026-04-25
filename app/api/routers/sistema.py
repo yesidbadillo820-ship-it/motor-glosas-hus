@@ -222,3 +222,113 @@ def metricas_ia(
         "cache_hit_rate_pct": round(cache_hit_rate, 1),
         "por_modelo": desglose,
     }
+
+
+@router.get("/metricas-ia/por-glosa/{glosa_id}")
+def metricas_ia_por_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R56 P2: detalle de los calls IA que generaron una glosa específica.
+
+    Útil para investigar glosas con dictamen sospechoso (latencia alta,
+    cache fallido, modelo equivocado, costo desproporcionado).
+    """
+    from app.models.db import AICallRecord
+
+    calls = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.glosa_id == glosa_id)
+        .order_by(AICallRecord.creado_en.asc())
+        .all()
+    )
+    if not calls:
+        return {
+            "glosa_id": glosa_id,
+            "total_calls": 0,
+            "cost_usd_total": 0.0,
+            "calls": [],
+        }
+
+    cost_total = sum(c.cost_usd or 0 for c in calls)
+    return {
+        "glosa_id": glosa_id,
+        "total_calls": len(calls),
+        "cost_usd_total": round(cost_total, 6),
+        "calls": [
+            {
+                "id": c.id,
+                "proveedor": c.proveedor,
+                "modelo": c.modelo,
+                "latency_ms": c.latency_ms,
+                "input_tokens": c.input_tokens,
+                "cache_creation_input_tokens": c.cache_creation_input_tokens,
+                "cache_read_input_tokens": c.cache_read_input_tokens,
+                "output_tokens": c.output_tokens,
+                "cost_usd": c.cost_usd,
+                "user_email": c.user_email,
+                "creado_en": c.creado_en.isoformat() if c.creado_en else None,
+            }
+            for c in calls
+        ],
+    }
+
+
+@router.get("/metricas-ia/por-usuario")
+def metricas_ia_por_usuario(
+    dias: int = 7,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R56 P3: agregaciones de uso IA por usuario en la ventana indicada.
+
+    Detecta abuso (usuario disparando 100×promedio) y permite cobranza
+    interna en multi-tenancy futuro.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICallRecord
+
+    desde = ahora_utc() - timedelta(days=max(1, int(dias)))
+    calls = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.creado_en >= desde)
+        .filter(AICallRecord.user_email.isnot(None))
+        .all()
+    )
+
+    por_usuario: dict[str, dict] = {}
+    for c in calls:
+        u = c.user_email or "(sin email)"
+        d = por_usuario.setdefault(
+            u,
+            {"calls": 0, "cost_usd": 0.0, "tokens_total": 0, "latency_ms_total": 0},
+        )
+        d["calls"] += 1
+        d["cost_usd"] += c.cost_usd or 0
+        d["tokens_total"] += (
+            (c.input_tokens or 0)
+            + (c.cache_creation_input_tokens or 0)
+            + (c.cache_read_input_tokens or 0)
+            + (c.output_tokens or 0)
+        )
+        d["latency_ms_total"] += c.latency_ms or 0
+
+    items = []
+    for email, d in por_usuario.items():
+        items.append({
+            "user_email": email,
+            "calls": d["calls"],
+            "cost_usd": round(d["cost_usd"], 6),
+            "tokens_total": d["tokens_total"],
+            "latency_ms_promedio": int(d["latency_ms_total"] / d["calls"]) if d["calls"] else 0,
+        })
+    items.sort(key=lambda x: x["cost_usd"], reverse=True)
+
+    return {
+        "ventana_dias": dias,
+        "total_usuarios": len(items),
+        "ranking": items,
+    }

@@ -95,3 +95,78 @@ class TestMetricasIaEndpoint:
         # Pero con dias=7 deben verse los 2
         r7 = metricas_ia(dias=7, db=db, current_user=user)
         assert r7["total_calls"] == 2
+
+
+class TestMetricasIaPorGlosa:
+    def test_glosa_sin_calls(self, db):
+        from app.api.routers.sistema import metricas_ia_por_glosa
+        user = MagicMock(rol="ADMIN")
+        r = metricas_ia_por_glosa(glosa_id=999, db=db, current_user=user)
+        assert r["total_calls"] == 0
+        assert r["calls"] == []
+
+    def test_glosa_con_un_call(self, db):
+        from app.api.routers.sistema import metricas_ia_por_glosa
+        _seed_call(db, glosa_id=42, cost_usd=0.025, latency_ms=2000)
+        # Otra glosa para confirmar aislamiento
+        _seed_call(db, glosa_id=43, cost_usd=0.999)
+        user = MagicMock(rol="ADMIN")
+        r = metricas_ia_por_glosa(glosa_id=42, db=db, current_user=user)
+        assert r["total_calls"] == 1
+        assert r["cost_usd_total"] == 0.025
+        assert r["calls"][0]["latency_ms"] == 2000
+
+    def test_glosa_con_multiples_calls_orden_cronologico(self, db):
+        """Debe ordenar por creado_en ASC (call inicial primero)."""
+        from app.api.routers.sistema import metricas_ia_por_glosa
+        _seed_call(db, glosa_id=7, cost_usd=0.05, creado_en=ahora_utc() - timedelta(seconds=20))
+        _seed_call(db, glosa_id=7, cost_usd=0.03, creado_en=ahora_utc() - timedelta(seconds=10))
+        _seed_call(db, glosa_id=7, cost_usd=0.001, creado_en=ahora_utc())
+        user = MagicMock(rol="ADMIN")
+        r = metricas_ia_por_glosa(glosa_id=7, db=db, current_user=user)
+        assert r["total_calls"] == 3
+        # cost_usd_total = 0.081
+        assert abs(r["cost_usd_total"] - 0.081) < 0.001
+        # Orden cronológico: el primero tiene el cost más alto (0.05)
+        assert r["calls"][0]["cost_usd"] == 0.05
+
+
+class TestMetricasIaPorUsuario:
+    def test_ranking_por_costo_descendente(self, db):
+        from app.api.routers.sistema import metricas_ia_por_usuario
+        # Usuario A gasta más
+        _seed_call(db, user_email="A@hus.com", cost_usd=0.10)
+        _seed_call(db, user_email="A@hus.com", cost_usd=0.05)
+        # Usuario B gasta menos
+        _seed_call(db, user_email="B@hus.com", cost_usd=0.01)
+        # Usuario sin email se excluye
+        _seed_call(db, user_email=None, cost_usd=999)
+
+        user = MagicMock(rol="ADMIN")
+        r = metricas_ia_por_usuario(dias=7, db=db, current_user=user)
+        assert r["total_usuarios"] == 2
+        assert r["ranking"][0]["user_email"] == "A@hus.com"
+        assert r["ranking"][0]["calls"] == 2
+        assert abs(r["ranking"][0]["cost_usd"] - 0.15) < 0.001
+        assert r["ranking"][1]["user_email"] == "B@hus.com"
+
+    def test_promedio_latencia_por_usuario(self, db):
+        from app.api.routers.sistema import metricas_ia_por_usuario
+        _seed_call(db, user_email="C@hus.com", latency_ms=1000, cost_usd=0.01)
+        _seed_call(db, user_email="C@hus.com", latency_ms=3000, cost_usd=0.01)
+        user = MagicMock(rol="ADMIN")
+        r = metricas_ia_por_usuario(dias=7, db=db, current_user=user)
+        # promedio = 2000
+        assert r["ranking"][0]["latency_ms_promedio"] == 2000
+
+    def test_filtro_ventana_dias(self, db):
+        from app.api.routers.sistema import metricas_ia_por_usuario
+        _seed_call(
+            db, user_email="X@hus.com", cost_usd=0.10,
+            creado_en=ahora_utc() - timedelta(days=10),
+        )
+        _seed_call(db, user_email="X@hus.com", cost_usd=0.01)
+        user = MagicMock(rol="ADMIN")
+        # Con dias=7, el call de hace 10 días no debe contar
+        r = metricas_ia_por_usuario(dias=7, db=db, current_user=user)
+        assert r["ranking"][0]["calls"] == 1
