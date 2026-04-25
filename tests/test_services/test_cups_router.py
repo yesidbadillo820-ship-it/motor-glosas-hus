@@ -127,3 +127,33 @@ def test_normalizacion_quita_tildes():
     assert _sin_tildes(None) == ""
 
 from app.api.routers.cups import _sin_tildes  # para el primer test
+
+
+# ─── R53 P4: endpoint /cups/sugerencias/por-descripcion ─────────────────
+
+def test_sugerencias_por_descripcion_hemograma(db):
+    from app.api.routers.cups import sugerencias_cups_por_descripcion
+    from unittest.mock import MagicMock
+    user = MagicMock(email="test@hus.com")
+    r = sugerencias_cups_por_descripcion(q="hemograma", limite=5, db=db, current_user=user)
+    assert r["total"] >= 1
+    codigos = {s["cups_oficial"] for s in r["sugerencias"]}
+    assert "902207" in codigos or "902210" in codigos
+
+
+def test_sugerencias_por_descripcion_radiografia_torax(db):
+    from app.api.routers.cups import sugerencias_cups_por_descripcion
+    from unittest.mock import MagicMock
+    user = MagicMock(email="test@hus.com")
+    r = sugerencias_cups_por_descripcion(q="radiografia torax", limite=3, db=db, current_user=user)
+    assert r["total"] >= 1
+    assert r["sugerencias"][0]["cups_oficial"].startswith("8711")
+
+
+def test_sugerencias_por_descripcion_query_solo_stopwords(db):
+    """Query con solo palabras vacías debe devolver lista vacía sin crash."""
+    from app.api.routers.cups import sugerencias_cups_por_descripcion
+    from unittest.mock import MagicMock
+    user = MagicMock(email="test@hus.com")
+    r = sugerencias_cups_por_descripcion(q="cual es el", limite=5, db=db, current_user=user)
+    assert r["total"] == 0

@@ -162,6 +162,36 @@ def buscar_cups(
     }
 
 
+@router.get("/sugerencias/por-descripcion")
+def sugerencias_cups_por_descripcion(
+    q: str = Query(..., min_length=2, description="Texto del procedimiento (ej: 'hemograma', 'TAC craneo')"),
+    limite: int = Query(8, ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R53 P4: Autocompletado CUPS por descripción.
+
+    Busca en DESCRIPCIONES_CUPS_2025 (catálogo curado de ~158 códigos),
+    HOMOLOGACIONES_EXPLICITAS y TarifaContratadaRecord (BD de contratos
+    cargados). Útil para que un gestor escribiendo el texto de la glosa
+    en el formulario reciba sugerencias del CUPS oficial sin tener que
+    abrir la biblioteca de normas.
+
+    Diferencia con /cups/buscar:
+      - /cups/buscar: input tipo código ('890101') o descripción simple,
+        solo en BD de tarifas contratadas.
+      - /cups/sugerencias/por-descripcion: input descriptivo natural
+        ('hemograma completo'), busca en catálogo curado + BD.
+    """
+    from app.services.homologador_cups import buscar_cups_por_descripcion
+    coincidencias = buscar_cups_por_descripcion(q, top_k=limite, db=db)
+    return {
+        "query": q,
+        "total": len(coincidencias),
+        "sugerencias": coincidencias,
+    }
+
+
 @router.get("/{codigo}")
 def detalle_cups(
     codigo: str,
