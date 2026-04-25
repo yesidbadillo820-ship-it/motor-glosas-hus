@@ -146,3 +146,44 @@ def test_buscar_historia_clinica_devuelve_T235_y_Res1995():
     r = buscar_normas("historia clínica institucional plena prueba soporte", top_k=5)
     claves_str = " ".join([d["clave"] for d in r])
     assert "T-235" in claves_str or "1995" in claves_str
+
+
+# ─── R52 B: ampliación catálogo a 100+ normas ───────────────────────────────
+
+def test_catalogo_amplio_cien_normas():
+    """Guardarraíl: el banner anuncia 100+ normas — el catálogo debe cumplirlo."""
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert len(_TODAS_LAS_NORMAS) >= 100
+
+
+def test_intereses_moratorios_indexados():
+    """Art. 884 C.Comercio (intereses moratorios) — útil para reclamos por mora."""
+    from app.services.rag_normativa import buscar_normas
+    r = buscar_normas("intereses moratorios cobro mora", top_k=3)
+    claves = [x["clave"] for x in r]
+    assert any("884" in c for c in claves)
+
+
+def test_recobros_mipres_no_pbs_indexados():
+    from app.services.rag_normativa import buscar_normas
+    r = buscar_normas("recobros MIPRES no PBS", top_k=5)
+    claves = [x["clave"] for x in r]
+    assert any("866" in c or "T-307" in c for c in claves)
+
+
+def test_recien_nacido_indexado():
+    """T-076/2008 — defensa contra glosa por afiliación neonatal."""
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert "SENTENCIA T-076 DE 2008" in _TODAS_LAS_NORMAS
+
+
+def test_codigo_penal_falsedad_indexado():
+    """Ley 599/2000 (falsedad documental) — marco penal en glosas fraudulentas."""
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert "LEY 599 DE 2000" in _TODAS_LAS_NORMAS
+
+
+def test_cpaca_terminos_peticion_indexado():
+    """CPACA — términos de respuesta administrativa."""
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert "LEY 1437 DE 2011 (CPACA)" in _TODAS_LAS_NORMAS

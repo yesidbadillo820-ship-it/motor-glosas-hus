@@ -179,6 +179,103 @@ LEYES = {
         "vigente": True,
         "keywords": ["FOMAG", "magisterio", "docentes"],
     },
+
+    # ─── R52 B: ampliación catálogo legal ──────────────────────────────────
+    "LEY 23 DE 1981": {
+        "nombre": "Ley 23 de 1981",
+        "titulo": "Normas en materia de Ética Médica",
+        "ambito": "Ética profesional médica — historia clínica",
+        "vigente": True,
+        "articulos": {
+            "34": {
+                "titulo": "Historia clínica",
+                "texto": "La historia clínica es el registro obligatorio de las condiciones de salud del paciente. Es un documento privado sometido a reserva que únicamente puede ser conocido por terceros previa autorización del paciente o en los casos previstos por la ley.",
+            },
+        },
+        "keywords": ["ética médica", "historia clínica", "secreto profesional", "reserva"],
+    },
+    "LEY 715 DE 2001": {
+        "nombre": "Ley 715 de 2001",
+        "titulo": "Sistema General de Participaciones — recursos para salud",
+        "ambito": "Distribución competencias y recursos del SGP en salud",
+        "vigente": True,
+        "keywords": ["SGP", "participaciones", "recursos", "competencias territoriales"],
+    },
+    "LEY 599 DE 2000": {
+        "nombre": "Ley 599 de 2000 (Código Penal)",
+        "titulo": "Código Penal — delitos contra la fe pública y el patrimonio",
+        "ambito": "Falsedad documental, fraude y peculado en glosas",
+        "vigente": True,
+        "articulos": {
+            "286": {
+                "titulo": "Falsedad ideológica en documento público",
+                "texto": "El servidor público que en ejercicio de sus funciones, al extender documento público que pueda servir de prueba, consigne una falsedad o calle total o parcialmente la verdad, incurrirá en prisión de cuatro (4) a ocho (8) años e inhabilitación para el ejercicio de derechos y funciones públicas de cinco (5) a diez (10) años.",
+            },
+            "289": {
+                "titulo": "Falsedad en documento privado",
+                "texto": "El que falsifique documento privado que pueda servir de prueba, incurrirá, si lo usa, en prisión de uno (1) a seis (6) años.",
+            },
+        },
+        "keywords": ["código penal", "falsedad documental", "fraude", "peculado"],
+    },
+    "LEY 1474 DE 2011": {
+        "nombre": "Ley 1474 de 2011 (Estatuto Anticorrupción)",
+        "titulo": "Normas para fortalecer mecanismos de prevención de la corrupción",
+        "ambito": "Anticorrupción — recobros y facturación pública",
+        "vigente": True,
+        "keywords": ["anticorrupción", "estatuto", "transparencia", "recobros"],
+    },
+    "LEY 1581 DE 2012": {
+        "nombre": "Ley 1581 de 2012",
+        "titulo": "Régimen general de protección de datos personales (Habeas Data)",
+        "ambito": "Datos sensibles del paciente — historia clínica digital",
+        "vigente": True,
+        "keywords": ["habeas data", "datos personales", "datos sensibles", "tratamiento"],
+    },
+    "LEY 1755 DE 2015": {
+        "nombre": "Ley 1755 de 2015",
+        "titulo": "Reglamentación del derecho fundamental de petición",
+        "ambito": "Términos para responder peticiones de pacientes y entidades",
+        "vigente": True,
+        "articulos": {
+            "14": {
+                "titulo": "Términos para resolver",
+                "texto": "Salvo norma legal especial y so pena de sanción disciplinaria, toda petición deberá resolverse dentro de los quince (15) días siguientes a su recepción. Para las peticiones de documentos y de información el término es de diez (10) días, y para consultas de las autoridades, treinta (30) días.",
+            },
+        },
+        "keywords": ["derecho de petición", "términos", "respuesta", "Ley 1755"],
+    },
+    "LEY 1437 DE 2011 (CPACA)": {
+        "nombre": "Ley 1437 de 2011 (CPACA)",
+        "titulo": "Código de Procedimiento Administrativo y de lo Contencioso Administrativo",
+        "ambito": "Actuaciones administrativas — procedimiento ante la administración",
+        "vigente": True,
+        "articulos": {
+            "14": {
+                "titulo": "Términos para resolver peticiones",
+                "texto": "Las peticiones de documentos y de información deberán resolverse dentro de los diez (10) días siguientes a su recepción. Las demás peticiones, dentro de los quince (15) días.",
+            },
+            "164": {
+                "titulo": "Caducidad — pretensión por reparación directa",
+                "texto": "La caducidad de la pretensión de reparación directa será de dos (2) años contados desde el día siguiente a la ocurrencia del hecho, omisión, operación administrativa o de la ejecutoria del acto.",
+            },
+        },
+        "keywords": ["CPACA", "procedimiento administrativo", "actuación", "caducidad"],
+    },
+    "LEY 1798 DE 2016": {
+        "nombre": "Ley 1798 de 2016",
+        "titulo": "Acceso de personas con discapacidad a servicios de salud — pago oportuno",
+        "ambito": "Derechos de las personas con discapacidad en salud",
+        "vigente": True,
+        "keywords": ["discapacidad", "acceso", "pago oportuno", "barreras"],
+    },
+    "LEY 2294 DE 2023": {
+        "nombre": "Ley 2294 de 2023",
+        "titulo": "Plan Nacional de Desarrollo 2022–2026 'Colombia Potencia Mundial de la Vida'",
+        "ambito": "PND — política pública de salud y giro directo a IPS",
+        "vigente": True,
+        "keywords": ["PND", "Plan Nacional de Desarrollo", "giro directo", "salud preventiva"],
+    },
 }
 
 
@@ -285,6 +382,51 @@ DECRETOS = {
         "ambito": "ARL — Libro 2 Parte 2 Título 4",
         "vigente": True,
         "keywords": ["ARL", "riesgos laborales", "decreto único trabajo"],
+    },
+
+    # ─── R52 B: ampliación catálogo ────────────────────────────────────────
+    "DECRETO 1011 DE 2006": {
+        "nombre": "Decreto 1011 de 2006",
+        "titulo": "Sistema Obligatorio de Garantía de Calidad de la Atención de Salud (SOGCS)",
+        "ambito": "Habilitación, auditoría y acreditación de servicios",
+        "vigente": True,
+        "keywords": ["SOGCS", "habilitación", "calidad", "auditoría servicios salud"],
+    },
+    "DECRETO 1683 DE 2013": {
+        "nombre": "Decreto 1683 de 2013",
+        "titulo": "Portabilidad nacional en el SGSSS",
+        "ambito": "Garantía de prestación a afiliados fuera de su municipio de afiliación",
+        "vigente": True,
+        "keywords": ["portabilidad", "afiliación nacional", "atención fuera del domicilio"],
+    },
+    "DECRETO 2353 DE 2015": {
+        "nombre": "Decreto 2353 de 2015",
+        "titulo": "Régimen unificado de afiliación al SGSSS",
+        "ambito": "Afiliación, traslado, movilidad de regímenes",
+        "vigente": True,
+        "keywords": ["afiliación", "traslado", "movilidad régimen", "régimen contributivo subsidiado"],
+    },
+    "DECRETO 866 DE 2017": {
+        "nombre": "Decreto 866 de 2017",
+        "titulo": "Pago de servicios y tecnologías no incluidas en el Plan de Beneficios",
+        "ambito": "Recobros — flujo de recursos por servicios NO PBS",
+        "vigente": True,
+        "keywords": ["recobros", "no PBS", "MIPRES", "ADRES"],
+    },
+    "DECRETO 538 DE 2020": {
+        "nombre": "Decreto 538 de 2020",
+        "titulo": "Medidas en el sector salud durante la emergencia COVID-19",
+        "ambito": "Excepciones a plazos y procedimientos durante pandemia",
+        "vigente": True,
+        "notas": "Continúa siendo invocado para casos de auditoría retroactiva sobre atenciones COVID 2020-2022.",
+        "keywords": ["COVID-19", "pandemia", "emergencia sanitaria", "excepciones"],
+    },
+    "DECRETO 064 DE 2020": {
+        "nombre": "Decreto 064 de 2020",
+        "titulo": "Reglamento del aseguramiento — flujo de recursos del SGSSS",
+        "ambito": "Pago a IPS, giro directo, glosas",
+        "vigente": True,
+        "keywords": ["flujo recursos", "aseguramiento", "giro directo IPS"],
     },
 }
 
@@ -469,6 +611,118 @@ RESOLUCIONES = {
         "vigente": False,
         "keywords": ["CUPS 2024", "2341", "clasificación única"],
     },
+
+    # ─── R52 B: ampliación catálogo ────────────────────────────────────────
+    "RESOLUCION 412 DE 2000": {
+        "nombre": "Resolución 412 de 2000 (MinSalud)",
+        "titulo": "Guías de Atención Integral y normas técnicas obligatorias",
+        "ambito": "Pertinencia clínica — actividades, intervenciones y procedimientos POS",
+        "vigente": True,
+        "keywords": ["guías de atención", "PAI", "promoción y prevención", "actividades de detección"],
+    },
+    "RESOLUCION 5261 DE 1994": {
+        "nombre": "Resolución 5261 de 1994 (MAPIPOS)",
+        "titulo": "Manual de Actividades, Procedimientos e Intervenciones del POS",
+        "ambito": "Histórica — base de tarifas SOAT y referente histórico",
+        "vigente": False,
+        "notas": "Si bien fue derogada por Res. 5521/2013 y posteriores, sigue siendo referida como histórica para discusión de tarifas SOAT en glosas extemporáneas.",
+        "keywords": ["MAPIPOS", "tarifas históricas", "SOAT histórico"],
+    },
+    "RESOLUCION 5521 DE 2013": {
+        "nombre": "Resolución 5521 de 2013 (MinSalud)",
+        "titulo": "Plan Obligatorio de Salud (POS) — actualización",
+        "ambito": "Cobertura — incluye/excluye procedimientos del POS",
+        "vigente": False,
+        "notas": "Reemplazada por Res. 5857/2018 y luego Res. 2481/2020 (PBS).",
+        "keywords": ["POS", "plan obligatorio", "cobertura POS", "exclusión POS"],
+    },
+    "RESOLUCION 5857 DE 2018": {
+        "nombre": "Resolución 5857 de 2018 (MinSalud)",
+        "titulo": "Plan de Beneficios en Salud con cargo a la UPC (PBS)",
+        "ambito": "Cobertura — financiación con UPC",
+        "vigente": False,
+        "notas": "Reemplazada por Res. 2481/2020.",
+        "keywords": ["PBS", "UPC", "plan beneficios", "cobertura UPC"],
+    },
+    "RESOLUCION 2481 DE 2020": {
+        "nombre": "Resolución 2481 de 2020 (MinSalud)",
+        "titulo": "Listado de tecnologías de salud financiadas con UPC",
+        "ambito": "Cobertura PBS vigente",
+        "vigente": True,
+        "keywords": ["PBS", "UPC", "Res. 2481", "listado financiado"],
+    },
+    "RESOLUCION 4505 DE 2012": {
+        "nombre": "Resolución 4505 de 2012 (MinSalud)",
+        "titulo": "Reporte de información a Programas de Atención a Eventos de Interés en Salud Pública",
+        "ambito": "PAI, gestación, salud bucal, RCV — reportes obligatorios",
+        "vigente": True,
+        "keywords": ["PVE", "eventos salud pública", "reporte", "gestación", "PAI"],
+    },
+    "RESOLUCION 256 DE 2016": {
+        "nombre": "Resolución 256 de 2016 (MinSalud)",
+        "titulo": "Sistema de Información para la Calidad — indicadores",
+        "ambito": "SOGCS — reporte obligatorio de indicadores trazadores",
+        "vigente": True,
+        "keywords": ["calidad", "indicadores trazadores", "SOGCS", "monitoría"],
+    },
+    "RESOLUCION 3100 DE 2019": {
+        "nombre": "Resolución 3100 de 2019 (MinSalud)",
+        "titulo": "Procedimientos y condiciones de inscripción de prestadores y habilitación de servicios",
+        "ambito": "Habilitación de servicios — base para auditoría de pertinencia",
+        "vigente": True,
+        "keywords": ["habilitación", "REPS", "registro especial prestadores", "estándares"],
+    },
+    "RESOLUCION 202 DE 2021": {
+        "nombre": "Resolución 202 de 2021 (MinSalud)",
+        "titulo": "Lineamientos del RIPS (Registro Individual de Prestación de Servicios de Salud)",
+        "ambito": "RIPS — estructura obligatoria de archivos planos",
+        "vigente": True,
+        "keywords": ["RIPS", "Res. 202", "registros prestación servicios", "archivos planos"],
+    },
+    "RESOLUCION 1441 DE 2013": {
+        "nombre": "Resolución 1441 de 2013 (MinSalud)",
+        "titulo": "Definición de procedimientos y condiciones para inscripción y habilitación",
+        "ambito": "Habilitación — antecesora de Res. 3100/2019",
+        "vigente": False,
+        "keywords": ["habilitación 2013", "Res. 1441"],
+    },
+    "RESOLUCION 1604 DE 2013": {
+        "nombre": "Resolución 1604 de 2013 (MinSalud)",
+        "titulo": "Procedimiento de glosas para servicios de salud",
+        "ambito": "Glosas — antecesora del Manual Único 2284/2023",
+        "vigente": False,
+        "notas": "Reemplazada por Res. 2284/2023. Aún se cita en glosas extemporáneas con eventos pre-julio 2023.",
+        "keywords": ["Res. 1604", "glosas históricas", "manual glosas 2013"],
+    },
+    "RESOLUCION 4331 DE 2012": {
+        "nombre": "Resolución 4331 de 2012 (MinSalud)",
+        "titulo": "Pago de servicios prestados por urgencias a no afiliados",
+        "ambito": "Urgencias — flujo de recursos para pacientes no asegurados",
+        "vigente": True,
+        "keywords": ["urgencias", "no afiliados", "ADRES", "FOSYGA"],
+    },
+    "RESOLUCION 2003 DE 2014": {
+        "nombre": "Resolución 2003 de 2014 (MinSalud)",
+        "titulo": "Sistema Único de Habilitación — manual de inscripción",
+        "ambito": "Habilitación — manual de criterios",
+        "vigente": False,
+        "notas": "Antecesora de Res. 3100/2019.",
+        "keywords": ["Res. 2003", "habilitación 2014", "manual inscripción"],
+    },
+    "RESOLUCION 1604 DE 2024": {
+        "nombre": "Resolución 1604 de 2024 (MinSalud)",
+        "titulo": "Modificaciones al RIPS y FEV — actualizaciones técnicas",
+        "ambito": "RIPS y Factura Electrónica de Venta",
+        "vigente": True,
+        "keywords": ["RIPS 2024", "FEV", "actualización", "Res. 2275"],
+    },
+    "RESOLUCION 754 DE 2024": {
+        "nombre": "Resolución 754 de 2024 (MinSalud)",
+        "titulo": "Periodicidad y reportes de PVE",
+        "ambito": "Programas de Vigilancia Epidemiológica — periodicidad",
+        "vigente": True,
+        "keywords": ["PVE", "vigilancia epidemiológica", "periodicidad reporte"],
+    },
 }
 
 
@@ -527,6 +781,43 @@ CIRCULARES = {
         },
         "keywords": ["SIIFA", "manual SIIFA", "cuentas médicas", "plazos", "cronograma glosas", "2026"],
     },
+
+    # ─── R52 B: ampliación catálogo ────────────────────────────────────────
+    "CIRCULAR 010 DE 2017": {
+        "nombre": "Circular 010 de 2017 (Supersalud)",
+        "titulo": "Pago oportuno de servicios — flujo de recursos a IPS",
+        "ambito": "Vigilancia y control — sanción por mora en pago",
+        "vigente": True,
+        "keywords": ["Supersalud", "pago oportuno", "flujo recursos", "mora EPS"],
+    },
+    "CIRCULAR 015 DE 2014": {
+        "nombre": "Circular Externa 015 de 2014 (Supersalud)",
+        "titulo": "Reportes obligatorios de IPS y EPS al Sistema de Información de la Supersalud",
+        "ambito": "Vigilancia — reportes financieros y de calidad",
+        "vigente": True,
+        "keywords": ["Supersalud", "reportes", "información financiera", "vigilancia"],
+    },
+    "CIRCULAR 005 DE 2022": {
+        "nombre": "Circular Externa 005 de 2022 (Supersalud)",
+        "titulo": "Giro directo a IPS y vigilancia del flujo de recursos",
+        "ambito": "Giro directo — control de pagos a prestadores",
+        "vigente": True,
+        "keywords": ["giro directo", "Supersalud", "flujo recursos", "ADRES IPS"],
+    },
+    "CIRCULAR 011 DE 2021": {
+        "nombre": "Circular Externa 011 de 2021 (Supersalud)",
+        "titulo": "Reportes de cartera y cuentas por cobrar de IPS",
+        "ambito": "Vigilancia — informe trimestral de cartera",
+        "vigente": True,
+        "keywords": ["cartera IPS", "cuentas por cobrar", "Supersalud", "reporte trimestral"],
+    },
+    "CIRCULAR 008 DE 2018": {
+        "nombre": "Circular Externa 008 de 2018 (Supersalud)",
+        "titulo": "Procedimiento para reportar a la SNS conductas que afectan flujo de recursos",
+        "ambito": "Anti-evasión y reporte de conductas EPS contrarias al flujo de recursos",
+        "vigente": True,
+        "keywords": ["denuncia EPS", "Supersalud", "flujo recursos", "conductas indebidas"],
+    },
 }
 
 
@@ -563,6 +854,36 @@ CODIGOS = {
         "texto": "Los contratos deben ejecutarse de buena fe, y por consiguiente obligan no solo a lo que en ellos se expresa, sino a todas las cosas que emanan precisamente de la naturaleza de la obligación, o que por ley pertenecen a ella.",
         "aplicacion": "Ejecución contractual de buena fe (complemento Art. 1602)",
         "keywords": ["buena fe", "ejecución", "1603", "C.Civil"],
+    },
+
+    # ─── R52 B: ampliación ────────────────────────────────────────────────
+    "CODIGO CIVIL - ARTICULO 1494": {
+        "nombre": "Código Civil — Artículo 1494",
+        "titulo": "Fuentes de las obligaciones",
+        "texto": "Las obligaciones nacen, ya del concurso real de las voluntades de dos o más personas, como en los contratos o convenciones; ya de un hecho voluntario de la persona que se obliga, como en la aceptación de una herencia o legado y en todos los cuasicontratos; ya a consecuencia de un hecho que ha inferido injuria o daño a otra persona, como en los delitos; ya por disposición de la ley, como entre los padres y los hijos de familia.",
+        "aplicacion": "Origen de la obligación de pago contractual EPS-IPS",
+        "keywords": ["fuentes obligaciones", "1494", "C.Civil", "contrato"],
+    },
+    "CODIGO CIVIL - ARTICULO 1626": {
+        "nombre": "Código Civil — Artículo 1626",
+        "titulo": "Pago efectivo y modos de extinción de obligaciones",
+        "texto": "El pago efectivo es la prestación de lo que se debe. Por consiguiente, el deudor de una cosa no puede obligar al acreedor a que reciba otra, aun cuando sea de igual o mayor valor.",
+        "aplicacion": "Base del concepto de pago integral por la EPS",
+        "keywords": ["pago efectivo", "1626", "modos extinción", "C.Civil"],
+    },
+    "CODIGO DE COMERCIO - ARTICULO 884": {
+        "nombre": "Código de Comercio — Artículo 884",
+        "titulo": "Intereses moratorios mercantiles",
+        "texto": "Cuando en los negocios mercantiles haya de pagarse réditos de un capital, sin que se especifique por convenio el interés, este será el bancario corriente; si las partes no han estipulado el interés moratorio, será equivalente a una y media veces del bancario corriente.",
+        "aplicacion": "Reclamo de intereses moratorios sobre saldos vencidos a favor de la IPS",
+        "keywords": ["intereses moratorios", "884", "C.Comercio", "mora EPS"],
+    },
+    "CODIGO PENAL - ARTICULO 397": {
+        "nombre": "Código Penal — Artículo 397 (Peculado)",
+        "titulo": "Peculado por apropiación",
+        "texto": "El servidor público que se apropie en provecho suyo o de un tercero de bienes del Estado o de empresas o instituciones en que éste tenga parte o de bienes o fondos parafiscales, o de bienes de particulares cuya administración, tenencia o custodia se le haya confiado por razón o con ocasión de sus funciones, incurrirá en prisión.",
+        "aplicacion": "Marco penal aplicable a fraude documental en glosas y recobros",
+        "keywords": ["peculado", "397", "C.Penal", "servidor público"],
     },
 }
 
@@ -715,6 +1036,107 @@ JURISPRUDENCIA = {
         "ratio_literal": "El silencio de la entidad responsable del pago frente a la respuesta motivada del prestador configura un levantamiento tácito de la glosa, no susceptible de revocatoria posterior.",
         "aplica_a": "Defensa cuando la EPS deja vencer el plazo de 10 días tras la respuesta del HUS",
         "keywords": ["Consejo de Estado", "silencio positivo", "Art. 57", "levantamiento tácito", "Ley 1438"],
+    },
+
+    # ─── R52 B: ampliación catálogo de jurisprudencia ──────────────────────
+    "SENTENCIA T-024 DE 2009": {
+        "nombre": "Sentencia T-024 de 2009",
+        "titulo": "Pago de servicios de salud — obligación EPS",
+        "ambito": "Glosas y mora en pago a IPS — derecho fundamental afectado",
+        "vigente": True,
+        "ratio": "Las EPS no pueden trasladar a las IPS las consecuencias económicas de su gestión administrativa interna mediante glosas dilatorias. El pago oportuno es presupuesto para garantizar el derecho a la salud.",
+        "aplica_a": "Defensa contra glosas reiterativas que dilatan el pago",
+        "keywords": ["T-024/2009", "pago oportuno", "glosas dilatorias"],
+    },
+    "SENTENCIA T-744 DE 2009": {
+        "nombre": "Sentencia T-744 de 2009",
+        "titulo": "Acceso a servicios y autorización médica — autonomía profesional",
+        "ambito": "Pertinencia médica vs. negativa de la EPS",
+        "vigente": True,
+        "ratio": "La autonomía del médico tratante es la regla; la EPS no puede sustituir el criterio médico ni condicionar la prestación a autorizaciones administrativas que generen barreras.",
+        "aplica_a": "Defensa de glosas por pertinencia donde la EPS cuestiona criterio del tratante",
+        "keywords": ["T-744/2009", "autonomía médica", "barreras"],
+    },
+    "SENTENCIA T-940 DE 2009": {
+        "nombre": "Sentencia T-940 de 2009",
+        "titulo": "Pago integral a IPS — no fragmentación arbitraria",
+        "ambito": "Glosa parcial — proporcionalidad",
+        "vigente": True,
+        "ratio": "Las glosas parciales solo proceden sobre los rubros efectivamente cuestionados, debidamente fundamentados; rebajas globales o porcentuales sin sustento técnico violan el debido proceso contractual.",
+        "aplica_a": "Defensa contra glosas tipo 'rebaja global' del valor facturado",
+        "keywords": ["T-940/2009", "glosa parcial", "rebaja global", "proporcionalidad"],
+    },
+    "SENTENCIA T-117 DE 2013": {
+        "nombre": "Sentencia T-117 de 2013",
+        "titulo": "Continuidad del tratamiento — atención integral",
+        "ambito": "Cobertura — interrupción de tratamiento por glosa",
+        "vigente": True,
+        "ratio": "Una vez iniciado un tratamiento, la EPS no puede interrumpirlo bajo el argumento de exclusión del PBS si existe pertinencia médica documentada.",
+        "aplica_a": "Glosas de cobertura sobre tratamientos en curso",
+        "keywords": ["T-117/2013", "continuidad", "tratamiento", "integralidad"],
+    },
+    "SENTENCIA T-307 DE 2017": {
+        "nombre": "Sentencia T-307 de 2017",
+        "titulo": "Recobros NO PBS — flujo oportuno de recursos",
+        "ambito": "MIPRES y recobros — barreras administrativas",
+        "vigente": True,
+        "ratio": "Las trabas administrativas para reconocer recobros NO PBS deben interpretarse en favor del prestador y del usuario; las glosas a recobros deben fundarse en hechos objetivos verificables.",
+        "aplica_a": "Glosas a recobros MIPRES/NO PBS",
+        "keywords": ["T-307/2017", "recobros", "MIPRES", "no PBS"],
+    },
+    "SENTENCIA T-543 DE 2013": {
+        "nombre": "Sentencia T-543 de 2013",
+        "titulo": "Atención inicial de urgencias — pago obligatorio",
+        "ambito": "Urgencias sin autorización previa",
+        "vigente": True,
+        "ratio": "La atención inicial de urgencias es obligatoria sin autorización previa y debe ser cubierta por la EPS o el FOSYGA/ADRES. La glosa por 'falta de autorización' en urgencias es contraria al ordenamiento.",
+        "aplica_a": "Glosa AU0101 (sin autorización) en servicios de urgencias",
+        "keywords": ["T-543/2013", "urgencias", "autorización previa", "AU0101"],
+    },
+    "SENTENCIA T-126 DE 2018": {
+        "nombre": "Sentencia T-126 de 2018",
+        "titulo": "Historia clínica como prueba plena",
+        "ambito": "Soportes de glosa — valor probatorio de la HC",
+        "vigente": True,
+        "ratio": "La historia clínica institucional, debidamente diligenciada, constituye prueba plena de los servicios efectivamente prestados, salvo prueba en contrario aportada por la EPS.",
+        "aplica_a": "Glosas SO0101 (soporte) cuando la HC respalda la atención",
+        "keywords": ["T-126/2018", "historia clínica", "prueba plena", "SO0101"],
+    },
+    "SENTENCIA C-313 DE 2014": {
+        "nombre": "Sentencia C-313 de 2014",
+        "titulo": "Control de constitucionalidad de la Ley Estatutaria 1751 de 2015",
+        "ambito": "Salud como derecho fundamental autónomo",
+        "vigente": True,
+        "ratio": "La salud es un derecho fundamental autónomo; ni la sostenibilidad fiscal ni los procedimientos administrativos pueden negar el acceso efectivo. La Corte declaró exequible la Ley Estatutaria con condicionamientos.",
+        "aplica_a": "Defensa estructural en glosas de cobertura/exclusión",
+        "keywords": ["C-313/2014", "Ley estatutaria", "derecho fundamental", "salud"],
+    },
+    "SENTENCIA T-1198 DE 2003": {
+        "nombre": "Sentencia T-1198 de 2003",
+        "titulo": "Pago a prestadores — solidaridad financiera del SGSSS",
+        "ambito": "Glosas dilatorias y bloqueo de cartera",
+        "vigente": True,
+        "ratio": "El no pago de la EPS a la IPS amenaza la sostenibilidad del prestador y, por extensión, el derecho a la salud de los usuarios. Las glosas deben tramitarse en plazos razonables, no como mecanismo de retención de recursos.",
+        "aplica_a": "Glosas tipo 'bloqueo de cartera' sin sustento técnico",
+        "keywords": ["T-1198/2003", "bloqueo cartera", "solidaridad SGSSS"],
+    },
+    "SENTENCIA T-076 DE 2008": {
+        "nombre": "Sentencia T-076 de 2008",
+        "titulo": "Atención a recién nacidos — cobertura inmediata",
+        "ambito": "Cobertura — afiliación posterior al nacimiento",
+        "vigente": True,
+        "ratio": "El recién nacido tiene cobertura desde el primer momento por la EPS de la madre, aun cuando el trámite formal de afiliación se haga después. Glosas por 'no afiliación' del neonato son improcedentes.",
+        "aplica_a": "Glosas de cobertura en atención perinatal",
+        "keywords": ["T-076/2008", "recién nacido", "afiliación", "cobertura inmediata"],
+    },
+    "SENTENCIA SU-1023 DE 2001": {
+        "nombre": "Sentencia SU-1023 de 2001",
+        "titulo": "Solidaridad del SGSSS y financiación cruzada",
+        "ambito": "Estructura del SGSSS — UPC y compensación",
+        "vigente": True,
+        "ratio": "El sistema de salud es solidario y de financiación cruzada; ninguna IPS pública puede ser usada como mecanismo de financiación de la liquidez de las EPS mediante glosas reiterativas.",
+        "aplica_a": "Argumento de fondo en glosas reiterativas a IPS pública (HUS)",
+        "keywords": ["SU-1023/2001", "solidaridad SGSSS", "IPS pública", "financiación cruzada"],
     },
 }
 
