@@ -33,11 +33,14 @@ class GlosaInput(BaseModel):
     tono: Optional[str] = Field(default="conciliador", max_length=20,
                                 description="Tono de la respuesta: conciliador | neutral | firme")
     # Modo de respuesta por concepto:
-    #   "defender"       → argumento IA completo (default)
-    #   "aceptar_total"  → RE9702, sin IA, plantilla corta
-    #   "aceptar_parcial"→ RE9801, argumento IA sobre la diferencia + aceptacion parcial
+    #   "defender"          → argumento IA completo (default)
+    #   "aceptar_total"     → RE9702, sin IA, plantilla corta
+    #   "aceptar_parcial"   → RE9801, argumento IA sobre la diferencia + aceptacion parcial
+    #   "auditoria_previa"  → R59: la IA NO redacta dictamen, da diagnóstico
+    #                         neutral (hallazgos, riesgos, recomendación) para
+    #                         que el gestor decida qué hacer.
     modo_respuesta: Optional[str] = Field(default="defender", max_length=30,
-                                           description="defender | aceptar_total | aceptar_parcial")
+                                           description="defender | aceptar_total | aceptar_parcial | auditoria_previa")
     # Para aceptar_parcial: valor que se acepta (el resto se defiende)
     valor_aceptado_parcial: Optional[float] = Field(default=0.0, ge=0,
                                                      description="Valor COP aceptado por el prestador (solo aplica en aceptar_parcial)")
@@ -77,7 +80,7 @@ class GlosaInput(BaseModel):
         if not v:
             return "defender"
         v_norm = str(v).strip().lower()
-        if v_norm in ("defender", "aceptar_total", "aceptar_parcial"):
+        if v_norm in ("defender", "aceptar_total", "aceptar_parcial", "auditoria_previa"):
             return v_norm
         return "defender"
 
