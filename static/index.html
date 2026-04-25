@@ -2079,8 +2079,8 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <h1>Consulta Normativa Colombiana</h1>
             <div class="panel-hero-sub">
               Pregunte sobre cualquier norma, artículo, decreto, resolución, circular o sentencia relacionada con
-              cuentas médicas, glosas, facturación, tarifas, pertinencia, cobertura o régimen especial. Más de 40
-              normas indexadas con texto literal.
+              cuentas médicas, glosas, facturación, tarifas, pertinencia, cobertura o régimen especial. Más de 50
+              normas indexadas con texto literal · Más de 150 códigos CUPS 2025 buscables por descripción.
             </div>
           </div>
         </div>
@@ -4014,26 +4014,66 @@ async function consultarNormativa(){
     });
     if(!r.ok){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Error ' + r.status + '</div>'; return; }
     var data = await r.json();
-    if(!data.resultados || data.resultados.length === 0){
+
+    var html = '';
+
+    // Ronda 52: bloque CUPS de homologación (si la pregunta traía un código específico)
+    if(data.homologacion_cups){
+      var h = data.homologacion_cups;
+      html += '<div class="form-card" style="margin-bottom:.8rem;border-left:4px solid #10b981;">';
+      html += '<div style="font-size:.78rem;color:#10b981;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Homologación CUPS — Res. 2641/2025</div>';
+      html += '<div style="font-size:1.05rem;font-weight:700;color:#0f172a;margin-top:.3rem;">';
+      html += escHtml(h.codigo_consultado || '') + ' → <span style="color:#10b981;">' + escHtml(h.cups_oficial || '') + '</span></div>';
+      if(h.descripcion){ html += '<div style="font-size:.9rem;color:var(--text2);margin-top:.3rem;">' + escHtml(h.descripcion) + '</div>'; }
+      if(h.fuente){ html += '<div style="font-size:.78rem;color:var(--text3);margin-top:.4rem;"><b>Fuente:</b> ' + escHtml(h.fuente) + ' · <b>Confianza:</b> ' + escHtml(h.confianza || '—') + '</div>'; }
+      html += '</div>';
+    }
+
+    // Ronda 52: bloque CUPS por descripción (si preguntó "qué CUPS para X" sin código)
+    if(data.busqueda_cups && data.busqueda_cups.coincidencias && data.busqueda_cups.coincidencias.length > 0){
+      var coinc = data.busqueda_cups.coincidencias;
+      html += '<div class="form-card" style="margin-bottom:.8rem;border-left:4px solid #3b82f6;">';
+      html += '<div style="font-size:.78rem;color:#3b82f6;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Códigos CUPS encontrados</div>';
+      html += '<div style="font-size:.85rem;color:var(--text3);margin-top:.2rem;">' + coinc.length + ' coincidencia(s) en el catálogo CUPS 2025 (Res. 2641/2025)</div>';
+      coinc.forEach(function(c){
+        html += '<div style="margin-top:.7rem;padding:.6rem .8rem;background:#eff6ff;border-radius:6px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">';
+        html += '<div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:1rem;font-weight:700;color:#1e40af;">' + escHtml(c.cups_oficial || '') + '</div>';
+        if(typeof c.score === 'number'){
+          html += '<div style="font-size:.7rem;color:var(--text3);">score ' + c.score.toFixed(2) + '</div>';
+        }
+        html += '</div>';
+        html += '<div style="font-size:.85rem;color:var(--text2);margin-top:.25rem;">' + escHtml(c.descripcion || '') + '</div>';
+        if(c.fuente){ html += '<div style="font-size:.72rem;color:var(--text3);margin-top:.2rem;">' + escHtml(c.fuente) + '</div>'; }
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Bloque de normas (resultado clásico TF-IDF)
+    if(data.resultados && data.resultados.length > 0){
+      html += '<div style="font-size:.85rem;color:var(--text3);margin:.8rem 0;"><b>' + escHtml(data.total_encontrados) + '</b> norma(s) encontrada(s) para: <i>"' + escHtml(pregunta) + '"</i></div>';
+      data.resultados.forEach(function(res){
+        var articuloStr = res.articulo ? ('Artículo ' + escHtml(res.articulo)) : '';
+        var tituloStr = escHtml(res.titulo || '');
+        var textoStr = escHtml(res.texto || '');
+        var normaStr = escHtml(res.norma || '');
+        var aplicacionStr = res.aplicacion ? '<div style="margin-top:.5rem;padding:.5rem .7rem;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;font-size:.8rem;"><b>Aplicación práctica:</b> ' + escHtml(res.aplicacion) + '</div>' : '';
+        html += '<div class="form-card" style="margin-bottom:.8rem;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;margin-bottom:.4rem;">';
+        html += '<div><div style="font-weight:700;color:#1e40af;">' + normaStr + (articuloStr ? ' — ' + articuloStr : '') + '</div>';
+        html += '<div style="font-size:.85rem;color:var(--text2);margin-top:.2rem;">' + tituloStr + '</div></div>';
+        html += '</div>';
+        if(textoStr){ html += '<div style="font-size:.85rem;line-height:1.6;color:var(--text2);padding:.7rem .9rem;background:#f8fafc;border-radius:6px;border-left:3px solid #3b82f6;">' + textoStr + '</div>'; }
+        html += aplicacionStr;
+        html += '</div>';
+      });
+    }
+
+    if(!html){
       cont.innerHTML = '<div style="padding:1rem;color:var(--text3);">No se encontraron resultados. Intenta con otros términos.</div>';
       return;
     }
-    var html = '<div style="font-size:.85rem;color:var(--text3);margin-bottom:.8rem;"><b>' + escHtml(data.total_encontrados) + '</b> norma(s) encontrada(s) para: <i>"' + escHtml(pregunta) + '"</i></div>';
-    data.resultados.forEach(function(res){
-      var articuloStr = res.articulo ? ('Artículo ' + escHtml(res.articulo)) : '';
-      var tituloStr = escHtml(res.titulo || '');
-      var textoStr = escHtml(res.texto || '');
-      var normaStr = escHtml(res.norma || '');
-      var aplicacionStr = res.aplicacion ? '<div style="margin-top:.5rem;padding:.5rem .7rem;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;font-size:.8rem;"><b>Aplicación práctica:</b> ' + escHtml(res.aplicacion) + '</div>' : '';
-      html += '<div class="form-card" style="margin-bottom:.8rem;">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;margin-bottom:.4rem;">';
-      html += '<div><div style="font-weight:700;color:#1e40af;">' + normaStr + (articuloStr ? ' — ' + articuloStr : '') + '</div>';
-      html += '<div style="font-size:.85rem;color:var(--text2);margin-top:.2rem;">' + tituloStr + '</div></div>';
-      html += '</div>';
-      if(textoStr){ html += '<div style="font-size:.85rem;line-height:1.6;color:var(--text2);padding:.7rem .9rem;background:#f8fafc;border-radius:6px;border-left:3px solid #3b82f6;">' + textoStr + '</div>'; }
-      html += aplicacionStr;
-      html += '</div>';
-    });
     cont.innerHTML = html;
   }catch(e){
     cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>';
@@ -4140,7 +4180,7 @@ var ONB_PASOS = [
   },
   {
     titulo: '📚 4. Consulta normativa',
-    texto: 'En "Herramientas → Consulta Normativa" tienes una biblioteca de 40+ normas indexadas. Pregunta "¿qué dice el Art. 57 Ley 1438?" y obtén el texto literal.',
+    texto: 'En "Herramientas → Consulta Normativa" tienes una biblioteca de 50+ normas indexadas y 150+ códigos CUPS buscables por descripción. Pregunta "¿qué dice el Art. 57 Ley 1438?" o "¿cuál es el CUPS para hemograma?".',
     target: '.sn-item[data-tip="Consulta Normativa"]',
   },
   {
