@@ -106,6 +106,86 @@ HOMOLOGACIONES_EXPLICITAS: dict[str, tuple[str, str]] = {
 }
 
 
+# ─── Descripciones canónicas CUPS 2025 — códigos de alto volumen ──────────
+# Cuando la normalización heurística de sufijos reduce '890201H1' → '890201',
+# este diccionario permite retornar la descripción oficial en vez de cadena
+# vacía. Son los ~50 códigos más glosados en hospitales de 3er nivel en
+# Colombia: consultas especializadas, laboratorio básico, imágenes comunes,
+# estancias. Expandir aquí es MÁS EFICIENTE que agregar variantes con sufijo
+# en HOMOLOGACIONES_EXPLICITAS, porque el normalizador las cubre todas.
+DESCRIPCIONES_CUPS_2025: dict[str, str] = {
+    # ── Consultas primera vez por especialista (8902xx) ─────────────────────
+    "890201": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA INTERNA",
+    "890202": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ELECTROFISIOLOGÍA",
+    "890205": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ANESTESIOLOGÍA",
+    "890207": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN NEUROLOGÍA",
+    "890208": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN CARDIOLOGÍA",
+    "890209": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN NEUMOLOGÍA",
+    "890210": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GASTROENTEROLOGÍA",
+    "890211": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ENDOCRINOLOGÍA",
+    "890213": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN NEFROLOGÍA",
+    "890215": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN HEMATOLOGÍA",
+    "890217": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ONCOLOGÍA",
+    "890218": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN REUMATOLOGÍA",
+    "890222": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN PEDIATRÍA",
+    "890225": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GINECOBSTETRICIA",
+    "890230": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN CIRUGÍA GENERAL",
+    "890235": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ORTOPEDIA Y TRAUMATOLOGÍA",
+    "890240": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN UROLOGÍA",
+    "890245": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN OFTALMOLOGÍA",
+    "890248": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GENÉTICA MÉDICA",
+    "890250": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN OTORRINOLARINGOLOGÍA",
+    "890253": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN HEPATOLOGÍA",
+    "890255": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN DERMATOLOGÍA",
+    "890260": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN PSIQUIATRÍA",
+    "890265": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FÍSICA Y REHABILITACIÓN",
+
+    # ── Consultas de control por especialista (8903xx) ──────────────────────
+    "890301": "CONSULTA DE CONTROL POR ESPECIALISTA EN MEDICINA INTERNA",
+    "890302": "CONSULTA DE CONTROL POR ESPECIALISTA EN ELECTROFISIOLOGÍA",
+    "890308": "CONSULTA DE CONTROL POR ESPECIALISTA EN CARDIOLOGÍA",
+    "890322": "CONSULTA DE CONTROL POR ESPECIALISTA EN PEDIATRÍA",
+    "890335": "CONSULTA DE CONTROL POR ESPECIALISTA EN ORTOPEDIA Y TRAUMATOLOGÍA",
+    "890348": "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
+
+    # ── Interconsultas hospitalarias (8904xx) ───────────────────────────────
+    "890402": "INTERCONSULTA HOSPITALARIA POR ELECTROFISIOLOGÍA",
+    "890405": "INTERCONSULTA HOSPITALARIA POR ENFERMERÍA",
+    "890410": "INTERCONSULTA HOSPITALARIA POR AUDIOLOGÍA",
+    "890453": "INTERCONSULTA HOSPITALARIA POR HEPATOLOGÍA",
+
+    # ── Urgencias por especialista (8907xx) ─────────────────────────────────
+    "890701": "CONSULTA DE URGENCIAS POR MEDICINA GENERAL",
+    "890750": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN GINECOLOGÍA Y OBSTETRICIA",
+    "890793": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN MEDICINA DE EMERGENCIAS",
+
+    # ── Laboratorio clínico básico alto-volumen ─────────────────────────────
+    "901040": "GLICEMIA PRE Y POST CARGA DE GLUCOSA",
+    "902207": "HEMOGRAMA IV (HEMATOCRITO, HEMOGLOBINA, RECUENTO DE ERITROCITOS, ÍNDICES ERITROCITARIOS, LEUCOGRAMA)",
+    "903866": "CREATININA EN SUERO U OTROS FLUIDOS",
+    "903868": "CREATININA EN ORINA DE 24 HORAS",
+    "903895": "TRANSAMINASA GLUTÁMICA OXALACÉTICA (AST)",
+    "906225": "PROTEÍNA C REACTIVA (PCR) CUANTITATIVA",
+    "907106": "UROANÁLISIS CON MICROSCOPIO DE CAMPO, SEDIMENTO Y DENSIDAD URINARIA",
+
+    # ── Imágenes diagnósticas alto-volumen ──────────────────────────────────
+    "871040": "RADIOGRAFÍA DE COLUMNA LUMBOSACRA",
+    "871121": "RADIOGRAFÍA DE TÓRAX PA O AP",
+    "873205": "RADIOGRAFÍA DE CODO",
+    "881330": "ECOGRAFÍA DE ABDOMEN TOTAL",
+    "883101": "TAC DE CRÁNEO SIMPLE",
+    "884003": "RESONANCIA MAGNÉTICA DE CEREBRO SIMPLE",
+    "897011": "MONITORIA FETAL ANTEPARTO",
+
+    # ── Patología y biopsia ─────────────────────────────────────────────────
+    "873306": "ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA",
+    "898101": "ESTUDIO ANATOMOPATOLÓGICO EN BIOPSIA",
+
+    # ── Otros alto-volumen ──────────────────────────────────────────────────
+    "881434": "PERFIL BIOFÍSICO",
+}
+
+
 # Sufijos institucionales que podemos retirar para intentar match con CUPS base.
 # Esta es una heurística — NO es homologación oficial, solo un intento de
 # reconocer el código base cuando la versión específica no está en la tabla.
@@ -154,7 +234,7 @@ def homologar_cups(
         return {
             "cups_oficial": k,
             "fuente": "código ya en formato CUPS oficial",
-            "descripcion": "",
+            "descripcion": DESCRIPCIONES_CUPS_2025.get(k, ""),
             "confianza": "alta",
         }
 
@@ -204,7 +284,7 @@ def homologar_cups(
             return {
                 "cups_oficial": base,
                 "fuente": "Res. 2641/2025 (normalización heurística de sufijos)",
-                "descripcion": "",
+                "descripcion": DESCRIPCIONES_CUPS_2025.get(base, ""),
                 "confianza": "media",
             }
 
