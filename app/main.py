@@ -518,6 +518,15 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler del digest: {_e}")
 
+    # R57 P2: scheduler diario de mantenimiento (3 AM) — purga
+    # ai_cache > 30d, ai_calls > 90d, papelera > 30d. No bloquea
+    # startup ni rompe si falla — el mantenimiento es secundario.
+    try:
+        from app.services.mantenimiento_scheduler import iniciar_scheduler as iniciar_mant_scheduler
+        iniciar_mant_scheduler()
+    except Exception as _e:
+        logger.warning(f"No se pudo iniciar scheduler de mantenimiento: {_e}")
+
     yield
 
     # Shutdown: detener schedulers limpiamente
@@ -529,6 +538,11 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.digest_scheduler import detener_scheduler as detener_digest_scheduler
         detener_digest_scheduler()
+    except Exception:
+        pass
+    try:
+        from app.services.mantenimiento_scheduler import detener_scheduler as detener_mant
+        detener_mant()
     except Exception:
         pass
     logger.info("=== APLICACIÓN CERRADA ===")
