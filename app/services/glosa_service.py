@@ -882,10 +882,18 @@ class GlosaService:
             normas_clave = ""
         else:
             prefijo = tipo_glosa[:2].upper() if tipo_glosa else "FA"
-            system_prompt = get_system_prompt(
-                prefijo=prefijo,
-                eps=data.eps
-            )
+            # R59 P3: si el gestor pidió 'auditoria_previa', usamos el
+            # prompt neutral que NO redacta dictamen sino diagnóstico.
+            # No depende del prefijo — el flujo de auditoría es uniforme
+            # para todos los tipos de glosa.
+            if modo_resp == "auditoria_previa":
+                from app.services.glosa_ia_prompts import get_system_prompt_auditoria
+                system_prompt = get_system_prompt_auditoria(eps=data.eps)
+            else:
+                system_prompt = get_system_prompt(
+                    prefijo=prefijo,
+                    eps=data.eps
+                )
             # Fase 3: inyectar contexto de tarifa oficial si es TA con CUPS
             # conocido. Le da a la IA el valor EXACTO publicado (Res. 124/2026
             # HUS o Circular 047/2025 SOAT) para que arme un dictamen con
@@ -1285,21 +1293,37 @@ class GlosaService:
 
             # 17) TONO INSTITUCIONAL CONCILIADOR + FRASES ROTAS (safety net
             # compartido con el camino de texto fijo). Ver _suavizar_tono.
-            arg_ia = _suavizar_tono(arg_ia)
+            # R59 P3: SALTAR _suavizar_tono en modo auditoria_previa — el
+            # output ya es HTML estructurado neutral con secciones fijas;
+            # cualquier sustitución de frases (ej. "SE EXIGE EL LEVANTAMIENTO"
+            # → "SE SOLICITA…") rompería el formato del informe de auditoría.
+            if modo_resp != "auditoria_previa":
+                arg_ia = _suavizar_tono(arg_ia)
 
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
         score = self._calcular_score(tipo_glosa, es_extemporanea, es_ratificacion, tiene_pdf, es_urgencia, es_tarifa, arg_limpio)
 
-        dictamen = self._generar_dictamen_html(
-            codigo_det, valor_raw, cod_res, desc_res, arg_ia, data.eps, tipo_glosa,
-            numero_factura=data.numero_factura, numero_radicado=data.numero_radicado,
-            normas_clave=normas_clave if normas_clave else None,
-            servicio=servicio_ia if servicio_ia else None,
-            contrato=contrato_ia if contrato_ia else None,
-            tarifa=tarifa_ia if tarifa_ia else None
-        )
+        # R59 P3: en modo auditoría usamos wrapper minimal — el LLM ya
+        # produjo el HTML estructurado con 6 secciones del informe; añadir
+        # tabla de defensa + bloque normas + bloque servicio confundiría
+        # al lector y rompería la estructura visual del diagnóstico.
+        if modo_resp == "auditoria_previa":
+            dictamen = self._wrapper_auditoria_html(
+                codigo=codigo_det, eps=data.eps, contenido_html=arg_ia,
+                numero_factura=data.numero_factura,
+                numero_radicado=data.numero_radicado,
+            )
+        else:
+            dictamen = self._generar_dictamen_html(
+                codigo_det, valor_raw, cod_res, desc_res, arg_ia, data.eps, tipo_glosa,
+                numero_factura=data.numero_factura, numero_radicado=data.numero_radicado,
+                normas_clave=normas_clave if normas_clave else None,
+                servicio=servicio_ia if servicio_ia else None,
+                contrato=contrato_ia if contrato_ia else None,
+                tarifa=tarifa_ia if tarifa_ia else None
+            )
 
         # Calcular riesgo de ratificación (heurística 0-100)
         try:
@@ -1454,6 +1478,54 @@ class GlosaService:
             return dias
         except Exception:
             return 0
+
+    def _wrapper_auditoria_html(
+        self, codigo: str, eps: str, contenido_html: str,
+        numero_factura: Optional[str] = None,
+        numero_radicado: Optional[str] = None,
+    ) -> str:
+        """R59 P3: wrapper minimal para diagnóstico de auditoría previa.
+
+        A diferencia de _generar_dictamen_html (orientado a defensa con
+        tabla de códigos, bloque verde de servicio, soportes obligatorios,
+        etc.), este wrapper solo añade:
+          - Header neutral (azul) identificando que es DIAGNÓSTICO
+          - Metadatos: EPS, código, factura/radicado
+          - El contenido del LLM tal cual (ya viene estructurado)
+          - Disclaimer: este NO es la respuesta oficial a la EPS
+        """
+        meta_factura = (
+            f"<span><b>Factura:</b> {numero_factura}</span>"
+            if numero_factura else ""
+        )
+        meta_radicado = (
+            f"<span><b>Radicado:</b> {numero_radicado}</span>"
+            if numero_radicado else ""
+        )
+        meta_sep = " · " if numero_factura and numero_radicado else ""
+        meta_html = (
+            f"<div style='font-size:11px;color:#64748b;margin-top:6px;'>"
+            f"{meta_factura}{meta_sep}{meta_radicado}"
+            f"</div>" if (meta_factura or meta_radicado) else ""
+        )
+        return f"""
+<div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background:linear-gradient(135deg,#1e40af 0%,#1e3a8a 100%);color:#fff;padding:14px 20px;">
+    <div style="font-size:11px;letter-spacing:1.5px;opacity:.85;text-transform:uppercase;font-weight:600;">📊 Auditoría previa · Diagnóstico neutral</div>
+    <div style="font-size:16px;font-weight:700;margin-top:4px;">Análisis interno de la glosa {codigo or ''} — {eps or ''}</div>
+    {meta_html}
+  </div>
+  <div style="padding:18px 22px;font-size:13px;line-height:1.55;color:#0f172a;">
+    {contenido_html}
+  </div>
+  <div style="background:#fef3c7;border-top:1px solid #f59e0b;padding:10px 22px;font-size:11px;color:#78350f;">
+    ⚠️ <b>Importante:</b> este documento es un INFORME INTERNO de auditoría
+    para apoyar la decisión del gestor. No constituye respuesta oficial a
+    la EPS. Una vez decidida la acción (defender / aceptar / pedir
+    información), se debe generar el dictamen formal correspondiente.
+  </div>
+</div>
+"""
 
     def _generar_dictamen_html(self, codigo: str, valor: str, cod_res: str, desc_res: str,
                                argumento: str, eps: str, tipo: str,
