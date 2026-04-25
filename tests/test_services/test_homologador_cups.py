@@ -141,3 +141,32 @@ class TestIntegridad:
     def test_tabla_tiene_caso_DMBUG(self):
         """Garantiza que el caso reportado por el usuario esté cubierto."""
         assert "39147B-18" in HOMOLOGACIONES_EXPLICITAS
+
+
+# ─── Ronda 51 Paso 5: DESCRIPCIONES_CUPS_2025 ──────────────────────────────
+
+class TestDescripcionesCups2025:
+    def test_descripciones_al_menos_50_codigos(self):
+        """Garantiza la cobertura mínima del catálogo."""
+        from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
+        assert len(DESCRIPCIONES_CUPS_2025) >= 50
+
+    def test_cups_oficial_6_digitos_retorna_descripcion(self):
+        """890201 (primera vez medicina interna) debe venir con descripción."""
+        r = homologar_cups("890201")
+        assert r is not None
+        assert "MEDICINA INTERNA" in r["descripcion"]
+
+    def test_normalizado_con_sufijo_H_retorna_descripcion(self):
+        """890322H (control pediatría con sufijo HUS) → 890322 con descripción."""
+        r = homologar_cups("890322H")
+        assert r is not None
+        assert r["cups_oficial"] == "890322"
+        assert "PEDIATR" in r["descripcion"].upper()
+
+    def test_cups_no_listado_descripcion_vacia(self):
+        """Un CUPS no catalogado retorna descripción vacía, no falla."""
+        r = homologar_cups("999999")
+        assert r is not None
+        assert r["cups_oficial"] == "999999"
+        assert r["descripcion"] == ""
