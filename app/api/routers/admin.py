@@ -160,11 +160,11 @@ def consumo_tokens_hoy(
     fueron servidas desde caché o plantilla fija. Ideal para detectar
     spikes de consumo en tiempo real durante la capacitación.
     """
-    from datetime import datetime
     from sqlalchemy import func as _func
+    from app.core.tz import ahora_utc
     from app.models.db import AICacheRecord
 
-    ahora = datetime.utcnow()
+    ahora = ahora_utc()
     hoy_ini = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Análisis del día que tocaron la IA (crean glosa con modelo_ia)

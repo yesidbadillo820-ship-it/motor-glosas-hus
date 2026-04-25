@@ -2019,7 +2019,9 @@ def _buscar_cache_ia_db(clave: str) -> tuple[str, str] | None:
     """Busca una respuesta cacheada en BD. Si existe y no expiró, incrementa
     hit_count + actualiza ultimo_hit y la devuelve. Si expiró, la borra."""
     try:
-        from datetime import datetime, timedelta
+        from datetime import timedelta
+
+        from app.core.tz import a_utc, ahora_utc
         from app.database import SessionLocal
         from app.models.db import AICacheRecord
         db = SessionLocal()
@@ -2027,7 +2029,7 @@ def _buscar_cache_ia_db(clave: str) -> tuple[str, str] | None:
             r = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
             if not r:
                 return None
-            if r.creado_en and (datetime.utcnow() - r.creado_en.replace(tzinfo=None)) > timedelta(days=_CACHE_IA_TTL_DIAS):
+            if r.creado_en and (ahora_utc() - a_utc(r.creado_en)) > timedelta(days=_CACHE_IA_TTL_DIAS):
                 db.delete(r)
                 db.commit()
                 return None

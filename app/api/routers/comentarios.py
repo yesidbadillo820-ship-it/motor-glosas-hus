@@ -1,10 +1,10 @@
 """Hilo de comentarios por glosa (colaboración entre el equipo)."""
-from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
+from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import ComentarioGlosaRecord, GlosaRecord, UsuarioRecord
 from app.api.deps import get_usuario_actual
@@ -116,7 +116,7 @@ def resolver(
         raise HTTPException(404, "Comentario no encontrado")
     c.resuelto = 1
     c.resuelto_por = current_user.email
-    c.resuelto_en = datetime.utcnow()
+    c.resuelto_en = ahora_utc()
     db.commit()
     return {"message": "Comentario resuelto", "id": c.id}
 

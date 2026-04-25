@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
+from app.core.tz import a_utc, ahora_utc
 from app.database import get_db
 from app.models.db import UsuarioRecord, GlosaRecord
 from app.repositories.conciliacion_repository import ConciliacionRepository
@@ -156,10 +157,10 @@ def registrar_contra_respuesta(
     if not data.texto or len(data.texto.strip()) < 20:
         raise HTTPException(400, "La contra-respuesta debe tener al menos 20 caracteres")
     c = _obtener_o_404(db, conciliacion_id)
-    fecha = datetime.utcnow()
+    fecha = ahora_utc()
     if data.fecha:
         try:
-            fecha = datetime.fromisoformat(data.fecha)
+            fecha = a_utc(datetime.fromisoformat(data.fecha))
         except ValueError:
             raise HTTPException(400, "Fecha inválida, use ISO")
     c.contra_respuesta_eps = data.texto.strip()
@@ -334,6 +335,6 @@ artículo 126 de la Ley 1438 de 2011.
   </div>
 </div>
 
-<div class="watermark">Generado {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')} · {current_user.email}</div>
+<div class="watermark">Generado {ahora_utc().strftime('%Y-%m-%d %H:%M UTC')} · {current_user.email}</div>
 </body></html>"""
     return HTMLResponse(content=html)

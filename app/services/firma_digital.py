@@ -37,7 +37,8 @@ import hashlib
 import hmac
 import json
 import os
-from datetime import datetime
+
+from app.core.tz import ahora_utc
 
 from app.core.config import get_settings
 
@@ -169,7 +170,7 @@ def firmar_dictamen(
     Returns:
         dict con hash, firma, timestamp ISO, firmante, algoritmo.
     """
-    ts = datetime.utcnow().isoformat()
+    ts = ahora_utc().isoformat()
     h = _hash_sha256(texto_dictamen or "")
     # Decidir algoritmo según disponibilidad de RSA
     alg = ALGORITMO_RSA if esta_rsa_habilitado() else ALGORITMO_HMAC

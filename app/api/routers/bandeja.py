@@ -15,9 +15,11 @@ import os
 import email
 import imaplib
 import base64
-from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from app.core.tz import ahora_utc
 
 from app.database import get_db
 from app.models.db import UsuarioRecord
@@ -107,6 +109,6 @@ def poll_ahora(
     )
     return {
         "total_mensajes": len(resultados),
-        "procesados_en": datetime.utcnow().isoformat(),
+        "procesados_en": ahora_utc().isoformat(),
         "mensajes": resultados,
     }

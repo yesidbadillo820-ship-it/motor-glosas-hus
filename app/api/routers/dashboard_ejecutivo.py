@@ -21,13 +21,14 @@ ratificación, tokens IA consumidos hoy vs promedio, etc.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_coordinador_o_admin
+from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -44,7 +45,7 @@ def dashboard_vivo(
     Diseñado para refrescarse cada 30-60s en el dashboard del coordinador
     sin saturar la BD: ~6 queries agregadas, ninguna scan full.
     """
-    ahora = datetime.utcnow()
+    ahora = ahora_utc()
     inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     inicio_hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
     en_48h = ahora + timedelta(hours=48)

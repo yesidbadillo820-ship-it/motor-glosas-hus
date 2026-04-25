@@ -4,10 +4,11 @@ Se guardan respuestas exitosas (glosa levantada por la EPS) y se usan como
 few-shot examples al generar respuestas para nuevas glosas del mismo
 (EPS, código). Efecto compuesto: cada victoria mejora las próximas.
 """
-from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from app.core.tz import ahora_utc
 from pydantic import BaseModel, Field
 
 from app.database import get_db
@@ -263,7 +264,7 @@ def marcar_usos(db: Session, plantilla_ids: list[int]):
     """Incrementa el contador de usos y actualiza ultima_uso_en."""
     if not plantilla_ids:
         return
-    now = datetime.utcnow()
+    now = ahora_utc()
     db.query(PlantillaGoldRecord).filter(PlantillaGoldRecord.id.in_(plantilla_ids)).update(
         {
             PlantillaGoldRecord.usos: PlantillaGoldRecord.usos + 1,

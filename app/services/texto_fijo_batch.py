@@ -19,8 +19,10 @@ La función es segura de correr múltiples veces.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
+
+from app.core.tz import ahora_utc
 
 from sqlalchemy.orm import Session
 
@@ -49,7 +51,7 @@ def retro_aplicar(
     Retorna stats con contadores por tipo y lista de IDs afectados
     (limitada a 200 para no saturar el response).
     """
-    desde = datetime.utcnow() - timedelta(days=max(1, int(ventana_dias)))
+    desde = ahora_utc() - timedelta(days=max(1, int(ventana_dias)))
 
     q = (
         db.query(GlosaRecord)
@@ -125,5 +127,5 @@ def retro_aplicar(
             stats["errores"] += 1
             logger.error(f"[TEXTO-FIJO-BATCH] commit final falló: {e}")
 
-    stats["timestamp"] = datetime.utcnow().isoformat()
+    stats["timestamp"] = ahora_utc().isoformat()
     return stats

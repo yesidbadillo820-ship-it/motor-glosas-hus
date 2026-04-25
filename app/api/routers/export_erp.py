@@ -1,11 +1,12 @@
 """Export a ERP contable (CSV con encabezados estándar SIIGO/Hélisa)."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 from app.api.deps import get_usuario_actual
@@ -28,8 +29,8 @@ def export_recuperaciones(
 
     Incluye solo glosas RESPONDIDAS/LEVANTADAS con valor_recuperado > 0.
     """
-    f_desde = _parse_date(desde) or (datetime.utcnow() - timedelta(days=30))
-    f_hasta = _parse_date(hasta) or datetime.utcnow()
+    f_desde = _parse_date(desde) or (ahora_utc() - timedelta(days=30))
+    f_hasta = _parse_date(hasta) or ahora_utc()
 
     q = (
         db.query(GlosaRecord)
@@ -44,7 +45,7 @@ def export_recuperaciones(
     buf = StringIO()
     buf.write("FECHA,CUENTA,TERCERO,FACTURA,DESCRIPCION,DEBE,HABER,CENTRO_COSTO\n")
     for g in glosas:
-        fecha = (g.creado_en or datetime.utcnow()).strftime("%Y-%m-%d")
+        fecha = (g.creado_en or ahora_utc()).strftime("%Y-%m-%d")
         obj = float(g.valor_objetado or 0)
         ace = float(g.valor_aceptado or 0)
         recuperado = obj - ace
@@ -78,6 +79,6 @@ def _parse_date(s: Optional[str]) -> Optional[datetime]:
     if not s:
         return None
     try:
-        return datetime.strptime(s, "%Y-%m-%d")
+        return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
         return None

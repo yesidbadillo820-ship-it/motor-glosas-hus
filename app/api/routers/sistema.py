@@ -55,7 +55,8 @@ def observabilidad(
       - ¿Cuántas líneas de código tiene el sistema?
     """
     import os
-    import datetime as _dt
+
+    from app.core.tz import ahora_utc
 
     # Detección de configuración
     sentry_ok = bool(os.getenv("SENTRY_DSN"))
@@ -112,7 +113,7 @@ def observabilidad(
     return {
         "version": {
             "rondas": 50,
-            "ultima_actualizacion": _dt.datetime.utcnow().isoformat(),
+            "ultima_actualizacion": ahora_utc().isoformat(),
         },
         "configuracion": {
             "sentry": sentry_ok,

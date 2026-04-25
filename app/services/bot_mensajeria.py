@@ -23,8 +23,9 @@ Escenarios típicos:
 from __future__ import annotations
 
 import os
-from datetime import datetime
 from typing import Optional
+
+from app.core.tz import ahora_utc
 
 from app.core.logging_utils import logger
 
@@ -40,7 +41,7 @@ class MockProvider:
         logger.info(
             f"[BOT-MOCK] → {destinatario[:30]}: {mensaje[:80]}…"
         )
-        return {"ok": True, "provider": self.nombre, "delivered_at": datetime.utcnow().isoformat()}
+        return {"ok": True, "provider": self.nombre, "delivered_at": ahora_utc().isoformat()}
 
 
 class WhatsAppMetaProvider:

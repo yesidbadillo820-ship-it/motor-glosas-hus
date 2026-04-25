@@ -1,11 +1,12 @@
 """Informes ejecutivos PDF para Gerencia y Junta Directiva."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord, ConciliacionRecord
 from app.api.deps import get_usuario_actual
@@ -30,15 +31,15 @@ def ejecutivo_mensual(
 ):
     """Genera HTML imprimible (guardar como PDF desde el navegador) con el
     informe ejecutivo del mes indicado. Por defecto el mes actual."""
-    now = datetime.utcnow()
+    now = ahora_utc()
     year = year or now.year
     month = month or now.month
-    inicio = datetime(year, month, 1)
+    inicio = datetime(year, month, 1, tzinfo=timezone.utc)
     # Fin = primer día del mes siguiente
     if month == 12:
-        fin = datetime(year + 1, 1, 1)
+        fin = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
     else:
-        fin = datetime(year, month + 1, 1)
+        fin = datetime(year, month + 1, 1, tzinfo=timezone.utc)
 
     # Totales del mes
     base_q = db.query(GlosaRecord).filter(
@@ -100,7 +101,7 @@ def ejecutivo_mensual(
 
     # Tendencia 6 meses (incluyendo el actual)
     meses_atras = 5
-    inicio_tendencia = datetime(year, month, 1) - timedelta(days=meses_atras * 32)
+    inicio_tendencia = datetime(year, month, 1, tzinfo=timezone.utc) - timedelta(days=meses_atras * 32)
     tendencia = (
         db.query(
             func.extract('year', GlosaRecord.creado_en).label('y'),

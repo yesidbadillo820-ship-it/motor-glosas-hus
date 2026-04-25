@@ -29,8 +29,10 @@ en glosa real, qué códigos salieron, cuánto se objetó en promedio.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
+
+from app.core.tz import ahora_utc
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -72,7 +74,7 @@ def predecir_glosa(
     valor_facturado = float(valor_facturado or 0.0)
 
     # 1) Histórico: cuántas facturas con (eps, cups) han sido glosadas
-    hace_12m = datetime.utcnow() - timedelta(days=365)
+    hace_12m = ahora_utc() - timedelta(days=365)
     try:
         total_hist = (
             db.query(func.count(GlosaRecord.id))

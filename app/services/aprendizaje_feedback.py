@@ -21,7 +21,8 @@ Reglas operativas:
 from __future__ import annotations
 
 import re
-from datetime import datetime
+
+from app.core.tz import ahora_utc
 
 from sqlalchemy.orm import Session
 
@@ -149,7 +150,7 @@ def _promover_a_gold(
         usos=0,
         creado_por=f"auto-feedback ({creado_por})",
         notas=(
-            f"Promovida automáticamente el {datetime.utcnow().isoformat()} "
+            f"Promovida automáticamente el {ahora_utc().isoformat()} "
             f"tras decisión EPS=LEVANTADA. Valor recuperado: "
             f"${int(glosa.valor_recuperado or 0):,}."
         ),
@@ -187,7 +188,7 @@ def _desactivar_gold(
             g.activa = 0
             g.notas = (
                 (g.notas or "") +
-                f"\n[DESACTIVADA auto {datetime.utcnow().isoformat()}] "
+                f"\n[DESACTIVADA auto {ahora_utc().isoformat()}] "
                 f"El mismo argumento fue ratificado por la EPS en glosa #{glosa.id}."
             )
             desactivadas += 1

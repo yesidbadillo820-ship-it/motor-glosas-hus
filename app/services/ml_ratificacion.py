@@ -24,10 +24,12 @@ Output:
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+from app.core.tz import ahora_utc
 
 from app.models.db import GlosaRecord
 
@@ -95,7 +97,7 @@ def predecir_ratificacion(db: Session, glosa: GlosaRecord) -> dict:
 
     # 1) EPS con alta tasa de ratificación (>30% últimos 90 días)
     try:
-        hace_90d = datetime.utcnow() - timedelta(days=90)
+        hace_90d = ahora_utc() - timedelta(days=90)
         total = db.query(func.count(GlosaRecord.id)).filter(
             GlosaRecord.eps.ilike(f"%{eps}%")
         ).filter(GlosaRecord.decision_eps.isnot(None)).filter(

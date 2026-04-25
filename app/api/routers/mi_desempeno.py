@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+
+from app.core.tz import ahora_utc
 from sqlalchemy import or_
 
 from app.database import get_db
@@ -32,7 +34,7 @@ def mi_desempeno(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """KPIs personales del usuario actual en la ventana indicada."""
-    desde = datetime.utcnow() - timedelta(days=ventana_dias)
+    desde = ahora_utc() - timedelta(days=ventana_dias)
 
     q = _glosas_del_gestor(db, current_user, desde)
     glosas = q.all()
@@ -127,7 +129,7 @@ def _calcular_racha(glosas: list[GlosaRecord]) -> int:
     for g in glosas:
         if g.creado_en:
             dias_con_actividad.add(g.creado_en.date())
-    hoy = datetime.utcnow().date()
+    hoy = ahora_utc().date()
     racha = 0
     while hoy in dias_con_actividad:
         racha += 1
@@ -171,7 +173,7 @@ def ranking_equipo(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Ranking completo del equipo (para tabla)."""
-    desde = datetime.utcnow() - timedelta(days=ventana_dias)
+    desde = ahora_utc() - timedelta(days=ventana_dias)
     return {
         "ventana_dias": ventana_dias,
         "ranking": _ranking_equipo(db, desde),

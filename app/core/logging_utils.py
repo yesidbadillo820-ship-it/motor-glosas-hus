@@ -1,7 +1,7 @@
 import logging
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from contextvars import ContextVar
 
@@ -10,7 +10,7 @@ request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 class StructuredFormatter(logging.Formatter):
     def format(self, record):
         log_obj = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

@@ -79,8 +79,9 @@ def _calcular_sugerencia(db: Session, glosa_id: int) -> dict:
     for u in usuarios:
         # Métricas del gestor:
         # 1. Tasa de éxito en ese tipo (últimas 90 días)
-        from datetime import datetime, timedelta
-        desde = datetime.utcnow() - timedelta(days=90)
+        from datetime import timedelta
+        from app.core.tz import ahora_utc
+        desde = ahora_utc() - timedelta(days=90)
         cond = [GlosaRecord.auditor_email == u.email]
         if u.nombre:
             cond.append(GlosaRecord.gestor_nombre.ilike(f"%{u.nombre.strip()}%"))

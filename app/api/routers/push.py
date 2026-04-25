@@ -6,11 +6,11 @@ El backend la guarda asociada al usuario. Para enviar, se requiere:
 - pywebpush instalado (se agrega como dependencia futura; por ahora solo
   guardamos suscripciones y exponemos endpoint de test que las lista)
 """
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from app.core.tz import ahora_utc
 from app.database import get_db
 from app.models.db import PushSubscriptionRecord, UsuarioRecord
 from app.api.deps import get_usuario_actual
@@ -51,7 +51,7 @@ def subscribe(
         existente.auth = data.auth
         existente.user_agent = data.user_agent
         existente.usuario_email = current_user.email
-        existente.ultima_usada_en = datetime.utcnow()
+        existente.ultima_usada_en = ahora_utc()
         db.commit()
         return {"message": "Suscripción actualizada", "id": existente.id}
     reg = PushSubscriptionRecord(

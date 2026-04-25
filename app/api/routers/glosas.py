@@ -6,6 +6,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Backgro
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
+from app.core.tz import ahora_utc
 from app.database import get_db, SessionLocal
 from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.contrato_repository import ContratoRepository
@@ -1231,7 +1232,7 @@ def cambiar_workflow(
     glosa.workflow_state = nuevo
     if data.comentario:
         nota = (glosa.nota_workflow or "")
-        nueva_nota = f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} {current_user.email} {actual}->{nuevo}] {data.comentario}"
+        nueva_nota = f"[{ahora_utc().strftime('%Y-%m-%d %H:%M')} {current_user.email} {actual}->{nuevo}] {data.comentario}"
         glosa.nota_workflow = (nota + " | " + nueva_nota)[-500:] if nota else nueva_nota[:500]
 
     db.commit()
@@ -1269,7 +1270,7 @@ def registrar_decision_eps(glosa_id: int, data: DecisionEPSInput,
     if not glosa:
         raise HTTPException(404, "Glosa no encontrada")
     glosa.decision_eps = decision
-    glosa.fecha_decision_eps = datetime.utcnow()
+    glosa.fecha_decision_eps = ahora_utc()
     glosa.valor_recuperado = data.valor_recuperado
     if data.observacion_eps:
         glosa.observacion_eps = data.observacion_eps
