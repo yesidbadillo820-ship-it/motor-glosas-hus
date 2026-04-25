@@ -1854,14 +1854,20 @@ class GlosaService:
         # implícitos del cliente.
         _timeout_anthropic = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
 
-        # Decidir si usar caching: solo si el system es suficientemente largo
-        # (requisito mínimo ~1024 tokens, heurística: ≥4000 chars).
-        if system and len(system) >= 4000:
+        # Decidir si usar caching: el mínimo cacheable de Anthropic es
+        # 1024 tokens. Con la heurística "1 token ≈ 3 chars en español"
+        # bajamos el threshold a 3000 chars (era 4000) para no perder hits
+        # en system prompts cortos pero aún cacheables.
+        # R53 P2: TTL extendido a 1h (default ephemeral = 5 min) → 12x más
+        # cache hits durante una ráfaga de glosas. Requiere el header
+        # beta 'extended-cache-ttl-2025-04-11'.
+        usar_cache = bool(system and len(system) >= 3000)
+        if usar_cache:
             system_payload = [
                 {
                     "type": "text",
                     "text": system,
-                    "cache_control": {"type": "ephemeral"},
+                    "cache_control": {"type": "ephemeral", "ttl": "1h"},
                 }
             ]
         else:
@@ -1876,17 +1882,23 @@ class GlosaService:
             httpx.RemoteProtocolError,
             httpx.ReadError,
         )
+        # Headers: si activamos cache con TTL=1h necesitamos el beta header
+        # 'extended-cache-ttl-2025-04-11'. Si no, payload normal.
+        _headers = {
+            "x-api-key": self.anthropic_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        if usar_cache:
+            _headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11"
+
         ultimo_error = None
         for intento in range(3):
             try:
                 async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
                     resp = await client.post(
                         "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": self.anthropic_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json",
-                        },
+                        headers=_headers,
                         json={
                             "model": self.anthropic_model,
                             # Ronda 49: 3000 tokens es suficiente para dictamen

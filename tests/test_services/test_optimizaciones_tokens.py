@@ -98,6 +98,7 @@ async def test_llamar_anthropic_usa_cache_control_con_system_largo():
             pass
         async def post(_self, url, headers=None, json=None):
             captured["json"] = json
+            captured["headers"] = headers
             return _FakeResp()
 
     with patch("httpx.AsyncClient", return_value=_FakeClient()):
@@ -105,7 +106,11 @@ async def test_llamar_anthropic_usa_cache_control_con_system_largo():
 
     sp = captured["json"]["system"]
     assert isinstance(sp, list), "system debe ser list cuando es largo"
-    assert sp[0]["cache_control"] == {"type": "ephemeral"}
+    # R53 P2: ahora con TTL extendido a 1h (vs ephemeral default 5min)
+    assert sp[0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+    # Header beta requerido para extended-cache-ttl
+    assert "anthropic-beta" in captured["headers"]
+    assert "extended-cache-ttl" in captured["headers"]["anthropic-beta"]
 
 
 @pytest.mark.asyncio
