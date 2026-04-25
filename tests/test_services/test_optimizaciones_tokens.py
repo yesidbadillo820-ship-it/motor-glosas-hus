@@ -151,7 +151,7 @@ def test_limit_key_con_token_valido_devuelve_email():
     """Si viene un JWT válido en el header, la key es 'user:<email>'."""
     from jose import jwt as _jwt
     from app.core.config import get_settings
-    from app.main import _limit_key_user_or_ip
+    from app.core.rate_limit import _limit_key_user_or_ip
     cfg = get_settings()
     token = _jwt.encode({"sub": "test@hus.gov.co"}, cfg.secret_key, algorithm=cfg.algorithm)
     req = SimpleNamespace(headers={"authorization": f"Bearer {token}"},
@@ -161,7 +161,7 @@ def test_limit_key_con_token_valido_devuelve_email():
 
 def test_limit_key_sin_token_usa_ip():
     """Sin JWT, cae a get_remote_address (IP)."""
-    from app.main import _limit_key_user_or_ip
+    from app.core.rate_limit import _limit_key_user_or_ip
     # get_remote_address espera un request tipo Starlette; mockeamos lo mínimo
     req = SimpleNamespace(headers={}, client=SimpleNamespace(host="9.9.9.9"),
                            scope={"client": ("9.9.9.9", 0), "headers": [], "type": "http"})
@@ -172,7 +172,7 @@ def test_limit_key_sin_token_usa_ip():
 
 def test_limit_key_con_token_invalido_usa_ip():
     """JWT basura → no debe crashear, cae a IP."""
-    from app.main import _limit_key_user_or_ip
+    from app.core.rate_limit import _limit_key_user_or_ip
     req = SimpleNamespace(headers={"authorization": "Bearer tokenbasura"},
                            client=SimpleNamespace(host="8.8.8.8"),
                            scope={"client": ("8.8.8.8", 0), "headers": [], "type": "http"})

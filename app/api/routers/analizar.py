@@ -1,0 +1,508 @@
+"""Endpoint /analizar — entrada principal del motor de glosas (R53 P1).
+
+Extraído de app/main.py (era ~365 LOC). Maneja:
+  - Validación de input (GlosaInput)
+  - Extracción de PDFs adjuntos (con OCR opcional vía Claude Vision)
+  - Pre-lookup de tarifa pactada (TA*) para evitar tokens innecesarios
+  - Llamada al GlosaService (IA + few-shots de plantillas Gold)
+  - Generación de banner de tarifa + dictamen de aceptación si aplica
+  - Persistencia (GlosaRecord) + snapshot de versión inicial
+"""
+from __future__ import annotations
+
+import re
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.orm import Session
+from starlette.requests import Request
+
+from app.api.deps import get_usuario_actual
+from app.core.config import get_settings
+from app.core.logging_utils import logger, set_request_id
+from app.core.rate_limit import limiter
+from app.database import get_db
+from app.models.db import UsuarioRecord
+from app.models.schemas import GlosaInput, GlosaResult
+from app.repositories.contrato_repository import ContratoRepository
+from app.repositories.glosa_repository import GlosaRepository
+from app.services.glosa_ia_prompts import get_contrato
+from app.services.glosa_service import GlosaService
+from app.utils.parsers_glosa import (
+    _concepto_glosa,
+    _descripcion_servicio,
+    _extraer_cups_servicio,
+    _extraer_valores_glosa,
+    _generar_banner_tarifa_html,
+)
+
+router = APIRouter(tags=["analizar"])
+
+cfg = get_settings()
+
+MAX_ARCHIVOS = 10  # Límite de soportes PDF por glosa
+MAX_BYTES_PDF = 15_000_000  # 15 MB por archivo
+
+
+async def _extraer_pdfs(
+    archivos: Optional[list[UploadFile]], req_id: str,
+) -> tuple[str, int]:
+    """Extrae texto de los PDFs adjuntos (con OCR Claude opcional).
+
+    Retorna (texto_concatenado, archivos_procesados). Los PDFs se separan
+    con un marker '═══ DOCUMENTO: <filename> ═══' para que la IA distinga
+    entre ellos. Errores por archivo se loguean pero no abortan el batch.
+    """
+    if not archivos:
+        return "", 0
+
+    from app.services.pdf_service import PdfService
+    pdf_svc = PdfService()
+    contexto_pdf = ""
+    procesados = 0
+
+    for archivo in archivos:
+        if procesados >= MAX_ARCHIVOS:
+            logger.warning(
+                f"[{req_id}] Máximo {MAX_ARCHIVOS} archivos alcanzado, "
+                "ignorando restantes"
+            )
+            break
+        if not archivo.filename:
+            continue
+        try:
+            contenido = await archivo.read()
+            if contenido[:4] != b"%PDF":
+                logger.warning(f"[{req_id}] Archivo ignorado (no es PDF): {archivo.filename}")
+                continue
+            if len(contenido) > MAX_BYTES_PDF:
+                logger.warning(f"[{req_id}] PDF muy grande: {archivo.filename}")
+                continue
+            texto, metodo = await pdf_svc.extraer_con_ocr(
+                contenido,
+                anthropic_api_key=cfg.anthropic_api_key,
+                anthropic_model=cfg.anthropic_model,
+            )
+            sep = (
+                f"\n\n═══ DOCUMENTO: {archivo.filename} ═══\n\n"
+                if contexto_pdf
+                else f"═══ DOCUMENTO: {archivo.filename} ═══\n\n"
+            )
+            contexto_pdf += sep + texto
+            procesados += 1
+            logger.info(f"[{req_id}] PDF {archivo.filename}: {metodo} ({len(texto)} chars)")
+        except Exception as e:
+            logger.warning(f"[{req_id}] Error extrayendo PDF {archivo.filename}: {e}")
+
+    if procesados:
+        logger.info(
+            f"[{req_id}] Total PDFs procesados: {procesados}/{MAX_ARCHIVOS} "
+            f"| {len(contexto_pdf)} chars"
+        )
+    return contexto_pdf, procesados
+
+
+def _obtener_few_shots(
+    db: Session, eps: str, tabla_excel: str,
+) -> tuple[list[str], list, str]:
+    """Pre-fetch de Plantillas Gold para inyectar como few-shot al LLM.
+
+    Devuelve (lista_argumentos, lista_records, codigo_prefijo). El prefijo
+    se usa también para el pre-lookup de tarifa.
+    """
+    from app.api.routers.plantillas_gold import obtener_few_shot
+    codigo_match = re.search(
+        r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b",
+        tabla_excel.upper(),
+    )
+    cod_pref = codigo_match.group(0) if codigo_match else ""
+    plantillas_gold = (
+        obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2)
+        if cod_pref else []
+    )
+    few_shots = [p.argumento for p in plantillas_gold]
+    return few_shots, plantillas_gold, cod_pref
+
+
+def _pre_lookup_tarifa(
+    db: Session, cod_pref: str, eps: str,
+    tabla_excel: str, contexto_pdf: str, req_id: str,
+) -> Optional[dict]:
+    """Pre-lookup: si la glosa es TA* y se identifica el CUPS, busca la
+    tarifa pactada antes de invocar al LLM. Si hay match, el service
+    puede saltarse la llamada (~8k tokens menos)."""
+    if not (cod_pref or "").upper().startswith("TA"):
+        return None
+    try:
+        cups_pre, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+        if not cups_pre:
+            return None
+        from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
+        vals_pre = _extraer_valores_glosa(tabla_excel or "")
+        info = evaluar_glosa_tarifa(
+            db, eps=eps, cups=cups_pre,
+            valor_facturado=vals_pre.get("facturado", 0.0),
+            valor_objetado=0.0,
+            valor_reconocido=vals_pre.get("reconocido", 0.0),
+        )
+        if info.get("encontrada"):
+            return info
+        # Fallback al catálogo oficial HUS/SOAT
+        from app.services.tarifas_oficiales import tarifa_a_banner_dict
+        ofic = tarifa_a_banner_dict(cups_pre)
+        if not ofic:
+            return None
+        diff = abs(vals_pre.get("facturado", 0.0) - ofic["valor_pactado"])
+        accion = (
+            "DEFENDER_TOTAL" if diff < max(1.0, ofic["valor_pactado"] * 0.005)
+            else "REVISAR"
+        )
+        return {
+            "encontrada": True,
+            "tarifa": ofic,
+            "valor_facturado": vals_pre.get("facturado", 0.0),
+            "valor_objetado": 0.0,
+            "valor_reconocido": vals_pre.get("reconocido", 0.0),
+            "valor_pactado_calc": ofic["valor_pactado"],
+            "recomendacion": {
+                "accion": accion,
+                "titulo": "Valor oficial conocido",
+                "razon": "",
+            },
+        }
+    except Exception as e:
+        logger.warning(f"[{req_id}] pre-lookup tarifa falló: {e}")
+        return None
+
+
+def _agregar_banner_tarifa_post(
+    db: Session, resultado, eps: str, tabla_excel: str,
+    contexto_pdf: str, val_obj: float, val_ac: float, req_id: str,
+) -> None:
+    """Si es glosa TA con CUPS extraíble, busca la tarifa y prefija el
+    banner HTML al dictamen para que el auditor vea los datos duros."""
+    es_ta = (resultado.codigo_glosa or "").upper().startswith("TA")
+    if not es_ta:
+        return
+    cups_ext, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    if not cups_ext:
+        return
+    try:
+        from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
+        vals_txt = _extraer_valores_glosa(tabla_excel or "")
+        val_fact = vals_txt["facturado"]
+        val_rec = vals_txt["reconocido"]
+        info_tarifa = evaluar_glosa_tarifa(
+            db, eps=eps, cups=cups_ext,
+            valor_facturado=val_fact, valor_objetado=val_obj,
+            valor_reconocido=val_rec,
+        )
+        if not info_tarifa.get("encontrada"):
+            from app.services.tarifas_oficiales import tarifa_a_banner_dict
+            oficial = tarifa_a_banner_dict(cups_ext)
+            if oficial:
+                info_tarifa = {
+                    "encontrada": True, "tarifa": oficial,
+                    "valor_facturado": val_fact, "valor_objetado": val_obj,
+                    "valor_reconocido": val_rec,
+                    "valor_pactado_calc": oficial["valor_pactado"],
+                    "recomendacion": {
+                        "accion": "DEFENDER_TOTAL" if val_fact <= oficial["valor_pactado"] + 1 else "REVISAR",
+                        "titulo": "✅ Valor oficial HUS/SOAT conocido — defender",
+                        "razon": (
+                            f"El valor oficial publicado para este CUPS es "
+                            f"${oficial['valor_pactado']:,.0f} según {oficial['contrato_numero']}. "
+                            "Defender este valor citando la norma institucional."
+                        ),
+                        "valor_a_defender": val_obj,
+                        "valor_a_aceptar": 0.0,
+                        "diferencia": 0.0,
+                    },
+                }
+        if info_tarifa.get("encontrada"):
+            banner = _generar_banner_tarifa_html(info_tarifa)
+            if banner:
+                resultado.dictamen = banner + (resultado.dictamen or "")
+                rec = info_tarifa.get("recomendacion") or {}
+                logger.info(
+                    f"[{req_id}] Tarifa pactada: cups={cups_ext} "
+                    f"fact=${val_fact:,.0f} rec=${val_rec:,.0f} "
+                    f"obj=${val_obj:,.0f} accion={rec.get('accion')}"
+                )
+    except Exception as e:
+        logger.warning(f"[{req_id}] No se pudo agregar banner de tarifa: {e}")
+
+
+def _decidir_estado_y_codigo(val_obj: float, val_ac: float) -> tuple[float, str, Optional[str], Optional[str]]:
+    """Determina (val_obj_corregido, estado, cod_respuesta, descripcion).
+
+    BUG fix preservado: si val_obj=0 y hay aceptación, val_ac es la base
+    del cálculo (caso de aceptación total con cifra ausente del texto).
+    """
+    if val_obj == 0 and val_ac > 0:
+        return val_ac, "ACEPTADA", "RE9702", "GLOSA ACEPTADA AL 100%"
+    if val_ac >= val_obj and val_obj > 0:
+        return val_obj, "ACEPTADA", "RE9702", "GLOSA ACEPTADA AL 100%"
+    if val_ac > 0:
+        return val_obj, "PARCIALMENTE_ACEPTADA", "RE9801", "GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE"
+    return val_obj, "RADICADA", None, None
+
+
+def _construir_dictamen_aceptacion(
+    eps: str, codigo_glosa: str, val_obj: float, val_ac: float,
+    estado: str, cod_resp: str, desc_resp: str,
+    tabla_excel: str, contexto_pdf: str,
+) -> str:
+    """Genera el HTML completo cuando hay aceptación (total/parcial).
+
+    Estructura: tabla códigos + bloque de argumento (verde/ámbar) +
+    tabla resumen de valores. Cita el contrato vigente con la EPS.
+    """
+    val_rechazado = val_obj - val_ac
+    contrato_info = get_contrato(eps)
+    num_contrato = contrato_info.get("numero") or "CONTRATO VIGENTE ENTRE LAS PARTES"
+    servicio_descr = _descripcion_servicio(
+        codigo_glosa, texto_glosa=tabla_excel, contexto_pdf=contexto_pdf,
+    )
+
+    if estado == "ACEPTADA":
+        argumento = f"""
+        <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:15px 0;border-radius:8px;">
+            <h4 style="color:#15803d;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
+            <p style="font-size:13px;line-height:1.8;color:#166534;">
+                ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
+                CORRESPONDIENTE {servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
+                SEGÚN <strong>{num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
+                DANDO CUMPLIMIENTO A ESTAS TARIFAS.
+            </p>
+        </div>"""
+        val_en_disputa = 0.0
+    else:
+        val_en_disputa = abs(val_rechazado)
+        argumento = f"""
+        <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:20px;margin:15px 0;border-radius:8px;">
+            <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
+            <p style="font-size:13px;line-height:1.8;color:#78350f;">
+                ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
+                CORRESPONDIENTE {servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
+                SEGÚN <strong>{num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
+                DANDO CUMPLIMIENTO A ESTAS TARIFAS.
+            </p>
+            <p style="font-size:13px;line-height:1.8;color:#78350f;">
+                EL VALOR RESTANTE DE <strong>${val_en_disputa:,.0f}</strong> NO SE ACEPTA POR LA ESE HUS
+                YA QUE SE EVIDENCIA QUE ESTE VALOR CORRESPONDE AL VALOR PACTADO ENTRE LAS PARTES.
+            </p>
+        </div>"""
+
+    tabla_codigos = f"""
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:15px;background:white;border:1px solid #cbd5e1;">
+        <thead>
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:10px;text-align:center;font-weight:700;letter-spacing:.3px;">CÓDIGO GLOSA</th>
+                <th style="padding:10px;text-align:center;font-weight:700;letter-spacing:.3px;">VALOR OBJETADO</th>
+                <th style="padding:10px;text-align:center;font-weight:700;letter-spacing:.3px;">CÓDIGO RESPUESTA</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding:10px;text-align:center;font-weight:700;border-bottom:1px solid #e2e8f0;">{codigo_glosa}</td>
+                <td style="padding:10px;text-align:center;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;">$ {val_obj:,.0f}</td>
+                <td style="padding:10px;text-align:center;border-bottom:1px solid #e2e8f0;">
+                    <b>{cod_resp}</b><br>
+                    <span style="font-size:10px;color:#64748b;">{desc_resp}</span>
+                </td>
+            </tr>
+        </tbody>
+    </table>"""
+
+    tabla_valores = f"""
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:15px;">
+        <div style="font-weight:700;color:#334155;margin-bottom:10px;font-size:11px;letter-spacing:.4px;text-transform:uppercase;">Resumen de valores</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr>
+                <td style="padding:6px 8px;color:#475569;">Valor objetado</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">$ {val_obj:,.0f}</td>
+            </tr>
+            <tr>
+                <td style="padding:6px 8px;color:#047857;">Valor aceptado</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#047857;font-variant-numeric:tabular-nums;">$ {val_ac:,.0f}</td>
+            </tr>"""
+    if estado == "PARCIALMENTE_ACEPTADA":
+        tabla_valores += f"""
+            <tr>
+                <td style="padding:6px 8px;color:#b91c1c;">Valor en disputa</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">$ {val_en_disputa:,.0f}</td>
+            </tr>"""
+    tabla_valores += """
+        </table>
+    </div>"""
+
+    return tabla_codigos + argumento + tabla_valores
+
+
+async def _persistir_y_responder(
+    db: Session, resultado, eps: str, etapa: str,
+    valor_aceptado: str, tabla_excel: str, contexto_pdf: str,
+    numero_factura: Optional[str], numero_radicado: Optional[str],
+    data, current_user, req_id: str,
+):
+    """Cierra el flujo: aplica banner de tarifa, decide estado, construye
+    dictamen final, persiste GlosaRecord, guarda snapshot de versión."""
+    glosa_repo = GlosaRepository(db)
+    val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)
+    val_ac = float(re.sub(r"[^\d]", "", valor_aceptado) or 0)
+
+    _agregar_banner_tarifa_post(
+        db, resultado, eps, tabla_excel, contexto_pdf, val_obj, val_ac, req_id,
+    )
+
+    val_obj, estado, cod_resp_acept, desc_resp_acept = _decidir_estado_y_codigo(
+        val_obj, val_ac,
+    )
+
+    dictamen_final = resultado.dictamen
+    if estado in ("ACEPTADA", "PARCIALMENTE_ACEPTADA"):
+        dictamen_final = _construir_dictamen_aceptacion(
+            eps=eps, codigo_glosa=resultado.codigo_glosa,
+            val_obj=val_obj, val_ac=val_ac,
+            estado=estado, cod_resp=cod_resp_acept,
+            desc_resp=desc_resp_acept,
+            tabla_excel=tabla_excel, contexto_pdf=contexto_pdf,
+        )
+
+    tipo_final = (
+        f"RESPUESTA {cod_resp_acept}" if cod_resp_acept else resultado.tipo
+    )
+    cup_ext, servicio_ext = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    cod_resp_m = re.search(r"\bRE\d{4}\b", tipo_final or "")
+    cod_resp = cod_resp_m.group(0) if cod_resp_m else (cod_resp_acept or "")
+
+    glosa = glosa_repo.crear(
+        eps=eps,
+        paciente=resultado.paciente,
+        codigo_glosa=resultado.codigo_glosa,
+        valor_objetado=val_obj,
+        valor_aceptado=val_ac,
+        etapa=etapa,
+        estado=estado,
+        dictamen=dictamen_final,
+        dias_restantes=resultado.dias_restantes,
+        modelo_ia=resultado.modelo_ia,
+        score=resultado.score,
+        numero_radicado=numero_radicado,
+        factura=numero_factura,
+        texto_glosa_original=tabla_excel,
+        codigo_respuesta=cod_resp,
+        cups_servicio=cup_ext or None,
+        servicio_descripcion=servicio_ext or None,
+        concepto_glosa=_concepto_glosa(resultado.codigo_glosa),
+        fecha_recepcion=data.fecha_recepcion,
+    )
+
+    if estado == "RADICADA":
+        glosa_repo.actualizar_estado(
+            glosa.id, "RESPONDIDA", responsable=current_user.email,
+        )
+
+    logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")
+
+    resultado.tipo = tipo_final
+    resultado.dictamen = dictamen_final
+    resultado.glosa_id = glosa.id
+    try:
+        from app.api.routers.versiones import guardar_version
+        guardar_version(
+            db=db, glosa_id=glosa.id, dictamen_html=dictamen_final,
+            accion="CREAR", autor_email=current_user.email,
+        )
+    except Exception as e:
+        logger.warning(f"No se pudo guardar version: {e}")
+    return resultado
+
+
+def get_glosa_service() -> GlosaService:
+    """Factory del GlosaService (inyectado vía Depends en el endpoint)."""
+    return GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+        anthropic_model=cfg.anthropic_model,
+        groq_model=cfg.groq_model,
+    )
+
+
+@router.post(
+    "/analizar",
+    response_model=GlosaResult,
+    summary="Analizar Glosa",
+    description="Analiza una glosa y genera respuesta técnico-jurídica automática.",
+)
+@limiter.limit("60/minute")
+async def analizar(
+    request: Request,
+    eps: str = Form(...),
+    etapa: str = Form(...),
+    fecha_radicacion: Optional[str] = Form(None),
+    fecha_recepcion: Optional[str] = Form(None),
+    valor_aceptado: str = Form("0"),
+    tabla_excel: str = Form(...),
+    numero_factura: Optional[str] = Form(None),
+    numero_radicado: Optional[str] = Form(None),
+    tono: Optional[str] = Form("conciliador"),
+    modo_respuesta: Optional[str] = Form("defender"),
+    valor_aceptado_parcial: Optional[float] = Form(0.0),
+    archivos: Optional[list[UploadFile]] = File(None),
+    db: Session = Depends(get_db),
+    service: GlosaService = Depends(get_glosa_service),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    req_id = set_request_id()
+    logger.info(
+        f"[{req_id}] Análisis solicitado por: {current_user.email} | "
+        f"eps={eps} | tono={tono} | modo={modo_respuesta}"
+    )
+
+    try:
+        data = GlosaInput(
+            eps=eps, etapa=etapa,
+            fecha_radicacion=fecha_radicacion,
+            fecha_recepcion=fecha_recepcion,
+            valor_aceptado=valor_aceptado,
+            tabla_excel=tabla_excel,
+            numero_factura=numero_factura,
+            numero_radicado=numero_radicado,
+            tono=tono,
+            modo_respuesta=modo_respuesta or "defender",
+            valor_aceptado_parcial=valor_aceptado_parcial or 0.0,
+        )
+    except Exception as e:
+        logger.error(f"[{req_id}] Validación fallida: {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+
+    contexto_pdf, archivos_procesados = await _extraer_pdfs(archivos, req_id)
+
+    contrato_repo = ContratoRepository(db)
+    contratos = contrato_repo.como_dict()
+
+    few_shots, plantillas_gold, cod_pref = _obtener_few_shots(db, eps, tabla_excel)
+
+    info_tarifa_pre = _pre_lookup_tarifa(
+        db, cod_pref, eps, tabla_excel, contexto_pdf, req_id
+    )
+
+    resultado = await service.analizar(
+        data, contexto_pdf, contratos,
+        few_shots=few_shots, info_tarifa=info_tarifa_pre,
+    )
+    if plantillas_gold:
+        from app.api.routers.plantillas_gold import marcar_usos
+        marcar_usos(db, [p.id for p in plantillas_gold])
+    logger.info(
+        f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} "
+        f"| few_shots={len(few_shots)} | tarifa_match={bool(info_tarifa_pre and info_tarifa_pre.get('encontrada'))}"
+    )
+
+    return await _persistir_y_responder(
+        db, resultado, eps, etapa, valor_aceptado, tabla_excel, contexto_pdf,
+        numero_factura, numero_radicado, data, current_user, req_id,
+    )
