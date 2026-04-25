@@ -132,3 +132,93 @@ def observabilidad(
         "metricas_codigo": metricas_codigo,
         "recomendaciones": recomendaciones,
     }
+
+
+@router.get("/metricas-ia")
+def metricas_ia(
+    dias: int = 1,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R55 P2: agregaciones de costo y latencia de los calls IA persistidos.
+
+    Parámetros:
+      dias=1 (default) → últimas 24h. Pasar 7 para semana, 30 para mes.
+
+    Devuelve:
+      - total_calls
+      - cost_usd_total / promedio
+      - latency_ms p50 / p95 / max
+      - cache_hit_rate
+      - desglose por modelo
+      - top 5 modelos por costo
+    """
+    from datetime import timedelta
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICallRecord
+
+    desde = ahora_utc() - timedelta(days=max(1, int(dias)))
+    q = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde)
+    calls = q.all()
+
+    if not calls:
+        return {
+            "ventana_dias": dias,
+            "total_calls": 0,
+            "cost_usd_total": 0.0,
+            "cost_usd_promedio": 0.0,
+            "latency_ms": {"p50": 0, "p95": 0, "max": 0},
+            "cache_hit_rate_pct": 0.0,
+            "por_modelo": [],
+        }
+
+    cost_total = sum(c.cost_usd or 0 for c in calls)
+    latencias = sorted(c.latency_ms or 0 for c in calls)
+    n = len(latencias)
+
+    def _percentil(p: float) -> int:
+        idx = min(n - 1, int(n * p))
+        return latencias[idx]
+
+    total_in = sum(
+        (c.input_tokens or 0)
+        + (c.cache_creation_input_tokens or 0)
+        + (c.cache_read_input_tokens or 0)
+        for c in calls
+    )
+    cache_read_total = sum(c.cache_read_input_tokens or 0 for c in calls)
+    cache_hit_rate = (cache_read_total / total_in * 100.0) if total_in else 0.0
+
+    # Desglose por modelo
+    por_modelo = {}
+    for c in calls:
+        m = c.modelo or "?"
+        por_modelo.setdefault(m, {"calls": 0, "cost_usd": 0.0, "tokens_total": 0})
+        por_modelo[m]["calls"] += 1
+        por_modelo[m]["cost_usd"] += c.cost_usd or 0
+        por_modelo[m]["tokens_total"] += (
+            (c.input_tokens or 0)
+            + (c.cache_creation_input_tokens or 0)
+            + (c.cache_read_input_tokens or 0)
+            + (c.output_tokens or 0)
+        )
+    desglose = sorted(
+        [{"modelo": m, **v} for m, v in por_modelo.items()],
+        key=lambda x: x["cost_usd"], reverse=True,
+    )
+
+    return {
+        "ventana_dias": dias,
+        "total_calls": n,
+        "cost_usd_total": round(cost_total, 6),
+        "cost_usd_promedio": round(cost_total / n, 6),
+        "latency_ms": {
+            "p50": _percentil(0.50),
+            "p95": _percentil(0.95),
+            "max": latencias[-1],
+        },
+        "cache_hit_rate_pct": round(cache_hit_rate, 1),
+        "por_modelo": desglose,
+    }

@@ -404,3 +404,37 @@ class AICacheRecord(Base):
     __table_args__ = (
         Index("ix_aicache_clave_creado", "clave", "creado_en"),
     )
+
+
+class AICallRecord(Base):
+    """Historial de cada llamada a Anthropic / Groq con métricas (R55 P2).
+
+    Permite calcular costo total del día/semana/mes, latencia p50/p95,
+    cache hit rate efectivo, identificar glosas que dispararon Opus por
+    error, etc. — sin depender de parsear logs externos.
+
+    Granularidad: 1 fila por call al LLM. En una glosa puede haber
+    múltiples filas (LLM principal + retry + check riesgo). El campo
+    glosa_id (nullable) permite trazar de vuelta cuando aplica.
+    """
+    __tablename__ = "ai_calls"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proveedor = Column(String(20), nullable=False)        # 'anthropic' | 'groq'
+    modelo = Column(String(80), nullable=False)           # 'claude-sonnet-4-6' | 'llama-3.3-70b'
+    latency_ms = Column(Integer, default=0, nullable=False)
+    input_tokens = Column(Integer, default=0, nullable=False)
+    cache_creation_input_tokens = Column(Integer, default=0, nullable=False)
+    cache_read_input_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
+    # Costo USD almacenado pre-calculado (Float es suficiente — los valores
+    # típicos están entre $0.0001 y $0.10 por call).
+    cost_usd = Column(Float, default=0.0, nullable=False)
+    # Trazabilidad opcional
+    glosa_id = Column(Integer, nullable=True, index=True)
+    user_email = Column(String(200), nullable=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    __table_args__ = (
+        Index("ix_aicalls_proveedor_creado", "proveedor", "creado_en"),
+    )

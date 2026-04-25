@@ -83,6 +83,29 @@ def _log_metricas_anthropic(usage: dict, modelo: str, latencia_ms: int) -> None:
         f"in={inp}t cache_w={cwrite}t cache_r={cread}t out={out}t "
         f"cost_usd=${costo:.6f} cache_hit_pct={cache_hit_pct:.1f}"
     )
+    # R55 P2: persistir en tabla ai_calls para agregaciones históricas.
+    # Try/except defensivo: un fallo de BD jamás debe romper la respuesta
+    # IA (la métrica es secundaria al producto).
+    try:
+        from app.database import SessionLocal
+        from app.models.db import AICallRecord
+        db = SessionLocal()
+        try:
+            db.add(AICallRecord(
+                proveedor="anthropic",
+                modelo=modelo,
+                latency_ms=int(latencia_ms or 0),
+                input_tokens=inp,
+                cache_creation_input_tokens=cwrite,
+                cache_read_input_tokens=cread,
+                output_tokens=out,
+                cost_usd=costo,
+            ))
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[ANTHROPIC-CALL] no se pudo persistir métrica: {e}")
 _CACHE_TTL = 3600
 # Lock para evitar races cuando N requests concurrentes tocan la misma clave.
 # TTLCache NO es thread-safe por default; con 10 usuarios paralelos escribiendo
