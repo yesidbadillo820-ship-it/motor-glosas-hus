@@ -13,6 +13,76 @@ from app.core.logging_utils import logger
 from app.services.glosa_ia_prompts import get_system_prompt, build_user_prompt
 
 _CACHE_IA: TTLCache = TTLCache(maxsize=500, ttl=3600)
+
+
+# ─── R54 P3: tarifas Anthropic (USD por millón de tokens) ───────────────
+# Fuente: https://docs.anthropic.com/en/docs/about-claude/pricing
+# Se actualizan manualmente cuando Anthropic cambia precios.
+# Cache READ es 10% del precio de input normal (oferta estándar Anthropic).
+# Cache WRITE 5min: 1.25× input. WRITE 1h (extended-cache-ttl): 2× input.
+_TARIFAS_ANTHROPIC_USD_POR_MTOK = {
+    # Familia Sonnet 4.x
+    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
+    "claude-sonnet-4-5": {"input": 3.0, "output": 15.0},
+    "claude-sonnet-4-7": {"input": 3.0, "output": 15.0},
+    # Familia Opus 4.x
+    "claude-opus-4-6": {"input": 15.0, "output": 75.0},
+    "claude-opus-4-7": {"input": 15.0, "output": 75.0},
+    # Familia Haiku
+    "claude-haiku-4-5-20251001": {"input": 1.0, "output": 5.0},
+    # Default conservador
+    "_default": {"input": 3.0, "output": 15.0},
+}
+
+
+def _calcular_costo_anthropic_usd(usage: dict, modelo: str) -> float:
+    """Estima el costo USD de una llamada a Claude a partir del 'usage'.
+
+    Considera:
+      - input_tokens (precio normal)
+      - cache_creation_input_tokens (con TTL=1h, 2× del precio input)
+      - cache_read_input_tokens (10% del precio input)
+      - output_tokens (precio output)
+    """
+    if not isinstance(usage, dict):
+        return 0.0
+    tarifas = _TARIFAS_ANTHROPIC_USD_POR_MTOK.get(
+        modelo, _TARIFAS_ANTHROPIC_USD_POR_MTOK["_default"],
+    )
+    p_in = tarifas["input"]
+    p_out = tarifas["output"]
+    inp = usage.get("input_tokens", 0) or 0
+    cwrite = usage.get("cache_creation_input_tokens", 0) or 0
+    cread = usage.get("cache_read_input_tokens", 0) or 0
+    out = usage.get("output_tokens", 0) or 0
+    costo = (
+        (inp * p_in) + (cwrite * p_in * 2.0) + (cread * p_in * 0.1) + (out * p_out)
+    ) / 1_000_000.0
+    return round(costo, 6)
+
+
+def _log_metricas_anthropic(usage: dict, modelo: str, latencia_ms: int) -> None:
+    """Loggea SIEMPRE las métricas de un call a Anthropic en formato
+    estructurado y parseable. Permite agregaciones desde Sentry / Loki.
+
+    Formato:
+      [ANTHROPIC-CALL] model=X latency_ms=Y in=Yt cache_w=Yt cache_r=Yt
+                       out=Yt cost_usd=$0.012345 cache_hit_pct=NN.N
+    """
+    if not isinstance(usage, dict):
+        return
+    inp = usage.get("input_tokens", 0) or 0
+    cwrite = usage.get("cache_creation_input_tokens", 0) or 0
+    cread = usage.get("cache_read_input_tokens", 0) or 0
+    out = usage.get("output_tokens", 0) or 0
+    total_in = inp + cwrite + cread
+    cache_hit_pct = (cread / total_in * 100.0) if total_in else 0.0
+    costo = _calcular_costo_anthropic_usd(usage, modelo)
+    logger.info(
+        f"[ANTHROPIC-CALL] model={modelo} latency_ms={latencia_ms} "
+        f"in={inp}t cache_w={cwrite}t cache_r={cread}t out={out}t "
+        f"cost_usd=${costo:.6f} cache_hit_pct={cache_hit_pct:.1f}"
+    )
 _CACHE_TTL = 3600
 # Lock para evitar races cuando N requests concurrentes tocan la misma clave.
 # TTLCache NO es thread-safe por default; con 10 usuarios paralelos escribiendo
@@ -1892,6 +1962,11 @@ class GlosaService:
         if usar_cache:
             _headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11"
 
+        # R54 P3: medir latencia y costo de cada call para observabilidad.
+        # Usamos time.monotonic() (no afecta a wall clock changes).
+        import time as _time
+        _t_inicio = _time.monotonic()
+
         ultimo_error = None
         for intento in range(3):
             try:
@@ -1912,13 +1987,10 @@ class GlosaService:
                     data = resp.json()
                     if "content" in data and data["content"]:
                         usage = data.get("usage", {})
-                        cache_read = usage.get("cache_read_input_tokens", 0)
-                        cache_write = usage.get("cache_creation_input_tokens", 0)
-                        if cache_read or cache_write:
-                            logger.info(
-                                f"[ANTHROPIC-CACHE] read={cache_read}t write={cache_write}t "
-                                f"normal={usage.get('input_tokens', 0)}t output={usage.get('output_tokens', 0)}t"
-                            )
+                        latencia_ms = int((_time.monotonic() - _t_inicio) * 1000)
+                        _log_metricas_anthropic(
+                            usage, self.anthropic_model, latencia_ms,
+                        )
                         return data["content"][0]["text"], f"anthropic/{self.anthropic_model}"
                     err = data.get("error", {}).get("message", str(data)[:300])
                     # Si es error 529 (overloaded) o 429 (rate limit), reintentar
