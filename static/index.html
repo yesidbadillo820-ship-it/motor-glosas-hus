@@ -1528,6 +1528,27 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div class="chart-card full"><div class="chart-hdr">Tendencia de Recuperación Mensual</div><canvas id="ch-trend" style="max-height:180px"></canvas></div>
         </div>
 
+        <!-- R55 P4: Métricas IA — costo, latencia, cache hit -->
+        <div id="metricas-ia-block" style="background:var(--card-bg, #fff);border:1px solid var(--border);border-radius:8px;padding:1rem 1.25rem;margin-top:1rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem;">
+            <div>
+              <div style="font-weight:700;color:#1e40af;font-size:.95rem;">Métricas de IA · costos y latencia</div>
+              <div style="font-size:.75rem;color:var(--text3);">Llamadas a Claude (Anthropic) — agregaciones desde la tabla ai_calls</div>
+            </div>
+            <div style="display:flex;gap:.4rem;align-items:center;">
+              <select id="mia-ventana" onchange="cargarMetricasIa()" style="padding:.3rem .5rem;font-size:.78rem;">
+                <option value="1">Últimas 24h</option>
+                <option value="7">Última semana</option>
+                <option value="30">Último mes</option>
+              </select>
+              <button class="btn btn-ghost" onclick="cargarMetricasIa()" style="font-size:.78rem;padding:.3rem .7rem;">Actualizar</button>
+            </div>
+          </div>
+          <div id="mia-contenido" style="font-size:.85rem;color:var(--text3);text-align:center;padding:1rem;">
+            Cargando métricas…
+          </div>
+        </div>
+
         <div class="analitica-block">
           <div class="analitica-hdr">
             <div>
@@ -4184,6 +4205,100 @@ async function consultarNormativa(){
     });
   });
 })();
+
+
+// ─── R55 P4: Dashboard de métricas IA ────────────────────────────────
+// Consume GET /sistema/metricas-ia?dias=N. Solo coordinador/admin.
+// Falla silenciosa: si el usuario no tiene permiso, oculta el bloque.
+async function cargarMetricasIa(){
+  var sel = document.getElementById('mia-ventana');
+  var dias = sel ? sel.value : '1';
+  var cont = document.getElementById('mia-contenido');
+  if(!cont) return;
+  cont.innerHTML = '<div style="padding:.5rem;color:var(--text3);">Cargando…</div>';
+  try{
+    var r = await fetch('/sistema/metricas-ia?dias=' + dias, { headers: authH() });
+    if(r.status === 403){
+      // Usuario sin permiso: oculta todo el bloque para no mostrar error
+      var blk = document.getElementById('metricas-ia-block');
+      if(blk) blk.style.display = 'none';
+      return;
+    }
+    if(!r.ok){
+      cont.innerHTML = '<div style="color:#dc2626;padding:.5rem;">Error ' + r.status + '</div>';
+      return;
+    }
+    var d = await r.json();
+    if(d.total_calls === 0){
+      cont.innerHTML = '<div style="color:var(--text3);padding:.8rem;text-align:center;">'
+                     + 'No hay llamadas a Anthropic registradas en esta ventana.<br>'
+                     + '<span style="font-size:.72rem;">Las métricas se acumulan automáticamente con cada análisis.</span>'
+                     + '</div>';
+      return;
+    }
+    var cost = (d.cost_usd_total || 0).toFixed(4);
+    var prom = (d.cost_usd_promedio || 0).toFixed(5);
+    var hit = (d.cache_hit_rate_pct || 0).toFixed(1);
+    var lat = d.latency_ms || {};
+    // KPI strip
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.7rem;">';
+    html += _miaKpi('Llamadas', d.total_calls, '#1e40af');
+    html += _miaKpi('Costo total', '$' + cost, '#0f766e');
+    html += _miaKpi('Costo / call', '$' + prom, '#7c3aed');
+    html += _miaKpi('Cache hit', hit + '%', hit > 50 ? '#16a34a' : (hit > 20 ? '#f59e0b' : '#dc2626'));
+    html += _miaKpi('Latencia p50', (lat.p50 || 0) + ' ms', '#475569');
+    html += _miaKpi('Latencia p95', (lat.p95 || 0) + ' ms', (lat.p95 > 5000 ? '#dc2626' : '#475569'));
+    html += '</div>';
+    // Desglose por modelo
+    if(d.por_modelo && d.por_modelo.length){
+      html += '<div style="margin-top:.9rem;">';
+      html += '<div style="font-weight:700;font-size:.78rem;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem;">Desglose por modelo</div>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:.78rem;">';
+      html += '<thead><tr style="border-bottom:2px solid var(--border);color:var(--text3);">'
+            + '<th style="text-align:left;padding:.35rem .5rem;">Modelo</th>'
+            + '<th style="text-align:right;padding:.35rem .5rem;">Calls</th>'
+            + '<th style="text-align:right;padding:.35rem .5rem;">Costo USD</th>'
+            + '<th style="text-align:right;padding:.35rem .5rem;">Tokens</th>'
+            + '</tr></thead><tbody>';
+      d.por_modelo.forEach(function(m){
+        html += '<tr style="border-bottom:1px solid var(--border);">'
+              + '<td style="padding:.35rem .5rem;font-family:ui-monospace,monospace;color:#1e40af;">' + escHtml(m.modelo || '?') + '</td>'
+              + '<td style="text-align:right;padding:.35rem .5rem;font-variant-numeric:tabular-nums;">' + m.calls + '</td>'
+              + '<td style="text-align:right;padding:.35rem .5rem;font-variant-numeric:tabular-nums;font-weight:700;">$' + (m.cost_usd || 0).toFixed(4) + '</td>'
+              + '<td style="text-align:right;padding:.35rem .5rem;font-variant-numeric:tabular-nums;color:var(--text3);">' + (m.tokens_total || 0).toLocaleString() + '</td>'
+              + '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    cont.innerHTML = html;
+  }catch(e){
+    cont.innerHTML = '<div style="color:#dc2626;padding:.5rem;">Conexión: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function _miaKpi(label, valor, color){
+  return '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:.6rem .7rem;">'
+       + '<div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;">' + label + '</div>'
+       + '<div style="font-size:1.15rem;font-weight:700;color:' + color + ';margin-top:.2rem;font-variant-numeric:tabular-nums;">' + valor + '</div>'
+       + '</div>';
+}
+
+// Auto-cargar al entrar al panel dashboard
+document.addEventListener('DOMContentLoaded', function(){
+  // Hook al click del tab dashboard del sidebar para cargar las métricas
+  var hooked = false;
+  document.querySelectorAll('.sn-item').forEach(function(b){
+    if(b.getAttribute('data-tip') === 'Dashboard'){
+      b.addEventListener('click', function(){
+        if(!hooked){
+          // Cargar inicial cuando se abre por primera vez
+          setTimeout(cargarMetricasIa, 300);
+          hooked = true;
+        }
+      });
+    }
+  });
+});
 
 
 async function listarNormas(){
