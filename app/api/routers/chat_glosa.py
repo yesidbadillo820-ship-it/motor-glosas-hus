@@ -161,7 +161,6 @@ async def enviar_mensaje(
         # Delegamos al refinar. Usamos el mensaje tal cual como instrucción.
         try:
             from app.services.glosa_service import GlosaService
-            from app.api.deps import get_glosa_service as _get_svc
             # Construir servicio manualmente (no tenemos Depends en este contexto)
             from app.core.config import get_settings
             cfg = get_settings()

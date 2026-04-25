@@ -102,7 +102,7 @@ def buscar_cups(
     # Prioridad 5: homologador explícito (solo para códigos)
     if _is_codigo(q_clean) and len(resultados) < limite:
         try:
-            from app.services.homologador_cups import HOMOLOGACIONES_EXPLICITAS, homologar_cups
+            from app.services.homologador_cups import homologar_cups
             homo = homologar_cups(q_clean, db=db, eps=eps)
             if homo and homo.get("cups_oficial"):
                 # Buscar tarifa del cups_oficial si no lo agregamos ya
