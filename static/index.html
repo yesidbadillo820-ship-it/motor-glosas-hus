@@ -1428,6 +1428,14 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <label>Descripción / Texto de la Glosa</label>
               <textarea id="f-glosa" rows="7" placeholder="Pegue aquí el texto completo de la glosa tal como aparece en el formato de la EPS. Incluya código, descripción, valores y justificación de la EPS..."></textarea>
             </div>
+            <div class="field" style="margin-top:.4rem;">
+              <label style="display:flex;align-items:center;gap:.4rem;">
+                <span>Buscador rápido de CUPS</span>
+                <span style="font-size:.7rem;color:var(--text3);font-weight:400;">por descripción del procedimiento (ej: "hemograma", "TAC cráneo")</span>
+              </label>
+              <input type="text" id="cups-buscador-input" placeholder='Escriba el procedimiento y se autocompleta el código CUPS 2025...' autocomplete="off" style="font-size:.85rem;" />
+              <div id="cups-buscador-sugerencias" style="display:none;margin-top:.3rem;border:1px solid var(--border);border-radius:6px;background:var(--card-bg, #fff);max-height:240px;overflow-y:auto;"></div>
+            </div>
             <div class="field">
               <label>Soportes PDF <span style="font-weight:400;color:var(--text3)">(hasta 10 archivos, 15MB c/u)</span></label>
               <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
@@ -4079,6 +4087,104 @@ async function consultarNormativa(){
     cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>';
   }
 }
+
+
+// ─── R54 P1: Autocompletado CUPS por descripción en el formulario ──────
+// Llama a /cups/sugerencias/por-descripcion con debounce 250ms y muestra
+// hasta 8 sugerencias clicables. Al clickar inserta el código + descripción
+// al final del textarea de la glosa (NO reemplaza para no perder lo escrito).
+(function initCupsAutocomplete(){
+  var debounceTimer = null;
+  var ultimoQuery = '';
+
+  function pintarSugerencias(items){
+    var box = document.getElementById('cups-buscador-sugerencias');
+    if(!box) return;
+    if(!items || items.length === 0){
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+    var html = '';
+    items.forEach(function(s){
+      var cup = (s.cups_oficial || '').replace(/[^A-Z0-9-]/gi, '');
+      var desc = (s.descripcion || '').replace(/</g, '&lt;');
+      html += '<div class="cups-sugerencia-item" data-cups="' + cup + '" data-desc="' + desc.replace(/"/g, '&quot;') + '" '
+            + 'style="padding:.55rem .7rem;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">'
+            + '<span style="font-family:ui-monospace,monospace;font-weight:700;color:#1e40af;">' + cup + '</span>'
+            + (typeof s.score === 'number' ? '<span style="font-size:.65rem;color:var(--text3);">' + s.score.toFixed(2) + '</span>' : '')
+            + '</div>'
+            + '<div style="font-size:.78rem;color:var(--text2);margin-top:.15rem;line-height:1.3;">' + desc + '</div>'
+            + '</div>';
+    });
+    box.innerHTML = html;
+    box.style.display = 'block';
+    // Hover + click → insertar al textarea
+    Array.prototype.forEach.call(box.querySelectorAll('.cups-sugerencia-item'), function(el){
+      el.addEventListener('mouseenter', function(){ el.style.background = '#eff6ff'; });
+      el.addEventListener('mouseleave', function(){ el.style.background = ''; });
+      el.addEventListener('click', function(){
+        var cup = el.getAttribute('data-cups');
+        var desc = el.getAttribute('data-desc');
+        var textarea = document.getElementById('f-glosa');
+        if(textarea){
+          var prev = textarea.value || '';
+          var sep = (prev && !prev.endsWith('\n')) ? '\n' : '';
+          textarea.value = prev + sep + 'CUPS ' + cup + ' — ' + desc;
+          textarea.focus();
+        }
+        // Cerrar dropdown y limpiar el input
+        box.style.display = 'none';
+        var inp = document.getElementById('cups-buscador-input');
+        if(inp) inp.value = '';
+        if(typeof toast === 'function') toast('CUPS insertado', cup + ' — ' + desc.slice(0, 60), 'success');
+      });
+    });
+  }
+
+  async function buscarCups(query){
+    var box = document.getElementById('cups-buscador-sugerencias');
+    if(!query || query.trim().length < 2){
+      if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+      return;
+    }
+    if(query === ultimoQuery) return;
+    ultimoQuery = query;
+    try{
+      var r = await fetch('/cups/sugerencias/por-descripcion?q=' + encodeURIComponent(query) + '&limite=8',
+                          { headers: authH() });
+      if(!r.ok) return;
+      var data = await r.json();
+      pintarSugerencias(data.sugerencias || []);
+    }catch(e){ /* silent: es solo un autocompletado */ }
+  }
+
+  // Listener con debounce
+  document.addEventListener('DOMContentLoaded', function(){
+    var inp = document.getElementById('cups-buscador-input');
+    if(!inp) return;
+    inp.addEventListener('input', function(){
+      var v = inp.value;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function(){ buscarCups(v); }, 250);
+    });
+    // Cerrar dropdown al perder foco (con un pequeño delay para que el click se registre)
+    inp.addEventListener('blur', function(){
+      setTimeout(function(){
+        var box = document.getElementById('cups-buscador-sugerencias');
+        if(box) box.style.display = 'none';
+      }, 200);
+    });
+    // Reabrir al hacer focus si hay valor
+    inp.addEventListener('focus', function(){
+      if(inp.value && inp.value.trim().length >= 2){
+        buscarCups(inp.value);
+      }
+    });
+  });
+})();
+
 
 async function listarNormas(){
   var cont = document.getElementById('cn-resultados');
