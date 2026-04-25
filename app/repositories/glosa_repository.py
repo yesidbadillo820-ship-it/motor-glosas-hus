@@ -5,6 +5,39 @@ from app.models.db import GlosaRecord
 from app.models.schemas import AnalyticsResult
 
 
+def buscar_duplicados_factura(
+    db: Session,
+    numero_factura: str,
+    eps: Optional[str] = None,
+    limite: int = 5,
+) -> list[GlosaRecord]:
+    """R58 P1: busca glosas previamente registradas con la misma factura.
+
+    Útil para detectar uploads duplicados (caso típico: dos gestores
+    cargando la misma factura, o el mismo gestor recargando). El match
+    es exacto sobre numero_factura tras strip+upper. Si se pasa eps,
+    filtra solo coincidencias dentro de esa EPS.
+
+    Retorna lista ordenada por creado_en DESC (más reciente primero),
+    limitada a `limite` resultados. Lista vacía si no hay duplicados.
+    """
+    factura_norm = (numero_factura or "").strip().upper()
+    if not factura_norm or len(factura_norm) < 3:
+        # Inputs vacíos o demasiado cortos no se consideran (riesgo de
+        # falsos positivos al match con cadenas genéricas tipo "N/A").
+        return []
+    q = db.query(GlosaRecord).filter(
+        func.upper(func.trim(GlosaRecord.factura)) == factura_norm,
+    )
+    if eps:
+        q = q.filter(GlosaRecord.eps == eps.strip().upper())
+    return (
+        q.order_by(GlosaRecord.creado_en.desc())
+        .limit(max(1, int(limite)))
+        .all()
+    )
+
+
 class GlosaRepository:
     def __init__(self, db: Session):
         self.db = db
