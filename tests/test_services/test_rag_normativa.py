@@ -108,3 +108,41 @@ def test_buscar_boost_cita_literal():
     assert len(r) >= 1
     # La primera debería ser Ley 1438 (por boost ×2)
     assert "1438" in r[0]["clave"]
+
+
+# ─── Ronda 50 Paso 11: nuevas sentencias indexadas ──────────────────────
+
+def test_sentencia_t235_historia_clinica_indexada():
+    """T-235/1998 debe estar disponible para defensas SO0101."""
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert "SENTENCIA T-235 DE 1998" in _TODAS_LAS_NORMAS
+
+
+def test_sentencia_su480_urgencias_indexada():
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert "SENTENCIA SU-480 DE 1997" in _TODAS_LAS_NORMAS
+
+
+def test_sentencia_t313_silencio_positivo_indexada():
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert "SENTENCIA T-313 DE 2007" in _TODAS_LAS_NORMAS
+
+
+def test_consejo_estado_silencio_positivo_indexado():
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+    assert "CONSEJO_ESTADO_2018_00154" in _TODAS_LAS_NORMAS
+
+
+def test_buscar_silencio_positivo_devuelve_jurisprudencia():
+    from app.services.rag_normativa import buscar_normas
+    r = buscar_normas("silencio positivo levantamiento tácito glosa", top_k=5)
+    claves = [d["clave"] for d in r]
+    # Debe devolver Consejo de Estado 2018-00154 o Sentencia T-313/2007
+    assert any("CONSEJO_ESTADO" in c or "T-313" in c for c in claves)
+
+
+def test_buscar_historia_clinica_devuelve_T235_y_Res1995():
+    from app.services.rag_normativa import buscar_normas
+    r = buscar_normas("historia clínica institucional plena prueba soporte", top_k=5)
+    claves_str = " ".join([d["clave"] for d in r])
+    assert "T-235" in claves_str or "1995" in claves_str
