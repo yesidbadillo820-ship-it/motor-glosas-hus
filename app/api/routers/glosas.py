@@ -389,7 +389,7 @@ def exportar_xlsx(
             ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"CERRADA")'], fill=fill_verde))
             ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"RATIFICADA")'], fill=fill_rojo))
             ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"EXTEMPORANEA")'], fill=fill_amarillo))
-    except Exception as _e:
+    except Exception:
         # Sin formato condicional el Excel sigue siendo válido.
         pass
 
@@ -951,7 +951,7 @@ def facturas_pendientes_agrupadas(
     equipo.
     """
     from app.models.db import GlosaRecord as _GR
-    from sqlalchemy import func as _func, or_ as _or
+    from sqlalchemy import or_ as _or
     repo = GlosaRepository(db)
     # Filtrar por gestor/equipo (igual que mis-asignaciones)
     equipo = getattr(current_user, "equipo", None)

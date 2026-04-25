@@ -44,7 +44,8 @@ from app.services.glosa_ia_prompts import get_contrato
 
 # Ronda 50 Paso 9: parsers extraídos a app/utils/parsers_glosa.py
 # para reducir main.py de 1757 → 1280 líneas.
-from app.utils.parsers_glosa import (  # noqa: E402,F401
+# Re-exports para otros módulos (`from app.main import _extraer_cups_servicio`)
+from app.utils.parsers_glosa import (
     _detectar_servicio_desde_texto,
     _extraer_motivo_glosa,
     _concepto_glosa,
@@ -53,6 +54,18 @@ from app.utils.parsers_glosa import (  # noqa: E402,F401
     _extraer_cups_servicio,
     _descripcion_servicio,
 )
+
+# __all__ declara los nombres públicos del módulo — pyflakes y otras
+# herramientas reconocen los re-exports como "usados" para este fin.
+__all__ = [
+    "_detectar_servicio_desde_texto",
+    "_extraer_motivo_glosa",
+    "_concepto_glosa",
+    "_extraer_valores_glosa",
+    "_generar_banner_tarifa_html",
+    "_extraer_cups_servicio",
+    "_descripcion_servicio",
+]
 
 
 logging.basicConfig(level=logging.INFO)

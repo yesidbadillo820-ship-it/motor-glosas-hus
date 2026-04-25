@@ -52,7 +52,7 @@ _SINONIMOS_DOMINIO: dict[str, list[str]] = {
     "objecion": ["glosa", "reparo"],
     "glosas": ["objeciones", "reparos"],
     "factura": ["cobro", "facturacion"],
-    "factura": ["cobro", "facturacion"],
+    "facturas": ["cobros", "facturaciones"],
     "soporte": ["documento", "anexo"],
     "historia": ["clinica", "epicrisis", "registro"],
     "tarifa": ["valor", "precio", "pactado"],
