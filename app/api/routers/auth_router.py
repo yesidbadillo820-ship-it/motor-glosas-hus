@@ -6,6 +6,7 @@ from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import UsuarioRecord
 from app.models.schemas import TokenResponse, CambiarPasswordRequest
@@ -27,8 +28,18 @@ async def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     cfg = get_settings()
+    # IP del cliente para auditoría de seguridad. Se loguea en TODOS los
+    # outcomes (éxito, password incorrecto, 2FA fallido) para detectar
+    # patrones de brute-force en logs centralizados / Sentry.
+    ip_cliente = get_remote_address(request)
+    email_intento = (form_data.username or "").strip().lower()
+
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        logger.warning(
+            f"[AUTH-FAIL] Intento de login con credenciales inválidas | "
+            f"email={email_intento!r} | ip={ip_cliente}"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos",
@@ -38,6 +49,9 @@ async def login_for_access_token(
     # 2FA TOTP: si el usuario tiene activo el 2FA, exigir código válido
     if user.totp_activo and user.totp_secret:
         if not totp:
+            logger.info(
+                f"[AUTH-2FA] Solicitud 2FA pendiente | email={user.email} | ip={ip_cliente}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="2FA requerido: envía el campo 'totp' con el código de 6 dígitos",
@@ -45,6 +59,9 @@ async def login_for_access_token(
             )
         import pyotp
         if not pyotp.TOTP(user.totp_secret).verify(totp.strip(), valid_window=1):
+            logger.warning(
+                f"[AUTH-2FA-FAIL] Código 2FA inválido | email={user.email} | ip={ip_cliente}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Código 2FA inválido. Verifica la hora de tu dispositivo.",
@@ -53,6 +70,9 @@ async def login_for_access_token(
     access_token_expires = timedelta(minutes=cfg.access_token_expire_minutes)
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    logger.info(
+        f"[AUTH-OK] Login exitoso | email={user.email} | rol={user.rol} | ip={ip_cliente}"
     )
     return {
         "access_token": access_token,
