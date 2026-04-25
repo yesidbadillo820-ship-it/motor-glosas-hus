@@ -83,10 +83,12 @@ def _log_metricas_anthropic(usage: dict, modelo: str, latencia_ms: int) -> None:
         f"in={inp}t cache_w={cwrite}t cache_r={cread}t out={out}t "
         f"cost_usd=${costo:.6f} cache_hit_pct={cache_hit_pct:.1f}"
     )
-    # R55 P2: persistir en tabla ai_calls para agregaciones históricas.
+    # R55 P2 + R56 P1: persistir en ai_calls + atribución a usuario/glosa
+    # vía ContextVars (sin acoplar firma del helper a la cadena de llamadas).
     # Try/except defensivo: un fallo de BD jamás debe romper la respuesta
-    # IA (la métrica es secundaria al producto).
+    # IA — la métrica es secundaria al producto.
     try:
+        from app.core.logging_utils import glosa_id_var, user_email_var
         from app.database import SessionLocal
         from app.models.db import AICallRecord
         db = SessionLocal()
@@ -100,6 +102,8 @@ def _log_metricas_anthropic(usage: dict, modelo: str, latencia_ms: int) -> None:
                 cache_read_input_tokens=cread,
                 output_tokens=out,
                 cost_usd=costo,
+                user_email=(user_email_var.get() or None),
+                glosa_id=glosa_id_var.get(),
             ))
             db.commit()
         finally:

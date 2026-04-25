@@ -7,6 +7,14 @@ from contextvars import ContextVar
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
+# R56 P1: trazabilidad request-scoped del usuario para que cualquier
+# servicio (incluido glosa_service) pueda atribuir métricas al usuario
+# sin tener que pasar el email a través de toda la cadena de llamadas.
+user_email_var: ContextVar[str] = ContextVar("user_email", default="")
+# glosa_id se setea cuando se crea la glosa en BD; calls IA posteriores
+# del mismo request lo heredan automáticamente.
+glosa_id_var: ContextVar[Optional[int]] = ContextVar("glosa_id", default=None)
+
 class StructuredFormatter(logging.Formatter):
     def format(self, record):
         log_obj = {

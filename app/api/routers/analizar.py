@@ -405,6 +405,11 @@ async def _persistir_y_responder(
         )
 
     logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")
+    # R56 P1: ahora que la glosa existe en BD, los siguientes calls IA
+    # de este request quedan trazados a su id (caso de glosas que disparen
+    # un análisis adicional, ej. evaluación de riesgo).
+    from app.core.logging_utils import glosa_id_var
+    glosa_id_var.set(glosa.id)
 
     resultado.tipo = tipo_final
     resultado.dictamen = dictamen_final
@@ -457,6 +462,11 @@ async def analizar(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     req_id = set_request_id()
+    # R56 P1: trazar el call IA al usuario via ContextVar.
+    # glosa_id se setea más tarde, en _persistir_y_responder cuando ya
+    # existe la fila en BD.
+    from app.core.logging_utils import user_email_var
+    user_email_var.set(current_user.email or "")
     logger.info(
         f"[{req_id}] Análisis solicitado por: {current_user.email} | "
         f"eps={eps} | tono={tono} | modo={modo_respuesta}"
