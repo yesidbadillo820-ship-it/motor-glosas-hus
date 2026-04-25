@@ -20,7 +20,9 @@ class GlosaInput(BaseModel):
         return v
 
     valor_aceptado: str       = Field(default="0")
-    tabla_excel: str          = Field(..., min_length=3,
+    # R55 P1: max_length para evitar payloads abusivos (50KB es 5x más
+    # de lo que ocupa una glosa real bien detallada).
+    tabla_excel: str          = Field(..., min_length=3, max_length=50_000,
                                       description="Texto copiado de la glosa en Excel")
     # NUEVOS: campos exigidos por Resolución 3047/2008 para trazabilidad
     numero_factura:   Optional[str] = Field(default=None, max_length=50,
@@ -30,7 +32,7 @@ class GlosaInput(BaseModel):
     # Tono de la respuesta: conciliador (default), neutral o firme
     tono: Optional[str] = Field(default="conciliador", max_length=20,
                                 description="Tono de la respuesta: conciliador | neutral | firme")
-    # Modo de respuesta por concepto (Sprint 1):
+    # Modo de respuesta por concepto:
     #   "defender"       → argumento IA completo (default)
     #   "aceptar_total"  → RE9702, sin IA, plantilla corta
     #   "aceptar_parcial"→ RE9801, argumento IA sobre la diferencia + aceptacion parcial
@@ -55,6 +57,29 @@ class GlosaInput(BaseModel):
     def valor_solo_numeros(cls, v: str) -> str:
         cleaned = re.sub(r"[^\d]", "", v)
         return cleaned or "0"
+
+    # R55 P1: validators de enumeración para tono y modo_respuesta.
+    # Si el cliente envía un valor desconocido, fallback al default
+    # silenciosamente (no romper la request, solo prevenir injection).
+    @field_validator("tono", mode="before")
+    @classmethod
+    def tono_valido(cls, v):
+        if not v:
+            return "conciliador"
+        v_norm = str(v).strip().lower()
+        if v_norm in ("conciliador", "neutral", "firme"):
+            return v_norm
+        return "conciliador"
+
+    @field_validator("modo_respuesta", mode="before")
+    @classmethod
+    def modo_valido(cls, v):
+        if not v:
+            return "defender"
+        v_norm = str(v).strip().lower()
+        if v_norm in ("defender", "aceptar_total", "aceptar_parcial"):
+            return v_norm
+        return "defender"
 
     @model_validator(mode="after")
     def fechas_coherentes(self) -> GlosaInput:
