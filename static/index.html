@@ -1450,6 +1450,15 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <button class="btn btn-primary" id="btn-analizar" onclick="analizar()" style="width:100%">
             Analizar con IA
           </button>
+          <!-- R59 P4: botón modo Auditoría Previa (diagnóstico neutral) -->
+          <button id="btn-auditoria"
+                  type="button"
+                  onclick="analizar('auditoria_previa')"
+                  title="La IA NO redacta dictamen 'ESE HUS NO ACEPTA…'. En su lugar genera un diagnóstico neutral con hallazgos, riesgos y recomendación. Útil cuando aún no decides defender o aceptar."
+                  style="width:100%;margin-top:.5rem;padding:.55rem;background:#fff;color:#1e40af;border:1px solid #1e40af;border-radius:6px;font-weight:600;font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.4rem;">
+            <span style="font-size:1rem;">📊</span>
+            <span>Auditoría previa (diagnóstico neutral)</span>
+          </button>
         </div>
       </div>
       <div class="result-area" id="result-area">
@@ -6600,14 +6609,20 @@ async function loadContratos(){
 }
 
 // ─── ANALIZAR ─────────────────────────────────────────────────────────────
-async function analizar(){
+async function analizar(modoOverride){
   var eps=document.getElementById('eps-sel').value;
   var glosa=document.getElementById('f-glosa').value.trim();
   if(!eps){toast('Campo requerido','Seleccione la EPS','warning');return;}
   if(glosa.length<15){toast('Campo requerido','Ingrese la descripción completa de la glosa (mínimo 15 caracteres)','warning');return;}
 
+  // R59 P4: bloquea ambos botones (defender + auditoría) para evitar
+  // doble click y feedback visual coherente
   var btn=document.getElementById('btn-analizar');
+  var btnAud=document.getElementById('btn-auditoria');
   btn.disabled=true;
+  if(btnAud) btnAud.disabled=true;
+  // Re-habilitador unificado — usar al volver de cada rama early-return
+  function _rehab(){ btn.disabled=false; if(btnAud) btnAud.disabled=false; }
   showLoading();
 
   var fd=new FormData();
@@ -6620,10 +6635,15 @@ async function analizar(){
   fd.append('numero_factura',document.getElementById('f-factura').value||'');
   fd.append('numero_radicado',document.getElementById('f-radicado').value||'');
   fd.append('tono',document.getElementById('tono-v').value||'conciliador');
-  // Modo de respuesta por concepto (Sprint 1). Si estamos analizando un
-  // concepto del cual el usuario marcó "aceptar_total" o "aceptar_parcial",
-  // el backend usa la plantilla correspondiente (RE9702 o RE9801).
-  if(window._concepto_modo_actual){
+  // R59 P4: si el usuario presionó "Auditoría previa", modoOverride
+  // toma precedencia sobre el modo por concepto. Es una acción global
+  // sobre la glosa, no por código.
+  if(modoOverride){
+    fd.append('modo_respuesta', modoOverride);
+  } else if(window._concepto_modo_actual){
+    // Modo de respuesta por concepto (Sprint 1). Si estamos analizando un
+    // concepto del cual el usuario marcó "aceptar_total" o "aceptar_parcial",
+    // el backend usa la plantilla correspondiente (RE9702 o RE9801).
     fd.append('modo_respuesta', window._concepto_modo_actual);
   }
   if(window._concepto_valor_parcial){
@@ -6633,17 +6653,17 @@ async function analizar(){
   var files=document.getElementById('f-pdf').files;
   if(files.length > 10){
     toast('Demasiados archivos','Máximo 10 soportes por glosa. Seleccionaste '+files.length,'error');
-    hideLoading();btn.disabled=false;return;
+    hideLoading();_rehab();return;
   }
   var tamTotal = 0;
   for(var i=0;i<files.length;i++){
-    if(files[i].size>15*1024*1024){toast('Archivo muy grande',files[i].name+' supera 15MB','error');hideLoading();btn.disabled=false;return;}
+    if(files[i].size>15*1024*1024){toast('Archivo muy grande',files[i].name+' supera 15MB','error');hideLoading();_rehab();return;}
     tamTotal += files[i].size;
     fd.append('archivos',files[i]);
   }
   if(tamTotal > 80*1024*1024){
     toast('Tamaño total excesivo','La suma de archivos supera 80MB','error');
-    hideLoading();btn.disabled=false;return;
+    hideLoading();_rehab();return;
   }
 
   try{
@@ -6652,7 +6672,7 @@ async function analizar(){
     if(!r.ok){
       var er=await r.json().catch(function(){return{detail:'Error desconocido'}});
       toast('Error en el análisis',er.detail||'Verifique los datos','error');
-      hideLoading();btn.disabled=false;return;
+      hideLoading();_rehab();return;
     }
     var d=await r.json();
     lastResult=d;
@@ -6662,7 +6682,7 @@ async function analizar(){
     toast('Error de conexión','No se pudo conectar con el servidor','error');
   }
   hideLoading();
-  btn.disabled=false;
+  _rehab();
 }
 
 function renderRiesgoRatificacion(r){
