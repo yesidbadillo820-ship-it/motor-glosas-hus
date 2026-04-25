@@ -52,10 +52,16 @@ class PdfService:
         except Exception as e:
             logger.warning(f"Fallo pdfplumber, usando PyPDF2 como respaldo: {e}")
             # Fallback con PyPDF2 (más rápido, útil si el PDF está corrupto para pdfplumber)
-            reader = PyPDF2.PdfReader(io.BytesIO(file_content))
-            for i in range(len(reader.pages)):
-                txt = reader.pages[i].extract_text() or ""
-                paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
+            try:
+                reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+                for i in range(len(reader.pages)):
+                    txt = reader.pages[i].extract_text() or ""
+                    paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
+            except Exception as e2:
+                # Si ambos fallan (archivo corrupto o no-PDF) devolvemos texto
+                # vacío en vez de propagar. El caller decide si pedir OCR.
+                logger.error(f"Fallo también PyPDF2: {e2}. Retornando vacío.")
+                return ""
 
         if not paginas:
             return ""
