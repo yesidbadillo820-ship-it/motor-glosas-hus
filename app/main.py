@@ -19,7 +19,6 @@ def fecha_hoy_espanol() -> str:
 
 from fastapi import FastAPI, Form, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -727,6 +726,12 @@ app.include_router(control_center_router)
 app.include_router(notificaciones_router)
 from app.api.routers.cups import router as cups_router
 app.include_router(cups_router)
+from app.api.routers.pwa import router as pwa_router
+app.include_router(pwa_router)
+from app.api.routers.pdf import router as pdf_router
+app.include_router(pdf_router)
+from app.api.routers.health import router as health_router
+app.include_router(health_router)
 
 
 def get_glosa_service() -> GlosaService:
@@ -1146,181 +1151,5 @@ async def analizar(
     return resultado
 
 
-_NO_STORE_HEADERS = {
-    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-    "Pragma": "no-cache",
-    "Expires": "0",
-}
 
 
-@app.get("/")
-def root():
-    # no-store a nivel servidor: sortea service workers viejos que sirven
-    # HTML cacheado. Esto es crítico cuando se despliegan cambios de UI.
-    return FileResponse("static/index.html", headers=_NO_STORE_HEADERS)
-
-
-@app.get("/manifest.webmanifest")
-def pwa_manifest():
-    return FileResponse("static/manifest.webmanifest", media_type="application/manifest+json")
-
-
-@app.get("/sw.js")
-def pwa_service_worker():
-    return FileResponse("static/sw.js", media_type="application/javascript")
-
-
-def _generar_icono_pwa(size: int) -> bytes:
-    """Genera un icono PWA cuadrado con el azul institucional y 'HUS'."""
-    from PIL import Image, ImageDraw, ImageFont
-    from io import BytesIO
-    img = Image.new("RGB", (size, size), "#0b5d8a")
-    draw = ImageDraw.Draw(img)
-    # Círculo de acento
-    pad = int(size * 0.08)
-    draw.ellipse([pad, pad, size - pad, size - pad], outline="#ffffff", width=max(2, size // 80))
-    # Texto "HUS"
-    try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", int(size * 0.42))
-    except Exception:
-        font = ImageFont.load_default()
-    texto = "HUS"
-    bbox = draw.textbbox((0, 0), texto, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    draw.text(((size - tw) // 2, (size - th) // 2 - int(size * 0.03)), texto, fill="#ffffff", font=font)
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue()
-
-
-@app.get("/icon-192.png")
-def icon_192():
-    from fastapi.responses import Response
-    return Response(content=_generar_icono_pwa(192), media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=86400"})
-
-
-@app.get("/icon-512.png")
-def icon_512():
-    from fastapi.responses import Response
-    return Response(content=_generar_icono_pwa(512), media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=86400"})
-
-
-@app.get("/importar-masiva")
-def importar_masiva():
-    return FileResponse("static/importar-masiva.html", headers=_NO_STORE_HEADERS)
-
-
-@app.get("/importar-recepcion")
-def importar_recepcion_page():
-    return FileResponse("static/importar-recepcion.html", headers=_NO_STORE_HEADERS)
-
-
-@app.get("/sw.js")
-def service_worker():
-    """El SW debe servirse SIEMPRE con no-store; si el navegador cachea sw.js
-    viejo, los clientes quedan pegados en una versión anterior."""
-    return FileResponse(
-        "static/sw.js",
-        media_type="application/javascript",
-        headers=_NO_STORE_HEADERS,
-    )
-
-
-@app.get("/reset-sw.html")
-def reset_sw():
-    """Página de emergencia que desregistra cualquier service worker viejo y
-    limpia el cache del navegador. Útil cuando un usuario queda pegado con
-    una UI vieja. Uso: abrir https://.../reset-sw.html y esperar 3 seg."""
-    from fastapi.responses import HTMLResponse
-    html = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Limpiando cache…</title>
-<style>body{font-family:sans-serif;max-width:600px;margin:80px auto;padding:20px;
-text-align:center;color:#1f2937}h1{color:#059669}.ok{color:#059669;font-size:48px}</style>
-</head><body>
-<h1>🧹 Limpiando caché del navegador…</h1>
-<p id="status">Procesando…</p>
-<script>
-(async () => {
-  const log = (msg) => document.getElementById('status').innerHTML += '<br>' + msg;
-  try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (const r of regs) { await r.unregister(); log('✓ SW desregistrado'); }
-    }
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      for (const k of keys) { await caches.delete(k); log('✓ Cache borrado: ' + k); }
-    }
-    log('<br><span class="ok">✅ Listo</span>');
-    log('<p>Redirigiendo a la aplicación en 2 segundos…</p>');
-    setTimeout(() => { location.href = '/'; }, 2000);
-  } catch (e) {
-    log('⚠ Error: ' + e.message);
-  }
-})();
-</script></body></html>"""
-    return HTMLResponse(content=html, headers=_NO_STORE_HEADERS)
-
-
-@app.get("/presentacion")
-def presentacion_ia():
-    """Presentación institucional del sistema IA (pública, sin login)."""
-    return FileResponse("static/presentacion-ia.html")
-
-
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "version": cfg.app_version,
-        "banner": (cfg.banner_capacitacion or "").strip(),
-    }
-
-
-@app.get("/debug/sentry-test", include_in_schema=False)
-def sentry_test(
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
-):
-    """Endpoint para verificar que Sentry captura errores.
-
-    Solo accesible por SUPER_ADMIN. Lanza una excepción intencional —
-    debería aparecer en el dashboard de Sentry a los pocos segundos.
-    """
-    if current_user.rol != "SUPER_ADMIN":
-        raise HTTPException(status_code=403, detail="Solo SUPER_ADMIN puede correr este test")
-    # Excepción intencional para verificar integración Sentry
-    raise RuntimeError(
-        f"[SENTRY_TEST] Test de integración disparado por {current_user.email} "
-        f"en {datetime.now().isoformat()}. Si ves este mensaje en Sentry, funciona correctamente."
-    )
-
-
-@app.post("/pdf/ocr")
-async def pdf_ocr(
-    archivo: UploadFile = File(...),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
-):
-    """Sube un PDF y devuelve su texto. Si el PDF es escaneado y hay
-    ANTHROPIC_API_KEY configurada, usa Claude Vision como OCR."""
-    contenido = await archivo.read()
-    if contenido[:4] != b"%PDF":
-        raise HTTPException(400, "El archivo no es un PDF válido")
-    if len(contenido) > 30_000_000:
-        raise HTTPException(400, "PDF muy grande (>30 MB)")
-
-    from app.services.pdf_service import PdfService
-    pdf_svc = PdfService()
-    texto, metodo = await pdf_svc.extraer_con_ocr(
-        contenido,
-        anthropic_api_key=cfg.anthropic_api_key,
-        anthropic_model=cfg.anthropic_model,
-    )
-    return {
-        "metodo": metodo,
-        "caracteres": len(texto),
-        "texto": texto,
-        "archivo": archivo.filename,
-    }
