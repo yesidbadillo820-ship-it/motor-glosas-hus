@@ -604,6 +604,28 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+
+# Ronda 50 Paso 10: middleware de tenant.
+# Resuelve el tenant_id desde header X-Tenant-ID, query ?tenant=, o
+# subdominio (hus.ia-glosas.com → 'HUS'). Por defecto 'HUS' para no
+# romper el flujo single-tenant actual. Cuando entre cliente #2 solo
+# hay que setear tenant_id en sus glosas y este middleware ya filtra.
+@app.middleware("http")
+async def _tenant_middleware(request, call_next):
+    try:
+        from app.services.tenancy import (
+            resolver_tenant_desde_request,
+            set_tenant_id,
+        )
+        tenant = resolver_tenant_desde_request(request)
+        set_tenant_id(tenant)
+    except Exception:
+        # No bloquear request si algo en la resolución falla
+        pass
+    response = await call_next(request)
+    return response
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 from app.api.routers.auth_router import router as auth_router
