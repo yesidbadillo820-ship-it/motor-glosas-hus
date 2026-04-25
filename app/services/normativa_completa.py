@@ -654,6 +654,68 @@ JURISPRUDENCIA = {
         "aplica_a": "Continuidad de tratamiento, oncología, crónicos",
         "keywords": ["T-050", "continuidad", "atención integral"],
     },
+
+    # ─── Ronda 50 Paso 11: ampliación jurisprudencia ─────────────────────
+
+    "SENTENCIA T-235 DE 1998": {
+        "nombre": "Sentencia T-235 de 1998",
+        "corte": "Corte Constitucional",
+        "titulo": "Historia clínica como prueba de la prestación",
+        "ratio": "La historia clínica institucional constituye plena prueba de los actos médicos realizados. La EPS no puede negar el pago alegando ausencia de soporte cuando la HC documenta la atención.",
+        "ratio_literal": "La historia clínica documenta de manera fehaciente la prestación efectiva del servicio y por sí misma constituye plena prueba para efectos del reconocimiento económico.",
+        "aplica_a": "Glosas SO0101, SO0102 (soportes faltantes) cuando la HC sí documenta",
+        "keywords": ["T-235", "historia clínica", "soportes", "plena prueba", "1995/1999"],
+    },
+
+    "SENTENCIA SU-480 DE 1997": {
+        "nombre": "Sentencia SU-480 de 1997",
+        "corte": "Corte Constitucional (Sala Plena)",
+        "titulo": "Atención inicial de urgencias sin autorización",
+        "ratio": "La sala plena unificó: la atención inicial de urgencias es obligatoria sin autorización previa. Cualquier exigencia administrativa previa que retrase la atención es inconstitucional.",
+        "ratio_literal": "Ningún requisito formal previo, incluyendo la autorización de la entidad pagadora, puede oponerse a la atención inicial de urgencias.",
+        "aplica_a": "Urgencias — autoridad de unificación (vincula a todas las salas)",
+        "keywords": ["SU-480", "urgencias", "unificación", "sala plena", "autorización previa"],
+    },
+
+    "SENTENCIA T-313 DE 2007": {
+        "nombre": "Sentencia T-313 de 2007",
+        "corte": "Corte Constitucional",
+        "titulo": "Autorización tácita por silencio administrativo",
+        "ratio": "Si la EPS no responde la solicitud de autorización en el plazo legal, opera el silencio positivo: el servicio queda autorizado y la EPS está obligada al pago íntegro sin glosa por autorización.",
+        "ratio_literal": "El silencio administrativo en materia de autorizaciones de salud opera a favor del usuario y del prestador, generando derechos plenamente exigibles.",
+        "aplica_a": "Glosas AU0101, AU0201 cuando hubo solicitud sin respuesta dentro del plazo",
+        "keywords": ["T-313", "silencio positivo", "autorización tácita", "plazo respuesta"],
+    },
+
+    "SENTENCIA T-642 DE 2008": {
+        "nombre": "Sentencia T-642 de 2008",
+        "corte": "Corte Constitucional",
+        "titulo": "Flujo de recursos y pago oportuno a IPS",
+        "ratio": "Las EPS deben pagar a los prestadores en los términos del art. 13 Ley 1122/2007. El retraso injustificado vulnera el derecho a la salud porque pone en riesgo la sostenibilidad de la red prestadora.",
+        "ratio_literal": "El pago oportuno a la red prestadora es condición esencial para la garantía del derecho fundamental a la salud, y su retraso o negación injustificada compromete la responsabilidad de la entidad responsable del pago.",
+        "aplica_a": "Defensa frente a glosas usadas como herramienta dilatoria de pago",
+        "keywords": ["T-642", "pago oportuno", "flujo recursos", "Ley 1122 art 13"],
+    },
+
+    "SENTENCIA T-053 DE 2009": {
+        "nombre": "Sentencia T-053 de 2009",
+        "corte": "Corte Constitucional",
+        "titulo": "Inadmisibilidad de glosas injustificadas",
+        "ratio": "La formulación de glosas sin sustento técnico-jurídico configura abuso del derecho y mala fe contractual. La EPS debe motivar cada glosa con base normativa y probatoria suficiente.",
+        "ratio_literal": "Las objeciones a la facturación deben ser técnicamente sustentadas; las formuladas sin motivación adecuada constituyen abuso del derecho y vulneran el principio de buena fe contractual (Art. 871 C. Comercio).",
+        "aplica_a": "Glosas FA injustificadas, glosas sin fundamento normativo o probatorio",
+        "keywords": ["T-053", "glosas injustificadas", "buena fe", "abuso del derecho", "Art. 871"],
+    },
+
+    "CONSEJO_ESTADO_2018_00154": {
+        "nombre": "Consejo de Estado, Sec. Tercera, Rad. 2018-00154",
+        "corte": "Consejo de Estado — Sala Contencioso Administrativa, Sección Tercera",
+        "titulo": "Silencio positivo en respuesta a glosa (Art. 57 Ley 1438/2011)",
+        "ratio": "Si la EPS no responde la respuesta a glosa del prestador dentro de los 10 días hábiles legales, opera el LEVANTAMIENTO TÁCITO de la objeción. La EPS pierde el derecho a discutir y debe pagar.",
+        "ratio_literal": "El silencio de la entidad responsable del pago frente a la respuesta motivada del prestador configura un levantamiento tácito de la glosa, no susceptible de revocatoria posterior.",
+        "aplica_a": "Defensa cuando la EPS deja vencer el plazo de 10 días tras la respuesta del HUS",
+        "keywords": ["Consejo de Estado", "silencio positivo", "Art. 57", "levantamiento tácito", "Ley 1438"],
+    },
 }
 
 
