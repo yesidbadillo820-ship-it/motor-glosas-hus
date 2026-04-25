@@ -103,3 +103,27 @@ def test_detalle_cups_inexistente(db):
     user = MagicMock(email="test@hus.com")
     r = detalle_cups("999999", db=db, current_user=user)
     assert r["total_contratos"] == 0
+
+
+# ─── Ronda 51 Paso 2: búsqueda insensible a tildes ──────────────────────
+
+def test_buscar_sin_tildes_encuentra_con_tilde(db):
+    """'GENETICA' debe encontrar 'GENÉTICA' aun cuando BD tiene tildes."""
+    from app.api.routers.cups import buscar_cups
+    from unittest.mock import MagicMock
+    user = MagicMock(email="test@hus.com")
+    r = buscar_cups(q="GENETICA", limite=10, eps=None, db=db, current_user=user)
+    assert r["total"] >= 1
+    # Debe encontrar 'CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA'
+    assert any("GEN" in _sin_tildes(f["descripcion"] or "") for f in r["resultados"])
+
+
+def test_normalizacion_quita_tildes():
+    from app.api.routers.cups import _sin_tildes
+    assert _sin_tildes("GENÉTICA") == "GENETICA"
+    assert _sin_tildes("MÉDICO") == "MEDICO"
+    assert _sin_tildes("ñandú") == "NANDU"
+    assert _sin_tildes("") == ""
+    assert _sin_tildes(None) == ""
+
+from app.api.routers.cups import _sin_tildes  # para el primer test

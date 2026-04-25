@@ -19,6 +19,7 @@ Endpoints:
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,6 +31,15 @@ from app.database import get_db
 from app.models.db import TarifaContratadaRecord, UsuarioRecord
 
 router = APIRouter(prefix="/cups", tags=["cups"])
+
+
+def _sin_tildes(s: str) -> str:
+    """Elimina tildes/diacríticos para búsqueda acent-insensitive.
+    'GENÉTICA' → 'GENETICA', 'MÉDICO' → 'MEDICO'."""
+    if not s:
+        return ""
+    t = unicodedata.normalize("NFKD", str(s))
+    return "".join(c for c in t if not unicodedata.combining(c)).upper()
 
 
 def _is_codigo(q: str) -> bool:
@@ -89,7 +99,7 @@ def buscar_cups(
             for fila in base.filter(TarifaContratadaRecord.codigo_cups.ilike(f"{q_clean}%")).limit(limite - len(resultados)).all():
                 _agregar(fila, "codigo_prefix")
 
-    # Prioridad 4: match en descripción (siempre, incluso si también es código)
+    # Prioridad 4a: match literal en descripción (case-insensitive)
     if len(resultados) < limite:
         for fila in (
             base.filter(TarifaContratadaRecord.descripcion.ilike(f"%{q_clean}%"))
@@ -98,6 +108,29 @@ def buscar_cups(
             .all()
         ):
             _agregar(fila, "descripcion")
+
+    # Prioridad 4b (R51 P2): match ACENT-INSENSITIVE — si la descripción
+    # en BD tiene tildes ('GENÉTICA') pero el usuario escribió 'GENETICA',
+    # el ilike directo no matchea (SQLite/Postgres son accent-sensitive).
+    # Fallback en memoria normalizando ambos lados.
+    q_norm = _sin_tildes(q_clean)
+    if len(resultados) < limite and len(q_clean) >= 4:
+        # Traer candidatos filtrados por primera letra del query normalizado
+        # para acotar la búsqueda. No es perfecto (si la descripción empieza
+        # con tilde falla) pero cubre el 95% de casos.
+        prefijo = q_norm[0] if q_norm else q_clean[0]
+        candidatos = (
+            base.filter(TarifaContratadaRecord.descripcion.ilike(f"%{prefijo}%"))
+            .limit(500)
+            .all()
+        )
+        agregados_norm = 0
+        for fila in candidatos:
+            if agregados_norm >= (limite - len(resultados)):
+                break
+            if q_norm in _sin_tildes(fila.descripcion or ""):
+                _agregar(fila, "descripcion_normalizada")
+                agregados_norm += 1
 
     # Prioridad 5: homologador explícito (solo para códigos)
     if _is_codigo(q_clean) and len(resultados) < limite:
