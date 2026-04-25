@@ -83,6 +83,34 @@ def _intentar_homologacion(pregunta: str, db: Session) -> dict | None:
     return None
 
 
+def _intentar_busqueda_cups_descripcion(pregunta: str, db: Session) -> dict | None:
+    """Ronda 52: si la pregunta es del tipo "qué CUPS para X" pero NO trae
+    un código específico, busca en el catálogo por descripción.
+
+    Ej: "Cuál es el CUPS para consulta de medicina general" → 890101
+        "qué CUPS para radiografía de tórax"                → 871121, 871122
+        "código de hemograma"                               → 902207, 902210
+    """
+    if not _PATRON_HOMOLOGACION.search(pregunta):
+        return None
+    # Si ya hay un código en la pregunta, esto no aplica (lo maneja
+    # _intentar_homologacion arriba).
+    limpia = _CONTEXTO_NORMA.sub(" ", pregunta)
+    if _PATRON_CODIGO_EN_PREGUNTA.search(limpia):
+        return None
+
+    from app.services.homologador_cups import buscar_cups_por_descripcion
+    coincidencias = buscar_cups_por_descripcion(pregunta, top_k=5, db=db)
+    if not coincidencias:
+        return None
+    return {
+        "tipo": "busqueda_cups_por_descripcion",
+        "consulta": pregunta,
+        "coincidencias": coincidencias,
+        "total": len(coincidencias),
+    }
+
+
 @router.post("")
 def consultar(
     req: ConsultaRequest,
@@ -99,10 +127,17 @@ def consultar(
     # Ronda 48: primero intentar homologación CUPS si la pregunta es sobre un código
     homo = _intentar_homologacion(req.pregunta, db)
 
+    # Ronda 52: si pregunta es "qué CUPS para X" sin código específico,
+    # buscar en el catálogo por descripción
+    busqueda_cups = None
+    if not homo:
+        busqueda_cups = _intentar_busqueda_cups_descripcion(req.pregunta, db)
+
     resultados = consultar_normativa(req.pregunta, limite=req.limite)
     return {
         "pregunta": req.pregunta,
         "homologacion_cups": homo,
+        "busqueda_cups": busqueda_cups,
         "total_encontrados": len(resultados),
         "resultados": resultados,
     }

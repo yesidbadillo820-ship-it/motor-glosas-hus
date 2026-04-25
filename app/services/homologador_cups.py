@@ -114,6 +114,27 @@ HOMOLOGACIONES_EXPLICITAS: dict[str, tuple[str, str]] = {
 # estancias. Expandir aquí es MÁS EFICIENTE que agregar variantes con sufijo
 # en HOMOLOGACIONES_EXPLICITAS, porque el normalizador las cubre todas.
 DESCRIPCIONES_CUPS_2025: dict[str, str] = {
+    # ── Consultas medicina general / familiar (8901xx) ──────────────────────
+    "890101": "CONSULTA DE PRIMERA VEZ POR MEDICINA GENERAL",
+    "890102": "CONSULTA DE PRIMERA VEZ POR MEDICINA FAMILIAR",
+    "890103": "CONSULTA DE PRIMERA VEZ POR MEDICINA DEL TRABAJO",
+    "890104": "CONSULTA DE PRIMERA VEZ POR ENFERMERÍA",
+    "890105": "CONSULTA DE PRIMERA VEZ POR NUTRICIÓN Y DIETÉTICA",
+    "890106": "CONSULTA DE PRIMERA VEZ POR PSICOLOGÍA",
+    "890107": "CONSULTA DE PRIMERA VEZ POR FISIOTERAPIA",
+    "890108": "CONSULTA DE PRIMERA VEZ POR FONOAUDIOLOGÍA",
+    "890109": "CONSULTA DE PRIMERA VEZ POR TERAPIA OCUPACIONAL",
+    "890110": "CONSULTA DE PRIMERA VEZ POR OPTOMETRÍA",
+    "890111": "CONSULTA DE PRIMERA VEZ POR ODONTOLOGÍA GENERAL",
+
+    # ── Consulta de control medicina general (8903xx) ───────────────────────
+    "890301": "CONSULTA DE CONTROL POR MEDICINA GENERAL",
+    "890303": "CONSULTA DE CONTROL POR ENFERMERÍA",
+    "890304": "CONSULTA DE CONTROL POR NUTRICIÓN Y DIETÉTICA",
+    "890305": "CONSULTA DE CONTROL POR PSICOLOGÍA",
+    "890306": "CONSULTA DE CONTROL POR FISIOTERAPIA",
+    "890307": "CONSULTA DE CONTROL POR FONOAUDIOLOGÍA",
+
     # ── Consultas primera vez por especialista (8902xx) ─────────────────────
     "890201": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA INTERNA",
     "890202": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ELECTROFISIOLOGÍA",
@@ -140,13 +161,15 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "890260": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN PSIQUIATRÍA",
     "890265": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FÍSICA Y REHABILITACIÓN",
 
-    # ── Consultas de control por especialista (8903xx) ──────────────────────
-    "890301": "CONSULTA DE CONTROL POR ESPECIALISTA EN MEDICINA INTERNA",
-    "890302": "CONSULTA DE CONTROL POR ESPECIALISTA EN ELECTROFISIOLOGÍA",
+    # ── Consultas de control por especialista (89035x..89036x) ──────────────
+    # Nota: 890301 = control medicina general (arriba). El control de
+    # especialista usa 8903xx con desplazamiento similar a 8902xx primera vez.
     "890308": "CONSULTA DE CONTROL POR ESPECIALISTA EN CARDIOLOGÍA",
     "890322": "CONSULTA DE CONTROL POR ESPECIALISTA EN PEDIATRÍA",
+    "890325": "CONSULTA DE CONTROL POR ESPECIALISTA EN GINECOBSTETRICIA",
     "890335": "CONSULTA DE CONTROL POR ESPECIALISTA EN ORTOPEDIA Y TRAUMATOLOGÍA",
     "890348": "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
+    "890351": "CONSULTA DE CONTROL POR ESPECIALISTA EN MEDICINA INTERNA",
 
     # ── Interconsultas hospitalarias (8904xx) ───────────────────────────────
     "890402": "INTERCONSULTA HOSPITALARIA POR ELECTROFISIOLOGÍA",
@@ -154,35 +177,140 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "890410": "INTERCONSULTA HOSPITALARIA POR AUDIOLOGÍA",
     "890453": "INTERCONSULTA HOSPITALARIA POR HEPATOLOGÍA",
 
-    # ── Urgencias por especialista (8907xx) ─────────────────────────────────
+    # ── Urgencias (8907xx) ──────────────────────────────────────────────────
     "890701": "CONSULTA DE URGENCIAS POR MEDICINA GENERAL",
     "890750": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN GINECOLOGÍA Y OBSTETRICIA",
     "890793": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN MEDICINA DE EMERGENCIAS",
 
-    # ── Laboratorio clínico básico alto-volumen ─────────────────────────────
+    # ── Laboratorio clínico — química e inmunología ─────────────────────────
     "901040": "GLICEMIA PRE Y POST CARGA DE GLUCOSA",
-    "902207": "HEMOGRAMA IV (HEMATOCRITO, HEMOGLOBINA, RECUENTO DE ERITROCITOS, ÍNDICES ERITROCITARIOS, LEUCOGRAMA)",
+    "901225": "GLUCOSA EN SUERO U OTROS FLUIDOS DIFERENTES A ORINA",
+    "901226": "HEMOGLOBINA GLICOSILADA HBA1C",
+    "901415": "PERFIL LIPÍDICO (COLESTEROL TOTAL, HDL, LDL, TRIGLICÉRIDOS)",
+    "903422": "TIROTROPINA (TSH)",
+    "903419": "TIROXINA LIBRE (T4 LIBRE)",
     "903866": "CREATININA EN SUERO U OTROS FLUIDOS",
     "903868": "CREATININA EN ORINA DE 24 HORAS",
     "903895": "TRANSAMINASA GLUTÁMICA OXALACÉTICA (AST)",
+    "903896": "TRANSAMINASA GLUTÁMICA PIRÚVICA (ALT)",
+    "904906": "ELECTROLITOS SÉRICOS (NA, K, CL)",
     "906225": "PROTEÍNA C REACTIVA (PCR) CUANTITATIVA",
+    "906039": "PARCIAL DE ORINA",
     "907106": "UROANÁLISIS CON MICROSCOPIO DE CAMPO, SEDIMENTO Y DENSIDAD URINARIA",
 
-    # ── Imágenes diagnósticas alto-volumen ──────────────────────────────────
+    # ── Hematología ─────────────────────────────────────────────────────────
+    "902207": "HEMOGRAMA IV (HEMATOCRITO, HEMOGLOBINA, RECUENTO ERITROCITOS, ÍNDICES, LEUCOGRAMA)",
+    "902210": "HEMOGRAMA III (HEMATOCRITO, HEMOGLOBINA, RECUENTO ERITROCITOS, LEUCOGRAMA)",
+    "902208": "RECUENTO DE PLAQUETAS",
+    "902049": "TIEMPO DE PROTROMBINA (TP-INR)",
+    "902045": "TIEMPO DE TROMBOPLASTINA PARCIAL ACTIVADA (TTPA)",
+    "906915": "VELOCIDAD DE SEDIMENTACIÓN GLOBULAR (VSG)",
+
+    # ── Microbiología y serología ───────────────────────────────────────────
+    "907111": "UROCULTIVO Y RECUENTO DE COLONIAS",
+    "908436": "PRUEBA RÁPIDA PARA VIH (TAMIZAJE)",
+    "906320": "PRUEBA TREPONÉMICA SIFILIS (FTA-ABS)",
+    "906916": "TAMIZAJE PARA HEPATITIS B (HBsAg)",
+
+    # ── Imagenología — Rayos X ──────────────────────────────────────────────
+    "870101": "RADIOGRAFÍA DE CRÁNEO PA O AP Y LATERAL",
     "871040": "RADIOGRAFÍA DE COLUMNA LUMBOSACRA",
+    "871020": "RADIOGRAFÍA DE COLUMNA CERVICAL",
+    "871021": "RADIOGRAFÍA DE COLUMNA TORÁCICA",
     "871121": "RADIOGRAFÍA DE TÓRAX PA O AP",
+    "871122": "RADIOGRAFÍA DE TÓRAX (PA Y LATERAL)",
+    "871330": "RADIOGRAFÍA DE ABDOMEN SIMPLE",
+    "873101": "RADIOGRAFÍA DE HOMBRO",
     "873205": "RADIOGRAFÍA DE CODO",
+    "873305": "RADIOGRAFÍA DE MANO",
+    "874101": "RADIOGRAFÍA DE PELVIS",
+    "874201": "RADIOGRAFÍA DE CADERA",
+    "874305": "RADIOGRAFÍA DE FÉMUR",
+    "874501": "RADIOGRAFÍA DE RODILLA",
+    "874601": "RADIOGRAFÍA DE TIBIA Y PERONÉ",
+    "874701": "RADIOGRAFÍA DE TOBILLO",
+    "874801": "RADIOGRAFÍA DE PIE",
+
+    # ── Imagenología — Ecografía ────────────────────────────────────────────
+    "881201": "ECOGRAFÍA DE TIROIDES",
     "881330": "ECOGRAFÍA DE ABDOMEN TOTAL",
+    "881331": "ECOGRAFÍA DE HÍGADO Y VÍAS BILIARES",
+    "881332": "ECOGRAFÍA DE RIÑONES Y VÍAS URINARIAS",
+    "881401": "ECOGRAFÍA OBSTÉTRICA TRANSABDOMINAL",
+    "881402": "ECOGRAFÍA OBSTÉTRICA TRANSVAGINAL",
+    "881403": "ECOGRAFÍA DE PELVIS GINECOLÓGICA",
+    "881431": "ECOGRAFÍA DOPPLER OBSTÉTRICA",
+    "881434": "PERFIL BIOFÍSICO",
+    "881501": "ECOGRAFÍA DE PARTES BLANDAS",
+    "881601": "ECOGRAFÍA TESTICULAR",
+    "881701": "ECOCARDIOGRAFÍA TRANSTORÁCICA",
+    "881702": "ECOCARDIOGRAFÍA TRANSESOFÁGICA",
+    "881901": "ECOGRAFÍA DOPPLER VENOSA DE MIEMBROS INFERIORES",
+    "881902": "ECOGRAFÍA DOPPLER ARTERIAL DE MIEMBROS INFERIORES",
+
+    # ── Imagenología — TAC (tomografía) ─────────────────────────────────────
     "883101": "TAC DE CRÁNEO SIMPLE",
+    "883102": "TAC DE CRÁNEO CON CONTRASTE",
+    "883201": "TAC DE TÓRAX SIMPLE",
+    "883202": "TAC DE TÓRAX CON CONTRASTE",
+    "883301": "TAC DE ABDOMEN SIMPLE",
+    "883302": "TAC DE ABDOMEN CON CONTRASTE",
+    "883303": "TAC DE PELVIS",
+    "883401": "TAC DE COLUMNA CERVICAL",
+    "883402": "TAC DE COLUMNA LUMBOSACRA",
+
+    # ── Imagenología — Resonancia magnética ─────────────────────────────────
     "884003": "RESONANCIA MAGNÉTICA DE CEREBRO SIMPLE",
+    "884004": "RESONANCIA MAGNÉTICA DE CEREBRO CON CONTRASTE",
+    "884101": "RESONANCIA MAGNÉTICA DE COLUMNA CERVICAL",
+    "884102": "RESONANCIA MAGNÉTICA DE COLUMNA LUMBOSACRA",
+    "884201": "RESONANCIA MAGNÉTICA DE ABDOMEN",
+    "884301": "RESONANCIA MAGNÉTICA DE RODILLA",
+    "884302": "RESONANCIA MAGNÉTICA DE HOMBRO",
+
+    # ── Otros estudios diagnósticos ─────────────────────────────────────────
+    "891101": "ELECTROCARDIOGRAMA DE REPOSO",
+    "891201": "ELECTROENCEFALOGRAMA",
+    "892101": "ESPIROMETRÍA",
+    "893101": "AUDIOMETRÍA TONAL",
     "897011": "MONITORIA FETAL ANTEPARTO",
 
     # ── Patología y biopsia ─────────────────────────────────────────────────
     "873306": "ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA",
     "898101": "ESTUDIO ANATOMOPATOLÓGICO EN BIOPSIA",
+    "898102": "ESTUDIO ANATOMOPATOLÓGICO EN ESPECIMEN QUIRÚRGICO",
+    "898104": "INMUNOHISTOQUÍMICA",
+    "898201": "CITOLOGÍA CÉRVICO-UTERINA CONVENCIONAL",
 
-    # ── Otros alto-volumen ──────────────────────────────────────────────────
-    "881434": "PERFIL BIOFÍSICO",
+    # ── Procedimientos quirúrgicos comunes ──────────────────────────────────
+    "470301": "APENDICECTOMÍA POR LAPAROTOMÍA",
+    "470302": "APENDICECTOMÍA LAPAROSCÓPICA",
+    "511001": "COLECISTECTOMÍA POR LAPAROTOMÍA",
+    "511002": "COLECISTECTOMÍA LAPAROSCÓPICA",
+    "740101": "PARTO VAGINAL ESPONTÁNEO",
+    "740301": "PARTO POR CESÁREA",
+    "861101": "SUTURA DE PIEL",
+    "861201": "DESBRIDAMIENTO DE TEJIDO BLANDO",
+    "865101": "CURACIÓN MAYOR",
+
+    # ── Estancias hospitalarias y servicios ────────────────────────────────
+    "S11101": "ESTANCIA EN HABITACIÓN COMPARTIDA",
+    "S11201": "ESTANCIA EN UCI ADULTOS",
+    "S11202": "ESTANCIA EN UCI PEDIÁTRICA",
+    "S11203": "ESTANCIA EN UCI NEONATAL",
+    "S11301": "ESTANCIA EN UCE (UNIDAD DE CUIDADOS ESPECIALES)",
+    "S12101": "ESTANCIA EN PEDIATRÍA",
+    "S13101": "ESTANCIA EN GINECOOBSTETRICIA",
+
+    # ── Materiales / suministros frecuentes ─────────────────────────────────
+    "M01101": "OXÍGENO MEDICINAL POR HORA",
+    "M02101": "TRANSFUSIÓN DE GLÓBULOS ROJOS EMPACADOS",
+
+    # ── Procedimientos menores comunes ──────────────────────────────────────
+    "391001": "CURACIÓN MENOR DE HERIDA",
+    "390402": "NEBULIZACIÓN CON BRONCODILATADOR",
+    "994001": "VACUNACIÓN (APLICACIÓN DE BIOLÓGICO)",
+    "898306": "CITOLOGÍA EN BASE LÍQUIDA",
 }
 
 
@@ -196,6 +324,128 @@ _SUFIJOS_INSTITUCIONALES = re.compile(
     r"|[A-Z]\d*$"        # ej. 'A1', 'B', 'C' al final
     r")+$"
 )
+
+
+def _normalizar_descripcion(s: str) -> str:
+    """Quita tildes y pasa a mayúsculas para matching acent-insensitive."""
+    if not s:
+        return ""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(s))
+    return "".join(c for c in t if not unicodedata.combining(c)).upper()
+
+
+def buscar_cups_por_descripcion(
+    consulta: str,
+    top_k: int = 10,
+    db: Optional[Session] = None,
+) -> list[dict]:
+    """Busca códigos CUPS cuya descripción matchee la consulta libre.
+
+    Usa scoring por número de tokens del query que aparecen en la
+    descripción (acent-insensitive). Permite responder preguntas como:
+      - "cuál es el CUPS para consulta médico general"   → 890101
+      - "qué CUPS para radiografía de tórax"            → 871121, 871122
+      - "código de hemograma"                           → 902207
+      - "ecografía abdominal"                           → 881330
+
+    Fuentes consultadas (en orden de prioridad):
+      1. DESCRIPCIONES_CUPS_2025 — catálogo curado interno (~150 códigos)
+      2. HOMOLOGACIONES_EXPLICITAS — variantes con sufijo HUS
+      3. TarifaContratadaRecord en BD — descripciones de contratos cargados
+
+    Retorna lista [{cups_oficial, descripcion, fuente, score}].
+    """
+    q = _normalizar_descripcion(consulta or "")
+    tokens = [t for t in q.split() if len(t) >= 3]
+    if not tokens:
+        return []
+
+    STOP = {
+        "CUAL", "QUE", "CUPS", "CODIGO", "PARA", "DEL", "LAS", "LOS",
+        "POR", "ESTA", "ESTE", "CON", "SIN", "NUMERO", "ES", "EL", "LA",
+        "DE", "EN", "UN", "UNA",
+    }
+    tokens = [t for t in tokens if t not in STOP]
+    if not tokens:
+        return []
+
+    resultados: list[tuple[float, dict]] = []
+    vistos: set[str] = set()
+
+    def _score(desc: str) -> float:
+        d = _normalizar_descripcion(desc)
+        if not d:
+            return 0.0
+        # Score = fracción de tokens del query presentes en la descripción
+        hits = sum(1 for t in tokens if t in d)
+        if hits == 0:
+            return 0.0
+        # Bonus si TODOS los tokens están presentes (match completo)
+        completo = 1.5 if hits == len(tokens) else 1.0
+        # Penalizar descripciones muy largas (preferir match concreto)
+        long_pen = max(0.5, 1.0 - len(d) / 500.0)
+        return (hits / len(tokens)) * completo * long_pen
+
+    # 1) Catálogo curado interno
+    for cups, desc in DESCRIPCIONES_CUPS_2025.items():
+        s = _score(desc)
+        if s > 0:
+            resultados.append((s, {
+                "cups_oficial": cups, "descripcion": desc,
+                "fuente": "DESCRIPCIONES_CUPS_2025 (catálogo curado)",
+            }))
+            vistos.add(cups)
+
+    # 2) Tabla de homologaciones explícitas (variantes con sufijo HUS)
+    for cod_viejo, (cups, desc) in HOMOLOGACIONES_EXPLICITAS.items():
+        if cups in vistos:
+            continue
+        s = _score(desc)
+        if s > 0:
+            resultados.append((s, {
+                "cups_oficial": cups, "descripcion": desc,
+                "fuente": f"Res. 2641/2025 (vía '{cod_viejo}')",
+            }))
+            vistos.add(cups)
+
+    # 3) BD: TarifaContratadaRecord (contratos cargados por el coordinador)
+    if db is not None:
+        try:
+            # Intento de prefijo con ilike sobre cualquier token >= 4 chars
+            from sqlalchemy import or_
+            largos = [t for t in tokens if len(t) >= 4]
+            if largos:
+                clausulas = [
+                    TarifaContratadaRecord.descripcion.ilike(f"%{t}%")
+                    for t in largos
+                ]
+                filas = (
+                    db.query(TarifaContratadaRecord)
+                    .filter(TarifaContratadaRecord.activa == 1)
+                    .filter(or_(*clausulas))
+                    .limit(200)
+                    .all()
+                )
+                for fila in filas:
+                    if not fila.codigo_cups or fila.codigo_cups in vistos:
+                        continue
+                    s = _score(fila.descripcion or "")
+                    if s > 0:
+                        resultados.append((s, {
+                            "cups_oficial": fila.codigo_cups,
+                            "descripcion": fila.descripcion or "",
+                            "fuente": f"contrato {fila.eps or '—'}",
+                        }))
+                        vistos.add(fila.codigo_cups)
+        except Exception:
+            pass
+
+    resultados.sort(key=lambda x: x[0], reverse=True)
+    return [
+        {**d, "score": round(s, 3)}
+        for s, d in resultados[:top_k]
+    ]
 
 
 def _normalizar_codigo(codigo: str) -> str:

@@ -170,3 +170,52 @@ class TestDescripcionesCups2025:
         assert r is not None
         assert r["cups_oficial"] == "999999"
         assert r["descripcion"] == ""
+
+
+# ─── Ronda 52: búsqueda por descripción ─────────────────────────────────────
+
+class TestBuscarCupsPorDescripcion:
+    def test_consulta_medico_general(self):
+        from app.services.homologador_cups import buscar_cups_por_descripcion
+        r = buscar_cups_por_descripcion("consulta medico general", top_k=5)
+        assert len(r) > 0
+        codigos = {x["cups_oficial"] for x in r}
+        # Debe estar el de medicina general (890101 o 890301)
+        assert "890101" in codigos or "890301" in codigos or "890701" in codigos
+
+    def test_radiografia_torax(self):
+        from app.services.homologador_cups import buscar_cups_por_descripcion
+        r = buscar_cups_por_descripcion("radiografia de torax", top_k=3)
+        assert len(r) > 0
+        # Top result debe ser 87112x (Rx tórax)
+        assert r[0]["cups_oficial"].startswith("8711")
+
+    def test_hemograma(self):
+        from app.services.homologador_cups import buscar_cups_por_descripcion
+        r = buscar_cups_por_descripcion("hemograma", top_k=3)
+        assert len(r) > 0
+        codigos = {x["cups_oficial"] for x in r}
+        assert "902207" in codigos or "902210" in codigos
+
+    def test_query_vacia_retorna_vacio(self):
+        from app.services.homologador_cups import buscar_cups_por_descripcion
+        assert buscar_cups_por_descripcion("") == []
+        assert buscar_cups_por_descripcion("   ") == []
+
+    def test_query_solo_stopwords(self):
+        """'cuál es el código' debe retornar vacío (todo stopwords)."""
+        from app.services.homologador_cups import buscar_cups_por_descripcion
+        r = buscar_cups_por_descripcion("cual es el codigo")
+        assert r == []
+
+    def test_acent_insensitive(self):
+        """'tomografia' (sin tilde) debe matchear 'TAC' (búsqueda flexible)."""
+        from app.services.homologador_cups import buscar_cups_por_descripcion
+        r = buscar_cups_por_descripcion("TAC craneo", top_k=3)
+        assert len(r) > 0
+        assert r[0]["cups_oficial"].startswith("8831")  # TAC craneal
+
+    def test_catalogo_amplio(self):
+        """Garantiza que el catálogo crezca a >100 códigos."""
+        from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
+        assert len(DESCRIPCIONES_CUPS_2025) >= 100

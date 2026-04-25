@@ -1,6 +1,6 @@
 """Papelera con soft-delete y restauración dentro de 30 días."""
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect
@@ -24,13 +24,40 @@ def _glosa_a_dict(g: GlosaRecord) -> dict:
     return out
 
 
+def _ahora_utc() -> datetime:
+    """Devuelve ahora() TZ-aware en UTC.
+
+    Postgres almacena `eliminado_en` como TIMESTAMPTZ (tz-aware), por lo
+    que cualquier resta debe ser entre dos datetimes TZ-aware. Antes
+    usábamos `datetime.utcnow()` (naive) y eso disparaba TypeError en
+    producción ('can't subtract offset-naive and offset-aware datetimes').
+    En SQLite no se notaba porque el motor no impone TZ awareness.
+    """
+    return datetime.now(timezone.utc)
+
+
+def _normalizar_tz(dt: datetime | None) -> datetime | None:
+    """Convierte un datetime naive a TZ-aware UTC; deja TZ-aware igual.
+
+    Defensa adicional: si por alguna razón histórica un registro quedó
+    con `eliminado_en` naive (ej. data migrada desde SQLite), no rompe la
+    comparación con datetimes TZ-aware.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 @router.get("/")
 def listar(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Lista glosas eliminadas que aún pueden restaurarse (< 30 días)."""
-    corte = datetime.utcnow() - timedelta(days=30)
+    ahora = _ahora_utc()
+    corte = ahora - timedelta(days=30)
     q = (
         db.query(GlosaEliminadaRecord)
         .filter(GlosaEliminadaRecord.eliminado_en >= corte)
@@ -42,12 +69,16 @@ def listar(
             snap = json.loads(r.snapshot_json)
         except Exception:
             snap = {}
-        dias_restantes = 30 - (datetime.utcnow() - r.eliminado_en).days if r.eliminado_en else 30
+        eliminado_en = _normalizar_tz(r.eliminado_en)
+        if eliminado_en is not None:
+            dias_restantes = 30 - (ahora - eliminado_en).days
+        else:
+            dias_restantes = 30
         items.append({
             "id": r.id,
             "glosa_id_original": r.glosa_id_original,
             "eliminado_por": r.eliminado_por,
-            "eliminado_en": r.eliminado_en.isoformat() if r.eliminado_en else None,
+            "eliminado_en": eliminado_en.isoformat() if eliminado_en else None,
             "motivo": r.motivo,
             "dias_restantes_restaurar": max(0, dias_restantes),
             "eps": snap.get("eps"),
