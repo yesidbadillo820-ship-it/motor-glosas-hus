@@ -329,3 +329,23 @@ def backfill_historial(
         "glosas_actualizadas": actualizadas,
         "ejecutado_por": current_user.email,
     }
+
+
+@router.post("/mantenimiento/purgar")
+def mantenimiento_purgar(
+    dry_run: bool = False,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R57 P1: ejecuta limpieza completa de tablas históricas.
+
+    - ai_cache: purga entradas > 30 días (TTL del caché)
+    - ai_calls: purga métricas > 90 días (historial)
+    - glosas_eliminadas: purga ya caducadas (>30 días, fuera de la
+      ventana de restauración)
+
+    Pasar dry_run=true para solo contar sin eliminar.
+    Solo SUPER_ADMIN.
+    """
+    from app.services.mantenimiento import ejecutar_mantenimiento_completo
+    return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
