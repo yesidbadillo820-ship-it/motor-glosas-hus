@@ -1842,6 +1842,54 @@ def info_zonas_horarias(
     }
 
 
+@router.get("/snapshot-general")
+def info_snapshot_general(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R158 P2: snapshot consolidado de TODO el sistema.
+
+    Single-call que reúne en un solo lugar las cifras "vivas"
+    de la plataforma, útil para una pantalla de monitoreo /
+    NOC del coordinador.
+
+    Diferente a /admin/snapshot.json (point-in-time export para
+    archivar): aquí solo counts agregados — pensado para un
+    refresh frecuente sin saturar BD.
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        AICacheRecord, AICallRecord, AuditLogRecord,
+        ConciliacionRecord, ContratoRecord,
+        DictamenVersionRecord, GlosaEliminadaRecord, GlosaRecord,
+        PlantillaGoldRecord, PlantillaRecord, UsuarioRecord,
+    )
+
+    def _count(model):
+        return db.query(_f.count()).select_from(model).scalar() or 0
+
+    return {
+        "evaluado_en": ahora_utc().isoformat(),
+        "counts": {
+            "glosas": _count(GlosaRecord),
+            "usuarios": _count(UsuarioRecord),
+            "audit_log": _count(AuditLogRecord),
+            "ai_calls": _count(AICallRecord),
+            "ai_cache": _count(AICacheRecord),
+            "dictamen_versiones": _count(DictamenVersionRecord),
+            "conciliaciones": _count(ConciliacionRecord),
+            "contratos": _count(ContratoRecord),
+            "plantillas": _count(PlantillaRecord),
+            "plantillas_gold": _count(PlantillaGoldRecord),
+            "papelera": _count(GlosaEliminadaRecord),
+        },
+    }
+
+
 @router.get("/glosas-con-ia")
 def info_glosas_con_ia(
     dias: int = 30,
