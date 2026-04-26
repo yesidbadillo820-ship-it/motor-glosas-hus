@@ -406,6 +406,59 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/comentarios-emitidos")
+def yo_comentarios_emitidos(
+    dias: int = 90,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R291 P1: comentarios que el usuario ha emitido.
+
+    Métricas de colaboración personal:
+      - total_emitidos
+      - menciones_hechas (con @ a otros)
+      - resueltos (count)
+      - resueltos_por_mi (count)
+      - glosas_distintas
+
+    Útil para auto-reflexión sobre nivel de colaboración.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import ComentarioGlosaRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.autor_email == current_user.email)
+        .filter(ComentarioGlosaRecord.creado_en >= desde)
+        .all()
+    )
+
+    total = len(rows)
+    menciones = sum(1 for c in rows if c.mencion)
+    resueltos = sum(1 for c in rows if int(c.resuelto or 0) == 1)
+    glosas = {c.glosa_id for c in rows}
+
+    resueltos_por_mi = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.resuelto_por == current_user.email)
+        .filter(ComentarioGlosaRecord.resuelto_en >= desde)
+        .count()
+    )
+
+    return {
+        "usuario_email": current_user.email,
+        "ventana_dias": int(dias),
+        "total_emitidos": total,
+        "menciones_hechas": menciones,
+        "resueltos": resueltos,
+        "resueltos_por_mi": int(resueltos_por_mi),
+        "glosas_distintas": len(glosas),
+    }
+
+
 @router.get("/yo/comparativa-equipo")
 def yo_comparativa_equipo(
     db: Session = Depends(get_db),
