@@ -3299,6 +3299,74 @@ def stats_concentracion_pareto(
     }
 
 
+@router.get("/stats/facturas-hot")
+def stats_facturas_hot(
+    min_glosas: int = Query(3, ge=2, le=20),
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R124 P1: facturas con múltiples glosas asociadas.
+
+    "Hot facturas" = facturas con N+ glosas distintas. Indican:
+      - Servicio/episodio complejo bajo objeción múltiple
+      - Posible glosa fraccionada (mala práctica EPS)
+      - Caso de litigio prioritario
+
+    Devuelve top N facturas con >= min_glosas:
+      - factura, eps
+      - count_glosas
+      - valor_objetado_total
+      - estados (mapa estado→count)
+      - codigos_distintos
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura.isnot(None))
+        .filter(GlosaRecord.factura != "N/A")
+        .all()
+    )
+
+    por_factura: dict[str, dict] = {}
+    for g in glosas:
+        f = g.factura
+        if f not in por_factura:
+            por_factura[f] = {
+                "eps": g.eps,
+                "count": 0,
+                "valor_objetado": 0.0,
+                "estados": {},
+                "codigos": set(),
+            }
+        b = por_factura[f]
+        b["count"] += 1
+        b["valor_objetado"] += float(g.valor_objetado or 0)
+        estado = g.estado or "?"
+        b["estados"][estado] = b["estados"].get(estado, 0) + 1
+        if g.codigo_glosa:
+            b["codigos"].add(g.codigo_glosa)
+
+    items = []
+    for f, b in por_factura.items():
+        if b["count"] < min_glosas:
+            continue
+        items.append({
+            "factura": f,
+            "eps": b["eps"],
+            "count_glosas": b["count"],
+            "valor_objetado_total": int(b["valor_objetado"]),
+            "estados": b["estados"],
+            "codigos_distintos": sorted(b["codigos"]),
+        })
+    items.sort(key=lambda x: x["count_glosas"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_facturas_calientes": len(items),
+        "items": items[:top],
+    }
+
+
 @router.get("/stats/cobranza-por-eps")
 def stats_cobranza_por_eps(
     top: int = Query(20, ge=1, le=100),
