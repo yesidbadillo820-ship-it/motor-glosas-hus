@@ -740,6 +740,58 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/eps-conteos")
+def admin_eps_conteos(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R239 P1: lista compacta de TODAS las EPS con conteos.
+
+    Útil como índice global de EPS, ordenado por count_total
+    DESC. Para cada EPS:
+      - count_total
+      - count_abiertas
+      - valor_total_objetado
+
+    Solo SUPER_ADMIN.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"total": 0, "abiertas": 0, "valor": 0.0}
+        b = por_eps[eps]
+        b["total"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+
+    items = []
+    for eps, b in por_eps.items():
+        items.append({
+            "eps": eps,
+            "count_total": b["total"],
+            "count_abiertas": b["abiertas"],
+            "valor_total_objetado": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count_total"], reverse=True)
+
+    return {
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/usuarios-mas-cargados")
 def admin_usuarios_mas_cargados(
     top: int = 10,
