@@ -509,6 +509,69 @@ def exportar_xlsx(
     )
 
 
+@router.get("/codigos-glosa-catalogo")
+def codigos_glosa_catalogo(
+    grupo: Optional[str] = None,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R136 P2: catálogo de códigos de glosa Resolución 2284/2023.
+
+    Expone el catálogo oficial del Manual Único usado por la IA
+    para que el frontend pueda:
+      - Mostrar autocomplete de códigos
+      - Renderizar tooltip con descripción al hover
+      - Validar que un código sea oficial antes de enviar
+
+    Param `grupo` opcional filtra por familia (FA, TA, SO, AU,
+    CO, CL, SA).
+
+    Devuelve:
+      - total_codigos
+      - por_grupo: counts
+      - items: [{codigo, grupo, descripcion}]
+    """
+    from app.services.catalogo_glosas import (
+        CODIGOS_AU, CODIGOS_CL, CODIGOS_CO, CODIGOS_FA,
+        CODIGOS_SA, CODIGOS_SO, CODIGOS_TA,
+    )
+
+    grupos = {
+        "FA": CODIGOS_FA, "TA": CODIGOS_TA, "SO": CODIGOS_SO,
+        "AU": CODIGOS_AU, "CO": CODIGOS_CO, "CL": CODIGOS_CL,
+        "SA": CODIGOS_SA,
+    }
+
+    if grupo:
+        g_upper = grupo.upper()
+        if g_upper not in grupos:
+            raise HTTPException(
+                400,
+                f"grupo inválido. Válidos: {sorted(grupos.keys())}",
+            )
+        grupos = {g_upper: grupos[g_upper]}
+
+    items = []
+    por_grupo: dict[str, int] = {}
+    for nombre_grupo, dic in grupos.items():
+        for codigo, descripcion in dic.items():
+            items.append({
+                "codigo": codigo,
+                "grupo": nombre_grupo,
+                "descripcion": descripcion,
+            })
+            por_grupo[nombre_grupo] = por_grupo.get(nombre_grupo, 0) + 1
+
+    items.sort(key=lambda x: x["codigo"])
+
+    return {
+        "regulacion": "Resolución 2284/2023 — Manual Único de Glosas",
+        "total_codigos": len(items),
+        "por_grupo": por_grupo,
+        "filtro_grupo": grupo,
+        "items": items,
+    }
+
+
 @router.get("/estados-disponibles")
 def estados_disponibles(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
