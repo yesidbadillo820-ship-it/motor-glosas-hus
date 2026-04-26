@@ -1956,6 +1956,53 @@ def exportar_paquete_multi_zip(
     )
 
 
+@router.get("/top-valor")
+def top_glosas_por_valor(
+    top: int = Query(20, ge=1, le=100),
+    abiertas_only: bool = True,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R183 P1: top N glosas por valor objetado.
+
+    Útil para identificar las glosas de mayor cuantía que
+    requieren atención prioritaria. Por defecto solo abiertas.
+
+    Devuelve top N ordenado DESC por valor_objetado.
+
+    Declarado ANTES de /{glosa_id} para evitar collision.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    q = db.query(GlosaRecord)
+    if abiertas_only:
+        q = q.filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+
+    glosas = (
+        q.order_by(GlosaRecord.valor_objetado.desc())
+        .limit(int(top))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "dias_restantes": g.dias_restantes,
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "abiertas_only": abiertas_only,
+        "items": items,
+    }
+
+
 @router.get("/cups-perfil")
 def cups_perfil(
     cups: str = Query(..., min_length=1),
