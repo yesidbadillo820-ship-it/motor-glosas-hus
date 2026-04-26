@@ -6843,6 +6843,41 @@ def dialogo_bilateral(
     }
 
 
+@router.get("/{glosa_id}/json-completo")
+def json_completo_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R142 P2: dump completo del GlosaRecord en JSON.
+
+    Devuelve TODOS los campos de la fila, útil para:
+      - Debugging: ver el estado completo sin filtros
+      - Backup individual de la glosa
+      - Migración a otro sistema
+
+    No incluye relaciones (conceptos, comentarios, audit) — solo
+    la fila plana del GlosaRecord. Para el paquete completo usar
+    /glosas/{id}/exportar-evidencia.zip.
+    """
+    from datetime import datetime as _dt
+
+    from sqlalchemy import inspect as _inspect
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    out = {}
+    for col in _inspect(glosa).mapper.column_attrs:
+        val = getattr(glosa, col.key)
+        if isinstance(val, _dt):
+            out[col.key] = val.isoformat()
+        else:
+            out[col.key] = val
+    return out
+
+
 @router.get("/{glosa_id}/conceptos-resumen")
 def conceptos_resumen(
     glosa_id: int,
