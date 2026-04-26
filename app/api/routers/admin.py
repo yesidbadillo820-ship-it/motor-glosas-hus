@@ -331,6 +331,77 @@ def backfill_historial(
     }
 
 
+@router.get("/ai-cache/stats")
+def ai_cache_stats(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R86 P1: estadísticas del cache de respuestas IA persistido en BD.
+
+    Útil para evaluar el ahorro real del caché:
+      - Cuánto se reutiliza (hit_count promedio/máximo)
+      - Cuáles entradas tienen más impacto
+      - Tamaño total del cache (chars almacenados)
+      - Edad de las entradas
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICacheRecord
+
+    total = db.query(_f.count(AICacheRecord.id)).scalar() or 0
+    if total == 0:
+        return {
+            "total_entradas": 0,
+            "hit_count_total": 0,
+            "espacio_chars": 0,
+            "top_5_mas_usadas": [],
+            "viejas_30d": 0,
+        }
+
+    hit_total = db.query(_f.sum(AICacheRecord.hit_count)).scalar() or 0
+    chars_total = db.query(_f.sum(_f.length(AICacheRecord.respuesta))).scalar() or 0
+    avg_hits = (hit_total / total) if total else 0
+    max_hits = db.query(_f.max(AICacheRecord.hit_count)).scalar() or 0
+
+    top_5 = (
+        db.query(AICacheRecord)
+        .order_by(AICacheRecord.hit_count.desc())
+        .limit(5)
+        .all()
+    )
+
+    corte_30 = ahora_utc() - timedelta(days=30)
+    viejas = (
+        db.query(_f.count(AICacheRecord.id))
+        .filter(AICacheRecord.creado_en < corte_30)
+        .scalar() or 0
+    )
+
+    return {
+        "total_entradas": int(total),
+        "hit_count_total": int(hit_total),
+        "hit_count_promedio": round(float(avg_hits), 1),
+        "hit_count_max": int(max_hits),
+        "espacio_chars": int(chars_total),
+        "espacio_kb": round(int(chars_total) / 1024, 1),
+        "viejas_30d": int(viejas),
+        "top_5_mas_usadas": [
+            {
+                "clave": r.clave[:20] + "…" if r.clave else "—",
+                "modelo": r.modelo,
+                "hits": r.hit_count or 0,
+                "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+            }
+            for r in top_5
+        ],
+    }
+
+
 @router.post("/mantenimiento/purgar")
 def mantenimiento_purgar(
     dry_run: bool = False,
