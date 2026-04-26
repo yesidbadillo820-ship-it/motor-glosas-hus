@@ -3403,6 +3403,57 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/picos-historicos")
+def stats_picos_historicos(
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R104 P2: top N días con más glosas creadas (picos de carga).
+
+    Útil para:
+      - Identificar fechas de "embotellamiento" históricas
+      - Correlacionar con eventos externos (cargas masivas EPS,
+        cambios normativos, fin de mes)
+      - Planeación: "los días X-Y de cada mes pico hay alta carga"
+
+    Devuelve top N días ordenados DESC por glosas creadas:
+      [{"fecha": "2026-04-15", "glosas": 47, "valor_total": 8500000}, ...]
+    """
+    from datetime import timezone
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_dia: dict[str, dict] = {}
+    for g in glosas:
+        if not g.creado_en:
+            continue
+        creado = g.creado_en
+        if creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        key = creado.date().isoformat()
+        if key not in por_dia:
+            por_dia[key] = {"glosas": 0, "valor": 0.0}
+        por_dia[key]["glosas"] += 1
+        por_dia[key]["valor"] += float(g.valor_objetado or 0)
+
+    items = [
+        {
+            "fecha": k,
+            "glosas": v["glosas"],
+            "valor_total": int(v["valor"]),
+        }
+        for k, v in por_dia.items()
+    ]
+    items.sort(key=lambda x: x["glosas"], reverse=True)
+
+    return {
+        "top_solicitado": int(top),
+        "total_dias_con_actividad": len(items),
+        "items": items[:top],
+    }
+
+
 @router.get("/stats/cohorte-mensual")
 def stats_cohorte_mensual(
     meses: int = Query(6, ge=1, le=24),
