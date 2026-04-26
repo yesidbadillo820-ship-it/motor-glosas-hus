@@ -6273,6 +6273,68 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/decisiones-por-dia")
+def stats_decisiones_por_dia(
+    dias: int = Query(30, ge=7, le=180),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R297 P1: serie diaria de decisiones EPS.
+
+    Para cada día de los últimos N, cuántas glosas fueron
+    decididas (LEVANTADA, RATIFICADA, ACEPTADA con
+    `fecha_decision_eps`).
+
+    Útil para detectar picos diarios de actividad y
+    planear cargas de equipo.
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .all()
+    )
+
+    por_dia: dict[str, dict] = {}
+    for g in glosas:
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not dec:
+            continue
+        k = dec.strftime("%Y-%m-%d")
+        b = por_dia.setdefault(k, {
+            "total": 0, "lev": 0, "rat": 0, "ace": 0,
+        })
+        b["total"] += 1
+        estado = (g.estado or "").upper()
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+        elif estado == "RATIFICADA":
+            b["rat"] += 1
+        elif estado == "ACEPTADA":
+            b["ace"] += 1
+
+    serie = []
+    for k in sorted(por_dia.keys()):
+        b = por_dia[k]
+        serie.append({
+            "fecha": k,
+            "total": b["total"],
+            "levantadas": b["lev"],
+            "ratificadas": b["rat"],
+            "aceptadas": b["ace"],
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total_dias_con_actividad": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/gestor-vs-eps-matriz")
 def stats_gestor_vs_eps_matriz(
     top_gestores: int = Query(10, ge=2, le=30),
