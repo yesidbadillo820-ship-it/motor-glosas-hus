@@ -732,6 +732,69 @@ def info_version():
     }
 
 
+@router.get("/test-suite-status")
+def info_test_suite(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R142 P1: índice de la suite de tests del proyecto.
+
+    Lista los archivos de test presentes (sin ejecutarlos),
+    útil para:
+      - Documentación: ¿qué cobertura tenemos?
+      - QA: revisar qué módulos no tienen tests
+      - Onboarding: navegar la base de tests rápidamente
+
+    NO ejecuta tests. Solo enumera archivos del FS.
+
+    Devuelve:
+      - total_archivos / total_lineas
+      - por_directorio: counts agrupados (test_api, test_services, ...)
+      - items: lista de archivos con tamaño y líneas
+    """
+    import os
+    from pathlib import Path
+
+    candidate = Path(os.getcwd()) / "tests"
+    if not candidate.is_dir():
+        candidate = Path(__file__).resolve().parents[3] / "tests"
+
+    if not candidate.is_dir():
+        return {
+            "total_archivos": 0,
+            "total_lineas": 0,
+            "por_directorio": {},
+            "items": [],
+            "error": "Directorio tests/ no encontrado",
+        }
+
+    items = []
+    por_dir: dict[str, int] = {}
+    for path in sorted(candidate.rglob("test_*.py")):
+        try:
+            rel = path.relative_to(candidate)
+            subdir = str(rel.parent)
+            por_dir[subdir] = por_dir.get(subdir, 0) + 1
+            tamano = path.stat().st_size
+            with open(path, "r", encoding="utf-8") as f:
+                lineas = sum(1 for _ in f)
+            items.append({
+                "archivo": str(rel),
+                "tamano_bytes": tamano,
+                "lineas": lineas,
+            })
+        except Exception:
+            continue
+
+    return {
+        "total_archivos": len(items),
+        "total_lineas": sum(it["lineas"] for it in items),
+        "por_directorio": dict(
+            sorted(por_dir.items(), key=lambda x: x[1], reverse=True)
+        ),
+        "items": items,
+    }
+
+
 @router.get("/api-endpoints")
 def info_api_endpoints(
     incluir_metodos: bool = True,
