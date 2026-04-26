@@ -6441,6 +6441,70 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/eps-radica-promedio-dia")
+def stats_eps_radica_promedio_dia(
+    dias: int = Query(30, ge=7, le=180),
+    min_glosas: int = Query(5, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R357 P1: glosas creadas por día por EPS.
+
+    En los últimos N días, cuántas glosas envía en
+    promedio cada EPS por día. Útil para presupuestar
+    capacidad operativa.
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        b = bucket.setdefault(eps, {
+            "total": 0, "por_dia": {},
+        })
+        b["total"] += 1
+        k = cre.date().isoformat()
+        b["por_dia"][k] = b["por_dia"].get(k, 0) + 1
+
+    items = []
+    for eps, b in bucket.items():
+        if b["total"] < min_glosas:
+            continue
+        n_dias = len(b["por_dia"])
+        max_dia = max(b["por_dia"].values()) if b["por_dia"] else 0
+        prom = round(b["total"] / int(dias), 2)
+        items.append({
+            "eps": eps,
+            "count_total": b["total"],
+            "dias_con_glosa": n_dias,
+            "promedio_diario": prom,
+            "max_dia": max_dia,
+        })
+    items.sort(key=lambda x: x["promedio_diario"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/factura-tasa-cierre")
 def stats_factura_tasa_cierre(
     min_glosas: int = Query(2, ge=1, le=20),
