@@ -6273,6 +6273,65 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/conciliaciones-mensual")
+def stats_conciliaciones_mensual(
+    meses: int = Query(12, ge=1, le=36),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R277 P1: serie temporal mensual de conciliaciones.
+
+    Diferente a /stats/conciliaciones (snapshot global):
+    aquí mes-a-mes count_conciliaciones, valor_conciliado
+    y resultado más común.
+
+    Útil para detectar tendencias en la fase pre-litigio.
+    """
+    from datetime import timedelta, timezone
+
+    from app.models.db import ConciliacionRecord
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    rows = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.creado_en >= desde)
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for c in rows:
+        cre = c.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {
+            "count": 0, "valor": 0.0, "resultados": {},
+        })
+        b["count"] += 1
+        b["valor"] += float(c.valor_conciliado or 0)
+        res = c.resultado or "SIN_RESULTADO"
+        b["resultados"][res] = b["resultados"].get(res, 0) + 1
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        top_res = max(b["resultados"].items(), key=lambda x: x[1])[0]
+        serie.append({
+            "mes": k,
+            "count_conciliaciones": b["count"],
+            "valor_conciliado_total": int(b["valor"]),
+            "resultado_dominante": top_res,
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/comentarios-actividad-mensual")
 def stats_comentarios_actividad_mensual(
     meses: int = Query(6, ge=1, le=24),
