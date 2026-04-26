@@ -6273,6 +6273,85 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-tendencia-mensual")
+def stats_eps_tendencia_mensual(
+    eps: str = Query(..., min_length=2),
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R273 P1: evolución mensual de UNA EPS específica.
+
+    Drill-down temporal por EPS. Diferente a
+    /stats/eps-actividad-mensual (todas las EPS): aquí
+    enfocado en una sola, perfecto para revisión de
+    relación EPS-IPS.
+
+    Por mes: creadas, decididas, levantadas, valor_objetado,
+    valor_recuperado, tasa_levantamiento_pct.
+    """
+    from datetime import timedelta, timezone
+
+    eps_q = (eps or "").strip()
+    if not eps_q:
+        return {"eps": "", "ventana_meses": int(meses), "serie": []}
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps_q))
+        .filter(GlosaRecord.creado_en >= desde)
+        .all()
+    )
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {
+            "creadas": 0, "decididas": 0, "levantadas": 0,
+            "obj": 0.0, "rec": 0.0,
+        })
+        b["creadas"] += 1
+        b["obj"] += float(g.valor_objetado or 0)
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_DECIDIDOS:
+            b["decididas"] += 1
+            b["rec"] += float(g.valor_recuperado or 0)
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        tasa = (
+            round(100 * b["levantadas"] / b["decididas"], 2)
+            if b["decididas"] else 0.0
+        )
+        serie.append({
+            "mes": k,
+            "creadas": b["creadas"],
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "valor_objetado": int(b["obj"]),
+            "valor_recuperado": int(b["rec"]),
+            "tasa_levantamiento_pct": tasa,
+        })
+
+    return {
+        "eps": eps_q,
+        "ventana_meses": int(meses),
+        "total_meses_con_actividad": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/facturas-saldos-pendientes")
 def stats_facturas_saldos_pendientes(
     limit: int = Query(50, ge=1, le=500),
