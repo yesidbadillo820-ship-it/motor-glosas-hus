@@ -4032,9 +4032,20 @@ async function verHistorialVersiones(){
     versiones.forEach(function(v, i){
       var fecha = v.creado_en ? new Date(v.creado_en).toLocaleString('es-CO') : '—';
       var previewTexto = stripHtml(v.preview || '');
+      // R63 P2: botón "Diff vs anterior" si hay versión cronológicamente
+      // anterior (versiones vienen en orden DESC, la siguiente del array
+      // es la previa en el tiempo).
+      var btnDiff = '';
+      if(i + 1 < versiones.length){
+        var prev = versiones[i + 1];
+        btnDiff = '<button class="restaurar" style="background:#1e40af;margin-left:6px;" '
+                + 'onclick="window.opener.verDiffVersiones(' + CURRENT_GLOSA_ID + ',' + prev.id + ',' + v.id + ')">'
+                + '🔍 Diff vs v' + prev.id + '</button>';
+      }
       html += '<div class="ver '+escHtml(v.accion||'')+'">' +
         '<div class="meta">' +
           '<span class="chip">'+escHtml(v.accion||'—')+'</span>' +
+          '<span>v'+v.id+'</span>' +
           '<span>📧 '+escHtml(v.autor_email||'—')+'</span>' +
           '<span>🕐 '+fecha+'</span>' +
           (i === 0 ? '<span style="color:#047857;font-weight:600">● ACTUAL</span>' : '') +
@@ -4042,11 +4053,63 @@ async function verHistorialVersiones(){
         (v.mensaje_refinar ? '<div class="msg">💬 ' + escHtml(v.mensaje_refinar) + '</div>' : '') +
         '<div class="preview">' + escHtml(previewTexto) + (previewTexto.length >= 450 ? '…' : '') + '</div>' +
         (i > 0 ? '<button class="restaurar" onclick="window.opener.restaurarVersion('+CURRENT_GLOSA_ID+','+v.id+');window.close()">Restaurar esta versión</button>' : '') +
+        btnDiff +
       '</div>';
     });
     html += '</body></html>';
     w.document.write(html); w.document.close();
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// R63 P2: muestra diff entre dos versiones del dictamen en una popup
+async function verDiffVersiones(glosaId, v1Id, v2Id){
+  try{
+    var r = await fetch('/glosas/' + glosaId + '/versiones/diff?v1=' + v1Id + '&v2=' + v2Id,
+                        {headers: authH()});
+    if(!r.ok){
+      var er = await r.json().catch(function(){return{detail:'Error'};});
+      toast('Error', er.detail || ('HTTP ' + r.status), 'error');
+      return;
+    }
+    var d = await r.json();
+    var w = window.open('', '_blank', 'width=900,height=700');
+    // Escapar HTML del diff y colorear líneas + / -
+    var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var lineas = (d.diff_unificado || '').split('\n');
+    var diffHtml = '';
+    lineas.forEach(function(ln){
+      var clase = '';
+      if(ln.startsWith('+++') || ln.startsWith('---')){ clase = 'header'; }
+      else if(ln.startsWith('@@')){ clase = 'hunk'; }
+      else if(ln.startsWith('+')){ clase = 'add'; }
+      else if(ln.startsWith('-')){ clase = 'rem'; }
+      diffHtml += '<div class="ln ' + clase + '">' + esc(ln) + '</div>';
+    });
+    var resumen = d.sin_cambios
+      ? '<div style="background:#dcfce7;border:1px solid #16a34a;color:#166534;padding:10px;border-radius:8px;font-weight:600;">✓ Las dos versiones son idénticas en contenido textual.</div>'
+      : '<div style="background:#eff6ff;border:1px solid #3b82f6;padding:10px;border-radius:8px;"><b>+' + d.lineas_agregadas + '</b> líneas · <b>−' + d.lineas_removidas + '</b> líneas</div>';
+    var html = '<html><head><meta charset="utf-8"><title>Diff v' + v1Id + ' ↔ v' + v2Id + '</title>'
+             + '<style>body{font-family:Segoe UI,Arial;padding:18px;background:#f8fafc;color:#1f2937;line-height:1.5}'
+             + 'h1{color:#0b5d8a;border-bottom:2px solid #0b5d8a;padding-bottom:6px;font-size:1.1rem;}'
+             + '.meta{font-size:.78rem;color:#64748b;margin:.4rem 0 1rem;}'
+             + 'pre{background:#1e293b;color:#e2e8f0;padding:14px;border-radius:8px;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;}'
+             + '.ln{padding:1px 8px;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;line-height:1.5;}'
+             + '.add{background:#14532d;color:#bbf7d0;}'
+             + '.rem{background:#7f1d1d;color:#fecaca;}'
+             + '.hunk{background:#1e3a8a;color:#bfdbfe;font-weight:700;}'
+             + '.header{background:#475569;color:#e2e8f0;font-weight:700;}'
+             + '</style></head><body>'
+             + '<h1>🔍 Diff: v' + v1Id + ' (' + esc(d.v1.accion || '—') + ') ↔ v' + v2Id + ' (' + esc(d.v2.accion || '—') + ')</h1>'
+             + '<div class="meta">Glosa #' + glosaId + ' · '
+             + 'v' + v1Id + ' ' + (d.v1.creado_en ? new Date(d.v1.creado_en).toLocaleString('es-CO') : '—')
+             + ' → v' + v2Id + ' ' + (d.v2.creado_en ? new Date(d.v2.creado_en).toLocaleString('es-CO') : '—')
+             + '</div>'
+             + resumen
+             + '<div style="background:#1e293b;border-radius:8px;padding:14px;margin-top:1rem;">'
+             + diffHtml + '</div></body></html>';
+    w.document.write(html);
+    w.document.close();
+  } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function restaurarVersion(glosaId, versionId){
