@@ -6086,6 +6086,74 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/calidad-dictamen-por-gestor")
+def stats_calidad_dictamen_por_gestor(
+    min_glosas: int = Query(3, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R261 P1: calidad de dictamen por gestor.
+
+    Métricas por gestor sobre el campo `dictamen`:
+      - total_glosas
+      - len_promedio (caracteres del dictamen)
+      - count_cortos (< 50 chars)
+      - count_largos (>= 200 chars)
+      - pct_completos (>= 50 chars)
+
+    Útil para detectar gestores que escriben dictámenes
+    pobres y sugerir entrenamiento.
+
+    Ordenado DESC por len_promedio.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        b = bucket.setdefault(gestor, {
+            "total": 0, "suma": 0, "cortos": 0, "largos": 0, "completos": 0,
+        })
+        dlen = len(g.dictamen or "")
+        b["total"] += 1
+        b["suma"] += dlen
+        if dlen < 50:
+            b["cortos"] += 1
+        elif dlen >= 200:
+            b["largos"] += 1
+        if dlen >= 50:
+            b["completos"] += 1
+
+    items = []
+    for gestor, b in bucket.items():
+        if b["total"] < min_glosas:
+            continue
+        prom = round(b["suma"] / b["total"], 1)
+        pct_c = round(100 * b["completos"] / b["total"], 2)
+        items.append({
+            "gestor": gestor,
+            "total_glosas": b["total"],
+            "len_promedio": prom,
+            "count_cortos": b["cortos"],
+            "count_largos": b["largos"],
+            "pct_completos": pct_c,
+        })
+    items.sort(key=lambda x: x["len_promedio"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_gestores": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigo-glosa-tendencia")
 def stats_codigo_glosa_tendencia(
     dias: int = Query(30, ge=7, le=90),
