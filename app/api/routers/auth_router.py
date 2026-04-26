@@ -154,6 +154,33 @@ async def cambiar_password(
     }
 
 
+@router.post("/auth/logout")
+def logout(
+    request: Request,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R82 P2: marca el cierre de sesión del usuario en el audit log.
+
+    Como los JWT son stateless, el endpoint no invalida el token
+    activamente (eso requeriría un blocklist en Redis). El frontend
+    debe DESCARTAR el token tras llamar /logout — esto solo registra
+    la intención del usuario para auditoría regulatoria.
+
+    Útil para:
+      - Trazabilidad: "¿quién cerró sesión y a qué hora?"
+      - Forense: si hay duda sobre actividad post-logout
+      - Cumplimiento Habeas Data (Ley 1581/2012)
+    """
+    ip = get_remote_address(request)
+    logger.info(
+        f"[AUTH-LOGOUT] Cierre de sesión | email={current_user.email} | ip={ip}"
+    )
+    return {
+        "ok": True,
+        "mensaje": "Sesión cerrada. Descarte el token en el cliente.",
+    }
+
+
 @router.post("/auth/refresh", response_model=TokenResponse)
 def refresh_token(
     request: Request,
