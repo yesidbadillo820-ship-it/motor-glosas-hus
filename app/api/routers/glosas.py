@@ -5927,6 +5927,56 @@ def stats_exito_por_codigo_respuesta(
     }
 
 
+@router.get("/stats/por-etapa-actual")
+def stats_por_etapa_actual(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R147 P1: distribución actual de glosas por etapa.
+
+    Snapshot del pipeline: cuántas glosas hay en cada etapa
+    ahora mismo. Útil para visualizar el funnel:
+      "RADICADA: 100 → RESPUESTA_PRIMERA: 80 → RATIFICACION: 20"
+
+    Devuelve por etapa:
+      - count
+      - valor_pendiente_total
+      - pct_del_total
+
+    Ordenado DESC por count.
+    """
+    glosas = db.query(GlosaRecord).all()
+
+    por_etapa: dict[str, dict] = {}
+    for g in glosas:
+        etapa = (g.etapa or "(SIN_ETAPA)").strip() or "(SIN_ETAPA)"
+        if etapa not in por_etapa:
+            por_etapa[etapa] = {"count": 0, "valor": 0.0}
+        por_etapa[etapa]["count"] += 1
+        por_etapa[etapa]["valor"] += float(g.valor_objetado or 0)
+
+    total_count = sum(b["count"] for b in por_etapa.values())
+    items = []
+    for etapa, b in por_etapa.items():
+        pct = (
+            round(100 * b["count"] / total_count, 2)
+            if total_count else 0.0
+        )
+        items.append({
+            "etapa": etapa,
+            "count": b["count"],
+            "valor_pendiente_total": int(b["valor"]),
+            "pct_del_total": pct,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "total_glosas": total_count,
+        "total_etapas_unicas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/concentracion-codigo")
 def stats_concentracion_codigo(
     db: Session = Depends(get_db),
