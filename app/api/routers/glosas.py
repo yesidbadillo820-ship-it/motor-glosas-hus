@@ -4631,6 +4631,119 @@ def contexto_completo_glosa(
     }
 
 
+@router.get("/{glosa_id}/recomendaciones")
+def recomendaciones_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R111 P1: sugerencias heurísticas de próximas acciones.
+
+    Sin IA — usa reglas determinísticas basadas en el estado actual
+    de la glosa. Útil para guiar al auditor: "¿qué debería hacer
+    a continuación?".
+
+    Devuelve lista de recomendaciones con prioridad y descripción:
+      - HIGH: vencidas, sin dictamen
+      - MEDIUM: sin gestor, datos incompletos
+      - LOW: enriquecer información
+
+    Cada recomendación tiene: {prioridad, accion, descripcion, endpoint?}
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    estado = (glosa.estado or "").upper()
+    cerrada = estado in ESTADOS_CERRADOS
+    recomendaciones = []
+
+    if cerrada:
+        recomendaciones.append({
+            "prioridad": "INFO",
+            "accion": "ARCHIVAR",
+            "descripcion": "Glosa cerrada — sin acciones pendientes.",
+        })
+        return {
+            "glosa_id": glosa_id,
+            "total": len(recomendaciones),
+            "items": recomendaciones,
+        }
+
+    # ── Reglas críticas ───────────────────────────────────────
+    dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+    if dr < 0:
+        recomendaciones.append({
+            "prioridad": "HIGH",
+            "accion": "ATENDER_VENCIDA",
+            "descripcion": (
+                f"Glosa vencida hace {abs(dr)} días. Responder "
+                "urgentemente para evitar ratificación automática."
+            ),
+        })
+    elif dr <= 3:
+        recomendaciones.append({
+            "prioridad": "HIGH",
+            "accion": "ATENDER_CRITICA",
+            "descripcion": f"Faltan {dr} días para vencimiento.",
+        })
+
+    if not glosa.dictamen or len(glosa.dictamen) < 50:
+        recomendaciones.append({
+            "prioridad": "HIGH",
+            "accion": "GENERAR_DICTAMEN",
+            "descripcion": "No hay dictamen generado. Usar IA para crear uno.",
+            "endpoint": f"POST /glosas/{glosa_id}/refinar",
+        })
+
+    # ── Reglas medias ─────────────────────────────────────────
+    if not glosa.gestor_nombre:
+        recomendaciones.append({
+            "prioridad": "MEDIUM",
+            "accion": "ASIGNAR_GESTOR",
+            "descripcion": "Glosa sin gestor asignado.",
+            "endpoint": f"PATCH /glosas/{glosa_id}/asignar",
+        })
+
+    if not glosa.factura or glosa.factura == "N/A":
+        recomendaciones.append({
+            "prioridad": "MEDIUM",
+            "accion": "COMPLETAR_FACTURA",
+            "descripcion": "Falta número de factura.",
+        })
+
+    if not glosa.texto_glosa_original:
+        recomendaciones.append({
+            "prioridad": "MEDIUM",
+            "accion": "CAPTURAR_TEXTO_ORIGINAL",
+            "descripcion": "Sin texto original — el contexto IA será débil.",
+        })
+
+    # ── Reglas bajas ──────────────────────────────────────────
+    if not glosa.cups_servicio:
+        recomendaciones.append({
+            "prioridad": "LOW",
+            "accion": "AGREGAR_CUPS",
+            "descripcion": "Sin código CUPS — útil para validación normativa.",
+        })
+
+    if not recomendaciones:
+        recomendaciones.append({
+            "prioridad": "INFO",
+            "accion": "MONITOREAR",
+            "descripcion": "Glosa en buen estado — esperar respuesta EPS.",
+        })
+
+    return {
+        "glosa_id": glosa_id,
+        "estado_actual": glosa.estado,
+        "total": len(recomendaciones),
+        "items": recomendaciones,
+    }
+
+
 @router.get("/{glosa_id}/exportar-evidencia.zip")
 def exportar_evidencia_zip(
     glosa_id: int,
