@@ -349,3 +349,100 @@ def mantenimiento_purgar(
     """
     from app.services.mantenimiento import ejecutar_mantenimiento_completo
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
+
+
+@router.get("/backup-db.json")
+def descargar_backup_db(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R62 P2: backup selectivo de tablas críticas en JSON.
+
+    Exporta tablas que NO son derivables (datos de negocio reales):
+      - glosas
+      - contratos
+      - tarifas_contratadas
+      - usuarios (sin password_hash)
+      - audit_log (últimos 90 días)
+      - conciliaciones
+      - plantillas_gold (las que el equipo curó manualmente)
+
+    NO incluye tablas regenerables:
+      - ai_cache (caché)
+      - ai_calls (métricas históricas)
+      - glosas_eliminadas (papelera)
+
+    Solo SUPER_ADMIN. La respuesta tiene Content-Disposition:
+    attachment para descarga directa.
+
+    Tamaño esperado: 1-50 MB para una IPS típica con 10k glosas.
+    """
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi.responses import Response
+    from sqlalchemy import inspect
+
+    from app.models.db import (
+        ContratoRecord, GlosaRecord, TarifaContratadaRecord,
+        ConciliacionRecord, PlantillaGoldRecord,
+    )
+
+    def _serializar(rec, exclude: tuple = ()) -> dict:
+        out = {}
+        for col in inspect(rec).mapper.column_attrs:
+            if col.key in exclude:
+                continue
+            val = getattr(rec, col.key)
+            if isinstance(val, datetime):
+                val = val.isoformat()
+            out[col.key] = val
+        return out
+
+    backup = {
+        "metadata": {
+            "exportado_en": datetime.now(timezone.utc).isoformat(),
+            "exportado_por": current_user.email,
+            "version_schema": "1.0",
+            "incluye_tablas": [
+                "glosas", "contratos", "tarifas_contratadas",
+                "usuarios", "audit_log_90d", "conciliaciones",
+                "plantillas_gold",
+            ],
+        },
+    }
+
+    backup["glosas"] = [_serializar(g) for g in db.query(GlosaRecord).all()]
+    backup["contratos"] = [_serializar(c) for c in db.query(ContratoRecord).all()]
+    backup["tarifas_contratadas"] = [
+        _serializar(t) for t in db.query(TarifaContratadaRecord).all()
+    ]
+    # Usuarios SIN password_hash (seguridad: el backup no debe servir
+    # para login en otra instancia)
+    backup["usuarios"] = [
+        _serializar(u, exclude=("password_hash", "totp_secret"))
+        for u in db.query(UsuarioRecord).all()
+    ]
+    # Audit log: solo últimos 90 días para mantener tamaño manejable
+    corte_audit = datetime.now(timezone.utc) - timedelta(days=90)
+    backup["audit_log_90d"] = [
+        _serializar(a) for a in db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= corte_audit)
+        .order_by(AuditLogRecord.timestamp.desc())
+        .all()
+    ]
+    backup["conciliaciones"] = [
+        _serializar(c) for c in db.query(ConciliacionRecord).all()
+    ]
+    backup["plantillas_gold"] = [
+        _serializar(p) for p in db.query(PlantillaGoldRecord)
+        .filter(PlantillaGoldRecord.activa == 1).all()
+    ]
+
+    fname = f"backup-hus-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.json"
+    payload = json.dumps(backup, ensure_ascii=False, default=str).encode("utf-8")
+    return Response(
+        content=payload,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )

@@ -2099,6 +2099,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </select>
           <input type="text" id="audit-usuario" placeholder="Filtrar por usuario…" oninput="debounceAudit()"/>
           <button class="btn btn-ghost" onclick="loadAudit(1)" style="margin-left:auto">Actualizar</button>
+          <!-- R62 P1+P2: descargas para auditoría regulatoria -->
+          <button class="btn btn-ghost" onclick="descargarAuditCsv()" title="Descargar audit log filtrado en CSV (Habeas Data, Ley 1581/2012)" style="font-size:.78rem;">📥 CSV</button>
+          <button class="btn btn-ghost" onclick="descargarBackupDb()" title="Descargar backup completo de la BD en JSON (solo SUPER_ADMIN)" style="font-size:.78rem;">💾 Backup</button>
         </div>
         <table style="margin-top:1rem;width:100%;border-collapse:collapse;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
           <thead><tr><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Fecha</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Usuario</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Rol</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Acción</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Tabla</th><th style="padding:.75rem;text-align:center;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">ID</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Campo</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Antes</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Después</th><th style="padding:.75rem;text-align:left;background:var(--bg);font-size:.7rem;font-weight:700;color:var(--text3)">Detalle</th></tr></thead>
@@ -8717,6 +8720,54 @@ async function registrarResultadoConciliacion(id){
 // ─── AUDIT LOG ─────────────────────────────────────────────────────────────
 var auditDebounce;
 function debounceAudit(){clearTimeout(auditDebounce);auditDebounce=setTimeout(function(){loadAudit(1);},350);}
+
+// R62 P1: descargar audit log filtrado como CSV
+async function descargarAuditCsv(){
+  var accion = document.getElementById('audit-accion').value || '';
+  var tabla = document.getElementById('audit-tabla').value || '';
+  var usuario = document.getElementById('audit-usuario').value || '';
+  var qs = [];
+  if(accion) qs.push('accion=' + encodeURIComponent(accion));
+  if(tabla) qs.push('tabla=' + encodeURIComponent(tabla));
+  if(usuario) qs.push('usuario=' + encodeURIComponent(usuario));
+  var url = '/audit/export.csv' + (qs.length ? '?' + qs.join('&') : '');
+  try{
+    var r = await fetch(url, { headers: authH() });
+    if(r.status === 403){ toast('Permiso','Solo coordinador/admin','warning'); return; }
+    if(!r.ok){ toast('Error', 'HTTP ' + r.status, 'error'); return; }
+    var blob = await r.blob();
+    var dispo = r.headers.get('content-disposition') || '';
+    var m = dispo.match(/filename="([^"]+)"/);
+    var fname = m ? m[1] : 'audit-log.csv';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Descargado', fname, 'success');
+  } catch(e){ toast('Error', e.message, 'error'); }
+}
+
+// R62 P2: descargar backup completo de BD (solo SUPER_ADMIN)
+async function descargarBackupDb(){
+  if(!confirm('¿Descargar backup completo de la BD?\n\nIncluye: glosas, contratos, usuarios (sin passwords), audit log 90 días, conciliaciones, plantillas Gold.\n\nGenerar backup puede tomar varios segundos en BDs grandes.')){
+    return;
+  }
+  toast('Generando…', 'Preparando backup', 'info');
+  try{
+    var r = await fetch('/admin/backup-db.json', { headers: authH() });
+    if(r.status === 403){ toast('Permiso','Solo SUPER_ADMIN puede generar backup','warning'); return; }
+    if(!r.ok){ toast('Error', 'HTTP ' + r.status, 'error'); return; }
+    var blob = await r.blob();
+    var dispo = r.headers.get('content-disposition') || '';
+    var m = dispo.match(/filename="([^"]+)"/);
+    var fname = m ? m[1] : 'backup-hus.json';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Descargado', fname + ' (' + (blob.size/1024).toFixed(0) + ' KB)', 'success');
+  } catch(e){ toast('Error', e.message, 'error'); }
+}
 
 async function loadAudit(page){
   var accion=document.getElementById('audit-accion').value;
