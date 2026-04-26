@@ -6441,6 +6441,55 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/conciliaciones-acta-firmadas")
+def stats_conciliaciones_acta_firmadas(
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R366 P1: conciliaciones con acta firmada.
+
+    Lista conciliaciones en estado ACTA_FIRMADA o
+    CERRADA con detalle de acta_numero, fecha_acta y
+    valor_ratificado_hus. Útil como inventario formal
+    de cierres bilaterales.
+    """
+    from app.models.db import ConciliacionRecord
+
+    rows = (
+        db.query(ConciliacionRecord)
+        .filter(
+            ConciliacionRecord.estado_bilateral.in_(
+                ["ACTA_FIRMADA", "CERRADA"],
+            )
+        )
+        .order_by(ConciliacionRecord.fecha_acta.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for c in rows:
+        items.append({
+            "conciliacion_id": c.id,
+            "glosa_id": c.glosa_id,
+            "acta_numero": c.acta_numero,
+            "fecha_acta": (
+                c.fecha_acta.isoformat() if c.fecha_acta else None
+            ),
+            "valor_conciliado": int(float(c.valor_conciliado or 0)),
+            "valor_ratificado_hus": int(
+                float(c.valor_ratificado_hus or 0),
+            ),
+            "estado_bilateral": c.estado_bilateral,
+        })
+
+    return {
+        "total_actas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/cobranza-eps-vencidas")
 def stats_cobranza_eps_vencidas(
     db: Session = Depends(get_db),
