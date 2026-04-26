@@ -10510,6 +10510,34 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/estado-resumen")
+def estado_resumen(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R251 P1: vista ultra-compacta del estado de una glosa.
+
+    Diferente a /{id}/dashboard (con contadores) y a
+    /{id}/contexto-completo (con relaciones): aquí sólo los 5
+    datos esenciales para tooltip o cards minimalistas:
+      - id, eps, valor, estado, dias_restantes
+
+    Útil para componentes UI muy pequeños.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    return {
+        "id": glosa.id,
+        "eps": glosa.eps,
+        "valor_objetado": float(glosa.valor_objetado or 0),
+        "estado": glosa.estado,
+        "dias_restantes": glosa.dias_restantes,
+    }
+
+
 @router.get("/{glosa_id}/glosas-mismo-paciente")
 def glosas_mismo_paciente(
     glosa_id: int,
