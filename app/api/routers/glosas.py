@@ -131,6 +131,14 @@ class BulkActualizarEstadoRequest(BaseModel):
     nota: Optional[str] = Field(default=None, max_length=300)
 
 
+class BulkMoverPapeleraRequest(BaseModel):
+    """R71 P2: mueve N glosas a la papelera en una sola transacción.
+    Soporta dry_run para preview antes de ejecutar."""
+    glosa_ids: list[int] = Field(..., min_length=1, max_length=200)
+    motivo: Optional[str] = Field(default=None, max_length=300)
+    dry_run: bool = False
+
+
 def _limpiar_observacion(dictamen_html: str) -> str:
     """Extrae solo el texto del argumento jurídico del dictamen, quitando la
     tabla superior (código/valor/respuesta), los badges, la tabla de resumen
@@ -2228,6 +2236,66 @@ def bulk_actualizar_estado(
         "actualizadas": actualizadas,
         "no_encontradas": no_encontradas,
         "estado": nuevo_estado_norm,
+    }
+
+
+@router.post("/bulk-mover-papelera")
+def bulk_mover_papelera(
+    data: BulkMoverPapeleraRequest,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R71 P2: mueve N glosas a la papelera (soft-delete) de un golpe.
+
+    Útil cuando se importó un Excel duplicado por error y hay 50
+    glosas para depurar. Auth restringido a coordinador/admin (no
+    auditor) por riesgo.
+
+    Soporta dry_run=true para PREVIEW: lista qué glosas se moverían
+    sin tocar la BD. UI puede mostrar al usuario qué borrará y pedir
+    confirm.
+
+    Cada glosa movida queda en glosas_eliminadas (R52, papelera con
+    TTL 30 días) y se borra de historial. Si una glosa no existe,
+    se reporta en no_encontradas pero el batch continúa.
+    """
+    repo = GlosaRepository(db)
+    movidas = 0
+    no_encontradas = []
+    fallidas = []
+
+    for gid in data.glosa_ids:
+        g = repo.obtener_por_id(gid)
+        if not g:
+            no_encontradas.append(gid)
+            continue
+        if data.dry_run:
+            movidas += 1
+            continue
+        try:
+            from app.api.routers.papelera import mover_a_papelera
+            mover_a_papelera(
+                db, g,
+                eliminado_por=current_user.email,
+                motivo=(data.motivo or "Bulk delete")[:300],
+            )
+            db.delete(g)
+            movidas += 1
+        except Exception as e:
+            fallidas.append({"id": gid, "error": str(e)[:200]})
+
+    if not data.dry_run:
+        db.commit()
+        logger.info(
+            f"[BULK-PAPELERA] {movidas} glosas movidas a papelera por "
+            f"{current_user.email} | {len(fallidas)} fallidas"
+        )
+
+    return {
+        "dry_run": data.dry_run,
+        "movidas_a_papelera": movidas,
+        "no_encontradas": no_encontradas,
+        "fallidas": fallidas,
     }
 
 
