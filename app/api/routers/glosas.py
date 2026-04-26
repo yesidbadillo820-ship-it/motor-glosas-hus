@@ -6086,6 +6086,56 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/eps-pendientes-detalle")
+def stats_eps_pendientes_detalle(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R243 P1: ranking de EPS por count de glosas pendientes.
+
+    Diferente a /stats/cobranza-por-eps (ordenado por valor) y
+    /admin/eps-conteos (todas con todos los counts):
+    aquí solo EPS con glosas abiertas, ordenado por count.
+
+    Solo glosas no-cerradas.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_eps: dict[str, dict] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"count": 0, "valor": 0.0, "vencidas": 0}
+        por_eps[eps]["count"] += 1
+        por_eps[eps]["valor"] += float(g.valor_objetado or 0)
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            por_eps[eps]["vencidas"] += 1
+
+    items = []
+    for eps, b in por_eps.items():
+        items.append({
+            "eps": eps,
+            "count_pendientes": b["count"],
+            "valor_pendiente": int(b["valor"]),
+            "vencidas": b["vencidas"],
+        })
+    items.sort(key=lambda x: x["count_pendientes"], reverse=True)
+
+    return {
+        "total_eps_con_pendientes": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigos-respuesta-distribucion")
 def stats_codigos_respuesta_distribucion(
     db: Session = Depends(get_db),
