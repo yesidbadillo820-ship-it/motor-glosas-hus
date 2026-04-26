@@ -3,6 +3,8 @@
 Requiere rol SUPER_ADMIN y confirmación explícita para todas las acciones.
 Cada operación queda registrada en audit_log para trazabilidad.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -572,6 +574,78 @@ def admin_diagnostico_bd(
         "total_estimado_mb": round(total_mb, 2),
         "items": items,
     }
+
+
+@router.get("/glosas/exportar.csv")
+def admin_exportar_glosas_csv(
+    eps: Optional[str] = None,
+    estado: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R116 P2: exporta glosas como CSV streaming (lightweight, sin formato).
+
+    Complementa /glosas/exportar-xlsx (Excel completo con formato)
+    con un CSV simple de 11 columnas, ideal para:
+      - Importar a Excel/Sheets sin abrir XLSX
+      - Procesar con scripts/jq/awk
+      - Backup ligero (CSV es texto plano)
+
+    Filtros opcionales: eps, estado.
+
+    StreamingResponse para no cargar todo en memoria.
+
+    Solo SUPER_ADMIN.
+    """
+    import csv
+    import io
+    from datetime import datetime, timezone
+
+    from fastapi.responses import StreamingResponse
+
+    from app.models.db import GlosaRecord
+
+    q = db.query(GlosaRecord)
+    if eps:
+        q = q.filter(GlosaRecord.eps == eps)
+    if estado:
+        q = q.filter(GlosaRecord.estado == estado.upper())
+    glosas = q.order_by(GlosaRecord.id.asc()).all()
+
+    def _generar():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow([
+            "id", "creado_en", "eps", "factura", "codigo_glosa",
+            "valor_objetado", "valor_recuperado", "estado", "etapa",
+            "decision_eps", "gestor_nombre",
+        ])
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+
+        for g in glosas:
+            w.writerow([
+                g.id,
+                g.creado_en.isoformat() if g.creado_en else "",
+                g.eps or "",
+                g.factura or "",
+                g.codigo_glosa or "",
+                float(g.valor_objetado or 0),
+                float(g.valor_recuperado or 0),
+                g.estado or "",
+                g.etapa or "",
+                g.decision_eps or "",
+                g.gestor_nombre or "",
+            ])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
+
+    fname = f"glosas-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        _generar(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/glosas-prioritarias")
