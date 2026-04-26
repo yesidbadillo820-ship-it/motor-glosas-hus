@@ -6273,6 +6273,66 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/factura-resumen")
+def stats_factura_resumen(
+    factura: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R325 P1: drill-down de TODAS las glosas de una factura.
+
+    Drill-down operacional: para una factura específica,
+    muestra todas las glosas con estado, código, valor.
+    Útil al revisar una factura disputada.
+
+    Devuelve resumen y lista detallada.
+    """
+    factura_q = (factura or "").strip()
+    if not factura_q:
+        return {"factura": "", "glosas": []}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura == factura_q)
+        .order_by(GlosaRecord.creado_en.asc())
+        .all()
+    )
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = sum(
+        1 for g in rows
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS
+    )
+    obj_total = sum(float(g.valor_objetado or 0) for g in rows)
+    rec_total = sum(float(g.valor_recuperado or 0) for g in rows)
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_recuperado": int(float(g.valor_recuperado or 0)),
+            "gestor_nombre": g.gestor_nombre,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+        })
+
+    return {
+        "factura": factura_q,
+        "count_total": len(rows),
+        "count_abiertas": abiertas,
+        "count_cerradas": len(rows) - abiertas,
+        "valor_objetado_total": int(obj_total),
+        "valor_recuperado_total": int(rec_total),
+        "glosas": items,
+    }
+
+
 @router.get("/stats/edad-promedio-por-estado")
 def stats_edad_promedio_por_estado(
     db: Session = Depends(get_db),
