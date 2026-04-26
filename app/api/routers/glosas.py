@@ -3757,6 +3757,104 @@ def stats_proyeccion_recuperacion(
     }
 
 
+@router.get("/stats/dashboard-snapshot")
+def stats_dashboard_snapshot(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R109 P2: snapshot agregado para dashboard ejecutivo (single-call).
+
+    Combina las métricas más usadas del dashboard en un solo
+    round-trip. Reduce latencia y simplifica el frontend.
+
+    Devuelve:
+      - kpis: counts globales (total, abiertas, cerradas, vencidas,
+              criticas, en_tiempo)
+      - economico: valor_objetado_total, valor_recuperado_total,
+                   tasa_recuperacion_pct
+      - resoluciones: tasa_levantamiento_pct
+      - sla: % en tiempo, criticas, vencidas
+
+    Si necesitas más detalle, usar endpoints específicos
+    (cumplimiento-sla, comparativa-eps, recuperacion-mensual).
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ESTADOS_DECIDIDOS = ESTADOS_CERRADOS | {"RATIFICADA"}
+
+    todas = db.query(GlosaRecord).all()
+    total = len(todas)
+
+    abiertas = 0
+    cerradas = 0
+    vencidas = 0
+    criticas = 0
+    en_tiempo = 0
+    levantadas = 0
+    decididas = 0
+    valor_obj_total = 0.0
+    valor_rec_total = 0.0
+
+    for g in todas:
+        estado = (g.estado or "").upper()
+        v_obj = float(g.valor_objetado or 0)
+        valor_obj_total += v_obj
+        valor_rec_total += float(g.valor_recuperado or 0)
+
+        if estado in ESTADOS_CERRADOS:
+            cerradas += 1
+        else:
+            abiertas += 1
+            dr = g.dias_restantes if g.dias_restantes is not None else 0
+            if dr < 0:
+                vencidas += 1
+            elif dr <= 3:
+                criticas += 1
+            else:
+                en_tiempo += 1
+
+        if estado in ESTADOS_DECIDIDOS:
+            decididas += 1
+            if estado == "LEVANTADA":
+                levantadas += 1
+
+    return {
+        "kpis": {
+            "total": total,
+            "abiertas": abiertas,
+            "cerradas": cerradas,
+            "vencidas": vencidas,
+            "criticas": criticas,
+            "en_tiempo": en_tiempo,
+        },
+        "economico": {
+            "valor_objetado_total": int(valor_obj_total),
+            "valor_recuperado_total": int(valor_rec_total),
+            "tasa_recuperacion_pct": (
+                round(100 * valor_rec_total / valor_obj_total, 2)
+                if valor_obj_total else 0.0
+            ),
+        },
+        "resoluciones": {
+            "decididas": decididas,
+            "levantadas": levantadas,
+            "tasa_levantamiento_pct": (
+                round(100 * levantadas / decididas, 2)
+                if decididas else 0.0
+            ),
+        },
+        "sla": {
+            "vencidas": vencidas,
+            "criticas": criticas,
+            "en_tiempo": en_tiempo,
+            "pct_en_tiempo": (
+                round(100 * en_tiempo / abiertas, 2)
+                if abiertas else 0.0
+            ),
+        },
+        "generado_en": ahora_utc().isoformat(),
+    }
+
+
 @router.get("/stats/abandono-por-etapa")
 def stats_abandono_por_etapa(
     db: Session = Depends(get_db),
