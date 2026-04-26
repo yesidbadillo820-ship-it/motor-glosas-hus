@@ -509,6 +509,97 @@ def exportar_xlsx(
     )
 
 
+@router.get("/buscar-avanzado")
+def buscar_avanzado(
+    eps: Optional[str] = None,
+    paciente: Optional[str] = None,
+    factura: Optional[str] = None,
+    codigo_glosa: Optional[str] = None,
+    estado: Optional[str] = None,
+    etapa: Optional[str] = None,
+    gestor: Optional[str] = None,
+    valor_min: Optional[float] = None,
+    valor_max: Optional[float] = None,
+    fecha_desde: Optional[str] = Query(None, description="ISO YYYY-MM-DD"),
+    fecha_hasta: Optional[str] = Query(None, description="ISO YYYY-MM-DD"),
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R94 P1: búsqueda multi-campo combinable (AND entre filtros).
+
+    Complementa /buscar/{termino} (un solo término en factura/ID)
+    permitiendo consultas precisas tipo:
+      "glosas SANITAS de Pedro entre 1M-5M de marzo"
+
+    Filtros opcionales combinables vía AND. Strings usan ILIKE %x%
+    (búsqueda parcial case-insensitive). Fechas en ISO YYYY-MM-DD.
+
+    Devuelve hasta `limit` resultados (default 50, max 500), ordenados
+    DESC por creado_en.
+    """
+    from datetime import datetime, timezone
+
+    q = db.query(GlosaRecord)
+    if eps:
+        q = q.filter(GlosaRecord.eps.ilike(f"%{eps}%"))
+    if paciente:
+        q = q.filter(GlosaRecord.paciente.ilike(f"%{paciente}%"))
+    if factura:
+        q = q.filter(GlosaRecord.factura.ilike(f"%{factura}%"))
+    if codigo_glosa:
+        q = q.filter(GlosaRecord.codigo_glosa.ilike(f"%{codigo_glosa}%"))
+    if estado:
+        q = q.filter(GlosaRecord.estado == estado.upper())
+    if etapa:
+        q = q.filter(GlosaRecord.etapa.ilike(f"%{etapa}%"))
+    if gestor:
+        q = q.filter(GlosaRecord.gestor_nombre.ilike(f"%{gestor}%"))
+    if valor_min is not None:
+        q = q.filter(GlosaRecord.valor_objetado >= valor_min)
+    if valor_max is not None:
+        q = q.filter(GlosaRecord.valor_objetado <= valor_max)
+    if fecha_desde:
+        try:
+            dt = datetime.strptime(fecha_desde, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc,
+            )
+            q = q.filter(GlosaRecord.creado_en >= dt)
+        except ValueError:
+            raise HTTPException(400, "fecha_desde debe ser YYYY-MM-DD")
+    if fecha_hasta:
+        try:
+            dt = datetime.strptime(fecha_hasta, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc,
+            )
+            q = q.filter(GlosaRecord.creado_en <= dt)
+        except ValueError:
+            raise HTTPException(400, "fecha_hasta debe ser YYYY-MM-DD")
+
+    total = q.count()
+    glosas = q.order_by(GlosaRecord.creado_en.desc()).limit(limit).all()
+
+    return {
+        "total_coincidencias": total,
+        "limit": int(limit),
+        "items": [
+            {
+                "id": g.id,
+                "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+                "eps": g.eps,
+                "paciente": g.paciente,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "estado": g.estado,
+                "etapa": g.etapa,
+                "gestor_nombre": g.gestor_nombre,
+            }
+            for g in glosas
+        ],
+    }
+
+
 @router.get("/buscar/{termino}")
 def buscar_por_id_o_factura(
     termino: str,
