@@ -6273,6 +6273,74 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-diversidad-codigos")
+def stats_eps_diversidad_codigos(
+    min_glosas: int = Query(5, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R293 P1: diversidad de códigos de glosa por EPS.
+
+    Para cada EPS calcula cuántos códigos distintos
+    `codigo_glosa` utiliza. EPS con muy pocos códigos
+    distintos suelen ser "especializadas" (golpean
+    siempre lo mismo); EPS con muchos códigos son
+    "amplias" (atacan en muchos frentes).
+
+    Por EPS:
+      - count_glosas
+      - codigos_distintos
+      - ratio_diversidad (codigos / count_glosas)
+      - top_3_codigos: lista de los 3 más usados
+
+    Ordenado DESC por codigos_distintos.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.isnot(None))
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        codigo = (g.codigo_glosa or "").strip()
+        if not eps or not codigo:
+            continue
+        b = bucket.setdefault(eps, {
+            "count": 0, "codigos": {},
+        })
+        b["count"] += 1
+        b["codigos"][codigo] = b["codigos"].get(codigo, 0) + 1
+
+    items = []
+    for eps, b in bucket.items():
+        if b["count"] < min_glosas:
+            continue
+        diversos = len(b["codigos"])
+        ratio = round(diversos / b["count"], 3) if b["count"] else 0.0
+        top3 = sorted(
+            b["codigos"].items(), key=lambda x: x[1], reverse=True,
+        )[:3]
+        items.append({
+            "eps": eps,
+            "count_glosas": b["count"],
+            "codigos_distintos": diversos,
+            "ratio_diversidad": ratio,
+            "top_3_codigos": [
+                {"codigo_glosa": c, "count": n} for c, n in top3
+            ],
+        })
+    items.sort(key=lambda x: x["codigos_distintos"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/tipo-glosa-mensual")
 def stats_tipo_glosa_mensual(
     meses: int = Query(6, ge=1, le=24),
