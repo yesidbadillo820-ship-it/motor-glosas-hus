@@ -6273,6 +6273,121 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/dashboard-mensual-completo")
+def stats_dashboard_mensual_completo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R350 P1: dashboard mensual completo (single-call). HITO.
+
+    Mega-snapshot del mes en curso, combinando:
+      - kpis_creacion: creadas, valor_objetado_total
+      - kpis_decisiones: decididas, levantadas,
+        ratificadas, valor_recuperado_total
+      - kpis_sla: cerradas a tiempo, % SLA
+      - top_3_eps_volumen
+      - top_3_gestores_volumen
+      - tasa_levantamiento_pct, tasa_recuperacion_monetaria_pct
+
+    Hito R350: dashboard ejecutivo definitivo del mes.
+    """
+    from app.core.tz import ahora_utc
+
+    inicio = ahora_utc().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    creadas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio)
+        .all()
+    )
+    decididas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    n_creadas = len(creadas)
+    obj_creadas = sum(float(g.valor_objetado or 0) for g in creadas)
+
+    n_dec = len(decididas)
+    n_lev = sum(
+        1 for g in decididas
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    n_rat = sum(
+        1 for g in decididas
+        if (g.estado or "").upper() == "RATIFICADA"
+    )
+    rec_total = sum(
+        float(g.valor_recuperado or 0) for g in decididas
+    )
+    obj_dec_total = sum(
+        float(g.valor_objetado or 0) for g in decididas
+    )
+
+    a_tiempo = 0
+    for g in decididas:
+        venc = g.fecha_vencimiento
+        dec = g.fecha_decision_eps
+        if venc and dec and dec <= venc:
+            a_tiempo += 1
+
+    tasa_lev = round(100 * n_lev / n_dec, 2) if n_dec else 0.0
+    tasa_rec = (
+        round(100 * rec_total / obj_dec_total, 2)
+        if obj_dec_total else 0.0
+    )
+    pct_sla = round(100 * a_tiempo / n_dec, 2) if n_dec else 0.0
+
+    eps_vol: dict[str, int] = {}
+    gestor_vol: dict[str, int] = {}
+    for g in creadas:
+        eps = (g.eps or "").strip()
+        gest = (g.gestor_nombre or "").strip()
+        if eps:
+            eps_vol[eps] = eps_vol.get(eps, 0) + 1
+        if gest:
+            gestor_vol[gest] = gestor_vol.get(gest, 0) + 1
+
+    top3_eps = sorted(
+        eps_vol.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+    top3_gestor = sorted(
+        gestor_vol.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+
+    return {
+        "mes": inicio.strftime("%Y-%m"),
+        "kpis_creacion": {
+            "creadas": n_creadas,
+            "valor_objetado_total": int(obj_creadas),
+        },
+        "kpis_decisiones": {
+            "decididas": n_dec,
+            "levantadas": n_lev,
+            "ratificadas": n_rat,
+            "valor_recuperado_total": int(rec_total),
+        },
+        "kpis_sla": {
+            "cerradas_a_tiempo": a_tiempo,
+            "pct_sla": pct_sla,
+        },
+        "tasa_levantamiento_pct": tasa_lev,
+        "tasa_recuperacion_monetaria_pct": tasa_rec,
+        "top_3_eps_volumen": [
+            {"eps": e, "count": c} for e, c in top3_eps
+        ],
+        "top_3_gestores_volumen": [
+            {"gestor": g, "count": c} for g, c in top3_gestor
+        ],
+    }
+
+
 @router.get("/stats/ratificadas-recientes")
 def stats_ratificadas_recientes(
     dias: int = Query(30, ge=1, le=180),
