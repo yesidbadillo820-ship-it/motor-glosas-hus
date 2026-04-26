@@ -2155,6 +2155,51 @@ def descargar_dictamen_markdown(
     )
 
 
+@router.get("/{glosa_id}/validar-rapido")
+def validar_rapido_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R70 P1: validación instantánea del dictamen sin IA (solo checks
+    locales programáticos del validador_dictamen).
+
+    Diferencia con POST /{id}/validar (validar_pre_radicacion):
+      - validar_pre_radicacion       → llama IA, ~5 seg, ~$0.05 USD
+      - validar-rapido (este)        → solo checks locales, <50 ms, $0
+
+    Útil para feedback rápido al gestor mientras edita o como
+    pre-check antes del validador completo.
+
+    Aplica los 11 checks del validador_dictamen.evaluar_dictamen():
+      apertura, cups_real, sin_cifras_inventadas, normas_citadas,
+      enumeracion, invitacion_conciliacion, extension,
+      codigo_respuesta_coherente, contrato_mencionado, placeholders,
+      cita_literal_normativa, anti_rebatimiento.
+
+    Devuelve score 0-100, total checks, aprobados, lista detallada.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not glosa.dictamen:
+        raise HTTPException(400, "La glosa aún no tiene dictamen generado")
+
+    from app.services.validador_dictamen import evaluar_dictamen
+    resultado = evaluar_dictamen(
+        glosa.dictamen or "",
+        codigo_glosa=glosa.codigo_glosa or "",
+        cups_esperado=glosa.cups_servicio,
+        valor_original=str(int(glosa.valor_objetado or 0)),
+        codigo_respuesta=glosa.codigo_respuesta,
+        eps=glosa.eps or "",
+    )
+    return {
+        "glosa_id": glosa.id,
+        **resultado,
+    }
+
+
 @router.get("/stats/por-tipo")
 def stats_por_tipo_glosa(
     dias: int = Query(90, ge=1, le=365),
