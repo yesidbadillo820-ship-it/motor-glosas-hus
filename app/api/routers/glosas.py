@@ -7986,6 +7986,54 @@ def conciliaciones_resumen(
     }
 
 
+@router.get("/{glosa_id}/whatsapp-mensaje")
+def whatsapp_mensaje(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R179 P1: pre-formatea un mensaje listo para WhatsApp.
+
+    Devuelve un texto plano corto con los datos clave de la
+    glosa, listo para copiar/pegar en WhatsApp o usar con la
+    integración Meta Business.
+
+    No envía nada — solo formatea.
+
+    Útil para coordinación rápida entre equipo HUS por WhatsApp.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    valor = float(glosa.valor_objetado or 0)
+    dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+
+    if dr < 0:
+        urgencia = f"VENCIDA hace {abs(dr)}d"
+    elif dr <= 3:
+        urgencia = f"CRITICA - {dr}d"
+    elif dr <= 7:
+        urgencia = f"PROXIMA - {dr}d"
+    else:
+        urgencia = f"EN TIEMPO - {dr}d"
+
+    mensaje = (
+        f"Glosa #{glosa.id} | {glosa.eps or '?'}\n"
+        f"Factura: {glosa.factura or 'N/A'}\n"
+        f"Codigo: {glosa.codigo_glosa or '?'}\n"
+        f"Valor objetado: ${int(valor):,} COP\n"
+        f"Estado: {glosa.estado or '?'}\n"
+        f"{urgencia}"
+    )
+
+    return {
+        "glosa_id": glosa_id,
+        "mensaje_whatsapp": mensaje,
+        "longitud_chars": len(mensaje),
+    }
+
+
 @router.get("/{glosa_id}/comentarios-resumen")
 def comentarios_resumen(
     glosa_id: int,
