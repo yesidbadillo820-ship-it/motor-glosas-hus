@@ -5908,6 +5908,53 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/decisiones-eps-detalle")
+def stats_decisiones_eps_detalle(
+    eps: str = Query(..., min_length=2),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R221 P1: distribución detallada de decisiones de una EPS.
+
+    Para una EPS específica, ver el patrón de decisiones:
+      - ¿Cuántas LEVANTÓ?
+      - ¿Cuántas RATIFICÓ?
+      - ¿Cuántas ACEPTÓ?
+
+    Útil para tailoring de estrategia: "SANITAS levanta 60% pero
+    rechaza 30%, vs OTRA que levanta 20% y rechaza 70%".
+
+    Param `eps`: nombre exacto.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .all()
+    )
+
+    por_estado: dict[str, int] = {}
+    for g in glosas:
+        e = (g.estado or "").upper()
+        por_estado[e] = por_estado.get(e, 0) + 1
+
+    total = sum(por_estado.values())
+    items = []
+    for estado, count in sorted(por_estado.items()):
+        pct = round(100 * count / total, 2) if total else 0.0
+        items.append({
+            "estado": estado,
+            "count": count,
+            "pct": pct,
+        })
+
+    return {
+        "eps": eps,
+        "total_decididas": total,
+        "items": items,
+    }
+
+
 @router.get("/stats/distribucion-urgencia")
 def stats_distribucion_urgencia(
     db: Session = Depends(get_db),
