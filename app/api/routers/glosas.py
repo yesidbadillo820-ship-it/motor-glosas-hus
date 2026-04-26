@@ -3299,6 +3299,80 @@ def stats_concentracion_pareto(
     }
 
 
+@router.get("/stats/eps-emergentes")
+def stats_eps_emergentes(
+    dias: int = Query(30, ge=7, le=180),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R120 P1: detecta EPS que aparecen como nuevas en el período.
+
+    Una EPS es "emergente" si:
+      - Tiene glosas creadas en los últimos N días
+      - NO tenía glosas en el histórico previo
+
+    Útil para alertar al coordinador:
+      "¡Aparece una nueva EPS en el sistema! Verificar contrato."
+
+    Devuelve:
+      - eps_nuevas: lista de EPS emergentes con count y valor
+      - eps_continuas: count de EPS que vienen del histórico
+    """
+    from datetime import timedelta, timezone
+
+    ahora = ahora_utc()
+    corte = ahora - timedelta(days=int(dias))
+
+    eps_recientes: dict[str, dict] = {}
+    eps_historicas: set[str] = set()
+
+    for g in db.query(GlosaRecord).all():
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        creado = g.creado_en
+        if creado and creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+
+        if creado and creado >= corte:
+            if eps not in eps_recientes:
+                eps_recientes[eps] = {
+                    "count": 0, "valor_objetado": 0.0,
+                    "primer_visto": None,
+                }
+            b = eps_recientes[eps]
+            b["count"] += 1
+            b["valor_objetado"] += float(g.valor_objetado or 0)
+            if b["primer_visto"] is None or creado < b["primer_visto"]:
+                b["primer_visto"] = creado
+        elif creado:
+            eps_historicas.add(eps)
+
+    nuevas = []
+    continuas = 0
+    for eps, b in eps_recientes.items():
+        if eps in eps_historicas:
+            continuas += 1
+            continue
+        nuevas.append({
+            "eps": eps,
+            "glosas_recientes": b["count"],
+            "valor_objetado_total": int(b["valor_objetado"]),
+            "primer_glosa_en": (
+                b["primer_visto"].isoformat() if b["primer_visto"] else None
+            ),
+        })
+
+    nuevas.sort(key=lambda x: x["glosas_recientes"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_eps_nuevas": len(nuevas),
+        "total_eps_continuas": continuas,
+        "items": nuevas,
+    }
+
+
 @router.get("/stats/comparativa-eps")
 def stats_comparativa_eps(
     min_glosas: int = Query(5, ge=1, le=100,
