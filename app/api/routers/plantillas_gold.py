@@ -275,6 +275,65 @@ def marcar_usos(db: Session, plantilla_ids: list[int]):
     db.commit()
 
 
+@router.get("/export.json")
+def exportar_plantillas_gold(
+    solo_activas: bool = True,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R77 P1: descarga las plantillas Gold como JSON (knowledge base).
+
+    Útil para:
+      - Migrar plantillas a otra instancia (ej. otra IPS de la red)
+      - Backup específico del trabajo curado del equipo
+      - Análisis externo de los argumentos ganadores
+
+    Solo coordinador/admin (las plantillas son IP del equipo legal).
+    """
+    import json
+    from datetime import datetime, timezone
+
+    from fastapi.responses import Response
+
+    q = db.query(PlantillaGoldRecord)
+    if solo_activas:
+        q = q.filter(PlantillaGoldRecord.activa == 1)
+    plantillas = q.order_by(PlantillaGoldRecord.usos.desc()).all()
+
+    payload = {
+        "metadata": {
+            "exportado_en": datetime.now(timezone.utc).isoformat(),
+            "exportado_por": current_user.email,
+            "total": len(plantillas),
+            "solo_activas": solo_activas,
+        },
+        "plantillas": [
+            {
+                "id": p.id,
+                "eps": p.eps,
+                "codigo_glosa": p.codigo_glosa,
+                "tipo": p.tipo,
+                "titulo": p.titulo,
+                "argumento": p.argumento,
+                "valor_recuperado": float(p.valor_recuperado or 0),
+                "glosa_origen_id": p.glosa_origen_id,
+                "creado_por": p.creado_por,
+                "notas": p.notas,
+                "usos": p.usos or 0,
+                "activa": int(p.activa or 0),
+                "creado_en": p.creado_en.isoformat() if p.creado_en else None,
+            }
+            for p in plantillas
+        ],
+    }
+    fname = f"plantillas-gold-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8"),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/sugerencias")
 def sugerencias_plantillas_gold(
     eps: Optional[str] = None,
