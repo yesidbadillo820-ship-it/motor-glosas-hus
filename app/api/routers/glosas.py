@@ -6086,6 +6086,52 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/codigos-respuesta-distribucion")
+def stats_codigos_respuesta_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R238 P1: distribución global de códigos de respuesta.
+
+    Muestra qué códigos de respuesta usa más HUS:
+      - RE9901: 60% (defensa principal)
+      - RE9502: 20% (extemporáneas)
+      - RE9801: 10% (parciales)
+
+    Útil para entender el patrón de defensa del equipo.
+
+    Solo glosas con codigo_respuesta no-NULL.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .all()
+    )
+
+    por_codigo: dict[str, int] = {}
+    for g in glosas:
+        cr = g.codigo_respuesta
+        if not cr:
+            continue
+        por_codigo[cr] = por_codigo.get(cr, 0) + 1
+
+    total = sum(por_codigo.values())
+    items = []
+    for cod, count in por_codigo.items():
+        pct = round(100 * count / total, 2) if total else 0.0
+        items.append({
+            "codigo_respuesta": cod,
+            "count": count,
+            "pct": pct,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "total_glosas_con_codigo": total,
+        "items": items,
+    }
+
+
 @router.get("/stats/aging-glosas")
 def stats_aging_glosas(
     db: Session = Depends(get_db),
