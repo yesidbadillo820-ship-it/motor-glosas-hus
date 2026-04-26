@@ -732,6 +732,64 @@ def info_version():
     }
 
 
+@router.get("/configuracion")
+def info_configuracion(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R97 P1: configuración runtime del sistema (sin secretos).
+
+    Devuelve los valores actuales de configuración no-sensibles,
+    útil para verificar que el deploy tiene la config esperada
+    sin tener que SSH a Render.
+
+    Campos secretos (api_keys, passwords, secret_key, smtp_password)
+    se reportan SOLO como booleanos "está_configurado" — nunca
+    el valor real.
+    """
+    from app.core.config import get_settings
+
+    cfg = get_settings()
+
+    return {
+        "app": {
+            "nombre": cfg.app_name,
+            "version": cfg.app_version,
+        },
+        "ia": {
+            "primary_ai": cfg.primary_ai,
+            "groq_model": cfg.groq_model,
+            "anthropic_model": cfg.anthropic_model,
+            "anthropic_configurado": bool(cfg.anthropic_api_key),
+            "groq_configurado": bool(cfg.groq_api_key),
+        },
+        "auth": {
+            "algorithm": cfg.algorithm,
+            "access_token_expire_minutes": cfg.access_token_expire_minutes,
+            "secret_key_configurado": bool(
+                cfg.secret_key
+                and cfg.secret_key != "dev-only-secret-key-change-in-production"
+            ),
+            "admin_password_configurado": bool(
+                cfg.admin_password
+                and cfg.admin_password != "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
+            ),
+        },
+        "cors": {
+            "allowed_origins": cfg.get_allowed_origins(),
+        },
+        "smtp": {
+            "host": cfg.smtp_host,
+            "port": cfg.smtp_port,
+            "user_configurado": bool(cfg.smtp_user),
+            "password_configurado": bool(cfg.smtp_password),
+            "alertas_email": cfg.alertas_email or None,
+        },
+        "ui": {
+            "banner_capacitacion": cfg.banner_capacitacion or None,
+        },
+    }
+
+
 @router.get("/dependencias")
 def info_dependencias(
     incluir_indirectas: bool = False,
