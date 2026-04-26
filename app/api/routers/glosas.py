@@ -5052,6 +5052,71 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/cups-mas-objetados")
+def stats_cups_mas_objetados(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R140 P1: ranking de CUPS más objetados por las EPS.
+
+    Cruza ConceptoGlosaRecord por cups_codigo para identificar
+    qué servicios/procedimientos son los más objetados.
+
+    Útil para:
+      - Capacitación a facturación: "ojo con estos CUPS"
+      - Análisis con departamentos clínicos
+      - Negociación de tarifas: si CUPS X siempre objetado por
+        diferencia de tarifa → revisar contrato
+
+    Devuelve top N CUPS con:
+      - cups_codigo + descripcion
+      - frecuencia
+      - valor_objetado_total
+      - facturas_distintas
+    """
+    conceptos = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.cups_codigo.isnot(None))
+        .all()
+    )
+
+    por_cups: dict[str, dict] = {}
+    for c in conceptos:
+        cups = c.cups_codigo
+        if not cups:
+            continue
+        if cups not in por_cups:
+            por_cups[cups] = {
+                "descripcion": c.cups_descripcion or "",
+                "frecuencia": 0,
+                "valor": 0.0,
+                "facturas": set(),
+            }
+        b = por_cups[cups]
+        b["frecuencia"] += 1
+        b["valor"] += float(c.valor_objetado or 0)
+        if c.factura:
+            b["facturas"].add(c.factura)
+
+    items = []
+    for cups, b in por_cups.items():
+        items.append({
+            "cups_codigo": cups,
+            "cups_descripcion": (b["descripcion"] or "")[:200],
+            "frecuencia": b["frecuencia"],
+            "valor_objetado_total": int(b["valor"]),
+            "facturas_distintas": len(b["facturas"]),
+        })
+    items.sort(key=lambda x: x["frecuencia"], reverse=True)
+
+    return {
+        "total_cups_unicos": len(items),
+        "top_solicitado": int(top),
+        "items": items[:top],
+    }
+
+
 @router.get("/stats/correlacion-codigos")
 def stats_correlacion_codigos(
     top: int = Query(10, ge=1, le=50),
