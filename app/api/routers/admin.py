@@ -740,6 +740,77 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/stats-asignacion")
+def admin_stats_asignacion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R184 P1: métricas de asignación de glosas.
+
+    Vista global del balanceo de cargas:
+      - cuántas glosas tienen gestor asignado
+      - cuántas tienen auditor_email
+      - cuántas están sin nadie
+      - distribución de carga (mín, máx, mediana)
+
+    Útil para detectar:
+      - Imbalance: 1 gestor con 200, otro con 5
+      - Glosas huérfanas que nadie atiende
+
+    Solo SUPER_ADMIN.
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    con_gestor = 0
+    con_auditor = 0
+    sin_nadie = 0
+    cargas: dict[str, int] = {}
+
+    for g in abiertas:
+        tiene_gestor = bool(g.gestor_nombre)
+        tiene_auditor = bool(g.auditor_email)
+        if tiene_gestor:
+            con_gestor += 1
+            cargas[g.gestor_nombre] = cargas.get(g.gestor_nombre, 0) + 1
+        if tiene_auditor:
+            con_auditor += 1
+        if not tiene_gestor and not tiene_auditor:
+            sin_nadie += 1
+
+    if cargas:
+        valores = sorted(cargas.values())
+        n = len(valores)
+        mediana = (
+            (valores[n // 2 - 1] + valores[n // 2]) / 2
+            if n % 2 == 0 else valores[n // 2]
+        )
+        carga_min = valores[0]
+        carga_max = valores[-1]
+    else:
+        mediana = 0
+        carga_min = 0
+        carga_max = 0
+
+    return {
+        "total_abiertas": len(abiertas),
+        "con_gestor": con_gestor,
+        "con_auditor": con_auditor,
+        "sin_nadie": sin_nadie,
+        "gestores_distintos": len(cargas),
+        "carga_min_por_gestor": carga_min,
+        "carga_max_por_gestor": carga_max,
+        "carga_mediana_por_gestor": mediana,
+    }
+
+
 @router.get("/incidentes-criticos")
 def admin_incidentes_criticos(
     db: Session = Depends(get_db),
