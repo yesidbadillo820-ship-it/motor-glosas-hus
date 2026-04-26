@@ -965,6 +965,55 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/audit-log-stats")
+def admin_audit_log_stats(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R326 P1: distribución de eventos audit_log por acción.
+
+    Cuenta los eventos audit_log por valor de `accion`
+    (UPDATE, INSERT, DELETE, LOGIN, etc.) en los últimos
+    N días. Útil para entender patrones de uso del
+    sistema.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .all()
+    )
+
+    total = len(rows)
+
+    bucket: dict[str, int] = {}
+    for e in rows:
+        accion = (e.accion or "?").upper()
+        bucket[accion] = bucket.get(accion, 0) + 1
+
+    items = []
+    for accion, c in bucket.items():
+        items.append({
+            "accion": accion,
+            "count": c,
+            "pct": round(100 * c / total, 2) if total else 0.0,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_eventos": total,
+        "items": items,
+    }
+
+
 @router.get("/cierre-mes-anterior")
 def admin_cierre_mes_anterior(
     db: Session = Depends(get_db),
