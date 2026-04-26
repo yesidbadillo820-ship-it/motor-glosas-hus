@@ -1588,6 +1588,39 @@ def info_zonas_horarias(
     }
 
 
+@router.get("/banner-info")
+def info_banner(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R143 P2: información del banner UI configurable.
+
+    Endpoint liviano que el frontend consulta al inicio para
+    decidir si mostrar un banner global. Mensaje viene de
+    BANNER_CAPACITACION env var:
+      - vacío → no mostrar banner
+      - cualquier string → mostrar como info
+
+    También indica si el sistema está en modo capacitación
+    (por convención: cuando el banner está activo).
+
+    Útil para:
+      - Avisos de mantenimiento programado
+      - Notas de capacitación
+      - Alertas de cambios regulatorios
+    """
+    from app.core.config import get_settings
+
+    cfg = get_settings()
+    mensaje = (cfg.banner_capacitacion or "").strip()
+
+    return {
+        "mostrar_banner": bool(mensaje),
+        "mensaje": mensaje or None,
+        "modo_capacitacion": bool(mensaje),
+        "tipo": "info",
+    }
+
+
 @router.get("/configuracion")
 def info_configuracion(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
