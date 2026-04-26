@@ -5331,6 +5331,62 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/listas-para-cerrar")
+def stats_listas_para_cerrar(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R194 P1: glosas con dictamen completo listas para enviar.
+
+    Filtra glosas con:
+      - Estado RADICADA
+      - Dictamen presente >= 200 chars
+      - codigo_respuesta configurado
+      - Gestor asignado
+
+    Útil como cola de "envío masivo": estas ya pasaron auditoría
+    interna y solo falta empujarlas a la EPS.
+
+    Devuelve top 50 ordenado por dias_restantes ASC.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado == "RADICADA")
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        if not g.dictamen or len(g.dictamen) < 200:
+            continue
+        if not g.codigo_respuesta or not g.codigo_respuesta.strip():
+            continue
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "codigo_respuesta": g.codigo_respuesta,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "dias_restantes": g.dias_restantes,
+            "gestor": g.gestor_nombre,
+        })
+    items.sort(
+        key=lambda x: (
+            x["dias_restantes"]
+            if x["dias_restantes"] is not None else 9999
+        ),
+    )
+
+    return {
+        "total_listas": len(items),
+        "items": items[:50],
+    }
+
+
 @router.get("/stats/refinaciones-por-dia")
 def stats_refinaciones_por_dia(
     dias: int = Query(30, ge=1, le=180),
