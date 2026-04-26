@@ -3339,6 +3339,80 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/codigos-mas-objetados")
+def stats_codigos_mas_objetados(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R102 P1: ranking de códigos de glosa por frecuencia y valor.
+
+    Útil para:
+      - Identificar dónde se "pelean" más las EPS
+        (¿es siempre TA0201 por insumos?)
+      - Decidir capacitación enfocada (top códigos = más impacto)
+      - Análisis de cumplimiento Resolución 2284/2023
+
+    Devuelve top N códigos ordenados DESC por frecuencia, con:
+      - codigo
+      - frecuencia (count de glosas con ese código)
+      - valor_objetado_total
+      - tasa_levantamiento_pct (LEVANTADAS / decididas)
+      - eps_principales (top 3 EPS que más usan ese código)
+    """
+    todas = db.query(GlosaRecord).all()
+
+    por_codigo: dict[str, dict] = {}
+    for g in todas:
+        cod = g.codigo_glosa
+        if not cod:
+            continue
+        if cod not in por_codigo:
+            por_codigo[cod] = {
+                "freq": 0, "valor": 0.0,
+                "decididas": 0, "levantadas": 0,
+                "por_eps": {},
+            }
+        b = por_codigo[cod]
+        b["freq"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+
+        estado = (g.estado or "").upper()
+        if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+            b["decididas"] += 1
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
+
+        if g.eps:
+            b["por_eps"][g.eps] = b["por_eps"].get(g.eps, 0) + 1
+
+    items = []
+    for cod, b in por_codigo.items():
+        tasa = (
+            round(100 * b["levantadas"] / b["decididas"], 2)
+            if b["decididas"] else 0.0
+        )
+        eps_top3 = sorted(
+            b["por_eps"].items(), key=lambda x: x[1], reverse=True,
+        )[:3]
+        items.append({
+            "codigo": cod,
+            "frecuencia": b["freq"],
+            "valor_objetado_total": int(b["valor"]),
+            "tasa_levantamiento_pct": tasa,
+            "eps_principales": [
+                {"eps": e, "veces": n} for e, n in eps_top3
+            ],
+        })
+    items.sort(key=lambda x: x["frecuencia"], reverse=True)
+
+    return {
+        "total_codigos_unicos": len(items),
+        "top_solicitado": int(top),
+        "items": items[:top],
+    }
+
+
 @router.get("/stats/eficiencia-gestor")
 def stats_eficiencia_gestor(
     min_glosas: int = Query(3, ge=1, le=100),
