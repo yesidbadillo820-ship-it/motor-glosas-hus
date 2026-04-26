@@ -228,6 +228,88 @@ def predecir_ratificacion_glosa(
     return predecir_ratificacion(db, glosa)
 
 
+@router.get("/ips-frecuentes")
+def ips_frecuentes(
+    dias: int = 30,
+    top: int = 20,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R131 P2: ranking de IPs por actividad reciente.
+
+    Complementa /buscar-por-ip (drill-down a una IP) con la
+    vista global: ¿qué IPs son las más activas en el sistema?
+
+    Útil para:
+      - Detectar IPs anómalas (alto volumen, múltiples usuarios)
+      - Identificar la red del HUS vs accesos externos
+      - Auditoría de cumplimiento (Habeas Data 1581/2012)
+
+    Devuelve top N IPs ordenadas DESC por eventos:
+      - ip
+      - eventos
+      - usuarios_distintos: count (>1 = sospechoso)
+      - primer_evento_en
+      - ultimo_evento_en
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.ip.isnot(None))
+        .all()
+    )
+
+    por_ip: dict[str, dict] = {}
+    for e in eventos:
+        ip = e.ip
+        if ip not in por_ip:
+            por_ip[ip] = {
+                "eventos": 0,
+                "usuarios": set(),
+                "primer": None,
+                "ultimo": None,
+            }
+        b = por_ip[ip]
+        b["eventos"] += 1
+        if e.usuario_email:
+            b["usuarios"].add(e.usuario_email)
+
+        ts = e.timestamp
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts:
+            if b["primer"] is None or ts < b["primer"]:
+                b["primer"] = ts
+            if b["ultimo"] is None or ts > b["ultimo"]:
+                b["ultimo"] = ts
+
+    items = []
+    for ip, b in por_ip.items():
+        items.append({
+            "ip": ip,
+            "eventos": b["eventos"],
+            "usuarios_distintos": len(b["usuarios"]),
+            "primer_evento_en": (
+                b["primer"].isoformat() if b["primer"] else None
+            ),
+            "ultimo_evento_en": (
+                b["ultimo"].isoformat() if b["ultimo"] else None
+            ),
+        })
+    items.sort(key=lambda x: x["eventos"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_ips_unicas": len(items),
+        "items": items[:top],
+    }
+
+
 @router.get("/buscar-por-ip")
 def buscar_por_ip(
     ip: str,
