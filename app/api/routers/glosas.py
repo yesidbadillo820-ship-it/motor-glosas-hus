@@ -6086,6 +6086,49 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/glosas-altas-cuantia")
+def stats_glosas_altas_cuantia(
+    umbral: float = Query(5_000_000, ge=10_000),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R253 P1: glosas con valor objetado superior al umbral.
+
+    Útil para identificar casos de alta cuantía que requieren
+    seguimiento ejecutivo:
+      "Glosas >\$5M ABIERTAS, ordenadas DESC por valor"
+
+    Solo abiertas. Param `umbral` en COP (default \$5M).
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.valor_objetado > float(umbral))
+        .order_by(GlosaRecord.valor_objetado.desc())
+        .limit(50)
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "dias_restantes": g.dias_restantes,
+        })
+
+    return {
+        "umbral": int(umbral),
+        "total_altas_cuantia": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-codigo-pareja")
 def stats_eps_codigo_pareja(
     eps: str = Query(..., min_length=2),
