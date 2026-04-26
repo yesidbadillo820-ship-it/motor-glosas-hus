@@ -6273,6 +6273,60 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/glosas-sin-comentarios")
+def stats_glosas_sin_comentarios(
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R284 P1: glosas abiertas sin comentarios internos.
+
+    Una glosa abierta sin ningún comentario en el hilo del
+    equipo posiblemente está siendo ignorada o no se ha
+    discutido. Útil para detectar casos "olvidados".
+
+    Filtro: solo abiertas. Ordena DESC por valor_objetado
+    para priorizar las de mayor cuantía.
+    """
+    from app.models.db import ComentarioGlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    # IDs con al menos 1 comentario
+    ids_con_com = {
+        row[0]
+        for row in db.query(ComentarioGlosaRecord.glosa_id)
+        .distinct()
+        .all()
+    }
+
+    items = []
+    for g in abiertas:
+        if g.id in ids_con_com:
+            continue
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dias_restantes": g.dias_restantes,
+        })
+    items.sort(key=lambda x: x["valor_objetado"], reverse=True)
+
+    return {
+        "total_sin_comentarios": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/eps-volumen-vs-tasa")
 def stats_eps_volumen_vs_tasa(
     min_decididas: int = Query(3, ge=1, le=100),
