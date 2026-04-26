@@ -6441,6 +6441,61 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/cobranza-eps-vencidas")
+def stats_cobranza_eps_vencidas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R364 P1: por EPS, glosas vencidas con saldo pendiente.
+
+    Combina vencidas (dias_restantes < 0) con saldo
+    financiero. Da prioridad de cobranza a EPS que más
+    nos deben + más nos ignoran.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < 0)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {
+            "count": 0, "suma_dias": 0,
+            "obj": 0.0, "saldo": 0.0,
+        })
+        b["count"] += 1
+        b["suma_dias"] += abs(int(g.dias_restantes or 0))
+        b["obj"] += float(g.valor_objetado or 0)
+        b["saldo"] += float(g.saldo_factura or 0)
+
+    items = []
+    for eps, b in bucket.items():
+        prom = (
+            round(b["suma_dias"] / b["count"], 1) if b["count"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "count_vencidas": b["count"],
+            "dias_promedio_vencido": prom,
+            "valor_objetado_total": int(b["obj"]),
+            "saldo_total": int(b["saldo"]),
+        })
+    items.sort(key=lambda x: x["valor_objetado_total"], reverse=True)
+
+    return {
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/conciliaciones-pendientes")
 def stats_conciliaciones_pendientes(
     db: Session = Depends(get_db),
