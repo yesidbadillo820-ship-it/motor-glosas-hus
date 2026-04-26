@@ -6086,6 +6086,67 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/tecnico-recepcion-actividad")
+def stats_tecnico_recepcion_actividad(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R263 P1: actividad por técnico que recepcionó glosas.
+
+    El campo `tecnico_recepcion` viene del Excel del DGH y
+    es el responsable inicial de la radicación. Útil para
+    ver carga de recepciones por técnico (no es el mismo
+    rol que gestor o auditor).
+
+    Por técnico:
+      - total_glosas
+      - eps_distintas (cuántas EPS le tocó manejar)
+      - valor_objetado_total
+      - count_devoluciones (es_devolucion = '1')
+
+    Ordenado DESC por total_glosas.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.tecnico_recepcion.isnot(None))
+        .filter(GlosaRecord.tecnico_recepcion != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        tec = (g.tecnico_recepcion or "").strip()
+        if not tec:
+            continue
+        b = bucket.setdefault(tec, {
+            "total": 0, "eps": set(), "valor": 0.0, "dev": 0,
+        })
+        b["total"] += 1
+        if g.eps:
+            b["eps"].add(g.eps.strip())
+        b["valor"] += float(g.valor_objetado or 0)
+        if (g.es_devolucion or "").strip() in ("1", "S", "Y"):
+            b["dev"] += 1
+
+    items = []
+    for tec, b in bucket.items():
+        items.append({
+            "tecnico_recepcion": tec,
+            "total_glosas": b["total"],
+            "eps_distintas": len(b["eps"]),
+            "valor_objetado_total": int(b["valor"]),
+            "count_devoluciones": b["dev"],
+        })
+    items.sort(key=lambda x: x["total_glosas"], reverse=True)
+
+    return {
+        "limit": int(limit),
+        "total_tecnicos": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/cartera-por-eps")
 def stats_cartera_por_eps(
     solo_abiertas: bool = Query(True),
