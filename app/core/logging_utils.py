@@ -17,6 +17,9 @@ glosa_id_var: ContextVar[Optional[int]] = ContextVar("glosa_id", default=None)
 
 class StructuredFormatter(logging.Formatter):
     def format(self, record):
+        # R80 P1: incluir glosa_id y user_email en cada log line si están
+        # disponibles en el ContextVar request-scoped. Permite filtrar logs
+        # de Render/Sentry por glosa o por usuario sin parsear strings.
         log_obj = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
@@ -24,6 +27,19 @@ class StructuredFormatter(logging.Formatter):
             "message": record.getMessage(),
             "request_id": request_id_var.get(),
         }
+        # Solo emitir los campos opcionales si tienen valor (evita ruido)
+        try:
+            email = user_email_var.get()
+            if email:
+                log_obj["user_email"] = email
+        except Exception:
+            pass
+        try:
+            gid = glosa_id_var.get()
+            if gid is not None:
+                log_obj["glosa_id"] = gid
+        except Exception:
+            pass
         if record.exc_info:
             log_obj["exception"] = self.formatException(record.exc_info)
         return json.dumps(log_obj)
