@@ -5532,6 +5532,56 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/valor-eficiencia-anual")
+def stats_valor_eficiencia_anual(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R210 P1: serie anual de valor objetado vs recuperado.
+
+    Vista comparativa para reportes anuales:
+      "En 2025 se objetaron \$10B y recuperamos \$5B (50%
+       efectividad económica)"
+
+    Por año:
+      - valor_objetado_total
+      - valor_recuperado_total
+      - eficiencia_pct (recuperado / objetado)
+    """
+    from datetime import timezone
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_anio: dict[str, dict] = {}
+    for g in glosas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = str(cre.year)
+        if k not in por_anio:
+            por_anio[k] = {"obj": 0.0, "rec": 0.0}
+        por_anio[k]["obj"] += float(g.valor_objetado or 0)
+        por_anio[k]["rec"] += float(g.valor_recuperado or 0)
+
+    serie = []
+    for k in sorted(por_anio.keys()):
+        b = por_anio[k]
+        eff = (
+            round(100 * b["rec"] / b["obj"], 2)
+            if b["obj"] else 0.0
+        )
+        serie.append({
+            "anio": k,
+            "valor_objetado": int(b["obj"]),
+            "valor_recuperado": int(b["rec"]),
+            "eficiencia_pct": eff,
+        })
+
+    return {"serie": serie}
+
+
 @router.get("/stats/criticas-economicas")
 def stats_criticas_economicas(
     top: int = Query(20, ge=1, le=100),
