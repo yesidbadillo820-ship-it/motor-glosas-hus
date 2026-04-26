@@ -3566,6 +3566,100 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/comparar-periodos")
+def stats_comparar_periodos(
+    dias: int = Query(30, ge=7, le=180),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R118 P1: compara métricas del período actual vs anterior.
+
+    Útil para reportes "vs mes pasado":
+      - "Este mes creamos 50 glosas; el mes pasado fueron 40
+        → +25%"
+      - "Recuperamos $5M vs $3M → +66%"
+
+    Devuelve métricas de ambos períodos + delta absoluto y %:
+      - glosas_creadas
+      - glosas_cerradas
+      - valor_recuperado
+      - tiempo_promedio_resolucion_dias
+
+    Período actual = últimos N días.
+    Período previo = los N días anteriores a esos.
+    """
+    from datetime import timedelta, timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    ahora = ahora_utc()
+    hoy_inicio = ahora - timedelta(days=int(dias))
+    prev_inicio = hoy_inicio - timedelta(days=int(dias))
+
+    todas = db.query(GlosaRecord).all()
+
+    def _stats(desde, hasta):
+        creadas = 0
+        cerradas = 0
+        valor_rec = 0.0
+        tiempos = []
+        for g in todas:
+            creado = g.creado_en
+            if creado and creado.tzinfo is None:
+                creado = creado.replace(tzinfo=timezone.utc)
+            dec = g.fecha_decision_eps
+            if dec and dec.tzinfo is None:
+                dec = dec.replace(tzinfo=timezone.utc)
+
+            if creado and desde <= creado < hasta:
+                creadas += 1
+
+            if (dec and desde <= dec < hasta and
+                    (g.estado or "").upper() in ESTADOS_CERRADOS):
+                cerradas += 1
+                valor_rec += float(g.valor_recuperado or 0)
+                if creado:
+                    tiempos.append((dec - creado).days)
+
+        return {
+            "glosas_creadas": creadas,
+            "glosas_cerradas": cerradas,
+            "valor_recuperado": int(valor_rec),
+            "tiempo_promedio_resolucion_dias": (
+                round(sum(tiempos) / len(tiempos), 2)
+                if tiempos else 0.0
+            ),
+        }
+
+    actual = _stats(hoy_inicio, ahora)
+    previo = _stats(prev_inicio, hoy_inicio)
+
+    def _delta(a, p):
+        diff = a - p
+        pct = round(100 * diff / p, 2) if p else None
+        return {"absoluto": diff, "pct": pct}
+
+    deltas = {
+        k: _delta(actual[k], previo[k])
+        for k in actual.keys()
+    }
+
+    return {
+        "ventana_dias": int(dias),
+        "periodo_actual": {
+            "desde": hoy_inicio.isoformat(),
+            "hasta": ahora.isoformat(),
+            **actual,
+        },
+        "periodo_previo": {
+            "desde": prev_inicio.isoformat(),
+            "hasta": hoy_inicio.isoformat(),
+            **previo,
+        },
+        "deltas": deltas,
+    }
+
+
 @router.get("/stats/forecast-cierres")
 def stats_forecast_cierres(
     semanas: int = Query(8, ge=1, le=24),
