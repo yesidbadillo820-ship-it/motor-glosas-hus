@@ -1842,6 +1842,90 @@ def info_zonas_horarias(
     }
 
 
+@router.get("/glosas-con-ia")
+def info_glosas_con_ia(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R157 P1: cobertura del LLM sobre las glosas.
+
+    Reporta qué porcentaje de las glosas creadas en la ventana
+    han pasado por al menos una llamada IA. Útil para entender
+    el ROI del LLM:
+      - Cobertura alta + buen tasa_lev → IA está ayudando
+      - Cobertura alta pero tasa_lev mala → revisar prompts
+      - Cobertura baja → ¿por qué no se usa más la IA?
+
+    Devuelve:
+      - total_glosas_periodo
+      - glosas_con_ia (al menos 1 call)
+      - cobertura_pct
+      - calls_por_glosa_promedio
+      - cost_promedio_usd_por_glosa
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICallRecord, GlosaRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= desde)
+        .all()
+    )
+    total_glosas = len(glosas)
+    glosa_ids = {g.id for g in glosas}
+
+    if not glosa_ids:
+        return {
+            "ventana_dias": int(dias),
+            "total_glosas_periodo": 0,
+            "glosas_con_ia": 0,
+            "cobertura_pct": 0.0,
+            "calls_por_glosa_promedio": 0.0,
+            "cost_promedio_usd_por_glosa": 0.0,
+        }
+
+    calls = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.glosa_id.in_(glosa_ids))
+        .all()
+    )
+
+    glosas_con_ia: set[int] = set()
+    cost_total = 0.0
+    for c in calls:
+        if c.glosa_id is not None:
+            glosas_con_ia.add(c.glosa_id)
+        cost_total += float(c.cost_usd or 0)
+
+    cobertura = round(100 * len(glosas_con_ia) / total_glosas, 2)
+    calls_promedio = (
+        round(len(calls) / len(glosas_con_ia), 2)
+        if glosas_con_ia else 0.0
+    )
+    cost_promedio = (
+        round(cost_total / len(glosas_con_ia), 6)
+        if glosas_con_ia else 0.0
+    )
+
+    return {
+        "ventana_dias": int(dias),
+        "total_glosas_periodo": total_glosas,
+        "glosas_con_ia": len(glosas_con_ia),
+        "cobertura_pct": cobertura,
+        "total_calls_periodo": len(calls),
+        "calls_por_glosa_promedio": calls_promedio,
+        "cost_total_usd": round(cost_total, 4),
+        "cost_promedio_usd_por_glosa": cost_promedio,
+    }
+
+
 @router.get("/feature-flags")
 def info_feature_flags(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
