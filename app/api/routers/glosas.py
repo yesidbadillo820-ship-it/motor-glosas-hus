@@ -4223,6 +4223,68 @@ def stats_abandono_por_etapa(
     }
 
 
+@router.get("/stats/exito-por-codigo-respuesta")
+def stats_exito_por_codigo_respuesta(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R116 P1: efectividad de cada código de respuesta IPS.
+
+    Códigos de respuesta (Resolución 2284/2023):
+      - RE9901: Acepta glosa
+      - RE9502: Rechaza por concepto técnico
+      - RE9801: Rechaza por concepto jurídico
+      - RE9702: No procede
+      - RE9602: Aclaración
+
+    Útil para entender cuáles argumentos funcionan mejor:
+      "Cuando respondemos con RE9502, ¿qué % de glosas se levantan?"
+
+    Devuelve por código_respuesta:
+      - total_usado
+      - levantadas (HUS ganó)
+      - tasa_levantamiento_pct
+    """
+    glosas = db.query(GlosaRecord).all()
+
+    por_codigo: dict[str, dict] = {}
+    for g in glosas:
+        cod = g.codigo_respuesta
+        if not cod:
+            continue
+        if cod not in por_codigo:
+            por_codigo[cod] = {
+                "total": 0, "levantadas": 0, "decididas": 0,
+            }
+        b = por_codigo[cod]
+        b["total"] += 1
+        estado = (g.estado or "").upper()
+        if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+            b["decididas"] += 1
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
+
+    items = []
+    for cod, b in por_codigo.items():
+        tasa = (
+            round(100 * b["levantadas"] / b["decididas"], 2)
+            if b["decididas"] else 0.0
+        )
+        items.append({
+            "codigo_respuesta": cod,
+            "total_usado": b["total"],
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+
+    return {
+        "total_codigos_respuesta_unicos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigos-mas-objetados")
 def stats_codigos_mas_objetados(
     top: int = Query(20, ge=1, le=100),
