@@ -1070,6 +1070,45 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/glosas-vencen-manana")
+def admin_glosas_vencen_manana(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R358 P1: glosas que vencen mañana (dias_restantes == 1).
+
+    Vista crítica del coordinador: cada caso requiere
+    decisión hoy mismo. Solo SUPER_ADMIN.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes == 1)
+        .order_by(GlosaRecord.valor_objetado.desc())
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "gestor_nombre": g.gestor_nombre,
+        })
+
+    return {
+        "total_vencen_manana": len(items),
+        "valor_total": sum(it["valor_objetado"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/eps-tendencia-volumen")
 def admin_eps_tendencia_volumen(
     db: Session = Depends(get_db),
