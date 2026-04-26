@@ -30,6 +30,79 @@ def crear_o_actualizar_contrato(
     repo = ContratoRepository(db)
     return repo.upsert(data)
 
+@router.get("/ranking")
+def ranking_contratos(
+    min_glosas: int = 5,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R100 P2: ranking de contratos por valor recuperado total.
+
+    Útil para reporte ejecutivo:
+      "¿De qué EPS hemos sacado más plata este año?"
+
+    Filtra contratos con >= min_glosas históricas (default 5)
+    para evitar ruido de EPS con poca data.
+
+    Devuelve por contrato:
+      - eps
+      - total_glosas
+      - valor_recuperado_total
+      - tasa_recuperacion_pct
+      - ranking_position (1=mejor)
+
+    Ordenado DESC por valor_recuperado_total.
+    """
+    from app.models.db import GlosaRecord
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {
+                "total": 0,
+                "valor_objetado": 0.0,
+                "valor_recuperado": 0.0,
+            }
+        b = por_eps[eps]
+        b["total"] += 1
+        b["valor_objetado"] += float(g.valor_objetado or 0)
+        b["valor_recuperado"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for eps, b in por_eps.items():
+        if b["total"] < min_glosas:
+            continue
+        tasa = (
+            round(100 * b["valor_recuperado"] / b["valor_objetado"], 2)
+            if b["valor_objetado"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "total_glosas": b["total"],
+            "valor_objetado_total": int(b["valor_objetado"]),
+            "valor_recuperado_total": int(b["valor_recuperado"]),
+            "tasa_recuperacion_pct": tasa,
+        })
+
+    items.sort(
+        key=lambda x: x["valor_recuperado_total"],
+        reverse=True,
+    )
+    for idx, it in enumerate(items, start=1):
+        it["ranking_position"] = idx
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_contratos_evaluados": len(items),
+        "items": items,
+    }
+
+
 @router.get("/{eps}/glosas-historico")
 def historial_contrato(
     eps: str,
