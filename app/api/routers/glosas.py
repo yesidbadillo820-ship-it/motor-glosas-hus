@@ -3245,6 +3245,78 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/recuperacion-mensual")
+def stats_recuperacion_mensual(
+    meses: int = Query(12, ge=1, le=36),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R97 P2: serie temporal mensual de valor recuperado.
+
+    Útil para reporte ejecutivo: ¿cuánto plata le hemos sacado a las
+    EPS este año? Tendencia mes-a-mes para detectar mejoras /
+    degradaciones del proceso de defensa de glosas.
+
+    Calcula valor_recuperado por mes basado en fecha_decision_eps
+    (cuándo se cerró el ciclo). Solo cuenta glosas cerradas con
+    valor_recuperado > 0.
+
+    Devuelve serie ordenada ascendentemente:
+      [{"mes": "2026-01", "recuperado": 1500000, "glosas_cerradas": 12,
+        "valor_objetado_total": 5000000, "tasa_recuperacion_pct": 30.0}, ...]
+    """
+    from datetime import timedelta, timezone
+
+    corte = ahora_utc() - timedelta(days=int(meses) * 31)
+
+    cerradas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .filter(GlosaRecord.fecha_decision_eps >= corte)
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in cerradas:
+        fecha = g.fecha_decision_eps
+        if fecha and fecha.tzinfo is None:
+            fecha = fecha.replace(tzinfo=timezone.utc)
+        if not fecha:
+            continue
+        key = fecha.strftime("%Y-%m")
+        if key not in por_mes:
+            por_mes[key] = {
+                "recuperado": 0.0,
+                "glosas_cerradas": 0,
+                "valor_objetado_total": 0.0,
+            }
+        b = por_mes[key]
+        b["glosas_cerradas"] += 1
+        b["recuperado"] += float(g.valor_recuperado or 0)
+        b["valor_objetado_total"] += float(g.valor_objetado or 0)
+
+    serie = []
+    for key in sorted(por_mes.keys()):
+        b = por_mes[key]
+        tasa = (
+            round(100 * b["recuperado"] / b["valor_objetado_total"], 2)
+            if b["valor_objetado_total"] else 0.0
+        )
+        serie.append({
+            "mes": key,
+            "recuperado": int(b["recuperado"]),
+            "glosas_cerradas": b["glosas_cerradas"],
+            "valor_objetado_total": int(b["valor_objetado_total"]),
+            "tasa_recuperacion_pct": tasa,
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_recuperado": sum(s["recuperado"] for s in serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/heatmap-actividad")
 def stats_heatmap_actividad(
     dias: int = Query(90, ge=7, le=365),
