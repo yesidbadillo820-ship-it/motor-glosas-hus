@@ -334,6 +334,90 @@ def metricas_ia_por_usuario(
     }
 
 
+@router.get("/healthcheck-profundo")
+def healthcheck_profundo(
+    db: Session = Depends(get_db),
+):
+    """R70 P2: healthcheck profundo PÚBLICO (sin auth) que valida
+    componentes críticos en tiempo real. Útil para monitores externos
+    (UptimeRobot, Healthchecks.io) que necesitan saber si el sistema
+    está operativo end-to-end, no solo si la app responde HTTP 200.
+
+    Componentes verificados:
+      - BD: ejecuta SELECT 1 y mide latencia
+      - schedulers: pre-análisis + mantenimiento están corriendo
+
+    Devuelve 200 si TODO OK, 503 (Service Unavailable) si algún
+    componente crítico falla — así los monitores saben cuándo alertar.
+
+    Respuesta:
+      {
+        "estado": "ok" | "degraded" | "down",
+        "componentes": {
+          "bd": {"ok": true, "latency_ms": 12},
+          "scheduler_pre_analisis": {"ok": true},
+          "scheduler_mantenimiento": {"ok": true},
+        },
+        "ahora": "2026-04-26T..."
+      }
+    """
+    import time
+
+    from fastapi import status as _http_status
+    from fastapi.responses import JSONResponse
+
+    from app.core.tz import ahora_utc
+
+    componentes = {}
+    todo_ok = True
+
+    # Check BD: SELECT 1
+    try:
+        t0 = time.monotonic()
+        db.execute(_select_1())
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        componentes["bd"] = {"ok": True, "latency_ms": latency_ms}
+    except Exception as e:
+        componentes["bd"] = {"ok": False, "error": str(e)[:200]}
+        todo_ok = False
+
+    # Check scheduler pre-análisis
+    try:
+        from app.services.ia_auditora_proactiva import _task as _t_pa
+        ok = (_t_pa is not None) and not _t_pa.done()
+        componentes["scheduler_pre_analisis"] = {"ok": bool(ok)}
+        if not ok:
+            todo_ok = False
+    except Exception:
+        # Si el módulo no expone _task no es un fallo bloqueante
+        componentes["scheduler_pre_analisis"] = {"ok": True, "info": "estado no verificable"}
+
+    # Check scheduler mantenimiento
+    try:
+        from app.services.mantenimiento_scheduler import _task as _t_mant
+        ok = (_t_mant is not None) and not _t_mant.done()
+        componentes["scheduler_mantenimiento"] = {"ok": bool(ok)}
+        if not ok:
+            todo_ok = False
+    except Exception:
+        componentes["scheduler_mantenimiento"] = {"ok": True, "info": "estado no verificable"}
+
+    estado = "ok" if todo_ok else "degraded"
+    payload = {
+        "estado": estado,
+        "componentes": componentes,
+        "ahora": ahora_utc().isoformat(),
+    }
+    code = _http_status.HTTP_200_OK if todo_ok else _http_status.HTTP_503_SERVICE_UNAVAILABLE
+    return JSONResponse(content=payload, status_code=code)
+
+
+def _select_1():
+    """Helper para abstraer la query SELECT 1 con SQLAlchemy 2."""
+    from sqlalchemy import text
+    return text("SELECT 1")
+
+
 @router.get("/version")
 def info_version():
     """R64 P1: información de versión PÚBLICA (sin auth).
