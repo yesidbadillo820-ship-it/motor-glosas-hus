@@ -713,6 +713,49 @@ def estados_disponibles(
     }
 
 
+@router.get("/buscar-radicado")
+def buscar_por_radicado(
+    radicado: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R152 P2: búsqueda exacta por número de radicado.
+
+    Diferente a /buscar/{termino} (búsqueda fuzzy en factura/ID/
+    consecutivo): aquí solo numero_radicado, exact match.
+
+    Útil para auditor que tiene un número de radicado en mano
+    y necesita la glosa rápido sin abrir el menú avanzado.
+
+    Param `radicado`: número exacto.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.numero_radicado == radicado)
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "eps": g.eps,
+            "factura": g.factura,
+            "numero_radicado": g.numero_radicado,
+            "estado": g.estado,
+            "valor_objetado": float(g.valor_objetado or 0),
+        })
+
+    return {
+        "radicado_buscado": radicado,
+        "encontradas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/buscar-similares-texto")
 def buscar_similares_texto(
     texto: str = Query(..., min_length=10, max_length=2000),
