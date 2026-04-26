@@ -545,6 +545,45 @@ def listar_usuarios(
     ]
 
 
+@router.get("/stats")
+def stats_usuarios(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R164 P1: estadísticas globales de usuarios.
+
+    Cifras agregadas para dashboard de admin:
+      - total y activos
+      - distribución por rol
+      - usuarios con 2FA habilitado
+      - usuarios con email único / sin nombre
+
+    Solo COORDINADOR/ADMIN.
+    """
+    todos = db.query(UsuarioRecord).all()
+
+    activos = sum(1 for u in todos if u.activo == 1)
+    por_rol: dict[str, int] = {}
+    con_2fa = 0
+    sin_nombre = 0
+    for u in todos:
+        rol = u.rol or "(SIN_ROL)"
+        por_rol[rol] = por_rol.get(rol, 0) + 1
+        if u.totp_secret:
+            con_2fa += 1
+        if not u.nombre:
+            sin_nombre += 1
+
+    return {
+        "total": len(todos),
+        "activos": activos,
+        "inactivos": len(todos) - activos,
+        "con_2fa": con_2fa,
+        "sin_nombre": sin_nombre,
+        "por_rol": por_rol,
+    }
+
+
 @router.get("/roles/disponibles")
 def listar_roles_disponibles(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
