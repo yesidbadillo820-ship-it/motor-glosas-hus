@@ -6273,6 +6273,54 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/conciliaciones-top-monto")
+def stats_conciliaciones_top_monto(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R340 P1: top N conciliaciones por valor_conciliado.
+
+    Lista las conciliaciones de mayor valor cerrado.
+    Útil para review de big-ticket cases.
+
+    Por conciliación:
+      - id, glosa_id, valor_conciliado, resultado,
+        estado_bilateral, fecha_audiencia
+    """
+    from app.models.db import ConciliacionRecord
+
+    rows = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.valor_conciliado > 0)
+        .order_by(ConciliacionRecord.valor_conciliado.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for c in rows:
+        items.append({
+            "conciliacion_id": c.id,
+            "glosa_id": c.glosa_id,
+            "valor_conciliado": int(float(c.valor_conciliado or 0)),
+            "valor_ratificado_hus": int(
+                float(c.valor_ratificado_hus or 0),
+            ),
+            "resultado": c.resultado,
+            "estado_bilateral": c.estado_bilateral,
+            "fecha_audiencia": (
+                c.fecha_audiencia.isoformat()
+                if c.fecha_audiencia else None
+            ),
+        })
+
+    return {
+        "limit": int(limit),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigos-recuperacion-monetaria")
 def stats_codigos_recuperacion_monetaria(
     min_glosas: int = Query(5, ge=1, le=100),
