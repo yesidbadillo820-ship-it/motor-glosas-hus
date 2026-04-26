@@ -740,6 +740,96 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/ranking-gestores")
+def admin_ranking_gestores(
+    dias: int = 90,
+    min_glosas: int = 3,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R148 P1: ranking de gestores con rating y badge.
+
+    Diferente a /glosas/stats/eficiencia-gestor (data raw): aquí
+    se agregan ranking position, rating estrellas y badge,
+    pensado para gamificación / reconocimiento del equipo.
+
+    Filtros:
+      - Glosas cerradas en últimos `dias` días
+      - Solo gestores con >= min_glosas
+
+    Por gestor:
+      - position (1=mejor)
+      - glosas_cerradas / levantadas
+      - tasa_levantamiento_pct
+      - rating (1-5 estrellas: 80+=5★, 60+=4★, 40+=3★,
+        20+=2★, <20=1★)
+      - badge: TOP_PERFORMER (>=80%) / DESTACADO (>=40%) /
+               EN_PROGRESO (<40%)
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    por_gestor: dict[str, dict] = {}
+    for g in glosas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        if gestor not in por_gestor:
+            por_gestor[gestor] = {"cerradas": 0, "levantadas": 0}
+        por_gestor[gestor]["cerradas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            por_gestor[gestor]["levantadas"] += 1
+
+    items = []
+    for gestor, b in por_gestor.items():
+        if b["cerradas"] < min_glosas:
+            continue
+        tasa = round(100 * b["levantadas"] / b["cerradas"], 2)
+        if tasa >= 80:
+            rating, badge = 5, "TOP_PERFORMER"
+        elif tasa >= 60:
+            rating, badge = 4, "DESTACADO"
+        elif tasa >= 40:
+            rating, badge = 3, "DESTACADO"
+        elif tasa >= 20:
+            rating, badge = 2, "EN_PROGRESO"
+        else:
+            rating, badge = 1, "EN_PROGRESO"
+        items.append({
+            "gestor": gestor,
+            "glosas_cerradas": b["cerradas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+            "rating": rating,
+            "badge": badge,
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+    for idx, it in enumerate(items, start=1):
+        it["position"] = idx
+
+    return {
+        "ventana_dias": int(dias),
+        "min_glosas_filtro": int(min_glosas),
+        "total_gestores_evaluados": len(items),
+        "items": items,
+    }
+
+
 @router.get("/glosas-prioritarias")
 def admin_glosas_prioritarias(
     limit: int = 50,
