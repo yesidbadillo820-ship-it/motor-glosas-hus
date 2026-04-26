@@ -406,6 +406,57 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/glosas-criticas")
+def yo_glosas_criticas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R303 P1: lista de TUS glosas críticas (vencidas o
+    a 3 días o menos del vencimiento).
+
+    Diferente a /yo/dashboard (solo counts) y /yo/worklist
+    (priorización heurística): aquí lista pura de las
+    críticas con datos de identificación. Útil como
+    morning briefing personal.
+
+    Ordena ASC por dias_restantes (vencidas primero).
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    nombre = current_user.nombre or current_user.email
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes <= 3)
+        .order_by(GlosaRecord.dias_restantes.asc())
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "dias_restantes": dr,
+            "es_vencida": dr < 0,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+        })
+
+    return {
+        "usuario_email": current_user.email,
+        "total_criticas": len(items),
+        "vencidas": sum(1 for x in items if x["es_vencida"]),
+        "items": items,
+    }
+
+
 @router.get("/yo/comentarios-emitidos")
 def yo_comentarios_emitidos(
     dias: int = 90,
