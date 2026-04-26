@@ -90,6 +90,59 @@ def facetas_audit_log(
     }
 
 
+@router.get("/distribucion-tablas")
+def audit_distribucion_tablas(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R155 P1: distribución de tablas afectadas en audit log.
+
+    Complementa /distribucion-acciones (qué se hace) con
+    /distribucion-tablas (a qué se le hace):
+      "70% glosas, 20% usuarios, 10% contratos"
+
+    Útil para identificar dónde se concentra la actividad
+    operacional y planear índices/particiones.
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.tabla.isnot(None))
+        .all()
+    )
+
+    por_tabla: dict[str, int] = {}
+    for e in eventos:
+        por_tabla[e.tabla] = por_tabla.get(e.tabla, 0) + 1
+
+    total = len(eventos)
+    items = []
+    for tabla, count in por_tabla.items():
+        pct = round(100 * count / total, 2) if total else 0.0
+        items.append({
+            "tabla": tabla,
+            "count": count,
+            "pct": pct,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_eventos": total,
+        "total_tablas_afectadas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/distribucion-acciones")
 def audit_distribucion_acciones(
     dias: int = 30,
