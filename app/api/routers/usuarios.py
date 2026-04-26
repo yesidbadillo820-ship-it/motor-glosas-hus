@@ -406,6 +406,73 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/glosas-cerradas-mes")
+def yo_glosas_cerradas_mes(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R318 P1: lista de TUS glosas cerradas este mes.
+
+    Diferente a /yo/dashboard (solo count): aquí lista
+    detallada de las que cerraste este mes con su
+    resultado. Útil para ver el trabajo del mes en
+    curso.
+
+    Ordena DESC por fecha_decision_eps.
+    """
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    nombre = current_user.nombre or current_user.email
+    inicio_mes = ahora_utc().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_recuperado": int(float(g.valor_recuperado or 0)),
+            "fecha_decision_eps": (
+                g.fecha_decision_eps.isoformat()
+                if g.fecha_decision_eps else None
+            ),
+        })
+
+    levantadas = sum(
+        1 for g in rows if (g.estado or "").upper() == "LEVANTADA"
+    )
+
+    return {
+        "usuario_email": current_user.email,
+        "mes": inicio_mes.strftime("%Y-%m"),
+        "total_cerradas": len(items),
+        "levantadas": levantadas,
+        "valor_recuperado_total": sum(
+            it["valor_recuperado"] for it in items
+        ),
+        "items": items,
+    }
+
+
 @router.get("/yo/eps-asignadas")
 def yo_eps_asignadas(
     db: Session = Depends(get_db),
