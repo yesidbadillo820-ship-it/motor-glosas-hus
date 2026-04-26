@@ -816,6 +816,40 @@ def semaforo(
     return repo.semaforo_counts()
 
 
+@router.get("/facetas")
+def facetas_glosas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R88 P1: facetas únicas de las glosas para construir filtros UI.
+
+    Devuelve los valores DISTINCT no-nulos de eps, etapa, estado,
+    codigo_glosa y gestor_nombre. Útil para que el frontend renderice
+    <select> con valores reales en lugar de inputs libres (mejor UX,
+    menos typos al filtrar).
+
+    Hace un solo round-trip por columna; cada columna tiene índice
+    en BD así que es O(distinct) eficiente.
+    """
+    def _distinct(col):
+        rows = (
+            db.query(col)
+            .filter(col.isnot(None))
+            .distinct()
+            .order_by(col.asc())
+            .all()
+        )
+        return [r[0] for r in rows if r[0]]
+
+    return {
+        "eps": _distinct(GlosaRecord.eps),
+        "etapas": _distinct(GlosaRecord.etapa),
+        "estados": _distinct(GlosaRecord.estado),
+        "codigos_glosa": _distinct(GlosaRecord.codigo_glosa),
+        "gestores": _distinct(GlosaRecord.gestor_nombre),
+    }
+
+
 @router.get("/por-factura")
 def glosas_por_factura(
     numero_factura: str = Query(..., min_length=1, max_length=60),
