@@ -5174,6 +5174,58 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/transiciones-recientes")
+def stats_transiciones_recientes(
+    horas: int = Query(24, ge=1, le=168),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R177 P1: transiciones de estado recientes.
+
+    Lista las transiciones de estado en audit_log en las últimas
+    N horas, agregadas por par (anterior, nuevo):
+      "RADICADA → RESPONDIDA: 12 transiciones"
+      "RESPONDIDA → LEVANTADA: 8"
+
+    Útil para entender el flujo del proceso en tiempo real.
+    """
+    from datetime import timedelta
+
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(hours=int(horas))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.campo == "estado")
+        .all()
+    )
+
+    por_transicion: dict[str, int] = {}
+    for e in eventos:
+        anterior = e.valor_anterior or "(NULL)"
+        nuevo = e.valor_nuevo or "(NULL)"
+        key = f"{anterior}|{nuevo}"
+        por_transicion[key] = por_transicion.get(key, 0) + 1
+
+    items = []
+    for k, count in por_transicion.items():
+        anterior, nuevo = k.split("|", 1)
+        items.append({
+            "anterior": anterior,
+            "nuevo": nuevo,
+            "count": count,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "ventana_horas": int(horas),
+        "total_transiciones": len(eventos),
+        "items": items,
+    }
+
+
 @router.get("/stats/cerradas-hoy")
 def stats_cerradas_hoy(
     db: Session = Depends(get_db),
