@@ -122,6 +122,15 @@ class ReanalizarRequest(BaseModel):
     modo_respuesta: Optional[str] = "defender"
 
 
+class BulkActualizarEstadoRequest(BaseModel):
+    """R71 P1: cambio masivo de estado. Útil cuando llega un Excel
+    de respuesta de la EPS con N decisiones (LEVANTADAS, RATIFICADAS)
+    para procesar de un golpe."""
+    glosa_ids: list[int] = Field(..., min_length=1, max_length=500)
+    nuevo_estado: str = Field(..., min_length=3, max_length=50)
+    nota: Optional[str] = Field(default=None, max_length=300)
+
+
 def _limpiar_observacion(dictamen_html: str) -> str:
     """Extrae solo el texto del argumento jurídico del dictamen, quitando la
     tabla superior (código/valor/respuesta), los badges, la tabla de resumen
@@ -2153,6 +2162,73 @@ def descargar_dictamen_markdown(
         media_type="text/markdown",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+@router.post("/bulk-actualizar-estado")
+def bulk_actualizar_estado(
+    data: BulkActualizarEstadoRequest,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """R71 P1: actualiza el estado de N glosas en una sola transacción.
+
+    Útil cuando llega Excel de respuesta de la EPS con decisiones para
+    múltiples glosas. En vez de llamar PATCH /glosas/{id}/estado N veces,
+    una sola llamada con la lista.
+
+    Estados válidos típicos:
+      LEVANTADA, RATIFICADA, ACEPTADA, ACEPTADA_PARCIAL, RESUELTA,
+      CONCILIADA, EN_REVISION
+
+    Devuelve:
+      {
+        "actualizadas": N,
+        "no_encontradas": [ids_no_encontrados],
+        "estado": "LEVANTADA"
+      }
+
+    Audit log: 1 entry por glosa con accion=BULK_UPDATE_ESTADO.
+    """
+    estados_validos = {
+        "RADICADA", "BORRADOR", "EN_REVISION", "RESPONDIDA",
+        "LEVANTADA", "RATIFICADA", "ACEPTADA", "PARCIALMENTE_ACEPTADA",
+        "RESUELTA", "CONCILIADA", "ARCHIVADA",
+    }
+    nuevo_estado_norm = data.nuevo_estado.strip().upper()
+    if nuevo_estado_norm not in estados_validos:
+        raise HTTPException(
+            422,
+            f"Estado '{nuevo_estado_norm}' inválido. Use uno de: "
+            f"{', '.join(sorted(estados_validos))}",
+        )
+
+    repo = GlosaRepository(db)
+    actualizadas = 0
+    no_encontradas = []
+    audit_repo = AuditRepository(db)
+
+    for gid in data.glosa_ids:
+        g = repo.obtener_por_id(gid)
+        if not g:
+            no_encontradas.append(gid)
+            continue
+        estado_anterior = g.estado
+        g.estado = nuevo_estado_norm
+        actualizadas += 1
+        audit_repo.registrar(
+            usuario_email=current_user.email, usuario_rol=current_user.rol,
+            accion="BULK_UPDATE_ESTADO", tabla="glosas", registro_id=gid,
+            campo="estado", valor_anterior=estado_anterior,
+            valor_nuevo=nuevo_estado_norm,
+            detalle=(data.nota or "Bulk update de estado")[:300],
+        )
+    db.commit()
+
+    return {
+        "actualizadas": actualizadas,
+        "no_encontradas": no_encontradas,
+        "estado": nuevo_estado_norm,
+    }
 
 
 @router.get("/{glosa_id}/validar-rapido")
