@@ -3339,6 +3339,89 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/cohorte-mensual")
+def stats_cohorte_mensual(
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R103 P1: cohort analysis de glosas por mes de creación.
+
+    Para cada cohorte mensual (mes en que se creó la glosa),
+    calcula qué % se cerraron dentro de 30/60/90 días.
+
+    Útil para identificar si el equipo mejora con el tiempo:
+      - ¿Cohorte de marzo cierra al 30d más rápido que cohorte de enero?
+      - ¿Empeoró tras nuevo proceso/cambio?
+
+    Devuelve serie ordenada por mes con métricas de retención
+    (% aún sin cerrar a los 30/60/90 días).
+
+    Estados cerrados: ACEPTADA, LEVANTADA, ARCHIVADA, CONCILIADA.
+    """
+    from datetime import timedelta, timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    corte = ahora_utc() - timedelta(days=int(meses) * 31)
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= corte)
+        .all()
+    )
+
+    cohortes: dict[str, list] = {}
+    for g in glosas:
+        creado = g.creado_en
+        if not creado:
+            continue
+        if creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        key = creado.strftime("%Y-%m")
+        cohortes.setdefault(key, []).append(g)
+
+    serie = []
+    for key in sorted(cohortes.keys()):
+        cohorte = cohortes[key]
+        total = len(cohorte)
+        cerradas_30 = 0
+        cerradas_60 = 0
+        cerradas_90 = 0
+        for g in cohorte:
+            estado = (g.estado or "").upper()
+            if estado not in ESTADOS_CERRADOS:
+                continue
+            if not (g.fecha_decision_eps and g.creado_en):
+                continue
+            dec = g.fecha_decision_eps
+            cre = g.creado_en
+            if dec.tzinfo is None:
+                dec = dec.replace(tzinfo=timezone.utc)
+            if cre.tzinfo is None:
+                cre = cre.replace(tzinfo=timezone.utc)
+            dias = (dec - cre).days
+            if dias <= 30:
+                cerradas_30 += 1
+            if dias <= 60:
+                cerradas_60 += 1
+            if dias <= 90:
+                cerradas_90 += 1
+
+        serie.append({
+            "cohorte": key,
+            "total_glosas": total,
+            "cierre_30d_pct": round(100 * cerradas_30 / total, 2),
+            "cierre_60d_pct": round(100 * cerradas_60 / total, 2),
+            "cierre_90d_pct": round(100 * cerradas_90 / total, 2),
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_cohortes": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/proyeccion-recuperacion")
 def stats_proyeccion_recuperacion(
     db: Session = Depends(get_db),
