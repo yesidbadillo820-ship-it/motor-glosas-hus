@@ -509,6 +509,55 @@ def exportar_xlsx(
     )
 
 
+@router.get("/codigos-respuesta-catalogo")
+def codigos_respuesta_catalogo(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R137 P1: catálogo de códigos de respuesta IPS (Res 2284/2023).
+
+    Códigos RE oficiales que IPS usa para responder a una glosa
+    o devolución de la EPS:
+      - RE9901: Glosa no aceptada (defensa total) — más común
+      - RE9801: Glosa aceptada parcialmente
+      - RE9602: Glosa injustificada al 100%
+      - RE9502: Glosa improcedente por extemporánea
+      - etc.
+
+    Útil para que el frontend renderice un dropdown contextual
+    al responder una glosa.
+
+    Devuelve los códigos con descripción + clasificación
+    funcional (DEFENSA / ACEPTACION / EXTEMPORANEA / OTRO).
+    """
+    from app.services.catalogo_glosas import CODIGOS_RESPUESTA
+
+    DEFENSA = {"RE9901", "RE9602", "RE9502", "RE9601", "RE9501"}
+    ACEPTACION = {"RE9701", "RE9801"}
+    EXTEMPORANEA = {"RE2201", "RE2202"}
+
+    items = []
+    for codigo, descripcion in sorted(CODIGOS_RESPUESTA.items()):
+        if codigo in DEFENSA:
+            tipo = "DEFENSA"
+        elif codigo in ACEPTACION:
+            tipo = "ACEPTACION"
+        elif codigo in EXTEMPORANEA:
+            tipo = "EXTEMPORANEA"
+        else:
+            tipo = "OTRO"
+        items.append({
+            "codigo": codigo,
+            "descripcion": descripcion,
+            "tipo_funcional": tipo,
+        })
+
+    return {
+        "regulacion": "Resolución 2284/2023 — Códigos de respuesta IPS",
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/codigos-glosa-catalogo")
 def codigos_glosa_catalogo(
     grupo: Optional[str] = None,
