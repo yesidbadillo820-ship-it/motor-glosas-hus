@@ -5174,6 +5174,86 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/tarifa-coincidente")
+def stats_tarifa_coincidente(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R169 P1: glosas TA* con tarifa pactada en el catálogo.
+
+    Detecta cuántas glosas tipo TARIFA (codigo_glosa empieza
+    con "TA") tienen una tarifa correspondiente cargada en
+    TarifaContratadaRecord para esa EPS+CUPS.
+
+    Si está cargada → la IA puede comparar valor pactado vs
+    facturado automáticamente.
+    Si NO está cargada → la IA tiene que improvisar.
+
+    Útil para medir el % de glosas TA con base de comparación
+    sólida.
+    """
+    from app.models.db import (
+        ConceptoGlosaRecord, GlosaRecord, TarifaContratadaRecord,
+    )
+
+    # Glosas TA* abiertas o cerradas, con CUPS
+    conceptos_ta = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.codigo_glosa.like("TA%"))
+        .filter(ConceptoGlosaRecord.cups_codigo.isnot(None))
+        .all()
+    )
+
+    if not conceptos_ta:
+        return {
+            "total_conceptos_ta": 0,
+            "con_tarifa_pactada": 0,
+            "sin_tarifa_pactada": 0,
+            "cobertura_pct": 0.0,
+        }
+
+    # Set de (eps, cups) con tarifa cargada
+    tarifas_set: set[tuple[str, str]] = set()
+    for t in db.query(TarifaContratadaRecord).all():
+        if t.eps and t.codigo_cups:
+            tarifas_set.add((t.eps, t.codigo_cups))
+
+    # Para cada concepto, ver si su (eps_de_la_glosa, cups) está
+    glosa_ids = {c.glosa_id for c in conceptos_ta if c.glosa_id}
+    eps_por_glosa = {}
+    if glosa_ids:
+        for g in (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.id.in_(glosa_ids))
+            .all()
+        ):
+            eps_por_glosa[g.id] = g.eps
+
+    con_tarifa = 0
+    sin_tarifa = 0
+    for c in conceptos_ta:
+        eps = eps_por_glosa.get(c.glosa_id)
+        if not eps:
+            sin_tarifa += 1
+            continue
+        if (eps, c.cups_codigo) in tarifas_set:
+            con_tarifa += 1
+        else:
+            sin_tarifa += 1
+
+    total = con_tarifa + sin_tarifa
+    cobertura = (
+        round(100 * con_tarifa / total, 2) if total else 0.0
+    )
+
+    return {
+        "total_conceptos_ta": total,
+        "con_tarifa_pactada": con_tarifa,
+        "sin_tarifa_pactada": sin_tarifa,
+        "cobertura_pct": cobertura,
+    }
+
+
 @router.get("/stats/sin-dictamen")
 def stats_sin_dictamen(
     db: Session = Depends(get_db),
