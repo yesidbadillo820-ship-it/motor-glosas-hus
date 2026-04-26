@@ -6273,6 +6273,52 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/glosas-recientes-eps")
+def stats_glosas_recientes_eps(
+    eps: str = Query(..., min_length=2),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R288 P1: últimas N glosas de una EPS específica.
+
+    Drill-down operacional: para una EPS dada, devuelve
+    las N glosas más recientes con datos clave. Útil al
+    comenzar revisión sectorial de una EPS.
+    """
+    eps_q = (eps or "").strip()
+    if not eps_q:
+        return {"eps": "", "items": []}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps_q))
+        .order_by(GlosaRecord.creado_en.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "gestor_nombre": g.gestor_nombre,
+        })
+
+    return {
+        "eps": eps_q,
+        "limit": int(limit),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigo-respuesta-tendencia")
 def stats_codigo_respuesta_tendencia(
     dias: int = Query(30, ge=7, le=90),
