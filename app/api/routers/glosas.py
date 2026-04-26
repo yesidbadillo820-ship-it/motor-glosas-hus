@@ -1941,3 +1941,146 @@ def clonar_glosa(
         "id_nueva": nueva.id,
         "estado": "BORRADOR",
     }
+
+
+@router.get("/{glosa_id}/timeline")
+def timeline_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R67 P2: cronología consolidada de eventos de una glosa.
+
+    Combina eventos de múltiples tablas en un solo timeline ordenado:
+      - Creación de la glosa (creado_en del GlosaRecord)
+      - Snapshots de versiones (DictamenVersionRecord — CREAR, REFINAR,
+        REANALIZAR, RESTAURAR)
+      - Cambios de estado (audit_log accion=ACTUALIZAR_ESTADO)
+      - Decisión EPS (audit_log accion=DECISION_EPS)
+      - Comentarios resueltos
+      - Calls IA con costo (AICallRecord)
+
+    Útil para:
+      - Investigación de glosas con dictamen extraño
+      - Auditoría regulatoria (¿quién tocó esta glosa, cuándo, qué hizo?)
+      - Trazabilidad post-decisión de la EPS
+
+    Respuesta: lista de {timestamp, tipo, actor, detalle, metadata}
+    ordenada DESC (más reciente primero).
+    """
+    from app.models.db import (
+        AICallRecord, AuditLogRecord, ComentarioGlosaRecord,
+        DictamenVersionRecord,
+    )
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    eventos = []
+
+    # 1. Creación de la glosa
+    if glosa.creado_en:
+        eventos.append({
+            "timestamp": glosa.creado_en.isoformat(),
+            "tipo": "CREAR_GLOSA",
+            "actor": glosa.auditor_email or "—",
+            "detalle": f"Glosa creada · {glosa.eps} · {glosa.codigo_glosa}",
+            "metadata": {
+                "valor_objetado": float(glosa.valor_objetado or 0),
+                "estado": glosa.estado,
+            },
+        })
+
+    # 2. Versiones del dictamen
+    versiones = (
+        db.query(DictamenVersionRecord)
+        .filter(DictamenVersionRecord.glosa_id == glosa_id)
+        .all()
+    )
+    for v in versiones:
+        eventos.append({
+            "timestamp": v.creado_en.isoformat() if v.creado_en else None,
+            "tipo": f"VERSION_{v.accion or 'CREAR'}",
+            "actor": v.autor_email or "—",
+            "detalle": v.mensaje_refinar or f"Snapshot del dictamen ({v.accion})",
+            "metadata": {"version_id": v.id},
+        })
+
+    # 3. Audit log para esta glosa
+    auditorias = (
+        db.query(AuditLogRecord)
+        .filter(
+            AuditLogRecord.tabla.in_(("glosas", "historial")),
+            AuditLogRecord.registro_id == glosa_id,
+        )
+        .all()
+    )
+    for a in auditorias:
+        eventos.append({
+            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+            "tipo": f"AUDIT_{a.accion or 'ACCION'}",
+            "actor": a.usuario_email or "—",
+            "detalle": (a.detalle or "")[:300],
+            "metadata": {
+                "campo": a.campo,
+                "valor_anterior": (a.valor_anterior or "")[:80],
+                "valor_nuevo": (a.valor_nuevo or "")[:80],
+                "ip": a.ip,
+            },
+        })
+
+    # 4. Comentarios resueltos
+    comentarios = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.glosa_id == glosa_id)
+        .all()
+    )
+    for c in comentarios:
+        if c.creado_en:
+            eventos.append({
+                "timestamp": c.creado_en.isoformat(),
+                "tipo": "COMENTARIO",
+                "actor": c.autor_email or "—",
+                "detalle": (c.texto or "")[:300],
+                "metadata": {"resuelto": bool(c.resuelto_en)},
+            })
+        if c.resuelto_en:
+            eventos.append({
+                "timestamp": c.resuelto_en.isoformat(),
+                "tipo": "COMENTARIO_RESUELTO",
+                "actor": c.resuelto_por or "—",
+                "detalle": "Comentario marcado como resuelto",
+                "metadata": {"comentario_id": c.id},
+            })
+
+    # 5. Calls IA con costo
+    calls = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.glosa_id == glosa_id)
+        .all()
+    )
+    for c in calls:
+        if c.creado_en:
+            eventos.append({
+                "timestamp": c.creado_en.isoformat(),
+                "tipo": "AI_CALL",
+                "actor": c.user_email or "—",
+                "detalle": f"{c.proveedor}/{c.modelo} · {c.latency_ms}ms · ${c.cost_usd:.5f}",
+                "metadata": {
+                    "tokens_in": (c.input_tokens or 0)
+                                 + (c.cache_creation_input_tokens or 0)
+                                 + (c.cache_read_input_tokens or 0),
+                    "tokens_out": c.output_tokens,
+                    "cost_usd": c.cost_usd,
+                },
+            })
+
+    # Ordenar DESC (más reciente primero)
+    eventos.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
+
+    return {
+        "glosa_id": glosa_id,
+        "total_eventos": len(eventos),
+        "eventos": eventos,
+    }
