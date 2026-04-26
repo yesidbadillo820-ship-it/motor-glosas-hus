@@ -5908,6 +5908,65 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/distribucion-urgencia")
+def stats_distribucion_urgencia(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R219 P1: distribución de glosas abiertas por banda urgencia.
+
+    Útil para una vista rápida del semáforo:
+      - VENCIDA (dr<0)
+      - CRITICA (0..3)
+      - PROXIMA (4..7)
+      - LEJANA (>7)
+
+    Devuelve por banda: count + valor_total + pct.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    bandas = {
+        "VENCIDA": {"count": 0, "valor": 0.0},
+        "CRITICA": {"count": 0, "valor": 0.0},
+        "PROXIMA": {"count": 0, "valor": 0.0},
+        "LEJANA": {"count": 0, "valor": 0.0},
+    }
+    for g in abiertas:
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            k = "VENCIDA"
+        elif dr <= 3:
+            k = "CRITICA"
+        elif dr <= 7:
+            k = "PROXIMA"
+        else:
+            k = "LEJANA"
+        bandas[k]["count"] += 1
+        bandas[k]["valor"] += float(g.valor_objetado or 0)
+
+    total = sum(b["count"] for b in bandas.values())
+    items = []
+    for nombre, b in bandas.items():
+        pct = round(100 * b["count"] / total, 2) if total else 0.0
+        items.append({
+            "banda": nombre,
+            "count": b["count"],
+            "valor_total": int(b["valor"]),
+            "pct": pct,
+        })
+
+    return {
+        "total_abiertas": total,
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-velocidad-respuesta")
 def stats_eps_velocidad_respuesta(
     min_glosas: int = Query(3, ge=1, le=50),
