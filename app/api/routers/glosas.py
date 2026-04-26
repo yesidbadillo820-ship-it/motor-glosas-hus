@@ -6570,6 +6570,74 @@ def dialogo_bilateral(
     }
 
 
+@router.get("/{glosa_id}/conceptos-resumen")
+def conceptos_resumen(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R139 P2: resumen agregado de los conceptos múltiples de una glosa.
+
+    Una glosa puede agrupar N conceptos (ConceptoGlosaRecord), cada
+    uno con su propio CUPS, valor objetado y observación EPS.
+
+    Este endpoint da el "TL;DR" de los conceptos:
+      - cuántos hay
+      - valor total objetado (suma de los valores de conceptos)
+      - cuántos ya tienen dictamen_html (respondidos)
+      - distribución por código_glosa
+      - centros de costo distintos
+
+    Útil para resumir glosas grandes con muchos conceptos.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    conceptos = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.glosa_id == glosa_id)
+        .all()
+    )
+
+    if not conceptos:
+        return {
+            "glosa_id": glosa_id,
+            "total_conceptos": 0,
+            "valor_objetado_conceptos": 0,
+            "respondidos": 0,
+            "pendientes": 0,
+            "por_codigo_glosa": {},
+            "centros_costo_distintos": [],
+        }
+
+    valor_total = sum(float(c.valor_objetado or 0) for c in conceptos)
+    respondidos = sum(
+        1 for c in conceptos
+        if c.dictamen_html and len(c.dictamen_html) > 50
+    )
+
+    por_codigo: dict[str, int] = {}
+    centros: set[str] = set()
+    for c in conceptos:
+        if c.codigo_glosa:
+            por_codigo[c.codigo_glosa] = (
+                por_codigo.get(c.codigo_glosa, 0) + 1
+            )
+        if c.centro_costo:
+            centros.add(c.centro_costo)
+
+    return {
+        "glosa_id": glosa_id,
+        "total_conceptos": len(conceptos),
+        "valor_objetado_conceptos": int(valor_total),
+        "respondidos": respondidos,
+        "pendientes": len(conceptos) - respondidos,
+        "por_codigo_glosa": por_codigo,
+        "centros_costo_distintos": sorted(centros),
+    }
+
+
 @router.get("/{glosa_id}/historial-workflow")
 def historial_workflow(
     glosa_id: int,
