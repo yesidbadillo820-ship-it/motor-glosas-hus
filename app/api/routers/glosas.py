@@ -3299,6 +3299,74 @@ def stats_concentracion_pareto(
     }
 
 
+@router.get("/stats/serie-mensual-cantidad")
+def stats_serie_mensual_cantidad(
+    meses: int = Query(12, ge=1, le=36),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R124 P2: serie temporal mensual con creadas Y cerradas.
+
+    Diferente a /stats/recuperacion-mensual (solo valor) y
+    /stats/cohorte-mensual (% cierre por cohorte de creación):
+    aquí se muestra el flujo entrante vs saliente del backlog.
+
+    Útil para gráficos de doble línea:
+      - Línea 1: glosas creadas en el mes
+      - Línea 2: glosas cerradas en el mes
+      - Si línea 1 > línea 2 sostenidamente → backlog crece
+
+    Devuelve serie ascendente:
+      [{"mes": "2026-04", "creadas": 50, "cerradas": 35,
+        "delta_neto": 15, "ratio_cierre": 0.7}, ...]
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = db.query(GlosaRecord).all()
+
+    creadas_mes: dict[str, int] = {}
+    cerradas_mes: dict[str, int] = {}
+
+    for g in glosas:
+        creado = g.creado_en
+        if creado and creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        if creado:
+            k = creado.strftime("%Y-%m")
+            creadas_mes[k] = creadas_mes.get(k, 0) + 1
+
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if (dec and (g.estado or "").upper() in ESTADOS_CERRADOS):
+            k = dec.strftime("%Y-%m")
+            cerradas_mes[k] = cerradas_mes.get(k, 0) + 1
+
+    todos_meses = sorted(set(creadas_mes.keys()) | set(cerradas_mes.keys()))
+    meses_recientes = todos_meses[-int(meses):]
+
+    serie = []
+    for k in meses_recientes:
+        c = creadas_mes.get(k, 0)
+        cer = cerradas_mes.get(k, 0)
+        ratio = round(cer / c, 2) if c else None
+        serie.append({
+            "mes": k,
+            "creadas": c,
+            "cerradas": cer,
+            "delta_neto": c - cer,
+            "ratio_cierre": ratio,
+        })
+
+    return {
+        "meses_solicitados": int(meses),
+        "total_meses_disponibles": len(todos_meses),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/facturas-hot")
 def stats_facturas_hot(
     min_glosas: int = Query(3, ge=2, le=20),
