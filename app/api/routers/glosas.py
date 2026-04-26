@@ -6273,6 +6273,77 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-totales-snapshot")
+def stats_eps_totales_snapshot(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R331 P1: snapshot tabular único por EPS de totales.
+
+    Tabla compacta para vista de referencia rápida.
+    Por EPS:
+      - count_total, count_abiertas, count_cerradas
+      - valor_objetado_total
+      - valor_recuperado_total
+      - saldo_total
+      - tasa_levantamiento_pct (sobre cerradas)
+
+    Útil para grilla de referencia en dashboards
+    operacionales.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {
+            "total": 0, "abiertas": 0, "lev": 0, "dec": 0,
+            "obj": 0.0, "rec": 0.0, "saldo": 0.0,
+        })
+        b["total"] += 1
+        b["obj"] += float(g.valor_objetado or 0)
+        b["rec"] += float(g.valor_recuperado or 0)
+        b["saldo"] += float(g.saldo_factura or 0)
+        estado = (g.estado or "").upper()
+        if estado not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+        if estado in ESTADOS_DECIDIDOS:
+            b["dec"] += 1
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for eps, b in bucket.items():
+        tasa = (
+            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "count_total": b["total"],
+            "count_abiertas": b["abiertas"],
+            "count_cerradas": b["total"] - b["abiertas"],
+            "valor_objetado_total": int(b["obj"]),
+            "valor_recuperado_total": int(b["rec"]),
+            "saldo_total": int(b["saldo"]),
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["count_total"], reverse=True)
+
+    return {
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/glosas-grandes-perdidas")
 def stats_glosas_grandes_perdidas(
     umbral: float = Query(5_000_000, ge=10_000),
