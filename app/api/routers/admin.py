@@ -965,6 +965,56 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/glosas-creadas-hoy-detalle")
+def admin_glosas_creadas_hoy_detalle(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R290 P1: detalle de las glosas creadas el día de hoy.
+
+    Diferente a /glosas/stats/creadas-hoy (solo count):
+    aquí lista completa con datos clave. Útil para morning
+    briefing del coordinador o admin.
+
+    Solo SUPER_ADMIN.
+    """
+    from app.core.tz import ahora_utc
+
+    inicio = ahora_utc().replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio)
+        .order_by(GlosaRecord.valor_objetado.desc())
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "gestor_nombre": g.gestor_nombre,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+        })
+
+    valor_total = sum(it["valor_objetado"] for it in items)
+
+    return {
+        "fecha": inicio.date().isoformat(),
+        "total_creadas": len(items),
+        "valor_objetado_total": valor_total,
+        "items": items,
+    }
+
+
 @router.get("/consecutivos-duplicados")
 def admin_consecutivos_duplicados(
     db: Session = Depends(get_db),
