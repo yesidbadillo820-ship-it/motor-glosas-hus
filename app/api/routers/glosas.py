@@ -5803,6 +5803,68 @@ def stats_abandono_por_etapa(
     }
 
 
+@router.get("/stats/codigos-respuesta-por-eps")
+def stats_codigos_respuesta_por_eps(
+    eps: str = Query(..., min_length=2),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R145 P1: efectividad de cada código de respuesta IPS contra
+    una EPS específica.
+
+    Diferente a /stats/exito-por-codigo-respuesta (global): aquí
+    se filtra a una EPS para descubrir qué argumentos funcionan
+    mejor contra esa EPS:
+      "Contra SANITAS, RE9502 levanta 80%; contra NUEVA EPS, 30%."
+
+    Útil para tailoring de estrategia por EPS.
+
+    Param `eps`: nombre exacto de la EPS.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .all()
+    )
+
+    por_codigo: dict[str, dict] = {}
+    for g in glosas:
+        cod = g.codigo_respuesta
+        if cod not in por_codigo:
+            por_codigo[cod] = {
+                "total": 0, "decididas": 0, "levantadas": 0,
+            }
+        b = por_codigo[cod]
+        b["total"] += 1
+        estado = (g.estado or "").upper()
+        if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+            b["decididas"] += 1
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
+
+    items = []
+    for cod, b in por_codigo.items():
+        tasa = (
+            round(100 * b["levantadas"] / b["decididas"], 2)
+            if b["decididas"] else 0.0
+        )
+        items.append({
+            "codigo_respuesta": cod,
+            "usado": b["total"],
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+
+    return {
+        "eps": eps,
+        "total_codigos_respuesta": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/exito-por-codigo-respuesta")
 def stats_exito_por_codigo_respuesta(
     db: Session = Depends(get_db),
