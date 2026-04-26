@@ -6273,6 +6273,62 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/devoluciones-resumen")
+def stats_devoluciones_resumen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R317 P1: resumen de glosas marcadas como devolución.
+
+    Una "devolución" (es_devolucion='1' o 'S') es una
+    objeción donde la EPS pide que se reradique la
+    factura por motivos formales, distinto de una
+    glosa propiamente dicha.
+
+    Métricas:
+      - count_total_devoluciones
+      - count_abiertas, count_cerradas
+      - valor_objetado_total
+      - top_eps con más devoluciones
+
+    Útil para identificar EPS que abusan de la devolución.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.es_devolucion.in_(["1", "S", "Y"]))
+        .all()
+    )
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    total = len(rows)
+    abiertas = sum(
+        1 for g in rows
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS
+    )
+    valor = sum(float(g.valor_objetado or 0) for g in rows)
+
+    por_eps: dict[str, int] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if eps:
+            por_eps[eps] = por_eps.get(eps, 0) + 1
+
+    top_eps = sorted(
+        por_eps.items(), key=lambda x: x[1], reverse=True,
+    )[:10]
+
+    return {
+        "count_total_devoluciones": total,
+        "count_abiertas": abiertas,
+        "count_cerradas": total - abiertas,
+        "valor_objetado_total": int(valor),
+        "top_eps": [
+            {"eps": e, "count": c} for e, c in top_eps
+        ],
+    }
+
+
 @router.get("/stats/dictamenes-largos-top")
 def stats_dictamenes_largos_top(
     limit: int = Query(20, ge=1, le=100),
