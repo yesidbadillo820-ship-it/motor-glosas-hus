@@ -713,6 +713,59 @@ def estados_disponibles(
     }
 
 
+@router.get("/sin-codigo-glosa")
+def glosas_sin_codigo_glosa(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R209 P1: glosas no-cerradas sin codigo_glosa configurado.
+
+    Detecta glosas que se importaron mal o que les falta el
+    código canónico Resolución 2284. Sin código no se puede:
+      - Buscar plantillas Gold
+      - Aplicar reglas de la IA
+      - Generar dictamen consistente
+
+    Útil como cola de saneamiento.
+
+    Devuelve hasta `limit` glosas no-cerradas sin codigo_glosa.
+
+    Declarado ANTES de /{glosa_id} para evitar collision.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(
+            (GlosaRecord.codigo_glosa.is_(None))
+            | (GlosaRecord.codigo_glosa == "")
+        )
+        .order_by(GlosaRecord.creado_en.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "eps": g.eps,
+            "factura": g.factura,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "estado": g.estado,
+        })
+
+    return {
+        "total_sin_codigo": len(glosas),
+        "items": items,
+    }
+
+
 @router.get("/factura-detalle")
 def factura_detalle(
     factura: str = Query(..., min_length=1),
