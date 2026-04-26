@@ -1070,6 +1070,53 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/glosas-altas-cuantia-vencidas")
+def admin_glosas_altas_cuantia_vencidas(
+    umbral: float = 5_000_000,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R367 P1: alta cuantía + vencidas (intersección crítica).
+
+    Glosas abiertas con valor_objetado >= umbral Y
+    dias_restantes < 0. Esto es el "red flag" del CFO:
+    casos grandes en mora.
+
+    Solo SUPER_ADMIN. Ordena DESC por valor_objetado.
+    """
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < 0)
+        .filter(GlosaRecord.valor_objetado >= float(umbral))
+        .order_by(GlosaRecord.valor_objetado.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dias_vencido": abs(int(g.dias_restantes or 0)),
+            "gestor_nombre": g.gestor_nombre,
+        })
+
+    return {
+        "umbral": int(umbral),
+        "total_red_flags": len(items),
+        "valor_total": sum(it["valor_objetado"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/glosas-saldo-cero-detalle")
 def admin_glosas_saldo_cero_detalle(
     limit: int = 100,
