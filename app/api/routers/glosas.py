@@ -6273,6 +6273,72 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-tiempo-radicacion-objecion")
+def stats_eps_tiempo_radicacion_objecion(
+    min_glosas: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R333 P1: tiempo entre radicación y objeción por EPS.
+
+    Por EPS, calcula los días promedio entre
+    `fecha_radicacion_factura` y `fecha_objecion_eps`.
+    Mide qué tan rápido objeta cada EPS desde que se le
+    radica la factura.
+
+    Por EPS:
+      - count
+      - tiempo_promedio_dias
+      - tiempo_max_dias
+    """
+    from datetime import timezone
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_radicacion_factura.isnot(None))
+        .filter(GlosaRecord.fecha_objecion_eps.isnot(None))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, list[int]] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        rad = g.fecha_radicacion_factura
+        obj = g.fecha_objecion_eps
+        if rad and rad.tzinfo is None:
+            rad = rad.replace(tzinfo=timezone.utc)
+        if obj and obj.tzinfo is None:
+            obj = obj.replace(tzinfo=timezone.utc)
+        if not rad or not obj:
+            continue
+        dias = (obj - rad).days
+        if dias < 0:
+            continue
+        bucket.setdefault(eps, []).append(dias)
+
+    items = []
+    for eps, vals in bucket.items():
+        if len(vals) < min_glosas:
+            continue
+        prom = round(sum(vals) / len(vals), 2)
+        items.append({
+            "eps": eps,
+            "count": len(vals),
+            "tiempo_promedio_dias": prom,
+            "tiempo_max_dias": max(vals),
+        })
+    items.sort(key=lambda x: x["tiempo_promedio_dias"])
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigo-eps-cobertura")
 def stats_codigo_eps_cobertura(
     min_glosas: int = Query(5, ge=1, le=100),
