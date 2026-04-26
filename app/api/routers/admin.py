@@ -965,6 +965,54 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/glosas-sin-codigo-respuesta")
+def admin_glosas_sin_codigo_respuesta(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R278 P1: glosas decididas pero sin codigo_respuesta.
+
+    Una glosa decidida (LEVANTADA/RATIFICADA/ACEPTADA) sin
+    `codigo_respuesta` es un dato incompleto: la EPS debió
+    haber emitido un código de respuesta (RE9501, RE9701,
+    etc) según Res. 2284/2023.
+
+    Útil para campañas de calidad de datos: completar
+    información histórica.
+
+    Solo SUPER_ADMIN. Ordena por valor_objetado DESC.
+    """
+    ESTADOS_DECIDIDOS = ["LEVANTADA", "RATIFICADA", "ACEPTADA"]
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(
+            (GlosaRecord.codigo_respuesta.is_(None))
+            | (GlosaRecord.codigo_respuesta == "")
+        )
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+        })
+    items.sort(key=lambda x: x["valor_objetado"], reverse=True)
+
+    return {
+        "total_sin_codigo_respuesta": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/audit-actividad-mensual")
 def admin_audit_actividad_mensual(
     meses: int = 6,
