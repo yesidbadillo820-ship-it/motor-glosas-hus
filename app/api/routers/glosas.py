@@ -6273,6 +6273,53 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/workflow-state-distribucion")
+def stats_workflow_state_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R301 P1: distribución por workflow_state.
+
+    `workflow_state` es el estado interno del flujo HUS
+    (BORRADOR, EN_ANALISIS, EN_REVISION, etc.) distinto
+    de `estado` (que sigue el ciclo formal con la EPS).
+
+    Útil para ver el pipeline interno: cuántas glosas
+    están en cada paso del proceso.
+    """
+    from sqlalchemy import func as _f
+
+    rows = (
+        db.query(
+            GlosaRecord.workflow_state,
+            _f.count(GlosaRecord.id),
+            _f.sum(GlosaRecord.valor_objetado),
+        )
+        .group_by(GlosaRecord.workflow_state)
+        .all()
+    )
+
+    items = []
+    for state, count, valor in rows:
+        items.append({
+            "workflow_state": state or "SIN_ESTADO",
+            "count": int(count),
+            "valor_objetado_total": int(float(valor or 0)),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    total = sum(it["count"] for it in items)
+    for it in items:
+        it["pct"] = (
+            round(100 * it["count"] / total, 2) if total else 0.0
+        )
+
+    return {
+        "total_glosas": total,
+        "items": items,
+    }
+
+
 @router.get("/stats/dashboard-cobranza")
 def stats_dashboard_cobranza(
     db: Session = Depends(get_db),
