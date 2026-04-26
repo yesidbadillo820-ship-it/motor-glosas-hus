@@ -152,3 +152,42 @@ async def cambiar_password(
         "ok": True,
         "mensaje": "Contraseña actualizada correctamente",
     }
+
+
+@router.post("/auth/refresh", response_model=TokenResponse)
+def refresh_token(
+    request: Request,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R82 P1: emite un nuevo token a un usuario ya autenticado.
+
+    Extiende la sesión sin requerir credenciales (la UI lo llama
+    automáticamente cuando detecta que el token expira pronto).
+
+    Auditado en log para detectar refresh sospechosos (ej. el mismo
+    usuario refrescando 100x en 1 min sería raro).
+
+    Solo válido para usuarios ACTIVOS (si el admin desactivó la
+    cuenta, no debe poder refrescar).
+    """
+    if not current_user.activo:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario desactivado",
+        )
+    cfg = get_settings()
+    ip = get_remote_address(request)
+    expires = timedelta(minutes=cfg.access_token_expire_minutes)
+    new_token = create_access_token(
+        data={"sub": current_user.email}, expires_delta=expires,
+    )
+    logger.info(
+        f"[AUTH-REFRESH] Token renovado | email={current_user.email} | ip={ip}"
+    )
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "nombre": current_user.nombre,
+        "rol": current_user.rol,
+        "must_change_password": bool(getattr(current_user, "must_change_password", 0)),
+    }
