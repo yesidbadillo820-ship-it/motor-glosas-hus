@@ -2341,6 +2341,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <button class="btn-sm ghost" onclick="verHistorialVersiones()" title="Historial de versiones del dictamen">📜 Versiones</button>
         <button class="btn-sm ghost" onclick="guardarComoPlantillaGold()" title="Guardar este argumento como plantilla ganadora">⭐ Gold</button>
         <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
+        <button class="btn-sm ghost" onclick="toggleReanalizarPanel()" title="Re-correr análisis cambiando modo o tono (no duplica la glosa)">🔄 Reanalizar</button>
         <button class="btn-sm ghost" onclick="validarDictamen()" title="Checklist pre-radicación">✅ Validar</button>
         <button class="modal-close" onclick="cerrarModal()">✕</button>
       </div>
@@ -2364,6 +2365,30 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <button class="btn btn-primary btn-sm" onclick="aplicarRefinar()">Refinar</button>
       </div>
       <div id="refinar-status" class="refinar-status"></div>
+    </div>
+    <!-- R60 P3: panel reanalizar (re-correr análisis cambiando modo/tono) -->
+    <div class="refinar-panel" id="reanalizar-panel" style="display:none">
+      <div class="refinar-hdr">
+        <b>🔄 Reanalizar</b>
+        <span class="refinar-sub">Re-corre el análisis con otro modo o tono, sobre la misma glosa (no duplica).</span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:.75rem;color:var(--text2);">Modo:</label>
+        <select id="reanalizar-modo" style="padding:.3rem .5rem;font-size:.78rem;">
+          <option value="defender">Defender (dictamen formal)</option>
+          <option value="auditoria_previa">Auditoría previa (diagnóstico neutral)</option>
+          <option value="aceptar_total">Aceptar total</option>
+          <option value="aceptar_parcial">Aceptar parcial</option>
+        </select>
+        <label style="font-size:.75rem;color:var(--text2);margin-left:.4rem;">Tono:</label>
+        <select id="reanalizar-tono" style="padding:.3rem .5rem;font-size:.78rem;">
+          <option value="conciliador">Conciliador</option>
+          <option value="neutral">Neutral</option>
+          <option value="firme">Firme</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="aplicarReanalizar()" id="btn-aplicar-reanalizar">Reanalizar</button>
+      </div>
+      <div id="reanalizar-status" class="refinar-status"></div>
     </div>
   </div>
 </div>
@@ -8095,6 +8120,11 @@ async function verDictamen(id){
     document.getElementById('refinar-msg').value = '';
     document.getElementById('refinar-status').textContent = '';
     document.getElementById('refinar-status').className = 'refinar-status';
+    // R60 P3: reset panel reanalizar también
+    var pRea = document.getElementById('reanalizar-panel');
+    if(pRea) pRea.style.display = 'none';
+    var sRea = document.getElementById('reanalizar-status');
+    if(sRea){ sRea.textContent = ''; sRea.className = 'refinar-status'; }
   }catch(e){toast('Error',e.message,'error');}
 }
 
@@ -8180,6 +8210,59 @@ function toggleRefinarPanel(){
   var p = document.getElementById('refinar-panel');
   p.style.display = p.style.display === 'none' ? 'flex' : 'none';
   if(p.style.display !== 'none') setTimeout(function(){ document.getElementById('refinar-msg').focus(); }, 50);
+}
+
+// R60 P3: toggle del panel reanalizar
+function toggleReanalizarPanel(){
+  var p = document.getElementById('reanalizar-panel');
+  if(!p) return;
+  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+  // Cerrar panel refinar si estaba abierto (UX: solo uno a la vez)
+  if(p.style.display !== 'none'){
+    var pr = document.getElementById('refinar-panel');
+    if(pr) pr.style.display = 'none';
+  }
+}
+
+// R60 P3: ejecuta POST /glosas/{id}/reanalizar y refresca el dictamen
+async function aplicarReanalizar(){
+  if(!CURRENT_GLOSA_ID){ toast('Error','No hay glosa abierta','error'); return; }
+  var modo = document.getElementById('reanalizar-modo').value;
+  var tono = document.getElementById('reanalizar-tono').value;
+  var status = document.getElementById('reanalizar-status');
+  var btn = document.getElementById('btn-aplicar-reanalizar');
+  status.textContent = 'Reanalizando con ' + modo + ' / ' + tono + '…';
+  status.className = 'refinar-status';
+  btn.disabled = true;
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/reanalizar', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({tono: tono, modo_respuesta: modo}),
+    });
+    if(!r.ok){
+      var er = await r.json().catch(function(){return{detail:'Error'};});
+      status.textContent = 'Error ' + r.status + ': ' + (er.detail || '—');
+      status.className = 'refinar-status err';
+      return;
+    }
+    var data = await r.json();
+    // Actualizar el body del modal con el nuevo dictamen
+    document.getElementById('modal-body').innerHTML = data.dictamen || '';
+    status.textContent = '✓ Dictamen reanalizado · ' + (data.modelo_ia || '');
+    status.className = 'refinar-status ok';
+    toast('Reanalizado', 'Dictamen actualizado · ' + modo, 'success');
+    // Cerrar panel tras 1.5s
+    setTimeout(function(){
+      var p = document.getElementById('reanalizar-panel');
+      if(p) p.style.display = 'none';
+    }, 1500);
+  } catch(e){
+    status.textContent = 'Conexión: ' + e.message;
+    status.className = 'refinar-status err';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function refinarSugerencia(texto){
