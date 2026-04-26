@@ -6086,6 +6086,80 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/codigo-glosa-tendencia")
+def stats_codigo_glosa_tendencia(
+    dias: int = Query(30, ge=7, le=90),
+    min_glosas_actual: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R260 P1: tendencia de códigos de glosa (emergentes vs en declive).
+
+    Compara dos ventanas consecutivas de N días:
+      - actual: últimos N días
+      - previa: N días anteriores a esos
+
+    Por código:
+      - count_actual, count_previo
+      - delta_abs (actual - previo)
+      - delta_pct (variación relativa)
+
+    Útil para alertar sobre nuevos patrones de objeción de las
+    EPS antes de que se vuelvan masivos.
+    """
+    from datetime import timedelta, timezone
+
+    ahora = ahora_utc()
+    corte_actual = ahora - timedelta(days=int(dias))
+    corte_previo = ahora - timedelta(days=int(dias) * 2)
+
+    actual: dict[str, int] = {}
+    previo: dict[str, int] = {}
+
+    for g in db.query(GlosaRecord).all():
+        codigo = (g.codigo_glosa or "").strip()
+        if not codigo:
+            continue
+        creado = g.creado_en
+        if creado and creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        if not creado:
+            continue
+        if creado >= corte_actual:
+            actual[codigo] = actual.get(codigo, 0) + 1
+        elif creado >= corte_previo:
+            previo[codigo] = previo.get(codigo, 0) + 1
+
+    todos_codigos = set(actual) | set(previo)
+    items = []
+    for codigo in todos_codigos:
+        a = actual.get(codigo, 0)
+        p = previo.get(codigo, 0)
+        if a < min_glosas_actual:
+            continue
+        delta_abs = a - p
+        if p == 0:
+            delta_pct = 100.0 if a > 0 else 0.0
+        else:
+            delta_pct = round(100 * (a - p) / p, 2)
+        items.append({
+            "codigo_glosa": codigo,
+            "count_actual": a,
+            "count_previo": p,
+            "delta_abs": delta_abs,
+            "delta_pct": delta_pct,
+        })
+
+    items.sort(key=lambda x: x["delta_pct"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "min_glosas_actual": int(min_glosas_actual),
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/gestores-pareto")
 def stats_gestores_pareto(
     db: Session = Depends(get_db),
