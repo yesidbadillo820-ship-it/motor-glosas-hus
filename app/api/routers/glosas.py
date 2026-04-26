@@ -6273,6 +6273,59 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/fecha-objecion-mensual")
+def stats_fecha_objecion_mensual(
+    meses: int = Query(12, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R309 P1: serie mensual por `fecha_objecion_eps`.
+
+    Diferente a /stats/serie-mensual-cantidad (basado en
+    creado_en — fecha de carga al sistema): aquí usamos
+    `fecha_objecion_eps`, la fecha real en que la EPS
+    emitió la objeción según el documento DGH.
+
+    Permite ver el patrón temporal real de las EPS, no
+    el de la operación interna HUS.
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_objecion_eps >= desde)
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in rows:
+        f = g.fecha_objecion_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        k = f.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {"count": 0, "valor": 0.0})
+        b["count"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        serie.append({
+            "mes": k,
+            "count_objetadas": b["count"],
+            "valor_objetado_total": int(b["valor"]),
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/tipo-glosa-tasa")
 def stats_tipo_glosa_tasa(
     db: Session = Depends(get_db),
