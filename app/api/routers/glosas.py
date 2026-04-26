@@ -6441,6 +6441,64 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/factura-tasa-cierre")
+def stats_factura_tasa_cierre(
+    min_glosas: int = Query(2, ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R354 P1: tasa de cierre por factura.
+
+    Para cada factura con >= min_glosas, qué % de sus
+    glosas están cerradas. Útil para identificar facturas
+    "atascadas" (varias glosas, todas abiertas) vs
+    "completadas".
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura.isnot(None))
+        .filter(GlosaRecord.factura != "N/A")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        f = (g.factura or "").strip()
+        if not f:
+            continue
+        b = bucket.setdefault(f, {
+            "total": 0, "cerradas": 0, "eps": g.eps,
+        })
+        b["total"] += 1
+        if (g.estado or "").upper() in ESTADOS_CERRADOS:
+            b["cerradas"] += 1
+
+    items = []
+    for f, b in bucket.items():
+        if b["total"] < min_glosas:
+            continue
+        pct = (
+            round(100 * b["cerradas"] / b["total"], 2)
+            if b["total"] else 0.0
+        )
+        items.append({
+            "factura": f,
+            "eps": b["eps"],
+            "total": b["total"],
+            "cerradas": b["cerradas"],
+            "pct_cerradas": pct,
+        })
+    items.sort(key=lambda x: x["pct_cerradas"])
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_facturas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-codigo-rentabilidad")
 def stats_eps_codigo_rentabilidad(
     min_decididas: int = Query(3, ge=1, le=50),
