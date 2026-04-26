@@ -6000,6 +6000,61 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/codigos-mejor-tasa")
+def stats_codigos_mejor_tasa(
+    min_decididas: int = Query(5, ge=1, le=100),
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R230 P1: códigos de glosa con MEJOR tasa.
+
+    Contraparte de /stats/codigos-peor-tasa. Útil para
+    identificar tipos de glosa donde HUS gana fácil:
+      "TA0201 levantamos 95% → seguir esa estrategia"
+
+    Filtra por min_decididas (default 5).
+    Ordenado DESC por tasa.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .all()
+    )
+
+    por_codigo: dict[str, dict] = {}
+    for g in glosas:
+        cod = g.codigo_glosa
+        if not cod:
+            continue
+        if cod not in por_codigo:
+            por_codigo[cod] = {"decididas": 0, "levantadas": 0}
+        por_codigo[cod]["decididas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            por_codigo[cod]["levantadas"] += 1
+
+    items = []
+    for cod, b in por_codigo.items():
+        if b["decididas"] < min_decididas:
+            continue
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2)
+        items.append({
+            "codigo_glosa": cod,
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+
+    return {
+        "min_decididas_filtro": int(min_decididas),
+        "items": items[:int(top)],
+    }
+
+
 @router.get("/stats/codigos-peor-tasa")
 def stats_codigos_peor_tasa(
     min_decididas: int = Query(5, ge=1, le=100),
