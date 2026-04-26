@@ -720,6 +720,8 @@ from app.api.routers.health import router as health_router
 app.include_router(health_router)
 from app.api.routers.analizar import router as analizar_router
 app.include_router(analizar_router)
+from app.api.routers.firma import router as firma_router
+app.include_router(firma_router)
 
 
 
