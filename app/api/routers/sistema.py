@@ -732,6 +732,56 @@ def info_version():
     }
 
 
+@router.get("/runtime-info")
+def info_runtime(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R107 P2: metadata del proceso Python en ejecución.
+
+    Útil para diagnosticar problemas de performance/memoria sin
+    SSH. Reporta:
+      - Python version + implementation
+      - Process uptime (segundos desde arranque)
+      - Working directory
+      - Total threads
+      - Memoria RSS (si psutil está disponible)
+
+    Solo COORDINADOR/ADMIN.
+    """
+    import os
+    import platform
+    import sys
+    import threading
+    import time
+
+    # Uptime: aproximamos con time.monotonic() vs hora arranque cacheada
+    # NO importamos psutil aquí (puede no estar instalado en prod minimal).
+    info = {
+        "python_version": sys.version.split()[0],
+        "python_implementation": platform.python_implementation(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "pid": os.getpid(),
+        "cwd": os.getcwd(),
+        "threads_activos": threading.active_count(),
+        "tz_env": os.getenv("TZ") or None,
+    }
+
+    # Memoria si psutil disponible
+    try:
+        import psutil
+        proc = psutil.Process(os.getpid())
+        mem_info = proc.memory_info()
+        info["memoria_rss_mb"] = round(mem_info.rss / 1024 / 1024, 2)
+        info["cpu_pct"] = proc.cpu_percent(interval=0.1)
+        info["uptime_segundos"] = int(time.time() - proc.create_time())
+        info["psutil_disponible"] = True
+    except ImportError:
+        info["psutil_disponible"] = False
+
+    return info
+
+
 @router.get("/db-schema")
 def info_db_schema(
     incluir_columnas: bool = True,
