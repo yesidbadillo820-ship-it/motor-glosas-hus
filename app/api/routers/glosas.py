@@ -6273,6 +6273,70 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-volumen-mes-anterior")
+def stats_eps_volumen_mes_anterior(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R338 P1: volumen por EPS en el mes anterior.
+
+    Snapshot del mes pasado: count_glosas y
+    valor_objetado por EPS para las creadas el mes
+    anterior. Útil para reportar "cómo cerró el mes" por
+    EPS.
+
+    Ordenado DESC por count_glosas.
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+
+    ahora = ahora_utc()
+    inicio_mes_actual = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if inicio_mes_actual.month == 1:
+        inicio_anterior = inicio_mes_actual.replace(
+            year=inicio_mes_actual.year - 1, month=12,
+        )
+    else:
+        inicio_anterior = inicio_mes_actual.replace(
+            month=inicio_mes_actual.month - 1,
+        )
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio_anterior)
+        .filter(GlosaRecord.creado_en < inicio_mes_actual)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {"count": 0, "valor": 0.0})
+        b["count"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+
+    items = []
+    for eps, b in bucket.items():
+        items.append({
+            "eps": eps,
+            "count_glosas": b["count"],
+            "valor_objetado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count_glosas"], reverse=True)
+
+    return {
+        "mes_anterior": inicio_anterior.strftime("%Y-%m"),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigo-respuesta-monetaria")
 def stats_codigo_respuesta_monetaria(
     db: Session = Depends(get_db),
