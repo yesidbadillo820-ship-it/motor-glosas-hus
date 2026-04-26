@@ -6086,6 +6086,77 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/mes-actual")
+def stats_mes_actual(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R248 P1: estadísticas del mes en curso.
+
+    Vista resumida del mes corriente (desde día 1):
+      - creadas
+      - cerradas
+      - levantadas
+      - valor_objetado_mes
+      - valor_recuperado_mes
+      - tasa_levantamiento_pct
+
+    Útil para reportes de avance del mes.
+    """
+    from sqlalchemy import func as _f
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    creadas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.creado_en >= inicio_mes)
+        .scalar() or 0
+    )
+    cerradas_list = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    levantadas = sum(
+        1 for g in cerradas_list
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    valor_obj_mes = (
+        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_objetado), 0))
+        .filter(GlosaRecord.creado_en >= inicio_mes)
+        .scalar() or 0
+    )
+    valor_rec_mes = sum(
+        float(g.valor_recuperado or 0) for g in cerradas_list
+    )
+
+    decididas = sum(
+        1 for g in cerradas_list
+        if (g.estado or "").upper() in
+        {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    )
+    tasa = (
+        round(100 * levantadas / decididas, 2)
+        if decididas else 0.0
+    )
+
+    return {
+        "mes": inicio_mes.strftime("%Y-%m"),
+        "creadas": int(creadas),
+        "cerradas": len(cerradas_list),
+        "levantadas": levantadas,
+        "valor_objetado_mes": int(valor_obj_mes),
+        "valor_recuperado_mes": int(valor_rec_mes),
+        "tasa_levantamiento_pct": tasa,
+    }
+
+
 @router.get("/stats/eps-pacientes-top")
 def stats_eps_pacientes_top(
     eps: str = Query(..., min_length=2),
