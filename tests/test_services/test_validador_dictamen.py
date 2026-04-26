@@ -137,3 +137,99 @@ class TestEvaluarDictamen:
     def test_dictamen_vacio_score_muy_bajo(self):
         r = evaluar_dictamen("", codigo_glosa="TA0201")
         assert r["score"] <= 50
+
+
+# ─── R69 P1: cobertura adicional de checks ─────────────────────────────────
+
+
+class TestCheckInvitacionConciliacion:
+    def test_con_palabra_conciliacion(self):
+        from app.services.validador_dictamen import check_invitacion_conciliacion
+        r = check_invitacion_conciliacion("Se invita a CONCILIACIÓN")
+        assert r["aprobado"] is True
+
+    def test_con_referencia_decreto_4747(self):
+        from app.services.validador_dictamen import check_invitacion_conciliacion
+        r = check_invitacion_conciliacion("Conforme al Art. 20 Dec. 4747")
+        assert r["aprobado"] is True
+
+    def test_sin_invitacion_falla(self):
+        from app.services.validador_dictamen import check_invitacion_conciliacion
+        r = check_invitacion_conciliacion("dictamen sin invitación")
+        assert r["aprobado"] is False
+
+
+class TestCheckEnumeracion:
+    def test_con_enumeracion_textual(self):
+        """Requiere AMBOS marcadores 'EN PRIMER LUGAR' y 'EN SEGUNDO LUGAR'."""
+        from app.services.validador_dictamen import check_enumeracion
+        r = check_enumeracion(
+            "EN PRIMER LUGAR el contrato es claro. EN SEGUNDO LUGAR la tarifa…"
+        )
+        assert r["aprobado"] is True
+
+    def test_solo_uno_de_los_dos_falla(self):
+        from app.services.validador_dictamen import check_enumeracion
+        r = check_enumeracion("EN PRIMER LUGAR el contrato")
+        assert r["aprobado"] is False
+
+    def test_sin_enumeracion(self):
+        from app.services.validador_dictamen import check_enumeracion
+        r = check_enumeracion("texto plano sin numeración")
+        assert r["aprobado"] is False
+
+
+class TestCheckCodigoRespuestaCoherente:
+    def test_RE9502_con_extemporanea_aprueba(self):
+        from app.services.validador_dictamen import check_codigo_respuesta_coherente
+        r = check_codigo_respuesta_coherente(
+            "La glosa fue formulada de forma EXTEMPORÁNEA",
+            codigo_respuesta="RE9502",
+        )
+        assert r["aprobado"] is True
+
+    def test_RE9502_sin_extemporanea_falla(self):
+        from app.services.validador_dictamen import check_codigo_respuesta_coherente
+        r = check_codigo_respuesta_coherente(
+            "Defensa estándar sin mencionar plazos",
+            codigo_respuesta="RE9502",
+        )
+        assert r["aprobado"] is False
+
+    def test_RE9901_es_libre(self):
+        """RE9901 (defensa) no requiere palabra clave específica."""
+        from app.services.validador_dictamen import check_codigo_respuesta_coherente
+        r = check_codigo_respuesta_coherente(
+            "Cualquier texto", codigo_respuesta="RE9901",
+        )
+        assert r["aprobado"] is True
+
+    def test_sin_codigo_aprueba_por_default(self):
+        from app.services.validador_dictamen import check_codigo_respuesta_coherente
+        r = check_codigo_respuesta_coherente("texto", codigo_respuesta=None)
+        assert r["aprobado"] is True
+
+    def test_codigo_desconocido_aprueba(self):
+        from app.services.validador_dictamen import check_codigo_respuesta_coherente
+        r = check_codigo_respuesta_coherente("texto", codigo_respuesta="RE9999")
+        assert r["aprobado"] is True
+
+
+class TestCheckContratoMencionado:
+    def test_con_palabra_contrato_aprueba(self):
+        from app.services.validador_dictamen import check_contrato_mencionado
+        r = check_contrato_mencionado(
+            "Según contrato S-13-1-03-1-04958 con FAMISANAR",
+            eps="FAMISANAR",
+        )
+        assert r["aprobado"] is True
+
+    def test_eps_sin_contrato_aprueba_por_default(self):
+        """Si la EPS no tiene contrato pactado conocido (SOAT puro),
+        el check no aplica → aprueba."""
+        from app.services.validador_dictamen import check_contrato_mencionado
+        r = check_contrato_mencionado(
+            "Texto sin mencionar contrato",
+            eps="EPS_INEXISTENTE_SIN_CONTRATO",
+        )
+        assert r["aprobado"] is True
