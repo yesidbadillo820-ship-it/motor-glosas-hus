@@ -5174,6 +5174,64 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/valor-objetado-mensual")
+def stats_valor_objetado_mensual(
+    meses: int = Query(12, ge=1, le=36),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R172 P1: serie mensual del valor objetado (no recuperado).
+
+    Diferente a /stats/recuperacion-mensual (valor RECUPERADO):
+    aquí valor OBJETADO en el mes que se creó la glosa, útil
+    para visualizar la "presión" mensual sobre HUS:
+      - "EPS objetaron \$500M en marzo"
+      - "Solo \$50M en abril → menor presión"
+
+    Devuelve serie ASC por mes:
+      - mes (YYYY-MM)
+      - count_glosas
+      - valor_objetado_total
+      - valor_promedio
+    """
+    from datetime import timezone
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.strftime("%Y-%m")
+        if k not in por_mes:
+            por_mes[k] = {"count": 0, "valor": 0.0}
+        por_mes[k]["count"] += 1
+        por_mes[k]["valor"] += float(g.valor_objetado or 0)
+
+    todos_meses = sorted(por_mes.keys())
+    meses_recientes = todos_meses[-int(meses):]
+
+    serie = []
+    for k in meses_recientes:
+        b = por_mes[k]
+        promedio = b["valor"] / b["count"] if b["count"] else 0
+        serie.append({
+            "mes": k,
+            "count_glosas": b["count"],
+            "valor_objetado_total": int(b["valor"]),
+            "valor_promedio": round(promedio, 2),
+        })
+
+    return {
+        "meses_solicitados": int(meses),
+        "total_meses_disponibles": len(todos_meses),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/cups-sin-tarifa")
 def stats_cups_sin_tarifa(
     eps: str = Query(..., min_length=2),
