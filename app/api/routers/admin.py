@@ -508,6 +508,98 @@ def admin_exportar_usuarios_csv(
     )
 
 
+@router.get("/snapshot.json")
+def admin_snapshot_json(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R117 P1: snapshot point-in-time del estado del sistema.
+
+    Captura métricas clave en un momento dado, ideal para:
+      - Auditoría regulatoria periódica ("estado al cierre de mes")
+      - Comparación temporal (snapshot mes A vs mes B)
+      - Rollback verification (¿el sistema quedó bien tras cambio X?)
+
+    NO incluye datos sensibles ni dumps masivos — es un resumen
+    estructurado descargable como archivo JSON con
+    Content-Disposition.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timezone
+    import json
+    from fastapi.responses import Response
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        AICacheRecord, AICallRecord, AuditLogRecord,
+        ContratoRecord, GlosaEliminadaRecord, GlosaRecord,
+        PlantillaGoldRecord,
+    )
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    ahora = ahora_utc()
+
+    # Counts
+    counts = {
+        "glosas_total": db.query(_f.count(GlosaRecord.id)).scalar() or 0,
+        "usuarios_activos": (
+            db.query(_f.count(UsuarioRecord.id))
+            .filter(UsuarioRecord.activo == 1)
+            .scalar() or 0
+        ),
+        "contratos": (
+            db.query(_f.count(ContratoRecord.eps)).scalar() or 0
+        ),
+        "plantillas_gold": (
+            db.query(_f.count(PlantillaGoldRecord.id)).scalar() or 0
+        ),
+        "ai_cache": db.query(_f.count(AICacheRecord.id)).scalar() or 0,
+        "ai_calls": db.query(_f.count(AICallRecord.id)).scalar() or 0,
+        "audit_log": db.query(_f.count(AuditLogRecord.id)).scalar() or 0,
+        "papelera": (
+            db.query(_f.count(GlosaEliminadaRecord.id)).scalar() or 0
+        ),
+    }
+
+    # Glosas por estado (snapshot)
+    abiertas = 0
+    cerradas = 0
+    valor_total_pendiente = 0.0
+    valor_total_recuperado = 0.0
+    for g in db.query(GlosaRecord).all():
+        v = float(g.valor_objetado or 0)
+        valor_total_recuperado += float(g.valor_recuperado or 0)
+        if (g.estado or "").upper() in ESTADOS_CERRADOS:
+            cerradas += 1
+        else:
+            abiertas += 1
+            valor_total_pendiente += v
+
+    payload = {
+        "snapshot_id": ahora.strftime("%Y%m%d-%H%M%S"),
+        "generado_en": ahora.isoformat(),
+        "generado_por": current_user.email,
+        "counts": counts,
+        "glosas": {
+            "abiertas": abiertas,
+            "cerradas": cerradas,
+            "valor_pendiente_total": int(valor_total_pendiente),
+            "valor_recuperado_acumulado": int(valor_total_recuperado),
+        },
+    }
+
+    fname = f"snapshot-{payload['snapshot_id']}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/diagnostico-bd")
 def admin_diagnostico_bd(
     db: Session = Depends(get_db),
