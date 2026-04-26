@@ -740,6 +740,58 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/dictamenes-recientes")
+def admin_dictamenes_recientes(
+    horas: int = 24,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R247 P1: últimas versiones de dictamen (últimas N horas).
+
+    Útil como feed de actividad reciente del equipo:
+      "alice@x refinó la glosa #123 hace 2h"
+      "bob@x creó dictamen para glosa #456 hace 30min"
+
+    Devuelve hasta 100 versiones DESC por creado_en.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import DictamenVersionRecord
+
+    desde = ahora_utc() - timedelta(hours=int(horas))
+    versiones = (
+        db.query(DictamenVersionRecord)
+        .filter(DictamenVersionRecord.creado_en >= desde)
+        .order_by(DictamenVersionRecord.creado_en.desc())
+        .limit(100)
+        .all()
+    )
+
+    items = []
+    for v in versiones:
+        items.append({
+            "id": v.id,
+            "glosa_id": v.glosa_id,
+            "accion": v.accion,
+            "autor_email": v.autor_email,
+            "creado_en": (
+                v.creado_en.isoformat() if v.creado_en else None
+            ),
+            "longitud_dictamen": (
+                len(v.dictamen_html) if v.dictamen_html else 0
+            ),
+        })
+
+    return {
+        "ventana_horas": int(horas),
+        "total_versiones": len(versiones),
+        "items": items,
+    }
+
+
 @router.get("/usuarios-actividad-mensual")
 def admin_usuarios_actividad_mensual(
     usuario_email: str,
