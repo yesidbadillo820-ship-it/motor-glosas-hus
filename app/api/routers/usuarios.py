@@ -63,6 +63,84 @@ def info_usuario_actual(
     }
 
 
+@router.get("/yo/worklist")
+def worklist_personal(
+    limit: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R123 P1: worklist personal priorizada del usuario actual.
+
+    Lista las glosas asignadas a este usuario (como gestor o
+    auditor) ordenadas por prioridad heurística — qué debería
+    atacar primero.
+
+    Score (mismo que /admin/glosas-prioritarias pero filtrado a
+    sus propias asignaciones):
+      +100 vencida, +50 crítica, +20 próxima
+      +30 alto valor, +25 sin dictamen
+
+    Útil al inicio del día: "estas son TUS glosas urgentes".
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    nombre = current_user.nombre or current_user.email
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(
+            (GlosaRecord.gestor_nombre == nombre) |
+            (GlosaRecord.auditor_email == current_user.email)
+        )
+        .all()
+    )
+
+    items = []
+    for g in abiertas:
+        score = 0
+        razones = []
+
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            score += 100
+            razones.append(f"vencida {abs(dr)}d")
+        elif dr <= 3:
+            score += 50
+            razones.append(f"crítica {dr}d")
+        elif dr <= 7:
+            score += 20
+
+        v = float(g.valor_objetado or 0)
+        if v > 10_000_000:
+            score += 30
+            razones.append("alto valor (>10M)")
+
+        if not g.dictamen or len(g.dictamen) < 50:
+            score += 25
+            razones.append("sin dictamen")
+
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "dias_restantes": dr,
+            "valor_objetado": int(v),
+            "score": score,
+            "razones": razones,
+        })
+
+    items.sort(key=lambda x: x["score"], reverse=True)
+
+    return {
+        "usuario_email": current_user.email,
+        "total_asignadas": len(abiertas),
+        "items": items[:limit],
+    }
+
+
 @router.get("/yo/permisos")
 def permisos_del_usuario_actual(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
