@@ -965,6 +965,92 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/eps-cartera-detalle")
+def admin_eps_cartera_detalle(
+    eps: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R292 P1: drill-down completo de cartera para una EPS.
+
+    Single-call con todo lo necesario para una revisión de
+    cobranza:
+      - resumen: counts y totales
+      - top_facturas: 10 facturas con mayor saldo
+      - top_codigos: 10 códigos más recurrentes en abiertas
+
+    Solo SUPER_ADMIN.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps))
+        .all()
+    )
+
+    if not rows:
+        return {
+            "eps": eps,
+            "resumen": {
+                "total": 0, "abiertas": 0, "cerradas": 0,
+                "valor_objetado_total": 0, "saldo_total": 0,
+            },
+            "top_facturas": [],
+            "top_codigos": [],
+        }
+
+    abiertas_count = 0
+    cerradas_count = 0
+    valor_total = 0.0
+    saldo_total = 0.0
+    facturas: dict[str, float] = {}
+    codigos: dict[str, int] = {}
+
+    for g in rows:
+        valor_total += float(g.valor_objetado or 0)
+        saldo_total += float(g.saldo_factura or 0)
+        cerrada = (g.estado or "").upper() in ESTADOS_CERRADOS
+        if cerrada:
+            cerradas_count += 1
+        else:
+            abiertas_count += 1
+            f = (g.factura or "").strip()
+            if f and f != "N/A":
+                facturas[f] = (
+                    facturas.get(f, 0.0) + float(g.saldo_factura or 0)
+                )
+            c = (g.codigo_glosa or "").strip()
+            if c:
+                codigos[c] = codigos.get(c, 0) + 1
+
+    top_facturas = sorted(
+        facturas.items(), key=lambda x: x[1], reverse=True,
+    )[:10]
+    top_codigos = sorted(
+        codigos.items(), key=lambda x: x[1], reverse=True,
+    )[:10]
+
+    return {
+        "eps": eps,
+        "resumen": {
+            "total": len(rows),
+            "abiertas": abiertas_count,
+            "cerradas": cerradas_count,
+            "valor_objetado_total": int(valor_total),
+            "saldo_total": int(saldo_total),
+        },
+        "top_facturas": [
+            {"factura": f, "saldo": int(s)}
+            for f, s in top_facturas
+        ],
+        "top_codigos": [
+            {"codigo_glosa": c, "count": n}
+            for c, n in top_codigos
+        ],
+    }
+
+
 @router.get("/glosas-creadas-hoy-detalle")
 def admin_glosas_creadas_hoy_detalle(
     db: Session = Depends(get_db),
