@@ -6273,6 +6273,74 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/factura-distribucion-glosas")
+def stats_factura_distribucion_glosas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R306 P1: distribución del número de glosas por factura.
+
+    Cuenta cuántas facturas tienen 1, 2, 3, ... 10+ glosas
+    asociadas. Útil para entender el patrón:
+      - ¿La mayoría de facturas tienen 1 sola glosa?
+      - ¿Hay facturas con 5+ glosas (objeción múltiple)?
+
+    Devuelve histograma de buckets.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura.isnot(None))
+        .filter(GlosaRecord.factura != "N/A")
+        .all()
+    )
+
+    counts: dict[str, int] = {}
+    for g in rows:
+        f = (g.factura or "").strip()
+        if not f:
+            continue
+        counts[f] = counts.get(f, 0) + 1
+
+    buckets = {
+        "1": 0, "2": 0, "3": 0, "4": 0, "5": 0,
+        "6-10": 0, "10+": 0,
+    }
+    for n in counts.values():
+        if n == 1:
+            buckets["1"] += 1
+        elif n == 2:
+            buckets["2"] += 1
+        elif n == 3:
+            buckets["3"] += 1
+        elif n == 4:
+            buckets["4"] += 1
+        elif n == 5:
+            buckets["5"] += 1
+        elif n <= 10:
+            buckets["6-10"] += 1
+        else:
+            buckets["10+"] += 1
+
+    items = [
+        {"glosas_por_factura": k, "count_facturas": v}
+        for k, v in buckets.items()
+    ]
+
+    total_facturas = len(counts)
+    total_glosas = sum(counts.values())
+    promedio = (
+        round(total_glosas / total_facturas, 2)
+        if total_facturas else 0.0
+    )
+
+    return {
+        "total_facturas": total_facturas,
+        "total_glosas": total_glosas,
+        "promedio_glosas_por_factura": promedio,
+        "buckets": items,
+    }
+
+
 @router.get("/stats/codigo-glosa-eps-cruzado")
 def stats_codigo_glosa_eps_cruzado(
     codigo: str = Query(..., min_length=2),
