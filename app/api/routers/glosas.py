@@ -5885,6 +5885,62 @@ def versiones_resumen_glosa(
     }
 
 
+@router.get("/{glosa_id}/historial-workflow")
+def historial_workflow(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R134 P2: historial específico de cambios de workflow_state.
+
+    Filtra audit_log a los eventos de cambio de workflow_state /
+    estado para una glosa, mostrando solo las transiciones de
+    máquina de estados (no toda la auditoría).
+
+    Útil para responder: "¿cómo evolucionó el estado de esta glosa?"
+
+    Devuelve transiciones ordenadas ASC por timestamp:
+      [{"timestamp", "usuario", "valor_anterior", "valor_nuevo",
+        "accion"}]
+    """
+    from app.models.db import AuditLogRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.registro_id == glosa_id)
+        .filter(AuditLogRecord.campo.in_(["estado", "workflow_state"]))
+        .order_by(AuditLogRecord.timestamp.asc())
+        .all()
+    )
+
+    items = [
+        {
+            "timestamp": (
+                e.timestamp.isoformat() if e.timestamp else None
+            ),
+            "usuario": e.usuario_email,
+            "campo": e.campo,
+            "valor_anterior": e.valor_anterior,
+            "valor_nuevo": e.valor_nuevo,
+            "accion": e.accion,
+        }
+        for e in eventos
+    ]
+
+    return {
+        "glosa_id": glosa_id,
+        "estado_actual": glosa.estado,
+        "workflow_state_actual": glosa.workflow_state,
+        "total_transiciones": len(items),
+        "items": items,
+    }
+
+
 @router.get("/{glosa_id}/comparar-con-promedio")
 def comparar_con_promedio(
     glosa_id: int,
