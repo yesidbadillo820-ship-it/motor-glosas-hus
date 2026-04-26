@@ -406,6 +406,92 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/comparativa-equipo")
+def yo_comparativa_equipo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R279 P1: cómo te comparas con el promedio del equipo.
+
+    Calcula tus métricas y las del equipo (promedio entre
+    gestores con al menos 1 decisión):
+      - decididas, levantadas, tasa_levantamiento_pct,
+        valor_recuperado_total
+
+    Útil para auto-evaluación: "estoy por encima/debajo
+    del promedio en tasa de levantamiento".
+
+    No revela nombres de otros, solo agregado.
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    nombre = current_user.nombre or current_user.email
+
+    decididas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in decididas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        b = bucket.setdefault(gestor, {
+            "dec": 0, "lev": 0, "rec": 0.0,
+        })
+        b["dec"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    if not bucket:
+        return {
+            "usuario_email": current_user.email,
+            "tu": {
+                "decididas": 0, "levantadas": 0,
+                "tasa_levantamiento_pct": 0.0,
+                "valor_recuperado_total": 0,
+            },
+            "equipo": {
+                "decididas_promedio": 0.0,
+                "tasa_levantamiento_promedio_pct": 0.0,
+                "valor_recuperado_promedio": 0,
+                "total_gestores": 0,
+            },
+        }
+
+    yo = bucket.get(nombre, {"dec": 0, "lev": 0, "rec": 0.0})
+    yo_tasa = (
+        round(100 * yo["lev"] / yo["dec"], 2) if yo["dec"] else 0.0
+    )
+
+    n = len(bucket)
+    sum_dec = sum(b["dec"] for b in bucket.values())
+    sum_lev = sum(b["lev"] for b in bucket.values())
+    sum_rec = sum(b["rec"] for b in bucket.values())
+    tasa_eq = round(100 * sum_lev / sum_dec, 2) if sum_dec else 0.0
+
+    return {
+        "usuario_email": current_user.email,
+        "tu": {
+            "decididas": yo["dec"],
+            "levantadas": yo["lev"],
+            "tasa_levantamiento_pct": yo_tasa,
+            "valor_recuperado_total": int(yo["rec"]),
+        },
+        "equipo": {
+            "decididas_promedio": round(sum_dec / n, 2),
+            "tasa_levantamiento_promedio_pct": tasa_eq,
+            "valor_recuperado_promedio": int(sum_rec / n),
+            "total_gestores": n,
+        },
+    }
+
+
 @router.get("/yo/streak")
 def yo_streak(
     db: Session = Depends(get_db),
