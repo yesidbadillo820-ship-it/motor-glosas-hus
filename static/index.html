@@ -2706,6 +2706,8 @@ async function checkHealth(){
           _ocultarBannerCapacitacion();
         }
       }catch(_){}
+      // R64 P2: detectar nuevos deploys comparando commit hash
+      _chequearVersionDeploy();
     } else {
       dot.classList.add('off');
       dot.style.background = '#dc2626';
@@ -2739,6 +2741,60 @@ function _mostrarBannerCapacitacion(mensaje){
 function _ocultarBannerCapacitacion(){
   var b = document.getElementById('banner-capacitacion');
   if(b){ b.style.display = 'none'; document.body.style.paddingTop = ''; }
+}
+
+// R64 P2: detección de nuevos deploys.
+// Al primer poll de /health, guarda el commit en window. En polls
+// subsiguientes, si el commit cambió → muestra banner "Nueva versión"
+// con botón Recargar. No interrumpe el trabajo del usuario, solo avisa.
+window._versionDeployActual = null;
+window._versionDeployYaAviso = false;
+async function _chequearVersionDeploy(){
+  if(window._versionDeployYaAviso) return;  // ya mostró banner
+  try{
+    var r = await fetch('/sistema/version', {cache: 'no-store'});
+    if(!r.ok) return;
+    var d = await r.json();
+    var commit = d.commit_full || d.commit || '';
+    if(!commit) return;
+    if(window._versionDeployActual === null){
+      // Primera vez — guardamos el baseline
+      window._versionDeployActual = commit;
+      return;
+    }
+    if(commit !== window._versionDeployActual){
+      // Hubo deploy
+      window._versionDeployYaAviso = true;
+      _mostrarBannerNuevoDeploy(d);
+    }
+  }catch(_){ /* silent */ }
+}
+
+function _mostrarBannerNuevoDeploy(versionInfo){
+  var b = document.getElementById('banner-deploy');
+  if(b) return;
+  b = document.createElement('div');
+  b.id = 'banner-deploy';
+  b.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9998;'
+    + 'background:linear-gradient(135deg,#0ea5e9,#1e40af);color:#fff;'
+    + 'padding:14px 18px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.2);'
+    + 'font-size:.85rem;max-width:340px;display:flex;flex-direction:column;gap:.6rem;';
+  b.innerHTML =
+    '<div style="display:flex;align-items:center;gap:.5rem;font-weight:700;">'
+    + '<span style="font-size:1.1rem;">🚀</span> Nueva versión disponible'
+    + '</div>'
+    + '<div style="font-size:.78rem;opacity:.92;">'
+    + 'Se desplegó una actualización del sistema · commit '
+    + '<span style="font-family:ui-monospace,monospace;background:rgba(255,255,255,.18);padding:1px 6px;border-radius:4px;">'
+    + (versionInfo.commit || '?') + '</span>'
+    + '</div>'
+    + '<div style="display:flex;gap:.5rem;justify-content:flex-end;">'
+    + '<button onclick="document.getElementById(\'banner-deploy\').remove();window._versionDeployYaAviso=true;" '
+    + 'style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5);padding:.3rem .7rem;border-radius:6px;font-size:.75rem;cursor:pointer;">Después</button>'
+    + '<button onclick="location.reload();" '
+    + 'style="background:#fff;color:#1e40af;border:none;padding:.3rem .8rem;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">↻ Recargar</button>'
+    + '</div>';
+  document.body.appendChild(b);
 }
 
 // ─── DARK MODE ────────────────────────────────────────────────────────────
