@@ -6086,6 +6086,72 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/cobranza-pareto-eps")
+def stats_cobranza_pareto_eps(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R254 P1: Pareto 80/20 sobre EPS pendientes (cobranza).
+
+    Identifica las EPS que concentran el 80% del valor pendiente.
+    Útil para el coordinador: "ataquemos primero estas 3 EPS y
+    cubrimos el 80% del valor a recuperar".
+
+    Devuelve:
+      - valor_total
+      - count_eps_top80 / pct_eps_top80
+      - eps_top80: lista de EPS hasta acumular 80%
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_eps: dict[str, float] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        por_eps[eps] = (
+            por_eps.get(eps, 0.0) + float(g.valor_objetado or 0)
+        )
+
+    valor_total = sum(por_eps.values())
+    if valor_total == 0:
+        return {
+            "valor_total": 0,
+            "count_eps_top80": 0,
+            "pct_eps_top80": 0.0,
+            "eps_top80": [],
+        }
+
+    eps_ord = sorted(por_eps.items(), key=lambda x: x[1], reverse=True)
+
+    acumulado = 0.0
+    eps_top80 = []
+    for eps, valor in eps_ord:
+        eps_top80.append({
+            "eps": eps,
+            "valor_pendiente": int(valor),
+            "pct_individual": round(100 * valor / valor_total, 2),
+        })
+        acumulado += valor
+        if acumulado >= 0.8 * valor_total:
+            break
+
+    pct_eps = round(100 * len(eps_top80) / len(eps_ord), 2)
+
+    return {
+        "valor_total": int(valor_total),
+        "count_eps_top80": len(eps_top80),
+        "pct_eps_top80": pct_eps,
+        "eps_top80": eps_top80,
+    }
+
+
 @router.get("/stats/glosas-altas-cuantia")
 def stats_glosas_altas_cuantia(
     umbral: float = Query(5_000_000, ge=10_000),
