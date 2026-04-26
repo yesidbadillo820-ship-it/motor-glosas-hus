@@ -6086,6 +6086,69 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/exito-por-gestor")
+def stats_exito_por_gestor(
+    min_glosas: int = Query(3, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R257 P1: tasa de levantamiento por gestor (público).
+
+    Diferente a /admin/ranking-gestores (con badges, requiere
+    SUPER_ADMIN): aquí solo métricas crudas, accesible a
+    cualquier auditor para autoevaluación o comparación con
+    pares.
+
+    Por gestor:
+      - decididas, levantadas
+      - tasa_levantamiento_pct
+      - valor_recuperado_total
+
+    Ordenado DESC por tasa_levantamiento_pct.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    por_gestor: dict[str, dict] = {}
+    for g in glosas:
+        gestor = g.gestor_nombre
+        if not gestor:
+            continue
+        if gestor not in por_gestor:
+            por_gestor[gestor] = {
+                "decididas": 0, "levantadas": 0, "rec": 0.0,
+            }
+        por_gestor[gestor]["decididas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            por_gestor[gestor]["levantadas"] += 1
+        por_gestor[gestor]["rec"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for gestor, b in por_gestor.items():
+        if b["decididas"] < min_glosas:
+            continue
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2)
+        items.append({
+            "gestor": gestor,
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+            "valor_recuperado_total": int(b["rec"]),
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "items": items,
+    }
+
+
 @router.get("/stats/cobranza-pareto-eps")
 def stats_cobranza_pareto_eps(
     db: Session = Depends(get_db),
