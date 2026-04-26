@@ -334,6 +334,132 @@ def metricas_ia_por_usuario(
     }
 
 
+@router.get("/alertas-criticas")
+def alertas_criticas_consolidadas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R74 P1: alertas críticas consolidadas para el dashboard del
+    coordinador. Combina señales de múltiples fuentes en un payload
+    único.
+
+    Categorías:
+      vencidas        glosas con dias_restantes <= 0 sin resolver
+      criticas        dias_restantes 1-2 sin resolver
+      sin_dictamen    glosas con >5 días en BORRADOR
+      iac_alto_costo  hoy gastamos más de $X en IA (umbral configurable)
+      schedulers_off  alguno de los 2 schedulers no corre
+
+    Devuelve {nivel, mensaje, count, link_sugerido} por cada alerta
+    activa. Si todo OK, items vacío.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICallRecord, GlosaRecord
+
+    items = []
+    estados_activos = ("RADICADA", "BORRADOR", "EN_REVISION", "RESPONDIDA")
+
+    # 1. Glosas vencidas (dias_restantes <= 0 y sin resolver)
+    cnt_vencidas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.dias_restantes <= 0)
+        .filter(GlosaRecord.estado.in_(estados_activos))
+        .scalar() or 0
+    )
+    if cnt_vencidas > 0:
+        items.append({
+            "nivel": "CRITICO",
+            "mensaje": f"{cnt_vencidas} glosa(s) VENCIDA(S) sin resolver",
+            "count": cnt_vencidas,
+            "link_sugerido": "/glosas/historial-paginado?estado=RADICADA",
+        })
+
+    # 2. Glosas críticas (1-2 días)
+    cnt_criticas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.dias_restantes > 0)
+        .filter(GlosaRecord.dias_restantes <= 2)
+        .filter(GlosaRecord.estado.in_(estados_activos))
+        .scalar() or 0
+    )
+    if cnt_criticas > 0:
+        items.append({
+            "nivel": "ALTO",
+            "mensaje": f"{cnt_criticas} glosa(s) vencen en 1-2 días",
+            "count": cnt_criticas,
+            "link_sugerido": "/glosas/historial-paginado?estado=RADICADA",
+        })
+
+    # 3. Borradores antiguos (>5 días sin avance)
+    corte_borrador = ahora_utc() - timedelta(days=5)
+    cnt_borradores_viejos = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.estado == "BORRADOR")
+        .filter(GlosaRecord.creado_en < corte_borrador)
+        .scalar() or 0
+    )
+    if cnt_borradores_viejos > 0:
+        items.append({
+            "nivel": "MEDIO",
+            "mensaje": f"{cnt_borradores_viejos} borrador(es) sin avance >5 días",
+            "count": cnt_borradores_viejos,
+            "link_sugerido": "/glosas/historial-paginado?estado=BORRADOR",
+        })
+
+    # 4. Costo IA del día (si supera $10 USD)
+    desde_24h = ahora_utc() - timedelta(hours=24)
+    cost_24h = (
+        db.query(_f.sum(AICallRecord.cost_usd))
+        .filter(AICallRecord.creado_en >= desde_24h)
+        .scalar() or 0
+    )
+    if float(cost_24h) > 10.0:
+        items.append({
+            "nivel": "MEDIO",
+            "mensaje": f"Costo IA hoy: ${float(cost_24h):.2f} USD (umbral $10)",
+            "count": 1,
+            "link_sugerido": "/sistema/metricas-ia?dias=1",
+        })
+
+    # 5. Schedulers caídos
+    try:
+        from app.services.ia_auditora_proactiva import _task as _t_pa
+        if _t_pa is None or _t_pa.done():
+            items.append({
+                "nivel": "ALTO",
+                "mensaje": "Scheduler de pre-análisis NO está corriendo",
+                "count": 1,
+                "link_sugerido": "/sistema/observabilidad",
+            })
+    except Exception:
+        pass
+    try:
+        from app.services.mantenimiento_scheduler import _task as _t_mant
+        if _t_mant is None or _t_mant.done():
+            items.append({
+                "nivel": "MEDIO",
+                "mensaje": "Scheduler de mantenimiento NO está corriendo",
+                "count": 1,
+                "link_sugerido": "/sistema/observabilidad",
+            })
+    except Exception:
+        pass
+
+    # Ordenar por nivel: CRITICO > ALTO > MEDIO
+    orden = {"CRITICO": 0, "ALTO": 1, "MEDIO": 2}
+    items.sort(key=lambda x: orden.get(x["nivel"], 3))
+
+    return {
+        "total_alertas": len(items),
+        "items": items,
+        "consultado_en": ahora_utc().isoformat(),
+    }
+
+
 @router.get("/healthcheck-profundo")
 def healthcheck_profundo(
     db: Session = Depends(get_db),
