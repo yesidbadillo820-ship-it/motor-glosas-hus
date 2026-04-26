@@ -6000,6 +6000,62 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/eps-mejor-tasa")
+def stats_eps_mejor_tasa(
+    min_decididas: int = Query(5, ge=1, le=100),
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R227 P1: top EPS donde HUS tiene MEJOR tasa de levantamiento.
+
+    Diferente a /stats/comparativa-eps (todas con métricas) y
+    /stats/estatus-eps (semáforo): aquí solo el ranking de las
+    EPS donde HUS gana más, ordenado DESC por tasa.
+
+    Útil para reconocer patrones positivos:
+      "Contra X EPS, levantamos el 90%"
+
+    Filtra por min_decididas (default 5) para evitar ruido.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"decididas": 0, "levantadas": 0}
+        por_eps[eps]["decididas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            por_eps[eps]["levantadas"] += 1
+
+    items = []
+    for eps, b in por_eps.items():
+        if b["decididas"] < min_decididas:
+            continue
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2)
+        items.append({
+            "eps": eps,
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+
+    return {
+        "min_decididas_filtro": int(min_decididas),
+        "items": items[:int(top)],
+    }
+
+
 @router.get("/stats/dashboard-completo")
 def stats_dashboard_completo(
     db: Session = Depends(get_db),
