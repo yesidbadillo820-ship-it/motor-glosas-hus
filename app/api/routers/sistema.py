@@ -732,6 +732,51 @@ def info_version():
     }
 
 
+@router.get("/db-schema")
+def info_db_schema(
+    incluir_columnas: bool = True,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R105 P2: introspección del schema de BD.
+
+    Útil para:
+      - Ops: verificar que migraciones aplicaron correctamente
+      - Documentación: generar diagramas
+      - Soporte: ¿qué columnas tiene la tabla X?
+
+    Lee directamente del MetaData de SQLAlchemy (no consulta BD),
+    así que es rápido y refleja el modelo declarado en código.
+    """
+    from app.database import Base
+
+    items = []
+    for tname, tabla in Base.metadata.tables.items():
+        cols = []
+        if incluir_columnas:
+            for col in tabla.columns:
+                cols.append({
+                    "nombre": col.name,
+                    "tipo": str(col.type),
+                    "nullable": bool(col.nullable),
+                    "primary_key": bool(col.primary_key),
+                    "indexado": bool(col.index) or bool(col.primary_key),
+                })
+        items.append({
+            "tabla": tname,
+            "total_columnas": len(tabla.columns),
+            "columnas": cols if incluir_columnas else None,
+        })
+
+    items.sort(key=lambda x: x["tabla"])
+
+    return {
+        "total_tablas": len(items),
+        "incluir_columnas": bool(incluir_columnas),
+        "items": items,
+    }
+
+
 @router.get("/jobs-programados")
 def info_jobs_programados(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
