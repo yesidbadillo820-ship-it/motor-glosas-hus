@@ -10027,6 +10027,59 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/glosas-misma-factura")
+def glosas_misma_factura(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R234 P1: glosas hermanas de la misma factura.
+
+    Para una glosa, devuelve TODAS las otras glosas con la
+    misma `factura`. Útil para ver el contexto: "esta factura
+    tiene 8 glosas, agruparlas para defender en bloque".
+
+    Excluye la glosa actual del listado.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    if not glosa.factura or glosa.factura == "N/A":
+        return {
+            "factura": glosa.factura,
+            "total_hermanas": 0,
+            "items": [],
+        }
+
+    hermanas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura == glosa.factura)
+        .filter(GlosaRecord.id != glosa_id)
+        .order_by(GlosaRecord.creado_en.desc())
+        .all()
+    )
+
+    items = []
+    for g in hermanas:
+        items.append({
+            "id": g.id,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "eps": g.eps,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "valor_objetado": float(g.valor_objetado or 0),
+        })
+
+    return {
+        "factura": glosa.factura,
+        "total_hermanas": len(hermanas),
+        "items": items,
+    }
+
+
 @router.get("/{glosa_id}/dictamen-similar-anterior")
 def dictamen_similar_anterior(
     glosa_id: int,
