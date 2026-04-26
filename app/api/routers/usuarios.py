@@ -406,6 +406,70 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/eps-mejor-rendimiento")
+def yo_eps_mejor_rendimiento(
+    min_decididas: int = 3,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R337 P1: TUS EPS con mejor tasa de levantamiento.
+
+    Para el usuario actual, qué EPS tienes con mejor tasa
+    histórica de levantamiento. Útil para auto-coaching:
+    "soy bueno con SANITAS, ¿qué hago bien?".
+
+    Filtra por min_decididas (default 3) para evitar
+    estadísticas con muestras pequeñas.
+
+    Por EPS: count_decididas, levantadas, tasa.
+    """
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for eps, b in bucket.items():
+        if b["dec"] < min_decididas:
+            continue
+        tasa = round(100 * b["lev"] / b["dec"], 2)
+        items.append({
+            "eps": eps,
+            "count_decididas": b["dec"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(
+        key=lambda x: x["tasa_levantamiento_pct"], reverse=True,
+    )
+
+    return {
+        "usuario_email": current_user.email,
+        "min_decididas": int(min_decididas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/yo/glosas-grandes")
 def yo_glosas_grandes(
     umbral: float = 5_000_000,
