@@ -30,6 +30,58 @@ def crear_o_actualizar_contrato(
     repo = ContratoRepository(db)
     return repo.upsert(data)
 
+@router.get("/eps-sin-contrato")
+def eps_sin_contrato(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R132 P2: EPS con glosas pero sin contrato firmado.
+
+    Caso opuesto a /sin-glosas. Detecta:
+      - Imports masivos con EPS no esperadas (typo/normalización)
+      - Contratos pendientes de cargar al sistema
+      - Riesgo regulatorio: prestar servicios sin contrato firmado
+
+    Útil para auditoría regulatoria — la falta de contrato puede
+    invalidar el cobro de glosas.
+
+    Devuelve EPS con glosas que NO tienen entrada en ContratoRecord.
+    """
+    from app.models.db import ContratoRecord, GlosaRecord
+
+    eps_contratadas = {
+        c.eps for c in db.query(ContratoRecord).all() if c.eps
+    }
+
+    # Agrupar glosas por EPS
+    por_eps: dict[str, dict] = {}
+    for g in db.query(GlosaRecord).all():
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps in eps_contratadas:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"glosas": 0, "valor_objetado": 0.0}
+        por_eps[eps]["glosas"] += 1
+        por_eps[eps]["valor_objetado"] += float(g.valor_objetado or 0)
+
+    items = [
+        {
+            "eps": eps,
+            "glosas_acumuladas": v["glosas"],
+            "valor_objetado_total": int(v["valor_objetado"]),
+        }
+        for eps, v in por_eps.items()
+    ]
+    items.sort(key=lambda x: x["valor_objetado_total"], reverse=True)
+
+    return {
+        "total_eps_sin_contrato": len(items),
+        "items": items,
+    }
+
+
 @router.get("/sin-glosas")
 def contratos_sin_glosas(
     db: Session = Depends(get_db),
