@@ -16071,6 +16071,65 @@ def sla_glosa(
     }
 
 
+@router.get("/{glosa_id}/casos-similares-resueltos")
+def casos_similares_resueltos(
+    glosa_id: int,
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R349 P1: casos similares ya resueltos a esta glosa.
+
+    Para una glosa abierta, busca otras del mismo
+    (eps, codigo_glosa) que ya estén decididas. Devuelve
+    sus dictámenes (extracto) y resultado para guiar
+    el argumento.
+
+    Útil cuando el gestor enfrenta un caso "típico" y
+    quiere ver qué argumentos funcionaron antes.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .filter(GlosaRecord.id != glosa.id)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        d = g.dictamen or ""
+        extracto = d[:200] + ("..." if len(d) > 200 else "")
+        items.append({
+            "glosa_id": g.id,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_recuperado": int(float(g.valor_recuperado or 0)),
+            "dictamen_extracto": extracto,
+            "fecha_decision_eps": (
+                g.fecha_decision_eps.isoformat()
+                if g.fecha_decision_eps else None
+            ),
+        })
+
+    return {
+        "glosa_id": glosa.id,
+        "eps": glosa.eps,
+        "codigo_glosa": glosa.codigo_glosa,
+        "total_casos_similares": len(items),
+        "items": items,
+    }
+
+
 @router.get("/{glosa_id}/probabilidad-levantamiento")
 def probabilidad_levantamiento(
     glosa_id: int,
