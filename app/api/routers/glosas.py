@@ -6086,6 +6086,61 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/eps-codigo-pareja")
+def stats_eps_codigo_pareja(
+    eps: str = Query(..., min_length=2),
+    codigo_glosa: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R252 P1: tasa histórica para una pareja (eps, codigo_glosa).
+
+    Útil cuando el frontend crea una glosa y quiere mostrar:
+      "Histórico SANITAS+TA0201: 5 levantadas, 3 ratificadas
+       (tasa 62%)"
+
+    Devuelve {decididas, levantadas, ratificadas, aceptadas,
+    tasa_levantamiento_pct}.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .filter(GlosaRecord.codigo_glosa == codigo_glosa)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    levantadas = sum(
+        1 for g in glosas
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    ratificadas = sum(
+        1 for g in glosas
+        if (g.estado or "").upper() == "RATIFICADA"
+    )
+    aceptadas = sum(
+        1 for g in glosas
+        if (g.estado or "").upper() == "ACEPTADA"
+    )
+
+    tasa = (
+        round(100 * levantadas / len(glosas), 2)
+        if glosas else 0.0
+    )
+
+    return {
+        "eps": eps,
+        "codigo_glosa": codigo_glosa,
+        "decididas": len(glosas),
+        "levantadas": levantadas,
+        "ratificadas": ratificadas,
+        "aceptadas": aceptadas,
+        "tasa_levantamiento_pct": tasa,
+    }
+
+
 @router.get("/stats/mes-actual")
 def stats_mes_actual(
     db: Session = Depends(get_db),
