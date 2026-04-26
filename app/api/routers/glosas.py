@@ -5885,6 +5885,116 @@ def versiones_resumen_glosa(
     }
 
 
+@router.get("/{glosa_id}/comparar-con-promedio")
+def comparar_con_promedio(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R133 P2: compara una glosa con el promedio histórico de su
+    cohorte (mismo EPS + mismo codigo_glosa).
+
+    Útil para responder: "¿es esta glosa típica o atípica?"
+
+    Si el valor objetado es 5x el promedio del cohorte, podría
+    indicar:
+      - Caso extraordinario que requiere atención senior
+      - Posible error de captura de datos
+      - Glosa fraccionada (mala práctica EPS)
+
+    Devuelve:
+      - glosa: valor_objetado, dias_restantes
+      - cohorte: count, valor_promedio, valor_mediano,
+                 tasa_levantamiento_pct
+      - posicion: percentil aproximado del valor en el cohorte
+      - flags: {valor_atipico, vencimiento_atipico}
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    if not glosa.eps or not glosa.codigo_glosa:
+        return {
+            "glosa_id": glosa_id,
+            "razon_no_evaluable": "Glosa sin EPS o codigo_glosa",
+        }
+
+    cohorte = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .filter(GlosaRecord.id != glosa_id)
+        .all()
+    )
+
+    if not cohorte:
+        return {
+            "glosa_id": glosa_id,
+            "razon_no_evaluable": (
+                f"No hay otras glosas con eps={glosa.eps} y "
+                f"codigo={glosa.codigo_glosa}"
+            ),
+        }
+
+    valores = sorted(float(g.valor_objetado or 0) for g in cohorte)
+    n = len(valores)
+    valor_glosa = float(glosa.valor_objetado or 0)
+
+    valor_promedio = sum(valores) / n
+    if n % 2 == 0:
+        valor_mediano = (valores[n // 2 - 1] + valores[n // 2]) / 2
+    else:
+        valor_mediano = valores[n // 2]
+
+    decididas = [
+        g for g in cohorte
+        if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA",
+                                         "RATIFICADA"}
+    ]
+    levantadas = [
+        g for g in decididas
+        if (g.estado or "").upper() == "LEVANTADA"
+    ]
+    tasa = (
+        round(100 * len(levantadas) / len(decididas), 2)
+        if decididas else 0.0
+    )
+
+    # Percentil aproximado
+    menores = sum(1 for v in valores if v < valor_glosa)
+    percentil = round(100 * menores / n, 1)
+
+    valor_atipico = (
+        valor_glosa > 3 * valor_promedio
+        or valor_glosa < valor_promedio / 5
+    ) if valor_promedio > 0 else False
+
+    return {
+        "glosa_id": glosa_id,
+        "glosa": {
+            "eps": glosa.eps,
+            "codigo_glosa": glosa.codigo_glosa,
+            "valor_objetado": valor_glosa,
+            "dias_restantes": glosa.dias_restantes,
+        },
+        "cohorte": {
+            "count": n,
+            "valor_promedio": round(valor_promedio, 2),
+            "valor_mediano": round(valor_mediano, 2),
+            "tasa_levantamiento_pct": tasa,
+        },
+        "posicion": {
+            "percentil_valor": percentil,
+            "ratio_vs_promedio": round(
+                valor_glosa / valor_promedio, 2,
+            ) if valor_promedio else None,
+        },
+        "flags": {
+            "valor_atipico": valor_atipico,
+        },
+    }
+
+
 @router.get("/{glosa_id}/recomendaciones")
 def recomendaciones_glosa(
     glosa_id: int,
