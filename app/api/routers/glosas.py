@@ -9900,6 +9900,70 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/dictamen-similar-anterior")
+def dictamen_similar_anterior(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R231 P1: sugerir dictamen de una glosa similar cerrada.
+
+    Para una glosa, busca otras del mismo (eps, codigo_glosa)
+    que estén LEVANTADAS y devuelve el dictamen más reciente
+    como base para copiar/pegar.
+
+    Útil para acelerar redacción cuando un caso similar ya se
+    ganó.
+
+    Devuelve {glosa_id_origen, dictamen, valor_recuperado_origen}
+    o sin_match=true.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    if not glosa.eps or not glosa.codigo_glosa:
+        return {
+            "glosa_id_origen": None,
+            "dictamen": None,
+            "sin_match": True,
+            "razon": "Glosa sin eps o codigo_glosa",
+        }
+
+    similar = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.id != glosa_id)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .filter(GlosaRecord.estado == "LEVANTADA")
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .first()
+    )
+
+    if not similar:
+        return {
+            "glosa_id_origen": None,
+            "dictamen": None,
+            "sin_match": True,
+            "razon": (
+                f"No hay glosas LEVANTADAS de eps={glosa.eps} "
+                f"codigo={glosa.codigo_glosa}"
+            ),
+        }
+
+    return {
+        "glosa_id_origen": similar.id,
+        "dictamen": similar.dictamen,
+        "valor_recuperado_origen": float(similar.valor_recuperado or 0),
+        "fecha_decision_origen": (
+            similar.fecha_decision_eps.isoformat()
+            if similar.fecha_decision_eps else None
+        ),
+        "sin_match": False,
+    }
+
+
 @router.get("/{glosa_id}/dashboard")
 def dashboard_glosa(
     glosa_id: int,
