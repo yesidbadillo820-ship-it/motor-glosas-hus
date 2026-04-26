@@ -732,6 +732,60 @@ def info_version():
     }
 
 
+@router.get("/limites")
+def info_limites(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R110 P1: documentación machine-readable de los límites de la app.
+
+    Útil para que el frontend sepa qué validar antes de enviar
+    requests, y para que ops conozca los caps configurados.
+
+    Devuelve límites de:
+      - rate_limit_ia: cuotas de uso de IA por usuario/día
+      - export_limits: max filas en exports CSV/JSON
+      - upload_limits: tamaño max archivos
+      - search_limits: max resultados en búsquedas
+      - retention: días de retención por tabla histórica
+
+    Solo COORDINADOR/ADMIN.
+    """
+    return {
+        "rate_limit_ia": {
+            "calls_por_dia_por_usuario": 100,
+            "calls_por_hora_por_usuario": 30,
+            "comment": "Cuotas para evitar costo desmedido de IA",
+        },
+        "export_limits": {
+            "audit_csv_max_filas": 50_000,
+            "glosas_xlsx_sin_limite": True,
+            "ndjson_streaming_sin_limite": True,
+            "comment": "CSV/XLSX cargan en memoria; NDJSON streamea",
+        },
+        "upload_limits": {
+            "pdf_ocr_max_mb": 25,
+            "excel_import_max_mb": 50,
+            "comment": "Pipelines de importación masiva",
+        },
+        "search_limits": {
+            "buscar_avanzado_max_limit": 500,
+            "buscar_similares_max_top": 50,
+            "facetas_distinct_max_implicito": "depende del cardinality",
+        },
+        "retention": {
+            "ai_cache_dias": 30,
+            "ai_calls_dias": 90,
+            "papelera_dias": 30,
+            "audit_log_dias": "ilimitado (retención regulatoria)",
+        },
+        "ui_limits": {
+            "items_por_pagina_default": 50,
+            "items_por_pagina_max": 200,
+        },
+        "documentado_en": "R110 P1",
+    }
+
+
 @router.get("/runtime-info")
 def info_runtime(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
