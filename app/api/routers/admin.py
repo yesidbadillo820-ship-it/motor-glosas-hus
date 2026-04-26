@@ -740,6 +740,56 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/historial-cambios-rol")
+def admin_historial_cambios_rol(
+    dias: int = 90,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R203 P1: historial de cambios de rol de usuarios.
+
+    Filtra audit_log a cambios del campo `rol` en tabla
+    `usuarios`. Crítico para auditoría de seguridad:
+      "¿quién promovió a Bob de AUDITOR a SUPER_ADMIN?"
+
+    Devuelve transiciones ordenadas DESC con metadata.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.tabla == "usuarios")
+        .filter(AuditLogRecord.campo == "rol")
+        .order_by(AuditLogRecord.timestamp.desc())
+        .all()
+    )
+
+    items = []
+    for e in eventos:
+        items.append({
+            "timestamp": (
+                e.timestamp.isoformat() if e.timestamp else None
+            ),
+            "usuario_que_cambio": e.usuario_email,
+            "usuario_afectado_id": e.registro_id,
+            "rol_anterior": e.valor_anterior,
+            "rol_nuevo": e.valor_nuevo,
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total_cambios": len(items),
+        "items": items,
+    }
+
+
 @router.get("/audit-cleanup-recomendado")
 def admin_audit_cleanup_recomendado(
     dias_retencion: int = 365,
