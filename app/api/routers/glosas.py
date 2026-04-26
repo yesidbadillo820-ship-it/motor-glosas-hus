@@ -1819,6 +1819,100 @@ def actualizar_estado(
     return {"message": "Estado actualizado", "glosa": glosa}
 
 
+@router.get("/exportar-paquete-multi.zip")
+def exportar_paquete_multi_zip(
+    ids: str = Query(..., description="IDs CSV, ej '1,2,3'"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R138 P2: ZIP con evidencias de múltiples glosas en una
+    sola descarga.
+
+    Complementa /glosas/{id}/exportar-evidencia.zip (1 glosa)
+    con la versión multi: descarga un ZIP con subcarpetas
+    glosa-{id}/ por cada ID solicitado.
+
+    Útil para entregas masivas a legal/compliance:
+      "manda las 50 glosas de SANITAS de marzo en un paquete"
+
+    Param `ids`: lista CSV de IDs (max 100 por request).
+
+    Cada subcarpeta: glosa.json + dictamen.txt (si existe),
+    plus README.txt en raíz con índice general.
+
+    Declarado ANTES de /{glosa_id} para evitar collisión con
+    el path resolver de FastAPI.
+    """
+    import io
+    import json
+    import zipfile
+
+    from fastapi.responses import StreamingResponse
+
+    try:
+        ids_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(400, "ids debe ser CSV de enteros")
+
+    if not ids_list:
+        raise HTTPException(400, "ids no puede estar vacío")
+    if len(ids_list) > 100:
+        raise HTTPException(400, "máximo 100 glosas por paquete")
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.id.in_(ids_list))
+        .all()
+    )
+    if not glosas:
+        raise HTTPException(404, "Ninguna glosa encontrada")
+
+    encontrados = {g.id for g in glosas}
+    no_encontrados = [i for i in ids_list if i not in encontrados]
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        indice = (
+            f"PAQUETE MULTI-GLOSA — {len(glosas)} glosas\n"
+            f"Generado: {ahora_utc().isoformat()}\n"
+            f"Por: {current_user.email}\n\n"
+            f"IDs solicitados: {ids_list}\n"
+            f"IDs encontrados: {sorted(encontrados)}\n"
+            f"IDs no encontrados: {no_encontrados}\n"
+        )
+        zf.writestr("README.txt", indice)
+
+        for g in glosas:
+            subdir = f"glosa-{g.id}/"
+            datos = {
+                "id": g.id,
+                "creado_en": (
+                    g.creado_en.isoformat() if g.creado_en else None
+                ),
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "valor_recuperado": float(g.valor_recuperado or 0),
+                "estado": g.estado,
+                "decision_eps": g.decision_eps,
+            }
+            zf.writestr(
+                f"{subdir}glosa.json",
+                json.dumps(datos, ensure_ascii=False, indent=2),
+            )
+            if g.dictamen:
+                zf.writestr(f"{subdir}dictamen.txt", g.dictamen)
+
+    buf.seek(0)
+    fname = f"glosas-paquete-{ahora_utc().strftime('%Y%m%d-%H%M%S')}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/{glosa_id}")
 def obtener_glosa(
     glosa_id: int,
