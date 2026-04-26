@@ -176,3 +176,54 @@ def normas_por_codigo_glosa(
         "codigo_glosa": codigo,
         "normas_sugeridas": detalles,
     }
+
+
+@router.get("/normas/export.json")
+def exportar_normas_completas(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R79 P2: descarga la base normativa completa como JSON.
+
+    Permite a otros sistemas (otra IPS, herramienta externa, asesor
+    legal externo) consumir el cuerpo normativo curado por el HUS.
+
+    NO requiere coordinador: la normativa es información pública
+    (leyes, decretos, sentencias).
+    """
+    import json
+    from datetime import datetime, timezone
+
+    from fastapi.responses import Response
+
+    from app.services.normativa_completa import _TODAS_LAS_NORMAS
+
+    # Convertir el dict interno a estructura serializable estable
+    items = []
+    for clave, n in _TODAS_LAS_NORMAS.items():
+        items.append({
+            "clave": clave,
+            "nombre": n.get("nombre", ""),
+            "titulo": n.get("titulo", ""),
+            "ambito": n.get("ambito", ""),
+            "vigente": bool(n.get("vigente", True)),
+            "keywords": n.get("keywords", []),
+            "articulos": n.get("articulos", {}),
+            "ratio": n.get("ratio", ""),
+            "notas": n.get("notas", ""),
+        })
+
+    payload = {
+        "metadata": {
+            "exportado_en": datetime.now(timezone.utc).isoformat(),
+            "exportado_por": current_user.email,
+            "total_normas": len(items),
+            "version_catalogo": "R52 B (101 normas)",
+        },
+        "normas": items,
+    }
+    fname = f"normativa-hus-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8"),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
