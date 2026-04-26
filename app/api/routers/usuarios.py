@@ -140,6 +140,82 @@ def mis_glosas_paginado(
     }
 
 
+@router.get("/yo/performance-historica")
+def performance_historica(
+    meses: int = 6,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R145 P2: evolución mensual personal del usuario actual.
+
+    Diferente a /yo/resumen (snapshot último N días): aquí
+    serie temporal mes-a-mes de las glosas que el usuario cerró.
+
+    Útil para que el auditor vea su mejora con el tiempo:
+      - "En enero levanté 10, en marzo 25 → mejorando"
+
+    Devuelve serie ascendente:
+      [{"mes": "2026-04", "glosas_cerradas": 12, "levantadas": 8,
+        "valor_recuperado": 5000000}, ...]
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    nombre = current_user.nombre or current_user.email
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not dec:
+            continue
+        k = dec.strftime("%Y-%m")
+        if k not in por_mes:
+            por_mes[k] = {
+                "cerradas": 0, "levantadas": 0, "valor_rec": 0.0,
+            }
+        b = por_mes[k]
+        b["cerradas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["levantadas"] += 1
+        b["valor_rec"] += float(g.valor_recuperado or 0)
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        tasa = (
+            round(100 * b["levantadas"] / b["cerradas"], 2)
+            if b["cerradas"] else 0.0
+        )
+        serie.append({
+            "mes": k,
+            "glosas_cerradas": b["cerradas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+            "valor_recuperado": int(b["valor_rec"]),
+        })
+
+    return {
+        "usuario_email": current_user.email,
+        "ventana_meses": int(meses),
+        "total_meses_con_actividad": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/yo/resumen")
 def resumen_personal(
     dias: int = 30,
