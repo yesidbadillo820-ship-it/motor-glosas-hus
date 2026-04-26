@@ -442,6 +442,70 @@ def mantenimiento_purgar(
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
 
 
+@router.get("/usuarios/exportar.csv")
+def admin_exportar_usuarios_csv(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R105 P1: exporta lista de usuarios como CSV (sin secretos).
+
+    Útil para reportes HR / auditoría interna. Excluye TODO lo
+    sensible: password_hash, totp_secret, sesiones, tokens.
+
+    Columnas (10): id, email, nombre, rol, activo, totp_activo,
+    must_change_password, creado_en, ultimo_login, fallos_login.
+
+    StreamingResponse para no cargar toda la lista en memoria si
+    eventualmente hay miles de usuarios.
+
+    Solo SUPER_ADMIN.
+    """
+    import csv
+    import io
+    from datetime import datetime, timezone
+
+    from fastapi.responses import StreamingResponse
+
+    usuarios = db.query(UsuarioRecord).order_by(UsuarioRecord.id).all()
+
+    def _generar():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow([
+            "id", "email", "nombre", "rol", "activo",
+            "totp_activo", "must_change_password",
+            "creado_en", "ultimo_login", "fallos_login",
+        ])
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+
+        for u in usuarios:
+            w.writerow([
+                u.id,
+                u.email or "",
+                u.nombre or "",
+                u.rol or "",
+                int(bool(u.activo)),
+                int(bool(getattr(u, "totp_activo", 0))),
+                int(bool(getattr(u, "must_change_password", 0))),
+                u.creado_en.isoformat() if getattr(u, "creado_en", None) else "",
+                (
+                    u.ultimo_login.isoformat()
+                    if getattr(u, "ultimo_login", None) else ""
+                ),
+                getattr(u, "fallos_login_consecutivos", 0) or 0,
+            ])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
+
+    fname = f"usuarios-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        _generar(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/diagnostico-bd")
 def admin_diagnostico_bd(
     db: Session = Depends(get_db),
