@@ -6086,6 +6086,74 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/tiempo-cierre-promedio")
+def stats_tiempo_cierre_promedio(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R245 P1: tiempo promedio total entre creación y cierre.
+
+    Para todas las glosas cerradas:
+      tiempo_cierre = fecha_decision_eps - creado_en
+
+    Devuelve estadísticas agregadas:
+      - count_glosas_cerradas
+      - tiempo_promedio_dias
+      - tiempo_mediano_dias
+      - tiempo_max_dias
+
+    KPI top-line de eficiencia operacional.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .all()
+    )
+
+    tiempos: list[int] = []
+    for g in glosas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not cre or not dec:
+            continue
+        d = (dec - cre).days
+        if d < 0:
+            continue
+        tiempos.append(d)
+
+    if not tiempos:
+        return {
+            "count_glosas_cerradas": 0,
+            "tiempo_promedio_dias": 0.0,
+            "tiempo_mediano_dias": 0.0,
+            "tiempo_max_dias": 0,
+        }
+
+    tiempos.sort()
+    n = len(tiempos)
+    promedio = sum(tiempos) / n
+    if n % 2 == 0:
+        mediano = (tiempos[n // 2 - 1] + tiempos[n // 2]) / 2
+    else:
+        mediano = tiempos[n // 2]
+
+    return {
+        "count_glosas_cerradas": n,
+        "tiempo_promedio_dias": round(promedio, 2),
+        "tiempo_mediano_dias": round(mediano, 2),
+        "tiempo_max_dias": int(max(tiempos)),
+    }
+
+
 @router.get("/stats/codigos-mas-recuperados")
 def stats_codigos_mas_recuperados(
     top: int = Query(10, ge=1, le=50),
