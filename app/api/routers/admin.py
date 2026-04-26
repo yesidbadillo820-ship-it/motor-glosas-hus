@@ -965,6 +965,63 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/codigo-respuesta-cobertura")
+def admin_codigo_respuesta_cobertura(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R343 P1: cobertura del uso de codigo_respuesta.
+
+    Por codigo_respuesta de HUS:
+      - count_total
+      - eps_distintas (con cuántas EPS se usó)
+      - codigos_glosa_distintos (en respuesta a cuántos)
+      - ratio_eps_por_uso
+
+    Útil para ver si HUS usa los códigos "ampliamente"
+    (muchas EPS) o "específicamente" (pocas).
+
+    Solo SUPER_ADMIN.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .filter(GlosaRecord.codigo_respuesta != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        c = (g.codigo_respuesta or "").strip()
+        if not c:
+            continue
+        b = bucket.setdefault(c, {
+            "count": 0, "eps": set(), "codigos": set(),
+        })
+        b["count"] += 1
+        if g.eps:
+            b["eps"].add(g.eps.strip())
+        if g.codigo_glosa:
+            b["codigos"].add(g.codigo_glosa.strip())
+
+    items = []
+    for c, b in bucket.items():
+        n_eps = len(b["eps"])
+        ratio = round(n_eps / b["count"], 3) if b["count"] else 0.0
+        items.append({
+            "codigo_respuesta": c,
+            "count_total": b["count"],
+            "eps_distintas": n_eps,
+            "codigos_glosa_distintos": len(b["codigos"]),
+            "ratio_eps_por_uso": ratio,
+        })
+    items.sort(key=lambda x: x["count_total"], reverse=True)
+
+    return {
+        "items": items,
+    }
+
+
 @router.get("/audit-cambios-criticos")
 def admin_audit_cambios_criticos(
     dias: int = 30,
