@@ -6441,6 +6441,64 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/dictamen-tasa-vs-largo")
+def stats_dictamen_tasa_vs_largo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R361 P1: correlación entre largo de dictamen y tasa de
+    levantamiento.
+
+    Bucketea dictamen length: 0-49 (sin), 50-199 (corto),
+    200-499 (medio), 500+ (largo). Para cada bucket
+    calcula la tasa de levantamiento sobre glosas decididas.
+
+    Hipótesis: dictámenes más largos correlacionan con
+    mayor tasa de levantamiento (mejor argumentación).
+    """
+    BUCKETS = [
+        ("0-49", 0, 49),
+        ("50-199", 50, 199),
+        ("200-499", 200, 499),
+        ("500+", 500, None),
+    ]
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    bandas = {n: {"dec": 0, "lev": 0} for n, _, _ in BUCKETS}
+    for g in glosas:
+        dlen = len(g.dictamen or "")
+        for n, lo, hi in BUCKETS:
+            if dlen >= lo and (hi is None or dlen <= hi):
+                bandas[n]["dec"] += 1
+                if (g.estado or "").upper() == "LEVANTADA":
+                    bandas[n]["lev"] += 1
+                break
+
+    items = []
+    for n, _, _ in BUCKETS:
+        b = bandas[n]
+        tasa = (
+            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        )
+        items.append({
+            "rango_caracteres": n,
+            "decididas": b["dec"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+        })
+
+    return {
+        "items": items,
+    }
+
+
 @router.get("/stats/codigo-respuesta-mes-actual")
 def stats_codigo_respuesta_mes_actual(
     db: Session = Depends(get_db),
