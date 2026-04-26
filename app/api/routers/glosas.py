@@ -6273,6 +6273,68 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/dias-decision-promedio-mes")
+def stats_dias_decision_promedio_mes(
+    meses: int = Query(12, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R295 P1: días promedio a la decisión por mes.
+
+    Serie temporal: para cada mes (basado en
+    `fecha_decision_eps`), cuál fue el promedio de días
+    desde `creado_en` a la decisión. Útil para detectar
+    si las EPS están tardando más o menos con el tiempo.
+
+    Diferente a /stats/eps-velocidad-respuesta (por EPS):
+    aquí agregado global por mes.
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .all()
+    )
+
+    por_mes: dict[str, list[int]] = {}
+    for g in glosas:
+        cre = g.creado_en
+        dec = g.fecha_decision_eps
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not cre or not dec:
+            continue
+        dias = (dec - cre).days
+        if dias < 0:
+            continue
+        k = dec.strftime("%Y-%m")
+        por_mes.setdefault(k, []).append(dias)
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        vals = por_mes[k]
+        prom = round(sum(vals) / len(vals), 2)
+        ord_v = sorted(vals)
+        med = ord_v[len(vals) // 2]
+        serie.append({
+            "mes": k,
+            "count": len(vals),
+            "promedio_dias": prom,
+            "mediana_dias": med,
+            "max_dias": max(vals),
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/eps-diversidad-codigos")
 def stats_eps_diversidad_codigos(
     min_glosas: int = Query(5, ge=1, le=100),
