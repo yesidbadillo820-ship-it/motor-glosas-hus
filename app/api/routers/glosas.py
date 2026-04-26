@@ -6273,6 +6273,60 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/saldo-evolucion-mensual")
+def stats_saldo_evolucion_mensual(
+    meses: int = Query(12, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R307 P1: evolución mensual del saldo pendiente acumulado.
+
+    Para cada mes, cuál era el saldo total pendiente al
+    final del mes. Calculado sobre todas las glosas
+    creadas hasta ese mes que aún estaban abiertas o
+    cuyo cierre fue posterior.
+
+    Métrica para evolución: ¿el saldo pendiente está
+    creciendo o disminuyendo?
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+
+    rows = db.query(GlosaRecord).all()
+
+    serie: dict[str, dict] = {}
+    for g in rows:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        if cre < desde:
+            continue
+        k = cre.strftime("%Y-%m")
+        b = serie.setdefault(k, {
+            "creadas": 0, "saldo": 0.0,
+        })
+        b["creadas"] += 1
+        b["saldo"] += float(g.saldo_factura or 0)
+
+    items = []
+    for k in sorted(serie.keys()):
+        b = serie[k]
+        items.append({
+            "mes": k,
+            "glosas_creadas": b["creadas"],
+            "saldo_creado": int(b["saldo"]),
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(items),
+        "serie": items,
+    }
+
+
 @router.get("/stats/factura-distribucion-glosas")
 def stats_factura_distribucion_glosas(
     db: Session = Depends(get_db),
