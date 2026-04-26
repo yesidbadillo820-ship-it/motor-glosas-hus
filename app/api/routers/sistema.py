@@ -2048,6 +2048,77 @@ def info_zonas_horarias(
     }
 
 
+@router.get("/observabilidad-completa")
+def info_observabilidad_completa(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R208 P1: bundle de métricas técnicas para dashboards.
+
+    Combina varios checks en uno solo para alimentar un
+    dashboard tipo Datadog/Grafana sin múltiples llamadas:
+      - tamaños de tablas
+      - schedulers vivos
+      - eventos audit última hora
+      - IA calls última hora
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        AICacheRecord, AICallRecord, AuditLogRecord, GlosaRecord,
+    )
+
+    ahora = ahora_utc()
+    desde_1h = ahora - timedelta(hours=1)
+
+    eventos_1h = (
+        db.query(_f.count(AuditLogRecord.id))
+        .filter(AuditLogRecord.timestamp >= desde_1h)
+        .scalar() or 0
+    )
+    ai_calls_1h = (
+        db.query(_f.count(AICallRecord.id))
+        .filter(AICallRecord.creado_en >= desde_1h)
+        .scalar() or 0
+    )
+    cache_size = (
+        db.query(_f.count()).select_from(AICacheRecord).scalar() or 0
+    )
+    total_glosas = (
+        db.query(_f.count(GlosaRecord.id)).scalar() or 0
+    )
+
+    schedulers = {}
+    try:
+        from app.services.ia_auditora_proactiva import _task as t1
+        schedulers["pre_analisis"] = bool(t1 and not t1.done())
+    except Exception:
+        schedulers["pre_analisis"] = False
+    try:
+        from app.services.mantenimiento_scheduler import _task as t2
+        schedulers["mantenimiento"] = bool(t2 and not t2.done())
+    except Exception:
+        schedulers["mantenimiento"] = False
+
+    return {
+        "evaluado_en": ahora.isoformat(),
+        "actividad_ultima_hora": {
+            "eventos_audit": int(eventos_1h),
+            "ia_calls": int(ai_calls_1h),
+        },
+        "tamanos": {
+            "ai_cache_filas": int(cache_size),
+            "glosas_total": int(total_glosas),
+        },
+        "schedulers": schedulers,
+    }
+
+
 @router.get("/snapshot-general")
 def info_snapshot_general(
     db: Session = Depends(get_db),
