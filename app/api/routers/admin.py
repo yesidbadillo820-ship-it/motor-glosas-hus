@@ -965,6 +965,54 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/asignaciones-recientes")
+def admin_asignaciones_recientes(
+    dias: int = 7,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R345 P1: vista global de glosas con cambio reciente
+    de gestor_nombre.
+
+    Lista del audit_log entries de cambios en
+    gestor_nombre en los últimos N días. Útil para
+    auditar reasignaciones realizadas por el coordinador.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.campo == "gestor_nombre")
+        .order_by(AuditLogRecord.timestamp.desc())
+        .all()
+    )
+
+    items = []
+    for e in rows:
+        items.append({
+            "audit_id": e.id,
+            "timestamp": (
+                e.timestamp.isoformat() if e.timestamp else None
+            ),
+            "glosa_id": e.registro_id,
+            "valor_anterior": e.valor_anterior,
+            "valor_nuevo": e.valor_nuevo,
+            "usuario_email": e.usuario_email,
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total_reasignaciones": len(items),
+        "items": items,
+    }
+
+
 @router.get("/codigo-respuesta-cobertura")
 def admin_codigo_respuesta_cobertura(
     db: Session = Depends(get_db),
