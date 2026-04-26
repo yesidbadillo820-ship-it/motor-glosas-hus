@@ -740,6 +740,55 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/audit-recientes")
+def admin_audit_recientes(
+    horas: int = 24,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R249 P1: últimos eventos audit (últimas N horas).
+
+    Devuelve los N eventos audit más recientes con metadata.
+    Útil como feed live de actividad del sistema.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(hours=int(horas))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .order_by(AuditLogRecord.timestamp.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for e in eventos:
+        items.append({
+            "id": e.id,
+            "timestamp": (
+                e.timestamp.isoformat() if e.timestamp else None
+            ),
+            "usuario_email": e.usuario_email,
+            "accion": e.accion,
+            "tabla": e.tabla,
+            "registro_id": e.registro_id,
+            "campo": e.campo,
+        })
+
+    return {
+        "ventana_horas": int(horas),
+        "total": len(eventos),
+        "items": items,
+    }
+
+
 @router.get("/dictamenes-recientes")
 def admin_dictamenes_recientes(
     horas: int = 24,
