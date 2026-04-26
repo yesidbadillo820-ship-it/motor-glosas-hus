@@ -2342,6 +2342,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <button class="btn-sm ghost" onclick="guardarComoPlantillaGold()" title="Guardar este argumento como plantilla ganadora">⭐ Gold</button>
         <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
         <button class="btn-sm ghost" onclick="toggleReanalizarPanel()" title="Re-correr análisis cambiando modo o tono (no duplica la glosa)">🔄 Reanalizar</button>
+        <button class="btn-sm ghost" onclick="verMetricasIaGlosa()" title="Ver calls IA atribuidos a esta glosa (solo coordinador/admin)">📊 Métricas IA</button>
         <button class="btn-sm ghost" onclick="validarDictamen()" title="Checklist pre-radicación">✅ Validar</button>
         <button class="modal-close" onclick="cerrarModal()">✕</button>
       </div>
@@ -2365,6 +2366,16 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <button class="btn btn-primary btn-sm" onclick="aplicarRefinar()">Refinar</button>
       </div>
       <div id="refinar-status" class="refinar-status"></div>
+    </div>
+    <!-- R61 P3: panel métricas IA por glosa -->
+    <div class="refinar-panel" id="mia-glosa-panel" style="display:none">
+      <div class="refinar-hdr">
+        <b>📊 Métricas de IA · esta glosa</b>
+        <span class="refinar-sub">Llamadas a Anthropic atribuidas a esta glosa específica.</span>
+      </div>
+      <div id="mia-glosa-contenido" style="font-size:.78rem;color:var(--text3);text-align:center;padding:.6rem;">
+        Cargando…
+      </div>
     </div>
     <!-- R60 P3: panel reanalizar (re-correr análisis cambiando modo/tono) -->
     <div class="refinar-panel" id="reanalizar-panel" style="display:none">
@@ -8125,6 +8136,9 @@ async function verDictamen(id){
     if(pRea) pRea.style.display = 'none';
     var sRea = document.getElementById('reanalizar-status');
     if(sRea){ sRea.textContent = ''; sRea.className = 'refinar-status'; }
+    // R61 P3: reset panel de métricas IA
+    var pMia = document.getElementById('mia-glosa-panel');
+    if(pMia) pMia.style.display = 'none';
   }catch(e){toast('Error',e.message,'error');}
 }
 
@@ -8262,6 +8276,69 @@ async function aplicarReanalizar(){
     status.className = 'refinar-status err';
   } finally {
     btn.disabled = false;
+  }
+}
+
+// R61 P3: muestra calls IA atribuidos a la glosa actual
+async function verMetricasIaGlosa(){
+  if(!CURRENT_GLOSA_ID){ toast('Error','No hay glosa abierta','error'); return; }
+  var panel = document.getElementById('mia-glosa-panel');
+  var cont = document.getElementById('mia-glosa-contenido');
+  // Toggle: si ya está abierto, cerrarlo
+  if(panel.style.display !== 'none'){
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'flex';
+  cont.innerHTML = '<div style="padding:.5rem;color:var(--text3);">Cargando…</div>';
+  try{
+    var r = await fetch('/sistema/metricas-ia/por-glosa/' + CURRENT_GLOSA_ID, { headers: authH() });
+    if(r.status === 403){
+      cont.innerHTML = '<div style="padding:.5rem;color:#9a3412;background:#fff7ed;border:1px solid #f97316;border-radius:6px;">⚠️ Solo coordinador/admin pueden ver métricas IA por glosa.</div>';
+      return;
+    }
+    if(!r.ok){
+      cont.innerHTML = '<div style="padding:.5rem;color:#dc2626;">Error ' + r.status + '</div>';
+      return;
+    }
+    var d = await r.json();
+    if(d.total_calls === 0){
+      cont.innerHTML = '<div style="padding:.6rem;color:var(--text3);text-align:center;">'
+                     + 'Sin llamadas IA registradas para esta glosa.'
+                     + '<div style="font-size:.7rem;margin-top:.3rem;">'
+                     + 'Las métricas se acumulan automáticamente desde R55 P2 — '
+                     + 'glosas anteriores no tienen historial.'
+                     + '</div></div>';
+      return;
+    }
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.78rem;margin-bottom:.5rem;">'
+             + '<span><b>' + d.total_calls + '</b> call' + (d.total_calls>1?'s':'') + ' · '
+             + '<b>$' + (d.cost_usd_total||0).toFixed(4) + '</b> USD total</span>'
+             + '</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:.72rem;">'
+          + '<thead><tr style="border-bottom:1px solid var(--border);color:var(--text3);">'
+          + '<th style="text-align:left;padding:.3rem;">Modelo</th>'
+          + '<th style="text-align:right;padding:.3rem;">Tokens</th>'
+          + '<th style="text-align:right;padding:.3rem;">Cache hit</th>'
+          + '<th style="text-align:right;padding:.3rem;">Latencia</th>'
+          + '<th style="text-align:right;padding:.3rem;">Costo</th>'
+          + '</tr></thead><tbody>';
+    d.calls.forEach(function(c){
+      var totalIn = (c.input_tokens||0) + (c.cache_creation_input_tokens||0) + (c.cache_read_input_tokens||0);
+      var hitPct = totalIn > 0 ? ((c.cache_read_input_tokens||0) / totalIn * 100).toFixed(0) : '0';
+      var hitColor = hitPct > 50 ? '#16a34a' : (hitPct > 20 ? '#f59e0b' : '#94a3b8');
+      html += '<tr style="border-bottom:1px solid var(--border);">'
+            + '<td style="padding:.3rem;font-family:ui-monospace,monospace;color:#1e40af;">' + escHtml(c.modelo||'?') + '</td>'
+            + '<td style="text-align:right;padding:.3rem;font-variant-numeric:tabular-nums;">' + (totalIn + (c.output_tokens||0)).toLocaleString() + '</td>'
+            + '<td style="text-align:right;padding:.3rem;color:' + hitColor + ';font-variant-numeric:tabular-nums;">' + hitPct + '%</td>'
+            + '<td style="text-align:right;padding:.3rem;font-variant-numeric:tabular-nums;">' + (c.latency_ms||0) + ' ms</td>'
+            + '<td style="text-align:right;padding:.3rem;font-weight:700;font-variant-numeric:tabular-nums;">$' + (c.cost_usd||0).toFixed(5) + '</td>'
+            + '</tr>';
+    });
+    html += '</tbody></table>';
+    cont.innerHTML = html;
+  } catch(e){
+    cont.innerHTML = '<div style="padding:.5rem;color:#dc2626;">Conexión: ' + escHtml(e.message) + '</div>';
   }
 }
 
