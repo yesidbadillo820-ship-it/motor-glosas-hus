@@ -740,6 +740,83 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/gestor-mensual")
+def admin_gestor_mensual(
+    gestor: str,
+    meses: int = 6,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R153 P1: desempeño mensual de un gestor específico.
+
+    Diferente a /usuarios/yo/performance-historica (self-service):
+    aquí el admin puede consultar a cualquier gestor por nombre.
+
+    Útil para revisión de desempeño individual:
+      "¿Cómo viene Alice mes-a-mes?"
+
+    Devuelve serie ASC por mes con métricas mensuales del gestor.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    if not gestor or len(gestor.strip()) < 2:
+        raise HTTPException(400, "gestor debe tener >=2 caracteres")
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == gestor)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not dec:
+            continue
+        k = dec.strftime("%Y-%m")
+        if k not in por_mes:
+            por_mes[k] = {
+                "cerradas": 0, "levantadas": 0, "valor_rec": 0.0,
+            }
+        b = por_mes[k]
+        b["cerradas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["levantadas"] += 1
+        b["valor_rec"] += float(g.valor_recuperado or 0)
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        tasa = (
+            round(100 * b["levantadas"] / b["cerradas"], 2)
+            if b["cerradas"] else 0.0
+        )
+        serie.append({
+            "mes": k,
+            "glosas_cerradas": b["cerradas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+            "valor_recuperado": int(b["valor_rec"]),
+        })
+
+    return {
+        "gestor": gestor,
+        "ventana_meses": int(meses),
+        "total_meses_con_actividad": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/ranking-gestores")
 def admin_ranking_gestores(
     dias: int = 90,
