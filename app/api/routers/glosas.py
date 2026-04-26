@@ -2746,6 +2746,100 @@ def stats_por_gestor(
     }
 
 
+@router.get("/stats/comparativa-eps")
+def stats_comparativa_eps(
+    min_glosas: int = Query(5, ge=1, le=100,
+                            description="Mínimo de glosas para incluir EPS"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R90 P2: ranking comparativo de EPS por desempeño.
+
+    Desde la perspectiva del HUS (IPS):
+      - LEVANTADA = HUS defendió con éxito (HUS recupera el valor)
+      - ACEPTADA = HUS aceptó la glosa (EPS no paga)
+      - RATIFICADA = EPS sostuvo la glosa
+      - CONCILIADA = acuerdo intermedio
+
+    "Mejor EPS" desde HUS = mayor tasa de levantamiento (HUS le gana
+    más casos a esa EPS), porque indica que la EPS objeta cosas que
+    no debería y HUS las defiende bien.
+
+    Devuelve por EPS (filtradas por min_glosas):
+      - total_glosas
+      - levantadas / aceptadas / ratificadas / pendientes
+      - tasa_levantamiento_pct
+      - valor_objetado_total
+      - valor_recuperado_total
+      - tiempo_promedio_decision_dias
+    Ordenado DESC por tasa_levantamiento_pct.
+    """
+    todas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, dict] = {}
+    for g in todas:
+        eps = (g.eps or "SIN_EPS").strip()
+        if eps not in por_eps:
+            por_eps[eps] = {
+                "total": 0, "levantadas": 0, "aceptadas": 0,
+                "ratificadas": 0, "pendientes": 0,
+                "valor_objetado": 0.0, "valor_recuperado": 0.0,
+                "tiempos": [],
+            }
+        b = por_eps[eps]
+        b["total"] += 1
+        b["valor_objetado"] += float(g.valor_objetado or 0)
+        b["valor_recuperado"] += float(g.valor_recuperado or 0)
+
+        estado = (g.estado or "").upper()
+        if estado == "LEVANTADA":
+            b["levantadas"] += 1
+        elif estado == "ACEPTADA":
+            b["aceptadas"] += 1
+        elif estado == "RATIFICADA":
+            b["ratificadas"] += 1
+        else:
+            b["pendientes"] += 1
+
+        if g.fecha_decision_eps and g.creado_en:
+            delta = (g.fecha_decision_eps - g.creado_en).total_seconds() / 86400
+            b["tiempos"].append(delta)
+
+    items = []
+    for eps, b in por_eps.items():
+        if b["total"] < min_glosas:
+            continue
+        decididas = b["levantadas"] + b["aceptadas"] + b["ratificadas"]
+        tasa = (
+            round(100 * b["levantadas"] / decididas, 2)
+            if decididas else 0.0
+        )
+        tiempo_prom = (
+            round(sum(b["tiempos"]) / len(b["tiempos"]), 2)
+            if b["tiempos"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "total_glosas": b["total"],
+            "levantadas": b["levantadas"],
+            "aceptadas": b["aceptadas"],
+            "ratificadas": b["ratificadas"],
+            "pendientes": b["pendientes"],
+            "tasa_levantamiento_pct": tasa,
+            "valor_objetado_total": int(b["valor_objetado"]),
+            "valor_recuperado_total": int(b["valor_recuperado"]),
+            "tiempo_promedio_decision_dias": tiempo_prom,
+        })
+
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps_evaluadas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/cumplimiento-sla")
 def stats_cumplimiento_sla(
     db: Session = Depends(get_db),
