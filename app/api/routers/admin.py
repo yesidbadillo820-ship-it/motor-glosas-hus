@@ -740,6 +740,58 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/dictamenes-versiones-limpieza")
+def admin_dictamenes_versiones_limpieza(
+    max_versiones_por_glosa: int = 10,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R205 P1: identifica glosas con demasiadas versiones.
+
+    Cada refinación de dictamen crea una fila en
+    DictamenVersionRecord. Glosas refinadas N veces ocupan N
+    filas. Si max>10, sugerir purga de versiones intermedias.
+
+    Sin ejecutar nada, solo reporta:
+      - cuántas glosas exceden el max
+      - cuántas filas exceden el max
+      - bytes estimados a recuperar (~5KB/version)
+
+    Solo SUPER_ADMIN.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import DictamenVersionRecord
+
+    rows = (
+        db.query(
+            DictamenVersionRecord.glosa_id,
+            _f.count().label("n"),
+        )
+        .group_by(DictamenVersionRecord.glosa_id)
+        .having(_f.count() > int(max_versiones_por_glosa))
+        .all()
+    )
+
+    glosas_excedidas = len(rows)
+    filas_excedentes = sum(
+        max(0, n - int(max_versiones_por_glosa)) for _, n in rows
+    )
+
+    BYTES_POR_VERSION = 5000
+    bytes_estimados = filas_excedentes * BYTES_POR_VERSION
+
+    return {
+        "max_versiones_por_glosa": int(max_versiones_por_glosa),
+        "glosas_que_exceden_max": glosas_excedidas,
+        "filas_excedentes": filas_excedentes,
+        "bytes_estimados_recuperables": bytes_estimados,
+        "mb_estimados_recuperables": round(
+            bytes_estimados / (1024 * 1024), 2,
+        ),
+    }
+
+
 @router.get("/historial-cambios-rol")
 def admin_historial_cambios_rol(
     dias: int = 90,
