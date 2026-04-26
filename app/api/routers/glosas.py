@@ -10027,6 +10027,61 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/glosas-mismo-paciente")
+def glosas_mismo_paciente(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R235 P1: glosas del mismo paciente (historial clínico).
+
+    Para una glosa, devuelve otras glosas del mismo paciente
+    (case-insensitive). Útil para investigar:
+      "Este paciente tiene 5 glosas, todas de SANITAS — patrón"
+
+    Excluye la glosa actual.
+
+    Devuelve {paciente, total_otras, items}.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    if not glosa.paciente:
+        return {
+            "paciente": None,
+            "total_otras": 0,
+            "items": [],
+        }
+
+    otras = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.paciente.ilike(glosa.paciente))
+        .filter(GlosaRecord.id != glosa_id)
+        .order_by(GlosaRecord.creado_en.desc())
+        .all()
+    )
+
+    items = []
+    for g in otras:
+        items.append({
+            "id": g.id,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": float(g.valor_objetado or 0),
+        })
+
+    return {
+        "paciente": glosa.paciente,
+        "total_otras": len(otras),
+        "items": items[:50],
+    }
+
+
 @router.get("/{glosa_id}/glosas-misma-factura")
 def glosas_misma_factura(
     glosa_id: int,
