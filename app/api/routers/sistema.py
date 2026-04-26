@@ -1133,6 +1133,73 @@ def info_health_score(
     }
 
 
+@router.get("/metricas-ia/cache-eficiencia")
+def metricas_ia_cache_eficiencia(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R143 P1: eficiencia del caché IA (hit rate y ahorro estimado).
+
+    El cache de respuestas IA evita pagar por queries repetidas.
+    Este endpoint mide qué tan bien funciona ese cache:
+      - hit_rate_pct = cache_read_tokens / total_input_tokens
+      - ahorro_usd_estimado: tokens leídos del cache × precio
+        (×0.9 = el ahorro vs full input)
+
+    Útil para optimizar costos:
+      - Hit rate < 30% → revisar normalización de prompts
+      - Hit rate > 80% → cache funcionando bien
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICacheRecord, AICallRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    rows = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.creado_en >= desde)
+        .all()
+    )
+
+    total_input = sum(r.input_tokens or 0 for r in rows)
+    total_cache_read = sum(r.cache_read_input_tokens or 0 for r in rows)
+    total_cache_creation = sum(
+        r.cache_creation_input_tokens or 0 for r in rows
+    )
+    total_cost = sum(float(r.cost_usd or 0) for r in rows)
+
+    hit_rate = (
+        round(100 * total_cache_read / total_input, 2)
+        if total_input else 0.0
+    )
+
+    # Asumimos precio Claude Sonnet input ~$3/Mtok. Cache_read
+    # ~10% del precio → ahorro = cache_read × 0.9 × $3/Mtok.
+    PRECIO_INPUT_USD_PER_MTOK = 3.0
+    ahorro_estimado = (
+        total_cache_read * 0.9 * PRECIO_INPUT_USD_PER_MTOK / 1_000_000
+    )
+
+    cache_total = db.query(AICacheRecord).count()
+
+    return {
+        "ventana_dias": int(dias),
+        "total_calls": len(rows),
+        "total_input_tokens": total_input,
+        "total_cache_read_tokens": total_cache_read,
+        "total_cache_creation_tokens": total_cache_creation,
+        "hit_rate_pct": hit_rate,
+        "cost_total_usd": round(total_cost, 4),
+        "ahorro_estimado_usd": round(ahorro_estimado, 4),
+        "ai_cache_filas_actuales": cache_total,
+    }
+
+
 @router.get("/metricas-ia/budget")
 def metricas_ia_budget(
     presupuesto_mensual_usd: float = 100.0,
