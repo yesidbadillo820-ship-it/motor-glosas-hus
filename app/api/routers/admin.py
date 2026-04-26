@@ -965,6 +965,75 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/audit-actividad-mensual")
+def admin_audit_actividad_mensual(
+    meses: int = 6,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R272 P1: actividad audit_log agregada por mes.
+
+    Diferente a /admin/audit-recientes (feed live): aquí
+    serie temporal de cuántos eventos audit se generaron
+    cada mes en los últimos N meses.
+
+    Útil para detectar tendencias: ¿el sistema está
+    siendo más usado o menos? ¿hay meses con picos?
+
+    Por mes: total_eventos, usuarios_distintos, top_acciones.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for e in eventos:
+        ts = e.timestamp
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if not ts:
+            continue
+        k = ts.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {
+            "count": 0, "usuarios": set(), "acciones": {},
+        })
+        b["count"] += 1
+        if e.usuario_email:
+            b["usuarios"].add(e.usuario_email)
+        accion = e.accion or "?"
+        b["acciones"][accion] = b["acciones"].get(accion, 0) + 1
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        top = sorted(
+            b["acciones"].items(), key=lambda x: x[1], reverse=True,
+        )[:3]
+        serie.append({
+            "mes": k,
+            "total_eventos": b["count"],
+            "usuarios_distintos": len(b["usuarios"]),
+            "top_acciones": [
+                {"accion": a, "count": c} for a, c in top
+            ],
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/glosas-sin-gestor")
 def admin_glosas_sin_gestor(
     limit: int = 100,
