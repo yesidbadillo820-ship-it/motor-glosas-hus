@@ -442,6 +442,94 @@ def mantenimiento_purgar(
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
 
 
+@router.get("/usuarios-inactivos")
+def admin_usuarios_inactivos(
+    dias: int = 60,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R98 P2: usuarios sin actividad reciente (basado en audit log).
+
+    Útil para que el admin identifique cuentas candidatas a desactivar
+    por no-uso (cleanup de licencias, política de mínimos accesos).
+
+    Considera "actividad" cualquier evento del usuario en audit_log
+    en los últimos `dias` días (default 60).
+
+    Devuelve usuarios activos en BD que NO han tenido eventos:
+      - id, email, nombre, rol
+      - ultimo_evento_en (puede ser null si nunca tuvo)
+      - dias_sin_actividad
+
+    Ordenado DESC por dias_sin_actividad. Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    ahora = ahora_utc()
+    corte = ahora - timedelta(days=int(dias))
+
+    # Fecha del último evento por email (todos los usuarios)
+    eventos_por_email: dict[str, "object"] = {}
+    rows = (
+        db.query(
+            AuditLogRecord.usuario_email,
+            AuditLogRecord.timestamp,
+        )
+        .filter(AuditLogRecord.usuario_email.isnot(None))
+        .all()
+    )
+    for email, ts in rows:
+        if not ts:
+            continue
+        prev = eventos_por_email.get(email)
+        if prev is None or ts > prev:
+            eventos_por_email[email] = ts
+
+    activos = (
+        db.query(UsuarioRecord)
+        .filter(UsuarioRecord.activo == 1)
+        .all()
+    )
+
+    inactivos = []
+    for u in activos:
+        ult = eventos_por_email.get(u.email)
+        # Normalizar tz si SQLite devuelve naive
+        if ult is not None and getattr(ult, "tzinfo", None) is None:
+            from datetime import timezone
+            ult = ult.replace(tzinfo=timezone.utc)
+
+        if ult and ult >= corte:
+            continue  # tiene actividad reciente
+
+        dias_sin = (
+            (ahora - ult).days if ult else None
+        )
+        inactivos.append({
+            "id": u.id,
+            "email": u.email,
+            "nombre": u.nombre,
+            "rol": u.rol,
+            "ultimo_evento_en": ult.isoformat() if ult else None,
+            "dias_sin_actividad": dias_sin,
+        })
+
+    # nulls al final, los más antiguos arriba
+    inactivos.sort(
+        key=lambda x: (x["dias_sin_actividad"] is None,
+                       -(x["dias_sin_actividad"] or 0)),
+    )
+
+    return {
+        "umbral_dias": int(dias),
+        "total_inactivos": len(inactivos),
+        "items": inactivos,
+    }
+
+
 @router.get("/distribucion-cargas")
 def admin_distribucion_cargas(
     db: Session = Depends(get_db),
