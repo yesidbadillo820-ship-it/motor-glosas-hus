@@ -6273,6 +6273,73 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/progreso-equipo-mes")
+def stats_progreso_equipo_mes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R320 P1: progreso del equipo en el mes en curso.
+
+    Snapshot de balance de mes para todo el equipo:
+      - creadas_mes
+      - cerradas_mes
+      - levantadas_mes
+      - balance_neto (cerradas - creadas)
+      - tasa_cierre_pct (cerradas / creadas)
+      - valor_recuperado_mes
+
+    Útil para landing del dashboard del equipo.
+    """
+    from app.core.tz import ahora_utc
+
+    inicio_mes = ahora_utc().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    creadas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio_mes)
+        .all()
+    )
+    cerradas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    n_creadas = len(creadas)
+    n_cerradas = len(cerradas)
+    n_levantadas = sum(
+        1 for g in cerradas
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    rec_total = sum(
+        float(g.valor_recuperado or 0) for g in cerradas
+    )
+    obj_creadas = sum(
+        float(g.valor_objetado or 0) for g in creadas
+    )
+
+    balance = n_cerradas - n_creadas
+    tasa_cierre = (
+        round(100 * n_cerradas / n_creadas, 2) if n_creadas else 0.0
+    )
+
+    return {
+        "mes": inicio_mes.strftime("%Y-%m"),
+        "creadas_mes": n_creadas,
+        "cerradas_mes": n_cerradas,
+        "levantadas_mes": n_levantadas,
+        "balance_neto": balance,
+        "tasa_cierre_pct": tasa_cierre,
+        "valor_recuperado_mes": int(rec_total),
+        "valor_creado_mes": int(obj_creadas),
+    }
+
+
 @router.get("/stats/recientes-decididas")
 def stats_recientes_decididas(
     limit: int = Query(20, ge=1, le=100),
