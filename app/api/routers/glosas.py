@@ -6273,6 +6273,72 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-ganancia-perdida")
+def stats_eps_ganancia_perdida(
+    min_glosas: int = Query(3, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R282 P1: ganancia vs pérdida financiera por EPS.
+
+    Vista neta de cada relación HUS-EPS:
+      - ganancia: sum(valor_recuperado) en LEVANTADAS
+                  (HUS defendió y EPS pagó)
+      - perdida: sum(valor_aceptado) en RATIFICADAS o
+                 ACEPTADAS (no se cobró)
+      - balance: ganancia - perdida
+      - ratio_ganancia_pct: ganancia / (ganancia + perdida)
+
+    Útil para clasificar EPS como "ganadora" o "perdedora"
+    desde el punto de vista financiero.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {
+            "count": 0, "ganancia": 0.0, "perdida": 0.0,
+        })
+        b["count"] += 1
+        estado = (g.estado or "").upper()
+        if estado == "LEVANTADA":
+            b["ganancia"] += float(g.valor_recuperado or 0)
+        elif estado in ("RATIFICADA", "ACEPTADA"):
+            b["perdida"] += float(g.valor_aceptado or 0)
+
+    items = []
+    for eps, b in bucket.items():
+        if b["count"] < min_glosas:
+            continue
+        denom = b["ganancia"] + b["perdida"]
+        ratio = round(100 * b["ganancia"] / denom, 2) if denom else 0.0
+        items.append({
+            "eps": eps,
+            "count_decididas": b["count"],
+            "ganancia": int(b["ganancia"]),
+            "perdida": int(b["perdida"]),
+            "balance": int(b["ganancia"] - b["perdida"]),
+            "ratio_ganancia_pct": ratio,
+        })
+    items.sort(key=lambda x: x["balance"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/conciliaciones-mensual")
 def stats_conciliaciones_mensual(
     meses: int = Query(12, ge=1, le=36),
