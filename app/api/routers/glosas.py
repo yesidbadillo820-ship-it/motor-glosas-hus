@@ -6086,6 +6086,53 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/codigos-mas-recuperados")
+def stats_codigos_mas_recuperados(
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R244 P1: códigos de glosa con más valor TOTAL recuperado.
+
+    Útil para identificar dónde se recauda más:
+      "TA0201 nos ha generado \$50M en defensas exitosas"
+
+    Solo glosas con valor_recuperado > 0.
+
+    Por código: count_levantadas + valor_recuperado_total.
+    Ordenado DESC por valor_recuperado_total.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.valor_recuperado > 0)
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .all()
+    )
+
+    por_cod: dict[str, dict] = {}
+    for g in glosas:
+        cod = g.codigo_glosa
+        if not cod:
+            continue
+        if cod not in por_cod:
+            por_cod[cod] = {"count": 0, "valor": 0.0}
+        por_cod[cod]["count"] += 1
+        por_cod[cod]["valor"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for cod, b in por_cod.items():
+        items.append({
+            "codigo_glosa": cod,
+            "count_levantadas": b["count"],
+            "valor_recuperado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["valor_recuperado_total"], reverse=True)
+
+    return {
+        "items": items[:int(top)],
+    }
+
+
 @router.get("/stats/eps-pendientes-detalle")
 def stats_eps_pendientes_detalle(
     db: Session = Depends(get_db),
