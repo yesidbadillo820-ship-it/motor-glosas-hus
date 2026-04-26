@@ -509,6 +509,70 @@ def exportar_xlsx(
     )
 
 
+@router.get("/buscar-similares-texto")
+def buscar_similares_texto(
+    texto: str = Query(..., min_length=10, max_length=2000),
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R103 P2: búsqueda de glosas con texto similar al dado.
+
+    Útil para auditor que recibe glosa nueva: "¿hemos visto algo
+    parecido antes?". Permite reusar respuestas/dictámenes
+    previos como punto de partida.
+
+    Algoritmo: Jaccard similarity sobre tokens del texto_glosa_original.
+    Liviano, sin dependencias ML — bueno para datasets pequeños/medianos.
+
+    Devuelve hasta `top` glosas con score 0-1 (1 = idéntico).
+    Solo glosas con texto_glosa_original no-vacío.
+    """
+    import re
+
+    def _tokenizar(s: str) -> set[str]:
+        s = (s or "").lower()
+        # Tokens alfanuméricos de >=3 caracteres (filtra "el", "de", etc.)
+        return {t for t in re.findall(r"\w+", s) if len(t) >= 3}
+
+    tokens_query = _tokenizar(texto)
+    if not tokens_query:
+        return {"total_evaluadas": 0, "items": []}
+
+    candidatas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.texto_glosa_original.isnot(None))
+        .all()
+    )
+
+    items = []
+    for g in candidatas:
+        tokens_g = _tokenizar(g.texto_glosa_original or "")
+        if not tokens_g:
+            continue
+        union = tokens_query | tokens_g
+        inter = tokens_query & tokens_g
+        score = len(inter) / len(union) if union else 0
+        if score < 0.05:  # threshold mínimo
+            continue
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "score_similitud": round(score, 4),
+            "preview": (g.texto_glosa_original or "")[:200],
+        })
+
+    items.sort(key=lambda x: x["score_similitud"], reverse=True)
+
+    return {
+        "total_evaluadas": len(candidatas),
+        "total_con_score_minimo": len(items),
+        "items": items[:top],
+    }
+
+
 @router.get("/buscar-avanzado")
 def buscar_avanzado(
     eps: Optional[str] = None,
