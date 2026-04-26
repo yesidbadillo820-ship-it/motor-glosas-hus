@@ -6273,6 +6273,70 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/cumplimiento-sla-mensual")
+def stats_cumplimiento_sla_mensual(
+    meses: int = Query(12, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R335 P1: serie mensual de cumplimiento SLA.
+
+    Por mes (basado en fecha_decision_eps), porcentaje de
+    glosas cerradas a tiempo (fecha_decision_eps <=
+    fecha_vencimiento) vs total cerradas en ese mes.
+
+    Diferente a /stats/cumplimiento-sla (snapshot global):
+    aquí evolución temporal.
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        dec = g.fecha_decision_eps
+        venc = g.fecha_vencimiento
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if venc and venc.tzinfo is None:
+            venc = venc.replace(tzinfo=timezone.utc)
+        if not dec:
+            continue
+        k = dec.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {"total": 0, "a_tiempo": 0})
+        b["total"] += 1
+        if venc and dec <= venc:
+            b["a_tiempo"] += 1
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        pct = (
+            round(100 * b["a_tiempo"] / b["total"], 2)
+            if b["total"] else 0.0
+        )
+        serie.append({
+            "mes": k,
+            "total_cerradas": b["total"],
+            "cerradas_a_tiempo": b["a_tiempo"],
+            "cumplimiento_sla_pct": pct,
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/eps-tiempo-radicacion-objecion")
 def stats_eps_tiempo_radicacion_objecion(
     min_glosas: int = Query(3, ge=1, le=50),
