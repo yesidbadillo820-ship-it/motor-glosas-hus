@@ -1174,6 +1174,121 @@ def cumplimiento_resolucion(
     }
 
 
+@router.get("/inventario-funcionalidades")
+def info_inventario_funcionalidades(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R200 P1: inventario machine-readable de funcionalidades.
+
+    Catálogo enumerable de las CAPACIDADES del sistema agrupadas
+    por dominio. Útil para:
+      - Documentación auto-generada
+      - Demos a stakeholders
+      - Onboarding de nuevos auditores
+      - Compliance audits
+
+    Hito redondo R200 — última iteración antes del informe
+    final. Incluye tanto funcionalidades core (CRUD glosa, IA
+    dictamen) como agregaciones (stats, dashboards, reportes).
+    """
+    return {
+        "dominios": [
+            {
+                "nombre": "Glosas",
+                "descripcion": (
+                    "Gestión completa (CRUD, workflow, dictamen "
+                    "IA, exportación)"
+                ),
+                "endpoints_aprox": 100,
+                "funcionalidades_clave": [
+                    "Importación masiva Excel DGH",
+                    "Dictamen IA con doble proveedor",
+                    "Multi-concepto por glosa",
+                    "Workflow state machine",
+                    "Audit log completo",
+                    "Exportación PDF/CSV/ZIP/JSON",
+                ],
+            },
+            {
+                "nombre": "Estadísticas",
+                "descripcion": "Analytics avanzado y dashboards",
+                "endpoints_aprox": 60,
+                "funcionalidades_clave": [
+                    "Heatmaps día×hora",
+                    "Cohort analysis mensual",
+                    "Forecast cierres + Pareto",
+                    "Score predictivo de defensa",
+                    "KPIs ejecutivos consolidados",
+                ],
+            },
+            {
+                "nombre": "Auditoría",
+                "descripcion": (
+                    "Trazabilidad completa, compliance Habeas Data"
+                ),
+                "endpoints_aprox": 15,
+                "funcionalidades_clave": [
+                    "Audit log estructurado",
+                    "Búsqueda por IP y forense",
+                    "Cumplimiento Resolución 2284",
+                    "Firma digital RSA-PSS",
+                ],
+            },
+            {
+                "nombre": "Operación",
+                "descripcion": "Vista personal y para coordinadores",
+                "endpoints_aprox": 30,
+                "funcionalidades_clave": [
+                    "Worklist priorizada por usuario",
+                    "Mi performance histórica",
+                    "Ranking gestores con badges",
+                    "Cierre del día / cargabilidad equipo",
+                ],
+            },
+            {
+                "nombre": "IA y prompts",
+                "descripcion": "LLM dual-provider con observabilidad",
+                "endpoints_aprox": 10,
+                "funcionalidades_clave": [
+                    "Claude Sonnet 4.6 + Groq fallback",
+                    "Cache 30d con SHA-256",
+                    "Multi-agente (validador + revisor)",
+                    "Métricas costo y cache hit rate",
+                    "Plantillas Gold (few-shot)",
+                ],
+            },
+            {
+                "nombre": "Sistema",
+                "descripcion": "Observabilidad y configuración",
+                "endpoints_aprox": 25,
+                "funcionalidades_clave": [
+                    "Health checks holísticos",
+                    "Feature flags",
+                    "Banner UI configurable",
+                    "Schedulers cron",
+                    "Snapshot point-in-time",
+                ],
+            },
+        ],
+        "regulacion": {
+            "principal": "Resolución 2284/2023 (Manual Único Glosas)",
+            "complementarias": [
+                "Habeas Data Ley 1581/2012",
+                "Historia Clínica Resolución 1995/1999",
+                "CUPS Resolución 2641/2025",
+            ],
+        },
+        "stack_principal": {
+            "framework": "FastAPI + Pydantic v2",
+            "orm": "SQLAlchemy",
+            "db_prod": "PostgreSQL",
+            "llm": "Claude Sonnet 4.6 + Groq Llama 3.3",
+            "auth": "JWT + 2FA TOTP",
+            "hosting": "Render",
+        },
+    }
+
+
 @router.get("/health-completo")
 def info_health_completo(
     db: Session = Depends(get_db),
