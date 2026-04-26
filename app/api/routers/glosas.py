@@ -3245,6 +3245,92 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/eficiencia-gestor")
+def stats_eficiencia_gestor(
+    min_glosas: int = Query(3, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R98 P1: métricas de eficiencia por gestor.
+
+    Diferente a /admin/distribucion-cargas (que cuenta workload):
+    este mide DESEMPEÑO — qué tan bien defiende cada gestor las
+    glosas asignadas.
+
+    Para gestores con >= min_glosas cerradas, devuelve:
+      - total_cerradas
+      - tasa_levantamiento_pct (LEVANTADAS / cerradas, mejor=más alto)
+      - valor_recuperado_total
+      - valor_objetado_total
+      - tasa_recuperacion_pct (recuperado / objetado)
+      - tiempo_promedio_resolucion_dias
+
+    Ordenado DESC por tasa_levantamiento_pct.
+    Útil para identificar best practices y oportunidades de mentoría.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    cerradas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    por_gestor: dict[str, dict] = {}
+    for g in cerradas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        if gestor not in por_gestor:
+            por_gestor[gestor] = {
+                "total": 0, "levantadas": 0,
+                "valor_recuperado": 0.0, "valor_objetado": 0.0,
+                "tiempos": [],
+            }
+        b = por_gestor[gestor]
+        b["total"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["levantadas"] += 1
+        b["valor_recuperado"] += float(g.valor_recuperado or 0)
+        b["valor_objetado"] += float(g.valor_objetado or 0)
+
+        if g.fecha_decision_eps and g.creado_en:
+            delta = (g.fecha_decision_eps - g.creado_en).total_seconds() / 86400
+            b["tiempos"].append(delta)
+
+    items = []
+    for gestor, b in por_gestor.items():
+        if b["total"] < min_glosas:
+            continue
+        tasa_lev = round(100 * b["levantadas"] / b["total"], 2)
+        tasa_rec = (
+            round(100 * b["valor_recuperado"] / b["valor_objetado"], 2)
+            if b["valor_objetado"] else 0.0
+        )
+        tiempo_prom = (
+            round(sum(b["tiempos"]) / len(b["tiempos"]), 2)
+            if b["tiempos"] else 0.0
+        )
+        items.append({
+            "gestor": gestor,
+            "total_cerradas": b["total"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa_lev,
+            "valor_recuperado_total": int(b["valor_recuperado"]),
+            "valor_objetado_total": int(b["valor_objetado"]),
+            "tasa_recuperacion_pct": tasa_rec,
+            "tiempo_promedio_resolucion_dias": tiempo_prom,
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_gestores_evaluados": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/recuperacion-mensual")
 def stats_recuperacion_mensual(
     meses: int = Query(12, ge=1, le=36),
