@@ -6000,6 +6000,69 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/tasa-levantamiento-mensual")
+def stats_tasa_levantamiento_mensual(
+    meses: int = Query(12, ge=1, le=36),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R232 P1: evolución mensual de la tasa de levantamiento global.
+
+    Por mes (basado en fecha_decision_eps):
+      tasa_pct = LEVANTADAS / decididas
+
+    Útil para ver si el equipo mejora con el tiempo:
+      "En enero 50%, en abril 75% → mejora sostenida"
+
+    Devuelve serie ASC por mes.
+    """
+    from datetime import timezone
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not dec:
+            continue
+        k = dec.strftime("%Y-%m")
+        if k not in por_mes:
+            por_mes[k] = {"decididas": 0, "levantadas": 0}
+        por_mes[k]["decididas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            por_mes[k]["levantadas"] += 1
+
+    todos = sorted(por_mes.keys())
+    recientes = todos[-int(meses):]
+    serie = []
+    for k in recientes:
+        b = por_mes[k]
+        tasa = (
+            round(100 * b["levantadas"] / b["decididas"], 2)
+            if b["decididas"] else 0.0
+        )
+        serie.append({
+            "mes": k,
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+        })
+
+    return {
+        "meses_solicitados": int(meses),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/codigos-mejor-tasa")
 def stats_codigos_mejor_tasa(
     min_decididas: int = Query(5, ge=1, le=100),
