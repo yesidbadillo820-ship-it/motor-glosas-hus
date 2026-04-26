@@ -730,3 +730,56 @@ def info_version():
         "python": sys.version.split()[0],
         "env": os.getenv("ENV", "development"),
     }
+
+
+@router.get("/dependencias")
+def info_dependencias(
+    incluir_indirectas: bool = False,
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R91 P2: lista de paquetes Python instalados con versiones.
+
+    Útil para:
+      - Auditoría de seguridad (cruzar contra base de CVEs)
+      - Reproducibilidad (recrear env exacto en local)
+      - Soporte (¿qué versión exacta de anthropic-sdk corre prod?)
+
+    Por defecto devuelve solo dependencias declaradas en requirements
+    (las que aparecen en pyproject/requirements.txt). Con
+    incluir_indirectas=true incluye TODAS las del entorno.
+    """
+    from importlib.metadata import distributions
+
+    # Heurística: dependencias declaradas explícitamente en requirements.txt.
+    # Hardcoded para evitar parseo en runtime (rápido, deterministic).
+    DECLARADAS_DIRECTAS = {
+        "fastapi", "uvicorn", "sqlalchemy", "psycopg2-binary",
+        "pydantic", "pydantic-settings", "python-jose",
+        "passlib", "bcrypt", "python-multipart",
+        "anthropic", "groq", "openai",
+        "openpyxl", "reportlab", "pypdf2", "pdfminer-six",
+        "pytesseract", "pillow", "weasyprint",
+        "python-dotenv", "httpx", "requests",
+        "pytest", "pytest-asyncio",
+        "sentry-sdk", "cryptography",
+    }
+
+    paquetes = []
+    for dist in distributions():
+        nombre = (dist.metadata.get("Name") or "").lower()
+        if not nombre:
+            continue
+        if not incluir_indirectas and nombre not in DECLARADAS_DIRECTAS:
+            continue
+        paquetes.append({
+            "nombre": nombre,
+            "version": dist.version,
+        })
+
+    paquetes.sort(key=lambda p: p["nombre"])
+
+    return {
+        "total": len(paquetes),
+        "incluye_indirectas": bool(incluir_indirectas),
+        "paquetes": paquetes,
+    }
