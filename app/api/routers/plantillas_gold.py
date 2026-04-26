@@ -273,3 +273,51 @@ def marcar_usos(db: Session, plantilla_ids: list[int]):
         synchronize_session=False,
     )
     db.commit()
+
+
+@router.get("/sugerencias")
+def sugerencias_plantillas_gold(
+    eps: Optional[str] = None,
+    codigo_glosa: Optional[str] = None,
+    limite: int = 5,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R75 P1: lista plantillas Gold sugeridas para un (EPS, código).
+
+    Útil para que el gestor vea qué argumentos ganadores ya existen
+    antes de generar dictamen, así puede:
+      - Reutilizarlas directamente (copiar texto)
+      - Pedirle a la IA que las use como base
+      - Decidir si crear una nueva variante
+
+    Reusa obtener_few_shot() pero con limite configurable y devuelve
+    JSON estructurado.
+    """
+    if not (eps or codigo_glosa):
+        raise HTTPException(400, "Debes pasar al menos eps o codigo_glosa")
+
+    plantillas = obtener_few_shot(
+        db,
+        eps=eps or "",
+        codigo_glosa=codigo_glosa or "",
+        limite=max(1, min(int(limite), 20)),
+    )
+    return {
+        "eps": eps,
+        "codigo_glosa": codigo_glosa,
+        "total": len(plantillas),
+        "items": [
+            {
+                "id": p.id,
+                "eps": p.eps,
+                "codigo_glosa": p.codigo_glosa,
+                "tipo": p.tipo,
+                "titulo": p.titulo,
+                "argumento_preview": (p.argumento or "")[:300],
+                "usos": p.usos or 0,
+                "creado_en": p.creado_en.isoformat() if p.creado_en else None,
+            }
+            for p in plantillas
+        ],
+    }
