@@ -13334,6 +13334,70 @@ def sla_glosa(
     }
 
 
+@router.get("/{glosa_id}/contexto-cartera")
+def contexto_cartera_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R280 P1: contexto financiero (cartera) de una glosa.
+
+    Drill-down económico para una glosa específica:
+      - factura, valor_factura, saldo_factura
+      - count de glosas en la misma factura
+      - valor_objetado_total y abierto en la factura
+      - eps, tercero_nit, tercero_nombre
+
+    Útil al revisar una glosa para ver el peso económico
+    real (no solo el valor objetado individual).
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    factura = (glosa.factura or "").strip()
+    if factura and factura != "N/A":
+        otras = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.factura == factura)
+            .all()
+        )
+        count_factura = len(otras)
+        obj_factura = sum(float(g.valor_objetado or 0) for g in otras)
+        obj_abierto = sum(
+            float(g.valor_objetado or 0)
+            for g in otras
+            if (g.estado or "").upper() not in ESTADOS_CERRADOS
+        )
+    else:
+        count_factura = 1
+        obj_factura = float(glosa.valor_objetado or 0)
+        obj_abierto = (
+            obj_factura
+            if (glosa.estado or "").upper() not in ESTADOS_CERRADOS
+            else 0.0
+        )
+
+    return {
+        "glosa_id": glosa.id,
+        "eps": glosa.eps,
+        "factura": glosa.factura,
+        "valor_factura": int(float(glosa.valor_factura or 0)),
+        "saldo_factura": int(float(glosa.saldo_factura or 0)),
+        "valor_objetado": int(float(glosa.valor_objetado or 0)),
+        "valor_recuperado": int(float(glosa.valor_recuperado or 0)),
+        "tercero_nit": glosa.tercero_nit,
+        "tercero_nombre": glosa.tercero_nombre,
+        "factura_resumen": {
+            "count_glosas": count_factura,
+            "valor_objetado_total": int(obj_factura),
+            "valor_objetado_abierto": int(obj_abierto),
+        },
+    }
+
+
 @router.get("/{glosa_id}/audit-resumen")
 def audit_resumen_glosa(
     glosa_id: int,
