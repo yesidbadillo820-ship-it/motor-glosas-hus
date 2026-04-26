@@ -5174,6 +5174,62 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/analizadas-hoy")
+def stats_analizadas_hoy(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R174 P1: glosas con dictamen creado o actualizado hoy.
+
+    Cuenta glosas con DictamenVersionRecord cuya creado_en es
+    hoy (UTC). Útil para ver el ritmo del día:
+      "Hoy ya se generaron/refinaron 27 dictámenes"
+
+    Devuelve:
+      - dictamenes_hoy
+      - glosas_distintas_hoy
+      - por_accion (CREAR/REFINAR/REGENERAR/RESTAURAR)
+      - por_autor: top 5
+    """
+    from datetime import timedelta, timezone
+
+    from app.models.db import DictamenVersionRecord
+
+    ahora = ahora_utc()
+    inicio_hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    versiones = (
+        db.query(DictamenVersionRecord)
+        .filter(DictamenVersionRecord.creado_en >= inicio_hoy)
+        .all()
+    )
+
+    glosas_set: set[int] = set()
+    por_accion: dict[str, int] = {}
+    por_autor: dict[str, int] = {}
+    for v in versiones:
+        if v.glosa_id:
+            glosas_set.add(v.glosa_id)
+        if v.accion:
+            por_accion[v.accion] = por_accion.get(v.accion, 0) + 1
+        if v.autor_email:
+            por_autor[v.autor_email] = por_autor.get(v.autor_email, 0) + 1
+
+    top_5 = sorted(
+        por_autor.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+
+    return {
+        "fecha": inicio_hoy.date().isoformat(),
+        "dictamenes_hoy": len(versiones),
+        "glosas_distintas_hoy": len(glosas_set),
+        "por_accion": por_accion,
+        "top_5_autores": [
+            {"autor": u, "acciones": n} for u, n in top_5
+        ],
+    }
+
+
 @router.get("/stats/cerradas-por-etapa")
 def stats_cerradas_por_etapa(
     db: Session = Depends(get_db),
