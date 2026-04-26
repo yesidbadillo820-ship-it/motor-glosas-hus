@@ -1042,6 +1042,89 @@ def semaforo(
     return repo.semaforo_counts()
 
 
+@router.get("/paciente-resumen")
+def paciente_resumen(
+    paciente: str = Query(..., min_length=2),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R130 P1: resumen de glosas asociadas a un paciente.
+
+    Útil para investigar el histórico de glosas de un paciente
+    específico (mismo paciente puede tener varias hospitalizaciones
+    objetadas).
+
+    Query param `paciente` se usa con ILIKE para tolerancia a
+    variaciones en mayúsculas/acentos.
+
+    Devuelve:
+      - total_glosas
+      - facturas_distintas
+      - eps_distintas
+      - valor_objetado_total / valor_recuperado_total
+      - estados (mapa)
+      - glosas: lista resumida (id, factura, codigo_glosa, valor)
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.paciente.ilike(f"%{paciente}%"))
+        .order_by(GlosaRecord.creado_en.desc())
+        .all()
+    )
+
+    if not glosas:
+        return {
+            "paciente_buscado": paciente,
+            "total_glosas": 0,
+            "facturas_distintas": 0,
+            "eps_distintas": 0,
+            "valor_objetado_total": 0,
+            "valor_recuperado_total": 0,
+            "estados": {},
+            "glosas": [],
+        }
+
+    facturas: set[str] = set()
+    epss: set[str] = set()
+    estados: dict[str, int] = {}
+    valor_obj = 0.0
+    valor_rec = 0.0
+
+    for g in glosas:
+        if g.factura and g.factura != "N/A":
+            facturas.add(g.factura)
+        if g.eps:
+            epss.add(g.eps)
+        e = g.estado or "?"
+        estados[e] = estados.get(e, 0) + 1
+        valor_obj += float(g.valor_objetado or 0)
+        valor_rec += float(g.valor_recuperado or 0)
+
+    return {
+        "paciente_buscado": paciente,
+        "total_glosas": len(glosas),
+        "facturas_distintas": len(facturas),
+        "eps_distintas": len(epss),
+        "valor_objetado_total": int(valor_obj),
+        "valor_recuperado_total": int(valor_rec),
+        "estados": estados,
+        "glosas": [
+            {
+                "id": g.id,
+                "creado_en": (
+                    g.creado_en.isoformat() if g.creado_en else None
+                ),
+                "factura": g.factura,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "estado": g.estado,
+            }
+            for g in glosas[:50]  # cap a 50 para no inflar
+        ],
+    }
+
+
 @router.get("/sin-actividad")
 def glosas_sin_actividad(
     dias: int = Query(15, ge=1, le=180),
