@@ -5174,6 +5174,59 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/proyeccion-vencimiento")
+def stats_proyeccion_vencimiento(
+    dias: int = Query(30, ge=7, le=90),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R178 P1: glosas que vencen en los próximos N días.
+
+    Distribución de vencimientos por día restante. Útil para
+    planeación semanal:
+      "En 1 día vencen 5, en 2 días 12, en 3 días 8..."
+
+    Solo cuenta glosas no-cerradas con 0 <= dias_restantes < N.
+
+    Devuelve serie ASC por dias_restantes.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes >= 0)
+        .filter(GlosaRecord.dias_restantes < int(dias))
+        .all()
+    )
+
+    por_dia: dict[int, dict] = {}
+    for g in abiertas:
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr not in por_dia:
+            por_dia[dr] = {"count": 0, "valor": 0.0}
+        por_dia[dr]["count"] += 1
+        por_dia[dr]["valor"] += float(g.valor_objetado or 0)
+
+    serie = []
+    for dr in sorted(por_dia.keys()):
+        b = por_dia[dr]
+        serie.append({
+            "dias_restantes": dr,
+            "count": b["count"],
+            "valor_objetado_total": int(b["valor"]),
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total_glosas_proximas": sum(s["count"] for s in serie),
+        "valor_total_proximas": sum(
+            s["valor_objetado_total"] for s in serie
+        ),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/transiciones-recientes")
 def stats_transiciones_recientes(
     horas: int = Query(24, ge=1, le=168),
