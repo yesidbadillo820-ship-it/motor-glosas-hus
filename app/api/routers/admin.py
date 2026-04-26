@@ -965,6 +965,93 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/cierre-mes-anterior")
+def admin_cierre_mes_anterior(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R316 P1: cierre del mes anterior (retrospectiva).
+
+    Snapshot agregado de las glosas cerradas el mes
+    anterior:
+      - count_decididas, count_levantadas, count_ratificadas
+      - tasa_levantamiento_pct
+      - valor_objetado_total, valor_recuperado_total
+      - tasa_recuperacion_monetaria_pct
+      - top_gestores: 5 gestores con más decisiones
+
+    Útil para reporte mensual al comité directivo.
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+
+    ahora = ahora_utc()
+    inicio_mes_actual = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if inicio_mes_actual.month == 1:
+        inicio_anterior = inicio_mes_actual.replace(
+            year=inicio_mes_actual.year - 1, month=12,
+        )
+    else:
+        inicio_anterior = inicio_mes_actual.replace(
+            month=inicio_mes_actual.month - 1,
+        )
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_anterior)
+        .filter(GlosaRecord.fecha_decision_eps < inicio_mes_actual)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    levantadas = sum(
+        1 for g in glosas
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    ratificadas = sum(
+        1 for g in glosas
+        if (g.estado or "").upper() == "RATIFICADA"
+    )
+    n = len(glosas)
+    obj_total = sum(float(g.valor_objetado or 0) for g in glosas)
+    rec_total = sum(float(g.valor_recuperado or 0) for g in glosas)
+
+    tasa_lev = round(100 * levantadas / n, 2) if n else 0.0
+    tasa_rec = (
+        round(100 * rec_total / obj_total, 2) if obj_total else 0.0
+    )
+
+    por_gestor: dict[str, int] = {}
+    for g in glosas:
+        gestor = (g.gestor_nombre or "").strip()
+        if gestor:
+            por_gestor[gestor] = por_gestor.get(gestor, 0) + 1
+    top_gestores = sorted(
+        por_gestor.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+
+    return {
+        "mes": inicio_anterior.strftime("%Y-%m"),
+        "count_decididas": n,
+        "count_levantadas": levantadas,
+        "count_ratificadas": ratificadas,
+        "tasa_levantamiento_pct": tasa_lev,
+        "valor_objetado_total": int(obj_total),
+        "valor_recuperado_total": int(rec_total),
+        "tasa_recuperacion_monetaria_pct": tasa_rec,
+        "top_gestores": [
+            {"gestor": g, "decididas": c}
+            for g, c in top_gestores
+        ],
+    }
+
+
 @router.get("/sugerencias-asignacion")
 def admin_sugerencias_asignacion(
     eps: str,
