@@ -108,6 +108,87 @@ def permisos_del_usuario_actual(
     }
 
 
+@router.get("/{usuario_id}/actividad")
+def actividad_usuario(
+    usuario_id: int,
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R95 P1: actividad de un usuario específico en el sistema.
+
+    Combina:
+      - Audit log: eventos generados por el usuario (acciones)
+      - Glosas asignadas/auditadas (gestor_nombre o auditor_email)
+
+    Útil para:
+      - Coordinador: ¿qué hizo el equipo esta semana?
+      - HR/management: medir productividad
+      - Investigación: auditar comportamiento sospechoso
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord, GlosaRecord
+
+    usuario = db.query(UsuarioRecord).filter_by(id=usuario_id).first()
+    if not usuario:
+        raise HTTPException(404, f"Usuario {usuario_id} no encontrado")
+
+    corte = ahora_utc() - timedelta(days=int(dias))
+
+    # Audit log: eventos del usuario
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.usuario_email == usuario.email)
+        .filter(AuditLogRecord.timestamp >= corte)
+        .all()
+    )
+
+    por_accion: dict[str, int] = {}
+    por_tabla: dict[str, int] = {}
+    for e in eventos:
+        if e.accion:
+            por_accion[e.accion] = por_accion.get(e.accion, 0) + 1
+        if e.tabla:
+            por_tabla[e.tabla] = por_tabla.get(e.tabla, 0) + 1
+
+    # Glosas donde es gestor o auditor (en la ventana)
+    glosas_asignadas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == (usuario.nombre or usuario.email))
+        .filter(GlosaRecord.creado_en >= corte)
+        .count()
+    )
+    glosas_auditadas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.auditor_email == usuario.email)
+        .filter(GlosaRecord.creado_en >= corte)
+        .count()
+    )
+
+    return {
+        "usuario": {
+            "id": usuario.id,
+            "email": usuario.email,
+            "nombre": usuario.nombre,
+            "rol": usuario.rol,
+        },
+        "ventana_dias": int(dias),
+        "audit": {
+            "total_eventos": len(eventos),
+            "por_accion": por_accion,
+            "por_tabla": por_tabla,
+        },
+        "glosas": {
+            "asignadas_como_gestor": glosas_asignadas,
+            "auditadas": glosas_auditadas,
+        },
+    }
+
+
 @router.get("/")
 def listar_usuarios(
     db: Session = Depends(get_db),
