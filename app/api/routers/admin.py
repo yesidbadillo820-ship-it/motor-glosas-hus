@@ -740,6 +740,60 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/audit-cleanup-recomendado")
+def admin_audit_cleanup_recomendado(
+    dias_retencion: int = 365,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R202 P1: sugerencia de purga de audit log antiguo.
+
+    Estima cuántos eventos audit son más viejos que el período
+    de retención configurado y sugiere la purga.
+
+    Útil para mantener la BD pequeña sin perder cumplimiento:
+      - Habeas Data: retención típica 5 años
+      - Pero solo los críticos; rutinarios pueden archivarse
+
+    Devuelve:
+      - dias_retencion configurado
+      - fecha_corte (timestamp ISO)
+      - eventos_total / eventos_a_purgar
+      - bytes_estimados_ahorro (~200 bytes/row)
+      - mb_estimados_ahorro
+
+    Solo SUPER_ADMIN. NO ejecuta nada — solo reporta.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias_retencion))
+    total = (
+        db.query(_f.count(AuditLogRecord.id)).scalar() or 0
+    )
+    a_purgar = (
+        db.query(_f.count(AuditLogRecord.id))
+        .filter(AuditLogRecord.timestamp < desde)
+        .scalar() or 0
+    )
+
+    BYTES_POR_ROW = 200
+    bytes_ahorro = a_purgar * BYTES_POR_ROW
+
+    return {
+        "dias_retencion": int(dias_retencion),
+        "fecha_corte": desde.isoformat(),
+        "eventos_total": int(total),
+        "eventos_a_purgar": int(a_purgar),
+        "bytes_estimados_ahorro": bytes_ahorro,
+        "mb_estimados_ahorro": round(bytes_ahorro / (1024 * 1024), 2),
+    }
+
+
 @router.get("/heatmap-usuario")
 def admin_heatmap_usuario(
     usuario_email: str,
