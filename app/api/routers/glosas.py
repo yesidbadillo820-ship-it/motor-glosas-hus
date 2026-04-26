@@ -1714,3 +1714,58 @@ def obtener_estado_batch(
             for g in glosas_batch
         ]
     }
+
+
+@router.get("/duplicados")
+def listar_duplicados_factura(
+    factura: str,
+    eps: Optional[str] = None,
+    limite: int = 5,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R58 P2: lista glosas previamente registradas con la misma factura.
+
+    Útil para detección de duplicados antes de cargar una glosa nueva.
+    Match exacto sobre numero_factura, opcional filtro por EPS.
+
+    Query params:
+      factura  número de factura a buscar (case-insensitive, trim)
+      eps      EPS opcional para restringir
+      limite   máximo de resultados (default 5)
+
+    Respuesta:
+      {
+        "factura_consultada": "FE-2026-001",
+        "total": 1,
+        "duplicados": [
+          {"id": 42, "eps": "FAMISANAR", "creado_en": "...",
+           "estado": "RADICADA", "valor_objetado": 168563.0,
+           "auditor_email": "x@hus.com"}
+        ]
+      }
+    """
+    from app.repositories.glosa_repository import buscar_duplicados_factura
+
+    duplicados = buscar_duplicados_factura(
+        db, numero_factura=factura, eps=eps, limite=limite,
+    )
+    return {
+        "factura_consultada": factura,
+        "eps_filtro": eps,
+        "total": len(duplicados),
+        "duplicados": [
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "valor_aceptado": float(g.valor_aceptado or 0),
+                "estado": g.estado,
+                "auditor_email": g.auditor_email,
+                "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+            }
+            for g in duplicados
+        ],
+    }

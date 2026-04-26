@@ -86,3 +86,43 @@ class TestBuscarDuplicadosFactura:
             _seed(db, factura="FE-LIM")
         r = buscar_duplicados_factura(db, "FE-LIM", limite=3)
         assert len(r) == 3
+
+
+class TestEndpointDuplicados:
+    def test_endpoint_devuelve_estructura_correcta(self, db):
+        from app.api.routers.glosas import listar_duplicados_factura
+        from unittest.mock import MagicMock
+        _seed(db, factura="FE-2026-001", eps="FAMISANAR", valor_objetado=100_000)
+        user = MagicMock(email="test@hus.com")
+        r = listar_duplicados_factura(
+            factura="FE-2026-001", eps=None, limite=5,
+            db=db, current_user=user,
+        )
+        assert r["total"] == 1
+        assert r["factura_consultada"] == "FE-2026-001"
+        assert r["duplicados"][0]["eps"] == "FAMISANAR"
+        assert r["duplicados"][0]["valor_objetado"] == 100_000.0
+
+    def test_endpoint_sin_duplicados(self, db):
+        from app.api.routers.glosas import listar_duplicados_factura
+        from unittest.mock import MagicMock
+        user = MagicMock(email="test@hus.com")
+        r = listar_duplicados_factura(
+            factura="FE-INEXISTENTE", eps=None, limite=5,
+            db=db, current_user=user,
+        )
+        assert r["total"] == 0
+        assert r["duplicados"] == []
+
+    def test_endpoint_filtro_eps(self, db):
+        from app.api.routers.glosas import listar_duplicados_factura
+        from unittest.mock import MagicMock
+        _seed(db, factura="FE-X", eps="FAMISANAR")
+        _seed(db, factura="FE-X", eps="SALUD TOTAL")
+        user = MagicMock(email="test@hus.com")
+        r = listar_duplicados_factura(
+            factura="FE-X", eps="FAMISANAR", limite=5,
+            db=db, current_user=user,
+        )
+        assert r["total"] == 1
+        assert r["duplicados"][0]["eps"] == "FAMISANAR"
