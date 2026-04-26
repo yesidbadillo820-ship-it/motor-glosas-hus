@@ -5131,6 +5131,68 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/por-dia-semana")
+def stats_por_dia_semana(
+    dias: int = Query(90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R141 P2: distribución de glosas creadas por día de la semana.
+
+    Diferente a /stats/heatmap-actividad (matriz día×hora):
+    aquí solo el día sumado, útil para responder "¿se crean más
+    glosas los lunes que los viernes?"
+
+    Útil para planeación:
+      - Spike los lunes → reforzar capacidad lunes
+      - Caída los viernes → ¿hay backlog que limpiar?
+
+    Devuelve por día de semana (Lunes...Domingo):
+      - dia (nombre)
+      - count, valor_total, pct_del_total
+    """
+    from datetime import timedelta, timezone
+
+    DIAS_NOMBRE = ["Lunes", "Martes", "Miércoles", "Jueves",
+                   "Viernes", "Sábado", "Domingo"]
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= desde)
+        .all()
+    )
+
+    por_dia = [
+        {"dia": DIAS_NOMBRE[i], "count": 0, "valor_total": 0.0}
+        for i in range(7)
+    ]
+
+    for g in glosas:
+        creado = g.creado_en
+        if creado and creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        if not creado:
+            continue
+        idx = creado.weekday()  # Monday=0 ... Sunday=6
+        por_dia[idx]["count"] += 1
+        por_dia[idx]["valor_total"] += float(g.valor_objetado or 0)
+
+    total_count = sum(d["count"] for d in por_dia)
+    for d in por_dia:
+        d["pct_del_total"] = (
+            round(100 * d["count"] / total_count, 2)
+            if total_count else 0.0
+        )
+        d["valor_total"] = int(d["valor_total"])
+
+    return {
+        "ventana_dias": int(dias),
+        "total_glosas": total_count,
+        "items": por_dia,
+    }
+
+
 @router.get("/stats/pacientes-frecuentes")
 def stats_pacientes_frecuentes(
     top: int = Query(20, ge=1, le=100),
