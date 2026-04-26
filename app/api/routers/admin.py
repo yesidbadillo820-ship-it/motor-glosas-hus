@@ -825,6 +825,102 @@ def admin_glosas_prioritarias(
     }
 
 
+@router.get("/cierre-del-dia")
+def admin_cierre_del_dia(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R122 P1: reporte de cierre del día (stand-up matutino).
+
+    Resumen de las últimas 24h, listo para que el coordinador lo
+    lea/comparta:
+      - Glosas creadas / cerradas / valor recuperado / IA calls
+      - Top 3 gestores con más actividad
+      - Glosas que vencen mañana
+
+    Útil como insumo para Slack/email diario.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        AICallRecord, AuditLogRecord, GlosaRecord,
+    )
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ahora = ahora_utc()
+    hace_24h = ahora - timedelta(hours=24)
+
+    # Glosas creadas últimas 24h
+    creadas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= hace_24h)
+        .all()
+    )
+
+    # Glosas cerradas últimas 24h (basado en fecha_decision_eps)
+    cerradas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= hace_24h)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    valor_recuperado_dia = sum(
+        float(g.valor_recuperado or 0) for g in cerradas
+    )
+
+    # IA calls últimas 24h
+    ia_calls = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.creado_en >= hace_24h)
+        .count()
+    )
+
+    # Top 3 gestores con más eventos audit
+    rows = (
+        db.query(AuditLogRecord.usuario_email)
+        .filter(AuditLogRecord.timestamp >= hace_24h)
+        .filter(AuditLogRecord.usuario_email.isnot(None))
+        .all()
+    )
+    por_user: dict[str, int] = {}
+    for (email,) in rows:
+        por_user[email] = por_user.get(email, 0) + 1
+    top_gestores = sorted(
+        por_user.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+
+    # Glosas que vencen mañana (dias_restantes == 1)
+    vencen_manana = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.dias_restantes == 1)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    valor_que_vence_manana = sum(
+        float(g.valor_objetado or 0) for g in vencen_manana
+    )
+
+    return {
+        "fecha_reporte": ahora.isoformat(),
+        "ventana_horas": 24,
+        "glosas_creadas_24h": len(creadas),
+        "glosas_cerradas_24h": len(cerradas),
+        "valor_recuperado_24h": int(valor_recuperado_dia),
+        "ia_calls_24h": ia_calls,
+        "top_3_gestores": [
+            {"usuario": u, "eventos": n} for u, n in top_gestores
+        ],
+        "vencen_manana": {
+            "count": len(vencen_manana),
+            "valor_total": int(valor_que_vence_manana),
+        },
+    }
+
+
 @router.get("/alertas-inteligentes")
 def admin_alertas_inteligentes(
     db: Session = Depends(get_db),
