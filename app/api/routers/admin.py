@@ -825,6 +825,183 @@ def admin_glosas_prioritarias(
     }
 
 
+@router.get("/alertas-inteligentes")
+def admin_alertas_inteligentes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R121 P1: alertas accionables consolidadas a nivel sistema.
+
+    Diferente a /glosas/alertas (por glosa individual), este
+    endpoint detecta condiciones agregadas que requieren
+    intervención del coordinador/admin.
+
+    Categorías:
+      - CRITICAL: condiciones graves (datos perdidos, servicio caído)
+      - WARNING: degradación notable (muchas vencidas, gestores
+                 sobrecargados)
+      - INFO: cambios notables (nueva EPS, picos de carga)
+      - BUSINESS: oportunidades (alto valor sin gestor)
+
+    Cada alerta tiene: {tipo, categoria, titulo, descripcion, accion,
+                        endpoint?, count?}.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    todas_abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    ahora = ahora_utc()
+    alertas = []
+
+    # CRITICAL: Vencidas hace mucho (>30d en negativo)
+    muy_vencidas = [
+        g for g in todas_abiertas
+        if (g.dias_restantes or 0) < -30
+    ]
+    if muy_vencidas:
+        alertas.append({
+            "tipo": "CRITICAL",
+            "categoria": "SLA",
+            "titulo": f"{len(muy_vencidas)} glosas vencidas hace más de 30 días",
+            "descripcion": (
+                "Estas glosas pueden ratificarse automáticamente. "
+                "Acción urgente requerida."
+            ),
+            "accion": "Revisar y atender",
+            "endpoint": "/admin/glosas-prioritarias",
+            "count": len(muy_vencidas),
+        })
+
+    # WARNING: Muchas críticas
+    criticas = [
+        g for g in todas_abiertas
+        if 0 <= (g.dias_restantes or 0) <= 3
+    ]
+    if len(criticas) >= 5:
+        alertas.append({
+            "tipo": "WARNING",
+            "categoria": "SLA",
+            "titulo": f"{len(criticas)} glosas críticas (≤3 días para vencer)",
+            "descripcion": "Concentración inusual de glosas próximas a vencer.",
+            "accion": "Reasignar y priorizar",
+            "endpoint": "/admin/glosas-prioritarias",
+            "count": len(criticas),
+        })
+
+    # WARNING: Glosas sin gestor
+    sin_gestor = [g for g in todas_abiertas if not g.gestor_nombre]
+    if len(sin_gestor) >= 10:
+        alertas.append({
+            "tipo": "WARNING",
+            "categoria": "ASIGNACION",
+            "titulo": f"{len(sin_gestor)} glosas sin gestor asignado",
+            "descripcion": "Estas glosas no tienen responsable.",
+            "accion": "Asignar gestores",
+            "endpoint": "/admin/distribucion-cargas",
+            "count": len(sin_gestor),
+        })
+
+    # BUSINESS: Alto valor sin gestor
+    alto_valor_sin_gestor = [
+        g for g in todas_abiertas
+        if not g.gestor_nombre and float(g.valor_objetado or 0) > 5_000_000
+    ]
+    if alto_valor_sin_gestor:
+        valor_total = sum(
+            float(g.valor_objetado or 0) for g in alto_valor_sin_gestor
+        )
+        alertas.append({
+            "tipo": "BUSINESS",
+            "categoria": "OPORTUNIDAD",
+            "titulo": (
+                f"{len(alto_valor_sin_gestor)} glosas de alto valor "
+                "(>$5M) sin gestor"
+            ),
+            "descripcion": (
+                f"Valor total no asignado: ${int(valor_total):,} COP. "
+                "Riesgo de no defenderlas a tiempo."
+            ),
+            "accion": "Asignar a auditor senior",
+            "count": len(alto_valor_sin_gestor),
+        })
+
+    # WARNING: Glosas sin dictamen en estados avanzados
+    sin_dictamen_avanzadas = [
+        g for g in todas_abiertas
+        if (g.estado or "").upper() in {"RESPONDIDA", "RATIFICADA"}
+        and (not g.dictamen or len(g.dictamen) < 50)
+    ]
+    if sin_dictamen_avanzadas:
+        alertas.append({
+            "tipo": "WARNING",
+            "categoria": "CALIDAD",
+            "titulo": (
+                f"{len(sin_dictamen_avanzadas)} glosas en estado avanzado "
+                "sin dictamen"
+            ),
+            "descripcion": (
+                "Inconsistencia: el workflow avanzó sin generar el "
+                "dictamen formal."
+            ),
+            "accion": "Generar dictámenes",
+            "endpoint": "/glosas/incompletas",
+            "count": len(sin_dictamen_avanzadas),
+        })
+
+    # INFO: EPS nuevas en últimos 7 días
+    desde_7d = ahora - timedelta(days=7)
+    eps_recientes: set[str] = set()
+    eps_historicas: set[str] = set()
+    for g in db.query(GlosaRecord).all():
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        creado = g.creado_en
+        if creado and creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        if creado and creado >= desde_7d:
+            eps_recientes.add(eps)
+        elif creado:
+            eps_historicas.add(eps)
+    eps_nuevas = eps_recientes - eps_historicas
+    if eps_nuevas:
+        alertas.append({
+            "tipo": "INFO",
+            "categoria": "DATOS",
+            "titulo": f"{len(eps_nuevas)} EPS nuevas detectadas en última semana",
+            "descripcion": (
+                f"EPS sin histórico previo: {', '.join(sorted(eps_nuevas))}. "
+                "Verificar contratos."
+            ),
+            "accion": "Validar contratos",
+            "endpoint": "/glosas/stats/eps-emergentes",
+            "count": len(eps_nuevas),
+        })
+
+    return {
+        "generado_en": ahora.isoformat(),
+        "total_alertas": len(alertas),
+        "por_tipo": {
+            "CRITICAL": sum(1 for a in alertas if a["tipo"] == "CRITICAL"),
+            "WARNING": sum(1 for a in alertas if a["tipo"] == "WARNING"),
+            "INFO": sum(1 for a in alertas if a["tipo"] == "INFO"),
+            "BUSINESS": sum(1 for a in alertas if a["tipo"] == "BUSINESS"),
+        },
+        "items": alertas,
+    }
+
+
 @router.get("/actividad-reciente")
 def admin_actividad_reciente(
     limit: int = 50,
