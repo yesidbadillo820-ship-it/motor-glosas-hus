@@ -1588,6 +1588,103 @@ def info_zonas_horarias(
     }
 
 
+@router.get("/feature-flags")
+def info_feature_flags(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R144 P1: flags de features activas según configuración.
+
+    Reporta qué funcionalidades opcionales están habilitadas en
+    el deploy actual. Útil para que el frontend muestre/oculte
+    UI sin adivinar:
+      - ¿Tiene IA? → mostrar "Generar dictamen IA"
+      - ¿Push notifications? → mostrar opción suscribirse
+      - ¿WhatsApp/Telegram? → mostrar canales alerta
+
+    Cada flag: {nombre, activo, descripcion}.
+
+    Solo COORDINADOR/ADMIN.
+    """
+    import os
+
+    from app.core.config import get_settings
+
+    cfg = get_settings()
+
+    flags = [
+        {
+            "nombre": "ia_anthropic",
+            "activo": bool(cfg.anthropic_api_key),
+            "descripcion": "Claude Sonnet como LLM principal",
+        },
+        {
+            "nombre": "ia_groq",
+            "activo": bool(cfg.groq_api_key),
+            "descripcion": "Groq Llama como LLM fallback",
+        },
+        {
+            "nombre": "firma_digital_rsa",
+            "activo": bool(os.getenv("FIRMA_DIGITAL_PRIVATE_KEY")),
+            "descripcion": "Firma RSA-PSS-SHA256 (asimétrica)",
+        },
+        {
+            "nombre": "cifrado_simetrico",
+            "activo": bool(os.getenv("GLOSAS_ENCRYPTION_KEY")),
+            "descripcion": "Cifrado de campos sensibles",
+        },
+        {
+            "nombre": "smtp_alertas",
+            "activo": bool(cfg.smtp_user and cfg.smtp_password),
+            "descripcion": "Email SMTP para alertas",
+        },
+        {
+            "nombre": "whatsapp_business",
+            "activo": bool(
+                os.getenv("WHATSAPP_META_TOKEN")
+                and os.getenv("WHATSAPP_META_PHONE_ID")
+            ),
+            "descripcion": "WhatsApp Business API (Meta)",
+        },
+        {
+            "nombre": "telegram_bot",
+            "activo": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
+            "descripcion": "Telegram bot para notificaciones",
+        },
+        {
+            "nombre": "push_notifications",
+            "activo": bool(
+                os.getenv("VAPID_PUBLIC_KEY")
+                and os.getenv("VAPID_PRIVATE_KEY")
+            ),
+            "descripcion": "Web Push (VAPID)",
+        },
+        {
+            "nombre": "sentry",
+            "activo": bool(os.getenv("SENTRY_DSN")),
+            "descripcion": "Tracking de errores Sentry",
+        },
+        {
+            "nombre": "digest_email",
+            "activo": bool(os.getenv("DIGEST_DESTINATARIOS")),
+            "descripcion": "Resumen diario por email",
+        },
+        {
+            "nombre": "banner_capacitacion",
+            "activo": bool(cfg.banner_capacitacion),
+            "descripcion": "Banner UI configurable",
+        },
+    ]
+
+    activas = sum(1 for f in flags if f["activo"])
+
+    return {
+        "total_flags": len(flags),
+        "activas": activas,
+        "inactivas": len(flags) - activas,
+        "items": flags,
+    }
+
+
 @router.get("/banner-info")
 def info_banner(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
