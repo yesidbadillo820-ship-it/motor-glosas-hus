@@ -6441,6 +6441,54 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/conciliaciones-pendientes")
+def stats_conciliaciones_pendientes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R363 P1: conciliaciones aún pendientes en el ciclo bilateral.
+
+    Filtra estados pre-cierre: PROGRAMADA, EPS_RESPONDIO,
+    AUDIENCIA_REALIZADA. Útil para saber cuánto trabajo
+    bilateral está activo.
+
+    Por estado_bilateral: count, valor_conciliado_total.
+    """
+    from app.models.db import ConciliacionRecord
+
+    PENDIENTES = [
+        "PROGRAMADA", "EPS_RESPONDIO", "AUDIENCIA_REALIZADA",
+    ]
+
+    rows = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.estado_bilateral.in_(PENDIENTES))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for c in rows:
+        e = (c.estado_bilateral or "?").upper()
+        b = bucket.setdefault(e, {"count": 0, "valor": 0.0})
+        b["count"] += 1
+        b["valor"] += float(c.valor_conciliado or 0)
+
+    items = []
+    for e, b in bucket.items():
+        items.append({
+            "estado_bilateral": e,
+            "count": b["count"],
+            "valor_conciliado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "total_pendientes": sum(it["count"] for it in items),
+        "valor_total": sum(it["valor_conciliado_total"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/stats/factura-grandes-pendientes")
 def stats_factura_grandes_pendientes(
     umbral: float = Query(50_000_000, ge=10_000_000),
