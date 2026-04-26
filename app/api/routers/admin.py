@@ -965,6 +965,46 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/distribucion-rol")
+def admin_distribucion_rol(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R266 P1: distribución de usuarios por rol.
+
+    Por rol: total y activos. Útil para revisar mix de
+    equipo: ¿hay suficientes auditores? ¿muchos
+    inactivos?
+
+    Solo SUPER_ADMIN.
+    """
+    usuarios = db.query(UsuarioRecord).all()
+
+    bucket: dict[str, dict] = {}
+    for u in usuarios:
+        rol = (u.rol or "SIN_ROL").upper()
+        b = bucket.setdefault(rol, {"total": 0, "activos": 0})
+        b["total"] += 1
+        if int(u.activo or 0) == 1:
+            b["activos"] += 1
+
+    items = []
+    for rol, b in bucket.items():
+        items.append({
+            "rol": rol,
+            "total": b["total"],
+            "activos": b["activos"],
+            "inactivos": b["total"] - b["activos"],
+        })
+    items.sort(key=lambda x: x["total"], reverse=True)
+
+    return {
+        "total_usuarios": sum(it["total"] for it in items),
+        "total_activos": sum(it["activos"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/eps-conteos")
 def admin_eps_conteos(
     db: Session = Depends(get_db),
