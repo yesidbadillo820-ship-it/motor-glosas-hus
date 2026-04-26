@@ -9143,6 +9143,95 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/dashboard")
+def dashboard_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R217 P1: dashboard ejecutivo de UNA glosa específica.
+
+    Single-call que reúne todas las métricas relevantes en
+    counts (no listas largas):
+      - Datos de la glosa
+      - Conceptos asociados
+      - Versiones de dictamen
+      - Comentarios + menciones pendientes
+      - Conciliaciones
+      - Audit log count
+
+    Útil para abrir vista detalle sin múltiples requests.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import (
+        AuditLogRecord, ComentarioGlosaRecord,
+        ConceptoGlosaRecord, ConciliacionRecord,
+        DictamenVersionRecord,
+    )
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    n_conceptos = (
+        db.query(_f.count(ConceptoGlosaRecord.id))
+        .filter(ConceptoGlosaRecord.glosa_id == glosa_id)
+        .scalar() or 0
+    )
+    n_versiones = (
+        db.query(_f.count(DictamenVersionRecord.id))
+        .filter(DictamenVersionRecord.glosa_id == glosa_id)
+        .scalar() or 0
+    )
+    n_comentarios = (
+        db.query(_f.count(ComentarioGlosaRecord.id))
+        .filter(ComentarioGlosaRecord.glosa_id == glosa_id)
+        .scalar() or 0
+    )
+    menciones_pend = (
+        db.query(_f.count(ComentarioGlosaRecord.id))
+        .filter(ComentarioGlosaRecord.glosa_id == glosa_id)
+        .filter(ComentarioGlosaRecord.mencion.isnot(None))
+        .filter(
+            (ComentarioGlosaRecord.resuelto == 0)
+            | (ComentarioGlosaRecord.resuelto.is_(None))
+        )
+        .scalar() or 0
+    )
+    n_conciliaciones = (
+        db.query(_f.count(ConciliacionRecord.id))
+        .filter(ConciliacionRecord.glosa_id == glosa_id)
+        .scalar() or 0
+    )
+    n_audit = (
+        db.query(_f.count(AuditLogRecord.id))
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.registro_id == glosa_id)
+        .scalar() or 0
+    )
+
+    return {
+        "glosa_id": glosa_id,
+        "datos": {
+            "eps": glosa.eps,
+            "factura": glosa.factura,
+            "estado": glosa.estado,
+            "valor_objetado": float(glosa.valor_objetado or 0),
+            "valor_recuperado": float(glosa.valor_recuperado or 0),
+            "dias_restantes": glosa.dias_restantes,
+        },
+        "contadores": {
+            "conceptos": int(n_conceptos),
+            "versiones_dictamen": int(n_versiones),
+            "comentarios": int(n_comentarios),
+            "menciones_pendientes": int(menciones_pend),
+            "conciliaciones": int(n_conciliaciones),
+            "eventos_audit": int(n_audit),
+        },
+    }
+
+
 @router.get("/{glosa_id}/checklist-pre-envio")
 def checklist_pre_envio(
     glosa_id: int,
