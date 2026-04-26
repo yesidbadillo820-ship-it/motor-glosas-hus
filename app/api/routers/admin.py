@@ -740,6 +740,54 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/usuarios-mas-cargados")
+def admin_usuarios_mas_cargados(
+    top: int = 10,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R212 P1: top N gestores con más glosas abiertas asignadas.
+
+    Diferente a /admin/distribucion-cargas (todos los gestores):
+    aquí solo los más sobrecargados, útil para revisión rápida
+    "¿quién está al límite?"
+
+    Devuelve top N ordenado DESC por carga.
+
+    Solo SUPER_ADMIN.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    rows = (
+        db.query(
+            GlosaRecord.gestor_nombre,
+            _f.count().label("n"),
+        )
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .group_by(GlosaRecord.gestor_nombre)
+        .order_by(_f.count().desc())
+        .limit(int(top))
+        .all()
+    )
+
+    items = []
+    for nombre, n in rows:
+        items.append({
+            "gestor": nombre,
+            "glosas_abiertas": int(n),
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "items": items,
+    }
+
+
 @router.get("/conciliaciones-proximas")
 def admin_conciliaciones_proximas(
     dias: int = 14,
