@@ -30,6 +30,50 @@ def crear_o_actualizar_contrato(
     repo = ContratoRepository(db)
     return repo.upsert(data)
 
+@router.get("/sin-glosas")
+def contratos_sin_glosas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R132 P1: contratos firmados sin actividad de glosas.
+
+    Útil para identificar EPS con contrato pero que aún no han
+    enviado glosas:
+      - Buenas noticias: la EPS está pagando todo bien
+      - Mala noticia: el contrato está inactivo (no hay servicios)
+      - Por confirmar: nuevo contrato sin operación aún
+
+    Cruza ContratoRecord con GlosaRecord:
+      - ContratoRecord.eps no aparece en GlosaRecord.eps
+
+    Devuelve la lista de EPS con contrato pero sin glosas.
+    """
+    from app.models.db import ContratoRecord, GlosaRecord
+
+    contratos = db.query(ContratoRecord).all()
+    eps_con_glosas = {
+        e[0] for e in db.query(GlosaRecord.eps).distinct().all()
+        if e[0]
+    }
+
+    sin_glosas = []
+    for c in contratos:
+        if c.eps not in eps_con_glosas:
+            sin_glosas.append({
+                "eps": c.eps,
+                "detalles": c.detalles,
+            })
+
+    sin_glosas.sort(key=lambda x: x["eps"])
+
+    return {
+        "total_contratos": len(contratos),
+        "contratos_con_glosas": len(contratos) - len(sin_glosas),
+        "contratos_sin_glosas": len(sin_glosas),
+        "items": sin_glosas,
+    }
+
+
 @router.get("/ranking")
 def ranking_contratos(
     min_glosas: int = 5,
