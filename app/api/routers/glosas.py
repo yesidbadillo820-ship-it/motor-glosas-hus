@@ -6273,6 +6273,106 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/dashboard-cobranza")
+def stats_dashboard_cobranza(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R300 P1: dashboard único de cobranza (single-call).
+
+    Combina en una sola respuesta los datos clave para el
+    panel de cobranza:
+      - kpis: saldo_total, valor_factura_total, count_abiertas
+      - aging: distribución por antigüedad
+      - top_eps: 5 EPS con mayor saldo
+      - top_facturas: 5 facturas con mayor saldo
+
+    Reduce latencia (de ~5 calls a 1) para landing del
+    coordinador de cobranza. Hito R300.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    BUCKETS = [
+        ("0-30", 0, 30),
+        ("31-60", 31, 60),
+        ("61-90", 61, 90),
+        ("91-180", 91, 180),
+        (">180", 181, None),
+    ]
+
+    ahora = ahora_utc()
+    bandas = {n: {"count": 0, "saldo": 0.0} for n, _, _ in BUCKETS}
+    saldo_total = 0.0
+    valor_total = 0.0
+    por_eps: dict[str, float] = {}
+    por_factura: dict[str, dict] = {}
+
+    for g in abiertas:
+        saldo = float(g.saldo_factura or 0)
+        valor = float(g.valor_factura or 0)
+        saldo_total += saldo
+        valor_total += valor
+
+        eps = (g.eps or "").strip()
+        if eps:
+            por_eps[eps] = por_eps.get(eps, 0.0) + saldo
+
+        factura = (g.factura or "").strip()
+        if factura and factura != "N/A":
+            f = por_factura.setdefault(factura, {
+                "saldo": 0.0, "eps": eps,
+            })
+            f["saldo"] += saldo
+
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if cre:
+            antig = (ahora - cre).days
+            for n, lo, hi in BUCKETS:
+                if antig >= lo and (hi is None or antig <= hi):
+                    bandas[n]["count"] += 1
+                    bandas[n]["saldo"] += saldo
+                    break
+
+    top_eps = sorted(
+        por_eps.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+    top_facturas = sorted(
+        por_factura.items(),
+        key=lambda x: x[1]["saldo"], reverse=True,
+    )[:5]
+
+    return {
+        "kpis": {
+            "count_abiertas": len(abiertas),
+            "saldo_total": int(saldo_total),
+            "valor_factura_total": int(valor_total),
+        },
+        "aging": [
+            {"rango_dias": n, "count": b["count"],
+             "saldo": int(b["saldo"])}
+            for n, b in bandas.items()
+        ],
+        "top_eps": [
+            {"eps": e, "saldo": int(s)}
+            for e, s in top_eps
+        ],
+        "top_facturas": [
+            {"factura": f, "eps": d["eps"], "saldo": int(d["saldo"])}
+            for f, d in top_facturas
+        ],
+    }
+
+
 @router.get("/stats/sin-actividad-reciente")
 def stats_sin_actividad_reciente(
     dias: int = Query(30, ge=7, le=180),
