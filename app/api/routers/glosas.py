@@ -6441,6 +6441,66 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/factura-grandes-pendientes")
+def stats_factura_grandes_pendientes(
+    umbral: float = Query(50_000_000, ge=10_000_000),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R362 P1: facturas grandes con glosas abiertas.
+
+    Lista facturas con valor_factura >= umbral que todavía
+    tienen al menos una glosa abierta. Prioridad alta
+    para cobranza estratégica.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura.isnot(None))
+        .filter(GlosaRecord.factura != "N/A")
+        .filter(GlosaRecord.valor_factura >= float(umbral))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        f = (g.factura or "").strip()
+        if not f:
+            continue
+        b = bucket.setdefault(f, {
+            "eps": g.eps,
+            "valor_factura": float(g.valor_factura or 0),
+            "saldo": float(g.saldo_factura or 0),
+            "abiertas": 0,
+            "obj_abierto": 0.0,
+        })
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+            b["obj_abierto"] += float(g.valor_objetado or 0)
+
+    items = []
+    for f, b in bucket.items():
+        if b["abiertas"] == 0:
+            continue
+        items.append({
+            "factura": f,
+            "eps": b["eps"],
+            "valor_factura": int(b["valor_factura"]),
+            "saldo_factura": int(b["saldo"]),
+            "count_glosas_abiertas": b["abiertas"],
+            "valor_objetado_pendiente": int(b["obj_abierto"]),
+        })
+    items.sort(key=lambda x: x["valor_factura"], reverse=True)
+
+    return {
+        "umbral": int(umbral),
+        "total_facturas": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/dictamen-tasa-vs-largo")
 def stats_dictamen_tasa_vs_largo(
     db: Session = Depends(get_db),
