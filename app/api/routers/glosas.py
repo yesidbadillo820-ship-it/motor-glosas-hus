@@ -6273,6 +6273,75 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-respuestas-codigos")
+def stats_eps_respuestas_codigos(
+    eps: str = Query(..., min_length=2),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R274 P1: distribución de codigo_respuesta usado por una EPS.
+
+    Para una EPS dada, lista los `codigo_respuesta` (RE9501,
+    RE9701, etc.) que esa EPS ha usado y cuántas veces.
+    Útil para preparación de mesa con la EPS:
+      "Esta EPS usa principalmente RE9501 (no comparto):
+       de las 50 veces que la usó, ratificó 40 → 80%
+       lo que indica que sus argumentos son fuertes."
+
+    Por código:
+      - count_total
+      - levantadas, ratificadas
+      - tasa_levantamiento_pct (sobre decididas)
+    """
+    eps_q = (eps or "").strip()
+    if not eps_q:
+        return {"eps": "", "items": []}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps_q))
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .filter(GlosaRecord.codigo_respuesta != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        c = (g.codigo_respuesta or "").strip()
+        if not c:
+            continue
+        b = bucket.setdefault(c, {
+            "count": 0, "lev": 0, "rat": 0, "dec": 0,
+        })
+        b["count"] += 1
+        estado = (g.estado or "").upper()
+        if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA"):
+            b["dec"] += 1
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+        elif estado == "RATIFICADA":
+            b["rat"] += 1
+
+    items = []
+    for c, b in bucket.items():
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append({
+            "codigo_respuesta": c,
+            "count_total": b["count"],
+            "decididas": b["dec"],
+            "levantadas": b["lev"],
+            "ratificadas": b["rat"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["count_total"], reverse=True)
+
+    return {
+        "eps": eps_q,
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-tendencia-mensual")
 def stats_eps_tendencia_mensual(
     eps: str = Query(..., min_length=2),
