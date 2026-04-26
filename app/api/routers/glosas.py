@@ -6273,6 +6273,71 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/cobertura-asignacion")
+def stats_cobertura_asignacion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R313 P1: cobertura de asignación de campos críticos.
+
+    Para campos que indican "quién está manejando esto":
+    qué porcentaje de glosas los tienen poblados. Métrica
+    de salud de datos del sistema.
+
+    Campos evaluados:
+      - gestor_nombre
+      - auditor_email
+      - profesional_medico
+      - codigo_respuesta
+      - fecha_decision_eps
+
+    Útil para identificar lagunas: "30% de glosas no
+    tiene gestor — ¿por qué?".
+    """
+    rows = db.query(GlosaRecord).all()
+    n = len(rows)
+
+    if n == 0:
+        return {
+            "total_glosas": 0,
+            "items": [],
+        }
+
+    counts = {
+        "gestor_nombre": 0,
+        "auditor_email": 0,
+        "profesional_medico": 0,
+        "codigo_respuesta": 0,
+        "fecha_decision_eps": 0,
+    }
+
+    for g in rows:
+        if g.gestor_nombre and g.gestor_nombre.strip():
+            counts["gestor_nombre"] += 1
+        if g.auditor_email and g.auditor_email.strip():
+            counts["auditor_email"] += 1
+        if g.profesional_medico and g.profesional_medico.strip():
+            counts["profesional_medico"] += 1
+        if g.codigo_respuesta and g.codigo_respuesta.strip():
+            counts["codigo_respuesta"] += 1
+        if g.fecha_decision_eps:
+            counts["fecha_decision_eps"] += 1
+
+    items = []
+    for campo, c in counts.items():
+        items.append({
+            "campo": campo,
+            "count": c,
+            "pct_cobertura": round(100 * c / n, 2),
+            "faltantes": n - c,
+        })
+
+    return {
+        "total_glosas": n,
+        "items": items,
+    }
+
+
 @router.get("/stats/recuperacion-tasa-mensual")
 def stats_recuperacion_tasa_mensual(
     meses: int = Query(12, ge=1, le=24),
