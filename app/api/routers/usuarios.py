@@ -406,6 +406,57 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/glosas-grandes")
+def yo_glosas_grandes(
+    umbral: float = 5_000_000,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R334 P1: tus glosas abiertas de alto valor.
+
+    Lista glosas asignadas a ti (gestor_nombre) que están
+    abiertas y tienen valor_objetado >= umbral. Útil
+    para no perder de vista las "grandes" que tienen
+    mayor impacto financiero.
+
+    Ordena DESC por valor_objetado.
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    nombre = current_user.nombre or current_user.email
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.valor_objetado >= float(umbral))
+        .order_by(GlosaRecord.valor_objetado.desc())
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dias_restantes": g.dias_restantes,
+        })
+
+    return {
+        "usuario_email": current_user.email,
+        "umbral": int(umbral),
+        "total_grandes": len(items),
+        "valor_total_pendiente": sum(
+            it["valor_objetado"] for it in items
+        ),
+        "items": items,
+    }
+
+
 @router.get("/yo/glosas-asignadas-recientes")
 def yo_glosas_asignadas_recientes(
     dias: int = 7,
