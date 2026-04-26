@@ -6273,6 +6273,66 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/recuperacion-tasa-mensual")
+def stats_recuperacion_tasa_mensual(
+    meses: int = Query(12, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R311 P1: tasa de recuperación monetaria mes a mes.
+
+    Diferente a /stats/recuperacion-mensual (suma absoluta)
+    y /stats/tasa-levantamiento-mensual (sobre count):
+    aquí mes a mes el ratio
+    valor_recuperado / valor_objetado.
+
+    Útil para ver si HUS está recuperando un % mayor o
+    menor de lo objetado con el tiempo.
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        k = f.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {"obj": 0.0, "rec": 0.0})
+        b["obj"] += float(g.valor_objetado or 0)
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        tasa = (
+            round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        )
+        serie.append({
+            "mes": k,
+            "valor_objetado": int(b["obj"]),
+            "valor_recuperado": int(b["rec"]),
+            "tasa_recuperacion_pct": tasa,
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/fecha-objecion-mensual")
 def stats_fecha_objecion_mensual(
     meses: int = Query(12, ge=1, le=24),
