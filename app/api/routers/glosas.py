@@ -5289,6 +5289,114 @@ def recomendaciones_glosa(
     }
 
 
+@router.get("/{glosa_id}/resumen-pdf")
+def resumen_pdf_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R119 P1: PDF de 1 página con resumen ejecutivo de una glosa.
+
+    Útil para imprimir/adjuntar a expedientes físicos sin tener
+    que armar el PDF manualmente.
+
+    Contenido:
+      - Header con logo HUS (texto)
+      - Datos clave: id, EPS, factura, valor objetado
+      - Estado y SLA
+      - Resumen del dictamen (primeros 1500 chars)
+      - Footer con fecha de generación + auditor
+
+    Usa reportlab (ya instalado en el stack).
+    """
+    import io
+
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import (
+        Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+    )
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        leftMargin=0.5 * inch, rightMargin=0.5 * inch,
+        topMargin=0.5 * inch, bottomMargin=0.5 * inch,
+    )
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Header
+    story.append(Paragraph(
+        f"<b>RESUMEN GLOSA #{glosa_id} — HUS</b>",
+        styles["Title"],
+    ))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Datos clave (tabla)
+    valor_obj = float(glosa.valor_objetado or 0)
+    valor_rec = float(glosa.valor_recuperado or 0)
+    datos = [
+        ["EPS", glosa.eps or "-"],
+        ["Factura", glosa.factura or "-"],
+        ["Código glosa", glosa.codigo_glosa or "-"],
+        ["Valor objetado", f"${valor_obj:,.0f} COP"],
+        ["Valor recuperado", f"${valor_rec:,.0f} COP"],
+        ["Estado", glosa.estado or "-"],
+        ["Etapa", glosa.etapa or "-"],
+        ["Días restantes", str(glosa.dias_restantes or "-")],
+        ["Gestor", glosa.gestor_nombre or "-"],
+        ["Decisión EPS", glosa.decision_eps or "Pendiente"],
+    ]
+    tabla = Table(datos, colWidths=[2.2 * inch, 4.5 * inch])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#0B5D8A")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.white),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("PADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    story.append(tabla)
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Resumen del dictamen
+    if glosa.dictamen:
+        story.append(Paragraph("<b>Dictamen HUS:</b>", styles["Heading3"]))
+        # Limpiar HTML básico
+        import re
+        texto_dict = re.sub(r"<[^>]+>", " ", glosa.dictamen)
+        texto_dict = re.sub(r"\s+", " ", texto_dict).strip()
+        story.append(Paragraph(texto_dict[:1500], styles["BodyText"]))
+        story.append(Spacer(1, 0.2 * inch))
+
+    # Footer
+    story.append(Spacer(1, 0.3 * inch))
+    story.append(Paragraph(
+        f"<i>Generado por {current_user.email} el {ahora_utc().strftime('%Y-%m-%d %H:%M UTC')}</i>",
+        styles["BodyText"],
+    ))
+
+    doc.build(story)
+    buf.seek(0)
+
+    fname = f"resumen-glosa-{glosa_id}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/{glosa_id}/exportar-evidencia.zip")
 def exportar_evidencia_zip(
     glosa_id: int,
