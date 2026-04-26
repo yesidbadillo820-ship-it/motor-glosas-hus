@@ -6086,6 +6086,72 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/gestores-pareto")
+def stats_gestores_pareto(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R259 P1: Pareto 80/20 sobre gestores por glosas decididas.
+
+    Identifica qué gestores concentran el 80% del volumen de
+    decisiones. Útil para el coordinador: detectar
+    sobrecarga en pocas personas y rebalancear cargas.
+
+    Devuelve:
+      - total_decididas
+      - count_gestores_top80 / pct_gestores_top80
+      - gestores_top80: lista hasta acumular 80%
+    """
+    decididas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    por_gestor: dict[str, int] = {}
+    for g in decididas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        por_gestor[gestor] = por_gestor.get(gestor, 0) + 1
+
+    total = sum(por_gestor.values())
+    if total == 0:
+        return {
+            "total_decididas": 0,
+            "count_gestores_top80": 0,
+            "pct_gestores_top80": 0.0,
+            "gestores_top80": [],
+        }
+
+    ord_g = sorted(por_gestor.items(), key=lambda x: x[1], reverse=True)
+
+    acumulado = 0
+    top80 = []
+    for gestor, count in ord_g:
+        top80.append({
+            "gestor": gestor,
+            "decididas": count,
+            "pct_individual": round(100 * count / total, 2),
+        })
+        acumulado += count
+        if acumulado >= 0.8 * total:
+            break
+
+    pct_g = round(100 * len(top80) / len(ord_g), 2)
+
+    return {
+        "total_decididas": int(total),
+        "total_gestores": len(ord_g),
+        "count_gestores_top80": len(top80),
+        "pct_gestores_top80": pct_g,
+        "gestores_top80": top80,
+    }
+
+
 @router.get("/stats/profesional-top")
 def stats_profesional_top(
     limit: int = Query(20, ge=1, le=100),
