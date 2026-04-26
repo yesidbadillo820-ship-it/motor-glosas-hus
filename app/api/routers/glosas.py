@@ -6273,6 +6273,79 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-tiempo-en-pipeline")
+def stats_eps_tiempo_en_pipeline(
+    min_glosas: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R304 P1: tiempo promedio de glosas abiertas en pipeline por EPS.
+
+    Para cada EPS, calcula los días que tienen las glosas
+    abiertas desde su `creado_en`. Diferente a
+    /stats/eps-velocidad-respuesta (mide cierres pasados):
+    aquí mide el "envejecimiento" actual del backlog.
+
+    Por EPS:
+      - count_abiertas
+      - antiguedad_promedio_dias
+      - antiguedad_max_dias
+      - saldo_pendiente_total
+
+    Ordenado DESC por antiguedad_promedio_dias.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    ahora = ahora_utc()
+    bucket: dict[str, dict] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        antig = (ahora - cre).days
+        b = bucket.setdefault(eps, {
+            "count": 0, "suma": 0, "max": 0, "saldo": 0.0,
+        })
+        b["count"] += 1
+        b["suma"] += antig
+        b["max"] = max(b["max"], antig)
+        b["saldo"] += float(g.saldo_factura or 0)
+
+    items = []
+    for eps, b in bucket.items():
+        if b["count"] < min_glosas:
+            continue
+        prom = round(b["suma"] / b["count"], 1)
+        items.append({
+            "eps": eps,
+            "count_abiertas": b["count"],
+            "antiguedad_promedio_dias": prom,
+            "antiguedad_max_dias": b["max"],
+            "saldo_pendiente_total": int(b["saldo"]),
+        })
+    items.sort(key=lambda x: x["antiguedad_promedio_dias"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/prioridad-distribucion")
 def stats_prioridad_distribucion(
     db: Session = Depends(get_db),
