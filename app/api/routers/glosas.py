@@ -2077,6 +2077,84 @@ def stats_por_eps(
     }
 
 
+@router.get("/{glosa_id}/dictamen.md")
+def descargar_dictamen_markdown(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R69 P2: descarga el dictamen de una glosa como archivo Markdown.
+
+    HTML → Markdown legible para:
+      - Compartir con equipo legal externo (no abre HTML stylado)
+      - Integración con sistemas de gestión documental que solo
+        aceptan texto plano
+      - Diff manual entre versiones en herramientas estándar (VSCode,
+        BBEdit, etc.)
+
+    No requiere librería externa — conversión simple por regex que
+    cubre los tags reales del dictamen (h3, p, b, ul, li, tabla
+    códigos al inicio).
+    """
+    import re
+    from fastapi.responses import Response
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not glosa.dictamen:
+        raise HTTPException(400, "Esta glosa aún no tiene dictamen generado")
+
+    html = glosa.dictamen
+    # 1) headers
+    md = re.sub(r"<h1[^>]*>(.*?)</h1>", r"# \1\n", html, flags=re.IGNORECASE | re.DOTALL)
+    md = re.sub(r"<h2[^>]*>(.*?)</h2>", r"## \1\n", md, flags=re.IGNORECASE | re.DOTALL)
+    md = re.sub(r"<h3[^>]*>(.*?)</h3>", r"### \1\n", md, flags=re.IGNORECASE | re.DOTALL)
+    md = re.sub(r"<h4[^>]*>(.*?)</h4>", r"#### \1\n", md, flags=re.IGNORECASE | re.DOTALL)
+    # 2) negritas
+    md = re.sub(r"<(b|strong)[^>]*>(.*?)</\1>", r"**\2**", md, flags=re.IGNORECASE | re.DOTALL)
+    md = re.sub(r"<(i|em)[^>]*>(.*?)</\1>", r"*\2*", md, flags=re.IGNORECASE | re.DOTALL)
+    # 3) listas
+    md = re.sub(r"<li[^>]*>(.*?)</li>", r"- \1\n", md, flags=re.IGNORECASE | re.DOTALL)
+    # 4) saltos
+    md = re.sub(r"<br\s*/?>", "\n", md, flags=re.IGNORECASE)
+    md = re.sub(r"</p>", "\n\n", md, flags=re.IGNORECASE)
+    md = re.sub(r"</div>", "\n", md, flags=re.IGNORECASE)
+    md = re.sub(r"</tr>", "\n", md, flags=re.IGNORECASE)
+    md = re.sub(r"</td>", " | ", md, flags=re.IGNORECASE)
+    # 5) tags restantes
+    md = re.sub(r"<[^>]+>", "", md)
+    # 6) entidades comunes
+    md = (md.replace("&nbsp;", " ").replace("&amp;", "&")
+            .replace("&lt;", "<").replace("&gt;", ">")
+            .replace("&quot;", '"').replace("&#39;", "'"))
+    # 7) normalizar líneas en blanco múltiples
+    md = re.sub(r"\n{3,}", "\n\n", md)
+    md = re.sub(r"[ \t]+", " ", md)
+    md = re.sub(r" +\n", "\n", md)
+    md = md.strip()
+
+    # Header informativo del archivo
+    cabecera = (
+        f"# Dictamen Glosa #{glosa.id}\n\n"
+        f"- **EPS:** {glosa.eps or '—'}\n"
+        f"- **Código glosa:** {glosa.codigo_glosa or '—'}\n"
+        f"- **Valor objetado:** ${(glosa.valor_objetado or 0):,.0f}\n"
+        f"- **Estado:** {glosa.estado or '—'}\n"
+        f"- **Factura:** {glosa.factura or '—'}\n"
+        f"- **Modelo IA:** {glosa.modelo_ia or '—'}\n\n"
+        f"---\n\n"
+    )
+    payload = (cabecera + md).encode("utf-8")
+
+    fname = f"dictamen-glosa-{glosa.id}.md"
+    return Response(
+        content=payload,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/stats/por-tipo")
 def stats_por_tipo_glosa(
     dias: int = Query(90, ge=1, le=365),
