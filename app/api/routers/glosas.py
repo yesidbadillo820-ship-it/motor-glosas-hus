@@ -6273,6 +6273,59 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/ratificadas-recientes")
+def stats_ratificadas_recientes(
+    dias: int = Query(30, ge=1, le=180),
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R347 P1: glosas ratificadas (HUS perdió) recientes.
+
+    Lista glosas que terminaron en RATIFICADA en los
+    últimos N días. Útil para retrospective: ¿qué
+    perdimos esta semana/mes?
+
+    Ordena DESC por fecha_decision_eps.
+    """
+    from datetime import timedelta
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado == "RATIFICADA")
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_aceptado": int(float(g.valor_aceptado or 0)),
+            "gestor_nombre": g.gestor_nombre,
+            "fecha_decision_eps": (
+                g.fecha_decision_eps.isoformat()
+                if g.fecha_decision_eps else None
+            ),
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total": len(items),
+        "valor_aceptado_total": sum(
+            it["valor_aceptado"] for it in items
+        ),
+        "items": items,
+    }
+
+
 @router.get("/stats/glosas-conciliadas-detalle")
 def stats_glosas_conciliadas_detalle(
     limit: int = Query(50, ge=1, le=500),
