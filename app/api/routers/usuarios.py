@@ -406,6 +406,237 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/asistente-proactivo")
+def yo_asistente_proactivo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R368 P1: asistente proactivo — qué hacer HOY sin pedirlo.
+
+    Combina señales del estado del usuario para devolver
+    acciones priorizadas:
+      URGENTE:    vencidas (dias_restantes < 0)
+      IMPORTANTE: críticas (0-3 días)
+      OPORTUNIDAD: alta cuantía sin dictamen
+      MENCIONES:  comentarios pendientes que te etiquetan
+      MEJORAR:    si tu tasa cayó vs mes anterior
+      REVISAR:    glosas en estado RESPONDIDA esperando confirmar
+
+    Cada acción tiene:
+      tipo, prioridad (1=más urgente), mensaje,
+      count, glosa_ids (top 5), accion_recomendada
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        ComentarioGlosaRecord,
+        GlosaRecord,
+    )
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    nombre = current_user.nombre or current_user.email
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if inicio_mes.month == 1:
+        inicio_anterior = inicio_mes.replace(
+            year=inicio_mes.year - 1, month=12,
+        )
+    else:
+        inicio_anterior = inicio_mes.replace(
+            month=inicio_mes.month - 1,
+        )
+
+    acciones = []
+
+    # 1. Vencidas (URGENTE)
+    vencidas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < 0)
+        .order_by(GlosaRecord.dias_restantes.asc())
+        .all()
+    )
+    if vencidas:
+        peor = vencidas[0]
+        acciones.append({
+            "tipo": "URGENTE",
+            "prioridad": 1,
+            "icono": "🚨",
+            "titulo": f"{len(vencidas)} glosa(s) vencidas",
+            "mensaje": (
+                f"La más antigua lleva "
+                f"{abs(int(peor.dias_restantes or 0))} días vencida. "
+                "Cerrá hoy o se archivan automáticamente."
+            ),
+            "count": len(vencidas),
+            "glosa_ids": [g.id for g in vencidas[:5]],
+            "accion_recomendada": "Abre Mis Glosas y filtra por VENCIDA",
+        })
+
+    # 2. Críticas (IMPORTANTE) — solo abiertas con 0..3 dias
+    criticas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes >= 0)
+        .filter(GlosaRecord.dias_restantes <= 3)
+        .order_by(GlosaRecord.dias_restantes.asc())
+        .all()
+    )
+    if criticas:
+        acciones.append({
+            "tipo": "IMPORTANTE",
+            "prioridad": 2,
+            "icono": "⏰",
+            "titulo": f"{len(criticas)} glosa(s) críticas",
+            "mensaje": (
+                "Vencen en 3 días o menos. Atendé hoy "
+                "para asegurar el cierre dentro de SLA."
+            ),
+            "count": len(criticas),
+            "glosa_ids": [g.id for g in criticas[:5]],
+            "accion_recomendada": (
+                "Prioriza por valor: las más caras primero"
+            ),
+        })
+
+    # 3. Oportunidad: alta cuantía abierta sin dictamen
+    sin_dict = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.valor_objetado >= 5_000_000)
+        .filter(
+            (GlosaRecord.dictamen.is_(None))
+            | (GlosaRecord.dictamen == "")
+        )
+        .all()
+    )
+    if sin_dict:
+        valor_total = sum(float(g.valor_objetado or 0) for g in sin_dict)
+        acciones.append({
+            "tipo": "OPORTUNIDAD",
+            "prioridad": 3,
+            "icono": "💰",
+            "titulo": (
+                f"{len(sin_dict)} glosa(s) de alto valor "
+                "sin dictamen"
+            ),
+            "mensaje": (
+                f"Valor total en juego: ${int(valor_total):,}. "
+                "Un dictamen sólido aquí impacta directamente "
+                "el recuperado del mes."
+            ),
+            "count": len(sin_dict),
+            "glosa_ids": [g.id for g in sin_dict[:5]],
+            "accion_recomendada": (
+                "Pide casos similares con /casos-similares-resueltos"
+            ),
+        })
+
+    # 4. Menciones pendientes
+    menciones = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.mencion == current_user.email)
+        .filter(
+            (ComentarioGlosaRecord.resuelto == 0)
+            | (ComentarioGlosaRecord.resuelto.is_(None))
+        )
+        .all()
+    )
+    if menciones:
+        glosa_ids = list({m.glosa_id for m in menciones if m.glosa_id})[:5]
+        acciones.append({
+            "tipo": "MENCIONES",
+            "prioridad": 4,
+            "icono": "💬",
+            "titulo": f"{len(menciones)} mención(es) sin resolver",
+            "mensaje": (
+                "Tus colegas te pidieron opinión en estas glosas. "
+                "Responder construye colaboración."
+            ),
+            "count": len(menciones),
+            "glosa_ids": glosa_ids,
+            "accion_recomendada": "Abre cada glosa y responde al hilo",
+        })
+
+    # 5. Mejora: tasa actual vs mes anterior
+    decididas_q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_anterior)
+        .all()
+    )
+    actual_dec = actual_lev = prev_dec = prev_lev = 0
+    for g in decididas_q:
+        f = g.fecha_decision_eps
+        if not f:
+            continue
+        if f >= inicio_mes:
+            actual_dec += 1
+            if (g.estado or "").upper() == "LEVANTADA":
+                actual_lev += 1
+        else:
+            prev_dec += 1
+            if (g.estado or "").upper() == "LEVANTADA":
+                prev_lev += 1
+    tasa_actual = (
+        (100.0 * actual_lev / actual_dec) if actual_dec else 0.0
+    )
+    tasa_prev = (
+        (100.0 * prev_lev / prev_dec) if prev_dec else 0.0
+    )
+    if prev_dec >= 3 and tasa_actual + 5 < tasa_prev:
+        acciones.append({
+            "tipo": "MEJORAR",
+            "prioridad": 5,
+            "icono": "📉",
+            "titulo": "Tu tasa cayó vs mes anterior",
+            "mensaje": (
+                f"Pasaste de {tasa_prev:.1f}% a {tasa_actual:.1f}%. "
+                "Revisa qué cambió: ¿más ratificadas?, "
+                "¿códigos nuevos?, ¿EPS distintas?"
+            ),
+            "count": int(prev_lev - actual_lev),
+            "glosa_ids": [],
+            "accion_recomendada": (
+                "Revisa /yo/eps-mejor-rendimiento y "
+                "/yo/comparativa-equipo"
+            ),
+        })
+
+    # 6. Si no hay nada urgente, dar un mensaje motivador
+    if not acciones:
+        acciones.append({
+            "tipo": "OK",
+            "prioridad": 99,
+            "icono": "✨",
+            "titulo": "Todo bajo control",
+            "mensaje": (
+                "No tienes vencidas, ni críticas, ni "
+                "menciones pendientes. Buen momento para "
+                "revisar tu tasa y planear conciliaciones."
+            ),
+            "count": 0,
+            "glosa_ids": [],
+            "accion_recomendada": "Abre Resumen del mes",
+        })
+
+    return {
+        "usuario_email": current_user.email,
+        "generado_en": ahora.isoformat(),
+        "total_acciones": len(acciones),
+        "acciones": acciones,
+    }
+
+
 @router.get("/yo/stats-trimestre")
 def yo_stats_trimestre(
     db: Session = Depends(get_db),
