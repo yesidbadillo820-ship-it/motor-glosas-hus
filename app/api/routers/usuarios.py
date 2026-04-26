@@ -406,6 +406,80 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/dashboard")
+def dashboard_personal(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R255 P1: dashboard personal compacto del usuario actual.
+
+    Single-call con los KPIs personales:
+      - mis_glosas_abiertas
+      - mis_vencidas / mis_criticas
+      - mis_menciones_pendientes
+      - cerradas_mes (mes corriente)
+
+    Útil como pantalla principal del usuario al login.
+    """
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import ComentarioGlosaRecord, GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    nombre = current_user.nombre or current_user.email
+    inicio_mes = ahora_utc().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    abiertas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    vencidas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < 0)
+        .scalar() or 0
+    )
+    criticas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes >= 0)
+        .filter(GlosaRecord.dias_restantes <= 3)
+        .scalar() or 0
+    )
+    menciones = (
+        db.query(_f.count(ComentarioGlosaRecord.id))
+        .filter(ComentarioGlosaRecord.mencion == current_user.email)
+        .filter(
+            (ComentarioGlosaRecord.resuelto == 0)
+            | (ComentarioGlosaRecord.resuelto.is_(None))
+        )
+        .scalar() or 0
+    )
+    cerradas_mes = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+
+    return {
+        "usuario_email": current_user.email,
+        "mis_glosas_abiertas": int(abiertas),
+        "mis_vencidas": int(vencidas),
+        "mis_criticas": int(criticas),
+        "mis_menciones_pendientes": int(menciones),
+        "cerradas_mes": int(cerradas_mes),
+    }
+
+
 @router.get("/yo/menciones-pendientes")
 def menciones_pendientes(
     db: Session = Depends(get_db),
