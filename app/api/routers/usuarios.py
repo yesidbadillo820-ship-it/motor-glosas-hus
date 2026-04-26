@@ -406,6 +406,76 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/eps-asignadas")
+def yo_eps_asignadas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R310 P1: EPS con las que trabajas (como gestor).
+
+    Lista las EPS donde tienes glosas asignadas, con
+    counts. Útil para que un nuevo gestor vea su scope:
+    "trabajo con 5 EPS distintas".
+
+    Por EPS:
+      - count_total
+      - count_abiertas
+      - valor_objetado_total
+      - tasa_levantamiento_pct (sobre las que ya decidió)
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    nombre = current_user.nombre or current_user.email
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {
+            "total": 0, "abiertas": 0, "valor": 0.0,
+            "dec": 0, "lev": 0,
+        })
+        b["total"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        estado = (g.estado or "").upper()
+        if estado not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+        if estado in ESTADOS_DECIDIDOS:
+            b["dec"] += 1
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for eps, b in bucket.items():
+        tasa = (
+            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "count_total": b["total"],
+            "count_abiertas": b["abiertas"],
+            "valor_objetado_total": int(b["valor"]),
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["count_total"], reverse=True)
+
+    return {
+        "usuario_email": current_user.email,
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/yo/glosas-criticas")
 def yo_glosas_criticas(
     db: Session = Depends(get_db),
