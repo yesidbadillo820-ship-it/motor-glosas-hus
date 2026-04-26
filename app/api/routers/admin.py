@@ -965,6 +965,75 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/audit-cambios-criticos")
+def admin_audit_cambios_criticos(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R341 P1: cambios audit en campos críticos.
+
+    Cuenta cambios en campos críticos (estado, eps,
+    valor_objetado, gestor_nombre) en los últimos N días.
+    Cambios manuales en estos campos son sensibles —
+    útil revisar quién los hace.
+
+    Por campo:
+      - count_cambios
+      - usuarios_distintos
+      - top_3_usuarios
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+
+    CAMPOS_CRITICOS = [
+        "estado", "eps", "valor_objetado", "gestor_nombre",
+        "auditor_email", "fecha_decision_eps",
+    ]
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.campo.in_(CAMPOS_CRITICOS))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for e in rows:
+        campo = e.campo
+        b = bucket.setdefault(campo, {
+            "count": 0, "usuarios": {},
+        })
+        b["count"] += 1
+        u = e.usuario_email or "?"
+        b["usuarios"][u] = b["usuarios"].get(u, 0) + 1
+
+    items = []
+    for campo, b in bucket.items():
+        top3 = sorted(
+            b["usuarios"].items(), key=lambda x: x[1], reverse=True,
+        )[:3]
+        items.append({
+            "campo": campo,
+            "count_cambios": b["count"],
+            "usuarios_distintos": len(b["usuarios"]),
+            "top_3_usuarios": [
+                {"usuario_email": u, "count": c}
+                for u, c in top3
+            ],
+        })
+    items.sort(key=lambda x: x["count_cambios"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "items": items,
+    }
+
+
 @router.get("/conciliaciones-bilateral-resumen")
 def admin_conciliaciones_bilateral_resumen(
     db: Session = Depends(get_db),
