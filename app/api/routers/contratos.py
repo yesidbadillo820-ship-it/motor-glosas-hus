@@ -82,6 +82,56 @@ def eps_sin_contrato(
     }
 
 
+@router.get("/exportar.csv")
+def exportar_contratos_csv(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R163 P1: export de TODOS los contratos a CSV.
+
+    Útil para auditoría externa, copias de seguridad fuera de
+    BD y análisis en Excel/Tableau.
+
+    StreamingResponse — no carga todo en memoria.
+
+    Columnas: eps, detalles.
+    """
+    import csv
+    import io
+    from datetime import datetime, timezone
+
+    from fastapi.responses import StreamingResponse
+
+    from app.models.db import ContratoRecord
+
+    contratos = (
+        db.query(ContratoRecord)
+        .order_by(ContratoRecord.eps.asc())
+        .all()
+    )
+
+    def _generar():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["eps", "detalles"])
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+
+        for c in contratos:
+            w.writerow([c.eps or "", (c.detalles or "")[:500]])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
+
+    fname = (
+        f"contratos-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    )
+    return StreamingResponse(
+        _generar(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/sin-glosas")
 def contratos_sin_glosas(
     db: Session = Depends(get_db),
