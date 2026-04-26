@@ -732,6 +732,64 @@ def info_version():
     }
 
 
+@router.get("/api-endpoints")
+def info_api_endpoints(
+    incluir_metodos: bool = True,
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R113 P2: lista todos los endpoints HTTP registrados en la app.
+
+    Útil para:
+      - Auditoría de superficie API: ¿qué endpoints existen?
+      - Generar clientes/SDKs automáticamente
+      - Comparar deploys: ¿qué endpoints se agregaron/quitaron?
+
+    Lee directamente de FastAPI app.routes — refleja el estado
+    real, no documentación que puede desactualizarse.
+
+    Devuelve:
+      - total_endpoints
+      - por_tag: {tag: count}
+      - items: [{path, methods, name, tags}]
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from fastapi.routing import APIRoute
+
+    from app.main import app
+
+    items = []
+    por_tag: dict[str, int] = {}
+
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        # Excluir endpoints internos como /openapi.json
+        if route.path.startswith("/_") or route.path == "/openapi.json":
+            continue
+        tags = list(route.tags) if route.tags else ["sin_tag"]
+        for t in tags:
+            por_tag[t] = por_tag.get(t, 0) + 1
+
+        item = {
+            "path": route.path,
+            "name": route.name,
+            "tags": tags,
+        }
+        if incluir_metodos:
+            item["methods"] = sorted(route.methods or [])
+        items.append(item)
+
+    items.sort(key=lambda x: x["path"])
+
+    return {
+        "total_endpoints": len(items),
+        "por_tag": dict(sorted(por_tag.items(), key=lambda x: x[1],
+                               reverse=True)),
+        "items": items,
+    }
+
+
 @router.get("/limites")
 def info_limites(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
