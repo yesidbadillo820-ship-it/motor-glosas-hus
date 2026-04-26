@@ -574,6 +574,79 @@ def admin_diagnostico_bd(
     }
 
 
+@router.get("/actividad-reciente")
+def admin_actividad_reciente(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R110 P2: últimos N eventos del sistema (audit log + IA).
+
+    Vista "live" de qué está pasando ahora mismo en el sistema.
+    Combina:
+      - Audit log (acciones de usuarios)
+      - AI calls recientes (usos de modelos IA)
+
+    Útil para el coordinador en stand-up daily o para soporte
+    investigando incidentes "¿qué pasó hace 5 minutos?".
+
+    Devuelve eventos ordenados DESC por timestamp con tipo
+    discriminado: AUDIT vs AI_CALL.
+    """
+    from app.models.db import AICallRecord, AuditLogRecord
+
+    audit_eventos = (
+        db.query(AuditLogRecord)
+        .order_by(AuditLogRecord.timestamp.desc())
+        .limit(int(limit))
+        .all()
+    )
+    ia_eventos = (
+        db.query(AICallRecord)
+        .order_by(AICallRecord.creado_en.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for e in audit_eventos:
+        items.append({
+            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "tipo": "AUDIT",
+            "usuario": e.usuario_email,
+            "descripcion": (
+                f"{e.accion or '?'} en {e.tabla or '?'}"
+                + (f" (id={e.registro_id})" if e.registro_id else "")
+            ),
+            "id_evento": e.id,
+        })
+    for e in ia_eventos:
+        items.append({
+            "timestamp": (
+                e.creado_en.isoformat() if e.creado_en else None
+            ),
+            "tipo": "AI_CALL",
+            "usuario": getattr(e, "usuario_email", None),
+            "descripcion": (
+                f"{getattr(e, 'modelo', '?')} "
+                f"({getattr(e, 'tipo_operacion', '?')})"
+            ),
+            "id_evento": e.id,
+        })
+
+    # Mezclar y reordenar DESC por timestamp
+    items.sort(
+        key=lambda x: x["timestamp"] or "",
+        reverse=True,
+    )
+
+    return {
+        "limit": int(limit),
+        "total_devueltos": len(items[:limit]),
+        "items": items[:limit],
+    }
+
+
 @router.get("/usuarios-inactivos")
 def admin_usuarios_inactivos(
     dias: int = 60,
