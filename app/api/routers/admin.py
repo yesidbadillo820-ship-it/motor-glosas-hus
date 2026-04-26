@@ -740,6 +740,102 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/incidentes-criticos")
+def admin_incidentes_criticos(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R162 P1: incidentes críticos del sistema en tiempo real.
+
+    Diferente a /admin/alertas-inteligentes (alertas tácticas
+    de operación): aquí solo CRÍTICAS de tiempo real que
+    requieren atención inmediata.
+
+    Reglas:
+      1. Glosas vencidas hace >60 días (riesgo regulatorio)
+      2. Conciliaciones con audiencia atrasada
+      3. Plantillas Gold con 0% éxito en últimos 30d (algo malo)
+
+    Pensado para alimentar pantalla NOC / Slack canal #incidentes.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        ConciliacionRecord, GlosaRecord, PlantillaGoldRecord,
+    )
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ahora = ahora_utc()
+    incidentes = []
+
+    # 1. Glosas muy vencidas (>60d)
+    muy_vencidas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < -60)
+        .count()
+    )
+    if muy_vencidas:
+        incidentes.append({
+            "tipo": "GLOSAS_MUY_VENCIDAS",
+            "severidad": "CRITICAL",
+            "count": muy_vencidas,
+            "descripcion": (
+                f"{muy_vencidas} glosas vencidas hace más de 60 días — "
+                "riesgo regulatorio"
+            ),
+        })
+
+    # 2. Conciliaciones con audiencia atrasada
+    audiencias_atrasadas = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.fecha_audiencia.isnot(None))
+        .filter(ConciliacionRecord.fecha_audiencia < ahora)
+        .filter(ConciliacionRecord.estado_bilateral != "CERRADA")
+        .filter(ConciliacionRecord.estado_bilateral != "ACTA_FIRMADA")
+        .count()
+    )
+    if audiencias_atrasadas:
+        incidentes.append({
+            "tipo": "AUDIENCIAS_ATRASADAS",
+            "severidad": "WARNING",
+            "count": audiencias_atrasadas,
+            "descripcion": (
+                f"{audiencias_atrasadas} audiencias bilaterales pasadas "
+                "sin acta firmada"
+            ),
+        })
+
+    # 3. Plantillas Gold con muchos usos pero valor_recuperado=0
+    plantillas_malas = (
+        db.query(PlantillaGoldRecord)
+        .filter(PlantillaGoldRecord.activa == 1)
+        .filter(PlantillaGoldRecord.usos >= 5)
+        .filter((PlantillaGoldRecord.valor_recuperado == 0) |
+                (PlantillaGoldRecord.valor_recuperado.is_(None)))
+        .count()
+    )
+    if plantillas_malas:
+        incidentes.append({
+            "tipo": "PLANTILLAS_GOLD_INEFECTIVAS",
+            "severidad": "WARNING",
+            "count": plantillas_malas,
+            "descripcion": (
+                f"{plantillas_malas} plantillas Gold con 5+ usos pero "
+                "$0 recuperado — revisar o desactivar"
+            ),
+        })
+
+    return {
+        "evaluado_en": ahora.isoformat(),
+        "total_incidentes": len(incidentes),
+        "items": incidentes,
+    }
+
+
 @router.get("/historial-reasignaciones")
 def admin_historial_reasignaciones(
     dias: int = 30,
