@@ -713,6 +713,54 @@ def estados_disponibles(
     }
 
 
+@router.get("/factura-detalle")
+def factura_detalle(
+    factura: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R204 P1: detalle de TODAS las glosas asociadas a una factura.
+
+    Útil para: "esta factura tiene 8 glosas distintas, agruparlas
+    para dar respuesta unificada".
+
+    Diferente a /buscar-radicado (por radicado) y a
+    /stats/facturas-hot (top facturas con muchas glosas):
+    aquí drill-down a UNA factura específica.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura == factura)
+        .order_by(GlosaRecord.creado_en.asc())
+        .all()
+    )
+
+    valor_obj = sum(float(g.valor_objetado or 0) for g in glosas)
+    valor_rec = sum(float(g.valor_recuperado or 0) for g in glosas)
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "eps": g.eps,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "valor_recuperado": float(g.valor_recuperado or 0),
+        })
+
+    return {
+        "factura_buscada": factura,
+        "total_glosas": len(glosas),
+        "valor_objetado_total": int(valor_obj),
+        "valor_recuperado_total": int(valor_rec),
+        "items": items,
+    }
+
+
 @router.get("/buscar-radicado")
 def buscar_por_radicado(
     radicado: str = Query(..., min_length=1),
