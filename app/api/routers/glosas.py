@@ -5908,6 +5908,62 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/cargabilidad-equipo")
+def stats_cargabilidad_equipo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R223 P1: cargabilidad agregada del equipo.
+
+    Diferente a /admin/stats-asignacion (counts globales) y
+    /admin/usuarios-mas-cargados (top): aquí distribución por
+    rangos de carga.
+
+    Categoriza gestores por carga abierta:
+      - 1-5: ligera
+      - 6-15: media
+      - 16-30: alta
+      - >30: sobrecarga
+
+    Útil para vista del coordinador: "¿hay sobrecarga?"
+    """
+    from sqlalchemy import func as _f
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    rows = (
+        db.query(
+            GlosaRecord.gestor_nombre,
+            _f.count().label("n"),
+        )
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .group_by(GlosaRecord.gestor_nombre)
+        .all()
+    )
+
+    bandas = {
+        "ligera_1a5": 0,
+        "media_6a15": 0,
+        "alta_16a30": 0,
+        "sobrecarga_mas_30": 0,
+    }
+    for _, n in rows:
+        if n <= 5:
+            bandas["ligera_1a5"] += 1
+        elif n <= 15:
+            bandas["media_6a15"] += 1
+        elif n <= 30:
+            bandas["alta_16a30"] += 1
+        else:
+            bandas["sobrecarga_mas_30"] += 1
+
+    return {
+        "total_gestores_con_carga": len(rows),
+        "bandas": bandas,
+    }
+
+
 @router.get("/stats/dictamen-calidad-distribucion")
 def stats_dictamen_calidad_distribucion(
     db: Session = Depends(get_db),
