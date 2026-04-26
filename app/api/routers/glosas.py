@@ -6273,6 +6273,77 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/aging-cartera-saldo")
+def stats_aging_cartera_saldo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R267 P1: aging report basado en `saldo_factura`.
+
+    Diferente a /stats/aging-glosas (basado en valor_objetado):
+    aquí usamos `saldo_factura`, el saldo real pendiente
+    según el módulo de cartera del DGH.
+
+    Buckets (días desde creado_en):
+      0-30, 31-60, 61-90, 91-180, >180
+
+    Solo glosas no-cerradas. Devuelve count y saldo por
+    bucket, con totales globales.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    BUCKETS = [
+        ("0-30",   0,    30),
+        ("31-60",  31,   60),
+        ("61-90",  61,   90),
+        ("91-180", 91,   180),
+        (">180",   181,  None),
+    ]
+
+    ahora = ahora_utc()
+    bandas: dict[str, dict] = {
+        nombre: {"count": 0, "saldo": 0.0}
+        for nombre, _, _ in BUCKETS
+    }
+
+    for g in abiertas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        antig = (ahora - cre).days
+        saldo = float(g.saldo_factura or 0)
+        for nombre, lo, hi in BUCKETS:
+            if antig >= lo and (hi is None or antig <= hi):
+                bandas[nombre]["count"] += 1
+                bandas[nombre]["saldo"] += saldo
+                break
+
+    items = []
+    for nombre, _, _ in BUCKETS:
+        b = bandas[nombre]
+        items.append({
+            "rango_dias": nombre,
+            "count": b["count"],
+            "saldo": int(b["saldo"]),
+        })
+
+    return {
+        "total_count": sum(it["count"] for it in items),
+        "total_saldo": sum(it["saldo"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/stats/cartera-por-eps")
 def stats_cartera_por_eps(
     solo_abiertas: bool = Query(True),
