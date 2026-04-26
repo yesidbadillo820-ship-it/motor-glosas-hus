@@ -5908,6 +5908,98 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/tiempo-primer-dictamen")
+def stats_tiempo_primer_dictamen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R226 P1: tiempo promedio entre creación y primer dictamen.
+
+    Mide la velocidad del flujo HUS: ¿cuánto tarda el equipo en
+    redactar el primer dictamen tras radicar la glosa?
+
+    Por glosa con DictamenVersionRecord:
+      tiempo = MIN(version.creado_en) - glosa.creado_en
+
+    Devuelve:
+      - count_glosas_evaluadas
+      - tiempo_promedio_horas
+      - tiempo_mediano_horas
+      - tiempo_max_horas
+    """
+    from datetime import timezone
+
+    from sqlalchemy import func as _f
+
+    from app.models.db import DictamenVersionRecord
+
+    rows = (
+        db.query(
+            DictamenVersionRecord.glosa_id,
+            _f.min(DictamenVersionRecord.creado_en).label("primera"),
+        )
+        .filter(DictamenVersionRecord.glosa_id.isnot(None))
+        .group_by(DictamenVersionRecord.glosa_id)
+        .all()
+    )
+
+    if not rows:
+        return {
+            "count_glosas_evaluadas": 0,
+            "tiempo_promedio_horas": 0.0,
+            "tiempo_mediano_horas": 0.0,
+            "tiempo_max_horas": 0.0,
+        }
+
+    glosa_ids = [r[0] for r in rows]
+    glosas_dict = {
+        g.id: g for g in (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.id.in_(glosa_ids))
+            .all()
+        )
+    }
+
+    horas: list[float] = []
+    for glosa_id, primera in rows:
+        g = glosas_dict.get(glosa_id)
+        if not g or not g.creado_en or not primera:
+            continue
+        cre = g.creado_en
+        if cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        prim = primera
+        if prim.tzinfo is None:
+            prim = prim.replace(tzinfo=timezone.utc)
+        h = (prim - cre).total_seconds() / 3600
+        if h < 0:
+            continue
+        horas.append(h)
+
+    horas.sort()
+    n = len(horas)
+    if n == 0:
+        return {
+            "count_glosas_evaluadas": 0,
+            "tiempo_promedio_horas": 0.0,
+            "tiempo_mediano_horas": 0.0,
+            "tiempo_max_horas": 0.0,
+        }
+
+    promedio = sum(horas) / n
+    if n % 2 == 0:
+        mediano = (horas[n // 2 - 1] + horas[n // 2]) / 2
+    else:
+        mediano = horas[n // 2]
+
+    return {
+        "count_glosas_evaluadas": n,
+        "tiempo_promedio_horas": round(promedio, 2),
+        "tiempo_mediano_horas": round(mediano, 2),
+        "tiempo_max_horas": round(max(horas), 2),
+    }
+
+
 @router.get("/stats/dashboard-completo")
 def stats_dashboard_completo(
     db: Session = Depends(get_db),
