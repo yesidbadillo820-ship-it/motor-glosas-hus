@@ -6273,6 +6273,53 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/vencen-en-dias")
+def stats_vencen_en_dias(
+    dias: int = Query(7, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R342 P1: lista detallada de glosas que vencen en N días.
+
+    Diferente a /stats/proyeccion-vencimiento (histograma):
+    aquí lista detallada de glosas con
+    0 <= dias_restantes <= N. Útil para acción operativa
+    inmediata.
+
+    Ordena ASC por dias_restantes.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes >= 0)
+        .filter(GlosaRecord.dias_restantes <= int(dias))
+        .order_by(GlosaRecord.dias_restantes.asc())
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dias_restantes": g.dias_restantes,
+            "gestor_nombre": g.gestor_nombre,
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total_proximos_a_vencer": len(items),
+        "valor_total": sum(it["valor_objetado"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/stats/conciliaciones-top-monto")
 def stats_conciliaciones_top_monto(
     limit: int = Query(20, ge=1, le=100),
