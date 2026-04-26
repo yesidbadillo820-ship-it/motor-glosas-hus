@@ -6000,6 +6000,70 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/anomalias-valor")
+def stats_anomalias_valor(
+    factor_z: float = Query(2.0, ge=1.0, le=5.0),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R233 P1: glosas con valor anómalo dentro de su cohorte.
+
+    Para cada (eps, codigo_glosa), calcula media + desviación
+    estándar y detecta glosas cuyo valor está más allá de
+    `factor_z` desviaciones (z-score>=factor_z).
+
+    Diferente a /stats/anomalias (IQR global): aquí cohorte y
+    z-score paramétricos.
+
+    Útil para detectar:
+      - Errores de captura ($1B en lugar de $1M)
+      - Casos extraordinarios que requieren review
+
+    Devuelve glosas anómalas con el motivo (z-score).
+    """
+    glosas = db.query(GlosaRecord).all()
+
+    # Agrupar por (eps, codigo_glosa)
+    cohortes: dict[tuple[str, str], list] = {}
+    for g in glosas:
+        if not g.eps or not g.codigo_glosa:
+            continue
+        v = float(g.valor_objetado or 0)
+        if v <= 0:
+            continue
+        key = (g.eps, g.codigo_glosa)
+        cohortes.setdefault(key, []).append((g, v))
+
+    items = []
+    for key, glosas_cohorte in cohortes.items():
+        if len(glosas_cohorte) < 5:
+            continue
+        valores = [v for _, v in glosas_cohorte]
+        mean = sum(valores) / len(valores)
+        var = sum((v - mean) ** 2 for v in valores) / len(valores)
+        std = var ** 0.5
+        if std == 0:
+            continue
+        for g, v in glosas_cohorte:
+            z = (v - mean) / std
+            if abs(z) >= factor_z:
+                items.append({
+                    "glosa_id": g.id,
+                    "eps": g.eps,
+                    "codigo_glosa": g.codigo_glosa,
+                    "valor_objetado": v,
+                    "z_score": round(z, 2),
+                    "promedio_cohorte": round(mean, 2),
+                })
+    items.sort(key=lambda x: abs(x["z_score"]), reverse=True)
+
+    return {
+        "factor_z_filtro": float(factor_z),
+        "total_anomalias": len(items),
+        "items": items[:50],
+    }
+
+
 @router.get("/stats/tasa-levantamiento-mensual")
 def stats_tasa_levantamiento_mensual(
     meses: int = Query(12, ge=1, le=36),
