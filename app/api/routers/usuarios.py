@@ -406,6 +406,69 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/stats-trimestre")
+def yo_stats_trimestre(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R365 P1: stats personales del trimestre en curso.
+
+    Para el usuario actual, métricas del trimestre actual:
+      - decididas
+      - levantadas
+      - tasa_levantamiento_pct
+      - valor_recuperado_total
+      - dias_activos (días con al menos una decisión)
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    trim = (ahora.month - 1) // 3 + 1
+    inicio_trim = ahora.replace(
+        month=(trim - 1) * 3 + 1, day=1,
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_trim)
+        .all()
+    )
+
+    n_dec = len(rows)
+    n_lev = sum(
+        1 for g in rows if (g.estado or "").upper() == "LEVANTADA"
+    )
+    rec = sum(float(g.valor_recuperado or 0) for g in rows)
+    dias = set()
+    for g in rows:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if f:
+            dias.add(f.date())
+
+    tasa = round(100 * n_lev / n_dec, 2) if n_dec else 0.0
+
+    return {
+        "usuario_email": current_user.email,
+        "trimestre": f"{ahora.year}-Q{trim}",
+        "decididas": n_dec,
+        "levantadas": n_lev,
+        "tasa_levantamiento_pct": tasa,
+        "valor_recuperado_total": int(rec),
+        "dias_activos": len(dias),
+    }
+
+
 @router.get("/yo/tendencia-personal")
 def yo_tendencia_personal(
     db: Session = Depends(get_db),
