@@ -1174,6 +1174,97 @@ def cumplimiento_resolucion(
     }
 
 
+@router.get("/health-completo")
+def info_health_completo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R190 P1: health check holístico del sistema.
+
+    Combina /salud + /health-score + alertas críticas + counts
+    en un solo endpoint, para una vista unificada de "estado
+    actual" del sistema.
+
+    Útil para:
+      - Pantalla NOC del coordinador
+      - Endpoint que monitor externo (UptimeRobot, Grafana)
+        puede consultar
+      - Reporte mensual de disponibilidad
+
+    Solo COORDINADOR/ADMIN.
+    """
+    import os
+
+    from sqlalchemy import func as _f, text as _text
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    # 1. BD viva
+    bd_ok = True
+    try:
+        db.execute(_text("SELECT 1")).fetchone()
+    except Exception:
+        bd_ok = False
+
+    # 2. IA configurada
+    ia_ok = bool(
+        os.getenv("ANTHROPIC_API_KEY") or os.getenv("GROQ_API_KEY")
+    )
+
+    # 3. Schedulers
+    sched_ok = 0
+    try:
+        from app.services.ia_auditora_proactiva import _task as t1
+        if t1 and not t1.done():
+            sched_ok += 1
+    except Exception:
+        pass
+    try:
+        from app.services.mantenimiento_scheduler import _task as t2
+        if t2 and not t2.done():
+            sched_ok += 1
+    except Exception:
+        pass
+
+    # 4. Estado operacional
+    total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
+    abiertas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    vencidas_graves = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < -30)
+        .scalar() or 0
+    )
+
+    estado_global = "OK"
+    if not bd_ok:
+        estado_global = "FAIL"
+    elif vencidas_graves > 20 or sched_ok < 1:
+        estado_global = "DEGRADED"
+
+    return {
+        "evaluado_en": ahora_utc().isoformat(),
+        "estado_global": estado_global,
+        "componentes": {
+            "bd_responsiva": bd_ok,
+            "ia_configurada": ia_ok,
+            "schedulers_activos": sched_ok,
+        },
+        "operacion": {
+            "total_glosas": int(total_glosas),
+            "abiertas": int(abiertas),
+            "vencidas_graves": int(vencidas_graves),
+        },
+    }
+
+
 @router.get("/health-score")
 def info_health_score(
     db: Session = Depends(get_db),
