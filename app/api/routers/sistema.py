@@ -844,6 +844,81 @@ def info_limites(
     }
 
 
+@router.get("/metricas-ia/budget")
+def metricas_ia_budget(
+    presupuesto_mensual_usd: float = 100.0,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R125 P2: estado del presupuesto IA del mes en curso.
+
+    Útil para alertas tempranas:
+      "Vamos $80 de $100 — 80% del budget consumido al día 20.
+       Proyección fin de mes: $123 → SOBRE PRESUPUESTO."
+
+    Param: presupuesto_mensual_usd (cap configurable).
+
+    Devuelve:
+      - presupuesto_mensual_usd
+      - gastado_usd_acumulado_mes
+      - dias_transcurridos_mes / dias_totales_mes
+      - proyeccion_fin_de_mes_usd (lineal)
+      - alerta: GREEN | YELLOW | RED
+      - pct_consumido / pct_proyectado
+    """
+    from datetime import datetime, timezone
+    from calendar import monthrange
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICallRecord
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    dias_mes_total = monthrange(ahora.year, ahora.month)[1]
+    dias_transcurridos = max(1, ahora.day)
+
+    rows = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.creado_en >= inicio_mes)
+        .all()
+    )
+    gastado = sum(float(r.cost_usd or 0) for r in rows)
+
+    # Proyección lineal
+    proyeccion = gastado * (dias_mes_total / dias_transcurridos)
+
+    pct_consumido = (
+        round(100 * gastado / presupuesto_mensual_usd, 2)
+        if presupuesto_mensual_usd else 0.0
+    )
+    pct_proyectado = (
+        round(100 * proyeccion / presupuesto_mensual_usd, 2)
+        if presupuesto_mensual_usd else 0.0
+    )
+
+    if pct_proyectado >= 100:
+        alerta = "RED"
+    elif pct_proyectado >= 80:
+        alerta = "YELLOW"
+    else:
+        alerta = "GREEN"
+
+    return {
+        "presupuesto_mensual_usd": float(presupuesto_mensual_usd),
+        "gastado_usd_acumulado_mes": round(gastado, 4),
+        "calls_acumuladas_mes": len(rows),
+        "dias_transcurridos_mes": dias_transcurridos,
+        "dias_totales_mes": dias_mes_total,
+        "proyeccion_fin_de_mes_usd": round(proyeccion, 4),
+        "pct_consumido": pct_consumido,
+        "pct_proyectado": pct_proyectado,
+        "alerta": alerta,
+        "mes_actual": ahora.strftime("%Y-%m"),
+    }
+
+
 @router.get("/metricas-ia/por-modelo")
 def metricas_ia_por_modelo(
     dias: int = 30,
