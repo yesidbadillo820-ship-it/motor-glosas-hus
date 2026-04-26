@@ -4381,6 +4381,108 @@ def contexto_completo_glosa(
     }
 
 
+@router.get("/{glosa_id}/exportar-evidencia.zip")
+def exportar_evidencia_zip(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R108 P1: paquete ZIP completo de evidencia para una glosa.
+
+    Complementa /paquete-evidencia.json (solo datos) con un ZIP
+    multi-archivo listo para entregar a legal/compliance:
+
+      glosa.json      — todos los datos de la glosa
+      dictamen.txt    — texto plano del dictamen
+      audit_log.json  — eventos de auditoría asociados
+      README.txt      — explicación del contenido
+
+    StreamingResponse con el ZIP en memoria (suficiente para
+    glosas individuales — el límite es ~10MB típicamente).
+    """
+    import io
+    import json
+    import zipfile
+
+    from fastapi.responses import StreamingResponse
+
+    from app.models.db import AuditLogRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    # Datos de la glosa (campos públicos)
+    glosa_dict = {
+        "id": glosa.id,
+        "creado_en": glosa.creado_en.isoformat() if glosa.creado_en else None,
+        "eps": glosa.eps,
+        "paciente": glosa.paciente,
+        "factura": glosa.factura,
+        "codigo_glosa": glosa.codigo_glosa,
+        "valor_objetado": float(glosa.valor_objetado or 0),
+        "valor_recuperado": float(glosa.valor_recuperado or 0),
+        "etapa": glosa.etapa,
+        "estado": glosa.estado,
+        "decision_eps": glosa.decision_eps,
+        "gestor_nombre": glosa.gestor_nombre,
+        "auditor_email": glosa.auditor_email,
+        "fecha_vencimiento": (
+            glosa.fecha_vencimiento.isoformat()
+            if glosa.fecha_vencimiento else None
+        ),
+    }
+
+    # Audit log
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.registro_id == glosa_id)
+        .order_by(AuditLogRecord.timestamp.asc())
+        .all()
+    )
+    audit_list = [
+        {
+            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "usuario_email": e.usuario_email,
+            "accion": e.accion,
+            "campo": e.campo,
+            "valor_anterior": e.valor_anterior,
+            "valor_nuevo": e.valor_nuevo,
+        }
+        for e in eventos
+    ]
+
+    readme = (
+        f"PAQUETE DE EVIDENCIA — GLOSA #{glosa_id}\n"
+        f"Generado: {ahora_utc().isoformat()}\n"
+        f"Generado por: {current_user.email}\n\n"
+        "Contenido:\n"
+        "  - glosa.json: datos estructurados completos\n"
+        "  - dictamen.txt: texto del dictamen HUS (si existe)\n"
+        "  - audit_log.json: histórico de eventos sobre esta glosa\n"
+    )
+
+    # Construir ZIP en memoria
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("README.txt", readme)
+        zf.writestr("glosa.json",
+                    json.dumps(glosa_dict, ensure_ascii=False, indent=2))
+        zf.writestr("audit_log.json",
+                    json.dumps(audit_list, ensure_ascii=False, indent=2))
+        if glosa.dictamen:
+            zf.writestr("dictamen.txt", glosa.dictamen)
+
+    buf.seek(0)
+    fname = f"evidencia-glosa-{glosa_id}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/{glosa_id}/duplicados-potenciales")
 def duplicados_potenciales_glosa(
     glosa_id: int,
