@@ -7275,6 +7275,63 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/comentarios-resumen")
+def comentarios_resumen(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R161 P1: resumen de comentarios de una glosa específica.
+
+    Diferente a /glosas/{id}/comentarios/ (lista completa con
+    todos los textos): aquí solo agregados rápidos:
+      - cuántos comentarios
+      - cuántas menciones pendientes
+      - autores distintos
+      - último comentario
+
+    Útil para mostrar un badge en la card de la glosa.
+    """
+    from datetime import timezone
+
+    from app.models.db import ComentarioGlosaRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    coms = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.glosa_id == glosa_id)
+        .order_by(ComentarioGlosaRecord.creado_en.desc())
+        .all()
+    )
+
+    autores: set[str] = set()
+    menciones_pendientes = 0
+    for c in coms:
+        if c.autor_email:
+            autores.add(c.autor_email)
+        if c.mencion and not c.resuelto:
+            menciones_pendientes += 1
+
+    ultimo = None
+    if coms:
+        ts = coms[0].creado_en
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts:
+            ultimo = ts.isoformat()
+
+    return {
+        "glosa_id": glosa_id,
+        "total_comentarios": len(coms),
+        "autores_distintos": sorted(autores),
+        "menciones_pendientes": menciones_pendientes,
+        "ultimo_comentario_en": ultimo,
+    }
+
+
 @router.get("/{glosa_id}/conceptos-resumen")
 def conceptos_resumen(
     glosa_id: int,
