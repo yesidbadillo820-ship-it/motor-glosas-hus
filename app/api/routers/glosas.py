@@ -2077,6 +2077,99 @@ def stats_por_eps(
     }
 
 
+@router.get("/stats/por-tipo")
+def stats_por_tipo_glosa(
+    dias: int = Query(90, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R68 P3: distribución por tipo de glosa (prefijo Res. 2284/2023).
+
+    Resolución 2284 de 2023 (Manual Único de Glosas) clasifica con
+    prefijos:
+      TA  Tarifas
+      SO  Soportes
+      AU  Autorización
+      CO  Cobertura
+      CL  Pertinencia clínica
+      PE  Pertinencia
+      FA  Facturación
+      SE  Servicios
+      IN  Insumos
+      ME  Medicamentos
+      EX  Extemporánea / proceso
+
+    Útil para identificar dónde tenemos brechas:
+      - Mucho SO → deficiente entrega de soportes operativos
+      - Mucho TA → desfase con tarifas pactadas
+      - Mucho AU → fallas en autorización previa
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    descripciones = {
+        "TA": "Tarifas",
+        "SO": "Soportes",
+        "AU": "Autorización",
+        "CO": "Cobertura",
+        "CL": "Pertinencia clínica",
+        "PE": "Pertinencia",
+        "FA": "Facturación",
+        "SE": "Servicios",
+        "IN": "Insumos",
+        "ME": "Medicamentos",
+        "EX": "Extemporánea / proceso",
+    }
+
+    rows = (
+        db.query(
+            GlosaRecord.codigo_glosa,
+            _f.count(GlosaRecord.id),
+            _f.sum(GlosaRecord.valor_objetado),
+        )
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .group_by(GlosaRecord.codigo_glosa)
+        .all()
+    )
+
+    # Agrupar por prefijo
+    por_prefijo = {}
+    for codigo, count, valor in rows:
+        prefijo = (codigo or "??")[:2].upper()
+        d = por_prefijo.setdefault(
+            prefijo,
+            {"count": 0, "valor_objetado": 0.0, "codigos_unicos": set()},
+        )
+        d["count"] += count
+        d["valor_objetado"] += float(valor or 0)
+        d["codigos_unicos"].add(codigo)
+
+    items = []
+    total_count = sum(d["count"] for d in por_prefijo.values()) or 0
+    for prefijo, d in por_prefijo.items():
+        items.append({
+            "prefijo": prefijo,
+            "tipo": descripciones.get(prefijo, "Otro"),
+            "count": d["count"],
+            "valor_objetado": d["valor_objetado"],
+            "codigos_distintos": len(d["codigos_unicos"]),
+            "porcentaje": round(d["count"] / total_count * 100, 1) if total_count else 0,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "ventana_dias": dias,
+        "total": total_count,
+        "items": items,
+    }
+
+
 @router.get("/{glosa_id}/timeline")
 def timeline_glosa(
     glosa_id: int,
