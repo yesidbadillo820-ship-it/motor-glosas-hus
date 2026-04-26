@@ -406,6 +406,94 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/streak")
+def yo_streak(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R270 P1: racha (streak) de días consecutivos con
+    al menos una glosa cerrada por el usuario.
+
+    Métrica de gamificación para auto-motivación.
+    Calcula:
+      - streak_actual: días consecutivos hasta hoy
+      - mejor_streak: mejor racha histórica
+      - dias_con_actividad_total
+      - ultima_decision_en
+
+    Una decisión cuenta cuando estado pasó a LEVANTADA,
+    ACEPTADA, RATIFICADA o ARCHIVADA y `fecha_decision_eps`
+    está poblada.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    nombre = current_user.nombre or current_user.email
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .all()
+    )
+
+    dias_set: set = set()
+    ultima = None
+    for g in glosas:
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not dec:
+            continue
+        dias_set.add(dec.date())
+        if ultima is None or dec > ultima:
+            ultima = dec
+
+    if not dias_set:
+        return {
+            "usuario_email": current_user.email,
+            "streak_actual": 0,
+            "mejor_streak": 0,
+            "dias_con_actividad_total": 0,
+            "ultima_decision_en": None,
+        }
+
+    dias_ordenados = sorted(dias_set)
+    hoy = ahora_utc().date()
+
+    streak_actual = 0
+    cursor = hoy
+    while cursor in dias_set:
+        streak_actual += 1
+        cursor -= timedelta(days=1)
+    if streak_actual == 0 and (hoy - timedelta(days=1)) in dias_set:
+        cursor = hoy - timedelta(days=1)
+        while cursor in dias_set:
+            streak_actual += 1
+            cursor -= timedelta(days=1)
+
+    mejor = 1
+    actual_run = 1
+    for i in range(1, len(dias_ordenados)):
+        if (dias_ordenados[i] - dias_ordenados[i - 1]).days == 1:
+            actual_run += 1
+            mejor = max(mejor, actual_run)
+        else:
+            actual_run = 1
+
+    return {
+        "usuario_email": current_user.email,
+        "streak_actual": streak_actual,
+        "mejor_streak": mejor,
+        "dias_con_actividad_total": len(dias_set),
+        "ultima_decision_en": ultima.isoformat() if ultima else None,
+    }
+
+
 @router.get("/yo/dashboard")
 def dashboard_personal(
     db: Session = Depends(get_db),
