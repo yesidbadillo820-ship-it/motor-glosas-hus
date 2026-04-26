@@ -1963,6 +1963,92 @@ def actualizar_estado(
     return {"message": "Estado actualizado", "glosa": glosa}
 
 
+@router.get("/exportar-resumen-eps.csv")
+def exportar_resumen_eps_csv(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R236 P1: export CSV con resumen agregado por EPS.
+
+    Una fila por EPS con columnas:
+      eps, total_glosas, abiertas, cerradas, levantadas,
+      valor_objetado, valor_recuperado, tasa_levantamiento_pct
+
+    Útil para reporting en Excel/Tableau.
+
+    StreamingResponse para no cargar todo en memoria.
+    """
+    import csv
+    import io
+    from datetime import datetime, timezone
+
+    from fastapi.responses import StreamingResponse
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {
+                "total": 0, "abiertas": 0, "cerradas": 0,
+                "decididas": 0, "levantadas": 0,
+                "obj": 0.0, "rec": 0.0,
+            }
+        b = por_eps[eps]
+        b["total"] += 1
+        b["obj"] += float(g.valor_objetado or 0)
+        b["rec"] += float(g.valor_recuperado or 0)
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_CERRADOS:
+            b["cerradas"] += 1
+            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+                b["decididas"] += 1
+                if estado == "LEVANTADA":
+                    b["levantadas"] += 1
+        else:
+            b["abiertas"] += 1
+
+    def _generar():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow([
+            "eps", "total_glosas", "abiertas", "cerradas",
+            "levantadas", "valor_objetado", "valor_recuperado",
+            "tasa_levantamiento_pct",
+        ])
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+
+        for eps, b in sorted(por_eps.items()):
+            tasa = (
+                round(100 * b["levantadas"] / b["decididas"], 2)
+                if b["decididas"] else 0.0
+            )
+            w.writerow([
+                eps, b["total"], b["abiertas"], b["cerradas"],
+                b["levantadas"], int(b["obj"]), int(b["rec"]),
+                tasa,
+            ])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
+
+    fname = (
+        f"resumen-eps-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    )
+    return StreamingResponse(
+        _generar(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{fname}"',
+        },
+    )
+
+
 @router.get("/exportar-paquete-multi.zip")
 def exportar_paquete_multi_zip(
     ids: str = Query(..., description="IDs CSV, ej '1,2,3'"),
