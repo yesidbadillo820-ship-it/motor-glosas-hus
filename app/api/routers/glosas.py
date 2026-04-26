@@ -6273,6 +6273,65 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/auditor-emails-distribucion")
+def stats_auditor_emails_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R327 P1: distribución por `auditor_email`.
+
+    Diferente a gestor_nombre (campo libre del Excel):
+    auditor_email es el email del usuario asignado en la
+    plataforma. Ambos campos pueden coexistir; este
+    endpoint usa solo auditor_email.
+
+    Solo coordinador/admin (datos sensibles). Por
+    auditor_email: total, abiertas, decididas,
+    valor_objetado_total.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.auditor_email.isnot(None))
+        .filter(GlosaRecord.auditor_email != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        email = (g.auditor_email or "").strip()
+        if not email:
+            continue
+        b = bucket.setdefault(email, {
+            "total": 0, "abiertas": 0, "decididas": 0, "valor": 0.0,
+        })
+        b["total"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        estado = (g.estado or "").upper()
+        if estado not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+        if estado in ESTADOS_DECIDIDOS:
+            b["decididas"] += 1
+
+    items = []
+    for email, b in bucket.items():
+        items.append({
+            "auditor_email": email,
+            "total": b["total"],
+            "abiertas": b["abiertas"],
+            "decididas": b["decididas"],
+            "valor_objetado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["total"], reverse=True)
+
+    return {
+        "total_auditores": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/factura-resumen")
 def stats_factura_resumen(
     factura: str = Query(..., min_length=1),
