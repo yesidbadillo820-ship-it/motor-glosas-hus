@@ -965,6 +965,63 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/usuarios-actividad-resumen")
+def admin_usuarios_actividad_resumen(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R346 P1: por usuario, count agregado de actividad audit.
+
+    Por usuario_email, count de eventos audit_log en los
+    últimos N días con desglose por accion y por tabla.
+    Útil para auditoría: "¿quién está más activo?".
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.usuario_email.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for e in rows:
+        email = (e.usuario_email or "").strip()
+        if not email:
+            continue
+        b = bucket.setdefault(email, {
+            "count": 0, "acciones": {}, "tablas": {},
+        })
+        b["count"] += 1
+        a = (e.accion or "?").upper()
+        t = (e.tabla or "?").lower()
+        b["acciones"][a] = b["acciones"].get(a, 0) + 1
+        b["tablas"][t] = b["tablas"].get(t, 0) + 1
+
+    items = []
+    for email, b in bucket.items():
+        items.append({
+            "usuario_email": email,
+            "count_total": b["count"],
+            "acciones": b["acciones"],
+            "tablas": b["tablas"],
+        })
+    items.sort(key=lambda x: x["count_total"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_usuarios": len(items),
+        "items": items,
+    }
+
+
 @router.get("/asignaciones-recientes")
 def admin_asignaciones_recientes(
     dias: int = 7,
