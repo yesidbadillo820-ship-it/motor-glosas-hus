@@ -825,6 +825,92 @@ def admin_glosas_prioritarias(
     }
 
 
+@router.get("/timeline-equipo")
+def admin_timeline_equipo(
+    horas: int = 24,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R126 P1: timeline cronológico del equipo (últimas N horas).
+
+    Diferente a /admin/actividad-reciente (lista plana mezclada),
+    aquí se agrupan eventos por hora con desglose por usuario.
+
+    Útil para:
+      - Reconstruir lo que pasó en una ventana específica
+      - Ver patrones de actividad por hora del día
+      - Auditoría retroactiva
+
+    Devuelve serie por hora (orden ASC, hora-más-vieja primero):
+      [{"hora": "2026-04-26T10", "total_eventos": 12,
+        "por_usuario": {"alice@x": 8, "bob@x": 4},
+        "acciones_top": [{"accion": "UPDATE", "n": 7}, ...]}]
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    ahora = ahora_utc()
+    desde = ahora - timedelta(hours=int(horas))
+
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .all()
+    )
+
+    por_hora: dict[str, dict] = {}
+    for e in eventos:
+        ts = e.timestamp
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if not ts:
+            continue
+        # Bucket de hora: YYYY-MM-DDTHH
+        key = ts.strftime("%Y-%m-%dT%H")
+        if key not in por_hora:
+            por_hora[key] = {
+                "total": 0,
+                "por_usuario": {},
+                "por_accion": {},
+            }
+        b = por_hora[key]
+        b["total"] += 1
+        if e.usuario_email:
+            b["por_usuario"][e.usuario_email] = (
+                b["por_usuario"].get(e.usuario_email, 0) + 1
+            )
+        if e.accion:
+            b["por_accion"][e.accion] = (
+                b["por_accion"].get(e.accion, 0) + 1
+            )
+
+    serie = []
+    for k in sorted(por_hora.keys()):
+        b = por_hora[k]
+        acciones_top = sorted(
+            b["por_accion"].items(), key=lambda x: x[1], reverse=True,
+        )[:3]
+        serie.append({
+            "hora": k,
+            "total_eventos": b["total"],
+            "por_usuario": b["por_usuario"],
+            "acciones_top": [
+                {"accion": a, "n": n} for a, n in acciones_top
+            ],
+        })
+
+    return {
+        "ventana_horas": int(horas),
+        "total_eventos": len(eventos),
+        "horas_con_actividad": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/cierre-del-dia")
 def admin_cierre_del_dia(
     db: Session = Depends(get_db),
