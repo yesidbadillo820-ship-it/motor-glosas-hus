@@ -5174,6 +5174,93 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/cups-sin-tarifa")
+def stats_cups_sin_tarifa(
+    eps: str = Query(..., min_length=2),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R170 P1: CUPS objetados por una EPS pero SIN tarifa cargada.
+
+    Para una EPS específica, lista los CUPS que aparecen en
+    glosas TA* pero no tienen entrada en
+    TarifaContratadaRecord.
+
+    Útil para priorizar la carga de tarifas:
+      "Carguen primero los CUPS que SANITAS más nos objeta"
+
+    Ordenado DESC por frecuencia de aparición en glosas.
+
+    Param `eps`: nombre exacto de la EPS.
+    """
+    from app.models.db import (
+        ConceptoGlosaRecord, GlosaRecord, TarifaContratadaRecord,
+    )
+
+    # CUPS con tarifa cargada para esta EPS
+    cups_con_tarifa = {
+        t.codigo_cups for t in (
+            db.query(TarifaContratadaRecord)
+            .filter(TarifaContratadaRecord.eps == eps)
+            .filter(TarifaContratadaRecord.codigo_cups.isnot(None))
+            .all()
+        )
+    }
+
+    # Conceptos TA* de glosas de esta EPS
+    glosas_eps = (
+        db.query(GlosaRecord.id)
+        .filter(GlosaRecord.eps == eps)
+        .all()
+    )
+    glosa_ids = {g[0] for g in glosas_eps}
+
+    if not glosa_ids:
+        return {
+            "eps": eps,
+            "total_cups_sin_tarifa": 0,
+            "items": [],
+        }
+
+    conceptos = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.glosa_id.in_(glosa_ids))
+        .filter(ConceptoGlosaRecord.codigo_glosa.like("TA%"))
+        .filter(ConceptoGlosaRecord.cups_codigo.isnot(None))
+        .all()
+    )
+
+    por_cups: dict[str, dict] = {}
+    for c in conceptos:
+        if c.cups_codigo in cups_con_tarifa:
+            continue
+        cups = c.cups_codigo
+        if cups not in por_cups:
+            por_cups[cups] = {
+                "frecuencia": 0,
+                "valor": 0.0,
+                "descripcion": c.cups_descripcion or "",
+            }
+        por_cups[cups]["frecuencia"] += 1
+        por_cups[cups]["valor"] += float(c.valor_objetado or 0)
+
+    items = []
+    for cups, b in por_cups.items():
+        items.append({
+            "cups_codigo": cups,
+            "cups_descripcion": (b["descripcion"] or "")[:200],
+            "frecuencia": b["frecuencia"],
+            "valor_total_objetado": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["frecuencia"], reverse=True)
+
+    return {
+        "eps": eps,
+        "total_cups_sin_tarifa": len(items),
+        "items": items[:50],
+    }
+
+
 @router.get("/stats/tarifa-coincidente")
 def stats_tarifa_coincidente(
     db: Session = Depends(get_db),
