@@ -11,6 +11,8 @@ Endpoints:
 """
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -542,6 +544,135 @@ def _select_1():
     """Helper para abstraer la query SELECT 1 con SQLAlchemy 2."""
     from sqlalchemy import text
     return text("SELECT 1")
+
+
+@router.get("/resumen-mensual")
+def resumen_mensual_ejecutivo(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R76 P1: snapshot ejecutivo del mes para gerencia.
+
+    Consolidado de KPIs principales en un solo payload, listo para
+    mostrar en el dashboard o exportar como informe gerencial.
+
+    Devuelve:
+      - Total de glosas del mes
+      - Valor objetado / aceptado / recuperado
+      - Tasa de éxito
+      - Top 3 EPS por valor objetado
+      - Top 3 tipos de glosa (TA, SO, etc.)
+      - Comparación vs mes anterior
+
+    Sin parámetros → mes actual.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ahora = ahora_utc()
+    year = year or ahora.year
+    month = month or ahora.month
+    inicio = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        fin = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        fin = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+
+    # Mes anterior para comparación
+    if month == 1:
+        inicio_prev = datetime(year - 1, 12, 1, tzinfo=timezone.utc)
+        fin_prev = inicio
+    else:
+        inicio_prev = datetime(year, month - 1, 1, tzinfo=timezone.utc)
+        fin_prev = inicio
+
+    def _agregar_periodo(desde, hasta):
+        rows = (
+            db.query(
+                _f.count(GlosaRecord.id),
+                _f.sum(GlosaRecord.valor_objetado),
+                _f.sum(GlosaRecord.valor_aceptado),
+            )
+            .filter(GlosaRecord.creado_en >= desde)
+            .filter(GlosaRecord.creado_en < hasta)
+            .first()
+        )
+        count = rows[0] if rows else 0
+        v_obj = float(rows[1] or 0) if rows else 0.0
+        v_ac = float(rows[2] or 0) if rows else 0.0
+        return {
+            "count": int(count or 0),
+            "valor_objetado": v_obj,
+            "valor_aceptado": v_ac,
+            "valor_recuperado": v_obj - v_ac,
+            "tasa_exito_pct": round((v_obj - v_ac) / v_obj * 100, 1) if v_obj > 0 else 0,
+        }
+
+    actual = _agregar_periodo(inicio, fin)
+    anterior = _agregar_periodo(inicio_prev, fin_prev)
+
+    # Top 3 EPS por valor
+    top_eps = (
+        db.query(
+            GlosaRecord.eps,
+            _f.count(GlosaRecord.id),
+            _f.sum(GlosaRecord.valor_objetado),
+        )
+        .filter(GlosaRecord.creado_en >= inicio)
+        .filter(GlosaRecord.creado_en < fin)
+        .filter(GlosaRecord.eps.isnot(None))
+        .group_by(GlosaRecord.eps)
+        .order_by(_f.sum(GlosaRecord.valor_objetado).desc())
+        .limit(3)
+        .all()
+    )
+
+    # Top 3 tipos
+    top_tipos = (
+        db.query(
+            _f.substr(GlosaRecord.codigo_glosa, 1, 2),
+            _f.count(GlosaRecord.id),
+        )
+        .filter(GlosaRecord.creado_en >= inicio)
+        .filter(GlosaRecord.creado_en < fin)
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .group_by(_f.substr(GlosaRecord.codigo_glosa, 1, 2))
+        .order_by(_f.count(GlosaRecord.id).desc())
+        .limit(3)
+        .all()
+    )
+
+    # Variación %
+    def _variacion(actual_v, prev_v):
+        if prev_v == 0:
+            return None  # sin base
+        return round((actual_v - prev_v) / prev_v * 100, 1)
+
+    return {
+        "year": year,
+        "month": month,
+        "actual": actual,
+        "anterior": anterior,
+        "variacion_pct": {
+            "count": _variacion(actual["count"], anterior["count"]),
+            "valor_objetado": _variacion(actual["valor_objetado"], anterior["valor_objetado"]),
+            "valor_recuperado": _variacion(actual["valor_recuperado"], anterior["valor_recuperado"]),
+        },
+        "top_3_eps": [
+            {"eps": e, "count": int(c), "valor_objetado": float(v or 0)}
+            for e, c, v in top_eps
+        ],
+        "top_3_tipos": [
+            {"prefijo": p, "count": int(c)} for p, c in top_tipos
+        ],
+        "generado_en": ahora_utc().isoformat(),
+    }
 
 
 @router.get("/version")
