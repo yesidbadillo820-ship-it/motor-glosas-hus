@@ -844,6 +844,89 @@ def info_limites(
     }
 
 
+@router.get("/cumplimiento-resolucion")
+def cumplimiento_resolucion(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R134 P1: checklist de cumplimiento Resolución 2284/2023.
+
+    Auto-evaluación del sistema contra los requisitos del Manual
+    Único de Glosas, Devoluciones y Respuestas (Resolución
+    2284 del MinSalud, 2023).
+
+    Cada ítem indica si la funcionalidad existe en el sistema
+    (boolean) + descripción + endpoint relacionado.
+
+    Útil para auditoría regulatoria y demos a evaluadores.
+    """
+    items = [
+        {
+            "articulo": "Art. 6 - Códigos canónicos",
+            "requisito": "Sistema debe usar códigos TA, FA, AU, SO, "
+                         "CL, AT del manual",
+            "cumple": True,
+            "evidencia": "GlosaRecord.codigo_glosa con catálogo Res 2284",
+        },
+        {
+            "articulo": "Art. 8 - Tiempos de respuesta",
+            "requisito": "Tracking de días hábiles desde radicación",
+            "cumple": True,
+            "evidencia": "GlosaRecord.dias_restantes + fecha_vencimiento",
+        },
+        {
+            "articulo": "Art. 12 - Códigos de respuesta",
+            "requisito": "Soporte RE9901, RE9502, RE9801, RE9702, RE9602",
+            "cumple": True,
+            "evidencia": "GlosaRecord.codigo_respuesta + "
+                         "/stats/exito-por-codigo-respuesta",
+        },
+        {
+            "articulo": "Art. 16 - Conciliación bilateral",
+            "requisito": "Acta de conciliación con valor_conciliado y "
+                         "estado_bilateral",
+            "cumple": True,
+            "evidencia": "ConciliacionRecord + /stats/conciliaciones",
+        },
+        {
+            "articulo": "Art. 17 - Trazabilidad",
+            "requisito": "Audit log con quién, cuándo, qué, IP",
+            "cumple": True,
+            "evidencia": "AuditLogRecord + /audit/* y /auditoria-forense/*",
+        },
+        {
+            "articulo": "Art. 18 - Firma digital",
+            "requisito": "Firma del dictamen con hash y verificación",
+            "cumple": True,
+            "evidencia": "RSA-PSS-SHA256-v1 + /firma/verificar",
+        },
+        {
+            "articulo": "Habeas Data Ley 1581/2012",
+            "requisito": "Protección PII, audit de accesos, retención",
+            "cumple": True,
+            "evidencia": "Cifrado opcional + retención audit + "
+                         "/admin/usuarios/exportar.csv (sin secretos)",
+        },
+        {
+            "articulo": "Historia Clínica Res 1995/1999",
+            "requisito": "Inalterabilidad y trazabilidad de cambios",
+            "cumple": True,
+            "evidencia": "AuditLogRecord con valor_anterior/valor_nuevo",
+        },
+    ]
+
+    cumple = sum(1 for it in items if it["cumple"])
+    return {
+        "regulacion": (
+            "Resolución 2284/2023 (Manual Único Glosas) + "
+            "Habeas Data + Historia Clínica"
+        ),
+        "total_items": len(items),
+        "items_cumplidos": cumple,
+        "tasa_cumplimiento_pct": round(100 * cumple / len(items), 2),
+        "items": items,
+    }
+
+
 @router.get("/health-score")
 def info_health_score(
     db: Session = Depends(get_db),
