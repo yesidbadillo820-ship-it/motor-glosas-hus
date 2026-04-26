@@ -509,6 +509,98 @@ def exportar_xlsx(
     )
 
 
+@router.get("/estados-disponibles")
+def estados_disponibles(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R136 P1: catálogo machine-readable de estados de glosa.
+
+    Devuelve la lista oficial de estados con:
+      - clave (valor en BD)
+      - nombre amigable
+      - descripcion
+      - es_cerrado (bool)
+      - color sugerido para UI (semáforo)
+
+    Útil para que el frontend renderice dropdowns y badges
+    consistentes sin hardcodear listas que se desactualizan.
+    """
+    estados = [
+        {
+            "clave": "RADICADA",
+            "nombre": "Radicada",
+            "descripcion": "Glosa recién recibida, esperando respuesta HUS.",
+            "es_cerrado": False,
+            "color": "AMARILLO",
+        },
+        {
+            "clave": "RESPONDIDA",
+            "nombre": "Respondida",
+            "descripcion": (
+                "HUS ya respondió la glosa, esperando decisión EPS."
+            ),
+            "es_cerrado": False,
+            "color": "AZUL",
+        },
+        {
+            "clave": "RATIFICADA",
+            "nombre": "Ratificada por EPS",
+            "descripcion": (
+                "EPS sostuvo la glosa tras respuesta HUS. Pasa a "
+                "siguiente etapa o se acepta."
+            ),
+            "es_cerrado": False,
+            "color": "ROJO",
+        },
+        {
+            "clave": "LEVANTADA",
+            "nombre": "Levantada (HUS ganó)",
+            "descripcion": "EPS retiró la glosa. HUS recupera el valor.",
+            "es_cerrado": True,
+            "color": "VERDE",
+        },
+        {
+            "clave": "ACEPTADA",
+            "nombre": "Aceptada por HUS",
+            "descripcion": "HUS aceptó la glosa. EPS no paga ese ítem.",
+            "es_cerrado": True,
+            "color": "GRIS",
+        },
+        {
+            "clave": "CONCILIADA",
+            "nombre": "Conciliada bilateralmente",
+            "descripcion": (
+                "HUS y EPS llegaron a acuerdo en audiencia bilateral."
+            ),
+            "es_cerrado": True,
+            "color": "AZUL",
+        },
+        {
+            "clave": "ARCHIVADA",
+            "nombre": "Archivada",
+            "descripcion": (
+                "Glosa retirada del flujo activo (sin valor a defender)."
+            ),
+            "es_cerrado": True,
+            "color": "GRIS",
+        },
+        {
+            "clave": "EXTEMPORANEA",
+            "nombre": "Extemporánea",
+            "descripcion": (
+                "EPS objetó fuera del término legal. HUS puede rechazar."
+            ),
+            "es_cerrado": False,
+            "color": "AMARILLO",
+        },
+    ]
+
+    return {
+        "total": len(estados),
+        "estados": estados,
+    }
+
+
 @router.get("/buscar-similares-texto")
 def buscar_similares_texto(
     texto: str = Query(..., min_length=10, max_length=2000),
