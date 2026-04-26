@@ -965,6 +965,69 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/sugerencias-asignacion")
+def admin_sugerencias_asignacion(
+    eps: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R315 P1: sugiere gestores con mejor tasa para una EPS.
+
+    Útil al asignar nuevas glosas: "¿quién tiene mejor
+    track record con SANITAS?". Devuelve gestores
+    ordenados por tasa de levantamiento histórica con esa
+    EPS específica.
+
+    Por gestor:
+      - count_decididas (volumen histórico con esa EPS)
+      - levantadas
+      - tasa_levantamiento_pct
+
+    Solo SUPER_ADMIN.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps))
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        b = bucket.setdefault(gestor, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for gestor, b in bucket.items():
+        if b["dec"] < 1:
+            continue
+        tasa = round(100 * b["lev"] / b["dec"], 2)
+        items.append({
+            "gestor": gestor,
+            "count_decididas": b["dec"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(
+        key=lambda x: (x["tasa_levantamiento_pct"], x["count_decididas"]),
+        reverse=True,
+    )
+
+    return {
+        "eps": eps,
+        "total_gestores_con_historial": len(items),
+        "items": items,
+    }
+
+
 @router.get("/conciliaciones-resultado-distribucion")
 def admin_conciliaciones_resultado_distribucion(
     db: Session = Depends(get_db),
