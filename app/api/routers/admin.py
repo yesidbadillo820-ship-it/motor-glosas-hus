@@ -442,6 +442,82 @@ def mantenimiento_purgar(
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
 
 
+@router.post("/recalcular-dias-restantes")
+def recalcular_dias_restantes(
+    dry_run: bool = False,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R91 P1: recalcula dias_restantes para todas las glosas activas
+    basado en fecha_vencimiento actual.
+
+    El campo dias_restantes se mantiene sincronizado por triggers
+    al crear/actualizar glosas, pero puede desincronizarse cuando:
+      - Se importan glosas masivamente sin recalc
+      - El cron diario falla
+      - Se modifica fecha_vencimiento manualmente
+
+    Estrategia:
+      - Solo glosas no-cerradas (estado != ACEPTADA, LEVANTADA,
+        ARCHIVADA, CONCILIADA)
+      - dias_nuevo = (fecha_vencimiento - now).days
+      - dry_run=True solo cuenta cuántas se actualizarían sin tocar BD
+
+    Solo SUPER_ADMIN.
+    """
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    activas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_vencimiento.isnot(None))
+        .all()
+    )
+
+    ahora = ahora_utc()
+    actualizadas = 0
+    sin_cambios = 0
+    cerradas_ignoradas = 0
+
+    for g in activas:
+        if (g.estado or "").upper() in ESTADOS_CERRADOS:
+            cerradas_ignoradas += 1
+            continue
+
+        # SQLite puede devolver fechas naive — normalizar a UTC tz-aware
+        # para comparar de forma uniforme con ahora_utc().
+        venc = g.fecha_vencimiento
+        if venc.tzinfo is None:
+            from datetime import timezone
+            venc = venc.replace(tzinfo=timezone.utc)
+
+        delta_dias = (venc - ahora).days
+        anterior = g.dias_restantes if g.dias_restantes is not None else 0
+
+        if anterior == delta_dias:
+            sin_cambios += 1
+            continue
+
+        if not dry_run:
+            g.dias_restantes = delta_dias
+        actualizadas += 1
+
+    if not dry_run and actualizadas:
+        db.commit()
+
+    return {
+        "total_glosas_evaluadas": len(activas),
+        "actualizadas": actualizadas,
+        "sin_cambios": sin_cambios,
+        "cerradas_ignoradas": cerradas_ignoradas,
+        "dry_run": bool(dry_run),
+        "ejecutado_por": current_user.email,
+        "ejecutado_en": ahora.isoformat(),
+    }
+
+
 @router.get("/system-info")
 def admin_system_info(
     db: Session = Depends(get_db),
