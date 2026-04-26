@@ -6273,6 +6273,74 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/facturas-saldos-pendientes")
+def stats_facturas_saldos_pendientes(
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R269 P1: top facturas con saldo pendiente más alto.
+
+    Diferente a /stats/facturas-hot (por count_glosas):
+    aquí ordenamos por saldo_factura agregado.
+
+    Solo facturas con al menos una glosa abierta. Por
+    factura:
+      - eps
+      - count_glosas, count_abiertas
+      - saldo_factura (representativo)
+      - valor_factura
+      - valor_objetado_total
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.factura.isnot(None))
+        .filter(GlosaRecord.factura != "N/A")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        f = (g.factura or "").strip()
+        if not f:
+            continue
+        b = bucket.setdefault(f, {
+            "eps": g.eps,
+            "count": 0, "abiertas": 0,
+            "saldo": float(g.saldo_factura or 0),
+            "valor_factura": float(g.valor_factura or 0),
+            "obj": 0.0,
+        })
+        b["count"] += 1
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+        b["obj"] += float(g.valor_objetado or 0)
+
+    items = []
+    for factura, b in bucket.items():
+        if b["abiertas"] == 0:
+            continue
+        items.append({
+            "factura": factura,
+            "eps": b["eps"],
+            "count_glosas": b["count"],
+            "count_abiertas": b["abiertas"],
+            "saldo_factura": int(b["saldo"]),
+            "valor_factura": int(b["valor_factura"]),
+            "valor_objetado_total": int(b["obj"]),
+        })
+    items.sort(key=lambda x: x["saldo_factura"], reverse=True)
+
+    return {
+        "limit": int(limit),
+        "total_facturas": len(items),
+        "saldo_total": sum(it["saldo_factura"] for it in items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/eps-codigo-pareto")
 def stats_eps_codigo_pareto(
     db: Session = Depends(get_db),
