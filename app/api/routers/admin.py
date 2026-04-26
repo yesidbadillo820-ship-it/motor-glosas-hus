@@ -740,6 +740,73 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/historial-reasignaciones")
+def admin_historial_reasignaciones(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R156 P2: detecta reasignaciones de gestor en glosas.
+
+    Filtra audit log a cambios del campo `gestor_nombre` o
+    `auditor_email` y reporta:
+      - cuántas reasignaciones hubo
+      - quién la hizo
+      - de quién a quién
+
+    Útil para:
+      - Auditoría: detectar reasignación masiva sospechosa
+      - Análisis: ¿se reasignan mucho ciertos casos?
+      - Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.campo.in_(["gestor_nombre", "auditor_email"]))
+        .order_by(AuditLogRecord.timestamp.desc())
+        .all()
+    )
+
+    items = []
+    por_quien_reasigna: dict[str, int] = {}
+    for e in eventos:
+        if e.usuario_email:
+            por_quien_reasigna[e.usuario_email] = (
+                por_quien_reasigna.get(e.usuario_email, 0) + 1
+            )
+        items.append({
+            "timestamp": (
+                e.timestamp.isoformat() if e.timestamp else None
+            ),
+            "usuario_que_reasigna": e.usuario_email,
+            "glosa_id": e.registro_id,
+            "campo": e.campo,
+            "anterior": e.valor_anterior,
+            "nuevo": e.valor_nuevo,
+        })
+
+    top_reasignadores = sorted(
+        por_quien_reasigna.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+
+    return {
+        "ventana_dias": int(dias),
+        "total_reasignaciones": len(eventos),
+        "top_5_quien_reasigna": [
+            {"usuario": u, "reasignaciones": n}
+            for u, n in top_reasignadores
+        ],
+        "items": items[:100],  # cap a 100 items
+    }
+
+
 @router.get("/usuarios-sin-glosas")
 def admin_usuarios_sin_glosas(
     db: Session = Depends(get_db),
