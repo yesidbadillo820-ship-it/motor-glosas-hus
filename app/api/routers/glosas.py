@@ -6441,6 +6441,66 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/eps-codigo-rentabilidad")
+def stats_eps_codigo_rentabilidad(
+    min_decididas: int = Query(3, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R352 P1: rentabilidad por par (eps, codigo_glosa).
+
+    Por combinación EPS-código:
+      - count_decididas
+      - valor_recuperado_total
+      - valor_recuperado_promedio_por_glosa
+
+    Identifica las parejas más rentables. Ordenado DESC
+    por valor_recuperado_total.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.eps.isnot(None))
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .all()
+    )
+
+    bucket: dict[tuple[str, str], dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        codigo = (g.codigo_glosa or "").strip()
+        if not eps or not codigo:
+            continue
+        b = bucket.setdefault((eps, codigo), {
+            "count": 0, "rec": 0.0,
+        })
+        b["count"] += 1
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for (eps, codigo), b in bucket.items():
+        if b["count"] < min_decididas:
+            continue
+        prom = int(b["rec"] / b["count"]) if b["count"] else 0
+        items.append({
+            "eps": eps,
+            "codigo_glosa": codigo,
+            "count_decididas": b["count"],
+            "valor_recuperado_total": int(b["rec"]),
+            "valor_recuperado_promedio": prom,
+        })
+    items.sort(key=lambda x: x["valor_recuperado_total"], reverse=True)
+
+    return {
+        "min_decididas_filtro": int(min_decididas),
+        "total_pares": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/conciliaciones-por-eps")
 def stats_conciliaciones_por_eps(
     db: Session = Depends(get_db),
