@@ -978,6 +978,76 @@ def semaforo(
     return repo.semaforo_counts()
 
 
+@router.get("/incompletas")
+def glosas_incompletas(
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R96 P2: lista glosas con datos críticos faltantes.
+
+    Complementa /glosas/{id}/checklist (vista por glosa) con una
+    vista agregada: ¿qué glosas tienen huecos que necesitan
+    completarse?
+
+    Filtra glosas no-cerradas a las que les falta AL MENOS UNO de:
+      - texto_glosa_original
+      - dictamen (vacío o muy corto)
+      - factura (vacía o "N/A")
+      - valor_objetado (0 o NULL)
+
+    Útil para batch cleanup masivo del coordinador.
+
+    Devuelve cada glosa con un campo "campos_faltantes" indicando
+    cuáles específicamente, ordenadas DESC por número de huecos.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    # Pre-filtramos por estado en SQL; los criterios de huecos los
+    # evaluamos en Python para tener semántica consistente (ej.
+    # "dictamen corto" requiere len() y SQL LENGTH no es portable).
+    candidatas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    items = []
+    for g in candidatas:
+        faltantes = []
+        if not g.texto_glosa_original:
+            faltantes.append("texto_glosa_original")
+        if not g.dictamen or len(g.dictamen) <= 50:
+            faltantes.append("dictamen")
+        if not g.factura or g.factura == "N/A":
+            faltantes.append("factura")
+        if not g.valor_objetado or g.valor_objetado == 0:
+            faltantes.append("valor_objetado")
+
+        if not faltantes:
+            continue
+
+        items.append({
+            "id": g.id,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "campos_faltantes": faltantes,
+            "total_huecos": len(faltantes),
+        })
+
+    items.sort(key=lambda x: x["total_huecos"], reverse=True)
+
+    return {
+        "total_incompletas": len(items),
+        "limit": int(limit),
+        "items": items[:limit],
+    }
+
+
 @router.get("/facetas")
 def facetas_glosas(
     db: Session = Depends(get_db),
