@@ -2346,6 +2346,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <button class="btn-sm ghost" onclick="toggleRefinarPanel()" title="Refinar con IA">🧠 Refinar</button>
         <button class="btn-sm ghost" onclick="toggleReanalizarPanel()" title="Re-correr análisis cambiando modo o tono (no duplica la glosa)">🔄 Reanalizar</button>
         <button class="btn-sm ghost" onclick="verMetricasIaGlosa()" title="Ver calls IA atribuidos a esta glosa (solo coordinador/admin)">📊 Métricas IA</button>
+        <button class="btn-sm ghost" onclick="clonarGlosaActual()" title="Crear nueva glosa BORRADOR con los datos descriptivos de esta (mismo paciente, factura, EPS)">📋 Clonar</button>
         <button class="btn-sm ghost" onclick="validarDictamen()" title="Checklist pre-radicación">✅ Validar</button>
         <button class="modal-close" onclick="cerrarModal()">✕</button>
       </div>
@@ -4115,6 +4116,26 @@ async function verHistorialVersiones(){
     html += '</body></html>';
     w.document.write(html); w.document.close();
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// R65 P2: clona la glosa actual y abre el modal de la nueva
+async function clonarGlosaActual(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+  if(!confirm('¿Clonar esta glosa como BORRADOR?\n\nSe copiará: paciente, EPS, factura, código, CUPS y servicio.\n\nNO se copiará: dictamen ni valores monetarios (los digitas según el caso nuevo).')) return;
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/clonar', {
+      method: 'POST', headers: authH(),
+    });
+    if(r.status === 403){ toast('Permiso','Solo auditor o superior','warning'); return; }
+    if(!r.ok){ toast('Error', 'HTTP ' + r.status, 'error'); return; }
+    var d = await r.json();
+    toast('Clonada', 'Nueva glosa #' + d.id_nueva + ' creada como BORRADOR', 'success');
+    cerrarModal();
+    // Refrescar historial si existe
+    if(typeof loadHist === 'function') loadHist(typeof histPage !== 'undefined' ? histPage : 1);
+    // Abrir el modal de la nueva (con setTimeout para que el cierre se complete)
+    setTimeout(function(){ if(typeof verDictamen === 'function') verDictamen(d.id_nueva); }, 200);
+  } catch(e){ toast('Error', 'Conexión: ' + e.message, 'error'); }
 }
 
 // R63 P2: muestra diff entre dos versiones del dictamen en una popup
