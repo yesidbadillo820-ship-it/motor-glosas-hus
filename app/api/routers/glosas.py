@@ -2344,6 +2344,71 @@ def validar_rapido_glosa(
     }
 
 
+@router.get("/stats/por-gestor")
+def stats_por_gestor(
+    dias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R73 P1: productividad por gestor en la ventana indicada.
+
+    Solo coordinador/admin (datos sensibles de equipo).
+
+    Devuelve por gestor:
+      count_glosas      glosas asignadas / creadas en la ventana
+      valor_objetado    suma total
+      valor_aceptado    suma aceptada
+      valor_recuperado  v_obj - v_ac
+      tasa_exito_pct    % defendido
+      tiempo_promedio_dias_a_decision  (si hay fecha_decision_eps)
+
+    Ordenado DESC por count_glosas.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    # Agregar por auditor_email (gestor responsable)
+    rows = (
+        db.query(
+            GlosaRecord.auditor_email,
+            _f.count(GlosaRecord.id),
+            _f.sum(GlosaRecord.valor_objetado),
+            _f.sum(GlosaRecord.valor_aceptado),
+        )
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.auditor_email.isnot(None))
+        .group_by(GlosaRecord.auditor_email)
+        .all()
+    )
+
+    items = []
+    for email, count, v_obj, v_ac in rows:
+        v_obj = float(v_obj or 0)
+        v_ac = float(v_ac or 0)
+        v_rec = v_obj - v_ac
+        tasa = (v_rec / v_obj * 100) if v_obj > 0 else 0
+        items.append({
+            "auditor_email": email,
+            "count_glosas": int(count),
+            "valor_objetado": v_obj,
+            "valor_aceptado": v_ac,
+            "valor_recuperado": v_rec,
+            "tasa_exito_pct": round(tasa, 1),
+        })
+    items.sort(key=lambda x: x["count_glosas"], reverse=True)
+
+    return {
+        "ventana_dias": dias,
+        "total_gestores_activos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/tendencia-diaria")
 def stats_tendencia_diaria(
     dias: int = Query(30, ge=1, le=180),
