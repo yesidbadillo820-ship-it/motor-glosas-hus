@@ -965,6 +965,75 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/usuarios-mas-comentarios")
+def admin_usuarios_mas_comentarios(
+    dias: int = 90,
+    top: int = 20,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R294 P1: ranking de usuarios por comentarios emitidos.
+
+    Diferente a /admin/heatmap-usuario (todas las acciones):
+    aquí solo se cuentan comentarios internos, que son
+    indicador específico de colaboración entre el equipo.
+
+    Por usuario:
+      - total_comentarios
+      - menciones_emitidas
+      - resueltos_emitidos
+      - glosas_distintas
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import ComentarioGlosaRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.creado_en >= desde)
+        .filter(ComentarioGlosaRecord.autor_email.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for c in rows:
+        email = (c.autor_email or "").strip()
+        if not email:
+            continue
+        b = bucket.setdefault(email, {
+            "total": 0, "menciones": 0, "resueltos": 0,
+            "glosas": set(),
+        })
+        b["total"] += 1
+        if c.mencion:
+            b["menciones"] += 1
+        if int(c.resuelto or 0) == 1:
+            b["resueltos"] += 1
+        if c.glosa_id:
+            b["glosas"].add(c.glosa_id)
+
+    items = []
+    for email, b in bucket.items():
+        items.append({
+            "autor_email": email,
+            "total_comentarios": b["total"],
+            "menciones_emitidas": b["menciones"],
+            "resueltos_emitidos": b["resueltos"],
+            "glosas_distintas": len(b["glosas"]),
+        })
+    items.sort(key=lambda x: x["total_comentarios"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_usuarios": len(items),
+        "items": items[: int(top)],
+    }
+
+
 @router.get("/eps-cartera-detalle")
 def admin_eps_cartera_detalle(
     eps: str,
