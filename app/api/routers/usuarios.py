@@ -63,6 +63,83 @@ def info_usuario_actual(
     }
 
 
+@router.get("/yo/mis-glosas")
+def mis_glosas_paginado(
+    estado: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 25,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R130 P2: listado paginado completo de glosas del usuario.
+
+    Diferente a /yo/worklist (top urgentes priorizadas con score):
+    aquí se devuelve la lista COMPLETA paginada, con filtro
+    opcional por estado.
+
+    Útil para "Mis Glosas → ver todas":
+      - Pestaña "Abiertas"
+      - Pestaña "Cerradas"
+      - Filtro libre por estado
+
+    Asignación = gestor_nombre == nombre OR auditor_email == email.
+
+    Devuelve {items, total, page, per_page, pages} estándar.
+    """
+    from sqlalchemy import or_
+
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+
+    q = (
+        db.query(GlosaRecord)
+        .filter(or_(
+            GlosaRecord.gestor_nombre == nombre,
+            GlosaRecord.auditor_email == current_user.email,
+        ))
+    )
+    if estado:
+        q = q.filter(GlosaRecord.estado == estado.upper())
+
+    total = q.count()
+    page = max(1, int(page))
+    per_page = max(1, min(int(per_page), 100))
+    pages = (total + per_page - 1) // per_page
+
+    glosas = (
+        q.order_by(GlosaRecord.creado_en.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return {
+        "usuario_email": current_user.email,
+        "filtro_estado": estado,
+        "items": [
+            {
+                "id": g.id,
+                "creado_en": (
+                    g.creado_en.isoformat() if g.creado_en else None
+                ),
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "estado": g.estado,
+                "etapa": g.etapa,
+                "dias_restantes": g.dias_restantes,
+            }
+            for g in glosas
+        ],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": pages,
+    }
+
+
 @router.get("/yo/resumen")
 def resumen_personal(
     dias: int = 30,
