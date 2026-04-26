@@ -6273,6 +6273,94 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-volumen-vs-tasa")
+def stats_eps_volumen_vs_tasa(
+    min_decididas: int = Query(3, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R283 P1: por EPS, volumen vs tasa de levantamiento.
+
+    Datos para análisis cuadrante (scatter-plot):
+      - Volumen alto + tasa alta = "EPS dominada" (gana mucho)
+      - Volumen alto + tasa baja = "EPS difícil" (foco)
+      - Volumen bajo + tasa alta = "EPS pequeña ganada"
+      - Volumen bajo + tasa baja = "EPS irrelevante"
+
+    Por EPS:
+      - decididas (volumen)
+      - tasa_levantamiento_pct
+      - cuadrante: ALTA_VOL_ALTA_TASA, etc.
+
+    Usa medianas para clasificar (evita outliers).
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+
+    raw = []
+    for eps, b in bucket.items():
+        if b["dec"] < min_decididas:
+            continue
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        raw.append({
+            "eps": eps,
+            "decididas": b["dec"],
+            "tasa_levantamiento_pct": tasa,
+        })
+
+    if not raw:
+        return {
+            "min_decididas_filtro": int(min_decididas),
+            "mediana_volumen": 0,
+            "mediana_tasa": 0.0,
+            "items": [],
+        }
+
+    vols = sorted(it["decididas"] for it in raw)
+    tasas = sorted(it["tasa_levantamiento_pct"] for it in raw)
+    med_vol = vols[len(vols) // 2]
+    med_tasa = tasas[len(tasas) // 2]
+
+    items = []
+    for it in raw:
+        alto_vol = it["decididas"] >= med_vol
+        alta_tasa = it["tasa_levantamiento_pct"] >= med_tasa
+        if alto_vol and alta_tasa:
+            cuadrante = "ALTA_VOL_ALTA_TASA"
+        elif alto_vol:
+            cuadrante = "ALTA_VOL_BAJA_TASA"
+        elif alta_tasa:
+            cuadrante = "BAJA_VOL_ALTA_TASA"
+        else:
+            cuadrante = "BAJA_VOL_BAJA_TASA"
+        items.append({**it, "cuadrante": cuadrante})
+
+    items.sort(key=lambda x: x["decididas"], reverse=True)
+
+    return {
+        "min_decididas_filtro": int(min_decididas),
+        "mediana_volumen": int(med_vol),
+        "mediana_tasa": float(med_tasa),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-ganancia-perdida")
 def stats_eps_ganancia_perdida(
     min_glosas: int = Query(3, ge=1, le=100),
