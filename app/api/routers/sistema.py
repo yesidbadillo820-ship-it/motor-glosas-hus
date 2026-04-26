@@ -1174,6 +1174,58 @@ def cumplimiento_resolucion(
     }
 
 
+@router.get("/uptime-aprox")
+def info_uptime_aprox(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R241 P1: tiempo de uptime aproximado del proceso.
+
+    Lee `process_create_time` desde psutil si está disponible.
+    Si no, usa fallback (segs=0).
+
+    Devuelve:
+      - uptime_segundos
+      - uptime_humano (ej. "2d 3h 15m")
+      - python_pid
+
+    Solo COORDINADOR/ADMIN.
+    """
+    import os
+    from datetime import datetime, timezone
+
+    pid = os.getpid()
+    inicio = None
+    try:
+        import psutil
+        p = psutil.Process(pid)
+        inicio = p.create_time()
+    except Exception:
+        inicio = None
+
+    if inicio:
+        ahora = datetime.now(timezone.utc).timestamp()
+        segs = int(ahora - inicio)
+    else:
+        segs = 0
+
+    dias = segs // 86400
+    horas = (segs % 86400) // 3600
+    mins = (segs % 3600) // 60
+
+    if dias > 0:
+        humano = f"{dias}d {horas}h {mins}m"
+    elif horas > 0:
+        humano = f"{horas}h {mins}m"
+    else:
+        humano = f"{mins}m"
+
+    return {
+        "uptime_segundos": segs,
+        "uptime_humano": humano,
+        "python_pid": pid,
+    }
+
+
 @router.get("/auth-stats")
 def info_auth_stats(
     dias: int = 7,
