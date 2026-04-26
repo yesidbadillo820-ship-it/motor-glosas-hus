@@ -1960,6 +1960,130 @@ def clonar_glosa(
     }
 
 
+@router.get("/{glosa_id}/paquete-evidencia.json")
+def descargar_paquete_evidencia(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R85 P2: paquete completo de evidencia para una disputa.
+
+    Bundle JSON listo para entregar al equipo legal o EPS contraparte
+    cuando se necesita demostrar:
+      - Cuál fue el dictamen exacto (texto + hash)
+      - Quién lo firmó y cuándo
+      - Qué pasó con esa glosa (timeline completo)
+      - Calls IA que la generaron (auditoría regulatoria)
+
+    Estructura:
+      {
+        "metadata": {generado_en, generado_por, glosa_id},
+        "glosa": {...campos descriptivos...},
+        "dictamen_actual": {texto, hash, firma, alg, timestamp},
+        "timeline": [...eventos cronológicos...],
+        "ia_calls": [...calls atribuidos...]
+      }
+    """
+    import json
+    from fastapi.responses import Response
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    # 1. Datos descriptivos
+    glosa_data = {
+        "id": glosa.id,
+        "eps": glosa.eps,
+        "paciente": glosa.paciente,
+        "codigo_glosa": glosa.codigo_glosa,
+        "factura": glosa.factura,
+        "numero_radicado": glosa.numero_radicado,
+        "valor_objetado": float(glosa.valor_objetado or 0),
+        "valor_aceptado": float(glosa.valor_aceptado or 0),
+        "estado": glosa.estado,
+        "modelo_ia": glosa.modelo_ia,
+        "creado_en": glosa.creado_en.isoformat() if glosa.creado_en else None,
+    }
+
+    # 2. Firma del dictamen actual (si existe)
+    firma_info = None
+    if glosa.dictamen:
+        from app.services.firma_digital import firmar_dictamen
+        firma_info = firmar_dictamen(
+            texto_dictamen=glosa.dictamen,
+            firmante_email=current_user.email,
+            glosa_id=glosa.id,
+        )
+        firma_info["texto_dictamen_html"] = glosa.dictamen
+
+    # 3. Timeline reusable: invocamos la función directamente
+    from app.models.db import (
+        AICallRecord, AuditLogRecord, ComentarioGlosaRecord,
+        DictamenVersionRecord,
+    )
+    eventos = []
+    for v in db.query(DictamenVersionRecord).filter_by(glosa_id=glosa_id).all():
+        eventos.append({
+            "tipo": f"VERSION_{v.accion or 'CREAR'}",
+            "actor": v.autor_email,
+            "timestamp": v.creado_en.isoformat() if v.creado_en else None,
+        })
+    for a in (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.tabla.in_(("glosas", "historial")))
+        .filter(AuditLogRecord.registro_id == glosa_id)
+        .all()
+    ):
+        eventos.append({
+            "tipo": f"AUDIT_{a.accion or 'ACCION'}",
+            "actor": a.usuario_email,
+            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+            "detalle": (a.detalle or "")[:200],
+        })
+    for c in db.query(ComentarioGlosaRecord).filter_by(glosa_id=glosa_id).all():
+        eventos.append({
+            "tipo": "COMENTARIO",
+            "actor": c.autor_email,
+            "timestamp": c.creado_en.isoformat() if c.creado_en else None,
+            "texto": (c.texto or "")[:200],
+        })
+    eventos.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
+
+    # 4. Calls IA atribuidos
+    ia_calls = []
+    for c in db.query(AICallRecord).filter_by(glosa_id=glosa_id).all():
+        ia_calls.append({
+            "modelo": c.modelo,
+            "tokens_total": (c.input_tokens or 0)
+                            + (c.cache_creation_input_tokens or 0)
+                            + (c.cache_read_input_tokens or 0)
+                            + (c.output_tokens or 0),
+            "cost_usd": c.cost_usd,
+            "latency_ms": c.latency_ms,
+            "creado_en": c.creado_en.isoformat() if c.creado_en else None,
+        })
+
+    payload = {
+        "metadata": {
+            "generado_en": ahora_utc().isoformat(),
+            "generado_por": current_user.email,
+            "glosa_id": glosa_id,
+            "version_paquete": "R85 P2",
+        },
+        "glosa": glosa_data,
+        "dictamen_actual": firma_info,
+        "timeline": eventos,
+        "ia_calls": ia_calls,
+    }
+    fname = f"paquete-evidencia-glosa-{glosa.id}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8"),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/{glosa_id}/firma-dictamen")
 def obtener_firma_dictamen(
     glosa_id: int,
