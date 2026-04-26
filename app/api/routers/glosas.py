@@ -1956,6 +1956,53 @@ def exportar_paquete_multi_zip(
     )
 
 
+@router.get("/top-urgentes")
+def top_glosas_urgentes(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R198 P1: top N glosas más urgentes (menor dias_restantes).
+
+    Solo cuenta abiertas. Las que tienen dias_restantes más
+    bajos (incluyendo negativos = vencidas) aparecen primero.
+
+    Útil para "fila de atención prioritaria":
+      - vencidas hace mucho aparecen primero
+      - luego críticas (0..3d)
+      - luego próximas (4..7d)
+
+    Devuelve top N ordenado ASC por dias_restantes.
+
+    Declarado ANTES de /{glosa_id} para evitar collision.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .order_by(GlosaRecord.dias_restantes.asc())
+        .limit(int(top))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "dias_restantes": g.dias_restantes,
+            "valor_objetado": float(g.valor_objetado or 0),
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "items": items,
+    }
+
+
 @router.get("/top-recuperadas")
 def top_glosas_recuperadas(
     top: int = Query(20, ge=1, le=100),
