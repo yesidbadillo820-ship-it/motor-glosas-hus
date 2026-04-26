@@ -1960,6 +1960,67 @@ def clonar_glosa(
     }
 
 
+@router.get("/{glosa_id}/dictamen.txt")
+def descargar_dictamen_txt(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R81 P1: descarga el dictamen como texto plano sin formato.
+
+    Más portable que .md para sistemas que no entienden Markdown
+    (integraciones legacy, copia/pega a correo electrónico, etc.).
+
+    Strip total de HTML + entidades + normalización de whitespace.
+    """
+    import re
+
+    from fastapi.responses import Response
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not glosa.dictamen:
+        raise HTTPException(400, "La glosa no tiene dictamen generado")
+
+    html = glosa.dictamen
+    # Reemplazos para preservar estructura visual
+    txt = re.sub(r"</p>", "\n\n", html, flags=re.IGNORECASE)
+    txt = re.sub(r"</h[1-6]>", "\n\n", txt, flags=re.IGNORECASE)
+    txt = re.sub(r"<br\s*/?>", "\n", txt, flags=re.IGNORECASE)
+    txt = re.sub(r"</li>", "\n", txt, flags=re.IGNORECASE)
+    txt = re.sub(r"</tr>", "\n", txt, flags=re.IGNORECASE)
+    txt = re.sub(r"</td>", " | ", txt, flags=re.IGNORECASE)
+    # Quitar todos los tags
+    txt = re.sub(r"<[^>]+>", "", txt)
+    # Decode entidades
+    txt = (txt.replace("&nbsp;", " ").replace("&amp;", "&")
+              .replace("&lt;", "<").replace("&gt;", ">")
+              .replace("&quot;", '"').replace("&#39;", "'"))
+    # Normalizar líneas en blanco
+    txt = re.sub(r"\n{3,}", "\n\n", txt)
+    txt = re.sub(r"[ \t]+", " ", txt)
+    txt = re.sub(r" +\n", "\n", txt).strip()
+
+    cabecera = (
+        f"DICTAMEN GLOSA #{glosa.id}\n"
+        f"{'=' * 50}\n"
+        f"EPS:              {glosa.eps or '—'}\n"
+        f"Código glosa:     {glosa.codigo_glosa or '—'}\n"
+        f"Valor objetado:   ${(glosa.valor_objetado or 0):,.0f}\n"
+        f"Estado:           {glosa.estado or '—'}\n"
+        f"Factura:          {glosa.factura or '—'}\n"
+        f"{'=' * 50}\n\n"
+    )
+    payload = (cabecera + txt).encode("utf-8")
+    fname = f"dictamen-glosa-{glosa.id}.txt"
+    return Response(
+        content=payload,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/stats/por-codigo-respuesta")
 def stats_por_codigo_respuesta(
     dias: int = Query(30, ge=1, le=365),
