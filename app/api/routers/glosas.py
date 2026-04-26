@@ -3454,6 +3454,71 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/correlacion-codigos")
+def stats_correlacion_codigos(
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R108 P2: pares de códigos de glosa que aparecen juntos en una factura.
+
+    Cruza ConceptoGlosaRecord (multi-concepto por glosa) para
+    detectar patrones de co-ocurrencia: "cuando objetan TA0201,
+    también suelen objetar FA0603".
+
+    Útil para:
+      - Anticipar argumentación: si veo TA0201, prepararme para
+        FA0603 también
+      - Detectar bundles típicos de objeción de cada EPS
+      - Capacitación: "estos códigos van casi siempre juntos"
+
+    Devuelve top N pares ordenados DESC por co-frecuencia:
+      [{"codigo_a": "TA0201", "codigo_b": "FA0603",
+        "co_frecuencia": 12, "facturas": ["F001", "F015", ...]}, ...]
+    """
+    from itertools import combinations
+
+    conceptos = db.query(ConceptoGlosaRecord).all()
+
+    # Agrupar códigos por factura
+    por_factura: dict[str, set[str]] = {}
+    for c in conceptos:
+        if not c.factura or not c.codigo_glosa:
+            continue
+        por_factura.setdefault(c.factura, set()).add(c.codigo_glosa)
+
+    # Contar pares
+    pares: dict[tuple, dict] = {}
+    for factura, codigos in por_factura.items():
+        if len(codigos) < 2:
+            continue
+        codigos_lista = sorted(codigos)
+        for a, b in combinations(codigos_lista, 2):
+            key = (a, b)
+            if key not in pares:
+                pares[key] = {"co_frecuencia": 0, "facturas": []}
+            pares[key]["co_frecuencia"] += 1
+            if len(pares[key]["facturas"]) < 5:  # cap muestra
+                pares[key]["facturas"].append(factura)
+
+    items = [
+        {
+            "codigo_a": a,
+            "codigo_b": b,
+            "co_frecuencia": v["co_frecuencia"],
+            "facturas_muestra": v["facturas"],
+        }
+        for (a, b), v in pares.items()
+    ]
+    items.sort(key=lambda x: x["co_frecuencia"], reverse=True)
+
+    return {
+        "total_pares_unicos": len(items),
+        "top_solicitado": int(top),
+        "items": items[:top],
+    }
+
+
 @router.get("/stats/cohorte-mensual")
 def stats_cohorte_mensual(
     meses: int = Query(6, ge=1, le=24),
