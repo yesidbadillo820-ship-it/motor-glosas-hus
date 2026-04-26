@@ -965,6 +965,53 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/conciliaciones-bilateral-resumen")
+def admin_conciliaciones_bilateral_resumen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R328 P1: distribución de conciliaciones por estado_bilateral.
+
+    Estados del ciclo bilateral HUS-EPS (campo
+    estado_bilateral del modelo ConciliacionRecord):
+      PROGRAMADA → EPS_RESPONDIO → AUDIENCIA_REALIZADA →
+      ACTA_FIRMADA → CERRADA
+
+    Útil para ver cuántas conciliaciones están en cada
+    paso del flujo bilateral.
+
+    Solo SUPER_ADMIN.
+    """
+    from app.models.db import ConciliacionRecord
+
+    rows = db.query(ConciliacionRecord).all()
+
+    bucket: dict[str, dict] = {}
+    for c in rows:
+        estado = (c.estado_bilateral or "?").upper()
+        b = bucket.setdefault(estado, {
+            "count": 0, "valor": 0.0, "valor_ratificado": 0.0,
+        })
+        b["count"] += 1
+        b["valor"] += float(c.valor_conciliado or 0)
+        b["valor_ratificado"] += float(c.valor_ratificado_hus or 0)
+
+    items = []
+    for estado, b in bucket.items():
+        items.append({
+            "estado_bilateral": estado,
+            "count": b["count"],
+            "valor_conciliado_total": int(b["valor"]),
+            "valor_ratificado_hus_total": int(b["valor_ratificado"]),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "total_conciliaciones": sum(it["count"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/audit-log-stats")
 def admin_audit_log_stats(
     dias: int = 30,
