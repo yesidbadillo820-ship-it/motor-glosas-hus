@@ -332,3 +332,60 @@ def metricas_ia_por_usuario(
         "total_usuarios": len(items),
         "ranking": items,
     }
+
+
+@router.get("/version")
+def info_version():
+    """R64 P1: información de versión PÚBLICA (sin auth).
+
+    Útil para:
+      - Soporte: saber qué commit tiene corriendo el cliente
+      - Frontend: comparar con su propia versión (auto-recarga si
+        detecta deploy nuevo)
+      - Monitoreo: ver fecha del último deploy
+
+    No expone secretos — solo metadata pública.
+
+    Respuesta:
+      {
+        "version": "1.0.0",            # cfg.app_version
+        "commit": "abc1234",           # primeros 7 chars (git short hash)
+        "commit_full": "abc1234...",   # 40 chars completos
+        "build_time": "2026-04-26T...", # ISO timestamp
+        "python": "3.11.15",
+        "env": "production"
+      }
+    """
+    import os
+    import sys
+
+    from app.core.config import get_settings
+    from app.core.tz import ahora_utc
+
+    cfg = get_settings()
+
+    # Render expone RENDER_GIT_COMMIT con el hash del commit deployado.
+    # Localmente usamos "dev" como fallback.
+    commit_full = (
+        os.getenv("RENDER_GIT_COMMIT")
+        or os.getenv("GIT_COMMIT")
+        or "dev"
+    )
+    commit_short = commit_full[:7] if len(commit_full) >= 7 else commit_full
+
+    # Build time: lo más cercano disponible — Render no expone el timestamp
+    # del build, así que usamos el del proceso (cuándo arrancó la app).
+    build_time = (
+        os.getenv("RENDER_BUILD_TIME")
+        or os.getenv("APP_BUILD_TIME")
+        or ahora_utc().isoformat()
+    )
+
+    return {
+        "version": cfg.app_version,
+        "commit": commit_short,
+        "commit_full": commit_full,
+        "build_time": build_time,
+        "python": sys.version.split()[0],
+        "env": os.getenv("ENV", "development"),
+    }
