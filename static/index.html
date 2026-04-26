@@ -1632,6 +1632,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
         <div id="md-alertas"></div>
 
+        <!-- 🤖 Asistente Proactivo (R368): la IA dice qué hacer HOY -->
+        <div id="md-asistente" style="margin-bottom:1rem"></div>
+
         <div class="md-kpis" id="md-kpis">
           <div class="md-kpi"><div class="md-lbl">Mis glosas</div><div class="md-num" id="mk-total">—</div></div>
           <div class="md-kpi"><div class="md-lbl">Valor recuperado</div><div class="md-num c-green" id="mk-rec">—</div></div>
@@ -6280,8 +6283,82 @@ async function cargarMiDesempeno(){
   }catch(e){ console.error('mi-desempeno:', e); }
 }
 
+// 🤖 Asistente Proactivo: carga acciones priorizadas y las pinta
+async function cargarAsistenteProactivo(){
+  var box = document.getElementById('md-asistente');
+  if(!box) return;
+  try{
+    var r = await fetch('/usuarios/yo/asistente-proactivo', {headers: authH()});
+    if(!r.ok){ box.innerHTML = ''; return; }
+    var d = await r.json();
+    var acciones = d.acciones || [];
+    if(!acciones.length){ box.innerHTML = ''; return; }
+
+    // Estilos por tipo
+    var estilos = {
+      URGENTE:    {bg:'linear-gradient(135deg,#fef2f2,#fee2e2)', border:'#fecaca', accent:'#991b1b'},
+      IMPORTANTE: {bg:'linear-gradient(135deg,#fff7ed,#ffedd5)', border:'#fed7aa', accent:'#9a3412'},
+      OPORTUNIDAD:{bg:'linear-gradient(135deg,#f0fdf4,#dcfce7)', border:'#bbf7d0', accent:'#166534'},
+      MENCIONES:  {bg:'linear-gradient(135deg,#eff6ff,#dbeafe)', border:'#bfdbfe', accent:'#1e40af'},
+      MEJORAR:    {bg:'linear-gradient(135deg,#fefce8,#fef9c3)', border:'#fde68a', accent:'#854d0e'},
+      OK:         {bg:'linear-gradient(135deg,#ecfeff,#cffafe)', border:'#a5f3fc', accent:'#155e75'}
+    };
+    var labelTipo = {
+      URGENTE:'Urgente', IMPORTANTE:'Importante', OPORTUNIDAD:'Oportunidad',
+      MENCIONES:'Menciones', MEJORAR:'Por mejorar', OK:'Sin pendientes'
+    };
+
+    box.innerHTML =
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.3rem;box-shadow:var(--sh-md, 0 1px 3px rgba(0,0,0,.06))">'+
+        '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem">'+
+          '<div style="font-size:1.3rem">🤖</div>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:1rem;font-weight:700;color:var(--text)">Asistente proactivo</div>'+
+            '<div style="font-size:.74rem;color:var(--text3)">La IA detectó '+acciones.length+' acción(es) prioritaria(s) — atendelas en orden</div>'+
+          '</div>'+
+          '<button onclick="cargarAsistenteProactivo()" class="btn btn-ghost" style="font-size:.75rem;padding:.3rem .65rem" title="Refrescar">↻</button>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:.55rem">'+
+          acciones.map(function(a){
+            var st = estilos[a.tipo] || estilos.OK;
+            var etiqueta = labelTipo[a.tipo] || a.tipo;
+            var glosaLinks = (a.glosa_ids||[]).slice(0,5).map(function(gid){
+              return '<a href="#" onclick="abrirGlosaDesdeAsistente('+gid+');return false" '+
+                'style="background:rgba(255,255,255,.85);border:1px solid '+st.border+';padding:.15rem .55rem;border-radius:8px;font-size:.7rem;font-family:monospace;font-weight:700;color:'+st.accent+';text-decoration:none">#'+gid+'</a>';
+            }).join('');
+            return '<div style="background:'+st.bg+';border:1px solid '+st.border+';border-radius:9px;padding:.75rem 1rem">'+
+              '<div style="display:flex;align-items:start;gap:.7rem">'+
+                '<div style="font-size:1.5rem;line-height:1">'+(a.icono||'•')+'</div>'+
+                '<div style="flex:1;min-width:0">'+
+                  '<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem">'+
+                    '<span style="background:'+st.accent+';color:#fff;padding:1px 8px;border-radius:8px;font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700">'+etiqueta+'</span>'+
+                    '<span style="font-weight:700;color:var(--text);font-size:.92rem">'+escHtml(a.titulo)+'</span>'+
+                  '</div>'+
+                  '<div style="font-size:.8rem;color:var(--text2);line-height:1.4;margin-bottom:.35rem">'+escHtml(a.mensaje)+'</div>'+
+                  (glosaLinks ? '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.4rem">'+glosaLinks+'</div>' : '')+
+                  (a.accion_recomendada ? '<div style="font-size:.72rem;color:'+st.accent+';margin-top:.4rem;font-style:italic">→ '+escHtml(a.accion_recomendada)+'</div>' : '')+
+                '</div>'+
+              '</div>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+      '</div>';
+  } catch(e){ console.error('Asistente proactivo:', e); box.innerHTML = ''; }
+}
+
+// Helper: abre la glosa al hacer clic en un chip del asistente
+function abrirGlosaDesdeAsistente(gid){
+  if(typeof verDetalleGlosa === 'function'){ verDetalleGlosa(gid); return; }
+  if(typeof abrirGlosa === 'function'){ abrirGlosa(gid); return; }
+  // Fallback: ir a Mis glosas
+  sidebarTab(document.querySelector('.sn-item[data-tip="Mis glosas"]'), 'mis-glosas');
+}
+
 // Carga datos para las tarjetas premium del panel "Mi desempeño"
 async function cargarMiDesempenoPremium(){
+  // 🤖 Asistente proactivo (R368) — lo primero
+  cargarAsistenteProactivo();
+
   // Streak (R270)
   try{
     var r = await fetch('/usuarios/yo/streak', {headers: authH()});
