@@ -5908,6 +5908,74 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/eps-velocidad-respuesta")
+def stats_eps_velocidad_respuesta(
+    min_glosas: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R218 P1: tiempo promedio decision por EPS.
+
+    Mide qué tan rápido decide cada EPS comparando creado_en vs
+    fecha_decision_eps. Útil para comparar:
+      "SANITAS responde en 30 días, NUEVA EPS en 90"
+
+    Solo EPS con >= min_glosas decididas (con fecha_decision_eps
+    set).
+
+    Devuelve por EPS:
+      - count
+      - tiempo_promedio_dias
+      - tiempo_max_dias
+
+    Ordenado ASC por tiempo_promedio (más rápidas primero).
+    """
+    from datetime import timezone
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .all()
+    )
+
+    por_eps: dict[str, list[int]] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not cre or not dec:
+            continue
+        dias = (dec - cre).days
+        if dias < 0:
+            continue
+        por_eps.setdefault(eps, []).append(dias)
+
+    items = []
+    for eps, tiempos in por_eps.items():
+        if len(tiempos) < min_glosas:
+            continue
+        promedio = sum(tiempos) / len(tiempos)
+        items.append({
+            "eps": eps,
+            "count": len(tiempos),
+            "tiempo_promedio_dias": round(promedio, 2),
+            "tiempo_max_dias": max(tiempos),
+        })
+    items.sort(key=lambda x: x["tiempo_promedio_dias"])
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/antiguedad-promedio-eps")
 def stats_antiguedad_promedio_eps(
     db: Session = Depends(get_db),
