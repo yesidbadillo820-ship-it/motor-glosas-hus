@@ -965,6 +965,55 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/conciliaciones-resultado-distribucion")
+def admin_conciliaciones_resultado_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R312 P1: distribución de conciliaciones por `resultado`.
+
+    Diferente a /stats/conciliaciones-mensual (serie
+    temporal): aquí agregado total por resultado
+    (FAVORABLE_HUS, RATIFICADA, PARCIAL, etc.) con count
+    y valor_conciliado total.
+
+    Útil para entender dónde se está cerrando el
+    proceso bilateral.
+
+    Solo SUPER_ADMIN.
+    """
+    from app.models.db import ConciliacionRecord
+
+    rows = db.query(ConciliacionRecord).all()
+
+    bucket: dict[str, dict] = {}
+    for c in rows:
+        res = (c.resultado or "SIN_RESULTADO").upper()
+        b = bucket.setdefault(res, {"count": 0, "valor": 0.0})
+        b["count"] += 1
+        b["valor"] += float(c.valor_conciliado or 0)
+
+    items = []
+    for res, b in bucket.items():
+        items.append({
+            "resultado": res,
+            "count": b["count"],
+            "valor_conciliado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    total = sum(it["count"] for it in items)
+    for it in items:
+        it["pct"] = (
+            round(100 * it["count"] / total, 2) if total else 0.0
+        )
+
+    return {
+        "total_conciliaciones": total,
+        "items": items,
+    }
+
+
 @router.get("/usuarios-mas-comentarios")
 def admin_usuarios_mas_comentarios(
     dias: int = 90,
