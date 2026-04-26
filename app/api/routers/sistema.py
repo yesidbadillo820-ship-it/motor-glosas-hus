@@ -732,6 +732,76 @@ def info_version():
     }
 
 
+@router.get("/jobs-programados")
+def info_jobs_programados(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R104 P1: estado de los jobs programados (schedulers asincrónicos).
+
+    Lista los background tasks de la app:
+      - pre_analisis: IA proactiva diaria 6 AM
+      - mantenimiento: limpieza BD diaria 3 AM
+      - digest: resumen diario por email (si DIGEST_DESTINATARIOS)
+
+    Útil para verificar que los schedulers están vivos sin tener
+    que SSH al servidor.
+
+    Cada job devuelve: nombre, activo (bool), descripción, frecuencia.
+    """
+    jobs = []
+
+    # Pre-análisis IA
+    pre_activo = None
+    try:
+        from app.services.ia_auditora_proactiva import _task as _t
+        pre_activo = _t is not None and not _t.done()
+    except Exception:
+        pre_activo = None
+    jobs.append({
+        "nombre": "pre_analisis_ia",
+        "descripcion": "Pre-análisis IA proactivo de glosas pendientes",
+        "frecuencia": "diaria 06:00 UTC",
+        "activo": pre_activo,
+        "modulo": "app.services.ia_auditora_proactiva",
+    })
+
+    # Mantenimiento
+    mant_activo = None
+    try:
+        from app.services.mantenimiento_scheduler import _task as _t
+        mant_activo = _t is not None and not _t.done()
+    except Exception:
+        mant_activo = None
+    jobs.append({
+        "nombre": "mantenimiento_bd",
+        "descripcion": "Purga ai_cache, ai_calls y papelera caducada",
+        "frecuencia": "diaria 03:00 UTC",
+        "activo": mant_activo,
+        "modulo": "app.services.mantenimiento_scheduler",
+    })
+
+    # Digest
+    digest_activo = None
+    try:
+        from app.services.digest_scheduler import _task as _t
+        digest_activo = _t is not None and not _t.done()
+    except Exception:
+        digest_activo = None
+    jobs.append({
+        "nombre": "digest_email",
+        "descripcion": "Resumen diario por email (requiere DIGEST_DESTINATARIOS)",
+        "frecuencia": "diaria 07:00 UTC",
+        "activo": digest_activo,
+        "modulo": "app.services.digest_scheduler",
+    })
+
+    return {
+        "total_jobs": len(jobs),
+        "activos": sum(1 for j in jobs if j["activo"]),
+        "items": jobs,
+    }
+
+
 @router.get("/zonas-horarias")
 def info_zonas_horarias(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
