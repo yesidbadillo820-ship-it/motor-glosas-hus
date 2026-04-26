@@ -1943,6 +1943,76 @@ def clonar_glosa(
     }
 
 
+@router.get("/stats/por-codigo-respuesta")
+def stats_por_codigo_respuesta(
+    dias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R68 P1: agregaciones por código de respuesta (RE97xx, RE98xx, RE99xx).
+
+    Útil para reportes mensuales: "este mes el HUS aceptó 23% (RE9702),
+    aceptó parcial 15% (RE9801) y defendió 62% (RE9901)."
+
+    Ventana configurable. Devuelve:
+      {
+        "ventana_dias": 30,
+        "total": 145,
+        "por_codigo": [
+          {"codigo": "RE9901", "descripcion": "Glosa no aceptada",
+           "count": 90, "valor_total": 12_345_678, "porcentaje": 62.1}
+        ]
+      }
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    rows = (
+        db.query(
+            GlosaRecord.codigo_respuesta,
+            _f.count(GlosaRecord.id),
+            _f.sum(GlosaRecord.valor_objetado),
+        )
+        .filter(GlosaRecord.creado_en >= desde)
+        .group_by(GlosaRecord.codigo_respuesta)
+        .all()
+    )
+
+    descripciones = {
+        "RE9901": "Glosa no aceptada (defensa)",
+        "RE9701": "Glosa aceptada total (texto fijo)",
+        "RE9702": "Glosa aceptada al 100%",
+        "RE9801": "Glosa aceptada y subsanada parcialmente",
+        "RE9502": "Glosa extemporánea",
+        "": "Sin código de respuesta",
+        None: "Sin código de respuesta",
+    }
+
+    total = sum(r[1] for r in rows) or 0
+    por_codigo = []
+    for codigo, count, valor in rows:
+        porcentaje = (count / total * 100) if total else 0
+        por_codigo.append({
+            "codigo": codigo or "—",
+            "descripcion": descripciones.get(codigo, "Otro"),
+            "count": count,
+            "valor_total": float(valor or 0),
+            "porcentaje": round(porcentaje, 1),
+        })
+    por_codigo.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "ventana_dias": dias,
+        "total": total,
+        "por_codigo": por_codigo,
+    }
+
+
 @router.get("/{glosa_id}/timeline")
 def timeline_glosa(
     glosa_id: int,
