@@ -50,6 +50,52 @@ def _normalizar_tz(dt: datetime | None) -> datetime | None:
     return dt
 
 
+@router.get("/buscar")
+def buscar_papelera(
+    glosa_id_original: int = None,
+    eliminado_por: str = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R171 P1: búsqueda en papelera por glosa_id_original o usuario.
+
+    Útil para investigar:
+      "¿Existe en papelera una versión previa de la glosa #123?"
+      "¿Qué glosas eliminó alice@x este mes?"
+
+    Devuelve lista de coincidencias con metadata.
+
+    Solo COORDINADOR/ADMIN.
+    """
+    q = db.query(GlosaEliminadaRecord)
+    if glosa_id_original is not None:
+        q = q.filter(
+            GlosaEliminadaRecord.glosa_id_original == int(glosa_id_original)
+        )
+    if eliminado_por:
+        q = q.filter(GlosaEliminadaRecord.eliminado_por == eliminado_por)
+
+    items = q.order_by(GlosaEliminadaRecord.eliminado_en.desc()).limit(100).all()
+
+    return {
+        "filtro_glosa_id_original": glosa_id_original,
+        "filtro_eliminado_por": eliminado_por,
+        "total": len(items),
+        "items": [
+            {
+                "id": g.id,
+                "glosa_id_original": g.glosa_id_original,
+                "eliminado_por": g.eliminado_por,
+                "eliminado_en": (
+                    g.eliminado_en.isoformat() if g.eliminado_en else None
+                ),
+                "motivo": g.motivo,
+            }
+            for g in items
+        ],
+    }
+
+
 @router.get("/stats")
 def stats_papelera(
     db: Session = Depends(get_db),
