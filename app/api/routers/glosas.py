@@ -6273,6 +6273,51 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/glosas-sin-fecha-decision")
+def stats_glosas_sin_fecha_decision(
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R322 P1: glosas en estados decididos pero sin
+    `fecha_decision_eps` poblada.
+
+    Si una glosa está en LEVANTADA, RATIFICADA o ACEPTADA
+    pero su fecha_decision_eps es null, hay un dato
+    incompleto. Esto afecta cálculos de tiempo y SLA.
+
+    Útil para campañas de calidad de datos: completar
+    fechas históricas.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.fecha_decision_eps.is_(None))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+        })
+    items.sort(key=lambda x: x["valor_objetado"], reverse=True)
+
+    return {
+        "total_sin_fecha_decision": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/eps-pacientes-distintos")
 def stats_eps_pacientes_distintos(
     min_glosas: int = Query(5, ge=1, le=100),
