@@ -406,6 +406,86 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/tendencia-personal")
+def yo_tendencia_personal(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R356 P1: tendencia personal mes vs mes anterior.
+
+    Para el usuario actual, comparación de cierre de
+    glosas mes en curso vs mes anterior. Útil para "vs
+    mes pasado, ¿estoy mejorando?".
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio_actual = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if inicio_actual.month == 1:
+        inicio_anterior = inicio_actual.replace(
+            year=inicio_actual.year - 1, month=12,
+        )
+    else:
+        inicio_anterior = inicio_actual.replace(
+            month=inicio_actual.month - 1,
+        )
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_anterior)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .all()
+    )
+
+    a_count = 0
+    a_rec = 0.0
+    p_count = 0
+    p_rec = 0.0
+    for g in rows:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        rec = float(g.valor_recuperado or 0)
+        if f >= inicio_actual:
+            a_count += 1
+            a_rec += rec
+        else:
+            p_count += 1
+            p_rec += rec
+
+    def _delta(a, p):
+        if p == 0:
+            return 100.0 if a > 0 else 0.0
+        return round(100 * (a - p) / p, 2)
+
+    return {
+        "usuario_email": current_user.email,
+        "mes_actual": inicio_actual.strftime("%Y-%m"),
+        "mes_anterior": inicio_anterior.strftime("%Y-%m"),
+        "actual": {
+            "decididas": a_count,
+            "valor_recuperado": int(a_rec),
+        },
+        "anterior": {
+            "decididas": p_count,
+            "valor_recuperado": int(p_rec),
+        },
+        "delta_decididas_pct": _delta(a_count, p_count),
+        "delta_recuperado_pct": _delta(a_rec, p_rec),
+    }
+
+
 @router.get("/yo/dictamenes-stats")
 def yo_dictamenes_stats(
     db: Session = Depends(get_db),
