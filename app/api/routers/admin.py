@@ -965,6 +965,54 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/glosas-sin-gestor")
+def admin_glosas_sin_gestor(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R271 P1: glosas abiertas sin gestor asignado.
+
+    Cualquier glosa cuyo `gestor_nombre` sea NULL o vacío
+    debe asignarse a alguien para iniciar el ciclo de
+    gestión. Útil para el coordinador hacer asignación
+    masiva.
+
+    Solo SUPER_ADMIN. Ordena por valor_objetado DESC para
+    priorizar las de mayor cuantía.
+    """
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(
+            (GlosaRecord.gestor_nombre.is_(None))
+            | (GlosaRecord.gestor_nombre == "")
+        )
+        .all()
+    )
+
+    items = []
+    for g in abiertas:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dias_restantes": g.dias_restantes,
+        })
+    items.sort(key=lambda x: x["valor_objetado"], reverse=True)
+
+    return {
+        "total_sin_gestor": len(items),
+        "valor_total_pendiente": sum(it["valor_objetado"] for it in items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/distribucion-rol")
 def admin_distribucion_rol(
     db: Session = Depends(get_db),
