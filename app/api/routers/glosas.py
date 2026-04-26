@@ -3316,6 +3316,66 @@ def stats_por_tipo_glosa(
     }
 
 
+@router.get("/{glosa_id}/diff/{otra_id}")
+def diff_entre_glosas(
+    glosa_id: int,
+    otra_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R93 P1: comparativa lado-a-lado entre dos glosas.
+
+    Útil para:
+      - Identificar casos similares con mismo código pero distinto
+        outcome (¿por qué SANITAS aceptó la TA0201 de Pedro pero
+        ratificó la de Juan?)
+      - Entrenar a auditores nuevos mostrando ejemplos contrastantes
+      - Investigar inconsistencias en decisiones EPS
+
+    Devuelve los campos clave de ambas glosas y un set de campos
+    "diferentes" para destacar.
+    """
+    repo = GlosaRepository(db)
+    g1 = repo.obtener_por_id(glosa_id)
+    if not g1:
+        raise HTTPException(404, f"Glosa {glosa_id} no encontrada")
+    g2 = repo.obtener_por_id(otra_id)
+    if not g2:
+        raise HTTPException(404, f"Glosa {otra_id} no encontrada")
+
+    CAMPOS = [
+        "eps", "paciente", "factura", "codigo_glosa",
+        "valor_objetado", "valor_aceptado", "valor_recuperado",
+        "etapa", "estado", "decision_eps",
+        "gestor_nombre", "cups_servicio", "codigo_respuesta",
+    ]
+
+    snapshot1 = {c: getattr(g1, c, None) for c in CAMPOS}
+    snapshot2 = {c: getattr(g2, c, None) for c in CAMPOS}
+
+    diferentes = sorted(
+        c for c in CAMPOS
+        if snapshot1.get(c) != snapshot2.get(c)
+    )
+
+    # Casteamos floats para serialización JSON consistente
+    def _normalizar(d: dict) -> dict:
+        out = {}
+        for k, v in d.items():
+            if isinstance(v, (int, float)) and v is not None:
+                out[k] = float(v) if isinstance(v, float) else v
+            else:
+                out[k] = v if v is not None else None
+        return out
+
+    return {
+        "glosa_a": {"id": g1.id, **_normalizar(snapshot1)},
+        "glosa_b": {"id": g2.id, **_normalizar(snapshot2)},
+        "campos_diferentes": diferentes,
+        "total_diferencias": len(diferentes),
+    }
+
+
 @router.get("/{glosa_id}/sla")
 def sla_glosa(
     glosa_id: int,
