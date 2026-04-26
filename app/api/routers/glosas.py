@@ -4135,6 +4135,105 @@ def stats_eps_emergentes(
     }
 
 
+@router.get("/stats/estatus-eps")
+def stats_estatus_eps(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R137 P2: estado consolidado por EPS con semáforo.
+
+    Para cada EPS calcula un estatus VERDE/AMARILLO/ROJO basado
+    en señales agregadas:
+      - ROJO: 15+ vencidas O (tasa_lev<30% con >=5 decididas)
+      - AMARILLO: 5+ vencidas O tasa_lev<60% con >=5 decididas
+      - VERDE: el resto
+
+    Útil como vista resumen rápida: "¿con qué EPS estamos
+    teniendo problemas?"
+
+    Devuelve por EPS: status, razones (lista), + métricas detalladas.
+    Items ordenados ROJO → AMARILLO → VERDE.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {
+                "total": 0, "decididas": 0, "levantadas": 0,
+                "vencidas": 0, "criticas": 0,
+            }
+        b = por_eps[eps]
+        b["total"] += 1
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_CERRADOS:
+            if estado in {"LEVANTADA", "ACEPTADA"}:
+                b["decididas"] += 1
+                if estado == "LEVANTADA":
+                    b["levantadas"] += 1
+        else:
+            dr = g.dias_restantes if g.dias_restantes is not None else 0
+            if dr < 0:
+                b["vencidas"] += 1
+            elif dr <= 3:
+                b["criticas"] += 1
+
+    items = []
+    for eps, b in por_eps.items():
+        tasa = (
+            round(100 * b["levantadas"] / b["decididas"], 2)
+            if b["decididas"] else 0.0
+        )
+        razones = []
+        if b["vencidas"] > 15:
+            status = "ROJO"
+            razones.append(f"{b['vencidas']} glosas vencidas")
+        elif tasa < 30 and b["decididas"] >= 5:
+            status = "ROJO"
+            razones.append(f"tasa_levantamiento_pct={tasa} muy baja")
+        elif b["vencidas"] > 5 or (tasa < 60 and b["decididas"] >= 5):
+            status = "AMARILLO"
+            if b["vencidas"] > 5:
+                razones.append(f"{b['vencidas']} vencidas")
+            if tasa < 60 and b["decididas"] >= 5:
+                razones.append(
+                    f"tasa_levantamiento_pct={tasa} bajo target"
+                )
+        else:
+            status = "VERDE"
+            razones.append("operación saludable")
+
+        items.append({
+            "eps": eps,
+            "status": status,
+            "razones": razones,
+            "total_glosas": b["total"],
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "vencidas": b["vencidas"],
+            "criticas": b["criticas"],
+            "tasa_levantamiento_pct": tasa,
+        })
+
+    orden_status = {"ROJO": 0, "AMARILLO": 1, "VERDE": 2}
+    items.sort(key=lambda x: (orden_status[x["status"]], x["eps"]))
+
+    counts = {"VERDE": 0, "AMARILLO": 0, "ROJO": 0}
+    for it in items:
+        counts[it["status"]] += 1
+
+    return {
+        "total_eps": len(items),
+        "por_status": counts,
+        "items": items,
+    }
+
+
 @router.get("/stats/comparativa-eps")
 def stats_comparativa_eps(
     min_glosas: int = Query(5, ge=1, le=100,
