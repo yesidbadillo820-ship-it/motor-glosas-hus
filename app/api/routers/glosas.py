@@ -115,6 +115,13 @@ class ValidarRequest(BaseModel):
     forzar: bool = False
 
 
+class ReanalizarRequest(BaseModel):
+    """R60 P2: petición de re-análisis sobre glosa existente.
+    Sin duplicar la fila — actualiza el dictamen de la glosa actual."""
+    tono: Optional[str] = "conciliador"
+    modo_respuesta: Optional[str] = "defender"
+
+
 def _limpiar_observacion(dictamen_html: str) -> str:
     """Extrae solo el texto del argumento jurídico del dictamen, quitando la
     tabla superior (código/valor/respuesta), los badges, la tabla de resumen
@@ -1768,4 +1775,105 @@ def listar_duplicados_factura(
             }
             for g in duplicados
         ],
+    }
+
+
+@router.post("/{glosa_id}/reanalizar")
+async def reanalizar_glosa(
+    glosa_id: int,
+    data: ReanalizarRequest,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+    _cupo_ia: None = Depends(_consumir_cupo_ia),
+):
+    """R60 P2: re-corre el análisis IA sobre una glosa existente.
+
+    Útil cuando el gestor hizo primero 'auditoria_previa' y ahora quiere
+    el dictamen de defensa, o cuando quiere cambiar el tono. NO duplica
+    la fila — sobreescribe el dictamen de la glosa actual y guarda
+    snapshot en versiones con accion='REANALIZAR'.
+
+    Reusa los datos persistidos: eps, texto_glosa_original, etapa,
+    factura, radicado.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not glosa.texto_glosa_original:
+        raise HTTPException(
+            400,
+            "Glosa sin texto_glosa_original — fue creada antes de R59 o por flujo legacy. "
+            "No se puede reanalizar.",
+        )
+
+    # Construir GlosaInput a partir de los campos persistidos
+    from app.models.schemas import GlosaInput
+    try:
+        glosa_input = GlosaInput(
+            eps=glosa.eps or "",
+            etapa=glosa.etapa or "RESPUESTA",
+            fecha_radicacion=None,  # opcional, ya pasaron los chequeos al crear
+            fecha_recepcion=None,
+            valor_aceptado=str(int(glosa.valor_aceptado or 0)),
+            tabla_excel=glosa.texto_glosa_original,
+            numero_factura=glosa.factura,
+            numero_radicado=glosa.numero_radicado,
+            tono=data.tono or "conciliador",
+            modo_respuesta=data.modo_respuesta or "defender",
+        )
+    except Exception as e:
+        raise HTTPException(422, f"No se pudo reconstruir el GlosaInput: {e}")
+
+    # Trazabilidad request-scoped (R56 P1)
+    from app.core.logging_utils import glosa_id_var, user_email_var
+    user_email_var.set(current_user.email or "")
+    glosa_id_var.set(glosa.id)
+
+    cfg = get_settings()
+    service = GlosaService(
+        groq_api_key=cfg.groq_api_key,
+        anthropic_api_key=cfg.anthropic_api_key,
+        primary_ai=cfg.primary_ai,
+        anthropic_model=cfg.anthropic_model,
+        groq_model=cfg.groq_model,
+    )
+
+    contrato_repo = ContratoRepository(db)
+    contratos = contrato_repo.como_dict()
+    resultado = await service.analizar(glosa_input, "", contratos)
+
+    # Sobreescribir dictamen + metadata. NO crear nueva fila.
+    glosa.dictamen = resultado.dictamen
+    glosa.tipo_analisis = resultado.tipo if hasattr(glosa, "tipo_analisis") else None
+    glosa.modelo_ia = resultado.modelo_ia
+    if hasattr(glosa, "score"):
+        glosa.score = resultado.score
+    glosa.actualizado_en = ahora_utc()
+    db.commit()
+    db.refresh(glosa)
+
+    # Snapshot del dictamen como nueva versión
+    try:
+        from app.api.routers.versiones import guardar_version
+        guardar_version(
+            db=db, glosa_id=glosa.id, dictamen_html=resultado.dictamen,
+            accion="REANALIZAR", autor_email=current_user.email,
+        )
+    except Exception as _e:
+        logger.warning(f"No se pudo guardar version: {_e}")
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email, usuario_rol=current_user.rol,
+        accion="REANALIZAR_GLOSA", tabla="glosas", registro_id=glosa.id,
+        detalle=f"tono={data.tono} modo={data.modo_respuesta}",
+    )
+
+    return {
+        "message": "Glosa reanalizada",
+        "glosa_id": glosa.id,
+        "modo": data.modo_respuesta,
+        "tono": data.tono,
+        "modelo_ia": resultado.modelo_ia,
+        "dictamen": resultado.dictamen,
+        "tipo": resultado.tipo,
     }
