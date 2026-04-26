@@ -3299,6 +3299,101 @@ def stats_concentracion_pareto(
     }
 
 
+@router.get("/stats/cobranza-pendiente")
+def stats_cobranza_pendiente(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R120 P2: valor pendiente de cobro segmentado por antigüedad.
+
+    Complementa /stats/proyeccion-recuperacion (forecast global) con
+    desglose por buckets de antigüedad — útil para priorizar
+    cobranza:
+      - <30d: cobranza temprana, alta probabilidad
+      - 30-60d: cobranza estándar
+      - 60-90d: cobranza tardía, alerta amarilla
+      - >90d: cobranza dudosa, alerta roja
+
+    Solo cuenta glosas no-cerradas con valor_objetado > 0.
+
+    Devuelve por bucket:
+      - count, valor_pendiente
+      - pct_count y pct_valor
+      - tasa_recuperacion_historica_pct (estimada del histórico)
+      - valor_recuperable_estimado
+    """
+    from datetime import timedelta, timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    BUCKETS = [
+        ("<30d",   0,    30),
+        ("30-60d", 30,   60),
+        ("60-90d", 60,   90),
+        (">90d",   90,   None),
+    ]
+
+    ahora = ahora_utc()
+    glosas = db.query(GlosaRecord).all()
+
+    # Tasa histórica global para extrapolar
+    cerradas_obj = 0.0
+    cerradas_rec = 0.0
+    pendientes = []
+    for g in glosas:
+        v = float(g.valor_objetado or 0)
+        if v <= 0:
+            continue
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_CERRADOS:
+            cerradas_obj += v
+            cerradas_rec += float(g.valor_recuperado or 0)
+        else:
+            creado = g.creado_en
+            if creado and creado.tzinfo is None:
+                creado = creado.replace(tzinfo=timezone.utc)
+            antig = (ahora - creado).days if creado else 0
+            pendientes.append((antig, v))
+
+    tasa_historica = (
+        round(100 * cerradas_rec / cerradas_obj, 2)
+        if cerradas_obj else 0.0
+    )
+
+    total_count = len(pendientes)
+    total_valor = sum(v for _, v in pendientes)
+
+    items = []
+    for nombre, lo, hi in BUCKETS:
+        en_bucket = [
+            (a, v) for a, v in pendientes
+            if a >= lo and (hi is None or a < hi)
+        ]
+        n = len(en_bucket)
+        v_sum = sum(v for _, v in en_bucket)
+        recuperable = v_sum * (tasa_historica / 100)
+        items.append({
+            "rango_antiguedad": nombre,
+            "antiguedad_min_dias": lo,
+            "antiguedad_max_dias": hi,
+            "count": n,
+            "valor_pendiente": int(v_sum),
+            "pct_count": round(100 * n / total_count, 2) if total_count else 0.0,
+            "pct_valor": round(100 * v_sum / total_valor, 2) if total_valor else 0.0,
+            "valor_recuperable_estimado": int(recuperable),
+        })
+
+    return {
+        "tasa_historica_recuperacion_pct": tasa_historica,
+        "total_pendientes": total_count,
+        "valor_pendiente_total": int(total_valor),
+        "valor_recuperable_estimado_total": int(
+            total_valor * (tasa_historica / 100),
+        ),
+        "buckets": items,
+    }
+
+
 @router.get("/stats/eps-emergentes")
 def stats_eps_emergentes(
     dias: int = Query(30, ge=7, le=180),
