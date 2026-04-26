@@ -1956,6 +1956,49 @@ def exportar_paquete_multi_zip(
     )
 
 
+@router.get("/top-recuperadas")
+def top_glosas_recuperadas(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R189 P1: top N glosas por valor recuperado.
+
+    Diferente a /top-valor (objetado): aquí solo glosas
+    cerradas con valor_recuperado > 0.
+
+    Útil para reconocimiento: "estas son nuestras mejores
+    defensas históricas".
+
+    Ordenado DESC por valor_recuperado.
+    Declarado ANTES de /{glosa_id} para evitar collision.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.valor_recuperado > 0)
+        .order_by(GlosaRecord.valor_recuperado.desc())
+        .limit(int(top))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "valor_recuperado": float(g.valor_recuperado or 0),
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "items": items,
+    }
+
+
 @router.get("/top-valor")
 def top_glosas_por_valor(
     top: int = Query(20, ge=1, le=100),
