@@ -965,6 +965,57 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/consecutivos-duplicados")
+def admin_consecutivos_duplicados(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R287 P1: detección de `consecutivo_dgh` duplicados.
+
+    Cada glosa debe tener un consecutivo_dgh único (es la
+    llave del DGH). Si aparecen duplicados, hay una
+    importación errada o una colisión de datos.
+
+    Devuelve solo los consecutivos que aparecen >= 2 veces,
+    con los IDs de las glosas duplicadas.
+
+    Solo SUPER_ADMIN. Crítico para integridad de datos.
+    """
+    from sqlalchemy import func as _f
+
+    rows = (
+        db.query(
+            GlosaRecord.consecutivo_dgh,
+            _f.count(GlosaRecord.id),
+        )
+        .filter(GlosaRecord.consecutivo_dgh.isnot(None))
+        .filter(GlosaRecord.consecutivo_dgh != "")
+        .group_by(GlosaRecord.consecutivo_dgh)
+        .having(_f.count(GlosaRecord.id) > 1)
+        .all()
+    )
+
+    items = []
+    for cons, count in rows:
+        glosas = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.consecutivo_dgh == cons)
+            .all()
+        )
+        items.append({
+            "consecutivo_dgh": cons,
+            "count": int(count),
+            "glosa_ids": [g.id for g in glosas],
+            "estados": list({(g.estado or "?") for g in glosas}),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "total_duplicados": len(items),
+        "items": items,
+    }
+
+
 @router.get("/sistema-resumen")
 def admin_sistema_resumen(
     db: Session = Depends(get_db),
