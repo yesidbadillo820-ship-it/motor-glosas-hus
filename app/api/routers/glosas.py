@@ -6273,6 +6273,54 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/recientes-decididas")
+def stats_recientes_decididas(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R319 P1: últimas N glosas decididas (live feed).
+
+    Lista las decisiones EPS más recientes con todo el
+    detalle relevante. Útil como feed operacional en
+    tiempo real.
+
+    Ordena DESC por fecha_decision_eps.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_recuperado": int(float(g.valor_recuperado or 0)),
+            "gestor_nombre": g.gestor_nombre,
+            "fecha_decision_eps": (
+                g.fecha_decision_eps.isoformat()
+                if g.fecha_decision_eps else None
+            ),
+        })
+
+    return {
+        "limit": int(limit),
+        "items": items,
+    }
+
+
 @router.get("/stats/devoluciones-resumen")
 def stats_devoluciones_resumen(
     db: Session = Depends(get_db),
