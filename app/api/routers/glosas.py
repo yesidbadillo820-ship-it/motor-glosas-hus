@@ -5331,6 +5331,65 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/refinaciones-por-dia")
+def stats_refinaciones_por_dia(
+    dias: int = Query(30, ge=1, le=180),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R193 P1: serie diaria de refinaciones de dictamen.
+
+    Útil para ver el ritmo de trabajo IA del equipo:
+      - Picos de refinación (días post-import masivo)
+      - Pausas (¿festivos? ¿BD caída?)
+
+    Devuelve serie ASC por fecha YYYY-MM-DD.
+    """
+    from datetime import timedelta, timezone
+
+    from app.models.db import DictamenVersionRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    versiones = (
+        db.query(DictamenVersionRecord)
+        .filter(DictamenVersionRecord.creado_en >= desde)
+        .all()
+    )
+
+    por_dia: dict[str, dict] = {}
+    for v in versiones:
+        cre = v.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.date().isoformat()
+        if k not in por_dia:
+            por_dia[k] = {"total": 0, "refinar": 0, "regenerar": 0}
+        b = por_dia[k]
+        b["total"] += 1
+        if v.accion == "REFINAR":
+            b["refinar"] += 1
+        elif v.accion == "REGENERAR":
+            b["regenerar"] += 1
+
+    serie = []
+    for k in sorted(por_dia.keys()):
+        b = por_dia[k]
+        serie.append({
+            "fecha": k,
+            "total": b["total"],
+            "refinar": b["refinar"],
+            "regenerar": b["regenerar"],
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total_acciones": len(versiones),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/glosas-mas-refinadas")
 def stats_glosas_mas_refinadas(
     top: int = Query(20, ge=1, le=100),
