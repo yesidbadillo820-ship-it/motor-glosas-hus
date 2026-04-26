@@ -5174,6 +5174,66 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/cerradas-por-etapa")
+def stats_cerradas_por_etapa(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R173 P1: distribución de glosas cerradas por etapa final.
+
+    Diferente a /stats/por-etapa-actual (snapshot pipeline):
+    aquí solo glosas en estados cerrados, agrupadas por la etapa
+    en la que se cerraron.
+
+    Útil para responder: "¿la mayoría de glosas se resuelven en
+    primera respuesta o llegan a ratificación/conciliación?"
+
+    Devuelve por etapa:
+      - count
+      - valor_recuperado_total
+      - tasa_levantamiento_pct (LEVANTADA / cerradas en esa etapa)
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_etapa: dict[str, dict] = {}
+    for g in glosas:
+        etapa = (g.etapa or "(SIN_ETAPA)").strip() or "(SIN_ETAPA)"
+        if etapa not in por_etapa:
+            por_etapa[etapa] = {
+                "count": 0, "levantadas": 0, "valor_rec": 0.0,
+            }
+        b = por_etapa[etapa]
+        b["count"] += 1
+        b["valor_rec"] += float(g.valor_recuperado or 0)
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["levantadas"] += 1
+
+    items = []
+    for etapa, b in por_etapa.items():
+        tasa = (
+            round(100 * b["levantadas"] / b["count"], 2)
+            if b["count"] else 0.0
+        )
+        items.append({
+            "etapa": etapa,
+            "count": b["count"],
+            "valor_recuperado_total": int(b["valor_rec"]),
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "total_glosas_cerradas": sum(it["count"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/stats/valor-objetado-mensual")
 def stats_valor_objetado_mensual(
     meses: int = Query(12, ge=1, le=36),
