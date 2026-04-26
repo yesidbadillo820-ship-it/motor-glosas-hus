@@ -1174,6 +1174,72 @@ def cumplimiento_resolucion(
     }
 
 
+@router.get("/auth-stats")
+def info_auth_stats(
+    dias: int = 7,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R240 P1: estadísticas de autenticación.
+
+    Usa audit_log para detectar eventos de auth en últimos N días:
+      - login_ok (acción AUTH-OK o LOGIN)
+      - login_fail (AUTH-FAIL)
+      - logout (AUTH-LOGOUT)
+      - twofa (AUTH-2FA)
+      - refresh (AUTH-REFRESH)
+
+    Útil para detectar:
+      - Brute-force attempts (muchos login_fail)
+      - Adopción de 2FA
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    rows = (
+        db.query(
+            AuditLogRecord.accion,
+            _f.count().label("n"),
+        )
+        .filter(AuditLogRecord.timestamp >= desde)
+        .group_by(AuditLogRecord.accion)
+        .all()
+    )
+
+    contadores = {
+        "login_ok": 0,
+        "login_fail": 0,
+        "logout": 0,
+        "twofa": 0,
+        "refresh": 0,
+    }
+    for accion, n in rows:
+        a = (accion or "").upper()
+        if "AUTH-OK" in a or a == "LOGIN":
+            contadores["login_ok"] += n
+        elif "AUTH-FAIL" in a:
+            contadores["login_fail"] += n
+        elif "AUTH-LOGOUT" in a or a == "LOGOUT":
+            contadores["logout"] += n
+        elif "AUTH-2FA" in a:
+            contadores["twofa"] += n
+        elif "AUTH-REFRESH" in a:
+            contadores["refresh"] += n
+
+    return {
+        "ventana_dias": int(dias),
+        "contadores": contadores,
+    }
+
+
 @router.get("/info-deploy")
 def info_deploy(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
