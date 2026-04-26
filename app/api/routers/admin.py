@@ -965,6 +965,61 @@ def admin_usuarios_actividad_mensual(
     }
 
 
+@router.get("/sistema-resumen")
+def admin_sistema_resumen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R281 P1: resumen ejecutivo del sistema (single-call).
+
+    Compone en una sola respuesta totales globales del
+    sistema, útil como landing page admin:
+      - glosas: total, abiertas, cerradas
+      - usuarios: total, activos
+      - comentarios: total
+      - conciliaciones: total
+      - audit_events: total
+
+    Solo SUPER_ADMIN.
+    """
+    from app.models.db import (
+        ComentarioGlosaRecord,
+        ConciliacionRecord,
+    )
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    total_glosas = db.query(GlosaRecord).count()
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .count()
+    )
+    cerradas = total_glosas - abiertas
+
+    total_users = db.query(UsuarioRecord).count()
+    activos = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).count()
+
+    total_comentarios = db.query(ComentarioGlosaRecord).count()
+    total_concil = db.query(ConciliacionRecord).count()
+    total_audit = db.query(AuditLogRecord).count()
+
+    return {
+        "glosas": {
+            "total": total_glosas,
+            "abiertas": abiertas,
+            "cerradas": cerradas,
+        },
+        "usuarios": {
+            "total": total_users,
+            "activos": activos,
+        },
+        "comentarios": total_comentarios,
+        "conciliaciones": total_concil,
+        "audit_events": total_audit,
+    }
+
+
 @router.get("/glosas-sin-codigo-respuesta")
 def admin_glosas_sin_codigo_respuesta(
     limit: int = 100,
