@@ -55,6 +55,41 @@ def historial_cambios_glosa(
     ]
 
 
+@router.get("/facetas")
+def facetas_audit_log(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R87 P2: facetas únicas del audit log para construir filtros UI.
+
+    Devuelve los valores DISTINCT no-nulos de accion, tabla y
+    usuario_email. Útil para que el frontend renderice <select>
+    poblados con valores reales en lugar de inputs libres.
+
+    No filtra por fecha — refleja el universo histórico para evitar
+    que el dropdown se "encoja" si no hay eventos recientes con cierto
+    valor.
+    """
+    from app.models.db import AuditLogRecord
+
+    def _distinct(col):
+        rows = (
+            db.query(col)
+            .filter(col.isnot(None))
+            .distinct()
+            .order_by(col.asc())
+            .all()
+        )
+        return [r[0] for r in rows if r[0]]
+
+    return {
+        "acciones": _distinct(AuditLogRecord.accion),
+        "tablas": _distinct(AuditLogRecord.tabla),
+        "usuarios": _distinct(AuditLogRecord.usuario_email),
+        "roles": _distinct(AuditLogRecord.usuario_rol),
+    }
+
+
 @router.get("/stats")
 def stats_audit_log(
     dias: int = Query(30, ge=1, le=365, description="Ventana en días"),
