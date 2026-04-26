@@ -5927,6 +5927,65 @@ def stats_exito_por_codigo_respuesta(
     }
 
 
+@router.get("/stats/promedio-por-eps")
+def stats_promedio_por_eps(
+    min_glosas: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R152 P1: valor promedio de glosa por EPS.
+
+    Detecta el "perfil económico" de cada EPS:
+      - SANITAS: promedio \$5M (glosas grandes, casos complejos)
+      - NUEVA EPS: promedio \$50k (glosas chicas, alto volumen)
+
+    Útil para tailoring de estrategia:
+      - EPS con promedio alto → atención senior
+      - EPS con promedio bajo → flujo automatizado masivo
+
+    Devuelve top N EPS con >= min_glosas (default 3):
+      - eps
+      - count
+      - valor_promedio (mean)
+      - valor_mediano (median)
+      - valor_max
+    """
+    glosas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, list[float]] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        por_eps.setdefault(eps, []).append(float(g.valor_objetado or 0))
+
+    items = []
+    for eps, valores in por_eps.items():
+        if len(valores) < min_glosas:
+            continue
+        valores_ord = sorted(valores)
+        n = len(valores_ord)
+        promedio = sum(valores_ord) / n
+        if n % 2 == 0:
+            mediano = (valores_ord[n // 2 - 1] + valores_ord[n // 2]) / 2
+        else:
+            mediano = valores_ord[n // 2]
+        items.append({
+            "eps": eps,
+            "count": n,
+            "valor_promedio": round(promedio, 2),
+            "valor_mediano": round(mediano, 2),
+            "valor_max": int(max(valores)),
+        })
+    items.sort(key=lambda x: x["valor_promedio"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/por-etapa-actual")
 def stats_por_etapa_actual(
     db: Session = Depends(get_db),
