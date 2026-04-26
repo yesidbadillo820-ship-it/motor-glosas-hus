@@ -740,6 +740,61 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/conciliaciones-vencidas")
+def admin_conciliaciones_vencidas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R206 P1: conciliaciones con audiencia atrasada.
+
+    Lista las conciliaciones con fecha_audiencia pasada y
+    estado_bilateral != ACTA_FIRMADA / CERRADA. Audiencias ya
+    pasadas que no se cerraron formalmente: riesgo legal.
+
+    Devuelve listado ordenado DESC por dias_atraso.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import ConciliacionRecord
+
+    ahora = ahora_utc()
+    CERRADAS = {"ACTA_FIRMADA", "CERRADA"}
+
+    todas = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.fecha_audiencia.isnot(None))
+        .all()
+    )
+
+    items = []
+    for c in todas:
+        fa = c.fecha_audiencia
+        if fa and fa.tzinfo is None:
+            fa = fa.replace(tzinfo=timezone.utc)
+        if not fa or fa >= ahora:
+            continue
+        if (c.estado_bilateral or "") in CERRADAS:
+            continue
+        dias_atraso = (ahora - fa).days
+        items.append({
+            "id": c.id,
+            "glosa_id": c.glosa_id,
+            "fecha_audiencia": fa.isoformat(),
+            "estado_bilateral": c.estado_bilateral,
+            "dias_atraso": dias_atraso,
+            "valor_ratificado_hus": float(c.valor_ratificado_hus or 0),
+        })
+    items.sort(key=lambda x: x["dias_atraso"], reverse=True)
+
+    return {
+        "total_atrasadas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/dictamenes-versiones-limpieza")
 def admin_dictamenes_versiones_limpieza(
     max_versiones_por_glosa: int = 10,
