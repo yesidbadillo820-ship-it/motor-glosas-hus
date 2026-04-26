@@ -6273,6 +6273,62 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/tipo-glosa-tasa")
+def stats_tipo_glosa_tasa(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R308 P1: tasa de levantamiento por tipo de glosa.
+
+    Por prefijo de codigo_glosa (TA, SO, AU, CO, CL, PE,
+    FA, SE, IN, ME, EX), cuál es la tasa histórica de
+    levantamiento. Útil para identificar tipos donde HUS
+    pierde sistemáticamente.
+    """
+    PREFIJOS = ["TA", "SO", "AU", "CO", "CL", "PE",
+                "FA", "SE", "IN", "ME", "EX"]
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        codigo = (g.codigo_glosa or "").strip().upper()
+        if len(codigo) < 2:
+            continue
+        prefijo = codigo[:2]
+        b = bucket.setdefault(prefijo, {
+            "dec": 0, "lev": 0,
+        })
+        b["dec"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for p in PREFIJOS:
+        b = bucket.get(p, {"dec": 0, "lev": 0})
+        tasa = (
+            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        )
+        items.append({
+            "tipo": p,
+            "decididas": b["dec"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+        })
+
+    return {
+        "total_decididas": sum(it["decididas"] for it in items),
+        "items": items,
+    }
+
+
 @router.get("/stats/saldo-evolucion-mensual")
 def stats_saldo_evolucion_mensual(
     meses: int = Query(12, ge=1, le=24),
