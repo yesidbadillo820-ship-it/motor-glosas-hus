@@ -740,6 +740,68 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/usuarios-sin-glosas")
+def admin_usuarios_sin_glosas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R156 P1: usuarios activos sin glosas asignadas.
+
+    Detecta usuarios con cuenta activa pero sin trabajo asignado
+    como gestor. Útil para:
+      - Identificar capacidad ociosa que puede absorber backlog
+      - Revisar si hay usuarios que ya no deberían estar activos
+      - Balanceo de cargas
+
+    Devuelve lista de usuarios con rol AUDITOR/COORDINADOR sin
+    aparecer como gestor en ninguna glosa abierta.
+
+    Solo SUPER_ADMIN.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    # Set de gestores con glosas abiertas
+    gestores_con_carga = {
+        n[0] for n in (
+            db.query(GlosaRecord.gestor_nombre)
+            .filter(GlosaRecord.gestor_nombre.isnot(None))
+            .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+            .distinct()
+            .all()
+        )
+        if n[0]
+    }
+
+    # Usuarios activos con rol gestor
+    usuarios = (
+        db.query(UsuarioRecord)
+        .filter(UsuarioRecord.activo == 1)
+        .filter(UsuarioRecord.rol.in_(["AUDITOR", "COORDINADOR"]))
+        .all()
+    )
+
+    items = []
+    for u in usuarios:
+        nombre = u.nombre or u.email
+        if nombre not in gestores_con_carga:
+            items.append({
+                "id": u.id,
+                "email": u.email,
+                "nombre": u.nombre,
+                "rol": u.rol,
+            })
+
+    return {
+        "total_usuarios_activos_evaluados": len(usuarios),
+        "total_sin_glosas_asignadas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/gestor-mensual")
 def admin_gestor_mensual(
     gestor: str,
