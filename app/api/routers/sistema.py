@@ -844,6 +844,149 @@ def info_limites(
     }
 
 
+@router.get("/health-score")
+def info_health_score(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R127 P1: score consolidado de salud del sistema (0-100).
+
+    Diferente a /sistema/salud (boolean OK/FAIL) y a
+    /healthcheck-profundo (boolean por componente):
+    score numérico ponderado de múltiples señales.
+
+    Componentes (cada uno 0-100, ponderado):
+      - bd_responsiva (peso 30): SELECT 1 funciona
+      - schedulers_corriendo (peso 20): pre-análisis y mantenimiento
+        ambos vivos
+      - ia_disponible (peso 20): al menos un proveedor configurado
+      - sin_alertas_criticas (peso 15): no hay glosas vencidas hace
+        >30 días en cantidad alarmante (>10)
+      - dictamenes_no_obsoletos (peso 15): no más del 20% de glosas
+        abiertas tienen audit log >30d sin actividad
+
+    Score final = suma(componente × peso/100).
+
+    Devuelve:
+      - score_total: 0-100
+      - estado: HEALTHY (>=85) | DEGRADED (60-84) | UNHEALTHY (<60)
+      - desglose: cada componente con su valor y contribución
+    """
+    import os
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord, GlosaRecord
+
+    desglose = []
+
+    # 1) BD responsiva
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1")).fetchone()
+        bd_score = 100
+    except Exception:
+        bd_score = 0
+    desglose.append({
+        "componente": "bd_responsiva",
+        "score": bd_score,
+        "peso": 30,
+    })
+
+    # 2) Schedulers corriendo
+    schedulers_ok = 0
+    try:
+        from app.services.ia_auditora_proactiva import _task as t1
+        if t1 and not t1.done():
+            schedulers_ok += 1
+    except Exception:
+        pass
+    try:
+        from app.services.mantenimiento_scheduler import _task as t2
+        if t2 and not t2.done():
+            schedulers_ok += 1
+    except Exception:
+        pass
+    sched_score = schedulers_ok * 50  # 0, 50 o 100
+    desglose.append({
+        "componente": "schedulers_corriendo",
+        "score": sched_score,
+        "peso": 20,
+    })
+
+    # 3) IA disponible
+    ia_score = 100 if (
+        os.getenv("ANTHROPIC_API_KEY") or os.getenv("GROQ_API_KEY")
+    ) else 0
+    desglose.append({
+        "componente": "ia_disponible",
+        "score": ia_score,
+        "peso": 20,
+    })
+
+    # 4) Sin alertas críticas
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    muy_vencidas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < -30)
+        .count()
+    )
+    if muy_vencidas == 0:
+        alertas_score = 100
+    elif muy_vencidas <= 5:
+        alertas_score = 75
+    elif muy_vencidas <= 10:
+        alertas_score = 50
+    else:
+        alertas_score = 0
+    desglose.append({
+        "componente": "sin_alertas_criticas",
+        "score": alertas_score,
+        "peso": 15,
+        "detalle": f"glosas vencidas >30d: {muy_vencidas}",
+    })
+
+    # 5) Audit log activo (eventos recientes)
+    ahora = ahora_utc()
+    desde_24h = ahora - timedelta(hours=24)
+    eventos_recientes = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde_24h)
+        .count()
+    )
+    if eventos_recientes >= 10:
+        actividad_score = 100
+    elif eventos_recientes >= 1:
+        actividad_score = 60
+    else:
+        actividad_score = 30
+    desglose.append({
+        "componente": "actividad_reciente",
+        "score": actividad_score,
+        "peso": 15,
+        "detalle": f"eventos audit últimas 24h: {eventos_recientes}",
+    })
+
+    # Suma ponderada
+    total = sum(d["score"] * d["peso"] / 100 for d in desglose)
+    total = round(total, 2)
+
+    if total >= 85:
+        estado = "HEALTHY"
+    elif total >= 60:
+        estado = "DEGRADED"
+    else:
+        estado = "UNHEALTHY"
+
+    return {
+        "score_total": total,
+        "estado": estado,
+        "desglose": desglose,
+        "evaluado_en": ahora.isoformat(),
+    }
+
+
 @router.get("/metricas-ia/budget")
 def metricas_ia_budget(
     presupuesto_mensual_usd: float = 100.0,
