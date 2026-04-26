@@ -5174,6 +5174,79 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/dashboard-light")
+def stats_dashboard_light(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R180 P1: KPIs livianos optimizados para mobile / PWA.
+
+    Endpoint ultraligero — solo COUNTs y SUMs SQL sin iteración
+    de Python. Pensado para refresh frecuente en dispositivos
+    con bajo ancho de banda.
+
+    6 cifras agregadas que un coordinador querría ver en la
+    pantalla principal de la app móvil:
+      - total_abiertas
+      - total_criticas (0..3 días)
+      - total_vencidas (<0 días)
+      - valor_pendiente
+      - cerradas_hoy
+      - valor_recuperado_hoy
+    """
+    from sqlalchemy import func as _f
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    inicio_hoy = ahora_utc().replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    abiertas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    criticas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes >= 0)
+        .filter(GlosaRecord.dias_restantes <= 3)
+        .scalar() or 0
+    )
+    vencidas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < 0)
+        .scalar() or 0
+    )
+    valor_pendiente = (
+        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_objetado), 0))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    cerradas_hoy = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    valor_rec_hoy = (
+        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+
+    return {
+        "total_abiertas": int(abiertas),
+        "total_criticas": int(criticas),
+        "total_vencidas": int(vencidas),
+        "valor_pendiente": int(valor_pendiente),
+        "cerradas_hoy": int(cerradas_hoy),
+        "valor_recuperado_hoy": int(valor_rec_hoy),
+    }
+
+
 @router.get("/stats/proyeccion-vencimiento")
 def stats_proyeccion_vencimiento(
     dias: int = Query(30, ge=7, le=90),
