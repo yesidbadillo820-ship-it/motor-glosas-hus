@@ -5174,6 +5174,57 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/dictamenes-cortos")
+def stats_dictamenes_cortos(
+    umbral_chars: int = Query(200, ge=50, le=2000),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R166 P1: glosas con dictamen muy corto (calidad sospechosa).
+
+    Identifica glosas cuyo dictamen tiene < umbral_chars caracteres,
+    señal de:
+      - Dictamen IA mal generado (timeout/error)
+      - Dictamen sin argumentación suficiente
+      - Glosa abandonada con texto placeholder
+
+    Útil como cola de revisión: "estos casos necesitan reanálisis
+    o refinamiento humano".
+
+    Solo cuenta glosas no-cerradas (cerradas ya pasaron filtro EPS).
+
+    Devuelve top 50 con menos chars.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        dlen = len(g.dictamen or "")
+        if dlen < umbral_chars:
+            items.append({
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "dictamen_chars": dlen,
+                "valor_objetado": float(g.valor_objetado or 0),
+            })
+    items.sort(key=lambda x: x["dictamen_chars"])
+
+    return {
+        "umbral_chars": int(umbral_chars),
+        "total_dictamenes_cortos": len(items),
+        "items": items[:50],
+    }
+
+
 @router.get("/stats/comentarios-globales")
 def stats_comentarios_globales(
     dias: int = Query(30, ge=1, le=365),
