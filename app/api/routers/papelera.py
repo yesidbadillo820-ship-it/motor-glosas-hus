@@ -50,6 +50,78 @@ def _normalizar_tz(dt: datetime | None) -> datetime | None:
     return dt
 
 
+@router.get("/stats")
+def stats_papelera(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R128 P2: métricas agregadas de la papelera (soft-delete).
+
+    Útil para auditoría:
+      - ¿Cuántas glosas se eliminaron en último mes?
+      - ¿Quién las eliminó?
+      - ¿Cuántas próximas a expirar (cerca de 30d)?
+
+    Devuelve:
+      - total_papelera
+      - eliminadas_ultimas_24h / 7d / 30d
+      - top_5_eliminadores: usuarios que más eliminan
+      - proximas_a_expirar: count con eliminado_en próximo a corte 30d
+        (le quedan ≤7d para purga permanente)
+    """
+    from datetime import timedelta, timezone
+
+    ahora = _ahora_utc()
+    todas = db.query(GlosaEliminadaRecord).all()
+
+    h24 = ahora - timedelta(hours=24)
+    d7 = ahora - timedelta(days=7)
+    d30 = ahora - timedelta(days=30)
+    d23 = ahora - timedelta(days=23)  # eliminadas hace ≥23d → ≤7d para expirar
+
+    cnt_24h = 0
+    cnt_7d = 0
+    cnt_30d = 0
+    proximas = 0
+    por_usuario: dict[str, int] = {}
+
+    for g in todas:
+        elim = g.eliminado_en
+        if elim and elim.tzinfo is None:
+            elim = elim.replace(tzinfo=timezone.utc)
+        if not elim:
+            continue
+        if elim >= h24:
+            cnt_24h += 1
+        if elim >= d7:
+            cnt_7d += 1
+        if elim >= d30:
+            cnt_30d += 1
+        # Próximas a expirar: eliminadas hace 23-30 días
+        if d30 <= elim <= d23:
+            proximas += 1
+
+        if g.eliminado_por:
+            por_usuario[g.eliminado_por] = (
+                por_usuario.get(g.eliminado_por, 0) + 1
+            )
+
+    top_5 = sorted(
+        por_usuario.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+
+    return {
+        "total_papelera": len(todas),
+        "eliminadas_ultimas_24h": cnt_24h,
+        "eliminadas_ultimos_7d": cnt_7d,
+        "eliminadas_ultimos_30d": cnt_30d,
+        "proximas_a_expirar": proximas,
+        "top_5_eliminadores": [
+            {"usuario": u, "eliminadas": n} for u, n in top_5
+        ],
+    }
+
+
 @router.get("/")
 def listar(
     db: Session = Depends(get_db),
