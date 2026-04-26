@@ -406,6 +406,67 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/dictamenes-stats")
+def yo_dictamenes_stats(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R348 P1: estadística de calidad de TUS dictámenes.
+
+    Para el usuario actual, métricas sobre el campo
+    `dictamen` en sus glosas asignadas:
+      - count_total
+      - count_con_dictamen
+      - len_promedio
+      - count_cortos (<50 chars)
+      - count_largos (>=200 chars)
+      - pct_completos
+
+    Útil para auto-evaluación de calidad escrita.
+    """
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .all()
+    )
+
+    total = len(rows)
+    con_dict = 0
+    suma = 0
+    cortos = 0
+    largos = 0
+    completos = 0
+
+    for g in rows:
+        d = g.dictamen or ""
+        dlen = len(d)
+        if dlen > 0:
+            con_dict += 1
+            suma += dlen
+        if dlen < 50:
+            cortos += 1
+        elif dlen >= 200:
+            largos += 1
+        if dlen >= 50:
+            completos += 1
+
+    prom = round(suma / con_dict, 1) if con_dict else 0.0
+    pct = round(100 * completos / total, 2) if total else 0.0
+
+    return {
+        "usuario_email": current_user.email,
+        "count_total": total,
+        "count_con_dictamen": con_dict,
+        "len_promedio": prom,
+        "count_cortos": cortos,
+        "count_largos": largos,
+        "pct_completos": pct,
+    }
+
+
 @router.get("/yo/eps-mejor-rendimiento")
 def yo_eps_mejor_rendimiento(
     min_decididas: int = 3,
