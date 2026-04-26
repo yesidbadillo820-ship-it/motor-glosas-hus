@@ -844,6 +844,99 @@ def info_limites(
     }
 
 
+@router.get("/metricas-ia/por-modelo")
+def metricas_ia_por_modelo(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R125 P1: desglose de métricas IA por modelo (Claude/Groq).
+
+    Útil para entender:
+      - ¿Qué proveedor consume más presupuesto?
+      - ¿Qué modelo es más rápido en producción real?
+      - ¿Vale la pena seguir con el fallback?
+
+    Para cada modelo en la ventana:
+      - calls
+      - cost_usd_total
+      - latency_promedio_ms
+      - tokens_input / tokens_output totales
+      - cache_hit_rate_pct (cache_read / total_input)
+      - cost_per_call_usd
+
+    Ordenado DESC por cost_usd_total.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AICallRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.creado_en >= desde)
+        .all()
+    )
+
+    por_modelo: dict[str, dict] = {}
+    for r in rows:
+        clave = f"{r.proveedor}/{r.modelo}"
+        if clave not in por_modelo:
+            por_modelo[clave] = {
+                "proveedor": r.proveedor,
+                "modelo": r.modelo,
+                "calls": 0,
+                "cost_usd": 0.0,
+                "latency_total_ms": 0,
+                "input_tokens": 0,
+                "cache_read": 0,
+                "output_tokens": 0,
+            }
+        b = por_modelo[clave]
+        b["calls"] += 1
+        b["cost_usd"] += float(r.cost_usd or 0)
+        b["latency_total_ms"] += int(r.latency_ms or 0)
+        b["input_tokens"] += int(r.input_tokens or 0)
+        b["cache_read"] += int(r.cache_read_input_tokens or 0)
+        b["output_tokens"] += int(r.output_tokens or 0)
+
+    items = []
+    for clave, b in por_modelo.items():
+        latency_avg = (
+            round(b["latency_total_ms"] / b["calls"], 0)
+            if b["calls"] else 0
+        )
+        cache_hit = (
+            round(100 * b["cache_read"] / b["input_tokens"], 2)
+            if b["input_tokens"] else 0.0
+        )
+        cost_per_call = (
+            round(b["cost_usd"] / b["calls"], 6)
+            if b["calls"] else 0.0
+        )
+        items.append({
+            "proveedor": b["proveedor"],
+            "modelo": b["modelo"],
+            "calls": b["calls"],
+            "cost_usd_total": round(b["cost_usd"], 4),
+            "cost_per_call_usd": cost_per_call,
+            "latency_promedio_ms": int(latency_avg),
+            "tokens_input": b["input_tokens"],
+            "tokens_output": b["output_tokens"],
+            "cache_hit_rate_pct": cache_hit,
+        })
+    items.sort(key=lambda x: x["cost_usd_total"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_modelos_usados": len(items),
+        "calls_totales": sum(it["calls"] for it in items),
+        "cost_usd_total": round(sum(it["cost_usd_total"] for it in items), 4),
+        "items": items,
+    }
+
+
 @router.get("/runtime-info")
 def info_runtime(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
