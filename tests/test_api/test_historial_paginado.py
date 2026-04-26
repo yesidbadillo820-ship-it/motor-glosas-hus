@@ -140,3 +140,33 @@ class TestHistorialPaginado:
         pacientes = [it["paciente"] for it in d["items"]]
         assert "NUEVO" in pacientes
         assert "VIEJO" not in pacientes
+
+    def test_search_full_text_en_dictamen(self, client, db_session):
+        """R66 P1: el filtro search ahora busca también dentro del
+        campo 'dictamen' — útil para encontrar argumentos previos."""
+        _seed(db_session, paciente="A",
+              dictamen="<p>se invoca Art. 57 Ley 1438</p>")
+        _seed(db_session, paciente="B",
+              dictamen="<p>fundamento en Sentencia T-760</p>")
+        r = client.get("/glosas/historial-paginado?search=T-760")
+        d = r.json()
+        pacientes = [it["paciente"] for it in d["items"]]
+        assert "B" in pacientes
+        assert "A" not in pacientes
+
+    def test_search_en_texto_glosa_original(self, client, db_session):
+        """search también matchea en texto_glosa_original (texto bruto
+        que pegó el gestor del Excel de la EPS)."""
+        _seed(db_session, paciente="X",
+              texto_glosa_original="TA0201 hemograma valor 168563")
+        r = client.get("/glosas/historial-paginado?search=hemograma")
+        d = r.json()
+        assert any(it["paciente"] == "X" for it in d["items"])
+
+    def test_search_en_servicio_descripcion(self, client, db_session):
+        """servicio_descripcion también parte del full-text."""
+        _seed(db_session, paciente="X",
+              servicio_descripcion="CONSULTA DE URGENCIAS POR GINECOLOGIA")
+        r = client.get("/glosas/historial-paginado?search=GINECOLOGIA")
+        d = r.json()
+        assert any(it["paciente"] == "X" for it in d["items"])

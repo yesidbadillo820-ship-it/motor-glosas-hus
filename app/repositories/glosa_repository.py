@@ -197,13 +197,23 @@ class GlosaRepository:
             except ValueError:
                 pass
         if search:
+            # R66 P1: búsqueda full-text amplia. Match en cualquiera de:
+            # paciente, eps, código de glosa/respuesta, factura, radicado,
+            # CUPS, descripción de servicio, texto original de la glosa
+            # y dictamen. Cubre el 95% de búsquedas que un gestor hace
+            # ("¿dónde quedó esa glosa de hemograma?", "buscar 168563",
+            # "ese argumento sobre Art. 57 que escribimos…").
+            patron = f'%{search}%'
             q = q.filter(
-                (GlosaRecord.paciente.ilike(f'%{search}%')) |
-                (GlosaRecord.eps.ilike(f'%{search}%')) |
-                (GlosaRecord.codigo_glosa.ilike(f'%{search}%')) |
-                (GlosaRecord.numero_radicado.ilike(f'%{search}%')) |
-                (GlosaRecord.factura.ilike(f'%{search}%')) |
-                (GlosaRecord.cups_servicio.ilike(f'%{search}%'))
+                (GlosaRecord.paciente.ilike(patron)) |
+                (GlosaRecord.eps.ilike(patron)) |
+                (GlosaRecord.codigo_glosa.ilike(patron)) |
+                (GlosaRecord.numero_radicado.ilike(patron)) |
+                (GlosaRecord.factura.ilike(patron)) |
+                (GlosaRecord.cups_servicio.ilike(patron)) |
+                (GlosaRecord.servicio_descripcion.ilike(patron)) |
+                (GlosaRecord.texto_glosa_original.ilike(patron)) |
+                (GlosaRecord.dictamen.ilike(patron))
             )
         return q
 
