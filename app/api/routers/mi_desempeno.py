@@ -178,3 +178,63 @@ def ranking_equipo(
         "ventana_dias": ventana_dias,
         "ranking": _ranking_equipo(db, desde),
     }
+
+
+@router.get("/proximas-vencer")
+def proximas_vencer_del_usuario(
+    dias_limite: int = Query(7, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R66 P2: glosas asignadas al usuario que vencen en N días o menos.
+
+    Diferencia con /glosas/alertas (global): este filtra solo las
+    asignadas al gestor actual. Útil como widget "Mi watch list" para
+    que cada gestor vea sus pendientes urgentes sin tener que filtrar
+    el listado completo.
+
+    Devuelve glosas con dias_restantes <= dias_limite ordenadas por
+    urgencia (menos días primero).
+    """
+    q = _glosas_del_gestor(db, current_user)
+    # Solo las que NO están resueltas/levantadas/aceptadas finalmente
+    q = q.filter(~GlosaRecord.estado.in_(
+        ["LEVANTADA", "RATIFICADA", "ACEPTADA", "RESUELTA", "CONCILIADA"]
+    ))
+    # Filtro por dias_restantes
+    q = q.filter(GlosaRecord.dias_restantes != None)  # noqa: E711
+    q = q.filter(GlosaRecord.dias_restantes <= dias_limite)
+    glosas = q.order_by(GlosaRecord.dias_restantes.asc()).limit(50).all()
+
+    items = []
+    for g in glosas:
+        # Severidad por días restantes
+        d = g.dias_restantes or 0
+        if d <= 0:
+            sev = "VENCIDA"
+        elif d <= 2:
+            sev = "CRITICA"
+        elif d <= 5:
+            sev = "ALTA"
+        else:
+            sev = "MEDIA"
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "paciente": g.paciente,
+            "codigo_glosa": g.codigo_glosa,
+            "factura": g.factura,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "estado": g.estado,
+            "dias_restantes": d,
+            "severidad": sev,
+            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+        })
+    return {
+        "usuario_email": current_user.email,
+        "dias_limite": dias_limite,
+        "total": len(items),
+        "vencidas": sum(1 for it in items if it["severidad"] == "VENCIDA"),
+        "criticas": sum(1 for it in items if it["severidad"] == "CRITICA"),
+        "items": items,
+    }
