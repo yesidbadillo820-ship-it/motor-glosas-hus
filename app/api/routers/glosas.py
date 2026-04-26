@@ -6273,6 +6273,72 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/heatmap-mes-eps")
+def stats_heatmap_mes_eps(
+    meses: int = Query(6, ge=1, le=24),
+    top_eps: int = Query(10, ge=2, le=30),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R275 P1: heatmap (mes × EPS) de count de glosas creadas.
+
+    Datos para visualizar como tabla 2D mes-vs-EPS. Solo
+    incluye las top N EPS por volumen total para mantener
+    el output enfocado.
+
+    Devuelve:
+      - meses: lista de YYYY-MM ordenados
+      - eps: lista de top N EPS
+      - matriz: dict[eps][mes] = count
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    total_por_eps: dict[str, int] = {}
+    matriz: dict[str, dict[str, int]] = {}
+    meses_set: set = set()
+
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.strftime("%Y-%m")
+        meses_set.add(k)
+        total_por_eps[eps] = total_por_eps.get(eps, 0) + 1
+        matriz.setdefault(eps, {})
+        matriz[eps][k] = matriz[eps].get(k, 0) + 1
+
+    top = sorted(total_por_eps.items(), key=lambda x: x[1], reverse=True)
+    eps_top = [e for e, _ in top[: int(top_eps)]]
+
+    meses_ord = sorted(meses_set)
+
+    matriz_filt = {}
+    for eps in eps_top:
+        matriz_filt[eps] = {
+            m: matriz.get(eps, {}).get(m, 0) for m in meses_ord
+        }
+
+    return {
+        "ventana_meses": int(meses),
+        "meses": meses_ord,
+        "eps": eps_top,
+        "matriz": matriz_filt,
+    }
+
+
 @router.get("/stats/eps-respuestas-codigos")
 def stats_eps_respuestas_codigos(
     eps: str = Query(..., min_length=2),
