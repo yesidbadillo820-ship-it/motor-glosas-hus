@@ -9143,6 +9143,76 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/checklist-pre-envio")
+def checklist_pre_envio(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R215 P1: checklist específico previo al envío a la EPS.
+
+    Diferente a /{id}/checklist (avance general): aquí solo
+    los ítems críticos para enviar respuesta:
+      - EPS configurada
+      - Factura no es N/A
+      - Código glosa válido
+      - Dictamen >= 200 chars
+      - Código respuesta configurado
+      - Gestor asignado
+      - No vencida (dr >= 0)
+
+    Devuelve {checklist[], todos_ok, faltantes}.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    items = []
+
+    items.append({
+        "item": "EPS configurada",
+        "ok": bool(glosa.eps and glosa.eps.strip()),
+    })
+    items.append({
+        "item": "Factura válida (no N/A)",
+        "ok": bool(glosa.factura and glosa.factura != "N/A"),
+    })
+    items.append({
+        "item": "Código glosa configurado",
+        "ok": bool(glosa.codigo_glosa and glosa.codigo_glosa.strip()),
+    })
+    items.append({
+        "item": "Dictamen sólido (>=200 chars)",
+        "ok": bool(glosa.dictamen and len(glosa.dictamen) >= 200),
+    })
+    items.append({
+        "item": "Código respuesta configurado",
+        "ok": bool(
+            glosa.codigo_respuesta and glosa.codigo_respuesta.strip()
+        ),
+    })
+    items.append({
+        "item": "Gestor asignado",
+        "ok": bool(glosa.gestor_nombre),
+    })
+    dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+    items.append({
+        "item": "No vencida",
+        "ok": dr >= 0,
+        "detalle": f"dias_restantes={dr}",
+    })
+
+    todos_ok = all(it["ok"] for it in items)
+    faltantes = [it["item"] for it in items if not it["ok"]]
+
+    return {
+        "glosa_id": glosa_id,
+        "checklist": items,
+        "todos_ok": todos_ok,
+        "faltantes": faltantes,
+    }
+
+
 @router.get("/{glosa_id}/conciliaciones-resumen")
 def conciliaciones_resumen(
     glosa_id: int,
