@@ -1463,6 +1463,76 @@ def info_db_schema(
     }
 
 
+@router.get("/import-history")
+def info_import_history(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R149 P1: historial de importaciones masivas.
+
+    Detecta cargas masivas analizando picos en creación de glosas:
+      "El día 2026-04-15 se crearon 247 glosas en 1 hora → carga
+       masiva probable"
+
+    Heurística: agrupa glosas por (fecha, hora) y reporta los
+    cluster más grandes (>=10 glosas en una misma hora).
+
+    Útil para auditoría:
+      - Reconstruir cuándo se hicieron imports
+      - Detectar imports duplicados
+      - Validar que el batch_id se respetó
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= desde)
+        .all()
+    )
+
+    por_hora: dict[str, dict] = {}
+    for g in glosas:
+        ts = g.creado_en
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if not ts:
+            continue
+        key = ts.strftime("%Y-%m-%dT%H:00")
+        if key not in por_hora:
+            por_hora[key] = {"count": 0, "valor": 0.0, "epss": set()}
+        b = por_hora[key]
+        b["count"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        if g.eps:
+            b["epss"].add(g.eps)
+
+    items = []
+    for hora, b in por_hora.items():
+        if b["count"] < 10:
+            continue
+        items.append({
+            "hora": hora,
+            "glosas_creadas": b["count"],
+            "valor_total": int(b["valor"]),
+            "eps_distintas": len(b["epss"]),
+        })
+    items.sort(key=lambda x: x["glosas_creadas"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "umbral_cluster": 10,
+        "total_clusters_detectados": len(items),
+        "items": items,
+    }
+
+
 @router.get("/jobs-programados")
 def info_jobs_programados(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
