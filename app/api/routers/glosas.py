@@ -1913,6 +1913,85 @@ def exportar_paquete_multi_zip(
     )
 
 
+@router.get("/cups-perfil")
+def cups_perfil(
+    cups: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R140 P2: perfil 360º de un CUPS específico.
+
+    Para un CUPS dado, agrega información de TODOS los conceptos
+    de glosa que lo mencionan:
+      - frecuencia, valor total y promedio
+      - distribución por EPS
+      - códigos de glosa asociados
+      - centros de costo
+
+    Útil para responder: "¿qué historia tiene este procedimiento
+    en glosas?"
+
+    Param `cups`: código CUPS (ej. "906625", "39143A").
+
+    Declarado ANTES de /{glosa_id} para evitar collision con path
+    resolver de FastAPI.
+    """
+    conceptos = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.cups_codigo == cups)
+        .all()
+    )
+
+    if not conceptos:
+        return {
+            "cups_codigo": cups,
+            "sin_historial": True,
+        }
+
+    valores = [float(c.valor_objetado or 0) for c in conceptos]
+    descripcion = next(
+        (c.cups_descripcion for c in conceptos if c.cups_descripcion),
+        "",
+    )
+
+    glosa_ids = {c.glosa_id for c in conceptos if c.glosa_id is not None}
+    epss: dict[str, int] = {}
+    if glosa_ids:
+        for g in (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.id.in_(glosa_ids))
+            .all()
+        ):
+            if g.eps:
+                epss[g.eps] = epss.get(g.eps, 0) + 1
+
+    por_codigo: dict[str, int] = {}
+    centros: set[str] = set()
+    for c in conceptos:
+        if c.codigo_glosa:
+            por_codigo[c.codigo_glosa] = (
+                por_codigo.get(c.codigo_glosa, 0) + 1
+            )
+        if c.centro_costo:
+            centros.add(c.centro_costo)
+
+    return {
+        "cups_codigo": cups,
+        "cups_descripcion": descripcion[:200] if descripcion else "",
+        "sin_historial": False,
+        "frecuencia_total": len(conceptos),
+        "valor_objetado_total": int(sum(valores)),
+        "valor_promedio": round(sum(valores) / len(valores), 2),
+        "por_eps": dict(
+            sorted(epss.items(), key=lambda x: x[1], reverse=True)
+        ),
+        "por_codigo_glosa": dict(
+            sorted(por_codigo.items(), key=lambda x: x[1], reverse=True)
+        ),
+        "centros_costo": sorted(centros),
+    }
+
+
 @router.get("/{glosa_id}")
 def obtener_glosa(
     glosa_id: int,
