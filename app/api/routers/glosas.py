@@ -2746,6 +2746,63 @@ def stats_por_gestor(
     }
 
 
+@router.get("/stats/heatmap-actividad")
+def stats_heatmap_actividad(
+    dias: int = Query(90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R89 P1: heatmap de glosas creadas por día-de-semana × hora-del-día.
+
+    Útil para:
+      - Detectar picos de carga (¿se concentran las cargas masivas
+        de glosas los lunes a las 9am? ¿hay actividad nocturna sospechosa?)
+      - Planeación de capacidad de auditores
+      - Identificar anomalías (carga repentina fuera de horario)
+
+    Devuelve matriz 7×24:
+      {
+        "ventana_dias": 90,
+        "total": 1234,
+        "matriz": [[lunes_0h, lunes_1h, ...], [martes_0h, ...], ...],
+        "dias_semana": ["Lunes", "Martes", ...],
+        "horas": [0..23]
+      }
+
+    Día-de-semana siguiendo ISO 8601 (Lunes=0, Domingo=6).
+    Agregación se hace en Python para portabilidad SQLite/PostgreSQL.
+    """
+    from datetime import timedelta
+
+    corte = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(GlosaRecord.creado_en)
+        .filter(GlosaRecord.creado_en >= corte)
+        .all()
+    )
+
+    matriz = [[0 for _ in range(24)] for _ in range(7)]
+    total = 0
+    for (creado,) in rows:
+        if creado is None:
+            continue
+        dow = creado.weekday()  # Lunes=0, Domingo=6
+        hr = creado.hour
+        matriz[dow][hr] += 1
+        total += 1
+
+    return {
+        "ventana_dias": int(dias),
+        "total": total,
+        "matriz": matriz,
+        "dias_semana": [
+            "Lunes", "Martes", "Miércoles", "Jueves",
+            "Viernes", "Sábado", "Domingo",
+        ],
+        "horas": list(range(24)),
+    }
+
+
 @router.get("/stats/tendencia-diaria")
 def stats_tendencia_diaria(
     dias: int = Query(30, ge=1, le=180),
