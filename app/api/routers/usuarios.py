@@ -63,6 +63,118 @@ def info_usuario_actual(
     }
 
 
+@router.get("/yo/resumen")
+def resumen_personal(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R123 P2: resumen personal de desempeño.
+
+    "Mis números" en un período: glosas trabajadas, tasa de
+    levantamiento, valor recuperado, posición vs equipo.
+
+    Útil para que cada auditor vea su propio progreso sin
+    depender del coordinador.
+
+    Devuelve:
+      - mis_glosas_asignadas: count abiertas
+      - mis_glosas_cerradas_periodo
+      - mi_valor_recuperado_periodo
+      - mi_tasa_levantamiento_pct
+      - mi_tiempo_promedio_resolucion_dias
+      - posicion_ranking: rank en equipo por levantamientos
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    nombre = current_user.nombre or current_user.email
+    ahora = ahora_utc()
+    desde = ahora - timedelta(days=int(dias))
+
+    glosas_asignadas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .all()
+    )
+
+    abiertas = sum(
+        1 for g in glosas_asignadas
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS
+    )
+
+    cerradas_periodo = []
+    for g in glosas_asignadas:
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if (dec and dec >= desde and
+                (g.estado or "").upper() in ESTADOS_CERRADOS):
+            cerradas_periodo.append(g)
+
+    levantadas = [
+        g for g in cerradas_periodo
+        if (g.estado or "").upper() == "LEVANTADA"
+    ]
+    decididas = [
+        g for g in cerradas_periodo
+        if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    ]
+
+    valor_rec = sum(float(g.valor_recuperado or 0) for g in cerradas_periodo)
+
+    tiempos = []
+    for g in cerradas_periodo:
+        if g.fecha_decision_eps and g.creado_en:
+            dec = g.fecha_decision_eps
+            cre = g.creado_en
+            if dec.tzinfo is None:
+                dec = dec.replace(tzinfo=timezone.utc)
+            if cre.tzinfo is None:
+                cre = cre.replace(tzinfo=timezone.utc)
+            tiempos.append((dec - cre).days)
+
+    # Ranking: cuántos gestores tienen MÁS levantamientos que yo en período
+    todas_periodo = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= desde)
+        .filter(GlosaRecord.estado == "LEVANTADA")
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+    levant_por_gestor: dict[str, int] = {}
+    for g in todas_periodo:
+        levant_por_gestor[g.gestor_nombre] = (
+            levant_por_gestor.get(g.gestor_nombre, 0) + 1
+        )
+    mis_levantamientos = levant_por_gestor.get(nombre, 0)
+    posicion = sum(
+        1 for n in levant_por_gestor.values()
+        if n > mis_levantamientos
+    ) + 1
+
+    return {
+        "usuario_email": current_user.email,
+        "ventana_dias": int(dias),
+        "mis_glosas_asignadas": abiertas,
+        "mis_glosas_cerradas_periodo": len(cerradas_periodo),
+        "mi_valor_recuperado_periodo": int(valor_rec),
+        "mi_tasa_levantamiento_pct": (
+            round(100 * len(levantadas) / len(decididas), 2)
+            if decididas else 0.0
+        ),
+        "mi_tiempo_promedio_resolucion_dias": (
+            round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
+        ),
+        "posicion_ranking": posicion,
+        "total_gestores_activos_ranking": len(levant_por_gestor),
+    }
+
+
 @router.get("/yo/worklist")
 def worklist_personal(
     limit: int = 30,
