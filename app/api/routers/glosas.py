@@ -6273,6 +6273,60 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/codigo-respuesta-monetaria")
+def stats_codigo_respuesta_monetaria(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R336 P1: efectividad monetaria por codigo_respuesta.
+
+    Para cada codigo_respuesta usado por HUS, cuál fue el
+    valor recuperado promedio cuando se ganó la glosa
+    (LEVANTADA). Diferente a /stats/exito-por-codigo-respuesta
+    (tasa por count): aquí enfoque monetario.
+
+    Por código:
+      - count_levantadas
+      - valor_recuperado_total
+      - valor_recuperado_promedio
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado == "LEVANTADA")
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .filter(GlosaRecord.codigo_respuesta != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        c = (g.codigo_respuesta or "").strip()
+        if not c:
+            continue
+        b = bucket.setdefault(c, {"count": 0, "rec": 0.0})
+        b["count"] += 1
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for c, b in bucket.items():
+        prom = (
+            int(b["rec"] / b["count"]) if b["count"] else 0
+        )
+        items.append({
+            "codigo_respuesta": c,
+            "count_levantadas": b["count"],
+            "valor_recuperado_total": int(b["rec"]),
+            "valor_recuperado_promedio": prom,
+        })
+    items.sort(
+        key=lambda x: x["valor_recuperado_total"], reverse=True,
+    )
+
+    return {
+        "items": items,
+    }
+
+
 @router.get("/stats/cumplimiento-sla-mensual")
 def stats_cumplimiento_sla_mensual(
     meses: int = Query(12, ge=1, le=24),
