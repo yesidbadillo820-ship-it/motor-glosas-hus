@@ -5908,6 +5908,66 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/dictamen-vs-tasa-exito")
+def stats_dictamen_vs_tasa_exito(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R224 P1: correlación longitud dictamen vs tasa levantamiento.
+
+    ¿Los dictámenes largos ganan más? ¿O los cortos? Este
+    endpoint calcula la tasa por banda de longitud.
+
+    Solo glosas decididas (LEVANTADA, ACEPTADA, RATIFICADA).
+
+    Devuelve por banda: count + levantadas + tasa_lev_pct.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    bandas = {
+        "MUY_CORTO_<100": {"count": 0, "lev": 0},
+        "CORTO_100a499": {"count": 0, "lev": 0},
+        "MEDIO_500a1999": {"count": 0, "lev": 0},
+        "LARGO_>=2000": {"count": 0, "lev": 0},
+    }
+    for g in glosas:
+        if not g.dictamen:
+            continue
+        n = len(g.dictamen)
+        if n < 100:
+            k = "MUY_CORTO_<100"
+        elif n < 500:
+            k = "CORTO_100a499"
+        elif n < 2000:
+            k = "MEDIO_500a1999"
+        else:
+            k = "LARGO_>=2000"
+        bandas[k]["count"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            bandas[k]["lev"] += 1
+
+    items = []
+    for nombre, b in bandas.items():
+        tasa = (
+            round(100 * b["lev"] / b["count"], 2)
+            if b["count"] else 0.0
+        )
+        items.append({
+            "banda": nombre,
+            "count": b["count"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+        })
+
+    return {"items": items}
+
+
 @router.get("/stats/cargabilidad-equipo")
 def stats_cargabilidad_equipo(
     db: Session = Depends(get_db),
