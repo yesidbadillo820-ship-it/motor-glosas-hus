@@ -5331,6 +5331,62 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/eps-no-responde")
+def stats_eps_no_responde(
+    dias_minimos: int = Query(15, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R195 P1: EPS que no responde tras N días desde respuesta HUS.
+
+    Detecta glosas en estado RESPONDIDA (HUS ya respondió) cuya
+    fecha_decision_eps NO está set y cuya creación es >= N días
+    atrás.
+
+    Útil para escalar:
+      "SANITAS no respondió 25 glosas que llevamos esperando
+       30+ días → llamar a su contraparte"
+
+    Agrega por EPS, ordenado DESC por count.
+    """
+    from datetime import timedelta
+
+    desde_minimo = ahora_utc() - timedelta(days=int(dias_minimos))
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado == "RESPONDIDA")
+        .filter(GlosaRecord.fecha_decision_eps.is_(None))
+        .filter(GlosaRecord.creado_en <= desde_minimo)
+        .all()
+    )
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"count": 0, "valor": 0.0}
+        por_eps[eps]["count"] += 1
+        por_eps[eps]["valor"] += float(g.valor_objetado or 0)
+
+    items = []
+    for eps, b in por_eps.items():
+        items.append({
+            "eps": eps,
+            "count_sin_respuesta": b["count"],
+            "valor_pendiente": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count_sin_respuesta"], reverse=True)
+
+    return {
+        "umbral_dias": int(dias_minimos),
+        "total_eps_morosas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/listas-para-cerrar")
 def stats_listas_para_cerrar(
     db: Session = Depends(get_db),
