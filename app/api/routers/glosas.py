@@ -5174,6 +5174,68 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/comentarios-globales")
+def stats_comentarios_globales(
+    dias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R160 P1: estadísticas globales del hilo de comentarios.
+
+    Mide la actividad colaborativa del equipo (comentarios entre
+    auditores en glosas):
+      - cuántos comentarios hubo
+      - quién comenta más
+      - cuántas menciones sin resolver
+
+    Útil para entender el nivel de colaboración:
+      - Pocos comentarios → trabajo siloed
+      - Muchas menciones sin resolver → comunicación trabada
+
+    Ventana default 30d.
+    """
+    from datetime import timedelta, timezone
+
+    from app.models.db import ComentarioGlosaRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    coms = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.creado_en >= desde)
+        .all()
+    )
+
+    por_autor: dict[str, int] = {}
+    glosas_set: set[int] = set()
+    menciones_total = 0
+    menciones_resueltas = 0
+    for c in coms:
+        if c.autor_email:
+            por_autor[c.autor_email] = por_autor.get(c.autor_email, 0) + 1
+        if c.glosa_id is not None:
+            glosas_set.add(c.glosa_id)
+        if c.mencion:
+            menciones_total += 1
+            if c.resuelto:
+                menciones_resueltas += 1
+
+    top_5 = sorted(
+        por_autor.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+
+    return {
+        "ventana_dias": int(dias),
+        "total_comentarios": len(coms),
+        "glosas_con_comentarios": len(glosas_set),
+        "menciones_totales": menciones_total,
+        "menciones_resueltas": menciones_resueltas,
+        "menciones_pendientes": menciones_total - menciones_resueltas,
+        "top_5_comentaristas": [
+            {"autor": u, "comentarios": n} for u, n in top_5
+        ],
+    }
+
+
 @router.get("/stats/por-anio")
 def stats_por_anio(
     db: Session = Depends(get_db),
