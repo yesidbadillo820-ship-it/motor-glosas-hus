@@ -1960,6 +1960,50 @@ def clonar_glosa(
     }
 
 
+@router.get("/{glosa_id}/firma-dictamen")
+def obtener_firma_dictamen(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R84 P1: genera la firma digital del dictamen actual.
+
+    Útil para evidenciar integridad antes de radicar a la EPS:
+    si la EPS modifica el documento, el hash cambia y la firma
+    deja de validar.
+
+    Usa RSA asimétrica si FIRMA_DIGITAL_PRIVATE_KEY está configurada
+    (R50 P8); fallback a HMAC con SECRET_KEY.
+
+    Devuelve:
+      {
+        "glosa_id": 42,
+        "hash": "sha256-hex",
+        "firma": "base64",
+        "timestamp": "ISO",
+        "firmante": "auditor@hus.com",
+        "alg": "RSA-PSS-SHA256-v1" | "HMAC-SHA256",
+        "verificable": "Endpoint /firma/verificar (futuro)"
+      }
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not glosa.dictamen:
+        raise HTTPException(400, "La glosa no tiene dictamen generado")
+
+    from app.services.firma_digital import firmar_dictamen
+    info = firmar_dictamen(
+        texto_dictamen=glosa.dictamen,
+        firmante_email=current_user.email,
+        glosa_id=glosa.id,
+    )
+    return {
+        "glosa_id": glosa.id,
+        **info,
+    }
+
+
 @router.get("/{glosa_id}/dictamen.txt")
 def descargar_dictamen_txt(
     glosa_id: int,
