@@ -402,6 +402,26 @@ def ai_cache_stats(
     }
 
 
+@router.post("/ai-cache/limpiar")
+def limpiar_ai_cache(
+    dias: int = 30,
+    dry_run: bool = False,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R86 P2: limpia el cache de respuestas IA con corte configurable.
+
+    Variante manual del scheduler de mantenimiento (R57 P2). Útil
+    cuando el admin quiere forzar limpieza con un threshold distinto
+    al default 30 días (ej. dias=7 para liberar espacio agresivamente
+    antes de un demo).
+
+    Reusa la función pura de R57 P1.
+    """
+    from app.services.mantenimiento import purgar_ai_cache_viejo
+    return purgar_ai_cache_viejo(db, dias=int(dias), dry_run=dry_run)
+
+
 @router.post("/mantenimiento/purgar")
 def mantenimiento_purgar(
     dry_run: bool = False,
