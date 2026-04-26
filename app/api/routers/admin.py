@@ -1070,6 +1070,52 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/glosas-saldo-cero-detalle")
+def admin_glosas_saldo_cero_detalle(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R360 P1: glosas abiertas con saldo_factura = 0.
+
+    Una glosa abierta sin saldo pendiente es ambigua:
+    posiblemente fue pagada parcialmente, mal codificada,
+    o falta actualizar. Útil para ronda de calidad.
+
+    Solo SUPER_ADMIN.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(
+            (GlosaRecord.saldo_factura == 0)
+            | (GlosaRecord.saldo_factura.is_(None))
+        )
+        .filter(GlosaRecord.valor_factura > 0)
+        .order_by(GlosaRecord.valor_factura.desc())
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_factura": int(float(g.valor_factura or 0)),
+            "saldo_factura": int(float(g.saldo_factura or 0)),
+        })
+
+    return {
+        "total_glosas_anomalas": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/glosas-vencen-manana")
 def admin_glosas_vencen_manana(
     db: Session = Depends(get_db),
