@@ -2344,6 +2344,88 @@ def validar_rapido_glosa(
     }
 
 
+@router.get("/stats/tendencia-diaria")
+def stats_tendencia_diaria(
+    dias: int = Query(30, ge=1, le=180),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R72 P1: serie temporal diaria de glosas creadas.
+
+    Útil para gráficos de línea en dashboard:
+      - Detectar spikes (días con muchas glosas → carga de trabajo)
+      - Tendencia semanal (lunes vs viernes)
+      - Comparación mes-a-mes
+
+    GET /glosas/stats/tendencia-diaria?dias=30
+
+    Devuelve serie completa (rellenando días con 0 glosas):
+      {
+        "ventana_dias": 30,
+        "serie": [
+          {"fecha": "2026-04-01", "count": 5, "valor_objetado": 250000},
+          {"fecha": "2026-04-02", "count": 0, "valor_objetado": 0},
+          ...
+        ]
+      }
+    """
+    from datetime import date, timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+
+    desde = (ahora_utc() - timedelta(days=int(dias))).date()
+
+    # Agregar por fecha (truncando a date)
+    rows = (
+        db.query(
+            _f.date(GlosaRecord.creado_en).label("fecha"),
+            _f.count(GlosaRecord.id),
+            _f.sum(GlosaRecord.valor_objetado),
+        )
+        .filter(GlosaRecord.creado_en >= desde)
+        .group_by(_f.date(GlosaRecord.creado_en))
+        .all()
+    )
+
+    # Indexar por fecha
+    por_fecha = {}
+    for fecha, count, valor in rows:
+        # SQLAlchemy puede devolver date o str según el motor
+        if isinstance(fecha, str):
+            from datetime import datetime
+            try:
+                fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
+            except Exception:
+                continue
+        por_fecha[fecha.isoformat()] = {
+            "count": int(count or 0),
+            "valor_objetado": float(valor or 0),
+        }
+
+    # Rellenar serie completa
+    serie = []
+    hoy = ahora_utc().date()
+    cursor = desde
+    while cursor <= hoy:
+        clave = cursor.isoformat()
+        info = por_fecha.get(clave, {"count": 0, "valor_objetado": 0.0})
+        serie.append({
+            "fecha": clave,
+            "count": info["count"],
+            "valor_objetado": info["valor_objetado"],
+        })
+        cursor += timedelta(days=1)
+
+    return {
+        "ventana_dias": dias,
+        "total_glosas": sum(s["count"] for s in serie),
+        "valor_total": sum(s["valor_objetado"] for s in serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/por-tipo")
 def stats_por_tipo_glosa(
     dias: int = Query(90, ge=1, le=365),
