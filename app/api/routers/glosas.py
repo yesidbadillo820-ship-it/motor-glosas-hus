@@ -6273,6 +6273,68 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/codigo-glosa-eps-cruzado")
+def stats_codigo_glosa_eps_cruzado(
+    codigo: str = Query(..., min_length=2),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R305 P1: para un codigo_glosa, qué EPS lo usan más.
+
+    Reverso de /stats/eps-codigo-pareja. Dado un código,
+    devuelve la lista de EPS que lo usan, con su frecuencia
+    y tasa de levantamiento.
+
+    Útil para: "¿qué EPS golpea más con TA0801?".
+    """
+    codigo_q = (codigo or "").strip()
+    if not codigo_q:
+        return {"codigo_glosa": "", "items": []}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.codigo_glosa.ilike(codigo_q))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {
+            "count": 0, "lev": 0, "dec": 0, "valor": 0.0,
+        })
+        b["count"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        estado = (g.estado or "").upper()
+        if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA"):
+            b["dec"] += 1
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for eps, b in bucket.items():
+        tasa = (
+            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "count": b["count"],
+            "decididas": b["dec"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+            "valor_objetado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "codigo_glosa": codigo_q,
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-tiempo-en-pipeline")
 def stats_eps_tiempo_en_pipeline(
     min_glosas: int = Query(3, ge=1, le=50),
