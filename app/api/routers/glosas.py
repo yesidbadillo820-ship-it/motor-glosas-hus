@@ -5174,6 +5174,71 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/por-anio")
+def stats_por_anio(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R157 P2: serie anual de glosas creadas y cerradas.
+
+    Vista de largo plazo de la operación. Útil para reporting
+    a JD / gerencia ("evolución últimos 5 años") y comparativos
+    año vs año.
+
+    Por año:
+      - creadas: glosas con creado_en en el año
+      - cerradas: glosas con fecha_decision_eps en el año
+      - valor_recuperado_anual
+
+    Devuelve serie ascendente.
+    """
+    from datetime import timezone
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_anio: dict[str, dict] = {}
+
+    def _ensure(k):
+        if k not in por_anio:
+            por_anio[k] = {
+                "creadas": 0, "cerradas": 0, "valor_rec": 0.0,
+            }
+        return por_anio[k]
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    for g in glosas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if cre:
+            _ensure(str(cre.year))["creadas"] += 1
+
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        estado = (g.estado or "").upper()
+        if dec and estado in ESTADOS_CERRADOS:
+            b = _ensure(str(dec.year))
+            b["cerradas"] += 1
+            b["valor_rec"] += float(g.valor_recuperado or 0)
+
+    serie = []
+    for k in sorted(por_anio.keys()):
+        b = por_anio[k]
+        serie.append({
+            "anio": k,
+            "creadas": b["creadas"],
+            "cerradas": b["cerradas"],
+            "valor_recuperado": int(b["valor_rec"]),
+        })
+
+    return {
+        "total_anios_con_actividad": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/por-dia-semana")
 def stats_por_dia_semana(
     dias: int = Query(90, ge=7, le=365),
