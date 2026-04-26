@@ -3136,6 +3136,86 @@ def stats_por_gestor(
     }
 
 
+@router.get("/stats/concentracion-pareto")
+def stats_concentracion_pareto(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R113 P1: análisis Pareto (80/20) sobre EPS y valor.
+
+    Identifica si el valor está concentrado en pocas EPS:
+      - ¿Cuántas EPS aportan el 80% del valor objetado?
+      - ¿Cuál es el coeficiente de Gini?
+
+    Útil para entender la dependencia HUS-EPS:
+      - Alta concentración: foco en pocas EPS clave
+      - Baja concentración: gestión más distribuida
+
+    Devuelve:
+      - eps_para_80_pct: int (cuántas EPS suman 80% del valor)
+      - top_eps_concentracion: serie con cumulative_pct
+      - gini_coefficient: 0 (igual) ... 1 (concentración total)
+    """
+    glosas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, float] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        por_eps[eps] = por_eps.get(eps, 0.0) + float(g.valor_objetado or 0)
+
+    if not por_eps:
+        return {
+            "total_eps": 0,
+            "valor_total": 0,
+            "eps_para_80_pct": 0,
+            "gini_coefficient": 0.0,
+            "top_eps_concentracion": [],
+        }
+
+    valores = sorted(por_eps.values(), reverse=True)
+    total = sum(valores)
+
+    # Pareto: cuántas EPS para 80%
+    acumulado = 0.0
+    eps_80 = 0
+    cuantas_para_80 = 0
+    for i, v in enumerate(valores):
+        acumulado += v
+        if acumulado / total >= 0.80 and cuantas_para_80 == 0:
+            cuantas_para_80 = i + 1
+            break
+
+    # Gini coefficient (formulación Lorenz)
+    n = len(valores)
+    valores_asc = sorted(valores)
+    suma_pesada = sum((i + 1) * v for i, v in enumerate(valores_asc))
+    gini = (2 * suma_pesada) / (n * sum(valores_asc)) - (n + 1) / n
+    gini = round(gini, 4)
+
+    # Top concentración (DESC) con cumulative_pct
+    items_eps = sorted(por_eps.items(), key=lambda x: x[1], reverse=True)
+    cum = 0.0
+    top_concentracion = []
+    for eps, v in items_eps[:20]:  # Top 20
+        cum += v
+        top_concentracion.append({
+            "eps": eps,
+            "valor": int(v),
+            "pct_individual": round(100 * v / total, 2),
+            "pct_acumulado": round(100 * cum / total, 2),
+        })
+
+    return {
+        "total_eps": len(por_eps),
+        "valor_total": int(total),
+        "eps_para_80_pct": cuantas_para_80,
+        "gini_coefficient": gini,
+        "top_eps_concentracion": top_concentracion,
+    }
+
+
 @router.get("/stats/comparativa-eps")
 def stats_comparativa_eps(
     min_glosas: int = Query(5, ge=1, le=100,
