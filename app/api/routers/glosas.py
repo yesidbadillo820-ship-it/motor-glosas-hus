@@ -1956,6 +1956,59 @@ def exportar_paquete_multi_zip(
     )
 
 
+@router.get("/top-antiguas")
+def top_glosas_antiguas(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R199 P1: top N glosas abiertas más antiguas.
+
+    Diferente a /top-urgentes (por dias_restantes): aquí por
+    fecha_creacion. Detecta glosas que llevan demasiado tiempo
+    en el sistema sin cerrarse — riesgo regulatorio + costo
+    operativo.
+
+    Devuelve top N ordenado ASC por creado_en (la más vieja
+    primero) con antiguedad_dias.
+
+    Declarado ANTES de /{glosa_id} para evitar collision.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .order_by(GlosaRecord.creado_en.asc())
+        .limit(int(top))
+        .all()
+    )
+
+    ahora = ahora_utc()
+    items = []
+    for g in glosas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        antig = (ahora - cre).days if cre else None
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "creado_en": cre.isoformat() if cre else None,
+            "antiguedad_dias": antig,
+            "valor_objetado": float(g.valor_objetado or 0),
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "items": items,
+    }
+
+
 @router.get("/top-urgentes")
 def top_glosas_urgentes(
     top: int = Query(20, ge=1, le=100),
