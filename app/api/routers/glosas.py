@@ -5174,6 +5174,60 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/cerradas-hoy")
+def stats_cerradas_hoy(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R176 P1: contador en vivo de glosas cerradas hoy.
+
+    Cuenta glosas con fecha_decision_eps en el día actual y
+    estado en cerrados.
+
+    Devuelve:
+      - count
+      - levantadas / aceptadas
+      - valor_recuperado_total
+      - tasa_levantamiento_pct
+    """
+    inicio_hoy = ahora_utc().replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    levantadas = 0
+    aceptadas = 0
+    valor_rec = 0.0
+    for g in glosas:
+        e = (g.estado or "").upper()
+        if e == "LEVANTADA":
+            levantadas += 1
+        elif e == "ACEPTADA":
+            aceptadas += 1
+        valor_rec += float(g.valor_recuperado or 0)
+
+    decididas = levantadas + aceptadas
+    tasa = (
+        round(100 * levantadas / decididas, 2) if decididas else 0.0
+    )
+
+    return {
+        "fecha": inicio_hoy.date().isoformat(),
+        "count": len(glosas),
+        "levantadas": levantadas,
+        "aceptadas": aceptadas,
+        "valor_recuperado_total": int(valor_rec),
+        "tasa_levantamiento_pct": tasa,
+    }
+
+
 @router.get("/stats/creadas-hoy")
 def stats_creadas_hoy(
     db: Session = Depends(get_db),
