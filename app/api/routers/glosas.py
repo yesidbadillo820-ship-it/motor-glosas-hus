@@ -5331,6 +5331,55 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/proceso-bilateral")
+def stats_proceso_bilateral(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R197 P1: estado del proceso bilateral HUS-EPS.
+
+    Muestra el funnel completo del proceso:
+      RADICADA → RESPONDIDA → RATIFICADA → CONCILIADA →
+      LEVANTADA / ACEPTADA / ARCHIVADA
+
+    Para cada estado: count + valor pendiente.
+
+    Útil para visualizar el embudo y dónde se pierde más valor.
+    """
+    glosas = db.query(GlosaRecord).all()
+
+    ESTADOS_PIPELINE = [
+        "RADICADA", "RESPONDIDA", "RATIFICADA",
+        "CONCILIADA", "LEVANTADA", "ACEPTADA",
+        "ARCHIVADA", "EXTEMPORANEA",
+    ]
+    por_estado: dict[str, dict] = {
+        e: {"count": 0, "valor": 0.0} for e in ESTADOS_PIPELINE
+    }
+
+    for g in glosas:
+        e = (g.estado or "").upper().strip() or "(SIN_ESTADO)"
+        if e in por_estado:
+            por_estado[e]["count"] += 1
+            por_estado[e]["valor"] += float(g.valor_objetado or 0)
+
+    items = []
+    for e in ESTADOS_PIPELINE:
+        b = por_estado[e]
+        items.append({
+            "estado": e,
+            "count": b["count"],
+            "valor": int(b["valor"]),
+        })
+
+    total = sum(it["count"] for it in items)
+
+    return {
+        "total_glosas": total,
+        "pipeline": items,
+    }
+
+
 @router.get("/stats/mas-comentadas")
 def stats_mas_comentadas(
     top: int = Query(20, ge=1, le=100),
