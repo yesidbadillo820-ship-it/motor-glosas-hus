@@ -5908,6 +5908,58 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/multi-concepto-ratio")
+def stats_multi_concepto_ratio(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R213 P1: ratio de glosas multi-concepto vs simples.
+
+    Mide qué porcentaje de las glosas tienen múltiples
+    conceptos (ConceptoGlosaRecord) vs son glosas "simples"
+    de un solo ítem.
+
+    Útil para entender la complejidad del trabajo:
+      - Multi-concepto = más esfuerzo de IA + auditor
+      - Simples = trámite directo
+
+    Devuelve totales + ratio_multi_pct + promedio.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import ConceptoGlosaRecord
+
+    total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
+
+    rows = (
+        db.query(
+            ConceptoGlosaRecord.glosa_id,
+            _f.count().label("n"),
+        )
+        .filter(ConceptoGlosaRecord.glosa_id.isnot(None))
+        .group_by(ConceptoGlosaRecord.glosa_id)
+        .all()
+    )
+
+    glosas_con_conceptos = len(rows)
+    glosas_multi = sum(1 for _, n in rows if n > 1)
+    promedio_conceptos = (
+        sum(n for _, n in rows) / len(rows) if rows else 0
+    )
+
+    return {
+        "total_glosas": int(total_glosas),
+        "glosas_con_conceptos": glosas_con_conceptos,
+        "glosas_multi_concepto": glosas_multi,
+        "glosas_simples": glosas_con_conceptos - glosas_multi,
+        "ratio_multi_pct": (
+            round(100 * glosas_multi / glosas_con_conceptos, 2)
+            if glosas_con_conceptos else 0.0
+        ),
+        "promedio_conceptos_por_glosa": round(promedio_conceptos, 2),
+    }
+
+
 @router.get("/stats/audit-mas-cambiada")
 def stats_audit_mas_cambiada(
     top: int = Query(20, ge=1, le=100),
