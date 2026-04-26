@@ -6273,6 +6273,54 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/edad-promedio-por-estado")
+def stats_edad_promedio_por_estado(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R324 P1: edad promedio (días desde creado_en) por estado.
+
+    Para cada valor del campo `estado`, cuál es la edad
+    promedio de las glosas que están en él. Distingue
+    entre estados normales (corta edad) y "atascos"
+    (estados donde glosas envejecen mucho).
+    """
+    from datetime import timezone
+
+    rows = db.query(GlosaRecord).all()
+    ahora = ahora_utc()
+
+    bucket: dict[str, list[int]] = {}
+    for g in rows:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        edad = (ahora - cre).days
+        estado = (g.estado or "?").upper()
+        bucket.setdefault(estado, []).append(edad)
+
+    items = []
+    for estado, ages in bucket.items():
+        n = len(ages)
+        prom = round(sum(ages) / n, 1) if n else 0.0
+        ord_a = sorted(ages)
+        med = ord_a[n // 2]
+        items.append({
+            "estado": estado,
+            "count": n,
+            "edad_promedio_dias": prom,
+            "edad_mediana_dias": med,
+            "edad_max_dias": max(ages),
+        })
+    items.sort(key=lambda x: x["edad_promedio_dias"], reverse=True)
+
+    return {
+        "items": items,
+    }
+
+
 @router.get("/stats/gestor-vencidas-distribucion")
 def stats_gestor_vencidas_distribucion(
     db: Session = Depends(get_db),
