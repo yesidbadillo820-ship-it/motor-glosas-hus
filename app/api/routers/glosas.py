@@ -6273,6 +6273,77 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/comentarios-actividad-mensual")
+def stats_comentarios_actividad_mensual(
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R276 P1: actividad mensual de comentarios internos.
+
+    Diferente a /stats/comentarios-globales (snapshot
+    actual): aquí serie temporal mes-a-mes de los
+    comentarios creados.
+
+    Por mes:
+      - count_comentarios
+      - autores_distintos
+      - menciones (con @ a otros)
+      - resueltos (porcentaje)
+
+    Útil para medir colaboración del equipo en el tiempo.
+    """
+    from datetime import timedelta, timezone
+
+    from app.models.db import ComentarioGlosaRecord
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    rows = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.creado_en >= desde)
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for c in rows:
+        cre = c.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {
+            "count": 0, "autores": set(),
+            "menciones": 0, "resueltos": 0,
+        })
+        b["count"] += 1
+        if c.autor_email:
+            b["autores"].add(c.autor_email)
+        if c.mencion:
+            b["menciones"] += 1
+        if int(c.resuelto or 0) == 1:
+            b["resueltos"] += 1
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        b = por_mes[k]
+        pct = round(100 * b["resueltos"] / b["count"], 2) if b["count"] else 0.0
+        serie.append({
+            "mes": k,
+            "count_comentarios": b["count"],
+            "autores_distintos": len(b["autores"]),
+            "menciones": b["menciones"],
+            "resueltos": b["resueltos"],
+            "pct_resueltos": pct,
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "total_meses": len(serie),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/heatmap-mes-eps")
 def stats_heatmap_mes_eps(
     meses: int = Query(6, ge=1, le=24),
