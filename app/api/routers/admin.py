@@ -740,6 +740,61 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/conciliaciones-proximas")
+def admin_conciliaciones_proximas(
+    dias: int = 14,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R207 P1: conciliaciones con audiencia próxima.
+
+    Lista las que tienen fecha_audiencia entre hoy y +N días.
+    Útil para preparación: "estas son las audiencias de las
+    próximas 2 semanas, prepara los argumentos".
+
+    Devuelve listado ordenado ASC por fecha_audiencia.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import ConciliacionRecord
+
+    ahora = ahora_utc()
+    futuro = ahora + timedelta(days=int(dias))
+
+    todas = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.fecha_audiencia.isnot(None))
+        .all()
+    )
+
+    items = []
+    for c in todas:
+        fa = c.fecha_audiencia
+        if fa and fa.tzinfo is None:
+            fa = fa.replace(tzinfo=timezone.utc)
+        if not fa or fa < ahora or fa > futuro:
+            continue
+        dias_para = (fa - ahora).days
+        items.append({
+            "id": c.id,
+            "glosa_id": c.glosa_id,
+            "fecha_audiencia": fa.isoformat(),
+            "estado_bilateral": c.estado_bilateral,
+            "dias_para_audiencia": dias_para,
+            "valor_ratificado_hus": float(c.valor_ratificado_hus or 0),
+        })
+    items.sort(key=lambda x: x["dias_para_audiencia"])
+
+    return {
+        "ventana_dias": int(dias),
+        "total_proximas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/conciliaciones-vencidas")
 def admin_conciliaciones_vencidas(
     db: Session = Depends(get_db),
