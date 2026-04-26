@@ -5131,6 +5131,73 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/pacientes-frecuentes")
+def stats_pacientes_frecuentes(
+    top: int = Query(20, ge=1, le=100),
+    min_glosas: int = Query(2, ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R141 P1: pacientes con más glosas asociadas.
+
+    Útil para detectar:
+      - Pacientes complejos con múltiples hospitalizaciones
+      - Casos de litigio prioritario (mismo paciente, varias glosas)
+      - Posibles patrones clínicos sistémicos
+
+    Devuelve top N pacientes con >= min_glosas (default 2):
+      - paciente
+      - count_glosas
+      - facturas_distintas
+      - eps_distintas
+      - valor_objetado_total
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.paciente.isnot(None))
+        .all()
+    )
+
+    por_paciente: dict[str, dict] = {}
+    for g in glosas:
+        nombre = (g.paciente or "").strip()
+        if not nombre:
+            continue
+        if nombre not in por_paciente:
+            por_paciente[nombre] = {
+                "count": 0,
+                "facturas": set(),
+                "epss": set(),
+                "valor": 0.0,
+            }
+        b = por_paciente[nombre]
+        b["count"] += 1
+        if g.factura and g.factura != "N/A":
+            b["facturas"].add(g.factura)
+        if g.eps:
+            b["epss"].add(g.eps)
+        b["valor"] += float(g.valor_objetado or 0)
+
+    items = []
+    for paciente, b in por_paciente.items():
+        if b["count"] < min_glosas:
+            continue
+        items.append({
+            "paciente": paciente,
+            "count_glosas": b["count"],
+            "facturas_distintas": len(b["facturas"]),
+            "eps_distintas": len(b["epss"]),
+            "valor_objetado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count_glosas"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_pacientes_recurrentes": len(items),
+        "items": items[:top],
+    }
+
+
 @router.get("/stats/cups-mas-objetados")
 def stats_cups_mas_objetados(
     top: int = Query(20, ge=1, le=100),
