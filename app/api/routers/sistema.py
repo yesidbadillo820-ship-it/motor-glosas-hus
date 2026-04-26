@@ -1174,6 +1174,50 @@ def cumplimiento_resolucion(
     }
 
 
+@router.get("/about")
+def info_about(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R250 P1: about page del sistema.
+
+    Información organizacional + técnica para la pantalla
+    "Acerca de" de la app.
+
+    Útil para:
+      - Pantalla de splash/about
+      - Documentación técnica
+      - Onboarding de nuevos usuarios
+    """
+    return {
+        "nombre": "Motor Glosas HUS — IA SINAC SC",
+        "descripcion": (
+            "Sistema de gestión y respuesta automatizada de glosas "
+            "con IA bajo Resolución 2284/2023 del MinSalud Colombia"
+        ),
+        "institucion": "Hospital Universitario de Santander",
+        "regulacion": [
+            "Resolución 2284/2023 - Manual Único Glosas",
+            "Habeas Data Ley 1581/2012",
+            "Historia Clínica Resolución 1995/1999",
+            "CUPS Resolución 2641/2025",
+        ],
+        "tecnologia": {
+            "framework": "FastAPI + Pydantic v2",
+            "orm": "SQLAlchemy",
+            "db": "PostgreSQL",
+            "llm": "Claude Sonnet 4.6 (Anthropic) + Groq Llama 3.3",
+            "auth": "JWT + 2FA TOTP",
+            "hosting": "Render",
+        },
+        "soporte": {
+            "github_issues": (
+                "https://github.com/yesidbadillo820-ship-it/"
+                "motor-glosas-hus/issues"
+            ),
+        },
+    }
+
+
 @router.get("/uptime-aprox")
 def info_uptime_aprox(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
