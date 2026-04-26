@@ -795,6 +795,115 @@ def info_test_suite(
     }
 
 
+@router.get("/kpis-negocio")
+def info_kpis_negocio(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R151 P1: KPIs ejecutivos consolidados (single-call).
+
+    Reporta los 8 KPIs principales en un solo round-trip,
+    pensados para pantallas de gerencia / reporting periódico.
+
+    KPIs:
+      1. tasa_levantamiento_global_pct
+      2. tasa_recuperacion_global_pct
+      3. valor_recuperado_acumulado
+      4. valor_pendiente_actual
+      5. tiempo_promedio_resolucion_dias
+      6. glosas_cerradas_30d
+      7. tasa_cumplimiento_sla_30d_pct (cerradas a tiempo)
+      8. eps_top_recuperacion (la EPS con más recuperado)
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    todas = db.query(GlosaRecord).all()
+    ahora = ahora_utc()
+    desde_30 = ahora - timedelta(days=30)
+
+    decididas = 0
+    levantadas = 0
+    valor_obj_cerradas = 0.0
+    valor_rec_total = 0.0
+    valor_pendiente_actual = 0.0
+    tiempos = []
+    cerradas_30d = 0
+    cerradas_a_tiempo_30d = 0
+    cerradas_total_con_venc_30d = 0
+    rec_por_eps: dict[str, float] = {}
+
+    for g in todas:
+        v_obj = float(g.valor_objetado or 0)
+        v_rec = float(g.valor_recuperado or 0)
+        valor_rec_total += v_rec
+
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_CERRADOS:
+            valor_obj_cerradas += v_obj
+            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+                decididas += 1
+                if estado == "LEVANTADA":
+                    levantadas += 1
+            if g.eps:
+                rec_por_eps[g.eps] = rec_por_eps.get(g.eps, 0.0) + v_rec
+
+            dec = g.fecha_decision_eps
+            if dec and dec.tzinfo is None:
+                dec = dec.replace(tzinfo=timezone.utc)
+            cre = g.creado_en
+            if cre and cre.tzinfo is None:
+                cre = cre.replace(tzinfo=timezone.utc)
+
+            if dec and cre:
+                tiempos.append((dec - cre).days)
+            if dec and dec >= desde_30:
+                cerradas_30d += 1
+                if g.fecha_vencimiento:
+                    venc = g.fecha_vencimiento
+                    if venc.tzinfo is None:
+                        venc = venc.replace(tzinfo=timezone.utc)
+                    cerradas_total_con_venc_30d += 1
+                    if dec <= venc:
+                        cerradas_a_tiempo_30d += 1
+        else:
+            valor_pendiente_actual += v_obj
+
+    tasa_lev = (
+        round(100 * levantadas / decididas, 2) if decididas else 0.0
+    )
+    tasa_rec = (
+        round(100 * valor_rec_total / valor_obj_cerradas, 2)
+        if valor_obj_cerradas else 0.0
+    )
+    tiempo_prom = (
+        round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
+    )
+    tasa_sla = (
+        round(100 * cerradas_a_tiempo_30d / cerradas_total_con_venc_30d, 2)
+        if cerradas_total_con_venc_30d else 0.0
+    )
+    eps_top = max(rec_por_eps, key=rec_por_eps.get) if rec_por_eps else None
+
+    return {
+        "tasa_levantamiento_global_pct": tasa_lev,
+        "tasa_recuperacion_global_pct": tasa_rec,
+        "valor_recuperado_acumulado": int(valor_rec_total),
+        "valor_pendiente_actual": int(valor_pendiente_actual),
+        "tiempo_promedio_resolucion_dias": tiempo_prom,
+        "glosas_cerradas_30d": cerradas_30d,
+        "tasa_cumplimiento_sla_30d_pct": tasa_sla,
+        "eps_top_recuperacion": eps_top,
+        "calculado_en": ahora.isoformat(),
+    }
+
+
 @router.get("/milestones")
 def info_milestones(
     db: Session = Depends(get_db),
