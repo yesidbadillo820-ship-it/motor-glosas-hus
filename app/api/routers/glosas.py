@@ -5174,6 +5174,71 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/eps-actividad-mensual")
+def stats_eps_actividad_mensual(
+    eps: str = Query(..., min_length=2),
+    meses: int = Query(12, ge=1, le=36),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R181 P1: serie mensual de actividad para una EPS.
+
+    Para una EPS específica, devuelve la evolución mes a mes:
+      - cuántas glosas inició
+      - cuánto valor objetó
+      - cuánto recuperamos
+
+    Útil para gráficos por EPS individual y detectar
+    aceleraciones / desaceleraciones:
+      "SANITAS pasó de 50 glosas/mes a 200 → algo cambió"
+
+    Param `eps`: nombre exacto.
+    """
+    from datetime import timezone
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.strftime("%Y-%m")
+        if k not in por_mes:
+            por_mes[k] = {
+                "count": 0, "valor_obj": 0.0, "valor_rec": 0.0,
+            }
+        b = por_mes[k]
+        b["count"] += 1
+        b["valor_obj"] += float(g.valor_objetado or 0)
+        b["valor_rec"] += float(g.valor_recuperado or 0)
+
+    todos_meses = sorted(por_mes.keys())
+    meses_recientes = todos_meses[-int(meses):]
+    serie = []
+    for k in meses_recientes:
+        b = por_mes[k]
+        serie.append({
+            "mes": k,
+            "glosas_iniciadas": b["count"],
+            "valor_objetado": int(b["valor_obj"]),
+            "valor_recuperado": int(b["valor_rec"]),
+        })
+
+    return {
+        "eps": eps,
+        "meses_solicitados": int(meses),
+        "total_meses_disponibles": len(todos_meses),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/dashboard-light")
 def stats_dashboard_light(
     db: Session = Depends(get_db),
