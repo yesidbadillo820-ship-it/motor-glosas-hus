@@ -942,6 +942,76 @@ def admin_reporte_mensual_csv(
     )
 
 
+@router.get("/inconsistencias-datos")
+def admin_inconsistencias_datos(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R133 P1: detecta inconsistencias estructurales en datos.
+
+    Revisa reglas de integridad:
+      1. Glosas LEVANTADA con valor_recuperado=0 (¿se cobró?)
+      2. Glosas ACEPTADA con valor_recuperado>0 (no debería)
+      3. Glosas con fecha_decision_eps pero estado abierto
+      4. Glosas con dias_restantes negativo en estado cerrado
+      5. Glosas sin EPS (no debería pasar por NOT NULL pero check)
+
+    Útil para limpieza de datos y auditoría regulatoria.
+
+    Devuelve por regla: count + sample (max 5 IDs).
+
+    Solo SUPER_ADMIN.
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = db.query(GlosaRecord).all()
+
+    incons = {
+        "levantadas_sin_recupero": [],
+        "aceptadas_con_recupero": [],
+        "decision_eps_en_estado_abierto": [],
+        "dias_negativos_en_cerrada": [],
+        "sin_eps": [],
+    }
+
+    for g in glosas:
+        estado = (g.estado or "").upper()
+
+        if estado == "LEVANTADA" and float(g.valor_recuperado or 0) == 0:
+            incons["levantadas_sin_recupero"].append(g.id)
+
+        if estado == "ACEPTADA" and float(g.valor_recuperado or 0) > 0:
+            incons["aceptadas_con_recupero"].append(g.id)
+
+        if g.fecha_decision_eps and estado not in ESTADOS_CERRADOS:
+            incons["decision_eps_en_estado_abierto"].append(g.id)
+
+        if (estado in ESTADOS_CERRADOS and
+                (g.dias_restantes or 0) < 0):
+            incons["dias_negativos_en_cerrada"].append(g.id)
+
+        if not g.eps:
+            incons["sin_eps"].append(g.id)
+
+    items = []
+    for regla, ids in incons.items():
+        items.append({
+            "regla": regla,
+            "count": len(ids),
+            "sample_ids": ids[:5],
+        })
+
+    total = sum(it["count"] for it in items)
+
+    return {
+        "total_inconsistencias": total,
+        "reglas_evaluadas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/timeline-equipo")
 def admin_timeline_equipo(
     horas: int = 24,
