@@ -6273,6 +6273,58 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/glosas-grandes-perdidas")
+def stats_glosas_grandes_perdidas(
+    umbral: float = Query(5_000_000, ge=10_000),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R330 P1: glosas de alto valor que terminaron ratificadas.
+
+    Lista las glosas con valor_objetado >= umbral que
+    terminaron en RATIFICADA o ACEPTADA (HUS perdió).
+    Útil para análisis post-mortem: ¿qué casos grandes
+    perdimos? ¿por qué?
+
+    Ordenado DESC por valor_objetado.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(["RATIFICADA", "ACEPTADA"]))
+        .filter(GlosaRecord.valor_objetado >= float(umbral))
+        .order_by(GlosaRecord.valor_objetado.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_aceptado": int(float(g.valor_aceptado or 0)),
+            "gestor_nombre": g.gestor_nombre,
+            "fecha_decision_eps": (
+                g.fecha_decision_eps.isoformat()
+                if g.fecha_decision_eps else None
+            ),
+        })
+
+    return {
+        "umbral": int(umbral),
+        "total_grandes_perdidas": len(items),
+        "valor_total_perdido": sum(
+            it["valor_aceptado"] for it in items
+        ),
+        "items": items,
+    }
+
+
 @router.get("/stats/auditor-emails-distribucion")
 def stats_auditor_emails_distribucion(
     db: Session = Depends(get_db),
