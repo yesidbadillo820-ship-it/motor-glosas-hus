@@ -5908,6 +5908,61 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/audit-mas-cambiada")
+def stats_audit_mas_cambiada(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R211 P1: glosas con más eventos audit (más editadas).
+
+    Diferente a /stats/glosas-mas-refinadas (versiones de
+    dictamen): aquí TODOS los eventos audit de la glosa.
+
+    Útil para identificar:
+      - Casos de litigio complejo con muchos cambios
+      - Posible edición sospechosa (modificaciones repetidas)
+
+    Devuelve top N glosas ordenado DESC por eventos audit.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import AuditLogRecord
+
+    rows = (
+        db.query(
+            AuditLogRecord.registro_id,
+            _f.count().label("n"),
+        )
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.registro_id.isnot(None))
+        .group_by(AuditLogRecord.registro_id)
+        .order_by(_f.count().desc())
+        .limit(int(top))
+        .all()
+    )
+
+    items = []
+    for glosa_id, n in rows:
+        g = db.query(GlosaRecord).filter(
+            GlosaRecord.id == glosa_id,
+        ).first()
+        if not g:
+            continue
+        items.append({
+            "glosa_id": glosa_id,
+            "n_eventos_audit": int(n),
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "items": items,
+    }
+
+
 @router.get("/stats/glosas-mas-refinadas")
 def stats_glosas_mas_refinadas(
     top: int = Query(20, ge=1, le=100),
