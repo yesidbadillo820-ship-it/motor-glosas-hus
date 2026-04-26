@@ -5174,6 +5174,70 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/recuperacion-promedio-por-eps")
+def stats_recuperacion_promedio_por_eps(
+    min_glosas: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R182 P1: valor recuperado promedio por glosa, por EPS.
+
+    Diferente a /stats/comparativa-eps (% tasa) y
+    /stats/promedio-por-eps (valor objetado): aquí valor
+    recuperado promedio por glosa CERRADA.
+
+    Útil para detectar:
+      - EPS donde recuperamos más por glosa (rentables)
+      - EPS donde recuperamos poco a pesar de mucho esfuerzo
+
+    Filtra por min_glosas (default 3).
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"count": 0, "rec": 0.0, "obj": 0.0}
+        b = por_eps[eps]
+        b["count"] += 1
+        b["rec"] += float(g.valor_recuperado or 0)
+        b["obj"] += float(g.valor_objetado or 0)
+
+    items = []
+    for eps, b in por_eps.items():
+        if b["count"] < min_glosas:
+            continue
+        promedio = b["rec"] / b["count"] if b["count"] else 0
+        tasa = (
+            round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "glosas_cerradas": b["count"],
+            "valor_recuperado_total": int(b["rec"]),
+            "valor_recuperado_promedio": round(promedio, 2),
+            "tasa_recuperacion_pct": tasa,
+        })
+    items.sort(
+        key=lambda x: x["valor_recuperado_promedio"], reverse=True,
+    )
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-actividad-mensual")
 def stats_eps_actividad_mensual(
     eps: str = Query(..., min_length=2),
