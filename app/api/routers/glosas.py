@@ -2013,6 +2013,70 @@ def stats_por_codigo_respuesta(
     }
 
 
+@router.get("/stats/por-eps")
+def stats_por_eps(
+    dias: int = Query(90, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R68 P2: distribución de glosas por EPS con tasa de recuperación.
+
+    Útil para identificar:
+      - EPS más conflictivas (más glosas formuladas)
+      - EPS que más recursos absorben (mayor valor objetado)
+      - EPS donde tenemos peor tasa de éxito (rev pertinencia)
+      - EPS donde defendemos bien (replicar argumentos)
+
+    Devuelve por EPS:
+      count, valor_objetado, valor_aceptado, valor_recuperado,
+      tasa_exito_pct (= valor_recuperado / valor_objetado * 100)
+
+    Ordenado DESC por valor_objetado.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    rows = (
+        db.query(
+            GlosaRecord.eps,
+            _f.count(GlosaRecord.id),
+            _f.sum(GlosaRecord.valor_objetado),
+            _f.sum(GlosaRecord.valor_aceptado),
+        )
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.eps.isnot(None))
+        .group_by(GlosaRecord.eps)
+        .all()
+    )
+
+    items = []
+    for eps, count, v_obj, v_ac in rows:
+        v_obj = float(v_obj or 0)
+        v_ac = float(v_ac or 0)
+        v_rec = v_obj - v_ac
+        tasa = (v_rec / v_obj * 100) if v_obj > 0 else 0
+        items.append({
+            "eps": eps,
+            "count": count,
+            "valor_objetado": v_obj,
+            "valor_aceptado": v_ac,
+            "valor_recuperado": v_rec,
+            "tasa_exito_pct": round(tasa, 1),
+        })
+    items.sort(key=lambda x: x["valor_objetado"], reverse=True)
+
+    return {
+        "ventana_dias": dias,
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/{glosa_id}/timeline")
 def timeline_glosa(
     glosa_id: int,
