@@ -6000,6 +6000,60 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/eps-peor-tasa")
+def stats_eps_peor_tasa(
+    min_decididas: int = Query(5, ge=1, le=100),
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R228 P1: top EPS donde HUS tiene PEOR tasa.
+
+    Contraparte de /stats/eps-mejor-tasa. Útil para identificar
+    EPS con dificultades:
+      "Contra X EPS, solo levantamos 10% — ¿qué hacemos
+       diferente?"
+
+    Filtra por min_decididas (default 5).
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"decididas": 0, "levantadas": 0}
+        por_eps[eps]["decididas"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            por_eps[eps]["levantadas"] += 1
+
+    items = []
+    for eps, b in por_eps.items():
+        if b["decididas"] < min_decididas:
+            continue
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2)
+        items.append({
+            "eps": eps,
+            "decididas": b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["tasa_levantamiento_pct"])
+
+    return {
+        "min_decididas_filtro": int(min_decididas),
+        "items": items[:int(top)],
+    }
+
+
 @router.get("/stats/eps-mejor-tasa")
 def stats_eps_mejor_tasa(
     min_decididas: int = Query(5, ge=1, le=100),
