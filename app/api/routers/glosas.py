@@ -3605,6 +3605,78 @@ def stats_proyeccion_recuperacion(
     }
 
 
+@router.get("/stats/abandono-por-etapa")
+def stats_abandono_por_etapa(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R106 P1: identifica en qué etapa se "atascan" más las glosas.
+
+    Útil para detectar bottlenecks del proceso:
+      - ¿Las glosas mueren en RESPUESTA_PRIMERA?
+      - ¿Hay un cuello en RATIFICACION?
+
+    Devuelve por etapa:
+      - total_glosas
+      - abiertas (no cerradas)
+      - tasa_abandono_pct (% que sigue en esta etapa)
+      - tiempo_promedio_dias (cuánto llevan en la etapa, basado en
+        días desde creación)
+
+    Ordenado DESC por tasa_abandono_pct.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    todas = db.query(GlosaRecord).all()
+    ahora = ahora_utc()
+
+    por_etapa: dict[str, dict] = {}
+    for g in todas:
+        etapa = (g.etapa or "SIN_ETAPA").strip() or "SIN_ETAPA"
+        if etapa not in por_etapa:
+            por_etapa[etapa] = {
+                "total": 0, "abiertas": 0, "tiempos": [],
+            }
+        b = por_etapa[etapa]
+        b["total"] += 1
+
+        estado = (g.estado or "").upper()
+        if estado not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+            if g.creado_en:
+                creado = g.creado_en
+                if creado.tzinfo is None:
+                    creado = creado.replace(tzinfo=timezone.utc)
+                b["tiempos"].append((ahora - creado).days)
+
+    items = []
+    for etapa, b in por_etapa.items():
+        tiempo_prom = (
+            round(sum(b["tiempos"]) / len(b["tiempos"]), 2)
+            if b["tiempos"] else 0.0
+        )
+        tasa = (
+            round(100 * b["abiertas"] / b["total"], 2)
+            if b["total"] else 0.0
+        )
+        items.append({
+            "etapa": etapa,
+            "total_glosas": b["total"],
+            "abiertas": b["abiertas"],
+            "tasa_abandono_pct": tasa,
+            "tiempo_promedio_dias_abiertas": tiempo_prom,
+        })
+
+    items.sort(key=lambda x: x["tasa_abandono_pct"], reverse=True)
+
+    return {
+        "total_etapas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigos-mas-objetados")
 def stats_codigos_mas_objetados(
     top: int = Query(20, ge=1, le=100),
