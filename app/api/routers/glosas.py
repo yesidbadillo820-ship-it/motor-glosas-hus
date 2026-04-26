@@ -3566,6 +3566,70 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/forecast-cierres")
+def stats_forecast_cierres(
+    semanas: int = Query(8, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R115 P2: proyección de cierres en las próximas N semanas.
+
+    Basado en velocidad_diaria_promedio_30d (de R115 P1) extrapolado
+    a futuro. Modelo simple: lineal, asume velocidad estable.
+
+    Útil para gráficos de proyección "burndown" del backlog:
+      - ¿Cuándo terminamos de cerrar las 500 pendientes?
+      - ¿La velocidad actual alcanza para el deadline?
+
+    Devuelve serie semanal:
+      [{"semana": "2026-W18", "cierres_estimados": 35,
+        "pendientes_restantes_estimados": 465}, ...]
+    """
+    from datetime import timedelta, timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    ahora = ahora_utc()
+    desde_30 = ahora - timedelta(days=30)
+
+    cerradas_30d = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .filter(GlosaRecord.fecha_decision_eps >= desde_30)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .count()
+    )
+    velocidad_diaria = cerradas_30d / 30 if cerradas_30d else 0
+    velocidad_semanal = velocidad_diaria * 7
+
+    pendientes_actuales = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .count()
+    )
+
+    serie = []
+    pendientes = pendientes_actuales
+    for w in range(1, int(semanas) + 1):
+        cierres = min(int(velocidad_semanal), pendientes)
+        pendientes -= cierres
+        fecha = ahora + timedelta(weeks=w)
+        serie.append({
+            "semana": f"{fecha.year}-W{fecha.isocalendar()[1]:02d}",
+            "cierres_estimados": cierres,
+            "pendientes_restantes_estimados": max(0, pendientes),
+        })
+        if pendientes <= 0:
+            break
+
+    return {
+        "semanas_solicitadas": int(semanas),
+        "velocidad_semanal_actual": round(velocidad_semanal, 2),
+        "pendientes_inicial": pendientes_actuales,
+        "serie": serie,
+    }
+
+
 @router.get("/stats/velocidad-equipo")
 def stats_velocidad_equipo(
     db: Session = Depends(get_db),
