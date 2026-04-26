@@ -6086,6 +6086,76 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/cartera-por-eps")
+def stats_cartera_por_eps(
+    solo_abiertas: bool = Query(True),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R262 P1: cartera (saldo_factura) consolidada por EPS.
+
+    Diferente a /stats/cobranza-por-eps (basado en
+    valor_objetado): aquí usamos `saldo_factura` que viene
+    del módulo de cartera del DGH. Es el saldo real
+    pendiente en libros, no el monto objetado.
+
+    Por EPS:
+      - count_glosas
+      - saldo_total (sum saldo_factura)
+      - valor_factura_total (sum valor_factura)
+      - pct_saldo (saldo_total / valor_factura_total)
+
+    Si `solo_abiertas` (default True), excluye glosas en
+    estados terminales.
+
+    Ordenado DESC por saldo_total.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    q = db.query(GlosaRecord).filter(GlosaRecord.eps.isnot(None))
+    if solo_abiertas:
+        q = q.filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+    rows = q.all()
+
+    por_eps: dict[str, dict] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = por_eps.setdefault(eps, {
+            "count": 0, "saldo": 0.0, "valor": 0.0,
+        })
+        b["count"] += 1
+        b["saldo"] += float(g.saldo_factura or 0)
+        b["valor"] += float(g.valor_factura or 0)
+
+    items = []
+    for eps, b in por_eps.items():
+        pct = round(100 * b["saldo"] / b["valor"], 2) if b["valor"] else 0.0
+        items.append({
+            "eps": eps,
+            "count_glosas": b["count"],
+            "saldo_total": int(b["saldo"]),
+            "valor_factura_total": int(b["valor"]),
+            "pct_saldo": pct,
+        })
+    items.sort(key=lambda x: x["saldo_total"], reverse=True)
+
+    saldo_global = sum(it["saldo_total"] for it in items)
+    valor_global = sum(it["valor_factura_total"] for it in items)
+    pct_global = (
+        round(100 * saldo_global / valor_global, 2) if valor_global else 0.0
+    )
+
+    return {
+        "solo_abiertas": bool(solo_abiertas),
+        "saldo_total": saldo_global,
+        "valor_factura_total": valor_global,
+        "pct_saldo_global": pct_global,
+        "items": items,
+    }
+
+
 @router.get("/stats/calidad-dictamen-por-gestor")
 def stats_calidad_dictamen_por_gestor(
     min_glosas: int = Query(3, ge=1, le=100),
