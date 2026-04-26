@@ -740,6 +740,69 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/heatmap-usuario")
+def admin_heatmap_usuario(
+    usuario_email: str,
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R188 P1: heatmap día×hora de actividad de un usuario específico.
+
+    Para investigar patrones individuales:
+      "¿Alice trabaja a horas extrañas?"
+      "¿Bob tiene picos los lunes?"
+
+    Devuelve matriz sparse 7×24 con eventos audit del usuario.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    if not usuario_email or len(usuario_email) < 3:
+        raise HTTPException(400, "usuario_email requerido")
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.usuario_email == usuario_email)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .all()
+    )
+
+    matriz: dict[tuple[int, int], int] = {}
+    for e in eventos:
+        ts = e.timestamp
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if not ts:
+            continue
+        key = (ts.weekday(), ts.hour)
+        matriz[key] = matriz.get(key, 0) + 1
+
+    DIAS = ["Lunes", "Martes", "Miércoles", "Jueves",
+            "Viernes", "Sábado", "Domingo"]
+    items = []
+    for (dia_idx, hora), count in matriz.items():
+        items.append({
+            "dia_semana": dia_idx,
+            "dia_nombre": DIAS[dia_idx],
+            "hora": hora,
+            "count": count,
+        })
+    items.sort(key=lambda x: (x["dia_semana"], x["hora"]))
+
+    return {
+        "usuario_email": usuario_email,
+        "ventana_dias": int(dias),
+        "total_eventos": len(eventos),
+        "items": items,
+    }
+
+
 @router.get("/stats-asignacion")
 def admin_stats_asignacion(
     db: Session = Depends(get_db),
