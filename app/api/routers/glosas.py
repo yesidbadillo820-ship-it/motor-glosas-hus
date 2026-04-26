@@ -3299,6 +3299,89 @@ def stats_concentracion_pareto(
     }
 
 
+@router.get("/stats/cobranza-por-eps")
+def stats_cobranza_por_eps(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R122 P2: ranking de EPS por valor pendiente de cobro.
+
+    Cruza /stats/cobranza-pendiente (global) con la EPS deudora
+    para identificar contra quién hay más plata por defender:
+      "$50M pendientes de SANITAS, $30M de NUEVA EPS, ..."
+
+    Devuelve top N EPS ordenadas DESC por valor_pendiente con:
+      - count_pendientes
+      - valor_pendiente (sum de valor_objetado en abiertas)
+      - valor_recuperable_estimado (con tasa histórica de la EPS)
+      - tasa_historica_recuperacion_pct
+      - antiguedad_promedio_dias
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ahora = ahora_utc()
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {
+                "pendiente_count": 0, "pendiente_valor": 0.0,
+                "antiguedades": [],
+                "cerradas_obj": 0.0, "cerradas_rec": 0.0,
+            }
+        b = por_eps[eps]
+        v = float(g.valor_objetado or 0)
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_CERRADOS:
+            b["cerradas_obj"] += v
+            b["cerradas_rec"] += float(g.valor_recuperado or 0)
+        else:
+            b["pendiente_count"] += 1
+            b["pendiente_valor"] += v
+            creado = g.creado_en
+            if creado and creado.tzinfo is None:
+                creado = creado.replace(tzinfo=timezone.utc)
+            if creado:
+                b["antiguedades"].append((ahora - creado).days)
+
+    items = []
+    for eps, b in por_eps.items():
+        if b["pendiente_count"] == 0:
+            continue
+        tasa_hist = (
+            round(100 * b["cerradas_rec"] / b["cerradas_obj"], 2)
+            if b["cerradas_obj"] else 0.0
+        )
+        recuperable = b["pendiente_valor"] * (tasa_hist / 100)
+        antig_prom = (
+            round(sum(b["antiguedades"]) / len(b["antiguedades"]), 1)
+            if b["antiguedades"] else 0.0
+        )
+        items.append({
+            "eps": eps,
+            "count_pendientes": b["pendiente_count"],
+            "valor_pendiente": int(b["pendiente_valor"]),
+            "tasa_historica_recuperacion_pct": tasa_hist,
+            "valor_recuperable_estimado": int(recuperable),
+            "antiguedad_promedio_dias": antig_prom,
+        })
+    items.sort(key=lambda x: x["valor_pendiente"], reverse=True)
+
+    return {
+        "top_solicitado": int(top),
+        "total_eps_con_pendientes": len(items),
+        "valor_pendiente_global": sum(it["valor_pendiente"] for it in items),
+        "items": items[:top],
+    }
+
+
 @router.get("/stats/cobranza-pendiente")
 def stats_cobranza_pendiente(
     db: Session = Depends(get_db),
