@@ -16760,6 +16760,259 @@ def sla_glosa(
     }
 
 
+@router.get("/{glosa_id}/asistente-ficha")
+def asistente_ficha(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R370 P1: asistente inteligente al abrir una glosa.
+
+    Single-call que devuelve TODO lo que el gestor
+    necesita para decidir cómo actuar en esta glosa,
+    sin que tenga que pedirlo:
+
+      - probabilidad_levantamiento: heurística mixta
+      - casos_similares: 3 casos resueltos misma EPS+código
+      - codigo_respuesta_sugerido: el que mejor tasa tuvo
+        en el par (eps, codigo_glosa)
+      - alerta_dictamen: si está corto/vacío
+      - factura_contexto: glosas hermanas en la factura
+      - urgencia: nivel según dias_restantes
+      - acciones_sugeridas: lista priorizada
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    # ─── Probabilidad heurística par + gestor ─────
+    pares = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .filter(GlosaRecord.id != glosa.id)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .all()
+    )
+    n_par = len(pares)
+    lev_par = sum(
+        1 for g in pares if (g.estado or "").upper() == "LEVANTADA"
+    )
+    tasa_par = round(100 * lev_par / n_par, 2) if n_par else None
+
+    tasa_gestor = None
+    n_gestor = 0
+    if glosa.gestor_nombre:
+        gpQ = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.gestor_nombre == glosa.gestor_nombre)
+            .filter(GlosaRecord.id != glosa.id)
+            .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+            .all()
+        )
+        n_gestor = len(gpQ)
+        lev_g = sum(
+            1 for g in gpQ if (g.estado or "").upper() == "LEVANTADA"
+        )
+        tasa_gestor = (
+            round(100 * lev_g / n_gestor, 2) if n_gestor else None
+        )
+
+    if tasa_par is not None and tasa_gestor is not None:
+        prob = round(tasa_par * 0.6 + tasa_gestor * 0.4, 2)
+    elif tasa_par is not None:
+        prob = tasa_par
+    elif tasa_gestor is not None:
+        prob = tasa_gestor
+    else:
+        prob = None
+
+    # ─── Casos similares (3) ─────
+    casos = []
+    casos_q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .filter(GlosaRecord.id != glosa.id)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .limit(3)
+        .all()
+    )
+    for c in casos_q:
+        d = c.dictamen or ""
+        casos.append({
+            "glosa_id": c.id,
+            "estado": c.estado,
+            "valor_objetado": int(float(c.valor_objetado or 0)),
+            "valor_recuperado": int(float(c.valor_recuperado or 0)),
+            "dictamen_extracto": (
+                d[:160] + ("…" if len(d) > 160 else "")
+            ),
+        })
+
+    # ─── codigo_respuesta sugerido (mejor tasa en el par) ─────
+    cr_bucket: dict[str, dict] = {}
+    for c in pares:
+        cr = (c.codigo_respuesta or "").strip()
+        if not cr:
+            continue
+        b = cr_bucket.setdefault(cr, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (c.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+    cr_sugerido = None
+    if cr_bucket:
+        ranked = []
+        for cr, b in cr_bucket.items():
+            if b["dec"] < 2:
+                continue
+            ranked.append((cr, 100 * b["lev"] / b["dec"], b["dec"]))
+        if ranked:
+            ranked.sort(key=lambda x: (x[1], x[2]), reverse=True)
+            cr_sugerido = {
+                "codigo_respuesta": ranked[0][0],
+                "tasa_levantamiento_pct": round(ranked[0][1], 2),
+                "muestras": ranked[0][2],
+            }
+
+    # ─── Alerta dictamen ─────
+    dlen = len(glosa.dictamen or "")
+    alerta_dictamen = None
+    if dlen == 0:
+        alerta_dictamen = (
+            "No has escrito dictamen. "
+            "Considera mirar los casos similares antes de redactar."
+        )
+    elif dlen < 50:
+        alerta_dictamen = (
+            f"Dictamen muy corto ({dlen} chars). "
+            "Los dictámenes >200 chars históricamente ganan más."
+        )
+
+    # ─── Contexto factura ─────
+    factura_ctx = None
+    f = (glosa.factura or "").strip()
+    if f and f != "N/A":
+        hermanas = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.factura == f)
+            .all()
+        )
+        abiertas_h = sum(
+            1 for g in hermanas
+            if (g.estado or "").upper() not in ESTADOS_CERRADOS
+        )
+        factura_ctx = {
+            "factura": f,
+            "total_glosas_factura": len(hermanas),
+            "glosas_abiertas": abiertas_h,
+            "valor_objetado_total": int(sum(
+                float(g.valor_objetado or 0) for g in hermanas
+            )),
+        }
+
+    # ─── Urgencia ─────
+    dr = glosa.dias_restantes if glosa.dias_restantes is not None else None
+    if dr is None:
+        urgencia = {"nivel": "DESCONOCIDA", "mensaje": "Sin SLA registrada"}
+    elif dr < 0:
+        urgencia = {
+            "nivel": "VENCIDA",
+            "mensaje": f"Vencida hace {abs(dr)} días",
+        }
+    elif dr == 0:
+        urgencia = {"nivel": "HOY", "mensaje": "Vence hoy"}
+    elif dr <= 3:
+        urgencia = {
+            "nivel": "CRITICA", "mensaje": f"Vence en {dr} días",
+        }
+    elif dr <= 7:
+        urgencia = {
+            "nivel": "PROXIMA", "mensaje": f"Vence en {dr} días",
+        }
+    else:
+        urgencia = {
+            "nivel": "NORMAL", "mensaje": f"Vence en {dr} días",
+        }
+
+    # ─── Acciones sugeridas (priorizadas) ─────
+    acciones = []
+    if (glosa.estado or "").upper() in ESTADOS_CERRADOS:
+        acciones.append({
+            "prioridad": 1,
+            "tipo": "INFO",
+            "mensaje": "Esta glosa ya está cerrada — solo lectura",
+        })
+    else:
+        if dr is not None and dr < 0:
+            acciones.append({
+                "prioridad": 1, "tipo": "URGENTE",
+                "mensaje": (
+                    f"Glosa vencida hace {abs(dr)}d. Cierra hoy."
+                ),
+            })
+        elif dr is not None and dr <= 3:
+            acciones.append({
+                "prioridad": 1, "tipo": "IMPORTANTE",
+                "mensaje": f"Vence en {dr}d — atender hoy",
+            })
+        if alerta_dictamen:
+            acciones.append({
+                "prioridad": 2, "tipo": "DICTAMEN",
+                "mensaje": alerta_dictamen,
+            })
+        if cr_sugerido:
+            acciones.append({
+                "prioridad": 3, "tipo": "SUGERENCIA",
+                "mensaje": (
+                    f"Considera responder con "
+                    f"{cr_sugerido['codigo_respuesta']} — "
+                    f"{cr_sugerido['tasa_levantamiento_pct']}% de "
+                    "éxito en casos iguales"
+                ),
+            })
+        if prob is not None and prob >= 70:
+            acciones.append({
+                "prioridad": 4, "tipo": "POSITIVA",
+                "mensaje": (
+                    f"Alta probabilidad de levantamiento ({prob}%) — "
+                    "vale el esfuerzo"
+                ),
+            })
+        elif prob is not None and prob < 30:
+            acciones.append({
+                "prioridad": 4, "tipo": "PRECAUCION",
+                "mensaje": (
+                    f"Baja probabilidad histórica ({prob}%) — "
+                    "considera conciliar"
+                ),
+            })
+
+    return {
+        "glosa_id": glosa.id,
+        "eps": glosa.eps,
+        "codigo_glosa": glosa.codigo_glosa,
+        "estado": glosa.estado,
+        "probabilidad": {
+            "levantamiento_pct": prob,
+            "tasa_par_eps_codigo_pct": tasa_par,
+            "n_par": n_par,
+            "tasa_gestor_pct": tasa_gestor,
+            "n_gestor": n_gestor,
+        },
+        "codigo_respuesta_sugerido": cr_sugerido,
+        "casos_similares": casos,
+        "alerta_dictamen": alerta_dictamen,
+        "factura_contexto": factura_ctx,
+        "urgencia": urgencia,
+        "acciones_sugeridas": acciones,
+    }
+
+
 @router.get("/{glosa_id}/casos-similares-resueltos")
 def casos_similares_resueltos(
     glosa_id: int,
