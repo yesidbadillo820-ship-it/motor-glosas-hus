@@ -5908,6 +5908,107 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/dashboard-completo")
+def stats_dashboard_completo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R225 P1: dashboard mega-completo en single-call.
+
+    Combina TODAS las métricas que un coordinador querría ver
+    en una sola pantalla, sin múltiples requests.
+
+    Secciones:
+      - kpis_globales (4 KPIs principales)
+      - urgencia (4 bandas)
+      - top_3_eps_pendientes
+      - actividad_hoy (creadas, cerradas)
+
+    Pensado como single-call autosuficiente para mobile/PWA.
+    """
+    from sqlalchemy import func as _f
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    inicio_hoy = ahora_utc().replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
+    abiertas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    valor_pendiente = (
+        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_objetado), 0))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    valor_recuperado_total = (
+        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0))
+        .scalar() or 0
+    )
+
+    abiertas_glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    urgencia = {
+        "VENCIDA": 0, "CRITICA": 0, "PROXIMA": 0, "LEJANA": 0,
+    }
+    for g in abiertas_glosas:
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            urgencia["VENCIDA"] += 1
+        elif dr <= 3:
+            urgencia["CRITICA"] += 1
+        elif dr <= 7:
+            urgencia["PROXIMA"] += 1
+        else:
+            urgencia["LEJANA"] += 1
+
+    por_eps_valor: dict[str, float] = {}
+    for g in abiertas_glosas:
+        if g.eps:
+            por_eps_valor[g.eps] = (
+                por_eps_valor.get(g.eps, 0.0)
+                + float(g.valor_objetado or 0)
+            )
+    top_3 = sorted(
+        por_eps_valor.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+
+    creadas_hoy = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.creado_en >= inicio_hoy)
+        .scalar() or 0
+    )
+    cerradas_hoy = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+
+    return {
+        "kpis_globales": {
+            "total_glosas": int(total_glosas),
+            "abiertas": int(abiertas),
+            "valor_pendiente": int(valor_pendiente),
+            "valor_recuperado_acumulado": int(valor_recuperado_total),
+        },
+        "urgencia": urgencia,
+        "top_3_eps_pendientes": [
+            {"eps": e, "valor_pendiente": int(v)} for e, v in top_3
+        ],
+        "actividad_hoy": {
+            "creadas": int(creadas_hoy),
+            "cerradas": int(cerradas_hoy),
+        },
+    }
+
+
 @router.get("/stats/dictamen-vs-tasa-exito")
 def stats_dictamen_vs_tasa_exito(
     db: Session = Depends(get_db),
