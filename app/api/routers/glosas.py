@@ -6086,6 +6086,69 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/tercero-nit-resumen")
+def stats_tercero_nit_resumen(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R265 P1: resumen por NIT del tercero (entidad responsable).
+
+    Cuando una EPS tiene varias razones sociales o filiales,
+    el campo `tercero_nit` permite agruparlas por entidad
+    legal real. Ejemplo: SANITAS y SANITAS COMPLEMENTARIO
+    podrían compartir NIT.
+
+    Por NIT:
+      - tercero_nombre (uno representativo)
+      - count_glosas
+      - eps_distintas (cuántas razones sociales)
+      - valor_objetado_total
+      - valor_recuperado_total
+
+    Ordenado DESC por valor_objetado_total.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.tercero_nit.isnot(None))
+        .filter(GlosaRecord.tercero_nit != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        nit = (g.tercero_nit or "").strip()
+        if not nit:
+            continue
+        b = bucket.setdefault(nit, {
+            "nombre": g.tercero_nombre or g.eps or nit,
+            "count": 0, "eps": set(), "obj": 0.0, "rec": 0.0,
+        })
+        b["count"] += 1
+        if g.eps:
+            b["eps"].add(g.eps.strip())
+        b["obj"] += float(g.valor_objetado or 0)
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for nit, b in bucket.items():
+        items.append({
+            "tercero_nit": nit,
+            "tercero_nombre": b["nombre"],
+            "count_glosas": b["count"],
+            "eps_distintas": len(b["eps"]),
+            "valor_objetado_total": int(b["obj"]),
+            "valor_recuperado_total": int(b["rec"]),
+        })
+    items.sort(key=lambda x: x["valor_objetado_total"], reverse=True)
+
+    return {
+        "limit": int(limit),
+        "total_terceros": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/dgh-radicacion-tiempo")
 def stats_dgh_radicacion_tiempo(
     db: Session = Depends(get_db),
