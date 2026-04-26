@@ -406,6 +406,52 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/menciones-pendientes")
+def menciones_pendientes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R216 P1: comentarios donde mencionan al usuario actual,
+    sin resolver.
+
+    Detecta @usuario en comentarios de glosas. Útil para
+    notificaciones de "alguien necesita tu atención":
+      "Bob te mencionó en glosa #123"
+
+    Devuelve menciones DESC por creado_en con metadata.
+    """
+    from app.models.db import ComentarioGlosaRecord
+
+    coms = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.mencion == current_user.email)
+        .filter(
+            (ComentarioGlosaRecord.resuelto == 0)
+            | (ComentarioGlosaRecord.resuelto.is_(None))
+        )
+        .order_by(ComentarioGlosaRecord.creado_en.desc())
+        .all()
+    )
+
+    items = []
+    for c in coms:
+        items.append({
+            "id": c.id,
+            "glosa_id": c.glosa_id,
+            "autor_email": c.autor_email,
+            "texto": (c.texto or "")[:300],
+            "creado_en": (
+                c.creado_en.isoformat() if c.creado_en else None
+            ),
+        })
+
+    return {
+        "usuario_email": current_user.email,
+        "total_pendientes": len(items),
+        "items": items,
+    }
+
+
 @router.get("/yo/permisos")
 def permisos_del_usuario_actual(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
