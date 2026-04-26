@@ -334,6 +334,76 @@ def exportar_plantillas_gold(
     )
 
 
+@router.get("/no-usadas")
+def plantillas_no_usadas(
+    dias: int = 90,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R127 P2: plantillas gold sin uso reciente (candidatas a archivar).
+
+    Complementa /plantillas-gold/efectividad (top usadas) con la
+    contraparte: cuáles NO se han usado en N días o nunca.
+
+    Útil para curación de la biblioteca:
+      - Plantillas viejas que ya no aplican
+      - Plantillas mal taggeadas (nunca matchean glosas reales)
+
+    Devuelve plantillas activas con:
+      - usos = 0 (nunca usada) O ultima_uso_en < hoy - N dias
+
+    Cada plantilla con: dias_sin_uso (None si nunca usada).
+    Ordenado DESC por dias_sin_uso (los más obsoletos primero).
+    """
+    from datetime import timedelta, timezone
+
+    plantillas = (
+        db.query(PlantillaGoldRecord)
+        .filter(PlantillaGoldRecord.activa == 1)
+        .all()
+    )
+
+    ahora = ahora_utc()
+    corte = ahora - timedelta(days=int(dias))
+
+    items = []
+    for p in plantillas:
+        ult = p.ultima_uso_en
+        if ult is not None and ult.tzinfo is None:
+            ult = ult.replace(tzinfo=timezone.utc)
+
+        # Nunca usada O sin actividad en >N días
+        if ult is None or ult < corte:
+            dias_sin = (
+                (ahora - ult).days if ult else None
+            )
+            items.append({
+                "id": p.id,
+                "titulo": p.titulo,
+                "eps": p.eps,
+                "codigo_glosa": p.codigo_glosa,
+                "usos": p.usos or 0,
+                "ultima_uso_en": ult.isoformat() if ult else None,
+                "dias_sin_uso": dias_sin,
+                "creado_en": (
+                    p.creado_en.isoformat() if p.creado_en else None
+                ),
+            })
+
+    # nulls al final, los más antiguos arriba
+    items.sort(
+        key=lambda x: (x["dias_sin_uso"] is None,
+                       -(x["dias_sin_uso"] or 0)),
+    )
+
+    return {
+        "umbral_dias": int(dias),
+        "total_no_usadas": len(items),
+        "nunca_usadas": sum(1 for it in items if it["usos"] == 0),
+        "items": items,
+    }
+
+
 @router.get("/efectividad")
 def plantillas_efectividad(
     min_usos: int = 1,
