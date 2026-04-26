@@ -3566,6 +3566,75 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/velocidad-equipo")
+def stats_velocidad_equipo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R115 P1: throughput del equipo (glosas cerradas por período).
+
+    Mide la velocidad de cierre del equipo, útil para:
+      - Capacity planning ("¿podemos cerrar las 500 pendientes en
+        un mes con la velocidad actual?")
+      - Detectar caídas de productividad
+      - Trends semana-a-semana
+
+    Devuelve:
+      - cerradas_ultimos_7d / 30d / 90d (counts)
+      - velocidad_diaria_promedio_30d
+      - dias_para_cerrar_pendientes (estimado)
+    """
+    from datetime import timedelta, timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    ahora = ahora_utc()
+
+    cerradas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    cerradas_7d = 0
+    cerradas_30d = 0
+    cerradas_90d = 0
+    for g in cerradas:
+        dec = g.fecha_decision_eps
+        if dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        delta = (ahora - dec).days
+        if delta <= 7:
+            cerradas_7d += 1
+        if delta <= 30:
+            cerradas_30d += 1
+        if delta <= 90:
+            cerradas_90d += 1
+
+    pendientes = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .count()
+    )
+
+    velocidad_diaria_30d = round(cerradas_30d / 30, 2)
+    dias_para_cerrar = (
+        round(pendientes / velocidad_diaria_30d, 1)
+        if velocidad_diaria_30d > 0 else None
+    )
+
+    return {
+        "ahora": ahora.isoformat(),
+        "cerradas_ultimos_7d": cerradas_7d,
+        "cerradas_ultimos_30d": cerradas_30d,
+        "cerradas_ultimos_90d": cerradas_90d,
+        "velocidad_diaria_promedio_30d": velocidad_diaria_30d,
+        "pendientes_actuales": pendientes,
+        "dias_estimados_cerrar_pendientes": dias_para_cerrar,
+    }
+
+
 @router.get("/stats/desempeno-trimestral")
 def stats_desempeno_trimestral(
     trimestres: int = Query(8, ge=1, le=20),
