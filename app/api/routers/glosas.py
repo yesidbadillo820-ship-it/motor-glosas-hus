@@ -6280,6 +6280,110 @@ def versiones_resumen_glosa(
     }
 
 
+@router.get("/{glosa_id}/dialogo-bilateral")
+def dialogo_bilateral(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R138 P1: narrativa cronológica del intercambio HUS↔EPS.
+
+    Construye un diálogo entre las partes basado en datos reales:
+      1. EPS objeta: codigo_glosa + valor_objetado
+      2. HUS responde: dictamen + codigo_respuesta
+      3. EPS decide: decision_eps + valor_recuperado
+      4. (Opcional) Conciliación bilateral
+
+    Cada paso: {actor, fecha, mensaje, estado_resultante}.
+
+    Útil para mostrar la "historia" completa de la glosa de
+    forma legible para no-técnicos (legal, gerencia).
+    """
+    from datetime import timezone
+
+    from app.models.db import ConciliacionRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    pasos = []
+
+    # 1) EPS objeta
+    if glosa.creado_en:
+        ts = glosa.creado_en
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        valor = float(glosa.valor_objetado or 0)
+        pasos.append({
+            "actor": "EPS",
+            "fecha": ts.isoformat(),
+            "mensaje": (
+                f"Objeta con código {glosa.codigo_glosa or '?'} por "
+                f"${int(valor):,} COP"
+            ),
+            "estado_resultante": "RADICADA",
+        })
+
+    # 2) HUS responde
+    if glosa.dictamen and len(glosa.dictamen) > 50:
+        pasos.append({
+            "actor": "HUS",
+            "fecha": None,
+            "mensaje": (
+                f"Responde con código {glosa.codigo_respuesta or '?'} "
+                f"y dictamen técnico-jurídico "
+                f"({len(glosa.dictamen)} chars)"
+            ),
+            "estado_resultante": glosa.estado or "RESPONDIDA",
+        })
+
+    # 3) EPS decide
+    if glosa.decision_eps:
+        ts = glosa.fecha_decision_eps
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        v_rec = float(glosa.valor_recuperado or 0)
+        pasos.append({
+            "actor": "EPS",
+            "fecha": ts.isoformat() if ts else None,
+            "mensaje": (
+                f"Decisión: {glosa.decision_eps}. "
+                f"Recuperado: ${int(v_rec):,} COP"
+            ),
+            "estado_resultante": glosa.estado or "?",
+        })
+
+    # 4) Conciliación si existe
+    conciliaciones = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.glosa_id == glosa_id)
+        .order_by(ConciliacionRecord.creado_en.asc())
+        .all()
+    )
+    for c in conciliaciones:
+        ts = c.fecha_audiencia or c.creado_en
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        v_conc = float(c.valor_conciliado or 0)
+        pasos.append({
+            "actor": "BILATERAL",
+            "fecha": ts.isoformat() if ts else None,
+            "mensaje": (
+                f"Conciliación: {c.resultado or 'pendiente'}. "
+                f"Valor conciliado: ${int(v_conc):,} COP"
+            ),
+            "estado_resultante": c.estado_bilateral or "?",
+        })
+
+    return {
+        "glosa_id": glosa_id,
+        "estado_actual": glosa.estado,
+        "total_pasos": len(pasos),
+        "dialogo": pasos,
+    }
+
+
 @router.get("/{glosa_id}/historial-workflow")
 def historial_workflow(
     glosa_id: int,
