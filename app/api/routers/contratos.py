@@ -103,6 +103,136 @@ def ranking_contratos(
     }
 
 
+@router.get("/{eps}/perfil-detallado")
+def perfil_detallado_eps(
+    eps: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R121 P2: perfil 360º de una EPS — toda la info en single-call.
+
+    Combina:
+      - Métricas históricas (volumen, valores, tasas)
+      - Top códigos glosa que esta EPS objeta
+      - Códigos respuesta más exitosos contra esta EPS
+      - Tiempo promedio de decisión
+      - Glosas pendientes vs cerradas
+      - Última actividad
+
+    Útil al abrir el panel de un contrato sin tener que hacer
+    múltiples requests.
+    """
+    from datetime import timezone
+
+    from app.models.db import GlosaRecord
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .all()
+    )
+
+    if not glosas:
+        return {
+            "eps": eps,
+            "sin_historial": True,
+            "total_glosas": 0,
+        }
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    abiertas = [g for g in glosas if (g.estado or "").upper() not in ESTADOS_CERRADOS]
+    cerradas = [g for g in glosas if (g.estado or "").upper() in ESTADOS_CERRADOS]
+    levantadas = [g for g in cerradas if (g.estado or "").upper() == "LEVANTADA"]
+    decididas = [
+        g for g in cerradas
+        if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    ]
+
+    valor_obj = sum(float(g.valor_objetado or 0) for g in glosas)
+    valor_rec = sum(float(g.valor_recuperado or 0) for g in glosas)
+    valor_pendiente = sum(float(g.valor_objetado or 0) for g in abiertas)
+
+    # Top códigos glosa
+    por_codigo: dict[str, int] = {}
+    for g in glosas:
+        if g.codigo_glosa:
+            por_codigo[g.codigo_glosa] = por_codigo.get(g.codigo_glosa, 0) + 1
+    top_codigos = sorted(por_codigo.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # Códigos respuesta exitosos
+    por_resp: dict[str, dict] = {}
+    for g in cerradas:
+        cr = g.codigo_respuesta
+        if not cr:
+            continue
+        if cr not in por_resp:
+            por_resp[cr] = {"total": 0, "levantadas": 0}
+        por_resp[cr]["total"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            por_resp[cr]["levantadas"] += 1
+    resp_efectivos = []
+    for cr, b in por_resp.items():
+        tasa = round(100 * b["levantadas"] / b["total"], 2) if b["total"] else 0
+        resp_efectivos.append({
+            "codigo_respuesta": cr,
+            "usado": b["total"],
+            "tasa_exito_pct": tasa,
+        })
+    resp_efectivos.sort(key=lambda x: x["tasa_exito_pct"], reverse=True)
+
+    # Tiempo promedio decisión
+    tiempos = []
+    for g in cerradas:
+        if g.fecha_decision_eps and g.creado_en:
+            dec = g.fecha_decision_eps
+            cre = g.creado_en
+            if dec.tzinfo is None:
+                dec = dec.replace(tzinfo=timezone.utc)
+            if cre.tzinfo is None:
+                cre = cre.replace(tzinfo=timezone.utc)
+            tiempos.append((dec - cre).days)
+
+    # Última glosa creada (señal de actividad)
+    ultima = max(
+        (g.creado_en for g in glosas if g.creado_en),
+        default=None,
+    )
+
+    return {
+        "eps": eps,
+        "sin_historial": False,
+        "volumen": {
+            "total_glosas": len(glosas),
+            "abiertas": len(abiertas),
+            "cerradas": len(cerradas),
+            "decididas": len(decididas),
+            "levantadas": len(levantadas),
+        },
+        "economico": {
+            "valor_objetado_total": int(valor_obj),
+            "valor_recuperado_total": int(valor_rec),
+            "valor_pendiente": int(valor_pendiente),
+            "tasa_recuperacion_pct": (
+                round(100 * valor_rec / valor_obj, 2) if valor_obj else 0.0
+            ),
+        },
+        "resoluciones": {
+            "tasa_levantamiento_pct": (
+                round(100 * len(levantadas) / len(decididas), 2)
+                if decididas else 0.0
+            ),
+            "tiempo_promedio_decision_dias": (
+                round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
+            ),
+        },
+        "top_5_codigos_objetados": [
+            {"codigo": c, "veces": n} for c, n in top_codigos
+        ],
+        "codigos_respuesta_efectivos": resp_efectivos[:5],
+        "ultima_actividad": ultima.isoformat() if ultima else None,
+    }
+
+
 @router.get("/{eps}/glosas-historico")
 def historial_contrato(
     eps: str,
