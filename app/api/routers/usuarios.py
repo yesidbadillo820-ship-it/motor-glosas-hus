@@ -406,6 +406,57 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/glosas-asignadas-recientes")
+def yo_glosas_asignadas_recientes(
+    dias: int = 7,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R329 P1: glosas asignadas a mí en los últimos N días.
+
+    Lista las glosas creadas en los últimos N días (default
+    7) donde tu nombre figura como gestor. Útil como
+    "qué llegó nuevo a mi mesa esta semana".
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    desde = ahora_utc() - timedelta(days=int(dias))
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.creado_en >= desde)
+        .order_by(GlosaRecord.creado_en.desc())
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "dias_restantes": g.dias_restantes,
+        })
+
+    return {
+        "usuario_email": current_user.email,
+        "ventana_dias": int(dias),
+        "total_recientes": len(items),
+        "items": items,
+    }
+
+
 @router.get("/yo/glosas-cerradas-mes")
 def yo_glosas_cerradas_mes(
     limit: int = 100,
