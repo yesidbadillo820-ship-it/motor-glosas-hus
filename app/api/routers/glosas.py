@@ -6086,6 +6086,54 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/eps-pacientes-top")
+def stats_eps_pacientes_top(
+    eps: str = Query(..., min_length=2),
+    top: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R246 P1: top pacientes con más glosas para una EPS específica.
+
+    Útil para identificar pacientes "calientes" en una EPS:
+      "Pedro tiene 8 glosas con SANITAS, casos relacionados"
+
+    Param `eps`: nombre exacto.
+
+    Devuelve top N ordenado DESC por count.
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .filter(GlosaRecord.paciente.isnot(None))
+        .all()
+    )
+
+    por_pac: dict[str, dict] = {}
+    for g in glosas:
+        pac = (g.paciente or "").strip()
+        if not pac:
+            continue
+        if pac not in por_pac:
+            por_pac[pac] = {"count": 0, "valor": 0.0}
+        por_pac[pac]["count"] += 1
+        por_pac[pac]["valor"] += float(g.valor_objetado or 0)
+
+    items = []
+    for pac, b in por_pac.items():
+        items.append({
+            "paciente": pac,
+            "count": b["count"],
+            "valor_objetado_total": int(b["valor"]),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "eps": eps,
+        "items": items[:int(top)],
+    }
+
+
 @router.get("/stats/tiempo-cierre-promedio")
 def stats_tiempo_cierre_promedio(
     db: Session = Depends(get_db),
