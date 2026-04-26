@@ -2340,6 +2340,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       <h3 id="modal-titulo">Dictamen Jurídico</h3>
       <div style="display:flex;gap:.5rem">
         <button class="btn-sm" style="background:#2563eb;color:#fff;border:0;" onclick="imprimirDictamenModal()" title="Imprimir o descargar PDF del dictamen">📄 PDF</button>
+        <button class="btn-sm ghost" onclick="descargarDictamenMd()" title="Descargar dictamen como archivo Markdown (.md) para edición externa">📝 .MD</button>
         <button class="btn-sm ghost" onclick="copiarDictamenModal()" title="Copiar texto del dictamen al portapapeles">📋 Copiar</button>
         <button class="btn-sm ghost" onclick="verHistorialVersiones()" title="Historial de versiones del dictamen">📜 Versiones</button>
         <button class="btn-sm ghost" onclick="guardarComoPlantillaGold()" title="Guardar este argumento como plantilla ganadora">⭐ Gold</button>
@@ -4117,6 +4118,25 @@ async function verHistorialVersiones(){
     html += '</body></html>';
     w.document.write(html); w.document.close();
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// R69 P3: descarga el dictamen actual como archivo Markdown
+async function descargarDictamenMd(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/dictamen.md', {headers: authH()});
+    if(r.status === 400){ toast('Sin dictamen','Esta glosa no tiene dictamen generado','warning'); return; }
+    if(!r.ok){ toast('Error', 'HTTP ' + r.status, 'error'); return; }
+    var blob = await r.blob();
+    var dispo = r.headers.get('content-disposition') || '';
+    var m = dispo.match(/filename="([^"]+)"/);
+    var fname = m ? m[1] : 'dictamen-glosa-' + CURRENT_GLOSA_ID + '.md';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Descargado', fname, 'success');
+  } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 // R67 P3: muestra timeline consolidado de la glosa en una popup
