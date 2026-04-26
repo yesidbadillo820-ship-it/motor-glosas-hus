@@ -5908,6 +5908,61 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/dictamen-calidad-distribucion")
+def stats_dictamen_calidad_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R222 P1: distribución de longitud de dictamen.
+
+    Categoriza dictámenes por chars:
+      - SIN_DICTAMEN: NULL/vacío
+      - MUY_CORTO: <100
+      - CORTO: 100-499
+      - MEDIO: 500-1999
+      - LARGO: >=2000
+
+    Útil para entender la calidad de los dictámenes generados.
+    """
+    glosas = db.query(GlosaRecord).all()
+
+    bandas = {
+        "SIN_DICTAMEN": 0,
+        "MUY_CORTO": 0,
+        "CORTO": 0,
+        "MEDIO": 0,
+        "LARGO": 0,
+    }
+    for g in glosas:
+        if not g.dictamen or not g.dictamen.strip():
+            bandas["SIN_DICTAMEN"] += 1
+            continue
+        n = len(g.dictamen)
+        if n < 100:
+            bandas["MUY_CORTO"] += 1
+        elif n < 500:
+            bandas["CORTO"] += 1
+        elif n < 2000:
+            bandas["MEDIO"] += 1
+        else:
+            bandas["LARGO"] += 1
+
+    total = sum(bandas.values())
+    items = []
+    for nombre, count in bandas.items():
+        pct = round(100 * count / total, 2) if total else 0.0
+        items.append({
+            "banda": nombre,
+            "count": count,
+            "pct": pct,
+        })
+
+    return {
+        "total_glosas": total,
+        "items": items,
+    }
+
+
 @router.get("/stats/decisiones-eps-detalle")
 def stats_decisiones_eps_detalle(
     eps: str = Query(..., min_length=2),
