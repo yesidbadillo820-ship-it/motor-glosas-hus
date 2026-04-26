@@ -5431,6 +5431,56 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/criticas-economicas")
+def stats_criticas_economicas(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R201 P1: top glosas con MAYOR valor + MENOR dias_restantes.
+
+    Combina urgencia + cuantía con score:
+      score = valor_objetado / max(1, dias_restantes + 30)
+      (más alto = más prioritaria)
+
+    Útil para que el coordinador atienda primero las glosas
+    "donde se queman millones de pesos por hora".
+
+    Solo abiertas, ordenado DESC por score.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    items = []
+    for g in abiertas:
+        valor = float(g.valor_objetado or 0)
+        if valor <= 0:
+            continue
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        score = valor / max(1, dr + 30)
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "valor_objetado": valor,
+            "dias_restantes": dr,
+            "score_urgencia_economica": round(score, 2),
+        })
+    items.sort(
+        key=lambda x: x["score_urgencia_economica"], reverse=True,
+    )
+
+    return {
+        "top_solicitado": int(top),
+        "items": items[:int(top)],
+    }
+
+
 @router.get("/stats/proceso-bilateral")
 def stats_proceso_bilateral(
     db: Session = Depends(get_db),
