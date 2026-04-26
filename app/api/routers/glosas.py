@@ -3407,6 +3407,138 @@ def stats_por_tipo_glosa(
     }
 
 
+@router.get("/{glosa_id}/contexto-completo")
+def contexto_completo_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R94 P2: contexto agregado para vista detalle de una glosa.
+
+    Combina en un solo round-trip:
+      - glosa (campos clave)
+      - sla (estado_sla, color_semaforo, dias_restantes)
+      - audit_resumen (total_cambios, ultimo_cambio_en, usuarios)
+      - relacionadas_count (sin items para no inflar — usar
+        /relacionadas para detalle)
+
+    Reduce N+1 calls del frontend al cargar la ficha de una glosa.
+    Si el frontend necesita detalle de cada sección, puede invocar
+    los endpoints individuales.
+    """
+    from datetime import timezone
+
+    from app.models.db import AuditLogRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    # ─── SLA ─────────────────────────────────────────────────
+    ahora = ahora_utc()
+    estado = (glosa.estado or "").upper()
+    cerrada = estado in ESTADOS_CERRADOS
+
+    venc = glosa.fecha_vencimiento
+    if venc and venc.tzinfo is None:
+        venc = venc.replace(tzinfo=timezone.utc)
+    dec = glosa.fecha_decision_eps
+    if dec and dec.tzinfo is None:
+        dec = dec.replace(tzinfo=timezone.utc)
+
+    if not venc:
+        estado_sla, color = "SIN_VENCIMIENTO", "GRIS"
+    elif cerrada:
+        if dec and dec <= venc:
+            estado_sla, color = "CERRADA_A_TIEMPO", "VERDE"
+        else:
+            estado_sla, color = "CERRADA_TARDE", "NEGRO"
+    else:
+        dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+        if dr < 0:
+            estado_sla, color = "VENCIDA", "ROJO"
+        elif dr <= 3:
+            estado_sla, color = "CRITICA", "AMARILLO"
+        else:
+            estado_sla, color = "EN_TIEMPO", "VERDE"
+
+    # ─── Audit resumen ──────────────────────────────────────
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.registro_id == glosa_id)
+        .all()
+    )
+    timestamps = [e.timestamp for e in eventos if e.timestamp]
+    usuarios = sorted({e.usuario_email for e in eventos if e.usuario_email})
+
+    # ─── Relacionadas (counts only) ─────────────────────────
+    rel_factura = 0
+    if glosa.factura and glosa.factura != "N/A":
+        rel_factura = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.factura == glosa.factura)
+            .filter(GlosaRecord.id != glosa_id)
+            .count()
+        )
+    rel_paciente = 0
+    if glosa.paciente:
+        rel_paciente = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.paciente == glosa.paciente)
+            .filter(GlosaRecord.id != glosa_id)
+            .count()
+        )
+    rel_patron = 0
+    if glosa.codigo_glosa and glosa.eps:
+        rel_patron = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+            .filter(GlosaRecord.eps == glosa.eps)
+            .filter(GlosaRecord.id != glosa_id)
+            .count()
+        )
+
+    return {
+        "glosa": {
+            "id": glosa.id,
+            "creado_en": (
+                glosa.creado_en.isoformat() if glosa.creado_en else None
+            ),
+            "eps": glosa.eps,
+            "paciente": glosa.paciente,
+            "factura": glosa.factura,
+            "codigo_glosa": glosa.codigo_glosa,
+            "valor_objetado": float(glosa.valor_objetado or 0),
+            "valor_recuperado": float(glosa.valor_recuperado or 0),
+            "estado": glosa.estado,
+            "etapa": glosa.etapa,
+            "decision_eps": glosa.decision_eps,
+        },
+        "sla": {
+            "estado_sla": estado_sla,
+            "color_semaforo": color,
+            "cerrada": cerrada,
+            "dias_restantes": glosa.dias_restantes,
+            "fecha_vencimiento": venc.isoformat() if venc else None,
+        },
+        "audit_resumen": {
+            "total_cambios": len(eventos),
+            "ultimo_cambio_en": (
+                max(timestamps).isoformat() if timestamps else None
+            ),
+            "usuarios_que_intervinieron": usuarios,
+        },
+        "relacionadas_count": {
+            "misma_factura": rel_factura,
+            "mismo_paciente": rel_paciente,
+            "mismo_codigo_y_eps": rel_patron,
+        },
+    }
+
+
 @router.get("/{glosa_id}/relacionadas")
 def glosas_relacionadas(
     glosa_id: int,
