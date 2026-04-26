@@ -6273,6 +6273,66 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/codigo-eps-cobertura")
+def stats_codigo_eps_cobertura(
+    min_glosas: int = Query(5, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R332 P1: cobertura de EPS por código de glosa.
+
+    Para cada código, cuántas EPS distintas lo usan. Un
+    código usado por muchas EPS es "universal", uno usado
+    por pocas EPS es "nicho".
+
+    Por código:
+      - count_glosas
+      - eps_distintas
+      - top_3_eps
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        codigo = (g.codigo_glosa or "").strip()
+        eps = (g.eps or "").strip()
+        if not codigo or not eps:
+            continue
+        b = bucket.setdefault(codigo, {
+            "count": 0, "eps": {},
+        })
+        b["count"] += 1
+        b["eps"][eps] = b["eps"].get(eps, 0) + 1
+
+    items = []
+    for codigo, b in bucket.items():
+        if b["count"] < min_glosas:
+            continue
+        top3 = sorted(
+            b["eps"].items(), key=lambda x: x[1], reverse=True,
+        )[:3]
+        items.append({
+            "codigo_glosa": codigo,
+            "count_glosas": b["count"],
+            "eps_distintas": len(b["eps"]),
+            "top_3_eps": [
+                {"eps": e, "count": c} for e, c in top3
+            ],
+        })
+    items.sort(key=lambda x: x["eps_distintas"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-totales-snapshot")
 def stats_eps_totales_snapshot(
     db: Session = Depends(get_db),
