@@ -5331,6 +5331,59 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/glosas-mas-refinadas")
+def stats_glosas_mas_refinadas(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R192 P1: glosas con más versiones de dictamen.
+
+    Glosas que requirieron más iteraciones humanas. Útil para:
+      - Detectar casos complejos que necesitan training
+      - Identificar problemas con el primer dictamen IA
+      - Estudio de "casos atípicos"
+
+    Devuelve top N ordenado DESC por número de versiones.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import DictamenVersionRecord
+
+    rows = (
+        db.query(
+            DictamenVersionRecord.glosa_id,
+            _f.count().label("n_versiones"),
+        )
+        .group_by(DictamenVersionRecord.glosa_id)
+        .order_by(_f.count().desc())
+        .limit(int(top))
+        .all()
+    )
+
+    items = []
+    for glosa_id, n in rows:
+        if glosa_id is None:
+            continue
+        g = db.query(GlosaRecord).filter(
+            GlosaRecord.id == glosa_id,
+        ).first()
+        if not g:
+            continue
+        items.append({
+            "glosa_id": glosa_id,
+            "n_versiones": int(n),
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "items": items,
+    }
+
+
 @router.get("/stats/concentracion-eps")
 def stats_concentracion_eps(
     db: Session = Depends(get_db),
