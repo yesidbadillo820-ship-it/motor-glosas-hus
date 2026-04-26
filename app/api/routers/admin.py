@@ -442,6 +442,74 @@ def mantenimiento_purgar(
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
 
 
+@router.get("/diagnostico-bd")
+def admin_diagnostico_bd(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R101 P2: diagnóstico de tamaños y conteos de BD.
+
+    Útil para detectar:
+      - Tablas creciendo descontroladamente
+      - Tablas que necesitan purga
+      - Predecir cuándo la BD necesitará escalado
+
+    Devuelve por tabla:
+      - filas: count
+      - tamano_estimado_mb: estimación basada en filas × tamaño promedio
+        de fila (heurística — no usa pg_total_relation_size para
+        ser portable SQLite/PostgreSQL)
+
+    Solo SUPER_ADMIN.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import (
+        AICacheRecord, AICallRecord, AuditLogRecord,
+        ContratoRecord, DictamenVersionRecord, GlosaEliminadaRecord,
+        GlosaRecord, PlantillaGoldRecord, TarifaContratadaRecord,
+    )
+
+    # Heurística de tamaño promedio por fila (bytes, aproximado)
+    TABLAS = [
+        ("glosas", GlosaRecord, 2000),
+        ("usuarios", UsuarioRecord, 500),
+        ("contratos", ContratoRecord, 5000),
+        ("tarifas_contratadas", TarifaContratadaRecord, 200),
+        ("plantillas_gold", PlantillaGoldRecord, 3000),
+        ("ai_cache", AICacheRecord, 4000),
+        ("ai_calls", AICallRecord, 800),
+        ("audit_log", AuditLogRecord, 600),
+        ("dictamen_versiones", DictamenVersionRecord, 4000),
+        ("glosas_eliminadas", GlosaEliminadaRecord, 2500),
+    ]
+
+    items = []
+    total_filas = 0
+    total_mb = 0.0
+    for nombre, model, bytes_por_fila in TABLAS:
+        try:
+            n = db.query(_f.count()).select_from(model).scalar() or 0
+        except Exception:
+            n = 0
+        mb = round(n * bytes_por_fila / 1024 / 1024, 2)
+        items.append({
+            "tabla": nombre,
+            "filas": n,
+            "tamano_estimado_mb": mb,
+        })
+        total_filas += n
+        total_mb += mb
+
+    items.sort(key=lambda x: x["tamano_estimado_mb"], reverse=True)
+
+    return {
+        "total_filas_todas_tablas": total_filas,
+        "total_estimado_mb": round(total_mb, 2),
+        "items": items,
+    }
+
+
 @router.get("/usuarios-inactivos")
 def admin_usuarios_inactivos(
     dias: int = 60,
