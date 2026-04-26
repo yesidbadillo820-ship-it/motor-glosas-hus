@@ -2299,6 +2299,80 @@ def bulk_mover_papelera(
     }
 
 
+@router.get("/{glosa_id}/acciones-disponibles")
+def acciones_disponibles_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R78 P1: lista las acciones que el gestor puede tomar sobre esta
+    glosa según su estado actual y contexto.
+
+    Combina:
+      - Transiciones válidas del workflow (state machine)
+      - Acciones operativas disponibles
+      - Sugerencia principal heurística
+
+    Útil para que la UI muestre solo las acciones aplicables.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    from app.services.workflow_service import WorkflowService
+    transiciones = WorkflowService.obtener_transiciones_validas(
+        glosa.estado or "RADICADA",
+    )
+
+    tiene_dictamen = bool(glosa.dictamen and len(glosa.dictamen) > 50)
+    tiene_texto_original = bool(glosa.texto_glosa_original)
+    tiene_factura = bool(glosa.factura)
+
+    return {
+        "glosa_id": glosa.id,
+        "estado_actual": glosa.estado,
+        "transiciones_workflow": [
+            {"hacia": t.hacia, "accion": t.accion, "requiere_nota": t.requiere_nota}
+            for t in transiciones
+        ],
+        "acciones_operativas": {
+            "puede_descargar_pdf": tiene_dictamen,
+            "puede_descargar_md": tiene_dictamen,
+            "puede_refinar": tiene_dictamen,
+            "puede_reanalizar": tiene_texto_original,
+            "puede_clonar": True,
+            "puede_validar_rapido": tiene_dictamen,
+            "puede_ver_timeline": True,
+            "puede_ver_metricas_ia": True,
+            "puede_buscar_duplicados": tiene_factura,
+            "puede_ver_versiones": tiene_dictamen,
+        },
+        "sugerencia_principal": _sugerir_accion_principal(glosa),
+    }
+
+
+def _sugerir_accion_principal(glosa) -> Optional[str]:
+    """Heurística: sugiere la próxima acción más útil según contexto."""
+    estado = (glosa.estado or "").upper()
+    tiene_dict = bool(glosa.dictamen and len(glosa.dictamen) > 50)
+    dias = glosa.dias_restantes or 0
+    if not tiene_dict:
+        if (glosa.texto_glosa_original or ""):
+            return "Generar dictamen con IA"
+        return "Pegar texto de la glosa para empezar"
+    if estado == "BORRADOR":
+        return "Marcar como respondida cuando esté lista"
+    if estado == "RADICADA" and dias > 0 and dias <= 2:
+        return "URGENTE: vence en 2 días o menos — radicar respuesta YA"
+    if estado == "RESPONDIDA":
+        return "Esperar decisión EPS · monitor de plazos activo"
+    if estado == "RATIFICADA":
+        return "Considerar conciliación o escalar a SuperSalud"
+    if estado == "LEVANTADA":
+        return "Glosa exitosa · considerar guardar argumento como Plantilla Gold"
+    return None
+
+
 @router.get("/{glosa_id}/validar-rapido")
 def validar_rapido_glosa(
     glosa_id: int,
