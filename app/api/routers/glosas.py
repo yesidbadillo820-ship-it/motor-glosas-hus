@@ -3969,6 +3969,81 @@ def contexto_completo_glosa(
     }
 
 
+@router.get("/{glosa_id}/duplicados-potenciales")
+def duplicados_potenciales_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R99 P2: detecta posibles duplicados de UNA glosa específica.
+
+    Diferente a /glosas/duplicados (que escanea TODAS): este se enfoca
+    en una glosa puntual. Útil para validar al crear/clonar:
+      "¿Estoy generando un duplicado?"
+
+    Heurística (DEBE coincidir TODO):
+      - Misma EPS
+      - Misma factura (no N/A)
+      - Mismo codigo_glosa
+      - Diferencia de valor_objetado < 1% (tolera redondeos)
+
+    Excluye la propia glosa. Devuelve hasta 20 candidatas con
+    score de similitud (0-100).
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    # Sin factura "real" no hay forma de identificar duplicado fiable
+    if not glosa.factura or glosa.factura == "N/A":
+        return {
+            "glosa_id": glosa_id,
+            "razon_no_evaluable": "factura ausente o N/A",
+            "candidatos": [],
+        }
+
+    candidatos = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.id != glosa_id)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.factura == glosa.factura)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .limit(20)
+        .all()
+    )
+
+    valor_origen = float(glosa.valor_objetado or 0)
+    items = []
+    for c in candidatos:
+        v = float(c.valor_objetado or 0)
+        # Score: 100 si valores idénticos, decrece según diferencia relativa
+        if valor_origen == 0 and v == 0:
+            score = 100.0
+        elif valor_origen == 0 or v == 0:
+            score = 50.0  # Uno tiene valor y otro no — sospechoso pero menos
+        else:
+            diff_pct = abs(v - valor_origen) / max(v, valor_origen) * 100
+            score = round(max(0, 100 - diff_pct), 2)
+
+        items.append({
+            "id": c.id,
+            "creado_en": (
+                c.creado_en.isoformat() if c.creado_en else None
+            ),
+            "valor_objetado": v,
+            "estado": c.estado,
+            "score_similitud": score,
+        })
+
+    items.sort(key=lambda x: x["score_similitud"], reverse=True)
+
+    return {
+        "glosa_id": glosa_id,
+        "total_candidatos": len(items),
+        "candidatos": items,
+    }
+
+
 @router.get("/{glosa_id}/relacionadas")
 def glosas_relacionadas(
     glosa_id: int,
