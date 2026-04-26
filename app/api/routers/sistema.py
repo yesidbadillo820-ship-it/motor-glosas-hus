@@ -1174,6 +1174,40 @@ def cumplimiento_resolucion(
     }
 
 
+@router.get("/info-deploy")
+def info_deploy(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R220 P1: información del deploy actual.
+
+    Lee env vars típicas de Render/CI para reportar:
+      - render_git_commit / render_git_branch
+      - render_service_id / render_external_url
+      - python_version
+      - build_id (commit corto)
+
+    Útil para confirmar que el deploy desplegó la versión
+    esperada después de un push.
+
+    Solo COORDINADOR/ADMIN.
+    """
+    import os
+    import sys
+
+    commit = os.getenv("RENDER_GIT_COMMIT", "local")
+    return {
+        "render_git_commit": os.getenv("RENDER_GIT_COMMIT"),
+        "render_git_branch": os.getenv("RENDER_GIT_BRANCH"),
+        "render_service_id": os.getenv("RENDER_SERVICE_ID"),
+        "render_external_url": os.getenv("RENDER_EXTERNAL_URL"),
+        "python_version": (
+            f"{sys.version_info.major}.{sys.version_info.minor}."
+            f"{sys.version_info.micro}"
+        ),
+        "build_id": commit[:8] if commit else "local",
+    }
+
+
 @router.get("/inventario-funcionalidades")
 def info_inventario_funcionalidades(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
