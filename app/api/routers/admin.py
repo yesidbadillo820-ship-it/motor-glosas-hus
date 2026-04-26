@@ -740,6 +740,62 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/usuarios-actividad-mensual")
+def admin_usuarios_actividad_mensual(
+    usuario_email: str,
+    meses: int = 6,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R242 P1: actividad audit mes-a-mes de un usuario.
+
+    Para investigar el ritmo histórico de un usuario:
+      "¿Alice ha bajado su actividad en últimos meses?"
+
+    Param `usuario_email`: email exacto.
+
+    Devuelve serie ASC por mes con count de eventos audit.
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    if not usuario_email or len(usuario_email) < 3:
+        raise HTTPException(400, "usuario_email requerido")
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.usuario_email == usuario_email)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .all()
+    )
+
+    por_mes: dict[str, int] = {}
+    for e in eventos:
+        ts = e.timestamp
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if not ts:
+            continue
+        k = ts.strftime("%Y-%m")
+        por_mes[k] = por_mes.get(k, 0) + 1
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        serie.append({"mes": k, "eventos": por_mes[k]})
+
+    return {
+        "usuario_email": usuario_email,
+        "ventana_meses": int(meses),
+        "total_eventos": len(eventos),
+        "serie": serie,
+    }
+
+
 @router.get("/eps-conteos")
 def admin_eps_conteos(
     db: Session = Depends(get_db),
