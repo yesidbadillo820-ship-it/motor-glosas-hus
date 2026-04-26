@@ -6273,6 +6273,74 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/gestor-vs-eps-matriz")
+def stats_gestor_vs_eps_matriz(
+    top_gestores: int = Query(10, ge=2, le=30),
+    top_eps: int = Query(10, ge=2, le=30),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R296 P1: matriz gestor × EPS de decisiones.
+
+    Muestra qué gestor maneja qué EPS y con qué volumen.
+    Útil para detectar asignaciones desbalanceadas:
+      "Alice maneja toda SANITAS, nadie más sabe."
+
+    Solo coordinador o admin (datos sensibles del equipo).
+
+    Devuelve:
+      - gestores: lista de top N gestores por volumen
+      - eps: lista de top N EPS por volumen
+      - matriz: dict[gestor][eps] = count_decididas
+    """
+    decididas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    total_g: dict[str, int] = {}
+    total_e: dict[str, int] = {}
+    matriz: dict[str, dict[str, int]] = {}
+
+    for g in decididas:
+        gestor = (g.gestor_nombre or "").strip()
+        eps = (g.eps or "").strip()
+        if not gestor or not eps:
+            continue
+        total_g[gestor] = total_g.get(gestor, 0) + 1
+        total_e[eps] = total_e.get(eps, 0) + 1
+        matriz.setdefault(gestor, {})
+        matriz[gestor][eps] = matriz[gestor].get(eps, 0) + 1
+
+    g_top = [
+        g for g, _ in sorted(
+            total_g.items(), key=lambda x: x[1], reverse=True,
+        )[: int(top_gestores)]
+    ]
+    e_top = [
+        e for e, _ in sorted(
+            total_e.items(), key=lambda x: x[1], reverse=True,
+        )[: int(top_eps)]
+    ]
+
+    matriz_filt = {}
+    for gestor in g_top:
+        matriz_filt[gestor] = {
+            eps: matriz.get(gestor, {}).get(eps, 0) for eps in e_top
+        }
+
+    return {
+        "gestores": g_top,
+        "eps": e_top,
+        "matriz": matriz_filt,
+    }
+
+
 @router.get("/stats/dias-decision-promedio-mes")
 def stats_dias_decision_promedio_mes(
     meses: int = Query(12, ge=1, le=24),
