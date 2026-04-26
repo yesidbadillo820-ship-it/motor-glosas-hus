@@ -6273,6 +6273,61 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-pacientes-distintos")
+def stats_eps_pacientes_distintos(
+    min_glosas: int = Query(5, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R321 P1: cobertura de pacientes por EPS.
+
+    Para cada EPS, cuántos pacientes distintos hay con
+    glosas. Útil para detectar EPS que afectan a pocos
+    pacientes vs muchas (concentración por paciente).
+
+    Por EPS:
+      - count_glosas
+      - pacientes_distintos
+      - ratio_glosas_paciente (count_glosas/pacientes)
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.isnot(None))
+        .filter(GlosaRecord.paciente.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        paciente = (g.paciente or "").strip()
+        if not eps or not paciente:
+            continue
+        b = bucket.setdefault(eps, {"count": 0, "pacientes": set()})
+        b["count"] += 1
+        b["pacientes"].add(paciente)
+
+    items = []
+    for eps, b in bucket.items():
+        if b["count"] < min_glosas:
+            continue
+        n_pac = len(b["pacientes"])
+        ratio = round(b["count"] / n_pac, 2) if n_pac else 0.0
+        items.append({
+            "eps": eps,
+            "count_glosas": b["count"],
+            "pacientes_distintos": n_pac,
+            "ratio_glosas_paciente": ratio,
+        })
+    items.sort(key=lambda x: x["pacientes_distintos"], reverse=True)
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/progreso-equipo-mes")
 def stats_progreso_equipo_mes(
     db: Session = Depends(get_db),
