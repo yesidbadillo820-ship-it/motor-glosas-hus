@@ -290,6 +290,77 @@ def historial_paginado(
     }
 
 
+@router.get("/exportar-json")
+def exportar_json(
+    eps: Optional[str] = None,
+    estado: Optional[str] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    valor_min: Optional[float] = None,
+    valor_max: Optional[float] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R92 P1: export streaming en formato NDJSON (newline-delimited JSON).
+
+    NDJSON > JSON-array para datos grandes:
+      - Cada línea es un objeto independiente parseable
+      - Permite streaming sin cargar todo en memoria
+      - Compatible con jq, pandas.read_json(lines=True), etc.
+
+    Útil para integrar con BI/data warehouse (Snowflake, BigQuery)
+    que aceptan NDJSON nativo.
+
+    Filtros opcionales: eps, estado, fecha_desde, fecha_hasta,
+    valor_min, valor_max.
+    """
+    import json
+
+    from fastapi.responses import StreamingResponse
+
+    repo = GlosaRepository(db)
+    glosas = repo.listar_para_export(
+        eps=eps, estado=estado,
+        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        valor_min=valor_min, valor_max=valor_max,
+    )
+
+    def _generar():
+        for g in glosas:
+            obj = {
+                "id": g.id,
+                "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+                "eps": g.eps,
+                "paciente": g.paciente,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "valor_aceptado": float(g.valor_aceptado or 0),
+                "valor_recuperado": float(g.valor_recuperado or 0),
+                "etapa": g.etapa,
+                "estado": g.estado,
+                "decision_eps": g.decision_eps,
+                "dias_restantes": g.dias_restantes,
+                "gestor_nombre": g.gestor_nombre,
+                "fecha_vencimiento": (
+                    g.fecha_vencimiento.isoformat()
+                    if g.fecha_vencimiento else None
+                ),
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat()
+                    if g.fecha_decision_eps else None
+                ),
+            }
+            yield json.dumps(obj, ensure_ascii=False) + "\n"
+
+    fname = f"glosas-{ahora_utc().strftime('%Y%m%d-%H%M%S')}.ndjson"
+    return StreamingResponse(
+        _generar(),
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/exportar-xlsx")
 def exportar_xlsx(
     eps: Optional[str] = None,
