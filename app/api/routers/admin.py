@@ -351,6 +351,109 @@ def mantenimiento_purgar(
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
 
 
+@router.get("/system-info")
+def admin_system_info(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R73 P2: información operativa consolidada del sistema.
+
+    Datos útiles para soporte y operaciones día-a-día:
+      - Conteos: cuántas glosas, contratos, plantillas Gold, etc.
+      - Última actividad: cuándo se creó la última glosa, último login
+      - Métricas IA agregadas (últimos 30 días)
+      - Estado de schedulers
+      - Variables de entorno SI están configuradas (sin revelar valores)
+
+    Solo SUPER_ADMIN.
+    """
+    import os
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        AICacheRecord, AICallRecord, AuditLogRecord,
+        ContratoRecord, GlosaEliminadaRecord, GlosaRecord,
+        PlantillaGoldRecord, TarifaContratadaRecord,
+    )
+
+    desde_30 = ahora_utc() - timedelta(days=30)
+
+    # Conteos por tabla
+    counts = {
+        "glosas": db.query(_f.count(GlosaRecord.id)).scalar() or 0,
+        "usuarios": db.query(_f.count(UsuarioRecord.id)).scalar() or 0,
+        "contratos": db.query(_f.count(ContratoRecord.eps)).scalar() or 0,
+        "tarifas_contratadas": db.query(_f.count(TarifaContratadaRecord.id)).scalar() or 0,
+        "plantillas_gold_activas": (
+            db.query(_f.count(PlantillaGoldRecord.id))
+            .filter(PlantillaGoldRecord.activa == 1).scalar() or 0
+        ),
+        "ai_cache": db.query(_f.count(AICacheRecord.id)).scalar() or 0,
+        "ai_calls_30d": (
+            db.query(_f.count(AICallRecord.id))
+            .filter(AICallRecord.creado_en >= desde_30).scalar() or 0
+        ),
+        "audit_log_30d": (
+            db.query(_f.count(AuditLogRecord.id))
+            .filter(AuditLogRecord.timestamp >= desde_30).scalar() or 0
+        ),
+        "papelera": db.query(_f.count(GlosaEliminadaRecord.id)).scalar() or 0,
+    }
+
+    # Última actividad
+    ultima_glosa = (
+        db.query(_f.max(GlosaRecord.creado_en)).scalar()
+    )
+
+    # Costo IA total (30d)
+    cost_30d = (
+        db.query(_f.sum(AICallRecord.cost_usd))
+        .filter(AICallRecord.creado_en >= desde_30).scalar() or 0
+    )
+
+    # Estado de schedulers
+    scheduler_pre, scheduler_mant = True, True
+    try:
+        from app.services.ia_auditora_proactiva import _task as _t_pa
+        scheduler_pre = _t_pa is not None and not _t_pa.done()
+    except Exception:
+        scheduler_pre = None
+    try:
+        from app.services.mantenimiento_scheduler import _task as _t_mant
+        scheduler_mant = _t_mant is not None and not _t_mant.done()
+    except Exception:
+        scheduler_mant = None
+
+    # Env vars: solo si están definidas, NO sus valores
+    env_status = {
+        "ANTHROPIC_API_KEY": bool(os.getenv("ANTHROPIC_API_KEY")),
+        "GROQ_API_KEY": bool(os.getenv("GROQ_API_KEY")),
+        "SENTRY_DSN": bool(os.getenv("SENTRY_DSN")),
+        "FIRMA_DIGITAL_PRIVATE_KEY": bool(os.getenv("FIRMA_DIGITAL_PRIVATE_KEY")),
+        "GLOSAS_ENCRYPTION_KEY": bool(os.getenv("GLOSAS_ENCRYPTION_KEY")),
+        "DIGEST_DESTINATARIOS": bool(os.getenv("DIGEST_DESTINATARIOS")),
+        "ALERTAS_EMAIL": bool(os.getenv("ALERTAS_EMAIL")),
+    }
+
+    return {
+        "counts": counts,
+        "ultima_glosa_creada_en": (
+            ultima_glosa.isoformat() if ultima_glosa else None
+        ),
+        "ia_cost_usd_30d": round(float(cost_30d), 4),
+        "schedulers": {
+            "pre_analisis": scheduler_pre,
+            "mantenimiento": scheduler_mant,
+        },
+        "env_configurada": env_status,
+        "consultado_por": current_user.email,
+        "consultado_en": ahora_utc().isoformat(),
+    }
+
+
 @router.get("/backup-db.json")
 def descargar_backup_db(
     db: Session = Depends(get_db),
