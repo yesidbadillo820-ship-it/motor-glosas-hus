@@ -825,6 +825,123 @@ def admin_glosas_prioritarias(
     }
 
 
+@router.get("/reporte-mensual.csv")
+def admin_reporte_mensual_csv(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R126 P2: reporte ejecutivo mensual descargable como CSV.
+
+    Una fila por mes con métricas clave:
+      mes, glosas_creadas, glosas_cerradas,
+      valor_objetado, valor_recuperado,
+      tasa_levantamiento_pct, tasa_recuperacion_pct,
+      ia_calls, costo_ia_usd
+
+    Útil para reporting periódico a gerencia (cargar a Power BI,
+    Tableau, archivar como evidencia de gestión).
+
+    Solo SUPER_ADMIN.
+    """
+    import csv
+    import io
+    from datetime import datetime, timezone
+
+    from fastapi.responses import StreamingResponse
+
+    from app.models.db import AICallRecord, GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = db.query(GlosaRecord).all()
+    ia_calls = db.query(AICallRecord).all()
+
+    por_mes: dict[str, dict] = {}
+
+    def _ensure(k):
+        if k not in por_mes:
+            por_mes[k] = {
+                "creadas": 0, "cerradas": 0,
+                "valor_obj": 0.0, "valor_rec": 0.0,
+                "decididas": 0, "levantadas": 0,
+                "ia_calls": 0, "ia_cost": 0.0,
+            }
+        return por_mes[k]
+
+    for g in glosas:
+        creado = g.creado_en
+        if creado and creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        if creado:
+            _ensure(creado.strftime("%Y-%m"))["creadas"] += 1
+
+        dec = g.fecha_decision_eps
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        estado = (g.estado or "").upper()
+        if dec and estado in ESTADOS_CERRADOS:
+            b = _ensure(dec.strftime("%Y-%m"))
+            b["cerradas"] += 1
+            b["valor_obj"] += float(g.valor_objetado or 0)
+            b["valor_rec"] += float(g.valor_recuperado or 0)
+            if estado in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}:
+                b["decididas"] += 1
+                if estado == "LEVANTADA":
+                    b["levantadas"] += 1
+
+    for c in ia_calls:
+        cre = c.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if cre:
+            b = _ensure(cre.strftime("%Y-%m"))
+            b["ia_calls"] += 1
+            b["ia_cost"] += float(c.cost_usd or 0)
+
+    def _generar():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow([
+            "mes", "glosas_creadas", "glosas_cerradas",
+            "valor_objetado", "valor_recuperado",
+            "tasa_levantamiento_pct", "tasa_recuperacion_pct",
+            "ia_calls", "costo_ia_usd",
+        ])
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+
+        for k in sorted(por_mes.keys()):
+            b = por_mes[k]
+            tasa_lev = (
+                round(100 * b["levantadas"] / b["decididas"], 2)
+                if b["decididas"] else 0.0
+            )
+            tasa_rec = (
+                round(100 * b["valor_rec"] / b["valor_obj"], 2)
+                if b["valor_obj"] else 0.0
+            )
+            w.writerow([
+                k,
+                b["creadas"],
+                b["cerradas"],
+                int(b["valor_obj"]),
+                int(b["valor_rec"]),
+                tasa_lev,
+                tasa_rec,
+                b["ia_calls"],
+                round(b["ia_cost"], 4),
+            ])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
+
+    fname = f"reporte-mensual-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        _generar(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @router.get("/timeline-equipo")
 def admin_timeline_equipo(
     horas: int = 24,
