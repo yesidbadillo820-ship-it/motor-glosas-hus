@@ -3316,6 +3316,95 @@ def stats_por_tipo_glosa(
     }
 
 
+@router.get("/{glosa_id}/sla")
+def sla_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R92 P2: estado SLA detallado de una glosa individual.
+
+    Útil para el panel de detalle: muestra de un vistazo si esta
+    glosa específica está cumpliendo el SLA o está en riesgo.
+
+    Devuelve:
+      - estado_sla: VENCIDA | CRITICA | EN_TIEMPO |
+                    CERRADA_A_TIEMPO | CERRADA_TARDE | SIN_VENCIMIENTO
+      - color_semaforo: ROJO | AMARILLO | VERDE | NEGRO | GRIS
+      - dias_restantes
+      - dias_transcurridos (desde creación)
+      - fecha_creado / fecha_vencimiento / fecha_decision_eps
+      - tiempo_total_resolucion_dias (si cerrada)
+      - cerrada (bool)
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    ahora = ahora_utc()
+    estado = (glosa.estado or "").upper()
+    cerrada = estado in ESTADOS_CERRADOS
+
+    creado = glosa.creado_en
+    if creado and creado.tzinfo is None:
+        creado = creado.replace(tzinfo=timezone.utc)
+    venc = glosa.fecha_vencimiento
+    if venc and venc.tzinfo is None:
+        venc = venc.replace(tzinfo=timezone.utc)
+    dec = glosa.fecha_decision_eps
+    if dec and dec.tzinfo is None:
+        dec = dec.replace(tzinfo=timezone.utc)
+
+    dias_transcurridos = (
+        (ahora - creado).days if creado else None
+    )
+
+    tiempo_total = None
+    if cerrada and dec and creado:
+        tiempo_total = (dec - creado).days
+
+    # Determinar estado_sla
+    if not venc:
+        estado_sla = "SIN_VENCIMIENTO"
+        color = "GRIS"
+    elif cerrada:
+        if dec and dec <= venc:
+            estado_sla = "CERRADA_A_TIEMPO"
+            color = "VERDE"
+        else:
+            estado_sla = "CERRADA_TARDE"
+            color = "NEGRO"
+    else:
+        dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+        if dr < 0:
+            estado_sla = "VENCIDA"
+            color = "ROJO"
+        elif dr <= 3:
+            estado_sla = "CRITICA"
+            color = "AMARILLO"
+        else:
+            estado_sla = "EN_TIEMPO"
+            color = "VERDE"
+
+    return {
+        "glosa_id": glosa_id,
+        "estado": glosa.estado,
+        "cerrada": cerrada,
+        "estado_sla": estado_sla,
+        "color_semaforo": color,
+        "dias_restantes": glosa.dias_restantes,
+        "dias_transcurridos": dias_transcurridos,
+        "fecha_creado": creado.isoformat() if creado else None,
+        "fecha_vencimiento": venc.isoformat() if venc else None,
+        "fecha_decision_eps": dec.isoformat() if dec else None,
+        "tiempo_total_resolucion_dias": tiempo_total,
+    }
+
+
 @router.get("/{glosa_id}/audit-resumen")
 def audit_resumen_glosa(
     glosa_id: int,
