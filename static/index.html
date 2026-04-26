@@ -1640,6 +1640,66 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div class="md-kpi"><div class="md-lbl">Mi posición</div><div class="md-num" id="mk-pos">—</div><div class="md-sub">en el ranking</div></div>
         </div>
 
+        <!-- Tarjetas premium nuevas: streak, comparativa, tendencia, EPS, críticas -->
+        <div id="md-premium-block" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.85rem;margin:1.25rem 0">
+          <!-- Streak gamificación -->
+          <div class="chart-card" style="padding:1rem">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem">
+              <div style="font-size:1.6rem">🔥</div>
+              <div>
+                <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Tu racha</div>
+                <div style="font-size:.78rem;color:var(--text)">Días consecutivos cerrando glosas</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:.5rem">
+              <div id="md-streak-actual" style="font-size:2.2rem;font-weight:700;color:var(--c-teal2);font-variant-numeric:tabular-nums">—</div>
+              <div style="color:var(--text3);font-size:.78rem">días</div>
+            </div>
+            <div id="md-streak-mejor" style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Mejor histórico: —</div>
+          </div>
+
+          <!-- Comparativa con equipo -->
+          <div class="chart-card" style="padding:1rem">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem">
+              <div style="font-size:1.6rem">⚖️</div>
+              <div>
+                <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Tú vs el equipo</div>
+                <div style="font-size:.78rem;color:var(--text)">Tasa de levantamiento</div>
+              </div>
+            </div>
+            <div id="md-comp-resumen" style="font-size:.85rem;line-height:1.45">—</div>
+            <div id="md-comp-bar" style="margin-top:.6rem"></div>
+          </div>
+
+          <!-- Tendencia mes vs mes -->
+          <div class="chart-card" style="padding:1rem">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem">
+              <div style="font-size:1.6rem">📈</div>
+              <div>
+                <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Mes vs anterior</div>
+                <div style="font-size:.78rem;color:var(--text)">Tu evolución</div>
+              </div>
+            </div>
+            <div id="md-tend-decididas" style="font-size:1rem;font-weight:600">—</div>
+            <div id="md-tend-rec" style="font-size:.85rem;color:var(--text3);margin-top:.3rem">—</div>
+          </div>
+
+          <!-- EPS asignadas (chips) -->
+          <div class="chart-card" style="padding:1rem">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem">
+              <div style="font-size:1.6rem">🏥</div>
+              <div>
+                <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">EPS que manejas</div>
+                <div style="font-size:.78rem;color:var(--text)" id="md-eps-count">—</div>
+              </div>
+            </div>
+            <div id="md-eps-chips" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem">—</div>
+          </div>
+        </div>
+
+        <!-- Banner de glosas críticas si hay -->
+        <div id="md-criticas-banner" style="display:none"></div>
+
         <div class="md-grid">
           <div class="chart-card">
             <div class="chart-hdr">Logros desbloqueados</div>
@@ -6214,7 +6274,151 @@ async function cargarMiDesempeno(){
         '<div class="md-bar-fill"><span style="width:'+pct+'%;background:'+semColors[k]+'"></span></div>' +
         '<span class="md-bar-num">'+v+'</span></div>';
     }).join('');
+
+    // ─── Tarjetas premium nuevas (FE3..FE8): consume nuevos endpoints R270/R279/R356/R310/R303 ───
+    cargarMiDesempenoPremium();
   }catch(e){ console.error('mi-desempeno:', e); }
+}
+
+// Carga datos para las tarjetas premium del panel "Mi desempeño"
+async function cargarMiDesempenoPremium(){
+  // Streak (R270)
+  try{
+    var r = await fetch('/usuarios/yo/streak', {headers: authH()});
+    if(r.ok){
+      var d = await r.json();
+      var el1 = document.getElementById('md-streak-actual');
+      if(el1) el1.textContent = (d.streak_actual||0);
+      var el2 = document.getElementById('md-streak-mejor');
+      if(el2){
+        el2.textContent = 'Mejor histórico: ' + (d.mejor_streak||0) + ' días · '
+          + (d.dias_con_actividad_total||0) + ' días totales con decisión';
+      }
+    }
+  }catch(e){}
+
+  // Comparativa con equipo (R279)
+  try{
+    var r = await fetch('/usuarios/yo/comparativa-equipo', {headers: authH()});
+    if(r.ok){
+      var d = await r.json();
+      var tu = d.tu || {}, eq = d.equipo || {};
+      var diff = (tu.tasa_levantamiento_pct||0) - (eq.tasa_levantamiento_promedio_pct||0);
+      var arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '·';
+      var color = diff > 0 ? '#15803d' : diff < 0 ? '#b91c1c' : 'var(--text3)';
+      var resEl = document.getElementById('md-comp-resumen');
+      if(resEl){
+        resEl.innerHTML =
+          '<div>Tú: <b>'+(tu.tasa_levantamiento_pct||0).toFixed(1)+'%</b> · '
+          + 'Equipo: <b>'+(eq.tasa_levantamiento_promedio_pct||0).toFixed(1)+'%</b></div>'
+          + '<div style="margin-top:.3rem;color:'+color+';font-weight:700">'
+          + arrow + ' '+Math.abs(diff).toFixed(1)+' pts'
+          + (diff > 0 ? ' por encima del promedio' : diff < 0 ? ' por debajo' : ' al promedio')
+          + '</div>';
+      }
+      var barEl = document.getElementById('md-comp-bar');
+      if(barEl){
+        var maxV = Math.max(tu.tasa_levantamiento_pct||0, eq.tasa_levantamiento_promedio_pct||0, 1);
+        barEl.innerHTML =
+          '<div style="font-size:.7rem;color:var(--text3);margin-bottom:.15rem">Tú</div>'+
+          '<div style="height:8px;background:var(--bg-subtle);border-radius:4px;overflow:hidden">'+
+            '<div style="width:'+((tu.tasa_levantamiento_pct||0)/maxV*100)+'%;height:100%;background:var(--c-teal2)"></div>'+
+          '</div>'+
+          '<div style="font-size:.7rem;color:var(--text3);margin:.3rem 0 .15rem">Equipo</div>'+
+          '<div style="height:8px;background:var(--bg-subtle);border-radius:4px;overflow:hidden">'+
+            '<div style="width:'+((eq.tasa_levantamiento_promedio_pct||0)/maxV*100)+'%;height:100%;background:#94a3b8"></div>'+
+          '</div>';
+      }
+    }
+  }catch(e){}
+
+  // Tendencia personal mes vs mes (R356)
+  try{
+    var r = await fetch('/usuarios/yo/tendencia-personal', {headers: authH()});
+    if(r.ok){
+      var d = await r.json();
+      var aD = d.actual||{}, pD = d.anterior||{};
+      var dDec = d.delta_decididas_pct||0;
+      var dRec = d.delta_recuperado_pct||0;
+      var arrowD = dDec > 0 ? '▲' : dDec < 0 ? '▼' : '·';
+      var arrowR = dRec > 0 ? '▲' : dRec < 0 ? '▼' : '·';
+      var colD = dDec > 0 ? '#15803d' : dDec < 0 ? '#b91c1c' : 'var(--text3)';
+      var colR = dRec > 0 ? '#15803d' : dRec < 0 ? '#b91c1c' : 'var(--text3)';
+      var elD = document.getElementById('md-tend-decididas');
+      var elR = document.getElementById('md-tend-rec');
+      if(elD){
+        elD.innerHTML = (aD.decididas||0)+' decididas '+
+          '<span style="color:'+colD+';font-weight:700">'+arrowD+' '+Math.abs(dDec).toFixed(0)+'%</span>'+
+          ' <span style="color:var(--text3);font-size:.78rem;font-weight:400">vs '+(pD.decididas||0)+' antes</span>';
+      }
+      if(elR){
+        elR.innerHTML = cop(aD.valor_recuperado||0)+' recup. '+
+          '<span style="color:'+colR+';font-weight:700">'+arrowR+' '+Math.abs(dRec).toFixed(0)+'%</span>';
+      }
+    }
+  }catch(e){}
+
+  // EPS asignadas (R310)
+  try{
+    var r = await fetch('/usuarios/yo/eps-asignadas', {headers: authH()});
+    if(r.ok){
+      var d = await r.json();
+      var n = d.total_eps||0;
+      var c1 = document.getElementById('md-eps-count');
+      if(c1) c1.textContent = n + ' EPS distintas';
+      var chips = document.getElementById('md-eps-chips');
+      if(chips){
+        var top = (d.items||[]).slice(0, 8);
+        chips.innerHTML = top.length
+          ? top.map(function(x){
+              return '<span style="background:var(--bg-subtle);padding:.25rem .6rem;border-radius:14px;font-size:.72rem;font-weight:600;display:inline-flex;gap:.3rem;align-items:center" title="'+escHtml(x.eps)+': '+x.count_total+' glosas">'+
+                escHtml(x.eps)+
+                '<span style="background:var(--c-teal2);color:#fff;padding:0 6px;border-radius:8px;font-size:.66rem">'+x.count_total+'</span>'+
+              '</span>';
+            }).join('') + (d.items.length > 8 ? '<span style="font-size:.7rem;color:var(--text3);padding:.25rem">+'+(d.items.length-8)+' más</span>' : '')
+          : '<span style="color:var(--text3);font-size:.78rem">Aún sin EPS asignadas</span>';
+      }
+    }
+  }catch(e){}
+
+  // Banner de glosas críticas (R303)
+  try{
+    var r = await fetch('/usuarios/yo/glosas-criticas', {headers: authH()});
+    if(r.ok){
+      var d = await r.json();
+      var box = document.getElementById('md-criticas-banner');
+      if(!box) return;
+      if((d.total_criticas||0) === 0){
+        box.style.display = 'none';
+        return;
+      }
+      var top = (d.items||[]).slice(0, 5);
+      box.style.display = 'block';
+      box.innerHTML =
+        '<div style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca;border-radius:10px;padding:1rem 1.2rem;margin:1rem 0">'+
+          '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem">'+
+            '<div style="font-size:1.4rem">⚠️</div>'+
+            '<div style="flex:1">'+
+              '<div style="font-weight:700;color:#991b1b">Tienes '+(d.total_criticas)+' glosa(s) críticas</div>'+
+              '<div style="font-size:.78rem;color:#7f1d1d">'+
+                (d.vencidas||0)+' vencidas y '+((d.total_criticas-d.vencidas)||0)+' a 3 días o menos del vencimiento'+
+              '</div>'+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.5rem">'+
+            top.map(function(g){
+              var dr = g.dias_restantes;
+              var lbl = dr < 0 ? ('Vencida hace '+Math.abs(dr)+'d') : (dr === 0 ? 'Vence HOY' : ('Vence en '+dr+'d'));
+              return '<div style="display:flex;justify-content:space-between;font-size:.78rem;background:rgba(255,255,255,.6);padding:.4rem .6rem;border-radius:6px">'+
+                '<div><b>#'+g.glosa_id+'</b> · '+escHtml(g.eps||'—')+' · '+escHtml(g.codigo_glosa||'—')+'</div>'+
+                '<div style="color:#991b1b;font-weight:700">'+lbl+' · '+cop(g.valor_objetado)+'</div>'+
+              '</div>';
+            }).join('') +
+            (d.total_criticas > 5 ? '<div style="font-size:.72rem;color:#7f1d1d;text-align:center;margin-top:.3rem">+'+(d.total_criticas-5)+' más</div>' : '')+
+          '</div>'+
+        '</div>';
+    }
+  }catch(e){}
 }
 
 // Sidebar: activa el item, sincroniza con tab() y en mobile cierra el drawer
