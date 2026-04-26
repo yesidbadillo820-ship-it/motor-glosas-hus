@@ -5174,6 +5174,52 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/creadas-hoy")
+def stats_creadas_hoy(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R175 P1: contador en vivo de glosas creadas hoy.
+
+    Endpoint MUY ligero. Devuelve los KPIs del día corriente:
+      - count
+      - valor_objetado_total
+      - epss_distintas
+      - facturas_distintas
+
+    Útil para refresh frecuente en pantalla de monitoreo.
+    """
+    from sqlalchemy import func as _f
+
+    inicio_hoy = ahora_utc().replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    glosas_hoy = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio_hoy)
+        .all()
+    )
+
+    eps_set: set[str] = set()
+    fac_set: set[str] = set()
+    valor_total = 0.0
+    for g in glosas_hoy:
+        if g.eps:
+            eps_set.add(g.eps)
+        if g.factura and g.factura != "N/A":
+            fac_set.add(g.factura)
+        valor_total += float(g.valor_objetado or 0)
+
+    return {
+        "fecha": inicio_hoy.date().isoformat(),
+        "count": len(glosas_hoy),
+        "valor_objetado_total": int(valor_total),
+        "epss_distintas": len(eps_set),
+        "facturas_distintas": len(fac_set),
+    }
+
+
 @router.get("/stats/analizadas-hoy")
 def stats_analizadas_hoy(
     db: Session = Depends(get_db),
