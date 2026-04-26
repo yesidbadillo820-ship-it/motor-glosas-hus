@@ -3407,6 +3407,114 @@ def stats_por_tipo_glosa(
     }
 
 
+@router.get("/{glosa_id}/checklist")
+def checklist_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R96 P1: checklist de progreso de una glosa en el ciclo.
+
+    Útil para que el auditor vea de un vistazo qué falta en cada
+    glosa. Cada item dice si está completo + si es opcional.
+
+    Devuelve:
+      {
+        "glosa_id": int,
+        "items": [
+          {"id": "texto_original", "descripcion": "...",
+           "completado": true, "opcional": false},
+          ...
+        ],
+        "total_items": int,
+        "completados": int,
+        "obligatorios_pendientes": int,
+        "porcentaje_avance": float (0-100, solo obligatorios)
+      }
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    items = [
+        {
+            "id": "texto_original",
+            "descripcion": "Texto de glosa original capturado",
+            "completado": bool(glosa.texto_glosa_original),
+            "opcional": False,
+        },
+        {
+            "id": "factura",
+            "descripcion": "Factura asociada (no N/A)",
+            "completado": bool(glosa.factura and glosa.factura != "N/A"),
+            "opcional": False,
+        },
+        {
+            "id": "valor_objetado",
+            "descripcion": "Valor objetado registrado",
+            "completado": bool(glosa.valor_objetado and glosa.valor_objetado > 0),
+            "opcional": False,
+        },
+        {
+            "id": "dictamen",
+            "descripcion": "Dictamen HUS generado",
+            "completado": bool(glosa.dictamen and len(glosa.dictamen) > 50),
+            "opcional": False,
+        },
+        {
+            "id": "gestor",
+            "descripcion": "Gestor asignado",
+            "completado": bool(glosa.gestor_nombre),
+            "opcional": True,
+        },
+        {
+            "id": "auditor",
+            "descripcion": "Auditor asignado",
+            "completado": bool(glosa.auditor_email),
+            "opcional": True,
+        },
+        {
+            "id": "fecha_recepcion",
+            "descripcion": "Fecha de recepción registrada",
+            "completado": bool(glosa.fecha_recepcion),
+            "opcional": True,
+        },
+        {
+            "id": "respuesta_eps",
+            "descripcion": "Decisión EPS registrada",
+            "completado": bool(glosa.decision_eps),
+            "opcional": False,
+        },
+        {
+            "id": "cierre",
+            "descripcion": "Glosa cerrada",
+            "completado": (glosa.estado or "").upper() in ESTADOS_CERRADOS,
+            "opcional": False,
+        },
+    ]
+
+    total = len(items)
+    completados = sum(1 for it in items if it["completado"])
+    obligatorios = [it for it in items if not it["opcional"]]
+    obl_completados = sum(1 for it in obligatorios if it["completado"])
+    obl_pendientes = len(obligatorios) - obl_completados
+    pct = (
+        round(100 * obl_completados / len(obligatorios), 2)
+        if obligatorios else 0.0
+    )
+
+    return {
+        "glosa_id": glosa_id,
+        "items": items,
+        "total_items": total,
+        "completados": completados,
+        "obligatorios_pendientes": obl_pendientes,
+        "porcentaje_avance": pct,
+    }
+
+
 @router.get("/{glosa_id}/contexto-completo")
 def contexto_completo_glosa(
     glosa_id: int,
