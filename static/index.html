@@ -2347,6 +2347,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <button class="btn-sm ghost" onclick="toggleReanalizarPanel()" title="Re-correr análisis cambiando modo o tono (no duplica la glosa)">🔄 Reanalizar</button>
         <button class="btn-sm ghost" onclick="verMetricasIaGlosa()" title="Ver calls IA atribuidos a esta glosa (solo coordinador/admin)">📊 Métricas IA</button>
         <button class="btn-sm ghost" onclick="clonarGlosaActual()" title="Crear nueva glosa BORRADOR con los datos descriptivos de esta (mismo paciente, factura, EPS)">📋 Clonar</button>
+        <button class="btn-sm ghost" onclick="verTimelineGlosa()" title="Cronología consolidada de eventos: creación, versiones, audit, comentarios, calls IA">📜 Timeline</button>
         <button class="btn-sm ghost" onclick="validarDictamen()" title="Checklist pre-radicación">✅ Validar</button>
         <button class="modal-close" onclick="cerrarModal()">✕</button>
       </div>
@@ -4116,6 +4117,76 @@ async function verHistorialVersiones(){
     html += '</body></html>';
     w.document.write(html); w.document.close();
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// R67 P3: muestra timeline consolidado de la glosa en una popup
+async function verTimelineGlosa(){
+  if(!CURRENT_GLOSA_ID){ toast('Sin glosa','Abre una glosa primero','warning'); return; }
+  try{
+    var r = await fetch('/glosas/' + CURRENT_GLOSA_ID + '/timeline', {headers: authH()});
+    if(!r.ok){ toast('Error', 'HTTP ' + r.status, 'error'); return; }
+    var d = await r.json();
+    var w = window.open('', '_blank', 'width=860,height=720');
+    var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    // Color por tipo de evento
+    var colorTipo = {
+      'CREAR_GLOSA': '#1e40af',
+      'AI_CALL': '#7c3aed',
+      'COMENTARIO': '#0d9488',
+      'COMENTARIO_RESUELTO': '#16a34a',
+    };
+    var colorPorTipo = function(t){
+      if(colorTipo[t]) return colorTipo[t];
+      if(t.indexOf('VERSION_') === 0) return '#0891b2';
+      if(t.indexOf('AUDIT_') === 0) return '#475569';
+      return '#64748b';
+    };
+    var iconoPorTipo = function(t){
+      if(t === 'CREAR_GLOSA') return '✨';
+      if(t === 'AI_CALL') return '🤖';
+      if(t === 'COMENTARIO') return '💬';
+      if(t === 'COMENTARIO_RESUELTO') return '✅';
+      if(t.indexOf('VERSION_') === 0) return '📝';
+      if(t.indexOf('AUDIT_') === 0) return '🛡️';
+      return '•';
+    };
+    var html = '<html><head><meta charset="utf-8"><title>Timeline Glosa #' + CURRENT_GLOSA_ID + '</title>'
+             + '<style>body{font-family:Segoe UI,Arial;padding:20px;background:#f8fafc;color:#1f2937;line-height:1.5}'
+             + 'h1{color:#0b5d8a;border-bottom:2px solid #0b5d8a;padding-bottom:8px;font-size:1.1rem;}'
+             + '.intro{font-size:.85rem;color:#64748b;margin-bottom:1rem;}'
+             + '.tl{position:relative;padding-left:32px;}'
+             + '.tl::before{content:"";position:absolute;left:11px;top:0;bottom:0;width:2px;background:#cbd5e1;}'
+             + '.ev{position:relative;background:white;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;}'
+             + '.ev::before{content:attr(data-icon);position:absolute;left:-32px;top:8px;background:white;width:24px;height:24px;border-radius:50%;border:2px solid var(--c);text-align:center;line-height:20px;font-size:.85rem;}'
+             + '.tipo{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}'
+             + '.actor{font-size:.75rem;color:#64748b;margin-top:.2rem;}'
+             + '.detalle{font-size:.85rem;color:#1f2937;margin-top:.4rem;}'
+             + '.fecha{font-size:.7rem;color:#94a3b8;}'
+             + '</style></head><body>'
+             + '<h1>📜 Timeline · Glosa #' + CURRENT_GLOSA_ID + '</h1>'
+             + '<p class="intro">' + d.total_eventos + ' evento(s) registrado(s) · más reciente primero</p>'
+             + '<div class="tl">';
+    d.eventos.forEach(function(e){
+      var color = colorPorTipo(e.tipo || '');
+      var icon = iconoPorTipo(e.tipo || '');
+      var fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '—';
+      html += '<div class="ev" data-icon="' + icon + '" style="--c:' + color + ';border-left:4px solid ' + color + ';">'
+            + '<div class="tipo" style="color:' + color + '">' + esc(e.tipo) + '</div>'
+            + '<div class="actor">' + esc(e.actor || '—') + ' · <span class="fecha">' + fecha + '</span></div>'
+            + '<div class="detalle">' + esc(e.detalle || '—') + '</div>';
+      if(e.metadata && Object.keys(e.metadata).length > 0){
+        html += '<details style="margin-top:.4rem;font-size:.72rem;color:#64748b;cursor:pointer;">'
+              + '<summary>metadata</summary>'
+              + '<pre style="background:#f1f5f9;padding:6px;border-radius:4px;overflow-x:auto;font-size:.7rem;">'
+              + esc(JSON.stringify(e.metadata, null, 2))
+              + '</pre></details>';
+      }
+      html += '</div>';
+    });
+    html += '</div></body></html>';
+    w.document.write(html);
+    w.document.close();
+  } catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 // R65 P2: clona la glosa actual y abre el modal de la nueva
