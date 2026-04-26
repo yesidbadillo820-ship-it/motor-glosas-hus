@@ -6273,6 +6273,62 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/tipo-glosa-mensual")
+def stats_tipo_glosa_mensual(
+    meses: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R289 P1: serie mensual por tipo de glosa (prefijo Res. 2284).
+
+    Diferente a /stats/por-tipo (snapshot global): aquí
+    serie temporal mes-a-mes por prefijo (TA, SO, AU, CO,
+    CL, PE, FA, SE, IN, ME, EX).
+
+    Útil para detectar cuál tipo está creciendo:
+      "Las glosas de soportes (SO) crecieron 200% este
+       trimestre."
+    """
+    from datetime import timedelta, timezone
+
+    PREFIJOS = ["TA", "SO", "AU", "CO", "CL", "PE",
+                "FA", "SE", "IN", "ME", "EX"]
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .all()
+    )
+
+    por_mes: dict[str, dict] = {}
+    for g in rows:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        codigo = (g.codigo_glosa or "").strip().upper()
+        prefijo = codigo[:2] if len(codigo) >= 2 else "??"
+        k = cre.strftime("%Y-%m")
+        b = por_mes.setdefault(k, {p: 0 for p in PREFIJOS})
+        b.setdefault(prefijo, 0)
+        b[prefijo] += 1
+
+    serie = []
+    for k in sorted(por_mes.keys()):
+        item = {"mes": k}
+        item.update(por_mes[k])
+        serie.append(item)
+
+    return {
+        "ventana_meses": int(meses),
+        "prefijos": PREFIJOS,
+        "serie": serie,
+    }
+
+
 @router.get("/stats/glosas-recientes-eps")
 def stats_glosas_recientes_eps(
     eps: str = Query(..., min_length=2),
