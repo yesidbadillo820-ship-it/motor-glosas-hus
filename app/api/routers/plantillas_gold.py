@@ -334,6 +334,86 @@ def exportar_plantillas_gold(
     )
 
 
+@router.get("/efectividad")
+def plantillas_efectividad(
+    min_usos: int = 1,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R107 P1: ranking de plantillas gold por efectividad real.
+
+    Cruza PlantillaGoldRecord con GlosaRecord (vía glosa_origen_id)
+    para mostrar qué plantillas vienen de glosas que efectivamente
+    se LEVANTARON, y cuántas veces se han reusado.
+
+    Útil para:
+      - Identificar mejores prácticas (plantillas con muchos usos +
+        glosa origen LEVANTADA = "gold real")
+      - Detectar plantillas obsoletas (creadas pero nunca usadas)
+      - Curación de la biblioteca
+
+    Devuelve por plantilla activa (con >= min_usos):
+      - id, titulo, eps, codigo_glosa
+      - usos
+      - glosa_origen_estado (LEVANTADA, ACEPTADA, etc.)
+      - valor_recuperado_origen
+      - es_gold_real (bool: usos>=3 Y origen=LEVANTADA)
+
+    Ordenado DESC por usos.
+    """
+    plantillas = (
+        db.query(PlantillaGoldRecord)
+        .filter(PlantillaGoldRecord.activa == 1)
+        .all()
+    )
+
+    items = []
+    for p in plantillas:
+        if (p.usos or 0) < min_usos:
+            continue
+
+        origen = None
+        origen_estado = None
+        valor_orig = 0.0
+        if p.glosa_origen_id:
+            origen = (
+                db.query(GlosaRecord)
+                .filter(GlosaRecord.id == p.glosa_origen_id)
+                .first()
+            )
+            if origen:
+                origen_estado = origen.estado
+                valor_orig = float(origen.valor_recuperado or 0)
+
+        es_gold_real = (
+            (p.usos or 0) >= 3 and
+            (origen_estado or "").upper() == "LEVANTADA"
+        )
+
+        items.append({
+            "id": p.id,
+            "titulo": p.titulo,
+            "eps": p.eps,
+            "codigo_glosa": p.codigo_glosa,
+            "usos": p.usos or 0,
+            "glosa_origen_id": p.glosa_origen_id,
+            "glosa_origen_estado": origen_estado,
+            "valor_recuperado_origen": int(valor_orig),
+            "ultima_uso_en": (
+                p.ultima_uso_en.isoformat() if p.ultima_uso_en else None
+            ),
+            "es_gold_real": es_gold_real,
+        })
+
+    items.sort(key=lambda x: x["usos"], reverse=True)
+
+    return {
+        "total_evaluadas": len(items),
+        "gold_reales": sum(1 for it in items if it["es_gold_real"]),
+        "items": items,
+    }
+
+
 @router.get("/sugerencias")
 def sugerencias_plantillas_gold(
     eps: Optional[str] = None,
