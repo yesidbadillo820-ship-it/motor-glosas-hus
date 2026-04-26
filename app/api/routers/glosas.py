@@ -3299,6 +3299,89 @@ def stats_concentracion_pareto(
     }
 
 
+@router.get("/stats/conciliaciones")
+def stats_conciliaciones(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R128 P1: métricas de conciliaciones bilaterales HUS-EPS.
+
+    La conciliación es la última instancia antes del litigio: si
+    EPS no levanta y HUS no acepta, hay audiencia bilateral con
+    acta firmada.
+
+    Útil para entender:
+      - ¿Cuántas glosas terminan en conciliación?
+      - ¿Cuál es el valor promedio defendido vs conciliado?
+      - ¿Estados bilaterales en pipeline?
+
+    Devuelve:
+      - total_conciliaciones
+      - por_resultado (mapa)
+      - por_estado_bilateral (mapa)
+      - valor_total_conciliado
+      - valor_total_defendido_hus (valor_ratificado_hus)
+      - tasa_recuperacion_conciliacion_pct
+      - audiencias_proximas_30d
+    """
+    from datetime import timedelta, timezone
+
+    from app.models.db import ConciliacionRecord
+
+    todas = db.query(ConciliacionRecord).all()
+
+    if not todas:
+        return {
+            "total_conciliaciones": 0,
+            "por_resultado": {},
+            "por_estado_bilateral": {},
+            "valor_total_conciliado": 0,
+            "valor_total_defendido_hus": 0,
+            "tasa_recuperacion_conciliacion_pct": 0.0,
+            "audiencias_proximas_30d": 0,
+        }
+
+    por_resultado: dict[str, int] = {}
+    por_estado: dict[str, int] = {}
+    valor_conc = 0.0
+    valor_def = 0.0
+
+    ahora = ahora_utc()
+    en_30d = ahora + timedelta(days=30)
+    audiencias_proximas = 0
+
+    for c in todas:
+        if c.resultado:
+            por_resultado[c.resultado] = (
+                por_resultado.get(c.resultado, 0) + 1
+            )
+        eb = c.estado_bilateral or "?"
+        por_estado[eb] = por_estado.get(eb, 0) + 1
+        valor_conc += float(c.valor_conciliado or 0)
+        valor_def += float(c.valor_ratificado_hus or 0)
+
+        fa = c.fecha_audiencia
+        if fa and fa.tzinfo is None:
+            fa = fa.replace(tzinfo=timezone.utc)
+        if fa and ahora <= fa <= en_30d:
+            audiencias_proximas += 1
+
+    tasa = (
+        round(100 * valor_conc / valor_def, 2)
+        if valor_def else 0.0
+    )
+
+    return {
+        "total_conciliaciones": len(todas),
+        "por_resultado": por_resultado,
+        "por_estado_bilateral": por_estado,
+        "valor_total_conciliado": int(valor_conc),
+        "valor_total_defendido_hus": int(valor_def),
+        "tasa_recuperacion_conciliacion_pct": tasa,
+        "audiencias_proximas_30d": audiencias_proximas,
+    }
+
+
 @router.get("/stats/serie-mensual-cantidad")
 def stats_serie_mensual_cantidad(
     meses: int = Query(12, ge=1, le=36),
