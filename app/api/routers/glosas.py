@@ -6086,6 +6086,69 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/dgh-radicacion-tiempo")
+def stats_dgh_radicacion_tiempo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R264 P1: distribución del campo `dias_radicacion_dgh`.
+
+    `dias_radicacion_dgh` mide los días entre la radicación
+    de la factura y la objeción de la EPS. Histograma por
+    rangos:
+      - 0-7, 8-30, 31-60, 61-90, 91+
+
+    Útil para ver patrones temporales: ¿las EPS demoran en
+    objetar? ¿hay glosas con radicación atípicamente larga?
+
+    También retorna promedio y mediana globales.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.dias_radicacion_dgh.isnot(None))
+        .all()
+    )
+
+    buckets = {"0-7": 0, "8-30": 0, "31-60": 0, "61-90": 0, "91+": 0}
+    valores: list[int] = []
+    for g in rows:
+        d = int(g.dias_radicacion_dgh or 0)
+        if d < 0:
+            continue
+        valores.append(d)
+        if d <= 7:
+            buckets["0-7"] += 1
+        elif d <= 30:
+            buckets["8-30"] += 1
+        elif d <= 60:
+            buckets["31-60"] += 1
+        elif d <= 90:
+            buckets["61-90"] += 1
+        else:
+            buckets["91+"] += 1
+
+    n = len(valores)
+    if n == 0:
+        promedio = 0.0
+        mediana = 0
+        maximo = 0
+    else:
+        promedio = round(sum(valores) / n, 2)
+        ord_v = sorted(valores)
+        mediana = ord_v[n // 2]
+        maximo = max(valores)
+
+    return {
+        "total_glosas": n,
+        "promedio_dias": promedio,
+        "mediana_dias": mediana,
+        "max_dias": maximo,
+        "buckets": [
+            {"rango": k, "count": v} for k, v in buckets.items()
+        ],
+    }
+
+
 @router.get("/stats/tecnico-recepcion-actividad")
 def stats_tecnico_recepcion_actividad(
     limit: int = Query(20, ge=1, le=100),
