@@ -978,6 +978,100 @@ def semaforo(
     return repo.semaforo_counts()
 
 
+@router.get("/sin-actividad")
+def glosas_sin_actividad(
+    dias: int = Query(15, ge=1, le=180),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R99 P1: glosas abiertas sin actualizaciones recientes.
+
+    Detecta glosas no-cerradas que llevan más de N días sin
+    movimiento en audit_log. Útil para que el coordinador
+    identifique:
+      - Glosas "olvidadas" en el flujo
+      - Casos que necesitan seguimiento o reasignación
+      - Trabajo estancado por carga de un gestor
+
+    Por glosa devuelve:
+      - id, eps, factura, estado, dias_restantes
+      - ultimo_movimiento_en (max(creado_en, max(audit.timestamp)))
+      - dias_sin_movimiento
+      - gestor_nombre
+
+    Ordenado DESC por dias_sin_movimiento.
+    """
+    from datetime import timedelta, timezone
+
+    from app.models.db import AuditLogRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    # Última actividad por glosa según audit_log
+    ultimas: dict[int, "object"] = {}
+    rows = (
+        db.query(AuditLogRecord.registro_id, AuditLogRecord.timestamp)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.registro_id.isnot(None))
+        .all()
+    )
+    for rid, ts in rows:
+        if not ts:
+            continue
+        prev = ultimas.get(rid)
+        if prev is None or ts > prev:
+            ultimas[rid] = ts
+
+    ahora = ahora_utc()
+    corte = ahora - timedelta(days=int(dias))
+
+    items = []
+    for g in abiertas:
+        creado = g.creado_en
+        if creado and creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+
+        ult = ultimas.get(g.id)
+        if ult is not None and ult.tzinfo is None:
+            ult = ult.replace(tzinfo=timezone.utc)
+
+        # Última actividad = max(creación, último audit)
+        ultimo_mov = creado
+        if ult and (ultimo_mov is None or ult > ultimo_mov):
+            ultimo_mov = ult
+
+        if ultimo_mov is None or ultimo_mov >= corte:
+            continue
+
+        dias_sin = (ahora - ultimo_mov).days
+        items.append({
+            "id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "dias_restantes": g.dias_restantes,
+            "gestor_nombre": g.gestor_nombre,
+            "ultimo_movimiento_en": ultimo_mov.isoformat(),
+            "dias_sin_movimiento": dias_sin,
+        })
+
+    items.sort(key=lambda x: x["dias_sin_movimiento"], reverse=True)
+
+    return {
+        "umbral_dias": int(dias),
+        "total_sin_actividad": len(items),
+        "limit": int(limit),
+        "items": items[:limit],
+    }
+
+
 @router.get("/incompletas")
 def glosas_incompletas(
     limit: int = Query(100, ge=1, le=500),
