@@ -6273,6 +6273,88 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/glosas-conciliadas-detalle")
+def stats_glosas_conciliadas_detalle(
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R344 P1: glosas que tienen al menos una conciliación.
+
+    Lista glosas con conciliacion asociada (pasaron por
+    proceso bilateral). Útil para ver el universo de
+    casos que llegaron a esa instancia.
+
+    Ordena DESC por valor_conciliado total agregado.
+    """
+    from app.models.db import ConciliacionRecord
+
+    # Para cada glosa con concil, sumar valor
+    rows = (
+        db.query(
+            ConciliacionRecord.glosa_id,
+        )
+        .distinct()
+        .all()
+    )
+
+    glosa_ids = {r[0] for r in rows if r[0]}
+
+    if not glosa_ids:
+        return {
+            "total": 0,
+            "items": [],
+        }
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.id.in_(glosa_ids))
+        .all()
+    )
+
+    # Aggregate valor per glosa
+    valores_concil = {}
+    valores_ratificado = {}
+    for g_id, valor, valor_rat in db.query(
+        ConciliacionRecord.glosa_id,
+        ConciliacionRecord.valor_conciliado,
+        ConciliacionRecord.valor_ratificado_hus,
+    ).all():
+        if not g_id:
+            continue
+        valores_concil[g_id] = (
+            valores_concil.get(g_id, 0.0) + float(valor or 0)
+        )
+        valores_ratificado[g_id] = (
+            valores_ratificado.get(g_id, 0.0)
+            + float(valor_rat or 0)
+        )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "valor_conciliado_total": int(
+                valores_concil.get(g.id, 0.0),
+            ),
+            "valor_ratificado_hus_total": int(
+                valores_ratificado.get(g.id, 0.0),
+            ),
+        })
+    items.sort(
+        key=lambda x: x["valor_conciliado_total"], reverse=True,
+    )
+
+    return {
+        "total": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/vencen-en-dias")
 def stats_vencen_en_dias(
     dias: int = Query(7, ge=1, le=30),
