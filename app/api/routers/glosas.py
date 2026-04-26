@@ -6273,6 +6273,84 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/codigo-respuesta-tendencia")
+def stats_codigo_respuesta_tendencia(
+    dias: int = Query(30, ge=7, le=90),
+    min_glosas_actual: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R286 P1: tendencia de uso del codigo_respuesta de HUS.
+
+    Compara dos ventanas consecutivas de N días en el uso
+    del campo `codigo_respuesta` (RE9501, RE9701, etc.).
+    Útil para ver evolución de la estrategia de respuesta
+    de la IPS:
+      "Empezamos a usar RE9501 mucho más → ¿está
+       funcionando?"
+
+    Por código:
+      - count_actual, count_previo
+      - delta_abs, delta_pct
+    """
+    from datetime import timedelta, timezone
+
+    ahora = ahora_utc()
+    corte_actual = ahora - timedelta(days=int(dias))
+    corte_previo = ahora - timedelta(days=int(dias) * 2)
+
+    actual: dict[str, int] = {}
+    previo: dict[str, int] = {}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .filter(GlosaRecord.codigo_respuesta != "")
+        .all()
+    )
+
+    for g in rows:
+        codigo = (g.codigo_respuesta or "").strip()
+        if not codigo:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        if cre >= corte_actual:
+            actual[codigo] = actual.get(codigo, 0) + 1
+        elif cre >= corte_previo:
+            previo[codigo] = previo.get(codigo, 0) + 1
+
+    todos = set(actual) | set(previo)
+    items = []
+    for codigo in todos:
+        a = actual.get(codigo, 0)
+        p = previo.get(codigo, 0)
+        if a < min_glosas_actual:
+            continue
+        if p == 0:
+            delta_pct = 100.0 if a > 0 else 0.0
+        else:
+            delta_pct = round(100 * (a - p) / p, 2)
+        items.append({
+            "codigo_respuesta": codigo,
+            "count_actual": a,
+            "count_previo": p,
+            "delta_abs": a - p,
+            "delta_pct": delta_pct,
+        })
+    items.sort(key=lambda x: x["delta_pct"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "min_glosas_actual": int(min_glosas_actual),
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/decision-eps-tiempo-distribucion")
 def stats_decision_eps_tiempo_distribucion(
     db: Session = Depends(get_db),
