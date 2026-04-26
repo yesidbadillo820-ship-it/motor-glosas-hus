@@ -795,6 +795,81 @@ def info_test_suite(
     }
 
 
+@router.get("/milestones")
+def info_milestones(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R150 P1: hitos cuantitativos del sistema.
+
+    Útil para celebrar el avance y comunicar progreso a gerencia:
+      "¡Llegamos a 1.000 glosas procesadas!"
+      "Hemos recuperado \$1B COP en total."
+
+    Calcula automáticamente:
+      - próximo hito por glosas (siguiente múltiplo de 100 o 1000)
+      - próximo hito por valor recuperado (\$10M, \$100M, \$1B...)
+      - días en operación (desde primera glosa)
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
+    valor_recuperado = (
+        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0))
+        .scalar() or 0
+    )
+    valor_recuperado = int(valor_recuperado)
+
+    # Hito glosas
+    if total_glosas < 1000:
+        siguiente_glosas = ((total_glosas // 100) + 1) * 100
+    else:
+        siguiente_glosas = ((total_glosas // 1000) + 1) * 1000
+    falta_glosas = siguiente_glosas - total_glosas
+
+    # Hito valor recuperado en COP
+    M = 1_000_000
+    hitos_valor = [10*M, 50*M, 100*M, 500*M, 1_000*M, 5_000*M]
+    siguiente_valor = next(
+        (h for h in hitos_valor if h > valor_recuperado),
+        valor_recuperado * 2,
+    )
+    falta_valor = max(0, siguiente_valor - valor_recuperado)
+
+    # Días en operación
+    primera_glosa = db.query(_f.min(GlosaRecord.creado_en)).scalar()
+    dias_operacion = None
+    if primera_glosa:
+        from datetime import timezone
+        ahora = ahora_utc()
+        if primera_glosa.tzinfo is None:
+            primera_glosa = primera_glosa.replace(tzinfo=timezone.utc)
+        dias_operacion = (ahora - primera_glosa).days
+
+    return {
+        "actual": {
+            "total_glosas": total_glosas,
+            "valor_recuperado_total": valor_recuperado,
+            "dias_en_operacion": dias_operacion,
+        },
+        "proximos_hitos": {
+            "glosas": {
+                "siguiente": siguiente_glosas,
+                "falta": falta_glosas,
+            },
+            "valor_recuperado": {
+                "siguiente": siguiente_valor,
+                "falta": falta_valor,
+            },
+        },
+    }
+
+
 @router.get("/api-endpoints")
 def info_api_endpoints(
     incluir_metodos: bool = True,
