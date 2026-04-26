@@ -3316,6 +3316,87 @@ def stats_por_tipo_glosa(
     }
 
 
+@router.get("/{glosa_id}/relacionadas")
+def glosas_relacionadas(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R93 P2: glosas relacionadas a una glosa dada.
+
+    Identifica vínculos por:
+      - Misma factura: glosas que objetan distintos servicios de
+        la misma factura (suelen ir/venir juntas en el ciclo)
+      - Mismo paciente: histórico clínico-administrativo del paciente
+      - Mismo código_glosa + misma EPS: patrones repetidos
+
+    Devuelve cada grupo limitado a 10 entradas para no inflar
+    el response. Ordenado DESC por creado_en (más reciente primero).
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    def _serializar(g):
+        return {
+            "id": g.id,
+            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "estado": g.estado,
+            "etapa": g.etapa,
+        }
+
+    LIMITE = 10
+
+    # Misma factura (excluyendo la glosa actual)
+    misma_factura = []
+    if glosa.factura and glosa.factura != "N/A":
+        misma_factura = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.factura == glosa.factura)
+            .filter(GlosaRecord.id != glosa_id)
+            .order_by(GlosaRecord.creado_en.desc())
+            .limit(LIMITE)
+            .all()
+        )
+
+    # Mismo paciente
+    mismo_paciente = []
+    if glosa.paciente:
+        mismo_paciente = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.paciente == glosa.paciente)
+            .filter(GlosaRecord.id != glosa_id)
+            .order_by(GlosaRecord.creado_en.desc())
+            .limit(LIMITE)
+            .all()
+        )
+
+    # Mismo código + misma EPS (patrones repetidos)
+    mismo_patron = []
+    if glosa.codigo_glosa and glosa.eps:
+        mismo_patron = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+            .filter(GlosaRecord.eps == glosa.eps)
+            .filter(GlosaRecord.id != glosa_id)
+            .order_by(GlosaRecord.creado_en.desc())
+            .limit(LIMITE)
+            .all()
+        )
+
+    return {
+        "glosa_id": glosa_id,
+        "misma_factura": [_serializar(g) for g in misma_factura],
+        "mismo_paciente": [_serializar(g) for g in mismo_paciente],
+        "mismo_codigo_y_eps": [_serializar(g) for g in mismo_patron],
+        "limite_por_grupo": LIMITE,
+    }
+
+
 @router.get("/{glosa_id}/diff/{otra_id}")
 def diff_entre_glosas(
     glosa_id: int,
