@@ -6441,6 +6441,68 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/conciliaciones-por-eps")
+def stats_conciliaciones_por_eps(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R351 P1: conciliaciones agregadas por EPS.
+
+    Para cada EPS, cuántas conciliaciones tiene asociadas
+    (a través de glosas) y suma de valores. Útil para
+    saber qué EPS llegan más al proceso bilateral.
+    """
+    from app.models.db import ConciliacionRecord
+
+    rows = (
+        db.query(
+            ConciliacionRecord.glosa_id,
+            ConciliacionRecord.valor_conciliado,
+            ConciliacionRecord.valor_ratificado_hus,
+        )
+        .all()
+    )
+
+    if not rows:
+        return {"total_eps": 0, "items": []}
+
+    glosa_ids = {r[0] for r in rows if r[0]}
+    glosas_eps = dict(
+        db.query(GlosaRecord.id, GlosaRecord.eps)
+        .filter(GlosaRecord.id.in_(glosa_ids))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g_id, val_c, val_r in rows:
+        eps = (glosas_eps.get(g_id) or "").strip() if g_id else ""
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {
+            "count": 0, "valor": 0.0, "ratificado": 0.0,
+        })
+        b["count"] += 1
+        b["valor"] += float(val_c or 0)
+        b["ratificado"] += float(val_r or 0)
+
+    items = []
+    for eps, b in bucket.items():
+        items.append({
+            "eps": eps,
+            "count_conciliaciones": b["count"],
+            "valor_conciliado_total": int(b["valor"]),
+            "valor_ratificado_hus_total": int(b["ratificado"]),
+        })
+    items.sort(
+        key=lambda x: x["count_conciliaciones"], reverse=True,
+    )
+
+    return {
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/glosas-conciliadas-detalle")
 def stats_glosas_conciliadas_detalle(
     limit: int = Query(50, ge=1, le=500),
