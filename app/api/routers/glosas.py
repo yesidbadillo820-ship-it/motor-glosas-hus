@@ -6273,6 +6273,55 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/prioridad-distribucion")
+def stats_prioridad_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R302 P1: distribución por nivel de prioridad.
+
+    Por valor del campo `prioridad`:
+      - count, valor_objetado_total, abiertas
+      - pct sobre el total
+
+    Útil para ver el balance del backlog por urgencia.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    rows = db.query(GlosaRecord).all()
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        p = (g.prioridad or "NORMAL").upper()
+        b = bucket.setdefault(p, {
+            "count": 0, "valor": 0.0, "abiertas": 0,
+        })
+        b["count"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS:
+            b["abiertas"] += 1
+
+    total = sum(b["count"] for b in bucket.values())
+
+    items = []
+    for p, b in bucket.items():
+        items.append({
+            "prioridad": p,
+            "count": b["count"],
+            "abiertas": b["abiertas"],
+            "valor_objetado_total": int(b["valor"]),
+            "pct": (
+                round(100 * b["count"] / total, 2) if total else 0.0
+            ),
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "total_glosas": total,
+        "items": items,
+    }
+
+
 @router.get("/stats/workflow-state-distribucion")
 def stats_workflow_state_distribucion(
     db: Session = Depends(get_db),
