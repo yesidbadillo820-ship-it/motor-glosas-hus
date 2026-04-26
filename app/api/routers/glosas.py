@@ -7275,6 +7275,74 @@ def json_completo_glosa(
     return out
 
 
+@router.get("/{glosa_id}/conciliaciones-resumen")
+def conciliaciones_resumen(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R165 P1: resumen de conciliaciones de una glosa.
+
+    Para una glosa específica, muestra las conciliaciones
+    bilaterales asociadas (puede tener múltiples a lo largo
+    del proceso).
+
+    Útil para identificar el ciclo de defensa de una glosa
+    sin tener que ir a /glosas/stats/conciliaciones global.
+
+    Devuelve:
+      - total
+      - en_curso (estado_bilateral != ACTA_FIRMADA/CERRADA)
+      - valor_conciliado_total
+      - items: lista resumida (máx 20)
+    """
+    from datetime import timezone
+
+    from app.models.db import ConciliacionRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    conciliaciones = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.glosa_id == glosa_id)
+        .order_by(ConciliacionRecord.creado_en.desc())
+        .all()
+    )
+
+    CERRADAS = {"ACTA_FIRMADA", "CERRADA"}
+    en_curso = sum(
+        1 for c in conciliaciones
+        if (c.estado_bilateral or "") not in CERRADAS
+    )
+    valor_total = sum(
+        float(c.valor_conciliado or 0) for c in conciliaciones
+    )
+
+    items = []
+    for c in conciliaciones[:20]:
+        cre = c.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        items.append({
+            "id": c.id,
+            "creado_en": cre.isoformat() if cre else None,
+            "estado_bilateral": c.estado_bilateral,
+            "resultado": c.resultado,
+            "valor_conciliado": float(c.valor_conciliado or 0),
+            "acta_numero": c.acta_numero,
+        })
+
+    return {
+        "glosa_id": glosa_id,
+        "total": len(conciliaciones),
+        "en_curso": en_curso,
+        "valor_conciliado_total": int(valor_total),
+        "items": items,
+    }
+
+
 @router.get("/{glosa_id}/comentarios-resumen")
 def comentarios_resumen(
     glosa_id: int,
