@@ -942,6 +942,80 @@ def admin_reporte_mensual_csv(
     )
 
 
+@router.get("/conteo-rapido")
+def admin_conteo_rapido(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R135 P2: contadores instantáneos para banner / pills UI.
+
+    Endpoint MUY ligero (solo COUNT queries, sin agregaciones
+    pesadas) que se puede llamar cada N segundos para alimentar
+    el badge global del header.
+
+    Devuelve solo enteros básicos:
+      - glosas_total / abiertas / cerradas / criticas / vencidas
+      - usuarios_activos
+      - audit_log_24h
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as _f
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord, GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ahora = ahora_utc()
+    desde_24h = ahora - timedelta(hours=24)
+
+    glosas_total = db.query(_f.count(GlosaRecord.id)).scalar() or 0
+    cerradas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .scalar() or 0
+    )
+    abiertas = glosas_total - cerradas
+    criticas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes <= 3)
+        .filter(GlosaRecord.dias_restantes >= 0)
+        .scalar() or 0
+    )
+    vencidas = (
+        db.query(_f.count(GlosaRecord.id))
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.dias_restantes < 0)
+        .scalar() or 0
+    )
+
+    usuarios_activos = (
+        db.query(_f.count(UsuarioRecord.id))
+        .filter(UsuarioRecord.activo == 1)
+        .scalar() or 0
+    )
+
+    audit_24h = (
+        db.query(_f.count(AuditLogRecord.id))
+        .filter(AuditLogRecord.timestamp >= desde_24h)
+        .scalar() or 0
+    )
+
+    return {
+        "glosas_total": glosas_total,
+        "glosas_abiertas": abiertas,
+        "glosas_cerradas": cerradas,
+        "glosas_criticas": criticas,
+        "glosas_vencidas": vencidas,
+        "usuarios_activos": usuarios_activos,
+        "audit_log_24h": audit_24h,
+        "consultado_en": ahora.isoformat(),
+    }
+
+
 @router.get("/inconsistencias-datos")
 def admin_inconsistencias_datos(
     db: Session = Depends(get_db),
