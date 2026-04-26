@@ -442,6 +442,78 @@ def mantenimiento_purgar(
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
 
 
+@router.get("/distribucion-cargas")
+def admin_distribucion_cargas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R95 P2: distribución de cargas de glosas por gestor.
+
+    Útil para que el coordinador detecte:
+      - Gestores sobrecargados (re-balancear)
+      - Gestores subutilizados
+      - Glosas sin asignar (nadie las está procesando)
+
+    Devuelve por gestor (incluyendo "SIN_ASIGNAR"):
+      - total_glosas (abiertas, no cerradas)
+      - vencidas (dias_restantes < 0)
+      - criticas (0 <= dias_restantes <= 3)
+      - valor_objetado_total
+      - tasa_atraso_pct (vencidas / total)
+
+    Ordenado DESC por total_glosas. Solo SUPER_ADMIN.
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_gestor: dict[str, dict] = {}
+    for g in abiertas:
+        gestor = (g.gestor_nombre or "").strip() or "SIN_ASIGNAR"
+        if gestor not in por_gestor:
+            por_gestor[gestor] = {
+                "total": 0, "vencidas": 0, "criticas": 0,
+                "valor_objetado": 0.0,
+            }
+        b = por_gestor[gestor]
+        b["total"] += 1
+        b["valor_objetado"] += float(g.valor_objetado or 0)
+
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            b["vencidas"] += 1
+        elif dr <= 3:
+            b["criticas"] += 1
+
+    items = []
+    for gestor, b in por_gestor.items():
+        tasa = (
+            round(100 * b["vencidas"] / b["total"], 2)
+            if b["total"] else 0.0
+        )
+        items.append({
+            "gestor": gestor,
+            "total_glosas": b["total"],
+            "vencidas": b["vencidas"],
+            "criticas": b["criticas"],
+            "valor_objetado_total": int(b["valor_objetado"]),
+            "tasa_atraso_pct": tasa,
+        })
+    items.sort(key=lambda x: x["total_glosas"], reverse=True)
+
+    return {
+        "total_gestores": len(items),
+        "total_glosas_abiertas": len(abiertas),
+        "items": items,
+    }
+
+
 @router.post("/recalcular-dias-restantes")
 def recalcular_dias_restantes(
     dry_run: bool = False,
