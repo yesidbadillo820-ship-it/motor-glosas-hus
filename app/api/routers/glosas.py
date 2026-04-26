@@ -6273,6 +6273,66 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/sin-actividad-reciente")
+def stats_sin_actividad_reciente(
+    dias: int = Query(30, ge=7, le=180),
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R298 P1: glosas abiertas sin actividad audit reciente.
+
+    Una glosa abierta sin ningún evento audit_log en los
+    últimos N días es candidata a "estancada". Útil para
+    detectar casos olvidados que requieren atención.
+
+    Solo abiertas, ordenado por valor_objetado DESC.
+    """
+    from datetime import timedelta
+
+    from app.models.db import AuditLogRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    glosas_con_actividad = {
+        row[0]
+        for row in db.query(AuditLogRecord.registro_id)
+        .filter(AuditLogRecord.tabla == "historial")
+        .filter(AuditLogRecord.timestamp >= desde)
+        .distinct()
+        .all()
+        if row[0]
+    }
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    items = []
+    for g in abiertas:
+        if g.id in glosas_con_actividad:
+            continue
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dias_restantes": g.dias_restantes,
+        })
+    items.sort(key=lambda x: x["valor_objetado"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_estancadas": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/decisiones-por-dia")
 def stats_decisiones_por_dia(
     dias: int = Query(30, ge=7, le=180),
