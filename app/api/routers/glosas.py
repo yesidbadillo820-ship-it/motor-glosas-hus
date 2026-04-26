@@ -2003,6 +2003,73 @@ def top_glosas_por_valor(
     }
 
 
+@router.get("/buscar-por-cups")
+def buscar_por_cups(
+    cups: str = Query(..., min_length=1),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R186 P1: glosas que mencionan un CUPS específico.
+
+    Cruza ConceptoGlosaRecord.cups_codigo == X para devolver
+    las glosas (DISTINCT) que tienen al menos un concepto con
+    ese CUPS.
+
+    Útil para investigar: "¿qué glosas hemos tenido por el
+    procedimiento 906625?"
+
+    Param `cups`: código exacto.
+
+    Declarado ANTES de /{glosa_id} para evitar collision.
+    """
+    from app.models.db import ConceptoGlosaRecord
+
+    glosa_ids = {
+        row[0] for row in (
+            db.query(ConceptoGlosaRecord.glosa_id)
+            .filter(ConceptoGlosaRecord.cups_codigo == cups)
+            .filter(ConceptoGlosaRecord.glosa_id.isnot(None))
+            .distinct()
+            .all()
+        )
+    }
+
+    if not glosa_ids:
+        return {
+            "cups_buscado": cups,
+            "encontradas": 0,
+            "items": [],
+        }
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.id.in_(glosa_ids))
+        .order_by(GlosaRecord.creado_en.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        items.append({
+            "id": g.id,
+            "creado_en": (
+                g.creado_en.isoformat() if g.creado_en else None
+            ),
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+            "valor_objetado": float(g.valor_objetado or 0),
+        })
+
+    return {
+        "cups_buscado": cups,
+        "encontradas": len(glosa_ids),
+        "items": items,
+    }
+
+
 @router.get("/cups-perfil")
 def cups_perfil(
     cups: str = Query(..., min_length=1),
