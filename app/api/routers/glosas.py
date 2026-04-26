@@ -8283,6 +8283,128 @@ def whatsapp_mensaje(
     }
 
 
+@router.get("/{glosa_id}/score-defensa")
+def score_defensa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R185 P1: score predictivo de probabilidad de defensa exitosa.
+
+    Heurístico (sin IA): combina señales históricas para estimar
+    qué tan probable es que esta glosa sea LEVANTADA.
+
+    Señales:
+      +1 EPS con tasa_levantamiento alta (>60%)
+      +1 codigo_glosa con tasa_levantamiento alta histórica
+      +1 dictamen presente (>200 chars)
+      +1 codigo_respuesta efectivo (RE9501, RE9502, RE9602, RE9901)
+      +1 con tiempo (dr>3) / -1 si vencida o crítica
+
+    Score 0-5. Veredicto:
+      PROBABLE_DEFENSA (>=4) / INCIERTA (2-3) / PROBABLE_RATIFICACION (<2)
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    score = 0
+    razones = []
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    if glosa.eps:
+        misma_eps = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.eps == glosa.eps)
+            .filter(GlosaRecord.id != glosa_id)
+            .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+            .all()
+        )
+        decididas = [
+            g for g in misma_eps
+            if (g.estado or "").upper() in
+            {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+        ]
+        levantadas = [
+            g for g in decididas
+            if (g.estado or "").upper() == "LEVANTADA"
+        ]
+        if decididas:
+            tasa = 100 * len(levantadas) / len(decididas)
+            if tasa > 60:
+                score += 1
+                razones.append(
+                    f"EPS con buena tasa histórica ({tasa:.0f}%)"
+                )
+
+    if glosa.codigo_glosa:
+        mismo_cod = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+            .filter(GlosaRecord.id != glosa_id)
+            .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+            .all()
+        )
+        decididas = [
+            g for g in mismo_cod
+            if (g.estado or "").upper() in
+            {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+        ]
+        levantadas = [
+            g for g in decididas
+            if (g.estado or "").upper() == "LEVANTADA"
+        ]
+        if decididas:
+            tasa = 100 * len(levantadas) / len(decididas)
+            if tasa > 60:
+                score += 1
+                razones.append(
+                    f"Código {glosa.codigo_glosa} con buena tasa "
+                    f"histórica ({tasa:.0f}%)"
+                )
+
+    if glosa.dictamen and len(glosa.dictamen) > 200:
+        score += 1
+        razones.append(
+            f"Dictamen sólido ({len(glosa.dictamen)} chars)"
+        )
+
+    EFECTIVOS = {"RE9501", "RE9502", "RE9602", "RE9901", "RE9601"}
+    if glosa.codigo_respuesta in EFECTIVOS:
+        score += 1
+        razones.append(
+            f"Código respuesta {glosa.codigo_respuesta} es de defensa"
+        )
+
+    dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+    if dr < 0:
+        score -= 1
+        razones.append(f"PENALIZACIÓN: vencida hace {abs(dr)}d")
+    elif dr <= 3:
+        score -= 1
+        razones.append(f"PENALIZACIÓN: crítica ({dr}d)")
+    else:
+        score += 1
+        razones.append(f"Aún en tiempo ({dr}d)")
+
+    score = max(0, min(5, score))
+
+    if score >= 4:
+        veredicto = "PROBABLE_DEFENSA"
+    elif score >= 2:
+        veredicto = "INCIERTA"
+    else:
+        veredicto = "PROBABLE_RATIFICACION"
+
+    return {
+        "glosa_id": glosa_id,
+        "score": score,
+        "veredicto": veredicto,
+        "razones": razones,
+    }
+
+
 @router.get("/{glosa_id}/comentarios-resumen")
 def comentarios_resumen(
     glosa_id: int,
