@@ -14115,6 +14115,90 @@ def sla_glosa(
     }
 
 
+@router.get("/{glosa_id}/probabilidad-levantamiento")
+def probabilidad_levantamiento(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R299 P1: estima probabilidad heurística de levantamiento.
+
+    Combina dos señales históricas:
+      - tasa_eps_codigo: tasa de levantamiento histórica
+        para el par (eps, codigo_glosa) de esta glosa
+      - tasa_gestor: tasa histórica del gestor asignado
+
+    Probabilidad final = promedio ponderado (60% par,
+    40% gestor) si ambos están disponibles. Si falta uno,
+    usa el otro al 100%.
+
+    Devuelve también las muestras (n) usadas para
+    confianza.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    # tasa par (eps, codigo)
+    par_query = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .filter(GlosaRecord.id != glosa.id)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .all()
+    )
+    n_par = len(par_query)
+    lev_par = sum(
+        1 for g in par_query
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    tasa_par = round(100 * lev_par / n_par, 2) if n_par else None
+
+    # tasa gestor
+    tasa_gestor = None
+    n_gestor = 0
+    if glosa.gestor_nombre:
+        gest_query = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.gestor_nombre == glosa.gestor_nombre)
+            .filter(GlosaRecord.id != glosa.id)
+            .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+            .all()
+        )
+        n_gestor = len(gest_query)
+        lev_gestor = sum(
+            1 for g in gest_query
+            if (g.estado or "").upper() == "LEVANTADA"
+        )
+        tasa_gestor = (
+            round(100 * lev_gestor / n_gestor, 2) if n_gestor else None
+        )
+
+    if tasa_par is not None and tasa_gestor is not None:
+        prob = round(tasa_par * 0.6 + tasa_gestor * 0.4, 2)
+    elif tasa_par is not None:
+        prob = tasa_par
+    elif tasa_gestor is not None:
+        prob = tasa_gestor
+    else:
+        prob = None
+
+    return {
+        "glosa_id": glosa.id,
+        "eps": glosa.eps,
+        "codigo_glosa": glosa.codigo_glosa,
+        "gestor_nombre": glosa.gestor_nombre,
+        "tasa_par_eps_codigo_pct": tasa_par,
+        "n_par": n_par,
+        "tasa_gestor_pct": tasa_gestor,
+        "n_gestor": n_gestor,
+        "probabilidad_levantamiento_pct": prob,
+    }
+
+
 @router.get("/{glosa_id}/contexto-cartera")
 def contexto_cartera_glosa(
     glosa_id: int,
