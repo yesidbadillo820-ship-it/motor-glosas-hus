@@ -55,6 +55,96 @@ def historial_cambios_glosa(
     ]
 
 
+@router.get("/stats")
+def stats_audit_log(
+    dias: int = Query(30, ge=1, le=365, description="Ventana en días"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R87 P1: resumen agregado del audit log para dashboards.
+
+    Devuelve:
+      - total_eventos en la ventana
+      - top_10_usuarios por cantidad de eventos
+      - top_10_acciones más comunes
+      - top_10_tablas más afectadas
+      - eventos_por_dia (últimos N días)
+
+    Útil para que el coordinador identifique de un vistazo qué
+    está pasando en el sistema sin tener que paginar audit log.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func as sa_func
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    corte = ahora_utc() - timedelta(days=int(dias))
+    base = db.query(AuditLogRecord).filter(AuditLogRecord.timestamp >= corte)
+
+    total = base.count()
+
+    top_usuarios = (
+        db.query(
+            AuditLogRecord.usuario_email,
+            sa_func.count(AuditLogRecord.id).label("n"),
+        )
+        .filter(AuditLogRecord.timestamp >= corte)
+        .filter(AuditLogRecord.usuario_email.isnot(None))
+        .group_by(AuditLogRecord.usuario_email)
+        .order_by(sa_func.count(AuditLogRecord.id).desc())
+        .limit(10)
+        .all()
+    )
+
+    top_acciones = (
+        db.query(
+            AuditLogRecord.accion,
+            sa_func.count(AuditLogRecord.id).label("n"),
+        )
+        .filter(AuditLogRecord.timestamp >= corte)
+        .filter(AuditLogRecord.accion.isnot(None))
+        .group_by(AuditLogRecord.accion)
+        .order_by(sa_func.count(AuditLogRecord.id).desc())
+        .limit(10)
+        .all()
+    )
+
+    top_tablas = (
+        db.query(
+            AuditLogRecord.tabla,
+            sa_func.count(AuditLogRecord.id).label("n"),
+        )
+        .filter(AuditLogRecord.timestamp >= corte)
+        .filter(AuditLogRecord.tabla.isnot(None))
+        .group_by(AuditLogRecord.tabla)
+        .order_by(sa_func.count(AuditLogRecord.id).desc())
+        .limit(10)
+        .all()
+    )
+
+    # Distribución por día — agrupando en Python para portabilidad
+    # SQLite/PostgreSQL (date() funciona distinto en cada motor).
+    eventos_por_dia: dict[str, int] = {}
+    for r in base.all():
+        if r.timestamp:
+            k = r.timestamp.date().isoformat()
+            eventos_por_dia[k] = eventos_por_dia.get(k, 0) + 1
+
+    return {
+        "ventana_dias": int(dias),
+        "total_eventos": total,
+        "top_10_usuarios": [{"usuario": u, "eventos": n} for u, n in top_usuarios],
+        "top_10_acciones": [{"accion": a, "eventos": n} for a, n in top_acciones],
+        "top_10_tablas": [{"tabla": t, "eventos": n} for t, n in top_tablas],
+        "eventos_por_dia": [
+            {"fecha": k, "eventos": v}
+            for k, v in sorted(eventos_por_dia.items())
+        ],
+    }
+
+
 @router.get("/export.csv")
 def exportar_audit_csv(
     desde: Optional[str] = Query(None, description="ISO date YYYY-MM-DD"),
