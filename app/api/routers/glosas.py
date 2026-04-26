@@ -6273,6 +6273,71 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/codigos-recuperacion-monetaria")
+def stats_codigos_recuperacion_monetaria(
+    min_glosas: int = Query(5, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R339 P1: ratio recuperado/objetado por codigo_glosa.
+
+    Diferente a /stats/codigos-mejor-tasa (% count) y
+    /stats/codigos-mas-recuperados (suma absoluta): aquí
+    el ratio monetario.
+
+    Por código:
+      - count_decididas
+      - valor_objetado_total
+      - valor_recuperado_total
+      - tasa_recuperacion_monetaria_pct
+    """
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in glosas:
+        codigo = (g.codigo_glosa or "").strip()
+        if not codigo:
+            continue
+        b = bucket.setdefault(codigo, {
+            "count": 0, "obj": 0.0, "rec": 0.0,
+        })
+        b["count"] += 1
+        b["obj"] += float(g.valor_objetado or 0)
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for codigo, b in bucket.items():
+        if b["count"] < min_glosas:
+            continue
+        tasa = (
+            round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        )
+        items.append({
+            "codigo_glosa": codigo,
+            "count_decididas": b["count"],
+            "valor_objetado_total": int(b["obj"]),
+            "valor_recuperado_total": int(b["rec"]),
+            "tasa_recuperacion_monetaria_pct": tasa,
+        })
+    items.sort(
+        key=lambda x: x["tasa_recuperacion_monetaria_pct"],
+        reverse=True,
+    )
+
+    return {
+        "min_glosas_filtro": int(min_glosas),
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-volumen-mes-anterior")
 def stats_eps_volumen_mes_anterior(
     db: Session = Depends(get_db),
