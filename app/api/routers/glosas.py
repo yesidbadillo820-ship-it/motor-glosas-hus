@@ -3600,6 +3600,98 @@ def stats_anomalias(
     }
 
 
+@router.get("/stats/distribucion-riesgo")
+def stats_distribucion_riesgo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R139 P1: perfil de riesgo de la cartera de glosas abiertas.
+
+    Clasifica cada glosa abierta en una matriz 2D:
+      eje 1 = urgencia (vencida / crítica / próxima / lejana)
+      eje 2 = monto (alto / medio / bajo)
+
+    Devuelve la distribución cruzada para detectar dónde se
+    concentra el riesgo:
+      "el 70% del valor pendiente está en glosas vencidas de
+       alto monto → atención prioritaria"
+
+    Útil para reportes ejecutivos de cartera.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    matriz = {
+        "VENCIDA": {"ALTO": [], "MEDIO": [], "BAJO": []},
+        "CRITICA": {"ALTO": [], "MEDIO": [], "BAJO": []},
+        "PROXIMA": {"ALTO": [], "MEDIO": [], "BAJO": []},
+        "LEJANA": {"ALTO": [], "MEDIO": [], "BAJO": []},
+    }
+
+    for g in glosas:
+        v = float(g.valor_objetado or 0)
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+
+        if dr < 0:
+            urg = "VENCIDA"
+        elif dr <= 3:
+            urg = "CRITICA"
+        elif dr <= 7:
+            urg = "PROXIMA"
+        else:
+            urg = "LEJANA"
+
+        if v > 5_000_000:
+            monto = "ALTO"
+        elif v > 1_000_000:
+            monto = "MEDIO"
+        else:
+            monto = "BAJO"
+
+        matriz[urg][monto].append(v)
+
+    items = []
+    total_valor = 0.0
+    for urg in ("VENCIDA", "CRITICA", "PROXIMA", "LEJANA"):
+        for monto in ("ALTO", "MEDIO", "BAJO"):
+            valores = matriz[urg][monto]
+            count = len(valores)
+            v_sum = sum(valores)
+            total_valor += v_sum
+            items.append({
+                "urgencia": urg,
+                "monto": monto,
+                "count": count,
+                "valor_total": int(v_sum),
+            })
+
+    # Calcular pct relativos
+    total_count = sum(it["count"] for it in items)
+    for it in items:
+        it["pct_count"] = (
+            round(100 * it["count"] / total_count, 2)
+            if total_count else 0.0
+        )
+        it["pct_valor"] = (
+            round(100 * it["valor_total"] / total_valor, 2)
+            if total_valor else 0.0
+        )
+
+    # Ordenar por valor DESC para resaltar el riesgo concentrado
+    items.sort(key=lambda x: x["valor_total"], reverse=True)
+
+    return {
+        "total_glosas_abiertas": total_count,
+        "valor_pendiente_total": int(total_valor),
+        "matriz": items,
+    }
+
+
 @router.get("/stats/concentracion-pareto")
 def stats_concentracion_pareto(
     db: Session = Depends(get_db),
