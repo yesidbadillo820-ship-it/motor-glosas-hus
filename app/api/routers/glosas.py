@@ -5174,6 +5174,52 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/sin-dictamen")
+def stats_sin_dictamen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R167 P1: glosas no-cerradas sin dictamen alguno.
+
+    Diferente a /stats/dictamenes-cortos (dictamen pero pobre):
+    aquí dictamen es NULL o vacío. Estas glosas requieren
+    pre-análisis IA o trabajo humano antes de poder responder.
+
+    Útil para alimentar cola de pre-análisis automático.
+
+    Devuelve top 50 priorizadas por dias_restantes ASC (las más
+    urgentes primero).
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    items = []
+    for g in glosas:
+        if not g.dictamen or not g.dictamen.strip():
+            items.append({
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "dias_restantes": g.dias_restantes,
+                "valor_objetado": float(g.valor_objetado or 0),
+            })
+    items.sort(
+        key=lambda x: (x["dias_restantes"]
+                       if x["dias_restantes"] is not None else 9999),
+    )
+
+    return {
+        "total_sin_dictamen": len(items),
+        "items": items[:50],
+    }
+
+
 @router.get("/stats/dictamenes-cortos")
 def stats_dictamenes_cortos(
     umbral_chars: int = Query(200, ge=50, le=2000),
