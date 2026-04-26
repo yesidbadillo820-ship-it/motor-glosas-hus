@@ -4631,6 +4631,99 @@ def contexto_completo_glosa(
     }
 
 
+@router.get("/{glosa_id}/score-prioridad")
+def score_prioridad_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R112 P2: score individual de prioridad para UNA glosa.
+
+    Misma fórmula que /admin/glosas-prioritarias (R112 P1) pero
+    aplicada a una sola glosa, con desglose detallado de cada
+    componente.
+
+    Útil para mostrar en la ficha de la glosa: "esta glosa tiene
+    score 130 porque está vencida + alto valor".
+
+    Devuelve:
+      - score_total
+      - desglose: {[{componente, peso, razon}]}
+      - banner_recomendado: "URGENTE" | "ALTA" | "MEDIA" | "BAJA"
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    estado = (glosa.estado or "").upper()
+    if estado in ESTADOS_CERRADOS:
+        return {
+            "glosa_id": glosa_id,
+            "score_total": 0,
+            "desglose": [],
+            "banner_recomendado": "INFO",
+            "razon": "Glosa cerrada — sin score de prioridad.",
+        }
+
+    desglose = []
+    score = 0
+
+    dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
+    if dr < 0:
+        desglose.append({"componente": "vencimiento", "peso": 100,
+                         "razon": f"vencida hace {abs(dr)}d"})
+        score += 100
+    elif dr <= 3:
+        desglose.append({"componente": "vencimiento", "peso": 50,
+                         "razon": f"crítica ({dr}d restantes)"})
+        score += 50
+    elif dr <= 7:
+        desglose.append({"componente": "vencimiento", "peso": 20,
+                         "razon": f"próxima ({dr}d restantes)"})
+        score += 20
+
+    v_obj = float(glosa.valor_objetado or 0)
+    if v_obj > 10_000_000:
+        desglose.append({"componente": "valor", "peso": 30,
+                         "razon": f"alto valor ({int(v_obj):,} COP)"})
+        score += 30
+    elif v_obj > 1_000_000:
+        desglose.append({"componente": "valor", "peso": 15,
+                         "razon": f"valor medio ({int(v_obj):,} COP)"})
+        score += 15
+
+    if not glosa.dictamen or len(glosa.dictamen) < 50:
+        desglose.append({"componente": "dictamen", "peso": 25,
+                         "razon": "sin dictamen generado"})
+        score += 25
+
+    if not glosa.gestor_nombre:
+        desglose.append({"componente": "asignacion", "peso": 15,
+                         "razon": "sin gestor asignado"})
+        score += 15
+
+    if score >= 100:
+        banner = "URGENTE"
+    elif score >= 50:
+        banner = "ALTA"
+    elif score >= 25:
+        banner = "MEDIA"
+    elif score > 0:
+        banner = "BAJA"
+    else:
+        banner = "INFO"
+
+    return {
+        "glosa_id": glosa_id,
+        "estado": glosa.estado,
+        "score_total": score,
+        "desglose": desglose,
+        "banner_recomendado": banner,
+    }
+
+
 @router.get("/{glosa_id}/recomendaciones")
 def recomendaciones_glosa(
     glosa_id: int,
