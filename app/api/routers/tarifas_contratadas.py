@@ -495,6 +495,57 @@ def eliminar_tarifa(
     return {"message": "Tarifa archivada", "id": tarifa_id}
 
 
+@router.get("/cobertura-eps")
+def cobertura_eps(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R168 P1: cobertura del catálogo de tarifas por EPS.
+
+    Diferente a /tarifas/stats (totales globales): aquí cuenta
+    cuántas tarifas hay cargadas por cada EPS, ordenadas DESC.
+
+    Útil para detectar:
+      - EPS con catálogo robusto (>500 entradas)
+      - EPS con catálogo magro
+      - EPS sin tarifas cargadas (pero con contrato)
+
+    Devuelve por EPS:
+      - eps
+      - tarifas_count
+      - contratos_distintos (DISTINCT contrato_numero)
+    """
+    from app.models.db import TarifaContratadaRecord
+
+    tarifas = db.query(TarifaContratadaRecord).all()
+
+    por_eps: dict[str, dict] = {}
+    for t in tarifas:
+        eps = (t.eps or "").strip()
+        if not eps:
+            continue
+        if eps not in por_eps:
+            por_eps[eps] = {"count": 0, "contratos": set()}
+        por_eps[eps]["count"] += 1
+        if t.contrato_numero:
+            por_eps[eps]["contratos"].add(t.contrato_numero)
+
+    items = []
+    for eps, b in por_eps.items():
+        items.append({
+            "eps": eps,
+            "tarifas_count": b["count"],
+            "contratos_distintos": len(b["contratos"]),
+        })
+    items.sort(key=lambda x: x["tarifas_count"], reverse=True)
+
+    return {
+        "total_eps_con_tarifas": len(items),
+        "total_tarifas_cargadas": len(tarifas),
+        "items": items,
+    }
+
+
 @router.get("/stats")
 def stats_tarifas(
     db: Session = Depends(get_db),
