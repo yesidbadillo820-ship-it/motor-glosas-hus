@@ -4877,6 +4877,98 @@ def stats_dashboard_snapshot(
     }
 
 
+@router.get("/stats/cuellos-botella")
+def stats_cuellos_botella(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R135 P1: detecta etapas con tiempo elevado (cuellos de botella).
+
+    Diferente a /stats/abandono-por-etapa (% abiertas): aquí mide
+    TIEMPO promedio que las glosas pasan en cada estado antes
+    de transicionar al siguiente, usando transiciones del
+    audit_log (campo='estado').
+
+    Útil para identificar:
+      - Estados que requieren más recursos
+      - Procesos lentos que necesitan optimización
+      - Comparación HUS vs SLA de la Resolución
+
+    Devuelve por estado:
+      - count_glosas_con_transicion
+      - tiempo_promedio_dias
+      - tiempo_mediano_dias
+    Ordenado DESC por tiempo_promedio.
+    """
+    from datetime import timezone
+
+    from app.models.db import AuditLogRecord
+
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.campo == "estado")
+        .filter(AuditLogRecord.timestamp.isnot(None))
+        .filter(AuditLogRecord.registro_id.isnot(None))
+        .order_by(
+            AuditLogRecord.registro_id.asc(),
+            AuditLogRecord.timestamp.asc(),
+        )
+        .all()
+    )
+
+    # Agrupar por glosa, ordenadas cronológicamente.
+    # Por cada evento guardamos (timestamp, valor_nuevo). El estado en
+    # el que está la glosa entre evento[i] y evento[i+1] es valor_nuevo
+    # del evento[i] (el "destino" de esa transición).
+    por_glosa: dict[int, list] = {}
+    for e in eventos:
+        ts = e.timestamp
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        por_glosa.setdefault(e.registro_id, []).append(
+            (ts, e.valor_nuevo)
+        )
+
+    # Para cada glosa, tiempo entre transiciones consecutivas
+    por_estado: dict[str, list[float]] = {}
+    for transiciones in por_glosa.values():
+        transiciones.sort(key=lambda x: x[0])
+        for i in range(1, len(transiciones)):
+            ts_prev, estado_durante = transiciones[i - 1]
+            ts_act, _ = transiciones[i]
+            if not estado_durante or not ts_prev or not ts_act:
+                continue
+            dias = (ts_act - ts_prev).total_seconds() / 86400
+            if dias < 0:
+                continue
+            por_estado.setdefault(estado_durante, []).append(dias)
+
+    items = []
+    for estado, tiempos in por_estado.items():
+        tiempos.sort()
+        n = len(tiempos)
+        promedio = sum(tiempos) / n
+        if n % 2 == 0:
+            mediano = (tiempos[n // 2 - 1] + tiempos[n // 2]) / 2
+        else:
+            mediano = tiempos[n // 2]
+        items.append({
+            "estado": estado,
+            "count_glosas_con_transicion": n,
+            "tiempo_promedio_dias": round(promedio, 2),
+            "tiempo_mediano_dias": round(mediano, 2),
+        })
+    items.sort(
+        key=lambda x: x["tiempo_promedio_dias"], reverse=True,
+    )
+
+    return {
+        "total_estados_con_data": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/abandono-por-etapa")
 def stats_abandono_por_etapa(
     db: Session = Depends(get_db),
