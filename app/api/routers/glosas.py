@@ -5908,6 +5908,67 @@ def stats_refinaciones_por_dia(
     }
 
 
+@router.get("/stats/antiguedad-promedio-eps")
+def stats_antiguedad_promedio_eps(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R214 P1: antigüedad promedio de glosas abiertas por EPS.
+
+    Útil para detectar EPS donde HUS demora mucho en cerrar
+    (problemas de comunicación o casos complejos):
+      "SANITAS tiene un promedio de 90d, OTRA solo 20d"
+
+    Solo cuenta glosas no-cerradas. Por EPS:
+      - count
+      - antiguedad_promedio_dias
+      - antiguedad_max_dias
+
+    Ordenado DESC por antiguedad_promedio.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    ahora = ahora_utc()
+    por_eps: dict[str, list[int]] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        antig = (ahora - cre).days
+        por_eps.setdefault(eps, []).append(antig)
+
+    items = []
+    for eps, antiguedades in por_eps.items():
+        promedio = sum(antiguedades) / len(antiguedades)
+        items.append({
+            "eps": eps,
+            "count": len(antiguedades),
+            "antiguedad_promedio_dias": round(promedio, 2),
+            "antiguedad_max_dias": max(antiguedades),
+        })
+    items.sort(
+        key=lambda x: x["antiguedad_promedio_dias"], reverse=True,
+    )
+
+    return {
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/multi-concepto-ratio")
 def stats_multi_concepto_ratio(
     db: Session = Depends(get_db),
