@@ -3339,6 +3339,74 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/proyeccion-recuperacion")
+def stats_proyeccion_recuperacion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R102 P2: forecast simple de recuperación esperada.
+
+    Usa la tasa histórica de recuperación (sobre glosas cerradas)
+    aplicada al valor pendiente como predicción gruesa de cuánto
+    podría recuperar el HUS si el patrón histórico se mantiene.
+
+    Útil para:
+      - Cash flow planning del coordinador
+      - Reporte ejecutivo con proyección
+      - Detectar cuándo la pendiente excede capacidad histórica
+
+    NO es ML — es una regla simple. Para una proyección más
+    sofisticada usar /analitica-predictiva.
+
+    Devuelve:
+      - tasa_historica_recuperacion_pct
+      - valor_pendiente_total (no cerradas)
+      - proyeccion_recuperable
+      - intervalo: {"min": ..., "max": ...} con ±20% de margen
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    todas = db.query(GlosaRecord).all()
+
+    cerradas_obj = 0.0
+    cerradas_rec = 0.0
+    pendientes_obj = 0.0
+    pendientes_count = 0
+
+    for g in todas:
+        estado = (g.estado or "").upper()
+        v_obj = float(g.valor_objetado or 0)
+        if estado in ESTADOS_CERRADOS:
+            cerradas_obj += v_obj
+            cerradas_rec += float(g.valor_recuperado or 0)
+        else:
+            pendientes_obj += v_obj
+            pendientes_count += 1
+
+    tasa = (
+        round(100 * cerradas_rec / cerradas_obj, 2)
+        if cerradas_obj else 0.0
+    )
+
+    proyeccion = pendientes_obj * (tasa / 100)
+
+    # Intervalo ±20% como margen de incertidumbre
+    margen = proyeccion * 0.20
+
+    return {
+        "tasa_historica_recuperacion_pct": tasa,
+        "valor_pendiente_total": int(pendientes_obj),
+        "glosas_pendientes": pendientes_count,
+        "proyeccion_recuperable": int(proyeccion),
+        "intervalo": {
+            "min": int(max(0, proyeccion - margen)),
+            "max": int(proyeccion + margen),
+            "margen_pct": 20,
+        },
+        "basado_en_glosas_cerradas": int(cerradas_obj > 0),
+    }
+
+
 @router.get("/stats/codigos-mas-objetados")
 def stats_codigos_mas_objetados(
     top: int = Query(20, ge=1, le=100),
