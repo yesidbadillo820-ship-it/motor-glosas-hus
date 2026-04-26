@@ -1877,3 +1877,67 @@ async def reanalizar_glosa(
         "dictamen": resultado.dictamen,
         "tipo": resultado.tipo,
     }
+
+
+@router.post("/{glosa_id}/clonar")
+def clonar_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """R65 P1: clona una glosa existente como BORRADOR para acelerar
+    captura de glosas similares (mismo paciente, mismo servicio, valor
+    distinto, o multi-conceptos sobre la misma factura).
+
+    Comportamiento:
+      - Copia campos descriptivos: eps, paciente, codigo_glosa, etapa,
+        factura, numero_radicado, texto_glosa_original, cups_servicio,
+        servicio_descripcion, concepto_glosa, fecha_recepcion.
+      - NO copia: dictamen, modelo_ia, score, valor_aceptado, decisiones
+        EPS, fechas de respuesta. La nueva glosa empieza limpia para
+        que el gestor decida tono/modo.
+      - Estado inicial: BORRADOR (no RADICADA — no se ha generado dictamen).
+      - valor_objetado y valor_aceptado quedan en 0 para forzar al gestor
+        a digitarlos según el nuevo concepto.
+
+    Audit log registrado con detalle de la glosa origen.
+    """
+    repo = GlosaRepository(db)
+    original = repo.obtener_por_id(glosa_id)
+    if not original:
+        raise HTTPException(404, "Glosa origen no encontrada")
+
+    nueva = repo.crear(
+        eps=original.eps,
+        paciente=original.paciente,
+        codigo_glosa=original.codigo_glosa,
+        valor_objetado=0,
+        valor_aceptado=0,
+        etapa=original.etapa,
+        estado="BORRADOR",
+        dictamen=None,
+        dias_restantes=original.dias_restantes,
+        modelo_ia=None,
+        score=0,
+        numero_radicado=original.numero_radicado,
+        factura=original.factura,
+        texto_glosa_original=original.texto_glosa_original,
+        codigo_respuesta=None,
+        cups_servicio=original.cups_servicio,
+        servicio_descripcion=original.servicio_descripcion,
+        concepto_glosa=original.concepto_glosa,
+        fecha_recepcion=original.fecha_recepcion,
+    )
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email, usuario_rol=current_user.rol,
+        accion="CLONAR_GLOSA", tabla="glosas", registro_id=nueva.id,
+        detalle=f"Clonada desde glosa #{glosa_id}",
+    )
+
+    return {
+        "message": "Glosa clonada como BORRADOR",
+        "id_origen": glosa_id,
+        "id_nueva": nueva.id,
+        "estado": "BORRADOR",
+    }
