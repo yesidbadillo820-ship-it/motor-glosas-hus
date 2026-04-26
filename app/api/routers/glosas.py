@@ -6441,6 +6441,66 @@ def stats_ratificadas_recientes(
     }
 
 
+@router.get("/stats/codigo-respuesta-mes-actual")
+def stats_codigo_respuesta_mes_actual(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R359 P1: uso de codigo_respuesta en el mes en curso.
+
+    Snapshot de codigos_respuesta usados por HUS este
+    mes, con count y tasa de levantamiento.
+    """
+    from app.core.tz import ahora_utc
+
+    inicio = ahora_utc().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio)
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .filter(GlosaRecord.codigo_respuesta != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        c = (g.codigo_respuesta or "").strip()
+        if not c:
+            continue
+        b = bucket.setdefault(c, {
+            "count": 0, "lev": 0, "dec": 0,
+        })
+        b["count"] += 1
+        estado = (g.estado or "").upper()
+        if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA"):
+            b["dec"] += 1
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for c, b in bucket.items():
+        tasa = (
+            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        )
+        items.append({
+            "codigo_respuesta": c,
+            "count_total": b["count"],
+            "decididas": b["dec"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+        })
+    items.sort(key=lambda x: x["count_total"], reverse=True)
+
+    return {
+        "mes": inicio.strftime("%Y-%m"),
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-radica-promedio-dia")
 def stats_eps_radica_promedio_dia(
     dias: int = Query(30, ge=7, le=180),
