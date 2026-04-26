@@ -732,6 +732,61 @@ def info_version():
     }
 
 
+@router.get("/zonas-horarias")
+def info_zonas_horarias(
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R101 P1: diagnóstico de timezones del servidor y BD.
+
+    Útil para diagnosticar inconsistencias en timestamps:
+      - ¿Por qué la fecha de creación se ve "una hora atrás"?
+      - ¿La BD está devolviendo naive vs aware datetimes?
+      - ¿El servidor está en UTC o en hora local?
+
+    Devuelve:
+      - now_utc / now_local
+      - server_timezone (TZ env var)
+      - bogota_offset_utc
+      - python_tz_module (zoneinfo / pytz / fallback)
+    """
+    import os
+    from datetime import datetime, timezone
+
+    from app.core.tz import ahora_utc
+
+    ahora = ahora_utc()
+    now_local = datetime.now()
+
+    # Detección de modulo TZ disponible
+    try:
+        from zoneinfo import ZoneInfo  # noqa: F401
+        tz_module = "zoneinfo"
+    except ImportError:
+        try:
+            import pytz  # noqa: F401
+            tz_module = "pytz"
+        except ImportError:
+            tz_module = "ninguno"
+
+    bogota_offset = None
+    if tz_module == "zoneinfo":
+        from zoneinfo import ZoneInfo
+        bogota_now = datetime.now(ZoneInfo("America/Bogota"))
+        bogota_offset = (
+            bogota_now.utcoffset().total_seconds() / 3600
+            if bogota_now.utcoffset() else None
+        )
+
+    return {
+        "now_utc": ahora.isoformat(),
+        "now_local": now_local.isoformat(),
+        "now_local_tz_aware": now_local.tzinfo is not None,
+        "server_tz_env": os.getenv("TZ") or None,
+        "python_tz_module": tz_module,
+        "bogota_offset_utc": bogota_offset,
+    }
+
+
 @router.get("/configuracion")
 def info_configuracion(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
