@@ -574,6 +574,91 @@ def admin_diagnostico_bd(
     }
 
 
+@router.get("/glosas-prioritarias")
+def admin_glosas_prioritarias(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R112 P1: worklist priorizada de glosas que necesitan atención.
+
+    Ranking heurístico para que el coordinador asigne trabajo:
+    score = peso_vencimiento + peso_valor + peso_falta_dictamen +
+            peso_sin_gestor
+
+    Útil al inicio del día: "estas son las glosas que el equipo
+    debe atacar primero".
+
+    Devuelve top N glosas no-cerradas ordenadas DESC por score
+    con razon (string explicando por qué entra al top).
+
+    Solo SUPER_ADMIN.
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    items = []
+    for g in abiertas:
+        score = 0.0
+        razones = []
+
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            score += 100
+            razones.append(f"vencida {abs(dr)}d")
+        elif dr <= 3:
+            score += 50
+            razones.append(f"crítica {dr}d")
+        elif dr <= 7:
+            score += 20
+
+        v_obj = float(g.valor_objetado or 0)
+        if v_obj > 10_000_000:
+            score += 30
+            razones.append("alto valor (>10M)")
+        elif v_obj > 1_000_000:
+            score += 15
+
+        if not g.dictamen or len(g.dictamen) < 50:
+            score += 25
+            razones.append("sin dictamen")
+
+        if not g.gestor_nombre:
+            score += 15
+            razones.append("sin gestor")
+
+        if score == 0:
+            continue
+
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "valor_objetado": int(v_obj),
+            "dias_restantes": dr,
+            "estado": g.estado,
+            "gestor_nombre": g.gestor_nombre,
+            "score": round(score, 2),
+            "razones": razones,
+        })
+
+    items.sort(key=lambda x: x["score"], reverse=True)
+
+    return {
+        "limit": int(limit),
+        "total_evaluadas": len(abiertas),
+        "total_priorizadas": len(items),
+        "items": items[:limit],
+    }
+
+
 @router.get("/actividad-reciente")
 def admin_actividad_reciente(
     limit: int = 50,
