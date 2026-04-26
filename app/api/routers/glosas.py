@@ -6273,6 +6273,65 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/gestor-vencidas-distribucion")
+def stats_gestor_vencidas_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R323 P1: distribución de glosas vencidas por gestor.
+
+    Solo coordinador/admin (datos sensibles del equipo).
+    Por gestor: count de vencidas, criticas y total
+    abiertas.
+
+    Útil para identificar gestores que necesitan apoyo
+    o redistribución de carga.
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in abiertas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        b = bucket.setdefault(gestor, {
+            "total": 0, "vencidas": 0, "criticas": 0,
+        })
+        b["total"] += 1
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            b["vencidas"] += 1
+        elif dr <= 3:
+            b["criticas"] += 1
+
+    items = []
+    for gestor, b in bucket.items():
+        pct = (
+            round(100 * b["vencidas"] / b["total"], 2)
+            if b["total"] else 0.0
+        )
+        items.append({
+            "gestor": gestor,
+            "total_abiertas": b["total"],
+            "vencidas": b["vencidas"],
+            "criticas": b["criticas"],
+            "pct_vencidas": pct,
+        })
+    items.sort(key=lambda x: x["vencidas"], reverse=True)
+
+    return {
+        "total_gestores": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/glosas-sin-fecha-decision")
 def stats_glosas_sin_fecha_decision(
     limit: int = Query(50, ge=1, le=500),
