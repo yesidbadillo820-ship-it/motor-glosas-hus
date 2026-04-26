@@ -3403,6 +3403,93 @@ def stats_distribucion_valores(
     }
 
 
+@router.get("/stats/desempeno-trimestral")
+def stats_desempeno_trimestral(
+    trimestres: int = Query(8, ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R109 P1: evolución del desempeño HUS por trimestre.
+
+    Útil para informe ejecutivo periódico: ¿estamos mejorando?
+    Cada trimestre devuelve:
+      - total_glosas (creadas en el trimestre)
+      - decididas / pendientes
+      - tasa_levantamiento_pct
+      - valor_objetado_total / valor_recuperado_total
+      - tasa_recuperacion_pct
+
+    Útil para gráficos de evolución (línea trimestre-a-trimestre).
+    Trimestre se calcula con ((mes-1)//3 + 1) → Q1, Q2, Q3, Q4.
+    """
+    from datetime import timezone
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA",
+                        "ARCHIVADA", "CONCILIADA"}
+
+    glosas = db.query(GlosaRecord).all()
+
+    por_trim: dict[str, dict] = {}
+    for g in glosas:
+        if not g.creado_en:
+            continue
+        creado = g.creado_en
+        if creado.tzinfo is None:
+            creado = creado.replace(tzinfo=timezone.utc)
+        anio = creado.year
+        trim = (creado.month - 1) // 3 + 1
+        key = f"{anio}-Q{trim}"
+
+        if key not in por_trim:
+            por_trim[key] = {
+                "total": 0, "decididas": 0, "levantadas": 0,
+                "valor_obj": 0.0, "valor_rec": 0.0,
+            }
+        b = por_trim[key]
+        b["total"] += 1
+        b["valor_obj"] += float(g.valor_objetado or 0)
+        b["valor_rec"] += float(g.valor_recuperado or 0)
+
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_DECIDIDOS:
+            b["decididas"] += 1
+            if estado == "LEVANTADA":
+                b["levantadas"] += 1
+
+    # Ordenar por trimestre y limitar a últimos N
+    keys_ordenados = sorted(por_trim.keys())
+    keys_recientes = keys_ordenados[-int(trimestres):]
+
+    serie = []
+    for key in keys_recientes:
+        b = por_trim[key]
+        tasa_lev = (
+            round(100 * b["levantadas"] / b["decididas"], 2)
+            if b["decididas"] else 0.0
+        )
+        tasa_rec = (
+            round(100 * b["valor_rec"] / b["valor_obj"], 2)
+            if b["valor_obj"] else 0.0
+        )
+        serie.append({
+            "trimestre": key,
+            "total_glosas": b["total"],
+            "decididas": b["decididas"],
+            "pendientes": b["total"] - b["decididas"],
+            "levantadas": b["levantadas"],
+            "tasa_levantamiento_pct": tasa_lev,
+            "valor_objetado_total": int(b["valor_obj"]),
+            "valor_recuperado_total": int(b["valor_rec"]),
+            "tasa_recuperacion_pct": tasa_rec,
+        })
+
+    return {
+        "trimestres_solicitados": int(trimestres),
+        "total_trimestres_disponibles": len(por_trim),
+        "serie": serie,
+    }
+
+
 @router.get("/stats/picos-historicos")
 def stats_picos_historicos(
     top: int = Query(10, ge=1, le=50),
