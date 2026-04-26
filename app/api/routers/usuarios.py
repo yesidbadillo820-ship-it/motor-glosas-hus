@@ -34,6 +34,51 @@ class RolChange(BaseModel):
 ROLES_VALIDOS = {ROL_SUPER_ADMIN, ROL_COORDINADOR, ROL_AUDITOR, ROL_VIEWER}
 
 
+@router.get("/yo/permisos")
+def permisos_del_usuario_actual(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R76 P2: capabilities del usuario actual basado en su rol.
+
+    Útil para que el frontend decida qué botones/menus mostrar sin
+    hardcodear roles. Si en el futuro se cambia la matriz de
+    permisos, solo se actualiza acá.
+
+    NO ejecuta autorización — solo describe. La autorización real
+    sigue en cada endpoint con get_admin / get_coordinador_o_admin /
+    get_auditor_o_superior.
+    """
+    rol = (current_user.rol or "").upper().strip()
+    es_super = rol == "SUPER_ADMIN"
+    es_admin = rol in ("SUPER_ADMIN", "ADMIN")
+    es_coord = rol in ("SUPER_ADMIN", "ADMIN", "COORDINADOR")
+    es_aud = rol in ("SUPER_ADMIN", "ADMIN", "COORDINADOR", "AUDITOR")
+
+    return {
+        "usuario_email": current_user.email,
+        "rol": rol or None,
+        "permisos": {
+            "puede_analizar_glosa": True,
+            "puede_refinar_dictamen": es_aud,
+            "puede_reanalizar_glosa": es_aud,
+            "puede_clonar_glosa": es_aud,
+            "puede_eliminar_glosa": es_coord,
+            "puede_ver_audit_log": es_coord,
+            "puede_exportar_csv_audit": es_coord,
+            "puede_ver_metricas_ia": es_coord,
+            "puede_ver_dashboard_equipo": es_coord,
+            "puede_ver_alertas_criticas": es_coord,
+            "puede_ver_resumen_mensual": es_coord,
+            "puede_bulk_actualizar_estado": es_aud,
+            "puede_bulk_mover_papelera": es_coord,
+            "puede_descargar_backup_db": es_super,
+            "puede_purgar_mantenimiento": es_super,
+            "puede_resetear_datos": es_super,
+            "puede_admin_usuarios": es_super,
+        },
+    }
+
+
 @router.get("/")
 def listar_usuarios(
     db: Session = Depends(get_db),
