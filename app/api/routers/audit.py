@@ -90,6 +90,70 @@ def facetas_audit_log(
     }
 
 
+@router.get("/heatmap-actividad")
+def audit_heatmap_actividad(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R159 P1: heatmap día×hora del audit log.
+
+    Diferente a /glosas/stats/heatmap-actividad (creación de
+    glosas): aquí TODA la actividad del audit log para detectar
+    patrones de uso del sistema:
+      - "Pico los lunes 9-11am"
+      - "Actividad fuera de horario sospechosa"
+
+    Devuelve matriz 7×24 (día×hora):
+      - dia (0=Lunes ... 6=Domingo)
+      - hora (0-23)
+      - count
+
+    Solo filas con count>0 (evita inflar payload).
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .all()
+    )
+
+    matriz: dict[tuple[int, int], int] = {}
+    for e in eventos:
+        ts = e.timestamp
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if not ts:
+            continue
+        key = (ts.weekday(), ts.hour)
+        matriz[key] = matriz.get(key, 0) + 1
+
+    DIAS = ["Lunes", "Martes", "Miércoles", "Jueves",
+            "Viernes", "Sábado", "Domingo"]
+    items = []
+    for (dia_idx, hora), count in matriz.items():
+        items.append({
+            "dia_semana": dia_idx,
+            "dia_nombre": DIAS[dia_idx],
+            "hora": hora,
+            "count": count,
+        })
+    items.sort(key=lambda x: (x["dia_semana"], x["hora"]))
+
+    return {
+        "ventana_dias": int(dias),
+        "total_eventos": len(eventos),
+        "items": items,
+    }
+
+
 @router.get("/distribucion-tablas")
 def audit_distribucion_tablas(
     dias: int = 30,
