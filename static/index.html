@@ -2553,6 +2553,77 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 <!-- TOASTS -->
 <div class="toast-wrap" id="toasts"></div>
 
+<!-- 💡 BOTÓN FLOTANTE: Reportar fallo / sugerencia (R369) -->
+<button id="fb-fab" onclick="abrirModalSugerencia()" title="Reportar fallo o sugerir mejora"
+  style="position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;
+         background:linear-gradient(135deg,#0284c7,#0ea5e9);color:#fff;border:none;
+         box-shadow:0 6px 18px rgba(2,132,199,.45);cursor:pointer;font-size:1.45rem;
+         z-index:998;display:none;transition:transform .15s ease,box-shadow .15s ease"
+  onmouseover="this.style.transform='scale(1.08)';this.style.boxShadow='0 8px 22px rgba(2,132,199,.6)'"
+  onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 6px 18px rgba(2,132,199,.45)'">
+  💡
+</button>
+
+<!-- 💡 MODAL: Reportar fallo / sugerencia -->
+<div id="fb-modal" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;
+                          display:none;align-items:center;justify-content:center;
+                          backdrop-filter:blur(6px)">
+  <div class="card-premium" style="width:520px;max-width:94vw;padding:1.6rem 1.85rem">
+    <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:1rem">
+      <div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:.2rem">💡 Tu opinión cuenta</div>
+        <div style="font-size:.78rem;color:var(--text3)">Reporta un fallo, sugiere una mejora o comparte una idea</div>
+      </div>
+      <button onclick="cerrarModalSugerencia()" class="btn btn-ghost" style="font-size:1.1rem;padding:.2rem .55rem" title="Cerrar">×</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:.7rem">
+      <div>
+        <label style="font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Tipo</label>
+        <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
+          <label class="fb-tipo-opt" style="display:flex;align-items:center;gap:.35rem;padding:.4rem .75rem;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:.82rem">
+            <input type="radio" name="fb-tipo" value="BUG" checked onchange="document.querySelectorAll('.fb-tipo-opt').forEach(function(x){x.style.background='';x.style.borderColor='var(--border)'});this.parentElement.style.background='#fef2f2';this.parentElement.style.borderColor='#fecaca'"/>
+            🐛 Fallo
+          </label>
+          <label class="fb-tipo-opt" style="display:flex;align-items:center;gap:.35rem;padding:.4rem .75rem;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:.82rem">
+            <input type="radio" name="fb-tipo" value="MEJORA" onchange="document.querySelectorAll('.fb-tipo-opt').forEach(function(x){x.style.background='';x.style.borderColor='var(--border)'});this.parentElement.style.background='#fff7ed';this.parentElement.style.borderColor='#fed7aa'"/>
+            ⚙️ Mejora
+          </label>
+          <label class="fb-tipo-opt" style="display:flex;align-items:center;gap:.35rem;padding:.4rem .75rem;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:.82rem">
+            <input type="radio" name="fb-tipo" value="IDEA" onchange="document.querySelectorAll('.fb-tipo-opt').forEach(function(x){x.style.background='';x.style.borderColor='var(--border)'});this.parentElement.style.background='#f0fdf4';this.parentElement.style.borderColor='#bbf7d0'"/>
+            💡 Idea
+          </label>
+          <label class="fb-tipo-opt" style="display:flex;align-items:center;gap:.35rem;padding:.4rem .75rem;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:.82rem">
+            <input type="radio" name="fb-tipo" value="OTRO" onchange="document.querySelectorAll('.fb-tipo-opt').forEach(function(x){x.style.background='';x.style.borderColor='var(--border)'});this.parentElement.style.background='var(--bg-subtle)';this.parentElement.style.borderColor='var(--border)'"/>
+            ✉️ Otro
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Título *</label>
+        <input id="fb-titulo" type="text" maxlength="200" placeholder="Ej: el botón Guardar no responde"
+          style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:7px;font-size:.88rem;background:var(--bg-card);color:var(--text);margin-top:.25rem"/>
+      </div>
+
+      <div>
+        <label style="font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Descripción *</label>
+        <textarea id="fb-desc" rows="5" placeholder="Cuéntanos los pasos para reproducirlo, qué esperabas y qué pasó realmente"
+          style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:7px;font-size:.85rem;background:var(--bg-card);color:var(--text);margin-top:.25rem;font-family:inherit;resize:vertical"></textarea>
+      </div>
+
+      <div style="font-size:.7rem;color:var(--text3);font-style:italic">
+        Se enviará junto con la página actual y tu sesión para ayudar a diagnosticar.
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.2rem">
+      <button onclick="cerrarModalSugerencia()" class="btn btn-ghost">Cancelar</button>
+      <button onclick="enviarSugerencia()" class="btn btn-primary" id="fb-enviar">Enviar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CAMBIAR PASSWORD (primer login / reset) -->
 <div id="chpw-backdrop" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);">
   <div class="card-premium" style="width:480px;max-width:92vw;padding:1.75rem 2rem;">
@@ -6523,6 +6594,75 @@ function toggleSidebar(forceOpen){
   sb.classList.toggle('open', shouldOpen);
   if(ov) ov.classList.toggle('show', shouldOpen);
 }
+
+// ─── 💡 Sugerencias / bug report (R369) ─────────────────────────────────
+function abrirModalSugerencia(){
+  var m = document.getElementById('fb-modal');
+  if(!m) return;
+  m.style.display = 'flex';
+  // Pre-rellena tipo BUG
+  var titulo = document.getElementById('fb-titulo');
+  var desc = document.getElementById('fb-desc');
+  if(titulo) titulo.value = '';
+  if(desc) desc.value = '';
+  // Estilo inicial del radio BUG
+  setTimeout(function(){
+    var first = document.querySelector('.fb-tipo-opt');
+    if(first){ first.style.background = '#fef2f2'; first.style.borderColor = '#fecaca'; }
+    if(titulo) titulo.focus();
+  }, 50);
+}
+function cerrarModalSugerencia(){
+  var m = document.getElementById('fb-modal');
+  if(m) m.style.display = 'none';
+}
+async function enviarSugerencia(){
+  var btn = document.getElementById('fb-enviar');
+  var titulo = (document.getElementById('fb-titulo').value || '').trim();
+  var desc = (document.getElementById('fb-desc').value || '').trim();
+  var tipoEl = document.querySelector('input[name="fb-tipo"]:checked');
+  var tipo = tipoEl ? tipoEl.value : 'OTRO';
+
+  if(titulo.length < 4){
+    if(typeof toast === 'function') toast('Título corto', 'Mínimo 4 caracteres', 'warning');
+    return;
+  }
+  if(desc.length < 10){
+    if(typeof toast === 'function') toast('Descripción corta', 'Mínimo 10 caracteres', 'warning');
+    return;
+  }
+  if(btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try{
+    var pagina = window.location.pathname + window.location.hash;
+    var r = await fetch('/sugerencias', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({tipo:tipo, titulo:titulo, descripcion:desc, pagina:pagina}),
+    });
+    if(r.ok){
+      if(typeof toast === 'function') toast('¡Gracias!', 'Tu reporte llegó al equipo', 'success');
+      cerrarModalSugerencia();
+    } else {
+      var err = await r.text();
+      if(typeof toast === 'function') toast('Error', err.slice(0, 80), 'error');
+    }
+  }catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo enviar: ' + e.message, 'error');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'Enviar'; }
+  }
+}
+// Mostrar el FAB solo cuando hay sesión iniciada
+window.addEventListener('hus:auth', function(){
+  var fab = document.getElementById('fb-fab');
+  if(fab) fab.style.display = 'flex';
+});
+// Fallback: si la app inicia con token, mostrar el FAB después de un tick
+setTimeout(function(){
+  var t = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
+  var fab = document.getElementById('fb-fab');
+  if(t && fab) fab.style.display = 'flex';
+}, 800);
 
 // Sincroniza el badge numerico del sidebar con el del nav-bar legacy
 function syncSidebarBadge(idLegacy, idSide){

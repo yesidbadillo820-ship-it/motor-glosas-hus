@@ -438,3 +438,32 @@ class AICallRecord(Base):
     __table_args__ = (
         Index("ix_aicalls_proveedor_creado", "proveedor", "creado_en"),
     )
+
+
+class SugerenciaRecord(Base):
+    """R369: feedback in-app de gestores (bugs, ideas, mejoras).
+
+    Tabla simple para que cualquier usuario reporte fallos o
+    sugerencias sin salir del sistema. Admin puede triagear
+    desde /admin/sugerencias.
+    """
+    __tablename__ = "sugerencias"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    autor_email = Column(String(200), index=True)
+    autor_nombre = Column(String(200), nullable=True)
+    autor_rol = Column(String(50), nullable=True)
+    # tipo: BUG | IDEA | MEJORA | OTRO
+    tipo = Column(String(20), default="OTRO", nullable=False, index=True)
+    titulo = Column(String(200), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    # Contexto opcional (página visitada, glosa relacionada)
+    pagina = Column(String(120), nullable=True)
+    glosa_id = Column(Integer, nullable=True)
+    # Estado del triage por admin
+    estado = Column(String(20), default="ABIERTA", nullable=False, index=True)
+    # ABIERTA | EN_REVISION | RESUELTA | DESCARTADA
+    resuelto_en = Column(DateTime(timezone=True), nullable=True)
+    resuelto_por = Column(String(200), nullable=True)
+    nota_admin = Column(Text, nullable=True)
