@@ -6086,6 +6086,73 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/profesional-top")
+def stats_profesional_top(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R258 P1: top profesionales médicos por glosas asociadas.
+
+    Útil para identificar prácticas (médicos, especialistas)
+    que generan más glosas y abrir conversaciones de calidad
+    con auditoría médica. Solo cuenta glosas con
+    `profesional_medico` no nulo y no vacío.
+
+    Por profesional:
+      - total_glosas
+      - levantadas, ratificadas, decididas
+      - tasa_levantamiento_pct (sobre decididas)
+      - valor_objetado_total
+
+    Ordenado DESC por total_glosas.
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.profesional_medico.isnot(None))
+        .filter(GlosaRecord.profesional_medico != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        prof = (g.profesional_medico or "").strip()
+        if not prof:
+            continue
+        b = bucket.setdefault(prof, {
+            "total": 0, "lev": 0, "rat": 0, "dec": 0, "val": 0.0,
+        })
+        b["total"] += 1
+        estado = (g.estado or "").upper()
+        if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA"):
+            b["dec"] += 1
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+        elif estado == "RATIFICADA":
+            b["rat"] += 1
+        b["val"] += float(g.valor_objetado or 0)
+
+    items = []
+    for prof, b in bucket.items():
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append({
+            "profesional_medico": prof,
+            "total_glosas": b["total"],
+            "decididas": b["dec"],
+            "levantadas": b["lev"],
+            "ratificadas": b["rat"],
+            "tasa_levantamiento_pct": tasa,
+            "valor_objetado_total": int(b["val"]),
+        })
+    items.sort(key=lambda x: x["total_glosas"], reverse=True)
+
+    return {
+        "limit": int(limit),
+        "total_profesionales": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/exito-por-gestor")
 def stats_exito_por_gestor(
     min_glosas: int = Query(3, ge=1, le=100),
