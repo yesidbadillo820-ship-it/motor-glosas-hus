@@ -90,6 +90,62 @@ def facetas_audit_log(
     }
 
 
+@router.get("/distribucion-acciones")
+def audit_distribucion_acciones(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R154 P1: distribución de tipos de acción en el audit log.
+
+    Diferente a /audit/stats (top usuarios/acciones/tablas):
+    aquí solo la distribución porcentual de las acciones para
+    un análisis rápido del tipo de actividad:
+
+      "60% UPDATE, 20% LOGIN, 10% CREATE, ..."
+
+    Útil para:
+      - Detectar patrones (¿demasiados DELETE?)
+      - Reportes de actividad
+
+    Solo COORDINADOR/ADMIN.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import AuditLogRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp >= desde)
+        .filter(AuditLogRecord.accion.isnot(None))
+        .all()
+    )
+
+    por_accion: dict[str, int] = {}
+    for e in eventos:
+        por_accion[e.accion] = por_accion.get(e.accion, 0) + 1
+
+    total = len(eventos)
+    items = []
+    for accion, count in por_accion.items():
+        pct = round(100 * count / total, 2) if total else 0.0
+        items.append({
+            "accion": accion,
+            "count": count,
+            "pct": pct,
+        })
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_eventos": total,
+        "total_acciones_unicas": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats")
 def stats_audit_log(
     dias: int = Query(30, ge=1, le=365, description="Ventana en días"),
