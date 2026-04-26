@@ -5331,6 +5331,62 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/mas-comentadas")
+def stats_mas_comentadas(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R196 P1: glosas con más comentarios entre auditores.
+
+    Indicador de glosas "complejas" o "controvertidas" — donde
+    el equipo tuvo que discutir mucho.
+
+    Útil para:
+      - Identificar casos para training
+      - Detectar discusiones interminables que necesitan
+        decisión gerencial
+
+    Devuelve top N glosas ordenado DESC por número de
+    comentarios.
+    """
+    from sqlalchemy import func as _f
+
+    from app.models.db import ComentarioGlosaRecord
+
+    rows = (
+        db.query(
+            ComentarioGlosaRecord.glosa_id,
+            _f.count().label("n_coms"),
+        )
+        .filter(ComentarioGlosaRecord.glosa_id.isnot(None))
+        .group_by(ComentarioGlosaRecord.glosa_id)
+        .order_by(_f.count().desc())
+        .limit(int(top))
+        .all()
+    )
+
+    items = []
+    for glosa_id, n in rows:
+        g = db.query(GlosaRecord).filter(
+            GlosaRecord.id == glosa_id,
+        ).first()
+        if not g:
+            continue
+        items.append({
+            "glosa_id": glosa_id,
+            "n_comentarios": int(n),
+            "eps": g.eps,
+            "factura": g.factura,
+            "estado": g.estado,
+        })
+
+    return {
+        "top_solicitado": int(top),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-no-responde")
 def stats_eps_no_responde(
     dias_minimos: int = Query(15, ge=1, le=365),
