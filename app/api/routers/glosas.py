@@ -2746,6 +2746,87 @@ def stats_por_gestor(
     }
 
 
+@router.get("/stats/cumplimiento-sla")
+def stats_cumplimiento_sla(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R90 P1: cumplimiento de SLA agregado para dashboard ejecutivo.
+
+    Resolución 2284/2023 fija términos máximos para cada etapa del
+    ciclo glosa→respuesta→ratificación→conciliación. Este endpoint
+    agrega el estado actual de la cartera de glosas frente a esos
+    plazos.
+
+    Devuelve:
+      {
+        "total": int,
+        "vencidas": int,           # dias_restantes < 0 y no cerradas
+        "criticas": int,           # 0 <= dias_restantes <= 3
+        "en_tiempo": int,          # dias_restantes > 3
+        "cerradas": int,           # estado in cerrados
+        "tasa_cumplimiento_pct": float,  # cerradas a_tiempo / cerradas
+        "tiempo_promedio_resolucion_dias": float,
+        "valor_en_riesgo": int,    # suma valor_objetado de vencidas+críticas
+      }
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    todas = db.query(GlosaRecord).all()
+    total = len(todas)
+
+    vencidas = 0
+    criticas = 0
+    en_tiempo = 0
+    cerradas = 0
+    cerradas_a_tiempo = 0
+    tiempos_resolucion: list[float] = []
+    valor_en_riesgo = 0.0
+
+    for g in todas:
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_CERRADOS:
+            cerradas += 1
+            if g.fecha_decision_eps and g.fecha_vencimiento:
+                if g.fecha_decision_eps <= g.fecha_vencimiento:
+                    cerradas_a_tiempo += 1
+            if g.fecha_decision_eps and g.creado_en:
+                delta = (g.fecha_decision_eps - g.creado_en).total_seconds() / 86400
+                tiempos_resolucion.append(delta)
+            continue
+
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            vencidas += 1
+            valor_en_riesgo += float(g.valor_objetado or 0)
+        elif dr <= 3:
+            criticas += 1
+            valor_en_riesgo += float(g.valor_objetado or 0)
+        else:
+            en_tiempo += 1
+
+    tasa = (
+        round(100 * cerradas_a_tiempo / cerradas, 2)
+        if cerradas else 0.0
+    )
+    tiempo_promedio = (
+        round(sum(tiempos_resolucion) / len(tiempos_resolucion), 2)
+        if tiempos_resolucion else 0.0
+    )
+
+    return {
+        "total": total,
+        "vencidas": vencidas,
+        "criticas": criticas,
+        "en_tiempo": en_tiempo,
+        "cerradas": cerradas,
+        "cerradas_a_tiempo": cerradas_a_tiempo,
+        "tasa_cumplimiento_pct": tasa,
+        "tiempo_promedio_resolucion_dias": tiempo_promedio,
+        "valor_en_riesgo": int(valor_en_riesgo),
+    }
+
+
 @router.get("/stats/distribucion-valores")
 def stats_distribucion_valores(
     dias: int = Query(180, ge=7, le=365),
