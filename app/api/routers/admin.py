@@ -1070,6 +1070,60 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/comentarios-no-resueltos")
+def admin_comentarios_no_resueltos(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R353 P1: glosas con más comentarios sin resolver.
+
+    Cuenta comentarios donde resuelto=0 por glosa. Útil
+    para identificar casos con discusión pendiente.
+
+    Solo SUPER_ADMIN.
+    """
+    from app.models.db import ComentarioGlosaRecord
+
+    rows = (
+        db.query(ComentarioGlosaRecord)
+        .filter(
+            (ComentarioGlosaRecord.resuelto == 0)
+            | (ComentarioGlosaRecord.resuelto.is_(None))
+        )
+        .all()
+    )
+
+    bucket: dict[int, dict] = {}
+    for c in rows:
+        if not c.glosa_id:
+            continue
+        b = bucket.setdefault(c.glosa_id, {
+            "count": 0, "menciones": 0, "ultimo_autor": None,
+        })
+        b["count"] += 1
+        if c.mencion:
+            b["menciones"] += 1
+        b["ultimo_autor"] = c.autor_email
+
+    items = []
+    for g_id, b in bucket.items():
+        items.append({
+            "glosa_id": g_id,
+            "comentarios_no_resueltos": b["count"],
+            "menciones_pendientes": b["menciones"],
+            "ultimo_autor": b["ultimo_autor"],
+        })
+    items.sort(
+        key=lambda x: x["comentarios_no_resueltos"], reverse=True,
+    )
+
+    return {
+        "total_glosas": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/codigo-respuesta-cobertura")
 def admin_codigo_respuesta_cobertura(
     db: Session = Depends(get_db),
