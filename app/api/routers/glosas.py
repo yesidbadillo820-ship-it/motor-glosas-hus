@@ -6273,6 +6273,79 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/decision-eps-tiempo-distribucion")
+def stats_decision_eps_tiempo_distribucion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R285 P1: distribución del tiempo `creado_en` → `fecha_decision_eps`.
+
+    Histograma de días que tarda la EPS en emitir
+    decisión, en buckets de SLA Res. 2284/2023:
+      - 0-15 (en plazo formal)
+      - 16-30
+      - 31-60
+      - 61-90
+      - >90 (extemporáneo grave)
+
+    Solo glosas con fecha_decision_eps poblada.
+    """
+    from datetime import timezone
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .all()
+    )
+
+    BUCKETS = [
+        ("0-15",  0,    15),
+        ("16-30", 16,   30),
+        ("31-60", 31,   60),
+        ("61-90", 61,   90),
+        (">90",   91,   None),
+    ]
+
+    bandas = {nombre: 0 for nombre, _, _ in BUCKETS}
+    total = 0
+    suma = 0
+    valores = []
+    for g in glosas:
+        cre = g.creado_en
+        dec = g.fecha_decision_eps
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if not cre or not dec:
+            continue
+        dias = (dec - cre).days
+        if dias < 0:
+            continue
+        valores.append(dias)
+        suma += dias
+        total += 1
+        for nombre, lo, hi in BUCKETS:
+            if dias >= lo and (hi is None or dias <= hi):
+                bandas[nombre] += 1
+                break
+
+    promedio = round(suma / total, 2) if total else 0.0
+    mediana = sorted(valores)[len(valores) // 2] if valores else 0
+
+    items = [
+        {"rango_dias": k, "count": bandas[k]}
+        for k, _, _ in BUCKETS
+    ]
+
+    return {
+        "total_glosas": total,
+        "promedio_dias": promedio,
+        "mediana_dias": mediana,
+        "buckets": items,
+    }
+
+
 @router.get("/stats/glosas-sin-comentarios")
 def stats_glosas_sin_comentarios(
     limit: int = Query(50, ge=1, le=500),
