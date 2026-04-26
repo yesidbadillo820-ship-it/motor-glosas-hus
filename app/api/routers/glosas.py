@@ -3136,6 +3136,89 @@ def stats_por_gestor(
     }
 
 
+@router.get("/stats/anomalias")
+def stats_anomalias(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R114 P1: detecta glosas con valores atípicos (outliers).
+
+    Usa IQR (interquartile range) sobre valor_objetado:
+      - Q1 = percentil 25
+      - Q3 = percentil 75
+      - IQR = Q3 - Q1
+      - Outlier alto: valor > Q3 + 1.5 * IQR
+      - Outlier bajo: valor < Q1 - 1.5 * IQR
+
+    Útil para identificar:
+      - Glosas con valores monstruosos (revisar, ¿typo?)
+      - Glosas mini (¿vale la pena pelearlas?)
+      - Patrones inusuales
+
+    Devuelve estadísticas + lista de outliers (max 50).
+    """
+    glosas = db.query(GlosaRecord).all()
+    valores = [
+        (g, float(g.valor_objetado or 0))
+        for g in glosas
+        if g.valor_objetado and float(g.valor_objetado) > 0
+    ]
+
+    if len(valores) < 4:
+        return {
+            "total_glosas_evaluadas": len(valores),
+            "razon": "Necesitas al menos 4 glosas con valor>0 para "
+                    "calcular cuartiles.",
+            "outliers_altos": [],
+            "outliers_bajos": [],
+        }
+
+    sorted_valores = sorted([v for _, v in valores])
+    n = len(sorted_valores)
+    q1 = sorted_valores[n // 4]
+    q3 = sorted_valores[3 * n // 4]
+    iqr = q3 - q1
+    upper = q3 + 1.5 * iqr
+    lower = max(0, q1 - 1.5 * iqr)
+
+    outliers_altos = []
+    outliers_bajos = []
+    for g, v in valores:
+        if v > upper:
+            outliers_altos.append({
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": int(v),
+                "veces_sobre_q3": round(v / q3, 2) if q3 else 0,
+            })
+        elif v < lower:
+            outliers_bajos.append({
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": int(v),
+            })
+
+    outliers_altos.sort(key=lambda x: x["valor_objetado"], reverse=True)
+    outliers_bajos.sort(key=lambda x: x["valor_objetado"])
+
+    return {
+        "total_glosas_evaluadas": len(valores),
+        "estadisticas": {
+            "q1": int(q1),
+            "q3": int(q3),
+            "iqr": int(iqr),
+            "limite_superior_outlier": int(upper),
+            "limite_inferior_outlier": int(lower),
+        },
+        "total_outliers_altos": len(outliers_altos),
+        "total_outliers_bajos": len(outliers_bajos),
+        "outliers_altos": outliers_altos[:50],
+        "outliers_bajos": outliers_bajos[:50],
+    }
+
+
 @router.get("/stats/concentracion-pareto")
 def stats_concentracion_pareto(
     db: Session = Depends(get_db),
