@@ -3299,6 +3299,84 @@ def stats_concentracion_pareto(
     }
 
 
+@router.get("/stats/refinaciones")
+def stats_refinaciones(
+    dias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R129 P2: métricas globales de refinaciones de dictámenes.
+
+    Agregado del versionado de TODOS los dictámenes en la
+    ventana. Útil para detectar si los auditores están
+    "refinando demasiado" (señal de que el dictamen IA inicial
+    no satisface).
+
+    Devuelve:
+      - total_acciones
+      - por_accion: counts por tipo (CREAR, REFINAR, REGENERAR,
+                    RESTAURAR)
+      - top_5_autores: usuarios que más refinan
+      - glosas_con_refinaciones (DISTINCT glosa_id)
+      - promedio_versiones_por_glosa
+      - tasa_refinacion_pct (REFINAR / total acciones)
+    """
+    from datetime import timedelta
+
+    from app.models.db import DictamenVersionRecord
+
+    desde = ahora_utc() - timedelta(days=int(dias))
+    versiones = (
+        db.query(DictamenVersionRecord)
+        .filter(DictamenVersionRecord.creado_en >= desde)
+        .all()
+    )
+
+    if not versiones:
+        return {
+            "ventana_dias": int(dias),
+            "total_acciones": 0,
+            "por_accion": {},
+            "top_5_autores": [],
+            "glosas_con_refinaciones": 0,
+            "promedio_versiones_por_glosa": 0.0,
+            "tasa_refinacion_pct": 0.0,
+        }
+
+    por_accion: dict[str, int] = {}
+    por_autor: dict[str, int] = {}
+    glosas_set: set[int] = set()
+    for v in versiones:
+        if v.accion:
+            por_accion[v.accion] = por_accion.get(v.accion, 0) + 1
+        if v.autor_email:
+            por_autor[v.autor_email] = por_autor.get(v.autor_email, 0) + 1
+        if v.glosa_id is not None:
+            glosas_set.add(v.glosa_id)
+
+    top_5 = sorted(
+        por_autor.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+
+    refinar = por_accion.get("REFINAR", 0)
+    tasa = round(100 * refinar / len(versiones), 2)
+
+    return {
+        "ventana_dias": int(dias),
+        "total_acciones": len(versiones),
+        "por_accion": por_accion,
+        "top_5_autores": [
+            {"autor": u, "acciones": n} for u, n in top_5
+        ],
+        "glosas_con_refinaciones": len(glosas_set),
+        "promedio_versiones_por_glosa": (
+            round(len(versiones) / len(glosas_set), 2)
+            if glosas_set else 0.0
+        ),
+        "tasa_refinacion_pct": tasa,
+    }
+
+
 @router.get("/stats/conciliaciones")
 def stats_conciliaciones(
     db: Session = Depends(get_db),
