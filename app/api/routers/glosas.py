@@ -6086,6 +6086,73 @@ def stats_tiempo_primer_dictamen(
     }
 
 
+@router.get("/stats/aging-glosas")
+def stats_aging_glosas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R237 P1: aging report estilo cobranza para glosas abiertas.
+
+    Tradicional aging: cuántas glosas abiertas y por cuánto valor
+    en buckets de antigüedad:
+      0-30, 31-60, 61-90, 91-180, >180
+
+    Útil para reportes financieros (cobranza tradicional).
+
+    Solo glosas no-cerradas.
+    """
+    from datetime import timezone
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    BUCKETS = [
+        ("0-30",   0,    30),
+        ("31-60",  31,   60),
+        ("61-90",  61,   90),
+        ("91-180", 91,   180),
+        (">180",   181,  None),
+    ]
+
+    ahora = ahora_utc()
+    bandas: dict[str, dict] = {
+        nombre: {"count": 0, "valor": 0.0}
+        for nombre, _, _ in BUCKETS
+    }
+
+    for g in abiertas:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        antig = (ahora - cre).days
+        for nombre, lo, hi in BUCKETS:
+            if antig >= lo and (hi is None or antig <= hi):
+                bandas[nombre]["count"] += 1
+                bandas[nombre]["valor"] += float(g.valor_objetado or 0)
+                break
+
+    items = []
+    for nombre, _, _ in BUCKETS:
+        b = bandas[nombre]
+        items.append({
+            "rango_dias": nombre,
+            "count": b["count"],
+            "valor": int(b["valor"]),
+        })
+
+    return {
+        "total_abiertas": len(abiertas),
+        "items": items,
+    }
+
+
 @router.get("/stats/anomalias-valor")
 def stats_anomalias_valor(
     factor_z: float = Query(2.0, ge=1.0, le=5.0),
