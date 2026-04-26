@@ -545,6 +545,47 @@ def listar_usuarios(
     ]
 
 
+@router.get("/sin-2fa")
+def usuarios_sin_2fa(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R191 P1: usuarios activos SIN 2FA configurado.
+
+    Para auditoría de seguridad: identificar cuentas que no
+    han habilitado autenticación de dos factores. Riesgo
+    Habeas Data.
+
+    Útil para forzar política "todos los AUDITOR/COORDINADOR
+    deben tener 2FA en X días".
+
+    Solo SUPER_ADMIN.
+    """
+    usuarios = (
+        db.query(UsuarioRecord)
+        .filter(UsuarioRecord.activo == 1)
+        .filter(
+            (UsuarioRecord.totp_secret.is_(None))
+            | (UsuarioRecord.totp_secret == "")
+        )
+        .all()
+    )
+
+    items = []
+    for u in usuarios:
+        items.append({
+            "id": u.id,
+            "email": u.email,
+            "nombre": u.nombre,
+            "rol": u.rol,
+        })
+
+    return {
+        "total_sin_2fa": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats")
 def stats_usuarios(
     db: Session = Depends(get_db),
