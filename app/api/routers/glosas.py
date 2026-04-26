@@ -5647,6 +5647,83 @@ def score_prioridad_glosa(
     }
 
 
+@router.get("/{glosa_id}/versiones-resumen")
+def versiones_resumen_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R129 P1: resumen del versionado del dictamen de una glosa.
+
+    Cada refinación, regeneración o restauración del dictamen
+    crea un DictamenVersionRecord. Este endpoint resume:
+      - Cuántas versiones tiene el dictamen
+      - Quién lo refinó cuándo
+      - Cuántas veces se REFINO (con instrucción humana) vs
+        REGENERO (con IA pura)
+
+    Útil para entender la "historia editorial" de un dictamen
+    sin tener que ir versión por versión.
+
+    Devuelve:
+      - total_versiones
+      - por_accion: mapa {CREAR, REFINAR, REGENERAR, RESTAURAR}
+      - autores_distintos
+      - primera_version_en / ultima_version_en
+      - ultima_accion
+    """
+    from datetime import timezone
+
+    from app.models.db import DictamenVersionRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    versiones = (
+        db.query(DictamenVersionRecord)
+        .filter(DictamenVersionRecord.glosa_id == glosa_id)
+        .order_by(DictamenVersionRecord.creado_en.asc())
+        .all()
+    )
+
+    if not versiones:
+        return {
+            "glosa_id": glosa_id,
+            "total_versiones": 0,
+            "por_accion": {},
+            "autores_distintos": [],
+            "primera_version_en": None,
+            "ultima_version_en": None,
+            "ultima_accion": None,
+        }
+
+    por_accion: dict[str, int] = {}
+    autores: set[str] = set()
+    for v in versiones:
+        if v.accion:
+            por_accion[v.accion] = por_accion.get(v.accion, 0) + 1
+        if v.autor_email:
+            autores.add(v.autor_email)
+
+    primera = versiones[0].creado_en
+    ultima = versiones[-1].creado_en
+    if primera and primera.tzinfo is None:
+        primera = primera.replace(tzinfo=timezone.utc)
+    if ultima and ultima.tzinfo is None:
+        ultima = ultima.replace(tzinfo=timezone.utc)
+
+    return {
+        "glosa_id": glosa_id,
+        "total_versiones": len(versiones),
+        "por_accion": por_accion,
+        "autores_distintos": sorted(autores),
+        "primera_version_en": primera.isoformat() if primera else None,
+        "ultima_version_en": ultima.isoformat() if ultima else None,
+        "ultima_accion": versiones[-1].accion,
+    }
+
+
 @router.get("/{glosa_id}/recomendaciones")
 def recomendaciones_glosa(
     glosa_id: int,
