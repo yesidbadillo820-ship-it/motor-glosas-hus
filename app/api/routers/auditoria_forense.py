@@ -228,6 +228,72 @@ def predecir_ratificacion_glosa(
     return predecir_ratificacion(db, glosa)
 
 
+@router.get("/buscar-por-ip")
+def buscar_por_ip(
+    ip: str,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """R131 P1: busca eventos audit asociados a una IP específica.
+
+    Útil para investigar incidentes de seguridad:
+      "¿Qué hizo la IP 192.168.1.50 ayer?"
+
+    También sirve para identificar accesos sospechosos:
+      - IP de país no esperado
+      - Múltiples usuarios desde misma IP
+      - Acciones masivas desde una sola IP
+
+    Devuelve eventos ordenados DESC por timestamp con:
+      - usuarios_distintos: lista emails que usaron esa IP
+      - acciones_distintas: tipos de acciones realizadas
+      - rango temporal (primer/ultimo evento)
+    """
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.ip == ip)
+        .order_by(AuditLogRecord.timestamp.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    usuarios = sorted({
+        e.usuario_email for e in eventos if e.usuario_email
+    })
+    acciones = sorted({
+        e.accion for e in eventos if e.accion
+    })
+
+    return {
+        "ip_buscada": ip,
+        "total_eventos": len(eventos),
+        "usuarios_distintos": usuarios,
+        "acciones_distintas": acciones,
+        "primer_evento_en": (
+            eventos[-1].timestamp.isoformat()
+            if eventos and eventos[-1].timestamp else None
+        ),
+        "ultimo_evento_en": (
+            eventos[0].timestamp.isoformat()
+            if eventos and eventos[0].timestamp else None
+        ),
+        "items": [
+            {
+                "id": e.id,
+                "timestamp": (
+                    e.timestamp.isoformat() if e.timestamp else None
+                ),
+                "usuario_email": e.usuario_email,
+                "accion": e.accion,
+                "tabla": e.tabla,
+                "registro_id": e.registro_id,
+            }
+            for e in eventos
+        ],
+    }
+
+
 @router.post("/verificar-firma")
 def verificar(
     payload: dict,
