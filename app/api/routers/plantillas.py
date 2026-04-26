@@ -22,6 +22,51 @@ class PlantillaUpdate(BaseModel):
     plantilla: Optional[str] = None
     activa: Optional[int] = None
 
+@router.get("/stats")
+def stats_plantillas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R159 P2: estadísticas de las plantillas regulares.
+
+    Diferente a /plantillas-gold/efectividad (Gold con métricas
+    de éxito) y /plantillas-gold/no-usadas (obsoletas): aquí
+    solo counts globales sobre PlantillaRecord.
+
+    Devuelve:
+      - total
+      - activas / inactivas
+      - por_tipo: distribución
+      - top_10_eps: EPS con más plantillas
+    """
+    from app.models.db import PlantillaRecord
+
+    todas = db.query(PlantillaRecord).all()
+
+    activas = sum(1 for p in todas if p.activa == 1)
+    por_tipo: dict[str, int] = {}
+    por_eps: dict[str, int] = {}
+    for p in todas:
+        if p.tipo:
+            por_tipo[p.tipo] = por_tipo.get(p.tipo, 0) + 1
+        if p.eps:
+            por_eps[p.eps] = por_eps.get(p.eps, 0) + 1
+
+    top_eps = sorted(
+        por_eps.items(), key=lambda x: x[1], reverse=True,
+    )[:10]
+
+    return {
+        "total": len(todas),
+        "activas": activas,
+        "inactivas": len(todas) - activas,
+        "por_tipo": por_tipo,
+        "top_10_eps": [
+            {"eps": e, "plantillas": n} for e, n in top_eps
+        ],
+    }
+
+
 @router.get("/")
 def listar_plantillas(
     activa_only: bool = True,
