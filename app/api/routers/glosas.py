@@ -5927,6 +5927,62 @@ def stats_exito_por_codigo_respuesta(
     }
 
 
+@router.get("/stats/concentracion-codigo")
+def stats_concentracion_codigo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R146 P1: concentración de valor pendiente por código de glosa.
+
+    Útil para responder: "¿qué tipos de glosa generan más cartera
+    pendiente?" — distinto a /stats/codigos-mas-objetados (mide
+    frecuencia), aquí mide concentración VALOR.
+
+    Solo cuenta glosas no-cerradas. Devuelve los códigos ordenados
+    DESC por valor_pendiente con su pct del total.
+
+    Útil para:
+      - Priorizar capacitación: ataquemos códigos del 80% valor
+      - Comparativo: ¿es el mismo top que el de frecuencia?
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_codigo: dict[str, dict] = {}
+    for g in abiertas:
+        cod = g.codigo_glosa or "(SIN_CODIGO)"
+        if cod not in por_codigo:
+            por_codigo[cod] = {"count": 0, "valor": 0.0}
+        por_codigo[cod]["count"] += 1
+        por_codigo[cod]["valor"] += float(g.valor_objetado or 0)
+
+    valor_total = sum(b["valor"] for b in por_codigo.values())
+    items = []
+    for cod, b in por_codigo.items():
+        pct = (
+            round(100 * b["valor"] / valor_total, 2)
+            if valor_total else 0.0
+        )
+        items.append({
+            "codigo_glosa": cod,
+            "count": b["count"],
+            "valor_pendiente": int(b["valor"]),
+            "pct_del_total": pct,
+        })
+    items.sort(key=lambda x: x["valor_pendiente"], reverse=True)
+
+    return {
+        "total_codigos_unicos": len(items),
+        "valor_pendiente_total": int(valor_total),
+        "items": items,
+    }
+
+
 @router.get("/stats/codigos-mas-objetados")
 def stats_codigos_mas_objetados(
     top: int = Query(20, ge=1, le=100),
