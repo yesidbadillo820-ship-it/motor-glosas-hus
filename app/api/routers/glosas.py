@@ -2921,6 +2921,77 @@ def stats_por_tipo_glosa(
     }
 
 
+@router.get("/{glosa_id}/audit-resumen")
+def audit_resumen_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R88 P2: resumen agregado del audit log de una glosa.
+
+    Mientras /audit/glosa/{id} devuelve los eventos en bruto y
+    /glosas/{id}/timeline los enriquece narrativamente, este
+    endpoint da el "TL;DR":
+      - total_cambios
+      - primer_cambio_en / ultimo_cambio_en
+      - usuarios_que_intervinieron (lista DISTINCT)
+      - eventos_por_accion (conteo)
+      - eventos_por_campo (qué columnas se modificaron y cuántas veces)
+
+    Útil para mostrar un mini-widget "Actividad" en la ficha
+    de la glosa sin tener que renderizar todo el audit raw.
+    """
+    from app.models.db import AuditLogRecord
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    eventos = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.tabla == "glosas")
+        .filter(AuditLogRecord.registro_id == glosa_id)
+        .all()
+    )
+
+    total = len(eventos)
+    if total == 0:
+        return {
+            "glosa_id": glosa_id,
+            "total_cambios": 0,
+            "primer_cambio_en": None,
+            "ultimo_cambio_en": None,
+            "usuarios_que_intervinieron": [],
+            "eventos_por_accion": {},
+            "eventos_por_campo": {},
+        }
+
+    timestamps = [e.timestamp for e in eventos if e.timestamp]
+    usuarios = sorted({e.usuario_email for e in eventos if e.usuario_email})
+
+    por_accion: dict[str, int] = {}
+    por_campo: dict[str, int] = {}
+    for e in eventos:
+        if e.accion:
+            por_accion[e.accion] = por_accion.get(e.accion, 0) + 1
+        if e.campo:
+            por_campo[e.campo] = por_campo.get(e.campo, 0) + 1
+
+    return {
+        "glosa_id": glosa_id,
+        "total_cambios": total,
+        "primer_cambio_en": (
+            min(timestamps).isoformat() if timestamps else None
+        ),
+        "ultimo_cambio_en": (
+            max(timestamps).isoformat() if timestamps else None
+        ),
+        "usuarios_que_intervinieron": usuarios,
+        "eventos_por_accion": por_accion,
+        "eventos_por_campo": por_campo,
+    }
+
+
 @router.get("/{glosa_id}/timeline")
 def timeline_glosa(
     glosa_id: int,
