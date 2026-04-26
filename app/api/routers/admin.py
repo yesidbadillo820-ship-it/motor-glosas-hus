@@ -740,6 +740,74 @@ def admin_exportar_glosas_csv(
     )
 
 
+@router.get("/glosas-revisar-bandeja")
+def admin_glosas_revisar_bandeja(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R256 P1: bandeja de glosas que el coordinador debe revisar.
+
+    Filtra glosas que están en estado RESPONDIDA pero llevan
+    >7 días sin que la EPS responda (señal de que requiere
+    seguimiento) O glosas RADICADA con dictamen presente >200
+    chars (listas para revisión final).
+
+    Útil para coordinador como cola de "cosas que mirar".
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ahora = ahora_utc()
+    siete_dias = ahora - timedelta(days=7)
+
+    # 1) RESPONDIDA con respuesta HUS hace >7 días
+    pendientes_eps = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado == "RESPONDIDA")
+        .filter(GlosaRecord.creado_en < siete_dias)
+        .filter(GlosaRecord.fecha_decision_eps.is_(None))
+        .all()
+    )
+
+    # 2) RADICADA con dictamen ya redactado pero no enviado
+    para_revision = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado == "RADICADA")
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .all()
+    )
+    para_revision = [
+        g for g in para_revision
+        if g.dictamen and len(g.dictamen) >= 200
+    ]
+
+    items_pe = []
+    for g in pendientes_eps:
+        items_pe.append({
+            "id": g.id, "eps": g.eps, "factura": g.factura,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "razon": "EPS no responde tras 7d",
+        })
+    items_pr = []
+    for g in para_revision:
+        items_pr.append({
+            "id": g.id, "eps": g.eps, "factura": g.factura,
+            "valor_objetado": float(g.valor_objetado or 0),
+            "razon": "Dictamen listo, falta envío",
+        })
+
+    return {
+        "total_pendiente_eps": len(items_pe),
+        "total_listas_envio": len(items_pr),
+        "pendiente_eps": items_pe[:30],
+        "listas_envio": items_pr[:30],
+    }
+
+
 @router.get("/audit-recientes")
 def admin_audit_recientes(
     horas: int = 24,
