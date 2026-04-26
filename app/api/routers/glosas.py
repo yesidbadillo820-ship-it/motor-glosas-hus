@@ -5288,6 +5288,74 @@ def stats_picos_historicos(
     }
 
 
+@router.get("/stats/concentracion-eps")
+def stats_concentracion_eps(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R187 P1: índice de concentración por EPS.
+
+    Mide qué tan concentrada está la cartera entre las EPS:
+      - HHI (Herfindahl-Hirschman Index) × 10000:
+        · <1500 = poco concentrado (sano)
+        · 1500-2500 = moderado
+        · >2500 = alto (riesgo de dependencia)
+      - top_eps_pct: % del valor que viene de la #1
+      - top_3_eps_pct: % del valor de las 3 más grandes
+
+    Útil para riesgo: "¿qué pasa si SANITAS quiebra?"
+    """
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    por_eps: dict[str, float] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        por_eps[eps] = (
+            por_eps.get(eps, 0.0) + float(g.valor_objetado or 0)
+        )
+
+    if not por_eps:
+        return {
+            "total_eps": 0,
+            "valor_pendiente_total": 0,
+            "hhi": 0.0,
+            "top_eps_pct": 0.0,
+            "top_3_eps_pct": 0.0,
+            "interpretacion": "(sin datos)",
+        }
+
+    valor_total = sum(por_eps.values())
+    pcts = sorted(
+        [v / valor_total for v in por_eps.values()],
+        reverse=True,
+    )
+    hhi = sum(p * p for p in pcts) * 10000
+
+    if hhi < 1500:
+        interpretacion = "POCO_CONCENTRADO"
+    elif hhi < 2500:
+        interpretacion = "MODERADO"
+    else:
+        interpretacion = "ALTO_RIESGO"
+
+    return {
+        "total_eps": len(por_eps),
+        "valor_pendiente_total": int(valor_total),
+        "hhi": round(hhi, 2),
+        "top_eps_pct": round(100 * pcts[0], 2),
+        "top_3_eps_pct": round(100 * sum(pcts[:3]), 2),
+        "interpretacion": interpretacion,
+    }
+
+
 @router.get("/stats/recuperacion-promedio-por-eps")
 def stats_recuperacion_promedio_por_eps(
     min_glosas: int = Query(3, ge=1, le=50),
