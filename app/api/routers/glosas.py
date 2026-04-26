@@ -6273,6 +6273,52 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/dictamenes-largos-top")
+def stats_dictamenes_largos_top(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R314 P1: top glosas con dictamen más largo.
+
+    Diferente a /stats/dictamenes-cortos: aquí los más
+    elaborados. Útil para identificar casos de alta
+    complejidad o dictámenes ejemplares (best practice).
+
+    Por glosa:
+      - id, eps, codigo_glosa, valor_objetado
+      - dictamen_len
+      - estado y resultado (si decidida)
+    """
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .all()
+    )
+
+    items = []
+    for g in rows:
+        dlen = len(g.dictamen or "")
+        if dlen < 50:
+            continue
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dictamen_len": dlen,
+            "estado": g.estado,
+            "gestor_nombre": g.gestor_nombre,
+        })
+    items.sort(key=lambda x: x["dictamen_len"], reverse=True)
+
+    return {
+        "limit": int(limit),
+        "total_glosas_evaluadas": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/stats/cobertura-asignacion")
 def stats_cobertura_asignacion(
     db: Session = Depends(get_db),
