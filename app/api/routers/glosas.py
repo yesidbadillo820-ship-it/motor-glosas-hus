@@ -6273,6 +6273,72 @@ def stats_tecnico_recepcion_actividad(
     }
 
 
+@router.get("/stats/eps-codigo-pareto")
+def stats_eps_codigo_pareto(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R268 P1: Pareto 80/20 sobre parejas (EPS, codigo_glosa).
+
+    Análisis bidimensional: identifica qué combinaciones
+    EPS-código concentran el 80% del valor objetado. Útil
+    para enfocar esfuerzos: "ataquemos primero estas 5
+    parejas (EPS, código) y cubrimos 80% del valor".
+
+    Diferente a /stats/concentracion-pareto (1D EPS) y
+    /stats/eps-codigo-pareja (lookup individual).
+
+    Devuelve:
+      - valor_total
+      - count_parejas_top80, pct_parejas_top80
+      - parejas_top80
+    """
+    rows = db.query(GlosaRecord).all()
+
+    pares: dict[tuple[str, str], float] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        codigo = (g.codigo_glosa or "").strip()
+        if not eps or not codigo:
+            continue
+        valor = float(g.valor_objetado or 0)
+        pares[(eps, codigo)] = pares.get((eps, codigo), 0.0) + valor
+
+    valor_total = sum(pares.values())
+    if valor_total == 0:
+        return {
+            "valor_total": 0,
+            "count_parejas_top80": 0,
+            "pct_parejas_top80": 0.0,
+            "parejas_top80": [],
+        }
+
+    ord_p = sorted(pares.items(), key=lambda x: x[1], reverse=True)
+
+    acumulado = 0.0
+    top80 = []
+    for (eps, codigo), valor in ord_p:
+        top80.append({
+            "eps": eps,
+            "codigo_glosa": codigo,
+            "valor_objetado": int(valor),
+            "pct_individual": round(100 * valor / valor_total, 2),
+        })
+        acumulado += valor
+        if acumulado >= 0.8 * valor_total:
+            break
+
+    pct = round(100 * len(top80) / len(ord_p), 2)
+
+    return {
+        "valor_total": int(valor_total),
+        "total_parejas": len(ord_p),
+        "count_parejas_top80": len(top80),
+        "pct_parejas_top80": pct,
+        "parejas_top80": top80,
+    }
+
+
 @router.get("/stats/aging-cartera-saldo")
 def stats_aging_cartera_saldo(
     db: Session = Depends(get_db),
