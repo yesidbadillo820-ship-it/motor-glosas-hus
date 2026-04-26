@@ -2746,6 +2746,98 @@ def stats_por_gestor(
     }
 
 
+@router.get("/stats/distribucion-valores")
+def stats_distribucion_valores(
+    dias: int = Query(180, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R89 P2: histograma del valor_objetado de las glosas.
+
+    Útil para entender la distribución económica de las glosas
+    (¿son mayoría < 100k pero pocas > 10M concentran el valor?).
+
+    Buckets en COP, pensados para el rango típico HUS:
+      - <100k, 100k-500k, 500k-1M, 1M-5M, 5M-10M, 10M-50M, 50M+
+
+    Devuelve:
+      {
+        "ventana_dias": 180,
+        "total_glosas": int,
+        "valor_total": int,           # suma COP
+        "valor_promedio": float,
+        "valor_mediano": float,
+        "buckets": [
+          {"rango": "<100k", "min": 0, "max": 100000,
+           "count": int, "valor": int, "pct_count": float, "pct_valor": float},
+          ...
+        ]
+      }
+    """
+    from datetime import timedelta
+
+    BUCKETS = [
+        ("<100k",    0,         100_000),
+        ("100k-500k", 100_000,   500_000),
+        ("500k-1M",  500_000,   1_000_000),
+        ("1M-5M",    1_000_000, 5_000_000),
+        ("5M-10M",   5_000_000, 10_000_000),
+        ("10M-50M",  10_000_000, 50_000_000),
+        ("50M+",     50_000_000, None),
+    ]
+
+    corte = ahora_utc() - timedelta(days=int(dias))
+    rows = (
+        db.query(GlosaRecord.valor_objetado)
+        .filter(GlosaRecord.creado_en >= corte)
+        .filter(GlosaRecord.valor_objetado.isnot(None))
+        .all()
+    )
+
+    valores = [float(v[0] or 0) for v in rows]
+    total_glosas = len(valores)
+    valor_total = sum(valores)
+
+    # Mediana
+    if valores:
+        ordenado = sorted(valores)
+        mid = total_glosas // 2
+        if total_glosas % 2 == 0:
+            valor_mediano = (ordenado[mid - 1] + ordenado[mid]) / 2
+        else:
+            valor_mediano = ordenado[mid]
+    else:
+        valor_mediano = 0.0
+
+    # Distribución por bucket
+    buckets_out = []
+    for nombre, lo, hi in BUCKETS:
+        en_bucket = [
+            v for v in valores
+            if v >= lo and (hi is None or v < hi)
+        ]
+        n = len(en_bucket)
+        v_sum = sum(en_bucket)
+        buckets_out.append({
+            "rango": nombre,
+            "min": lo,
+            "max": hi,
+            "count": n,
+            "valor": int(v_sum),
+            "pct_count": round(100 * n / total_glosas, 2) if total_glosas else 0.0,
+            "pct_valor": round(100 * v_sum / valor_total, 2) if valor_total else 0.0,
+        })
+
+    return {
+        "ventana_dias": int(dias),
+        "total_glosas": total_glosas,
+        "valor_total": int(valor_total),
+        "valor_promedio": round(valor_total / total_glosas, 2) if total_glosas else 0.0,
+        "valor_mediano": round(valor_mediano, 2),
+        "buckets": buckets_out,
+    }
+
+
 @router.get("/stats/heatmap-actividad")
 def stats_heatmap_actividad(
     dias: int = Query(90, ge=7, le=365),
