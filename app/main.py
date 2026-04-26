@@ -17,6 +17,7 @@ def fecha_hoy_espanol() -> str:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -597,6 +598,12 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+# R61 P2: GZip para responses >1KB. Reduce ~70% el peso de payloads
+# JSON grandes (historial-paginado, dashboard, dictamenes HTML largos).
+# El umbral 1024 evita comprimir respuestas pequeñas donde el overhead
+# de CPU supera el ahorro de bytes.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 # Ronda 50 Paso 10: middleware de tenant.
