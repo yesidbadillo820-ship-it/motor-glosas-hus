@@ -1070,6 +1070,85 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/eps-tendencia-volumen")
+def admin_eps_tendencia_volumen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R355 P1: tendencia de volumen por EPS mes vs mes anterior.
+
+    Para cada EPS, compara volumen del mes en curso vs el
+    anterior. Útil para detectar EPS que están enviando
+    más glosas (señal de cambio de patrón).
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+
+    ahora = ahora_utc()
+    inicio_actual = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if inicio_actual.month == 1:
+        inicio_anterior = inicio_actual.replace(
+            year=inicio_actual.year - 1, month=12,
+        )
+    else:
+        inicio_anterior = inicio_actual.replace(
+            month=inicio_actual.month - 1,
+        )
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio_anterior)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    actual: dict[str, int] = {}
+    anterior: dict[str, int] = {}
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        if cre >= inicio_actual:
+            actual[eps] = actual.get(eps, 0) + 1
+        else:
+            anterior[eps] = anterior.get(eps, 0) + 1
+
+    todos = set(actual) | set(anterior)
+    items = []
+    for eps in todos:
+        a = actual.get(eps, 0)
+        p = anterior.get(eps, 0)
+        if p == 0:
+            delta_pct = 100.0 if a > 0 else 0.0
+        else:
+            delta_pct = round(100 * (a - p) / p, 2)
+        items.append({
+            "eps": eps,
+            "count_actual": a,
+            "count_anterior": p,
+            "delta_abs": a - p,
+            "delta_pct": delta_pct,
+        })
+    items.sort(key=lambda x: x["delta_pct"], reverse=True)
+
+    return {
+        "mes_actual": inicio_actual.strftime("%Y-%m"),
+        "mes_anterior": inicio_anterior.strftime("%Y-%m"),
+        "total_eps": len(items),
+        "items": items,
+    }
+
+
 @router.get("/comentarios-no-resueltos")
 def admin_comentarios_no_resueltos(
     limit: int = 50,
