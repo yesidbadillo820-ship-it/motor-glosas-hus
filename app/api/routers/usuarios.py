@@ -34,6 +34,35 @@ class RolChange(BaseModel):
 ROLES_VALIDOS = {ROL_SUPER_ADMIN, ROL_COORDINADOR, ROL_AUDITOR, ROL_VIEWER}
 
 
+@router.get("/yo")
+def info_usuario_actual(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R81 P2: información del usuario autenticado.
+
+    Útil para que el frontend muestre nombre/email/rol en el header
+    sin tener que decodificar el JWT en JavaScript ni hacer lookup
+    adicional al login.
+
+    NO devuelve password_hash ni totp_secret — solo metadata pública.
+    """
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "nombre": current_user.nombre,
+        "rol": current_user.rol,
+        "activo": bool(current_user.activo),
+        "totp_activo": bool(getattr(current_user, "totp_activo", 0)),
+        "must_change_password": bool(
+            getattr(current_user, "must_change_password", 0)
+        ),
+        "creado_en": (
+            current_user.creado_en.isoformat()
+            if getattr(current_user, "creado_en", None) else None
+        ),
+    }
+
+
 @router.get("/yo/permisos")
 def permisos_del_usuario_actual(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
