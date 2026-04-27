@@ -406,6 +406,115 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/timeline-mes")
+def yo_timeline_mes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R389 P1: timeline diaria del mes en curso.
+
+    Para cada día del mes hasta hoy, devuelve count de
+    glosas decididas por el usuario y el resultado más
+    común (LEVANTADA / RATIFICADA / ACEPTADA). Útil para
+    vista de calendario o sparkline en Mi desempeño.
+    """
+    from calendar import monthrange
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    dias_mes = monthrange(ahora.year, ahora.month)[1]
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .all()
+    )
+
+    por_dia: dict[int, dict] = {}
+    for g in rows:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        d = f.day
+        b = por_dia.setdefault(d, {
+            "count": 0, "lev": 0, "rat": 0, "ace": 0, "rec": 0.0,
+        })
+        b["count"] += 1
+        e = (g.estado or "").upper()
+        if e == "LEVANTADA":
+            b["lev"] += 1
+        elif e == "RATIFICADA":
+            b["rat"] += 1
+        elif e == "ACEPTADA":
+            b["ace"] += 1
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    serie = []
+    for d in range(1, dias_mes + 1):
+        b = por_dia.get(d)
+        if d > ahora.day:
+            serie.append({
+                "dia": d, "count": 0, "futuro": True,
+                "lev": 0, "rat": 0, "ace": 0,
+                "valor_recuperado": 0,
+                "dominante": None,
+            })
+        elif b:
+            dominante = max(
+                ("LEVANTADA", "RATIFICADA", "ACEPTADA"),
+                key=lambda k: (
+                    b["lev"] if k == "LEVANTADA"
+                    else b["rat"] if k == "RATIFICADA"
+                    else b["ace"]
+                ),
+            )
+            serie.append({
+                "dia": d,
+                "count": b["count"],
+                "lev": b["lev"],
+                "rat": b["rat"],
+                "ace": b["ace"],
+                "valor_recuperado": int(b["rec"]),
+                "dominante": dominante,
+                "futuro": False,
+            })
+        else:
+            serie.append({
+                "dia": d, "count": 0, "futuro": False,
+                "lev": 0, "rat": 0, "ace": 0,
+                "valor_recuperado": 0,
+                "dominante": None,
+            })
+
+    total_mes = sum(s["count"] for s in serie)
+    max_dia = max(serie, key=lambda s: s["count"]) if serie else None
+
+    return {
+        "mes": inicio.strftime("%Y-%m"),
+        "dias_mes": dias_mes,
+        "dia_actual": ahora.day,
+        "total_decididas_mes": total_mes,
+        "mejor_dia": (
+            {"dia": max_dia["dia"], "count": max_dia["count"]}
+            if max_dia and max_dia["count"] > 0 else None
+        ),
+        "serie": serie,
+    }
+
+
 @router.get("/yo/progreso-mes")
 def yo_progreso_mes(
     db: Session = Depends(get_db),
