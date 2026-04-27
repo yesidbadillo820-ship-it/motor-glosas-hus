@@ -232,6 +232,11 @@ async def lifespan(app: FastAPI):
         ("tercero_nit", "VARCHAR(30)"),
         ("dias_radicacion_dgh", "INTEGER DEFAULT 0"),
         ("tercero_nombre", "VARCHAR(300)"),
+        # Nota crédito (commit cfafe7d / hotfix 4adbb7b)
+        ("numero_nota_credito", "VARCHAR(60)"),
+        ("fecha_nota_credito", "TIMESTAMP WITH TIME ZONE"),
+        ("valor_nota_credito", "DOUBLE PRECISION DEFAULT 0"),
+        ("nota_credito_observacion", "TEXT"),
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:
@@ -244,6 +249,18 @@ async def lifespan(app: FastAPI):
                 db.commit()
         except Exception as e:
             logger.warning(f"MIGRACIÓN {col_name}: {e}")
+
+    # Índice idempotente sobre numero_nota_credito (declarado index=True en
+    # el modelo). create_all() no lo agrega para tablas pre-existentes.
+    try:
+        if _tiene_tabla("historial") and _tiene_columna("historial", "numero_nota_credito"):
+            db.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_historial_numero_nota_credito "
+                "ON historial (numero_nota_credito)"
+            ))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
 
     # Migraciones para usuarios - 2FA TOTP
     _USUARIOS_MISSING_2FA = [
