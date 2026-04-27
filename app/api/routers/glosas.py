@@ -7565,6 +7565,75 @@ def stats_codigo_eps_cobertura(
     }
 
 
+@router.get("/stats/comparativa-anio")
+def stats_comparativa_anio(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R383 P1: comparativa este año vs año anterior, mes a mes.
+
+    Para cada mes (1..12) devuelve creadas y valor_objetado
+    de este año y del anterior, con delta_pct. Útil para
+    informe ejecutivo Y-over-Y.
+    """
+    from datetime import timezone
+
+    ahora = ahora_utc()
+    year_actual = ahora.year
+    year_anterior = year_actual - 1
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en.isnot(None))
+        .all()
+    )
+
+    actual: dict[int, dict] = {m: {"count": 0, "valor": 0.0} for m in range(1, 13)}
+    anterior: dict[int, dict] = {m: {"count": 0, "valor": 0.0} for m in range(1, 13)}
+    for g in rows:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        m = cre.month
+        v = float(g.valor_objetado or 0)
+        if cre.year == year_actual:
+            actual[m]["count"] += 1
+            actual[m]["valor"] += v
+        elif cre.year == year_anterior:
+            anterior[m]["count"] += 1
+            anterior[m]["valor"] += v
+
+    serie = []
+    for m in range(1, 13):
+        a = actual[m]
+        p = anterior[m]
+        delta_pct = None
+        if p["count"]:
+            delta_pct = round(100 * (a["count"] - p["count"]) / p["count"], 2)
+        elif a["count"] > 0:
+            delta_pct = 100.0
+        serie.append({
+            "mes": m,
+            "actual_count": a["count"],
+            "actual_valor": int(a["valor"]),
+            "anterior_count": p["count"],
+            "anterior_valor": int(p["valor"]),
+            "delta_count_pct": delta_pct,
+        })
+
+    return {
+        "year_actual": year_actual,
+        "year_anterior": year_anterior,
+        "serie": serie,
+        "total_actual_count": sum(actual[m]["count"] for m in range(1, 13)),
+        "total_anterior_count": sum(anterior[m]["count"] for m in range(1, 13)),
+        "total_actual_valor": int(sum(actual[m]["valor"] for m in range(1, 13))),
+        "total_anterior_valor": int(sum(anterior[m]["valor"] for m in range(1, 13))),
+    }
+
+
 @router.post("/stats/tasas-pares-batch")
 def stats_tasas_pares_batch(
     payload: dict,
