@@ -1070,6 +1070,133 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/digest-diario")
+def admin_digest_diario(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R392 P1: digest diario para coordinador / admin.
+
+    Resumen del día anterior + estado actual en una sola
+    llamada para que el coordinador empiece la jornada
+    informado:
+      - ayer: creadas, decididas, levantadas, recuperado
+      - hoy: vencidas_globales, sin_gestor, top_riesgo (3)
+      - tendencia: delta_creadas vs día anterior
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio_hoy = ahora.replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+    inicio_ayer = inicio_hoy - timedelta(days=1)
+    inicio_anteayer = inicio_ayer - timedelta(days=1)
+
+    # AYER
+    creadas_ayer = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio_ayer)
+        .filter(GlosaRecord.creado_en < inicio_hoy)
+        .count()
+    )
+    creadas_anteayer = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio_anteayer)
+        .filter(GlosaRecord.creado_en < inicio_ayer)
+        .count()
+    )
+    decididas_ayer_q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_ayer)
+        .filter(GlosaRecord.fecha_decision_eps < inicio_hoy)
+        .filter(GlosaRecord.estado.in_(list(ESTADOS_DECIDIDOS)))
+        .all()
+    )
+    decididas_ayer = len(decididas_ayer_q)
+    levantadas_ayer = sum(
+        1 for g in decididas_ayer_q
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    recuperado_ayer = sum(
+        float(g.valor_recuperado or 0) for g in decididas_ayer_q
+    )
+
+    # HOY (estado vivo)
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    vencidas_globales = sum(
+        1 for g in abiertas if (g.dias_restantes or 0) < 0
+    )
+    sin_gestor = sum(
+        1 for g in abiertas
+        if not (g.gestor_nombre or "").strip()
+    )
+
+    # Top riesgo: alto valor + vencida
+    top_riesgo = sorted(
+        [
+            g for g in abiertas
+            if (g.dias_restantes or 0) < 0
+            and float(g.valor_objetado or 0) >= 5_000_000
+        ],
+        key=lambda g: float(g.valor_objetado or 0),
+        reverse=True,
+    )[:3]
+
+    # Delta vs anteayer
+    if creadas_anteayer > 0:
+        delta_pct = round(
+            100 * (creadas_ayer - creadas_anteayer)
+            / creadas_anteayer, 1,
+        )
+    elif creadas_ayer > 0:
+        delta_pct = 100.0
+    else:
+        delta_pct = 0.0
+
+    return {
+        "fecha_digest": inicio_hoy.date().isoformat(),
+        "ayer": {
+            "creadas": creadas_ayer,
+            "decididas": decididas_ayer,
+            "levantadas": levantadas_ayer,
+            "valor_recuperado": int(recuperado_ayer),
+        },
+        "hoy": {
+            "abiertas_total": len(abiertas),
+            "vencidas_globales": vencidas_globales,
+            "sin_gestor": sin_gestor,
+        },
+        "top_riesgo_grandes_vencidas": [
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_vencido": abs(int(g.dias_restantes or 0)),
+                "gestor_nombre": g.gestor_nombre,
+            }
+            for g in top_riesgo
+        ],
+        "tendencia_creadas": {
+            "ayer": creadas_ayer,
+            "anteayer": creadas_anteayer,
+            "delta_pct": delta_pct,
+        },
+    }
+
+
 @router.get("/anomalias-asignacion")
 def admin_anomalias_asignacion(
     db: Session = Depends(get_db),
