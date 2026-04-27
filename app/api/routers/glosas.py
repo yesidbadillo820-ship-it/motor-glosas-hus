@@ -7565,6 +7565,80 @@ def stats_codigo_eps_cobertura(
     }
 
 
+@router.get("/stats/codigos-respuesta-mejor-tasa-eps")
+def stats_codigos_respuesta_mejor_tasa_eps(
+    eps: str = Query(..., min_length=2),
+    min_muestras: int = Query(2, ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R398 P1: para una EPS, qué código de respuesta de
+    HUS tuvo mejor tasa de levantamiento históricamente.
+
+    Útil estratégico: "con esta EPS, RE9501 funciona el
+    80% de las veces, RE9701 solo el 30%". Permite al
+    gestor elegir el mejor código antes de enviar.
+
+    Devuelve códigos ordenados DESC por tasa
+    (con muestras ≥ min_muestras).
+    """
+    eps_q = (eps or "").strip()
+    if not eps_q:
+        return {"eps": "", "items": []}
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps_q))
+        .filter(GlosaRecord.codigo_respuesta.isnot(None))
+        .filter(GlosaRecord.codigo_respuesta != "")
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in rows:
+        cr = (g.codigo_respuesta or "").strip()
+        if not cr:
+            continue
+        b = bucket.setdefault(cr, {"dec": 0, "lev": 0, "rec": 0.0})
+        b["dec"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+        b["rec"] += float(g.valor_recuperado or 0)
+
+    items = []
+    for cr, b in bucket.items():
+        if b["dec"] < int(min_muestras):
+            continue
+        tasa = round(100 * b["lev"] / b["dec"], 2)
+        prom_rec = (
+            int(b["rec"] / b["dec"]) if b["dec"] else 0
+        )
+        items.append({
+            "codigo_respuesta": cr,
+            "decididas": b["dec"],
+            "levantadas": b["lev"],
+            "tasa_levantamiento_pct": tasa,
+            "valor_recuperado_promedio": prom_rec,
+        })
+    items.sort(
+        key=lambda x: (
+            x["tasa_levantamiento_pct"],
+            x["decididas"],
+        ),
+        reverse=True,
+    )
+
+    return {
+        "eps": eps_q,
+        "min_muestras": int(min_muestras),
+        "total_codigos": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/eps-volumen-tasa-mes")
 def stats_eps_volumen_tasa_mes(
     meses: int = Query(6, ge=1, le=24),
