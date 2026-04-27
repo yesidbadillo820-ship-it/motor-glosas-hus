@@ -190,21 +190,32 @@ class TestUserPrompt:
         )
         assert "EXCEDENTE FACTURADO" not in prompt
 
-    def test_excedente_mucho_mayor_propone_aceptar_total(self):
-        """Si el parser midió mal (TOTAL en vez de línea-CUPS) el
-        excedente queda enorme. Antes el safeguard descartaba el
-        bloque; ahora confiamos en el parser correcto y proponemos
-        ACEPTAR_TOTAL — la EPS objeta menos del excedente real."""
+    def test_facturado_absurdo_se_descarta(self):
+        """Caso real producción 27-abr-2026: parser leyó facturado
+        $3.411.840 cuando objetado era $16.656 — ratio 205×.
+        Sanity check debe descartar el facturado y NO inyectar bloque
+        excedente, evitando que HUS acepte montos que no debía."""
+        prompt = build_user_prompt(
+            texto_glosa="x", contexto_pdf="",
+            codigo="TA2301", eps="DISPENSARIO",
+            valor_objetado="$16.656",
+            valor_facturado="$3.411.840",  # ratio 205× — absurdo
+            valor_pactado="$117.676",
+        )
+        # NO debe inyectar el bloque excedente (causaría ACEPTAR_TOTAL
+        # incorrecto). Cae al flujo normal donde el LLM defiende.
+        assert "EXCEDENTE FACTURADO DETECTADO" not in prompt
+
+    def test_excedente_moderado_propone_aceptar_total(self):
+        """facturado $41.151 vs objetado $3.151 → ratio 13× (razonable).
+        Excedente real $7.664 ≥ objetado → ACEPTAR_TOTAL correcto."""
         prompt = build_user_prompt(
             texto_glosa="x", contexto_pdf="",
             codigo="TA0801", eps="DISPENSARIO",
             valor_objetado="$3.151",
-            valor_facturado="$488.497",
+            valor_facturado="$41.151",
             valor_pactado="$33.487",
         )
-        # Con el parser bien (>=2 montos), facturado=$488.497 implica
-        # multi-CUPS o tarifa errónea. Aún así, dado los datos, la
-        # decisión correcta es ACEPTAR_TOTAL.
         assert "DECISIÓN: ACEPTAR_TOTAL" in prompt
 
     def test_decision_autonoma_en_system_prompt(self):

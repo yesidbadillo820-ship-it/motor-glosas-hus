@@ -282,6 +282,13 @@ def evaluar_glosa_tarifa(
             "recomendacion": None,
         }
 
+    # Sanity check: si el facturado es absurdamente mayor al objetado
+    # (>50×), es señal de que el parser leyó mal el PDF (concatenó
+    # otros valores, agarró el TOTAL de la factura completa, etc.).
+    # Resetear a 0 antes de seguir — preferimos "facturado desconocido"
+    # a un valor erróneo que cause ACEPTAR_TOTAL injustificado.
+    if valor_facturado > 0 and valor_objetado > 0 and valor_facturado > 50 * valor_objetado:
+        valor_facturado = 0
     # Ronda 47 fix: si la glosa solo trae valor_objetado (lo que la EPS
     # reconoció de menos) y no el facturado, asumimos facturado = objetado
     # porque lo típico es que la EPS objete el monto completo. Esto corrige

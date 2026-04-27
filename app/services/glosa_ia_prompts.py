@@ -1144,6 +1144,13 @@ def build_user_prompt(
         _vf = _num(valor_facturado)
         _vp = _num(valor_pactado)
         _vo = _num(valor_objetado)
+        # ─── SANITY CHECK ─── descartar facturado si el ratio contra
+        # objetado es absurdo (>50×). Cuando ocurre es porque el parser
+        # leyó mal el PDF (ej. tomó otro valor de la factura, o
+        # concatenó cifras). Aceptar valores en esa condición causaría
+        # que HUS acepte montos que no debía aceptar.
+        if _vf > 0 and _vo > 0 and _vf > 50 * _vo:
+            _vf = 0
         # Cuando facturado > pactado y existe valor objetado: la EPS
         # tiene razón parcial o total dependiendo de cómo se compare
         # la diferencia con lo objetado. Decidimos automáticamente:
