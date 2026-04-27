@@ -7565,6 +7565,91 @@ def stats_codigo_eps_cobertura(
     }
 
 
+@router.get("/stats/eps-volumen-tasa-mes")
+def stats_eps_volumen_tasa_mes(
+    meses: int = Query(6, ge=1, le=24),
+    top_eps: int = Query(8, ge=2, le=20),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R393 P1: matriz EPS × mes con volumen y tasa.
+
+    Para las top N EPS por volumen total, devuelve por
+    cada mes el count de creadas y la tasa de
+    levantamiento. Útil para detectar EPS que están
+    cambiando su patrón de tasa (no solo volumen).
+    """
+    from datetime import timedelta, timezone
+
+    desde = ahora_utc() - timedelta(days=int(meses) * 31)
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    total_eps: dict[str, int] = {}
+    matriz: dict[str, dict[str, dict]] = {}
+    meses_set: set = set()
+
+    for g in rows:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        k = cre.strftime("%Y-%m")
+        meses_set.add(k)
+        total_eps[eps] = total_eps.get(eps, 0) + 1
+        b = matriz.setdefault(eps, {}).setdefault(k, {
+            "count": 0, "dec": 0, "lev": 0,
+        })
+        b["count"] += 1
+        estado = (g.estado or "").upper()
+        if estado in ESTADOS_DECIDIDOS:
+            b["dec"] += 1
+        if estado == "LEVANTADA":
+            b["lev"] += 1
+
+    eps_top = [
+        e for e, _ in sorted(
+            total_eps.items(), key=lambda x: x[1], reverse=True,
+        )[: int(top_eps)]
+    ]
+    meses_ord = sorted(meses_set)
+
+    items = []
+    for eps in eps_top:
+        celdas = []
+        for m in meses_ord:
+            b = matriz.get(eps, {}).get(m, {"count": 0, "dec": 0, "lev": 0})
+            tasa = (
+                round(100 * b["lev"] / b["dec"], 1) if b["dec"] else None
+            )
+            celdas.append({
+                "mes": m,
+                "count": b["count"],
+                "tasa_levantamiento_pct": tasa,
+            })
+        items.append({
+            "eps": eps,
+            "total": total_eps.get(eps, 0),
+            "celdas": celdas,
+        })
+
+    return {
+        "ventana_meses": int(meses),
+        "meses": meses_ord,
+        "items": items,
+    }
+
+
 @router.get("/stats/anomalias-recientes")
 def stats_anomalias_recientes(
     db: Session = Depends(get_db),
