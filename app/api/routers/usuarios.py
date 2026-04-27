@@ -406,6 +406,157 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/super-resumen")
+def yo_super_resumen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R397 P1: super-resumen — TODO el contexto del usuario.
+
+    Single-call con todo lo que el dashboard de Mi
+    desempeño necesita en una sola request:
+      - kpis: abiertas, vencidas, criticas, decididas_mes,
+        recuperado_mes, tasa_levantamiento_mes
+      - donut: progreso_pct, meta, mensaje
+      - alertas_count: total acciones URGENTE+IMPORTANTE
+      - menciones_pendientes
+      - streak_actual
+
+    Reduce 5+ llamadas del frontend a 1 sola.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        ComentarioGlosaRecord, GlosaRecord,
+    )
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    n_abiertas = len(abiertas)
+    n_vencidas = sum(
+        1 for g in abiertas if (g.dias_restantes or 0) < 0
+    )
+    n_criticas = sum(
+        1 for g in abiertas
+        if 0 <= (g.dias_restantes or 0) <= 3
+    )
+
+    decididas_mes = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
+        .all()
+    )
+    n_dec_mes = len(decididas_mes)
+    n_lev_mes = sum(
+        1 for g in decididas_mes
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    rec_mes = sum(
+        float(g.valor_recuperado or 0) for g in decididas_mes
+    )
+    tasa_mes = (
+        round(100 * n_lev_mes / n_dec_mes, 2) if n_dec_mes else 0.0
+    )
+
+    # Donut
+    desde_hist = inicio_mes - timedelta(days=180)
+    hist_q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.fecha_decision_eps >= desde_hist)
+        .filter(GlosaRecord.fecha_decision_eps < inicio_mes)
+        .all()
+    )
+    por_mes_hist: dict[str, int] = {}
+    for g in hist_q:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        k = f.strftime("%Y-%m")
+        por_mes_hist[k] = por_mes_hist.get(k, 0) + 1
+    if por_mes_hist:
+        meta = max(int(sum(por_mes_hist.values()) / len(por_mes_hist)), 5)
+    else:
+        meta = 5
+    progreso_pct = min(round(100 * n_dec_mes / meta, 1), 200) if meta else 0
+
+    # Streak
+    dias_set: set = set()
+    for g in decididas_mes:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if f:
+            dias_set.add(f.date())
+    streak = 0
+    cursor = ahora.date()
+    while cursor in dias_set:
+        streak += 1
+        cursor -= timedelta(days=1)
+
+    # Menciones
+    menciones = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.mencion == current_user.email)
+        .filter(
+            (ComentarioGlosaRecord.resuelto == 0)
+            | (ComentarioGlosaRecord.resuelto.is_(None))
+        )
+        .count()
+    )
+
+    # Mensaje según progreso
+    if progreso_pct >= 100:
+        mensaje = "🎉 Meta cumplida"
+    elif progreso_pct >= 80:
+        mensaje = "💪 Casi llegas"
+    elif progreso_pct >= 50:
+        mensaje = "📊 Buen ritmo"
+    else:
+        mensaje = "🎯 Hay margen"
+
+    return {
+        "usuario_email": current_user.email,
+        "kpis": {
+            "abiertas": n_abiertas,
+            "vencidas": n_vencidas,
+            "criticas": n_criticas,
+            "decididas_mes": n_dec_mes,
+            "levantadas_mes": n_lev_mes,
+            "recuperado_mes": int(rec_mes),
+            "tasa_levantamiento_mes_pct": tasa_mes,
+        },
+        "donut": {
+            "meta": meta,
+            "actual": n_dec_mes,
+            "progreso_pct": progreso_pct,
+            "mensaje": mensaje,
+        },
+        "alertas_count": n_vencidas + n_criticas + menciones,
+        "menciones_pendientes": menciones,
+        "streak_actual": streak,
+    }
+
+
 @router.get("/yo/sugerencias-orden")
 def yo_sugerencias_orden(
     limit: int = 15,
