@@ -1070,6 +1070,128 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/anomalias-asignacion")
+def admin_anomalias_asignacion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R390 P1: la IA detecta inequidades en la asignación.
+
+    Reglas:
+      - GESTOR_ESPECIALIZADO: gestor maneja >= 80% de las
+        glosas de una EPS (riesgo de bus-factor)
+      - EPS_DESATENDIDA: EPS con > 5 glosas abiertas y
+        ningún gestor con histórico decidido en ella
+      - VALOR_CONCENTRADO: gestor con >= 50% del valor
+        objetado pendiente del equipo
+
+    Solo SUPER_ADMIN.
+    """
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    todas = db.query(GlosaRecord).all()
+    abiertas = [
+        g for g in todas
+        if (g.estado or "").upper() not in ESTADOS_CERRADOS
+    ]
+
+    # GESTOR_ESPECIALIZADO: por EPS, qué gestor toma > 80%
+    eps_glosas: dict[str, dict[str, int]] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        gestor = (g.gestor_nombre or "").strip()
+        if not eps or not gestor:
+            continue
+        eps_glosas.setdefault(eps, {})
+        eps_glosas[eps][gestor] = eps_glosas[eps].get(gestor, 0) + 1
+
+    items = []
+    for eps, by_gestor in eps_glosas.items():
+        total = sum(by_gestor.values())
+        if total < 10:
+            continue
+        for gestor, count in by_gestor.items():
+            ratio = count / total
+            if ratio >= 0.8:
+                items.append({
+                    "tipo": "GESTOR_ESPECIALIZADO",
+                    "gestor": gestor,
+                    "eps": eps,
+                    "count": count,
+                    "ratio_pct": round(100 * ratio, 1),
+                    "mensaje": (
+                        f"{gestor} concentra el "
+                        f"{ratio*100:.0f}% de las {total} "
+                        f"glosas abiertas de {eps}. "
+                        "Considera repartir para reducir bus-factor."
+                    ),
+                })
+
+    # EPS_DESATENDIDA: EPS con >5 abiertas y ningún gestor con histórico
+    historico_decidido_por_eps: dict[str, set] = {}
+    for g in todas:
+        eps = (g.eps or "").strip()
+        gestor = (g.gestor_nombre or "").strip()
+        if not eps or not gestor:
+            continue
+        if (g.estado or "").upper() in ESTADOS_DECIDIDOS:
+            historico_decidido_por_eps.setdefault(eps, set()).add(gestor)
+
+    abiertas_por_eps: dict[str, int] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        if eps:
+            abiertas_por_eps[eps] = abiertas_por_eps.get(eps, 0) + 1
+
+    for eps, count in abiertas_por_eps.items():
+        if count < 6:
+            continue
+        if not historico_decidido_por_eps.get(eps):
+            items.append({
+                "tipo": "EPS_DESATENDIDA",
+                "eps": eps,
+                "abiertas": count,
+                "mensaje": (
+                    f"{eps} tiene {count} glosas abiertas y "
+                    "ningún gestor del equipo cerró nunca una. "
+                    "Asignar a alguien con experiencia."
+                ),
+            })
+
+    # VALOR_CONCENTRADO: gestor con >50% del valor pendiente
+    bucket_v: dict[str, float] = {}
+    valor_total = 0.0
+    for g in abiertas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        v = float(g.valor_objetado or 0)
+        bucket_v[gestor] = bucket_v.get(gestor, 0.0) + v
+        valor_total += v
+    if valor_total > 0:
+        for gestor, v in bucket_v.items():
+            ratio = v / valor_total
+            if ratio >= 0.5:
+                items.append({
+                    "tipo": "VALOR_CONCENTRADO",
+                    "gestor": gestor,
+                    "valor_pendiente": int(v),
+                    "ratio_pct": round(100 * ratio, 1),
+                    "mensaje": (
+                        f"{gestor} concentra el "
+                        f"{ratio*100:.0f}% del valor pendiente "
+                        f"(${int(v):,}). Riesgo financiero "
+                        "si se va o se atrasa."
+                    ),
+                })
+
+    return {
+        "total_anomalias": len(items),
+        "items": items,
+    }
+
+
 @router.get("/insight-financiero")
 def admin_insight_financiero(
     db: Session = Depends(get_db),
