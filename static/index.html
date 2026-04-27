@@ -871,6 +871,31 @@ body.dark .chip-estado{background:rgba(29,78,216,.2);color:#93c5fd;border-color:
 .btn-sm:hover{background:var(--c-teal);box-shadow:0 2px 6px rgba(2,132,199,.25)}
 .btn-sm.ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
 .btn-sm.ghost:hover{border-color:var(--c-teal2);color:var(--c-teal2);background:var(--c-teal-light)}
+.btn-sm.btn-primary{background:var(--c-teal2);color:#fff;border:none;font-weight:700}
+.btn-sm.btn-primary:hover{background:var(--c-teal);box-shadow:0 2px 6px rgba(2,132,199,.3)}
+
+/* Menú de acciones secundarias (⋯) — reduce ruido visual de filas */
+.action-menu{position:relative;display:inline-block;vertical-align:middle}
+.action-menu .am-trigger{padding:.4rem .65rem;font-weight:700;letter-spacing:1px;line-height:1}
+.action-menu .am-dropdown{
+  position:absolute;right:0;top:calc(100% + 4px);z-index:50;
+  min-width:200px;background:var(--bg-card,#fff);
+  border:1px solid var(--border,#e5e7eb);border-radius:8px;
+  box-shadow:0 8px 24px rgba(15,23,42,.12);
+  padding:.35rem;display:none;
+}
+.action-menu.open .am-dropdown{display:block}
+.action-menu .am-item{
+  width:100%;text-align:left;background:transparent;border:none;
+  padding:.5rem .7rem;font-size:.8rem;color:var(--text,#1e293b);
+  cursor:pointer;border-radius:5px;display:flex;align-items:center;gap:.55rem;
+  font-family:var(--font);
+}
+.action-menu .am-item:hover{background:var(--bg-subtle,#f3f4f6)}
+.action-menu .am-icon{display:inline-flex;width:1.1rem;justify-content:center;font-size:.95rem;color:var(--text3,#6b7280)}
+.action-menu .am-item-danger{color:#b91c1c}
+.action-menu .am-item-danger:hover{background:#fef2f2}
+.action-menu .am-item-danger .am-icon{color:#b91c1c}
 
 /* Toolbar inline para filtros/toggle */
 .toolbar-inline{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
@@ -8200,50 +8225,72 @@ function _renderMisGlosas(dataRaw){
         apChip = '<br><span class="chip" title="Autopilot · confianza ' + conf + '%" style="margin-top:4px;display:inline-block;background:' + apColor[0] + ';color:' + apColor[1] + ';font-size:.68rem;font-weight:700;padding:2px 8px;">🤖 ' + apLabel + '</span>';
       }
 
-      // Construir botones de acción según estado y rol
+      // Construir botones de acción según estado y rol.
+      // R-UI 27-abr-2026: refactor → 1 botón primario + menú "⋯"
+      // con acciones secundarias. Reduce ruido visual de la fila.
       var estadoUpper = (g.estado || '').toUpperCase();
       var yaRespondida = estadoUpper === 'RESPONDIDA' || wfEstado === 'RESPONDIDA';
-      var acciones = '';
+      var primario = '';
+      var menuItems = [];
+
       if(yaRespondida){
-        acciones = '<span style="color:#059669;font-weight:700;font-size:.78rem;">✓ Respondida</span>';
-        acciones += ' <button class="btn-sm ghost" onclick="responderGlosa(' + g.id + ')">Ver/Re-abrir</button>';
-        // Cuando hay valor_aceptado > 0 (parcial o total), permitir
-        // capturar el número de nota crédito de la aceptación.
+        // Respondida: primario = "Ver" (abre la glosa con el dictamen).
+        primario = '<button class="btn-sm btn-primary" onclick="responderGlosa(' + g.id + ')" title="Abrir glosa y ver el dictamen">Ver</button>';
+        // Si tiene aceptación parcial/total, opción nota crédito en menú
         if((g.valor_aceptado || 0) > 0){
-          var ncTxt = g.numero_nota_credito
-            ? ('📝 NC ' + g.numero_nota_credito)
-            : '📝 Agregar nota crédito';
-          var ncBg = g.numero_nota_credito ? '#0ea5e9' : '#d97706';
-          acciones += ' <button class="btn-sm" style="background:' + ncBg +
-            ';color:#fff;border:none" title="Registrar número de nota crédito" ' +
-            'onclick="abrirModalNotaCredito(' + g.id + ', \'' +
-            ((g.factura || '').replace(/\'/g, "\\'")) + '\', ' +
-            (g.valor_aceptado || 0) + ', ' +
-            (g.numero_nota_credito ? ('\'' + g.numero_nota_credito.replace(/\'/g, "\\'") + '\'') : 'null') +
-            ')">' + ncTxt + '</button>';
+          var ncTxt = g.numero_nota_credito ? 'Editar nota crédito' : 'Agregar nota crédito';
+          menuItems.push({
+            icon: '📝',
+            label: ncTxt,
+            onclick: 'abrirModalNotaCredito(' + g.id + ', \'' +
+              ((g.factura || '').replace(/\'/g, "\\'")) + '\', ' +
+              (g.valor_aceptado || 0) + ', ' +
+              (g.numero_nota_credito ? ('\'' + g.numero_nota_credito.replace(/\'/g, "\\'") + '\'') : 'null') +
+              ')',
+          });
         }
       } else {
-        acciones = '<button class="btn-sm" onclick="responderGlosa(' + g.id + ')">Responder</button>';
-        // Boton "Marcar respondida" visible siempre que tenga dictamen generado
-        // (g.dictamen_generado viene del backend). Evita tener que abrir y re-analizar.
+        // No respondida: primario = "Responder" (analizar con IA).
+        primario = '<button class="btn-sm btn-primary" onclick="responderGlosa(' + g.id + ')" title="Abrir y generar dictamen">Responder</button>';
+        // Marcar respondida (si ya tiene dictamen generado)
         if(g.dictamen_generado){
-          acciones += ' <button class="btn-sm" style="background:#10b981;color:#fff;border:none" title="Marcar esta glosa como respondida (mueve a tab Respondidas)" onclick="marcarFacturaRespondida(' + g.id + ',\'' + ((g.factura||'').replace(/\'/g,"\\'")) + '\',this)">✓ Respondida</button>';
+          menuItems.push({
+            icon: '✓',
+            label: 'Marcar respondida',
+            onclick: 'marcarFacturaRespondida(' + g.id + ',\'' + ((g.factura||'').replace(/\'/g,"\\'")) + '\',this)',
+          });
         }
+        // Workflow transitions
         if(wfEstado === 'BORRADOR'){
-          acciones += ' <button class="btn-sm ghost" style="color:#ca8a04;border-color:#fde68a" onclick="cambiarWorkflow(' + g.id + ',\'EN_REVISION\',\'Enviar a revisión\')">→ Revisar</button>';
+          menuItems.push({icon:'→', label:'Enviar a revisión', onclick:'cambiarWorkflow(' + g.id + ',\'EN_REVISION\',\'Enviar a revisión\')'});
         } else if(wfEstado === 'EN_REVISION' && puedeAprobar){
-          acciones += ' <button class="btn-sm" style="background:#047857" onclick="cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')">✓ Aprobar</button>';
-          acciones += ' <button class="btn-sm ghost" onclick="cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')">← Devolver</button>';
+          menuItems.push({icon:'✓', label:'Aprobar', onclick:'cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')'});
+          menuItems.push({icon:'←', label:'Devolver a borrador', onclick:'cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')'});
         } else if(wfEstado === 'APROBADA' && puedeAprobar){
-          acciones += ' <button class="btn-sm" style="background:#1d4ed8" onclick="cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')">Radicar</button>';
+          menuItems.push({icon:'📤', label:'Marcar radicada', onclick:'cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')'});
         }
       }
 
-      // Ronda 43: botones admin para reasignar o eliminar (solo coord/super_admin)
+      // Acciones admin (siempre disponibles para coord/super_admin)
       if(puedeAprobar){
-        acciones += ' <button class="btn-sm ghost" style="color:#7c3aed;border-color:#ddd6fe" title="Reasignar esta glosa a otro gestor" onclick="reasignarGlosaUI(' + g.id + ',\'' + ((g.gestor_nombre||'').replace(/\'/g,"\\\\'")) + '\')">↪ Reasignar</button>';
-        acciones += ' <button class="btn-sm ghost" style="color:#b91c1c;border-color:#fecaca" title="Mover esta glosa a la papelera (restaurable 30 días)" onclick="eliminarGlosaUI(' + g.id + ',\'' + ((g.factura||'').replace(/\'/g,"\\\\'")) + '\')">🗑 Eliminar</button>';
+        menuItems.push({icon:'↪', label:'Reasignar', onclick:'reasignarGlosaUI(' + g.id + ',\'' + ((g.gestor_nombre||'').replace(/\'/g,"\\\\'")) + '\')'});
+        menuItems.push({icon:'🗑', label:'Eliminar', onclick:'eliminarGlosaUI(' + g.id + ',\'' + ((g.factura||'').replace(/\'/g,"\\\\'")) + '\')', danger:true});
       }
+
+      // Renderizar menú "⋯" si hay items, si no solo el primario
+      var menuHtml = '';
+      if(menuItems.length > 0){
+        var itemsHtml = menuItems.map(function(it){
+          var dangerCls = it.danger ? ' am-item-danger' : '';
+          return '<button class="am-item' + dangerCls + '" onclick="closeActionMenus();' + it.onclick + '"><span class="am-icon">' + it.icon + '</span><span>' + it.label + '</span></button>';
+        }).join('');
+        menuHtml = ' <div class="action-menu">'
+          + '<button class="btn-sm ghost am-trigger" onclick="toggleActionMenu(this,event)" title="Más acciones">⋯</button>'
+          + '<div class="am-dropdown">' + itemsHtml + '</div>'
+          + '</div>';
+      }
+
+      var acciones = primario + menuHtml;
 
       return '<tr data-glosa-id="' + g.id + '">' +
         '<td class="cell-center"><input type="checkbox" class="bulk-chk" value="' + g.id + '" onchange="actualizarContadorLote()"/></td>' +
@@ -8435,6 +8482,29 @@ async function cambiarWorkflow(id, nuevoEstado, etiqueta){
 }
 
 // Ronda 43: reasignar glosa a otro gestor (por ej. cuando se cargó al usuario equivocado)
+// ─── Menú de acciones secundarias (⋯) en filas de Mis Glosas ──────────────
+function toggleActionMenu(btn, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  var menu = btn && btn.closest && btn.closest('.action-menu');
+  if(!menu) return;
+  var isOpen = menu.classList.contains('open');
+  closeActionMenus();
+  if(!isOpen) menu.classList.add('open');
+}
+function closeActionMenus(){
+  document.querySelectorAll('.action-menu.open').forEach(function(m){
+    m.classList.remove('open');
+  });
+}
+// Cerrar al hacer click fuera
+document.addEventListener('click', function(ev){
+  var t = ev.target;
+  if(!t || !t.closest || !t.closest('.action-menu')) closeActionMenus();
+});
+document.addEventListener('keydown', function(ev){
+  if(ev.key === 'Escape') closeActionMenus();
+});
+
 async function reasignarGlosaUI(glosaId, gestorActual){
   // Primero traer lista de auditores disponibles
   var lista = [];
@@ -8613,50 +8683,86 @@ async function _mostrarBannerAutopilot(glosaId){
     var a = await r.json();
     var estado = a.estado_autopilot || '';
     var conf = Math.round((a.confianza || 0) * 100);
-    var colores = {
-      LISTA_ENVIAR: ['#dcfce7','#166534','✅'],
-      CASI_LISTA:   ['#d1fae5','#065f46','🟢'],
-      REVISAR:      ['#fef3c7','#92400e','🟡'],
-      INTERVENIR:   ['#fee2e2','#991b1b','🔴'],
-    };
-    var c = colores[estado] || ['#f3f4f6','#374151','🤖'];
-    var pro = (a.razones_a_favor||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
-    var con = (a.razones_en_contra||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
-    var acc = (a.acciones_sugeridas||[]).slice(0,3).map(function(x){ return '<li>' + _h(x) + '</li>'; }).join('');
 
-    // Ronda 40 fix: si la glosa ya está cerrada (RESPONDIDA/CONCILIADA/LEVANTADA),
-    // NO mostrar el botón one-click — mostrar pill informativo en su lugar.
-    var oneClick = '';
-    if(a.ya_cerrada){
-      var wf = (a.workflow_state || '').toUpperCase();
-      oneClick = '<div style="margin-top:10px;padding:8px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:12.5px;color:#166534;font-weight:600;">'
-        + '✓ Esta glosa ya está <b>' + (wf || 'RESPONDIDA') + '</b> — no requiere más acción.'
-        + '</div>';
-    } else if(estado === 'LISTA_ENVIAR' && conf >= 85){
-      // Ronda 31: acción one-click si autopilot dice LISTA_ENVIAR con alta confianza
-      oneClick = '<button onclick="_apEnviarRapido(' + glosaId + ',event)" style="margin-top:10px;padding:9px 16px;background:' + c[1] + ';color:#fff;border:0;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 2px 6px ' + c[1] + '40;">'
-        + '✓ Marcar como RESPONDIDA (sin revisar)'
-        + '</button>'
-        + '<div style="font-size:10.5px;color:' + c[1] + ';opacity:.8;margin-top:4px;">⚡ Atajo del autopilot — confianza ' + conf + '%. La glosa pasa directo a bandeja Respondidas.</div>';
-    }
-
-    var html = ''
-      + '<div id="ap-banner" data-glosa="' + glosaId + '" style="background:' + c[0] + ';border:1px solid ' + c[1] + '33;border-left:4px solid ' + c[1] + ';border-radius:10px;padding:14px 18px;margin:12px 0;color:' + c[1] + ';">'
-      +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
-      +     '<div style="font-size:14px;font-weight:700;">' + c[2] + ' Autopilot: ' + estado.replace("_"," ") + ' <span style="font-weight:500;opacity:.8;">(confianza ' + conf + '%)</span></div>'
-      +     '<button onclick="var b=document.getElementById(\'ap-banner\');if(b)b.remove()" style="background:transparent;border:0;color:' + c[1] + ';cursor:pointer;font-size:18px;line-height:1;">×</button>'
-      +   '</div>'
-      +   (pro ? '<div style="margin-top:8px;font-size:12px;"><b>A favor:</b><ul style="margin:4px 0 0 18px;padding:0;">' + pro + '</ul></div>' : '')
-      +   (con ? '<div style="margin-top:6px;font-size:12px;"><b>En contra:</b><ul style="margin:4px 0 0 18px;padding:0;">' + con + '</ul></div>' : '')
-      +   (acc ? '<div style="margin-top:6px;font-size:12px;"><b>Acciones sugeridas:</b><ul style="margin:4px 0 0 18px;padding:0;">' + acc + '</ul></div>' : '')
-      +   oneClick
-      + '</div>';
-    // Insertar al inicio del panel analizar
+    // R-UI 27-abr-2026: limpieza visual del banner — solo aparece
+    // cuando aporta valor real al gestor:
+    //   • Glosa ya cerrada → pill chico verde (no panel grande).
+    //   • LISTA_ENVIAR + conf ≥ 85% → panel con botón one-click.
+    //   • INTERVENIR/REVISAR con info útil → panel chico colapsable.
+    //   • Otros casos / confianza < 30% → nada.
     var panel = document.getElementById('p-analizar');
     if(!panel) return;
-    // Remover banner previo si existe
     var prev = document.getElementById('ap-banner');
     if(prev) prev.remove();
+
+    var razonesPro = (a.razones_a_favor||[]).slice(0,3);
+    var razonesCon = (a.razones_en_contra||[]).slice(0,3);
+    var acciones = (a.acciones_sugeridas||[]).slice(0,3);
+
+    // Caso 1: glosa cerrada → solo pill chico
+    if(a.ya_cerrada){
+      var wf = (a.workflow_state || a.estado || 'RESPONDIDA').toUpperCase();
+      var pillHtml = '<div id="ap-banner" data-glosa="' + glosaId + '" '
+        + 'style="display:inline-flex;align-items:center;gap:.5rem;'
+        + 'padding:.45rem .85rem;background:#dcfce7;border:1px solid #86efac;'
+        + 'border-radius:999px;margin:.5rem 0;font-size:.78rem;color:#166534;'
+        + 'font-weight:600;">'
+        + '✓ ' + wf + ' — no requiere más acción'
+        + '</div>';
+      panel.insertAdjacentHTML('afterbegin', pillHtml);
+      return;
+    }
+
+    // Caso 2: LISTA_ENVIAR alta confianza → panel con one-click
+    if(estado === 'LISTA_ENVIAR' && conf >= 85){
+      var html = ''
+        + '<div id="ap-banner" data-glosa="' + glosaId + '" '
+        + 'style="background:#dcfce7;border:1px solid #86efac;border-left:4px solid #16a34a;'
+        + 'border-radius:8px;padding:.75rem 1rem;margin:.5rem 0;color:#166534;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">'
+        + '<div style="font-size:.85rem;font-weight:700;">'
+        + '✅ Listo para enviar <span style="opacity:.7;font-weight:500;">(confianza ' + conf + '%)</span>'
+        + '</div>'
+        + '<button onclick="var b=document.getElementById(\'ap-banner\');if(b)b.remove()" '
+        + 'style="background:transparent;border:0;color:#166534;cursor:pointer;font-size:1rem;">×</button>'
+        + '</div>'
+        + '<button onclick="_apEnviarRapido(' + glosaId + ',event)" '
+        + 'style="margin-top:.5rem;padding:.55rem 1rem;background:#16a34a;color:#fff;'
+        + 'border:0;border-radius:6px;font-weight:700;font-size:.82rem;cursor:pointer;">'
+        + '✓ Marcar como RESPONDIDA</button>'
+        + '</div>';
+      panel.insertAdjacentHTML('afterbegin', html);
+      return;
+    }
+
+    // Caso 3: confianza baja sin acción concreta → no mostrar nada
+    // (evita el banner enorme rojo de "INTERVENIR 30%" que no aporta).
+    if(conf < 30) return;
+    if(razonesPro.length === 0 && razonesCon.length === 0 && acciones.length === 0) return;
+
+    // Caso 4: panel colapsable chico para REVISAR/CASI_LISTA con info
+    var colores = {
+      CASI_LISTA: ['#d1fae5','#065f46','🟢'],
+      REVISAR:    ['#fef3c7','#92400e','🟡'],
+      INTERVENIR: ['#fee2e2','#991b1b','🔴'],
+    };
+    var c = colores[estado] || ['#f3f4f6','#374151','🤖'];
+    var html = ''
+      + '<div id="ap-banner" data-glosa="' + glosaId + '" '
+      + 'style="background:' + c[0] + ';border-left:3px solid ' + c[1] + ';'
+      + 'border-radius:6px;padding:.55rem .85rem;margin:.5rem 0;color:' + c[1] + ';font-size:.78rem;">'
+      + '<details>'
+      + '<summary style="cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;">'
+      + '<span>' + c[2] + ' ' + estado.replace("_"," ") + ' · confianza ' + conf + '%</span>'
+      + '<span style="font-size:.7rem;opacity:.7;">▾ ver detalles</span>'
+      + '</summary>'
+      + '<div style="margin-top:.5rem;font-size:.75rem;line-height:1.5;">'
+      + (razonesPro.length ? '<b>A favor:</b> ' + razonesPro.map(_h).join(' · ') + '<br>' : '')
+      + (razonesCon.length ? '<b>En contra:</b> ' + razonesCon.map(_h).join(' · ') + '<br>' : '')
+      + (acciones.length ? '<b>Sugerencia:</b> ' + acciones.map(_h).join(' · ') : '')
+      + '</div>'
+      + '</details>'
+      + '</div>';
     panel.insertAdjacentHTML('afterbegin', html);
   }catch(_){/* silencioso */}
 }
