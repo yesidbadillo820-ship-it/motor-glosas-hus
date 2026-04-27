@@ -1240,11 +1240,109 @@ class GlosaService:
             except Exception:
                 pass
 
-            res_ia, modelo_usado = await self._llamar_ia(
-                system_prompt, user_prompt,
-                eps=str(data.eps), codigo=codigo_det,
-                modelo_override=_modelo_override,
-            )
+            # ═══════════════════════════════════════════════════════════
+            #  R-CEREBRO #10: Skip Claude (dictamen directo sin tokens).
+            #  Si la pre-auditoría ya da veredicto contundente
+            #  (score >= 70, DEFENDER_FUERTE, datos completos, sin
+            #  excedente facturado), emitimos el dictamen con plantilla
+            #  curada que cumple todas las reglas estructurales.
+            #  Costo: $0. Latencia: ~50ms vs ~25s del LLM.
+            # ═══════════════════════════════════════════════════════════
+            res_ia = None
+            modelo_usado = None
+            try:
+                from app.services.auditor_glosa import auditar
+                from app.services.dictamen_directo import (
+                    puede_emitir_directo,
+                    generar_dictamen_directo,
+                )
+                _pact_num = 0.0
+                _fact_num = 0.0
+                if info_tarifa and info_tarifa.get("encontrada"):
+                    _pact_num = float(
+                        info_tarifa.get("valor_pactado_calc") or 0.0
+                    )
+                    _fact_num = float(
+                        info_tarifa.get("valor_facturado") or 0.0
+                    )
+                _obj_num = 0.0
+                if valor_raw:
+                    _d = re.sub(r"[^\d]", "", str(valor_raw))
+                    if _d:
+                        _obj_num = float(_d)
+                _aud = auditar(
+                    texto_base or "",
+                    eps=str(data.eps), codigo=codigo_det,
+                    cups=cups_verificado,
+                    tiene_contrato=tiene_contrato,
+                    valor_facturado=_fact_num,
+                    valor_pactado=_pact_num,
+                    valor_objetado=_obj_num,
+                    contexto_pdf=contexto_pdf or "",
+                )
+                _num_contrato_real = ""
+                try:
+                    from app.services.glosa_ia_prompts import get_contrato
+                    _ctr = get_contrato(str(data.eps))
+                    _num_contrato_real = (
+                        _ctr.get("numero", "") if _ctr else ""
+                    )
+                except Exception:
+                    pass
+                # Si hay tarifa exacta del catálogo, usar ese contrato.
+                if (
+                    info_tarifa and info_tarifa.get("encontrada")
+                    and info_tarifa.get("tarifa")
+                ):
+                    _ttar = info_tarifa.get("tarifa")
+                    _ctr_cat = getattr(_ttar, "contrato_numero", None) \
+                        or (_ttar.get("contrato_numero")
+                            if isinstance(_ttar, dict) else None)
+                    if _ctr_cat:
+                        _num_contrato_real = _ctr_cat
+
+                if puede_emitir_directo(
+                    _aud,
+                    codigo=codigo_det,
+                    eps=str(data.eps),
+                    cups=cups_verificado,
+                    valor_objetado=_obj_num,
+                    valor_facturado=_fact_num,
+                    valor_pactado=_pact_num,
+                    tiene_contrato=tiene_contrato,
+                    numero_contrato=_num_contrato_real,
+                ):
+                    _xml_directo = generar_dictamen_directo(
+                        _aud,
+                        codigo=codigo_det,
+                        eps=str(data.eps),
+                        cups=cups_verificado or "",
+                        servicio=getattr(data, "servicio_descripcion", "") or "",
+                        valor_objetado=_obj_num,
+                        valor_facturado=_fact_num,
+                        valor_pactado=_pact_num,
+                        numero_contrato=_num_contrato_real,
+                    )
+                    if _xml_directo:
+                        res_ia = _xml_directo
+                        modelo_usado = "directo_auditor"
+                        logger.info(
+                            "[SKIP-CLAUDE] Dictamen emitido directamente "
+                            f"sin LLM. score={_aud['score_evidencia']} "
+                            f"hallazgos={_aud['n_hallazgos_alta']} "
+                            f"ahorro=$~0.05 latencia=<100ms"
+                        )
+            except Exception as _e_dir:
+                logger.debug(f"[SKIP-CLAUDE] Falló: {_e_dir}")
+                res_ia = None
+
+            # Si NO se emitió directamente, llamar al LLM como siempre.
+            if not res_ia:
+                res_ia, modelo_usado = await self._llamar_ia(
+                    system_prompt, user_prompt,
+                    eps=str(data.eps), codigo=codigo_det,
+                    modelo_override=_modelo_override,
+                )
 
             # ═══════════════════════════════════════════════════════════
             #  R-CEREBRO #1: Validación post-generación con retry
