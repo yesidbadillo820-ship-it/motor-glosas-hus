@@ -1070,6 +1070,79 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/insight-financiero")
+def admin_insight_financiero(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R386 P1: insight financiero ejecutivo (single-call).
+
+    Resumen para CFO / coordinador:
+      - top_3_eps_recuperacion: las EPS donde mejor
+        recuperamos $ (sobre valor objetado)
+      - bottom_3_eps_recuperacion: peores
+      - tasa_recuperacion_global_pct
+      - valor_recuperado_total
+      - valor_objetado_total
+
+    Solo SUPER_ADMIN.
+    """
+    decididas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    obj_global = 0.0
+    rec_global = 0.0
+    for g in decididas:
+        eps = (g.eps or "").strip()
+        if not eps:
+            continue
+        b = bucket.setdefault(eps, {"obj": 0.0, "rec": 0.0, "n": 0})
+        v_obj = float(g.valor_objetado or 0)
+        v_rec = float(g.valor_recuperado or 0)
+        b["obj"] += v_obj
+        b["rec"] += v_rec
+        b["n"] += 1
+        obj_global += v_obj
+        rec_global += v_rec
+
+    items = []
+    for eps, b in bucket.items():
+        if b["n"] < 3 or b["obj"] <= 0:
+            continue
+        tasa = round(100 * b["rec"] / b["obj"], 2)
+        items.append({
+            "eps": eps,
+            "n_decididas": b["n"],
+            "valor_objetado": int(b["obj"]),
+            "valor_recuperado": int(b["rec"]),
+            "tasa_recuperacion_pct": tasa,
+        })
+    items.sort(
+        key=lambda x: x["tasa_recuperacion_pct"], reverse=True,
+    )
+
+    tasa_global = (
+        round(100 * rec_global / obj_global, 2) if obj_global else 0.0
+    )
+
+    return {
+        "tasa_recuperacion_global_pct": tasa_global,
+        "valor_objetado_total": int(obj_global),
+        "valor_recuperado_total": int(rec_global),
+        "top_3_eps_recuperacion": items[:3],
+        "bottom_3_eps_recuperacion": list(reversed(items[-3:]))
+        if len(items) >= 3 else [],
+        "total_eps_evaluadas": len(items),
+    }
+
+
 @router.get("/equipo-pulse")
 def admin_equipo_pulse(
     db: Session = Depends(get_db),
