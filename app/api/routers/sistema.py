@@ -1174,6 +1174,192 @@ def cumplimiento_resolucion(
     }
 
 
+@router.get("/copilot-resumen")
+def copilot_resumen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R400 P1 — HITO: copilot resumen ejecutivo del sistema.
+
+    El copilot escanea el estado de TODA la operación y
+    devuelve 1 frase ejecutiva + 3-5 highlights con
+    cifras concretas. Es el "estado del país" en una
+    pantalla.
+
+    Highlights detectados automáticamente:
+      - cuántas glosas en vencida CRÍTICA (vencidas + alto valor)
+      - tasa de levantamiento del mes
+      - valor recuperado del mes
+      - top EPS en disputa actual
+      - alerta de gestor sobrecargado (si hay)
+
+    Single-call universal pensado como widget en topbar
+    o landing.
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    todas = db.query(GlosaRecord).all()
+
+    abiertas = []
+    decididas_mes = []
+    eps_count: dict[str, int] = {}
+    gestor_carga: dict[str, int] = {}
+
+    for g in todas:
+        e = (g.estado or "").upper()
+        if e not in ESTADOS_CERRADOS:
+            abiertas.append(g)
+            eps = (g.eps or "").strip()
+            if eps:
+                eps_count[eps] = eps_count.get(eps, 0) + 1
+            gestor = (g.gestor_nombre or "").strip()
+            if gestor:
+                gestor_carga[gestor] = (
+                    gestor_carga.get(gestor, 0) + 1
+                )
+        if e in ESTADOS_DECIDIDOS:
+            f = g.fecha_decision_eps
+            if f and f.tzinfo is None:
+                f = f.replace(tzinfo=timezone.utc)
+            if f and f >= inicio_mes:
+                decididas_mes.append(g)
+
+    # Métricas
+    n_abiertas = len(abiertas)
+    n_vencidas = sum(
+        1 for g in abiertas if (g.dias_restantes or 0) < 0
+    )
+    n_vencidas_grandes = sum(
+        1 for g in abiertas
+        if (g.dias_restantes or 0) < 0
+        and float(g.valor_objetado or 0) >= 5_000_000
+    )
+
+    n_dec_mes = len(decididas_mes)
+    n_lev_mes = sum(
+        1 for g in decididas_mes
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    rec_mes = sum(
+        float(g.valor_recuperado or 0) for g in decididas_mes
+    )
+    tasa_mes = (
+        100.0 * n_lev_mes / n_dec_mes if n_dec_mes else 0.0
+    )
+
+    top_eps = sorted(
+        eps_count.items(), key=lambda x: x[1], reverse=True,
+    )[:1]
+
+    # Detectar gestor sobrecargado (mediana × 1.5)
+    gestor_alerta = None
+    if gestor_carga:
+        cnts = sorted(gestor_carga.values())
+        med = cnts[len(cnts) // 2]
+        umbral = max(int(med * 1.5), med + 5)
+        for gestor, c in gestor_carga.items():
+            if c >= umbral and c > 10:
+                gestor_alerta = {"gestor": gestor, "abiertas": c}
+                break
+
+    # Highlights
+    highlights = []
+    if n_vencidas_grandes > 0:
+        highlights.append({
+            "tipo": "ATENCION",
+            "titulo": f"🚨 {n_vencidas_grandes} glosa(s) grandes vencidas",
+            "valor": f"{n_vencidas_grandes}",
+            "detalle": "Alto valor + en mora. Acción inmediata.",
+        })
+    elif n_vencidas > 0:
+        highlights.append({
+            "tipo": "ATENCION",
+            "titulo": f"⏰ {n_vencidas} vencida(s) en el sistema",
+            "valor": f"{n_vencidas}",
+            "detalle": "Cierre en orden de antigüedad.",
+        })
+
+    if n_dec_mes > 0:
+        highlights.append({
+            "tipo": "POSITIVO" if tasa_mes >= 60 else "NEUTRAL",
+            "titulo": f"Tasa del mes {tasa_mes:.1f}%",
+            "valor": f"{tasa_mes:.0f}%",
+            "detalle": f"{n_lev_mes} de {n_dec_mes} decididas",
+        })
+
+    if rec_mes > 0:
+        highlights.append({
+            "tipo": "POSITIVO",
+            "titulo": "💰 Recuperado del mes",
+            "valor": f"${int(rec_mes):,}",
+            "detalle": f"de {n_dec_mes} cierres del mes",
+        })
+
+    if top_eps:
+        eps_n, eps_c = top_eps[0]
+        highlights.append({
+            "tipo": "INFO",
+            "titulo": f"📊 EPS dominante: {eps_n}",
+            "valor": f"{eps_c}",
+            "detalle": "abiertas en pipeline",
+        })
+
+    if gestor_alerta:
+        highlights.append({
+            "tipo": "ATENCION",
+            "titulo": f"⚖️ {gestor_alerta['gestor']} sobrecargado",
+            "valor": f"{gestor_alerta['abiertas']}",
+            "detalle": "abiertas — considera rebalancear",
+        })
+
+    # Frase ejecutiva
+    if n_vencidas_grandes >= 5:
+        frase = (
+            f"⚠️ {n_vencidas_grandes} glosas grandes vencidas — "
+            "atención urgente del coordinador."
+        )
+    elif n_vencidas == 0 and tasa_mes >= 70:
+        frase = (
+            f"✅ Todo bajo control · tasa del mes "
+            f"{tasa_mes:.0f}% · sin vencidas."
+        )
+    elif n_vencidas == 0:
+        frase = (
+            f"✅ Sin vencidas · {n_abiertas} abiertas · "
+            f"tasa {tasa_mes:.0f}%."
+        )
+    else:
+        frase = (
+            f"📋 {n_abiertas} abiertas · {n_vencidas} "
+            f"vencidas · tasa del mes {tasa_mes:.0f}%."
+        )
+
+    return {
+        "generado_en": ahora.isoformat(),
+        "frase_ejecutiva": frase,
+        "highlights": highlights,
+        "kpis_resumen": {
+            "abiertas_total": n_abiertas,
+            "vencidas": n_vencidas,
+            "vencidas_grandes": n_vencidas_grandes,
+            "decididas_mes": n_dec_mes,
+            "tasa_mes_pct": round(tasa_mes, 2),
+            "valor_recuperado_mes": int(rec_mes),
+        },
+    }
+
+
 @router.get("/que-hay-de-nuevo")
 def que_hay_de_nuevo(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
