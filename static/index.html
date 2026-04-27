@@ -5715,6 +5715,10 @@ function responderTodosLosConceptos(){
   var conceptos = window._factura_conceptos || [];
   if(!conceptos.length){ toast('Info','Sin conceptos para responder','info'); return; }
   if(!confirm('¿Analizar los ' + conceptos.length + ' conceptos de esta factura en secuencia?\n\nEl sistema procesará cada uno y generará su dictamen individual.')) return;
+  // R-UI 27-abr-2026: limpiar el track de glosa activa al iniciar
+  // el lote — sino analizar() redirige todas las iteraciones al
+  // endpoint reanalizar de la primera glosa (Sprint B).
+  window._glosa_id_actual = null;
   // Arrancamos secuencialmente (evita saturar IA)
   toast('Procesando lote','Analizando ' + conceptos.length + ' conceptos secuencialmente…','info');
   procesarConceptosSecuencial(conceptos.slice(), 0, conceptos.length);
