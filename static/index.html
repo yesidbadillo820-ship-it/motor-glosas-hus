@@ -7445,10 +7445,10 @@ function _renderMisGlosas(dataRaw){
         acciones += ' <button class="btn-sm ghost" style="color:#b91c1c;border-color:#fecaca" title="Mover esta glosa a la papelera (restaurable 30 días)" onclick="eliminarGlosaUI(' + g.id + ',\'' + ((g.factura||'').replace(/\'/g,"\\\\'")) + '\')">🗑 Eliminar</button>';
       }
 
-      return '<tr>' +
+      return '<tr data-glosa-id="' + g.id + '">' +
         '<td class="cell-center"><input type="checkbox" class="bulk-chk" value="' + g.id + '" onchange="actualizarContadorLote()"/></td>' +
         '<td>' + (g.gestor_nombre || '—') + '</td>' +
-        '<td>' + (g.eps || '—') + '</td>' +
+        '<td>' + (g.eps || '—') + '<span class="mis-tasa-badge" data-tasa-for="' + g.id + '"></span></td>' +
         '<td class="mono">' + (g.factura || '—') + '</td>' +
         '<td class="mono">' + (g.consecutivo_dgh || '—') + '</td>' +
         '<td>' + radicadoTxt + '</td>' +
@@ -7465,9 +7465,35 @@ function _renderMisGlosas(dataRaw){
         '</tr>';
     }).join('');
     actualizarContadorLote();
+    // 🤖 R382: pintar badges de tasa histórica del par (eps, codigo) en cada fila
+    _pintarBadgesTasaMisGlosas(data.map(function(g){ return g.id; }));
   } catch(e){
     body.innerHTML = '<tr class="empty-row"><td colspan="13" style="color:#991b1b">Error: ' + (e && e.message ? e.message : e) + '</td></tr>';
   }
+}
+
+// R382: badges de tasa histórica par en filas de Mis Glosas
+async function _pintarBadgesTasaMisGlosas(ids){
+  if(!ids || !ids.length) return;
+  try{
+    var r = await fetch('/glosas/stats/tasas-pares-batch', {
+      method: 'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({glosa_ids: ids.slice(0, 200)}),
+    });
+    if(!r.ok) return;
+    var d = await r.json();
+    (d.items || []).forEach(function(it){
+      if(it.tasa_par_pct == null) return;
+      var span = document.querySelector('.mis-tasa-badge[data-tasa-for="' + it.glosa_id + '"]');
+      if(!span) return;
+      var col = it.tasa_par_pct >= 70 ? '#15803d'
+              : it.tasa_par_pct >= 40 ? '#d97706' : '#b91c1c';
+      span.style.cssText = 'display:inline-block;background:'+col+';color:#fff;padding:1px 6px;border-radius:6px;font-size:.62rem;font-weight:700;margin-left:.4rem;vertical-align:middle';
+      span.textContent = it.tasa_par_pct.toFixed(0) + '%';
+      span.title = 'Tasa histórica par (eps, código): ' + it.tasa_par_pct.toFixed(1) + '% sobre ' + it.n_par + ' casos decididos';
+    });
+  } catch(e){}
 }
 
 function _idsSeleccionados(){
