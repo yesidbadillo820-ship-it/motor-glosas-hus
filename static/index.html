@@ -1519,6 +1519,15 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <button class="btn btn-primary" id="btn-analizar" onclick="analizar()" style="width:100%">
             Analizar con IA
           </button>
+          <!-- R-cerebro #9: pre-auditar gratis, sin tokens -->
+          <button id="btn-preauditar"
+                  type="button"
+                  onclick="preAuditarGratis()"
+                  title="Corre el auditor determinístico SIN llamar al LLM. Detecta mentiras de la EPS (sin contrato, sin tarifa, SOAT indebido) comparando contra los datos del sistema. NO consume tokens."
+                  style="width:100%;margin-top:.5rem;padding:.55rem;background:#fff;color:#16a34a;border:1px solid #16a34a;border-radius:6px;font-weight:600;font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.4rem;">
+            <span style="font-size:1rem;">🔍</span>
+            <span>Pre-auditar (gratis, sin tokens)</span>
+          </button>
           <!-- R59 P4: botón modo Auditoría Previa (diagnóstico neutral) -->
           <button id="btn-auditoria"
                   type="button"
@@ -8787,6 +8796,124 @@ async function loadContratos(){
 }
 
 // ─── ANALIZAR ─────────────────────────────────────────────────────────────
+// Pre-auditoría gratis (sin tokens) — corre el auditor determinístico
+// del backend y muestra los hallazgos en un panel inline. Útil para
+// validar el caso ANTES de gastar tokens del LLM.
+async function preAuditarGratis(){
+  var eps = (document.getElementById('eps-sel') || {}).value || '';
+  var glosa = (document.getElementById('f-glosa') || {}).value || '';
+  glosa = glosa.trim();
+  if(glosa.length < 15){
+    toast('Campo requerido', 'Ingrese el texto de la glosa (mínimo 15 caracteres)', 'warning');
+    return;
+  }
+  var btn = document.getElementById('btn-preauditar');
+  if(btn){ btn.disabled = true; btn.querySelector('span:last-child').textContent = 'Auditando...'; }
+  try {
+    // Intentar inferir CUPS y código del texto (regex simple).
+    var mCups = glosa.match(/CUPS\s+([A-Z0-9-]+)/i);
+    var mCod = glosa.match(/\b([A-Z]{2}\d{4})\b/);
+    var body = {
+      texto_glosa: glosa,
+      eps: eps || null,
+      codigo: mCod ? mCod[1].toUpperCase() : null,
+      cups: mCups ? mCups[1].toUpperCase() : null,
+    };
+    var r = await fetch('/glosas/preview-auditoria', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authH()),
+      body: JSON.stringify(body),
+    });
+    if(!r.ok){
+      var err = await r.json().catch(function(){ return {}; });
+      throw new Error(err.detail || ('HTTP ' + r.status));
+    }
+    var data = await r.json();
+    renderPreviewAuditoria(data);
+  } catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo auditar: ' + e.message, 'error');
+  } finally {
+    if(btn){ btn.disabled = false; btn.querySelector('span:last-child').textContent = 'Pre-auditar (gratis, sin tokens)'; }
+  }
+}
+
+function renderPreviewAuditoria(data){
+  var area = document.getElementById('result-area');
+  if(!area) return;
+  var landing = document.getElementById('landing-hero');
+  if(landing) landing.style.display = 'none';
+  var score = Number(data.score_evidencia || 0);
+  var nivel = score >= 60 ? 'FUERTE' : (score >= 30 ? 'MODERADO' : 'DÉBIL');
+  var color = score >= 60 ? '#16a34a' : (score >= 30 ? '#d97706' : '#dc2626');
+  var bg = score >= 60 ? '#dcfce7' : (score >= 30 ? '#fef3c7' : '#fee2e2');
+  var hallazgos = data.hallazgos || [];
+  var fmt = function(v){ return '$' + Number(v||0).toLocaleString('es-CO',{maximumFractionDigits:0}); };
+  var html = '<div class="card-premium" style="margin:1rem 1.5rem;padding:1.4rem;">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">';
+  html += '<div>';
+  html += '<div style="font-size:.7rem;font-weight:800;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">🔍 Pre-auditoría · Sin tokens · Determinístico</div>';
+  html += '<div style="font-size:1.05rem;font-weight:700;color:var(--text);margin-top:.2rem">Análisis de inconsistencias de la EPS contra los datos del sistema</div>';
+  html += '</div>';
+  html += '<button onclick="ocultarPreviewAuditoria()" class="btn btn-ghost" style="font-size:1rem;padding:.3rem .65rem">×</button>';
+  html += '</div>';
+  // Score grande
+  html += '<div style="display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;background:' + bg + ';padding:1rem 1.3rem;border-radius:10px;border:2px solid ' + color + '">';
+  html += '<div style="font-size:2.4rem;font-weight:800;color:' + color + ';line-height:1">' + score + '<span style="font-size:1.1rem;color:var(--text3)">/100</span></div>';
+  html += '<div style="flex:1;min-width:180px">';
+  html += '<div style="font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Evidencia a favor del prestador</div>';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-top:.2rem">' + nivel + ' · ' + (data.accion_sugerida || 'REVISAR') + '</div>';
+  html += '<div style="font-size:.78rem;color:var(--text2);margin-top:.3rem">';
+  html += hallazgos.length + ' hallazgo(s) · ' + (data.n_hallazgos_alta || 0) + ' de severidad ALTA';
+  if(data.tiene_contrato_detectado) html += ' · ✓ Contrato detectado';
+  if(data.valor_pactado_detectado > 0) html += ' · pactado ' + fmt(data.valor_pactado_detectado);
+  html += '</div>';
+  html += '</div>';
+  html += '</div>';
+  // Lista de hallazgos
+  if(hallazgos.length === 0){
+    html += '<div style="margin-top:1rem;padding:1rem;text-align:center;color:var(--text3);font-size:.88rem;font-style:italic">';
+    html += 'No se detectaron inconsistencias automáticas. La glosa requiere análisis manual o IA.';
+    html += '</div>';
+  } else {
+    html += '<div style="margin-top:1.2rem">';
+    hallazgos.forEach(function(h, i){
+      var sev = h.severidad || 'MEDIA';
+      var marker = sev === 'ALTA' ? '🔴' : (sev === 'MEDIA' ? '🟡' : '🟢');
+      var sevColor = sev === 'ALTA' ? '#dc2626' : (sev === 'MEDIA' ? '#d97706' : '#16a34a');
+      var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+      html += '<div style="border-left:4px solid ' + sevColor + ';background:var(--bg-card);padding:.8rem 1rem;margin-bottom:.7rem;border-radius:0 8px 8px 0">';
+      html += '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">';
+      html += '<span style="font-size:1.05rem">' + marker + '</span>';
+      html += '<span style="font-size:.65rem;font-weight:800;color:' + sevColor + ';letter-spacing:.06em">' + sev + '</span>';
+      html += '<span style="font-size:.7rem;color:var(--text3);font-family:var(--font-mono)">' + esc(h.id) + '</span>';
+      html += '</div>';
+      html += '<div style="font-size:.86rem;color:var(--text);font-weight:600;margin-bottom:.4rem">📣 ' + esc(h.afirmacion_eps) + '</div>';
+      html += '<div style="font-size:.8rem;color:var(--text2);margin-bottom:.4rem"><b style="color:#16a34a">✓ Realidad del sistema:</b> ' + esc(h.realidad_sistema) + '</div>';
+      html += '<div style="font-size:.78rem;color:var(--text2);font-style:italic"><b style="color:var(--c-teal2);font-style:normal">💡 Cómo refutar:</b> ' + esc(h.refutacion_sugerida) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  html += '<div style="margin-top:1rem;padding:.7rem 1rem;background:var(--bg-subtle);border-radius:8px;font-size:.78rem;color:var(--text2)">';
+  html += '⚡ <b>Listo para gastar tokens?</b> Si los hallazgos te parecen sólidos, dale al botón <b>Analizar con IA</b> para que Claude genere el dictamen completo refutando cada punto.';
+  html += '</div>';
+  html += '</div>';
+  area.innerHTML = html + (area.innerHTML || '');
+  area.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function ocultarPreviewAuditoria(){
+  var area = document.getElementById('result-area');
+  if(!area) return;
+  // Quitar la primera card-premium si es la del preview.
+  var first = area.querySelector('.card-premium');
+  if(first && first.textContent.indexOf('Pre-auditoría') !== -1){
+    first.remove();
+  }
+  var landing = document.getElementById('landing-hero');
+  if(landing) landing.style.display = '';
+}
+
 async function analizar(modoOverride){
   var eps=document.getElementById('eps-sel').value;
   var glosa=document.getElementById('f-glosa').value.trim();

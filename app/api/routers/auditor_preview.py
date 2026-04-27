@@ -44,10 +44,16 @@ def preview_auditoria(
 ):
     """Corre el auditor pre-IA. Determinístico, no consume tokens."""
     from app.services.auditor_glosa import auditar
+    from app.utils.parsers_glosa import _extraer_valores_glosa
 
-    # Inferir tiene_contrato preguntando al catálogo de contratos.
+    # Auto-extraer valores del texto si no vinieron en el body.
+    vals = _extraer_valores_glosa(body.texto_glosa, cups=body.cups)
+    valor_facturado = float(body.valor_facturado or vals.get("facturado") or 0.0)
+    valor_objetado = float(body.valor_objetado or vals.get("objetado") or 0.0)
+
+    # Inferir contrato y tarifa pactada del catálogo.
     tiene_contrato = False
-    valor_pactado = body.valor_pactado or 0.0
+    valor_pactado = float(body.valor_pactado or 0.0)
     if body.eps:
         try:
             from app.repositories.contrato_repository import ContratoRepository
@@ -63,8 +69,8 @@ def preview_auditoria(
             from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
             info = evaluar_glosa_tarifa(
                 db, eps=body.eps, cups=body.cups,
-                valor_facturado=body.valor_facturado or 0.0,
-                valor_objetado=body.valor_objetado or 0.0,
+                valor_facturado=valor_facturado,
+                valor_objetado=valor_objetado,
             )
             if info and info.get("encontrada"):
                 valor_pactado = float(
@@ -78,9 +84,9 @@ def preview_auditoria(
         body.texto_glosa,
         eps=body.eps, codigo=body.codigo, cups=body.cups,
         tiene_contrato=tiene_contrato,
-        valor_facturado=body.valor_facturado or 0.0,
+        valor_facturado=valor_facturado,
         valor_pactado=valor_pactado,
-        valor_objetado=body.valor_objetado or 0.0,
+        valor_objetado=valor_objetado,
     )
     return {
         "hallazgos": a["hallazgos"],
@@ -88,5 +94,7 @@ def preview_auditoria(
         "accion_sugerida": a["accion_sugerida"],
         "n_hallazgos_alta": a["n_hallazgos_alta"],
         "tiene_contrato_detectado": tiene_contrato,
+        "valor_facturado_detectado": valor_facturado,
+        "valor_objetado_detectado": valor_objetado,
         "valor_pactado_detectado": valor_pactado,
     }

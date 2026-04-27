@@ -153,9 +153,10 @@ def auditar(
         })
 
     # ── HALLAZGO 3: La EPS aplica SOAT como sustituto cuando hay
-    #    contrato con tarifa propia. SOAT es supletorio, no aplicable
-    #    cuando hay pacto contractual específico.
-    if _PAT_APLICA_SOAT.search(texto) and tiene_contrato and valor_pactado > 0:
+    #    contrato vigente. SOAT es supletorio (Decreto 2423/1996 +
+    #    Circular 047/2025); cuando hay pacto contractual aplica el
+    #    pacto, no el SOAT, por especialidad sobre la regla supletiva.
+    if _PAT_APLICA_SOAT.search(texto) and tiene_contrato:
         hallazgos.append({
             "id": "soat_sustituto_indebido",
             "severidad": "ALTA",
