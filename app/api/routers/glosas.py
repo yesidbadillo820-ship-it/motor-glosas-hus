@@ -383,11 +383,36 @@ def exportar_xlsx(
     from fastapi.responses import StreamingResponse
 
     repo = GlosaRepository(db)
-    glosas = repo.listar_para_export(
+    glosas_raw = repo.listar_para_export(
         eps=eps, estado=estado, search=search,
         fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
         valor_min=valor_min, valor_max=valor_max,
         tipo=tipo, semaforo=semaforo, workflow=workflow,
+    )
+
+    # R-export 27-abr-2026: deduplicar por (factura, código, cups, etapa)
+    # quedándonos con la versión más reciente. Antes el Excel exportaba
+    # TODAS las versiones (13 filas para una sola glosa que se reanalizó
+    # 13 veces). Ahora 1 fila por glosa única — la última.
+    visto = {}
+    for g in glosas_raw:
+        clave = (
+            (g.factura or "").strip().upper(),
+            (g.codigo_glosa or "").strip().upper(),
+            (g.cups_servicio or "").strip().upper(),
+            (g.etapa or "").strip().upper(),
+        )
+        # Solo conservamos si NO había una entrada para esta clave o
+        # si la nueva es más reciente (creado_en mayor).
+        prev = visto.get(clave)
+        if prev is None or (
+            g.creado_en and prev.creado_en and g.creado_en > prev.creado_en
+        ):
+            visto[clave] = g
+    glosas = sorted(
+        visto.values(),
+        key=lambda x: x.creado_en or 0,
+        reverse=True,
     )
 
     wb = Workbook()
