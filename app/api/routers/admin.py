@@ -1070,6 +1070,103 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/equipo-pulse")
+def admin_equipo_pulse(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R384 P1: pulso del equipo (single-call para admin).
+
+    Resumen rápido del estado del equipo: total gestores
+    activos, glosas abiertas totales, vencidas globales,
+    top 3 gestores con más vencidas, gestores
+    sobrecargados/subcargados (mediana). Todo en una
+    sola llamada para el dashboard del coordinador.
+
+    Solo SUPER_ADMIN.
+    """
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    n_total_abiertas = len(abiertas)
+    n_total_vencidas = sum(
+        1 for g in abiertas if (g.dias_restantes or 0) < 0
+    )
+
+    bucket: dict[str, dict] = {}
+    sin_gestor = 0
+    for g in abiertas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            sin_gestor += 1
+            continue
+        b = bucket.setdefault(gestor, {
+            "count": 0, "vencidas": 0, "valor": 0.0,
+        })
+        b["count"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        if (g.dias_restantes or 0) < 0:
+            b["vencidas"] += 1
+
+    if bucket:
+        counts_ord = sorted(b["count"] for b in bucket.values())
+        mediana = counts_ord[len(counts_ord) // 2]
+        umbral_alto = max(int(mediana * 1.5), mediana + 5)
+        umbral_bajo = max(int(mediana * 0.5), 1)
+    else:
+        mediana = umbral_alto = umbral_bajo = 0
+
+    sobrecargados = []
+    subcargados = []
+    for gestor, b in bucket.items():
+        if b["count"] >= umbral_alto:
+            sobrecargados.append({
+                "gestor": gestor,
+                "abiertas": b["count"],
+                "vencidas": b["vencidas"],
+            })
+        elif b["count"] <= umbral_bajo:
+            subcargados.append({
+                "gestor": gestor,
+                "abiertas": b["count"],
+            })
+
+    top_vencidas = sorted(
+        [
+            {
+                "gestor": g,
+                "vencidas": b["vencidas"],
+                "abiertas": b["count"],
+            }
+            for g, b in bucket.items() if b["vencidas"] > 0
+        ],
+        key=lambda x: x["vencidas"], reverse=True,
+    )[:3]
+
+    # Sugerencias usuarios SUPER_ADMIN/COORDINADOR
+    activos = (
+        db.query(UsuarioRecord)
+        .filter(UsuarioRecord.activo == 1)
+        .count()
+    )
+
+    return {
+        "total_gestores_con_carga": len(bucket),
+        "total_usuarios_activos": activos,
+        "abiertas_totales": n_total_abiertas,
+        "vencidas_globales": n_total_vencidas,
+        "glosas_sin_gestor": sin_gestor,
+        "mediana_carga": int(mediana),
+        "sobrecargados": sobrecargados,
+        "subcargados": subcargados,
+        "top_3_con_vencidas": top_vencidas,
+    }
+
+
 @router.get("/balance-carga-gestores")
 def admin_balance_carga_gestores(
     db: Session = Depends(get_db),
