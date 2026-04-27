@@ -149,6 +149,62 @@ def admin_listar_sugerencias(
     }
 
 
+@router.get("/admin/sugerencias-resumen")
+def admin_sugerencias_resumen(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R376 P1: snapshot rápido del feedback del equipo.
+
+    Single-call para landing del admin:
+      - totales por estado
+      - totales por tipo
+      - top 5 reportadores recientes
+      - 5 más recientes (top of feed)
+
+    Solo SUPER_ADMIN.
+    """
+    rows = db.query(SugerenciaRecord).all()
+
+    por_estado: dict[str, int] = {}
+    por_tipo: dict[str, int] = {}
+    por_autor: dict[str, int] = {}
+    for s in rows:
+        e = (s.estado or "ABIERTA").upper()
+        t = (s.tipo or "OTRO").upper()
+        por_estado[e] = por_estado.get(e, 0) + 1
+        por_tipo[t] = por_tipo.get(t, 0) + 1
+        a = s.autor_email or "anónimo"
+        por_autor[a] = por_autor.get(a, 0) + 1
+
+    top_autores = sorted(
+        por_autor.items(), key=lambda x: x[1], reverse=True,
+    )[:5]
+
+    recientes = (
+        db.query(SugerenciaRecord)
+        .order_by(SugerenciaRecord.creado_en.desc())
+        .limit(5)
+        .all()
+    )
+
+    return {
+        "total": len(rows),
+        "por_estado": por_estado,
+        "por_tipo": por_tipo,
+        "abiertas": por_estado.get("ABIERTA", 0),
+        "bugs_pendientes": sum(
+            1 for s in rows
+            if (s.tipo or "").upper() == "BUG"
+            and (s.estado or "").upper() in ("ABIERTA", "EN_REVISION")
+        ),
+        "top_autores": [
+            {"email": e, "count": n} for e, n in top_autores
+        ],
+        "recientes": [_to_dict(s) for s in recientes],
+    }
+
+
 @router.put("/admin/sugerencias/{sugerencia_id}")
 def admin_triagear_sugerencia(
     sugerencia_id: int,

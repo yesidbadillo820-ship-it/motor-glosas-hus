@@ -118,3 +118,24 @@ class TestSugerencias:
             assert r.status_code == 403
         from app.main import app
         app.dependency_overrides.clear()
+
+    def test_admin_resumen(self, db_session, auditor, admin):
+        with _client(db_session, auditor) as c:
+            for tipo in ["BUG", "BUG", "IDEA"]:
+                c.post("/sugerencias", json={
+                    "tipo": tipo,
+                    "titulo": "Reporte de prueba abc",
+                    "descripcion": "Descripción de prueba lo suficiente",
+                })
+        from app.main import app
+        app.dependency_overrides.clear()
+
+        with _client(db_session, admin) as c:
+            r = c.get("/admin/sugerencias-resumen")
+            d = r.json()
+            assert d["total"] == 3
+            assert d["por_tipo"]["BUG"] == 2
+            assert d["por_tipo"]["IDEA"] == 1
+            assert d["bugs_pendientes"] == 2
+            assert d["abiertas"] == 3
+        app.dependency_overrides.clear()
