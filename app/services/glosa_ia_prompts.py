@@ -1119,58 +1119,74 @@ def build_user_prompt(
         _vf = _num(valor_facturado)
         _vp = _num(valor_pactado)
         _vo = _num(valor_objetado)
-        # SAFEGUARD: solo inyectar el bloque MIXTO cuando el excedente
-        # CABE razonablemente en el valor objetado. Si excedente >
-        # objetado por mucho, es señal de mismatch (factura
-        # multi-CUPS, tarifa cargada incorrecta, etc.) y hacer
-        # "ACEPTAR EXCEDENTE de $X" donde $X >> objetado significaría
-        # aceptar otros servicios legítimos. En ese caso, dejamos que
-        # el LLM redacte sin el bloque y el banner del UI le pide al
-        # gestor revisar manualmente.
-        _aplica_excedente = (
-            _vf > 0 and _vp > 0 and _vf > _vp
-            and _vo > 0 and (_vf - _vp) <= _vo + 1
-        )
-        if _aplica_excedente:
+        # Cuando facturado > pactado y existe valor objetado: la EPS
+        # tiene razón parcial o total dependiendo de cómo se compare
+        # la diferencia con lo objetado. Decidimos automáticamente:
+        #   excedente_real >= objetado → ACEPTAR_TOTAL (la EPS sólo
+        #     objeta una porción de lo que realmente excede el contrato)
+        #   excedente_real < objetado → ACEPTAR_PARCIAL (parte del
+        #     objetado es excedente real, parte es valor pactado)
+        if _vf > 0 and _vp > 0 and _vf > _vp and _vo > 0:
             _excedente = _vf - _vp
-            _aceptar = min(_excedente, _vo)
-            _defender = max(0, _vo - _aceptar)
+            if _excedente + 1 >= _vo:
+                _aceptar = _vo
+                _defender = 0
+                _modo = "ACEPTAR_TOTAL"
+                _explica = (
+                    f"El monto OBJETADO (${_vo:,.0f}) cabe completo en "
+                    f"el excedente real (${_excedente:,.0f}). La "
+                    "objeción de la EPS es procedente."
+                )
+            else:
+                _aceptar = _excedente
+                _defender = _vo - _excedente
+                _modo = "ACEPTAR_PARCIAL"
+                _explica = (
+                    f"Parte del objetado (${_aceptar:,.0f}) es "
+                    f"excedente real; el resto (${_defender:,.0f}) "
+                    "está dentro de la tarifa pactada."
+                )
+            _bloque_p2_p4 = (
+                (
+                    "  P2: reconoce que la objeción es procedente porque "
+                    "  el monto objetado cabe completo en el excedente "
+                    "  facturado por encima de lo pactado. ESE HUS "
+                    f"  ACEPTA ÍNTEGRAMENTE LOS ${_aceptar:,.0f} OBJETADOS.\n"
+                    "  P4: manifiesta ACEPTACIÓN ÍNTEGRA de la glosa por "
+                    f"  ${_aceptar:,.0f}. No pidas levantamiento — esto NO\n"
+                    "      se está defendiendo, se está aceptando.\n"
+                    "  CÓDIGO RESPUESTA: usa el de ACEPTACIÓN TOTAL.\n"
+                ) if _modo == "ACEPTAR_TOTAL" else (
+                    f"  P2: reconoce con transparencia que ESE HUS ACEPTA "
+                    f"  ${_aceptar:,.0f} (excedente real) y argumenta que "
+                    f"  ${_defender:,.0f} sí está dentro del contrato.\n"
+                    "  P3: Art. 1602 C.C. + Art. 871 C.Com. en ambas\n"
+                    "      direcciones (EPS no puede objetar lo pactado;\n"
+                    "      HUS reconoce lo facturado en exceso).\n"
+                    f"  P4: solicita LEVANTAMIENTO PARCIAL por ${_defender:,.0f} "
+                    f"  + ACEPTACIÓN PARCIAL por ${_aceptar:,.0f}.\n"
+                    "  CÓDIGO RESPUESTA: RE9905 (ACEPTAR PARCIAL).\n"
+                )
+            )
             bloque_excedente_str = (
-                "\n═══ ⚠ EXCEDENTE FACTURADO DETECTADO — RESPUESTA MIXTA OBLIGATORIA ═══\n"
+                f"\n═══ ⚠ EXCEDENTE FACTURADO DETECTADO — DECISIÓN: {_modo} ═══\n"
                 f"  • FACTURADO  : ${_vf:,.0f}\n"
                 f"  • PACTADO    : ${_vp:,.0f}\n"
                 f"  • OBJETADO   : ${_vo:,.0f}\n"
                 f"  • EXCEDENTE REAL (facturado − pactado): ${_excedente:,.0f}\n"
-                f"  • SE ACEPTA   : ${_aceptar:,.0f} (el excedente real)\n"
-                f"  • SE DEFIENDE : ${_defender:,.0f} (lo que sí está dentro del contrato)\n"
+                f"  • SE ACEPTA   : ${_aceptar:,.0f}\n"
+                f"  • SE DEFIENDE : ${_defender:,.0f}\n"
+                f"  • {_explica}\n"
                 "\n"
-                "  HUS facturó por encima de la tarifa pactada en el "
-                "contrato. NO podés defender el 100% — Art. 1602 C.C. "
-                "obliga a respetar lo pactado en ambas direcciones. "
-                "Tu dictamen DEBE ser HONESTO y MIXTO:\n"
+                "  Tu dictamen DEBE ser HONESTO según la matriz:\n"
+                f"  → <accion>{_modo}</accion>\n"
+                f"  → <valor_aceptar>{int(_aceptar)}</valor_aceptar>\n"
+                f"  → <valor_defender>{int(_defender)}</valor_defender>\n"
                 "  P1 (apertura): cita FACTURADO real y OBJETADO real "
                 "  con la fórmula \"FACTURADO POR $[FACT], RESPECTO DEL "
                 "  CUAL LA EPS OBJETA $[OBJ]\".\n"
-                f"  P2 (refutación parcial + reconocimiento): comienza "
-                "  reconociendo con transparencia que parte del valor "
-                "  facturado supera la tarifa pactada y QUE ESE "
-                f"  EXCEDENTE DE ${_excedente:,.0f} ESE HUS LO ACEPTA "
-                "  COMO PROCEDENTE EN VIRTUD DEL CONTRATO. Luego "
-                "  argumenta que el RESTO objetado "
-                f"  (${_defender:,.0f}) SÍ corresponde al valor "
-                "  pactado y carece de fundamento la objeción.\n"
-                "  P3 (fundamento): Art. 1602 C.C. (contrato es ley) "
-                "  + Art. 871 C.Comercio (buena fe), aplicados en "
-                "  AMBAS direcciones — EPS no puede objetar lo "
-                "  pactado, HUS reconoce lo facturado en exceso.\n"
-                "  P4 (petición): solicita LEVANTAMIENTO PARCIAL de "
-                f"  la GLOSA por ${_defender:,.0f} y manifiesta "
-                f"  ACEPTACIÓN PARCIAL del excedente de ${_excedente:,.0f}. "
-                "  No uses \"levantamiento íntegro\" ni \"reconocimiento "
-                "  íntegro del valor facturado\" — sería incorrecto.\n"
-                "  CÓDIGO RESPUESTA: usa RE9905 (ACEPTAR PARCIAL) en lugar "
-                "  de RE9901 (NO ACEPTADA TOTAL).\n"
-                "════════════════════════════════════════════════════════\n"
+                + _bloque_p2_p4
+                + "════════════════════════════════════════════════════════\n"
             )
     except Exception:
         bloque_excedente_str = ""

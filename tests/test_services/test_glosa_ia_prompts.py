@@ -138,8 +138,9 @@ class TestUserPrompt:
         assert len(prompt) < 15000
 
     def test_bloque_excedente_facturado_mayor_que_pactado(self):
-        """Caso real: HUS facturó $247.663, pactado $231.556 → debe inyectar
-        bloque EXCEDENTE FACTURADO con números de aceptar y defender."""
+        """Caso TA0201: HUS facturó $247.663, pactado $231.556, objetado
+        $168.563. Excedente real $16.107 < objetado $168.563 →
+        ACEPTAR_PARCIAL con $16.107 a aceptar y $152.456 a defender."""
         prompt = build_user_prompt(
             texto_glosa="SE GLOSA MVC", contexto_pdf="",
             codigo="TA0201", eps="DISPENSARIO MEDICO",
@@ -148,10 +149,26 @@ class TestUserPrompt:
             valor_pactado="$231.556",
         )
         assert "EXCEDENTE FACTURADO DETECTADO" in prompt
-        assert "$16,107" in prompt  # diferencia real
+        assert "DECISIÓN: ACEPTAR_PARCIAL" in prompt
+        assert "$16,107" in prompt   # diferencia real
         assert "$152,456" in prompt  # a defender
-        assert "RESPUESTA MIXTA" in prompt
-        assert "RE9905" in prompt  # código respuesta sugerido
+        assert "RE9905" in prompt    # código respuesta sugerido
+
+    def test_bloque_excedente_aceptar_total_si_excedente_mayor_que_objetado(self):
+        """Caso TA0801 real: facturado $41.151, pactado $33.487, objetado
+        $3.151. Excedente real $7.664 >= objetado $3.151 →
+        ACEPTAR_TOTAL del objetado completo (la EPS tenía razón)."""
+        prompt = build_user_prompt(
+            texto_glosa="SE GLOSA MVC", contexto_pdf="",
+            codigo="TA0801", eps="DISPENSARIO MEDICO",
+            valor_objetado="$3.151",
+            valor_facturado="$41.151",
+            valor_pactado="$33.487",
+        )
+        assert "EXCEDENTE FACTURADO DETECTADO" in prompt
+        assert "DECISIÓN: ACEPTAR_TOTAL" in prompt
+        assert "$3,151" in prompt   # objetado se acepta completo
+        assert "ACEPTACIÓN TOTAL" in prompt or "ACEPTACIÓN ÍNTEGRA" in prompt
 
     def test_bloque_excedente_no_aparece_si_facturado_menor(self):
         """Si facturado <= pactado, no inyecta bloque (no hay excedente)."""
@@ -173,11 +190,11 @@ class TestUserPrompt:
         )
         assert "EXCEDENTE FACTURADO" not in prompt
 
-    def test_bloque_excedente_no_aparece_si_dif_excede_objetado(self):
-        """Caso real TA0801 HUS491868: factura multi-CUPS, el lookup
-        comparó facturado=$488.497 (TOTAL) contra pactado=$33.487 dando
-        excedente $455.010 que excede al objetado de $3.151. NO debe
-        inyectar (sería catastrófico). El gestor revisa manualmente."""
+    def test_excedente_mucho_mayor_propone_aceptar_total(self):
+        """Si el parser midió mal (TOTAL en vez de línea-CUPS) el
+        excedente queda enorme. Antes el safeguard descartaba el
+        bloque; ahora confiamos en el parser correcto y proponemos
+        ACEPTAR_TOTAL — la EPS objeta menos del excedente real."""
         prompt = build_user_prompt(
             texto_glosa="x", contexto_pdf="",
             codigo="TA0801", eps="DISPENSARIO",
@@ -185,7 +202,10 @@ class TestUserPrompt:
             valor_facturado="$488.497",
             valor_pactado="$33.487",
         )
-        assert "EXCEDENTE FACTURADO" not in prompt
+        # Con el parser bien (>=2 montos), facturado=$488.497 implica
+        # multi-CUPS o tarifa errónea. Aún así, dado los datos, la
+        # decisión correcta es ACEPTAR_TOTAL.
+        assert "DECISIÓN: ACEPTAR_TOTAL" in prompt
 
     def test_decision_autonoma_en_system_prompt(self):
         """El system prompt debe instruir la matriz de decisión

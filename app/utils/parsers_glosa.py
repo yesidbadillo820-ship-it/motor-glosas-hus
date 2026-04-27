@@ -226,6 +226,13 @@ def _facturado_linea_cups(texto: str, cups: str) -> float:
         cm = re.search(pat, chunk)
         if cm:
             chunk = chunk[: cm.start()]
+    # Heurística anti-falso-positivo: una fila de factura legítima
+    # tiene >= 2 valores monetarios (CANT + VR UNIT + VR PAC + VR
+    # ENT, mínimo 2 con $). Si solo hay 1, casi seguro es texto de
+    # glosa donde la única cifra es el OBJETADO — no el facturado.
+    todos_montos = re.findall(r"\$\s*[\d][\d.,]{2,}", chunk)
+    if len(todos_montos) < 2:
+        return 0.0
     # Capturar todos los $<valor> del fragmento (tolera espacios).
     montos = re.findall(r"\$\s*([\d][\d\.,]{2,})", chunk)
     if not montos:
