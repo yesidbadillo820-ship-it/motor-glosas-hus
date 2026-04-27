@@ -406,6 +406,145 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/checklist-personal")
+def yo_checklist_personal(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R381 P1: checklist auto-detectado de cosas pendientes.
+
+    La IA escanea TUS glosas abiertas y detecta lo que
+    falta completar. Devuelve checks con título y count
+    para mostrar como lista de pendientes claros:
+
+      - sin_dictamen
+      - dictamen_corto (< 50 chars)
+      - sin_codigo_respuesta (en RESPONDIDA)
+      - sin_valor_aceptado (en RATIFICADA)
+      - vencidas
+      - criticas (≤ 3 días)
+      - alto_valor_sin_dictamen (≥ 5M)
+
+    Cada item incluye glosa_ids para acción directa.
+    """
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    respondidas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado == "RESPONDIDA")
+        .all()
+    )
+    ratificadas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado == "RATIFICADA")
+        .all()
+    )
+
+    sin_dict = [
+        g for g in abiertas
+        if not (g.dictamen or "").strip()
+    ]
+    dict_corto = [
+        g for g in abiertas
+        if g.dictamen and 0 < len(g.dictamen.strip()) < 50
+    ]
+    sin_cresp = [
+        g for g in respondidas
+        if not (g.codigo_respuesta or "").strip()
+    ]
+    sin_aceptado = [
+        g for g in ratificadas
+        if not g.valor_aceptado or float(g.valor_aceptado) == 0
+    ]
+    vencidas = [
+        g for g in abiertas
+        if (g.dias_restantes or 0) < 0
+    ]
+    criticas = [
+        g for g in abiertas
+        if 0 <= (g.dias_restantes or 0) <= 3
+    ]
+    alto_valor_sin_dict = [
+        g for g in sin_dict
+        if float(g.valor_objetado or 0) >= 5_000_000
+    ]
+
+    def _ids(lst, n=5):
+        return [g.id for g in lst[:n]]
+
+    items = [
+        {
+            "id": "sin_dictamen",
+            "titulo": "Glosas abiertas sin dictamen",
+            "count": len(sin_dict),
+            "prioridad": 2,
+            "glosa_ids": _ids(sin_dict),
+        },
+        {
+            "id": "dictamen_corto",
+            "titulo": "Dictamen demasiado corto (< 50 chars)",
+            "count": len(dict_corto),
+            "prioridad": 3,
+            "glosa_ids": _ids(dict_corto),
+        },
+        {
+            "id": "sin_codigo_respuesta",
+            "titulo": "RESPONDIDAS sin código de respuesta",
+            "count": len(sin_cresp),
+            "prioridad": 2,
+            "glosa_ids": _ids(sin_cresp),
+        },
+        {
+            "id": "sin_valor_aceptado",
+            "titulo": "RATIFICADAS sin valor_aceptado",
+            "count": len(sin_aceptado),
+            "prioridad": 3,
+            "glosa_ids": _ids(sin_aceptado),
+        },
+        {
+            "id": "vencidas",
+            "titulo": "Glosas vencidas (¡cierra hoy!)",
+            "count": len(vencidas),
+            "prioridad": 1,
+            "glosa_ids": _ids(vencidas),
+        },
+        {
+            "id": "criticas",
+            "titulo": "Glosas críticas (≤ 3 días)",
+            "count": len(criticas),
+            "prioridad": 1,
+            "glosa_ids": _ids(criticas),
+        },
+        {
+            "id": "alto_valor_sin_dictamen",
+            "titulo": "Alto valor (≥5M) sin dictamen",
+            "count": len(alto_valor_sin_dict),
+            "prioridad": 1,
+            "glosa_ids": _ids(alto_valor_sin_dict),
+        },
+    ]
+    items_no_vacios = [it for it in items if it["count"] > 0]
+    items_no_vacios.sort(key=lambda x: (x["prioridad"], -x["count"]))
+
+    return {
+        "usuario_email": current_user.email,
+        "total_chequeos": len(items),
+        "total_pendientes": len(items_no_vacios),
+        "items": items_no_vacios,
+    }
+
+
 @router.get("/yo/inicio")
 def yo_inicio(
     db: Session = Depends(get_db),
