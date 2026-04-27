@@ -1498,6 +1498,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <div class="stat-card-delta neutral" id="land-alertas-delta">en 5 días</div>
             </div>
           </div>
+          <!-- 🤖 Asistente IA por glosa (R370) — se muestra cuando hay una cargada -->
+          <div id="ficha-asistente-ia" style="display:none;margin:1rem 0"></div>
+
           <!-- Empty state con logo SINAC de fondo + tema festivo dinámico -->
           <div class="empty-state" id="landing-empty-state" style="margin:1rem auto;position:relative;overflow:hidden;">
             <img src="/static/sinac-logo.png" alt=""
@@ -6419,10 +6422,111 @@ async function cargarAsistenteProactivo(){
 
 // Helper: abre la glosa al hacer clic en un chip del asistente
 function abrirGlosaDesdeAsistente(gid){
+  if(typeof responderGlosa === 'function'){ responderGlosa(gid); return; }
   if(typeof verDetalleGlosa === 'function'){ verDetalleGlosa(gid); return; }
   if(typeof abrirGlosa === 'function'){ abrirGlosa(gid); return; }
   // Fallback: ir a Mis glosas
   sidebarTab(document.querySelector('.sn-item[data-tip="Mis glosas"]'), 'mis-glosas');
+}
+
+// 🤖 R370: Asistente IA en la ficha de glosa — carga single-call
+async function cargarAsistenteFicha(glosaId){
+  var box = document.getElementById('ficha-asistente-ia');
+  if(!box) return;
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/asistente-ficha', {headers: authH()});
+    if(!r.ok){ box.style.display = 'none'; return; }
+    var d = await r.json();
+
+    // Color de urgencia
+    var ucol = {
+      VENCIDA:'#b91c1c', HOY:'#dc2626', CRITICA:'#ea580c',
+      PROXIMA:'#d97706', NORMAL:'#15803d', DESCONOCIDA:'#64748b'
+    };
+    var u = d.urgencia || {};
+    var uc = ucol[u.nivel] || '#64748b';
+
+    // Probabilidad
+    var p = d.probabilidad || {};
+    var probHtml = '';
+    if(p.levantamiento_pct != null){
+      var pcol = p.levantamiento_pct >= 70 ? '#15803d'
+                : p.levantamiento_pct >= 40 ? '#d97706' : '#b91c1c';
+      probHtml = '<div style="background:rgba(255,255,255,.85);padding:.45rem .75rem;border-radius:8px;font-size:.78rem">'+
+        '<div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">Probabilidad</div>'+
+        '<div style="font-size:1.1rem;font-weight:800;color:'+pcol+'">'+p.levantamiento_pct.toFixed(0)+'%</div>'+
+        '<div style="font-size:.65rem;color:var(--text3)">par n='+(p.n_par||0)+' · gestor n='+(p.n_gestor||0)+'</div>'+
+      '</div>';
+    } else {
+      probHtml = '<div style="background:rgba(255,255,255,.85);padding:.45rem .75rem;border-radius:8px;font-size:.72rem;color:var(--text3)">Sin histórico</div>';
+    }
+
+    // codigo_respuesta sugerido
+    var crSug = d.codigo_respuesta_sugerido;
+    var crHtml = '';
+    if(crSug){
+      crHtml = '<div style="background:rgba(255,255,255,.85);padding:.45rem .75rem;border-radius:8px;font-size:.78rem">'+
+        '<div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">Sugerido</div>'+
+        '<div style="font-size:1rem;font-weight:800;color:#0c4a6e;font-family:monospace">'+escHtml(crSug.codigo_respuesta)+'</div>'+
+        '<div style="font-size:.65rem;color:var(--text3)">'+crSug.tasa_levantamiento_pct.toFixed(0)+'% éxito · '+crSug.muestras+' casos</div>'+
+      '</div>';
+    }
+
+    // Acciones
+    var accColors = {
+      URGENTE:'#b91c1c', IMPORTANTE:'#ea580c', DICTAMEN:'#0284c7',
+      SUGERENCIA:'#0ea5e9', POSITIVA:'#15803d', PRECAUCION:'#d97706',
+      INFO:'#64748b'
+    };
+    var accHtml = (d.acciones_sugeridas||[]).map(function(a){
+      var c = accColors[a.tipo] || '#64748b';
+      return '<div style="display:flex;gap:.5rem;align-items:start;padding:.4rem 0;border-bottom:1px solid rgba(0,0,0,.06)">'+
+        '<span style="background:'+c+';color:#fff;padding:1px 7px;border-radius:6px;font-size:.6rem;font-weight:700;text-transform:uppercase">'+a.tipo+'</span>'+
+        '<span style="font-size:.78rem;color:var(--text);flex:1">'+escHtml(a.mensaje)+'</span>'+
+      '</div>';
+    }).join('') || '<div style="font-size:.75rem;color:var(--text3);padding:.5rem 0">Sin acciones sugeridas</div>';
+
+    // Casos similares
+    var casosHtml = (d.casos_similares||[]).map(function(c){
+      var col = c.estado === 'LEVANTADA' ? '#dcfce7' : c.estado === 'RATIFICADA' ? '#fee2e2' : '#fef3c7';
+      var col2 = c.estado === 'LEVANTADA' ? '#166534' : c.estado === 'RATIFICADA' ? '#991b1b' : '#92400e';
+      return '<div style="background:rgba(255,255,255,.85);border-radius:6px;padding:.5rem .65rem;margin-bottom:.4rem">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">'+
+          '<a href="#" onclick="abrirGlosaDesdeAsistente('+c.glosa_id+');return false" style="font-family:monospace;font-weight:700;color:#0c4a6e;font-size:.75rem;text-decoration:none">#'+c.glosa_id+'</a>'+
+          '<span style="background:'+col+';color:'+col2+';padding:1px 7px;border-radius:6px;font-size:.62rem;font-weight:700">'+c.estado+'</span>'+
+        '</div>'+
+        '<div style="font-size:.7rem;color:var(--text2);font-style:italic;line-height:1.3">'+escHtml(c.dictamen_extracto || '— sin dictamen')+'</div>'+
+        '<div style="font-size:.65rem;color:var(--text3);margin-top:.2rem">Recuperado: '+cop(c.valor_recuperado)+'</div>'+
+      '</div>';
+    }).join('') || '<div style="font-size:.7rem;color:var(--text3)">Sin casos similares previos</div>';
+
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:12px;padding:1rem 1.2rem">'+
+        '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem;flex-wrap:wrap">'+
+          '<div style="font-size:1.4rem">🤖</div>'+
+          '<div style="flex:1;min-width:200px">'+
+            '<div style="font-weight:700;color:var(--text);font-size:.95rem">Asistente IA · Glosa #'+d.glosa_id+'</div>'+
+            '<div style="font-size:.72rem;color:var(--text3)">'+escHtml(d.eps||'')+' · '+escHtml(d.codigo_glosa||'')+' · estado <b>'+escHtml(d.estado||'')+'</b></div>'+
+          '</div>'+
+          '<span style="background:'+uc+';color:#fff;padding:3px 10px;border-radius:8px;font-size:.7rem;font-weight:700">⏱ '+escHtml(u.nivel||'')+' · '+escHtml(u.mensaje||'')+'</span>'+
+          '<button onclick="document.getElementById(\'ficha-asistente-ia\').style.display=\'none\'" class="btn btn-ghost" style="font-size:.85rem;padding:.2rem .55rem" title="Cerrar">×</button>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:.85rem">'+
+          probHtml + crHtml +
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem" class="cv-grid">'+
+          '<div>'+
+            '<div style="font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem">Acciones sugeridas</div>'+
+            accHtml +
+          '</div>'+
+          '<div>'+
+            '<div style="font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem">Casos similares</div>'+
+            casosHtml +
+          '</div>'+
+        '</div>'+
+      '</div>';
+  } catch(e){ console.error('Asistente ficha:', e); box.style.display = 'none'; }
 }
 
 // Carga datos para las tarjetas premium del panel "Mi desempeño"
@@ -7276,6 +7380,8 @@ async function _mostrarBannerAutopilot(glosaId){
 // Cambia a la pestaña Analizar y pre-rellena los campos desde la glosa
 async function responderGlosa(id){
   try{
+    // 🤖 R370: cargar asistente IA en paralelo (no bloqueante)
+    if(typeof cargarAsistenteFicha === 'function') cargarAsistenteFicha(id);
     // Ronda 30: consultar autopilot en paralelo — no bloqueante
     _mostrarBannerAutopilot(id);
     var r = await fetch('/glosas/' + id, {headers: authH()});
