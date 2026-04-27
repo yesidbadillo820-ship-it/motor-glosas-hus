@@ -406,6 +406,115 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/progreso-mes")
+def yo_progreso_mes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R387 P1: progreso del mes vs meta personal.
+
+    Calcula meta automática como el promedio mensual de
+    los últimos 6 meses con actividad. Devuelve:
+      - decididas_mes_actual
+      - meta_mensual (promedio histórico, mín 5)
+      - progreso_pct (cap 200 si superó la meta)
+      - dias_restantes_del_mes
+      - ritmo_diario_actual vs ritmo_diario_necesario
+      - mensaje motivacional según el progreso
+    """
+    from calendar import monthrange
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    # Mes actual count
+    decididas_mes = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
+        .count()
+    )
+
+    # Histórico últimos 6 meses con actividad
+    desde_hist = inicio_mes - timedelta(days=180)
+    hist = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.fecha_decision_eps >= desde_hist)
+        .filter(GlosaRecord.fecha_decision_eps < inicio_mes)
+        .all()
+    )
+    por_mes: dict[str, int] = {}
+    for g in hist:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        k = f.strftime("%Y-%m")
+        por_mes[k] = por_mes.get(k, 0) + 1
+
+    if por_mes:
+        promedio = sum(por_mes.values()) / len(por_mes)
+        meta = max(int(promedio), 5)
+    else:
+        meta = 5  # arranque mínimo
+
+    progreso_pct = min(round(100 * decididas_mes / meta, 1), 200) if meta else 0
+
+    dias_mes = monthrange(ahora.year, ahora.month)[1]
+    dia_actual = ahora.day
+    dias_restantes_mes = max(dias_mes - dia_actual, 0)
+
+    ritmo_actual = round(decididas_mes / dia_actual, 2) if dia_actual else 0.0
+    faltan = max(meta - decididas_mes, 0)
+    ritmo_necesario = (
+        round(faltan / max(dias_restantes_mes, 1), 2)
+        if dias_restantes_mes else 0.0
+    )
+
+    if progreso_pct >= 100:
+        mensaje = "🎉 ¡Meta cumplida! Sigue sumando para batir tu récord."
+        nivel = "EXCELENTE"
+    elif progreso_pct >= 80:
+        mensaje = "💪 Casi llegas — solo te faltan unas pocas."
+        nivel = "BUENO"
+    elif progreso_pct >= 50:
+        mensaje = "📊 Vas a buen ritmo, mantén el foco."
+        nivel = "OK"
+    elif dias_restantes_mes <= 5:
+        mensaje = "⚠️ Pocos días restantes — prioriza Quick Wins."
+        nivel = "ATENCION"
+    else:
+        mensaje = "🎯 Aún hay margen — atiende casos críticos primero."
+        nivel = "EN_PROGRESO"
+
+    return {
+        "usuario_email": current_user.email,
+        "mes": inicio_mes.strftime("%Y-%m"),
+        "decididas_mes_actual": decididas_mes,
+        "meta_mensual": meta,
+        "progreso_pct": progreso_pct,
+        "dia_actual": dia_actual,
+        "dias_mes": dias_mes,
+        "dias_restantes_mes": dias_restantes_mes,
+        "ritmo_diario_actual": ritmo_actual,
+        "ritmo_diario_necesario": ritmo_necesario,
+        "nivel": nivel,
+        "mensaje": mensaje,
+    }
+
+
 @router.get("/yo/insights")
 def yo_insights(
     db: Session = Depends(get_db),
