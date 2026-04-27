@@ -352,13 +352,17 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
                     return v
         return 0.0
 
-    # Si tenemos el CUPS, primero intentamos el valor de línea
-    # específico — más preciso en facturas multi-CUPS. Si no hay
-    # match, caemos a los patrones generales (incluido el TOTAL).
+    # Si tenemos el CUPS conocido, JAMÁS caemos al TOTAL — caso real
+    # 27-abr-2026: factura multi-CUPS HUS0000492150, parser tomaba
+    # el VALOR TOTAL ORDEN DE SERVICIO de la factura completa para
+    # cada uno de los 9 conceptos individuales. Eso causaba que la
+    # IA aceptara montos que no debía.
+    # Regla: si conozco el CUPS, busco SU línea o devuelvo 0. Nunca
+    # un valor inferido que sea contaminación de otra fila.
     val_fact = 0.0
     if cups:
         val_fact = _facturado_linea_cups(t, cups)
-    if val_fact <= 0:
+    else:
         val_fact = _primer_match(patrones_fact)
 
     return {

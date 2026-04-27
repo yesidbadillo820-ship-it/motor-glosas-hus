@@ -67,7 +67,21 @@ class TestExtraerValoresGlosa:
         v = _extraer_valores_glosa(FACTURA_MULTI, cups="902210")
         assert v["facturado"] == 41151.0
 
-    def test_con_cups_inexistente_fallback_a_total(self):
-        # Si no encontramos línea del CUPS, caemos al total.
+    def test_con_cups_inexistente_devuelve_cero(self):
+        # Si conocemos el CUPS y NO lo encontramos en el texto, NO
+        # caemos al TOTAL — eso causaría que la IA tome el total de
+        # toda la factura como si fuera el valor del CUPS específico
+        # y aceptara montos que no debía. Preferimos 0 (incertidumbre)
+        # a un valor erróneo.
         v = _extraer_valores_glosa(FACTURA_MULTI, cups="ZZZ")
-        assert v["facturado"] == 488497.0
+        assert v["facturado"] == 0.0
+
+    def test_modo_estricto_evita_contaminacion_multi_cups(self):
+        """Caso real producción 27-abr-2026: lote 9 conceptos, parser
+        no debe agarrar valor de OTRO concepto ni el total como
+        valor de la línea actual."""
+        texto_lote = "TA2301 - CUPS 938303 - Valor objetado: $16.656"
+        # Sin contexto PDF de la línea 938303 → 0 facturado, no
+        # invención.
+        v = _extraer_valores_glosa(texto_lote, cups="938303")
+        assert v["facturado"] == 0.0
