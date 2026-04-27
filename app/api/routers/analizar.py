@@ -392,27 +392,84 @@ async def _persistir_y_responder(
     cod_resp_m = re.search(r"\bRE\d{4}\b", tipo_final or "")
     cod_resp = cod_resp_m.group(0) if cod_resp_m else (cod_resp_acept or "")
 
-    glosa = glosa_repo.crear(
-        eps=eps,
-        paciente=resultado.paciente,
-        codigo_glosa=resultado.codigo_glosa,
-        valor_objetado=val_obj,
-        valor_aceptado=val_ac,
-        etapa=etapa,
-        estado=estado,
-        dictamen=dictamen_final,
-        dias_restantes=resultado.dias_restantes,
-        modelo_ia=resultado.modelo_ia,
-        score=resultado.score,
-        numero_radicado=numero_radicado,
-        factura=numero_factura,
-        texto_glosa_original=tabla_excel,
-        codigo_respuesta=cod_resp,
-        cups_servicio=cup_ext or None,
-        servicio_descripcion=servicio_ext or None,
-        concepto_glosa=_concepto_glosa(resultado.codigo_glosa),
-        fecha_recepcion=data.fecha_recepcion,
-    )
+    # R-backend 27-abr-2026: anti-duplicación.
+    # Si ya existe una glosa para el par (factura, codigo_glosa, cups,
+    # etapa) hacemos UPDATE en vez de INSERT. Esto evita los duplicados
+    # que ocurrían cuando el frontend llamaba /analizar dos veces para
+    # la misma glosa (ej. el gestor abre una respondida y vuelve a
+    # darle Analizar). El frontend ya redirige a /reanalizar cuando
+    # sabe el ID, pero esto es la doble salvaguarda en el server.
+    existente = None
+    try:
+        if numero_factura and resultado.codigo_glosa:
+            from app.models.db import GlosaRecord as _GR
+            q = (
+                db.query(_GR)
+                .filter(_GR.factura == numero_factura)
+                .filter(_GR.codigo_glosa == resultado.codigo_glosa)
+                .filter(_GR.etapa == etapa)
+            )
+            if cup_ext:
+                q = q.filter(_GR.cups_servicio == cup_ext)
+            existente = q.order_by(_GR.creado_en.desc()).first()
+    except Exception as _e_dup:
+        logger.debug(f"[ANTI-DUP] Lookup falló: {_e_dup}")
+
+    if existente:
+        # UPDATE de la fila existente — sobreescribe dictamen y campos.
+        existente.valor_objetado = val_obj
+        existente.valor_aceptado = val_ac
+        existente.estado = estado
+        existente.dictamen = dictamen_final
+        existente.dias_restantes = resultado.dias_restantes
+        existente.modelo_ia = resultado.modelo_ia
+        existente.score = resultado.score
+        existente.numero_radicado = (
+            numero_radicado or existente.numero_radicado
+        )
+        existente.texto_glosa_original = (
+            tabla_excel or existente.texto_glosa_original
+        )
+        existente.codigo_respuesta = cod_resp or existente.codigo_respuesta
+        existente.cups_servicio = (
+            cup_ext or existente.cups_servicio
+        )
+        existente.servicio_descripcion = (
+            servicio_ext or existente.servicio_descripcion
+        )
+        existente.paciente = resultado.paciente or existente.paciente
+        if data and getattr(data, "fecha_recepcion", None):
+            existente.fecha_recepcion = data.fecha_recepcion
+        db.commit()
+        db.refresh(existente)
+        glosa = existente
+        logger.info(
+            f"[{req_id}] [ANTI-DUP] Glosa existente actualizada "
+            f"ID={glosa.id} factura={numero_factura} "
+            f"codigo={resultado.codigo_glosa} cups={cup_ext} (no se duplicó)"
+        )
+    else:
+        glosa = glosa_repo.crear(
+            eps=eps,
+            paciente=resultado.paciente,
+            codigo_glosa=resultado.codigo_glosa,
+            valor_objetado=val_obj,
+            valor_aceptado=val_ac,
+            etapa=etapa,
+            estado=estado,
+            dictamen=dictamen_final,
+            dias_restantes=resultado.dias_restantes,
+            modelo_ia=resultado.modelo_ia,
+            score=resultado.score,
+            numero_radicado=numero_radicado,
+            factura=numero_factura,
+            texto_glosa_original=tabla_excel,
+            codigo_respuesta=cod_resp,
+            cups_servicio=cup_ext or None,
+            servicio_descripcion=servicio_ext or None,
+            concepto_glosa=_concepto_glosa(resultado.codigo_glosa),
+            fecha_recepcion=data.fecha_recepcion,
+        )
 
     if estado == "RADICADA":
         glosa_repo.actualizar_estado(
