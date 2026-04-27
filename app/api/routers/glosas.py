@@ -16760,6 +16760,187 @@ def sla_glosa(
     }
 
 
+@router.get("/{glosa_id}/playbook")
+def playbook_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R375 P1: playbook táctico para esta glosa.
+
+    Combina señales y devuelve un plan de acción
+    accionable: tono, próximo paso, riesgo, recomendaciones.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    eps = (glosa.eps or "").strip()
+    cod = (glosa.codigo_glosa or "").strip()
+
+    pares = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .filter(GlosaRecord.codigo_glosa == cod)
+        .filter(GlosaRecord.id != glosa.id)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .all()
+    )
+    n_par = len(pares)
+    lev_par = sum(
+        1 for g in pares if (g.estado or "").upper() == "LEVANTADA"
+    )
+    tasa_par = (100.0 * lev_par / n_par) if n_par else None
+
+    eps_q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .filter(GlosaRecord.id != glosa.id)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .all()
+    )
+    n_eps = len(eps_q)
+    lev_eps = sum(
+        1 for g in eps_q if (g.estado or "").upper() == "LEVANTADA"
+    )
+    tasa_eps_global = (100.0 * lev_eps / n_eps) if n_eps else None
+
+    # Tono
+    if tasa_par is not None and tasa_par >= 70:
+        tono = "conciliador"
+        tono_motivo = (
+            "Históricamente esta EPS levanta este código — "
+            "tono profesional y directo basta."
+        )
+    elif tasa_par is not None and tasa_par <= 30:
+        tono = "firme"
+        tono_motivo = (
+            "Histórico desfavorable — argumenta con técnica "
+            "fuerte y respaldo normativo."
+        )
+    else:
+        tono = "neutral"
+        tono_motivo = (
+            "Sin patrón claro — defensa técnico-jurídica "
+            "estándar."
+        )
+
+    # Próximo paso
+    dr = glosa.dias_restantes if glosa.dias_restantes is not None else None
+    estado_actual = (glosa.estado or "").upper()
+    if estado_actual in ("LEVANTADA", "ACEPTADA", "RATIFICADA",
+                         "ARCHIVADA", "CONCILIADA"):
+        proximo = "Glosa cerrada — solo lectura"
+    elif estado_actual == "RESPONDIDA":
+        proximo = (
+            "Esperando decisión de EPS — monitorear "
+            "fecha_decision_eps"
+        )
+    elif dr is not None and dr < 0:
+        proximo = (
+            "URGENTE: glosa vencida. Ejecutar respuesta "
+            "definitiva HOY o se archiva."
+        )
+    elif dr is not None and dr <= 3:
+        proximo = (
+            "Crítico (≤3 días): redactar dictamen y enviar "
+            "respuesta antes de cierre."
+        )
+    elif not (glosa.dictamen or "").strip():
+        proximo = (
+            "Redactar dictamen técnico-jurídico — comienza "
+            "revisando casos similares."
+        )
+    elif len(glosa.dictamen or "") < 200:
+        proximo = (
+            "Reforzar dictamen actual con normativa "
+            "específica antes de enviar."
+        )
+    else:
+        proximo = "Revisar dictamen y enviar respuesta a EPS."
+
+    # Riesgo
+    valor = float(glosa.valor_objetado or 0)
+    riesgo_score = 0
+    razones_riesgo = []
+    if dr is not None and dr < 0:
+        riesgo_score += 40
+        razones_riesgo.append("vencida")
+    elif dr is not None and dr <= 3:
+        riesgo_score += 25
+        razones_riesgo.append("vence en 3 días o menos")
+    if tasa_par is not None and tasa_par < 30:
+        riesgo_score += 25
+        razones_riesgo.append(f"tasa par baja ({tasa_par:.0f}%)")
+    if valor >= 10_000_000:
+        riesgo_score += 20
+        razones_riesgo.append("alto valor (>10M)")
+    if not (glosa.dictamen or "").strip():
+        riesgo_score += 10
+        razones_riesgo.append("sin dictamen")
+
+    if riesgo_score >= 60:
+        riesgo_nivel = "ALTO"
+    elif riesgo_score >= 30:
+        riesgo_nivel = "MEDIO"
+    else:
+        riesgo_nivel = "BAJO"
+
+    # Recomendaciones
+    recomendaciones = []
+    if (
+        tasa_par is not None and tasa_par >= 60
+        and not (glosa.dictamen or "").strip()
+    ):
+        recomendaciones.append(
+            "🎯 Caso favorable según histórico: redactar "
+            "dictamen y cerrar pronto."
+        )
+    if valor >= 10_000_000 and not (glosa.dictamen or "").strip():
+        recomendaciones.append(
+            "💰 Alto valor sin dictamen — enfoque cuidadoso "
+            "en respaldo normativo."
+        )
+    if dr is not None and dr < 0:
+        recomendaciones.append(
+            "🚨 Vencida — riesgo de archivo automático."
+        )
+    if (
+        tasa_par is not None and tasa_par < 30
+        and tasa_eps_global is not None and tasa_eps_global < 30
+    ):
+        recomendaciones.append(
+            "🤝 Considera conciliación bilateral antes de "
+            "ratificación."
+        )
+
+    return {
+        "glosa_id": glosa.id,
+        "eps": eps,
+        "codigo_glosa": cod,
+        "estado_actual": estado_actual,
+        "tono_recomendado": tono,
+        "tono_motivo": tono_motivo,
+        "proximo_paso": proximo,
+        "riesgo": {
+            "nivel": riesgo_nivel,
+            "score": riesgo_score,
+            "razones": razones_riesgo,
+        },
+        "tasa_par_pct": (
+            round(tasa_par, 2) if tasa_par is not None else None
+        ),
+        "tasa_eps_global_pct": (
+            round(tasa_eps_global, 2)
+            if tasa_eps_global is not None else None
+        ),
+        "n_par": n_par,
+        "n_eps_global": n_eps,
+        "recomendaciones": recomendaciones,
+    }
+
+
 @router.get("/{glosa_id}/eps-comportamiento")
 def eps_comportamiento(
     glosa_id: int,
