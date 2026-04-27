@@ -173,6 +173,34 @@ class TestUserPrompt:
         )
         assert "EXCEDENTE FACTURADO" not in prompt
 
+    def test_bloque_excedente_no_aparece_si_dif_excede_objetado(self):
+        """Caso real TA0801 HUS491868: factura multi-CUPS, el lookup
+        comparó facturado=$488.497 (TOTAL) contra pactado=$33.487 dando
+        excedente $455.010 que excede al objetado de $3.151. NO debe
+        inyectar (sería catastrófico). El gestor revisa manualmente."""
+        prompt = build_user_prompt(
+            texto_glosa="x", contexto_pdf="",
+            codigo="TA0801", eps="DISPENSARIO",
+            valor_objetado="$3.151",
+            valor_facturado="$488.497",
+            valor_pactado="$33.487",
+        )
+        assert "EXCEDENTE FACTURADO" not in prompt
+
+    def test_decision_autonoma_en_system_prompt(self):
+        """El system prompt debe instruir la matriz de decisión
+        autónoma (DEFENDER_TOTAL / ACEPTAR_PARCIAL / ACEPTAR_TOTAL /
+        REVISAR) y exigir <accion>, <valor_aceptar>, <valor_defender>
+        en el XML de salida."""
+        from app.services.glosa_ia_prompts import get_system_prompt
+        sp = get_system_prompt("TA0201", "EPS TEST")
+        assert "DECISIÓN AUTÓNOMA" in sp
+        assert "DEFENDER_TOTAL" in sp
+        assert "ACEPTAR_PARCIAL" in sp
+        assert "ACEPTAR_TOTAL" in sp
+        assert "<accion>" in sp
+        assert "<valor_aceptar>" in sp
+
     def test_build_user_prompt_instrucciones(self):
         """Should include structured instructions and norms."""
         prompt = build_user_prompt(

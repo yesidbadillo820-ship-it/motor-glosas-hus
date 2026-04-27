@@ -183,12 +183,93 @@ def _concepto_glosa(codigo_glosa: str) -> str:
     return fallbacks.get(prefijo, "Glosa sin concepto específico asignado")
 
 
-def _extraer_valores_glosa(texto: str) -> dict:
+def _facturado_linea_cups(texto: str, cups: str) -> float:
+    """Busca el valor de LÍNEA del CUPS específico en la factura.
+
+    En facturas HUS multi-CUPS el "VALOR TOTAL ORDEN DE SERVICIO" es
+    la suma de TODOS los ítems — NO sirve cuando la glosa ataca un
+    CUPS puntual. Esta función busca el CUPS y toma el último monto
+    monetario en su ventana cercana (que en formato HUS suele ser
+    "VR ENT" — el valor entregado de esa fila).
+
+    Retorna 0.0 si no encuentra match razonable.
+    """
+    if not texto or not cups:
+        return 0.0
+    cups_norm = re.escape(str(cups).strip().upper())
+    if not cups_norm:
+        return 0.0
+    # Ventana de hasta 300 chars después del CUPS, recortada al primer
+    # marcador de cierre de fila o bloque (otro código tipo CUPS al
+    # inicio de línea, totalizadores). Sin esto en facturas multi-CUPS
+    # terminamos atrapando montos de la siguiente fila o el TOTAL
+    # ORDEN DE SERVICIO.
+    m = re.search(cups_norm + r"(.{0,300})", texto.upper(), re.DOTALL)
+    if not m:
+        return 0.0
+    chunk = m.group(1)
+    cortes = [
+        r"VALOR\s+SUBTOTAL",
+        r"VALOR\s+TOTAL\s+ORDEN",
+        r"VALOR\s+CUOTA",
+        r"VALOR\s+ANTICIPO",
+        r"NOTAS?\s+FINALES",
+        r"\bTOTAL\b\s*:\s*",
+        # Inicio de fila siguiente: salto de línea + código (mezcla
+        # de mayúsculas, dígitos y guiones) seguido de espacio y un
+        # caracter de descripción (letra mayúscula o paréntesis).
+        # Captura tanto "FMQ0178-3 TRANSAMINASA" como "39147B-18 CONSULTA"
+        # como "902210 HEMOGRAMA".
+        r"\n\s*[A-Z0-9][A-Z0-9-]{2,12}\s+[A-ZÁÉÍÓÚÑ(]",
+    ]
+    for pat in cortes:
+        cm = re.search(pat, chunk)
+        if cm:
+            chunk = chunk[: cm.start()]
+    # Capturar todos los $<valor> del fragmento (tolera espacios).
+    montos = re.findall(r"\$\s*([\d][\d\.,]{2,})", chunk)
+    if not montos:
+        return 0.0
+    # Filtrar ceros ($0,00) y quedarnos con valores significativos.
+    def _tof(s):
+        s = re.sub(r"[^\d,\.]", "", s)
+        if "," in s and "." in s:
+            if s.rfind(",") > s.rfind("."):
+                s = s.replace(".", "").replace(",", ".")
+            else:
+                s = s.replace(",", "")
+        else:
+            mm = re.match(r"^(\d+)[\.,](\d{1,2})$", s)
+            if mm:
+                s = f"{mm.group(1)}.{mm.group(2)}"
+            else:
+                s = s.replace(".", "").replace(",", "")
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+    valores = [_tof(x) for x in montos]
+    valores = [v for v in valores if v > 0]
+    if not valores:
+        return 0.0
+    # En facturas HUS la fila típica es "CANT  VR_UNIT  VR_PAC  VR_ENT".
+    # El último monto significativo del chunk suele ser VR_ENT (valor
+    # final de la línea). Si los dos últimos coinciden (cantidad=1 →
+    # vr_unit == vr_ent), ambos son válidos.
+    return valores[-1]
+
+
+def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
     """Extrae valores de COP mencionados en el texto libre de la glosa.
 
     La EPS suele escribir "facturada por $114.900 y reconocida solo por
     $90.000, objetándose $24.900". Esta función intenta identificar esos
     tres valores con regex tolerante (acepta $, pesos, puntos, comas).
+
+    Si se pasa `cups`, primero intenta extraer el valor de LÍNEA del
+    CUPS en la factura — más preciso que el total cuando la factura
+    tiene múltiples ítems. Solo cae al patrón TOTAL/SUBTOTAL si la
+    búsqueda CUPS-específica falla.
 
     Devuelve: {facturado, reconocido, objetado}. Si no se encuentra un
     valor, queda 0.0. Siempre devuelve las tres claves.
@@ -264,8 +345,17 @@ def _extraer_valores_glosa(texto: str) -> dict:
                     return v
         return 0.0
 
+    # Si tenemos el CUPS, primero intentamos el valor de línea
+    # específico — más preciso en facturas multi-CUPS. Si no hay
+    # match, caemos a los patrones generales (incluido el TOTAL).
+    val_fact = 0.0
+    if cups:
+        val_fact = _facturado_linea_cups(t, cups)
+    if val_fact <= 0:
+        val_fact = _primer_match(patrones_fact)
+
     return {
-        "facturado": _primer_match(patrones_fact),
+        "facturado": val_fact,
         "reconocido": _primer_match(patrones_rec),
         "objetado": _primer_match(patrones_obj),
     }

@@ -8863,6 +8863,93 @@ async function analizar(modoOverride){
   _rehab();
 }
 
+function renderAccionIA(d){
+  // Banner premium con la decisión autónoma de la IA: DEFENDER_TOTAL,
+  // ACEPTAR_PARCIAL, ACEPTAR_TOTAL o REVISAR. Incluye botón para
+  // pre-cargar los campos del formulario con los montos sugeridos.
+  if(!d || !d.accion_ia) return '';
+  var accion = String(d.accion_ia).toUpperCase();
+  var aceptar = Number(d.valor_aceptar_ia || 0);
+  var defender = Number(d.valor_defender_ia || 0);
+  var fmt = function(v){ return '$' + Number(v||0).toLocaleString('es-CO', {maximumFractionDigits:0}); };
+  var meta = {
+    'DEFENDER_TOTAL': {
+      bg: 'linear-gradient(135deg,#dcfce7,#bbf7d0)',
+      border: '#16a34a', icon: '🛡', label: 'DEFENDER 100%',
+      texto: 'La IA recomienda defender íntegramente la glosa. La objeción de la EPS no procede.',
+    },
+    'ACEPTAR_PARCIAL': {
+      bg: 'linear-gradient(135deg,#fef3c7,#fde68a)',
+      border: '#d97706', icon: '◐', label: 'ACEPTACIÓN PARCIAL',
+      texto: 'La IA recomienda aceptar el excedente real y defender el resto.',
+    },
+    'ACEPTAR_TOTAL': {
+      bg: 'linear-gradient(135deg,#fee2e2,#fecaca)',
+      border: '#dc2626', icon: '✓', label: 'ACEPTAR 100%',
+      texto: 'La IA considera que la objeción de la EPS es procedente.',
+    },
+    'REVISAR': {
+      bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)',
+      border: '#4f46e5', icon: '❗', label: 'REVISAR MANUALMENTE',
+      texto: 'La IA detectó datos faltantes o inconsistentes — confirma manualmente.',
+    },
+  }[accion] || { bg:'#f3f4f6', border:'#9ca3af', icon:'?', label: accion, texto:'' };
+  var detalle = '';
+  if(aceptar > 0 || defender > 0){
+    detalle = '<div style="display:flex;gap:1rem;margin-top:.7rem;flex-wrap:wrap;font-size:.85rem">';
+    if(defender > 0) detalle += '<div><b style="color:#16a34a">A defender:</b> ' + fmt(defender) + '</div>';
+    if(aceptar > 0) detalle += '<div><b style="color:#d97706">A aceptar:</b> ' + fmt(aceptar) + '</div>';
+    detalle += '</div>';
+  }
+  var btnAplicar = '';
+  if(aceptar > 0){
+    btnAplicar = '<button onclick="aplicarRecomendacionIA(' + aceptar + ',\'' + accion + '\')" ' +
+      'class="btn btn-primary" style="margin-top:.8rem;background:' + meta.border + '">' +
+      'Aplicar recomendación (' + fmt(aceptar) + ')</button>';
+  }
+  return (
+    '<div class="card-premium" style="margin-top:1rem;padding:1rem 1.3rem;background:' + meta.bg +
+    ';border:2px solid ' + meta.border + ';">'
+    + '<div style="display:flex;align-items:flex-start;gap:.8rem">'
+    + '<div style="font-size:1.6rem;line-height:1">' + meta.icon + '</div>'
+    + '<div style="flex:1;min-width:0">'
+    + '<div style="font-weight:800;color:' + meta.border + ';letter-spacing:.04em;font-size:.78rem;text-transform:uppercase">'
+    + '💡 La IA recomienda · ' + meta.label + '</div>'
+    + '<div style="margin-top:.3rem;color:var(--text);font-size:.9rem">' + meta.texto + '</div>'
+    + detalle
+    + btnAplicar
+    + '</div>'
+    + '</div>'
+    + '</div>'
+  );
+}
+
+function aplicarRecomendacionIA(monto, accion){
+  // Pre-cargar el campo "Valor Aceptado (COP)" con el monto sugerido
+  // por la IA. El gestor confirma con un toast de éxito.
+  try {
+    var inp = document.getElementById('valor-aceptado') ||
+              document.getElementById('valorAceptado') ||
+              document.querySelector('input[name="valor_aceptado"]');
+    if(inp){
+      inp.value = monto;
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+      inp.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+    if(typeof toast === 'function'){
+      toast('Recomendación aplicada',
+        accion + ' · valor a aceptar: $' +
+        Number(monto).toLocaleString('es-CO',{maximumFractionDigits:0}) +
+        '. Verifica antes de marcar la glosa como respondida.',
+        'success');
+    }
+  } catch(e){
+    if(typeof toast === 'function'){
+      toast('No se pudo aplicar', e.message, 'error');
+    }
+  }
+}
+
 function renderRiesgoRatificacion(r){
   if(!r) return '';
   var nivelClass = r.nivel === 'BAJO' ? 'low' : (r.nivel === 'MEDIO' ? 'medium' : 'high');
@@ -8913,6 +9000,7 @@ function renderResult(d){
     +'<div class="score-bar-bg"><div class="score-bar" style="width:'+d.score+'%;background:'+scoreColor+'"></div></div>'
     +'</div>'
     + (d.riesgo_ratificacion ? renderRiesgoRatificacion(d.riesgo_ratificacion) : '')
+    + (d.accion_ia ? renderAccionIA(d) : '')
 
     +'<div class="res-dictamen">'
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'

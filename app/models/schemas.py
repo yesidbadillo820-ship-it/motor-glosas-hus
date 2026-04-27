@@ -133,6 +133,11 @@ class GlosaResult(BaseModel):
     riesgo_ratificacion: Optional[dict] = None
     # ID en BD (llenado por main.py después de persistir) — permite refinar/gold
     glosa_id:        Optional[int] = None
+    # R-cerebro #8: decisión autónoma de la IA sobre la glosa.
+    # Valores posibles: DEFENDER_TOTAL | ACEPTAR_PARCIAL | ACEPTAR_TOTAL | REVISAR
+    accion_ia:       Optional[str] = None
+    valor_aceptar_ia: Optional[float] = None
+    valor_defender_ia: Optional[float] = None
 
 
 class GlosaHistorialItem(BaseModel):

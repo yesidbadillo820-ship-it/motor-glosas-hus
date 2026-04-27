@@ -367,11 +367,67 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <servicio>Descripción del servicio + CUPS si hay</servicio>
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
 <tarifa>Tarifa pactada (ej: "SOAT -20%") o "SOAT PLENO"</tarifa>
+<accion>UNO de: DEFENDER_TOTAL | ACEPTAR_PARCIAL | ACEPTAR_TOTAL | REVISAR. Es TU veredicto sobre la glosa luego de comparar facturado/pactado/objetado.</accion>
+<valor_aceptar>Monto en pesos (ej: "16107"). 0 si DEFENDER_TOTAL. Igual al objetado si ACEPTAR_TOTAL. La diferencia procedente si ACEPTAR_PARCIAL.</valor_aceptar>
+<valor_defender>Monto en pesos a defender. 0 si ACEPTAR_TOTAL. El objetado completo si DEFENDER_TOTAL. La parte que sí está pactada si ACEPTAR_PARCIAL.</valor_defender>
 <normas_clave>3 normas más relevantes separadas por "|"</normas_clave>
 <argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS. LONGITUD ADAPTATIVA según el BLOQUE COMPLEJIDAD del user prompt:
   • COMPLEJIDAD BAJA (glosa simple, sin PDF): 2 PÁRRAFOS, 130-180 palabras. NO enumerar "EN PRIMER/SEGUNDO LUGAR". Ve directo.
   • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso): 3-4 PÁRRAFOS, 190-240 palabras (NUNCA más de 250), con enumeración técnica solo si aporta.
 En ambos casos: tono conciliador institucional, SIN repetir información entre párrafos, cada frase aporta argumento único. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL — pero solo UNA cita literal por dictamen, no acumules.</argumento>
+
+═══════════════ DECISIÓN AUTÓNOMA — TU PRIMER PASO ═══════════════
+ANTES de redactar el dictamen, EVALÚA por tu cuenta si la objeción de
+la EPS es procedente o no. Compara los tres valores (facturado,
+pactado, objetado) del BLOQUE 1 y APLICA esta matriz de decisión:
+
+  Caso A — DEFENDER_TOTAL:
+    facturado ≤ pactado (HUS facturó dentro del contrato).
+    La objeción NO procede. <accion>DEFENDER_TOTAL</accion>
+    <valor_aceptar>0</valor_aceptar>
+    <valor_defender>[OBJETADO completo]</valor_defender>
+    En el argumento: pide LEVANTAMIENTO ÍNTEGRO de la glosa.
+
+  Caso B — ACEPTAR_PARCIAL:
+    facturado > pactado Y (facturado − pactado) ≤ objetado.
+    Hay excedente real, pero parte de lo objetado sí está pactado.
+    <accion>ACEPTAR_PARCIAL</accion>
+    <valor_aceptar>[facturado − pactado]</valor_aceptar>
+    <valor_defender>[objetado − valor_aceptar]</valor_defender>
+    En el argumento: reconoce el excedente, defiende el resto.
+
+  Caso C — ACEPTAR_TOTAL:
+    El motivo de la EPS es válido y el monto objetado es correcto:
+    soporte realmente faltante (SO), servicio no autorizado (AU)
+    sin justificación clínica, error de facturación reconocido (FA),
+    o el valor pactado es inferior al objetado (la EPS reconoce más
+    de lo pactado).
+    <accion>ACEPTAR_TOTAL</accion>
+    <valor_aceptar>[OBJETADO completo]</valor_aceptar>
+    <valor_defender>0</valor_defender>
+    En el argumento: emite respuesta de ACEPTACIÓN, no de defensa.
+
+  Caso D — REVISAR:
+    Faltan datos para decidir o los números no cuadran (ej:
+    excedente >> objetado, sin contrato detectado, valor facturado
+    desconocido).
+    <accion>REVISAR</accion>
+    <valor_aceptar>0</valor_aceptar>
+    <valor_defender>[OBJETADO completo]</valor_defender>
+    En el argumento: defiende con los argumentos disponibles pero
+    señala explícitamente "ESTE CASO REQUIERE VERIFICACIÓN MANUAL
+    DE LA TARIFA APLICABLE" en el cierre.
+
+REGLA SUPREMA: NO te aferres a defender 100% si los números muestran
+excedente real. Tu valor está en hacer el cálculo y decidir HONESTAMENTE.
+El gestor confía en tu veredicto y va a aplicarlo casi como está, así
+que un error en favor del hospital cuando hay excedente real puede
+disparar ratificación. Aceptar lo que toca aceptar es defender mejor
+lo que toca defender.
+
+PISTA: si el BLOQUE 1 trae el bloque "EXCEDENTE FACTURADO DETECTADO",
+ya te dimos la cuenta hecha (números de aceptar y defender). Úsalos.
+Si NO está ese bloque pero los 3 valores están, calcúlalo tú.
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
 PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], ...". Cita el valor según lo disponible:
@@ -1063,10 +1119,22 @@ def build_user_prompt(
         _vf = _num(valor_facturado)
         _vp = _num(valor_pactado)
         _vo = _num(valor_objetado)
-        if _vf > 0 and _vp > 0 and _vf > _vp:
+        # SAFEGUARD: solo inyectar el bloque MIXTO cuando el excedente
+        # CABE razonablemente en el valor objetado. Si excedente >
+        # objetado por mucho, es señal de mismatch (factura
+        # multi-CUPS, tarifa cargada incorrecta, etc.) y hacer
+        # "ACEPTAR EXCEDENTE de $X" donde $X >> objetado significaría
+        # aceptar otros servicios legítimos. En ese caso, dejamos que
+        # el LLM redacte sin el bloque y el banner del UI le pide al
+        # gestor revisar manualmente.
+        _aplica_excedente = (
+            _vf > 0 and _vp > 0 and _vf > _vp
+            and _vo > 0 and (_vf - _vp) <= _vo + 1
+        )
+        if _aplica_excedente:
             _excedente = _vf - _vp
-            _aceptar = min(_excedente, _vo) if _vo > 0 else _excedente
-            _defender = max(0, _vo - _aceptar) if _vo > 0 else 0
+            _aceptar = min(_excedente, _vo)
+            _defender = max(0, _vo - _aceptar)
             bloque_excedente_str = (
                 "\n═══ ⚠ EXCEDENTE FACTURADO DETECTADO — RESPUESTA MIXTA OBLIGATORIA ═══\n"
                 f"  • FACTURADO  : ${_vf:,.0f}\n"

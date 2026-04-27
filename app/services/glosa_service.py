@@ -852,8 +852,31 @@ class GlosaService:
         normas_clave = ""
         modelo_usado = "desconocido"
 
+        # Inicializar variables de decisión IA — pueden ser sobreescritas
+        # por texto fijo (mapping abajo) o por XML extraído del LLM.
+        accion_ia = ""
+        valor_aceptar_ia = 0.0
+        valor_defender_ia = 0.0
+
         if argumento_fijo:
             pac_ia = "N/A"
+            # Mapeo fijo: el tipo de texto canónico determina la acción.
+            _mapa_accion = {
+                "RATIFICADA": "DEFENDER_TOTAL",
+                "EXTEMPORANEA": "DEFENDER_TOTAL",
+                "TARIFA_MATCH_PERFECTO": "DEFENDER_TOTAL",
+                "ACEPTADA_TOTAL": "ACEPTAR_TOTAL",
+                "ACEPTADA_PARCIAL": "ACEPTAR_PARCIAL",
+            }
+            accion_ia = _mapa_accion.get(tipo_glosa, "")
+            try:
+                _vobj = float(re.sub(r"[^\d.]", "", str(valor_raw or "")) or 0)
+            except Exception:
+                _vobj = 0.0
+            if accion_ia == "DEFENDER_TOTAL":
+                valor_defender_ia = _vobj
+            elif accion_ia == "ACEPTAR_TOTAL":
+                valor_aceptar_ia = _vobj
             # EXTEMPORANEA y ACEPTADA_* usan textos 100% fijos curados por el
             # equipo juridico — NO pasan por _suavizar_tono() porque ese
             # reemplaza frases como "SE EXIGE EL LEVANTAMIENTO" o "CARECE DE
@@ -1307,6 +1330,23 @@ class GlosaService:
             tarifa_ia = self._xml("tarifa", res_ia, "")
             arg_ia = self._xml("argumento", res_ia, "")
             normas_clave = self._xml("normas_clave", res_ia, "")
+            # Decisión autónoma de la IA (R-cerebro #8)
+            accion_ia = (self._xml("accion", res_ia, "") or "").strip().upper()
+            try:
+                _va = self._xml("valor_aceptar", res_ia, "0") or "0"
+                valor_aceptar_ia = float(re.sub(r"[^\d.]", "", _va) or 0)
+            except Exception:
+                valor_aceptar_ia = 0.0
+            try:
+                _vd = self._xml("valor_defender", res_ia, "0") or "0"
+                valor_defender_ia = float(re.sub(r"[^\d.]", "", _vd) or 0)
+            except Exception:
+                valor_defender_ia = 0.0
+            if accion_ia:
+                logger.info(
+                    f"[IA-ACCION] {accion_ia} aceptar=${valor_aceptar_ia:,.0f} "
+                    f"defender=${valor_defender_ia:,.0f}"
+                )
 
             if not arg_ia or arg_ia == res_ia:
                 if "<argumento>" in res_ia:
@@ -1545,7 +1585,14 @@ class GlosaService:
             score=score,
             dias_restantes=max(0, DIAS_HABILES_LIMITE_EXTEMPORANEA - dias),
             modelo_ia=modelo_usado,
-            riesgo_ratificacion=riesgo
+            riesgo_ratificacion=riesgo,
+            accion_ia=(accion_ia or None),
+            valor_aceptar_ia=(
+                valor_aceptar_ia if valor_aceptar_ia > 0 else None
+            ),
+            valor_defender_ia=(
+                valor_defender_ia if valor_defender_ia > 0 else None
+            ),
         )
 
     def _calcular_score(self, tipo_glosa: str, es_extemporanea: bool, es_ratificacion: bool,
