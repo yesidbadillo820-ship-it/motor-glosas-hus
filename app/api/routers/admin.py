@@ -1070,6 +1070,121 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/dashboard-coordinador")
+def admin_dashboard_coordinador(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R396 P1: dashboard ejecutivo del coordinador.
+
+    Single-call que combina las métricas más usadas
+    para el dashboard del coordinador:
+      - kpis: abiertas_total, vencidas, sin_gestor,
+        cerradas_mes, valor_recuperado_mes
+      - top_3_eps_volumen
+      - top_3_gestores_decididas_mes
+      - alertas: count vencidas + alto valor + sin gestor
+      - tasa_levantamiento_mes_pct
+
+    Solo SUPER_ADMIN.
+    """
+    from datetime import timezone
+
+    from app.core.tz import ahora_utc
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    todas = db.query(GlosaRecord).all()
+
+    abiertas = []
+    decididas_mes = []
+    for g in todas:
+        e = (g.estado or "").upper()
+        if e not in ESTADOS_CERRADOS:
+            abiertas.append(g)
+        if e in ESTADOS_DECIDIDOS:
+            f = g.fecha_decision_eps
+            if f and f.tzinfo is None:
+                f = f.replace(tzinfo=timezone.utc)
+            if f and f >= inicio_mes:
+                decididas_mes.append(g)
+
+    n_abiertas = len(abiertas)
+    n_vencidas = sum(1 for g in abiertas if (g.dias_restantes or 0) < 0)
+    n_sin_gestor = sum(
+        1 for g in abiertas
+        if not (g.gestor_nombre or "").strip()
+    )
+    n_alto_valor_vencido = sum(
+        1 for g in abiertas
+        if (g.dias_restantes or 0) < 0
+        and float(g.valor_objetado or 0) >= 5_000_000
+    )
+
+    # Mes
+    n_dec_mes = len(decididas_mes)
+    n_lev_mes = sum(
+        1 for g in decididas_mes
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    rec_mes = sum(
+        float(g.valor_recuperado or 0) for g in decididas_mes
+    )
+    tasa_mes = (
+        round(100 * n_lev_mes / n_dec_mes, 2) if n_dec_mes else 0.0
+    )
+
+    # Top 3 EPS por volumen abierto
+    eps_count: dict[str, int] = {}
+    for g in abiertas:
+        eps = (g.eps or "").strip()
+        if eps:
+            eps_count[eps] = eps_count.get(eps, 0) + 1
+    top_eps = sorted(
+        eps_count.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+
+    # Top 3 gestores por decididas mes
+    gestor_count: dict[str, int] = {}
+    for g in decididas_mes:
+        gestor = (g.gestor_nombre or "").strip()
+        if gestor:
+            gestor_count[gestor] = gestor_count.get(gestor, 0) + 1
+    top_gestores = sorted(
+        gestor_count.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+
+    return {
+        "mes": inicio_mes.strftime("%Y-%m"),
+        "kpis": {
+            "abiertas_total": n_abiertas,
+            "vencidas": n_vencidas,
+            "sin_gestor": n_sin_gestor,
+            "decididas_mes": n_dec_mes,
+            "levantadas_mes": n_lev_mes,
+            "valor_recuperado_mes": int(rec_mes),
+        },
+        "tasa_levantamiento_mes_pct": tasa_mes,
+        "alertas": {
+            "vencidas": n_vencidas,
+            "alto_valor_vencidas": n_alto_valor_vencido,
+            "sin_gestor": n_sin_gestor,
+        },
+        "top_3_eps_volumen": [
+            {"eps": e, "abiertas": n} for e, n in top_eps
+        ],
+        "top_3_gestores_decididas_mes": [
+            {"gestor": g, "decididas": n} for g, n in top_gestores
+        ],
+    }
+
+
 @router.get("/digest-diario")
 def admin_digest_diario(
     db: Session = Depends(get_db),
