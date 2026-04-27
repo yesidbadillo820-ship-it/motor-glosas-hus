@@ -7565,6 +7565,137 @@ def stats_codigo_eps_cobertura(
     }
 
 
+@router.get("/stats/anomalias-recientes")
+def stats_anomalias_recientes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R388 P1: anomalías detectadas en últimos 7 días.
+
+    La IA compara la última semana con el promedio
+    histórico (12 semanas) para cada EPS y reporta
+    anomalías estadísticas:
+      - volumen 2x el promedio (PICO)
+      - volumen 0.3x el promedio (CAÍDA)
+      - código nuevo apareció (NUEVO_CODIGO)
+
+    Útil como vigilancia automática.
+    """
+    from datetime import timedelta, timezone
+
+    ahora = ahora_utc()
+    inicio_actual = ahora - timedelta(days=7)
+    inicio_hist = ahora - timedelta(days=7 * 13)
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.creado_en >= inicio_hist)
+        .filter(GlosaRecord.eps.isnot(None))
+        .all()
+    )
+
+    eps_actual: dict[str, int] = {}
+    eps_hist_buckets: dict[str, list[int]] = {}
+    codigos_actual: dict[tuple, int] = {}
+    codigos_hist: set = set()
+
+    # 12 cubos semanales históricos (sin la semana actual)
+    semanas = {}
+    for g in rows:
+        cre = g.creado_en
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if not cre:
+            continue
+        eps = (g.eps or "").strip()
+        cod = (g.codigo_glosa or "").strip()
+        if cre >= inicio_actual:
+            eps_actual[eps] = eps_actual.get(eps, 0) + 1
+            if eps and cod:
+                codigos_actual[(eps, cod)] = (
+                    codigos_actual.get((eps, cod), 0) + 1
+                )
+        else:
+            # bucket por semana
+            semana_idx = int((ahora - cre).days // 7)
+            if 1 <= semana_idx <= 12:
+                semanas.setdefault(eps, {}).setdefault(semana_idx, 0)
+                semanas[eps][semana_idx] += 1
+            if eps and cod:
+                codigos_hist.add((eps, cod))
+
+    for eps, by_w in semanas.items():
+        # 12 buckets, llenar con 0 si falta
+        bk = [by_w.get(i, 0) for i in range(1, 13)]
+        eps_hist_buckets[eps] = bk
+
+    items = []
+
+    # PICO / CAÍDA por volumen
+    for eps, count in eps_actual.items():
+        bk = eps_hist_buckets.get(eps, [])
+        if not bk:
+            continue
+        promedio = sum(bk) / len(bk) if bk else 0
+        if promedio < 1:
+            continue
+        ratio = count / promedio
+        if ratio >= 2.0 and count >= 5:
+            items.append({
+                "tipo": "PICO",
+                "eps": eps,
+                "actual_semana": count,
+                "promedio_semanal_hist": round(promedio, 1),
+                "ratio": round(ratio, 2),
+                "mensaje": (
+                    f"{eps} pasó de ~{promedio:.0f}/sem a "
+                    f"{count} esta semana ({ratio:.1f}x)"
+                ),
+            })
+        elif ratio <= 0.3 and promedio >= 5:
+            items.append({
+                "tipo": "CAIDA",
+                "eps": eps,
+                "actual_semana": count,
+                "promedio_semanal_hist": round(promedio, 1),
+                "ratio": round(ratio, 2),
+                "mensaje": (
+                    f"{eps} cayó de ~{promedio:.0f}/sem a "
+                    f"{count} esta semana"
+                ),
+            })
+
+    # CODIGO NUEVO por par (eps, codigo) que no estaba en histórico
+    for (eps, cod), count in codigos_actual.items():
+        if (eps, cod) in codigos_hist:
+            continue
+        if count < 2:
+            continue  # filtra ruido — al menos 2 casos
+        items.append({
+            "tipo": "NUEVO_CODIGO",
+            "eps": eps,
+            "codigo_glosa": cod,
+            "actual_semana": count,
+            "mensaje": (
+                f"Código {cod} aparece en {eps} "
+                f"({count} casos esta semana, antes nunca)"
+            ),
+        })
+
+    # Orden: PICO primero, luego CAÍDA, luego NUEVO_CODIGO
+    orden_tipo = {"PICO": 1, "CAIDA": 2, "NUEVO_CODIGO": 3}
+    items.sort(key=lambda x: (
+        orden_tipo.get(x["tipo"], 9),
+        -(x.get("actual_semana") or 0),
+    ))
+
+    return {
+        "ventana_dias": 7,
+        "total_anomalias": len(items),
+        "items": items,
+    }
+
+
 @router.get("/stats/comparativa-anio")
 def stats_comparativa_anio(
     db: Session = Depends(get_db),
