@@ -262,6 +262,35 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
 
+    # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
+    # Caso 27-abr-2026: importación de Excel falla con
+    # "value too long for type character varying(50)" en EPS oficial
+    # "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO
+    # BUCARAMANG" (71 chars). Ampliamos a 300 para tener margen.
+    # Los ALTER TYPE en Postgres son seguros mientras la nueva
+    # longitud sea >= a la actual y los datos existentes quepan.
+    if not _is_sqlite:
+        _HISTORIAL_RESIZE = [
+            ("eps", "VARCHAR(300)"),
+            ("paciente", "VARCHAR(300)"),
+            ("etapa", "VARCHAR(120)"),
+            ("estado", "VARCHAR(50)"),
+            ("modelo_ia", "VARCHAR(120)"),
+        ]
+        for col_name, col_ddl in _HISTORIAL_RESIZE:
+            try:
+                if (
+                    _tiene_tabla("historial")
+                    and _tiene_columna("historial", col_name)
+                ):
+                    db.execute(text(
+                        f"ALTER TABLE historial "
+                        f"ALTER COLUMN {col_name} TYPE {col_ddl}"
+                    ))
+                    db.commit()
+            except Exception as e:
+                logger.warning(f"MIGRACIÓN resize {col_name}: {e}")
+
     # Migraciones para usuarios - 2FA TOTP
     _USUARIOS_MISSING_2FA = [
         ("totp_secret", "VARCHAR(64)"),
