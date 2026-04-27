@@ -406,6 +406,93 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/quick-wins")
+def yo_quick_wins(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R373 P1: glosas "fáciles de ganar" HOY.
+
+    La IA filtra de tu backlog las que probablemente
+    levantes con poco esfuerzo:
+      - Abierta
+      - Tasa histórica del par (eps, codigo) >= 60%
+      - Suficientes muestras (>= 3)
+      - Aún no decidida y sin dictamen pesado
+
+    Devuelve top N ordenado por (tasa * valor_objetado)
+    para priorizar las más rentables.
+    """
+    from app.models.db import GlosaRecord
+
+    ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    nombre = current_user.nombre or current_user.email
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+
+    # Pre-cache tasas (eps, codigo) para evitar N queries
+    tasas_cache: dict[tuple, tuple[int, int]] = {}
+
+    def _tasa_par(eps, cod):
+        k = (eps, cod)
+        if k in tasas_cache:
+            return tasas_cache[k]
+        rows = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.eps == eps)
+            .filter(GlosaRecord.codigo_glosa == cod)
+            .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+            .all()
+        )
+        n = len(rows)
+        lev = sum(
+            1 for r in rows
+            if (r.estado or "").upper() == "LEVANTADA"
+        )
+        tasas_cache[k] = (n, lev)
+        return n, lev
+
+    items = []
+    for g in abiertas:
+        if not g.eps or not g.codigo_glosa:
+            continue
+        n, lev = _tasa_par(g.eps, g.codigo_glosa)
+        if n < 3:
+            continue
+        tasa = 100.0 * lev / n
+        if tasa < 60:
+            continue
+        valor = float(g.valor_objetado or 0)
+        score = tasa * valor
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(valor),
+            "tasa_par_pct": round(tasa, 2),
+            "n_muestras": n,
+            "score": round(score, 2),
+            "dias_restantes": g.dias_restantes,
+            "tiene_dictamen": bool(g.dictamen and len(g.dictamen) > 50),
+        })
+    items.sort(key=lambda x: x["score"], reverse=True)
+
+    return {
+        "usuario_email": current_user.email,
+        "total_quick_wins": len(items),
+        "valor_potencial": sum(it["valor_objetado"] for it in items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/yo/asistente-proactivo")
 def yo_asistente_proactivo(
     db: Session = Depends(get_db),
