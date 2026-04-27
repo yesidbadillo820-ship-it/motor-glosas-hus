@@ -406,6 +406,120 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/sugerencias-orden")
+def yo_sugerencias_orden(
+    limit: int = 15,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R394 P1: orden óptimo de cierre para hoy.
+
+    La IA combina urgencia × probabilidad × valor para
+    devolver tus glosas abiertas en el orden óptimo de
+    atención. Score:
+      score = urgencia_w × prob_w × valor_w
+    donde:
+      - urgencia_w: 3 si vencida, 2 si <=3 días, 1 si <=7
+      - prob_w: tasa par/100 (mín 0.3)
+      - valor_w: log10(valor + 1)
+
+    Cada glosa devuelta incluye motivo legible.
+    """
+    import math
+
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    if not abiertas:
+        return {
+            "usuario_email": current_user.email,
+            "total": 0, "items": [],
+        }
+
+    # Cargar histórico de pares relevantes en una sola query
+    pares = {
+        ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
+        for g in abiertas if g.eps and g.codigo_glosa
+    }
+    eps_set = {p[0] for p in pares}
+    cod_set = {p[1] for p in pares}
+    historico = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(list(ESTADOS_DECIDIDOS)))
+        .filter(GlosaRecord.eps.in_(eps_set))
+        .filter(GlosaRecord.codigo_glosa.in_(cod_set))
+        .all()
+    ) if pares else []
+    par_idx: dict[tuple, dict] = {}
+    for h in historico:
+        k = ((h.eps or "").strip(), (h.codigo_glosa or "").strip())
+        if k not in pares:
+            continue
+        b = par_idx.setdefault(k, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (h.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for g in abiertas:
+        dr = g.dias_restantes if g.dias_restantes is not None else 999
+        if dr < 0:
+            urg_w, urg_lbl = 3.0, f"vencida {abs(dr)}d"
+        elif dr <= 3:
+            urg_w, urg_lbl = 2.0, f"crítica {dr}d"
+        elif dr <= 7:
+            urg_w, urg_lbl = 1.0, f"próxima {dr}d"
+        else:
+            urg_w, urg_lbl = 0.5, f"{dr}d restantes"
+
+        k = ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
+        b = par_idx.get(k)
+        if b and b["dec"] >= 2:
+            tasa = b["lev"] / b["dec"]
+            prob_w = max(tasa, 0.3)
+            prob_lbl = f"{tasa*100:.0f}% prob ({b['dec']} casos)"
+        else:
+            prob_w = 0.5
+            prob_lbl = "sin histórico"
+
+        valor = float(g.valor_objetado or 0)
+        valor_w = math.log10(max(valor, 1) + 1)
+        score = round(urg_w * prob_w * valor_w * 10, 2)
+
+        # Motivo legible
+        motivo = f"{urg_lbl} · {prob_lbl}"
+        if valor >= 5_000_000:
+            motivo += f" · alto valor (${int(valor):,})"
+
+        items.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "factura": g.factura,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": int(valor),
+            "dias_restantes": dr,
+            "score": score,
+            "motivo": motivo,
+        })
+
+    items.sort(key=lambda x: x["score"], reverse=True)
+
+    return {
+        "usuario_email": current_user.email,
+        "total": len(items),
+        "items": items[: int(limit)],
+    }
+
+
 @router.get("/yo/proyeccion-mes")
 def yo_proyeccion_mes(
     db: Session = Depends(get_db),
