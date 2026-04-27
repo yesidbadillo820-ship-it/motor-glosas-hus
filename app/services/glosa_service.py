@@ -983,6 +983,24 @@ class GlosaService:
                     if _m2:
                         cups_verificado = _m2.group(1)
 
+            # Extraer valor facturado/pactado de info_tarifa cuando esté
+            # disponible. Es la única forma fiable de distinguir el
+            # FACTURADO ($247.663 ej.) del OBJETADO ($168.563 ej.). Si no
+            # hay info_tarifa, ambos quedan en None y el prompt se redacta
+            # con el patrón "OBJETA $X" sin mencionar facturado.
+            _val_fact_str: Optional[str] = None
+            _val_pact_str: Optional[str] = None
+            try:
+                if info_tarifa and info_tarifa.get("encontrada"):
+                    _vf = float(info_tarifa.get("valor_facturado") or 0.0)
+                    _vp = float(info_tarifa.get("valor_pactado_calc") or 0.0)
+                    if _vf > 0:
+                        _val_fact_str = f"${_vf:,.0f}".replace(",", ".")
+                    if _vp > 0:
+                        _val_pact_str = f"${_vp:,.0f}".replace(",", ".")
+            except Exception:
+                pass
+
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
                 contexto_pdf=contexto_pdf,
@@ -994,6 +1012,8 @@ class GlosaService:
                 es_extemporanea=es_extemporanea,
                 cups_verificado=cups_verificado or None,
                 valor_objetado=valor_raw,
+                valor_facturado=_val_fact_str,
+                valor_pactado=_val_pact_str,
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
             )
 
@@ -1200,6 +1220,7 @@ class GlosaService:
                     codigo_glosa=codigo_det,
                     valor_objetado=valor_raw,
                     tiene_contrato=tiene_contrato,
+                    valor_facturado=_val_fact_str,
                 )
                 # Mejora #7: chequear si el dictamen es copia textual
                 # de algún ejemplo Gold inyectado. Si lo es, eso es un
@@ -1258,6 +1279,7 @@ class GlosaService:
                             codigo_glosa=codigo_det,
                             valor_objetado=valor_raw,
                             tiene_contrato=tiene_contrato,
+                            valor_facturado=_val_fact_str,
                         )
                         if len(_defectos_retry) < len(_defectos):
                             logger.info(

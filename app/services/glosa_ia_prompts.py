@@ -374,7 +374,14 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 En ambos casos: tono conciliador institucional, SIN repetir información entre párrafos, cada frase aporta argumento único. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL — pero solo UNA cita literal por dictamen, no acumules.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
-PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], FACTURADO POR [VALOR o "EL VALOR INDICADO EN EL EXPEDIENTE"]". Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
+PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], ...". Cita el valor según lo disponible:
+  • Si el BLOQUE 1 trae FACTURADO real:
+      "FACTURADO POR $[FACTURADO], RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA $[OBJETADO]"
+  • Si solo trae OBJETADO:
+      "RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA $[OBJETADO]"
+  • Si no hay número alguno:
+      "FACTURADO POR EL VALOR INDICADO EN EL EXPEDIENTE"
+🚫 PROHIBIDO escribir "FACTURADO POR $[OBJETADO]" — son conceptos DISTINTOS. Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
 
 PÁRRAFO 2 — REFUTACIÓN FÁCTICA (70-100 palabras, enumerada): Abre con "LA AFIRMACIÓN DE LA AUDITORÍA DE QUE [motivo EPS, literal] NO SE AJUSTA A [...] POR LAS SIGUIENTES RAZONES:". Enumera 2-3 razones concisas con "EN PRIMER LUGAR / EN SEGUNDO LUGAR / EN TERCER LUGAR". Cada razón 1-2 oraciones técnicas. Sin redundancia.
 
@@ -888,6 +895,8 @@ def build_user_prompt(
     cups_verificado: Optional[str] = None,
     valor_objetado: Optional[str] = None,
     tono: Optional[str] = "conciliador",
+    valor_facturado: Optional[str] = None,
+    valor_pactado: Optional[str] = None,
 ) -> str:
     """Construye el user prompt estructurado para la IA.
 
@@ -920,6 +929,8 @@ def build_user_prompt(
 
     # Valor monetario — si no viene, la IA no debe inventar
     valor_fmt = _formato_valor(valor_objetado)
+    valor_fact_fmt = _formato_valor(valor_facturado) if valor_facturado else None
+    valor_pact_fmt = _formato_valor(valor_pactado) if valor_pactado else None
 
     # Trazabilidad
     trazabilidad_partes = []
@@ -1177,17 +1188,31 @@ def build_user_prompt(
 • Contrato vigente  : {numero_contrato}
 • Tarifa pactada    : {tarifa}
 • CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
-• Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
+• Valor FACTURADO por HUS : {valor_fact_fmt or "no detectado en el expediente"}   ← LO QUE COBRAMOS
+• Valor PACTADO en contrato: {valor_pact_fmt or "no detectado en el expediente"}   ← LO QUE EL CONTRATO FIJA
+• Valor OBJETADO por la EPS: {valor_fmt}   ← LO QUE LA EPS DICE QUE ES EXCEDENTE / NO QUIERE PAGAR
 • Trazabilidad      : {trazabilidad}
 • Tiempo transcurrido: {contexto_tiempo}
 
 ⚠ REGLA CRÍTICA DE DATOS (FALLAR ESTO DESCALIFICA LA RESPUESTA):
-  1. Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar
-     literalmente en el argumento. NUNCA escribas "EL VALOR INDICADO EN EL
-     EXPEDIENTE" si tienes el número real.
-  2. Si el CUPS tiene sufijo (ej. "372301H", "039001H1", "39147B-18",
+  1. NUNCA confundas los TRES valores. Son CONCEPTOS DISTINTOS:
+       FACTURADO   = monto bruto que HUS cobró por el servicio
+       PACTADO     = monto que el contrato establece como tarifa
+       OBJETADO    = monto que la EPS rechaza pagar (suele ser el
+                     "excedente" según la EPS, no el total de la factura)
+     EJEMPLO REAL: factura HUS por $247.663, contrato pacta $231.556,
+     EPS objeta $168.563. Decir "FACTURADO POR $168.563" es ERROR
+     GRAVE — $168.563 es OBJETADO, no facturado.
+  2. En el párrafo 1 (apertura), CITA el valor FACTURADO si está
+     disponible:
+        ✅ "FACTURADO POR $247.663, RESPECTO DEL CUAL LA EPS OBJETA
+            $168.563"
+     Si SOLO conoces el OBJETADO, redacta neutral:
+        ✅ "RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA $168.563"
+     NUNCA escribas "FACTURADO POR $[valor objetado]".
+  3. Si el CUPS tiene sufijo (ej. "372301H", "039001H1", "39147B-18",
      "FMQ6296", "19914262-04"), ÚSALO COMPLETO, NO lo trunques.
-  3. Cuando la EPS mencione un CUPS alternativo dentro del texto de la glosa
+  4. Cuando la EPS mencione un CUPS alternativo dentro del texto de la glosa
      (frases como "se reconoce código 39143", "tarifa SOAT código X", "se
      paga como CUPS Y"), ESE CUPS alternativo NO es el que HUS facturó —
      es lo que la EPS PROPONE como sustituto. TÚ SIEMPRE CITAS EL CUPS DEL

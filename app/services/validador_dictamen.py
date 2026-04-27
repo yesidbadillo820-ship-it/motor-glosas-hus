@@ -407,6 +407,7 @@ def detectar_defectos_criticos(
     codigo_glosa: str = "",
     valor_objetado: Optional[str] = None,
     tiene_contrato: bool = False,
+    valor_facturado: Optional[str] = None,
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -590,6 +591,60 @@ def detectar_defectos_criticos(
                     'Resolución 054/2026".'
                 ),
             })
+
+    # 9c. Confusión "FACTURADO POR $X" donde $X = valor objetado.
+    #     Es un error conceptual GRAVE: el valor facturado es lo que HUS
+    #     cobró (ej. $247.663); el valor objetado es lo que la EPS dice
+    #     que es excedente (ej. $168.563). El LLM tiende a confundirlos
+    #     cuando solo recibe el valor objetado del input.
+    #     Heurística: si el dictamen dice "FACTURAD[O|A] POR $X" Y ese
+    #     mismo $X coincide con el valor_objetado del input, marcamos
+    #     defecto. Solo aplica cuando ADEMÁS conocemos el valor_facturado
+    #     real y es DISTINTO del objetado, o no lo conocemos pero el
+    #     número exacto del objetado aparece como "facturado por".
+    if valor_objetado and not str(valor_objetado).upper().startswith("EL VALOR"):
+        digitos_obj = re.sub(r"[^\d]", "", str(valor_objetado))
+        digitos_fact = (
+            re.sub(r"[^\d]", "", str(valor_facturado))
+            if valor_facturado else ""
+        )
+        # Solo activamos la regla si:
+        #   - hay un número claro de valor_objetado (≥4 dígitos),
+        #   - NO conocemos un valor_facturado distinto, o lo conocemos y
+        #     es distinto del objetado (caso real).
+        if len(digitos_obj) >= 4 and digitos_obj != digitos_fact:
+            # Buscar "FACTURAD(O|A) POR ... $<digitos_obj>" tolerando
+            # puntos/comas y palabras intermedias cortas.
+            patron = (
+                r"FACTURAD[OA]S?\s+POR\b[^.]{0,30}?"
+                r"\$?\s*[\d.,]*"
+                + r"".join([d for d in digitos_obj])
+            )
+            # construimos un patrón laxo: permitimos puntos como
+            # separadores de miles entre dígitos.
+            laxo = (
+                r"FACTURAD[OA]S?\s+POR\b[^.\n]{0,40}?\$\s*"
+                + r"[\.,]?".join(list(digitos_obj))
+            )
+            if re.search(laxo, arg_up):
+                obj_clean = str(valor_objetado).lstrip("$").strip()
+                defectos.append({
+                    "regla": "facturado_es_objetado",
+                    "mensaje": (
+                        f'El dictamen dice "FACTURADO POR ${obj_clean}" '
+                        f'pero ${obj_clean} es el VALOR OBJETADO '
+                        "(lo que la EPS rechaza pagar), NO el valor que "
+                        "HUS facturó. Son conceptos distintos."
+                    ),
+                    "sugerencia": (
+                        'Reescribe el párrafo 1 usando: "RESPECTO DEL '
+                        f'CUAL LA ENTIDAD PAGADORA OBJETA ${obj_clean}" '
+                        "(sin la palabra FACTURADO antes del valor "
+                        "objetado). Si conoces el valor facturado real, "
+                        'úsalo así: "FACTURADO POR $[REAL], RESPECTO '
+                        f'DEL CUAL OBJETA ${obj_clean}".'
+                    ),
+                })
 
     # 10. Anti-divagación: la respuesta excesivamente larga oculta el
     #     argumento central. Más de 290 palabras = retry.

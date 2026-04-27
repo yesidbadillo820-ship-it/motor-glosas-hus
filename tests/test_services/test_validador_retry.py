@@ -181,6 +181,46 @@ class TestDetectarDefectos:
             x["regla"] == "tarifa_propia_con_contrato" for x in d
         )
 
+    def test_facturado_es_objetado_se_marca(self):
+        # Caso real 27-abr-2026: el LLM escribió "FACTURADA POR $168.563"
+        # pero $168.563 es el VALOR OBJETADO, no el facturado ($247.663).
+        arg = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
+            "SOBRE EL CÓDIGO TA0201, INTERPUESTA POR DISPENSARIO MEDICO, "
+            "RESPECTO DEL SERVICIO IDENTIFICADO CON CUPS 39147B-18, "
+            "FACTURADA POR $168.563, DADO QUE EL VALOR COBRADO ESTÁ POR "
+            "DEBAJO DE LA TARIFA PACTADA. COMUNICACIONES: "
+            "CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(arg),
+            codigo_glosa="TA0201",
+            valor_objetado="$168.563",
+            valor_facturado="$247.663",
+            tiene_contrato=True,
+        )
+        assert any(x["regla"] == "facturado_es_objetado" for x in d)
+
+    def test_facturado_correcto_no_se_marca(self):
+        # Si el dictamen cita el FACTURADO real ($247.663) y luego dice
+        # OBJETA $168.563, NO debe marcar.
+        arg = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
+            "SOBRE EL CÓDIGO TA0201, INTERPUESTA POR DISPENSARIO MEDICO, "
+            "RESPECTO DEL SERVICIO IDENTIFICADO CON CUPS 39147B-18, "
+            "FACTURADO POR $247.663, RESPECTO DEL CUAL LA ENTIDAD "
+            "PAGADORA OBJETA $168.563. COMUNICACIONES: "
+            "CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(arg),
+            codigo_glosa="TA0201",
+            valor_objetado="$168.563",
+            valor_facturado="$247.663",
+            tiene_contrato=True,
+        )
+        assert not any(x["regla"] == "facturado_es_objetado" for x in d)
+
     def test_demasiado_largo_se_marca(self):
         # Argumento con > 290 palabras debe disparar 'demasiado_largo'
         bloque = (
