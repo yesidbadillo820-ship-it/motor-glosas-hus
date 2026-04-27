@@ -724,6 +724,8 @@ from app.api.routers.firma import router as firma_router
 app.include_router(firma_router)
 from app.api.routers.sugerencias import router as sugerencias_router
 app.include_router(sugerencias_router)
+from app.api.routers.tareas_diarias import router as tareas_diarias_router
+app.include_router(tareas_diarias_router)
 
 
 

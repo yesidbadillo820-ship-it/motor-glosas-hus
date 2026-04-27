@@ -2724,6 +2724,68 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   💡
 </button>
 
+<!-- ✅ BOTÓN FLOTANTE: Tareas diarias del gestor -->
+<button id="td-fab" onclick="abrirPanelTareas()" title="Mis tareas del día"
+  style="position:fixed;bottom:22px;right:84px;width:52px;height:52px;border-radius:50%;
+         background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border:none;
+         box-shadow:0 6px 18px rgba(22,163,74,.45);cursor:pointer;font-size:1.4rem;
+         z-index:998;display:none;transition:transform .15s ease,box-shadow .15s ease"
+  onmouseover="this.style.transform='scale(1.08)';this.style.boxShadow='0 8px 22px rgba(22,163,74,.6)'"
+  onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 6px 18px rgba(22,163,74,.45)'">
+  ✅
+  <span id="td-badge" style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;
+        font-size:.65rem;font-weight:700;border-radius:10px;padding:.1rem .35rem;min-width:18px;
+        text-align:center;display:none;border:2px solid #fff;line-height:1.1">0</span>
+</button>
+
+<!-- ✅ PANEL: Tareas diarias -->
+<div id="td-panel" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;
+                          display:none;align-items:center;justify-content:center;
+                          backdrop-filter:blur(6px)">
+  <div class="card-premium" style="width:560px;max-width:96vw;max-height:88vh;display:flex;
+       flex-direction:column;padding:0;overflow:hidden">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);
+                background:linear-gradient(135deg,rgba(34,197,94,.08),rgba(34,197,94,.02));
+                display:flex;align-items:center;justify-content:space-between;gap:.6rem">
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;color:var(--text)">✅ Mis tareas del día</div>
+        <div id="td-fecha-label" style="font-size:.72rem;color:var(--text3);margin-top:.1rem">—</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.4rem">
+        <input id="td-fecha-input" type="date" onchange="cargarTareas()"
+          style="padding:.35rem .55rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;background:var(--bg-card);color:var(--text)"/>
+        <button onclick="cerrarPanelTareas()" class="btn btn-ghost" style="font-size:1.1rem;padding:.2rem .55rem" title="Cerrar">×</button>
+      </div>
+    </div>
+
+    <div style="padding:.85rem 1.5rem;border-bottom:1px solid var(--border);background:var(--bg-subtle);
+                display:flex;gap:.5rem;align-items:flex-start;flex-wrap:wrap">
+      <input id="td-nuevo-titulo" type="text" maxlength="200" placeholder="Nueva tarea (Enter para agregar)"
+        onkeydown="if(event.key==='Enter') crearTarea()"
+        style="flex:1;min-width:180px;padding:.55rem .75rem;border:1px solid var(--border);
+               border-radius:7px;font-size:.85rem;background:var(--bg-card);color:var(--text)"/>
+      <select id="td-nuevo-prioridad"
+        style="padding:.55rem .55rem;border:1px solid var(--border);border-radius:7px;
+               font-size:.82rem;background:var(--bg-card);color:var(--text)">
+        <option value="MEDIA">Media</option>
+        <option value="ALTA">Alta</option>
+        <option value="BAJA">Baja</option>
+      </select>
+      <button onclick="crearTarea()" class="btn btn-primary" id="td-btn-add"
+        style="padding:.55rem 1rem;font-size:.85rem">Agregar</button>
+    </div>
+
+    <div id="td-resumen" style="padding:.55rem 1.5rem;font-size:.74rem;color:var(--text3);
+                                 border-bottom:1px solid var(--border);background:var(--bg-card)"></div>
+
+    <div id="td-lista" style="flex:1;overflow-y:auto;padding:.6rem 1rem 1rem">
+      <div style="text-align:center;color:var(--text3);padding:2rem;font-size:.85rem">
+        Cargando...
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 💡 MODAL: Reportar fallo / sugerencia -->
 <div id="fb-modal" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;
                           display:none;align-items:center;justify-content:center;
@@ -7575,13 +7637,197 @@ async function enviarSugerencia(){
 window.addEventListener('hus:auth', function(){
   var fab = document.getElementById('fb-fab');
   if(fab) fab.style.display = 'flex';
+  var tdFab = document.getElementById('td-fab');
+  if(tdFab) tdFab.style.display = 'flex';
+  refrescarBadgeTareas();
 });
 // Fallback: si la app inicia con token, mostrar el FAB después de un tick
 setTimeout(function(){
   var t = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
   var fab = document.getElementById('fb-fab');
   if(t && fab) fab.style.display = 'flex';
+  var tdFab = document.getElementById('td-fab');
+  if(t && tdFab) tdFab.style.display = 'flex';
+  if(t) refrescarBadgeTareas();
 }, 800);
+
+// ─── TAREAS DIARIAS (checklist personal del gestor) ───────────────────────
+function _hoyISO(){
+  var d = new Date();
+  var pad = function(n){ return n < 10 ? '0' + n : '' + n; };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+async function abrirPanelTareas(){
+  var panel = document.getElementById('td-panel');
+  if(!panel) return;
+  var inp = document.getElementById('td-fecha-input');
+  if(inp && !inp.value) inp.value = _hoyISO();
+  panel.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  await cargarTareas();
+  setTimeout(function(){
+    var n = document.getElementById('td-nuevo-titulo');
+    if(n) n.focus();
+  }, 60);
+}
+
+function cerrarPanelTareas(){
+  var panel = document.getElementById('td-panel');
+  if(panel) panel.style.display = 'none';
+  document.body.style.overflow = '';
+  refrescarBadgeTareas();
+}
+
+function _fechaLabel(iso){
+  if(!iso) return '';
+  var hoy = _hoyISO();
+  if(iso === hoy) return 'Hoy · ' + iso;
+  return iso;
+}
+
+async function cargarTareas(){
+  var lista = document.getElementById('td-lista');
+  var resumen = document.getElementById('td-resumen');
+  var fechaLabel = document.getElementById('td-fecha-label');
+  var inp = document.getElementById('td-fecha-input');
+  var fecha = (inp && inp.value) || _hoyISO();
+  if(fechaLabel) fechaLabel.textContent = _fechaLabel(fecha);
+  if(!lista) return;
+  lista.innerHTML = '<div style="text-align:center;color:var(--text3);padding:1.2rem;font-size:.85rem">Cargando...</div>';
+  try {
+    var r = await fetch('/usuarios/yo/tareas?fecha=' + encodeURIComponent(fecha), { headers: authH() });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    if(resumen){
+      resumen.innerHTML = (data.total === 0)
+        ? 'Sin tareas para esta fecha. Agrega la primera abajo.'
+        : ('Total: <b>' + data.total + '</b> · Pendientes: <b style="color:#dc2626">' +
+           data.pendientes + '</b> · Completadas: <b style="color:#16a34a">' +
+           data.completadas + '</b>');
+    }
+    if(!data.items || data.items.length === 0){
+      lista.innerHTML = '<div style="text-align:center;color:var(--text3);padding:2rem;font-size:.85rem">' +
+        '🌱 Tu día está limpio. Agrega lo que necesitas hacer arriba.</div>';
+      return;
+    }
+    var html = '';
+    data.items.forEach(function(t){
+      var prColor = (t.prioridad === 'ALTA') ? '#dc2626' :
+                    (t.prioridad === 'BAJA' ? '#64748b' : '#d97706');
+      var prText = (t.prioridad === 'ALTA') ? 'ALTA' :
+                   (t.prioridad === 'BAJA' ? 'BAJA' : 'MEDIA');
+      var done = !!t.completada;
+      var titEsc = String(t.titulo || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var descEsc = String(t.descripcion || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += '<div class="td-item" data-id="' + t.id + '" ' +
+        'style="display:flex;align-items:flex-start;gap:.6rem;padding:.6rem .8rem;' +
+        'border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;' +
+        (done ? 'opacity:.55;background:var(--bg-subtle);' : 'background:var(--bg-card);') +
+        '">';
+      html += '<input type="checkbox" ' + (done ? 'checked' : '') +
+              ' onchange="toggleTarea(' + t.id + ', this.checked)" ' +
+              ' style="margin-top:.18rem;cursor:pointer;width:1.05rem;height:1.05rem;flex-shrink:0"/>';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:.88rem;color:var(--text);' +
+              (done ? 'text-decoration:line-through' : '') + '">' + titEsc + '</div>';
+      if(descEsc){
+        html += '<div style="font-size:.74rem;color:var(--text3);margin-top:.2rem">' + descEsc + '</div>';
+      }
+      html += '<div style="display:flex;gap:.5rem;margin-top:.3rem;font-size:.65rem">' +
+              '<span style="color:' + prColor + ';font-weight:700;letter-spacing:.5px">' + prText + '</span>' +
+              (t.glosa_id ? '<span style="color:var(--text3)">· glosa #' + t.glosa_id + '</span>' : '') +
+              '</div>';
+      html += '</div>';
+      html += '<button onclick="eliminarTarea(' + t.id + ')" title="Eliminar" ' +
+              'style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1rem;padding:.1rem .35rem">🗑</button>';
+      html += '</div>';
+    });
+    lista.innerHTML = html;
+  } catch(e){
+    lista.innerHTML = '<div style="text-align:center;color:#dc2626;padding:1.2rem;font-size:.85rem">' +
+      'Error al cargar: ' + e.message + '</div>';
+  }
+}
+
+async function crearTarea(){
+  var inp = document.getElementById('td-nuevo-titulo');
+  var prio = document.getElementById('td-nuevo-prioridad');
+  var fechaInp = document.getElementById('td-fecha-input');
+  if(!inp) return;
+  var titulo = (inp.value || '').trim();
+  if(titulo.length < 2){
+    inp.focus();
+    return;
+  }
+  var btn = document.getElementById('td-btn-add');
+  if(btn) btn.disabled = true;
+  try {
+    var body = { titulo: titulo, prioridad: (prio && prio.value) || 'MEDIA' };
+    if(fechaInp && fechaInp.value) body.fecha_para = fechaInp.value;
+    var r = await fetch('/usuarios/yo/tareas', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authH()),
+      body: JSON.stringify(body),
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    inp.value = '';
+    await cargarTareas();
+  } catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo crear: ' + e.message, 'error');
+  } finally {
+    if(btn) btn.disabled = false;
+  }
+}
+
+async function toggleTarea(id, completada){
+  try {
+    var r = await fetch('/usuarios/yo/tareas/' + id, {
+      method: 'PATCH',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authH()),
+      body: JSON.stringify({ completada: !!completada }),
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    await cargarTareas();
+  } catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo actualizar: ' + e.message, 'error');
+  }
+}
+
+async function eliminarTarea(id){
+  if(!confirm('¿Eliminar esta tarea?')) return;
+  try {
+    var r = await fetch('/usuarios/yo/tareas/' + id, {
+      method: 'DELETE', headers: authH(),
+    });
+    if(!(r.status === 204 || r.ok)) throw new Error('HTTP ' + r.status);
+    await cargarTareas();
+  } catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo eliminar: ' + e.message, 'error');
+  }
+}
+
+async function refrescarBadgeTareas(){
+  var badge = document.getElementById('td-badge');
+  if(!badge) return;
+  try {
+    var r = await fetch('/usuarios/yo/tareas/resumen', { headers: authH() });
+    if(!r.ok) return;
+    var d = await r.json();
+    if(d.pendientes > 0){
+      badge.textContent = d.pendientes > 99 ? '99+' : String(d.pendientes);
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e){ /* silencioso */ }
+}
+
+// Refresca el badge cada 5 min mientras la sesión esté activa
+setInterval(function(){
+  var t = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
+  if(t) refrescarBadgeTareas();
+}, 300000);
 
 // Sincroniza el badge numerico del sidebar con el del nav-bar legacy
 function syncSidebarBadge(idLegacy, idSide){

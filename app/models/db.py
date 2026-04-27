@@ -440,6 +440,32 @@ class AICallRecord(Base):
     )
 
 
+class TareaDiariaRecord(Base):
+    """Checklist de tareas diarias del gestor.
+
+    Independiente del motor de glosas: cada usuario gestiona su
+    propia lista (responder glosa X, preparar informe, ir a la
+    reunión, etc.). El día al que pertenece la tarea se guarda
+    en `fecha_para` para poder filtrar "lo de hoy".
+    """
+    __tablename__ = "tareas_diarias"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_email = Column(String(200), nullable=False, index=True)
+    titulo = Column(String(200), nullable=False)
+    descripcion = Column(Text, nullable=True)
+    # ALTA | MEDIA | BAJA
+    prioridad = Column(String(10), default="MEDIA", nullable=False)
+    # Fecha lógica (ISO date, el día al que pertenece la tarea).
+    # Sin time-zone: es local, lo que importa es "hoy/mañana".
+    fecha_para = Column(String(10), nullable=False, index=True)
+    completada = Column(Integer, default=0, nullable=False, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    completada_en = Column(DateTime(timezone=True), nullable=True)
+    # Vínculo opcional con una glosa (si la tarea es "responder GLS-...")
+    glosa_id = Column(Integer, nullable=True)
+
+
 class SugerenciaRecord(Base):
     """R369: feedback in-app de gestores (bugs, ideas, mejoras).
 
