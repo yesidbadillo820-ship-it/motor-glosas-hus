@@ -1070,6 +1070,144 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/auto-asignacion-sugerencias")
+def admin_auto_asignacion_sugerencias(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R377 P1: la IA sugiere a quién asignar cada glosa
+    abierta sin gestor.
+
+    Para cada glosa abierta sin gestor, busca el gestor
+    con mejor tasa histórica para el par (eps,
+    codigo_glosa). Si no hay datos, sugiere el de mejor
+    tasa global con esa EPS. Útil para asignación
+    masiva inteligente del coordinador.
+
+    Por glosa:
+      - glosa_id, eps, codigo_glosa, valor_objetado
+      - gestor_sugerido (con tasa y muestras)
+      - razon (por qué se sugiere)
+
+    Solo SUPER_ADMIN.
+    """
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    sin_gestor = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(
+            (GlosaRecord.gestor_nombre.is_(None))
+            | (GlosaRecord.gestor_nombre == "")
+        )
+        .order_by(GlosaRecord.valor_objetado.desc())
+        .limit(int(limit))
+        .all()
+    )
+
+    if not sin_gestor:
+        return {
+            "total_pendientes": 0,
+            "items": [],
+        }
+
+    # Pre-cargar histórico decidido relevante en una sola pasada
+    epss = {(g.eps or "").strip() for g in sin_gestor if g.eps}
+    historicas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .filter(GlosaRecord.eps.in_(epss))
+        .all()
+    ) if epss else []
+
+    # Indexamos por par y por eps
+    par_idx: dict[tuple, dict] = {}
+    eps_idx: dict[str, dict] = {}
+    for h in historicas:
+        eps = (h.eps or "").strip()
+        cod = (h.codigo_glosa or "").strip()
+        gestor = (h.gestor_nombre or "").strip()
+        if not eps or not gestor:
+            continue
+        # par index
+        kp = (eps, cod, gestor)
+        bp = par_idx.setdefault(kp, {"dec": 0, "lev": 0})
+        bp["dec"] += 1
+        if (h.estado or "").upper() == "LEVANTADA":
+            bp["lev"] += 1
+        # eps index
+        ke = (eps, gestor)
+        be = eps_idx.setdefault(ke, {"dec": 0, "lev": 0})
+        be["dec"] += 1
+        if (h.estado or "").upper() == "LEVANTADA":
+            be["lev"] += 1
+
+    items = []
+    for g in sin_gestor:
+        eps = (g.eps or "").strip()
+        cod = (g.codigo_glosa or "").strip()
+
+        # Buscar mejor gestor en par (eps, codigo)
+        candidatos_par = [
+            (gestor, b["dec"], b["lev"])
+            for (e, c, gestor), b in par_idx.items()
+            if e == eps and c == cod and b["dec"] >= 2
+        ]
+        sugerido = None
+        razon = None
+        if candidatos_par:
+            candidatos_par.sort(
+                key=lambda x: (100*x[2]/x[1], x[1]), reverse=True,
+            )
+            ge, dec, lev = candidatos_par[0]
+            sugerido = {
+                "gestor": ge,
+                "tasa_pct": round(100*lev/dec, 2),
+                "muestras": dec,
+                "fuente": "par_eps_codigo",
+            }
+            razon = f"Mejor tasa en (EPS, código) con {dec} casos"
+        else:
+            # Fallback: mejor en EPS global
+            candidatos_eps = [
+                (gestor, b["dec"], b["lev"])
+                for (e, gestor), b in eps_idx.items()
+                if e == eps and b["dec"] >= 3
+            ]
+            if candidatos_eps:
+                candidatos_eps.sort(
+                    key=lambda x: (100*x[2]/x[1], x[1]), reverse=True,
+                )
+                ge, dec, lev = candidatos_eps[0]
+                sugerido = {
+                    "gestor": ge,
+                    "tasa_pct": round(100*lev/dec, 2),
+                    "muestras": dec,
+                    "fuente": "eps_global",
+                }
+                razon = f"Sin datos del par; mejor en la EPS con {dec} casos"
+            else:
+                razon = "Sin datos históricos suficientes"
+
+        items.append({
+            "glosa_id": g.id,
+            "eps": eps,
+            "codigo_glosa": cod,
+            "valor_objetado": int(float(g.valor_objetado or 0)),
+            "dias_restantes": g.dias_restantes,
+            "gestor_sugerido": sugerido,
+            "razon": razon,
+        })
+
+    return {
+        "total_pendientes": len(items),
+        "items": items,
+    }
+
+
 @router.get("/glosas-altas-cuantia-vencidas")
 def admin_glosas_altas_cuantia_vencidas(
     umbral: float = 5_000_000,
