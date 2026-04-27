@@ -8854,14 +8854,102 @@ async function responderGlosa(id){
       }, 1200);
     }
 
+    // R-UI 27-abr-2026: trackear ID activo para que un re-analizar
+    // posterior actualice esta glosa (no cree fila duplicada en
+    // historial). analizar() lee window._glosa_id_actual y, si está
+    // seteado, llama a POST /glosas/{id}/reanalizar.
+    window._glosa_id_actual = id;
+
+    // R-UI 27-abr-2026: si la glosa ya tiene dictamen guardado,
+    // renderizarlo en result-area en vez de dejar la pantalla en
+    // blanco (causa que el gestor crea que no hay respuesta y
+    // dispare otro analizar duplicando registros).
+    if(g.dictamen && g.dictamen.length > 80){
+      try{
+        var area = document.getElementById('result-area');
+        if(area){
+          var landing = document.getElementById('landing-hero');
+          if(landing) landing.style.display = 'none';
+          var fechaCreado = g.creado_en
+            ? new Date(g.creado_en).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'})
+            : '';
+          var modeloUsado = g.modelo_ia || '—';
+          var html = '<div class="card-premium" style="margin:1rem 1.5rem;padding:1.4rem;">'
+            + '<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.8rem;flex-wrap:wrap">'
+            + '<div>'
+            + '<div style="font-size:.7rem;font-weight:800;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">📜 Dictamen ya generado</div>'
+            + '<div style="font-size:1rem;font-weight:700;color:var(--text);margin-top:.2rem">Glosa #' + g.id + ' · ' + (g.factura || '—') + '</div>'
+            + '<div style="font-size:.72rem;color:var(--text3);margin-top:.15rem">' + fechaCreado + (modeloUsado ? ' · ' + modeloUsado : '') + '</div>'
+            + '</div>'
+            + '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'
+            + '<button class="btn-sm btn-primary" onclick="reanalizarConIA(' + g.id + ')" title="Vuelve a generar el dictamen con la IA — sobreescribe el actual">🧠 Re-analizar con IA</button>'
+            + '<button class="btn-sm ghost" onclick="copiarDictamenActual()">Copiar texto</button>'
+            + '</div>'
+            + '</div>'
+            + '<div id="dictamen-previo-body" style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.1rem;font-size:.85rem;line-height:1.55;white-space:pre-wrap;max-height:60vh;overflow-y:auto;color:var(--text)">'
+            + (g.dictamen.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
+            + '</div>'
+            + '<div style="margin-top:.8rem;padding:.55rem .85rem;background:var(--bg-subtle);border-radius:6px;font-size:.72rem;color:var(--text3)">'
+            + '💡 Si el dictamen está OK no hace falta re-analizar. Solo presioná "Re-analizar con IA" si querés cambiar tono, agregar PDFs nuevos, o refinar argumentos.'
+            + '</div>'
+            + '</div>';
+          area.innerHTML = html + (area.innerHTML || '');
+        }
+      }catch(_){/* silencioso */}
+    }
+
     // Scroll arriba y avisar al usuario
     window.scrollTo({top: 0, behavior: 'smooth'});
     if(typeof toast === 'function'){
-      toast('Glosa #' + id + ' cargada', 'Selecciona un concepto de la lista o usa "Analizar todos"', 'success');
+      var msgToast = (g.dictamen && g.dictamen.length > 80)
+        ? 'Dictamen anterior cargado arriba. Re-analizá solo si querés cambiarlo.'
+        : 'Selecciona un concepto de la lista o usa "Analizar todos"';
+      toast('Glosa #' + id + ' cargada', msgToast, 'success');
     }
   }catch(e){
     alert('Error al cargar la glosa: ' + e.message);
   }
+}
+
+// R-UI 27-abr-2026: re-analiza una glosa existente sin crear nueva
+// fila en historial. Usa POST /glosas/{id}/reanalizar.
+async function reanalizarConIA(glosaId){
+  if(!glosaId){ alert('No hay glosa activa'); return; }
+  if(!confirm('Esto regenerará el dictamen de la glosa #' + glosaId + ' con la IA y reemplazará el actual. ¿Continuar?')) return;
+  if(typeof showLoading === 'function') showLoading();
+  try{
+    var tono = (document.querySelector('input[name="tono"]:checked')||{}).value || 'conciliador';
+    var modo = 'defender';
+    var r = await fetch('/glosas/' + glosaId + '/reanalizar', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({tono: tono, modo_respuesta: modo}),
+    });
+    if(!r.ok){
+      var e = await r.json().catch(function(){return{};});
+      throw new Error(e.detail || ('HTTP ' + r.status));
+    }
+    var data = await r.json();
+    if(typeof toast === 'function') toast('✓ Dictamen regenerado', 'La glosa #' + glosaId + ' fue actualizada en historial', 'success');
+    // Recargar la vista con el nuevo dictamen
+    setTimeout(function(){ responderGlosa(glosaId); }, 400);
+  }catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo re-analizar: ' + e.message, 'error');
+    else alert('Error: ' + e.message);
+  }finally{
+    if(typeof hideLoading === 'function') hideLoading();
+  }
+}
+
+function copiarDictamenActual(){
+  var body = document.getElementById('dictamen-previo-body') || document.getElementById('res-dictamen-body');
+  if(!body) return;
+  var txt = body.innerText || body.textContent || '';
+  navigator.clipboard.writeText(txt).then(function(){
+    if(typeof toast === 'function') toast('Copiado', 'Texto del dictamen copiado al portapapeles', 'success');
+  }).catch(function(){
+    alert('No se pudo copiar — usa Ctrl+C manual');
+  });
 }
 
 // ─── FORM ─────────────────────────────────────────────────────────────────
@@ -9025,6 +9113,23 @@ async function analizar(modoOverride){
   var glosa=document.getElementById('f-glosa').value.trim();
   if(!eps){toast('Campo requerido','Seleccione la EPS','warning');return;}
   if(glosa.length<15){toast('Campo requerido','Ingrese la descripción completa de la glosa (mínimo 15 caracteres)','warning');return;}
+
+  // R-UI 27-abr-2026: si el usuario está analizando una glosa que YA
+  // existe (vino de "Ver/Re-abrir" en Mis Glosas), redirigir el flujo
+  // a /glosas/{id}/reanalizar para SOBREESCRIBIR el dictamen actual
+  // en vez de crear una fila duplicada en historial. El servidor
+  // reusa los datos persistidos (texto_glosa_original, factura, etc.).
+  if(window._glosa_id_actual){
+    var idActivo = window._glosa_id_actual;
+    if(!confirm('Esto va a regenerar el dictamen de la glosa #' + idActivo + ' y reemplazar el actual. ¿Continuar?')){
+      return;
+    }
+    if(typeof reanalizarConIA === 'function'){
+      // limpiar el flag para que la próxima glosa NO se confunda
+      window._glosa_id_actual = null;
+      return reanalizarConIA(idActivo);
+    }
+  }
 
   // R59 P4: bloquea ambos botones (defender + auditoría) para evitar
   // doble click y feedback visual coherente
@@ -9722,6 +9827,10 @@ function nuevaGlosa(){
   document.getElementById('f-radicado').value='';
   document.getElementById('result-area').innerHTML='<div class="empty-state"><div class="empty-icon">⚖</div><div class="empty-h">IA GLOSAS SINAC SC</div><div class="empty-p">Complete los datos y presione Analizar</div></div>';
   lastResult=null;
+  // R-UI 27-abr-2026: limpiar tracker de glosa activa para que el
+  // próximo "Analizar" SÍ cree una glosa nueva (no reanalice la
+  // que estaba abierta antes).
+  window._glosa_id_actual = null;
 }
 
 function copiarDictamen(event){
