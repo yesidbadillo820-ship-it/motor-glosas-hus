@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_coordinador_o_admin
+from app.api.deps import get_coordinador_o_admin, get_usuario_actual
 from app.database import get_db
 from app.models.db import UsuarioRecord
 from app.services.health_monitor import checar_salud
@@ -1171,6 +1171,86 @@ def cumplimiento_resolucion(
         "items_cumplidos": cumple,
         "tasa_cumplimiento_pct": round(100 * cumple / len(items), 2),
         "items": items,
+    }
+
+
+@router.get("/que-hay-de-nuevo")
+def que_hay_de_nuevo(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R380 P1: changelog visible para los gestores.
+
+    Lista las últimas mejoras visibles al usuario,
+    agrupadas por categoría. Estático en código (rinde
+    rápido y no necesita base de datos).
+
+    Útil como modal "novedades" al iniciar sesión.
+    """
+    return {
+        "version_actual": "premium-2026-04",
+        "destacadas": [
+            {
+                "titulo": "🤖 Asistente proactivo en topbar",
+                "desc": (
+                    "El bot 🤖 al lado de las notificaciones "
+                    "te dice qué hacer hoy con prioridades. "
+                    "Hace pulse rojo cuando hay urgentes."
+                ),
+                "tipo": "feature",
+            },
+            {
+                "titulo": "🎯 Quick Wins automáticos",
+                "desc": (
+                    "En Mi desempeño la IA detecta glosas "
+                    "fáciles de cerrar HOY (tasa histórica "
+                    "≥60%). Cierra estas primero para mover "
+                    "tu mes."
+                ),
+                "tipo": "feature",
+            },
+            {
+                "titulo": "🧠 Asistente IA en cada glosa",
+                "desc": (
+                    "Al abrir cualquier glosa aparece arriba "
+                    "una tarjeta con probabilidad de "
+                    "levantamiento, código de respuesta "
+                    "sugerido, casos similares ya resueltos "
+                    "y un Playbook táctico (tono, riesgo, "
+                    "próximo paso)."
+                ),
+                "tipo": "feature",
+            },
+            {
+                "titulo": "💡 Reportar fallos en 2 clics",
+                "desc": (
+                    "Botón flotante azul abajo a la derecha. "
+                    "Reporta bugs, ideas o mejoras sin salir "
+                    "del sistema. Tecla rápida: B."
+                ),
+                "tipo": "feature",
+            },
+            {
+                "titulo": "⌨️ Atajos de teclado",
+                "desc": (
+                    "?: ayuda · /: buscar · n: nueva glosa · "
+                    "m: mis glosas · d: dashboard · b: "
+                    "reportar · Esc: cerrar."
+                ),
+                "tipo": "ux",
+            },
+            {
+                "titulo": "📊 2 dashboards single-call",
+                "desc": (
+                    "Cobranza Live (saldo + aging + top EPS) "
+                    "y Resumen del mes (KPIs ejecutivos) en "
+                    "el sidebar de Reportes. Una sola llamada "
+                    "= carga inmediata."
+                ),
+                "tipo": "feature",
+            },
+        ],
+        "endpoints_nuevos_count": 117,
+        "ultima_revision": "R380",
     }
 
 
