@@ -406,6 +406,229 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/insights")
+def yo_insights(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R385 P1: insights personales narrativos.
+
+    La IA convierte tus métricas en frases cortas
+    accionables, en lenguaje humano. Devuelve hasta 5
+    insights ordenados por relevancia.
+
+    Cada insight: titulo, frase, tipo (POSITIVO,
+    NEUTRAL, ATENCION), accion_sugerida.
+    """
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if inicio_mes.month == 1:
+        inicio_anterior = inicio_mes.replace(
+            year=inicio_mes.year - 1, month=12,
+        )
+    else:
+        inicio_anterior = inicio_mes.replace(
+            month=inicio_mes.month - 1,
+        )
+
+    # Mes actual y anterior
+    decididas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_anterior)
+        .all()
+    )
+    actual_dec = actual_lev = prev_dec = prev_lev = 0
+    actual_rec = prev_rec = 0.0
+    for g in decididas:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        rec = float(g.valor_recuperado or 0)
+        if f >= inicio_mes:
+            actual_dec += 1
+            actual_rec += rec
+            if (g.estado or "").upper() == "LEVANTADA":
+                actual_lev += 1
+        else:
+            prev_dec += 1
+            prev_rec += rec
+            if (g.estado or "").upper() == "LEVANTADA":
+                prev_lev += 1
+
+    tasa_actual = (
+        100.0 * actual_lev / actual_dec if actual_dec else 0.0
+    )
+    tasa_prev = (
+        100.0 * prev_lev / prev_dec if prev_dec else 0.0
+    )
+
+    # Equipo (para comparativa)
+    decididas_eq = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .all()
+    )
+    bucket_eq: dict[str, dict] = {}
+    for g in decididas_eq:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        b = bucket_eq.setdefault(gestor, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (g.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+    if bucket_eq:
+        tasas_eq = [
+            100.0 * b["lev"] / b["dec"]
+            for b in bucket_eq.values() if b["dec"] >= 3
+        ]
+        tasa_eq_promedio = (
+            round(sum(tasas_eq) / len(tasas_eq), 2)
+            if tasas_eq else 0.0
+        )
+    else:
+        tasa_eq_promedio = 0.0
+
+    # Backlog
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    n_abiertas = len(abiertas)
+    n_vencidas = sum(
+        1 for g in abiertas if (g.dias_restantes or 0) < 0
+    )
+
+    insights = []
+
+    # 1) Comparación con mes anterior
+    if prev_dec >= 3:
+        delta = tasa_actual - tasa_prev
+        if delta >= 5:
+            insights.append({
+                "titulo": "Subiste tu tasa este mes",
+                "frase": (
+                    f"Pasaste de {tasa_prev:.1f}% a "
+                    f"{tasa_actual:.1f}% — sube {delta:.1f} pts."
+                ),
+                "tipo": "POSITIVO",
+                "accion_sugerida": "Mantén el momentum",
+                "prioridad": 3,
+            })
+        elif delta <= -5:
+            insights.append({
+                "titulo": "Tu tasa cayó vs mes anterior",
+                "frase": (
+                    f"Bajaste de {tasa_prev:.1f}% a "
+                    f"{tasa_actual:.1f}% ({delta:+.1f} pts)."
+                ),
+                "tipo": "ATENCION",
+                "accion_sugerida": (
+                    "Revisa /yo/eps-mejor-rendimiento para "
+                    "identificar qué cambió"
+                ),
+                "prioridad": 1,
+            })
+
+    # 2) Comparación con equipo
+    if actual_dec >= 3 and tasa_eq_promedio > 0:
+        diff = tasa_actual - tasa_eq_promedio
+        if diff >= 8:
+            insights.append({
+                "titulo": "Por encima del promedio del equipo",
+                "frase": (
+                    f"Tu tasa ({tasa_actual:.1f}%) está "
+                    f"{diff:.1f} pts arriba del promedio "
+                    f"({tasa_eq_promedio:.1f}%)."
+                ),
+                "tipo": "POSITIVO",
+                "accion_sugerida": (
+                    "Comparte buenas prácticas con el equipo"
+                ),
+                "prioridad": 3,
+            })
+        elif diff <= -8:
+            insights.append({
+                "titulo": "Por debajo del promedio del equipo",
+                "frase": (
+                    f"Tu tasa ({tasa_actual:.1f}%) está "
+                    f"{abs(diff):.1f} pts abajo del promedio "
+                    f"({tasa_eq_promedio:.1f}%)."
+                ),
+                "tipo": "ATENCION",
+                "accion_sugerida": (
+                    "Revisa casos similares antes de redactar dictamen"
+                ),
+                "prioridad": 2,
+            })
+
+    # 3) Vencidas
+    if n_vencidas > 0:
+        insights.append({
+            "titulo": f"{n_vencidas} glosa(s) vencidas",
+            "frase": (
+                "Estas glosas pueden archivarse "
+                "automáticamente si no las cierras hoy."
+            ),
+            "tipo": "ATENCION",
+            "accion_sugerida": "Atender en orden de antigüedad",
+            "prioridad": 1,
+        })
+
+    # 4) Backlog
+    if n_abiertas > 30:
+        insights.append({
+            "titulo": "Backlog alto",
+            "frase": (
+                f"Tienes {n_abiertas} glosas abiertas — "
+                "considera priorizar quick-wins."
+            ),
+            "tipo": "NEUTRAL",
+            "accion_sugerida": "Abre Quick Wins en Mi desempeño",
+            "prioridad": 2,
+        })
+
+    # 5) Recuperado del mes
+    if actual_rec > 0:
+        if actual_rec > prev_rec * 1.2 and prev_rec > 0:
+            insights.append({
+                "titulo": "Recuperación creciente",
+                "frase": (
+                    f"Recuperaste ${int(actual_rec):,} este mes — "
+                    f"{((actual_rec/prev_rec - 1)*100):.0f}% más "
+                    "que el mes pasado."
+                ),
+                "tipo": "POSITIVO",
+                "accion_sugerida": "Buen ritmo financiero",
+                "prioridad": 3,
+            })
+
+    insights.sort(key=lambda x: x["prioridad"])
+    return {
+        "usuario_email": current_user.email,
+        "total_insights": len(insights),
+        "items": insights[:5],
+    }
+
+
 @router.get("/yo/checklist-personal")
 def yo_checklist_personal(
     db: Session = Depends(get_db),
