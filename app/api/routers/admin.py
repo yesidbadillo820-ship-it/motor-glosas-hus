@@ -21,6 +21,49 @@ from app.repositories.audit_repository import AuditRepository
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+@router.post("/migracion-emergencia")
+def migracion_emergencia(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Ejecuta los ALTER TABLE de resize de columnas que la migración
+    auto del startup no aplicó por algún motivo (Render no reinició,
+    bug del flag _is_sqlite, conexión cacheada, etc.).
+
+    Idempotente — los ALTER TYPE en Postgres no fallan si la columna
+    ya tiene ese tipo. Solo SUPER_ADMIN.
+    """
+    from sqlalchemy import text
+    statements = [
+        "ALTER TABLE historial ALTER COLUMN eps TYPE VARCHAR(300)",
+        "ALTER TABLE historial ALTER COLUMN paciente TYPE VARCHAR(300)",
+        "ALTER TABLE historial ALTER COLUMN etapa TYPE VARCHAR(120)",
+        "ALTER TABLE historial ALTER COLUMN modelo_ia TYPE VARCHAR(120)",
+        "ALTER TABLE historial ALTER COLUMN tecnico_recepcion TYPE VARCHAR(300)",
+        "ALTER TABLE historial ALTER COLUMN gestor_nombre TYPE VARCHAR(300)",
+    ]
+    resultados = []
+    for sql in statements:
+        try:
+            db.execute(text(sql))
+            db.commit()
+            resultados.append({"sql": sql, "status": "OK"})
+        except Exception as e:
+            db.rollback()
+            resultados.append({"sql": sql, "status": "ERROR", "msg": str(e)})
+    ok = sum(1 for r in resultados if r["status"] == "OK")
+    return {
+        "ejecutados": resultados,
+        "exitosos": ok,
+        "total": len(statements),
+        "mensaje": (
+            "Migración aplicada. Reintenta la importación del Excel."
+            if ok == len(statements)
+            else "Algunos ALTER fallaron — revisa los mensajes."
+        ),
+    }
+
 # Frase de confirmación obligatoria en el body
 CONFIRMACION_REQUERIDA = "CONFIRMAR-BORRADO-TOTAL"
 
