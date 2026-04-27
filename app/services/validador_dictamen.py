@@ -554,25 +554,40 @@ def detectar_defectos_criticos(
         menciona_propia = re.search(
             r"TARIFA\s+PROPIA(?:\s+INSTITUCIONAL)?", arg_up,
         )
+        # 9a. Auto-contradicción dentro de la misma frase:
+        #     "TARIFA PROPIA INSTITUCIONAL PACTADA" — "propia" implica
+        #     fijación unilateral, "pactada" implica acuerdo bilateral.
+        #     Esto NO requiere mencionar contrato a parte; ya es
+        #     contradictorio en sí mismo.
+        propia_pactada = re.search(
+            r"TARIFA\s+PROPIA(?:\s+INSTITUCIONAL)?\s+PACTADA", arg_up,
+        )
+        # 9b. Mención de contrato en cualquier forma habitual.
         menciona_contrato = re.search(
             r"(?:EN\s+VIRTUD\s+DEL\s+CONTRATO|CONFORME\s+AL\s+CONTRATO|"
-            r"CONTRATO\s+(?:N[OUÚ]MERO|No\.|NRO\.?))",
+            r"CONTRATO\s+(?:N[OUÚ]MERO|No\.?|NRO\.?|VIGENTE|"
+            r"INTERADMINISTRATIVO|SUSCRITO|CELEBRADO)|"
+            r"CONTRATO\s+\d|CL[ÁA]USULA\s+CONTRACTUAL)",
             arg_up,
         )
-        if menciona_propia and menciona_contrato:
+        if propia_pactada or (menciona_propia and menciona_contrato):
             defectos.append({
                 "regla": "tarifa_propia_con_contrato",
                 "mensaje": (
-                    'El dictamen menciona "TARIFA PROPIA INSTITUCIONAL" '
-                    "junto con el contrato, lo cual es CONTRADICTORIO: "
+                    'El dictamen menciona "TARIFA PROPIA" '
+                    "junto al contrato, lo cual es CONTRADICTORIO: "
                     "si hay contrato, la tarifa es PACTADA, no propia."
                 ),
                 "sugerencia": (
                     'Reescribe usando exclusivamente "TARIFA PACTADA EN '
-                    "EL CONTRATO No. [X]\". Si necesitas referenciar la "
-                    'Resolución 054/2026, dilo como "tarifas incorporadas '
-                    'al contrato a través de la Resolución 054/2026", '
-                    'NUNCA como "tarifa propia institucional".'
+                    "EL CONTRATO No. [X]\". NUNCA escribas "
+                    '"TARIFA PROPIA INSTITUCIONAL" cuando hay contrato; '
+                    "tampoco lo combines con la palabra PACTADA: "
+                    '"propia" implica fijación unilateral y "pactada" '
+                    "implica acuerdo, no pueden coexistir. Si necesitas "
+                    "referenciar la Resolución 054/2026, dilo como "
+                    '"tarifas incorporadas al contrato a través de la '
+                    'Resolución 054/2026".'
                 ),
             })
 

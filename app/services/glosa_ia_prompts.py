@@ -450,16 +450,19 @@ REGLAS:
 • Si la entidad es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001 FUERZAS MILITARES, NO cites T-760/2008.
 
 🚫 PROHIBIDO MEZCLAR "TARIFA PROPIA" CON "CONTRATO" (regla anti-contradicción):
-  Si el BLOQUE 1 informa un CONTRATO vigente, la tarifa aplicable es la
-  TARIFA PACTADA EN ESE CONTRATO — punto. NUNCA digas frases como:
+  Si el BLOQUE 1 informa un CONTRATO vigente (cualquier número de
+  contrato, "interadministrativo", "vigente", "suscrito"), la tarifa
+  aplicable es la TARIFA PACTADA EN ESE CONTRATO — punto. La palabra
+  "PROPIA" queda PROHIBIDA en todo el dictamen. Frases vetadas:
     ❌ "TARIFA PROPIA INSTITUCIONAL ... EN VIRTUD DEL CONTRATO X"
+    ❌ "TARIFA PROPIA INSTITUCIONAL PACTADA"  ← contradicción interna:
+        "propia" = unilateral, "pactada" = bilateral; NO COEXISTEN
+    ❌ "TARIFA PROPIA INSTITUCIONAL DE $X" (en presencia de contrato)
     ❌ "RESOLUCIÓN 054/2026 ... ESTABLECIDA POR EL CONTRATO X"
     ❌ "TARIFA UNILATERAL DEL HOSPITAL ... CONFORME AL CONTRATO X"
-  Esto se lee como contradicción porque "tarifa propia" implica
-  fijación unilateral, mientras que "contrato" implica acuerdo bilateral.
   Cuando hay contrato, di SIEMPRE:
-    ✅ "TARIFA PACTADA EN EL CONTRATO No. [X]"
-    ✅ "EL CONTRATO No. [X] ESTABLECE COMO TARIFA APLICABLE [...]"
+    ✅ "TARIFA PACTADA EN EL CONTRATO No. [X] DE $[VALOR]"
+    ✅ "EL CONTRATO No. [X] ESTABLECE COMO TARIFA APLICABLE $[VALOR]"
     ✅ "EL CONTRATO INCORPORA LAS TARIFAS DE LA RESOLUCIÓN 054/2026 ESE HUS"
        (solo si el campo Tarifa pactada del BLOQUE 1 dice "PROPIA" o
        "INSTITUCIONAL" — y aún así, la fuente normativa primaria es el
@@ -467,6 +470,11 @@ REGLAS:
   Si NO hay contrato (Tarifa pactada = "SIN CONTRATO" o vacía), entonces
   sí puedes invocar la Resolución 054/2026 como tarifario institucional
   aplicable supletoriamente, junto con la Circular 047/2025 (SOAT).
+
+  REGLA DE ORO: si el BLOQUE 1 te muestra un número de contrato + un
+  valor de tarifa, llama a esa tarifa "TARIFA PACTADA" o "TARIFA DEL
+  CONTRATO" — sin importar lo que diga la modalidad. La palabra
+  "propia" queda RESERVADA exclusivamente al caso sin contrato.
 
 🚫 ANTI-RELLENO Y REPETICIÓN (regla de concisión):
   • NO repitas en P3 lo que ya dijiste en P1 (servicio, código, EPS, valor).

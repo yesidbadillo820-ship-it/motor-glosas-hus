@@ -118,6 +118,47 @@ class TestDetectarDefectos:
         )
         assert any(x["regla"] == "tarifa_propia_con_contrato" for x in d)
 
+    def test_tarifa_propia_pactada_es_contradiccion_interna(self):
+        # Caso real de producción 27-abr-2026: el LLM escribió
+        # "TARIFA PROPIA INSTITUCIONAL PACTADA DE $231.556" — se lee
+        # como contradicción aunque no diga "en virtud del contrato".
+        arg = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
+            "SOBRE EL CÓDIGO TA0201, INTERPUESTA POR DISPENSARIO MEDICO, "
+            "RESPECTO DEL SERVICIO IDENTIFICADO CON CUPS 39147B-18, "
+            "FACTURADO POR $168.563, DADO QUE EL VALOR COBRADO SE "
+            "ENCUENTRA POR DEBAJO DE LA TARIFA PROPIA INSTITUCIONAL "
+            "PACTADA DE $231.556. EL DECRETO 1795 DE 2000 RIGE EL "
+            "CONTRATO INTERADMINISTRATIVO VIGENTE. "
+            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(arg),
+            codigo_glosa="TA0201",
+            valor_objetado="$168.563",
+            tiene_contrato=True,
+        )
+        assert any(x["regla"] == "tarifa_propia_con_contrato" for x in d)
+
+    def test_tarifa_propia_y_contrato_interadministrativo(self):
+        # Variante: contrato mencionado solo como "interadministrativo".
+        arg = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
+            "SOBRE EL CÓDIGO TA0201, FACTURADA POR $168.563, RESPECTO DEL "
+            "SERVICIO. LA TARIFA PROPIA INSTITUCIONAL DE $231.556 RIGE "
+            "EL CONTRATO INTERADMINISTRATIVO. "
+            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(arg),
+            codigo_glosa="TA0201",
+            valor_objetado="$168.563",
+            tiene_contrato=True,
+        )
+        assert any(x["regla"] == "tarifa_propia_con_contrato" for x in d)
+
     def test_tarifa_propia_sin_contrato_no_es_defecto(self):
         # Si NO hay contrato, "tarifa propia institucional" sí aplica.
         arg = (

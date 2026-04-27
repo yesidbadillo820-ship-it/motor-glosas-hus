@@ -8,7 +8,6 @@ Extraído de app/main.py (era ~365 LOC). Maneja:
   - Generación de banner de tarifa + dictamen de aceptación si aplica
   - Persistencia (GlosaRecord) + snapshot de versión inicial
 """
-from __future__ import annotations
 
 import re
 from typing import Optional
