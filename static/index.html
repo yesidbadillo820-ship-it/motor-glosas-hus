@@ -6652,9 +6652,15 @@ async function cargarAsistenteFicha(glosaId){
   var box = document.getElementById('ficha-asistente-ia');
   if(!box) return;
   try{
-    var r = await fetch('/glosas/'+glosaId+'/asistente-ficha', {headers: authH()});
+    // En paralelo: ficha (R370) + playbook (R375)
+    var [r, rp] = await Promise.all([
+      fetch('/glosas/'+glosaId+'/asistente-ficha', {headers: authH()}),
+      fetch('/glosas/'+glosaId+'/playbook', {headers: authH()}).catch(function(){ return null; })
+    ]);
     if(!r.ok){ box.style.display = 'none'; return; }
     var d = await r.json();
+    var pb = null;
+    if(rp && rp.ok){ try{ pb = await rp.json(); }catch(_){} }
 
     // Color de urgencia
     var ucol = {
@@ -6718,6 +6724,36 @@ async function cargarAsistenteFicha(glosaId){
       '</div>';
     }).join('') || '<div style="font-size:.7rem;color:var(--text3)">Sin casos similares previos</div>';
 
+    // Bloque playbook (R375)
+    var pbHtml = '';
+    if(pb && pb.tono_recomendado){
+      var tonoColor = {
+        conciliador:'#15803d', neutral:'#0284c7', firme:'#b91c1c'
+      }[pb.tono_recomendado] || '#64748b';
+      var riesgoColor = {
+        ALTO:'#b91c1c', MEDIO:'#d97706', BAJO:'#15803d'
+      }[pb.riesgo && pb.riesgo.nivel] || '#64748b';
+      pbHtml =
+        '<div style="background:rgba(255,255,255,.85);border-radius:9px;padding:.7rem .85rem;margin-top:.85rem;border-left:4px solid '+tonoColor+'">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem">'+
+            '<div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">📘 Playbook táctico</div>'+
+            '<div style="display:flex;gap:.4rem">'+
+              '<span style="background:'+tonoColor+';color:#fff;padding:2px 8px;border-radius:6px;font-size:.66rem;font-weight:700;text-transform:uppercase">Tono: '+escHtml(pb.tono_recomendado)+'</span>'+
+              '<span style="background:'+riesgoColor+';color:#fff;padding:2px 8px;border-radius:6px;font-size:.66rem;font-weight:700">Riesgo: '+escHtml(pb.riesgo.nivel)+'</span>'+
+            '</div>'+
+          '</div>'+
+          '<div style="font-size:.78rem;color:var(--text2);margin-bottom:.4rem"><b>'+escHtml(pb.proximo_paso||'')+'</b></div>'+
+          '<div style="font-size:.72rem;color:var(--text3);font-style:italic;margin-bottom:.5rem">'+escHtml(pb.tono_motivo||'')+'</div>'+
+          (pb.recomendaciones && pb.recomendaciones.length
+            ? '<div style="display:flex;flex-direction:column;gap:.25rem">'+
+                pb.recomendaciones.map(function(x){
+                  return '<div style="font-size:.74rem;color:var(--text2);padding:.25rem .5rem;background:var(--bg-subtle);border-radius:5px">'+escHtml(x)+'</div>';
+                }).join('')+
+              '</div>'
+            : '')+
+        '</div>';
+    }
+
     box.style.display = 'block';
     box.innerHTML =
       '<div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:12px;padding:1rem 1.2rem">'+
@@ -6743,6 +6779,7 @@ async function cargarAsistenteFicha(glosaId){
             casosHtml +
           '</div>'+
         '</div>'+
+        pbHtml +
       '</div>';
   } catch(e){ console.error('Asistente ficha:', e); box.style.display = 'none'; }
 }
