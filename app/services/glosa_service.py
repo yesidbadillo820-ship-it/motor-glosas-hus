@@ -1196,6 +1196,11 @@ class GlosaService:
             #  hay 2+ PDFs) usamos Opus 4.7 que rinde mejor en tareas
             #  jurídicas largas.
             # ═══════════════════════════════════════════════════════════
+            #  Routing en 3 niveles para optimizar costo:
+            #    HAIKU  — casos simples / valor bajo / sin PDF / glosa
+            #             corta. ~20× más barato que Sonnet.
+            #    SONNET — caso por defecto.
+            #    OPUS   — alta complejidad: valor>=10M + 2+ PDFs.
             _modelo_override = None
             try:
                 _valor_num_route = 0
@@ -1205,11 +1210,32 @@ class GlosaService:
                     if _digits:
                         _valor_num_route = int(_digits)
                 _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
+                _len_glosa_route = len(str(texto_base or ""))
+                _len_pdf_route = len(str(contexto_pdf or ""))
+
+                # OPUS: valor alto + multi-PDF
                 if _valor_num_route >= 10_000_000 and _num_pdfs_route >= 2:
                     _modelo_override = "claude-opus-4-7"
                     logger.info(
-                        "[ROUTING-IA] Caso de alta complejidad — "
-                        f"valor=${_valor_num_route:,} pdfs={_num_pdfs_route} → Opus 4.7"
+                        "[ROUTING-IA] OPUS — "
+                        f"valor=${_valor_num_route:,} pdfs={_num_pdfs_route}"
+                    )
+                # HAIKU: caso liviano. Reduce ~75% el costo y conserva
+                # calidad porque el cerebro pre-IA ya hizo el trabajo
+                # duro (auditoría + bloque excedente + checklist).
+                elif (
+                    _valor_num_route < 500_000
+                    and _num_pdfs_route <= 1
+                    and _len_pdf_route < 5_000
+                    and _len_glosa_route < 800
+                ):
+                    _modelo_override = "claude-haiku-4-5-20251001"
+                    logger.info(
+                        "[ROUTING-IA] HAIKU — caso liviano "
+                        f"(valor=${_valor_num_route:,}, "
+                        f"pdfs={_num_pdfs_route}, "
+                        f"texto={_len_glosa_route}c). "
+                        "Ahorro ~75% vs Sonnet."
                     )
             except Exception:
                 pass
