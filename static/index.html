@@ -1743,6 +1743,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <!-- ✅ Checklist personal (R381): cosas pendientes -->
         <div id="md-checklist" style="display:none"></div>
 
+        <!-- 💬 Insights narrativos (R385): la IA habla en humano -->
+        <div id="md-insights" style="display:none"></div>
+
         <!-- Banner de glosas críticas si hay -->
         <div id="md-criticas-banner" style="display:none"></div>
 
@@ -7008,6 +7011,49 @@ async function cargarChecklistPersonal(){
   } catch(e){ console.error('checklist:', e); box.style.display = 'none'; }
 }
 
+// 💬 R385: Insights narrativos
+async function cargarInsightsPersonales(){
+  var box = document.getElementById('md-insights');
+  if(!box) return;
+  try{
+    var r = await fetch('/usuarios/yo/insights', {headers: authH()});
+    if(!r.ok){ box.style.display = 'none'; return; }
+    var d = await r.json();
+    if(!d.total_insights){ box.style.display = 'none'; return; }
+    var tipoEstilo = {
+      POSITIVO: {bg:'linear-gradient(135deg,#f0fdf4,#dcfce7)', border:'#86efac', accent:'#166534', icon:'✨'},
+      NEUTRAL:  {bg:'linear-gradient(135deg,#eff6ff,#dbeafe)', border:'#bfdbfe', accent:'#1e40af', icon:'💡'},
+      ATENCION: {bg:'linear-gradient(135deg,#fff7ed,#fed7aa)', border:'#fdba74', accent:'#9a3412', icon:'⚠️'}
+    };
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;margin:1rem 0;box-shadow:var(--sh-md, 0 1px 3px rgba(0,0,0,.06))">'+
+        '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem">'+
+          '<div style="font-size:1.4rem">💬</div>'+
+          '<div style="flex:1">'+
+            '<div style="font-weight:700;color:var(--text);font-size:.95rem">La IA dice</div>'+
+            '<div style="font-size:.74rem;color:var(--text3)">'+d.total_insights+' insight(s) sobre tu desempeño</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:.5rem">'+
+          d.items.map(function(it){
+            var s = tipoEstilo[it.tipo] || tipoEstilo.NEUTRAL;
+            return '<div style="background:'+s.bg+';border:1px solid '+s.border+';border-radius:9px;padding:.7rem .9rem">'+
+              '<div style="display:flex;align-items:start;gap:.55rem">'+
+                '<div style="font-size:1.2rem;line-height:1.2">'+s.icon+'</div>'+
+                '<div style="flex:1">'+
+                  '<div style="font-weight:700;color:'+s.accent+';font-size:.85rem;margin-bottom:.2rem">'+escHtml(it.titulo)+'</div>'+
+                  '<div style="font-size:.78rem;color:var(--text2);line-height:1.45">'+escHtml(it.frase)+'</div>'+
+                  (it.accion_sugerida ? '<div style="font-size:.7rem;color:'+s.accent+';margin-top:.3rem;font-style:italic">→ '+escHtml(it.accion_sugerida)+'</div>' : '')+
+                '</div>'+
+              '</div>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+      '</div>';
+  } catch(e){ console.error('insights:', e); box.style.display = 'none'; }
+}
+
 // Carga datos para las tarjetas premium del panel "Mi desempeño"
 async function cargarMiDesempenoPremium(){
   // 🤖 Asistente proactivo (R368) — lo primero
@@ -7016,6 +7062,8 @@ async function cargarMiDesempenoPremium(){
   cargarQuickWins();
   // ✅ Checklist personal (R381)
   cargarChecklistPersonal();
+  // 💬 Insights narrativos (R385)
+  cargarInsightsPersonales();
 
   // Streak (R270)
   try{
