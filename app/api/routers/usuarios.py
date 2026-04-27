@@ -406,6 +406,184 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/inicio")
+def yo_inicio(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R378 P1: home unificado del usuario (single-call).
+
+    Devuelve TODO lo que el gestor necesita ver al
+    iniciar la jornada — sin que pregunte:
+      - resumen_dia (count vencidas, críticas, abiertas,
+        cerradas_hoy)
+      - top_acciones (3 más urgentes del asistente)
+      - top_quick_wins (3 fáciles de cerrar HOY)
+      - menciones_pendientes (count + 3 más recientes)
+
+    Optimizado: una sola llamada para una pantalla
+    completa de bienvenida.
+    """
+    from datetime import timedelta
+
+    from app.core.tz import ahora_utc
+    from app.models.db import (
+        ComentarioGlosaRecord, GlosaRecord,
+    )
+
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    nombre = current_user.nombre or current_user.email
+    ahora = ahora_utc()
+    inicio_dia = ahora.replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+
+    # Resumen del día
+    abiertas_q = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    n_abiertas = len(abiertas_q)
+    n_vencidas = sum(
+        1 for g in abiertas_q
+        if (g.dias_restantes or 0) < 0
+    )
+    n_criticas = sum(
+        1 for g in abiertas_q
+        if 0 <= (g.dias_restantes or 0) <= 3
+    )
+
+    cerradas_hoy = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(
+            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+        ))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_dia)
+        .count()
+    )
+
+    # Top 3 acciones más urgentes
+    top_acciones = []
+    if n_vencidas:
+        peor = next(
+            (g for g in sorted(
+                abiertas_q,
+                key=lambda x: x.dias_restantes or 0,
+            )), None,
+        )
+        top_acciones.append({
+            "tipo": "URGENTE",
+            "titulo": f"{n_vencidas} vencida(s)",
+            "glosa_id": peor.id if peor else None,
+        })
+    if n_criticas:
+        peor_c = next(
+            (g for g in sorted(
+                abiertas_q,
+                key=lambda x: x.dias_restantes or 0,
+            ) if 0 <= (g.dias_restantes or 0) <= 3),
+            None,
+        )
+        top_acciones.append({
+            "tipo": "IMPORTANTE",
+            "titulo": f"{n_criticas} crítica(s)",
+            "glosa_id": peor_c.id if peor_c else None,
+        })
+
+    # Top 3 quick wins
+    tasas_cache: dict[tuple, tuple] = {}
+
+    def _tasa(eps, cod):
+        k = (eps, cod)
+        if k in tasas_cache:
+            return tasas_cache[k]
+        rows = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.eps == eps)
+            .filter(GlosaRecord.codigo_glosa == cod)
+            .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+            .all()
+        )
+        n = len(rows)
+        lev = sum(
+            1 for r in rows
+            if (r.estado or "").upper() == "LEVANTADA"
+        )
+        tasas_cache[k] = (n, lev)
+        return n, lev
+
+    qw = []
+    for g in abiertas_q:
+        if not g.eps or not g.codigo_glosa:
+            continue
+        n, lev = _tasa(g.eps, g.codigo_glosa)
+        if n < 3:
+            continue
+        tasa = 100.0 * lev / n
+        if tasa < 60:
+            continue
+        valor = float(g.valor_objetado or 0)
+        qw.append({
+            "glosa_id": g.id,
+            "eps": g.eps,
+            "valor_objetado": int(valor),
+            "tasa_pct": round(tasa, 1),
+            "score": tasa * valor,
+        })
+    qw.sort(key=lambda x: x["score"], reverse=True)
+
+    # Menciones pendientes
+    menciones_q = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.mencion == current_user.email)
+        .filter(
+            (ComentarioGlosaRecord.resuelto == 0)
+            | (ComentarioGlosaRecord.resuelto.is_(None))
+        )
+        .order_by(ComentarioGlosaRecord.creado_en.desc())
+        .all()
+    )
+    menciones_top = [
+        {
+            "glosa_id": m.glosa_id,
+            "autor_email": m.autor_email,
+            "texto": (m.texto or "")[:140],
+            "creado_en": m.creado_en.isoformat() if m.creado_en else None,
+        }
+        for m in menciones_q[:3]
+    ]
+
+    return {
+        "usuario_email": current_user.email,
+        "saludo_hora": ahora.hour,
+        "resumen_dia": {
+            "abiertas": n_abiertas,
+            "vencidas": n_vencidas,
+            "criticas": n_criticas,
+            "cerradas_hoy": cerradas_hoy,
+        },
+        "top_acciones": top_acciones,
+        "top_quick_wins": [
+            {
+                "glosa_id": x["glosa_id"],
+                "eps": x["eps"],
+                "valor_objetado": x["valor_objetado"],
+                "tasa_pct": x["tasa_pct"],
+            }
+            for x in qw[:3]
+        ],
+        "menciones_pendientes": {
+            "total": len(menciones_q),
+            "top_3": menciones_top,
+        },
+    }
+
+
 @router.get("/yo/quick-wins")
 def yo_quick_wins(
     limit: int = 10,
