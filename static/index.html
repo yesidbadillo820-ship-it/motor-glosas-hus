@@ -1562,6 +1562,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <!-- 🤖 Asistente IA por glosa (R370) — se muestra cuando hay una cargada -->
           <div id="ficha-asistente-ia" style="display:none;margin:1rem 0"></div>
 
+          <!-- 🎯 R400: Copilot ejecutivo (estado del sistema) -->
+          <div id="copilot-banner" style="display:none;margin:1rem 0"></div>
+
           <!-- Empty state con logo SINAC de fondo + tema festivo dinámico -->
           <div class="empty-state" id="landing-empty-state" style="margin:1rem auto;position:relative;overflow:hidden;">
             <img src="/static/sinac-logo.png" alt=""
@@ -6776,17 +6779,60 @@ setTimeout(function(){
   if(t){
     cargarAsistenteProactivo();
     cargarDonutProgreso();
+    cargarCopilotBanner();
     setInterval(function(){
       var t2 = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
       if(t2){
         cargarAsistenteProactivo();
         cargarDonutProgreso();
+        cargarCopilotBanner();
       }
     }, 5 * 60 * 1000);
     // 🎉 Mostrar "Qué hay de nuevo" si la versión cambió
     chequearQueHayDeNuevo();
   }
 }, 1500);
+
+// 🎯 R400: Banner del copilot ejecutivo
+async function cargarCopilotBanner(){
+  var box = document.getElementById('copilot-banner');
+  if(!box) return;
+  try{
+    var r = await fetch('/sistema/copilot-resumen', {headers: authH()});
+    if(!r.ok){ box.style.display = 'none'; return; }
+    var d = await r.json();
+    if(!d.frase_ejecutiva){ box.style.display = 'none'; return; }
+    var hilColors = {
+      ATENCION: {bg:'#fef2f2', fg:'#991b1b', border:'#fecaca'},
+      POSITIVO: {bg:'#f0fdf4', fg:'#166534', border:'#86efac'},
+      NEUTRAL:  {bg:'#eff6ff', fg:'#1e40af', border:'#bfdbfe'},
+      INFO:     {bg:'#f5f3ff', fg:'#5b21b6', border:'#ddd6fe'}
+    };
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div style="background:linear-gradient(135deg,#0b1220,#1e293b);color:#fff;border-radius:12px;padding:1.1rem 1.4rem;box-shadow:0 4px 14px rgba(11,18,32,.18)">'+
+        '<div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.85rem;flex-wrap:wrap">'+
+          '<div style="font-size:1.5rem">🎯</div>'+
+          '<div style="flex:1;min-width:200px">'+
+            '<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;opacity:.65;font-weight:700">Copilot · estado del sistema</div>'+
+            '<div style="font-weight:700;font-size:1rem;margin-top:.15rem">'+escHtml(d.frase_ejecutiva)+'</div>'+
+          '</div>'+
+          '<button onclick="document.getElementById(\'copilot-banner\').style.display=\'none\'" '+
+            'style="background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:.95rem">×</button>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.5rem">'+
+          (d.highlights||[]).map(function(h){
+            var c = hilColors[h.tipo] || hilColors.NEUTRAL;
+            return '<div style="background:'+c.bg+';color:'+c.fg+';border:1px solid '+c.border+';border-radius:9px;padding:.6rem .8rem">'+
+              '<div style="font-size:.7rem;font-weight:600;opacity:.85">'+escHtml(h.titulo)+'</div>'+
+              '<div style="font-weight:800;font-size:1.1rem;margin-top:.15rem">'+escHtml(h.valor)+'</div>'+
+              '<div style="font-size:.66rem;opacity:.85;margin-top:.15rem">'+escHtml(h.detalle||'')+'</div>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+      '</div>';
+  } catch(e){ console.error('copilot-banner:', e); box.style.display = 'none'; }
+}
 
 // 🎯 R387: hidrata donut de progreso del mes
 async function cargarDonutProgreso(){
