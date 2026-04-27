@@ -222,11 +222,11 @@ class TestDetectarDefectos:
         assert not any(x["regla"] == "facturado_es_objetado" for x in d)
 
     def test_demasiado_largo_se_marca(self):
-        # Argumento con > 290 palabras debe disparar 'demasiado_largo'
+        # Argumento con > 340 palabras debe disparar 'demasiado_largo'
         bloque = (
             "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN "
             "SOBRE EL CÓDIGO FA0401, INTERPUESTA POR COOSALUD, RESPECTO DEL "
-            "SERVICIO FACTURADO. " + ("PALABRA " * 300) +
+            "SERVICIO FACTURADO. " + ("PALABRA " * 350) +
             "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
             "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
         )
@@ -234,6 +234,20 @@ class TestDetectarDefectos:
             _xml_ok(bloque), codigo_glosa="FA0401",
         )
         assert any(x["regla"] == "demasiado_largo" for x in d)
+
+    def test_300_palabras_ya_no_dispara(self):
+        # 300 palabras está dentro del nuevo límite (340) — no flag.
+        bloque = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN "
+            "SOBRE EL CÓDIGO FA0401, INTERPUESTA POR COOSALUD, RESPECTO DEL "
+            "SERVICIO FACTURADO. " + ("PALABRA " * 280) +
+            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(bloque), codigo_glosa="FA0401",
+        )
+        assert not any(x["regla"] == "demasiado_largo" for x in d)
 
 
 class TestInstruccionRetry:

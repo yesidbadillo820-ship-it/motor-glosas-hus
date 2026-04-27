@@ -647,14 +647,16 @@ def detectar_defectos_criticos(
                 })
 
     # 10. Anti-divagación: la respuesta excesivamente larga oculta el
-    #     argumento central. Más de 290 palabras = retry.
+    #     argumento central. Más de 340 palabras = retry. Subido de
+    #     290 a 340 (27-abr-2026) porque retries solo por longitud
+    #     casi nunca mejoraban y desperdiciaban ~$0.05 por llamada.
     n_palabras = _contar_palabras(arg)
-    if n_palabras > 290:
+    if n_palabras > 340:
         defectos.append({
             "regla": "demasiado_largo",
             "mensaje": (
                 f"El argumento tiene {n_palabras} palabras: divaga "
-                "y diluye el alegato. Máximo 250-280."
+                "y diluye el alegato. Máximo 320."
             ),
             "sugerencia": (
                 "Compacta: una idea por oración, sin repetir código/EPS/"

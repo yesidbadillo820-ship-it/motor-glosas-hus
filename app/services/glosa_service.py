@@ -1281,7 +1281,22 @@ class GlosaService:
                             )
                     except Exception as _e_c:
                         logger.debug(f"Detector copia falló: {_e_c}")
-                if _defectos:
+                # Heurística de costo: si el ÚNICO defecto es
+                # "demasiado_largo", el retry rara vez mejora (el LLM
+                # vuelve a producir longitud similar) y gastamos
+                # ~$0.05 + ~25s en latencia por nada. Tratamos esa
+                # regla como soft warning y NO disparamos retry.
+                _solo_largo = (
+                    len(_defectos) == 1
+                    and _defectos[0].get("regla") == "demasiado_largo"
+                )
+                if _solo_largo:
+                    logger.info(
+                        "[VALIDACION-IA] Solo demasiado_largo — "
+                        "retry omitido para ahorrar tokens (~$0.05). "
+                        "Aceptando primera respuesta."
+                    )
+                if _defectos and not _solo_largo:
                     logger.warning(
                         f"[VALIDACION-IA] Defectos detectados en primera "
                         f"respuesta: {resumen_defectos(_defectos)}"
