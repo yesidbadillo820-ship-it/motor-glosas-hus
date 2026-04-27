@@ -1241,6 +1241,11 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <span style="font-size:17px;">🔔</span>
         <span id="hdr-notif-badge" style="display:none;position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;border-radius:999px;padding:1px 5px;font-size:9px;font-weight:700;line-height:1.1;min-width:13px;text-align:center;">0</span>
       </button>
+      <!-- 🤖 R372: bell del Asistente Proactivo -->
+      <button id="hdr-asistente-btn" onclick="abrirAsistenteDrawer()" title="Asistente IA: qué hacer hoy" style="position:relative;background:rgba(255,255,255,.08);border:0;color:#fff;border-radius:50%;width:34px;height:34px;cursor:pointer;margin-right:.5rem;display:none;align-items:center;justify-content:center;">
+        <span style="font-size:17px;">🤖</span>
+        <span id="hdr-asistente-badge" style="display:none;position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;border-radius:999px;padding:1px 5px;font-size:9px;font-weight:700;line-height:1.1;min-width:13px;text-align:center;">0</span>
+      </button>
       <button class="search-trigger" onclick="abrirCommandPalette()" title="Buscar acciones">
         <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <span>Buscar…</span>
@@ -2555,6 +2560,25 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
 <!-- TOASTS -->
 <div class="toast-wrap" id="toasts"></div>
+
+<!-- 🤖 R372: Drawer del Asistente Proactivo (slide-in derecha) -->
+<div id="asistente-drawer" style="position:fixed;top:0;right:-440px;bottom:0;width:420px;max-width:92vw;
+                                    background:var(--bg-card);border-left:1px solid var(--border);
+                                    box-shadow:-8px 0 30px rgba(11,18,32,.18);z-index:9990;
+                                    transition:right .25s var(--ease, ease);overflow-y:auto;display:flex;flex-direction:column">
+  <div style="position:sticky;top:0;background:linear-gradient(135deg,#0b1220,#1e293b);color:#fff;padding:1rem 1.2rem;display:flex;align-items:center;gap:.6rem">
+    <div style="font-size:1.4rem">🤖</div>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:.95rem">Asistente proactivo</div>
+      <div style="font-size:.7rem;opacity:.75">Qué deberías hacer hoy, según la IA</div>
+    </div>
+    <button onclick="cerrarAsistenteDrawer()" style="background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:1.1rem">×</button>
+  </div>
+  <div id="asistente-drawer-body" style="padding:1rem 1.1rem;flex:1">
+    <div style="text-align:center;color:var(--text3);padding:2rem 0;font-size:.8rem">Cargando…</div>
+  </div>
+</div>
+<div id="asistente-drawer-overlay" style="position:fixed;inset:0;background:rgba(11,18,32,.5);z-index:9989;display:none" onclick="cerrarAsistenteDrawer()"></div>
 
 <!-- 💡 BOTÓN FLOTANTE: Reportar fallo / sugerencia (R369) -->
 <button id="fb-fab" onclick="abrirModalSugerencia()" title="Reportar fallo o sugerir mejora"
@@ -6442,12 +6466,22 @@ async function cargarMiDesempeno(){
 // 🤖 Asistente Proactivo: carga acciones priorizadas y las pinta
 async function cargarAsistenteProactivo(){
   var box = document.getElementById('md-asistente');
-  if(!box) return;
   try{
     var r = await fetch('/usuarios/yo/asistente-proactivo', {headers: authH()});
-    if(!r.ok){ box.innerHTML = ''; return; }
+    if(!r.ok){ if(box) box.innerHTML = ''; actualizarBadgeAsistente(0); return; }
     var d = await r.json();
     var acciones = d.acciones || [];
+
+    // Badge en topbar — cuenta solo URGENTE/IMPORTANTE/MENCIONES
+    var pendientes = acciones.filter(function(a){
+      return ['URGENTE','IMPORTANTE','MENCIONES'].indexOf(a.tipo) >= 0;
+    }).reduce(function(acc,a){ return acc + (a.count||0); }, 0);
+    actualizarBadgeAsistente(pendientes);
+
+    // Pintar drawer si está abierto (o pre-renderizar)
+    pintarAsistenteDrawer(acciones);
+
+    if(!box) return;
     if(!acciones.length){ box.innerHTML = ''; return; }
 
     // Estilos por tipo
@@ -6501,6 +6535,86 @@ async function cargarAsistenteProactivo(){
       '</div>';
   } catch(e){ console.error('Asistente proactivo:', e); box.innerHTML = ''; }
 }
+
+// 🤖 Pintar el drawer lateral con las mismas acciones del asistente
+function pintarAsistenteDrawer(acciones){
+  var body = document.getElementById('asistente-drawer-body');
+  if(!body) return;
+  if(!acciones || !acciones.length){
+    body.innerHTML = '<div style="text-align:center;color:var(--text3);padding:2rem 0;font-size:.85rem">'+
+      '<div style="font-size:2rem;margin-bottom:.5rem">✨</div>'+
+      'Todo bajo control — sin acciones pendientes</div>';
+    return;
+  }
+  var estilos = {
+    URGENTE:    {bg:'linear-gradient(135deg,#fef2f2,#fee2e2)', border:'#fecaca', accent:'#991b1b'},
+    IMPORTANTE: {bg:'linear-gradient(135deg,#fff7ed,#ffedd5)', border:'#fed7aa', accent:'#9a3412'},
+    OPORTUNIDAD:{bg:'linear-gradient(135deg,#f0fdf4,#dcfce7)', border:'#bbf7d0', accent:'#166534'},
+    MENCIONES:  {bg:'linear-gradient(135deg,#eff6ff,#dbeafe)', border:'#bfdbfe', accent:'#1e40af'},
+    MEJORAR:    {bg:'linear-gradient(135deg,#fefce8,#fef9c3)', border:'#fde68a', accent:'#854d0e'},
+    OK:         {bg:'linear-gradient(135deg,#ecfeff,#cffafe)', border:'#a5f3fc', accent:'#155e75'}
+  };
+  body.innerHTML = acciones.map(function(a){
+    var st = estilos[a.tipo] || estilos.OK;
+    var glosaLinks = (a.glosa_ids||[]).slice(0,5).map(function(gid){
+      return '<a href="#" onclick="abrirGlosaDesdeAsistente('+gid+');cerrarAsistenteDrawer();return false" '+
+        'style="background:rgba(255,255,255,.85);border:1px solid '+st.border+';padding:.15rem .55rem;border-radius:8px;font-size:.7rem;font-family:monospace;font-weight:700;color:'+st.accent+';text-decoration:none">#'+gid+'</a>';
+    }).join('');
+    return '<div style="background:'+st.bg+';border:1px solid '+st.border+';border-radius:9px;padding:.7rem .85rem;margin-bottom:.55rem">'+
+      '<div style="display:flex;align-items:start;gap:.6rem">'+
+        '<div style="font-size:1.3rem;line-height:1">'+(a.icono||'•')+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-weight:700;font-size:.85rem;color:var(--text);margin-bottom:.2rem">'+escHtml(a.titulo)+'</div>'+
+          '<div style="font-size:.74rem;color:var(--text2);line-height:1.4">'+escHtml(a.mensaje)+'</div>'+
+          (glosaLinks ? '<div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.4rem">'+glosaLinks+'</div>' : '')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function actualizarBadgeAsistente(n){
+  var b = document.getElementById('hdr-asistente-btn');
+  var bd = document.getElementById('hdr-asistente-badge');
+  if(!b || !bd) return;
+  // Visible si hay sesión iniciada (token presente)
+  var t = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
+  if(t) b.style.display = 'flex';
+  if(n > 0){
+    bd.style.display = 'inline-flex';
+    bd.textContent = n > 99 ? '99+' : String(n);
+  } else {
+    bd.style.display = 'none';
+  }
+}
+
+function abrirAsistenteDrawer(){
+  var d = document.getElementById('asistente-drawer');
+  var ov = document.getElementById('asistente-drawer-overlay');
+  if(!d) return;
+  d.style.right = '0';
+  if(ov) ov.style.display = 'block';
+  // Refresca al abrir
+  cargarAsistenteProactivo();
+}
+function cerrarAsistenteDrawer(){
+  var d = document.getElementById('asistente-drawer');
+  var ov = document.getElementById('asistente-drawer-overlay');
+  if(d) d.style.right = '-440px';
+  if(ov) ov.style.display = 'none';
+}
+
+// Polling inicial al login y cada 5 minutos
+setTimeout(function(){
+  var t = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
+  if(t){
+    cargarAsistenteProactivo();
+    setInterval(function(){
+      var t2 = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
+      if(t2) cargarAsistenteProactivo();
+    }, 5 * 60 * 1000);
+  }
+}, 1500);
 
 // Helper: abre la glosa al hacer clic en un chip del asistente
 function abrirGlosaDesdeAsistente(gid){
