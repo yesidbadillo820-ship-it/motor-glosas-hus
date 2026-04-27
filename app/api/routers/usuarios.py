@@ -406,6 +406,142 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/proximas-sugerencias")
+def yo_proximas_sugerencias(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R399 P1: combinador de sugerencias prioritarias.
+
+    Mezcla las 3 mejores recomendaciones del momento
+    (de quick-wins, vencidas y casos sin dictamen) en
+    una lista única ordenada por impacto inmediato.
+
+    Cada item incluye categoría (QUICK_WIN, URGENTE,
+    SIN_DICTAMEN), motivo legible y action_button.
+    """
+    import math
+
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .all()
+    )
+    if not abiertas:
+        return {
+            "usuario_email": current_user.email,
+            "total": 0, "items": [],
+        }
+
+    # Cargar histórico de pares
+    pares = {
+        ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
+        for g in abiertas if g.eps and g.codigo_glosa
+    }
+    eps_set = {p[0] for p in pares}
+    cod_set = {p[1] for p in pares}
+    historico = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(list(ESTADOS_DECIDIDOS)))
+        .filter(GlosaRecord.eps.in_(eps_set))
+        .filter(GlosaRecord.codigo_glosa.in_(cod_set))
+        .all()
+    ) if pares else []
+    par_idx: dict[tuple, dict] = {}
+    for h in historico:
+        k = ((h.eps or "").strip(), (h.codigo_glosa or "").strip())
+        if k not in pares:
+            continue
+        b = par_idx.setdefault(k, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (h.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+
+    quick_wins = []
+    urgentes = []
+    sin_dict_alto = []
+
+    for g in abiertas:
+        dr = g.dias_restantes if g.dias_restantes is not None else 999
+        valor = float(g.valor_objetado or 0)
+        k = ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
+        b = par_idx.get(k)
+        tasa = (b["lev"] / b["dec"]) if b and b["dec"] >= 2 else None
+
+        # URGENTE
+        if dr < 0:
+            urgentes.append({
+                "categoria": "URGENTE",
+                "glosa_id": g.id,
+                "motivo": (
+                    f"Vencida hace {abs(dr)}d · valor "
+                    f"${int(valor):,}"
+                ),
+                "score": 1000 + math.log10(max(valor, 1) + 1) * 10,
+                "action_button": "Cerrar HOY",
+            })
+            continue
+
+        # QUICK_WIN: tasa alta + valor medio-alto + abierta
+        if tasa is not None and tasa >= 0.6 and dr >= 0:
+            score = 500 + tasa * 200 + math.log10(max(valor, 1) + 1) * 5
+            quick_wins.append({
+                "categoria": "QUICK_WIN",
+                "glosa_id": g.id,
+                "motivo": (
+                    f"{tasa*100:.0f}% probabilidad histórica · "
+                    f"valor ${int(valor):,}"
+                ),
+                "score": score,
+                "action_button": "Cerrar pronto",
+            })
+            continue
+
+        # SIN_DICTAMEN + alto valor
+        if (
+            (not (g.dictamen or "").strip())
+            and valor >= 5_000_000
+        ):
+            sin_dict_alto.append({
+                "categoria": "SIN_DICTAMEN",
+                "glosa_id": g.id,
+                "motivo": (
+                    f"Alto valor ${int(valor):,} sin "
+                    "dictamen — riesgo de pérdida"
+                ),
+                "score": 300 + math.log10(max(valor, 1) + 1) * 8,
+                "action_button": "Redactar dictamen",
+            })
+
+    # Tomar 3 de cada categoría, ordenados por score
+    urgentes.sort(key=lambda x: x["score"], reverse=True)
+    quick_wins.sort(key=lambda x: x["score"], reverse=True)
+    sin_dict_alto.sort(key=lambda x: x["score"], reverse=True)
+
+    items = (
+        urgentes[:3] + quick_wins[:3] + sin_dict_alto[:3]
+    )
+    items.sort(key=lambda x: x["score"], reverse=True)
+
+    return {
+        "usuario_email": current_user.email,
+        "total": len(items),
+        "categorias_count": {
+            "URGENTE": len(urgentes),
+            "QUICK_WIN": len(quick_wins),
+            "SIN_DICTAMEN": len(sin_dict_alto),
+        },
+        "items": items[:9],
+    }
+
+
 @router.get("/yo/super-resumen")
 def yo_super_resumen(
     db: Session = Depends(get_db),
