@@ -1374,6 +1374,11 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M9 12L11 14L15 10"/></svg>
           <span class="sn-item-label">Auditoría</span>
         </button>
+        <button class="sn-item" data-tip="Sugerencias / Bug Reports (admin)" onclick="sidebarTab(this,'admin-sugerencias')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11h6M9 15h4M21 12c0 4.97-4.03 9-9 9-1.49 0-2.9-.36-4.14-1L3 21l1-4.86C3.36 14.9 3 13.49 3 12c0-4.97 4.03-9 9-9s9 4.03 9 9z"/></svg>
+          <span class="sn-item-label">Sugerencias</span>
+          <span id="sn-sug-badge" class="sn-badge" style="display:none;background:#ef4444;color:#fff;padding:1px 6px;border-radius:9px;font-size:10px;font-weight:700;margin-left:auto"></span>
+        </button>
       </div>
 
       <div class="sn-group">
@@ -1881,6 +1886,43 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <div class="chart-hdr">Top 3 gestores por volumen</div>
             <div id="rm-top-gestor" style="padding:.6rem"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- R376: Panel admin de Sugerencias -->
+    <div class="panel" id="p-admin-sugerencias">
+      <div class="page-pad">
+        <div class="page-head">
+          <div>
+            <h2 class="page-title">💡 Sugerencias y reportes del equipo</h2>
+            <p class="page-sub">Feedback in-app de los gestores · solo SUPER_ADMIN</p>
+          </div>
+          <div class="page-actions toolbar-inline">
+            <select id="sug-filtro-estado" onchange="cargarPanelSugerencias()" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);font-size:.82rem">
+              <option value="">Todas</option>
+              <option value="ABIERTA" selected>Abiertas</option>
+              <option value="EN_REVISION">En revisión</option>
+              <option value="RESUELTA">Resueltas</option>
+              <option value="DESCARTADA">Descartadas</option>
+            </select>
+            <select id="sug-filtro-tipo" onchange="cargarPanelSugerencias()" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);font-size:.82rem">
+              <option value="">Todos los tipos</option>
+              <option value="BUG">🐛 Bug</option>
+              <option value="MEJORA">⚙️ Mejora</option>
+              <option value="IDEA">💡 Idea</option>
+              <option value="OTRO">✉️ Otro</option>
+            </select>
+            <button class="btn-sm ghost" onclick="cargarPanelSugerencias()">Actualizar</button>
+          </div>
+        </div>
+
+        <!-- Tarjetas resumen -->
+        <div id="sug-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1rem"></div>
+
+        <!-- Lista -->
+        <div id="sug-lista" style="display:flex;flex-direction:column;gap:.65rem">
+          <div style="text-align:center;color:var(--text3);padding:2rem">Cargando…</div>
         </div>
       </div>
     </div>
@@ -4148,6 +4190,7 @@ function tab(btn,id){
   if(id==='dashboard') loadDash();
   if(id==='cobranza-live') loadDashCobranza();
   if(id==='resumen-mes') loadResumenMes();
+  if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
   if(id==='usuarios') loadUsuarios();
@@ -8807,6 +8850,114 @@ async function loadResumenMes(){
         }).join('')
       : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin datos del mes</div>';
   } catch(e){ console.error('Resumen mes error', e); }
+}
+
+// ─── R376: Panel admin de Sugerencias ────────────────────────────────────
+async function cargarPanelSugerencias(){
+  var lista = document.getElementById('sug-lista');
+  var kpis = document.getElementById('sug-kpis');
+  if(!lista || !kpis) return;
+  lista.innerHTML = '<div style="text-align:center;color:var(--text3);padding:2rem">Cargando…</div>';
+
+  // Resumen primero
+  try{
+    var rR = await fetch('/admin/sugerencias-resumen', {headers: authH()});
+    if(rR.status === 403){
+      lista.innerHTML = '<div style="text-align:center;color:#b45309;padding:2rem">Solo SUPER_ADMIN puede ver este panel</div>';
+      kpis.innerHTML = '';
+      return;
+    }
+    var dR = await rR.json();
+    kpis.innerHTML =
+      '<div class="kpi"><div class="kpi-lbl">Abiertas</div><div class="kpi-num" style="color:#b91c1c">'+(dR.abiertas||0)+'</div><div class="kpi-sub">sin atender</div></div>'+
+      '<div class="kpi"><div class="kpi-lbl">Bugs pendientes</div><div class="kpi-num" style="color:#dc2626">'+(dR.bugs_pendientes||0)+'</div><div class="kpi-sub">prioritarios</div></div>'+
+      '<div class="kpi"><div class="kpi-lbl">Total reportes</div><div class="kpi-num">'+(dR.total||0)+'</div><div class="kpi-sub">histórico</div></div>'+
+      '<div class="kpi"><div class="kpi-lbl">Top reportador</div><div class="kpi-num" style="font-size:1rem">'+
+        ((dR.top_autores||[])[0] ? escHtml((dR.top_autores[0].email||'').split('@')[0]) : '—')+'</div>'+
+        '<div class="kpi-sub">'+((dR.top_autores||[])[0] ? dR.top_autores[0].count + ' reportes' : '')+'</div></div>';
+    // Update sidebar badge
+    var sb = document.getElementById('sn-sug-badge');
+    if(sb){
+      var pendientes = (dR.abiertas||0);
+      if(pendientes > 0){ sb.style.display='inline-flex'; sb.textContent = pendientes>99?'99+':String(pendientes); }
+      else sb.style.display = 'none';
+    }
+  }catch(e){ console.error('sug-resumen', e); }
+
+  // Lista filtrada
+  var qs = [];
+  var fe = (document.getElementById('sug-filtro-estado')||{}).value || '';
+  var ft = (document.getElementById('sug-filtro-tipo')||{}).value || '';
+  if(fe) qs.push('estado=' + encodeURIComponent(fe));
+  if(ft) qs.push('tipo=' + encodeURIComponent(ft));
+  qs.push('limit=200');
+  try{
+    var r = await fetch('/admin/sugerencias?' + qs.join('&'), {headers: authH()});
+    if(!r.ok){ lista.innerHTML = '<div style="text-align:center;color:#b91c1c;padding:2rem">Error '+r.status+'</div>'; return; }
+    var d = await r.json();
+    if(!d.items || !d.items.length){
+      lista.innerHTML = '<div style="text-align:center;color:var(--text3);padding:2rem">Sin sugerencias con esos filtros</div>';
+      return;
+    }
+    var tipoIcon = {BUG:'🐛', MEJORA:'⚙️', IDEA:'💡', OTRO:'✉️'};
+    var estadoCol = {
+      ABIERTA:['#fee2e2','#991b1b'],
+      EN_REVISION:['#fef3c7','#92400e'],
+      RESUELTA:['#dcfce7','#166534'],
+      DESCARTADA:['#f3f4f6','#374151']
+    };
+    lista.innerHTML = d.items.map(function(s){
+      var col = estadoCol[s.estado] || ['#f3f4f6','#374151'];
+      var fechaF = s.creado_en ? new Date(s.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      var ico = tipoIcon[s.tipo] || '✉️';
+      return '<div class="chart-card" style="padding:1rem 1.2rem">'+
+        '<div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem">'+
+          '<div style="flex:1;min-width:200px">'+
+            '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem;flex-wrap:wrap">'+
+              '<span style="font-size:1.2rem">'+ico+'</span>'+
+              '<span style="font-weight:700;color:var(--text);font-size:.95rem">'+escHtml(s.titulo)+'</span>'+
+              '<span style="background:'+col[0]+';color:'+col[1]+';padding:1px 8px;border-radius:6px;font-size:.65rem;font-weight:700">'+escHtml(s.estado)+'</span>'+
+            '</div>'+
+            '<div style="font-size:.78rem;color:var(--text2);line-height:1.45;margin-bottom:.4rem;white-space:pre-wrap">'+escHtml(s.descripcion)+'</div>'+
+            '<div style="font-size:.7rem;color:var(--text3)">'+
+              escHtml(s.autor_email||'anónimo')+
+              (s.pagina ? ' · <span style="font-family:monospace">'+escHtml(s.pagina)+'</span>' : '')+
+              ' · '+fechaF+
+              (s.glosa_id ? ' · <a href="#" onclick="abrirGlosaDesdeAsistente('+s.glosa_id+');return false">glosa #'+s.glosa_id+'</a>' : '')+
+            '</div>'+
+            (s.nota_admin ? '<div style="margin-top:.5rem;padding:.45rem .7rem;background:var(--bg-subtle);border-radius:6px;font-size:.74rem"><b>Nota admin:</b> '+escHtml(s.nota_admin)+'</div>' : '')+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:.3rem;min-width:130px">'+
+            '<button class="btn-sm" onclick="triagearSugerencia('+s.id+',\'EN_REVISION\')" '+(s.estado==='EN_REVISION'?'disabled':'')+'>👀 En revisión</button>'+
+            '<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="triagearSugerencia('+s.id+',\'RESUELTA\')" '+(s.estado==='RESUELTA'?'disabled':'')+'>✓ Resuelta</button>'+
+            '<button class="btn-sm ghost" onclick="triagearSugerencia('+s.id+',\'DESCARTADA\')" '+(s.estado==='DESCARTADA'?'disabled':'')+'>× Descartar</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    lista.innerHTML = '<div style="text-align:center;color:#b91c1c;padding:2rem">'+escHtml(e.message)+'</div>';
+  }
+}
+
+async function triagearSugerencia(id, nuevoEstado){
+  var nota = '';
+  if(nuevoEstado === 'RESUELTA' || nuevoEstado === 'DESCARTADA'){
+    nota = prompt('Nota administrativa (opcional):', '') || '';
+  }
+  try{
+    var r = await fetch('/admin/sugerencias/'+id, {
+      method: 'PUT',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({estado:nuevoEstado, nota_admin:nota||null}),
+    });
+    if(r.ok){
+      toast('Actualizado', 'Estado: '+nuevoEstado, 'success');
+      cargarPanelSugerencias();
+    } else {
+      toast('Error', 'No se pudo actualizar', 'error');
+    }
+  }catch(e){ toast('Error', e.message, 'error'); }
 }
 
 async function generarInformeEjecutivo(){
