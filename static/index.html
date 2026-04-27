@@ -333,9 +333,28 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
   from{opacity:0;transform:translateY(6px)}
   to{opacity:1;transform:translateY(0)}
 }
+/* Hover suave en filas de tablas */
+tbody tr{transition:background-color .12s ease}
+tbody tr:hover{background-color:rgba(2,132,199,.06)}
+body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
+/* Toast con animación in/out */
+@keyframes toastIn{
+  from{opacity:0;transform:translateY(-12px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.toast-wrap > div{animation:toastIn .22s var(--ease, ease-out)}
+/* Botones — pulse sutil al hacer clic */
+.btn:active,.btn-sm:active,.btn-primary:active,.btn-secondary:active{
+  transform:scale(.98);
+}
 @media (prefers-reduced-motion: reduce){
   .panel.active{animation:none}
   #hdr-asistente-btn.has-urgent{animation:none}
+  tbody tr{transition:none}
+  .toast-wrap > div{animation:none}
+  .btn:active,.btn-sm:active,.btn-primary:active,.btn-secondary:active{
+    transform:none;
+  }
 }
 /* Paneles verticales (sin sidebar lateral) usan column-layout. */
 .panel.active#p-consulta-normativa,
@@ -4258,7 +4277,14 @@ function tab(btn,id){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
   if(btn) btn.classList.add('active');
   var panel = document.getElementById('p-'+id);
-  if(panel) panel.classList.add('active');
+  if(panel){
+    panel.classList.add('active');
+    // Smooth scroll al cambiar de tab
+    if(panel.scrollTo){
+      panel.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
   if(id==='dashboard') loadDash();
   if(id==='cobranza-live') loadDashCobranza();
   if(id==='resumen-mes') loadResumenMes();
