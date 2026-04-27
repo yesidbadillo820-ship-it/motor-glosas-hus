@@ -1270,6 +1270,14 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <span style="font-size:17px;">🤖</span>
         <span id="hdr-asistente-badge" style="display:none;position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;border-radius:999px;padding:1px 5px;font-size:9px;font-weight:700;line-height:1.1;min-width:13px;text-align:center;">0</span>
       </button>
+      <!-- 🎯 R387: donut de progreso del mes -->
+      <button id="hdr-progreso-btn" onclick="sidebarTab(document.querySelector('.sn-item[data-tip=\'Mi desempeño\']'),'mi-desempeno')" title="Tu progreso del mes — clic para ver Mi desempeño" style="background:rgba(255,255,255,.08);border:0;color:#fff;border-radius:50%;width:36px;height:36px;cursor:pointer;margin-right:.5rem;display:none;align-items:center;justify-content:center;padding:0;position:relative">
+        <svg width="34" height="34" viewBox="0 0 36 36" style="position:absolute;inset:1px">
+          <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="3"/>
+          <circle id="hdr-progreso-circle" cx="18" cy="18" r="15" fill="none" stroke="#22c55e" stroke-width="3" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease,stroke .3s ease"/>
+        </svg>
+        <span id="hdr-progreso-num" style="font-size:10px;font-weight:800;line-height:1;position:relative">—</span>
+      </button>
       <button class="search-trigger" onclick="abrirCommandPalette()" title="Buscar acciones">
         <svg class="i i-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <span>Buscar…</span>
@@ -6735,14 +6743,44 @@ setTimeout(function(){
   var t = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
   if(t){
     cargarAsistenteProactivo();
+    cargarDonutProgreso();
     setInterval(function(){
       var t2 = (typeof TOKEN !== 'undefined' ? TOKEN : null) || localStorage.getItem('hus_token');
-      if(t2) cargarAsistenteProactivo();
+      if(t2){
+        cargarAsistenteProactivo();
+        cargarDonutProgreso();
+      }
     }, 5 * 60 * 1000);
     // 🎉 Mostrar "Qué hay de nuevo" si la versión cambió
     chequearQueHayDeNuevo();
   }
 }, 1500);
+
+// 🎯 R387: hidrata donut de progreso del mes
+async function cargarDonutProgreso(){
+  var btn = document.getElementById('hdr-progreso-btn');
+  var num = document.getElementById('hdr-progreso-num');
+  var circle = document.getElementById('hdr-progreso-circle');
+  if(!btn || !num || !circle) return;
+  try{
+    var r = await fetch('/usuarios/yo/progreso-mes', {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    btn.style.display = 'flex';
+    var pct = Math.min(d.progreso_pct || 0, 100);
+    var dash = pct + ' 100';
+    circle.setAttribute('stroke-dasharray', dash);
+    var col = '#22c55e';
+    if(d.progreso_pct >= 100) col = '#10b981';
+    else if(d.progreso_pct >= 80) col = '#84cc16';
+    else if(d.progreso_pct >= 50) col = '#fbbf24';
+    else if(d.progreso_pct >= 30) col = '#f59e0b';
+    else col = '#ef4444';
+    circle.setAttribute('stroke', col);
+    num.textContent = Math.round(d.progreso_pct || 0) + '%';
+    btn.title = (d.mensaje || '') + ' (' + d.decididas_mes_actual + '/' + d.meta_mensual + ')';
+  } catch(e){}
+}
 
 // ─── R380: Qué hay de nuevo ──────────────────────────────────────────
 async function chequearQueHayDeNuevo(){
