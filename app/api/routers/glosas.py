@@ -17124,6 +17124,78 @@ def sla_glosa(
     }
 
 
+@router.get("/{glosa_id}/borrador-respuesta")
+def borrador_respuesta(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R395 P1: borrador automático de respuesta basado en mejor
+    caso similar.
+
+    Busca el caso LEVANTADO más reciente del par
+    (eps, codigo_glosa) y devuelve su dictamen como
+    borrador inicial. Útil para que el gestor parta de
+    un texto que ya funcionó en lugar de página en
+    blanco.
+
+    No reemplaza el dictamen actual, solo SUGIERE.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    # Buscar el mejor caso histórico con dictamen
+    candidato = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == glosa.eps)
+        .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+        .filter(GlosaRecord.id != glosa.id)
+        .filter(GlosaRecord.estado == "LEVANTADA")
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .first()
+    )
+
+    if not candidato or not (candidato.dictamen or "").strip():
+        return {
+            "glosa_id": glosa.id,
+            "eps": glosa.eps,
+            "codigo_glosa": glosa.codigo_glosa,
+            "borrador_disponible": False,
+            "mensaje": (
+                "No hay caso similar levantado con dictamen "
+                "para usar como base. Redacta desde cero."
+            ),
+        }
+
+    # Adaptar el texto: solo tomamos el dictamen como punto
+    # de partida, no se reemplaza nada automáticamente
+    texto = (candidato.dictamen or "").strip()
+    # Limitar tamaño para que sea manejable
+    if len(texto) > 3000:
+        texto = texto[:3000] + "\n\n[…borrador truncado, ver caso original]"
+
+    return {
+        "glosa_id": glosa.id,
+        "eps": glosa.eps,
+        "codigo_glosa": glosa.codigo_glosa,
+        "borrador_disponible": True,
+        "fuente_caso_id": candidato.id,
+        "fuente_fecha_decision": (
+            candidato.fecha_decision_eps.isoformat()
+            if candidato.fecha_decision_eps else None
+        ),
+        "fuente_resultado": "LEVANTADA",
+        "borrador": texto,
+        "mensaje": (
+            "Texto base tomado del caso anterior LEVANTADO "
+            "más reciente del mismo par (EPS, código). "
+            "Adáptalo a este caso antes de enviar."
+        ),
+    }
+
+
 @router.get("/{glosa_id}/playbook")
 def playbook_glosa(
     glosa_id: int,
