@@ -406,6 +406,96 @@ def worklist_personal(
     }
 
 
+@router.get("/yo/proyeccion-mes")
+def yo_proyeccion_mes(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R391 P1: proyección de cierre del mes.
+
+    Extrapola el ritmo actual al final del mes:
+      - decididas_proyectadas (ritmo_actual × días_mes)
+      - intervalo_min/max (±15% margen)
+      - vs meta y vs mes anterior
+      - confianza (BAJA/MEDIA/ALTA según muestras)
+    """
+    from calendar import monthrange
+    from datetime import timedelta, timezone
+
+    from app.core.tz import ahora_utc
+    from app.models.db import GlosaRecord
+
+    nombre = current_user.nombre or current_user.email
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    ahora = ahora_utc()
+    inicio_mes = ahora.replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if inicio_mes.month == 1:
+        inicio_anterior = inicio_mes.replace(
+            year=inicio_mes.year - 1, month=12,
+        )
+    else:
+        inicio_anterior = inicio_mes.replace(
+            month=inicio_mes.month - 1,
+        )
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.gestor_nombre == nombre)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.fecha_decision_eps >= inicio_anterior)
+        .all()
+    )
+    actual = anterior = 0
+    for g in rows:
+        f = g.fecha_decision_eps
+        if f and f.tzinfo is None:
+            f = f.replace(tzinfo=timezone.utc)
+        if not f:
+            continue
+        if f >= inicio_mes:
+            actual += 1
+        else:
+            anterior += 1
+
+    dias_mes = monthrange(ahora.year, ahora.month)[1]
+    dia_actual = ahora.day
+    ritmo = actual / dia_actual if dia_actual else 0
+    proyectado = round(ritmo * dias_mes)
+    margen = max(int(proyectado * 0.15), 1)
+    proy_min = max(actual, proyectado - margen)
+    proy_max = proyectado + margen
+
+    delta_vs_anterior = None
+    if anterior > 0:
+        delta_vs_anterior = round(
+            100 * (proyectado - anterior) / anterior, 1,
+        )
+
+    if dia_actual <= 3:
+        conf = "BAJA"
+    elif dia_actual <= 10:
+        conf = "MEDIA"
+    else:
+        conf = "ALTA"
+
+    return {
+        "usuario_email": current_user.email,
+        "decididas_actual": actual,
+        "decididas_anterior": anterior,
+        "ritmo_diario": round(ritmo, 2),
+        "decididas_proyectadas": proyectado,
+        "intervalo_min": proy_min,
+        "intervalo_max": proy_max,
+        "delta_vs_anterior_pct": delta_vs_anterior,
+        "confianza": conf,
+        "dia_actual": dia_actual,
+        "dias_mes": dias_mes,
+    }
+
+
 @router.get("/yo/timeline-mes")
 def yo_timeline_mes(
     db: Session = Depends(get_db),
