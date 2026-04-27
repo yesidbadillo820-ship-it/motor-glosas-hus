@@ -1943,6 +1943,8 @@ def mis_asignaciones(
             "dictamen": g.dictamen,
             "workflow_state": g.workflow_state or "BORRADOR",
             "nota_workflow": g.nota_workflow,
+            "valor_aceptado": float(g.valor_aceptado or 0.0),
+            "numero_nota_credito": getattr(g, "numero_nota_credito", None),
         }
         for g in glosas
     ]

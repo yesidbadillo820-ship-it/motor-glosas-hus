@@ -2786,6 +2786,55 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   </div>
 </div>
 
+<!-- 📝 MODAL: Nota crédito de glosa aceptada -->
+<div id="nc-modal" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;
+                          display:none;align-items:center;justify-content:center;
+                          backdrop-filter:blur(6px)">
+  <div class="card-premium" style="width:480px;max-width:94vw;padding:1.6rem 1.85rem">
+    <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:1rem">
+      <div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:.2rem">📝 Nota crédito</div>
+        <div id="nc-subtitulo" style="font-size:.78rem;color:var(--text3)">—</div>
+      </div>
+      <button onclick="cerrarModalNotaCredito()" class="btn btn-ghost" style="font-size:1.1rem;padding:.2rem .55rem" title="Cerrar">×</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:.7rem">
+      <div>
+        <label style="font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Número de nota crédito *</label>
+        <input id="nc-numero" type="text" maxlength="60" placeholder="Ej: NC-2026-0042"
+          style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:7px;font-size:.88rem;background:var(--bg-card);color:var(--text);margin-top:.25rem"/>
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <div style="flex:1">
+          <label style="font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Fecha</label>
+          <input id="nc-fecha" type="date"
+            style="width:100%;padding:.55rem .55rem;border:1px solid var(--border);border-radius:7px;font-size:.85rem;background:var(--bg-card);color:var(--text);margin-top:.25rem"/>
+        </div>
+        <div style="flex:1">
+          <label style="font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Valor (COP)</label>
+          <input id="nc-valor" type="number" min="0" step="1" placeholder="Default = aceptado"
+            style="width:100%;padding:.55rem .55rem;border:1px solid var(--border);border-radius:7px;font-size:.85rem;background:var(--bg-card);color:var(--text);margin-top:.25rem"/>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Observación (opcional)</label>
+        <textarea id="nc-obs" rows="2" maxlength="500" placeholder="Ej: Acepta excedente facturado por encima de tarifa pactada"
+          style="width:100%;padding:.55rem .75rem;border:1px solid var(--border);border-radius:7px;font-size:.82rem;background:var(--bg-card);color:var(--text);margin-top:.25rem;font-family:inherit;resize:vertical"></textarea>
+      </div>
+      <div id="nc-info" style="font-size:.72rem;color:var(--text3);font-style:italic"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;gap:.5rem;margin-top:1.2rem">
+      <button onclick="eliminarNotaCredito()" class="btn btn-ghost" id="nc-eliminar" style="display:none;color:#dc2626">🗑 Eliminar</button>
+      <div style="display:flex;gap:.5rem;margin-left:auto">
+        <button onclick="cerrarModalNotaCredito()" class="btn btn-ghost">Cancelar</button>
+        <button onclick="guardarNotaCredito()" class="btn btn-primary" id="nc-guardar">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 💡 MODAL: Reportar fallo / sugerencia -->
 <div id="fb-modal" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;
                           display:none;align-items:center;justify-content:center;
@@ -7829,6 +7878,130 @@ setInterval(function(){
   if(t) refrescarBadgeTareas();
 }, 300000);
 
+// ─── NOTA CRÉDITO (glosas aceptadas parcial o total) ──────────────────────
+var NC_CTX = { glosaId: null, factura: null, valorAceptado: 0 };
+
+function abrirModalNotaCredito(glosaId, factura, valorAceptado, numeroExistente){
+  NC_CTX.glosaId = glosaId;
+  NC_CTX.factura = factura || '';
+  NC_CTX.valorAceptado = valorAceptado || 0;
+  var modal = document.getElementById('nc-modal');
+  if(!modal) return;
+  // Pre-cargar valores
+  var sub = document.getElementById('nc-subtitulo');
+  if(sub){
+    sub.textContent = 'Factura ' + (factura || '#' + glosaId) +
+      ' · valor aceptado: $' +
+      Number(valorAceptado || 0).toLocaleString('es-CO', {maximumFractionDigits:0});
+  }
+  var inpNum = document.getElementById('nc-numero');
+  if(inpNum) inpNum.value = numeroExistente || '';
+  var inpFecha = document.getElementById('nc-fecha');
+  if(inpFecha){
+    var hoy = new Date();
+    var pad = function(n){ return n < 10 ? '0' + n : '' + n; };
+    inpFecha.value = hoy.getFullYear() + '-' + pad(hoy.getMonth() + 1) + '-' + pad(hoy.getDate());
+  }
+  var inpValor = document.getElementById('nc-valor');
+  if(inpValor) inpValor.value = '';  // vacío → backend usa valor_aceptado
+  var inpObs = document.getElementById('nc-obs');
+  if(inpObs) inpObs.value = '';
+  var btnDel = document.getElementById('nc-eliminar');
+  if(btnDel) btnDel.style.display = numeroExistente ? 'inline-block' : 'none';
+  var info = document.getElementById('nc-info');
+  if(info){
+    info.innerHTML = 'Se registrará la nota crédito asociada a esta aceptación. ' +
+      'Si dejas el valor vacío, se tomará el valor aceptado (<b>$' +
+      Number(valorAceptado || 0).toLocaleString('es-CO', {maximumFractionDigits:0}) +
+      '</b>).';
+  }
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  // Si ya hay número, traer datos completos del servidor
+  if(numeroExistente){
+    fetch('/glosas/' + glosaId + '/nota-credito', { headers: authH() })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d) return;
+        if(d.fecha_nota_credito && inpFecha){
+          inpFecha.value = String(d.fecha_nota_credito).slice(0, 10);
+        }
+        if(d.valor_nota_credito && inpValor){
+          inpValor.value = d.valor_nota_credito;
+        }
+        if(d.observacion && inpObs){
+          inpObs.value = d.observacion;
+        }
+      })
+      .catch(function(){ /* silencioso */ });
+  }
+  setTimeout(function(){ inpNum && inpNum.focus(); }, 60);
+}
+
+function cerrarModalNotaCredito(){
+  var modal = document.getElementById('nc-modal');
+  if(modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function guardarNotaCredito(){
+  if(!NC_CTX.glosaId) return;
+  var inpNum = document.getElementById('nc-numero');
+  var inpFecha = document.getElementById('nc-fecha');
+  var inpValor = document.getElementById('nc-valor');
+  var inpObs = document.getElementById('nc-obs');
+  var numero = (inpNum && inpNum.value || '').trim();
+  if(numero.length < 1){
+    inpNum && inpNum.focus();
+    return;
+  }
+  var btn = document.getElementById('nc-guardar');
+  if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    var body = { numero_nota: numero };
+    if(inpFecha && inpFecha.value) body.fecha_nota = inpFecha.value;
+    var v = inpValor && parseFloat(inpValor.value);
+    if(!isNaN(v) && v > 0) body.valor = v;
+    if(inpObs && inpObs.value.trim()) body.observacion = inpObs.value.trim();
+    var r = await fetch('/glosas/' + NC_CTX.glosaId + '/nota-credito', {
+      method: 'PATCH',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authH()),
+      body: JSON.stringify(body),
+    });
+    if(!r.ok){
+      var err = await r.json().catch(function(){ return {}; });
+      throw new Error(err.detail || ('HTTP ' + r.status));
+    }
+    if(typeof toast === 'function'){
+      toast('✓ Nota crédito registrada',
+        'NC ' + numero + ' guardada para factura ' + (NC_CTX.factura || '#' + NC_CTX.glosaId),
+        'success');
+    }
+    cerrarModalNotaCredito();
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+  } catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo guardar: ' + e.message, 'error');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
+}
+
+async function eliminarNotaCredito(){
+  if(!NC_CTX.glosaId) return;
+  if(!confirm('¿Eliminar la nota crédito registrada en esta glosa?')) return;
+  try {
+    var r = await fetch('/glosas/' + NC_CTX.glosaId + '/nota-credito', {
+      method: 'DELETE', headers: authH(),
+    });
+    if(!(r.status === 204 || r.ok)) throw new Error('HTTP ' + r.status);
+    if(typeof toast === 'function') toast('Nota crédito eliminada', '', 'info');
+    cerrarModalNotaCredito();
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+  } catch(e){
+    if(typeof toast === 'function') toast('Error', 'No se pudo eliminar: ' + e.message, 'error');
+  }
+}
+
 // Sincroniza el badge numerico del sidebar con el del nav-bar legacy
 function syncSidebarBadge(idLegacy, idSide){
   var legacy = document.getElementById(idLegacy);
@@ -8025,6 +8198,21 @@ function _renderMisGlosas(dataRaw){
       if(yaRespondida){
         acciones = '<span style="color:#059669;font-weight:700;font-size:.78rem;">✓ Respondida</span>';
         acciones += ' <button class="btn-sm ghost" onclick="responderGlosa(' + g.id + ')">Ver/Re-abrir</button>';
+        // Cuando hay valor_aceptado > 0 (parcial o total), permitir
+        // capturar el número de nota crédito de la aceptación.
+        if((g.valor_aceptado || 0) > 0){
+          var ncTxt = g.numero_nota_credito
+            ? ('📝 NC ' + g.numero_nota_credito)
+            : '📝 Agregar nota crédito';
+          var ncBg = g.numero_nota_credito ? '#0ea5e9' : '#d97706';
+          acciones += ' <button class="btn-sm" style="background:' + ncBg +
+            ';color:#fff;border:none" title="Registrar número de nota crédito" ' +
+            'onclick="abrirModalNotaCredito(' + g.id + ', \'' +
+            ((g.factura || '').replace(/\'/g, "\\'")) + '\', ' +
+            (g.valor_aceptado || 0) + ', ' +
+            (g.numero_nota_credito ? ('\'' + g.numero_nota_credito.replace(/\'/g, "\\'") + '\'') : 'null') +
+            ')">' + ncTxt + '</button>';
+        }
       } else {
         acciones = '<button class="btn-sm" onclick="responderGlosa(' + g.id + ')">Responder</button>';
         // Boton "Marcar respondida" visible siempre que tenga dictamen generado

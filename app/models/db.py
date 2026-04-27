@@ -79,6 +79,13 @@ class GlosaRecord(Base):
     # si > 20 días hábiles, la EPS glosó fuera de término (Art. 57 Ley 1438/2011).
     dias_radicacion_dgh = Column(Integer, default=0)
 
+    # Nota crédito asociada cuando la glosa se acepta (parcial o total).
+    # El gestor la captura desde "Mis glosas respondidas".
+    numero_nota_credito = Column(String(60), nullable=True, index=True)
+    fecha_nota_credito = Column(DateTime(timezone=True), nullable=True)
+    valor_nota_credito = Column(Float, default=0.0)
+    nota_credito_observacion = Column(Text, nullable=True)
+
     __table_args__ = (
         Index("ix_historial_alertas", "dias_restantes", "estado"),
         Index("ix_historial_auditor", "auditor_email"),
