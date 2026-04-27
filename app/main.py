@@ -745,6 +745,8 @@ from app.api.routers.tareas_diarias import router as tareas_diarias_router
 app.include_router(tareas_diarias_router)
 from app.api.routers.nota_credito import router as nota_credito_router
 app.include_router(nota_credito_router)
+from app.api.routers.auditor_preview import router as auditor_preview_router
+app.include_router(auditor_preview_router)
 
 
 

@@ -1105,6 +1105,31 @@ def build_user_prompt(
         pass
 
     # ───────────────────────────────────────────────────────────────
+    # Bloque AUDITORÍA PREVIA: el sistema audita las afirmaciones de
+    # la EPS contra los datos verificados ANTES de gastar tokens del
+    # LLM. La IA recibe los hallazgos como checklist a refutar.
+    # ───────────────────────────────────────────────────────────────
+    bloque_auditoria_str = ""
+    try:
+        from app.services.auditor_glosa import construir_bloque_auditoria
+        def _num_safe(s):
+            if not s:
+                return 0.0
+            d = re.sub(r"[^\d]", "", str(s))
+            return float(d) if d else 0.0
+        bloque_auditoria_str = construir_bloque_auditoria(
+            texto_glosa or "",
+            eps=eps, codigo=codigo, cups=cups,
+            tiene_contrato=bool(numero_contrato and "SIN" not in str(numero_contrato).upper()),
+            valor_facturado=_num_safe(valor_facturado),
+            valor_pactado=_num_safe(valor_pactado),
+            valor_objetado=_num_safe(valor_objetado),
+            contexto_pdf=contexto_pdf or "",
+        )
+    except Exception:
+        bloque_auditoria_str = ""
+
+    # ───────────────────────────────────────────────────────────────
     # Bloque EXCEDENTE: cuando facturado > pactado, instruimos al LLM
     # a redactar dictamen MIXTO (acepta el excedente real, defiende
     # el resto). Solo se inyecta si tenemos los 3 números reales.
@@ -1390,7 +1415,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_excedente_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_auditoria_str}{bloque_excedente_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
