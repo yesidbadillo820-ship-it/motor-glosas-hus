@@ -328,7 +328,15 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 /* ─── LAYOUT ─────────────────────────────── */
 .workspace{flex:1;display:flex;overflow:hidden}
 .panel{display:none;flex:1;overflow:hidden}
-.panel.active{display:flex}
+.panel.active{display:flex;animation:panelFadeIn .22s ease-out}
+@keyframes panelFadeIn{
+  from{opacity:0;transform:translateY(6px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@media (prefers-reduced-motion: reduce){
+  .panel.active{animation:none}
+  #hdr-asistente-btn.has-urgent{animation:none}
+}
 /* Paneles verticales (sin sidebar lateral) usan column-layout. */
 .panel.active#p-consulta-normativa,
 .panel.active#p-multi-concepto,
@@ -1731,6 +1739,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
         <!-- 🎯 Quick Wins (R373): glosas fáciles de ganar HOY -->
         <div id="md-quick-wins" style="display:none"></div>
+
+        <!-- ✅ Checklist personal (R381): cosas pendientes -->
+        <div id="md-checklist" style="display:none"></div>
 
         <!-- Banner de glosas críticas si hay -->
         <div id="md-criticas-banner" style="display:none"></div>
@@ -6930,12 +6941,56 @@ async function cargarQuickWins(){
   } catch(e){ console.error('quick-wins:', e); box.style.display = 'none'; }
 }
 
+// ✅ R381: Checklist personal — auto-detecta lo que falta completar
+async function cargarChecklistPersonal(){
+  var box = document.getElementById('md-checklist');
+  if(!box) return;
+  try{
+    var r = await fetch('/usuarios/yo/checklist-personal', {headers: authH()});
+    if(!r.ok){ box.style.display = 'none'; return; }
+    var d = await r.json();
+    if(!d.total_pendientes){ box.style.display = 'none'; return; }
+    var prioCol = {1:'#b91c1c', 2:'#ea580c', 3:'#d97706'};
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border:1px solid #fde68a;border-radius:11px;padding:1rem 1.2rem;margin:1rem 0">'+
+        '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem;flex-wrap:wrap">'+
+          '<div style="font-size:1.5rem">✅</div>'+
+          '<div style="flex:1;min-width:200px">'+
+            '<div style="font-weight:700;color:#854d0e;font-size:.95rem">Checklist personal — '+d.total_pendientes+' pendiente(s)</div>'+
+            '<div style="font-size:.75rem;color:#854d0e;opacity:.85">La IA detectó campos por completar en tus glosas</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:.4rem">'+
+          d.items.map(function(it){
+            var c = prioCol[it.prioridad] || '#64748b';
+            var ids = (it.glosa_ids||[]).map(function(g){
+              return '<a href="#" onclick="abrirGlosaDesdeAsistente('+g+');return false" style="background:#fff;border:1px solid #fde68a;padding:1px 7px;border-radius:6px;font-size:.65rem;font-family:monospace;font-weight:700;color:#854d0e;text-decoration:none">#'+g+'</a>';
+            }).join(' ');
+            return '<div style="background:rgba(255,255,255,.7);padding:.55rem .8rem;border-radius:7px">'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem">'+
+                '<div style="display:flex;align-items:center;gap:.5rem">'+
+                  '<span style="background:'+c+';color:#fff;padding:1px 7px;border-radius:5px;font-size:.62rem;font-weight:700">P'+it.prioridad+'</span>'+
+                  '<span style="font-weight:600;font-size:.82rem">'+escHtml(it.titulo)+'</span>'+
+                '</div>'+
+                '<span style="background:'+c+';color:#fff;padding:1px 8px;border-radius:9px;font-size:.7rem;font-weight:700">'+it.count+'</span>'+
+              '</div>'+
+              (ids ? '<div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.3rem">'+ids+'</div>' : '')+
+            '</div>';
+          }).join('')+
+        '</div>'+
+      '</div>';
+  } catch(e){ console.error('checklist:', e); box.style.display = 'none'; }
+}
+
 // Carga datos para las tarjetas premium del panel "Mi desempeño"
 async function cargarMiDesempenoPremium(){
   // 🤖 Asistente proactivo (R368) — lo primero
   cargarAsistenteProactivo();
   // 🎯 Quick Wins (R373)
   cargarQuickWins();
+  // ✅ Checklist personal (R381)
+  cargarChecklistPersonal();
 
   // Streak (R270)
   try{
