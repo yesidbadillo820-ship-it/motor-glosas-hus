@@ -7565,6 +7565,85 @@ def stats_codigo_eps_cobertura(
     }
 
 
+@router.post("/stats/tasas-pares-batch")
+def stats_tasas_pares_batch(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R382 P1: tasas par (eps, codigo_glosa) en batch.
+
+    Recibe `{"glosa_ids": [1, 2, 3, ...]}` y devuelve para
+    cada una su tasa histórica del par sin N+1 queries.
+    Pensado para que el frontend muestre badges de tasa
+    en listas (Mis glosas, Historial, etc.).
+
+    Por glosa devuelve: glosa_id, eps, codigo_glosa,
+    tasa_par_pct (null si < 2 muestras), n_par.
+    """
+    ESTADOS_DECIDIDOS = ["LEVANTADA", "ACEPTADA", "RATIFICADA"]
+    ids = payload.get("glosa_ids") or []
+    if not isinstance(ids, list) or not ids:
+        return {"items": []}
+    ids = [int(x) for x in ids if isinstance(x, (int, float, str))][:200]
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.id.in_(ids))
+        .all()
+    )
+    if not glosas:
+        return {"items": []}
+
+    # Para cada glosa, encontrar par único; cargar el histórico de cada par
+    pares_unicos = {
+        ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
+        for g in glosas
+        if g.eps and g.codigo_glosa
+    }
+
+    # Carga única de todo el histórico decidido relevante
+    eps_set = {p[0] for p in pares_unicos}
+    cod_set = {p[1] for p in pares_unicos}
+    historico = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+        .filter(GlosaRecord.eps.in_(eps_set))
+        .filter(GlosaRecord.codigo_glosa.in_(cod_set))
+        .all()
+    ) if pares_unicos else []
+
+    par_idx: dict[tuple, dict] = {}
+    for h in historico:
+        k = ((h.eps or "").strip(), (h.codigo_glosa or "").strip())
+        if k not in pares_unicos:
+            continue
+        b = par_idx.setdefault(k, {"dec": 0, "lev": 0})
+        b["dec"] += 1
+        if (h.estado or "").upper() == "LEVANTADA":
+            b["lev"] += 1
+
+    items = []
+    for g in glosas:
+        k = ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
+        b = par_idx.get(k)
+        if not b or b["dec"] < 2:
+            tasa = None
+            n = b["dec"] if b else 0
+        else:
+            tasa = round(100 * b["lev"] / b["dec"], 2)
+            n = b["dec"]
+        items.append({
+            "glosa_id": g.id,
+            "eps": k[0],
+            "codigo_glosa": k[1],
+            "tasa_par_pct": tasa,
+            "n_par": n,
+        })
+
+    return {"total": len(items), "items": items}
+
+
 @router.get("/stats/eps-totales-snapshot")
 def stats_eps_totales_snapshot(
     db: Session = Depends(get_db),
