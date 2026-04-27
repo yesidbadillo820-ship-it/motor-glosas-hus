@@ -137,6 +137,42 @@ class TestUserPrompt:
         )
         assert len(prompt) < 15000
 
+    def test_bloque_excedente_facturado_mayor_que_pactado(self):
+        """Caso real: HUS facturó $247.663, pactado $231.556 → debe inyectar
+        bloque EXCEDENTE FACTURADO con números de aceptar y defender."""
+        prompt = build_user_prompt(
+            texto_glosa="SE GLOSA MVC", contexto_pdf="",
+            codigo="TA0201", eps="DISPENSARIO MEDICO",
+            valor_objetado="$168.563",
+            valor_facturado="$247.663",
+            valor_pactado="$231.556",
+        )
+        assert "EXCEDENTE FACTURADO DETECTADO" in prompt
+        assert "$16,107" in prompt  # diferencia real
+        assert "$152,456" in prompt  # a defender
+        assert "RESPUESTA MIXTA" in prompt
+        assert "RE9905" in prompt  # código respuesta sugerido
+
+    def test_bloque_excedente_no_aparece_si_facturado_menor(self):
+        """Si facturado <= pactado, no inyecta bloque (no hay excedente)."""
+        prompt = build_user_prompt(
+            texto_glosa="x", contexto_pdf="",
+            codigo="TA0201", eps="EPS TEST",
+            valor_objetado="$168.563",
+            valor_facturado="$200.000",
+            valor_pactado="$231.556",
+        )
+        assert "EXCEDENTE FACTURADO" not in prompt
+
+    def test_bloque_excedente_no_aparece_sin_facturado(self):
+        """Si no se conoce el facturado, no se infiere — no inyecta."""
+        prompt = build_user_prompt(
+            texto_glosa="x", contexto_pdf="",
+            codigo="TA0201", eps="EPS TEST",
+            valor_objetado="$168.563",
+        )
+        assert "EXCEDENTE FACTURADO" not in prompt
+
     def test_build_user_prompt_instrucciones(self):
         """Should include structured instructions and norms."""
         prompt = build_user_prompt(

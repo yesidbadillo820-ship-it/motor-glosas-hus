@@ -221,6 +221,14 @@ def _extraer_valores_glosa(texto: str) -> dict:
             return 0.0
 
     patrones_fact = [
+        # Factura electrónica HUS — totalizadores al pie de la FEV.
+        # "VALOR TOTAL ORDEN DE SERVICIO   $ 247.663,00"
+        # "VALOR SUBTOTAL DE SERVICIOS PRESTADOS  $247.663"
+        r"VALOR\s+TOTAL\s+ORDEN\s+DE\s+SERVICIO[:\s]*\$?\s*([\d][\d\.,]{3,})",
+        r"VALOR\s+SUBTOTAL\s+DE\s+SERVICIOS\s+PRESTADOS[:\s]*\$?\s*([\d][\d\.,]{3,})",
+        # Columna "VR ENT" (valor entregado al cliente) de la fila
+        # de concepto en la factura HUS.
+        r"VR\s+ENT[:\s]*\$?\s*([\d][\d\.,]{3,})",
         # Forma explícita de HUS: "VALOR UNITARIO FACTURADO POR IPS $ 206,400"
         # o "FACTURADO POR IPS $XXX" (tolera hasta 3 palabras entre POR y el valor)
         r"FACTURAD[OA]S?\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",

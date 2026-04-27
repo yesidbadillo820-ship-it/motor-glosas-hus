@@ -138,9 +138,16 @@ def _pre_lookup_tarifa(
             return None
         from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
         vals_pre = _extraer_valores_glosa(tabla_excel or "")
+        # Si la glosa no trae el facturado, intentar extraerlo del PDF
+        # de la factura electrónica HUS ("VALOR TOTAL ORDEN DE SERVICIO").
+        _vp_fact = vals_pre.get("facturado", 0.0)
+        if _vp_fact <= 0 and contexto_pdf:
+            _vp_pdf = _extraer_valores_glosa(contexto_pdf)
+            if _vp_pdf.get("facturado", 0.0) > 0:
+                _vp_fact = _vp_pdf["facturado"]
         info = evaluar_glosa_tarifa(
             db, eps=eps, cups=cups_pre,
-            valor_facturado=vals_pre.get("facturado", 0.0),
+            valor_facturado=_vp_fact,
             valor_objetado=0.0,
             valor_reconocido=vals_pre.get("reconocido", 0.0),
         )
@@ -188,9 +195,16 @@ def _agregar_banner_tarifa_post(
         return
     try:
         from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
+        # Buscar valores en la glosa Y en el PDF (la factura electrónica
+        # HUS trae "VALOR TOTAL ORDEN DE SERVICIO $X" — fuente confiable
+        # del facturado real, distinto del valor objetado por la EPS).
         vals_txt = _extraer_valores_glosa(tabla_excel or "")
         val_fact = vals_txt["facturado"]
         val_rec = vals_txt["reconocido"]
+        if val_fact <= 0 and contexto_pdf:
+            vals_pdf = _extraer_valores_glosa(contexto_pdf)
+            if vals_pdf["facturado"] > 0:
+                val_fact = vals_pdf["facturado"]
         info_tarifa = evaluar_glosa_tarifa(
             db, eps=eps, cups=cups_ext,
             valor_facturado=val_fact, valor_objetado=val_obj,
