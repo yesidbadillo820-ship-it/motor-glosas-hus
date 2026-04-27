@@ -1070,6 +1070,83 @@ def admin_asignaciones_recientes(
     }
 
 
+@router.get("/balance-carga-gestores")
+def admin_balance_carga_gestores(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """R379 P1: balance de carga del equipo.
+
+    Para cada gestor con glosas abiertas calcula counts,
+    valor pendiente y un estado_carga:
+      SOBRECARGADO (>= mediana × 1.5)
+      NORMAL
+      SUBCARGADO (<= mediana × 0.5)
+
+    Útil para rebalancear asignaciones objetivamente.
+    Solo SUPER_ADMIN.
+    """
+    ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
+
+    abiertas = (
+        db.query(GlosaRecord)
+        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
+        .filter(GlosaRecord.gestor_nombre.isnot(None))
+        .filter(GlosaRecord.gestor_nombre != "")
+        .all()
+    )
+
+    bucket: dict[str, dict] = {}
+    for g in abiertas:
+        gestor = (g.gestor_nombre or "").strip()
+        if not gestor:
+            continue
+        b = bucket.setdefault(gestor, {
+            "count": 0, "vencidas": 0, "criticas": 0, "valor": 0.0,
+        })
+        b["count"] += 1
+        b["valor"] += float(g.valor_objetado or 0)
+        dr = g.dias_restantes if g.dias_restantes is not None else 0
+        if dr < 0:
+            b["vencidas"] += 1
+        elif dr <= 3:
+            b["criticas"] += 1
+
+    if not bucket:
+        return {"total_gestores": 0, "items": []}
+
+    counts = sorted(b["count"] for b in bucket.values())
+    mediana = counts[len(counts) // 2]
+    umbral_alto = max(int(mediana * 1.5), mediana + 5)
+    umbral_bajo = max(int(mediana * 0.5), 1)
+
+    items = []
+    for gestor, b in bucket.items():
+        if b["count"] >= umbral_alto:
+            estado = "SOBRECARGADO"
+        elif b["count"] <= umbral_bajo:
+            estado = "SUBCARGADO"
+        else:
+            estado = "NORMAL"
+        items.append({
+            "gestor": gestor,
+            "count_abiertas": b["count"],
+            "count_vencidas": b["vencidas"],
+            "count_criticas": b["criticas"],
+            "valor_objetado_pendiente": int(b["valor"]),
+            "estado_carga": estado,
+        })
+    items.sort(key=lambda x: x["count_abiertas"], reverse=True)
+
+    return {
+        "total_gestores": len(items),
+        "mediana_abiertas": int(mediana),
+        "umbral_sobrecarga": int(umbral_alto),
+        "umbral_subcarga": int(umbral_bajo),
+        "items": items,
+    }
+
+
 @router.get("/auto-asignacion-sugerencias")
 def admin_auto_asignacion_sugerencias(
     limit: int = 50,
