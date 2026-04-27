@@ -3201,6 +3201,88 @@ document.addEventListener('keydown', function(e){
   if(e.key === 'Escape' && document.getElementById('tour-overlay')) _cerrarTour();
 });
 
+// ─── Atajos de teclado premium (R371) ───────────────────────────────────
+// `?` → ayuda · `/` → buscar · `n` → nueva glosa · `b` → reportar bug
+// `Esc` → cerrar modales abiertos
+document.addEventListener('keydown', function(e){
+  // No interferir si el usuario está escribiendo en un input/textarea
+  var t = e.target;
+  var enInput = t && (
+    t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
+    t.isContentEditable
+  );
+  if(e.key === 'Escape'){
+    // Cierra todos los modales potenciales
+    var fbm = document.getElementById('fb-modal');
+    if(fbm && fbm.style.display === 'flex'){ fbm.style.display = 'none'; e.preventDefault(); return; }
+    var ks = document.getElementById('ks-modal');
+    if(ks && ks.style.display === 'flex'){ ks.style.display = 'none'; e.preventDefault(); return; }
+    return;
+  }
+  if(enInput) return;
+  if(e.altKey || e.ctrlKey || e.metaKey) return;
+
+  if(e.key === '?'){
+    abrirAtajosPanel();
+    e.preventDefault();
+  } else if(e.key === '/'){
+    var cp = document.getElementById('cp-input');
+    if(cp){
+      var bg = document.getElementById('cp-backdrop');
+      if(bg) bg.style.display = 'flex';
+      setTimeout(function(){ cp.focus(); cp.select(); }, 50);
+      e.preventDefault();
+    }
+  } else if(e.key === 'n' || e.key === 'N'){
+    if(typeof nuevaGlosa === 'function'){ nuevaGlosa(); e.preventDefault(); }
+  } else if(e.key === 'b' || e.key === 'B'){
+    if(typeof abrirModalSugerencia === 'function'){ abrirModalSugerencia(); e.preventDefault(); }
+  } else if(e.key === 'd' || e.key === 'D'){
+    sidebarTab(document.querySelector('.sn-item[data-tip="Dashboard"]'), 'dashboard');
+    e.preventDefault();
+  } else if(e.key === 'm' || e.key === 'M'){
+    sidebarTab(document.querySelector('.sn-item[data-tip="Mis glosas"]'), 'mis-glosas');
+    e.preventDefault();
+  }
+});
+
+// Modal con todos los atajos
+function abrirAtajosPanel(){
+  var existente = document.getElementById('ks-modal');
+  if(existente){ existente.style.display = 'flex'; return; }
+  var html =
+    '<div id="ks-modal" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)" onclick="if(event.target===this)this.style.display=\'none\'">'+
+      '<div class="card-premium" style="width:480px;max-width:92vw;padding:1.5rem 1.75rem">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">'+
+          '<div>'+
+            '<div style="font-size:1.05rem;font-weight:700;color:var(--text)">⌨️ Atajos de teclado</div>'+
+            '<div style="font-size:.74rem;color:var(--text3)">Trabaja más rápido sin tocar el mouse</div>'+
+          '</div>'+
+          '<button onclick="document.getElementById(\'ks-modal\').style.display=\'none\'" class="btn btn-ghost" style="font-size:1rem;padding:.2rem .55rem">×</button>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:.5rem">'+
+          [
+            ['?','Mostrar este panel'],
+            ['/','Buscar (Command Palette)'],
+            ['n','Nueva glosa'],
+            ['m','Ir a Mis glosas'],
+            ['d','Ir al Dashboard'],
+            ['b','Reportar fallo o sugerencia'],
+            ['Esc','Cerrar modales'],
+          ].map(function(p){
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.45rem .75rem;background:var(--bg-subtle);border-radius:7px">'+
+              '<span style="font-size:.85rem;color:var(--text)">'+p[1]+'</span>'+
+              '<kbd style="background:var(--bg-card);border:1px solid var(--border);border-bottom-width:2px;padding:.15rem .55rem;border-radius:5px;font-family:monospace;font-size:.78rem;font-weight:700">'+p[0]+'</kbd>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  var div = document.createElement('div');
+  div.innerHTML = html;
+  document.body.appendChild(div.firstChild);
+}
+
 // ─── Centro Premium (Ronda 27) — UI visible de rondas 16-25 ─────────────
 // Modal con pestañas que consumen los endpoints nuevos para que el usuario
 // vea y pruebe cada feature desde el navegador.
