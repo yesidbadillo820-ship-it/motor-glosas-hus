@@ -3361,8 +3361,31 @@ document.addEventListener('keydown', function(e){
   } else if(e.key === 'm' || e.key === 'M'){
     sidebarTab(document.querySelector('.sn-item[data-tip="Mis glosas"]'), 'mis-glosas');
     e.preventDefault();
+  } else if(e.key === 'g' || e.key === 'G'){
+    abrirGlosaPorId();
+    e.preventDefault();
+  } else if(e.key === 'a' || e.key === 'A'){
+    abrirAsistenteDrawer();
+    e.preventDefault();
   }
 });
+
+// 🔢 Atajo G: prompt para ir a una glosa por ID directamente
+function abrirGlosaPorId(){
+  var sid = prompt('Ir a glosa por ID:');
+  if(!sid) return;
+  var id = parseInt(String(sid).replace(/[^0-9]/g, ''), 10);
+  if(!id || id < 1){
+    if(typeof toast === 'function') toast('ID inválido','Solo números','warning');
+    return;
+  }
+  if(typeof responderGlosa === 'function'){
+    sidebarTab(document.querySelector('.sn-item[data-tip="Analizar"]'), 'analizar');
+    setTimeout(function(){ responderGlosa(id); }, 100);
+  } else if(typeof abrirGlosaDesdeAsistente === 'function'){
+    abrirGlosaDesdeAsistente(id);
+  }
+}
 
 // Modal con todos los atajos
 function abrirAtajosPanel(){
@@ -3385,6 +3408,8 @@ function abrirAtajosPanel(){
             ['n','Nueva glosa'],
             ['m','Ir a Mis glosas'],
             ['d','Ir al Dashboard'],
+            ['g','Ir a glosa por ID'],
+            ['a','Abrir asistente IA (drawer)'],
             ['b','Reportar fallo o sugerencia'],
             ['Esc','Cerrar modales'],
           ].map(function(p){
