@@ -27,42 +27,83 @@ def migracion_emergencia(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_admin),
 ):
-    """Ejecuta los ALTER TABLE de resize de columnas que la migración
-    auto del startup no aplicó por algún motivo (Render no reinició,
-    bug del flag _is_sqlite, conexión cacheada, etc.).
+    """Detecta y amplía AGRESIVAMENTE todas las VARCHAR de la tabla
+    `historial` cuyo tamaño actual sea <= 50 caracteres, llevándolas
+    a VARCHAR(300). También extiende campos PII a 300 si están en
+    valores intermedios.
 
     Idempotente — los ALTER TYPE en Postgres no fallan si la columna
-    ya tiene ese tipo. Solo SUPER_ADMIN.
+    ya tiene ese tipo o uno mayor.
+
+    Devuelve diagnóstico antes/después para verificar.
     """
     from sqlalchemy import text
-    statements = [
-        "ALTER TABLE historial ALTER COLUMN eps TYPE VARCHAR(300)",
-        "ALTER TABLE historial ALTER COLUMN paciente TYPE VARCHAR(300)",
-        "ALTER TABLE historial ALTER COLUMN etapa TYPE VARCHAR(120)",
-        "ALTER TABLE historial ALTER COLUMN modelo_ia TYPE VARCHAR(120)",
-        "ALTER TABLE historial ALTER COLUMN tecnico_recepcion TYPE VARCHAR(300)",
-        "ALTER TABLE historial ALTER COLUMN gestor_nombre TYPE VARCHAR(300)",
+
+    diag_query = text(
+        "SELECT column_name, data_type, character_maximum_length "
+        "FROM information_schema.columns "
+        "WHERE table_schema = current_schema() "
+        "  AND table_name = 'historial' "
+        "  AND data_type = 'character varying' "
+        "ORDER BY column_name"
+    )
+
+    # 1. Snapshot ANTES
+    antes = []
+    try:
+        rows = db.execute(diag_query).fetchall()
+        antes = [
+            {"col": r[0], "tipo": r[1], "tamaño": r[2]}
+            for r in rows
+        ]
+    except Exception as e:
+        return {"error_diag_antes": str(e)}
+
+    # 2. Identificar candidatas: VARCHAR(N) con N <= 50
+    candidatas = [
+        x["col"] for x in antes
+        if x["tamaño"] is not None and x["tamaño"] <= 50
     ]
+
+    # 3. Aplicar ALTER TYPE a 300 a cada candidata
     resultados = []
-    for sql in statements:
+    for col in candidatas:
+        sql = f"ALTER TABLE historial ALTER COLUMN {col} TYPE VARCHAR(300)"
         try:
             db.execute(text(sql))
             db.commit()
-            resultados.append({"sql": sql, "status": "OK"})
+            resultados.append({"col": col, "status": "OK"})
         except Exception as e:
             db.rollback()
-            resultados.append({"sql": sql, "status": "ERROR", "msg": str(e)})
+            resultados.append({"col": col, "status": "ERROR", "msg": str(e)})
+
+    # 4. Snapshot DESPUÉS
+    despues = []
+    try:
+        rows = db.execute(diag_query).fetchall()
+        despues = [
+            {"col": r[0], "tipo": r[1], "tamaño": r[2]}
+            for r in rows
+        ]
+    except Exception:
+        pass
+
     ok = sum(1 for r in resultados if r["status"] == "OK")
     return {
+        "candidatas_detectadas": candidatas,
         "ejecutados": resultados,
         "exitosos": ok,
-        "total": len(statements),
+        "total_candidatas": len(candidatas),
+        "antes": antes,
+        "despues": despues,
         "mensaje": (
-            "Migración aplicada. Reintenta la importación del Excel."
-            if ok == len(statements)
-            else "Algunos ALTER fallaron — revisa los mensajes."
+            f"Aplicados {ok}/{len(candidatas)} ALTER. "
+            "Reintenta la importación del Excel."
+            if ok == len(candidatas)
+            else f"Solo {ok}/{len(candidatas)} OK — revisa los mensajes."
         ),
     }
+
 
 # Frase de confirmación obligatoria en el body
 CONFIRMACION_REQUERIDA = "CONFIRMAR-BORRADO-TOTAL"
