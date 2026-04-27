@@ -16760,6 +16760,131 @@ def sla_glosa(
     }
 
 
+@router.get("/{glosa_id}/eps-comportamiento")
+def eps_comportamiento(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """R374 P1: perfil de comportamiento de la EPS de esta glosa.
+
+    Resumen rápido para el gestor: cómo se comporta esta
+    EPS en general (no solo este código). Útil para
+    calibrar el tono y la estrategia.
+
+    Devuelve:
+      - tasa_levantamiento_global_pct (cuántas levantamos
+        de las decididas con esta EPS)
+      - tiempo_promedio_decision_dias (qué tan rápido
+        decide)
+      - codigos_top_3 (los 3 códigos que más usa)
+      - codigos_respuesta_top_3
+      - estilo_resumen: una etiqueta legible
+        ("EPS difícil", "EPS conciliadora", etc.)
+    """
+    from datetime import timezone
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    eps = (glosa.eps or "").strip()
+    if not eps:
+        return {
+            "glosa_id": glosa.id,
+            "eps": None,
+            "estilo_resumen": "Sin EPS",
+        }
+
+    rows = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps == eps)
+        .filter(GlosaRecord.id != glosa.id)
+        .all()
+    )
+
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+
+    decididas = [g for g in rows if (g.estado or "").upper() in ESTADOS_DECIDIDOS]
+    n_dec = len(decididas)
+    n_lev = sum(
+        1 for g in decididas
+        if (g.estado or "").upper() == "LEVANTADA"
+    )
+    tasa_lev = round(100 * n_lev / n_dec, 2) if n_dec else 0.0
+
+    # Tiempo promedio de decisión
+    tiempos = []
+    for g in decididas:
+        cre = g.creado_en
+        dec = g.fecha_decision_eps
+        if cre and cre.tzinfo is None:
+            cre = cre.replace(tzinfo=timezone.utc)
+        if dec and dec.tzinfo is None:
+            dec = dec.replace(tzinfo=timezone.utc)
+        if cre and dec:
+            d = (dec - cre).days
+            if d >= 0:
+                tiempos.append(d)
+    tiempo_prom = round(sum(tiempos) / len(tiempos), 2) if tiempos else None
+
+    # Top códigos de glosa que usa la EPS
+    codigos: dict[str, int] = {}
+    for g in rows:
+        c = (g.codigo_glosa or "").strip()
+        if c:
+            codigos[c] = codigos.get(c, 0) + 1
+    top_codigos = sorted(
+        codigos.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+
+    # Top códigos respuesta cuando HUS responde
+    cresp: dict[str, int] = {}
+    for g in rows:
+        cr = (g.codigo_respuesta or "").strip()
+        if cr:
+            cresp[cr] = cresp.get(cr, 0) + 1
+    top_cresp = sorted(
+        cresp.items(), key=lambda x: x[1], reverse=True,
+    )[:3]
+
+    # Estilo: combina tasa + tiempo
+    if n_dec < 5:
+        estilo = "Sin historial suficiente"
+    elif tasa_lev >= 70:
+        estilo = "EPS conciliadora — levanta la mayoría"
+    elif tasa_lev >= 40:
+        estilo = "EPS estándar — depende del argumento"
+    elif tasa_lev >= 20:
+        estilo = "EPS difícil — exige técnica fuerte"
+    else:
+        estilo = "EPS muy difícil — considere conciliación"
+
+    if tiempo_prom is not None:
+        if tiempo_prom <= 15:
+            estilo += " · responde rápido"
+        elif tiempo_prom <= 60:
+            estilo += " · responde dentro del SLA"
+        else:
+            estilo += " · responde tarde"
+
+    return {
+        "glosa_id": glosa.id,
+        "eps": eps,
+        "n_glosas_historico": len(rows),
+        "n_decididas": n_dec,
+        "tasa_levantamiento_global_pct": tasa_lev,
+        "tiempo_promedio_decision_dias": tiempo_prom,
+        "codigos_top_3": [
+            {"codigo_glosa": c, "count": n} for c, n in top_codigos
+        ],
+        "codigos_respuesta_top_3": [
+            {"codigo_respuesta": c, "count": n} for c, n in top_cresp
+        ],
+        "estilo_resumen": estilo,
+    }
+
+
 @router.get("/{glosa_id}/asistente-ficha")
 def asistente_ficha(
     glosa_id: int,
