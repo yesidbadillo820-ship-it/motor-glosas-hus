@@ -406,6 +406,7 @@ def detectar_defectos_criticos(
     *,
     codigo_glosa: str = "",
     valor_objetado: Optional[str] = None,
+    tiene_contrato: bool = False,
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -544,6 +545,54 @@ def detectar_defectos_criticos(
                         "primer párrafo."
                     ),
                 })
+
+    # 9. Anti-contradicción: "tarifa propia" + "contrato" cuando hay contrato.
+    #    Si el caso tiene contrato vigente, decir "tarifa propia
+    #    institucional" es contradictorio: la tarifa pactada nace del
+    #    contrato, no es unilateral. (Feedback del usuario 27-abr-2026.)
+    if tiene_contrato:
+        menciona_propia = re.search(
+            r"TARIFA\s+PROPIA(?:\s+INSTITUCIONAL)?", arg_up,
+        )
+        menciona_contrato = re.search(
+            r"(?:EN\s+VIRTUD\s+DEL\s+CONTRATO|CONFORME\s+AL\s+CONTRATO|"
+            r"CONTRATO\s+(?:N[OUÚ]MERO|No\.|NRO\.?))",
+            arg_up,
+        )
+        if menciona_propia and menciona_contrato:
+            defectos.append({
+                "regla": "tarifa_propia_con_contrato",
+                "mensaje": (
+                    'El dictamen menciona "TARIFA PROPIA INSTITUCIONAL" '
+                    "junto con el contrato, lo cual es CONTRADICTORIO: "
+                    "si hay contrato, la tarifa es PACTADA, no propia."
+                ),
+                "sugerencia": (
+                    'Reescribe usando exclusivamente "TARIFA PACTADA EN '
+                    "EL CONTRATO No. [X]\". Si necesitas referenciar la "
+                    'Resolución 054/2026, dilo como "tarifas incorporadas '
+                    'al contrato a través de la Resolución 054/2026", '
+                    'NUNCA como "tarifa propia institucional".'
+                ),
+            })
+
+    # 10. Anti-divagación: la respuesta excesivamente larga oculta el
+    #     argumento central. Más de 290 palabras = retry.
+    n_palabras = _contar_palabras(arg)
+    if n_palabras > 290:
+        defectos.append({
+            "regla": "demasiado_largo",
+            "mensaje": (
+                f"El argumento tiene {n_palabras} palabras: divaga "
+                "y diluye el alegato. Máximo 250-280."
+            ),
+            "sugerencia": (
+                "Compacta: una idea por oración, sin repetir código/EPS/"
+                "servicio. Elimina conectores redundantes y suprime la "
+                "segunda cita literal si hay dos. Objetivo: 190-240 "
+                "palabras (caso complejo) o 130-180 (caso simple)."
+            ),
+        })
 
     return defectos
 

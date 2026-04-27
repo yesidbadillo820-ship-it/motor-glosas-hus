@@ -1088,20 +1088,41 @@ class GlosaService:
             #  Inyecta 1-2 ejemplos GOLD (par eps+código que ya ganaron)
             #  para que el LLM aprenda del estilo que funcionó antes.
             # ═══════════════════════════════════════════════════════════
+            _ejemplos_gold: list[dict] = []  # disponibles para detector copia
             try:
                 from app.database import SessionLocal
-                from app.services.few_shot_gold import construir_bloque_gold
+                from app.services.few_shot_gold import (
+                    bloque_few_shot_para_prompt,
+                    obtener_ejemplos_gold,
+                )
                 _db_fs = SessionLocal()
                 try:
-                    bloque_fs = construir_bloque_gold(
+                    _ejemplos_gold = obtener_ejemplos_gold(
                         _db_fs, str(data.eps), codigo_det,
                     )
                 finally:
                     _db_fs.close()
+                bloque_fs = bloque_few_shot_para_prompt(_ejemplos_gold)
                 if bloque_fs:
                     user_prompt = user_prompt + bloque_fs
             except Exception as _e:
                 logger.debug(f"Few-shot Gold no inyectado: {_e}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  R-CEREBRO #6: Análisis del motivo EPS — puntos a refutar
+            #  Parsea el texto de la glosa para extraer qué dice la EPS
+            #  (valor reconocido, descuento, soportes faltantes, etc.)
+            #  y pasarle al LLM una checklist explícita de qué atacar.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                from app.services.analizador_motivo_eps import (
+                    construir_bloque_motivo_eps,
+                )
+                bloque_motivo = construir_bloque_motivo_eps(texto_base)
+                if bloque_motivo:
+                    user_prompt = user_prompt + bloque_motivo
+            except Exception as _e:
+                logger.debug(f"Análisis motivo EPS no inyectado: {_e}")
 
             # ═══════════════════════════════════════════════════════════
             #  R-CEREBRO #3: Calibración por dificultad histórica
@@ -1165,6 +1186,10 @@ class GlosaService:
             #  de qué corregir.
             # ═══════════════════════════════════════════════════════════
             try:
+                from app.services.detector_copia import (
+                    detectar_copia_gold,
+                    instruccion_anti_copia,
+                )
                 from app.services.validador_dictamen import (
                     detectar_defectos_criticos,
                     construir_instruccion_retry,
@@ -1174,7 +1199,44 @@ class GlosaService:
                     res_ia,
                     codigo_glosa=codigo_det,
                     valor_objetado=valor_raw,
+                    tiene_contrato=tiene_contrato,
                 )
+                # Mejora #7: chequear si el dictamen es copia textual
+                # de algún ejemplo Gold inyectado. Si lo es, eso es un
+                # defecto crítico equivalente y forzamos retry.
+                _copia = None
+                if _ejemplos_gold:
+                    try:
+                        # Extraer solo el contenido de <argumento>
+                        import re as _re_arg
+                        _m_arg = _re_arg.search(
+                            r"<argumento>(.*?)</argumento>",
+                            res_ia or "", _re_arg.DOTALL | _re_arg.IGNORECASE,
+                        )
+                        _arg_solo = _m_arg.group(1) if _m_arg else (res_ia or "")
+                        _copia = detectar_copia_gold(
+                            _arg_solo, _ejemplos_gold, umbral=0.55,
+                        )
+                        if _copia:
+                            _defectos.append({
+                                "regla": "copia_textual_gold",
+                                "mensaje": (
+                                    f"El dictamen es {_copia['similitud']*100:.0f}% "
+                                    "idéntico a un ejemplo Gold."
+                                ),
+                                "sugerencia": (
+                                    "Reformula con vocabulario propio. "
+                                    "Mantén estructura y normas pero "
+                                    "cambia las palabras."
+                                ),
+                            })
+                            logger.warning(
+                                f"[VALIDACION-IA] Copia textual detectada: "
+                                f"{_copia['similitud']*100:.0f}% similitud con "
+                                f"ejemplo {_copia['fuente']} #{_copia['ejemplo_id']}"
+                            )
+                    except Exception as _e_c:
+                        logger.debug(f"Detector copia falló: {_e_c}")
                 if _defectos:
                     logger.warning(
                         f"[VALIDACION-IA] Defectos detectados en primera "
@@ -1195,6 +1257,7 @@ class GlosaService:
                             res_retry,
                             codigo_glosa=codigo_det,
                             valor_objetado=valor_raw,
+                            tiene_contrato=tiene_contrato,
                         )
                         if len(_defectos_retry) < len(_defectos):
                             logger.info(

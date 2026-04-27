@@ -370,8 +370,8 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <normas_clave>3 normas más relevantes separadas por "|"</normas_clave>
 <argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS. LONGITUD ADAPTATIVA según el BLOQUE COMPLEJIDAD del user prompt:
   • COMPLEJIDAD BAJA (glosa simple, sin PDF): 2 PÁRRAFOS, 130-180 palabras. NO enumerar "EN PRIMER/SEGUNDO LUGAR". Ve directo.
-  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso): 4 PÁRRAFOS, 230-310 palabras, con enumeración técnica.
-En ambos casos: tono conciliador institucional, SIN repetir información entre párrafos, cada frase aporta argumento único. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL.</argumento>
+  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso): 3-4 PÁRRAFOS, 190-240 palabras (NUNCA más de 250), con enumeración técnica solo si aporta.
+En ambos casos: tono conciliador institucional, SIN repetir información entre párrafos, cada frase aporta argumento único. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL — pero solo UNA cita literal por dictamen, no acumules.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
 PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], FACTURADO POR [VALOR o "EL VALOR INDICADO EN EL EXPEDIENTE"]". Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
@@ -448,6 +448,34 @@ REGLAS:
 • Si hay contrato con factor (SOAT -X%): menciona el descuento pactado pero NO hagas cálculos aritméticos visibles.
 • NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia). Glosa tarifaria es contractual.
 • Si la entidad es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001 FUERZAS MILITARES, NO cites T-760/2008.
+
+🚫 PROHIBIDO MEZCLAR "TARIFA PROPIA" CON "CONTRATO" (regla anti-contradicción):
+  Si el BLOQUE 1 informa un CONTRATO vigente, la tarifa aplicable es la
+  TARIFA PACTADA EN ESE CONTRATO — punto. NUNCA digas frases como:
+    ❌ "TARIFA PROPIA INSTITUCIONAL ... EN VIRTUD DEL CONTRATO X"
+    ❌ "RESOLUCIÓN 054/2026 ... ESTABLECIDA POR EL CONTRATO X"
+    ❌ "TARIFA UNILATERAL DEL HOSPITAL ... CONFORME AL CONTRATO X"
+  Esto se lee como contradicción porque "tarifa propia" implica
+  fijación unilateral, mientras que "contrato" implica acuerdo bilateral.
+  Cuando hay contrato, di SIEMPRE:
+    ✅ "TARIFA PACTADA EN EL CONTRATO No. [X]"
+    ✅ "EL CONTRATO No. [X] ESTABLECE COMO TARIFA APLICABLE [...]"
+    ✅ "EL CONTRATO INCORPORA LAS TARIFAS DE LA RESOLUCIÓN 054/2026 ESE HUS"
+       (solo si el campo Tarifa pactada del BLOQUE 1 dice "PROPIA" o
+       "INSTITUCIONAL" — y aún así, la fuente normativa primaria es el
+       contrato, no la resolución).
+  Si NO hay contrato (Tarifa pactada = "SIN CONTRATO" o vacía), entonces
+  sí puedes invocar la Resolución 054/2026 como tarifario institucional
+  aplicable supletoriamente, junto con la Circular 047/2025 (SOAT).
+
+🚫 ANTI-RELLENO Y REPETICIÓN (regla de concisión):
+  • NO repitas en P3 lo que ya dijiste en P1 (servicio, código, EPS, valor).
+  • NO uses "DE LA ESE HUS" más de UNA VEZ en todo el dictamen — el sujeto
+    ya quedó identificado al inicio.
+  • Cuando enuncies la fuente normativa, basta con UNA cita literal entre
+    comillas — NO concatenes 3 normas con citas literales seguidas.
+  • Si el BLOQUE COMPLEJIDAD dice ALTA y la respuesta supera 250 palabras,
+    estás divagando: condensa.
 
 EJEMPLO DE RESPUESTA CONCILIADORA (longitud objetivo ~230 palabras):
 "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS SOBRE EL CÓDIGO TA0801, INTERPUESTA POR DISPENSARIO MÉDICO BUCARAMANGA, RESPECTO DEL ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA IDENTIFICADO CON CUPS 898101, FACTURADO POR VALOR DE $190.964 Y RECONOCIDO SOLO POR $45.411.
@@ -1080,8 +1108,11 @@ def build_user_prompt(
             f"\n[COMPLEJIDAD DETECTADA: ALTA — puntaje {_puntos_complejidad}]\n"
             f"  • {_num_docs_pdf} documento(s) PDF adjunto(s), {_pdf_len:,} caracteres totales.\n"
             f"  • Texto de glosa: {_texto_glosa_len} caracteres.\n"
-            f"  LONGITUD DE RESPUESTA: 4 PÁRRAFOS, 230-310 palabras total.\n"
+            f"  LONGITUD DE RESPUESTA: 3-4 PÁRRAFOS, 190-240 palabras total. NO superes 250.\n"
             f"  Aprovecha los datos del PDF: cita folios, fechas, diagnósticos, médicos específicos.\n"
+            f"  ⚠ ANTI-RELLENO: cada oración debe aportar argumento NUEVO. Si te das cuenta de que\n"
+            f"  estás repitiendo el código de glosa, el servicio o la EPS por segunda vez en otro\n"
+            f"  párrafo, REESCRIBE esa oración: ya quedó identificado al inicio.\n"
         )
     else:
         bloque_complejidad_str = (
@@ -1183,7 +1214,7 @@ Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 <contrato>...</contrato>
 <tarifa>...</tarifa>
 <normas_clave>Norma1 | Norma2 | Norma3</normas_clave>
-<argumento>[EN MAYÚSCULAS, TONO CONCILIADOR. LONGITUD SEGÚN BLOQUE COMPLEJIDAD: simple=2 párrafos 130-180 palabras, complejo=4 párrafos 230-310 palabras. DENSO, SIN RELLENO, SIN REPETIR información. Cita literal entre comillas del BLOQUE NORMATIVA cuando aplique]</argumento>
+<argumento>[EN MAYÚSCULAS, TONO CONCILIADOR. LONGITUD SEGÚN BLOQUE COMPLEJIDAD: simple=2 párrafos 130-180 palabras, complejo=3-4 párrafos 190-240 palabras (máximo 250). DENSO, SIN RELLENO, SIN REPETIR información. UNA sola cita literal entre comillas del BLOQUE NORMATIVA, no acumules. Si hay contrato, llama a la tarifa "TARIFA PACTADA" — NUNCA "tarifa propia institucional"]</argumento>
 
 RECUERDA:
 1. El <argumento> debe seguir la estructura de 4 párrafos del system prompt (Identificación → Refutación → Fundamento → Petición conciliadora).

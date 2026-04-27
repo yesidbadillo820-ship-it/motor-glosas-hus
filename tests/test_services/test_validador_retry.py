@@ -96,6 +96,64 @@ class TestDetectarDefectos:
         d = detectar_defectos_criticos(_xml_ok(arg), codigo_glosa="FA0401")
         assert any(x["regla"] == "cita_incorrecta" for x in d)
 
+    def test_tarifa_propia_con_contrato_es_critico(self):
+        # Caso real del feedback usuario: dictamen menciona "tarifa
+        # propia institucional" + "en virtud del contrato" simultáneamente.
+        arg = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
+            "SOBRE EL CÓDIGO TA0201, INTERPUESTA POR DISPENSARIO MEDICO, "
+            "RESPECTO DEL SERVICIO IDENTIFICADO CON CUPS 39147B-18, "
+            "FACTURADO POR $168.563, DADO QUE LA TARIFA APLICADA "
+            "CORRESPONDE A LA TARIFA PROPIA INSTITUCIONAL DE LA ESE HUS "
+            "ESTABLECIDA EN LA RESOLUCIÓN 054 DE 2026, LA CUAL RESULTA "
+            "PLENAMENTE EXIGIBLE EN VIRTUD DEL CONTRATO No. 440-DIGSA. "
+            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(arg),
+            codigo_glosa="TA0201",
+            valor_objetado="$168.563",
+            tiene_contrato=True,
+        )
+        assert any(x["regla"] == "tarifa_propia_con_contrato" for x in d)
+
+    def test_tarifa_propia_sin_contrato_no_es_defecto(self):
+        # Si NO hay contrato, "tarifa propia institucional" sí aplica.
+        arg = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA SOBRE EL CÓDIGO TA0201, "
+            "INTERPUESTA POR ASEGURADORA SOAT, RESPECTO DEL SERVICIO "
+            "FACTURADO POR $168.563, DADO QUE LA TARIFA APLICADA "
+            "CORRESPONDE A LA TARIFA PROPIA INSTITUCIONAL ESTABLECIDA EN "
+            "LA RESOLUCIÓN 054 DE 2026 ESE HUS, APLICABLE EN AUSENCIA "
+            "DE ACUERDO TARIFARIO PREVIO. "
+            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(arg),
+            codigo_glosa="TA0201",
+            valor_objetado="$168.563",
+            tiene_contrato=False,
+        )
+        assert not any(
+            x["regla"] == "tarifa_propia_con_contrato" for x in d
+        )
+
+    def test_demasiado_largo_se_marca(self):
+        # Argumento con > 290 palabras debe disparar 'demasiado_largo'
+        bloque = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN "
+            "SOBRE EL CÓDIGO FA0401, INTERPUESTA POR COOSALUD, RESPECTO DEL "
+            "SERVICIO FACTURADO. " + ("PALABRA " * 300) +
+            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+        )
+        d = detectar_defectos_criticos(
+            _xml_ok(bloque), codigo_glosa="FA0401",
+        )
+        assert any(x["regla"] == "demasiado_largo" for x in d)
+
 
 class TestInstruccionRetry:
     def test_construir_retry_no_vacio_si_hay_defectos(self):
