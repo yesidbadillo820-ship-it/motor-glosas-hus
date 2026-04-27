@@ -1083,28 +1083,134 @@ class GlosaService:
             except Exception as _e:
                 logger.debug(f"Multi-agente no inyectado (se ignora): {_e}")
 
+            # ═══════════════════════════════════════════════════════════
+            #  R-CEREBRO #2: Few-shot dinámico con dictámenes ganadores
+            #  Inyecta 1-2 ejemplos GOLD (par eps+código que ya ganaron)
+            #  para que el LLM aprenda del estilo que funcionó antes.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                from app.database import SessionLocal
+                from app.services.few_shot_gold import construir_bloque_gold
+                _db_fs = SessionLocal()
+                try:
+                    bloque_fs = construir_bloque_gold(
+                        _db_fs, str(data.eps), codigo_det,
+                    )
+                finally:
+                    _db_fs.close()
+                if bloque_fs:
+                    user_prompt = user_prompt + bloque_fs
+            except Exception as _e:
+                logger.debug(f"Few-shot Gold no inyectado: {_e}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  R-CEREBRO #3: Calibración por dificultad histórica
+            #  Si el par tiene tasa ≥70% → tono confiado / si ≤30% →
+            #  blindaje reforzado / si en medio → estándar.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                from app.database import SessionLocal
+                from app.services.calibracion_dificultad import (
+                    construir_bloque_calibracion,
+                )
+                _db_cal = SessionLocal()
+                try:
+                    bloque_cal = construir_bloque_calibracion(
+                        _db_cal, str(data.eps), codigo_det,
+                    )
+                finally:
+                    _db_cal.close()
+                if bloque_cal:
+                    user_prompt = user_prompt + bloque_cal
+            except Exception as _e:
+                logger.debug(f"Calibración no inyectada: {_e}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  R-CEREBRO #5: Ruteo dinámico Sonnet → Opus
+            #  Para casos de ALTA complejidad (puntaje >= 6 ya marca
+            #  "complejo", aquí endurecemos: solo si valor >= 10M Y
+            #  hay 2+ PDFs) usamos Opus 4.7 que rinde mejor en tareas
+            #  jurídicas largas.
+            # ═══════════════════════════════════════════════════════════
+            _modelo_override = None
+            try:
+                _valor_num_route = 0
+                if valor_raw:
+                    import re as _re_route
+                    _digits = _re_route.sub(r"[^\d]", "", str(valor_raw))
+                    if _digits:
+                        _valor_num_route = int(_digits)
+                _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
+                if _valor_num_route >= 10_000_000 and _num_pdfs_route >= 2:
+                    _modelo_override = "claude-opus-4-7"
+                    logger.info(
+                        "[ROUTING-IA] Caso de alta complejidad — "
+                        f"valor=${_valor_num_route:,} pdfs={_num_pdfs_route} → Opus 4.7"
+                    )
+            except Exception:
+                pass
+
             res_ia, modelo_usado = await self._llamar_ia(
-                system_prompt, user_prompt, eps=str(data.eps), codigo=codigo_det
+                system_prompt, user_prompt,
+                eps=str(data.eps), codigo=codigo_det,
+                modelo_override=_modelo_override,
             )
 
-            # XML validation retry: si no vino <argumento> en la respuesta,
-            # reintentamos UNA vez con un recordatorio explícito del contrato.
-            if "<argumento>" not in res_ia:
-                logger.warning("IA no devolvió <argumento>; reintentando con recordatorio XML")
-                user_retry = user_prompt + (
-                    "\n\nRECORDATORIO CRÍTICO: Tu respuesta anterior no incluyó los tags XML "
-                    "requeridos. Responde AHORA estrictamente en el formato XML definido "
-                    "(<paciente>, <servicio>, <contrato>, <tarifa>, <normas_clave>, "
-                    "<argumento>). Ningún texto fuera de los tags."
+            # ═══════════════════════════════════════════════════════════
+            #  R-CEREBRO #1: Validación post-generación con retry
+            #  Detecta defectos críticos (frases prohibidas, tags
+            #  faltantes, citas legales mal escritas, código no
+            #  mencionado, valor no textual). Si los hay, regenera UNA
+            #  vez bypaseando el caché con instrucciones específicas
+            #  de qué corregir.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                from app.services.validador_dictamen import (
+                    detectar_defectos_criticos,
+                    construir_instruccion_retry,
+                    resumen_defectos,
                 )
-                try:
-                    res_retry, modelo_usado = await self._llamar_ia(
-                        system_prompt, user_retry, eps=str(data.eps), codigo=codigo_det
+                _defectos = detectar_defectos_criticos(
+                    res_ia,
+                    codigo_glosa=codigo_det,
+                    valor_objetado=valor_raw,
+                )
+                if _defectos:
+                    logger.warning(
+                        f"[VALIDACION-IA] Defectos detectados en primera "
+                        f"respuesta: {resumen_defectos(_defectos)}"
                     )
-                    if "<argumento>" in res_retry:
-                        res_ia = res_retry
-                except Exception as _e:
-                    logger.warning(f"Retry IA falló: {_e}")
+                    instr_retry = construir_instruccion_retry(_defectos)
+                    user_retry = user_prompt + instr_retry
+                    try:
+                        res_retry, _modelo_retry = await self._llamar_ia(
+                            system_prompt, user_retry,
+                            eps=str(data.eps), codigo=codigo_det,
+                            modelo_override=_modelo_override,
+                            bypass_cache=True,
+                        )
+                        # Aceptamos la nueva respuesta solo si tiene
+                        # MENOS defectos críticos que la primera
+                        _defectos_retry = detectar_defectos_criticos(
+                            res_retry,
+                            codigo_glosa=codigo_det,
+                            valor_objetado=valor_raw,
+                        )
+                        if len(_defectos_retry) < len(_defectos):
+                            logger.info(
+                                f"[VALIDACION-IA] Retry mejoró: "
+                                f"{len(_defectos)} → {len(_defectos_retry)} defectos"
+                            )
+                            res_ia = res_retry
+                            modelo_usado = _modelo_retry
+                        else:
+                            logger.warning(
+                                "[VALIDACION-IA] Retry no mejoró — usando primera respuesta"
+                            )
+                    except Exception as _e:
+                        logger.warning(f"Retry IA por validación falló: {_e}")
+            except Exception as _e:
+                logger.debug(f"Validación post-gen no aplicada: {_e}")
 
             razonamiento = self._xml("razonamiento", res_ia, "")
             if razonamiento:
@@ -2005,7 +2111,13 @@ class GlosaService:
                 raise
         raise ultimo_error
 
-    async def _llamar_anthropic(self, system: str, user: str) -> tuple[str, str]:
+    async def _llamar_anthropic(
+        self,
+        system: str,
+        user: str,
+        modelo_override: Optional[str] = None,
+        temperature_override: Optional[float] = None,
+    ) -> tuple[str, str]:
         """Llama a Claude vía API REST. Devuelve (texto, etiqueta_modelo).
 
         Usa **prompt caching** (optimización #3) cuando el system prompt tiene
@@ -2013,6 +2125,11 @@ class GlosaService:
         llamadas subsecuentes con el mismo system. Para activarlo se pasa
         `system` como lista con `cache_control: {"type": "ephemeral"}`.
         Ref: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+
+        modelo_override: si se pasa (ej. "claude-opus-4-7" para casos de
+        alta complejidad), usa ese modelo en lugar del default. Permite
+        ruteo dinámico Sonnet→Opus para los casos críticos.
+        temperature_override: idem para temperature.
         """
         if not self.anthropic_key:
             raise RuntimeError("Anthropic API key no configurada")
@@ -2070,15 +2187,25 @@ class GlosaService:
         for intento in range(3):
             try:
                 async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
+                    # Ruteo dinámico: caller puede forzar Opus 4.7 para
+                    # casos de alta complejidad (mejora #5 cerebro IA).
+                    _modelo_efectivo = modelo_override or self.anthropic_model
+                    # Mejora #4: temperature 0.10 (era 0.15) — más
+                    # consistencia en dictámenes estructurados.
+                    _temp_efectiva = (
+                        temperature_override
+                        if temperature_override is not None
+                        else 0.10
+                    )
                     resp = await client.post(
                         "https://api.anthropic.com/v1/messages",
                         headers=_headers,
                         json={
-                            "model": self.anthropic_model,
+                            "model": _modelo_efectivo,
                             # Ronda 49: 3000 tokens es suficiente para dictamen
                             # de 800-1200 palabras; reduce latencia vs 4000.
                             "max_tokens": 3000,
-                            "temperature": 0.15,
+                            "temperature": _temp_efectiva,
                             "system": system_payload,
                             "messages": [{"role": "user", "content": user}],
                         },
@@ -2088,9 +2215,9 @@ class GlosaService:
                         usage = data.get("usage", {})
                         latencia_ms = int((_time.monotonic() - _t_inicio) * 1000)
                         _log_metricas_anthropic(
-                            usage, self.anthropic_model, latencia_ms,
+                            usage, _modelo_efectivo, latencia_ms,
                         )
-                        return data["content"][0]["text"], f"anthropic/{self.anthropic_model}"
+                        return data["content"][0]["text"], f"anthropic/{_modelo_efectivo}"
                     err = data.get("error", {}).get("message", str(data)[:300])
                     # Si es error 529 (overloaded) o 429 (rate limit), reintentar
                     status = resp.status_code
@@ -2118,50 +2245,70 @@ class GlosaService:
             f"{type(ultimo_error).__name__}: {str(ultimo_error)[:200]}"
         )
 
-    async def _llamar_ia(self, system: str, user: str, eps: str = "", codigo: str = "") -> tuple[str, str]:
+    async def _llamar_ia(
+        self,
+        system: str,
+        user: str,
+        eps: str = "",
+        codigo: str = "",
+        modelo_override: Optional[str] = None,
+        temperature_override: Optional[float] = None,
+        bypass_cache: bool = False,
+    ) -> tuple[str, str]:
         """Llama a la IA configurada (primary_ai) con fallback al otro proveedor.
 
         Orden de consulta de caché:
           1. Caché en memoria (_CACHE_IA, TTL 1h) — rapidísimo
           2. Caché persistente BD (ai_cache, TTL 30 días) — sobrevive reinicios
           3. Llamar a la IA y guardar en ambos cachés
+
+        modelo_override: para forzar un modelo específico (ej. "claude-opus-4-7"
+        en casos de alta complejidad). Se propaga al provider Anthropic.
+        bypass_cache: para retries de validación (no queremos servir respuestas
+        defectuosas desde caché).
         """
-        # Clave de caché incluye EPS y código para evitar colisiones cruzadas
+        # Clave de caché incluye EPS, código y modelo override para evitar
+        # colisiones cruzadas entre Sonnet/Opus
+        modelo_para_clave = modelo_override or self.anthropic_model
         clave_cache = hashlib.sha256(
-            f"{self.primary_ai}|{self.anthropic_model}|{eps}|{codigo}|{system}|{user}".encode()
+            f"{self.primary_ai}|{modelo_para_clave}|{eps}|{codigo}|{system}|{user}".encode()
         ).hexdigest()
 
         # 1) Caché en memoria (lock asyncio para evitar race condition con
         #    múltiples requests concurrentes escribiendo la misma clave)
-        async with _CACHE_IA_LOCK:
-            if clave_cache in _CACHE_IA:
-                cached = _CACHE_IA[clave_cache]
-            else:
-                cached = None
-        if cached is not None:
-            if isinstance(cached, tuple):
-                respuesta, modelo = cached[0], cached[1]
-            else:
-                respuesta, modelo = cached, "cache"
-            logger.info(f"Cache MEM: {len(respuesta)} chars [{modelo}]")
-            return respuesta, modelo
-
-        # 2) Caché persistente en BD (si hay sesión global disponible)
-        cached_db = _buscar_cache_ia_db(clave_cache)
-        if cached_db is not None:
-            respuesta, modelo = cached_db
+        if not bypass_cache:
             async with _CACHE_IA_LOCK:
-                _CACHE_IA[clave_cache] = (respuesta, modelo)  # rellenar caché memoria
-            logger.info(f"Cache DB: {len(respuesta)} chars [{modelo}]")
-            return respuesta, modelo
+                if clave_cache in _CACHE_IA:
+                    cached = _CACHE_IA[clave_cache]
+                else:
+                    cached = None
+            if cached is not None:
+                if isinstance(cached, tuple):
+                    respuesta, modelo = cached[0], cached[1]
+                else:
+                    respuesta, modelo = cached, "cache"
+                logger.info(f"Cache MEM: {len(respuesta)} chars [{modelo}]")
+                return respuesta, modelo
+
+            # 2) Caché persistente en BD (si hay sesión global disponible)
+            cached_db = _buscar_cache_ia_db(clave_cache)
+            if cached_db is not None:
+                respuesta, modelo = cached_db
+                async with _CACHE_IA_LOCK:
+                    _CACHE_IA[clave_cache] = (respuesta, modelo)  # rellenar caché memoria
+                logger.info(f"Cache DB: {len(respuesta)} chars [{modelo}]")
+                return respuesta, modelo
 
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
         if not self.groq and not self.anthropic_key:
             return "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>", "error"
 
-        # Orden de intento según configuración
-        if self.primary_ai == "anthropic" and self.anthropic_key:
+        # Orden de intento según configuración. Si hay modelo_override,
+        # SOLO usamos Anthropic (Groq no soporta el modelo de Anthropic).
+        if modelo_override and self.anthropic_key:
+            intentos = [("anthropic", self._llamar_anthropic)]
+        elif self.primary_ai == "anthropic" and self.anthropic_key:
             intentos = [("anthropic", self._llamar_anthropic)]
             if self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
@@ -2175,7 +2322,15 @@ class GlosaService:
         ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
         for nombre, fn in intentos:
             try:
-                content, modelo = await fn(system, user)
+                # Solo Anthropic acepta modelo/temperature override
+                if nombre == "anthropic":
+                    content, modelo = await fn(
+                        system, user,
+                        modelo_override=modelo_override,
+                        temperature_override=temperature_override,
+                    )
+                else:
+                    content, modelo = await fn(system, user)
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
                 _guardar_cache_ia_db(clave_cache, content, modelo)

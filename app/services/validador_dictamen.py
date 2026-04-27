@@ -354,3 +354,232 @@ def evaluar_dictamen(
         "total": len(checks),
         "palabras": _contar_palabras(texto),
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Validación para RETRY automático del cerebro IA (R-cerebro mejora #1)
+# ═══════════════════════════════════════════════════════════════════════
+#  Diferente al `evaluar_dictamen()` (informativo, score 0-100): aquí
+#  detectamos defectos CRÍTICOS que justifican re-llamar al modelo con
+#  una instrucción de corrección. Evita que dictámenes con tags faltantes,
+#  frases prohibidas o cifras inventadas lleguen al gestor.
+
+# Frases prohibidas según el system prompt (registro hostil/coloquial)
+_FRASES_PROHIBIDAS_CRITICAS = [
+    "SE EXIGE",
+    "ACTO ABUSIVO",
+    "OBLIGA A",
+    "INCUMPLIMIENTO INJUSTIFICADO",
+    "ELLA MISMA FIRMÓ",
+    "AFECTA DIRECTAMENTE EL FLUJO DE RECURSOS",
+    "CARECE DE SUSTENTO LEGAL",
+    "NO FUE RESPETADA",
+]
+
+# Errores típicos de citación legal (incorrecto → correcto)
+_CITAS_INCORRECTAS = [
+    ("ART. 1601 ", "ART. 1602 "),
+    ("ARTÍCULO 1601 ", "ART. 1602 "),
+    ("ARTICULO 1601 ", "ART. 1602 "),
+    ("LEY 1438 DE 2015", "LEY 1438 DE 2011"),
+    ("RES. 2284 DE 2024", "RES. 2284 DE 2023"),
+    ("RESOLUCIÓN 2284/2024", "RESOLUCIÓN 2284/2023"),
+]
+
+_EMAILS_CONTACTO = ("CARTERA@HUS.GOV.CO", "GLOSASYDEVOLUCIONES@HUS.GOV.CO")
+
+
+def _extraer_argumento_xml(xml: str) -> Optional[str]:
+    """Extrae el contenido de <argumento>...</argumento>."""
+    if not xml:
+        return None
+    m = re.search(
+        r"<argumento>(.*?)</argumento>", xml, re.IGNORECASE | re.DOTALL,
+    )
+    if not m:
+        return None
+    return (m.group(1) or "").strip()
+
+
+def detectar_defectos_criticos(
+    dictamen_xml: str,
+    *,
+    codigo_glosa: str = "",
+    valor_objetado: Optional[str] = None,
+) -> list[dict]:
+    """Detecta defectos CRÍTICOS que justifican retry de la IA.
+
+    Cada defecto retorna un dict con:
+      regla: id corto
+      mensaje: descripción legible
+      sugerencia: cómo arreglarlo en el reintento
+
+    Filosofía:
+      - solo defectos que el LLM PUEDE corregir si se le indica
+      - no incluye warnings "soft" (longitud, mayúsculas) que no
+        afectan utilidad legal
+      - resultado vacío [] significa que el dictamen es usable
+    """
+    defectos: list[dict] = []
+    if not dictamen_xml or not dictamen_xml.strip():
+        return [{
+            "regla": "vacio",
+            "mensaje": "La respuesta de la IA está vacía.",
+            "sugerencia": "Genera el dictamen completo en el formato XML del contrato.",
+        }]
+
+    # 1. Tag <argumento> obligatorio
+    arg = _extraer_argumento_xml(dictamen_xml)
+    if arg is None:
+        defectos.append({
+            "regla": "sin_argumento",
+            "mensaje": "Falta el tag <argumento>...</argumento>.",
+            "sugerencia": (
+                "Incluye obligatoriamente <argumento>...</argumento> "
+                "con el dictamen completo en MAYÚSCULAS."
+            ),
+        })
+        return defectos  # sin argumento, los demás checks no aplican
+
+    if len(arg) < 80:
+        defectos.append({
+            "regla": "argumento_vacio",
+            "mensaje": "El tag <argumento> tiene menos de 80 caracteres.",
+            "sugerencia": "Redacta el dictamen completo según las reglas del system prompt.",
+        })
+        return defectos
+
+    arg_up = arg.upper()
+
+    # 2. Inicio obligatorio: el system prompt exige "ESE HUS NO ACEPTA"
+    # como PRIMERAS palabras, sin antefijos como "RESPETUOSAMENTE".
+    primeras = arg.strip()[:50].upper()
+    if not primeras.startswith("ESE HUS NO ACEPTA"):
+        defectos.append({
+            "regla": "inicio_invalido",
+            "mensaje": 'El dictamen no inicia con "ESE HUS NO ACEPTA".',
+            "sugerencia": (
+                'Comienza el primer párrafo: '
+                '"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE..."'
+            ),
+        })
+
+    # 3. Email institucional de contacto
+    if not any(e in arg_up for e in _EMAILS_CONTACTO):
+        defectos.append({
+            "regla": "sin_email_contacto",
+            "mensaje": "El dictamen no incluye el email institucional de contacto.",
+            "sugerencia": (
+                "Cierra el último párrafo con: "
+                "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+                "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+            ),
+        })
+
+    # 4. Frases prohibidas (registro hostil)
+    for frase in _FRASES_PROHIBIDAS_CRITICAS:
+        if frase in arg_up:
+            defectos.append({
+                "regla": f"frase_prohibida_{frase.lower().replace(' ', '_')[:30]}",
+                "mensaje": f'Detectada frase prohibida: "{frase}".',
+                "sugerencia": (
+                    f'Reemplaza "{frase}" por una expresión institucional '
+                    "conciliadora (ver system prompt §USA SIEMPRE)."
+                ),
+            })
+
+    # 5. Citas legales con sintaxis incorrecta
+    for incorrecto, correcto in _CITAS_INCORRECTAS:
+        if incorrecto.upper() in arg_up:
+            defectos.append({
+                "regla": "cita_incorrecta",
+                "mensaje": f'Cita normativa incorrecta: "{incorrecto.strip()}".',
+                "sugerencia": f'Usa "{correcto.strip()}".',
+            })
+
+    # 6. Placeholders con corchetes
+    if re.search(r"\$\s*\[[^\]]+\]", arg) or re.search(
+        r"\[(VALOR|CIFRA|MONTO|PACIENTE|PACINTE|MEDICO|CUPS|CODIGO|FECHA|NOMBRE)\]",
+        arg.upper(),
+    ):
+        defectos.append({
+            "regla": "placeholder_corchete",
+            "mensaje": "Hay placeholders sin reemplazar (corchetes [VALOR], $[X], etc.).",
+            "sugerencia": (
+                'Si no tienes el dato exacto, usa frases neutras: '
+                '"EL VALOR INDICADO EN EL EXPEDIENTE", '
+                '"PACIENTE IDENTIFICADO EN EXPEDIENTE", "MÉDICO TRATANTE".'
+            ),
+        })
+
+    # 7. Código de glosa correcto debe aparecer
+    if codigo_glosa and codigo_glosa not in ("", "N/A"):
+        if codigo_glosa.upper() not in arg_up:
+            defectos.append({
+                "regla": "codigo_glosa_no_mencionado",
+                "mensaje": (
+                    f'El dictamen no menciona el código solicitado '
+                    f'"{codigo_glosa}".'
+                ),
+                "sugerencia": (
+                    f'Cita explícitamente "GLOSA {codigo_glosa}" '
+                    "en el primer y último párrafo."
+                ),
+            })
+
+    # 8. Si hay valor numérico exacto pedido, debe aparecer
+    if valor_objetado and not str(valor_objetado).upper().startswith("EL VALOR"):
+        digitos = re.sub(r"[^\d]", "", str(valor_objetado))
+        if len(digitos) >= 4:
+            arg_digitos = re.sub(r"[^\d]", "", arg)
+            if digitos not in arg_digitos:
+                defectos.append({
+                    "regla": "valor_no_textual",
+                    "mensaje": (
+                        f'El valor objetado exacto "{valor_objetado}" '
+                        "no aparece en el dictamen."
+                    ),
+                    "sugerencia": (
+                        f"Incluye textualmente {valor_objetado} en el "
+                        "primer párrafo."
+                    ),
+                })
+
+    return defectos
+
+
+def construir_instruccion_retry(defectos: list[dict]) -> str:
+    """Construye el bloque a anexar al user_prompt para el reintento.
+
+    Reemplaza la respuesta anterior y le indica a la IA exactamente
+    qué corregir.
+    """
+    if not defectos:
+        return ""
+    partes = [
+        "",
+        "═══ TU RESPUESTA ANTERIOR TUVO DEFECTOS CRÍTICOS — REGENERA EL DICTAMEN COMPLETO ═══",
+        "",
+        "Detectamos los siguientes problemas que DEBES corregir:",
+        "",
+    ]
+    for i, d in enumerate(defectos, 1):
+        partes.append(f"{i}. ❌ {d['mensaje']}")
+        if d.get("sugerencia"):
+            partes.append(f"   ✅ {d['sugerencia']}")
+    partes.append("")
+    partes.append(
+        "Genera de nuevo el dictamen completo en el formato XML "
+        "(<paciente>, <servicio>, <contrato>, <tarifa>, <normas_clave>, "
+        "<argumento>) corrigiendo TODO lo anterior. Ningún texto fuera "
+        "de los tags."
+    )
+    return "\n".join(partes)
+
+
+def resumen_defectos(defectos: list[dict]) -> dict:
+    """Para logging/observabilidad."""
+    return {
+        "total": len(defectos),
+        "reglas": [d["regla"] for d in defectos],
+    }
