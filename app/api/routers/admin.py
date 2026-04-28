@@ -22,6 +22,82 @@ from app.repositories.audit_repository import AuditRepository
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+@router.post("/dedup-historial")
+def dedup_historial(
+    dry_run: bool = True,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Detecta y limpia duplicados en `historial`.
+
+    Para cada par (factura, codigo_glosa, cups_servicio, etapa) que
+    tenga más de una fila, conserva LA MEJOR (preferencia: estado
+    terminal RESPONDIDA/CONCILIADA/LEVANTADA, después la más reciente)
+    y mueve las otras a estado='DUPLICADA_OCULTA' para que no
+    aparezcan en bandejas pero queden en BD para auditoría.
+
+    Por defecto dry_run=True (solo reporta cuántas movería). Para
+    ejecutar de verdad: ?dry_run=false.
+    """
+    from sqlalchemy import text
+    from app.models.db import GlosaRecord
+
+    grupos: dict[tuple, list] = {}
+    rows = db.query(GlosaRecord).all()
+    for g in rows:
+        clave = (
+            (g.factura or "").strip().upper(),
+            (g.codigo_glosa or "").strip().upper(),
+            (getattr(g, "cups_servicio", None) or "").strip().upper(),
+            (g.etapa or "").strip().upper(),
+        )
+        if not any(clave):  # todo vacío — saltar
+            continue
+        grupos.setdefault(clave, []).append(g)
+
+    duplicados_grupos = {k: v for k, v in grupos.items() if len(v) > 1}
+    candidatos_a_ocultar: list[int] = []
+    terminales = {"RESPONDIDA", "CONCILIADA", "LEVANTADA"}
+
+    for clave, lista in duplicados_grupos.items():
+        # Ordenar: terminales primero, luego más reciente
+        def _score(g):
+            est = (g.estado or "").upper()
+            wf = (getattr(g, "workflow_state", None) or "").upper()
+            es_terminal = est in terminales or wf in terminales
+            ts = g.creado_en.timestamp() if g.creado_en else 0
+            return (1 if es_terminal else 0, ts)
+        lista_ordenada = sorted(lista, key=_score, reverse=True)
+        # El primero se queda, el resto se oculta
+        for g in lista_ordenada[1:]:
+            candidatos_a_ocultar.append(g.id)
+
+    if not dry_run and candidatos_a_ocultar:
+        db.query(GlosaRecord).filter(
+            GlosaRecord.id.in_(candidatos_a_ocultar)
+        ).update(
+            {GlosaRecord.estado: "DUPLICADA_OCULTA"},
+            synchronize_session=False,
+        )
+        db.commit()
+
+    return {
+        "dry_run": dry_run,
+        "total_filas_revisadas": len(rows),
+        "grupos_con_duplicados": len(duplicados_grupos),
+        "filas_a_ocultar": len(candidatos_a_ocultar),
+        "filas_ocultadas": len(candidatos_a_ocultar) if not dry_run else 0,
+        "ejemplos_grupos": [
+            {
+                "clave": list(k),
+                "n_filas": len(v),
+                "ids": [g.id for g in v],
+            }
+            for k, v in list(duplicados_grupos.items())[:5]
+        ],
+    }
+
+
 @router.post("/migracion-emergencia")
 def migracion_emergencia(
     db: Session = Depends(get_db),

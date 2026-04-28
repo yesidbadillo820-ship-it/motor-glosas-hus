@@ -1933,6 +1933,41 @@ def mis_asignaciones(
             current_user.email, current_user.nombre,
             emails_equipo=emails_equipo,
         )
+
+    # R-UI 27-abr-2026: deduplicar por (factura, código, cups, etapa)
+    # quedándonos con la versión MÁS RECIENTE. Si una glosa antigua
+    # ya está RESPONDIDA, otra fila duplicada antigua RADICADA no
+    # debe seguir apareciendo en pendientes — eso pasaba con
+    # glosas creadas antes del fix anti-dup (commit d8b1d53).
+    visto = {}
+    for g in glosas:
+        clave = (
+            (g.factura or "").strip().upper(),
+            (g.codigo_glosa or "").strip().upper(),
+            (getattr(g, "cups_servicio", None) or "").strip().upper(),
+            (g.etapa or "").strip().upper(),
+        )
+        prev = visto.get(clave)
+        if prev is None:
+            visto[clave] = g
+            continue
+        # Si una versión está cerrada (RESPONDIDA/CONCILIADA/LEVANTADA),
+        # esa gana sobre la abierta. Caso contrario gana la más reciente.
+        prev_estado = (prev.estado or "").upper()
+        prev_wf = (getattr(prev, "workflow_state", None) or "").upper()
+        cur_estado = (g.estado or "").upper()
+        cur_wf = (getattr(g, "workflow_state", None) or "").upper()
+        terminales = {"RESPONDIDA", "CONCILIADA", "LEVANTADA"}
+        prev_es_terminal = (prev_estado in terminales) or (prev_wf in terminales)
+        cur_es_terminal = (cur_estado in terminales) or (cur_wf in terminales)
+        if cur_es_terminal and not prev_es_terminal:
+            visto[clave] = g
+        elif (cur_es_terminal == prev_es_terminal) and (
+            g.creado_en and prev.creado_en and g.creado_en > prev.creado_en
+        ):
+            visto[clave] = g
+    glosas = list(visto.values())
+
     from app.services.resolver_entidad import resolver_entidad_mostrar
     return [
         {
