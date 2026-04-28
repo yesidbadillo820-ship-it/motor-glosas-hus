@@ -21,6 +21,12 @@ class WorkflowTransicion(BaseModel):
     nota: str = None
 
 
+class WorkflowTransicionLote(BaseModel):
+    glosa_ids: list[int]
+    hacia: str
+    nota: str = None
+
+
 @router.get("/{glosa_id}/estados")
 def obtener_estados_disponibles(
     glosa_id: int,
@@ -95,6 +101,64 @@ def transicionar_glosa(
         "nuevo_estado": data.hacia.upper(),
         "glosa_id": glosa_id,
     }
+
+
+@router.post("/transicionar-lote")
+def transicionar_lote(
+    data: WorkflowTransicionLote,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Transiciona en lote varias glosas al mismo estado.
+
+    Idempotente: las que ya están en el estado destino se cuentan como
+    `ya_en_estado` (no como fallidas). Útil para cerrar pendientes en bloque.
+    Máximo 500 ids por llamada.
+    """
+    if not data.glosa_ids:
+        raise HTTPException(400, "Lista de IDs vacía")
+    if len(data.glosa_ids) > 500:
+        raise HTTPException(400, "Máximo 500 glosas por lote")
+
+    destino = (data.hacia or "").upper().strip()
+    if not destino:
+        raise HTTPException(400, "Estado destino requerido")
+
+    repo = GlosaRepository(db)
+    resumen = {
+        "total": len(data.glosa_ids),
+        "procesadas": 0,
+        "ya_en_estado": 0,
+        "fallidas": [],
+    }
+    nota = data.nota or f"Transición a {destino} en lote"
+
+    for gid in data.glosa_ids:
+        glosa = repo.obtener_por_id(gid)
+        if not glosa:
+            resumen["fallidas"].append({"id": gid, "error": "no encontrada"})
+            continue
+        estado_actual = (glosa.workflow_state or glosa.estado or "").upper()
+        if estado_actual == destino:
+            resumen["ya_en_estado"] += 1
+            continue
+        exito, mensaje = WorkflowService.transicionar(
+            glosa=glosa,
+            nuevo_estado=destino,
+            db=db,
+            nota=nota,
+            responsable=current_user.email,
+        )
+        if exito:
+            resumen["procesadas"] += 1
+        else:
+            # "RESPONDIDA a RESPONDIDA" y similares se tratan como idempotentes
+            if "a " + destino in (mensaje or "") and destino in (mensaje or ""):
+                resumen["ya_en_estado"] += 1
+            else:
+                resumen["fallidas"].append({"id": gid, "error": mensaje[:200]})
+
+    return resumen
 
 
 @router.get("/estados/definiciones")
