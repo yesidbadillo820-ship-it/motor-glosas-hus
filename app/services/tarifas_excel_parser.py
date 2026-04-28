@@ -154,7 +154,8 @@ def _indice_columna(headers: list[str], *candidatos: str) -> int | None:
 # ─── Detección de hojas ─────────────────────────────────────────────────────
 
 def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
-    """Devuelve 'ANEXO3' | 'ANEXO31' | 'ANEXO32' | 'SIMPLE_FIJO'.
+    """Devuelve 'ANEXO3' | 'ANEXO31' | 'ANEXO32' | 'FOMAG_TARIFARIO' |
+    'FOMAG_PAQUETES' | 'SIMPLE_FIJO'.
 
     Los formatos específicos se evalúan primero para evitar que un Excel
     tipo Famisanar caiga en el fallback SIMPLE_FIJO.
@@ -162,6 +163,14 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
     hset = {h for h in headers_normalizados if h}
     hunion = " ".join(hset)
     cups_like = any("CUPS" in h for h in hset)
+
+    # FOMAG (tarifario y excluidos comparten estructura) — distintivo:
+    # "PROPUESTA IPS" + "OBSERVACION FOMAG" + "CUPS RESOL 2641"
+    if "PROPUESTA IPS" in hset and "OBSERVACION FOMAG" in hset:
+        return "FOMAG_TARIFARIO"
+    # FOMAG paquetes — "VALOR PROPUESTO" + "CODIGO" institucional + "CUPS"
+    if "VALOR PROPUESTO" in hset and "CODIGO" in hset and cups_like:
+        return "FOMAG_PAQUETES"
 
     # 3.1 medicamentos — CODIGO DCI + CUM/IUM (muy distintivo)
     if {"CODIGO DCI", "DESCRIPCION DCI"} & hset and "CUM/IUM" in hset:
@@ -209,6 +218,10 @@ def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[
         "CODIGO DEL PRESTADOR", "CODIGO DCI", "CUM/IUM",
         "DESCRIPCION DEL PRESTADOR", "PRECIO DE REFERENCIA",
         "TARIFA UNITARIA", "TARIFA FINAL",
+        # FOMAG: cabecera de ANEXO TARIFARIO / EXCLUIDOS / *_AMBULATORIOS
+        "PROPUESTA IPS", "OBSERVACION FOMAG",
+        # FOMAG paquetes
+        "VALOR PROPUESTO",
     ]
     limite = min(200, len(rows))
     for idx, fila in enumerate(rows[:limite]):
@@ -554,6 +567,182 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
     return filas
 
 
+# ─── Parsers FOMAG ──────────────────────────────────────────────────────────
+#
+# Estructura del Excel FOMAG (Acta No. 012, FIDUPREVISORA):
+#   • ANEXO TARIFARIO       — servicios hospitalarios SOAT-20% / propios
+#   • EXCLUIDOS             — servicios cuya propuesta IPS quedó por encima
+#                             del techo FOMAG (no pactados en bloque, FOMAG
+#                             paga hasta el techo)
+#   • PAQUETES              — bundles (gastroenterología, columna, IVE,
+#                             rehabilitación, domiciliaria, urología) con
+#                             CODIGO institucional + CUPS + VALOR PROPUESTO
+#   • ANEXO TARIFARIO AMBULATORIOS — laboratorios + imagenología con CODIGO
+#                             INSTITUCIONAL adicional (ej. "902210AMB")
+#   • EXCLUIDOS AMBULATORIOS — equivalente excluido para ambulatorios
+#
+# Estrategia de carga:
+#   - ANEXO TARIFARIO + ANEXO AMBULATORIO → valor_pactado = PROPUESTA IPS,
+#     modalidad = "SOAT -20% FOMAG" o "TARIFA PROPIA FOMAG"
+#   - EXCLUIDOS + EXCLUIDOS AMBULATORIOS → valor_pactado = TECHO FOMAG (lo
+#     que efectivamente paga), modalidad = "EXCLUIDO POR TECHO FOMAG"; se
+#     guardan activos para que el lookup los encuentre y la IA pueda
+#     argumentar con el dato real.
+#   - PAQUETES → tipo_tarifa=VALOR_FIJO, modalidad="PAQUETE FOMAG",
+#     codigo_ips = CODIGO institucional (ej. "423301H").
+
+def _parsear_fomag_tarifario(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
+    """Parser para hojas ANEXO TARIFARIO / EXCLUIDOS / *_AMBULATORIOS de FOMAG.
+
+    Distingue pactadas vs excluidas leyendo OBSERVACION FOMAG:
+      "SE ACEPTA TARIFA PROPUESTA POR LA IPS" → pactada (valor=PROPUESTA IPS)
+      "TARIFA POR ENCIMA DEL TECHO"            → excluida (valor=TECHO)
+    """
+    idx_cups = _indice_columna(headers, "CUPS RESOL 2641", "CUPS")
+    idx_desc = _indice_columna(headers, "DESCRIPCION", "DESCRIPCIÓN")
+    idx_cod_inst = _indice_columna(headers, "CODIGO INSTITUCIONAL")
+    idx_propuesta = _indice_columna(headers, "PROPUESTA IPS")
+    idx_techo = _indice_columna(headers, "TECHO")
+    idx_obs_fomag = _indice_columna(headers, "OBSERVACION FOMAG", "OBSERVACIÓN FOMAG")
+    idx_atencion = _indice_columna(headers, "ATENCION", "ATENCIÓN")
+    idx_servicio = _indice_columna(headers, "NOMBRE SERVICIO REPS")
+    idx_comparacion = _indice_columna(headers, "COMPARACION TECHO", "COMPARACIÓN TECHO")
+
+    if idx_cups is None or idx_propuesta is None:
+        return []
+
+    filas: list[dict] = []
+    for fila in rows[hdr_idx + 1:]:
+        cups_raw = _celda(fila, idx_cups)
+        if not cups_raw:
+            continue
+        cups = str(cups_raw).strip()
+        if not _es_codigo_cups_valido(cups):
+            continue
+        propuesta = _normalizar_valor(_celda(fila, idx_propuesta))
+        techo = _normalizar_valor(_celda(fila, idx_techo)) if idx_techo is not None else 0.0
+        obs_fomag = _normalizar_texto(_celda(fila, idx_obs_fomag)) if idx_obs_fomag is not None else ""
+        es_excluida = "POR ENCIMA DEL TECHO" in obs_fomag or "ENCIMA DEL TECHO" in obs_fomag
+
+        if es_excluida:
+            valor = techo if techo > 0 else propuesta
+            modalidad = "EXCLUIDO POR TECHO FOMAG"
+        else:
+            valor = propuesta
+            tipo_compa = _normalizar_texto(_celda(fila, idx_comparacion)) if idx_comparacion is not None else ""
+            if "PROPIA" in tipo_compa or "TARIFA PROPIA" in tipo_compa:
+                modalidad = "TARIFA PROPIA FOMAG"
+            else:
+                modalidad = "SOAT -20% FOMAG"
+        if valor <= 0:
+            continue
+
+        desc = _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
+        cod_inst = ""
+        if idx_cod_inst is not None:
+            cod_inst = str(_celda(fila, idx_cod_inst) or "").strip()
+        atencion = ""
+        if idx_atencion is not None:
+            atencion = _limpiar_descripcion(str(_celda(fila, idx_atencion) or ""))
+        servicio = ""
+        if idx_servicio is not None:
+            servicio = _limpiar_descripcion(str(_celda(fila, idx_servicio) or ""))
+
+        partes_obs = []
+        if obs_fomag:
+            partes_obs.append(obs_fomag.title())
+        if atencion:
+            partes_obs.append(f"Atención: {atencion}")
+        if servicio:
+            partes_obs.append(f"Servicio: {servicio}")
+        if es_excluida and propuesta > 0 and techo > 0:
+            partes_obs.append(
+                f"Propuesta IPS ${propuesta:,.0f} excede techo FOMAG ${techo:,.0f}"
+            )
+        observacion = " · ".join(partes_obs)[:500] or None
+
+        filas.append({
+            "codigo_cups": cups[:30],
+            "codigo_ips": cod_inst[:30] if cod_inst and cod_inst != cups else None,
+            "descripcion": desc[:500] if desc else None,
+            "valor_pactado": round(valor, 2),
+            "modalidad": modalidad[:80],
+            "tipo_tarifa": "VALOR_FIJO",
+            "factor_ajuste": 0.0,
+            "observacion": observacion,
+        })
+    return filas
+
+
+def _parsear_fomag_paquetes(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
+    """Parser para la hoja PAQUETES de FOMAG.
+
+    Esta hoja tiene sub-secciones (Gastroenterología, Columna, IVE,
+    Rehabilitación, Domiciliaria, Urología) separadas por filas con un
+    título de categoría. La columna CODIGO trae el código institucional
+    (ej. "423301H") y CUPS el código oficial.
+    """
+    idx_cups = _indice_columna(headers, "CUPS")
+    idx_codigo = _indice_columna(headers, "CODIGO")
+    idx_desc = _indice_columna(headers, "DESCRIPCION DEL CUPS", "DESCRIPCION")
+    idx_valor = _indice_columna(headers, "VALOR PROPUESTO", "VALOR")
+    idx_obs = _indice_columna(headers, "OBSERVACIONES", "OBSERVACION")
+    if idx_cups is None or idx_valor is None:
+        return []
+
+    # La categoría aparece como header del bloque; la inferimos viendo la
+    # columna que NO está mapeada en cada fila de subtítulo (ej. "PAQUETES
+    # DE GASTROENTEROLOGIA" / "DE COLUMNA" / "INTERRUPCION VOLUNTARIA DEL
+    # EMBARAZO (IVE)" / "REHABILITACION" / "ATENCION VISITA DOMICILIARIA").
+    # Asumimos que esa celda está entre las primeras 8 columnas.
+    categoria_actual = "PAQUETE FOMAG"
+    filas: list[dict] = []
+    for fila in rows[hdr_idx + 1:]:
+        cups_raw = _celda(fila, idx_cups)
+        cups = str(cups_raw or "").strip()
+        # Filas de subtítulo: tienen un texto largo en alguna celda pero ni
+        # CUPS ni VALOR. Capturamos la categoría desde ahí.
+        if not _es_codigo_cups_valido(cups):
+            for c in fila[:8]:
+                if c is None:
+                    continue
+                t = str(c).strip()
+                if len(t) > 6 and t.upper() == t and not t.replace(" ", "").isdigit():
+                    if any(k in t.upper() for k in (
+                        "GASTRO", "COLUMNA", "IVE", "EMBARAZO",
+                        "REHABILITACION", "REHABILITACIÓN",
+                        "DOMICILIARIA", "UROLOG", "PAQUETE", "ENDOSCOP",
+                    )):
+                        categoria_actual = ("PAQUETE FOMAG · " + t)[:80]
+                        break
+            continue
+
+        valor = _normalizar_valor(_celda(fila, idx_valor))
+        if valor <= 0:
+            continue
+        codigo_inst = ""
+        if idx_codigo is not None:
+            codigo_inst = str(_celda(fila, idx_codigo) or "").strip()
+        desc = ""
+        if idx_desc is not None:
+            desc = _limpiar_descripcion(str(_celda(fila, idx_desc) or ""))
+        obs = ""
+        if idx_obs is not None:
+            obs = _limpiar_descripcion(str(_celda(fila, idx_obs) or ""))
+
+        filas.append({
+            "codigo_cups": cups[:30],
+            "codigo_ips": codigo_inst[:30] if codigo_inst and codigo_inst != cups else None,
+            "descripcion": desc[:500] if desc else None,
+            "valor_pactado": round(valor, 2),
+            "modalidad": categoria_actual[:80],
+            "tipo_tarifa": "VALOR_FIJO",
+            "factor_ajuste": 0.0,
+            "observacion": obs[:500] if obs else None,
+        })
+    return filas
+
+
 # ─── API pública ────────────────────────────────────────────────────────────
 
 def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
@@ -603,6 +792,9 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
                 tipo = _tipo_hoja(headers)
                 if tipo is None:
                     continue
+                # Auto-detección de EPS=FOMAG cuando aparece la firma del Acta.
+                if tipo in ("FOMAG_TARIFARIO", "FOMAG_PAQUETES") and not meta_global["eps"]:
+                    meta_global["eps"] = "FOMAG"
                 hojas_detectadas.append(f"{tipo}:{sheet_name}")
                 if tipo == "ANEXO3":
                     nuevas = _parsear_anexo3(rows, hdr_idx, headers)
@@ -610,6 +802,10 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
                     nuevas = _parsear_anexo31(rows, hdr_idx, headers)
                 elif tipo == "ANEXO32":
                     nuevas = _parsear_anexo32(rows, hdr_idx, headers)
+                elif tipo == "FOMAG_TARIFARIO":
+                    nuevas = _parsear_fomag_tarifario(rows, hdr_idx, headers)
+                elif tipo == "FOMAG_PAQUETES":
+                    nuevas = _parsear_fomag_paquetes(rows, hdr_idx, headers)
                 elif tipo == "SIMPLE_FIJO":
                     nuevas = _parsear_simple_fijo(rows, hdr_idx, headers)
                 else:

@@ -326,11 +326,24 @@ async def importar_excel(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
-    """Importa un Excel de tarifas contratadas (tipo Famisanar) con hasta 3 hojas:
+    """Importa un Excel de tarifas contratadas. Formatos soportados:
 
-    - **Anexo 3** — Servicios CUPS con fórmula SOAT ± % (tipo_tarifa=SOAT_PORCENTAJE)
-    - **Anexo 3.1** — Medicamentos, valor fijo (tipo_tarifa=VALOR_FIJO)
-    - **Anexo 3.2** — Suministros, valor fijo, con IVA opcional (tipo_tarifa=VALOR_FIJO)
+    **Famisanar (3 hojas):**
+    - Anexo 3 — Servicios CUPS con fórmula SOAT ± % (tipo_tarifa=SOAT_PORCENTAJE)
+    - Anexo 3.1 — Medicamentos, valor fijo
+    - Anexo 3.2 — Suministros, valor fijo, con IVA opcional
+
+    **FOMAG (5 hojas, Acta No. 012 FIDUPREVISORA):**
+    - ANEXO TARIFARIO + ANEXO TARIFARIO AMBULATORIOS — pactadas a valor
+      PROPUESTA IPS (SOAT-20% o tarifas propias). modalidad="SOAT -20% FOMAG".
+    - EXCLUIDOS + EXCLUIDOS AMBULATORIOS — propuesta IPS por encima del techo
+      FOMAG; se cargan con valor=TECHO y modalidad="EXCLUIDO POR TECHO FOMAG"
+      para que la IA pueda argumentar con el dato real.
+    - PAQUETES — bundles (gastroenterología, columna, IVE, rehabilitación,
+      domiciliaria, urología) con codigo_ips=CODIGO institucional + CUPS oficial.
+    EPS se detecta automáticamente como "FOMAG" cuando aparece la firma del Acta.
+
+    **Genéricos (Dispensario, Nueva EPS, etc.):** hoja plana con CUPS + valor.
 
     Auto-detecta EPS, nº de contrato y vigencia desde el encabezado de cada hoja.
     Upsert por (eps + cups + contrato). Si `reemplazar=true`, hace hard-delete
