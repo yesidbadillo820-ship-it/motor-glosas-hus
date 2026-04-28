@@ -1,0 +1,216 @@
+"""Auto-responder de glosas importadas masivamente.
+
+Orquesta el procesamiento en background después de la importación
+del Excel de recepción:
+
+  Para cada glosa nueva:
+    1. Aplica detector REQUIERE_SOPORTES (gratis, sin tokens)
+       • Si requiere → marca estado=REQUIERE_SOPORTES, guarda
+         dictamen-placeholder con la lista de soportes a aportar.
+       • Si NO requiere → llama al cerebro IA (Haiku/Sonnet/Opus
+         según routing) para generar dictamen completo.
+
+  Concurrencia: hasta 3 glosas en paralelo (semáforo asyncio).
+  Resiliente: si una glosa falla, el resto sigue procesando.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# Límite de glosas procesadas en paralelo (anti rate-limit Anthropic)
+_MAX_CONCURRENCIA = 3
+_SEMAFORO = asyncio.Semaphore(_MAX_CONCURRENCIA)
+
+
+async def procesar_glosa_id(glosa_id: int) -> dict:
+    """Procesa una sola glosa en una NUEVA sesión DB.
+
+    Retorna {'glosa_id', 'estado', 'modelo', 'requirio_soportes'}.
+    Idempotente: si la glosa ya tiene dictamen real (no placeholder),
+    no la re-procesa.
+    """
+    from app.database import SessionLocal
+    from app.models.db import GlosaRecord
+    from app.services.detector_requiere_soportes import (
+        evaluar,
+        mensaje_para_dictamen,
+    )
+
+    db = SessionLocal()
+    try:
+        g = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+        if not g:
+            return {"glosa_id": glosa_id, "estado": "NO_ENCONTRADA"}
+
+        # Idempotencia: si ya tiene dictamen útil, no re-procesar
+        dict_actual = (g.dictamen or "").strip()
+        if (
+            len(dict_actual) > 200
+            and "PENDIENTE DE ANÁLISIS" not in dict_actual.upper()
+            and "REQUIERE SOPORTES" not in dict_actual.upper()
+        ):
+            return {
+                "glosa_id": glosa_id,
+                "estado": "YA_PROCESADA",
+                "modelo": g.modelo_ia,
+            }
+
+        # Reglas pre-IA (gratis)
+        evaluacion = evaluar(
+            codigo_glosa=g.codigo_glosa,
+            texto_glosa=(g.texto_glosa_original or g.dictamen or g.concepto_glosa or ""),
+            contexto_pdf="",  # importación masiva no trae PDFs
+            valor_objetado=float(g.valor_objetado or 0),
+            cups=g.cups_servicio,
+        )
+
+        if evaluacion["requiere"]:
+            g.dictamen = mensaje_para_dictamen(
+                evaluacion, codigo_glosa=g.codigo_glosa or "—",
+            )
+            g.estado = "REQUIERE_SOPORTES"
+            g.modelo_ia = "detector_pre_ia"
+            db.commit()
+            return {
+                "glosa_id": glosa_id,
+                "estado": "REQUIERE_SOPORTES",
+                "modelo": "detector_pre_ia",
+                "requirio_soportes": True,
+                "motivo": evaluacion.get("motivo", ""),
+            }
+
+        # Llamada al cerebro IA con los datos mínimos
+        try:
+            return await _ejecutar_ia_y_persistir(db, g)
+        except Exception as e:
+            logger.warning(
+                f"[AUTO-RESPONDER] Glosa {glosa_id} falló en IA: {e}"
+            )
+            # En caso de error, dejar la glosa pendiente para el gestor
+            return {
+                "glosa_id": glosa_id,
+                "estado": "ERROR",
+                "error": str(e)[:200],
+            }
+    finally:
+        db.close()
+
+
+async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
+    """Llama al motor IA de glosa_service y guarda el dictamen en la
+    glosa existente."""
+    from app.services.glosa_service import GlosaService
+    from app.models.schemas import GlosaInput
+
+    eps = (glosa.eps or "").strip() or "OTRA / SIN DEFINIR"
+    texto = (
+        glosa.texto_glosa_original
+        or glosa.dictamen
+        or glosa.concepto_glosa
+        or ""
+    ).strip()
+    if len(texto) < 15:
+        return {
+            "glosa_id": glosa.id,
+            "estado": "TEXTO_INSUFICIENTE",
+        }
+
+    glosa_input = GlosaInput(
+        eps=eps,
+        etapa=glosa.etapa or "RESPUESTA",
+        fecha_radicacion=None,
+        fecha_recepcion=None,
+        valor_aceptado=str(int(glosa.valor_aceptado or 0)),
+        tabla_excel=texto,
+        numero_factura=glosa.factura,
+        numero_radicado=glosa.numero_radicado,
+        tono="conciliador",
+        modo_respuesta="defender",
+    )
+
+    service = GlosaService()
+    resultado = await service.analizar(glosa_input, contexto_pdf="")
+
+    # Actualizar la glosa existente con el dictamen generado
+    glosa.dictamen = resultado.dictamen
+    glosa.modelo_ia = resultado.modelo_ia
+    glosa.score = float(resultado.score or 0.0)
+    if not glosa.codigo_glosa and resultado.codigo_glosa:
+        glosa.codigo_glosa = resultado.codigo_glosa
+    glosa.estado = "RESPONDIDA"
+    glosa.workflow_state = "BORRADOR"  # gestor revisa antes de radicar
+    db.commit()
+
+    return {
+        "glosa_id": glosa.id,
+        "estado": "RESPONDIDA",
+        "modelo": resultado.modelo_ia,
+        "requirio_soportes": False,
+    }
+
+
+async def procesar_lote(glosa_ids: list[int]) -> dict:
+    """Procesa un lote de glosas en paralelo controlado.
+
+    Devuelve resumen agregado: cuántas auto-respondidas, cuántas
+    REQUIERE_SOPORTES, cuántas con error.
+    """
+    if not glosa_ids:
+        return {"total": 0, "respondidas": 0, "requieren_soportes": 0, "errores": 0}
+
+    async def _con_semaforo(gid):
+        async with _SEMAFORO:
+            try:
+                return await procesar_glosa_id(gid)
+            except Exception as e:
+                logger.error(f"[AUTO-RESPONDER] worker {gid}: {e}")
+                return {"glosa_id": gid, "estado": "ERROR", "error": str(e)[:200]}
+
+    resultados = await asyncio.gather(
+        *[_con_semaforo(gid) for gid in glosa_ids],
+        return_exceptions=False,
+    )
+
+    respondidas = sum(1 for r in resultados if r.get("estado") == "RESPONDIDA")
+    req_soportes = sum(1 for r in resultados if r.get("estado") == "REQUIERE_SOPORTES")
+    errores = sum(1 for r in resultados if r.get("estado") in ("ERROR", "TEXTO_INSUFICIENTE"))
+    ya_procesadas = sum(1 for r in resultados if r.get("estado") == "YA_PROCESADA")
+
+    logger.info(
+        f"[AUTO-RESPONDER] Lote completo: {len(glosa_ids)} glosas, "
+        f"respondidas={respondidas} requieren_soportes={req_soportes} "
+        f"ya_procesadas={ya_procesadas} errores={errores}"
+    )
+
+    return {
+        "total": len(glosa_ids),
+        "respondidas": respondidas,
+        "requieren_soportes": req_soportes,
+        "ya_procesadas": ya_procesadas,
+        "errores": errores,
+        "detalle": resultados,
+    }
+
+
+def lanzar_lote_background(glosa_ids: list[int]) -> None:
+    """Crea una task asyncio que procesa el lote sin bloquear al caller.
+
+    Pensado para ser llamado desde un endpoint FastAPI usando
+    asyncio.create_task — el response al cliente se devuelve
+    inmediatamente y el procesamiento corre en el event loop.
+    """
+    if not glosa_ids:
+        return
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(procesar_lote(glosa_ids))
+        logger.info(
+            f"[AUTO-RESPONDER] Lote de {len(glosa_ids)} glosas encolado "
+            "para auto-procesamiento"
+        )
+    except Exception as e:
+        logger.error(f"[AUTO-RESPONDER] No se pudo lanzar lote: {e}")

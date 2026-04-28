@@ -359,6 +359,9 @@ class ResumenImportacion:
         self.conceptos_creados = 0
         self.conceptos_actualizados = 0
         self.conceptos_huerfanos: list[dict] = []  # sin GlosaRecord que los ancle
+        # IDs de glosas creadas/actualizadas para auto-procesamiento
+        # post-importación (cerebro IA en background).
+        self.glosas_ids_para_auto_responder: list[int] = []
 
     def to_dict(self) -> dict:
         return {
@@ -646,9 +649,15 @@ class RecepcionService:
                     for k, v in campos.items():
                         setattr(existente, k, v)
                     resumen.actualizadas += 1
+                    if existente.id is not None:
+                        resumen.glosas_ids_para_auto_responder.append(existente.id)
                 else:
-                    self.db.add(GlosaRecord(**campos))
+                    nueva = GlosaRecord(**campos)
+                    self.db.add(nueva)
+                    self.db.flush()  # asignar nueva.id antes del commit final
                     resumen.creadas += 1
+                    if nueva.id is not None:
+                        resumen.glosas_ids_para_auto_responder.append(nueva.id)
 
                 resumen.total += 1
                 resumen.semaforo[semaforo] = resumen.semaforo.get(semaforo, 0) + 1

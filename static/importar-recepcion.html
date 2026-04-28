@@ -148,6 +148,26 @@ function mostrarResultado(d){
 
   document.getElementById('e-num').textContent = d.correos_enviados || 0;
 
+  // 🤖 Indicador prominente de auto-procesamiento IA en background
+  if(d.auto_respuesta_lanzada && d.glosas_en_auto_proceso > 0){
+    const banner = document.createElement('div');
+    banner.style.cssText = 'margin:1rem 0;padding:1.1rem 1.4rem;background:linear-gradient(135deg,#dbeafe,#bfdbfe);border:2px solid #2563eb;border-radius:12px;color:#1e3a8a;';
+    banner.innerHTML =
+      '<div style="display:flex;align-items:center;gap:.8rem;">'
+      + '<div style="font-size:1.8rem;">🤖</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-weight:800;font-size:1rem;">IA procesando ' + d.glosas_en_auto_proceso + ' glosas en segundo plano</div>'
+      + '<div style="font-size:.85rem;margin-top:.25rem;opacity:.85;">'
+      + 'El cerebro auditará cada glosa, generará dictamen automático para las que tienen información suficiente, y marcará como '
+      + '<b>REQUIERE SOPORTES</b> las que necesiten PDFs del expediente. '
+      + 'Volvé a "Mis glosas" en unos minutos — vas a ver las respondidas listas en la pestaña <b>Respondidas</b>.'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+    const wrap = document.getElementById('result');
+    if(wrap) wrap.insertBefore(banner, wrap.children[1] || null);
+  }
+
   const cont = document.getElementById('gestores');
   cont.innerHTML = '';
   const porG = d.por_gestor || {};

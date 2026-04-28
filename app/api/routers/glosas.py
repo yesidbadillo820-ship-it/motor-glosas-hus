@@ -3096,6 +3096,27 @@ async def importar_recepcion(
 
     resumen_dict = resumen.to_dict()
 
+    # Auto-respuesta de glosas en background (R-cerebro #11):
+    # encolamos las glosas creadas/actualizadas para que el motor
+    # IA genere su dictamen sin esperar a que el gestor las abra.
+    # Usa detector REQUIERE_SOPORTES para no gastar tokens en
+    # casos donde sin PDFs el dictamen sería pobre.
+    glosas_para_auto = list(getattr(resumen, "glosas_ids_para_auto_responder", []) or [])
+    auto_respuesta_lanzada = False
+    if glosas_para_auto:
+        try:
+            from app.services.auto_responder_service import lanzar_lote_background
+            lanzar_lote_background(glosas_para_auto)
+            auto_respuesta_lanzada = True
+            logger.info(
+                f"[{req_id}] Auto-respuesta encolada: "
+                f"{len(glosas_para_auto)} glosas en background"
+            )
+        except Exception as e:
+            logger.warning(f"[{req_id}] Error encolando auto-respuesta: {e}")
+    resumen_dict["auto_respuesta_lanzada"] = auto_respuesta_lanzada
+    resumen_dict["glosas_en_auto_proceso"] = len(glosas_para_auto)
+
     # Notificación broadcast (no bloquea la respuesta si falla)
     # Pasamos db para que la funcion busque usuarios cuyo nombre matchee
     # con los gestores del resumen (ej. EQUIPO ASEGURADORAS) y los incluya
