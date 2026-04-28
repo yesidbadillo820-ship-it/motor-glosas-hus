@@ -512,6 +512,10 @@ Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
 • Cálculos aritméticos visibles ("SOAT × 0.80 = $X")
 • Placeholders con corchetes o "$[VALOR]"
 • Bloques finales tipo "NORMAS RELEVANTES:"
+• 🚫 SINTAXIS MARKDOWN — el panel renderiza HTML, NO Markdown.
+  NUNCA uses [texto](url), [email](mailto:email), **negrita**,
+  __subrayado__, ### encabezados, * listas, etc. Los emails van
+  PLANOS: "CARTERA@HUS.GOV.CO" — sin corchetes, sin paréntesis.
 • Texto fuera de los tags XML
 • Repetir información entre párrafos
 • Tono hostil o acusatorio

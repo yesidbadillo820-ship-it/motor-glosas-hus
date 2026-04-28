@@ -1571,6 +1571,27 @@ class GlosaService:
             arg_ia = re.sub(r"\bGLosas\b", "GLOSAS", arg_ia)
             arg_ia = re.sub(r"\bGLosA\b", "GLOSA", arg_ia)
 
+            # 9b) Limpieza de sintaxis Markdown que la IA inserta sola.
+            # Caso típico: [CARTERA@HUS.GOV.CO](mailto:CARTERA@HUS.GOV.CO)
+            # se queda como texto crudo en el panel HTML porque el motor
+            # no procesa Markdown. Lo bajamos al email plano.
+            arg_ia = re.sub(
+                r"\[([^\]]+)\]\(mailto:([^)]+)\)",
+                lambda m: m.group(1) if "@" in m.group(1) else m.group(2),
+                arg_ia,
+            )
+            # Enlaces Markdown genéricos [texto](url) → texto (sin URL)
+            arg_ia = re.sub(
+                r"\[([^\]]+)\]\(https?://[^)]+\)",
+                r"\1",
+                arg_ia,
+            )
+            # **negrita** y __negrita__ Markdown → texto plano
+            arg_ia = re.sub(r"\*\*([^\*]+)\*\*", r"\1", arg_ia)
+            arg_ia = re.sub(r"__([^_]+)__", r"\1", arg_ia)
+            # Headers Markdown al inicio de línea (### Título → Título)
+            arg_ia = re.sub(r"(?m)^#{1,6}\s+", "", arg_ia)
+
             # 10) Typos inventados por la IA (palabras que no existen)
             _TYPOS_IA = {
                 r"\bSERJURAR\b": "ESTAR SUJETA A",

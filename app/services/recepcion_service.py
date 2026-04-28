@@ -140,6 +140,8 @@ def _fix_mojibake(texto: str) -> str:
     - Mojibake: "OBJECIÃ³N" → "OBJECIÓN".
     - Artefactos Excel: "_x000D_" (Windows CRLF escapado por openpyxl) → " ".
     - Multiples espacios/saltos: colapsados a un solo espacio.
+    - Truncamientos del DGH: nombres de entidad cortados a la mitad
+      ("BUCARAMANG" → "BUCARAMANGA", "MANIZAL" → "MANIZALES", etc.).
     """
     if not texto or not isinstance(texto, str):
         return texto
@@ -154,6 +156,21 @@ def _fix_mojibake(texto: str) -> str:
     texto = texto.replace("_x000D_", " ").replace("_x000A_", " ")
     # Quitar saltos de línea intermedios y espacios redundantes
     texto = re.sub(r"\s+", " ", texto).strip()
+    # 3. Restaurar nombres de ciudad truncados que el DGH manda cortados.
+    # El sistema DGH usa columnas de ancho fijo y trunca la cola de la
+    # entidad. Mapeo inverso de fragmentos conocidos → nombre completo.
+    _CIUDADES_TRUNCADAS = {
+        "BUCARAMANG": "BUCARAMANGA",
+        "FLORIDABLAN": "FLORIDABLANCA",
+        "BARRANCABERMEJ": "BARRANCABERMEJA",
+        "PIEDECUEST": "PIEDECUESTA",
+        "MANIZAL": "MANIZALES",
+        "VALLEDUPA": "VALLEDUPAR",
+        "CARTAGEN": "CARTAGENA",
+    }
+    for cortado, completo in _CIUDADES_TRUNCADAS.items():
+        # Solo reemplazar como palabra final (no parcial dentro de otra)
+        texto = re.sub(rf"\b{cortado}\b(?!A)", completo, texto)
     return texto
 
 
