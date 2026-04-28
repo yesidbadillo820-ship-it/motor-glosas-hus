@@ -1187,10 +1187,23 @@ async def generar_lote(
                     contexto_pdf="",
                     req_id=f"lote-{gid}",
                 )
+                # Memoria del gestor para este auditor + caso similar
+                hint_gestor = ""
+                try:
+                    from app.services.memoria_gestor import patron_gestor
+                    pat = patron_gestor(
+                        db, autor_email=current_user.email,
+                        codigo_glosa=g.codigo_glosa or "",
+                        eps=gi.eps or "",
+                    )
+                    hint_gestor = pat.get("hint_para_prompt", "") or ""
+                except Exception:
+                    pass
                 res = await service.analizar(
                     gi, contexto_pdf="", contratos_db=contratos,
                     few_shots=[p.argumento for p in pg],
                     info_tarifa=info_tarifa_pre,
+                    hint_gestor=hint_gestor,
                 )
                 if pg:
                     marcar_usos(db, [p.id for p in pg])
@@ -2963,6 +2976,73 @@ def obtener_glosa(
     }
 
 
+@router.get("/{glosa_id}/preparar-conciliacion")
+def preparar_conciliacion(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Material táctico para llegar preparado a la audiencia de
+    conciliación: contraargumentos probables de la EPS, respuesta
+    sugerida a cada uno, valor mínimo aceptable y recomendación
+    táctica basada en el histórico de esa EPS contra ese tipo de glosa.
+    """
+    from app.services.conciliador_ia import preparar_audiencia
+    return preparar_audiencia(db, glosa_id)
+
+
+@router.post("/autopiloto-niveles")
+def autopiloto_niveles_batch(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Batch: clasifica un conjunto de glosas en niveles de auto-piloto.
+
+    Recibe `{"glosa_ids": [1, 2, ...]}` (máx 300) y devuelve para cada una
+    `{glosa_id, nivel, icono, color, etiqueta, razon, accion_sugerida}`.
+    Permite a la UI pintar un badge por glosa indicando si es mecánica
+    (1 click), revisable rápido o requiere editor manual.
+    """
+    from app.services.autopiloto_nivel import clasificar_nivel
+    ids = payload.get("glosa_ids") or []
+    if not isinstance(ids, list) or not ids:
+        return {"items": []}
+    ids = [int(x) for x in ids if isinstance(x, (int, float, str))][:300]
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids)).all()
+    items = []
+    for g in glosas:
+        try:
+            n = clasificar_nivel(g, db)
+            n["glosa_id"] = g.id
+            items.append(n)
+        except Exception:
+            continue
+    return {"total": len(items), "items": items}
+
+
+@router.get("/mi-estilo")
+def mi_estilo_gestor(
+    codigo_glosa: Optional[str] = None,
+    eps: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Patrones de refinamiento del gestor logueado. Si pasás codigo_glosa
+    y/o eps, filtra al contexto similar.
+
+    Útil para mostrar al gestor en el editor: '💭 Tu estilo: sueles
+    agregar T-760 + tono conciliador en TA0201 contra FAMISANAR.'
+    """
+    from app.services.memoria_gestor import patron_gestor
+    return patron_gestor(
+        db,
+        autor_email=current_user.email,
+        codigo_glosa=codigo_glosa or "",
+        eps=eps or "",
+    )
+
+
 @router.get("/{glosa_id}/auditoria")
 def auditar_glosa(
     glosa_id: int,
@@ -3867,8 +3947,24 @@ async def reanalizar_glosa(
         contexto_pdf="",
         req_id=f"reanalizar-{glosa.id}",
     )
+    # Memoria del gestor: hint de estilo personal aprendido del histórico
+    # de refinamientos de este auditor para casos similares (mismo CUPS,
+    # misma EPS).
+    hint_gestor = ""
+    try:
+        from app.services.memoria_gestor import patron_gestor
+        patron = patron_gestor(
+            db, autor_email=current_user.email,
+            codigo_glosa=glosa.codigo_glosa or "",
+            eps=glosa.eps or "",
+        )
+        hint_gestor = patron.get("hint_para_prompt", "") or ""
+    except Exception:
+        pass
     resultado = await service.analizar(
-        glosa_input, "", contratos, info_tarifa=info_tarifa_pre,
+        glosa_input, "", contratos,
+        info_tarifa=info_tarifa_pre,
+        hint_gestor=hint_gestor,
     )
 
     # Sobreescribir dictamen + metadata. NO crear nueva fila.
@@ -8644,6 +8740,121 @@ def stats_tasas_pares_batch(
         })
 
     return {"total": len(items), "items": items}
+
+
+@router.get("/stats/eps-perfil")
+def stats_eps_perfil(
+    eps: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Perfil estadístico por EPS — qué tan bien le va al HUS contra ella
+    históricamente, y qué tono le funciona mejor.
+
+    Si `eps` se pasa, devuelve solo esa entidad. Si no, top 30 por volumen.
+    Cada item:
+      - eps_norm: nombre normalizado para mostrar
+      - n_decididas: total con decision_eps registrada
+      - n_levantadas: cuántas le ganamos
+      - tasa_pct: levantamiento sobre total decididas
+      - tono_recomendado: heurística simple basada en perfil HUS
+      - codigos_top: top 5 códigos glosa más frecuentes con tasa par
+    """
+    from app.services import pagador_normalizer
+    q = db.query(GlosaRecord).filter(
+        GlosaRecord.estado.in_(["LEVANTADA", "ACEPTADA", "RATIFICADA"])
+    )
+    if eps:
+        q = q.filter(GlosaRecord.eps.ilike(f"%{eps.strip()}%"))
+    glosas = q.limit(20000).all()
+
+    perfiles: dict[str, dict] = {}
+    for g in glosas:
+        clave = pagador_normalizer.nombre_corto(g.eps or "") or (g.eps or "—")
+        p = perfiles.setdefault(clave, {
+            "n_decididas": 0,
+            "n_levantadas": 0,
+            "n_aceptadas": 0,
+            "n_ratificadas": 0,
+            "valor_total": 0.0,
+            "valor_recuperado": 0.0,
+            "codigos": {},
+        })
+        p["n_decididas"] += 1
+        e = (g.estado or "").upper()
+        if e == "LEVANTADA":
+            p["n_levantadas"] += 1
+            p["valor_recuperado"] += float(g.valor_recuperado or g.valor_objetado or 0)
+        elif e == "ACEPTADA":
+            p["n_aceptadas"] += 1
+        elif e == "RATIFICADA":
+            p["n_ratificadas"] += 1
+        p["valor_total"] += float(g.valor_objetado or 0)
+        cod = (g.codigo_glosa or "").upper().strip()
+        if cod:
+            cod_b = p["codigos"].setdefault(cod, {"n": 0, "lev": 0})
+            cod_b["n"] += 1
+            if e == "LEVANTADA":
+                cod_b["lev"] += 1
+
+    def _tono_recomendado(p: dict) -> dict:
+        n = p["n_decididas"]
+        if n < 5:
+            return {
+                "tono": "conciliador",
+                "razon": "Sin datos suficientes — tono conciliador por defecto.",
+                "confianza": "baja",
+            }
+        tasa = (p["n_levantadas"] / n) * 100
+        if tasa >= 65:
+            return {
+                "tono": "conciliador",
+                "razon": f"Esta EPS levanta el {tasa:.0f}% de las glosas — el tono conciliador funciona bien.",
+                "confianza": "alta",
+            }
+        if tasa <= 35:
+            return {
+                "tono": "firme",
+                "razon": f"Esta EPS solo levanta el {tasa:.0f}% — tono firme con citas normativas reforzadas.",
+                "confianza": "alta",
+            }
+        return {
+            "tono": "neutral",
+            "razon": f"Tasa intermedia ({tasa:.0f}%) — tono neutral con argumento técnico claro.",
+            "confianza": "media",
+        }
+
+    items = []
+    for clave, p in perfiles.items():
+        n = p["n_decididas"]
+        if n == 0:
+            continue
+        tasa = round(100 * p["n_levantadas"] / n, 1)
+        codigos_top = sorted(
+            p["codigos"].items(), key=lambda kv: kv[1]["n"], reverse=True
+        )[:5]
+        items.append({
+            "eps": clave,
+            "n_decididas": n,
+            "n_levantadas": p["n_levantadas"],
+            "n_ratificadas": p["n_ratificadas"],
+            "n_aceptadas": p["n_aceptadas"],
+            "tasa_pct": tasa,
+            "valor_total": int(p["valor_total"]),
+            "valor_recuperado": int(p["valor_recuperado"]),
+            "tono_recomendado": _tono_recomendado(p),
+            "codigos_top": [
+                {
+                    "codigo": k,
+                    "n": v["n"],
+                    "tasa_par_pct": round(100 * v["lev"] / v["n"], 1) if v["n"] >= 2 else None,
+                }
+                for k, v in codigos_top
+            ],
+        })
+
+    items.sort(key=lambda x: x["n_decididas"], reverse=True)
+    return {"total": len(items), "items": items[:30]}
 
 
 @router.get("/stats/eps-totales-snapshot")

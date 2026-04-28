@@ -703,7 +703,15 @@ class GlosaService:
         contratos_db: dict = None,
         few_shots: list[str] = None,
         info_tarifa: dict = None,
+        hint_gestor: str = "",
     ) -> GlosaResult:
+        # `hint_gestor` se inyecta como contexto adicional al few_shots
+        # cuando viene del módulo memoria_gestor — lleva el estilo
+        # personal de refinamiento del auditor logueado.
+        if hint_gestor:
+            if few_shots is None:
+                few_shots = []
+            few_shots = list(few_shots) + [hint_gestor]
         texto_base = str(data.tabla_excel).strip().upper()
 
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
