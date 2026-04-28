@@ -4483,6 +4483,19 @@ function tab(btn,id){
   if(id==='usuarios') cargar2FAEstado();
   if(id==='papelera') cargarPapelera();
   if(id==='tarifas') cargarTarifas();
+  // Si el usuario vuelve al panel de Analizar y la glosa activa ya
+  // está cerrada (lastResult con workflow terminal), limpiar el panel
+  // para no mostrar un dictamen viejo. Si no hay glosa activa, no
+  // tocar para no borrar trabajo en progreso.
+  if(id==='analizar'){
+    try{
+      var lr = window.lastResult || null;
+      var wf = lr && (lr.workflow_state || lr.estado || '');
+      var terminal = ['RESPONDIDA','CONCILIADA','LEVANTADA','RATIFICADA','ACEPTADA','ARCHIVADA']
+        .indexOf((wf || '').toUpperCase()) !== -1;
+      if(terminal && typeof nuevaGlosa === 'function') nuevaGlosa();
+    }catch(_){}
+  }
 }
 
 async function cargarPapelera(){
@@ -5632,6 +5645,9 @@ async function marcarFacturaRespondida(glosaId, factura, btn){
     }
     // Refrescar Mis glosas si está cargada (para que desaparezca de pendientes)
     if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    // Limpiar el panel de Analizar — si el usuario vuelve, ve el estado
+    // inicial y no el dictamen viejo de la glosa que acaba de cerrar.
+    if(typeof nuevaGlosa === 'function') nuevaGlosa();
   }catch(e){
     if(btn){ btn.disabled = false; btn.textContent = '✅ Marcar factura como RESPONDIDA'; btn.style.opacity = '1'; }
     toast('Error de conexión', e.message, 'error');
