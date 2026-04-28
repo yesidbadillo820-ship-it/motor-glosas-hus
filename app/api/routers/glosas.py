@@ -3235,12 +3235,62 @@ async def reanalizar_glosa(
     glosa = GlosaRepository(db).obtener_por_id(glosa_id)
     if not glosa:
         raise HTTPException(404, "Glosa no encontrada")
-    if not glosa.texto_glosa_original:
-        raise HTTPException(
-            400,
-            "Glosa sin texto_glosa_original — fue creada antes de R59 o por flujo legacy. "
-            "No se puede reanalizar.",
-        )
+
+    # R-UI 27-abr-2026: si falta texto_glosa_original (glosa importada
+    # masivamente), construirlo on-the-fly con los datos disponibles
+    # (código + nombre + cups + servicio + valor + observación EPS) y
+    # con los conceptos vinculados si los hay. Antes el endpoint
+    # rechazaba con 400 — ahora intenta defender con lo que tenga.
+    texto_para_ia = (glosa.texto_glosa_original or "").strip()
+    if len(texto_para_ia) < 30:
+        partes = []
+        if glosa.codigo_glosa:
+            partes.append(glosa.codigo_glosa)
+        if glosa.concepto_glosa:
+            partes.append(glosa.concepto_glosa)
+        if glosa.cups_servicio:
+            partes.append(f"CUPS {glosa.cups_servicio}")
+        if glosa.servicio_descripcion:
+            partes.append(glosa.servicio_descripcion)
+        if glosa.valor_objetado and float(glosa.valor_objetado) > 0:
+            partes.append(
+                f"Valor objetado: ${int(glosa.valor_objetado):,}".replace(",", ".")
+            )
+        if glosa.observacion_eps:
+            partes.append(glosa.observacion_eps)
+        # Conceptos vinculados (importación masiva nueva con hojas I/R)
+        try:
+            from app.models.db import ConceptoGlosaRecord
+            conceptos = (
+                db.query(ConceptoGlosaRecord)
+                .filter(ConceptoGlosaRecord.glosa_id == glosa.id)
+                .limit(5)
+                .all()
+            )
+            for c in conceptos:
+                if c.codigo_glosa and c.codigo_glosa not in partes:
+                    partes.append(c.codigo_glosa)
+                if c.cups_codigo:
+                    partes.append(f"CUPS {c.cups_codigo}")
+                if c.cups_descripcion:
+                    partes.append(c.cups_descripcion)
+                if c.observacion_eps:
+                    partes.append(c.observacion_eps)
+                if c.valor_objetado and float(c.valor_objetado) > 0:
+                    partes.append(
+                        f"Valor objetado: ${int(c.valor_objetado):,}".replace(",", ".")
+                    )
+        except Exception:
+            pass
+        texto_para_ia = " - ".join(p for p in partes if p and str(p).strip())
+        # Salvaguarda final
+        if len(texto_para_ia) < 30:
+            texto_para_ia = (
+                f"{glosa.codigo_glosa or 'GLOSA'} - "
+                f"Glosa interpuesta por {glosa.eps or 'la entidad pagadora'}, "
+                f"valor objetado ${int(glosa.valor_objetado or 0):,}".replace(",", ".") +
+                ". Defender con argumentos generales aplicables al código."
+            )
 
     # Construir GlosaInput a partir de los campos persistidos
     from app.models.schemas import GlosaInput
@@ -3251,7 +3301,7 @@ async def reanalizar_glosa(
             fecha_radicacion=None,  # opcional, ya pasaron los chequeos al crear
             fecha_recepcion=None,
             valor_aceptado=str(int(glosa.valor_aceptado or 0)),
-            tabla_excel=glosa.texto_glosa_original,
+            tabla_excel=texto_para_ia,
             numero_factura=glosa.factura,
             numero_radicado=glosa.numero_radicado,
             tono=data.tono or "conciliador",

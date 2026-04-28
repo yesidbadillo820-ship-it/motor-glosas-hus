@@ -8687,17 +8687,22 @@ async function _mostrarBannerAutopilot(glosaId){
     var razonesCon = (a.razones_en_contra||[]).slice(0,3);
     var acciones = (a.acciones_sugeridas||[]).slice(0,3);
 
+    // R-UI 27-abr-2026: insertar el banner DENTRO de result-area
+    // (no como hijo directo del panel-analizar que es flex y le da
+    // columna entera). Si no existe result-area aún, no renderizar.
+    var contenedor = document.getElementById('result-area') || panel;
+
     // Caso 1: glosa cerrada → solo pill chico
     if(a.ya_cerrada){
       var wf = (a.workflow_state || a.estado || 'RESPONDIDA').toUpperCase();
       var pillHtml = '<div id="ap-banner" data-glosa="' + glosaId + '" '
         + 'style="display:inline-flex;align-items:center;gap:.5rem;'
         + 'padding:.45rem .85rem;background:#dcfce7;border:1px solid #86efac;'
-        + 'border-radius:999px;margin:.5rem 0;font-size:.78rem;color:#166534;'
+        + 'border-radius:999px;margin:.5rem 1.5rem;font-size:.78rem;color:#166534;'
         + 'font-weight:600;">'
         + '✓ ' + wf + ' — no requiere más acción'
         + '</div>';
-      panel.insertAdjacentHTML('afterbegin', pillHtml);
+      contenedor.insertAdjacentHTML('afterbegin', pillHtml);
       return;
     }
 
@@ -8706,7 +8711,7 @@ async function _mostrarBannerAutopilot(glosaId){
       var html = ''
         + '<div id="ap-banner" data-glosa="' + glosaId + '" '
         + 'style="background:#dcfce7;border:1px solid #86efac;border-left:4px solid #16a34a;'
-        + 'border-radius:8px;padding:.75rem 1rem;margin:.5rem 0;color:#166534;">'
+        + 'border-radius:8px;padding:.75rem 1rem;margin:.5rem 1.5rem;color:#166534;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">'
         + '<div style="font-size:.85rem;font-weight:700;">'
         + '✅ Listo para enviar <span style="opacity:.7;font-weight:500;">(confianza ' + conf + '%)</span>'
@@ -8719,7 +8724,7 @@ async function _mostrarBannerAutopilot(glosaId){
         + 'border:0;border-radius:6px;font-weight:700;font-size:.82rem;cursor:pointer;">'
         + '✓ Marcar como RESPONDIDA</button>'
         + '</div>';
-      panel.insertAdjacentHTML('afterbegin', html);
+      contenedor.insertAdjacentHTML('afterbegin', html);
       return;
     }
 
@@ -8738,7 +8743,7 @@ async function _mostrarBannerAutopilot(glosaId){
     var html = ''
       + '<div id="ap-banner" data-glosa="' + glosaId + '" '
       + 'style="background:' + c[0] + ';border-left:3px solid ' + c[1] + ';'
-      + 'border-radius:6px;padding:.55rem .85rem;margin:.5rem 0;color:' + c[1] + ';font-size:.78rem;">'
+      + 'border-radius:6px;padding:.55rem .85rem;margin:.5rem 1.5rem;color:' + c[1] + ';font-size:.78rem;">'
       + '<details>'
       + '<summary style="cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;">'
       + '<span>' + c[2] + ' ' + estado.replace("_"," ") + ' · confianza ' + conf + '%</span>'
@@ -8751,7 +8756,7 @@ async function _mostrarBannerAutopilot(glosaId){
       + '</div>'
       + '</details>'
       + '</div>';
-    panel.insertAdjacentHTML('afterbegin', html);
+    contenedor.insertAdjacentHTML('afterbegin', html);
   }catch(_){/* silencioso */}
 }
 
@@ -8852,7 +8857,17 @@ async function responderGlosa(id){
     // renderizarlo en result-area en vez de dejar la pantalla en
     // blanco (causa que el gestor crea que no hay respuesta y
     // dispare otro analizar duplicando registros).
-    if(g.dictamen && g.dictamen.length > 80){
+    var _dictTxt = (g.dictamen || '').trim();
+    var _dictUpper = _dictTxt.toUpperCase().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    var _esPlaceholder = (
+      _dictUpper.indexOf('GLOSA IMPORTADA DESDE RECEPCI') !== -1
+      || _dictUpper.indexOf('PENDIENTE DE ANÁLISIS') !== -1
+      || _dictUpper.indexOf('PENDIENTE DE ANALISIS') !== -1
+      || _dictUpper.length < 100
+    );
+    var _esRequiereSoportes = _dictUpper.indexOf('REQUIERE SOPORTES') !== -1;
+
+    if(_dictTxt && (!_esPlaceholder || _esRequiereSoportes)){
       try{
         var area = document.getElementById('result-area');
         if(area){
@@ -8862,23 +8877,35 @@ async function responderGlosa(id){
             ? new Date(g.creado_en).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'})
             : '';
           var modeloUsado = g.modelo_ia || '—';
+          var titulo = _esRequiereSoportes
+            ? '📄 Glosa pendiente: requiere soportes'
+            : '📜 Dictamen ya generado';
+          var bgBody = _esRequiereSoportes ? '#fef3c7' : 'var(--bg-card)';
+          var borderBody = _esRequiereSoportes ? '#f59e0b' : 'var(--border)';
+          // Detectar si el dictamen es HTML (tiene tags) o texto plano
+          var pareceHtml = /<(div|p|span|b|strong|i|em|br|ul|ol|li|h\d|table|tr|td)[\s>]/i.test(_dictTxt);
+          var bodyContent = pareceHtml
+            ? _dictTxt  // confiamos: el motor IA genera HTML controlado
+            : _dictTxt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
           var html = '<div class="card-premium" style="margin:1rem 1.5rem;padding:1.4rem;">'
             + '<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.8rem;flex-wrap:wrap">'
             + '<div>'
-            + '<div style="font-size:.7rem;font-weight:800;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">📜 Dictamen ya generado</div>'
+            + '<div style="font-size:.7rem;font-weight:800;color:var(--text3);letter-spacing:.06em;text-transform:uppercase">' + titulo + '</div>'
             + '<div style="font-size:1rem;font-weight:700;color:var(--text);margin-top:.2rem">Glosa #' + g.id + ' · ' + (g.factura || '—') + '</div>'
             + '<div style="font-size:.72rem;color:var(--text3);margin-top:.15rem">' + fechaCreado + (modeloUsado ? ' · ' + modeloUsado : '') + '</div>'
             + '</div>'
             + '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'
-            + '<button class="btn-sm btn-primary" onclick="reanalizarConIA(' + g.id + ')" title="Vuelve a generar el dictamen con la IA — sobreescribe el actual">🧠 Re-analizar con IA</button>'
-            + '<button class="btn-sm ghost" onclick="copiarDictamenActual()">Copiar texto</button>'
+            + '<button class="btn-sm btn-primary" onclick="reanalizarConIA(' + g.id + ')" title="Genera el dictamen con la IA usando los datos del expediente">🧠 ' + (_esRequiereSoportes ? 'Analizar ahora' : 'Re-analizar con IA') + '</button>'
+            + (_esRequiereSoportes ? '' : '<button class="btn-sm ghost" onclick="copiarDictamenActual()">Copiar texto</button>')
             + '</div>'
             + '</div>'
-            + '<div id="dictamen-previo-body" style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.1rem;font-size:.85rem;line-height:1.55;white-space:pre-wrap;max-height:60vh;overflow-y:auto;color:var(--text)">'
-            + (g.dictamen.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
+            + '<div id="dictamen-previo-body" style="background:' + bgBody + ';border:1px solid ' + borderBody + ';border-radius:8px;padding:1.1rem;font-size:.85rem;line-height:1.55;' + (pareceHtml ? '' : 'white-space:pre-wrap;') + 'max-height:60vh;overflow-y:auto;color:var(--text)">'
+            + bodyContent
             + '</div>'
             + '<div style="margin-top:.8rem;padding:.55rem .85rem;background:var(--bg-subtle);border-radius:6px;font-size:.72rem;color:var(--text3)">'
-            + '💡 Si el dictamen está OK no hace falta re-analizar. Solo presioná "Re-analizar con IA" si querés cambiar tono, agregar PDFs nuevos, o refinar argumentos.'
+            + (_esRequiereSoportes
+                ? '💡 Subí los soportes PDF al formulario de la izquierda y luego dale "🧠 Analizar ahora".'
+                : '💡 Si el dictamen está OK no hace falta re-analizar. Solo presioná "Re-analizar con IA" si querés cambiar tono, agregar PDFs nuevos, o refinar argumentos.')
             + '</div>'
             + '</div>';
           area.innerHTML = html + (area.innerHTML || '');
