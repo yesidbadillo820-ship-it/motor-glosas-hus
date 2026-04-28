@@ -25,13 +25,36 @@ from sqlalchemy.orm import Session
 from app.models.db import TarifaContratadaRecord
 
 
+def _eps_matchea(eps_glosa: str, eps_tarifa: str) -> bool:
+    """Match permisivo de EPS por tokens significativos.
+
+    El ilike('%X%') falla cuando los nombres no se contienen mutuamente,
+    como con "DISPENSARIO MEDICO BUCARAMANGA" (plan EPS oficial) vs
+    "DISPENSARIO MEDICO DMBUG" (nombre con que se carga el contrato).
+    Este matcher comparte la lógica con app.services.dictamen_stale para
+    consistencia.
+    """
+    if not eps_glosa or not eps_tarifa:
+        return False
+    try:
+        from app.services.dictamen_stale import _matchea_eps
+    except Exception:
+        return False
+    return _matchea_eps(eps_glosa, eps_tarifa)
+
+
 def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord]:
     """Busca la tarifa activa más reciente para (eps, cups).
 
-    Match case-insensitive en EPS (ilike %X%) porque puede venir
-    'FAMISANAR' vs 'FAMISANAR EPS' vs 'U220181 - FAMISANAR EPS'.
+    Match en EPS en dos pasadas:
+      1. Substring case-insensitive (ilike '%X%') — ruta rápida cuando los
+         nombres se contienen mutuamente (ej. "FAMISANAR" ⊂ "FAMISANAR EPS").
+      2. Token-based — comparte ≥2 palabras significativas con la EPS de la
+         tarifa, o sigla única (DMBUG, FOMAG) que aparezca en el otro
+         nombre. Cubre el caso real "DISPENSARIO MEDICO BUCARAMANG" ↔
+         "DISPENSARIO MEDICO DMBUG".
 
-    Orden de matching (Ronda 45 — Res. 2641/2025):
+    Orden de matching de CUPS (Ronda 45 — Res. 2641/2025):
       1. Match directo por codigo_cups
       2. Match por codigo_ips (código interno del prestador cargado
          desde el Excel del contrato, ej. '39147B-18' del HUS)
@@ -44,7 +67,15 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
     if not eps or not cups:
         return None
 
-    # 1) Match directo por CUPS oficial
+    def _resolver_por_eps(filas: list[TarifaContratadaRecord]) -> Optional[TarifaContratadaRecord]:
+        """De una lista de tarifas (mismo CUPS), elige la que matchea la EPS."""
+        for f in filas:
+            if _eps_matchea(eps, f.eps or ""):
+                return f
+        return None
+
+    # 1) Match directo por CUPS oficial — primero ilike (rápido), luego
+    # token-based sobre el universo de tarifas con ese CUPS.
     fila = (
         db.query(TarifaContratadaRecord)
         .filter(TarifaContratadaRecord.activa == 1)
@@ -55,8 +86,21 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
     )
     if fila:
         return fila
+    # Fallback: traer todas las tarifas activas con ese CUPS y filtrar por
+    # tokens de EPS en Python (suelen ser 1-5 candidatos máx).
+    candidatos = (
+        db.query(TarifaContratadaRecord)
+        .filter(TarifaContratadaRecord.activa == 1)
+        .filter(TarifaContratadaRecord.codigo_cups == cups)
+        .order_by(TarifaContratadaRecord.creado_en.desc())
+        .limit(20)
+        .all()
+    )
+    fila = _resolver_por_eps(candidatos)
+    if fila:
+        return fila
 
-    # 2) Match por codigo_ips (cargado desde columna 'CODIGO IPS' del Excel)
+    # 2) Match por codigo_ips — misma estrategia
     fila = (
         db.query(TarifaContratadaRecord)
         .filter(TarifaContratadaRecord.activa == 1)
@@ -67,6 +111,17 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
     )
     if fila:
         return fila
+    candidatos = (
+        db.query(TarifaContratadaRecord)
+        .filter(TarifaContratadaRecord.activa == 1)
+        .filter(TarifaContratadaRecord.codigo_ips == cups)
+        .order_by(TarifaContratadaRecord.creado_en.desc())
+        .limit(20)
+        .all()
+    )
+    fila = _resolver_por_eps(candidatos)
+    if fila:
+        return fila
 
     # 3) Homologación Res. 2641/2025 — si el código entrada es viejo, lo
     # traducimos al CUPS oficial y reintentamos.
@@ -74,14 +129,26 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
         from app.services.homologador_cups import homologar_cups
         homo = homologar_cups(cups, db=db, eps=eps)
         if homo and homo.get("cups_oficial") and homo["cups_oficial"] != cups:
+            cups_oficial = homo["cups_oficial"]
             fila = (
                 db.query(TarifaContratadaRecord)
                 .filter(TarifaContratadaRecord.activa == 1)
                 .filter(TarifaContratadaRecord.eps.ilike(f"%{eps}%"))
-                .filter(TarifaContratadaRecord.codigo_cups == homo["cups_oficial"])
+                .filter(TarifaContratadaRecord.codigo_cups == cups_oficial)
                 .order_by(TarifaContratadaRecord.creado_en.desc())
                 .first()
             )
+            if fila:
+                return fila
+            candidatos = (
+                db.query(TarifaContratadaRecord)
+                .filter(TarifaContratadaRecord.activa == 1)
+                .filter(TarifaContratadaRecord.codigo_cups == cups_oficial)
+                .order_by(TarifaContratadaRecord.creado_en.desc())
+                .limit(20)
+                .all()
+            )
+            fila = _resolver_por_eps(candidatos)
             if fila:
                 return fila
     except Exception:
