@@ -425,6 +425,81 @@ def evaluar_glosa_tarifa(
     }
 
 
+def pre_lookup_tarifa(
+    db: Session,
+    cod_pref: str,
+    eps: str,
+    tabla_excel: str = "",
+    contexto_pdf: str = "",
+    req_id: str = "",
+) -> Optional[dict]:
+    """Pre-lookup compartido por los flujos de análisis (analizar / reanalizar
+    / generar-lote). Devuelve `info_tarifa` listo para pasar a
+    `GlosaService.analizar(info_tarifa=...)`.
+
+    Si la glosa NO es TA*, no aplica → devuelve None.
+    Si no se identifica el CUPS, devuelve None.
+    Si no se encuentra tarifa pactada, intenta el catálogo oficial HUS/SOAT.
+    Si tampoco hay catálogo oficial, devuelve None.
+
+    Importante: sin este pre-lookup el motor genera el dictamen con argumento
+    genérico SOAT pleno aunque haya contrato pactado en BD — por eso es
+    crítico llamarlo desde TODOS los puntos donde se invoca service.analizar.
+    """
+    if not (cod_pref or "").upper().startswith("TA"):
+        return None
+    try:
+        from app.utils.parsers_glosa import _extraer_cups_servicio, _extraer_valores_glosa
+        cups_pre, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+        if not cups_pre:
+            return None
+        vals_pre = _extraer_valores_glosa(tabla_excel or "", cups=cups_pre)
+        # Si la glosa no trae el facturado, intentar extraerlo del PDF
+        # priorizando el valor de línea (no el total de la factura).
+        _vp_fact = vals_pre.get("facturado", 0.0)
+        if _vp_fact <= 0 and contexto_pdf:
+            _vp_pdf = _extraer_valores_glosa(contexto_pdf, cups=cups_pre)
+            if _vp_pdf.get("facturado", 0.0) > 0:
+                _vp_fact = _vp_pdf["facturado"]
+        info = evaluar_glosa_tarifa(
+            db, eps=eps, cups=cups_pre,
+            valor_facturado=_vp_fact,
+            valor_objetado=0.0,
+            valor_reconocido=vals_pre.get("reconocido", 0.0),
+        )
+        if info.get("encontrada"):
+            return info
+        # Fallback al catálogo oficial HUS/SOAT
+        from app.services.tarifas_oficiales import tarifa_a_banner_dict
+        ofic = tarifa_a_banner_dict(cups_pre)
+        if not ofic:
+            return None
+        diff = abs(vals_pre.get("facturado", 0.0) - ofic["valor_pactado"])
+        accion = (
+            "DEFENDER_TOTAL" if diff < max(1.0, ofic["valor_pactado"] * 0.005)
+            else "REVISAR"
+        )
+        return {
+            "encontrada": True,
+            "tarifa": ofic,
+            "valor_facturado": vals_pre.get("facturado", 0.0),
+            "valor_objetado": 0.0,
+            "valor_reconocido": vals_pre.get("reconocido", 0.0),
+            "valor_pactado_calc": ofic["valor_pactado"],
+            "recomendacion": {
+                "accion": accion,
+                "titulo": "Valor oficial conocido",
+                "razon": "",
+            },
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            f"[{req_id}] pre_lookup_tarifa falló: {e}"
+        )
+        return None
+
+
 def formato_texto_banner(info: dict) -> str:
     """Construye un texto plano resumen para inyectar al prompt de la IA.
 

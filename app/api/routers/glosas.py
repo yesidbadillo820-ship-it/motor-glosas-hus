@@ -1176,7 +1176,22 @@ async def generar_lote(
                 # Few-shots según (EPS, código)
                 from app.api.routers.plantillas_gold import obtener_few_shot, marcar_usos
                 pg = obtener_few_shot(db, eps=gi.eps, codigo_glosa=g.codigo_glosa or "", limite=2)
-                res = await service.analizar(gi, contexto_pdf="", contratos_db=contratos, few_shots=[p.argumento for p in pg])
+                # Pre-lookup de tarifa pactada — sin esto el LLM defaultea
+                # al argumento "no existe contrato" aunque exista en BD.
+                from app.services.tarifa_lookup_service import pre_lookup_tarifa
+                info_tarifa_pre = pre_lookup_tarifa(
+                    db=db,
+                    cod_pref=g.codigo_glosa or "",
+                    eps=gi.eps or "",
+                    tabla_excel=texto,
+                    contexto_pdf="",
+                    req_id=f"lote-{gid}",
+                )
+                res = await service.analizar(
+                    gi, contexto_pdf="", contratos_db=contratos,
+                    few_shots=[p.argumento for p in pg],
+                    info_tarifa=info_tarifa_pre,
+                )
                 if pg:
                     marcar_usos(db, [p.id for p in pg])
                 from datetime import datetime, timezone as _tz
@@ -3415,8 +3430,13 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             numero_factura=fila_data.get('factura'),
             numero_radicado=servicio_id,
         )
-        
-        resultado = await service.analizar(data, "", contratos)
+
+        from app.services.tarifa_lookup_service import pre_lookup_tarifa
+        info_tarifa_pre = pre_lookup_tarifa(
+            db=db, cod_pref=fila_data.get('codigo', ''),
+            eps=eps_final, tabla_excel=texto_glosa,
+        )
+        resultado = await service.analizar(data, "", contratos, info_tarifa=info_tarifa_pre)
 
         repo = GlosaRepository(db)
         # Campos adicionales para que el flujo "responder por factura"
@@ -3814,7 +3834,22 @@ async def reanalizar_glosa(
 
     contrato_repo = ContratoRepository(db)
     contratos = contrato_repo.como_dict()
-    resultado = await service.analizar(glosa_input, "", contratos)
+
+    # Pre-lookup de tarifa pactada antes de invocar al LLM. Sin esto el
+    # motor produce el argumento genérico "no existe contrato" aunque sí
+    # exista en BD — bug crítico que afectaba a #2513 y otras TA-DMBUG.
+    from app.services.tarifa_lookup_service import pre_lookup_tarifa
+    info_tarifa_pre = pre_lookup_tarifa(
+        db=db,
+        cod_pref=glosa.codigo_glosa or "",
+        eps=glosa.eps or "",
+        tabla_excel=texto_para_ia,
+        contexto_pdf="",
+        req_id=f"reanalizar-{glosa.id}",
+    )
+    resultado = await service.analizar(
+        glosa_input, "", contratos, info_tarifa=info_tarifa_pre,
+    )
 
     # Sobreescribir dictamen + metadata. NO crear nueva fila.
     from datetime import datetime, timezone as _tz

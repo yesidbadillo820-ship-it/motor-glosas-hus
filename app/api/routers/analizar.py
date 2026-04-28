@@ -127,60 +127,14 @@ def _pre_lookup_tarifa(
     db: Session, cod_pref: str, eps: str,
     tabla_excel: str, contexto_pdf: str, req_id: str,
 ) -> Optional[dict]:
-    """Pre-lookup: si la glosa es TA* y se identifica el CUPS, busca la
-    tarifa pactada antes de invocar al LLM. Si hay match, el service
-    puede saltarse la llamada (~8k tokens menos)."""
-    if not (cod_pref or "").upper().startswith("TA"):
-        return None
-    try:
-        cups_pre, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
-        if not cups_pre:
-            return None
-        from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
-        vals_pre = _extraer_valores_glosa(tabla_excel or "", cups=cups_pre)
-        # Si la glosa no trae el facturado, intentar extraerlo del PDF
-        # de la factura electrónica HUS — usando CUPS para priorizar
-        # el valor de línea (no el total de la factura, que en
-        # facturas multi-CUPS sería incorrecto).
-        _vp_fact = vals_pre.get("facturado", 0.0)
-        if _vp_fact <= 0 and contexto_pdf:
-            _vp_pdf = _extraer_valores_glosa(contexto_pdf, cups=cups_pre)
-            if _vp_pdf.get("facturado", 0.0) > 0:
-                _vp_fact = _vp_pdf["facturado"]
-        info = evaluar_glosa_tarifa(
-            db, eps=eps, cups=cups_pre,
-            valor_facturado=_vp_fact,
-            valor_objetado=0.0,
-            valor_reconocido=vals_pre.get("reconocido", 0.0),
-        )
-        if info.get("encontrada"):
-            return info
-        # Fallback al catálogo oficial HUS/SOAT
-        from app.services.tarifas_oficiales import tarifa_a_banner_dict
-        ofic = tarifa_a_banner_dict(cups_pre)
-        if not ofic:
-            return None
-        diff = abs(vals_pre.get("facturado", 0.0) - ofic["valor_pactado"])
-        accion = (
-            "DEFENDER_TOTAL" if diff < max(1.0, ofic["valor_pactado"] * 0.005)
-            else "REVISAR"
-        )
-        return {
-            "encontrada": True,
-            "tarifa": ofic,
-            "valor_facturado": vals_pre.get("facturado", 0.0),
-            "valor_objetado": 0.0,
-            "valor_reconocido": vals_pre.get("reconocido", 0.0),
-            "valor_pactado_calc": ofic["valor_pactado"],
-            "recomendacion": {
-                "accion": accion,
-                "titulo": "Valor oficial conocido",
-                "razon": "",
-            },
-        }
-    except Exception as e:
-        logger.warning(f"[{req_id}] pre-lookup tarifa falló: {e}")
-        return None
+    """Wrapper local sobre tarifa_lookup_service.pre_lookup_tarifa.
+    Mantenido para no romper el call site original (línea 573 de este módulo).
+    """
+    from app.services.tarifa_lookup_service import pre_lookup_tarifa
+    return pre_lookup_tarifa(
+        db=db, cod_pref=cod_pref, eps=eps,
+        tabla_excel=tabla_excel, contexto_pdf=contexto_pdf, req_id=req_id,
+    )
 
 
 def _agregar_banner_tarifa_post(
