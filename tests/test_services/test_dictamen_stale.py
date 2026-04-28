@@ -16,7 +16,9 @@ import pytest
 sqlalchemy = pytest.importorskip("sqlalchemy")  # noqa: F841
 
 from app.services.dictamen_stale import (  # noqa: E402
+    _matchea_eps,
     _texto_dictamen_normalizado,
+    _tokens_significativos,
     motivo_stale,
 )
 
@@ -105,3 +107,55 @@ class TestDetectaPorTexto:
         # Hay tarifa pero para otra EPS
         db = _StubDB([_tarifa("DISPENSARIO MEDICO")])
         assert motivo_stale(glosa, db) is None
+
+
+class TestMatcheaEps:
+    """Matching permisivo por tokens — caso real DMBUG vs nombre del plan EPS."""
+
+    def test_dispensario_bucaramanga_matchea_dmbug(self):
+        # Glosa trae el plan EPS oficial; tarifa cargada con nombre comercial.
+        assert _matchea_eps(
+            "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANG",
+            "DISPENSARIO MEDICO DMBUG",
+        )
+
+    def test_fomag_matchea_fondo_magisterio(self):
+        assert _matchea_eps("FOMAG", "FOMAG")
+        assert _matchea_eps(
+            "FONDO PRESTACIONES MAGISTERIO FOMAG", "FOMAG MAGISTERIO"
+        )
+
+    def test_eps_completamente_distintas_no_matchean(self):
+        assert not _matchea_eps("FAMISANAR EPS", "SANITAS EPS")
+        assert not _matchea_eps("NUEVA EPS", "COMPENSAR")
+
+    def test_token_unico_no_basta(self):
+        # Solo "EPS" en común no debería contar (es stopword)
+        assert not _matchea_eps("FAMISANAR EPS", "OTRA COSA EPS")
+
+    def test_sigla_unica_matchea_si_aparece_en_el_otro(self):
+        # Tarifa cargada con un solo token significativo (sigla DMBUG)
+        # matchea contra eps que contenga esa sigla en cualquier parte
+        assert _matchea_eps(
+            "DISPENSARIO MEDICO DMBUG BUCARAMANGA", "DMBUG"
+        )
+        assert _matchea_eps("FOMAG MAGISTERIO", "FOMAG")
+
+    def test_tokens_significativos_filtra_stopwords(self):
+        toks = _tokens_significativos("DIRECCION DE SANIDAD EJERCITO")
+        assert "EJERCITO" in toks
+        assert "DIRECCION" not in toks  # stopword
+
+
+class TestTerceroNombre:
+    def test_match_via_tercero_cuando_eps_oficial_no_matchea(self):
+        # eps oficial muy formal, tarifa cargada con el tercero comercial
+        glosa = _glosa(
+            "ESE HUS NO ACEPTA. NO EXISTE CONTRATO PACTADO ENTRE LAS PARTES.",
+            eps="U220311 - DIRECCION DE SANIDAD EJERCITO",
+        )
+        # Ningún token significativo común con la tarifa
+        # pero el tercero_nombre sí matchea
+        glosa.tercero_nombre = "DISPENSARIO MEDICO BUCARAMANGA"
+        db = _StubDB([_tarifa("DISPENSARIO MEDICO DMBUG")])
+        assert motivo_stale(glosa, db) is not None

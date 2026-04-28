@@ -44,27 +44,78 @@ def es_stale(glosa, db) -> bool:
     return motivo_stale(glosa, db) is not None
 
 
-def _eps_tiene_tarifas(db, eps: str):
-    """Devuelve la primera tarifa activa para la EPS o None si no hay."""
-    if not eps:
-        return None
+_STOPWORDS_EPS = {
+    "DE", "DEL", "LA", "EL", "Y", "EPS", "ERP", "ARS", "CAJA",
+    "ENTIDAD", "PROMOTORA", "SALUD", "SAS", "S.A.S", "S.A", "LTDA",
+    "DIRECCION", "DIRECCIÓN", "SANIDAD", "SUBSISTEMA",
+}
+
+
+def _tokens_significativos(s: str) -> set[str]:
+    """Devuelve las palabras significativas (≥4 chars, sin stopwords) del nombre."""
+    if not s:
+        return set()
+    palabras = re.split(r"[\s\-·:/]+", s.upper())
+    return {p for p in palabras if len(p) >= 4 and p not in _STOPWORDS_EPS}
+
+
+def _matchea_eps(eps_glosa: str, eps_tarifa: str) -> bool:
+    """Match permisivo de EPS por tokens significativos.
+
+    Reglas (en orden):
+      1. Equivalencia exacta del normalizador (caso ideal).
+      2. ≥2 tokens significativos compartidos (≥4 chars, sin stopwords).
+         Ej: "DISPENSARIO MEDICO BUCARAMANGA" ~ "DISPENSARIO MEDICO DMBUG"
+             → {DISPENSARIO, MEDICO} → match.
+      3. Si uno de los dos tiene un solo token significativo (siglas como
+         FOMAG, DMBUG, ISS), basta con que ese token aparezca como
+         subcadena del otro. Ej: "DMBUG" matchea
+         "U220311 - ... - DMBUG" si encontramos el token "DMBUG".
+    """
+    if not eps_glosa or not eps_tarifa:
+        return False
     from app.services import pagador_normalizer
+    if pagador_normalizer.son_equivalentes(eps_glosa, eps_tarifa):
+        return True
+    a = _tokens_significativos(pagador_normalizer.nombre_corto(eps_glosa))
+    b = _tokens_significativos(pagador_normalizer.nombre_corto(eps_tarifa))
+    if len(a & b) >= 2:
+        return True
+    # Sigla única (DMBUG, FOMAG, ISS, etc.) — buscar como subcadena en el otro
+    if len(a) == 1 and a:
+        sigla = next(iter(a))
+        if sigla in pagador_normalizer.nombre_corto(eps_tarifa).upper():
+            return True
+    if len(b) == 1 and b:
+        sigla = next(iter(b))
+        if sigla in pagador_normalizer.nombre_corto(eps_glosa).upper():
+            return True
+    return False
+
+
+def _eps_tiene_tarifas(db, eps: str, tercero_nombre: str = ""):
+    """Devuelve la primera tarifa activa que matchea la EPS o None.
+
+    Prueba contra `eps` (plan EPS oficial) y `tercero_nombre` (nombre
+    comercial corto del Tercero) usando matching por tokens permisivo.
+    """
+    nombres_a_probar = [n for n in (eps, tercero_nombre) if n and n.strip()]
+    if not nombres_a_probar:
+        return None
     from app.models.db import TarifaContratadaRecord
-    eps_corto = pagador_normalizer.nombre_corto(eps)
     candidatos = (
         db.query(TarifaContratadaRecord)
         .filter(TarifaContratadaRecord.activa == 1)
-        .limit(80)
+        .limit(200)
         .all()
     )
     for t in candidatos:
         t_eps = (t.eps or "").strip()
         if not t_eps:
             continue
-        if pagador_normalizer.son_equivalentes(t_eps, eps) or (
-            eps_corto and eps_corto in t_eps.upper()
-        ):
-            return t
+        for n in nombres_a_probar:
+            if _matchea_eps(n, t_eps):
+                return t
     return None
 
 
@@ -93,10 +144,12 @@ def motivo_stale(glosa, db) -> Optional[str]:
 
     generado: Optional[datetime] = getattr(glosa, "dictamen_generado_en", None)
 
+    tercero = (getattr(glosa, "tercero_nombre", "") or "").strip()
+
     # 1) Texto-based: dictamen niega contrato pero la EPS sí tiene tarifas
     #    activas. Se aplica también a dictámenes sin timestamp (legados).
     if contradice_contrato:
-        tarifa = _eps_tiene_tarifas(db, eps)
+        tarifa = _eps_tiene_tarifas(db, eps, tercero)
         if tarifa is not None:
             return (
                 "El dictamen argumenta que NO existe contrato, pero el "
@@ -106,23 +159,19 @@ def motivo_stale(glosa, db) -> Optional[str]:
 
     # 2) Timestamp-based: tarifas para la EPS cargadas después del dictamen.
     if generado:
-        from app.services import pagador_normalizer
         from app.models.db import TarifaContratadaRecord
-        eps_corto = pagador_normalizer.nombre_corto(eps)
         candidatos = (
             db.query(TarifaContratadaRecord)
             .filter(TarifaContratadaRecord.activa == 1)
             .filter(TarifaContratadaRecord.creado_en > generado)
-            .limit(50)
+            .limit(80)
             .all()
         )
         for t in candidatos:
             t_eps = (t.eps or "").strip()
             if not t_eps:
                 continue
-            if pagador_normalizer.son_equivalentes(t_eps, eps) or (
-                eps_corto and eps_corto in t_eps.upper()
-            ):
+            if _matchea_eps(eps, t_eps) or (tercero and _matchea_eps(tercero, t_eps)):
                 fecha_str = t.creado_en.strftime("%d/%m/%Y") if t.creado_en else "?"
                 return (
                     f"Hay tarifas nuevas cargadas el {fecha_str} para esta EPS. "
