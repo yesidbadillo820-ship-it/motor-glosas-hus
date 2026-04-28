@@ -313,12 +313,14 @@ def sugerir_codigo_respuesta(tipo_glosa: str, es_extemporanea: bool = False,
                               aceptada_parcial: bool = False,
                               aceptada_total: bool = False,
                               ratificada: bool = False,
-                              subsanada: bool = False) -> str:
+                              sin_contrato: bool = False) -> str:
     """Sugiere el código de respuesta correcto según la situación.
 
-    Default: RE9602 (defensa por injustificación con evidencia).
-    RE9901 solo cuando hay subsanación efectiva o la EPS ratificó la glosa
-    y el flujo legal exige insistir en la respuesta inicial.
+    Default: RE9901 (defensa estándar — IPS subsana aportando referencia
+    contractual). Es el código más común cuando hay contrato pactado.
+    RE9602 ("glosa injustificada con evidencia") solo aplica cuando el
+    tipo de glosa es TARIFAS y NO hay contrato pactado en el catálogo,
+    porque entonces la defensa se apoya en SOAT pleno + ausencia de pacto.
     """
     if ratificada:
         return "RE9901"
@@ -328,7 +330,7 @@ def sugerir_codigo_respuesta(tipo_glosa: str, es_extemporanea: bool = False,
         return "RE9801"
     if es_extemporanea:
         return "RE9502"
-    if subsanada:
-        return "RE9901"
-    # Default: defensa por injustificación con evidencia
-    return "RE9602"
+    if (tipo_glosa or "").upper().startswith("TA") and sin_contrato:
+        return "RE9602"
+    # Default: defensa estándar (subsanada con soportes / referencia contractual)
+    return "RE9901"

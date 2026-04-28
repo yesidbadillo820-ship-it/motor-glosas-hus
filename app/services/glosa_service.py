@@ -831,16 +831,18 @@ class GlosaService:
                     f"pactado=${pact:,.0f} facturado=${fact:,.0f} — plantilla fija usada (0 tokens)"
                 )
 
-        # Ratificación tiene prioridad sobre extemporaneidad: si ya pasamos por
-        # respuesta inicial y la EPS ratificó, el flujo legal es ratificación,
-        # NO aceptación tácita.
-        # Selección RE según Manual Único (Res. 2284/2023):
-        #   RE9702 → IPS acepta 100%; RE9801 → IPS acepta parcial y subsana
+        # Selección RE según Manual Único (Res. 2284/2023) y práctica HUS:
+        #   RE9702 → IPS acepta 100%
+        #   RE9801 → IPS acepta parcial y subsana
+        #   RE9901 → defensa estándar: IPS no acepta y subsana aportando
+        #            soporte / referencia contractual. Es el código más
+        #            común cuando hay contrato pactado y el HUS defiende
+        #            la tarifa contractual.
         #   RE9502 → glosa extemporánea (aceptación tácita Art. 57 Ley 1438)
-        #   RE9602 → defensa por injustificación (IPS aporta evidencia)
-        #   RE9901 → glosa ratificada por EPS y respondida con subsanación
-        # Importante: RE9901 implica subsanación efectiva. Si la IPS solo defiende
-        # con argumento jurídico sin subsanar nada, el código correcto es RE9602.
+        #   RE9602 → glosa injustificada al 100% (IPS aporta evidencia
+        #            de la injustificación). Aplica cuando NO hay contrato
+        #            pactado y la defensa se apoya en SOAT pleno + ausencia
+        #            de pacto distinto. Si hay contrato cargado, va RE9901.
         if modo_resp == "aceptar_total":
             cod_res, desc_res = "RE9702", "GLOSA ACEPTADA AL 100% POR EL PRESTADOR"
         elif modo_resp == "aceptar_parcial":
@@ -849,8 +851,10 @@ class GlosaService:
             cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
         elif es_extemporanea:
             cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 57 Ley 1438/2011)"
-        else:
+        elif es_tarifa and not tiene_contrato:
             cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
+        else:
+            cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
 
         plantilla = obtener_plantilla_por_codigo(codigo_det)
         usa_plantilla = plantilla is not None

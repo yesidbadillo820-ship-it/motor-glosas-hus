@@ -63,13 +63,20 @@ class TestSugerirCodigoRespuesta:
     def test_extemporanea_RE9502(self):
         assert sugerir_codigo_respuesta("TA", es_extemporanea=True) == "RE9502"
 
-    def test_default_RE9602(self):
-        # Defensa por injustificación con evidencia es el default; RE9901 solo
-        # aplica cuando la IPS realmente subsanó algo o la EPS ratificó.
-        assert sugerir_codigo_respuesta("TA") == "RE9602"
+    def test_default_RE9901(self):
+        # Defensa estándar con contrato cargado → RE9901 (subsanada con
+        # referencia contractual). Es el código más común.
+        assert sugerir_codigo_respuesta("TA") == "RE9901"
 
-    def test_subsanada_RE9901(self):
-        assert sugerir_codigo_respuesta("TA", subsanada=True) == "RE9901"
+    def test_tarifa_sin_contrato_RE9602(self):
+        # Glosa por tarifas sin contrato pactado → defensa con SOAT pleno +
+        # argumento de injustificación con evidencia.
+        assert sugerir_codigo_respuesta("TA", sin_contrato=True) == "RE9602"
+
+    def test_no_tarifa_sin_contrato_sigue_RE9901(self):
+        # El flag sin_contrato solo aplica al tipo TA. Otros tipos siguen
+        # el default RE9901.
+        assert sugerir_codigo_respuesta("FA", sin_contrato=True) == "RE9901"
 
     def test_ratificada_prevalece_sobre_aceptada(self):
         """Si ambos flags se pasan, ratificada gana (caso del autopilot)."""
