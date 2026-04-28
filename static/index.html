@@ -1896,8 +1896,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <label class="bulk-chk"><input type="checkbox" id="bulk-sobrescribir"/> Regenerar aunque ya tengan dictamen</label>
           <button class="btn btn-primary" onclick="generarRespuestasLote()">Generar respuestas en lote</button>
           <!-- Sprint #4: marcar decisión EPS en lote -->
-          <button class="btn" style="background:#16a34a;color:#fff;border:0" onclick="decisionEpsLote('LEVANTADA')" title="La EPS levantó (aceptó nuestra defensa) las glosas seleccionadas">✅ Marcar LEVANTADAS</button>
-          <button class="btn" style="background:#dc2626;color:#fff;border:0" onclick="decisionEpsLote('RATIFICADA')" title="La EPS ratificó (rechazó) las glosas seleccionadas">❌ Marcar RATIFICADAS</button>
+          <button class="btn" style="background:#10b981;color:#fff;border:0" onclick="marcarRespondidasLote()" title="Marca las glosas seleccionadas como RESPONDIDAS (cierra el ciclo desde HUS, salen de Pendientes)">✅ Marcar como RESPONDIDAS</button>
+          <button class="btn" style="background:#16a34a;color:#fff;border:0" onclick="decisionEpsLote('LEVANTADA')" title="Decisión EPS: levantó (aceptó nuestra defensa) las glosas seleccionadas">⬆ EPS LEVANTÓ</button>
+          <button class="btn" style="background:#dc2626;color:#fff;border:0" onclick="decisionEpsLote('RATIFICADA')" title="Decisión EPS: ratificó (rechazó) las glosas seleccionadas">❌ EPS RATIFICÓ</button>
           <button class="btn btn-ghost" onclick="limpiarSeleccionLote()">Limpiar</button>
         </div>
 
@@ -8430,6 +8431,36 @@ async function _pintarBadgesTasaMisGlosas(ids){
       span.title = 'Tasa histórica par (eps, código): ' + it.tasa_par_pct.toFixed(1) + '% sobre ' + it.n_par + ' casos decididos';
     });
   } catch(e){}
+}
+
+// ─── Marcar como RESPONDIDAS en lote ───────────────────────────────
+// Cierra el ciclo del HUS para varias glosas a la vez (workflow_state =
+// RESPONDIDA). Idempotente: las que ya estaban respondidas no se
+// cuentan como fallidas. Es la acción típica al terminar Mis glosas
+// pendientes en bloque.
+async function marcarRespondidasLote(){
+  var ids = _idsSeleccionados();
+  if(!ids.length){ toast('Nada seleccionado','Marca al menos una glosa con el checkbox','warning'); return; }
+  if(ids.length > 500){ toast('Demasiadas','Máximo 500 por lote','warning'); return; }
+  if(!confirm('Marcar ' + ids.length + ' glosa(s) como RESPONDIDAS?\n\n'
+    + 'Saldrán de la bandeja "Pendientes" y quedarán en "Respondidas". '
+    + 'El dictamen ya generado se conserva.\n\n¿Continuar?')) return;
+  try{
+    var r = await fetch('/workflow/transicionar-lote', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({glosa_ids: ids, hacia: 'RESPONDIDA', nota: 'Marcadas como respondidas en lote desde Mis glosas'}),
+    });
+    var d = await r.json();
+    if(!r.ok){ toast('Error', d.detail || 'Error en lote', 'error'); return; }
+    var partes = [];
+    if(d.procesadas) partes.push('✓ ' + d.procesadas + ' marcadas como RESPONDIDAS');
+    if(d.ya_en_estado) partes.push(d.ya_en_estado + ' ya estaban respondidas');
+    if(d.fallidas && d.fallidas.length) partes.push('⚠ ' + d.fallidas.length + ' fallaron');
+    toast('Lote procesado', partes.join(' · ') || 'Sin cambios', d.fallidas && d.fallidas.length ? 'warning' : 'success');
+    limpiarSeleccionLote();
+    loadMisGlosas();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 // ─── Sprint #4 — Decisión EPS en lote ───────────────────────────────
