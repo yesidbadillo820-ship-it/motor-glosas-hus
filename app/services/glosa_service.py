@@ -1582,6 +1582,23 @@ class GlosaService:
             for pat, repl in _TYPOS_IA.items():
                 arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
 
+            # 10b) Limpiar adjetivos calificativos colados en la apertura.
+            # La IA tiende a copiar el nombre del código RE (p.ej.
+            # "RE9602 GLOSA INJUSTIFICADA…") dentro de la frase de apertura,
+            # produciendo "ESE HUS NO ACEPTA LA GLOSA INJUSTIFICADA APLICADA…",
+            # cuando la fórmula correcta es "ESE HUS NO ACEPTA LA GLOSA
+            # APLICADA POR CONCEPTO DE…". Removemos el adjetivo intercalado.
+            arg_ia = re.sub(
+                r"\bLA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
+                "LA GLOSA APLICADA",
+                arg_ia, flags=re.IGNORECASE,
+            )
+            arg_ia = re.sub(
+                r"\bACEPTA\s+LA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\b(?!\s+APLICADA)",
+                "ACEPTA LA GLOSA",
+                arg_ia, flags=re.IGNORECASE,
+            )
+
             # 11) Limpieza minima de PHI: solo conectores o formatos rotos,
             # PERO conservamos nombres y numero de HC porque son base argumental
             # para la defensa ante la entidad pagadora.

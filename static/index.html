@@ -5715,6 +5715,11 @@ async function procesarConceptosSecuencial(conceptos, idx, total){
   // renderizamos todos juntos con separador y acordeón por concepto).
   var resultadosHtml = [];
   var area = document.getElementById('result-area');
+  // Limpiar cualquier "Dictamen ya generado" o tarjeta previa que
+  // haya quedado de una llamada anterior a responderGlosa(). Si no
+  // limpiamos, area.innerHTML al final de cada iteración del lote
+  // arrastra la tarjeta vieja y la duplica entre dictámenes nuevos.
+  if(area) area.innerHTML = '';
 
   for(var i = 0; i < conceptos.length; i++){
     var g = conceptos[i];
@@ -8280,9 +8285,35 @@ function _renderMisGlosas(dataRaw){
 
       var acciones = primario + menuHtml;
 
+      // R-UI 27-abr-2026: badge de priorización automática.
+      // El backend calcula score_urgencia (0-100) y motivo_prioridad.
+      // Render visual:
+      //   • score >= 95 (vencida o vence + alta cuantía) → rojo
+      //   • score >= 85 (vence pronto) → naranja
+      //   • score >= 75 (requiere soportes / aprobada por radicar) → azul
+      //   • score >= 70 (alta cuantía) → ámbar suave
+      //   • resto → sin badge
+      var motivoPrio = g.motivo_prioridad || '';
+      var scoreUrg = Number(g.score_urgencia || 0);
+      var prioBadge = '';
+      if(motivoPrio){
+        var bg, fg;
+        if(scoreUrg >= 95){ bg = '#fee2e2'; fg = '#991b1b'; }
+        else if(scoreUrg >= 85){ bg = '#fed7aa'; fg = '#9a3412'; }
+        else if(scoreUrg >= 75){ bg = '#dbeafe'; fg = '#1e40af'; }
+        else if(scoreUrg >= 70){ bg = '#fef3c7'; fg = '#92400e'; }
+        else { bg = ''; fg = ''; }
+        if(bg){
+          prioBadge = '<span style="display:inline-block;background:' + bg + ';color:' + fg
+            + ';padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700;'
+            + 'margin-right:.35rem;letter-spacing:.02em;white-space:nowrap;" title="Prioridad automática">'
+            + '⚡ ' + motivoPrio + '</span>';
+        }
+      }
+
       return '<tr data-glosa-id="' + g.id + '">' +
         '<td class="cell-center"><input type="checkbox" class="bulk-chk" value="' + g.id + '" onchange="actualizarContadorLote()"/></td>' +
-        '<td>' + (g.gestor_nombre || '—') + '</td>' +
+        '<td>' + prioBadge + (g.gestor_nombre || '—') + '</td>' +
         '<td>' + (g.eps || '—') + '<span class="mis-tasa-badge" data-tasa-for="' + g.id + '"></span></td>' +
         '<td class="mono">' + (g.factura || '—') + '</td>' +
         '<td class="mono">' + (g.consecutivo_dgh || '—') + '</td>' +

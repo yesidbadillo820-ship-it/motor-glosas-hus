@@ -1968,9 +1968,58 @@ def mis_asignaciones(
             visto[clave] = g
     glosas = list(visto.values())
 
+    # R-UI 27-abr-2026: scoring de urgencia para priorización automática.
+    # El gestor abre Mis glosas y ve PRIMERO lo que necesita atención
+    # inmediata, sin tener que filtrar/ordenar manualmente.
+    def _score_urgencia(g) -> tuple[int, str]:
+        """Devuelve (score 0-100, motivo legible). Más alto = más urgente."""
+        estado = (g.estado or "").upper()
+        wf = (getattr(g, "workflow_state", None) or "").upper()
+        valor = float(g.valor_objetado or 0)
+        dias = int(g.dias_restantes or 999)
+        terminales = {"RESPONDIDA", "CONCILIADA", "LEVANTADA"}
+
+        # Aprobada pero no radicada → prioridad alta
+        if wf == "APROBADA":
+            return (88, "Aprobada — falta radicar")
+        # Vencidas
+        if dias <= 0 and estado not in terminales:
+            return (100, "VENCIDA")
+        # Estados cerrados — sin urgencia
+        if estado in terminales or wf in terminales:
+            return (10, "")
+        # Requiere soportes — bloquea hasta que el gestor actúe
+        if estado == "REQUIERE_SOPORTES":
+            return (75, "Requiere soportes")
+        # Vence pronto + alta cuantía
+        if dias <= 3 and valor >= 1_000_000:
+            return (95, f"Vence en {dias}d · ${int(valor):,}".replace(",", "."))
+        # Vence muy pronto
+        if dias <= 3:
+            return (85, f"Vence en {dias}d")
+        # Alta cuantía
+        if valor >= 5_000_000:
+            return (70, f"Alta cuantía · ${int(valor):,}".replace(",", "."))
+        # Por vencer (5d)
+        if dias <= 5:
+            return (55, f"Vence en {dias}d")
+        # Resto: por antigüedad
+        return (max(20, 50 - min(dias, 50)), "")
+
+    # Anotar score y ordenar
+    glosas_con_score = []
+    for g in glosas:
+        score, motivo = _score_urgencia(g)
+        glosas_con_score.append((score, motivo, g))
+    glosas_con_score.sort(key=lambda x: x[0], reverse=True)
+    glosas = [t[2] for t in glosas_con_score]
+    score_por_id = {t[2].id: (t[0], t[1]) for t in glosas_con_score}
+
     from app.services.resolver_entidad import resolver_entidad_mostrar
-    return [
-        {
+    items = []
+    for g in glosas:
+        score, motivo = score_por_id.get(g.id, (0, ""))
+        items.append({
             "id": g.id,
             "eps": resolver_entidad_mostrar(
                 eps=g.eps,
@@ -2005,9 +2054,11 @@ def mis_asignaciones(
             "nota_workflow": g.nota_workflow,
             "valor_aceptado": float(g.valor_aceptado or 0.0),
             "numero_nota_credito": getattr(g, "numero_nota_credito", None),
-        }
-        for g in glosas
-    ]
+            # Priorización automática (R-UI 27-abr-2026)
+            "score_urgencia": int(score),
+            "motivo_prioridad": motivo,
+        })
+    return items
 
 
 @router.patch("/{glosa_id}/estado")
