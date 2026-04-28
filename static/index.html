@@ -1897,6 +1897,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <button class="btn btn-primary" onclick="generarRespuestasLote()">Generar respuestas en lote</button>
           <!-- Sprint #4: marcar decisión EPS en lote -->
           <button class="btn" style="background:#10b981;color:#fff;border:0" onclick="marcarRespondidasLote()" title="Marca las glosas seleccionadas como RESPONDIDAS (cierra el ciclo desde HUS, salen de Pendientes)">✅ Marcar como RESPONDIDAS</button>
+          <button class="btn" style="background:#7c3aed;color:#fff;border:0" onclick="reabrirParaCorregirLote()" title="Reabre glosas RESPONDIDAS o CONCILIADAS para poder regenerar el dictamen (vuelven a Pendientes con dictamen actual). Útil para corregir dictámenes que quedaron mal por error de auditor o falta de contrato">🔧 Reabrir para corregir</button>
           <button class="btn" style="background:#16a34a;color:#fff;border:0" onclick="decisionEpsLote('LEVANTADA')" title="Decisión EPS: levantó (aceptó nuestra defensa) las glosas seleccionadas">⬆ EPS LEVANTÓ</button>
           <button class="btn" style="background:#dc2626;color:#fff;border:0" onclick="decisionEpsLote('RATIFICADA')" title="Decisión EPS: ratificó (rechazó) las glosas seleccionadas">❌ EPS RATIFICÓ</button>
           <button class="btn btn-ghost" onclick="limpiarSeleccionLote()">Limpiar</button>
@@ -1912,7 +1913,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <button class="vista-chip" data-vista="requieren_soportes" onclick="aplicarVista('requieren_soportes')" title="Necesitan PDFs del expediente">📄 Requieren soportes</button>
           <button class="vista-chip" data-vista="ta_sin_contrato" onclick="aplicarVista('ta_sin_contrato')" title="Tarifas + EPS sin contrato">💰 TA sin contrato</button>
           <button class="vista-chip" data-vista="alta_cuantia" onclick="aplicarVista('alta_cuantia')" title="Valor objetado ≥ $5.000.000">💎 Alta cuantía</button>
-          <button class="vista-chip" data-vista="dictamen_obsoleto" onclick="aplicarVista('dictamen_obsoleto')" title="Dictamen contradice el catálogo de contratos/tarifas actual — re-analizar recomendado">⚠ Dictamen obsoleto</button>
+          <button class="vista-chip" data-vista="dictamen_obsoleto" onclick="aplicarVista('dictamen_obsoleto')" title="Dictámenes con texto que niega contrato cuando sí hay tarifa cargada, o con código RE9602 cuando debería ser RE9901 (defensa con contrato). Re-analizar recomendado">⚠ Dictamen obsoleto</button>
         </div>
 
         <!-- Sprint #6: banner glosas que vencen en 24h -->
@@ -8459,6 +8460,43 @@ async function marcarRespondidasLote(){
     if(d.ya_en_estado) partes.push(d.ya_en_estado + ' ya estaban respondidas');
     if(d.fallidas && d.fallidas.length) partes.push('⚠ ' + d.fallidas.length + ' fallaron');
     toast('Lote procesado', partes.join(' · ') || 'Sin cambios', d.fallidas && d.fallidas.length ? 'warning' : 'success');
+    limpiarSeleccionLote();
+    loadMisGlosas();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// ─── Reabrir para corregir en lote ─────────────────────────────────
+// Para casos donde glosas ya respondidas tienen un dictamen incorrecto
+// (ej. RE9602 cuando debería ser RE9901 porque hay contrato pactado, o
+// el texto dice "no existe contrato" cuando el catálogo lo tiene). Las
+// devuelve a workflow_state=RADICADA (Pendientes) para regenerar.
+async function reabrirParaCorregirLote(){
+  var ids = _idsSeleccionados();
+  if(!ids.length){ toast('Nada seleccionado','Marca al menos una glosa con el checkbox','warning'); return; }
+  if(ids.length > 200){ toast('Demasiadas','Máximo 200 por reapertura','warning'); return; }
+  var motivo = prompt('Motivo de la reapertura (queda en auditoría):',
+    'Corrección de dictamen — RE incorrecto / texto obsoleto');
+  if(motivo === null) return;
+  if(!confirm('Reabrir ' + ids.length + ' glosa(s) para corrección.\n\n'
+    + 'Las que estén en RESPONDIDA o CONCILIADA volverán a "Pendientes" '
+    + 'con su dictamen actual visible. Después puedes seleccionarlas, '
+    + 'pulsar "Generar respuestas en lote" con la casilla "Regenerar '
+    + 'aunque ya tengan dictamen", y volver a marcar como RESPONDIDAS.\n\n'
+    + '¿Continuar?')) return;
+  try{
+    var r = await fetch('/workflow/reabrir-para-corregir', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({glosa_ids: ids, motivo: motivo || ''}),
+    });
+    var d = await r.json();
+    if(!r.ok){ toast('Error', d.detail || 'Error al reabrir', 'error'); return; }
+    var partes = [];
+    if(d.reabiertas) partes.push('🔧 ' + d.reabiertas + ' reabiertas');
+    if(d.ya_no_estaban_cerradas) partes.push(d.ya_no_estaban_cerradas + ' no estaban cerradas');
+    if(d.fallidas && d.fallidas.length) partes.push('⚠ ' + d.fallidas.length + ' fallaron');
+    toast('Lote reabierto', partes.join(' · ') || 'Sin cambios',
+          d.fallidas && d.fallidas.length ? 'warning' : 'success');
     limpiarSeleccionLote();
     loadMisGlosas();
   }catch(e){ toast('Error','Conexión: '+e.message,'error'); }

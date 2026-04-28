@@ -47,9 +47,12 @@ class _StubDB:
 
 
 def _glosa(dictamen: str, eps: str = "DISPENSARIO MEDICO BUCARAMANGA",
-           generado: datetime | None = None) -> SimpleNamespace:
+           generado: datetime | None = None,
+           codigo_respuesta: str = "",
+           codigo_glosa: str = "") -> SimpleNamespace:
     return SimpleNamespace(
-        id=1, eps=eps, dictamen=dictamen, dictamen_generado_en=generado
+        id=1, eps=eps, dictamen=dictamen, dictamen_generado_en=generado,
+        codigo_respuesta=codigo_respuesta, codigo_glosa=codigo_glosa,
     )
 
 
@@ -145,6 +148,49 @@ class TestMatcheaEps:
         toks = _tokens_significativos("DIRECCION DE SANIDAD EJERCITO")
         assert "EJERCITO" in toks
         assert "DIRECCION" not in toks  # stopword
+
+
+class TestReIncorrecto:
+    """Caso real: glosas TA con RE9602 cuando hay contrato pactado.
+    El código correcto sería RE9901 (defensa con subsanación contractual)."""
+
+    def test_RE9602_con_contrato_es_stale(self):
+        glosa = _glosa(
+            "ESE HUS DEFIENDE LA TARIFA FACTURADA EN $100.000.",
+            codigo_respuesta="RE9602",
+            codigo_glosa="TA0201",
+        )
+        db = _StubDB([_tarifa("DISPENSARIO MEDICO DMBUG")])
+        msg = motivo_stale(glosa, db)
+        assert msg is not None
+        assert "RE9602" in msg
+        assert "RE9901" in msg
+
+    def test_RE9602_sin_contrato_no_es_stale(self):
+        # Sin contrato pactado, RE9602 es correcto.
+        glosa = _glosa(
+            "ESE HUS DEFIENDE.", codigo_respuesta="RE9602", codigo_glosa="TA0201",
+        )
+        db = _StubDB([])
+        assert motivo_stale(glosa, db) is None
+
+    def test_RE9602_glosa_no_TA_no_aplica(self):
+        # El check de RE9602 incorrecto solo aplica para TA*. Otros tipos
+        # pueden usar RE9602 legítimamente.
+        glosa = _glosa(
+            "ESE HUS DEFIENDE.", codigo_respuesta="RE9602", codigo_glosa="FA0203",
+        )
+        db = _StubDB([_tarifa("DISPENSARIO MEDICO")])
+        assert motivo_stale(glosa, db) is None
+
+    def test_RE9901_no_dispara_stale(self):
+        # RE9901 es correcto cuando hay contrato, no debe marcarse stale.
+        glosa = _glosa(
+            "ESE HUS DEFIENDE CON CONTRATO PACTADO.",
+            codigo_respuesta="RE9901", codigo_glosa="TA0201",
+        )
+        db = _StubDB([_tarifa("DISPENSARIO MEDICO")])
+        assert motivo_stale(glosa, db) is None
 
 
 class TestTerceroNombre:

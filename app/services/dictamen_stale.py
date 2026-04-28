@@ -145,6 +145,8 @@ def motivo_stale(glosa, db) -> Optional[str]:
     generado: Optional[datetime] = getattr(glosa, "dictamen_generado_en", None)
 
     tercero = (getattr(glosa, "tercero_nombre", "") or "").strip()
+    codigo_respuesta = (getattr(glosa, "codigo_respuesta", "") or "").strip().upper()
+    codigo_glosa = (getattr(glosa, "codigo_glosa", "") or "").strip().upper()
 
     # 1) Texto-based: dictamen niega contrato pero la EPS sí tiene tarifas
     #    activas. Se aplica también a dictámenes sin timestamp (legados).
@@ -157,7 +159,22 @@ def motivo_stale(glosa, db) -> Optional[str]:
                 "Re-analizar para usar el contrato vigente."
             )
 
-    # 2) Timestamp-based: tarifas para la EPS cargadas después del dictamen.
+    # 2) Código RE incorrecto: glosa por TARIFAS con código RE9602 (defensa
+    #    "injustificada por SOAT pleno"), pero el catálogo SÍ tiene
+    #    contrato pactado para esta EPS. El código correcto sería RE9901
+    #    ("subsanada con referencia contractual"). Caso típico: dictámenes
+    #    generados cuando aún no se cargaba el contrato y quedaron mal
+    #    etiquetados aunque ya se respondieron.
+    if codigo_respuesta == "RE9602" and codigo_glosa.startswith("TA"):
+        tarifa = _eps_tiene_tarifas(db, eps, tercero)
+        if tarifa is not None:
+            return (
+                "Código RE9602 incorrecto: hay contrato pactado para esta "
+                "EPS, así que la defensa estándar es RE9901. Re-analizar "
+                "para que el dictamen cite la tarifa contractual."
+            )
+
+    # 3) Timestamp-based: tarifas para la EPS cargadas después del dictamen.
     if generado:
         from app.models.db import TarifaContratadaRecord
         candidatos = (

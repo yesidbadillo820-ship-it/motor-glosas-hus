@@ -103,6 +103,86 @@ def transicionar_glosa(
     }
 
 
+class ReabrirParaCorregirInput(BaseModel):
+    glosa_ids: list[int]
+    motivo: str = "Reabrir para corregir dictamen"
+
+
+@router.post("/reabrir-para-corregir")
+def reabrir_para_corregir(
+    data: ReabrirParaCorregirInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Reabre glosas en estado RESPONDIDA / CONCILIADA para que puedan ser
+    corregidas (re-analizadas con la IA) y luego volver a marcarse como
+    respondidas. Usado cuando el dictamen original quedó mal por error de
+    auditor o por falta de contrato cargado al momento.
+
+    No toca decision_eps ni los registros ya enviados a la EPS — solo
+    revierte el estado interno del workflow para permitir la corrección.
+    Máx 200 ids por llamada. Idempotente: las que no estaban en RESPONDIDA
+    ni CONCILIADA se ignoran.
+    """
+    if not data.glosa_ids:
+        raise HTTPException(400, "Lista de IDs vacía")
+    if len(data.glosa_ids) > 200:
+        raise HTTPException(400, "Máximo 200 glosas por reapertura")
+
+    repo = GlosaRepository(db)
+    estados_reabribles = {"RESPONDIDA", "CONCILIADA"}
+    resumen = {
+        "total": len(data.glosa_ids),
+        "reabiertas": 0,
+        "ya_no_estaban_cerradas": 0,
+        "fallidas": [],
+    }
+    nota = (data.motivo or "Reabrir para corregir dictamen")[:500]
+
+    for gid in data.glosa_ids:
+        glosa = repo.obtener_por_id(gid)
+        if not glosa:
+            resumen["fallidas"].append({"id": gid, "error": "no encontrada"})
+            continue
+        wf_actual = (glosa.workflow_state or "").upper()
+        est_actual = (glosa.estado or "").upper()
+        if wf_actual not in estados_reabribles and est_actual not in estados_reabribles:
+            resumen["ya_no_estaban_cerradas"] += 1
+            continue
+        # Revertir a RADICADA — no usamos WorkflowService.transicionar
+        # porque la transición RESPONDIDA → RADICADA no está en el grafo
+        # válido. Lo hacemos directamente con auditoría explícita.
+        glosa.workflow_state = "RADICADA"
+        if est_actual in estados_reabribles:
+            glosa.estado = "RADICADA"
+        glosa.nota_workflow = nota
+        resumen["reabiertas"] += 1
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Error al guardar: {e}")
+
+    # Auditoría: una sola entrada agregada
+    try:
+        from app.repositories.audit_repository import AuditRepository
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="REABRIR_PARA_CORREGIR",
+            tabla="historial",
+            detalle=(
+                f"total={resumen['total']} reabiertas={resumen['reabiertas']} "
+                f"motivo='{nota[:100]}'"
+            ),
+        )
+    except Exception:
+        pass
+
+    return resumen
+
+
 @router.post("/transicionar-lote")
 def transicionar_lote(
     data: WorkflowTransicionLote,
