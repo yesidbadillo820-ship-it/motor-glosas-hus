@@ -9053,6 +9053,7 @@ async function responderGlosa(id){
             + '</div>'
             + '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'
             + '<button class="btn-sm btn-primary" onclick="reanalizarConIA(' + g.id + ')" title="Genera el dictamen con la IA usando los datos del expediente">🧠 ' + (_esRequiereSoportes ? 'Analizar ahora' : 'Re-analizar con IA') + '</button>'
+            + (_esRequiereSoportes ? '' : '<button class="btn-sm ghost" onclick="refinarDictamenPrevio(' + g.id + ')" title="Pedile a la IA que ajuste tono, agregue una norma, acorte, etc. — sin re-analizar todo">✨ Refinar</button>')
             + (_esRequiereSoportes ? '' : '<button class="btn-sm ghost" onclick="copiarDictamenActual()">Copiar texto</button>')
             + '</div>'
             + '</div>'
@@ -9110,6 +9111,44 @@ async function reanalizarConIA(glosaId){
     else alert('Error: ' + e.message);
   }finally{
     if(typeof hideLoading === 'function') hideLoading();
+  }
+}
+
+// Refinar el dictamen ya guardado — usa el endpoint /refinar
+// (no reanaliza desde cero, solo ajusta lo que pidas).
+async function refinarDictamenPrevio(glosaId){
+  if(!glosaId){ toast('Sin glosa','No se identificó la glosa','warning'); return; }
+  var ejemplos = (
+    'Ejemplos:\n' +
+    ' • acorta el segundo párrafo\n' +
+    ' • tono más firme\n' +
+    ' • agrega cita al Decreto 4747 de 2007 art. 20\n' +
+    ' • cita también la Sentencia T-760 de 2008\n' +
+    ' • simplifica el lenguaje técnico'
+  );
+  var msg = prompt('🧠 Refinar dictamen con IA\n\nEscribí qué querés cambiar:\n\n' + ejemplos, '');
+  if(msg === null) return;
+  msg = (msg || '').trim();
+  if(msg.length < 3){ toast('Instrucción muy corta','Escribí al menos unas palabras','warning'); return; }
+  toast('Refinando','La IA está ajustando el dictamen… ~15s','info');
+  try{
+    var r = await fetch('/glosas/' + glosaId + '/refinar', {
+      method:'POST',
+      headers:{...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({mensaje: msg, guardar: true}),
+    });
+    var d = await r.json();
+    if(!r.ok){ toast('Error', d.detail || 'No se pudo refinar', 'error'); return; }
+    // Actualizar el cuerpo del dictamen previo en pantalla
+    var body = document.getElementById('dictamen-previo-body');
+    if(body){
+      body.innerHTML = d.dictamen_html;
+      body.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    if(lastResult) lastResult.dictamen = d.dictamen_html;
+    toast('Dictamen actualizado', 'Cambios guardados ✓', 'success');
+  }catch(e){
+    toast('Error de red', e.message, 'error');
   }
 }
 
