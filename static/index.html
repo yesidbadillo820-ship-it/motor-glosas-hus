@@ -8381,7 +8381,7 @@ function _renderMisGlosas(dataRaw){
         '<td class="cell-center" style="font-weight:700" title="Días hábiles entre fecha de radicación de la factura y fecha del documento DGH">' + (g.dias_radicacion_dgh != null ? g.dias_radicacion_dgh : (g.dias_restantes || 0)) + '</td>' +
         '<td>' + wfChip + apChip + '</td>' +
         '<td><span class="chip ' + semCls + '">' + (g.prioridad || '—') + '</span></td>' +
-        '<td class="cell-center">' + acciones + '</td>' +
+        '<td class="cell-center"><div style="display:inline-flex;gap:.35rem;align-items:center;justify-content:center;flex-wrap:nowrap">' + acciones + '</div></td>' +
         '</tr>';
     }).join('');
     actualizarContadorLote();
