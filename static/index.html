@@ -9065,6 +9065,23 @@ async function responderGlosa(id){
                 ? '💡 Subí los soportes PDF al formulario de la izquierda y luego dale "🧠 Analizar ahora".'
                 : '💡 Si el dictamen está OK no hace falta re-analizar. Solo presioná "Re-analizar con IA" si querés cambiar tono, agregar PDFs nuevos, o refinar argumentos.')
             + '</div>'
+            // Botón "Marcar factura como RESPONDIDA" — solo si NO está ya respondida
+            // y NO requiere soportes. Permite cerrar la glosa sin re-analizar.
+            + (function(){
+                var estadoUp = (g.estado || '').toUpperCase();
+                var wfUp = (g.workflow_state || '').toUpperCase();
+                var yaCerrada = ['RESPONDIDA','CONCILIADA','LEVANTADA','RATIFICADA','ACEPTADA'].indexOf(estadoUp) !== -1
+                             || ['RESPONDIDA','CONCILIADA','LEVANTADA'].indexOf(wfUp) !== -1;
+                if(_esRequiereSoportes) return '';
+                if(yaCerrada){
+                  return '<div style="margin-top:1rem;padding:.7rem 1rem;background:#ecfdf5;border:1px solid #10b981;border-radius:8px;color:#065f46;font-size:.8rem;font-weight:600">✓ Esta glosa ya está marcada como ' + (estadoUp || wfUp) + '. No hace falta volver a marcarla.</div>';
+                }
+                var fact = (g.factura || '').replace(/'/g, "\\'");
+                return '<div style="margin-top:1rem;padding:14px 16px;background:#ecfdf5;border:2px solid #10b981;border-radius:10px;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap">'
+                  + '<button type="button" onclick="marcarFacturaRespondida(' + g.id + ',\'' + fact + '\',this)" style="padding:.55rem 1.1rem;background:#10b981;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;box-shadow:0 2px 6px rgba(16,185,129,.3)">✅ Marcar factura como RESPONDIDA</button>'
+                  + '<span style="font-size:.78rem;color:#065f46;flex:1;min-width:200px">Se moverá a la bandeja <b>Respondidas</b> en Mis glosas. El dictamen ya está guardado.</span>'
+                  + '</div>';
+              })()
             + '</div>';
           area.innerHTML = html + (area.innerHTML || '');
         }
