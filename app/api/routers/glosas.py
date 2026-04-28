@@ -1139,6 +1139,7 @@ async def generar_lote(
         "saltadas": 0,
         "fallidas": 0,
         "detalle_fallidas": [],
+        "detalle_saltadas": [],
     }
 
     async def _procesar_una(gid: int):
@@ -1150,6 +1151,7 @@ async def generar_lote(
                 return
             if g.dictamen and not data.sobrescribir:
                 resumen["saltadas"] += 1
+                resumen["detalle_saltadas"].append({"id": gid, "razon": "ya_tiene_dictamen"})
                 return
             # Construir input desde los campos del registro
             texto = g.texto_glosa_original or ""

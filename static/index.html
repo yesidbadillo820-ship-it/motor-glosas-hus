@@ -1893,7 +1893,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
         <div class="bulk-bar" id="bulk-bar" style="display:none">
           <span><b id="bulk-count">0</b> glosas seleccionadas</span>
-          <label class="bulk-chk"><input type="checkbox" id="bulk-sobrescribir"/> Regenerar aunque ya tengan respuesta</label>
+          <label class="bulk-chk"><input type="checkbox" id="bulk-sobrescribir"/> Regenerar aunque ya tengan dictamen</label>
           <button class="btn btn-primary" onclick="generarRespuestasLote()">Generar respuestas en lote</button>
           <!-- Sprint #4: marcar decisión EPS en lote -->
           <button class="btn" style="background:#16a34a;color:#fff;border:0" onclick="decisionEpsLote('LEVANTADA')" title="La EPS levantó (aceptó nuestra defensa) las glosas seleccionadas">✅ Marcar LEVANTADAS</button>
@@ -8529,11 +8529,12 @@ function limpiarSeleccionLote(){
   actualizarContadorLote();
 }
 
-async function generarRespuestasLote(){
-  var ids = _idsSeleccionados();
+async function generarRespuestasLote(idsForzados, forzarSobrescribir){
+  var ids = Array.isArray(idsForzados) && idsForzados.length ? idsForzados.slice() : _idsSeleccionados();
   if(!ids.length){ toast('Nada seleccionado','Marca al menos una glosa','warning'); return; }
   if(ids.length > 100){ toast('Demasiadas','Máximo 100 por lote','warning'); return; }
-  var sobre = document.getElementById('bulk-sobrescribir') && document.getElementById('bulk-sobrescribir').checked;
+  var sobre = forzarSobrescribir === true
+    || (document.getElementById('bulk-sobrescribir') && document.getElementById('bulk-sobrescribir').checked);
   var segs = Math.max(10, Math.ceil(ids.length * 2.5));
   if(!confirm('⚡ Procesamiento en lote\n\n' +
     '• ' + ids.length + ' glosa(s) seleccionadas\n' +
@@ -8555,7 +8556,7 @@ async function generarRespuestasLote(){
     var d = await r.json();
     _bulkOcultarProgreso();
     if(!r.ok){ toast('Error', d.detail || 'Error en lote', 'error'); return; }
-    _bulkMostrarResultado(d);
+    _bulkMostrarResultado(d, sobre);
     limpiarSeleccionLote();
     loadMisGlosas();
   }catch(e){
@@ -8594,18 +8595,47 @@ function _bulkOcultarProgreso(){
   var el = document.getElementById('bulk-progress');
   if(el) el.remove();
 }
-function _bulkMostrarResultado(d){
-  var tieneFallos = (d.fallidas || 0) > 0;
-  var bg = tieneFallos ? '#fef3c7' : '#dcfce7';
-  var border = tieneFallos ? '#f59e0b' : '#10b981';
-  var icono = tieneFallos ? '⚠️' : '✅';
+function _bulkMostrarResultado(d, eraSobrescribir){
+  var procesadas = d.procesadas || 0;
+  var saltadas = d.saltadas || 0;
+  var fallidas = d.fallidas || 0;
+  var tieneFallos = fallidas > 0;
+  var nadaProcesado = procesadas === 0 && saltadas > 0 && !tieneFallos;
+  var saltadasPorDictamen = Array.isArray(d.detalle_saltadas)
+    ? d.detalle_saltadas.filter(function(s){ return s.razon === 'ya_tiene_dictamen'; })
+    : [];
+  var todasSaltadasPorDictamen = nadaProcesado
+    && saltadasPorDictamen.length === saltadas
+    && !eraSobrescribir;
+
+  var bg, border, icono;
+  if(todasSaltadasPorDictamen){ bg = '#fef9c3'; border = '#ca8a04'; icono = 'ℹ️'; }
+  else if(tieneFallos){ bg = '#fef3c7'; border = '#f59e0b'; icono = '⚠️'; }
+  else { bg = '#dcfce7'; border = '#10b981'; icono = '✅'; }
+
   var html = ''
     + '<div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:10px;">' + icono + ' Lote finalizado</div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">'
-    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#059669;">' + (d.procesadas||0) + '</div><div style="font-size:11px;color:#6b7280;">Procesadas</div></div>'
-    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6b7280;">' + (d.saltadas||0) + '</div><div style="font-size:11px;color:#6b7280;">Saltadas</div></div>'
-    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:' + (tieneFallos ? '#b91c1c' : '#6b7280') + ';">' + (d.fallidas||0) + '</div><div style="font-size:11px;color:#6b7280;">Fallidas</div></div>'
+    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#059669;">' + procesadas + '</div><div style="font-size:11px;color:#6b7280;">Procesadas</div></div>'
+    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6b7280;">' + saltadas + '</div><div style="font-size:11px;color:#6b7280;">Saltadas</div></div>'
+    +   '<div style="background:#fff;padding:10px;border-radius:8px;text-align:center;"><div style="font-size:22px;font-weight:700;color:' + (tieneFallos ? '#b91c1c' : '#6b7280') + ';">' + fallidas + '</div><div style="font-size:11px;color:#6b7280;">Fallidas</div></div>'
     + '</div>';
+
+  if(todasSaltadasPorDictamen){
+    var idsRegen = saltadasPorDictamen.map(function(s){ return s.id; });
+    window._bulkUltimosIdsSaltados = idsRegen;
+    html += '<div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px;font-size:12px;color:#78350f;margin-bottom:10px;line-height:1.5;">'
+         +  '<b>¿Por qué se saltaron?</b><br/>'
+         +  'Las ' + saltadas + ' glosa(s) ya tienen un dictamen generado previamente. '
+         +  'Marca <b>«Regenerar aunque ya tengan dictamen»</b> antes de lanzar el lote, '
+         +  'o usa el botón de abajo para regenerarlas ahora.'
+         +  '</div>';
+  } else if(saltadas > 0 && saltadasPorDictamen.length){
+    html += '<div style="font-size:12px;color:#6b7280;margin-bottom:8px;">'
+         +  saltadasPorDictamen.length + ' saltada(s) ya tenían dictamen previo.'
+         +  '</div>';
+  }
+
   if(tieneFallos && Array.isArray(d.detalle_fallidas) && d.detalle_fallidas.length){
     html += '<div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:6px;">Detalle de fallos:</div>'
          +  '<div style="max-height:180px;overflow-y:auto;background:#fff;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:11px;">';
@@ -8614,13 +8644,31 @@ function _bulkMostrarResultado(d){
     });
     html += '</div>';
   }
-  html += '<div style="text-align:right;margin-top:14px;"><button onclick="document.getElementById(\'bulk-result\').remove()" style="padding:8px 18px;background:' + border + ';color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600;">Cerrar</button></div>';
+
+  html += '<div style="text-align:right;margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">';
+  if(todasSaltadasPorDictamen){
+    html += '<button onclick="_bulkRegenerarSaltadas()" style="padding:8px 18px;background:#ca8a04;color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600;">⚡ Regenerar de todos modos</button>';
+  }
+  html += '<button onclick="document.getElementById(\'bulk-result\').remove()" style="padding:8px 18px;background:' + border + ';color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600;">Cerrar</button>'
+       +  '</div>';
+
   var el = document.createElement('div');
   el.id = 'bulk-result';
   el.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:' + bg + ';border:2px solid ' + border + ';padding:20px 26px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);z-index:5000;min-width:440px;max-width:560px;';
   el.innerHTML = html;
   document.body.appendChild(el);
-  setTimeout(function(){ var x=document.getElementById('bulk-result'); if(x && !tieneFallos) x.remove(); }, 8000);
+  // Solo auto-cierre cuando es éxito limpio (sin saltadas ni fallidas)
+  var cierreAuto = !tieneFallos && !todasSaltadasPorDictamen && saltadas === 0;
+  if(cierreAuto){
+    setTimeout(function(){ var x=document.getElementById('bulk-result'); if(x) x.remove(); }, 8000);
+  }
+}
+
+function _bulkRegenerarSaltadas(){
+  var ids = window._bulkUltimosIdsSaltados;
+  if(!Array.isArray(ids) || !ids.length){ toast('Nada que regenerar','','warning'); return; }
+  var el = document.getElementById('bulk-result'); if(el) el.remove();
+  generarRespuestasLote(ids, true);
 }
 
 // ─── WORKFLOW DE APROBACION ───────────────────────────────────────────────
