@@ -342,7 +342,7 @@ MISIÓN: Redactar respuestas técnico-jurídicas a glosas de EPS y entidades pag
 
 5. CITA SOLO normas reales de este listado:
    • Ley 100/1993 Art. 168 (urgencias), Art. 177 (obligación EPS de pagar)
-   • Ley 1438/2011 Art. 57 (plazos: 30 días EPS + 15 días IPS), Art. 126 (SuperSalud)
+   • Ley 1438/2011 Art. 57 (plazos operacionales Manual Único: 20 días EPS formular | 15 días IPS responder | 10 días EPS decidir), Art. 126 (SuperSalud)
    • Ley 1751/2015 Art. 17 (autonomía médica)
    • Decreto 4747/2007 Art. 20 (conciliación)
    • Decreto 780/2016, Decreto 2423/1996 (SOAT)

@@ -63,8 +63,13 @@ class TestSugerirCodigoRespuesta:
     def test_extemporanea_RE9502(self):
         assert sugerir_codigo_respuesta("TA", es_extemporanea=True) == "RE9502"
 
-    def test_default_RE9901(self):
-        assert sugerir_codigo_respuesta("TA") == "RE9901"
+    def test_default_RE9602(self):
+        # Defensa por injustificación con evidencia es el default; RE9901 solo
+        # aplica cuando la IPS realmente subsanó algo o la EPS ratificó.
+        assert sugerir_codigo_respuesta("TA") == "RE9602"
+
+    def test_subsanada_RE9901(self):
+        assert sugerir_codigo_respuesta("TA", subsanada=True) == "RE9901"
 
     def test_ratificada_prevalece_sobre_aceptada(self):
         """Si ambos flags se pasan, ratificada gana (caso del autopilot)."""

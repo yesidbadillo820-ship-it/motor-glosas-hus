@@ -255,7 +255,7 @@ CODIGOS_SA = {
 # ─── CÓDIGOS DE RESPUESTA (RE) ───────────────────────────────────────────
 CODIGOS_RESPUESTA = {
     "RE9501": "Devolución no procede por haberse generado fuera de los términos (extemporánea).",
-    "RE9502": "Glosa no procede por extemporánea — aceptación tácita de la factura (Art. 56 Ley 1438/2011).",
+    "RE9502": "Glosa no procede por extemporánea — aceptación tácita de la factura (Art. 57 Ley 1438/2011).",
     "RE9601": "Devolución injustificada al 100% (IPS aporta evidencia que lo demuestra).",
     "RE9602": "Glosa injustificada al 100% (IPS aporta evidencia que lo demuestra).",
     "RE9701": "Devolución/glosa aceptada al 100% por la IPS.",
@@ -312,15 +312,23 @@ def pertenece_a_tipo(codigo: str) -> str:
 def sugerir_codigo_respuesta(tipo_glosa: str, es_extemporanea: bool = False,
                               aceptada_parcial: bool = False,
                               aceptada_total: bool = False,
-                              ratificada: bool = False) -> str:
-    """Sugiere el código de respuesta correcto según la situación."""
+                              ratificada: bool = False,
+                              subsanada: bool = False) -> str:
+    """Sugiere el código de respuesta correcto según la situación.
+
+    Default: RE9602 (defensa por injustificación con evidencia).
+    RE9901 solo cuando hay subsanación efectiva o la EPS ratificó la glosa
+    y el flujo legal exige insistir en la respuesta inicial.
+    """
     if ratificada:
-        return "RE9901"  # mantener respuesta, solicitar conciliación
+        return "RE9901"
     if aceptada_total:
         return "RE9701"
     if aceptada_parcial:
         return "RE9801"
     if es_extemporanea:
         return "RE9502"
-    # Default: glosa no aceptada y subsanada
-    return "RE9901"
+    if subsanada:
+        return "RE9901"
+    # Default: defensa por injustificación con evidencia
+    return "RE9602"

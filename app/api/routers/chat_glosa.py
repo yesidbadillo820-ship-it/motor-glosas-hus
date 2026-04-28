@@ -109,10 +109,12 @@ def _respuesta_rapida(texto: str, glosa: GlosaRecord) -> str:
             )
     if "plazo" in t:
         return (
-            "Los plazos clave: IPS tiene 15 días hábiles para responder una "
-            "glosa (Art. 56 Ley 1438/2011). EPS tiene 30 días para "
-            "pronunciarse sobre la respuesta (Art. 57). Pasado ese plazo sin "
-            "respuesta, opera el silencio favorable al prestador."
+            "Plazos del Art. 57 Ley 1438/2011 operacionalizados por el "
+            "Manual Único (Res. 2284/2023): la EPS tiene 20 días hábiles "
+            "para formular la glosa, la IPS 15 días hábiles para responder, "
+            "y la EPS 10 días hábiles para pronunciarse sobre la respuesta. "
+            "Pasado ese plazo sin respuesta, opera el silencio favorable al "
+            "prestador (levantamiento tácito)."
         )
     if "silencio" in t:
         return (

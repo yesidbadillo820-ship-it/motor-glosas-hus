@@ -1179,7 +1179,9 @@ async def generar_lote(
                 res = await service.analizar(gi, contexto_pdf="", contratos_db=contratos, few_shots=[p.argumento for p in pg])
                 if pg:
                     marcar_usos(db, [p.id for p in pg])
+                from datetime import datetime, timezone as _tz
                 g.dictamen = res.dictamen
+                g.dictamen_generado_en = datetime.now(_tz.utc)
                 g.score = res.score
                 g.modelo_ia = res.modelo_ia
                 if not g.codigo_respuesta:
@@ -1265,7 +1267,9 @@ async def refinar_dictamen_endpoint(
         )
 
     if data.guardar:
+        from datetime import datetime, timezone as _tz
         glosa.dictamen = nuevo_html
+        glosa.dictamen_generado_en = datetime.now(_tz.utc)
         db.commit()
         AuditRepository(db).registrar(
             usuario_email=current_user.email,
@@ -1892,27 +1896,15 @@ def glosas_por_factura(
         return {"numero_factura": "", "glosas": []}
 
     def _nombre_corto_entidad(plan_eps: str, tercero: str = "") -> str:
-        """Devuelve el nombre corto de la entidad:
-          1. tercero_nombre si existe (FacturaCartera.Tercero.NombreCompletoNA).
-          2. sino: último segmento del plan EPS tras " - " / " — " / " – ".
-          Ej: "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO
-               BUCARAMANG" → "DISPENSARIO MEDICO BUCARAMANG".
+        """Wrapper sobre `pagador_normalizer.nombre_corto` con preferencia
+        por `tercero_nombre` (FacturaCartera.Tercero.NombreCompletoNA).
+        El normalizador también repara truncamientos como BUCARAMANG → BUCARAMANGA.
         """
-        t = (tercero or "").strip()
+        from app.services import pagador_normalizer
+        t = pagador_normalizer.nombre_corto(tercero)
         if t:
             return t
-        p = (plan_eps or "").strip()
-        if not p:
-            return ""
-        # Separar por guiones largos o cortos rodeados de espacios
-        import re as _rex
-        partes = _rex.split(r"\s+[-–—]\s+", p)
-        # Filtrar códigos tipo "U220311" (solo letras+digitos cortos) al inicio
-        filtradas = [x.strip() for x in partes if x.strip()]
-        if len(filtradas) >= 2:
-            # Último segmento suele ser el nombre comercial
-            return filtradas[-1]
-        return p
+        return pagador_normalizer.nombre_corto(plan_eps)
 
     glosas_padre = (
         db.query(_GR)
@@ -2907,6 +2899,8 @@ def obtener_glosa(
     glosa = repo.obtener_por_id(glosa_id)
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
+    from app.services.dictamen_stale import motivo_stale
+    aviso_stale = motivo_stale(glosa, db)
     return {
         "id": glosa.id,
         "eps": glosa.eps,
@@ -2917,6 +2911,9 @@ def obtener_glosa(
         "etapa": glosa.etapa,
         "estado": glosa.estado,
         "dictamen": glosa.dictamen,
+        "dictamen_generado_en": glosa.dictamen_generado_en.isoformat() if getattr(glosa, "dictamen_generado_en", None) else None,
+        "dictamen_stale": bool(aviso_stale),
+        "dictamen_stale_motivo": aviso_stale,
         "dias_restantes": glosa.dias_restantes,
         "factura": glosa.factura,
         "numero_radicado": glosa.numero_radicado,
@@ -3805,7 +3802,9 @@ async def reanalizar_glosa(
     resultado = await service.analizar(glosa_input, "", contratos)
 
     # Sobreescribir dictamen + metadata. NO crear nueva fila.
+    from datetime import datetime, timezone as _tz
     glosa.dictamen = resultado.dictamen
+    glosa.dictamen_generado_en = datetime.now(_tz.utc)
     glosa.tipo_analisis = resultado.tipo if hasattr(glosa, "tipo_analisis") else None
     glosa.modelo_ia = resultado.modelo_ia
     if hasattr(glosa, "score"):

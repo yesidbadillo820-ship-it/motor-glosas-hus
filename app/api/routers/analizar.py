@@ -417,10 +417,12 @@ async def _persistir_y_responder(
 
     if existente:
         # UPDATE de la fila existente — sobreescribe dictamen y campos.
+        from datetime import datetime, timezone as _tz
         existente.valor_objetado = val_obj
         existente.valor_aceptado = val_ac
         existente.estado = estado
         existente.dictamen = dictamen_final
+        existente.dictamen_generado_en = datetime.now(_tz.utc)
         existente.dias_restantes = resultado.dias_restantes
         existente.modelo_ia = resultado.modelo_ia
         existente.score = resultado.score

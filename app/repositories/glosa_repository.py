@@ -68,6 +68,7 @@ class GlosaRepository:
         fecha_recepcion=None,
         fecha_entrega=None,
     ) -> GlosaRecord:
+        from datetime import datetime, timezone as _tz
         record = GlosaRecord(
             eps=eps,
             paciente=paciente,
@@ -77,6 +78,7 @@ class GlosaRepository:
             etapa=etapa,
             estado=estado,
             dictamen=dictamen,
+            dictamen_generado_en=(datetime.now(_tz.utc) if dictamen else None),
             dias_restantes=dias_restantes,
             modelo_ia=modelo_ia,
             request_id=request_id,

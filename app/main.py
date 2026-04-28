@@ -237,6 +237,8 @@ async def lifespan(app: FastAPI):
         ("fecha_nota_credito", "TIMESTAMP WITH TIME ZONE"),
         ("valor_nota_credito", "DOUBLE PRECISION DEFAULT 0"),
         ("nota_credito_observacion", "TEXT"),
+        # Stale-detection del dictamen vs tarifas/contratos cargados después.
+        ("dictamen_generado_en", "TIMESTAMP WITH TIME ZONE"),
     ]
     for col_name, col_ddl in _HISTORIAL_MISSING_COLUMNS:
         try:
@@ -609,7 +611,7 @@ Sistema automatizado de defensa de glosas médicas con asistencia de IA.
 
 ### Funcionalidades
 - **Análisis automático** de glosas mediante Groq/Anthropic
-- **Detección de extemporaneidad** (20 días hábiles - Art. 56 Ley 1438/2011)
+- **Detección de extemporaneidad** (20 días hábiles - Art. 57 Ley 1438/2011 + Manual Único Res. 2284/2023)
 - **Plantillas especializadas** por tipo de glosa
 - **Gestión de contratos** EPS con tarifas específicas
 - **Historial y métricas** de glosas
@@ -621,7 +623,7 @@ Obtener token en `/api/auth/login`.
 ### Códigos de Respuesta (Resolución 3047/2008 - Normativa Colombiana)
 | Código | Descripción |
 |--------|-------------|
-| RE9502 | Glosa no procede - Aceptación tácita de la factura (Art. 56 Ley 1438/2011) |
+| RE9502 | Glosa no procede - Aceptación tácita de la factura (Art. 57 Ley 1438/2011) |
 | RE9602 | Glosa Injustificada - Aporta evidencia de que la glosa es injustificada al 100% |
 | RE9701 | Devolución aceptada al 100% |
 | RE9702 | Glosa aceptada al 100% |
