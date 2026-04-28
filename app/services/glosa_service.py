@@ -148,14 +148,15 @@ FERIADOS_CO = [
     "2028-11-06","2028-11-13","2028-12-08","2028-12-25",
 ]
 
-# PLAZO LEGAL: 20 días hábiles según Art. 56 Ley 1438 de 2011
-# Las glosas extemporáneas son improcedentes, abusivas y no deben disminuir el pago a las IPS
+# PLAZO LEGAL: 20 días hábiles para que la EPS formule la glosa (Art. 57 Ley 1438/2011
+# operacionalizado por Decreto 4747/2007 + Res. 3047/2008 + criterio institucional HUS).
+# Las glosas extemporáneas son improcedentes, abusivas y no deben disminuir el pago a las IPS.
 DIAS_HABILES_LIMITE_EXTEMPORANEA = 20
 
 NORMATIVA_COLOMBIA = """
 NORMATIVA APLICABLE:
 - Ley 100 de 1993: Sistema de Seguridad Social Integral (Art. 168 - Urgencias)
-- Ley 1438 de 2011: Reforma al Sistema de Salud (Artículo 56 - Plazo 20 días hábiles para glosas)
+- Ley 1438 de 2011: Reforma al Sistema de Salud (Artículo 57 - Trámite de glosas; plazos: 20 días EPS formular | 15 días IPS responder | 10 días EPS decidir)
 - Ley 1751 de 2015: Ley Estatutaria de Salud (Derecho fundamental a la salud)
 - Ley 1122 de 2007: Flujo de recursos entre EPS e IPS (Art. 13)
 - Decreto 4747 de 2007: Regulaciones sobre glosas y devoluciones (Art. 20 - Conciliación)
@@ -185,7 +186,7 @@ ESTRATEGIAS_TIPO = {
 - Mencionar que la EPS no puede aplicar descuentos unilaterales sin sustento
 - El IPC es un referente NO una obligación para la IPS
 - Si hay incremento institucional debidamente aprobado, citar acto administrativo""",
-    "SO_SOPORTES": "ESTRATEGIA SOPORTES: Historia clínica es plena prueba según Res. 1995/1999. Documentos cumplen norma. EPS tuvo 20 días hábiles para objetar (Art. 56 Ley 1438/2011).",
+    "SO_SOPORTES": "ESTRATEGIA SOPORTES: Historia clínica es plena prueba según Res. 1995/1999. Documentos cumplen norma. EPS tuvo 20 días hábiles para objetar (Art. 57 Ley 1438/2011).",
     "AU_AUTORIZACION": "ESTRATEGIA AUTORIZACIÓN: Atención por urgencia vital. No requiere autorización previa. Art. 168 Ley 100/1993 y Resolución 5269/2017.",
     "CO_COBERTURA": "ESTRATEGIA COBERTURA: Servicio dentro del Plan de Beneficios en Salud (Res. 5269/2017). EPS tiene obligación de pago. No hay exclusiones.",
     "CL_PERTINENCIA": "ESTRATEGIA PERTINENCIA: Autonomía médica protegida por Art. 17 Ley 1751/2015. Criterio del médico tratante prevalece. Historia clínica soporta la decisión.",
@@ -193,7 +194,7 @@ ESTRATEGIAS_TIPO = {
     "FA_FACTURACION": "ESTRATEGIA FACTURACIÓN: Error formal no es causal de glosa (Circular 030/2013). Los errores formales son subsanables. La prestación del servicio genera obligación de pago.",
     "IN_INSUMOS": "ESTRATEGIA INSUMOS: Inherentes al acto médico. Se facturan al costo de adquisición más porcentaje administrativo pactado. Factura de compra disponible como soporte.",
     "ME_MEDICAMENTOS": "ESTRATEGIA MEDICAMENTOS: Dispensados bajo fórmula médica. Plan de Beneficios los incluye (Res. 5269/2017). No existe alternativa terapéutica equivalente.",
-    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Glosa improcedente por extemporaneidad. Art. 56 Ley 1438/2011 establece 20 días hábiles. EPS perdió el derecho a glosar. Estas glosas son abusivas y no pueden disminuir el pago a la IPS."
+    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Glosa improcedente por extemporaneidad. Art. 57 Ley 1438/2011 + Decreto 4747/2007 establecen 20 días hábiles para formular glosas. EPS perdió el derecho a glosar. Estas glosas son abusivas y no pueden disminuir el pago a la IPS."
 }
 
 CODIGOS_GLOSA = {
@@ -722,7 +723,7 @@ class GlosaService:
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
                 dias = self._calcular_dias_habiles(str(data.fecha_radicacion), str(data.fecha_recepcion))
-                # PLAZO LEGAL: 20 días hábiles según Art. 56 Ley 1438/2011
+                # PLAZO LEGAL: 20 días hábiles para que la EPS formule glosa (Art. 57 Ley 1438/2011 + Dec. 4747/2007)
                 es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
                 msg_tiempo = (
                     f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES - LÍMITE: {DIAS_HABILES_LIMITE_EXTEMPORANEA})"
@@ -833,6 +834,13 @@ class GlosaService:
         # Ratificación tiene prioridad sobre extemporaneidad: si ya pasamos por
         # respuesta inicial y la EPS ratificó, el flujo legal es ratificación,
         # NO aceptación tácita.
+        # Selección RE según Manual Único (Res. 2284/2023):
+        #   RE9702 → IPS acepta 100%; RE9801 → IPS acepta parcial y subsana
+        #   RE9502 → glosa extemporánea (aceptación tácita Art. 57 Ley 1438)
+        #   RE9602 → defensa por injustificación (IPS aporta evidencia)
+        #   RE9901 → glosa ratificada por EPS y respondida con subsanación
+        # Importante: RE9901 implica subsanación efectiva. Si la IPS solo defiende
+        # con argumento jurídico sin subsanar nada, el código correcto es RE9602.
         if modo_resp == "aceptar_total":
             cod_res, desc_res = "RE9702", "GLOSA ACEPTADA AL 100% POR EL PRESTADOR"
         elif modo_resp == "aceptar_parcial":
@@ -840,11 +848,9 @@ class GlosaService:
         elif es_ratificacion:
             cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
         elif es_extemporanea:
-            cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 56 Ley 1438/2011)"
-        elif es_tarifa and not tiene_contrato:
-            cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
+            cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 57 Ley 1438/2011)"
         else:
-            cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
+            cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
 
         plantilla = obtener_plantilla_por_codigo(codigo_det)
         usa_plantilla = plantilla is not None

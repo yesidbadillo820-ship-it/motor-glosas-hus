@@ -24,6 +24,11 @@ class GlosaRecord(Base):
     etapa = Column(String)
     estado = Column(String, index=True)
     dictamen = Column(Text)
+    # Timestamp del último guardado del dictamen. Se usa para detectar
+    # dictámenes stale tras cargar tarifas/contratos nuevos: si una tarifa
+    # relevante se cargó después de `dictamen_generado_en`, la UI marca
+    # el dictamen como obsoleto y sugiere re-analizar.
+    dictamen_generado_en = Column(DateTime(timezone=True))
     dias_restantes = Column(Integer, default=0)
     modelo_ia = Column(String(100))
     workflow_state = Column(String(50), default="RADICADA")
