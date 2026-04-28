@@ -175,6 +175,45 @@ def calcular_valor_pactado(tarifa: TarifaContratadaRecord, valor_soat_base: floa
     return round(valor_soat_base * (1 + factor / 100.0), 2)
 
 
+# Frases en el motivo de la glosa que indican que la EPS está cuestionando
+# la EXISTENCIA del contrato (no un cálculo de diferencia). Cuando se
+# detectan, NO conviene aceptar parcial aunque haya sobrecargo HUS — la
+# defensa correcta es defender íntegro porque el motivo de la EPS es falso,
+# y ajustar el sobrecargo internamente con nota crédito.
+_FRASES_CUESTIONA_CONTRATO = (
+    "NO HAY CONTRATO",
+    "NO EXISTE CONTRATO",
+    "SIN CONTRATO",
+    "AUSENCIA DE CONTRATO",
+    "MAYOR VALOR COBRADO",
+    "TARIFA NO PACTADA",
+    "SIN PACTO",
+    "NO SE RECONOCE",
+    "NO PROCEDE",
+    "FUERA DEL CONTRATO",
+    "NO CONTEMPLADO",
+    "NO INCLUIDO",
+    "EXCEDE EL CONTRATO",
+)
+
+
+def _motivo_cuestiona_contrato(motivo_glosa: str) -> bool:
+    """True si el motivo de la EPS niega la existencia/aplicación del contrato.
+
+    En estos casos la respuesta correcta NO es aceptar parcial el sobrecargo —
+    es defender íntegro porque el argumento de la EPS es falso. El sobrecargo
+    interno del HUS se corrige con nota crédito al expediente, no a la glosa.
+    """
+    if not motivo_glosa:
+        return False
+    import re
+    import unicodedata
+    nfkd = unicodedata.normalize("NFKD", motivo_glosa)
+    sin_dia = "".join(c for c in nfkd if not unicodedata.combining(c))
+    txt = re.sub(r"\s+", " ", sin_dia).upper()
+    return any(f in txt for f in _FRASES_CUESTIONA_CONTRATO)
+
+
 def _recomendacion(
     valor_facturado: float,
     valor_pactado: float,
@@ -183,12 +222,16 @@ def _recomendacion(
     es_soat_pct: bool = False,
     factor_pct: float = 0.0,
     valor_reconocido: float = 0.0,
+    motivo_glosa: str = "",
 ) -> dict:
     """Compara facturado vs pactado y sugiere acción.
 
     Reglas VALOR_FIJO:
       - facturado == pactado (±$1) → glosa INJUSTIFICADA (defender 100%)
       - facturado > pactado, diferencia cabe en objetado → aceptar parcial
+        EXCEPTO si el motivo de la glosa cuestiona el CONTRATO (ej. "no hay
+        contrato", "mayor valor cobrado") — en ese caso defender íntegro
+        + ajuste interno con nota crédito.
       - facturado < pactado → defender (cobró menos del pactado)
       - diferencia excede objetado → revisar manualmente
 
@@ -200,6 +243,7 @@ def _recomendacion(
         discrepancia es sobre la tarifa SOAT oficial del CUPS).
     """
     tolerancia = 1.0
+    cuestiona_contrato = _motivo_cuestiona_contrato(motivo_glosa)
 
     # Rama SOAT_PORCENTAJE: siempre inferir SOAT base implícito de HUS y EPS
     # desde los valores facturado/reconocido, y explicar la discrepancia.
@@ -281,6 +325,28 @@ def _recomendacion(
         valor_a_defender = max(0.0, valor_objetado - valor_a_aceptar) if valor_objetado > 0 else 0.0
         cabe_en_objetado = valor_objetado > 0 and diferencia_abs <= valor_objetado + tolerancia
         if cabe_en_objetado:
+            # Si el motivo de la EPS cuestiona la EXISTENCIA del contrato
+            # (no un cálculo), aceptar parcial valida el argumento falso.
+            # Mejor defender íntegro y registrar nota crédito INTERNA del HUS
+            # por el sobrecargo (no se cede a la glosa).
+            if cuestiona_contrato:
+                return {
+                    "accion": "DEFENDER_TOTAL_AJUSTE_INTERNO",
+                    "titulo": "🛡 Defender íntegro + ajuste interno (no ceder al argumento EPS)",
+                    "razon": (
+                        f"La EPS objeta ${valor_objetado:,.0f} alegando que NO hay "
+                        f"contrato pactado, pero el catálogo SÍ tiene tarifa para "
+                        f"este CUPS (${valor_pactado:,.0f}). Aceptar parcial validaría "
+                        f"el argumento falso de la EPS. Defender íntegros los "
+                        f"${valor_objetado:,.0f}; el sobrecargo interno HUS de "
+                        f"${diferencia_abs:,.0f} se ajusta con nota crédito al "
+                        f"expediente, NO se cede a la glosa."
+                    ),
+                    "valor_a_defender": valor_objetado,
+                    "valor_a_aceptar": 0.0,
+                    "diferencia": diferencia_abs,
+                    "ajuste_interno_sugerido": diferencia_abs,
+                }
             return {
                 "accion": "ACEPTAR_PARCIAL",
                 "titulo": "⚠️ Aceptar parcial por la diferencia",
@@ -330,6 +396,7 @@ def evaluar_glosa_tarifa(
     valor_objetado: float = 0.0,
     valor_soat_base: float = 0.0,
     valor_reconocido: float = 0.0,
+    motivo_glosa: str = "",
 ) -> dict:
     """Evalúa una glosa TA contra la tarifa pactada.
 
@@ -382,6 +449,7 @@ def evaluar_glosa_tarifa(
         es_soat_pct=es_soat_pct,
         factor_pct=factor_pct,
         valor_reconocido=valor_reconocido,
+        motivo_glosa=motivo_glosa,
     )
 
     # Ronda 45: detectar si el match fue por homologación (el cups del auditor
@@ -466,6 +534,7 @@ def pre_lookup_tarifa(
             valor_facturado=_vp_fact,
             valor_objetado=0.0,
             valor_reconocido=vals_pre.get("reconocido", 0.0),
+            motivo_glosa=tabla_excel or "",
         )
         if info.get("encontrada"):
             return info

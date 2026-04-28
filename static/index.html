@@ -7414,8 +7414,140 @@ async function cargarAsistenteFicha(glosaId){
           '</div>'+
         '</div>'+
         pbHtml +
+        '<div id="ficha-extras-row" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.85rem;padding-top:.85rem;border-top:1px dashed var(--border)">'+
+          '<button class="btn-sm" onclick="cargarMiEstilo('+d.glosa_id+',\''+(d.codigo_glosa||'')+'\',\''+(d.eps||'').replace(/\'/g,"\\'")+'\')" style="background:#fef3c7;color:#78350f;border:1px solid #fde68a;padding:.35rem .7rem;border-radius:7px;font-size:.75rem;cursor:pointer">💭 Tu estilo</button>'+
+          '<button class="btn-sm" onclick="cargarPerfilEps(\''+(d.eps||'').replace(/\'/g,"\\'")+'\')" style="background:#dbeafe;color:#1e3a8a;border:1px solid #bfdbfe;padding:.35rem .7rem;border-radius:7px;font-size:.75rem;cursor:pointer">📊 Perfil de la EPS</button>'+
+          '<button class="btn-sm" onclick="cargarPreparadorConciliacion('+d.glosa_id+')" style="background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;padding:.35rem .7rem;border-radius:7px;font-size:.75rem;cursor:pointer">📞 Preparar conciliación</button>'+
+        '</div>'+
+        '<div id="ficha-extras-resultado" style="margin-top:.6rem"></div>'+
       '</div>';
   } catch(e){ console.error('Asistente ficha:', e); box.style.display = 'none'; }
+}
+
+// ─── Sprint 2.E: Tu estilo (memoria del gestor) ──────────────────────
+async function cargarMiEstilo(glosaId, codigoGlosa, eps){
+  var box = document.getElementById('ficha-extras-resultado');
+  if(!box) return;
+  box.innerHTML = '<div style="font-size:.78rem;color:var(--text3);padding:.5rem">Cargando tu estilo...</div>';
+  try{
+    var qs = [];
+    if(codigoGlosa) qs.push('codigo_glosa=' + encodeURIComponent(codigoGlosa));
+    if(eps) qs.push('eps=' + encodeURIComponent(eps));
+    var url = '/glosas/mi-estilo' + (qs.length ? '?' + qs.join('&') : '');
+    var r = await fetch(url, {headers: authH()});
+    var d = await r.json();
+    if(!r.ok || !d.n_refinamientos){
+      box.innerHTML = '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:.7rem .9rem;font-size:.78rem;color:#78350f">💭 Aún no tenés patrones detectados. Mientras refinás dictámenes con la IA, voy a ir aprendiendo tu estilo y aplicándolo automáticamente.</div>';
+      return;
+    }
+    var patronesCtx = d.patrones_contexto || [];
+    var patronesGlobal = d.patrones_globales || [];
+    var html = '<div style="background:linear-gradient(135deg,#fef9c3,#fef3c7);border:1px solid #fde68a;border-radius:10px;padding:.85rem 1rem">'+
+      '<div style="font-weight:700;color:#78350f;font-size:.85rem;margin-bottom:.5rem">💭 Tu estilo en este caso ('+ d.n_refinamientos +' refinamientos en 6 meses)</div>';
+    if(patronesCtx.length){
+      html += '<div style="font-size:.75rem;color:#92400e;margin-bottom:.4rem"><b>Para casos similares (' + escHtml(codigoGlosa||'?') + ' / ' + escHtml((eps||'?').slice(0,40)) + '):</b></div>';
+      patronesCtx.slice(0, 4).forEach(function(p){
+        html += '<div style="font-size:.75rem;color:#78350f;margin-left:.5rem;line-height:1.55">• ' + escHtml(p.hint) + ' <span style="color:#a16207">(' + p.veces + 'x)</span></div>';
+      });
+    } else if(patronesGlobal.length){
+      html += '<div style="font-size:.75rem;color:#92400e;margin-bottom:.4rem"><b>Tus patrones más comunes globales:</b></div>';
+      patronesGlobal.slice(0, 4).forEach(function(p){
+        html += '<div style="font-size:.75rem;color:#78350f;margin-left:.5rem;line-height:1.55">• ' + escHtml(p.hint) + ' <span style="color:#a16207">(' + p.veces + 'x)</span></div>';
+      });
+    }
+    html += '<div style="font-size:.7rem;color:#a16207;margin-top:.6rem;font-style:italic">La IA aplica estos patrones automáticamente al re-analizar.</div>'+
+      '</div>';
+    box.innerHTML = html;
+  }catch(e){ box.innerHTML = '<div style="color:#b91c1c;font-size:.78rem">Error: ' + escHtml(e.message) + '</div>'; }
+}
+
+// ─── Sprint 2.C: Perfil de la EPS ────────────────────────────────────
+async function cargarPerfilEps(eps){
+  var box = document.getElementById('ficha-extras-resultado');
+  if(!box) return;
+  box.innerHTML = '<div style="font-size:.78rem;color:var(--text3);padding:.5rem">Cargando perfil de la EPS...</div>';
+  try{
+    var r = await fetch('/glosas/stats/eps-perfil?eps=' + encodeURIComponent(eps), {headers: authH()});
+    var d = await r.json();
+    if(!r.ok || !d.items || !d.items.length){
+      box.innerHTML = '<div style="background:#dbeafe;border:1px solid #bfdbfe;border-radius:8px;padding:.7rem .9rem;font-size:.78rem;color:#1e3a8a">📊 Aún no hay suficientes glosas decididas con esta EPS para sacar un perfil. La data se irá llenando con cada decision_eps que registres.</div>';
+      return;
+    }
+    var p = d.items[0];
+    var tono = p.tono_recomendado || {};
+    var tonoColor = tono.tono === 'firme' ? '#b91c1c' : tono.tono === 'conciliador' ? '#15803d' : '#1d4ed8';
+    var html = '<div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:.95rem 1.1rem">'+
+      '<div style="font-weight:700;color:#1e3a8a;font-size:.9rem;margin-bottom:.55rem">📊 ' + escHtml(p.eps) + '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.5rem;margin-bottom:.6rem">'+
+        '<div style="background:#fff;padding:.5rem;border-radius:6px;text-align:center"><div style="font-size:1.1rem;font-weight:800;color:#15803d">' + p.tasa_pct + '%</div><div style="font-size:.65rem;color:var(--text3)">Levantamiento</div></div>'+
+        '<div style="background:#fff;padding:.5rem;border-radius:6px;text-align:center"><div style="font-size:1.1rem;font-weight:800;color:#1e3a8a">' + p.n_decididas + '</div><div style="font-size:.65rem;color:var(--text3)">Casos</div></div>'+
+        '<div style="background:#fff;padding:.5rem;border-radius:6px;text-align:center"><div style="font-size:.95rem;font-weight:800;color:#059669">' + cop(p.valor_recuperado) + '</div><div style="font-size:.65rem;color:var(--text3)">Recuperado</div></div>'+
+      '</div>'+
+      '<div style="background:' + tonoColor + ';color:#fff;padding:.5rem .75rem;border-radius:7px;font-size:.78rem;line-height:1.5;margin-bottom:.55rem">'+
+        '🎙 Tono recomendado: <b>' + (tono.tono||'').toUpperCase() + '</b> · <span style="opacity:.9">' + escHtml(tono.razon||'') + '</span>'+
+      '</div>';
+    if(p.codigos_top && p.codigos_top.length){
+      html += '<div style="font-size:.72rem;color:#1e3a8a;font-weight:700;margin-bottom:.3rem">Top códigos contra esta EPS:</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:.3rem">';
+      p.codigos_top.slice(0, 5).forEach(function(c){
+        var tasa = c.tasa_par_pct !== null ? c.tasa_par_pct.toFixed(0) + '%' : '—';
+        html += '<span style="background:#fff;border:1px solid #bfdbfe;padding:.2rem .55rem;border-radius:5px;font-size:.7rem;color:#1e3a8a">' + escHtml(c.codigo) + ' · ' + tasa + ' (' + c.n + ')</span>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    box.innerHTML = html;
+  }catch(e){ box.innerHTML = '<div style="color:#b91c1c;font-size:.78rem">Error: ' + escHtml(e.message) + '</div>'; }
+}
+
+// ─── Sprint 3.F: Preparador de conciliación ──────────────────────────
+async function cargarPreparadorConciliacion(glosaId){
+  var box = document.getElementById('ficha-extras-resultado');
+  if(!box) return;
+  box.innerHTML = '<div style="font-size:.78rem;color:var(--text3);padding:.5rem">Preparando audiencia...</div>';
+  try{
+    var r = await fetch('/glosas/' + glosaId + '/preparar-conciliacion', {headers: authH()});
+    var d = await r.json();
+    if(!r.ok || d.error){
+      box.innerHTML = '<div style="color:#b91c1c;font-size:.78rem">Error: ' + escHtml(d.error || 'no se pudo preparar') + '</div>';
+      return;
+    }
+    var s = d.estadistica_eps || {};
+    var patron = s.patron_eps || 'sin_datos';
+    var patronColor = patron === 'agresiva' ? '#b91c1c' : patron === 'negociadora' ? '#15803d' : '#a16207';
+    var patronEmoji = patron === 'agresiva' ? '⚔' : patron === 'negociadora' ? '🤝' : patron === 'indecisa' ? '⚖' : '❔';
+    var html = '<div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-radius:10px;padding:.95rem 1.1rem">'+
+      '<div style="font-weight:700;color:#5b21b6;font-size:.9rem;margin-bottom:.55rem">📞 Preparador de conciliación · ' + escHtml(d.codigo_glosa||'') + ' · ' + cop(d.valor_objetado) + '</div>'+
+      '<div style="background:' + patronColor + ';color:#fff;padding:.5rem .75rem;border-radius:7px;font-size:.78rem;line-height:1.5;margin-bottom:.6rem">'+
+        patronEmoji + ' Patrón EPS: <b>' + patron.toUpperCase() + '</b> · ' + (s.n_audiencias_previas||0) + ' audiencias previas · tasa ' + (s.tasa_levantamiento_pct !== null ? s.tasa_levantamiento_pct + '%' : 'sin datos')+
+      '</div>'+
+      '<div style="font-size:.78rem;color:#5b21b6;margin-bottom:.6rem;line-height:1.55"><b>Recomendación táctica:</b> ' + escHtml(d.recomendacion_tactica||'') + '</div>';
+    if(d.valor_minimo_aceptable > 0){
+      html += '<div style="background:#fef3c7;color:#78350f;padding:.4rem .7rem;border-radius:6px;font-size:.74rem;margin-bottom:.6rem">💵 Valor mínimo aceptable sugerido: <b>' + cop(d.valor_minimo_aceptable) + '</b></div>';
+    } else {
+      html += '<div style="background:#dcfce7;color:#166534;padding:.4rem .7rem;border-radius:6px;font-size:.74rem;margin-bottom:.6rem">✅ Sugerencia: defender íntegramente — no ceder.</div>';
+    }
+    if(d.contraargumentos && d.contraargumentos.length){
+      html += '<div style="font-size:.74rem;color:#5b21b6;font-weight:700;margin-bottom:.35rem">⚔ Contraargumentos probables de la EPS:</div>';
+      d.contraargumentos.forEach(function(c){
+        var freqColor = c.frecuencia_estimada === 'alta' ? '#b91c1c' : c.frecuencia_estimada === 'media' ? '#a16207' : '#6b7280';
+        html += '<div style="background:#fff;border:1px solid #ddd6fe;border-radius:7px;padding:.55rem .7rem;margin-bottom:.4rem">'+
+          '<div style="font-size:.74rem;color:#5b21b6;font-weight:700">' + escHtml(c.titulo||'') + ' <span style="color:' + freqColor + ';font-weight:400">(freq. ' + (c.frecuencia_estimada||'') + ')</span></div>'+
+          '<div style="font-size:.72rem;color:var(--text2);line-height:1.55;margin-top:.2rem">↳ ' + escHtml(c.respuesta_sugerida||'') + '</div>'+
+        '</div>';
+      });
+    }
+    if(d.normas_clave && d.normas_clave.length){
+      html += '<div style="font-size:.72rem;color:#5b21b6;font-weight:700;margin-top:.5rem;margin-bottom:.3rem">📚 Normas clave para la audiencia:</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:.3rem">';
+      d.normas_clave.forEach(function(n){
+        html += '<span style="background:#ede9fe;color:#5b21b6;padding:.2rem .5rem;border-radius:5px;font-size:.68rem">' + escHtml(n) + '</span>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    box.innerHTML = html;
+  }catch(e){ box.innerHTML = '<div style="color:#b91c1c;font-size:.78rem">Error: ' + escHtml(e.message) + '</div>'; }
 }
 
 // 🎯 R373: Quick Wins — glosas fáciles de ganar
@@ -8369,6 +8501,25 @@ async function loadMisGlosas(){
     setCount('mis-count-respondidas', countResp);
     setCount('mis-count-todas', data.length);
 
+    // Auto-piloto: clasificar todas las glosas para pintar badges.
+    try{
+      var ids = data.map(function(g){ return g.id; }).filter(Boolean);
+      if(ids.length){
+        var rApn = await fetch('/glosas/autopiloto-niveles', {
+          method:'POST',
+          headers: Object.assign({'Content-Type':'application/json'}, authH()),
+          body: JSON.stringify({glosa_ids: ids.slice(0, 300)}),
+        });
+        if(rApn.ok){
+          var dApn = await rApn.json();
+          window._autopiloto_niveles = {};
+          (dApn.items || []).forEach(function(it){
+            window._autopiloto_niveles[it.glosa_id] = it;
+          });
+        }
+      }
+    }catch(_){ window._autopiloto_niveles = {}; }
+
     // Asistente conversacional: saludo + tip del día contextual.
     try{
       var statsAsist = {
@@ -8440,6 +8591,15 @@ function _renderMisGlosas(dataRaw){
       var semCls = semChip[g.prioridad] || '';
       var wfEstado = g.workflow_state || 'BORRADOR';
       var wfChip = '<span class="chip" style="background:transparent;color:' + (wfColor[wfEstado]||'#6b7280') + ';border:1px solid ' + (wfColor[wfEstado]||'#6b7280') + '">' + wfEstado.replace('_', ' ') + '</span>';
+
+      // Sprint 3.D: badge auto-piloto graduado por confianza (mecánica /
+      // revisar / editar). Va antes del chip de workflow, con tooltip.
+      var apnInfo = (window._autopiloto_niveles || {})[g.id];
+      if(apnInfo){
+        var apnBg = apnInfo.color || '#6366f1';
+        var apnTooltip = (apnInfo.razon || '').replace(/"/g, '&quot;');
+        wfChip = '<span class="chip" title="' + apnTooltip + '" style="background:' + apnBg + ';color:#fff;border:0;margin-right:4px;font-size:.7rem">' + (apnInfo.icono||'') + ' ' + (apnInfo.etiqueta||'') + '</span>' + wfChip;
+      }
 
       // Ronda 29: chip autopilot al lado del workflow (si hay data)
       var apInfo = (window._autopilot_map || {})[g.id];
@@ -8771,11 +8931,33 @@ async function generarRespuestasLote(idsForzados, forzarSobrescribir){
   var sobre = forzarSobrescribir === true
     || (document.getElementById('bulk-sobrescribir') && document.getElementById('bulk-sobrescribir').checked);
   var segs = Math.max(10, Math.ceil(ids.length * 2.5));
+
+  // Pre-fetch: agregar resumen por nivel auto-piloto para que el gestor
+  // sepa qué tan mecánico/manual va a ser el lote.
+  var resumenAutopiloto = '';
+  try{
+    var rApn = await fetch('/glosas/autopiloto-niveles', {
+      method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({glosa_ids: ids}),
+    });
+    if(rApn.ok){
+      var dApn = await rApn.json();
+      var conteo = {AUTO_RADICAR:0, REVISAR_RAPIDO:0, EDITAR_MANUAL:0};
+      (dApn.items||[]).forEach(function(it){ if(conteo[it.nivel] !== undefined) conteo[it.nivel]++; });
+      var lineas = [];
+      if(conteo.AUTO_RADICAR) lineas.push('  🤖 ' + conteo.AUTO_RADICAR + ' mecánicas (alta confianza)');
+      if(conteo.REVISAR_RAPIDO) lineas.push('  ⚡ ' + conteo.REVISAR_RAPIDO + ' para revisar rápido');
+      if(conteo.EDITAR_MANUAL) lineas.push('  ✏ ' + conteo.EDITAR_MANUAL + ' requieren edición manual');
+      if(lineas.length) resumenAutopiloto = '\n• Composición:\n' + lineas.join('\n');
+    }
+  }catch(_){}
+
   if(!confirm('⚡ Procesamiento en lote\n\n' +
     '• ' + ids.length + ' glosa(s) seleccionadas\n' +
     '• Tiempo estimado: ~' + Math.ceil(segs/60) + ' min ' + (segs%60) + ' seg\n' +
     '• Concurrencia IA: 5 paralelas\n' +
-    '• Regenerar aunque ya tengan dictamen: ' + (sobre ? 'SÍ' : 'NO') + '\n\n' +
+    '• Regenerar aunque ya tengan dictamen: ' + (sobre ? 'SÍ' : 'NO') +
+    resumenAutopiloto + '\n\n' +
     '¿Continuar?')) return;
 
   // Barra de progreso determinística simulada (el endpoint no hace streaming
