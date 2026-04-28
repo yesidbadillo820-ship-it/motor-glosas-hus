@@ -1382,6 +1382,57 @@ def alertas(
     ]
 
 
+# ─── Sprint #6 — Vencen en próximas 24h (alerta máxima urgencia) ────────
+@router.get("/vencen-24h")
+def glosas_vencen_24h(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Glosas que vencen HOY o MAÑANA y no están cerradas.
+
+    Pensado para banner alerta + notificación push diaria. Un cron en
+    admin invoca este endpoint cada 8h para alimentar las notifs.
+    """
+    terminales = ["LEVANTADA", "CONCILIADA", "ACEPTADA", "RATIFICADA",
+                  "ARCHIVADA", "DUPLICADA_OCULTA"]
+    base_q = db.query(GlosaRecord).filter(
+        GlosaRecord.dias_restantes <= 1,
+        GlosaRecord.estado.notin_(terminales),
+    )
+    # Auditor solo ve las suyas
+    if current_user.rol == "AUDITOR":
+        base_q = base_q.filter(
+            (GlosaRecord.auditor_email == current_user.email)
+            | (GlosaRecord.gestor_nombre == current_user.email)
+        )
+
+    rows = base_q.order_by(
+        GlosaRecord.dias_restantes.asc(),
+        GlosaRecord.valor_objetado.desc(),
+    ).limit(200).all()
+
+    valor_total_riesgo = sum(float(g.valor_objetado or 0) for g in rows)
+
+    return {
+        "total": len(rows),
+        "valor_total_riesgo": valor_total_riesgo,
+        "glosas": [
+            {
+                "id": g.id, "factura": g.factura,
+                "eps": g.eps, "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "dias_restantes": int(g.dias_restantes or 0),
+                "estado": g.estado,
+                "fecha_vencimiento": (
+                    g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None
+                ),
+                "gestor_nombre": g.gestor_nombre,
+            }
+            for g in rows
+        ],
+    }
+
+
 @router.get("/metrics")
 def metrics(
     db:   Session       = Depends(get_db),
@@ -1413,6 +1464,125 @@ def semaforo(
     (VERDE / AMARILLO / ROJO / NEGRO). Útil para el dashboard."""
     repo = GlosaRepository(db)
     return repo.semaforo_counts()
+
+
+# ─── Sprint #7 — Dashboard plata recuperada ─────────────────────────────
+@router.get("/dashboard-plata-recuperada")
+def dashboard_plata_recuperada(
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Resumen de plata facturada vs aceptada vs recuperada.
+
+    Agrupa por EPS, código y mes. Útil para mostrar a gerencia
+    cuánto plata el motor le ha hecho recuperar al hospital.
+    Filtros opcionales: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD.
+    """
+    from sqlalchemy import func as _fn
+
+    base_q = db.query(GlosaRecord).filter(
+        GlosaRecord.estado.notin_(["DUPLICADA_OCULTA"])
+    )
+
+    if desde:
+        try:
+            d = datetime.fromisoformat(desde)
+            base_q = base_q.filter(GlosaRecord.creado_en >= d)
+        except ValueError:
+            raise HTTPException(400, "desde debe ser YYYY-MM-DD")
+    if hasta:
+        try:
+            h = datetime.fromisoformat(hasta)
+            base_q = base_q.filter(GlosaRecord.creado_en <= h)
+        except ValueError:
+            raise HTTPException(400, "hasta debe ser YYYY-MM-DD")
+
+    glosas = base_q.all()
+
+    # Agregados globales
+    total_objetado = sum(float(g.valor_objetado or 0) for g in glosas)
+    total_aceptado = sum(float(g.valor_aceptado or 0) for g in glosas)
+    total_recuperado = sum(float(g.valor_recuperado or 0) for g in glosas)
+    n_total = len(glosas)
+    n_levantadas = sum(1 for g in glosas if (g.estado or "").upper() == "LEVANTADA")
+    n_ratificadas = sum(1 for g in glosas if (g.estado or "").upper() == "RATIFICADA")
+    n_pendientes = sum(
+        1 for g in glosas
+        if (g.estado or "").upper() not in
+           {"LEVANTADA", "RATIFICADA", "ACEPTADA", "CONCILIADA", "ARCHIVADA"}
+    )
+
+    tasa_efectividad = (n_levantadas / max(1, n_levantadas + n_ratificadas)) * 100
+
+    # Por EPS
+    por_eps: dict[str, dict] = {}
+    for g in glosas:
+        eps_k = (g.eps or "—").upper()
+        d = por_eps.setdefault(eps_k, {
+            "eps": eps_k,
+            "n_glosas": 0,
+            "valor_objetado": 0.0,
+            "valor_aceptado": 0.0,
+            "valor_recuperado": 0.0,
+            "n_levantadas": 0,
+        })
+        d["n_glosas"] += 1
+        d["valor_objetado"] += float(g.valor_objetado or 0)
+        d["valor_aceptado"] += float(g.valor_aceptado or 0)
+        d["valor_recuperado"] += float(g.valor_recuperado or 0)
+        if (g.estado or "").upper() == "LEVANTADA":
+            d["n_levantadas"] += 1
+    por_eps_list = sorted(por_eps.values(), key=lambda x: -x["valor_recuperado"])[:20]
+
+    # Por código de glosa
+    por_codigo: dict[str, dict] = {}
+    for g in glosas:
+        cod = (g.codigo_glosa or "—").upper()
+        d = por_codigo.setdefault(cod, {
+            "codigo_glosa": cod,
+            "n_glosas": 0,
+            "valor_objetado": 0.0,
+            "valor_recuperado": 0.0,
+        })
+        d["n_glosas"] += 1
+        d["valor_objetado"] += float(g.valor_objetado or 0)
+        d["valor_recuperado"] += float(g.valor_recuperado or 0)
+    por_codigo_list = sorted(por_codigo.values(), key=lambda x: -x["valor_recuperado"])[:15]
+
+    # Por mes (últimos 12 meses)
+    por_mes: dict[str, dict] = {}
+    for g in glosas:
+        if not g.creado_en:
+            continue
+        ym = g.creado_en.strftime("%Y-%m")
+        d = por_mes.setdefault(ym, {
+            "mes": ym,
+            "n_glosas": 0,
+            "valor_objetado": 0.0,
+            "valor_recuperado": 0.0,
+        })
+        d["n_glosas"] += 1
+        d["valor_objetado"] += float(g.valor_objetado or 0)
+        d["valor_recuperado"] += float(g.valor_recuperado or 0)
+    por_mes_list = sorted(por_mes.values(), key=lambda x: x["mes"])[-12:]
+
+    return {
+        "totales": {
+            "n_glosas": n_total,
+            "n_levantadas": n_levantadas,
+            "n_ratificadas": n_ratificadas,
+            "n_pendientes": n_pendientes,
+            "valor_objetado": total_objetado,
+            "valor_aceptado": total_aceptado,
+            "valor_recuperado": total_recuperado,
+            "tasa_efectividad_pct": round(tasa_efectividad, 1),
+        },
+        "por_eps": por_eps_list,
+        "por_codigo": por_codigo_list,
+        "por_mes": por_mes_list,
+    }
 
 
 @router.get("/paciente-resumen")
@@ -1907,12 +2077,22 @@ def facturas_pendientes_agrupadas(
 @router.get("/mis-asignaciones")
 def mis_asignaciones(
     todas: bool = False,
+    vista: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Lista las glosas asignadas al usuario actual.
 
     Los SUPER_ADMIN y COORDINADOR pueden pasar `?todas=true` para ver todas.
+
+    Sprint #5 — Vistas guardadas (`?vista=...`):
+      • `urgentes`        : score_urgencia >= 85 (vence pronto + alta cuantía)
+      • `vencen_hoy`      : dias_restantes <= 1 y no terminales
+      • `aprobadas`       : workflow_state == APROBADA (faltan radicar)
+      • `requieren_soportes`: estado == REQUIERE_SOPORTES
+      • `ta_sin_contrato` : codigo_glosa empieza por TA y EPS sin contrato
+      • `alta_cuantia`    : valor_objetado >= 5_000_000
+      • `respondidas`     : workflow_state RESPONDIDA / LEVANTADA / etc.
     """
     repo = GlosaRepository(db)
     if todas and current_user.rol in ("SUPER_ADMIN", "COORDINADOR"):
@@ -2015,6 +2195,40 @@ def mis_asignaciones(
     glosas = [t[2] for t in glosas_con_score]
     score_por_id = {t[2].id: (t[0], t[1]) for t in glosas_con_score}
 
+    # Sprint #5 — Aplicar vista guardada después de scoring/ordenamiento
+    if vista:
+        vista_norm = vista.lower().strip()
+        contratos_db = ContratoRepository(db).como_dict() or {}
+        terminales = {"RESPONDIDA", "CONCILIADA", "LEVANTADA", "ACEPTADA",
+                      "RATIFICADA", "ARCHIVADA"}
+
+        def _matches(g) -> bool:
+            score, _ = score_por_id.get(g.id, (0, ""))
+            estado = (g.estado or "").upper()
+            wf = (getattr(g, "workflow_state", None) or "").upper()
+            valor = float(g.valor_objetado or 0)
+            dias = int(g.dias_restantes or 999)
+            cod = (g.codigo_glosa or "").upper()
+            eps_norm = (g.eps or "").upper().strip()
+
+            if vista_norm == "urgentes":
+                return score >= 85 and estado not in terminales
+            if vista_norm == "vencen_hoy":
+                return dias <= 1 and estado not in terminales and wf not in terminales
+            if vista_norm == "aprobadas":
+                return wf == "APROBADA"
+            if vista_norm == "requieren_soportes":
+                return estado == "REQUIERE_SOPORTES"
+            if vista_norm == "ta_sin_contrato":
+                return cod.startswith("TA") and eps_norm not in contratos_db
+            if vista_norm == "alta_cuantia":
+                return valor >= 5_000_000 and estado not in terminales
+            if vista_norm == "respondidas":
+                return estado in terminales or wf in terminales
+            return True
+
+        glosas = [g for g in glosas if _matches(g)]
+
     from app.services.resolver_entidad import resolver_entidad_mostrar
     items = []
     for g in glosas:
@@ -2057,6 +2271,9 @@ def mis_asignaciones(
             # Priorización automática (R-UI 27-abr-2026)
             "score_urgencia": int(score),
             "motivo_prioridad": motivo,
+            # Campos para Sprint #3 (similares en bloque) y filtros UI
+            "codigo_glosa": g.codigo_glosa,
+            "cups_servicio": getattr(g, "cups_servicio", None),
         })
     return items
 
@@ -2592,6 +2809,92 @@ def cups_perfil(
     }
 
 
+# ─── Sprint #3 — Detector de glosas similares (DEBE ir antes de /{glosa_id}) ───
+@router.get("/similares-bloque")
+def detectar_glosas_similares_en_bloque(
+    factura: Optional[str] = None,
+    eps: Optional[str] = None,
+    codigo_glosa: Optional[str] = None,
+    cups: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Agrupa glosas pendientes por (eps, código_glosa, cups) para responder
+    en bloque con el mismo dictamen base.
+
+    Sin filtros: devuelve todos los grupos con >= 2 glosas pendientes
+    (RADICADA / REQUIERE_SOPORTES) del usuario actual. Con filtros:
+    devuelve solo los grupos que coinciden.
+    """
+    base_q = db.query(GlosaRecord).filter(
+        GlosaRecord.estado.notin_(["LEVANTADA", "CONCILIADA", "ACEPTADA",
+                                   "RATIFICADA", "ARCHIVADA",
+                                   "DUPLICADA_OCULTA"]),
+    )
+    if current_user.rol == "AUDITOR":
+        base_q = base_q.filter(
+            (GlosaRecord.auditor_email == current_user.email)
+            | (GlosaRecord.gestor_nombre == current_user.email)
+        )
+    if factura:
+        base_q = base_q.filter(GlosaRecord.factura == factura)
+    if eps:
+        base_q = base_q.filter(GlosaRecord.eps.ilike(f"%{eps.upper()}%"))
+    if codigo_glosa:
+        base_q = base_q.filter(GlosaRecord.codigo_glosa == codigo_glosa.upper())
+    if cups:
+        base_q = base_q.filter(GlosaRecord.cups_servicio == cups)
+
+    todas = base_q.limit(2000).all()
+
+    grupos: dict[tuple, list] = {}
+    for g in todas:
+        key = (
+            (g.eps or "").upper().strip(),
+            (g.codigo_glosa or "").upper().strip(),
+            (g.cups_servicio or "").strip(),
+        )
+        grupos.setdefault(key, []).append(g)
+
+    resultado = []
+    for (eps_g, cod_g, cups_g), glosas in grupos.items():
+        if len(glosas) < 2:
+            continue
+        valor_total = sum(float(g.valor_objetado or 0.0) for g in glosas)
+        respondidas = [g for g in glosas if g.dictamen and len(g.dictamen) > 200]
+        dictamen_modelo = (
+            max(respondidas, key=lambda g: len(g.dictamen or "")).dictamen
+            if respondidas else None
+        )
+        resultado.append({
+            "eps": eps_g, "codigo_glosa": cod_g, "cups": cups_g,
+            "n_glosas": len(glosas),
+            "valor_total": valor_total,
+            "dictamen_modelo_glosa_id": (
+                max(respondidas, key=lambda g: len(g.dictamen or "")).id
+                if respondidas else None
+            ),
+            "tiene_dictamen_modelo": dictamen_modelo is not None,
+            "glosas": [
+                {
+                    "id": g.id, "factura": g.factura,
+                    "valor_objetado": float(g.valor_objetado or 0.0),
+                    "estado": g.estado, "workflow_state": g.workflow_state,
+                    "dias_restantes": g.dias_restantes,
+                    "tiene_dictamen": bool(g.dictamen and len(g.dictamen) > 200),
+                }
+                for g in glosas
+            ],
+        })
+
+    resultado.sort(key=lambda x: -x["valor_total"])
+    return {
+        "grupos": resultado,
+        "total_grupos": len(resultado),
+        "total_glosas_agrupables": sum(g["n_glosas"] for g in resultado),
+    }
+
+
 @router.get("/{glosa_id}")
 def obtener_glosa(
     glosa_id: int,
@@ -2807,6 +3110,91 @@ def registrar_decision_eps(glosa_id: int, data: DecisionEPSInput,
         campo="decision_eps", valor_nuevo=decision,
         detalle=f"Decisión: {decision} | recuperado: ${data.valor_recuperado:,.0f}")
     return {"message": "Decisión registrada", "glosa_id": glosa_id, "decision_eps": decision}
+
+
+# ─── Sprint #4 — Decisión EPS en LOTE ────────────────────────────────────
+class DecisionEPSLoteInput(BaseModel):
+    glosa_ids: list[int] = Field(..., min_length=1, max_length=500)
+    decision_eps: str
+    observacion_eps: Optional[str] = None
+    # Si la decisión es LEVANTADA, el usuario suele dejar valor_recuperado
+    # = valor_objetado de cada glosa. Si manda explícito, se usa ese.
+    valor_recuperado: Optional[float] = None
+
+
+@router.patch("/decision-eps-lote")
+def registrar_decision_eps_lote(
+    data: DecisionEPSLoteInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Aplica la misma decisión de la EPS a N glosas seleccionadas.
+
+    Caso típico: la EPS responde el lote y todas quedan LEVANTADAS — el
+    gestor selecciona checkboxes en /mis-asignaciones y marca las N de un
+    solo click. Para LEVANTADA, si no se manda `valor_recuperado`, se
+    asume valor_objetado de cada glosa (recupera el 100%).
+    """
+    DECISIONES = {"LEVANTADA", "ACEPTADA", "RATIFICADA", "PENDIENTE"}
+    decision = data.decision_eps.upper()
+    if decision not in DECISIONES:
+        raise HTTPException(400, f"Decisión inválida. Use: {', '.join(DECISIONES)}")
+
+    procesadas, fallidas, recuperado_total = 0, [], 0.0
+    for gid in data.glosa_ids:
+        glosa = GlosaRepository(db).obtener_por_id(gid)
+        if not glosa:
+            fallidas.append({"glosa_id": gid, "motivo": "no encontrada"})
+            continue
+        # No re-decidir glosas ya cerradas con la misma decisión
+        if (glosa.decision_eps or "").upper() == decision:
+            fallidas.append({"glosa_id": gid, "motivo": f"ya estaba {decision}"})
+            continue
+        # Para LEVANTADA, valor recuperado por defecto = valor_objetado
+        if decision == "LEVANTADA":
+            recuperado = data.valor_recuperado if data.valor_recuperado is not None \
+                else float(glosa.valor_objetado or 0.0)
+        else:
+            recuperado = data.valor_recuperado or 0.0
+
+        glosa.decision_eps = decision
+        glosa.fecha_decision_eps = ahora_utc()
+        glosa.valor_recuperado = recuperado
+        if data.observacion_eps:
+            glosa.observacion_eps = data.observacion_eps
+        if decision in ("LEVANTADA", "ACEPTADA", "RATIFICADA"):
+            glosa.estado = decision
+
+        # Aprendizaje feedback: promover argumento exitoso a Plantilla Gold
+        try:
+            from app.services.aprendizaje_feedback import aprender_de_decision_eps
+            aprender_de_decision_eps(
+                db=db, glosa=glosa, decision=decision, creado_por=current_user.email,
+            )
+        except Exception as _e:
+            import logging as _l
+            _l.getLogger("motor_glosas").warning(f"Aprendizaje feedback (lote) falló: {_e}")
+
+        recuperado_total += recuperado
+        procesadas += 1
+
+    db.commit()
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email, usuario_rol=current_user.rol,
+        accion="DECISION_EPS_LOTE", tabla="glosas", registro_id=0,
+        campo="decision_eps", valor_nuevo=decision,
+        detalle=(f"Lote {decision}: {procesadas}/{len(data.glosa_ids)} procesadas | "
+                 f"recuperado total: ${recuperado_total:,.0f}"),
+    )
+
+    return {
+        "message": f"Lote procesado: {procesadas} glosas → {decision}",
+        "decision_eps": decision,
+        "procesadas": procesadas,
+        "fallidas": fallidas,
+        "valor_recuperado_total": recuperado_total,
+    }
 
 
 @router.patch("/{glosa_id}/asignar")

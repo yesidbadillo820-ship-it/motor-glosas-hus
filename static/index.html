@@ -712,6 +712,10 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .bulk-bar b{color:var(--c-teal2);font-size:1rem}
 .bulk-chk{display:flex;align-items:center;gap:.4rem;color:var(--text2);font-size:.8rem;cursor:pointer}
 .bulk-chk input{cursor:pointer}
+/* Sprint #5: chips de vistas guardadas */
+.vista-chip{background:var(--bg-card);border:1px solid var(--border);color:var(--text2);padding:.35rem .7rem;border-radius:18px;font-size:.74rem;font-weight:600;cursor:pointer;transition:all .15s}
+.vista-chip:hover{background:var(--bg-subtle);border-color:var(--c-teal2);color:var(--text)}
+.vista-chip.vista-active{background:var(--c-teal2);border-color:var(--c-teal2);color:#fff}
 .field-inline{display:flex;flex-direction:column;gap:2px}
 .field-inline label{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
 .field-inline input,.field-inline select{padding:.35rem .55rem;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);min-width:110px}
@@ -1630,6 +1634,32 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div class="chart-card full"><div class="chart-hdr">Tendencia de Recuperación Mensual</div><canvas id="ch-trend" style="max-height:180px"></canvas></div>
         </div>
 
+        <!-- Sprint #7: Dashboard plata recuperada (detalle gerencial) -->
+        <div id="plata-recuperada-block" style="background:var(--card-bg,#fff);border:1px solid var(--border);border-radius:8px;padding:1rem 1.25rem;margin-top:1rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem">
+            <div>
+              <div style="font-weight:700;color:#0f766e;font-size:.95rem">💰 Plata recuperada · vista gerencial</div>
+              <div style="font-size:.75rem;color:var(--text3)">Cuánto dinero le recuperó el motor al hospital, agrupado por EPS, código y mes.</div>
+            </div>
+            <button class="btn btn-ghost" onclick="cargarPlataRecuperada()" style="font-size:.78rem;padding:.3rem .7rem">Actualizar</button>
+          </div>
+          <div id="plata-recuperada-totales" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.6rem;margin-bottom:1rem"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+              <div style="font-size:.78rem;font-weight:700;color:var(--text2);margin-bottom:.3rem">Top EPS por valor recuperado</div>
+              <div id="plata-eps-tabla" style="font-size:.78rem"></div>
+            </div>
+            <div>
+              <div style="font-size:.78rem;font-weight:700;color:var(--text2);margin-bottom:.3rem">Top códigos de glosa</div>
+              <div id="plata-codigo-tabla" style="font-size:.78rem"></div>
+            </div>
+          </div>
+          <div style="margin-top:1rem">
+            <div style="font-size:.78rem;font-weight:700;color:var(--text2);margin-bottom:.3rem">Por mes (últimos 12)</div>
+            <div id="plata-mes-tabla" style="font-size:.78rem;overflow-x:auto"></div>
+          </div>
+        </div>
+
         <!-- R55 P4: Métricas IA — costo, latencia, cache hit -->
         <div id="metricas-ia-block" style="background:var(--card-bg, #fff);border:1px solid var(--border);border-radius:8px;padding:1rem 1.25rem;margin-top:1rem;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem;">
@@ -1865,8 +1895,26 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <span><b id="bulk-count">0</b> glosas seleccionadas</span>
           <label class="bulk-chk"><input type="checkbox" id="bulk-sobrescribir"/> Regenerar aunque ya tengan respuesta</label>
           <button class="btn btn-primary" onclick="generarRespuestasLote()">Generar respuestas en lote</button>
+          <!-- Sprint #4: marcar decisión EPS en lote -->
+          <button class="btn" style="background:#16a34a;color:#fff;border:0" onclick="decisionEpsLote('LEVANTADA')" title="La EPS levantó (aceptó nuestra defensa) las glosas seleccionadas">✅ Marcar LEVANTADAS</button>
+          <button class="btn" style="background:#dc2626;color:#fff;border:0" onclick="decisionEpsLote('RATIFICADA')" title="La EPS ratificó (rechazó) las glosas seleccionadas">❌ Marcar RATIFICADAS</button>
           <button class="btn btn-ghost" onclick="limpiarSeleccionLote()">Limpiar</button>
         </div>
+
+        <!-- Sprint #5: vistas guardadas como chips -->
+        <div id="vistas-bar" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem;align-items:center">
+          <span style="color:var(--text3);font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:.3rem">Vistas:</span>
+          <button class="vista-chip vista-active" data-vista="" onclick="aplicarVista('')" title="Todas">🗂 Todas</button>
+          <button class="vista-chip" data-vista="urgentes" onclick="aplicarVista('urgentes')" title="Score urgencia ≥ 85">🔥 Urgentes</button>
+          <button class="vista-chip" data-vista="vencen_hoy" onclick="aplicarVista('vencen_hoy')" title="Vencen hoy o mañana">⏰ Vencen ≤ 24h</button>
+          <button class="vista-chip" data-vista="aprobadas" onclick="aplicarVista('aprobadas')" title="Workflow APROBADA — falta radicar">✓ Aprobadas (radicar)</button>
+          <button class="vista-chip" data-vista="requieren_soportes" onclick="aplicarVista('requieren_soportes')" title="Necesitan PDFs del expediente">📄 Requieren soportes</button>
+          <button class="vista-chip" data-vista="ta_sin_contrato" onclick="aplicarVista('ta_sin_contrato')" title="Tarifas + EPS sin contrato">💰 TA sin contrato</button>
+          <button class="vista-chip" data-vista="alta_cuantia" onclick="aplicarVista('alta_cuantia')" title="Valor objetado ≥ $5.000.000">💎 Alta cuantía</button>
+        </div>
+
+        <!-- Sprint #6: banner glosas que vencen en 24h -->
+        <div id="banner-vencen-24h" style="display:none;margin-bottom:.6rem"></div>
 
         <div class="tbl-modern">
           <table>
@@ -8117,9 +8165,15 @@ async function _cargarMapaAutopilot(){
 
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
-  var url = '/glosas/mis-asignaciones' + (todas ? '?todas=true' : '');
+  var vista = window._mis_vista || '';
+  var qs = [];
+  if(todas) qs.push('todas=true');
+  if(vista) qs.push('vista=' + encodeURIComponent(vista));
+  var url = '/glosas/mis-asignaciones' + (qs.length ? '?' + qs.join('&') : '');
   var body = document.getElementById('mis-body');
   body.innerHTML = '<tr class="empty-row"><td colspan="13">Cargando…</td></tr>';
+  // Cargar banner 24h en paralelo (sin bloquear)
+  if(typeof cargarBannerVencen24h === 'function') cargarBannerVencen24h();
   try{
     var r = await fetch(url, {headers: authH()});
     if(r.status === 401){ alert('Sesión expirada'); return; }
@@ -8360,6 +8414,78 @@ async function _pintarBadgesTasaMisGlosas(ids){
       span.title = 'Tasa histórica par (eps, código): ' + it.tasa_par_pct.toFixed(1) + '% sobre ' + it.n_par + ' casos decididos';
     });
   } catch(e){}
+}
+
+// ─── Sprint #4 — Decisión EPS en lote ───────────────────────────────
+async function decisionEpsLote(decision){
+  var ids = _idsSeleccionados();
+  if(!ids.length){ toast('Nada seleccionado','Marca al menos una glosa con el checkbox','warning'); return; }
+  if(ids.length > 500){ toast('Demasiadas','Máximo 500 por lote','warning'); return; }
+  var verbo = decision === 'LEVANTADA' ? 'LEVANTÓ (aceptó nuestra defensa)'
+           : decision === 'RATIFICADA' ? 'RATIFICÓ (rechazó nuestra defensa)'
+           : decision;
+  var obs = prompt('La EPS ' + verbo + ' las ' + ids.length + ' glosa(s) seleccionadas.\n\n' +
+    'Observación opcional (acta, fecha, motivo de la EPS, etc.):', '');
+  if(obs === null) return;
+  try{
+    var r = await fetch('/glosas/decision-eps-lote', {
+      method:'PATCH',
+      headers:{...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({glosa_ids: ids, decision_eps: decision, observacion_eps: obs || null}),
+    });
+    var d = await r.json();
+    if(!r.ok){ toast('Error', d.detail || 'Error en lote', 'error'); return; }
+    var msg = '✓ ' + d.procesadas + ' glosa(s) marcadas como ' + decision;
+    if(decision === 'LEVANTADA' && d.valor_recuperado_total > 0){
+      msg += '\n\n💰 Total recuperado: $' + (d.valor_recuperado_total||0).toLocaleString('es-CO');
+    }
+    if(d.fallidas && d.fallidas.length){
+      msg += '\n\n⚠ ' + d.fallidas.length + ' fallaron (ya estaban en ese estado o no encontradas)';
+    }
+    toast('Lote procesado', msg, 'success');
+    limpiarSeleccionLote();
+    loadMisGlosas();
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// ─── Sprint #5 — Vistas guardadas ────────────────────────────────────
+function aplicarVista(vista){
+  window._mis_vista = vista || '';
+  // Resaltar chip activo
+  document.querySelectorAll('.vista-chip').forEach(function(c){
+    c.classList.toggle('vista-active', (c.dataset.vista || '') === (vista || ''));
+  });
+  loadMisGlosas();
+}
+
+// ─── Sprint #6 — Banner glosas vencen en 24h ────────────────────────
+async function cargarBannerVencen24h(){
+  var box = document.getElementById('banner-vencen-24h');
+  if(!box) return;
+  try{
+    var r = await fetch('/glosas/vencen-24h', {headers: authH()});
+    if(!r.ok){ box.style.display = 'none'; return; }
+    var d = await r.json();
+    if(!d.total){ box.style.display = 'none'; return; }
+    var valor = (d.valor_total_riesgo || 0).toLocaleString('es-CO');
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div style="background:linear-gradient(135deg,#fee2e2,#fecaca);border:2px solid #dc2626;border-radius:10px;padding:.9rem 1.2rem;color:#991b1b">' +
+        '<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap">' +
+          '<div style="font-size:1.6rem">⚠</div>' +
+          '<div style="flex:1;min-width:200px">' +
+            '<div style="font-weight:800;font-size:.95rem">' +
+              d.total + ' glosa(s) vencen en las próximas 24h' +
+            '</div>' +
+            '<div style="font-size:.78rem;margin-top:.2rem">' +
+              'Valor en riesgo: <b>$' + valor + '</b> · ' +
+              'Si no se responden hoy, opera el silencio en contra del prestador (Art. 57 Ley 1438/2011 sólo aplica a EPS, NO al hospital).' +
+            '</div>' +
+          '</div>' +
+          '<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:0" onclick="aplicarVista(\'vencen_hoy\')">Ver y resolver ahora</button>' +
+        '</div>' +
+      '</div>';
+  }catch(_){ box.style.display = 'none'; }
 }
 
 function _idsSeleccionados(){
@@ -10154,7 +10280,87 @@ async function loadDash(){
     // Analítica predictiva (últimos N días)
     cargarAnaliticaPredictiva();
 
+    // Sprint #7: dashboard plata recuperada
+    cargarPlataRecuperada();
+
   } catch(e){console.error('Dashboard error',e);}
+}
+
+// ─── Sprint #7 — Dashboard plata recuperada ────────────────────────
+async function cargarPlataRecuperada(){
+  try{
+    var r = await fetch('/glosas/dashboard-plata-recuperada', {headers: authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    var t = d.totales || {};
+    var fmt = function(n){ return '$' + (n||0).toLocaleString('es-CO',{maximumFractionDigits:0}); };
+
+    var totBox = document.getElementById('plata-recuperada-totales');
+    if(totBox){
+      totBox.innerHTML = ''
+        + '<div style="background:#ecfdf5;border:1px solid #10b981;border-radius:8px;padding:.7rem 1rem">'
+        +   '<div style="font-size:.68rem;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.06em">Recuperado</div>'
+        +   '<div style="font-size:1.3rem;font-weight:800;color:#065f46;margin-top:.15rem">' + fmt(t.valor_recuperado) + '</div>'
+        + '</div>'
+        + '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.7rem 1rem">'
+        +   '<div style="font-size:.68rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.06em">Objetado total</div>'
+        +   '<div style="font-size:1.3rem;font-weight:800;color:#92400e;margin-top:.15rem">' + fmt(t.valor_objetado) + '</div>'
+        + '</div>'
+        + '<div style="background:#fee2e2;border:1px solid #dc2626;border-radius:8px;padding:.7rem 1rem">'
+        +   '<div style="font-size:.68rem;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.06em">Aceptado (perdido)</div>'
+        +   '<div style="font-size:1.3rem;font-weight:800;color:#991b1b;margin-top:.15rem">' + fmt(t.valor_aceptado) + '</div>'
+        + '</div>'
+        + '<div style="background:#dbeafe;border:1px solid #2563eb;border-radius:8px;padding:.7rem 1rem">'
+        +   '<div style="font-size:.68rem;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:.06em">Tasa efectividad</div>'
+        +   '<div style="font-size:1.3rem;font-weight:800;color:#1e3a8a;margin-top:.15rem">' + (t.tasa_efectividad_pct||0) + '%</div>'
+        +   '<div style="font-size:.65rem;color:var(--text3);margin-top:.15rem">' + (t.n_levantadas||0) + ' levantadas / ' + ((t.n_levantadas||0)+(t.n_ratificadas||0)) + ' decididas</div>'
+        + '</div>';
+    }
+
+    var renderTabla = function(rows, cols){
+      if(!rows || !rows.length) return '<div style="color:var(--text3);padding:.5rem">Sin datos.</div>';
+      var head = '<tr style="border-bottom:1px solid var(--border)">' +
+        cols.map(function(c){ return '<th style="text-align:'+(c.align||'left')+';padding:.4rem .5rem;font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase">'+c.label+'</th>'; }).join('') +
+        '</tr>';
+      var body = rows.map(function(r){
+        return '<tr style="border-bottom:1px solid rgba(0,0,0,.04)">' +
+          cols.map(function(c){
+            var v = r[c.key];
+            var disp = c.fmt ? c.fmt(v) : (v == null ? '—' : v);
+            return '<td style="padding:.4rem .5rem;text-align:'+(c.align||'left')+'">'+disp+'</td>';
+          }).join('') + '</tr>';
+      }).join('');
+      return '<table style="width:100%;border-collapse:collapse"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+    };
+
+    var elEps = document.getElementById('plata-eps-tabla');
+    if(elEps){
+      elEps.innerHTML = renderTabla(d.por_eps || [], [
+        {key:'eps', label:'EPS'},
+        {key:'n_glosas', label:'Glosas', align:'right'},
+        {key:'valor_recuperado', label:'Recuperado', align:'right', fmt:fmt},
+        {key:'n_levantadas', label:'Levant.', align:'right'},
+      ]);
+    }
+    var elCod = document.getElementById('plata-codigo-tabla');
+    if(elCod){
+      elCod.innerHTML = renderTabla(d.por_codigo || [], [
+        {key:'codigo_glosa', label:'Código'},
+        {key:'n_glosas', label:'Glosas', align:'right'},
+        {key:'valor_objetado', label:'Objetado', align:'right', fmt:fmt},
+        {key:'valor_recuperado', label:'Recuperado', align:'right', fmt:fmt},
+      ]);
+    }
+    var elMes = document.getElementById('plata-mes-tabla');
+    if(elMes){
+      elMes.innerHTML = renderTabla(d.por_mes || [], [
+        {key:'mes', label:'Mes'},
+        {key:'n_glosas', label:'Glosas', align:'right'},
+        {key:'valor_objetado', label:'Objetado', align:'right', fmt:fmt},
+        {key:'valor_recuperado', label:'Recuperado', align:'right', fmt:fmt},
+      ]);
+    }
+  }catch(e){ console.error('plata-recuperada error', e); }
 }
 
 // ─── R300: Cobranza Live ──────────────────────────────────────────────────
