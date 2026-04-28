@@ -49,10 +49,13 @@ class _StubDB:
 def _glosa(dictamen: str, eps: str = "DISPENSARIO MEDICO BUCARAMANGA",
            generado: datetime | None = None,
            codigo_respuesta: str = "",
-           codigo_glosa: str = "") -> SimpleNamespace:
+           codigo_glosa: str = "",
+           etapa: str = "",
+           dias_radicacion_dgh: int = 0) -> SimpleNamespace:
     return SimpleNamespace(
         id=1, eps=eps, dictamen=dictamen, dictamen_generado_en=generado,
         codigo_respuesta=codigo_respuesta, codigo_glosa=codigo_glosa,
+        etapa=etapa, dias_radicacion_dgh=dias_radicacion_dgh,
     )
 
 
@@ -148,6 +151,68 @@ class TestMatcheaEps:
         toks = _tokens_significativos("DIRECCION DE SANIDAD EJERCITO")
         assert "EJERCITO" in toks
         assert "DIRECCION" not in toks  # stopword
+
+
+class TestTextoCanonicoMecanico:
+    """Caso glosa #2484: extemporánea con texto LLM-suavizado en lugar
+    del texto fijo canónico HUS. Detección debe forzar regeneración."""
+
+    def test_extemporanea_con_texto_no_canonico_es_stale(self):
+        glosa = _glosa(
+            dictamen=(
+                "ESE HUS RESPETUOSAMENTE NO ACEPTA LA GLOSA POR CONSIDERARLA "
+                "EXTEMPORÁNEA. CONFORME AL MARCO CONTRACTUAL VIGENTE..."
+            ),
+            dias_radicacion_dgh=21,
+        )
+        db = _StubDB([])
+        msg = motivo_stale(glosa, db)
+        assert msg is not None
+        assert "extemporánea" in msg.lower() or "extemporanea" in msg.lower()
+
+    def test_extemporanea_con_texto_canonico_no_es_stale(self):
+        glosa = _glosa(
+            dictamen=(
+                "ESE HUS NO ACEPTA GLOSA EXTEMPORANEA. AL HABERSE SUPERADO "
+                "EL PLAZO LEGAL DE 20 DIAS HABILES..."
+            ),
+            dias_radicacion_dgh=21,
+        )
+        db = _StubDB([])
+        assert motivo_stale(glosa, db) is None
+
+    def test_ratificada_con_texto_no_canonico_es_stale(self):
+        glosa = _glosa(
+            dictamen=(
+                "ESE HUS NO ACEPTA LA RATIFICACIÓN DE LA GLOSA Y MANTIENE "
+                "LA RESPUESTA DADA EN EL TRÁMITE..."
+            ),
+            etapa="RESPUESTA A RATIFICACION",
+        )
+        db = _StubDB([])
+        msg = motivo_stale(glosa, db)
+        assert msg is not None
+        assert "ratificac" in msg.lower()
+
+    def test_ratificada_con_texto_canonico_no_es_stale(self):
+        glosa = _glosa(
+            dictamen=(
+                "ESE HUS NO ACEPTA GLOSA RATIFICADA; SE MANTIENE LA "
+                "RESPUESTA DADA EN TRAMITE DE LA GLOSA INICIAL..."
+            ),
+            etapa="RATIFICACION",
+        )
+        db = _StubDB([])
+        assert motivo_stale(glosa, db) is None
+
+    def test_dentro_de_terminos_no_aplica_check(self):
+        # Glosa NO extemporánea (<20 días) no debe forzar texto canónico.
+        glosa = _glosa(
+            dictamen="ARGUMENTO DEFENSIVO TÉCNICO ESTÁNDAR.",
+            dias_radicacion_dgh=10,
+        )
+        db = _StubDB([])
+        assert motivo_stale(glosa, db) is None
 
 
 class TestReIncorrecto:

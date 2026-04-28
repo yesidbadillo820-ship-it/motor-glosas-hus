@@ -1868,6 +1868,19 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <button class="btn-sm ghost" onclick="loadMisGlosas()">Actualizar</button>
           </div>
         </div>
+
+        <!-- Asistente conversacional: saludo + tip del día contextual.
+             No presiona, no muestra cifras intimidantes — solo orienta.
+             Se actualiza dinámicamente desde renderSaludoAsistente(). -->
+        <div id="asistente-saludo" style="display:none;margin-bottom:1rem;background:linear-gradient(135deg,#eff6ff 0%, #ecfdf5 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 18px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+          <div id="asistente-emoji" style="font-size:2rem;line-height:1">👋</div>
+          <div style="flex:1;min-width:240px">
+            <div id="asistente-saludo-texto" style="font-weight:700;color:#0c4a6e;font-size:.98rem;line-height:1.3"></div>
+            <div id="asistente-tip" style="font-size:.82rem;color:#1e40af;margin-top:.35rem;line-height:1.55"></div>
+          </div>
+          <button onclick="sessionStorage.setItem('asistente_oculto','1');document.getElementById('asistente-saludo').style.display='none'" style="background:transparent;border:0;color:#64748b;cursor:pointer;font-size:1.1rem;padding:0 4px" title="Ocultar por esta sesión">×</button>
+        </div>
+
         <!-- Tabs de filtro por estado -->
         <div id="mis-tabs" style="display:flex;gap:.4rem;margin-bottom:1rem;border-bottom:2px solid var(--border);padding-bottom:0;flex-wrap:wrap;">
           <button type="button" class="mis-tab active" data-filter="pendientes" onclick="setMisFiltro('pendientes')"
@@ -5609,9 +5622,85 @@ function buscarConceptosFactura(numero){
 if(!window._concepto_modos) window._concepto_modos = {};
 if(!window._concepto_parciales) window._concepto_parciales = {};
 
+// Auto-auditoría suave antes de marcar como RESPONDIDA. Si hay hallazgos
+// se muestra un modal con sugerencias; el gestor decide. Si todo OK, pasa
+// directo a marcar como RESPONDIDA con un mensaje celebratorio.
+async function _auditarYConfirmar(glosaId, factura){
+  try{
+    var r = await fetch('/glosas/'+glosaId+'/auditoria', {headers: authH()});
+    if(!r.ok) return true; // si la auditoría falla, no bloqueamos
+    var aud = await r.json();
+    if(aud.ok){
+      // Dictamen impecable — confirmación celebratoria simple
+      return confirm('✨ Dictamen verificado — todo OK.\n\n' +
+        (aud.celebracion || '') + '\n\n' +
+        '¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?');
+    }
+    // Hay hallazgos — modal informativo con opción de continuar o corregir
+    return _mostrarModalAuditoria(glosaId, factura, aud);
+  }catch(e){
+    return confirm('¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?');
+  }
+}
+
+function _mostrarModalAuditoria(glosaId, factura, aud){
+  return new Promise(function(resolve){
+    var prev = document.getElementById('auditoria-modal');
+    if(prev) prev.remove();
+    var puntaje = aud.puntaje || 0;
+    var color = puntaje >= 80 ? '#10b981' : puntaje >= 60 ? '#f59e0b' : '#dc2626';
+    var titulo = puntaje >= 80
+      ? 'Casi listo — pequeñas mejoras posibles'
+      : puntaje >= 60
+        ? 'Atención — el dictamen tiene algunos puntos a revisar'
+        : 'Mejor revisemos esto antes de radicar';
+    var iconoTitulo = puntaje >= 80 ? '🟢' : puntaje >= 60 ? '🟡' : '🔴';
+    var html = '<div style="background:#fff;border-radius:14px;padding:22px 26px;max-width:620px;width:92vw;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);">'
+      + '<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;">'
+      +   '<div style="font-size:34px;line-height:1">' + iconoTitulo + '</div>'
+      +   '<div style="flex:1">'
+      +     '<div style="font-weight:800;font-size:1.05rem;color:#111827">' + titulo + '</div>'
+      +     '<div style="font-size:.78rem;color:#6b7280;margin-top:.2rem">Factura ' + (factura||'#'+glosaId) + ' — Calidad del dictamen: <b style="color:'+color+'">' + puntaje + '/100</b></div>'
+      +   '</div>'
+      + '</div>'
+      + '<div style="height:6px;background:#f3f4f6;border-radius:4px;overflow:hidden;margin-bottom:16px">'
+      +   '<div style="height:6px;width:'+puntaje+'%;background:'+color+';transition:width .6s"></div>'
+      + '</div>';
+    (aud.hallazgos || []).forEach(function(h){
+      var bg = h.severidad === 'alta' ? '#fef2f2' : h.severidad === 'media' ? '#fffbeb' : '#eff6ff';
+      var bd = h.severidad === 'alta' ? '#fecaca' : h.severidad === 'media' ? '#fde68a' : '#bfdbfe';
+      html += '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+        +   '<div style="display:flex;gap:10px;align-items:flex-start">'
+        +     '<div style="font-size:1.1rem">' + (h.icono||'⚠') + '</div>'
+        +     '<div style="flex:1">'
+        +       '<div style="font-weight:700;font-size:.88rem;color:#111827">' + (h.titulo||'') + '</div>'
+        +       '<div style="font-size:.78rem;color:#374151;margin-top:.2rem;line-height:1.5">' + (h.detalle||'') + '</div>'
+        +       (h.tip ? '<div style="font-size:.76rem;color:#0c4a6e;margin-top:.4rem;background:#e0f2fe;padding:6px 8px;border-radius:6px"><b>💡 Tip:</b> ' + h.tip + '</div>' : '')
+        +     '</div>'
+        +   '</div>'
+        + '</div>';
+    });
+    html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">'
+      +   '<button id="aud-corregir" class="btn btn-ghost" style="padding:10px 16px">Lo corrijo primero</button>'
+      +   '<button id="aud-continuar" class="btn" style="padding:10px 18px;background:'+color+';color:#fff;border:0;border-radius:8px;font-weight:700">Marcar RESPONDIDA de todos modos</button>'
+      + '</div>'
+      + '</div>';
+    var bg = document.createElement('div');
+    bg.id = 'auditoria-modal';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:6000;backdrop-filter:blur(2px);animation:fadeIn .15s ease';
+    bg.innerHTML = html;
+    document.body.appendChild(bg);
+    document.getElementById('aud-corregir').onclick = function(){ bg.remove(); resolve(false); };
+    document.getElementById('aud-continuar').onclick = function(){ bg.remove(); resolve(true); };
+  });
+}
+
 async function marcarFacturaRespondida(glosaId, factura, btn){
   if(!glosaId) return;
-  if(!confirm('¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?\n\nSe moverá a la bandeja Respondidas y se quitará de las pendientes de Mis glosas.')) return;
+  // Auto-auditoría primero (suave). Si pasa o el gestor decide continuar,
+  // procedemos a marcar. Si el gestor dice "lo corrijo", abortamos.
+  var ok = await _auditarYConfirmar(glosaId, factura);
+  if(!ok) return;
   if(btn){
     btn.disabled = true;
     btn.textContent = '⏳ Guardando...';
@@ -8182,6 +8271,67 @@ async function _cargarMapaAutopilot(){
   }catch(_){ return {}; }
 }
 
+// ─── Asistente conversacional ──────────────────────────────────────
+// Mensaje de bienvenida dinámico arriba de Mis glosas. Cambia según hora,
+// cantidad de pendientes, vista activa y patrones del día. NUNCA presiona
+// con cifras de dinero — la idea es enseñar y acompañar, no estresar.
+function _saludoPorHora(){
+  var h = new Date().getHours();
+  if(h < 6) return {emoji:'🌙', saludo:'Trabajando temprano'};
+  if(h < 12) return {emoji:'☀', saludo:'Buenos días'};
+  if(h < 19) return {emoji:'☕', saludo:'Buenas tardes'};
+  return {emoji:'🌆', saludo:'Buenas noches'};
+}
+
+function _tipDelDia(stats){
+  // stats: { pendientes, urgentes24h, obsoletos, alta_cuantia, completadas_hoy }
+  // Selecciona UN tip pertinente. Tono: amigable, educativo, sin presión.
+  var tips = [];
+  var p = stats.pendientes || 0;
+  if(p === 0){
+    tips.push('🎉 No tenés pendientes. Si querés, podés revisar Plantillas Gold para refinar tu repertorio, o tomar café tranquilo. Gran trabajo.');
+  } else if(p <= 5){
+    tips.push('🌿 Pocas pendientes hoy. Es buen momento para resolver con calma — calidad sobre velocidad.');
+  } else if(stats.urgentes24h && stats.urgentes24h > 0){
+    tips.push('⏰ Tenés ' + stats.urgentes24h + ' glosa(s) que vencen en 24h. Te recomiendo arrancar por esas — el chip "Vencen ≤ 24h" las filtra.');
+  } else if(stats.obsoletos && stats.obsoletos > 0){
+    tips.push('🔧 Detecté ' + stats.obsoletos + ' dictamen(es) obsoletos. Si los reabrís y regenerás en lote, salen mucho mejor con el catálogo actual.');
+  } else if(stats.alta_cuantia && stats.alta_cuantia > 0){
+    tips.push('💎 ' + stats.alta_cuantia + ' alta(s) cuantía(s) en pipeline. Estas merecen un dictamen sólido — refiná con la IA si hace falta.');
+  } else if(p > 30){
+    tips.push('📋 Bastantes pendientes hoy. Truco: usá "Generar respuestas en lote" en glosas similares — la IA las procesa en paralelo.');
+  } else {
+    var rotacion = [
+      '💡 ¿Sabías que podés filtrar por "TA sin contrato" para ver dónde necesitás cargar tarifario?',
+      '⌨ Tip: el botón "Refinar" deja que le pidás a la IA cambios puntuales sin re-analizar todo.',
+      '📚 Las plantillas Gold guardan tus mejores defensas — revisá cuáles guardarías.',
+      '🧠 Si un dictamen no te convence, pulsá "Refinar" y describí en lenguaje natural qué cambiar. La IA ajusta solo eso.',
+      '🛡 Antes de marcar como RESPONDIDA hago una mini-auditoría — si todo OK, paso de largo. Si veo algo, te aviso.',
+    ];
+    tips.push(rotacion[Math.floor(Math.random() * rotacion.length)]);
+  }
+  if(stats.completadas_hoy && stats.completadas_hoy > 0){
+    tips.push('✨ Llevás ' + stats.completadas_hoy + ' respondidas hoy — vas bien.');
+  }
+  return tips.join(' · ');
+}
+
+function renderSaludoAsistente(stats){
+  var box = document.getElementById('asistente-saludo');
+  if(!box) return;
+  // Si el usuario lo ocultó manualmente, respetar (sessionStorage)
+  if(sessionStorage.getItem('asistente_oculto') === '1') { box.style.display = 'none'; return; }
+  var nombre = (window._user_nombre || (window.__user && window.__user.nombre) || 'gestor').split(' ')[0];
+  var s = _saludoPorHora();
+  var saludoTxt = document.getElementById('asistente-saludo-texto');
+  var tipTxt = document.getElementById('asistente-tip');
+  var emojiEl = document.getElementById('asistente-emoji');
+  if(emojiEl) emojiEl.textContent = s.emoji;
+  if(saludoTxt) saludoTxt.textContent = s.saludo + ', ' + nombre + '. ¿Empezamos?';
+  if(tipTxt) tipTxt.innerHTML = _tipDelDia(stats || {});
+  box.style.display = 'flex';
+}
+
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var vista = window._mis_vista || '';
@@ -8218,6 +8368,21 @@ async function loadMisGlosas(){
     setCount('mis-count-pendientes', countPend);
     setCount('mis-count-respondidas', countResp);
     setCount('mis-count-todas', data.length);
+
+    // Asistente conversacional: saludo + tip del día contextual.
+    try{
+      var statsAsist = {
+        pendientes: countPend,
+        urgentes24h: data.filter(function(g){
+          var e = (g.estado||'').toUpperCase(), wf = (g.workflow_state||'').toUpperCase();
+          var t = ['RESPONDIDA','CONCILIADA','LEVANTADA'];
+          return t.indexOf(e) === -1 && t.indexOf(wf) === -1 && (g.dias_restantes||999) <= 1;
+        }).length,
+        alta_cuantia: data.filter(function(g){ return (g.valor_objetado||0) >= 5_000_000; }).length,
+        completadas_hoy: countResp,
+      };
+      renderSaludoAsistente(statsAsist);
+    }catch(_){ /* silencioso */ }
 
     _renderMisGlosas(data);
   }catch(e){ body.innerHTML = '<tr class="empty-row"><td colspan="13">Error: '+escHtml(e.message)+'</td></tr>'; }

@@ -2963,6 +2963,26 @@ def obtener_glosa(
     }
 
 
+@router.get("/{glosa_id}/auditoria")
+def auditar_glosa(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Auto-auditoría suave del dictamen antes de marcar como RESPONDIDA.
+
+    Devuelve hallazgos de calidad (cita normativa, código RE coherente,
+    texto canónico de extemporáneas/ratificadas, soportes, etc.). NO
+    bloquea — el gestor decide si corrige o radica de todos modos.
+    """
+    repo = GlosaRepository(db)
+    glosa = repo.obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    from app.services.auditor_dictamen import auditar_dictamen
+    return auditar_dictamen(glosa, db)
+
+
 @router.delete("/{glosa_id}")
 def eliminar_glosa(
     glosa_id: int,

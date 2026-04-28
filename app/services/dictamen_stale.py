@@ -37,6 +37,21 @@ _FRASES_NO_CONTRATO = (
     "SIN CONTRATO ENTRE LAS PARTES",
 )
 
+# Frases canónicas que DEBEN aparecer en dictámenes mecánicos. Si la glosa
+# califica como extemporánea o ratificada pero el texto del dictamen no
+# contiene la frase canónica, el dictamen quedó mal generado por el LLM
+# (caso glosa #2484: texto suavizado 'RESPETUOSAMENTE NO ACEPTA' cuando
+# debería ser el canónico 'NO ACEPTA GLOSA EXTEMPORÁNEA').
+_CANONICA_EXTEMPORANEA = "NO ACEPTA GLOSA EXTEMPORANEA"
+_CANONICA_RATIFICADA = "NO ACEPTA GLOSA RATIFICADA"
+
+# Indicadores en el texto de la glosa o etapa que delatan ratificación.
+_INDICADORES_RATIFICACION = (
+    "RATIFIC",   # RATIFICACION / RATIFICADA / RATIFICACIÓN
+    "RESPUESTA A RATIFICACION",
+    "RESPUESTA RATIFICACION",
+)
+
 
 def es_stale(glosa, db) -> bool:
     """True si el dictamen quedó desactualizado por carga de tarifas o
@@ -147,6 +162,24 @@ def motivo_stale(glosa, db) -> Optional[str]:
     tercero = (getattr(glosa, "tercero_nombre", "") or "").strip()
     codigo_respuesta = (getattr(glosa, "codigo_respuesta", "") or "").strip().upper()
     codigo_glosa = (getattr(glosa, "codigo_glosa", "") or "").strip().upper()
+    etapa = (getattr(glosa, "etapa", "") or "").upper()
+    dias_radicacion = int(getattr(glosa, "dias_radicacion_dgh", 0) or 0)
+
+    # 0a) Extemporánea (>20 días) sin texto canónico aplicado.
+    if dias_radicacion > 20 and _CANONICA_EXTEMPORANEA not in texto:
+        return (
+            f"Glosa extemporánea ({dias_radicacion} días) pero el dictamen "
+            f"no usa el texto canónico HUS para extemporáneas. "
+            f"Re-analizar para aplicar el texto fijo correcto."
+        )
+
+    # 0b) Ratificación sin texto canónico aplicado.
+    if any(ind in etapa for ind in _INDICADORES_RATIFICACION) and _CANONICA_RATIFICADA not in texto:
+        return (
+            "Glosa en etapa de ratificación pero el dictamen no usa el "
+            "texto canónico HUS para ratificadas. Re-analizar para "
+            "aplicar el texto fijo correcto."
+        )
 
     # 1) Texto-based: dictamen niega contrato pero la EPS sí tiene tarifas
     #    activas. Se aplica también a dictámenes sin timestamp (legados).
