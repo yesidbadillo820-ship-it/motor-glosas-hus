@@ -2196,6 +2196,19 @@ def mis_asignaciones(
         terminales = {"RESPONDIDA", "CONCILIADA", "LEVANTADA", "ACEPTADA",
                       "RATIFICADA", "ARCHIVADA"}
 
+        # Vista "dictamen_obsoleto" — recorre el módulo dedicado. Cargamos
+        # los IDs antes del filtro para no llamar dictamen_stale.es_stale
+        # por cada glosa (evita N+1 sobre tarifas_contratadas).
+        ids_obsoletos: set[int] = set()
+        if vista_norm == "dictamen_obsoleto":
+            from app.services.dictamen_stale import es_stale as _es_stale
+            for g in glosas:
+                try:
+                    if _es_stale(g, db):
+                        ids_obsoletos.add(g.id)
+                except Exception:
+                    continue
+
         def _matches(g) -> bool:
             score, _ = score_por_id.get(g.id, (0, ""))
             estado = (g.estado or "").upper()
@@ -2219,6 +2232,8 @@ def mis_asignaciones(
                 return valor >= 5_000_000 and estado not in terminales
             if vista_norm == "respondidas":
                 return estado in terminales or wf in terminales
+            if vista_norm == "dictamen_obsoleto":
+                return g.id in ids_obsoletos
             return True
 
         glosas = [g for g in glosas if _matches(g)]
