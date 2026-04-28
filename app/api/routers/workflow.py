@@ -152,11 +152,15 @@ def transicionar_lote(
         if exito:
             resumen["procesadas"] += 1
         else:
-            # "RESPONDIDA a RESPONDIDA" y similares se tratan como idempotentes
-            if "a " + destino in (mensaje or "") and destino in (mensaje or ""):
+            # Race: si estado_actual cambió a destino entre la lectura y la
+            # transición, el mensaje será "de {destino} a {destino}". Solo
+            # ese patrón cuenta como idempotente; los demás (terminal
+            # incompatible, etc.) son fallidas reales.
+            msg = mensaje or ""
+            if f"de {destino} a {destino}" in msg:
                 resumen["ya_en_estado"] += 1
             else:
-                resumen["fallidas"].append({"id": gid, "error": mensaje[:200]})
+                resumen["fallidas"].append({"id": gid, "error": msg[:200]})
 
     return resumen
 
