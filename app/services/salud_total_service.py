@@ -204,14 +204,17 @@ class GlosaSaludTotal:
         servicio = servicio_raw[:80] if len(servicio_raw) > 80 else servicio_raw
 
         # Calificativo de apertura según código RE.
-        # Importante: NO insertamos adjetivos calificativos como "INJUSTIFICADA"
-        # entre "GLOSA" y el conector — la fórmula institucional es
-        # "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE…". El
-        # adjetivo "INJUSTIFICADA" pertenece al nombre del código RE, NO a
-        # la apertura del argumento.
+        # REGLA DE NEGOCIO (abr 2026): "LA GLOSA INJUSTIFICADA" SÍ aplica
+        # cuando la entidad NO tiene contrato y glosa por TARIFAS (TA**) —
+        # porque sin contrato no existe tarifa pactada y la objeción carece
+        # de sustento. Este servicio (salud_total_service) está dedicado a
+        # entidades SIN contrato (Salud Total, Dispensarios, Sanidad
+        # Militar, etc.), por lo que RE9602 → "LA GLOSA INJUSTIFICADA" es
+        # correcto aquí. Para entidades CON contrato se usa RE9901 con
+        # argumento técnico, NO RE9602 (lo enruta otro flujo).
         CALIFICATIVO = {
-            "RE9502": "LA GLOSA",
-            "RE9602": "LA GLOSA",
+            "RE9502": "LA GLOSA EXTEMPORÁNEA",
+            "RE9602": "LA GLOSA INJUSTIFICADA",
             "RE9701": "LA DEVOLUCIÓN",
             "RE9702": "LA GLOSA",
             "RE9801": "LA GLOSA",

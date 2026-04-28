@@ -1583,21 +1583,36 @@ class GlosaService:
                 arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
 
             # 10b) Limpiar adjetivos calificativos colados en la apertura.
-            # La IA tiende a copiar el nombre del código RE (p.ej.
-            # "RE9602 GLOSA INJUSTIFICADA…") dentro de la frase de apertura,
-            # produciendo "ESE HUS NO ACEPTA LA GLOSA INJUSTIFICADA APLICADA…",
-            # cuando la fórmula correcta es "ESE HUS NO ACEPTA LA GLOSA
-            # APLICADA POR CONCEPTO DE…". Removemos el adjetivo intercalado.
-            arg_ia = re.sub(
-                r"\bLA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
-                "LA GLOSA APLICADA",
-                arg_ia, flags=re.IGNORECASE,
-            )
-            arg_ia = re.sub(
-                r"\bACEPTA\s+LA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\b(?!\s+APLICADA)",
-                "ACEPTA LA GLOSA",
-                arg_ia, flags=re.IGNORECASE,
-            )
+            # REGLA DE NEGOCIO (abr 2026):
+            #   • TA + sin contrato → "LA GLOSA INJUSTIFICADA" SÍ es válido
+            #     (no hay tarifa pactada → la objeción es injustificada).
+            #   • Cualquier otro caso (TA con contrato, o concepto distinto
+            #     a TA) → la apertura debe ser "LA GLOSA APLICADA POR
+            #     CONCEPTO DE…" sin adjetivo. Si la IA mete "INJUSTIFICADA"
+            #     en esos casos, lo limpiamos.
+            # Variables disponibles del flujo: `prefijo` (TA/SO/AU/...) y
+            # `tiene_contrato` (bool).
+            _injustificada_permitida = (prefijo == "TA" and not tiene_contrato)
+            if not _injustificada_permitida:
+                arg_ia = re.sub(
+                    r"\bLA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
+                    "LA GLOSA APLICADA",
+                    arg_ia, flags=re.IGNORECASE,
+                )
+                arg_ia = re.sub(
+                    r"\bACEPTA\s+LA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\b(?!\s+APLICADA)",
+                    "ACEPTA LA GLOSA",
+                    arg_ia, flags=re.IGNORECASE,
+                )
+            else:
+                # TA + sin contrato: solo limpiar los OTROS adjetivos
+                # (INDEBIDA / IMPROCEDENTE / etc.) pero permitir
+                # INJUSTIFICADA porque corresponde a la regla de negocio.
+                arg_ia = re.sub(
+                    r"\bLA\s+GLOSA\s+(INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
+                    "LA GLOSA APLICADA",
+                    arg_ia, flags=re.IGNORECASE,
+                )
 
             # 11) Limpieza minima de PHI: solo conectores o formatos rotos,
             # PERO conservamos nombres y numero de HC porque son base argumental

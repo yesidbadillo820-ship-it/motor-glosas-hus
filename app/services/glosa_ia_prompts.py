@@ -438,7 +438,24 @@ PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMEN
   • Si no hay número alguno:
       "FACTURADO POR EL VALOR INDICADO EN EL EXPEDIENTE"
 🚫 PROHIBIDO escribir "FACTURADO POR $[OBJETADO]" — son conceptos DISTINTOS. Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
-🚫 PROHIBIDO ABSOLUTO insertar adjetivos calificativos entre "GLOSA" y "APLICADA" en la apertura. La forma EXACTA es: "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE…". NUNCA escribas "GLOSA INJUSTIFICADA APLICADA", "GLOSA INDEBIDA APLICADA", "GLOSA IMPROCEDENTE APLICADA", "GLOSA INFUNDADA APLICADA" ni cualquier variante. Aunque el código de respuesta o el catálogo se llamen "GLOSA INJUSTIFICADA…", ESE nombre NO debe replicarse en la primera oración: el adjetivo va únicamente en el argumento técnico, NO en la fórmula de apertura. Solo "LA GLOSA APLICADA POR CONCEPTO DE [TIPO]".
+
+📋 REGLA CONDICIONAL DEL ADJETIVO "INJUSTIFICADA" EN LA APERTURA:
+  ✅ SÍ usar "LA GLOSA INJUSTIFICADA APLICADA POR CONCEPTO DE TARIFAS…" SOLO cuando:
+      • Concepto = TARIFAS (código TA**: TA0201, TA0801, etc.) Y
+      • La entidad NO tiene contrato vigente con ESE HUS.
+      Justificación: sin contrato no existe tarifa pactada, por lo que
+      la objeción tarifaria carece de sustento → "INJUSTIFICADA" es
+      preciso jurídicamente.
+  🚫 NO usar "INJUSTIFICADA" en la apertura cuando:
+      • La entidad SÍ tiene contrato (aunque el código sea TA): se
+        argumenta técnicamente con base en el contrato, no se etiqueta
+        como injustificada. Apertura = "LA GLOSA APLICADA POR…".
+      • El código NO es TA (FA, SO, AU, CO, PE, IS, ME, etc.) sin
+        importar si hay contrato o no: la apertura es siempre
+        "LA GLOSA APLICADA POR CONCEPTO DE…".
+  🚫 NUNCA usar otros adjetivos en la apertura: "INDEBIDA", "IMPROCEDENTE",
+      "INFUNDADA", "INCORRECTA", "ERRÓNEA". Esos van solo en el
+      cuerpo del argumento, NO en la primera oración.
 
 PÁRRAFO 2 — REFUTACIÓN FÁCTICA (70-100 palabras, enumerada): Abre con "LA AFIRMACIÓN DE LA AUDITORÍA DE QUE [motivo EPS, literal] NO SE AJUSTA A [...] POR LAS SIGUIENTES RAZONES:". Enumera 2-3 razones concisas con "EN PRIMER LUGAR / EN SEGUNDO LUGAR / EN TERCER LUGAR". Cada razón 1-2 oraciones técnicas. Sin redundancia.
 
