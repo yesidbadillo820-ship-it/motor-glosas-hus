@@ -9657,6 +9657,10 @@ async function responderGlosa(id){
     var r = await fetch('/glosas/' + id, {headers: authH()});
     if(!r.ok){ alert('No se pudo cargar la glosa'); return; }
     var g = await r.json();
+    // Soportes auto-detectados del servidor (\\Prime\radicacion_2026)
+    // — corre en paralelo, no bloqueante. Aparece como banner verde
+    // si hay PDFs disponibles para esta factura.
+    if(g.factura) _detectarSoportesParaFactura(g.factura);
 
     // 1. Cambiar a pestaña Analizar
     var tabs = document.querySelectorAll('.nb');
@@ -11222,6 +11226,68 @@ async function reindexarSoportes(){
       'success');
     cargarSoportesEstado();
   }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+// Auto-detección de soportes al abrir una glosa.
+// Llama /soportes-auto/factura/{numero} y, si hay PDFs disponibles
+// en el servidor de archivos del HUS, los muestra como banner verde
+// dentro del panel de Analizar. El gestor sabe sin tener que ir a
+// buscarlos manualmente al servidor.
+async function _detectarSoportesParaFactura(factura){
+  if(!factura) return;
+  // Quitar banner previo (si abrimos una glosa diferente)
+  var prev = document.getElementById('soportes-banner-auto');
+  if(prev) prev.remove();
+  try{
+    var r = await fetch('/soportes-auto/factura/' + encodeURIComponent(factura), {headers: authH()});
+    if(!r.ok) return;  // 404/503 silencioso — el banner solo aparece si encontramos algo
+    var d = await r.json();
+    if(!d || !d.total) return;  // sin soportes, no banner
+    // Insertar el banner al inicio del panel de Analizar
+    var area = document.getElementById('result-area');
+    if(!area) return;
+    var banner = document.createElement('div');
+    banner.id = 'soportes-banner-auto';
+    var tipos = (d.tipos_detectados || []).map(function(t){
+      var badges = {
+        'FEV':'Factura electrónica','HEV':'Historia clínica',
+        'CRC':'Comp. recibido cobro','RIPS':'RIPS','OPF':'Otros proc.',
+        'PDE':'PDE','PDX':'PDX','FURIPS':'FURIPS','RESULTADOSMSPS':'Validador MSPS',
+        'AD':'XML CUFE'
+      };
+      return badges[t] || t;
+    }).join(', ');
+    banner.style.cssText = 'margin:1rem 1.5rem;padding:.9rem 1.2rem;background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:2px solid #16a34a;border-radius:10px;color:#065f46';
+    banner.innerHTML =
+        '<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap">'
+      +   '<div style="font-size:1.6rem">📁</div>'
+      +   '<div style="flex:1;min-width:240px">'
+      +     '<div style="font-weight:800;font-size:.9rem">'
+      +       '✓ ' + d.total + ' soporte(s) detectado(s) en el servidor'
+      +     '</div>'
+      +     '<div style="font-size:.75rem;margin-top:.2rem">'
+      +       'Factura <b>' + escHtml(d.factura) + '</b> · Tipos: ' + escHtml(tipos)
+      +     '</div>'
+      +   '</div>'
+      +   '<button class="btn-sm" style="background:#16a34a;color:#fff;border:0" onclick="_verSoportesDetalle(\'' + (d.factura || '').replace(/\'/g,"\\'") + '\')">Ver detalle</button>'
+      + '</div>';
+    area.insertBefore(banner, area.firstChild);
+  }catch(_){
+    // silencioso — la detección no debe romper el flujo de Responder
+  }
+}
+
+function _verSoportesDetalle(factura){
+  // Saltar al panel Soportes con la factura precargada
+  var btn = document.querySelector('.sn-item[data-tip="Soportes"]');
+  if(btn && typeof sidebarTab === 'function') sidebarTab(btn, 'soportes');
+  setTimeout(function(){
+    var input = document.getElementById('soportes-q');
+    if(input){
+      input.value = factura;
+      if(typeof buscarSoportesFactura === 'function') buscarSoportesFactura();
+    }
+  }, 200);
 }
 
 async function buscarSoportesFactura(){
