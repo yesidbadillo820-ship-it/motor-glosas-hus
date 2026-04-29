@@ -63,11 +63,31 @@ async def _loop() -> None:
 
 
 def iniciar_scheduler() -> None:
-    """Inicia el loop. Idempotente."""
+    """Inicia el loop. Idempotente.
+
+    Optimización memoria (free tier): si la raíz de soportes NO existe,
+    NO arrancamos el scheduler — sería un task de asyncio en background
+    que solo loguea errores y consume RAM. Cuando Infra HUS conecte
+    el mount o el jump-box agent empuje el primer batch, el endpoint
+    /soportes-auto/reindex sí queda disponible para forzar manualmente.
+    """
     global _task
     if _task is not None and not _task.done():
         logger.info("[SOPORTES-REINDEX] Scheduler ya estaba activo")
         return
+    # Evitar arrancar el scheduler si no hay raíz accesible.
+    try:
+        from pathlib import Path
+        import os as _os
+        raiz = Path(_os.getenv("SOPORTES_ROOT", "/mnt/radicacion_2026"))
+        if not raiz.exists():
+            logger.info(
+                f"[SOPORTES-REINDEX] Scheduler NO iniciado — raíz no existe: {raiz} "
+                "(reactivá montando el share o configurando jump-box agent)"
+            )
+            return
+    except Exception:
+        pass  # si el check falla, seguimos como antes
     try:
         loop = asyncio.get_event_loop()
         _task = loop.create_task(_loop())

@@ -21,8 +21,12 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Límite de glosas procesadas en paralelo (anti rate-limit Anthropic)
-_MAX_CONCURRENCIA = 3
+# Límite de glosas procesadas en paralelo. Considera dos restricciones:
+#   1. Rate-limit Anthropic (3-5 paralelas seguro para Claude Sonnet)
+#   2. Memoria del proceso (Render Free = 512 MB). Cada call IA mantiene en
+#      memoria el prompt + respuesta + PDFs decodificados; con 3 paralelas
+#      llegamos a OOM kills. Bajamos a 2 para reducir picos.
+_MAX_CONCURRENCIA = 2
 _SEMAFORO = asyncio.Semaphore(_MAX_CONCURRENCIA)
 
 
@@ -186,13 +190,29 @@ async def procesar_lote(glosa_ids: list[int]) -> dict:
         f"ya_procesadas={ya_procesadas} errores={errores}"
     )
 
+    # Memoria (Render Free 512 MB): el `detalle` puede contener referencias
+    # a dictámenes HTML grandes (varios KB c/u) × N glosas. En lotes de
+    # 50-100 glosas eso son varios MB que no se liberan hasta que la
+    # task background termine. Compactamos el detalle a solo los IDs
+    # antes de devolver, y forzamos GC.
+    detalle_compacto = [
+        {"glosa_id": r.get("glosa_id"), "estado": r.get("estado")}
+        for r in resultados
+    ]
+    del resultados
+    try:
+        import gc as _gc
+        _gc.collect()
+    except Exception:
+        pass
+
     return {
         "total": len(glosa_ids),
         "respondidas": respondidas,
         "requieren_soportes": req_soportes,
         "ya_procesadas": ya_procesadas,
         "errores": errores,
-        "detalle": resultados,
+        "detalle": detalle_compacto,
     }
 
 

@@ -1780,7 +1780,7 @@ class GlosaService:
             logger.warning(f"Error calculando riesgo: {_e}")
             riesgo = None
 
-        return GlosaResult(
+        resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
             dictamen=dictamen,
@@ -1801,6 +1801,17 @@ class GlosaService:
                 valor_defender_ia if valor_defender_ia > 0 else None
             ),
         )
+        # Memoria (Render Free 512 MB): el análisis dejó en memoria PDFs
+        # decodificados, prompts grandes, y caché de respuestas IA. Si no
+        # forzamos GC ahora, varios análisis seguidos llegan al límite y
+        # disparan OOM kill (~90s downtime). Llamada explícita reduce
+        # picos de heap entre 50-80 MB en pruebas locales.
+        try:
+            import gc as _gc
+            _gc.collect()
+        except Exception:
+            pass
+        return resultado
 
     def _calcular_score(self, tipo_glosa: str, es_extemporanea: bool, es_ratificacion: bool,
                         tiene_pdf: bool, es_urgencia: bool, es_tarifa: bool,
