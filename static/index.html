@@ -362,6 +362,7 @@ body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
 .panel.active#p-detector-masa,
 .panel.active#p-simulador,
 .panel.active#p-salud-total,
+.panel.active#p-soportes,
 .panel.active#p-historial,
 .panel.active#p-mis-glosas,
 .panel.active#p-alertas,
@@ -1454,6 +1455,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <button class="sn-item" data-tip="Salud Total" onclick="sidebarTab(this,'salud-total')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M20.84 4.61A5.5 5.5 0 0 0 13.06 4.61L12 5.67L10.94 4.61A5.5 5.5 0 0 0 3.16 12.39L12 21.23L20.84 12.39A5.5 5.5 0 0 0 20.84 4.61Z"/></svg>
           <span class="sn-item-label">Salud Total</span>
+        </button>
+        <button class="sn-item" data-tip="Soportes" onclick="sidebarTab(this,'soportes')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span class="sn-item-label">Soportes</span>
         </button>
         <button class="sn-item sn-highlight" data-tip="Importar recepción" onclick="window.location.href='/importar-recepcion'">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -2640,6 +2645,86 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             </div>
           </div>
           <div id="sim-resultado" style="margin-top:1.2rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── SOPORTES (anclar servidor de archivos) ─── -->
+    <div class="panel" id="p-soportes">
+      <div style="flex:1 1 auto;overflow-y:auto;overflow-x:hidden;width:100%;min-height:0;">
+        <div class="panel-hero">
+          <div class="panel-hero-inner">
+            <span class="panel-hero-tag">Servidor de archivos</span>
+            <h1>Soportes — Indexador del servidor de radicación</h1>
+            <div class="panel-hero-sub">
+              📁 Anclar el servidor de archivos del HUS (<code>\\Prime\radicacion_2026</code>) para que el motor
+              detecte automáticamente los PDFs de cada factura (FEV, HEV, RIPS, etc.) al responder glosas.
+              Estructura esperada: <code>{MES} {AÑO} - SOPORTES RADICACION / {EPS} / FVS_900006037_{factura}.pdf</code>.
+            </div>
+          </div>
+        </div>
+        <div style="padding:1.5rem 2rem;max-width:1100px;margin:0 auto">
+
+          <!-- Estado del indexador -->
+          <div class="form-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem">
+              <div>
+                <h3 style="margin:0">📊 Estado del indexador</h3>
+                <p style="font-size:.75rem;color:var(--text3);margin-top:.25rem">Reconstruye el índice de soportes en disco. El scheduler corre cada 24h a las 2 AM.</p>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <button class="btn-secondary" onclick="cargarSoportesEstado()">Actualizar</button>
+                <button class="btn-primary" onclick="reindexarSoportes()">🔄 Reindexar ahora</button>
+              </div>
+            </div>
+            <div id="soportes-estado" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.7rem"></div>
+          </div>
+
+          <!-- Buscador por factura -->
+          <div class="form-card">
+            <h3>🔎 Buscar soportes por factura</h3>
+            <p style="font-size:.78rem;color:var(--text3);margin-bottom:.8rem">
+              Pegá el número de factura (<code>HUS487175</code>, <code>HUS0000487175</code> o solo <code>487175</code>) — se normaliza por la parte numérica.
+            </p>
+            <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
+              <div class="field" style="margin:0;flex:1;min-width:240px">
+                <label style="font-size:.7rem">Número de factura</label>
+                <input id="soportes-q" type="text" placeholder="Ej: HUS0000487175" onkeydown="if(event.key==='Enter')buscarSoportesFactura()" />
+              </div>
+              <button class="btn-primary" onclick="buscarSoportesFactura()">Buscar</button>
+            </div>
+            <div id="soportes-resultados" style="margin-top:1rem"></div>
+          </div>
+
+          <!-- Cómo conectar el servidor -->
+          <div class="form-card" style="border:2px dashed #f59e0b;background:#fffbeb">
+            <h3 style="color:#92400e">🔌 Cómo conectar tu servidor de archivos</h3>
+            <p style="font-size:.8rem;color:var(--text2);margin-bottom:.8rem">
+              El motor corre en Render (cloud). Tu servidor <code>\\Prime\radicacion_2026</code> está en la red local del HUS. Hay dos formas de conectarlos:
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.8rem">
+              <div style="background:#fff;border:1px solid #f59e0b;border-radius:8px;padding:1rem">
+                <div style="font-size:.85rem;font-weight:700;color:#92400e;margin-bottom:.4rem">Plan A — Mount CIFS directo</div>
+                <p style="font-size:.75rem;color:var(--text2);line-height:1.5">
+                  Infra del HUS expone <code>\\Prime</code> a Render vía VPN/túnel y se monta como <code>/mnt/radicacion_2026</code>. El motor lee el share en tiempo real.
+                </p>
+                <p style="font-size:.7rem;color:var(--text3);margin-top:.5rem">
+                  Variable: <code>SOPORTES_ROOT=/mnt/radicacion_2026</code>
+                </p>
+              </div>
+              <div style="background:#fff;border:2px solid #10b981;border-radius:8px;padding:1rem">
+                <div style="font-size:.85rem;font-weight:700;color:#065f46;margin-bottom:.4rem">Plan B — Jump-box agent ⭐ recomendado</div>
+                <p style="font-size:.75rem;color:var(--text2);line-height:1.5">
+                  Una PC del HUS con acceso a <code>Y:\</code> corre <code>tools/jumpbox_sync.py</code> y empuja los archivos al motor por HTTP cada N minutos.
+                </p>
+                <p style="font-size:.7rem;color:var(--text3);margin-top:.5rem">
+                  Variables: <code>MOTOR_URL</code>, <code>MOTOR_TOKEN</code>, <code>SHARE_ROOT=Y:\</code>
+                </p>
+                <button class="btn-secondary btn-sm" style="margin-top:.5rem;font-size:.72rem" onclick="window.open('https://github.com/yesidbadillo820-ship-it/motor-glosas-hus/blob/motor-glosas/tools/README_jumpbox.md','_blank')">📖 Setup paso a paso</button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -4547,6 +4632,7 @@ function tab(btn,id){
   if(id==='usuarios') cargar2FAEstado();
   if(id==='papelera') cargarPapelera();
   if(id==='tarifas') cargarTarifas();
+  if(id==='soportes') cargarSoportesEstado();
   // Si el usuario vuelve al panel de Analizar y la glosa activa ya
   // está cerrada (lastResult con workflow terminal), limpiar el panel
   // para no mostrar un dictamen viejo. Si no hay glosa activa, no
@@ -11074,6 +11160,125 @@ async function cargarPlataRecuperada(){
       ]);
     }
   }catch(e){ console.error('plata-recuperada error', e); }
+}
+
+// ─── Soportes (anclar servidor de archivos) ───────────────────────────
+async function cargarSoportesEstado(){
+  var box = document.getElementById('soportes-estado');
+  if(!box) return;
+  box.innerHTML = '<div style="color:var(--text3);grid-column:1/-1">Consultando indexador…</div>';
+  try{
+    var r = await fetch('/soportes-auto/stats', {headers: authH()});
+    if(!r.ok){
+      box.innerHTML = '<div style="color:#991b1b;grid-column:1/-1">Error: ' + r.status + '</div>';
+      return;
+    }
+    var s = await r.json();
+    var raizExiste = s.raiz_existe;
+    var bgEst = raizExiste ? '#ecfdf5' : '#fef2f2';
+    var fgEst = raizExiste ? '#065f46' : '#991b1b';
+    var labelEst = raizExiste ? '✓ Raíz accesible' : '✗ Raíz NO accesible';
+    var hace = s.construido_hace_seg;
+    var haceTxt = hace == null ? 'nunca'
+      : hace < 60 ? Math.round(hace) + 's'
+      : hace < 3600 ? Math.round(hace/60) + 'm'
+      : Math.round(hace/3600) + 'h';
+    box.innerHTML =
+        '<div style="background:' + bgEst + ';border:1px solid ' + fgEst + ';border-radius:8px;padding:.7rem 1rem">'
+      +   '<div style="font-size:.68rem;font-weight:700;color:' + fgEst + ';text-transform:uppercase;letter-spacing:.05em">Estado</div>'
+      +   '<div style="font-size:1rem;font-weight:800;color:' + fgEst + ';margin-top:.2rem">' + labelEst + '</div>'
+      +   '<div style="font-size:.7rem;color:var(--text3);margin-top:.2rem;font-family:var(--font-mono);word-break:break-all">' + escHtml(s.raiz || '') + '</div>'
+      + '</div>'
+      + '<div style="background:#dbeafe;border:1px solid #2563eb;border-radius:8px;padding:.7rem 1rem">'
+      +   '<div style="font-size:.68rem;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:.05em">Facturas indexadas</div>'
+      +   '<div style="font-size:1.4rem;font-weight:800;color:#1e3a8a;margin-top:.15rem">' + (s.facturas_indexadas || 0).toLocaleString('es-CO') + '</div>'
+      + '</div>'
+      + '<div style="background:#f3e8ff;border:1px solid #7c3aed;border-radius:8px;padding:.7rem 1rem">'
+      +   '<div style="font-size:.68rem;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.05em">Archivos indexados</div>'
+      +   '<div style="font-size:1.4rem;font-weight:800;color:#5b21b6;margin-top:.15rem">' + (s.archivos_indexados || 0).toLocaleString('es-CO') + '</div>'
+      + '</div>'
+      + '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.7rem 1rem">'
+      +   '<div style="font-size:.68rem;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em">Último build</div>'
+      +   '<div style="font-size:1rem;font-weight:800;color:#92400e;margin-top:.2rem">hace ' + haceTxt + '</div>'
+      +   (s.ultimo_error ? '<div style="font-size:.65rem;color:#991b1b;margin-top:.2rem">Último error: ' + escHtml(s.ultimo_error) + '</div>' : '')
+      + '</div>';
+  }catch(e){
+    box.innerHTML = '<div style="color:#991b1b;grid-column:1/-1">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function reindexarSoportes(){
+  if(!confirm('¿Forzar reindexación del servidor de archivos?\n\nPuede demorar varios minutos según el volumen de archivos en disco.')) return;
+  toast('Reindexando','Escaneando el servidor de archivos…','info');
+  try{
+    var r = await fetch('/soportes-auto/reindex', {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(!r.ok){
+      toast('Error', d.detail || 'No se pudo reindexar', 'error');
+      return;
+    }
+    toast('Reindexado ✓',
+      d.archivos_indexados + ' archivos / ' + d.facturas_indexadas + ' facturas en ' + d.duracion_segundos + 's',
+      'success');
+    cargarSoportesEstado();
+  }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+async function buscarSoportesFactura(){
+  var q = (document.getElementById('soportes-q').value || '').trim();
+  if(!q){ toast('Buscar','Ingresá un número de factura','warning'); return; }
+  var box = document.getElementById('soportes-resultados');
+  box.innerHTML = '<div style="color:var(--text3);padding:.8rem">Buscando…</div>';
+  try{
+    var r = await fetch('/soportes-auto/factura/' + encodeURIComponent(q), {headers: authH()});
+    if(!r.ok){
+      var err = await r.json().catch(function(){ return {}; });
+      box.innerHTML = '<div style="color:#991b1b;padding:.8rem">Error ' + r.status + ': ' + escHtml(err.detail || '') + '</div>';
+      return;
+    }
+    var d = await r.json();
+    if(!d.total){
+      box.innerHTML = '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.9rem 1.1rem;color:#92400e;font-size:.85rem">'
+        + '<b>Sin soportes para la factura ' + escHtml(d.factura) + '.</b><br>'
+        + 'Causas posibles:<br>'
+        + '• El servidor de archivos no está indexado (si recién se conectó, presioná "🔄 Reindexar ahora").<br>'
+        + '• La factura aún no fue radicada (los soportes se generan al radicar).<br>'
+        + '• El número de factura no coincide con el patrón <code>HUS{dígitos}</code>.'
+        + '</div>';
+      return;
+    }
+    var fmtKb = function(kb){
+      if(kb < 1024) return kb + ' KB';
+      return (kb/1024).toFixed(1) + ' MB';
+    };
+    var rows = d.soportes.map(function(s){
+      var bgTipo = {
+        'factura_electronica':'#dcfce7','historia_clinica':'#dbeafe',
+        'rips':'#f3e8ff','xml_cufe':'#fef3c7'
+      }[s.tipo] || '#f3f4f6';
+      return '<tr style="border-bottom:1px solid rgba(0,0,0,.05)">'
+        + '<td style="padding:.5rem .7rem"><span style="background:' + bgTipo + ';padding:2px 8px;border-radius:10px;font-size:.65rem;font-weight:700;font-family:var(--font-mono)">' + s.tipo_codigo + '</span></td>'
+        + '<td style="padding:.5rem .7rem;font-size:.78rem">' + escHtml(s.nombre_archivo) + '</td>'
+        + '<td style="padding:.5rem .7rem;font-size:.7rem;color:var(--text3)">' + escHtml(s.eps || '—') + '</td>'
+        + '<td style="padding:.5rem .7rem;text-align:right;font-size:.72rem;color:var(--text3)">' + fmtKb(s.tamano_kb || 0) + '</td>'
+        + '<td style="padding:.5rem .7rem;font-size:.65rem;color:var(--text3);font-family:var(--font-mono);word-break:break-all">' + escHtml(s.ruta || '') + '</td>'
+        + '</tr>';
+    }).join('');
+    box.innerHTML = '<div style="background:#ecfdf5;border:1px solid #10b981;border-radius:8px;padding:.7rem 1rem;margin-bottom:.7rem;color:#065f46;font-size:.85rem">'
+      + '<b>✓ ' + d.total + ' soporte(s) encontrado(s)</b> para la factura ' + escHtml(d.factura)
+      + ' · tipos: ' + d.tipos_detectados.join(', ')
+      + '</div>'
+      + '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr style="background:var(--bg-subtle)">'
+      +   '<th style="padding:.5rem .7rem;text-align:left;font-size:.65rem;color:var(--text3);text-transform:uppercase">Tipo</th>'
+      +   '<th style="padding:.5rem .7rem;text-align:left;font-size:.65rem;color:var(--text3);text-transform:uppercase">Archivo</th>'
+      +   '<th style="padding:.5rem .7rem;text-align:left;font-size:.65rem;color:var(--text3);text-transform:uppercase">EPS</th>'
+      +   '<th style="padding:.5rem .7rem;text-align:right;font-size:.65rem;color:var(--text3);text-transform:uppercase">Tamaño</th>'
+      +   '<th style="padding:.5rem .7rem;text-align:left;font-size:.65rem;color:var(--text3);text-transform:uppercase">Ruta</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }catch(e){
+    box.innerHTML = '<div style="color:#991b1b;padding:.8rem">Error: ' + escHtml(e.message) + '</div>';
+  }
 }
 
 // ─── R300: Cobranza Live ──────────────────────────────────────────────────
