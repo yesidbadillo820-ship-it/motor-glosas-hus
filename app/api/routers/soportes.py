@@ -5,17 +5,26 @@ Flujo:
   GET  /soportes-auto/stats                    → estado detallado (auth)
   GET  /soportes-auto/factura/{numero}         → soportes detectados (auth + audit PHI)
   POST /soportes-auto/reindex                  → rebuild manual (auditor+)
+  POST /soportes-auto/upload-bulk              → jump-box agent: subir lote de archivos (auditor+)
+  GET  /soportes-auto/manifest                 → jump-box agent: estado del mirror local
 
 Cada `GET /factura/{numero}` registra acceso PHI en audit_log con
 acción `LISTAR_SOPORTES_FACTURA` — obligatorio para auditoría de
 historias clínicas.
+
+Los endpoints de jump-box solo aplican cuando el motor no tiene mount
+CIFS directo y depende de un agente externo que lee el share desde
+una PC Windows y empuja los archivos. Path traversal está bloqueado
+por validación estricta antes de escribir a disco.
 """
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual, get_auditor_o_superior
@@ -144,3 +153,187 @@ def reindex(
     except Exception:
         pass
     return {"duracion_segundos": duracion, **stats_resultado}
+
+
+# ─── Jump-box agent (Plan B sin mount CIFS) ──────────────────────────
+#
+# Cuando Infra no puede montar el share en el server, una PC Windows
+# que ya ve `Y:\` corre tools/jumpbox_sync.py y empuja los archivos
+# vía POST. Los archivos se guardan bajo SOPORTES_LOCAL_ROOT preservando
+# la estructura de carpetas del share. El indexador apunta al mismo
+# directorio (SOPORTES_ROOT == SOPORTES_LOCAL_ROOT en este modo) y no
+# nota la diferencia.
+
+_EXT_PERMITIDAS = {".pdf", ".json", ".xml", ".txt", ".csv"}
+_MAX_BYTES_POR_ARCHIVO = 50 * 1024 * 1024   # 50 MB
+_MAX_BYTES_POR_LOTE = 200 * 1024 * 1024     # 200 MB total por request
+_MAX_ARCHIVOS_POR_LOTE = 50
+
+
+def _local_root() -> Path:
+    """Raíz donde el motor guarda los archivos empujados por el agente.
+
+    Por defecto coincide con SOPORTES_ROOT — en modo jump-box el motor
+    indexa exactamente lo que el agente subió.
+    """
+    raiz = os.getenv("SOPORTES_LOCAL_ROOT") or os.getenv(
+        "SOPORTES_ROOT", "/var/lib/motor/soportes-uploaded"
+    )
+    return Path(raiz)
+
+
+def _safe_join(base: Path, rel_path: str) -> Optional[Path]:
+    """Une `rel_path` (recibido del cliente) bajo `base` con validación
+    estricta. Devuelve `None` si el path es inseguro.
+
+    Bloquea: rutas absolutas, drive letters Windows, segmentos `..`,
+    bytes nulos, paths que después de `.resolve()` salen de `base`.
+    """
+    if not rel_path or len(rel_path) > 500 or "\x00" in rel_path:
+        return None
+    # Normalizar separadores Windows → POSIX
+    rel = rel_path.replace("\\", "/").lstrip("/")
+    # Drive letter al inicio (Y:/foo, C:/foo)
+    if len(rel) >= 2 and rel[1] == ":":
+        return None
+    # Segmentos peligrosos
+    partes = [p for p in rel.split("/") if p]
+    if any(p in {"..", "."} or not p.strip() for p in partes):
+        return None
+    candidato = (base / "/".join(partes)).resolve()
+    base_resuelto = base.resolve()
+    try:
+        candidato.relative_to(base_resuelto)
+    except ValueError:
+        return None
+    return candidato
+
+
+@router.get("/manifest")
+def manifest(
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Resumen del mirror local — lo usa el agente para saber qué
+    archivos ya subió y evitar transferencias redundantes.
+
+    Devuelve `{rel_path: {tamaño, mtime}}` para todos los archivos
+    bajo SOPORTES_LOCAL_ROOT. El agente compara con su lado y solo
+    sube los que cambiaron.
+    """
+    raiz = _local_root()
+    if not raiz.exists():
+        return {"raiz": str(raiz), "raiz_existe": False, "archivos": {}}
+    archivos = {}
+    for p in raiz.rglob("*"):
+        if not p.is_file():
+            continue
+        try:
+            rel = str(p.relative_to(raiz)).replace(os.sep, "/")
+            st = p.stat()
+            archivos[rel] = {"size": st.st_size, "mtime": int(st.st_mtime)}
+        except OSError:
+            continue
+    return {
+        "raiz": str(raiz),
+        "raiz_existe": True,
+        "total_archivos": len(archivos),
+        "archivos": archivos,
+    }
+
+
+@router.post("/upload-bulk")
+async def upload_bulk(
+    request: Request,
+    files: list[UploadFile] = File(...),
+    rel_paths: list[str] = Form(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Recibe un lote de archivos del agente jump-box y los guarda en
+    `SOPORTES_LOCAL_ROOT` preservando la estructura indicada en
+    `rel_paths`.
+
+    Args:
+        files: lista de archivos (multipart). Máx 50 archivos / 200 MB.
+        rel_paths: ruta relativa para cada archivo, en el mismo orden.
+                   Ej. ["ABRIL 2026 - SOPORTES RADICACION/.../FEV_X.pdf", ...]
+
+    Validaciones:
+        - Path traversal bloqueado (`_safe_join`).
+        - Solo extensiones de soporte (.pdf .json .xml .txt .csv).
+        - Tamaño por archivo y por lote.
+
+    Tras escribir, NO dispara reindex automático para no recalcular en
+    cada batch del agente. El agente debe llamar a `/reindex` cuando
+    termine su pasada.
+    """
+    if len(files) != len(rel_paths):
+        raise HTTPException(400, "Cantidad de files y rel_paths no coincide")
+    if len(files) > _MAX_ARCHIVOS_POR_LOTE:
+        raise HTTPException(400, f"Máx {_MAX_ARCHIVOS_POR_LOTE} archivos por lote")
+
+    raiz = _local_root()
+    raiz.mkdir(parents=True, exist_ok=True)
+
+    resumen = {
+        "guardados": 0,
+        "ignorados_iguales": 0,
+        "rechazados": [],
+        "bytes_escritos": 0,
+    }
+    total_bytes = 0
+
+    for upload, rel in zip(files, rel_paths):
+        nombre = upload.filename or rel.split("/")[-1]
+        # Validación de path
+        destino = _safe_join(raiz, rel)
+        if destino is None:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "path_invalido"})
+            continue
+        # Validación de extensión
+        if destino.suffix.lower() not in _EXT_PERMITIDAS:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "extension_no_permitida"})
+            continue
+        # Leer en memoria con tope de tamaño
+        contenido = await upload.read(_MAX_BYTES_POR_ARCHIVO + 1)
+        if len(contenido) > _MAX_BYTES_POR_ARCHIVO:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "demasiado_grande"})
+            continue
+        total_bytes += len(contenido)
+        if total_bytes > _MAX_BYTES_POR_LOTE:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "lote_excede_total"})
+            continue
+        # Skip si ya existe con mismo tamaño (rápido — no compara hash)
+        if destino.exists() and destino.stat().st_size == len(contenido):
+            resumen["ignorados_iguales"] += 1
+            continue
+        # Escribir atómico (tmp → rename)
+        try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            tmp = destino.with_suffix(destino.suffix + ".tmp")
+            tmp.write_bytes(contenido)
+            tmp.replace(destino)
+            resumen["guardados"] += 1
+            resumen["bytes_escritos"] += len(contenido)
+        except OSError as e:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": f"io:{e}"})
+
+    # Audit
+    try:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=getattr(current_user, "rol", "") or "",
+            accion="UPLOAD_BULK_SOPORTES",
+            tabla="soportes_share",
+            detalle=(
+                f"guardados={resumen['guardados']} "
+                f"ignorados={resumen['ignorados_iguales']} "
+                f"rechazados={len(resumen['rechazados'])} "
+                f"bytes={resumen['bytes_escritos']}"
+            ),
+            ip=request.client.host if request.client else None,
+        )
+    except Exception:
+        pass
+
+    return resumen
