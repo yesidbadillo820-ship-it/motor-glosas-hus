@@ -9533,7 +9533,7 @@ async function responderGlosa(id){
               + '<button class="btn-sm" style="background:#ca8a04;color:#fff;border:0;padding:.35rem .8rem;border-radius:6px;font-weight:600;cursor:pointer" onclick="reanalizarConIA(' + g.id + ')">Re-analizar</button>'
               + '</div>';
           }
-          var html = '<div class="card-premium" style="margin:1rem 1.5rem;padding:1.4rem;">'
+          var html = '<div class="card-premium dictamen-previo-card" style="margin:1rem 1.5rem;padding:1.4rem;">'
             + bannerStale
             + '<div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.8rem;flex-wrap:wrap">'
             + '<div>'
@@ -9573,6 +9573,10 @@ async function responderGlosa(id){
                   + '</div>';
               })()
             + '</div>';
+          // Idempotente: si ya hay un card de "Dictamen ya generado"
+          // de una entrada previa a esta misma glosa, lo removemos
+          // antes de prepend para no apilar copias duplicadas.
+          area.querySelectorAll('.dictamen-previo-card').forEach(function(n){ n.remove(); });
           area.innerHTML = html + (area.innerHTML || '');
         }
       }catch(_){/* silencioso */}
