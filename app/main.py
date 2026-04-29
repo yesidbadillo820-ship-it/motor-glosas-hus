@@ -576,6 +576,16 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de mantenimiento: {_e}")
 
+    # Reindex diario del share de soportes (2 AM) + build inicial al
+    # arrancar para que el primer gestor del día encuentre el índice
+    # caliente. No bloquea startup si el mount aún no está disponible
+    # — el healthz lo refleja y el reintento ocurre al día siguiente.
+    try:
+        from app.services.soportes_reindex_scheduler import iniciar_scheduler as iniciar_soportes_scheduler
+        iniciar_soportes_scheduler()
+    except Exception as _e:
+        logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
+
     yield
 
     # Shutdown: detener schedulers limpiamente
@@ -592,6 +602,11 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.mantenimiento_scheduler import detener_scheduler as detener_mant
         detener_mant()
+    except Exception:
+        pass
+    try:
+        from app.services.soportes_reindex_scheduler import detener_scheduler as detener_soportes
+        detener_soportes()
     except Exception:
         pass
     logger.info("=== APLICACIÓN CERRADA ===")
