@@ -2928,30 +2928,29 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 </div>
 <div id="asistente-drawer-overlay" style="position:fixed;inset:0;background:rgba(11,18,32,.5);z-index:9989;display:none" onclick="cerrarAsistenteDrawer()"></div>
 
-<!-- 💡 BOTÓN FLOTANTE: Reportar fallo / sugerencia (R369) -->
-<button id="fb-fab" onclick="abrirModalSugerencia()" title="Reportar fallo o sugerir mejora"
-  style="position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;
-         background:linear-gradient(135deg,#0284c7,#0ea5e9);color:#fff;border:none;
-         box-shadow:0 6px 18px rgba(2,132,199,.45);cursor:pointer;font-size:1.45rem;
-         z-index:998;display:none;transition:transform .15s ease,box-shadow .15s ease"
-  onmouseover="this.style.transform='scale(1.08)';this.style.boxShadow='0 8px 22px rgba(2,132,199,.6)'"
-  onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 6px 18px rgba(2,132,199,.45)'">
-  💡
-</button>
-
-<!-- ✅ BOTÓN FLOTANTE: Tareas diarias del gestor -->
-<button id="td-fab" onclick="abrirPanelTareas()" title="Mis tareas del día"
-  style="position:fixed;bottom:22px;right:84px;width:52px;height:52px;border-radius:50%;
-         background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border:none;
-         box-shadow:0 6px 18px rgba(22,163,74,.45);cursor:pointer;font-size:1.4rem;
-         z-index:998;display:none;transition:transform .15s ease,box-shadow .15s ease"
-  onmouseover="this.style.transform='scale(1.08)';this.style.boxShadow='0 8px 22px rgba(22,163,74,.6)'"
-  onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 6px 18px rgba(22,163,74,.45)'">
-  ✅
-  <span id="td-badge" style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;
-        font-size:.65rem;font-weight:700;border-radius:10px;padding:.1rem .35rem;min-width:18px;
-        text-align:center;display:none;border:2px solid #fff;line-height:1.1">0</span>
-</button>
+<!-- Botones flotantes (FABs) — apilados verticalmente, esquina inferior derecha.
+     Diseño compacto 42px, sombras suaves, iconos SVG (no emoji) para
+     consistencia visual entre Windows, Mac y Linux. -->
+<style>
+  .fab-stack{position:fixed;right:18px;bottom:18px;z-index:998;display:flex;flex-direction:column;gap:10px;align-items:center;pointer-events:none}
+  .fab-stack > button{pointer-events:auto}
+  .fab{width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 4px 10px rgba(15,23,42,.18),0 1px 2px rgba(15,23,42,.12);transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;position:relative}
+  .fab:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(15,23,42,.22),0 2px 4px rgba(15,23,42,.14);filter:brightness(1.06)}
+  .fab:active{transform:translateY(0)}
+  .fab svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .fab-tareas{background:linear-gradient(135deg,#15803d,#22c55e)}
+  .fab-feedback{background:linear-gradient(135deg,#0369a1,#0ea5e9)}
+  .fab-badge{position:absolute;top:-3px;right:-3px;background:#dc2626;color:#fff;font-size:.6rem;font-weight:700;border-radius:9px;padding:1px 5px;min-width:16px;text-align:center;border:1.5px solid #fff;line-height:1.1;font-family:var(--font)}
+</style>
+<div class="fab-stack">
+  <button id="td-fab" class="fab fab-tareas" onclick="abrirPanelTareas()" title="Mis tareas del día" style="display:none">
+    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="td-badge" class="fab-badge" style="display:none">0</span>
+  </button>
+  <button id="fb-fab" class="fab fab-feedback" onclick="abrirModalSugerencia()" title="Reportar fallo o sugerir mejora" style="display:none">
+    <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>
+  </button>
+</div>
 
 <!-- ✅ PANEL: Tareas diarias -->
 <div id="td-panel" style="position:fixed;inset:0;background:rgba(11,18,32,.72);z-index:9999;
