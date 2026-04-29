@@ -2451,16 +2451,64 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       <div style="flex:1 1 auto;overflow-y:auto;overflow-x:hidden;width:100%;min-height:0;">
         <div class="panel-hero">
           <div class="panel-hero-inner">
-            <span class="panel-hero-tag">Biblioteca legal</span>
-            <h1>Consulta Normativa Colombiana</h1>
+            <span class="panel-hero-tag">Liquidador + biblioteca legal</span>
+            <h1>Consulta Normativa y Liquidador de Tarifas</h1>
             <div class="panel-hero-sub">
-              Pregunte sobre cualquier norma, artículo, decreto, resolución, circular o sentencia relacionada con
-              cuentas médicas, glosas, facturación, tarifas, pertinencia, cobertura o régimen especial. Más de 100
-              normas indexadas con texto literal · Más de 150 códigos CUPS 2025 buscables por descripción.
+              💰 <b>Liquida en línea</b> tarifas SOAT (UVB) y Propias HUS (SMDLV) por código CUPS o descripción —
+              equivalente local a miscuentasmedicas.com con los catálogos del HUS (Res. 054/2026 + 124/2026, Manual
+              SOAT 2026 Circular 047/2025). 📚 También <b>consulta cualquier norma</b>: artículo, decreto, resolución,
+              circular o sentencia. Más de 100 normas indexadas y 150+ códigos CUPS 2025.
             </div>
           </div>
         </div>
         <div style="padding:1.75rem 2rem;max-width:1100px;margin:0 auto;">
+
+        <!-- ─── LIQUIDADOR DE TARIFAS (SOAT UVB + Propias HUS SMDLV) ─── -->
+        <div class="form-card" style="border:2px solid #0d9488;background:linear-gradient(135deg,#f0fdfa,#ccfbf1)">
+          <h3 style="color:#0f766e">💰 Liquidador de tarifas (SOAT UVB + Propias HUS)</h3>
+          <p style="font-size:.78rem;color:var(--text3);margin-bottom:1rem">
+            Calcula el valor en pesos a partir del código CUPS o descripción.
+            Equivalente local a miscuentasmedicas.com pero con los catálogos
+            oficiales del HUS (Res. 054/2026 + 124/2026) y el Manual SOAT 2026
+            (Circular 047/2025, UVB $12.110).
+          </p>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.7rem;margin-bottom:.8rem">
+            <div class="field" style="margin:0">
+              <label style="font-size:.7rem">Código o descripción</label>
+              <input id="liq-q" type="text" placeholder="Ej: 890402 o 'ecocardiograma'" oninput="if(event.key==='Enter')liquidarTarifa();" />
+            </div>
+            <div class="field" style="margin:0">
+              <label style="font-size:.7rem">Modalidad</label>
+              <select id="liq-modalidad">
+                <option value="AMBOS">SOAT + Propias HUS</option>
+                <option value="SOAT">Solo SOAT</option>
+                <option value="PROPIA">Solo Propias HUS</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0">
+              <label style="font-size:.7rem">% contractual</label>
+              <input id="liq-pct" type="number" step="1" value="0" placeholder="0" title="Ej: -5 para SOAT-5%, +10 para SOAT+10%" />
+            </div>
+            <div class="field" style="margin:0">
+              <label style="font-size:.7rem">Año</label>
+              <select id="liq-anio">
+                <option value="2026" selected>2026</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+            <button class="btn-primary" onclick="liquidarTarifa()">🔎 Buscar y liquidar</button>
+            <button class="btn-secondary" onclick="liquidarTarifa('soat-pleno')">SOAT pleno</button>
+            <button class="btn-secondary" onclick="liquidarTarifa('soat-menos5')">SOAT -5%</button>
+            <button class="btn-secondary" onclick="liquidarTarifa('soat-mas10')">SOAT +10%</button>
+            <span style="margin-left:auto;font-size:.7rem;color:var(--text3);align-self:center">UVB 2026: $12.110 · SMDLV 2026: $58.375</span>
+          </div>
+
+          <div id="liq-resultados" style="margin-top:.8rem"></div>
+        </div>
+
         <div class="form-card">
           <h3>Buscar en la biblioteca</h3>
 
@@ -4995,6 +5043,109 @@ async function exportarERP(){
     hideLoading();
     toast('CSV listo','Descarga iniciada','success');
   }catch(e){ hideLoading(); toast('Error','Conexión: '+e.message,'error'); }
+}
+
+// ─── Liquidador de tarifas (SOAT UVB + Propias HUS SMDLV) ───
+async function liquidarTarifa(preset){
+  // Aplicar presets opcionales
+  if(preset === 'soat-pleno'){
+    document.getElementById('liq-modalidad').value = 'SOAT';
+    document.getElementById('liq-pct').value = '0';
+  } else if(preset === 'soat-menos5'){
+    document.getElementById('liq-modalidad').value = 'SOAT';
+    document.getElementById('liq-pct').value = '-5';
+  } else if(preset === 'soat-mas10'){
+    document.getElementById('liq-modalidad').value = 'SOAT';
+    document.getElementById('liq-pct').value = '10';
+  }
+  var q = document.getElementById('liq-q').value.trim();
+  if(!q){ toast('Buscar tarifa','Escribí un código o descripción','warning'); return; }
+  var modalidad = document.getElementById('liq-modalidad').value;
+  var pct = parseFloat(document.getElementById('liq-pct').value || '0');
+  var anio = document.getElementById('liq-anio').value || '2026';
+  var box = document.getElementById('liq-resultados');
+  box.innerHTML = '<div style="color:var(--text3);padding:.8rem">Buscando…</div>';
+  try{
+    var url = '/tarifa-liquidador/buscar?q=' + encodeURIComponent(q)
+            + '&modalidad=' + encodeURIComponent(modalidad)
+            + '&pct=' + pct + '&anio=' + anio + '&limite=30';
+    var r = await fetch(url, {headers: authH()});
+    if(r.status === 401){ alert('Sesión expirada'); return; }
+    var d = await r.json();
+    if(!r.ok){ box.innerHTML = '<div style="color:#991b1b;padding:.8rem">Error: ' + (d.detail || r.status) + '</div>'; return; }
+    if(!d.resultados || !d.resultados.length){
+      box.innerHTML = '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:.9rem 1.1rem;color:#92400e;font-size:.85rem">'
+        + '<b>Sin resultados.</b> Probá con otro término o cambiá la modalidad. '
+        + 'Si tenés el factor del documento físico, podés liquidarlo manualmente abajo.'
+        + '</div>'
+        + _liquidadorManualHtml(modalidad, pct, anio);
+      return;
+    }
+    var fmt = function(n){ return '$' + (n||0).toLocaleString('es-CO'); };
+    var head = '<tr style="border-bottom:2px solid var(--border);background:var(--bg-subtle)">'
+      + '<th style="text-align:left;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Código</th>'
+      + '<th style="text-align:left;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Descripción</th>'
+      + '<th style="text-align:right;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Factor</th>'
+      + '<th style="text-align:right;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Catálogo</th>'
+      + '<th style="text-align:right;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Valor calculado</th>'
+      + '</tr>';
+    var rows = d.resultados.map(function(r){
+      var factor = r.factor_uvb != null
+        ? (r.factor_uvb + ' UVB' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
+        : (r.factor_smdlv + ' SMDLV');
+      var bgCat = r.catalogo === 'PROPIA_HUS' ? '#fef3c7' : '#dbeafe';
+      var fgCat = r.catalogo === 'PROPIA_HUS' ? '#92400e' : '#1e40af';
+      var labelCat = r.catalogo === 'PROPIA_HUS' ? 'PROPIA HUS' : 'SOAT 2026';
+      return '<tr style="border-bottom:1px solid rgba(0,0,0,.05)">'
+        + '<td style="padding:.5rem .7rem;font-family:var(--font-mono);font-weight:600;color:var(--c-teal2)">' + r.codigo + '</td>'
+        + '<td style="padding:.5rem .7rem;font-size:.78rem">' + escHtml(r.descripcion) + '<div style="font-size:.65rem;color:var(--text3);margin-top:2px">' + escHtml(r.norma) + '</div></td>'
+        + '<td style="padding:.5rem .7rem;text-align:right;font-size:.78rem">' + factor + '</td>'
+        + '<td style="padding:.5rem .7rem;text-align:right"><span style="background:' + bgCat + ';color:' + fgCat + ';padding:2px 8px;border-radius:10px;font-size:.65rem;font-weight:700">' + labelCat + '</span></td>'
+        + '<td style="padding:.5rem .7rem;text-align:right;font-weight:800;color:#065f46;font-size:.92rem">' + fmt(r.valor_pesos) + '</td>'
+        + '</tr>';
+    }).join('');
+    var formula = d.resultados[0] && d.resultados[0].formula
+      ? '<div style="margin-top:.5rem;font-size:.7rem;color:var(--text3);font-family:var(--font-mono)">Fórmula: ' + escHtml(d.resultados[0].formula) + '</div>'
+      : '';
+    box.innerHTML = '<div style="font-size:.8rem;color:var(--text2);margin-bottom:.5rem">'
+      + '<b>' + d.total_resultados + '</b> resultado(s) para "<b>' + escHtml(q) + '</b>" · '
+      + 'modalidad <b>' + d.modalidad + '</b>' + (pct ? ' · <b>' + (pct>0?'+':'') + pct + '%</b>' : '')
+      + '</div>'
+      + '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse">'
+      + '<thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>'
+      + formula;
+  }catch(e){
+    box.innerHTML = '<div style="color:#991b1b;padding:.8rem">Error de red: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function _liquidadorManualHtml(modalidad, pct, anio){
+  return '<div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:.8rem 1rem;margin-top:.6rem">'
+    + '<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin-bottom:.5rem">Liquidación manual sin código</div>'
+    + '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">'
+    + '<input type="number" step="0.01" id="liq-manual-factor" placeholder="Factor (UVB o SMDLV)" style="width:180px;padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px"/>'
+    + '<button class="btn-secondary" onclick="liquidarManual(\'' + modalidad + '\',' + pct + ',' + anio + ')">Calcular</button>'
+    + '<span id="liq-manual-result" style="font-size:.85rem;font-weight:700;color:#065f46"></span>'
+    + '</div>'
+    + '</div>';
+}
+
+async function liquidarManual(modalidad, pct, anio){
+  var factorEl = document.getElementById('liq-manual-factor');
+  if(!factorEl) return;
+  var factor = parseFloat(factorEl.value);
+  if(!factor || factor <= 0){ toast('Factor inválido','Ingresá un factor mayor a 0','warning'); return; }
+  try{
+    var r = await fetch('/tarifa-liquidador/liquidar-manual', {
+      method:'POST',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({factor: factor, modalidad: modalidad, pct: pct, anio: parseInt(anio)}),
+    });
+    var d = await r.json();
+    if(!r.ok){ toast('Error', d.detail || 'No se pudo calcular', 'error'); return; }
+    var resEl = document.getElementById('liq-manual-result');
+    if(resEl) resEl.textContent = '= $' + (d.valor_pesos||0).toLocaleString('es-CO') + ' (' + d.formula + ')';
+  }catch(e){ toast('Error', e.message, 'error'); }
 }
 
 async function consultarNormativa(){

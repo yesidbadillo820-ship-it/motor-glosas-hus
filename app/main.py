@@ -705,6 +705,7 @@ from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
 from app.api.routers.salud_total import router as salud_total_router
 from app.api.routers.tarifas_contratadas import router as tarifas_contratadas_router
+from app.api.routers.tarifa_liquidador import router as tarifa_liquidador_router
 from app.api.routers.admin import router as admin_router
 from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
@@ -746,6 +747,7 @@ app.include_router(conciliacion_router)
 app.include_router(audit_router)
 app.include_router(salud_total_router)
 app.include_router(tarifas_contratadas_router)
+app.include_router(tarifa_liquidador_router)
 app.include_router(admin_router)
 app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
