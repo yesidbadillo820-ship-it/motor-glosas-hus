@@ -2267,6 +2267,25 @@ def mis_asignaciones(
         glosas = [g for g in glosas if _matches(g)]
 
     from app.services.resolver_entidad import resolver_entidad_mostrar
+    # Soportes auto-detectados: cuántos PDFs hay en el servidor por
+    # factura. Un lookup por factura única (no por glosa) para no
+    # penalizar listas largas. Silencioso si el indexador no tiene
+    # raíz accesible (servidor desconectado).
+    _soportes_por_factura: dict[str, int] = {}
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+        _indexer = get_indexer()
+        if _indexer.stats().get("raiz_existe"):
+            _facturas_unicas = {(g.factura or "").strip() for g in glosas if g.factura}
+            for _fact in _facturas_unicas:
+                if not _fact:
+                    continue
+                _hits = _indexer.lookup(_fact)
+                if _hits:
+                    _soportes_por_factura[_fact] = len(_hits)
+    except Exception:
+        _soportes_por_factura = {}
+
     items = []
     for g in glosas:
         score, motivo = score_por_id.get(g.id, (0, ""))
@@ -2311,6 +2330,10 @@ def mis_asignaciones(
             # Campos para Sprint #3 (similares en bloque) y filtros UI
             "codigo_glosa": g.codigo_glosa,
             "cups_servicio": getattr(g, "cups_servicio", None),
+            # Soportes auto-detectados en el servidor de archivos
+            "soportes_disponibles": _soportes_por_factura.get(
+                (g.factura or "").strip(), 0
+            ),
         })
     return items
 

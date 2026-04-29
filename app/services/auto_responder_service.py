@@ -63,13 +63,25 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
                 "modelo": g.modelo_ia,
             }
 
+        # Auto-detección: ¿la factura tiene soportes en el servidor?
+        # Si sí, el detector no marca REQUIERE_SOPORTES porque los PDFs
+        # están disponibles para que la IA los referencie.
+        soportes_count = 0
+        try:
+            from app.services.soportes_autodiscovery_service import get_indexer
+            if g.factura:
+                soportes_count = len(get_indexer().lookup(g.factura) or [])
+        except Exception:
+            soportes_count = 0
+
         # Reglas pre-IA (gratis)
         evaluacion = evaluar(
             codigo_glosa=g.codigo_glosa,
             texto_glosa=(g.texto_glosa_original or g.dictamen or g.concepto_glosa or ""),
-            contexto_pdf="",  # importación masiva no trae PDFs
+            contexto_pdf="",  # importación masiva no trae PDFs locales
             valor_objetado=float(g.valor_objetado or 0),
             cups=g.cups_servicio,
+            soportes_servidor_count=soportes_count,
         )
 
         if evaluacion["requiere"]:
@@ -123,13 +135,39 @@ async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
             "estado": "TEXTO_INSUFICIENTE",
         }
 
+    # Auto-detección de soportes en el servidor de archivos del HUS.
+    # Si la factura ya tiene PDFs subidos (FEV, HEV, RIPS, etc.), se
+    # mencionan en el contexto del prompt para que la IA pueda
+    # referenciarlos por nombre en el dictamen ("conforme a la historia
+    # clínica HEV_900006037_HUS487120.pdf radicada en el expediente").
+    contexto_soportes = ""
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+        if glosa.factura:
+            soportes = get_indexer().lookup(glosa.factura)
+            if soportes:
+                tipos_unicos = sorted({s["tipo_codigo"] for s in soportes})
+                ejemplos = [s["nombre_archivo"] for s in soportes[:5]]
+                contexto_soportes = (
+                    f"\n\n[SOPORTES EN EXPEDIENTE]\n"
+                    f"La factura {glosa.factura} cuenta con {len(soportes)} "
+                    f"soporte(s) radicado(s) en el servidor del HUS, tipos: "
+                    f"{', '.join(tipos_unicos)}. Archivos: "
+                    f"{', '.join(ejemplos)}"
+                    f"{'...' if len(soportes) > 5 else ''}. "
+                    f"Puedes referenciar estos soportes en el dictamen como "
+                    f"prueba documental."
+                )
+    except Exception:
+        contexto_soportes = ""
+
     glosa_input = GlosaInput(
         eps=eps,
         etapa=glosa.etapa or "RESPUESTA",
         fecha_radicacion=None,
         fecha_recepcion=None,
         valor_aceptado=str(int(glosa.valor_aceptado or 0)),
-        tabla_excel=texto,
+        tabla_excel=texto + contexto_soportes,
         numero_factura=glosa.factura,
         numero_radicado=glosa.numero_radicado,
         tono="conciliador",

@@ -8833,7 +8833,13 @@ function _renderMisGlosas(dataRaw){
     body.innerHTML = data.map(function(g){
       var vence = g.fecha_vencimiento ? new Date(g.fecha_vencimiento).toLocaleDateString('es-CO') : '—';
       var valor = (g.valor_objetado || 0).toLocaleString('es-CO', {minimumFractionDigits:0, maximumFractionDigits:0});
-      var radicadoTxt = g.numero_radicado ? '<span class="chip chip-radicado">' + g.numero_radicado + '</span>' : '<span style="color:var(--text3)">—</span>';
+      // Indicador de soportes auto-detectados (PDFs en servidor del HUS)
+      var soportesIcon = '';
+      if(g.soportes_disponibles && g.soportes_disponibles > 0){
+        soportesIcon = ' <span title="' + g.soportes_disponibles + ' soporte(s) detectado(s) en el servidor (Plan Y:\\) — listos para incluir en el análisis" '
+          + 'style="display:inline-flex;align-items:center;gap:2px;background:#dcfce7;color:#065f46;padding:1px 6px;border-radius:8px;font-size:.65rem;font-weight:700;margin-left:4px;cursor:help">📁 ' + g.soportes_disponibles + '</span>';
+      }
+      var radicadoTxt = g.numero_radicado ? '<span class="chip chip-radicado">' + g.numero_radicado + '</span>' + soportesIcon : '<span style="color:var(--text3)">—</span>' + soportesIcon;
       var tipoCls = g.tipo_glosa_excel ? 'chip-tipo-' + g.tipo_glosa_excel.toLowerCase() : '';
       var tipoTxt = g.tipo_glosa_excel ? '<span class="chip ' + tipoCls + '">' + g.tipo_glosa_excel + '</span>' : '<span style="color:var(--text3)">—</span>';
       var semCls = semChip[g.prioridad] || '';

@@ -46,8 +46,15 @@ def evaluar(
     valor_objetado: float = 0.0,
     cups: Optional[str] = None,
     numero_autorizacion: Optional[str] = None,
+    soportes_servidor_count: int = 0,
 ) -> dict:
     """Evalúa si la glosa requiere soportes adicionales antes de procesarla.
+
+    Args:
+        soportes_servidor_count: cantidad de soportes detectados en el
+            servidor de archivos del HUS (vía soportes_autodiscovery).
+            Si > 0, las reglas de SO* / AU* se relajan porque ya
+            tenemos los archivos disponibles en el expediente físico.
 
     Retorna:
       {
@@ -61,6 +68,12 @@ def evaluar(
     pdf = (contexto_pdf or "").strip()
     codigo = (codigo_glosa or "").strip().upper()
     pref = codigo[:2] if len(codigo) >= 2 else ""
+    # Si hay PDFs en el servidor, simulamos contexto_pdf no vacío
+    # para que las reglas SO/AU/CL/PE no marquen REQUIERE_SOPORTES.
+    if soportes_servidor_count > 0 and len(pdf) < 500:
+        pdf = (
+            pdf + f" [SERVIDOR_HUS:{soportes_servidor_count}_PDFS_DISPONIBLES]"
+        ) * 5  # padding para que el len > 500
 
     texto_upper = texto.upper()
 
