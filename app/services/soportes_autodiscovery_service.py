@@ -172,7 +172,27 @@ class SoportesIndexer:
     """
 
     def __init__(self, raiz: Optional[str] = None, ttl_segundos: int = 6 * 3600):
-        self.raiz = Path(raiz or os.getenv("SOPORTES_ROOT", "/mnt/radicacion_2026"))
+        # Resolución de raíz (orden de prioridad):
+        #   1. arg explícito (tests / overrides)
+        #   2. SOPORTES_ROOT (Plan A — mount CIFS directo)
+        #   3. SOPORTES_LOCAL_ROOT (Plan B — jump-box agent sube acá)
+        #   4. default /tmp/motor-soportes (Plan B sin config — coincide
+        #      con el default de _local_root en el router de upload, así
+        #      que el motor lee exactamente lo que el agente subió).
+        if raiz is None:
+            raiz = (
+                os.getenv("SOPORTES_ROOT")
+                or os.getenv("SOPORTES_LOCAL_ROOT")
+                or "/tmp/motor-soportes"
+            )
+        self.raiz = Path(raiz)
+        # Crear si no existe — el agente puede subir antes del primer
+        # rebuild. Sin esto el indexador reporta "raíz no existe" aunque
+        # el upload-bulk sí esté funcionando.
+        try:
+            self.raiz.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         self.ttl_segundos = ttl_segundos
         self._lock = threading.Lock()
         self._indice: dict[str, list[SoporteEntry]] = {}

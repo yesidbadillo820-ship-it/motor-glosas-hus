@@ -75,15 +75,22 @@ def iniciar_scheduler() -> None:
     if _task is not None and not _task.done():
         logger.info("[SOPORTES-REINDEX] Scheduler ya estaba activo")
         return
-    # Evitar arrancar el scheduler si no hay raíz accesible.
+    # Evitar arrancar el scheduler si la raíz claramente no aplica.
+    # Con la nueva resolución de raíz (autodiscovery_service.py) el
+    # default es /tmp/motor-soportes que SIEMPRE existe (se crea on
+    # init), así que normalmente el scheduler arranca. Solo lo
+    # apagamos si el operador setea SOPORTES_ROOT explícitamente a un
+    # path que no existe (ej. mount CIFS no montado todavía).
     try:
         from pathlib import Path
         import os as _os
-        raiz = Path(_os.getenv("SOPORTES_ROOT", "/mnt/radicacion_2026"))
-        if not raiz.exists():
+        raiz_explicita = _os.getenv("SOPORTES_ROOT")
+        if raiz_explicita and not Path(raiz_explicita).exists():
             logger.info(
-                f"[SOPORTES-REINDEX] Scheduler NO iniciado — raíz no existe: {raiz} "
-                "(reactivá montando el share o configurando jump-box agent)"
+                f"[SOPORTES-REINDEX] Scheduler NO iniciado — SOPORTES_ROOT "
+                f"explícito no existe: {raiz_explicita}. Configurá Plan A "
+                f"(mount CIFS) o quitá la variable para usar Plan B "
+                f"(jump-box → /tmp/motor-soportes)."
             )
             return
     except Exception:

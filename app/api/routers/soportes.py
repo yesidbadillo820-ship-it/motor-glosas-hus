@@ -173,13 +173,25 @@ _MAX_ARCHIVOS_POR_LOTE = 50
 def _local_root() -> Path:
     """Raíz donde el motor guarda los archivos empujados por el agente.
 
-    Por defecto coincide con SOPORTES_ROOT — en modo jump-box el motor
-    indexa exactamente lo que el agente subió.
+    Modo jump-box: el agente sube por HTTP, el motor escribe acá y el
+    indexador lee de acá (SOPORTES_ROOT == SOPORTES_LOCAL_ROOT).
+
+    Default `/tmp/motor-soportes`: existe siempre en Linux, es writable
+    en Render Free, y es ephemeral (se borra en cada redeploy — pero
+    el agente re-sincroniza en cada pasada cada 30 min, así que es
+    aceptable).
     """
     raiz = os.getenv("SOPORTES_LOCAL_ROOT") or os.getenv(
-        "SOPORTES_ROOT", "/var/lib/motor/soportes-uploaded"
+        "SOPORTES_ROOT", "/tmp/motor-soportes"
     )
-    return Path(raiz)
+    p = Path(raiz)
+    # Crear si no existe (idempotente). Sin esto el primer upload
+    # falla con FileNotFoundError.
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    return p
 
 
 def _safe_join(base: Path, rel_path: str) -> Optional[Path]:
