@@ -9,6 +9,9 @@ como miscuentasmedicas.com pero usando los catálogos del HUS.
 Catálogos consultados:
   • TARIFAS_PROPIAS_HUS  — Res. 054/2026 + 124/2026 ESE HUS
   • TARIFAS_SOAT_2026    — Circular 047/2025 MinSalud (UVB $12.110)
+  • DESCRIPCIONES_CUPS_2025 — fallback informativo (~150 códigos sin
+    factor; cuando aparece acá pero no en los anteriores, se devuelve
+    como "sin tarifa local — consulte el Manual SOAT 2026 oficial").
 
 Modalidades soportadas:
   • SOAT_PLENO            (UVB × 12.110)
@@ -24,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import get_usuario_actual
 from app.models.db import UsuarioRecord
+from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
     TARIFAS_SOAT_2026,
@@ -144,6 +148,35 @@ def buscar_codigo(
         x["descripcion"],
     ))
 
+    # Fallback informativo: si no hay tarifa local pero el código existe
+    # en el catálogo CUPS curado, devolverlo como "sin tarifa local". El
+    # gestor al menos confirma que el código existe y la descripción.
+    fallback_cups = []
+    if not matches and q:
+        for cod, desc in DESCRIPCIONES_CUPS_2025.items():
+            if _matchea(q, cod, desc):
+                fallback_cups.append({
+                    "codigo": cod,
+                    "descripcion": desc,
+                    "modalidad": "SIN_TARIFA_LOCAL",
+                    "factor_uvb": None,
+                    "factor_smdlv": None,
+                    "valor_pesos": None,
+                    "uvb_vigente": valor_uvb_vigente(anio),
+                    "smdlv_vigente": valor_smdlv_vigente(anio),
+                    "porcentaje_aplicado": pct,
+                    "catalogo": "CUPS_2025_DESCRIPTIVO",
+                    "norma": "Catálogo CUPS curado (sin factor tarifario local)",
+                    "formula": (
+                        "Sin factor en catálogos locales. Consulta el Manual SOAT "
+                        "2026 oficial (Circular 047/2025) o el contrato vigente "
+                        "para obtener el factor UVB/SMDLV de este código."
+                    ),
+                })
+        # Limitar fallback a 30 para no saturar
+        fallback_cups = fallback_cups[:30]
+
+    todos = matches[:limite] + fallback_cups
     return {
         "query": q,
         "modalidad": mod or "AMBOS",
@@ -152,7 +185,8 @@ def buscar_codigo(
         "uvb_vigente": valor_uvb_vigente(anio),
         "smdlv_vigente": valor_smdlv_vigente(anio),
         "total_resultados": len(matches),
-        "resultados": matches[:limite],
+        "total_fallback_cups": len(fallback_cups),
+        "resultados": todos,
     }
 
 

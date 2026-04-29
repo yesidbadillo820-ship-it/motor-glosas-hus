@@ -5081,7 +5081,7 @@ async function liquidarTarifa(preset){
         + _liquidadorManualHtml(modalidad, pct, anio);
       return;
     }
-    var fmt = function(n){ return '$' + (n||0).toLocaleString('es-CO'); };
+    var fmt = function(n){ return n == null ? '—' : '$' + (n||0).toLocaleString('es-CO'); };
     var head = '<tr style="border-bottom:2px solid var(--border);background:var(--bg-subtle)">'
       + '<th style="text-align:left;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Código</th>'
       + '<th style="text-align:left;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Descripción</th>'
@@ -5090,26 +5090,38 @@ async function liquidarTarifa(preset){
       + '<th style="text-align:right;padding:.5rem .7rem;font-size:.7rem;color:var(--text3);text-transform:uppercase">Valor calculado</th>'
       + '</tr>';
     var rows = d.resultados.map(function(r){
-      var factor = r.factor_uvb != null
-        ? (r.factor_uvb + ' UVB' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
-        : (r.factor_smdlv + ' SMDLV');
-      var bgCat = r.catalogo === 'PROPIA_HUS' ? '#fef3c7' : '#dbeafe';
-      var fgCat = r.catalogo === 'PROPIA_HUS' ? '#92400e' : '#1e40af';
-      var labelCat = r.catalogo === 'PROPIA_HUS' ? 'PROPIA HUS' : 'SOAT 2026';
-      return '<tr style="border-bottom:1px solid rgba(0,0,0,.05)">'
-        + '<td style="padding:.5rem .7rem;font-family:var(--font-mono);font-weight:600;color:var(--c-teal2)">' + r.codigo + '</td>'
-        + '<td style="padding:.5rem .7rem;font-size:.78rem">' + escHtml(r.descripcion) + '<div style="font-size:.65rem;color:var(--text3);margin-top:2px">' + escHtml(r.norma) + '</div></td>'
+      var sinTarifa = r.modalidad === 'SIN_TARIFA_LOCAL';
+      var factor = sinTarifa
+        ? '<span style="color:var(--text3);font-size:.7rem">sin factor local</span>'
+        : (r.factor_uvb != null
+            ? (r.factor_uvb + ' UVB' + (pct ? ' · ' + (pct>0?'+':'') + pct + '%' : ''))
+            : (r.factor_smdlv + ' SMDLV'));
+      var bgCat, fgCat, labelCat;
+      if(sinTarifa){       bgCat = '#f3f4f6'; fgCat = '#6b7280'; labelCat = 'CUPS · sin tarifa'; }
+      else if(r.catalogo === 'PROPIA_HUS'){ bgCat = '#fef3c7'; fgCat = '#92400e'; labelCat = 'PROPIA HUS'; }
+      else {               bgCat = '#dbeafe'; fgCat = '#1e40af'; labelCat = 'SOAT 2026'; }
+      var valorCol = sinTarifa
+        ? '<span style="font-size:.68rem;color:var(--text3);font-style:italic">consulta Manual SOAT oficial</span>'
+        : '<span style="font-weight:800;color:#065f46;font-size:.92rem">' + fmt(r.valor_pesos) + '</span>';
+      return '<tr style="border-bottom:1px solid rgba(0,0,0,.05);' + (sinTarifa ? 'background:#fafafa' : '') + '">'
+        + '<td style="padding:.5rem .7rem;font-family:var(--font-mono);font-weight:600;color:' + (sinTarifa ? '#6b7280' : 'var(--c-teal2)') + '">' + r.codigo + '</td>'
+        + '<td style="padding:.5rem .7rem;font-size:.78rem">' + escHtml(r.descripcion) + '<div style="font-size:.65rem;color:var(--text3);margin-top:2px">' + escHtml(r.norma || '') + '</div></td>'
         + '<td style="padding:.5rem .7rem;text-align:right;font-size:.78rem">' + factor + '</td>'
         + '<td style="padding:.5rem .7rem;text-align:right"><span style="background:' + bgCat + ';color:' + fgCat + ';padding:2px 8px;border-radius:10px;font-size:.65rem;font-weight:700">' + labelCat + '</span></td>'
-        + '<td style="padding:.5rem .7rem;text-align:right;font-weight:800;color:#065f46;font-size:.92rem">' + fmt(r.valor_pesos) + '</td>'
+        + '<td style="padding:.5rem .7rem;text-align:right">' + valorCol + '</td>'
         + '</tr>';
     }).join('');
     var formula = d.resultados[0] && d.resultados[0].formula
       ? '<div style="margin-top:.5rem;font-size:.7rem;color:var(--text3);font-family:var(--font-mono)">Fórmula: ' + escHtml(d.resultados[0].formula) + '</div>'
       : '';
+    var fbCount = d.total_fallback_cups || 0;
+    var fbTxt = fbCount > 0
+      ? ' · <span style="color:#92400e">+' + fbCount + ' coincidencias en CUPS sin tarifa local</span>'
+      : '';
     box.innerHTML = '<div style="font-size:.8rem;color:var(--text2);margin-bottom:.5rem">'
-      + '<b>' + d.total_resultados + '</b> resultado(s) para "<b>' + escHtml(q) + '</b>" · '
+      + '<b>' + d.total_resultados + '</b> resultado(s) con tarifa para "<b>' + escHtml(q) + '</b>" · '
       + 'modalidad <b>' + d.modalidad + '</b>' + (pct ? ' · <b>' + (pct>0?'+':'') + pct + '%</b>' : '')
+      + fbTxt
       + '</div>'
       + '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px"><table style="width:100%;border-collapse:collapse">'
       + '<thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>'

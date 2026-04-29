@@ -63,6 +63,21 @@ class TestBuscar:
         r = client.get("/tarifa-liquidador/buscar")
         assert r.status_code == 422  # q es requerido
 
+    def test_fallback_cups_cuando_no_hay_tarifa_local(self, client):
+        # 890402 está en DESCRIPCIONES_CUPS_2025 pero NO en TARIFAS_SOAT_2026.
+        # Sin embargo está en PROPIAS_HUS como 890402H1 — buscar SOLO SOAT
+        # debería devolver 0 con tarifa pero mostrar fallback.
+        r = client.get("/tarifa-liquidador/buscar?q=890402&modalidad=SOAT")
+        assert r.status_code == 200
+        d = r.json()
+        # Sin tarifa SOAT pero el CUPS existe en catálogo descriptivo
+        assert d["total_resultados"] == 0
+        assert d["total_fallback_cups"] >= 1
+        # Cada item de fallback marca SIN_TARIFA_LOCAL
+        for r in d["resultados"]:
+            assert r["modalidad"] == "SIN_TARIFA_LOCAL"
+            assert r["valor_pesos"] is None
+
 
 class TestLiquidarManual:
     def test_soat_pleno(self, client):
