@@ -41,6 +41,122 @@ cfg = get_settings()
 
 MAX_ARCHIVOS = 10  # Límite de soportes PDF por glosa
 MAX_BYTES_PDF = 15_000_000  # 15 MB por archivo
+# Cuántos soportes auto-detectados del servidor inyectar al prompt.
+# Limitamos a 3 PDFs y 5000 chars c/u para no romper memoria de Render Free.
+MAX_SOPORTES_AUTO = 3
+MAX_CHARS_POR_SOPORTE = 5_000
+# Tipos prioritarios de soportes (orden de preferencia):
+# HEV (historia clínica) > RIPS > FEV (factura electrónica) > el resto.
+PRIORIDAD_TIPOS_SOPORTE = ["HEV", "RIPS", "FEV", "OPF", "PDE", "PDX", "CRC", "AD"]
+
+
+async def _extraer_soportes_del_servidor(
+    numero_factura: Optional[str],
+    contexto_pdf_existente: str,
+    req_id: str,
+) -> str:
+    """Lee PDFs del servidor de archivos (soportes auto-detectados) y los
+    inyecta al contexto IA. Solo se usan si el gestor NO subió archivos
+    manualmente — para no duplicar contenido.
+
+    Idempotente: si no hay factura o el indexador no encuentra nada,
+    devuelve string vacío sin tirar error.
+    """
+    if not numero_factura:
+        return ""
+    if contexto_pdf_existente and len(contexto_pdf_existente) > 1000:
+        # El gestor ya subió PDFs manualmente — esos pesan más que los
+        # auto-detectados, mejor no duplicar contexto.
+        logger.info(
+            f"[{req_id}] Soportes auto-detectados: omitidos (gestor subió "
+            f"{len(contexto_pdf_existente)} chars manualmente)"
+        )
+        return ""
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+        soportes = get_indexer().lookup(numero_factura) or []
+    except Exception as e:
+        logger.warning(f"[{req_id}] Indexador soportes no disponible: {e}")
+        return ""
+    if not soportes:
+        return ""
+
+    # Ordenar por prioridad de tipo
+    def _prioridad(s: dict) -> int:
+        try:
+            return PRIORIDAD_TIPOS_SOPORTE.index(s.get("tipo_codigo") or "")
+        except ValueError:
+            return len(PRIORIDAD_TIPOS_SOPORTE)
+    soportes_ordenados = sorted(soportes, key=_prioridad)
+
+    contexto = ""
+    leidos = 0
+    from app.services.pdf_service import PdfService
+    pdf_svc = PdfService()
+    for s in soportes_ordenados:
+        if leidos >= MAX_SOPORTES_AUTO:
+            break
+        ruta = s.get("ruta")
+        nombre = s.get("nombre_archivo") or "soporte.pdf"
+        tipo = s.get("tipo_codigo") or "OTRO"
+        if not ruta:
+            continue
+        if not nombre.lower().endswith(".pdf"):
+            # Para JSON/XML/TXT (RIPS, etc.), inyectamos directo como texto plano
+            try:
+                from pathlib import Path as _P
+                p = _P(ruta)
+                if p.exists() and p.stat().st_size < 500_000:
+                    contenido_txt = p.read_text(encoding="utf-8", errors="ignore")[:MAX_CHARS_POR_SOPORTE]
+                    contexto += (
+                        f"\n\n═══ SOPORTE AUTO ({tipo}): {nombre} ═══\n\n"
+                        + contenido_txt
+                    )
+                    leidos += 1
+                    logger.info(f"[{req_id}] Soporte texto auto: {nombre} ({len(contenido_txt)} chars)")
+            except Exception as e:
+                logger.warning(f"[{req_id}] No pude leer soporte {nombre}: {e}")
+            continue
+        # PDF — extraer texto
+        try:
+            from pathlib import Path as _P
+            p = _P(ruta)
+            if not p.exists():
+                continue
+            tam = p.stat().st_size
+            if tam > MAX_BYTES_PDF:
+                logger.info(f"[{req_id}] Soporte auto omitido por tamaño: {nombre} ({tam} bytes)")
+                continue
+            if tam < 100:
+                # Archivo vacío o corrupto (los hay con 0 KB)
+                continue
+            contenido_bytes = p.read_bytes()
+            texto, metodo = await pdf_svc.extraer_con_ocr(
+                contenido_bytes,
+                anthropic_api_key=cfg.anthropic_api_key,
+                anthropic_model=cfg.anthropic_model,
+            )
+            texto_recortado = (texto or "")[:MAX_CHARS_POR_SOPORTE]
+            if not texto_recortado.strip():
+                continue
+            contexto += (
+                f"\n\n═══ SOPORTE AUTO ({tipo}): {nombre} ═══\n\n"
+                + texto_recortado
+            )
+            leidos += 1
+            logger.info(
+                f"[{req_id}] Soporte auto inyectado: {nombre} "
+                f"({metodo}, {len(texto_recortado)} chars)"
+            )
+        except Exception as e:
+            logger.warning(f"[{req_id}] Error procesando soporte auto {nombre}: {e}")
+
+    if contexto:
+        logger.info(
+            f"[{req_id}] Soportes auto-detectados inyectados: {leidos}/{len(soportes)} "
+            f"| total {len(contexto)} chars"
+        )
+    return contexto
 
 
 async def _extraer_pdfs(
@@ -518,6 +634,23 @@ async def analizar(
         raise HTTPException(status_code=422, detail=str(e))
 
     contexto_pdf, archivos_procesados = await _extraer_pdfs(archivos, req_id)
+
+    # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
+    # si el gestor NO subió PDFs manualmente, leemos directo del indexador
+    # los soportes asociados a esta factura (HEV, RIPS, FEV, etc.) y los
+    # inyectamos como contexto IA. Esto permite que el dictamen mencione
+    # paciente, servicios y fechas reales sin que el gestor tenga que
+    # buscar y subir cada PDF a mano.
+    contexto_soportes_auto = await _extraer_soportes_del_servidor(
+        numero_factura=numero_factura,
+        contexto_pdf_existente=contexto_pdf,
+        req_id=req_id,
+    )
+    if contexto_soportes_auto:
+        contexto_pdf = (contexto_pdf + "\n\n" + contexto_soportes_auto) if contexto_pdf else contexto_soportes_auto
+        # Contar como "archivos procesados" para que el motor IA detecte
+        # que hay soportes disponibles y referencie en el dictamen.
+        archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
 
     contrato_repo = ContratoRepository(db)
     contratos = contrato_repo.como_dict()
