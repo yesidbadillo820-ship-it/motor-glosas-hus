@@ -161,6 +161,11 @@ def post_reindex() -> dict:
 # son relevantes para el motor de glosas activas. Si querés sincronizar
 # una carpeta que no matchea este patrón, podés desactivar el filtro
 # con la variable de entorno `JUMPBOX_SKIP_FILTRO_MESES=1`.
+#
+# Para acelerar la primera pasada en Render Free (donde /tmp se borra
+# en cada OOM), podés limitar a SOLO los meses activos con
+# `JUMPBOX_MESES=ABRIL,MAYO` (sin tildes, sin año, mayúsculas o
+# minúsculas). Con eso bajás de 300k archivos a ~50k.
 import re
 import os as _os
 _RE_CARPETA_MES = re.compile(
@@ -169,12 +174,32 @@ _RE_CARPETA_MES = re.compile(
     re.IGNORECASE,
 )
 _FILTRO_MESES_ON = _os.getenv("JUMPBOX_SKIP_FILTRO_MESES", "0") != "1"
+# Lista opcional de meses específicos. Vacío = todos los matcheen el regex.
+_MESES_INCLUIR_RAW = _os.getenv("JUMPBOX_MESES", "").strip()
+_MESES_INCLUIR: set[str] = set()
+if _MESES_INCLUIR_RAW:
+    for m in re.split(r"[,;|]", _MESES_INCLUIR_RAW):
+        m = m.strip().upper()
+        # Aceptar "ABRIL", "ABRIL 2026", "ABRIL2026" — extraer solo el mes
+        match = re.match(
+            r"^(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|"
+            r"SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)",
+            m,
+        )
+        if match:
+            _MESES_INCLUIR.add(match.group(1))
 
 
 def _carpeta_mes_valida(carpeta_top: str) -> bool:
     """Devuelve True si la carpeta de primer nivel matchea el patrón
-    de carpeta de mes de soportes radicación."""
-    return bool(_RE_CARPETA_MES.match(carpeta_top.strip()))
+    de carpeta de mes de soportes radicación. Si JUMPBOX_MESES está
+    seteado, además debe ser uno de los meses listados."""
+    m = _RE_CARPETA_MES.match(carpeta_top.strip())
+    if not m:
+        return False
+    if _MESES_INCLUIR:
+        return m.group(1).upper() in _MESES_INCLUIR
+    return True
 
 
 def iter_archivos(raiz: Path) -> Iterator[Path]:
