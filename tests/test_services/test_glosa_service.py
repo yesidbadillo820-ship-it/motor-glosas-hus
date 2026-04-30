@@ -5,8 +5,46 @@ from app.services.glosa_service import (
     generar_texto_extemporanea,
     generar_texto_injustificada,
     obtener_plantilla_por_codigo,
-    DIAS_HABILES_LIMITE_EXTEMPORANEA
+    DIAS_HABILES_LIMITE_EXTEMPORANEA,
+    TEXTO_DMBUG_TARIFAS,
+    _es_dispensario_medico,
 )
+
+
+class TestDMBUGTextoFijo:
+    """Override institucional Yesid abr 2026: DMBUG + TA siempre con texto canónico."""
+
+    def test_detecta_dispensario_medico_variantes(self):
+        # Casos típicos del DGH (con prefijo U220311)
+        assert _es_dispensario_medico("DISPENSARIO MEDICO")
+        assert _es_dispensario_medico("DISPENSARIO MEDICO BUCARAMANGA")
+        assert _es_dispensario_medico("DISPENSARIO MEDICO BUCARAMANG")
+        assert _es_dispensario_medico(
+            "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANG"
+        )
+        assert _es_dispensario_medico("DMBUG")
+        assert _es_dispensario_medico("DIGSA")
+
+    def test_no_matchea_otras_eps(self):
+        assert not _es_dispensario_medico("FAMISANAR")
+        assert not _es_dispensario_medico("NUEVA EPS")
+        assert not _es_dispensario_medico("COOSALUD")
+        assert not _es_dispensario_medico("")
+
+    def test_texto_dmbug_tiene_referencias_clave(self):
+        # El texto canónico DEBE contener estos elementos para validez
+        # jurídica (revisado y aprobado por Yesid).
+        assert "440-DIGSA/DMBUG-2025" in TEXTO_DMBUG_TARIFAS
+        assert "PROCESO CD477" in TEXTO_DMBUG_TARIFAS
+        assert "30/07/2026" in TEXTO_DMBUG_TARIFAS
+        assert "7.141 ÍTEMS" in TEXTO_DMBUG_TARIFAS
+        assert "ARTÍCULOS 1602 Y 1603" in TEXTO_DMBUG_TARIFAS
+        assert "DECRETO-LEY 1795 DE 2000" in TEXTO_DMBUG_TARIFAS
+        assert "AGOTAMIENTO PRESUPUESTAL" in TEXTO_DMBUG_TARIFAS
+        # No debe arrancar con "RESPETUOSAMENTE" (nunca en aperturas)
+        assert not TEXTO_DMBUG_TARIFAS.startswith("RESPETUOSAMENTE")
+        # Debe iniciar con la fórmula institucional canónica
+        assert TEXTO_DMBUG_TARIFAS.startswith("ESE HUS NO ACEPTA")
 
 
 class TestCalculoDiasHabiles:

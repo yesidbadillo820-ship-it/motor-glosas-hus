@@ -553,6 +553,56 @@ TEXTO_RATIFICADA = (
 )
 
 
+# ─── Texto fijo: DISPENSARIO MEDICO BUCARAMANGA (DMBUG) — concepto TARIFAS ───
+# Pedido por Yesid (abr 2026, hasta nueva orden): toda glosa de
+# DISPENSARIO MEDICO con código TA* debe responderse con este texto
+# canónico institucional, sin ir al motor IA. Cita el contrato
+# 440-DIGSA/DMBUG-2025 con su anexo de 7.141 ítems tarifados y refuta
+# el argumento de "agotamiento presupuestal".
+TEXTO_DMBUG_TARIFAS = (
+    "ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE TARIFAS INTERPUESTA POR DMBUG "
+    "SOBRE LOS SERVICIOS EN MENCION. ENTRE LAS PARTES SE ENCUENTRA SUSCRITO Y "
+    "VIGENTE EL CONTRATO INTERADMINISTRATIVO No. 440-DIGSA/DMBUG-2025 "
+    "(PROCESO CD477), CON PLAZO HASTA 30/07/2026, QUE EN SU CLÁUSULA SEGUNDA "
+    "– PARÁGRAFO 1 INCORPORA EL ANEXO No. 1 CON 7.141 ÍTEMS TARIFADOS, ENTRE "
+    "LOS CUALES SE ENCUENTRA LOS SERVICIOS FACTURADOS. LA AFIRMACIÓN DE "
+    "INEXISTENCIA DE CONTRATO ES INEXACTA. EL ARGUMENTO DE AGOTAMIENTO "
+    "PRESUPUESTAL NO CONSTITUYE CAUSAL CONTRACTUAL NI LEGAL PARA SUSTITUIR "
+    "UNILATERALMENTE LAS TARIFAS PACTADAS POR SOAT, EN VIRTUD DE LOS "
+    "ARTÍCULOS 1602 Y 1603 DEL CÓDIGO CIVIL (\"TODO CONTRATO LEGALMENTE "
+    "CELEBRADO ES UNA LEY PARA LOS CONTRATANTES\"), 871 DEL CÓDIGO DE "
+    "COMERCIO (BUENA FE CONTRACTUAL), 5 Y 27 DE LA LEY 80 DE 1993 (DERECHO A "
+    "LA REMUNERACIÓN PACTADA Y ECUACIÓN CONTRACTUAL), DECRETO-LEY 1795 DE "
+    "2000 (RÉGIMEN DEL SUBSISTEMA DE SALUD DE LAS FF.MM.), ACUERDO 002 DE "
+    "2001 DEL CSSMP, DECRETO 4747 DE 2007 Y RESOLUCIÓN 3047 DE 2008 (MANUAL "
+    "ÚNICO DE GLOSAS). EL EVENTUAL AGOTAMIENTO PRESUPUESTAL ES "
+    "RESPONSABILIDAD DEL DMBUG (ART. 71 DEL DECRETO 111/1996) Y NO PUEDE "
+    "TRASLADARSE AL PRESTADOR. ASIMISMO, EL DECRETO 2423 DE 1996 OPERA EN "
+    "AUSENCIA DE PACTO; HABIENDO CONTRATO VIGENTE, NO PROCEDE COMO CRITERIO "
+    "SUSTITUTIVO. SE SOLICITA EL LEVANTAMIENTO ÍNTEGRO DE LA GLOSA Y EL "
+    "RECONOCIMIENTO DEL VALOR PACTADO EN EL ANEXO No. 1 DEL CONTRATO "
+    "440-DIGSA/DMBUG-2025."
+)
+
+
+def _es_dispensario_medico(eps: str) -> bool:
+    """Detecta si la EPS es Dispensario Médico Bucaramanga (DMBUG).
+    Acepta variantes:
+      DISPENSARIO MEDICO, DISPENSARIO MEDICO BUCARAMANGA, DISPENSARIO
+      MEDICO BUCARAMANG (truncado del DGH), DMBUG, U220311 - DIRECCION
+      DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANG, etc.
+    """
+    if not eps:
+        return False
+    e = eps.upper().strip()
+    return (
+        "DISPENSARIO MEDICO" in e
+        or "DMBUG" in e
+        or "DIGSA" in e
+        or "U220311" in e
+    )
+
+
 def generar_texto_extemporanea(dias: int) -> str:
     """Texto FIJO canónico HUS para glosas extemporáneas (RE9502).
 
@@ -762,6 +812,15 @@ class GlosaService:
         elif es_extemporanea:
             argumento_fijo = generar_texto_extemporanea(dias)
             tipo_glosa = "EXTEMPORANEA"
+        elif es_tarifa and _es_dispensario_medico(eps_key):
+            # Override institucional (Yesid abr 2026, hasta nueva orden):
+            # toda glosa TA* de Dispensario Médico Bucaramanga (DMBUG)
+            # responde con el texto canónico que cita el contrato
+            # 440-DIGSA/DMBUG-2025. NO se llama al motor IA — ahorra
+            # tokens y garantiza consistencia jurídica entre todas las
+            # glosas de este pagador.
+            argumento_fijo = TEXTO_DMBUG_TARIFAS
+            tipo_glosa = "TA_DMBUG_FIJO"
         elif es_tarifa and not tiene_contrato:
             # Pasamos texto_base como contexto — si eps_key es "OTRA / SIN DEFINIR",
             # la funcion extrae el nombre real del Excel (ej. COMPAÑIA MUNDIAL DE
@@ -856,6 +915,12 @@ class GlosaService:
             cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
         elif es_extemporanea:
             cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 57 Ley 1438/2011)"
+        elif es_tarifa and _es_dispensario_medico(eps_key):
+            # Override DMBUG: contrato 440-DIGSA/DMBUG-2025 está vigente,
+            # por lo que la respuesta es RE9901 (defensa con contrato),
+            # NO RE9602 (injustificada). Aún si tiene_contrato es False
+            # porque el eps_key viene con prefijo U220311.
+            cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
         elif es_tarifa and not tiene_contrato:
             cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
         else:
