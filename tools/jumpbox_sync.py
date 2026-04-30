@@ -110,6 +110,35 @@ def fetch_manifest() -> dict:
     return r.json()
 
 
+def fetch_facturas_objetivo() -> set[str]:
+    """Pide al motor la lista de facturas con glosas pendientes.
+
+    Devuelve set normalizado (solo dígitos sin ceros a la izquierda)
+    para matchear contra los nombres de archivo del share.
+    """
+    url = f"{MOTOR_URL}/soportes-auto/facturas-objetivo"
+    r = requests.get(url, headers=_headers(), timeout=60)
+    r.raise_for_status()
+    data = r.json()
+    facturas_set = set()
+    for f in data.get("facturas", []):
+        # Quitar prefijo HUS y ceros a la izquierda → solo dígitos
+        f_up = (f or "").upper().strip()
+        m = re.search(r"(\d+)", f_up)
+        if m:
+            facturas_set.add(m.group(1).lstrip("0") or "0")
+    logger.info(
+        f"Modo --solo-pendientes: {data.get('total', 0)} facturas pendientes "
+        f"reportadas por el motor ({len(facturas_set)} normalizadas únicas)."
+    )
+    return facturas_set
+
+
+# Set de facturas objetivo cargado al inicio si --solo-pendientes
+_FACTURAS_OBJETIVO: set[str] = set()
+SOLO_PENDIENTES: bool = False
+
+
 def post_batch(archivos_batch: list[tuple[Path, str]]) -> dict:
     """Sube un batch via multipart. Devuelve el resumen del motor."""
     url = f"{MOTOR_URL}/soportes-auto/upload-bulk"
@@ -214,8 +243,19 @@ def _carpeta_mes_valida(carpeta_top: str) -> bool:
     return True
 
 
+def _factura_de_filename(nombre: str) -> str:
+    """Extrae la parte numérica de la factura del nombre de archivo.
+    `HEV_900006037_HUS494213.pdf` → `494213`.
+    Devuelve "" si no encuentra un patrón HUS\\d+ válido."""
+    m = re.search(r"HUS(\d{4,12})", nombre.upper())
+    if not m:
+        return ""
+    return m.group(1).lstrip("0") or "0"
+
+
 def iter_archivos(raiz: Path) -> Iterator[Path]:
-    """Recorre el share, filtra por carpeta-mes válida + extensión + tamaño."""
+    """Recorre el share, filtra por carpeta-mes válida + extensión + tamaño +
+    (opcional) lista de facturas objetivo cuando SOLO_PENDIENTES está ON."""
     if _FILTRO_MESES_ON:
         # Iterar solo dentro de las carpetas de primer nivel que
         # matchean "{MES} {AÑO} - SOPORTES RADICACION".
@@ -244,6 +284,14 @@ def iter_archivos(raiz: Path) -> Iterator[Path]:
                 continue
             if p.suffix.lower() not in EXT_PERMITIDAS:
                 continue
+            # Filtro --solo-pendientes: el archivo debe pertenecer a una
+            # factura con glosa pendiente. Si no se puede extraer factura
+            # del nombre, lo saltamos (típicamente archivos genéricos
+            # como Glosas_Lote_X.pdf que no son por factura).
+            if SOLO_PENDIENTES and _FACTURAS_OBJETIVO:
+                fact = _factura_de_filename(p.name)
+                if not fact or fact not in _FACTURAS_OBJETIVO:
+                    continue
             try:
                 if p.stat().st_size > MAX_BYTES_POR_ARCHIVO:
                     logger.warning(f"Saltado por tamaño: {p}")
@@ -375,6 +423,24 @@ def run_once() -> dict:
         raise RuntimeError(f"SHARE_ROOT no existe: {SHARE_ROOT}")
 
     logger.info(f"Iniciando sync. SHARE_ROOT={SHARE_ROOT} → {MOTOR_URL}")
+
+    # Modo --solo-pendientes: cargar facturas objetivo del motor antes
+    # de scanear el share. iter_archivos las usa para descartar todo
+    # lo que no pertenezca a una glosa pendiente.
+    if SOLO_PENDIENTES:
+        try:
+            global _FACTURAS_OBJETIVO
+            _FACTURAS_OBJETIVO = fetch_facturas_objetivo()
+            if not _FACTURAS_OBJETIVO:
+                logger.warning(
+                    "Modo --solo-pendientes: el motor no devolvió facturas "
+                    "pendientes. Nada que sincronizar."
+                )
+                return {"duracion_s": 0.0, "subidos": 0, "reindexado": False}
+        except Exception as e:
+            logger.error(f"No pude obtener facturas objetivo: {e}")
+            raise
+
     manifest = fetch_manifest()
     pendientes = calcular_pendientes(SHARE_ROOT, manifest)
     if not pendientes:
@@ -429,7 +495,20 @@ def main() -> None:
     parser.add_argument("--once", action="store_true", help="Una sola pasada y salir")
     parser.add_argument("--loop", action="store_true", help="Pasada cada --interval-min minutos")
     parser.add_argument("--interval-min", type=int, default=30, help="Intervalo entre pasadas en modo loop")
+    parser.add_argument(
+        "--solo-pendientes",
+        action="store_true",
+        help=(
+            "Solo sincronizar PDFs de facturas con glosas pendientes "
+            "(consulta el motor en /soportes-auto/facturas-objetivo). "
+            "Reduce drásticamente el volumen — típicamente decenas de "
+            "facturas en vez de miles. Ideal para Render Free."
+        ),
+    )
     args = parser.parse_args()
+    # Exponer el flag globalmente para que iter_archivos lo lea
+    global SOLO_PENDIENTES
+    SOLO_PENDIENTES = bool(args.solo_pendientes)
 
     setup_logging()
 

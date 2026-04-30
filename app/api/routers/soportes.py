@@ -221,6 +221,53 @@ def _safe_join(base: Path, rel_path: str) -> Optional[Path]:
     return candidato
 
 
+@router.get("/facturas-objetivo")
+def facturas_objetivo(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Devuelve la lista de facturas con glosas PENDIENTES de respuesta.
+
+    Pensado para que el jump-box agent corra en modo `--solo-pendientes`
+    y solo sincronice los PDFs de las facturas que el gestor realmente
+    necesita responder ahora — en vez de los 144k archivos del share
+    completo.
+
+    Criterio "pendiente":
+      • estado NO IN (LEVANTADA, CONCILIADA, ACEPTADA, RATIFICADA,
+        ARCHIVADA, DUPLICADA_OCULTA)
+      • workflow_state NO IN (RESPONDIDA, CONCILIADA, LEVANTADA)
+
+    Devuelve facturas únicas + el conteo. La normalización (quitar
+    ceros a la izquierda, quitar prefijo HUS) la hace el agente al
+    matchear vs nombres de archivo del share.
+    """
+    from app.models.db import GlosaRecord
+    estados_terminales = (
+        "LEVANTADA", "CONCILIADA", "ACEPTADA", "RATIFICADA",
+        "ARCHIVADA", "DUPLICADA_OCULTA",
+    )
+    workflow_terminales = ("RESPONDIDA", "CONCILIADA", "LEVANTADA")
+    rows = (
+        db.query(GlosaRecord.factura)
+        .filter(GlosaRecord.factura.isnot(None))
+        .filter(GlosaRecord.factura != "")
+        .filter(~GlosaRecord.estado.in_(estados_terminales))
+        .filter(
+            (GlosaRecord.workflow_state.is_(None))
+            | (~GlosaRecord.workflow_state.in_(workflow_terminales))
+        )
+        .distinct()
+        .limit(5000)
+        .all()
+    )
+    facturas = sorted({r[0].strip().upper() for r in rows if r[0]})
+    return {
+        "total": len(facturas),
+        "facturas": facturas,
+    }
+
+
 @router.get("/manifest")
 def manifest(
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
