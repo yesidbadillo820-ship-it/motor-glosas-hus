@@ -102,24 +102,30 @@ def post_batch(archivos_batch: list[tuple[Path, str]]) -> dict:
     """Sube un batch via multipart. Devuelve el resumen del motor."""
     url = f"{MOTOR_URL}/soportes-auto/upload-bulk"
     files = []
-    rel_paths = []
+    rel_paths_lista: list[str] = []
     file_handles: list = []
     try:
         for ruta_local, rel in archivos_batch:
             fh = open(ruta_local, "rb")
             file_handles.append(fh)
             files.append(("files", (ruta_local.name, fh, "application/octet-stream")))
-            rel_paths.append(("rel_paths", rel))
+            rel_paths_lista.append(rel)
         ultimo_error: Optional[Exception] = None
         for intento in range(1, REINTENTOS + 1):
             try:
                 # Reposicionar handles si fue reintento (después de un envío parcial)
                 for fh in file_handles:
                     fh.seek(0)
+                # IMPORTANTE: rel_paths van por `data=` con dict-de-lista, NO
+                # mezclados en `files=`. Si se mezclan en `files`, requests los
+                # manda como UploadFile (con filename="upload") y FastAPI
+                # rechaza con 422 porque esperaba string. La forma `{"rel_paths":
+                # [lista]}` los manda como form fields texto repetidos.
                 r = requests.post(
                     url,
                     headers=_headers(),
-                    files=files + rel_paths,
+                    files=files,
+                    data={"rel_paths": rel_paths_lista},
                     timeout=300,
                 )
                 r.raise_for_status()
