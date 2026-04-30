@@ -113,23 +113,62 @@ def fetch_manifest() -> dict:
 def fetch_facturas_objetivo() -> set[str]:
     """Pide al motor la lista de facturas con glosas pendientes.
 
+    Estrategia con fallback (Render Free puede tener un build pendiente
+    sin desplegar):
+      1. Intenta /soportes-auto/facturas-objetivo (endpoint dedicado).
+      2. Si NO existe (404) → fallback a /glosas/mis-asignaciones?todas=true
+         que SIEMPRE existe en producción y devuelve las glosas pendientes
+         del usuario (o de todos si es SUPER_ADMIN/COORDINADOR).
+
     Devuelve set normalizado (solo dígitos sin ceros a la izquierda)
     para matchear contra los nombres de archivo del share.
     """
-    url = f"{MOTOR_URL}/soportes-auto/facturas-objetivo"
-    r = requests.get(url, headers=_headers(), timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    facturas_set = set()
-    for f in data.get("facturas", []):
-        # Quitar prefijo HUS y ceros a la izquierda → solo dígitos
-        f_up = (f or "").upper().strip()
-        m = re.search(r"(\d+)", f_up)
-        if m:
-            facturas_set.add(m.group(1).lstrip("0") or "0")
+    facturas_set: set[str] = set()
+    total_reportadas = 0
+    fuente = "facturas-objetivo"
+
+    # Intento 1: endpoint dedicado
+    try:
+        url = f"{MOTOR_URL}/soportes-auto/facturas-objetivo"
+        r = requests.get(url, headers=_headers(), timeout=60)
+        if r.status_code == 404:
+            raise FileNotFoundError("endpoint no desplegado")
+        r.raise_for_status()
+        data = r.json()
+        for f in data.get("facturas", []):
+            f_up = (f or "").upper().strip()
+            m = re.search(r"(\d+)", f_up)
+            if m:
+                facturas_set.add(m.group(1).lstrip("0") or "0")
+        total_reportadas = data.get("total", len(facturas_set))
+    except (FileNotFoundError, requests.HTTPError):
+        # Fallback: /glosas/mis-asignaciones que existe en todas las versiones
+        logger.info(
+            "Endpoint /soportes-auto/facturas-objetivo no disponible — "
+            "uso fallback /glosas/mis-asignaciones?todas=true"
+        )
+        fuente = "mis-asignaciones (fallback)"
+        url = f"{MOTOR_URL}/glosas/mis-asignaciones?todas=true"
+        r = requests.get(url, headers=_headers(), timeout=60)
+        r.raise_for_status()
+        glosas = r.json() if isinstance(r.json(), list) else []
+        for g in glosas:
+            f = (g.get("factura") or "").upper().strip()
+            estado = (g.get("estado") or "").upper()
+            wf = (g.get("workflow_state") or "").upper()
+            terminales_estado = {"LEVANTADA", "CONCILIADA", "ACEPTADA",
+                                 "RATIFICADA", "ARCHIVADA", "DUPLICADA_OCULTA"}
+            terminales_wf = {"RESPONDIDA", "CONCILIADA", "LEVANTADA"}
+            if estado in terminales_estado or wf in terminales_wf:
+                continue  # ya respondida — no necesita PDFs nuevos
+            m = re.search(r"(\d+)", f)
+            if m:
+                facturas_set.add(m.group(1).lstrip("0") or "0")
+        total_reportadas = len(facturas_set)
+
     logger.info(
-        f"Modo --solo-pendientes: {data.get('total', 0)} facturas pendientes "
-        f"reportadas por el motor ({len(facturas_set)} normalizadas únicas)."
+        f"Modo --solo-pendientes ({fuente}): {total_reportadas} facturas "
+        f"pendientes ({len(facturas_set)} normalizadas únicas)."
     )
     return facturas_set
 
