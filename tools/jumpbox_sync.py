@@ -56,12 +56,24 @@ SHARE_ROOT = Path(os.getenv("SHARE_ROOT", r"Y:\\"))
 EXT_PERMITIDAS = {".pdf", ".json", ".xml", ".txt", ".csv"}
 # Tope por archivo individual (acorde con el endpoint del motor)
 MAX_BYTES_POR_ARCHIVO = 50 * 1024 * 1024
-# Tope por batch HTTP — debe ser <= límite del motor (200 MB)
-MAX_BYTES_POR_BATCH = 100 * 1024 * 1024
-MAX_ARCHIVOS_POR_BATCH = 20
+# Tope por batch HTTP. CRITICAL para Render Free (512 MB RAM): el motor
+# carga TODO el body del multipart en memoria antes de procesarlo, así
+# que un batch grande lo lleva a OOM kill (502/connection-reset
+# observado en producción). Bajamos a 10 archivos / 25 MB por batch
+# para mantener al motor estable, aunque cada pasada sea más lenta.
+# Si en algún momento Yesid sube a Render Standard 2 GB, podés
+# subir estos números a 20/100 MB de nuevo.
+MAX_BYTES_POR_BATCH = 25 * 1024 * 1024
+MAX_ARCHIVOS_POR_BATCH = 10
 # Reintentos por batch en caso de error transitorio
 REINTENTOS = 3
 PAUSA_REINTENTO_S = 10
+# Pausa entre batches exitosos. En Render Free, después de procesar
+# un batch (descomprimir N PDFs en memoria), el motor necesita unos
+# segundos para que el GC de Python libere memoria y no llegue al
+# límite de 512 MB en el siguiente request. Sin esta pausa observamos
+# 502/connection-reset cada 5-10 batches.
+PAUSA_ENTRE_BATCHES_S = 3
 
 # Estado persistente — diagnóstico, no caché
 APPDATA = Path(os.getenv("APPDATA") or Path.home() / ".motor-glosas")
@@ -322,9 +334,15 @@ def subir_pendientes(pendientes: list[tuple[Path, str]]) -> dict:
             try:
                 resp = post_batch(batch)
                 _acumular(agregado, resp)
+                # Pausa para que Render Free libere memoria del request
+                # anterior antes del siguiente. Sin esto: cascadas de OOM.
+                time.sleep(PAUSA_ENTRE_BATCHES_S)
             except Exception as e:
                 logger.error(f"Batch perdido: {e}")
                 agregado["fallidos"] += len(batch)
+                # Pausa más larga después de fallo — el motor probablemente
+                # se está reiniciando por OOM (~90s downtime).
+                time.sleep(30)
             batch = []
             bytes_batch = 0
         batch.append((ruta, rel))
