@@ -155,21 +155,66 @@ def post_reindex() -> dict:
 
 
 # ─── Walker / filtros ──────────────────────────────────────────────
+# Patrón aceptado en la raíz: "{MES} {AÑO} - SOPORTES RADICACION".
+# Cualquier otra carpeta de primer nivel se ignora — eso evita escanear
+# `Radicacion Digital - Carpeta 2` y demás archivos históricos que no
+# son relevantes para el motor de glosas activas. Si querés sincronizar
+# una carpeta que no matchea este patrón, podés desactivar el filtro
+# con la variable de entorno `JUMPBOX_SKIP_FILTRO_MESES=1`.
+import re
+import os as _os
+_RE_CARPETA_MES = re.compile(
+    r"^(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|"
+    r"SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s+\d{4}\s*-\s*SOPORTES",
+    re.IGNORECASE,
+)
+_FILTRO_MESES_ON = _os.getenv("JUMPBOX_SKIP_FILTRO_MESES", "0") != "1"
+
+
+def _carpeta_mes_valida(carpeta_top: str) -> bool:
+    """Devuelve True si la carpeta de primer nivel matchea el patrón
+    de carpeta de mes de soportes radicación."""
+    return bool(_RE_CARPETA_MES.match(carpeta_top.strip()))
+
+
 def iter_archivos(raiz: Path) -> Iterator[Path]:
-    """Recorre el share, filtra por extensión y tamaño."""
-    for p in raiz.rglob("*"):
-        if not p.is_file():
-            continue
-        if p.suffix.lower() not in EXT_PERMITIDAS:
-            continue
-        try:
-            if p.stat().st_size > MAX_BYTES_POR_ARCHIVO:
-                logger.warning(f"Saltado por tamaño: {p}")
+    """Recorre el share, filtra por carpeta-mes válida + extensión + tamaño."""
+    if _FILTRO_MESES_ON:
+        # Iterar solo dentro de las carpetas de primer nivel que
+        # matchean "{MES} {AÑO} - SOPORTES RADICACION".
+        carpetas_validas = [
+            d for d in raiz.iterdir()
+            if d.is_dir() and _carpeta_mes_valida(d.name)
+        ]
+        if not carpetas_validas:
+            logger.warning(
+                f"No encontré carpetas que matcheen '{{MES}} {{AÑO}} - SOPORTES "
+                f"RADICACION' bajo {raiz}. Si querés sincronizar otras, "
+                f"usá JUMPBOX_SKIP_FILTRO_MESES=1."
+            )
+            return
+        logger.info(
+            f"Filtrando por carpeta-mes: {len(carpetas_validas)} carpetas "
+            f"válidas: {[d.name for d in carpetas_validas]}"
+        )
+        sub_raices = carpetas_validas
+    else:
+        sub_raices = [raiz]
+
+    for sub in sub_raices:
+        for p in sub.rglob("*"):
+            if not p.is_file():
                 continue
-        except OSError as e:
-            logger.warning(f"Stat falló en {p}: {e}")
-            continue
-        yield p
+            if p.suffix.lower() not in EXT_PERMITIDAS:
+                continue
+            try:
+                if p.stat().st_size > MAX_BYTES_POR_ARCHIVO:
+                    logger.warning(f"Saltado por tamaño: {p}")
+                    continue
+            except OSError as e:
+                logger.warning(f"Stat falló en {p}: {e}")
+                continue
+            yield p
 
 
 def _to_rel(local: Path, raiz: Path) -> str:
@@ -205,6 +250,13 @@ def calcular_pendientes(raiz: Path, manifest: dict) -> list[tuple[Path, str]]:
     total_local = 0
     for archivo in iter_archivos(raiz):
         total_local += 1
+        # Log de progreso cada 1000 archivos escaneados — sin esto el
+        # share grande parece colgado durante varios minutos.
+        if total_local % 1000 == 0:
+            logger.info(
+                f"Escaneando... {total_local} archivos vistos, "
+                f"{len(pendientes)} pendientes hasta ahora"
+            )
         rel = _to_rel(archivo, raiz)
         try:
             tam_local = archivo.stat().st_size
