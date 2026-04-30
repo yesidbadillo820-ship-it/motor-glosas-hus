@@ -1205,8 +1205,17 @@ async def generar_lote(
                 gi = GlosaInput(
                     eps=g.eps or "SIN DEFINIR",
                     etapa=g.etapa or "RESPUESTA A GLOSA",
-                    fecha_radicacion=g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,
-                    fecha_recepcion=g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+                    # Pydantic v2 GlosaInput valida date estricto (sin hora).
+                    # El campo del modelo es DateTime (trae T00:01:00 del DGH),
+                    # así que tomamos solo la fecha con .date().
+                    fecha_radicacion=(
+                        g.fecha_radicacion_factura.date().isoformat()
+                        if g.fecha_radicacion_factura else None
+                    ),
+                    fecha_recepcion=(
+                        g.fecha_recepcion.date().isoformat()
+                        if g.fecha_recepcion else None
+                    ),
                     valor_aceptado=str(int(g.valor_aceptado or 0)),
                     tabla_excel=texto,
                     numero_factura=g.factura,
