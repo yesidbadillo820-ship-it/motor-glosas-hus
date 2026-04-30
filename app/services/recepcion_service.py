@@ -754,7 +754,14 @@ class RecepcionService:
                 observacion = _fix_mojibake(str(_get("concepto_observacion") or "").strip())
                 valor_obj = _a_float(_get("concepto_valor"))
 
-                # Buscar la glosa padre por factura + consecutivo
+                # Buscar la glosa padre por factura + consecutivo.
+                # Si no se encuentra con esa combinación exacta, intentar
+                # fallback por solo FACTURA cuando el consecutivo del padre
+                # esté vacío (caso típico: la hoja Recepción no tenía el
+                # campo "consecutivo dgh" pero la hoja I/R sí lo trae).
+                # En ese caso, completamos el consecutivo del padre con el
+                # de esta fila — así el resto de la metadata (NIT, valor
+                # factura, tercero, fecha objecion) sí se llena.
                 glosa_padre = (
                     self.db.query(GlosaRecord)
                     .filter(
@@ -763,6 +770,50 @@ class RecepcionService:
                     )
                     .first()
                 )
+                if not glosa_padre and consecutivo:
+                    # Fallback 1: factura + consecutivo NULL (parent fue
+                    # creado sin consecutivo). Le seteamos el consecutivo
+                    # ahora.
+                    glosa_padre = (
+                        self.db.query(GlosaRecord)
+                        .filter(
+                            GlosaRecord.factura == factura,
+                            (GlosaRecord.consecutivo_dgh.is_(None))
+                            | (GlosaRecord.consecutivo_dgh == ""),
+                        )
+                        .order_by(GlosaRecord.id.desc())
+                        .first()
+                    )
+                    if glosa_padre:
+                        glosa_padre.consecutivo_dgh = consecutivo
+                        logger.info(
+                            f"[I/R] Fallback match: glosa_id={glosa_padre.id} "
+                            f"factura={factura} sin consecutivo previo, "
+                            f"se le asigna {consecutivo}"
+                        )
+                if not glosa_padre:
+                    # Fallback 2: factura sola (cualquier glosa con esa
+                    # factura — escogemos la más reciente). Si la encontrada
+                    # tiene un consecutivo distinto pero la factura coincide,
+                    # asumimos que es la misma glosa (puede haber inconsistencia
+                    # entre lo que el técnico de recepción cargó y lo que el
+                    # DGH oficial trae). Logeamos la divergencia.
+                    glosa_padre = (
+                        self.db.query(GlosaRecord)
+                        .filter(GlosaRecord.factura == factura)
+                        .order_by(GlosaRecord.id.desc())
+                        .first()
+                    )
+                    if glosa_padre:
+                        prev_consec = glosa_padre.consecutivo_dgh
+                        if prev_consec and prev_consec != consecutivo:
+                            logger.warning(
+                                f"[I/R] Divergencia consecutivo factura={factura}: "
+                                f"BD tiene '{prev_consec}', I/R trae '{consecutivo}'. "
+                                f"Vinculando igual y conservando el de BD."
+                            )
+                        elif not prev_consec:
+                            glosa_padre.consecutivo_dgh = consecutivo
                 if not glosa_padre:
                     resumen.conceptos_huerfanos.append({
                         "fila": num_fila,
@@ -772,7 +823,7 @@ class RecepcionService:
                         "codigo_glosa": codigo_glosa,
                         "cups": cups_codigo,
                         "valor": valor_obj,
-                        "motivo": "No existe glosa con esa FACTURA+CONSECUTIVO DGH (carga primero INICIAL/RATIFICADA)",
+                        "motivo": "No existe glosa con esa FACTURA (carga primero INICIAL/RATIFICADA)",
                     })
                     continue
 

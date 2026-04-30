@@ -375,3 +375,58 @@ class TestImportacionCompleta:
         assert r.conceptos_huerfanos[0]["factura"] == "HUS9999999999"
         assert r.conceptos_huerfanos[0]["consecutivo_dgh"] == "999999"
         assert r.conceptos_huerfanos[0]["codigo_glosa"] == "TA0801"
+
+    def test_fallback_match_por_factura_cuando_consecutivo_vacio_en_padre(self, db):
+        """Bug fix abr 2026: si el padre fue creado SIN consecutivo (porque
+        la hoja Recepción no tenía esa columna), el match por (factura,
+        consecutivo) falla y todos los campos de la hoja I (NIT, valor
+        factura, tercero) se quedan vacíos. Fix: matchear por factura y
+        completar el consecutivo del padre."""
+        from app.models.db import GlosaRecord
+        # Pre-crear glosa padre con consecutivo VACÍO (caso real).
+        from app.core.tz import ahora_utc
+        padre = GlosaRecord(
+            eps="DISPENSARIO MEDICO",
+            paciente="N/A",
+            factura="HUS0000491522",
+            etapa="INICIAL",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            codigo_glosa="FA0301",
+            valor_objetado=32208,
+            consecutivo_dgh=None,  # ← clave: vacío
+        )
+        db.add(padre)
+        db.commit()
+        db.refresh(padre)
+
+        # Ahora subir solo la hoja I con datos completos
+        wb = Workbook()
+        wb.remove(wb.active)
+        ws = wb.create_sheet("I")
+        _hoja_conceptos(ws, [
+            [
+                "Glosa_Inicial", "Administrativo", "", "DISPENSARIO MEDICO", 0,
+                "U", "U", "U", "U",
+                "U220311 - DISPENSARIO MEDICO BUCARAMANG", "EPS001",
+                "HUS0000491522", "20/04/2026", "170979", "", "Confirmado",
+                1022622, "13/04/2026", "901541137", "DISPENSARIO MEDICO BUCARAMANGA", "20/04/2026",
+                "", 1, "", 0, "U",
+                "FA0301", "1066549", "Honorarios profesionales",
+                "890602", "CUIDADO INTRAHOSPITALARIO", 32208,
+                "734303 - CARDIOLOGIA", "Obs orig",
+            ]
+        ])
+        r = RecepcionService(db).procesar_excel(_bytes_wb(wb))
+
+        # El concepto NO debería ser huérfano — el fallback lo vincula
+        assert len(r.conceptos_huerfanos) == 0, r.conceptos_huerfanos
+        assert r.conceptos_creados == 1
+
+        db.refresh(padre)
+        # El consecutivo del padre AHORA tiene que estar lleno
+        assert padre.consecutivo_dgh == "170979"
+        # Y los campos enriquecidos también
+        assert padre.tercero_nit == "901541137"
+        assert padre.valor_factura == 1022622
+        assert "BUCARAMANGA" in (padre.tercero_nombre or "")
