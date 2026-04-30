@@ -1155,12 +1155,51 @@ async def generar_lote(
                 return
             # Construir input desde los campos del registro
             texto = g.texto_glosa_original or ""
-            if not texto and g.codigo_glosa:
-                # Fallback mínimo si no hay texto original
-                texto = f"{g.codigo_glosa} $ {int(g.valor_objetado or 0):,} {g.concepto_glosa or ''}".strip()
+            if not texto:
+                # Fallback robusto: ensamblar texto desde TODOS los campos
+                # disponibles + conceptos vinculados (hojas I/R del DGH).
+                # Necesario para glosas importadas sin texto_glosa_original
+                # (caso típico cuando la importación masiva creó la glosa
+                # con placeholder).
+                partes = []
+                if g.codigo_glosa:
+                    partes.append(g.codigo_glosa)
+                if g.concepto_glosa:
+                    partes.append(g.concepto_glosa)
+                if g.cups_servicio:
+                    partes.append(f"CUPS {g.cups_servicio}")
+                if g.servicio_descripcion:
+                    partes.append(g.servicio_descripcion)
+                if g.valor_objetado and float(g.valor_objetado) > 0:
+                    partes.append(f"Valor objetado: ${int(g.valor_objetado):,}".replace(",", "."))
+                if g.observacion_eps:
+                    partes.append(g.observacion_eps)
+                # Conceptos vinculados (hojas I/R del DGH)
+                try:
+                    from app.models.db import ConceptoGlosaRecord as _CG
+                    conceptos = (
+                        db.query(_CG)
+                        .filter(_CG.glosa_id == g.id)
+                        .limit(5)
+                        .all()
+                    )
+                    for c in conceptos:
+                        if c.codigo_glosa and c.codigo_glosa not in partes:
+                            partes.append(c.codigo_glosa)
+                        if c.cups_codigo:
+                            partes.append(f"CUPS {c.cups_codigo}")
+                        if c.cups_descripcion:
+                            partes.append(c.cups_descripcion)
+                        if c.observacion_eps:
+                            partes.append(c.observacion_eps)
+                        if c.valor_objetado and float(c.valor_objetado) > 0:
+                            partes.append(f"Valor objetado: ${int(c.valor_objetado):,}".replace(",", "."))
+                except Exception:
+                    pass
+                texto = " — ".join([p for p in partes if p]).strip()
             if not texto:
                 resumen["fallidas"] += 1
-                resumen["detalle_fallidas"].append({"id": gid, "error": "sin texto_glosa_original"})
+                resumen["detalle_fallidas"].append({"id": gid, "error": "sin texto ni conceptos vinculados"})
                 return
             try:
                 gi = GlosaInput(
