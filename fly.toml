@@ -51,10 +51,15 @@ primary_region = "gru"
     method = "GET"
     path = "/health"
 
-# ─── VM size (free tier) ─────────────────────────────────────────────
+# ─── VM size ─────────────────────────────────────────────────────────
+# 1024MB necesarios — el worker base pesa ~235MB, y al subir un PDF
+# grande (Famisanar contrato 30-50 páginas) pdfplumber lo carga en
+# memoria y el worker crece a 380-450MB momentáneamente. 512MB era
+# justo y producía OOM. Costo aprox: $5.70/mes - $5 free credit Fly =
+# ~$0.70/mes (nada vs estabilidad del sistema).
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"   # 256 free + 256 que Fly da gratis con free plan
+  memory = "1gb"
 
 # ─── Volumen persistente para soportes ───────────────────────────────
 # Resuelve el problema de Render Free donde /tmp se borraba en cada
