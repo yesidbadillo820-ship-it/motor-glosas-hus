@@ -55,6 +55,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsS http://localhost:8080/health || exit 1
 
-# Comando final. 1 worker para Render Free era suficiente; en Fly podemos
-# subir a 2 si el plan lo soporta. Para arrancar conservador.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+# Comando final. 2 workers para que peticiones largas (extracción IA de
+# cláusulas de PDF de contrato, parsing de Excel Famisanar 3 hojas) no
+# bloqueen el endpoint /health del healthcheck de Fly. Con 512MB RAM cada
+# worker consume ~120-150MB; 2 workers + libs entran cómodos en el budget.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]

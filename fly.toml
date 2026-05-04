@@ -41,7 +41,11 @@ primary_region = "gru"
 
   [[http_service.checks]]
     interval = "30s"
-    timeout = "5s"
+    # 10s (era 5s) — los uploads pesados (Excel Famisanar 3 hojas, PDFs
+    # de contrato con extracción Claude 30-60s) pueden ocupar un worker
+    # momentáneamente. 10s da margen sin sacrificar detección rápida de
+    # caídas reales.
+    timeout = "10s"
     grace_period = "60s"
     method = "GET"
     path = "/health"
