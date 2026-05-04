@@ -86,6 +86,13 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
             soportes_servidor_count=soportes_count,
         )
 
+        if soportes_count > 0:
+            logger.info(
+                f"[auto-responder] glosa={glosa_id} factura={g.factura} "
+                f"tiene {soportes_count} soporte(s) en servidor — relajando "
+                f"reglas de detector REQUIERE_SOPORTES"
+            )
+
         if evaluacion["requiere"]:
             g.dictamen = mensaje_para_dictamen(
                 evaluacion, codigo_glosa=g.codigo_glosa or "—",

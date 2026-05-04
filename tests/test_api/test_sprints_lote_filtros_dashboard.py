@@ -232,3 +232,22 @@ class TestDashboardPlataRecuperada:
         assert t["tasa_efectividad_pct"] == 50.0
         assert len(d["por_eps"]) >= 1
         assert len(d["por_codigo"]) >= 1
+
+    def test_db_vacia_no_explota(self, client):
+        """Edge case sugerido por audit: dashboard con 0 glosas debe
+        responder 200 con totales en 0 y listas vacías, NO 500 ni
+        ZeroDivisionError en la tasa de efectividad."""
+        r = client.get("/glosas/dashboard-plata-recuperada")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        t = d["totales"]
+        assert t["n_glosas"] == 0
+        assert t["n_levantadas"] == 0
+        assert t["n_ratificadas"] == 0
+        assert t["valor_objetado"] == 0
+        assert t["valor_recuperado"] == 0
+        # Sin decisiones → tasa = 0% (NO division by zero)
+        assert t["tasa_efectividad_pct"] == 0.0
+        assert d["por_eps"] == []
+        assert d["por_codigo"] == []
+        assert d["por_mes"] == []
