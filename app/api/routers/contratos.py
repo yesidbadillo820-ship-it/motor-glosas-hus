@@ -492,10 +492,10 @@ async def subir_pdf_contrato(
 
     Flow:
       1. Valida que el contrato exista (debe haberse creado antes vía /upsert).
-      2. Lee el PDF, extrae texto con pdf_service.
-      3. Llama a Claude para sacar cláusulas estructuradas.
-      4. Guarda el PDF en /data/contratos/<eps>.pdf (sobreescribe vigente).
-      5. Borra cláusulas viejas + inserta las nuevas.
+      2. Guarda el PDF en /data/contratos/<eps>.pdf (sobreescribe vigente).
+      3. Pasa el PDF binario a Claude (soporte nativo Messages API) para
+         extraer cláusulas estructuradas — más robusto que pdfplumber.
+      4. Borra cláusulas viejas + inserta las nuevas.
 
     Devuelve cantidad de cláusulas extraídas + ruta donde quedó el PDF.
     """
@@ -515,21 +515,6 @@ async def subir_pdf_contrato(
     if len(contenido) > 30 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="PDF mayor a 30MB no soportado")
 
-    # Extraer texto del PDF
-    from app.services.pdf_service import PdfService
-    pdf_svc = PdfService()
-    try:
-        texto = await pdf_svc.extraer(contenido)
-    except Exception as e:
-        logger.error(f"[CONTRATO-PDF] Error extrayendo texto del PDF eps={eps}: {e}")
-        raise HTTPException(status_code=500, detail=f"No se pudo leer el PDF: {e}")
-
-    if not texto or len(texto.strip()) < 200:
-        raise HTTPException(
-            status_code=422,
-            detail="El PDF no contiene texto legible (¿escaneado sin OCR?). Subí una versión con texto seleccionable.",
-        )
-
     # Guardar el PDF en disco (sobreescribe el vigente)
     os.makedirs(CONTRATOS_PDF_ROOT, exist_ok=True)
     eps_safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in eps)[:80]
@@ -537,10 +522,17 @@ async def subir_pdf_contrato(
     with open(pdf_path, "wb") as f:
         f.write(contenido)
 
-    # Extraer cláusulas con Claude
-    from app.services.extractor_clausulas_contrato import extraer_clausulas_desde_texto
+    # Extraer cláusulas: pasamos el PDF binario directo a Claude (soporte
+    # nativo de Anthropic Messages API). Es mucho más robusto que
+    # pdfplumber → texto plano: Claude lee todas las páginas incluso si
+    # el PDF tiene fonts raros, tablas complejas, o escaneos con OCR
+    # incrustado. Famisanar tiene formato que pdfplumber no maneja bien
+    # (devolvía solo 7k chars de un PDF de 4MB → 0 cláusulas).
+    from app.services.extractor_clausulas_contrato import (
+        extraer_clausulas_desde_pdf_bytes,
+    )
     try:
-        clausulas = await extraer_clausulas_desde_texto(texto, eps)
+        clausulas = await extraer_clausulas_desde_pdf_bytes(contenido, eps)
     except Exception as e:
         logger.error(f"[CONTRATO-PDF] Error extrayendo cláusulas eps={eps}: {e}")
         clausulas = []
@@ -563,13 +555,12 @@ async def subir_pdf_contrato(
 
     logger.info(
         f"[CONTRATO-PDF] eps={eps} pdf={len(contenido)//1024}KB "
-        f"texto={len(texto)} chars clausulas={len(clausulas)}"
+        f"clausulas={len(clausulas)}"
     )
 
     return {
         "eps": eps,
         "pdf_kb": len(contenido) // 1024,
-        "texto_chars": len(texto),
         "clausulas_extraidas": len(clausulas),
         "subido_en": contrato.pdf_subido_en.isoformat(),
     }

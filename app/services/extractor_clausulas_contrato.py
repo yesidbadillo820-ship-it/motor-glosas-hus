@@ -13,9 +13,16 @@ Mapeo de temas a códigos de glosa (primeras 2 letras):
     CO = Cobertura / pertinencia
     FA = Facturación / pagos
     NN = Notas / generales
+
+Implementación: usa el soporte nativo de PDFs de la Messages API de
+Anthropic (envía el PDF binario en base64 como `document`). Claude lee
+todas las páginas (incluso aquellas que pdfplumber falla en extraer
+por formato raro o fonts no estándar) y entiende layout/tablas. Más
+robusto que pdfplumber → texto plano → Claude.
 """
 import os
 import json
+import base64
 import logging
 import re
 import httpx
@@ -167,6 +174,139 @@ async def extraer_clausulas_desde_texto(
         })
 
     logger.info(f"[CLAUSULAS] Extraídas {len(sanas)} cláusulas válidas para EPS={eps}")
+    return sanas
+
+
+async def extraer_clausulas_desde_pdf_bytes(
+    pdf_bytes: bytes,
+    eps: str,
+    api_key: str = None,
+    modelo: str = None,
+) -> list[dict]:
+    """Llama a Claude pasándole el PDF binario directo (sin pdfplumber).
+
+    Usa el soporte nativo de PDFs de Anthropic — Claude lee todas las
+    páginas, incluso aquellas que pdfplumber falla en extraer (fonts
+    raros, encoding no estándar, tablas complejas, escaneos con OCR
+    incrustado). Mucho más robusto.
+
+    Si la API falla devuelve []. El caller (router) loggea y continúa.
+    """
+    api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
+    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+
+    if not api_key:
+        logger.warning("[CLAUSULAS] ANTHROPIC_API_KEY no configurada — saltando")
+        return []
+
+    if not pdf_bytes or len(pdf_bytes) < 1024:
+        logger.warning(f"[CLAUSULAS] PDF muy chico ({len(pdf_bytes or b'')} bytes)")
+        return []
+
+    # Anthropic acepta PDFs hasta 32MB. Cap defensivo.
+    if len(pdf_bytes) > 32 * 1024 * 1024:
+        logger.warning(f"[CLAUSULAS] PDF >32MB ({len(pdf_bytes)//1024//1024}MB)")
+        return []
+
+    pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("ascii")
+
+    user_prompt_text = (
+        f"Contrato de la EPS: {eps}\n\n"
+        "Analiza el PDF adjunto y extrae las cláusulas contractuales útiles "
+        "para responder glosas, según las reglas del system prompt."
+    )
+
+    timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers,
+                json={
+                    "model": modelo,
+                    "max_tokens": 8000,
+                    "temperature": 0.0,
+                    "system": SYSTEM_EXTRACCION,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "document",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "application/pdf",
+                                        "data": pdf_b64,
+                                    },
+                                },
+                                {
+                                    "type": "text",
+                                    "text": user_prompt_text,
+                                },
+                            ],
+                        }
+                    ],
+                },
+            )
+    except Exception as e:
+        logger.error(f"[CLAUSULAS-PDF] Error llamando a Anthropic: {e}")
+        return []
+
+    if resp.status_code != 200:
+        logger.error(
+            f"[CLAUSULAS-PDF] Anthropic HTTP {resp.status_code}: {resp.text[:500]}"
+        )
+        return []
+
+    data = resp.json()
+    if not data.get("content"):
+        logger.error(f"[CLAUSULAS-PDF] Respuesta sin content: {str(data)[:300]}")
+        return []
+
+    texto_resp = data["content"][0].get("text", "")
+    json_text = _limpiar_json_respuesta(texto_resp)
+
+    try:
+        parsed = json.loads(json_text)
+    except json.JSONDecodeError as e:
+        logger.error(
+            f"[CLAUSULAS-PDF] JSON inválido: {e} — texto: {json_text[:300]}"
+        )
+        return []
+
+    clausulas = parsed.get("clausulas", [])
+    if not isinstance(clausulas, list):
+        return []
+
+    TEMAS_VALIDOS = {"TA", "SO", "AU", "CO", "FA", "NN"}
+    sanas = []
+    for c in clausulas:
+        if not isinstance(c, dict):
+            continue
+        texto = (c.get("texto_literal") or "").strip()
+        if len(texto) < 30:
+            continue
+        tema = (c.get("tema") or "NN").upper().strip()
+        if tema not in TEMAS_VALIDOS:
+            tema = "NN"
+        sanas.append({
+            "numero": (c.get("numero") or "").strip()[:80],
+            "tema": tema,
+            "titulo": (c.get("titulo") or "").strip()[:300],
+            "texto_literal": texto[:5000],
+            "pagina": c.get("pagina") if isinstance(c.get("pagina"), int) else None,
+        })
+
+    logger.info(
+        f"[CLAUSULAS-PDF] Extraídas {len(sanas)} cláusulas válidas para "
+        f"EPS={eps} desde PDF de {len(pdf_bytes)//1024}KB"
+    )
     return sanas
 
 

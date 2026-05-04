@@ -4871,7 +4871,6 @@ async function subirContratoPDF(){
         '<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#14532d;line-height:1.55;">' +
           '<b>✅ Contrato procesado correctamente</b><br>' +
           '• PDF guardado: ' + (data.pdf_kb || 0) + ' KB<br>' +
-          '• Texto extraído: ' + (data.texto_chars || 0).toLocaleString('es-CO') + ' caracteres<br>' +
           '• Cláusulas detectadas: <b>' + (data.clausulas_extraidas || 0) + '</b><br>' +
           '<span style="font-size:.75rem;color:#365314;">A partir de ahora el motor citará estas cláusulas literales al objetar glosas de ' + escHtml(eps) + '.</span>' +
         '</div>';
