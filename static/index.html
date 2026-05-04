@@ -1484,8 +1484,8 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div class="sb-section">
             <div class="sb-label">Pagador</div>
             <div class="field">
-              <label>EPS / Entidad Pagadora</label>
-              <select id="eps-sel"></select>
+              <label>EPS / Entidad Pagadora <span style="color:#dc2626" title="Campo obligatorio">*</span></label>
+              <select id="eps-sel" required></select>
             </div>
           </div>
           <div class="sb-section">
@@ -1528,8 +1528,8 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div class="sb-section">
             <div class="sb-label">Contenido</div>
             <div class="field">
-              <label>Descripción / Texto de la Glosa</label>
-              <textarea id="f-glosa" rows="7" placeholder="Pegue aquí el texto completo de la glosa tal como aparece en el formato de la EPS. Incluya código, descripción, valores y justificación de la EPS..."></textarea>
+              <label>Descripción / Texto de la Glosa <span style="color:#dc2626" title="Campo obligatorio">*</span></label>
+              <textarea id="f-glosa" rows="7" placeholder="Pegue aquí el texto completo de la glosa tal como aparece en el formato de la EPS. Incluya código, descripción, valores y justificación de la EPS..." required></textarea>
             </div>
             <div class="field" style="margin-top:.4rem;">
               <label style="display:flex;align-items:center;gap:.4rem;">
@@ -4781,6 +4781,16 @@ async function subirTarifasExcel(){
       return;
     }
   }
+  // Anti-doble-click: deshabilitar el botón mientras procesa.
+  // Sin esto, dos clicks rápidos disparan dos uploads en paralelo →
+  // tarifas duplicadas.
+  var btn = document.querySelector('button[onclick="subirTarifasExcel()"]');
+  if(btn){
+    btn.disabled = true;
+    btn.dataset._origText = btn.textContent;
+    btn.textContent = '⏳ Subiendo...';
+    btn.style.opacity = '.7';
+  }
   var fd = new FormData();
   fd.append('archivo', input.files[0]);
   var params = [];
@@ -4824,6 +4834,12 @@ async function subirTarifasExcel(){
     cargarTarifas();
   }catch(e){
     if(resultDiv) resultDiv.innerHTML = '<div style="color:#b91c1c">Error de red: ' + escHtml(e.message) + '</div>';
+  } finally {
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = btn.dataset._origText || '📊 Importar Excel';
+      btn.style.opacity = '';
+    }
   }
 }
 
@@ -4834,6 +4850,14 @@ async function subirTarifasCSV(){
   if(!input || !input.files || !input.files.length){
     toast('Sin archivo', 'Selecciona un CSV primero', 'warning');
     return;
+  }
+  // Anti-doble-click
+  var btn = document.querySelector('button[onclick="subirTarifasCSV()"]');
+  if(btn){
+    btn.disabled = true;
+    btn.dataset._origText = btn.textContent;
+    btn.textContent = '⏳ Subiendo...';
+    btn.style.opacity = '.7';
   }
   var fd = new FormData();
   fd.append('archivo', input.files[0]);
@@ -4864,6 +4888,12 @@ async function subirTarifasCSV(){
     cargarTarifas();
   }catch(e){
     if(resultDiv) resultDiv.innerHTML = '<div style="color:#b91c1c">Error de red: ' + escHtml(e.message) + '</div>';
+  } finally {
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = btn.dataset._origText || '📤 Importar CSV';
+      btn.style.opacity = '';
+    }
   }
 }
 
@@ -8821,7 +8851,16 @@ function _renderMisGlosas(dataRaw){
         '<path d="M9 11V7a3 3 0 0 1 6 0v4"/><path d="M9 16h6"/>' +
         '</svg>' +
         '<div style="font-size:.95rem;font-weight:600;color:var(--text2);margin-bottom:.25rem">Sin glosas asignadas</div>' +
-        '<div style="max-width:420px;margin:0 auto;line-height:1.6">Si esperabas ver alguna, pídele a un administrador que revise el campo <b>Nombre</b> de tu usuario. Debe coincidir con la columna <code>GESTOR</code> del Excel (ej: "YESID PEREZ").</div>' +
+        '<div style="max-width:480px;margin:0 auto 1rem auto;line-height:1.6">' +
+          'Si esperabas ver alguna, pídele a un administrador que revise el campo ' +
+          '<b>Nombre</b> de tu usuario. Debe coincidir con la columna ' +
+          '<code>GESTOR</code> del Excel (ej: "YESID PEREZ").' +
+        '</div>' +
+        '<div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-top:.8rem">' +
+          '<button class="btn-sm btn-primary" onclick="window.location.href=\'/importar-recepcion\'" '+
+                  'title="Subir el Excel del DGH para crear glosas">📥 Importar recepción</button> ' +
+          '<button class="btn-sm ghost" onclick="loadMisGlosas()" title="Recargar la lista">🔄 Recargar</button>' +
+        '</div>' +
         '</td></tr>';
       return;
     }
@@ -10097,8 +10136,26 @@ function ocultarPreviewAuditoria(){
 async function analizar(modoOverride){
   var eps=document.getElementById('eps-sel').value;
   var glosa=document.getElementById('f-glosa').value.trim();
-  if(!eps){toast('Campo requerido','Seleccione la EPS','warning');return;}
-  if(glosa.length<15){toast('Campo requerido','Ingrese la descripción completa de la glosa (mínimo 15 caracteres)','warning');return;}
+  if(!eps){
+    toast('Campo requerido','Seleccione la EPS','warning');
+    var e = document.getElementById('eps-sel');
+    if(e){
+      e.focus();
+      e.style.outline = '2px solid #dc2626';
+      setTimeout(function(){ e.style.outline = ''; }, 2500);
+    }
+    return;
+  }
+  if(glosa.length<15){
+    toast('Campo requerido','Ingrese la descripción completa de la glosa (mínimo 15 caracteres)','warning');
+    var t = document.getElementById('f-glosa');
+    if(t){
+      t.focus();
+      t.style.outline = '2px solid #dc2626';
+      setTimeout(function(){ t.style.outline = ''; }, 2500);
+    }
+    return;
+  }
 
   // R-UI 27-abr-2026: si el usuario está analizando una glosa que YA
   // existe (vino de "Ver/Re-abrir" en Mis Glosas), redirigir el flujo
