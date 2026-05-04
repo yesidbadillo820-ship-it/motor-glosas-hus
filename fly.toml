@@ -1,0 +1,82 @@
+# Motor Glosas HUS — configuración de Fly.io
+#
+# Free Tier (mid-2026):
+#   • 3 shared-cpu-1x VMs incluidas (256 MB RAM cada una)
+#   • 3 GB de volúmenes persistentes
+#   • Tráfico: 160 GB outbound/mes
+#
+# Para deploy:
+#   1) Subir este archivo + Dockerfile al repo (este commit lo hace).
+#   2) En la UI Fly: "Setup GitHub Integration" → seleccionar este repo.
+#   3) Crear el volumen persistente UNA SOLA VEZ vía CLI o UI:
+#      flyctl volumes create soportes_data --size 3 --region gru
+#   4) Configurar secrets desde la UI Fly (Secrets section):
+#      DATABASE_URL = postgresql://neondb_owner:...@ep-...neon.tech/neondb?sslmode=require
+#      ANTHROPIC_API_KEY = sk-ant-...
+#      JWT_SECRET = (generar con: openssl rand -hex 32)
+#      ADMIN_EMAIL, ADMIN_PASSWORD (opcionales — el seed usa defaults)
+#   5) Deploy: la primera vez automático tras conectar GitHub.
+#
+# Región: GRU (São Paulo) es la más cercana a Bucaramanga, Colombia
+# (~50ms de latencia vs ~120ms de Oregon que era Render).
+
+app = "motor-glosas-hus"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# ─── Servicio HTTP ───────────────────────────────────────────────────
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # NO auto-stop machines — los schedulers asyncio (mantenimiento,
+  # soportes-reindex, pre-análisis) requieren el proceso vivo. Si Fly
+  # apaga la máquina por inactividad, los schedulers no corren a la
+  # 2/3/6 AM como deben.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+    method = "GET"
+    path = "/health"
+
+# ─── VM size (free tier) ─────────────────────────────────────────────
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"   # 256 free + 256 que Fly da gratis con free plan
+
+# ─── Volumen persistente para soportes ───────────────────────────────
+# Resuelve el problema de Render Free donde /tmp se borraba en cada
+# deploy. En Fly montamos un disco persistente que sobrevive deploys,
+# reinicios y migraciones de máquina.
+[mounts]
+  source = "soportes_data"
+  destination = "/data"
+
+# ─── Variables de entorno (no secretos) ──────────────────────────────
+# Los SECRETOS van por `flyctl secrets set` o panel UI > Secrets.
+# Acá solo van valores no-sensibles que Fly puede ver públicamente.
+[env]
+  ENV = "production"
+  LOG_LEVEL = "INFO"
+  # Soportes auto-detection: el motor lee/escribe acá. Coincide con
+  # lo declarado en el Dockerfile.
+  SOPORTES_ROOT = "/data/soportes"
+  SOPORTES_LOCAL_ROOT = "/data/soportes"
+  # Anthropic models (mismo setup que Render)
+  ANTHROPIC_MODEL = "claude-sonnet-4-5"
+
+# ─── Despliegue ──────────────────────────────────────────────────────
+[deploy]
+  release_command = "python -c 'from app.database import Base, engine; Base.metadata.create_all(bind=engine); print(\"DB schema OK\")'"
+  strategy = "rolling"
+
+# Sentry (opcional — si decides activar tracking de errores)
+# [env]
+#   SENTRY_DSN = ""  # poner como secret no como env
