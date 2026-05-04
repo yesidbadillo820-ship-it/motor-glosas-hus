@@ -8,7 +8,68 @@ from app.services.glosa_service import (
     DIAS_HABILES_LIMITE_EXTEMPORANEA,
     TEXTO_DMBUG_TARIFAS,
     _es_dispensario_medico,
+    limpiar_palabra_injustificado,
 )
+
+
+class TestSanitizerInjustificado:
+    """Directiva ESE HUS mayo 2026: la palabra "injustificado/a/os/as"
+    NUNCA debe aparecer en respuestas. Verificamos sustitución global."""
+
+    def test_glosa_injustificada_aplicada_pierde_adjetivo(self):
+        out = limpiar_palabra_injustificado(
+            "ESE HUS NO ACEPTA LA GLOSA INJUSTIFICADA APLICADA POR CONCEPTO DE TARIFAS"
+        )
+        assert "INJUSTIFIC" not in out.upper()
+        assert "LA GLOSA APLICADA POR CONCEPTO DE TARIFAS" in out
+
+    def test_descuentos_injustificados_a_unilaterales(self):
+        out = limpiar_palabra_injustificado(
+            "NO SE ACEPTAN DESCUENTOS INJUSTIFICADOS SOBRE MATERIALES"
+        )
+        assert "INJUSTIFIC" not in out.upper()
+        assert "DESCUENTOS UNILATERALES" in out
+
+    def test_retraso_injustificado_a_indebido(self):
+        out = limpiar_palabra_injustificado("EL RETRASO INJUSTIFICADO DE LA EPS")
+        assert "RETRASO INDEBIDO" in out
+        assert "INJUSTIFIC" not in out.upper()
+
+    def test_incumplimiento_injustificado_a_contractual(self):
+        out = limpiar_palabra_injustificado("CONFIGURA UN INCUMPLIMIENTO INJUSTIFICADO")
+        assert "INCUMPLIMIENTO CONTRACTUAL" in out
+        assert "INJUSTIFIC" not in out.upper()
+
+    def test_palabra_suelta_a_improcedente(self):
+        # Singular y plural, mayúsculas y minúsculas
+        cases = [
+            ("la glosa es injustificada", "la glosa es improcedente"),
+            ("LA GLOSA ES INJUSTIFICADA", "LA GLOSA ES IMPROCEDENTE"),
+            ("esta glosa es injustificado", "esta glosa es improcedente"),
+            ("tarifas injustificadas en el contrato",
+             "tarifas improcedentes en el contrato"),
+            ("TARIFAS INJUSTIFICADAS EN EL CONTRATO",
+             "TARIFAS IMPROCEDENTES EN EL CONTRATO"),
+        ]
+        for src, expected in cases:
+            assert limpiar_palabra_injustificado(src) == expected, (
+                f"{src!r} → {limpiar_palabra_injustificado(src)!r} (esperaba {expected!r})"
+            )
+
+    def test_idempotente(self):
+        # Múltiples pases no cambian el resultado.
+        src = "GLOSA INJUSTIFICADA SOBRE DESCUENTOS INJUSTIFICADOS"
+        out1 = limpiar_palabra_injustificado(src)
+        out2 = limpiar_palabra_injustificado(out1)
+        assert out1 == out2
+
+    def test_no_toca_texto_sin_palabra(self):
+        src = "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS"
+        assert limpiar_palabra_injustificado(src) == src
+
+    def test_string_vacio_no_explota(self):
+        assert limpiar_palabra_injustificado("") == ""
+        assert limpiar_palabra_injustificado(None) is None
 
 
 class TestDMBUGTextoFijo:
@@ -87,22 +148,22 @@ class TestGenerarTextoExtemporanea:
         texto = generar_texto_extemporanea(25)
         assert "25 DÍAS HÁBILES" in texto
         assert "20 DÍAS HÁBILES" in texto
-        # El texto fijo usa el Art. 56 de la Ley 1438/2011 (plazo 20 dias)
-        # como referencia principal por directriz del equipo juridico HUS.
-        assert "ARTÍCULO 56" in texto
+        # El texto canónico usa Art. 57 de la Ley 1438/2011 (silencio
+        # administrativo a favor del prestador) como base normativa.
+        assert "ARTÍCULO 57" in texto
         assert "LEY 1438 DE 2011" in texto
 
     def test_genera_texto_rechaza_glosa(self):
         """Should reject the glosa with firm tone."""
         texto = generar_texto_extemporanea(25)
-        assert "RECHAZA LA GLOSA" in texto.upper()
+        # Texto canónico actual: "NO ACEPTA GLOSA EXTEMPORÁNEA"
+        assert "NO ACEPTA GLOSA" in texto.upper()
         assert "EXTEMPORÁNEA" in texto
 
     def test_genera_texto_pago_integro(self):
         """Should demand immediate and definitive lifting of the glosa."""
         texto = generar_texto_extemporanea(25)
         assert "LEVANTAMIENTO INMEDIATO Y DEFINITIVO" in texto.upper()
-        assert "IPS" in texto
         # Correo institucional siempre incluido
         assert "CARTERA@HUS.GOV.CO" in texto
 

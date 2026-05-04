@@ -472,7 +472,7 @@ def generar_texto_tarifa_match(
         f"COINCIDE EXACTAMENTE CON LA TARIFA PACTADA EN EL {contrato} PARA EL CUPS "
         f"{cups} — {desc} — BAJO LA MODALIDAD {modalidad}. "
         f"LA IDENTIDAD ENTRE VALOR FACTURADO Y VALOR PACTADO CONVIERTE ESTA GLOSA "
-        f"EN INJUSTIFICADA: LA ENTIDAD PAGADORA NO PUEDE DESCONOCER UNILATERALMENTE "
+        f"EN IMPROCEDENTE: LA ENTIDAD PAGADORA NO PUEDE DESCONOCER UNILATERALMENTE "
         f"EL VALOR QUE ELLA MISMA PACTÓ, POR APLICACIÓN DEL ARTÍCULO 871 DEL CÓDIGO "
         f"DE COMERCIO («LOS CONTRATOS DEBERÁN CELEBRARSE Y EJECUTARSE DE BUENA FE») "
         f"Y DEL ARTÍCULO 1602 DEL CÓDIGO CIVIL («TODO CONTRATO LEGALMENTE CELEBRADO "
@@ -603,6 +603,79 @@ def _es_dispensario_medico(eps: str) -> bool:
     )
 
 
+def limpiar_palabra_injustificado(texto: str) -> str:
+    """Reemplaza todas las formas de "injustificado/a/os/as" por sinónimos
+    profesionales que NO contengan la raíz "injustific".
+
+    Directiva institucional ESE HUS (mayo 2026 — Yesid): la palabra no
+    debe aparecer en NINGUNA respuesta generada (apertura, cuerpo,
+    fundamento, petición). Esta función es idempotente y safe en
+    múltiples pases.
+
+    Reemplazos:
+      • Frases compuestas (más específicas primero):
+        - "DESCUENTOS INJUSTIFICADOS" → "DESCUENTOS UNILATERALES"
+        - "RETRASO INJUSTIFICADO"     → "RETRASO INDEBIDO"
+        - "INCUMPLIMIENTO INJUSTIFICADO" → "INCUMPLIMIENTO CONTRACTUAL"
+        - "GLOSA INJUSTIFICADA"       → "GLOSA IMPROCEDENTE"
+        - "GLOSAS INJUSTIFICADAS"     → "GLOSAS IMPROCEDENTES"
+      • Apertura: limpia adjetivos colados entre GLOSA y APLICADA.
+      • Palabra suelta: INJUSTIFICAD(O/A/OS/AS) → IMPROCEDENTE/S.
+    Preserva mayúsculas/minúsculas del original.
+    """
+    if not texto:
+        return texto
+    out = texto
+    # Apertura — primero los adjetivos calificativos colados.
+    out = re.sub(
+        r"\bLA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
+        "LA GLOSA APLICADA",
+        out, flags=re.IGNORECASE,
+    )
+    out = re.sub(
+        r"\bACEPTA\s+LA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\b(?!\s+APLICADA)",
+        "ACEPTA LA GLOSA",
+        out, flags=re.IGNORECASE,
+    )
+    # Frases compuestas con "injustificado/a/os/as" — preservando case.
+    def _frase(reemplazo_upper: str):
+        def _r(m):
+            original = m.group(0)
+            if original.isupper():
+                return reemplazo_upper
+            if original.islower():
+                return reemplazo_upper.lower()
+            # Mixed: capitalize cada palabra
+            return " ".join(w.capitalize() for w in reemplazo_upper.split())
+        return _r
+    out = re.sub(r"\bDESCUENTOS\s+INJUSTIFICADOS\b",
+                 _frase("DESCUENTOS UNILATERALES"), out, flags=re.IGNORECASE)
+    out = re.sub(r"\bDESCUENTO\s+INJUSTIFICADO\b",
+                 _frase("DESCUENTO UNILATERAL"), out, flags=re.IGNORECASE)
+    out = re.sub(r"\bRETRASO\s+INJUSTIFICADO\b",
+                 _frase("RETRASO INDEBIDO"), out, flags=re.IGNORECASE)
+    out = re.sub(r"\bINCUMPLIMIENTO\s+INJUSTIFICADO\b",
+                 _frase("INCUMPLIMIENTO CONTRACTUAL"), out, flags=re.IGNORECASE)
+    out = re.sub(r"\bGLOSA\s+INJUSTIFICADA\b",
+                 _frase("GLOSA IMPROCEDENTE"), out, flags=re.IGNORECASE)
+    out = re.sub(r"\bGLOSAS\s+INJUSTIFICADAS\b",
+                 _frase("GLOSAS IMPROCEDENTES"), out, flags=re.IGNORECASE)
+    # Palabra suelta — preservando case
+    def _repl(m):
+        terminacion = m.group(1)
+        original = m.group(0)
+        plural = terminacion.lower() in ("os", "as")
+        sustituto = "IMPROCEDENTES" if plural else "IMPROCEDENTE"
+        if original.isupper():
+            return sustituto
+        if original.islower():
+            return sustituto.lower()
+        # Mixed case: capitalizar
+        return sustituto.capitalize()
+    out = re.sub(r"\bINJUSTIFICAD(OS|AS|O|A)\b", _repl, out, flags=re.IGNORECASE)
+    return out
+
+
 def generar_texto_extemporanea(dias: int) -> str:
     """Texto FIJO canónico HUS para glosas extemporáneas (RE9502).
 
@@ -686,23 +759,25 @@ def _nombre_entidad_para_texto(eps: str, texto_contextual: str = "") -> str:
 
 
 def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "", texto_contextual: str = "") -> str:
-    """Argumento fijo para glosas de tarifas SIN contrato pactado (RE9602).
+    """Argumento fijo para glosas de tarifas SIN contrato pactado.
 
-    Estructura de 4 párrafos — apertura "GLOSA INJUSTIFICADA POR CONCEPTO DE
-    TARIFAS" alineada al código RE9602 del Manual Único. Incluye petición
-    conciliadora + reserva de derechos SuperSalud + contacto.
+    NOTA (mayo 2026 - directiva Yesid): el nombre de la función se mantiene
+    por compatibilidad pero el texto generado YA NO USA la palabra
+    "injustificada/o/os/as" en NINGUNA forma. La apertura ahora es
+    "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS…" (sin
+    adjetivo). Esto es coherente con el sanitizer global del flujo
+    analizar() que reemplaza cualquier "injustific*" por "improcedente".
 
-    Si la EPS es genérica ("OTRA / SIN DEFINIR"), se intenta extraer el
-    nombre real del texto_contextual (ej. el texto_base con la tabla Excel)
-    para personalizar la respuesta con el nombre verdadero de la aseguradora.
+    Estructura de 4 párrafos. Si la EPS es genérica ("OTRA / SIN DEFINIR"),
+    se intenta extraer el nombre real del texto_contextual.
     """
     entidad = _nombre_entidad_para_texto(eps, texto_contextual=texto_contextual)
     codigo_str = codigo if codigo else "DE TARIFAS"
     valor_str = valor if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "") else "EL VALOR INDICADO EN EL EXPEDIENTE"
 
     return (
-        f"ESE HUS NO ACEPTA LA GLOSA INJUSTIFICADA POR CONCEPTO DE TARIFAS "
-        f"APLICADA POR {entidad} BAJO EL CÓDIGO {codigo_str}, FACTURADA POR "
+        f"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
+        f"INTERPUESTA POR {entidad} BAJO EL CÓDIGO {codigo_str}, FACTURADA POR "
         f"{valor_str}. "
 
         f"LA OBJECIÓN NO SE AJUSTA AL MARCO CONTRACTUAL NI NORMATIVO POR LAS "
@@ -968,6 +1043,9 @@ class GlosaService:
                 "TARIFA_MATCH_PERFECTO",
             )
             arg_ia = argumento_fijo if _saltar_suavizar else _suavizar_tono(argumento_fijo)
+            # Sanitizer: aplicar también al camino de texto_fijo para que
+            # plantillas hardcoded sin "injustific*" estén garantizadas.
+            arg_ia = limpiar_palabra_injustificado(arg_ia)
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "texto_fijo"
             servicio_ia = ""
@@ -1165,7 +1243,7 @@ class GlosaService:
                     "     047/2025 MinSalud + UVB 2026 $12.110.\n"
                     "  4. Usa el VALOR facturado y reconocido EXACTOS de arriba.\n"
                     "  5. Si tarifa pactada > valor facturado: la glosa es\n"
-                    "     INJUSTIFICADA (facturamos por DEBAJO de lo pactado).\n"
+                    "     IMPROCEDENTE (facturamos por DEBAJO de lo pactado).\n"
                 )
                 user_prompt = user_prompt + bloque_tarifa
 
@@ -1683,37 +1761,12 @@ class GlosaService:
             for pat, repl in _TYPOS_IA.items():
                 arg_ia = re.sub(pat, repl, arg_ia, flags=re.IGNORECASE)
 
-            # 10b) Limpiar adjetivos calificativos colados en la apertura.
-            # REGLA DE NEGOCIO (abr 2026):
-            #   • TA + sin contrato → "LA GLOSA INJUSTIFICADA" SÍ es válido
-            #     (no hay tarifa pactada → la objeción es injustificada).
-            #   • Cualquier otro caso (TA con contrato, o concepto distinto
-            #     a TA) → la apertura debe ser "LA GLOSA APLICADA POR
-            #     CONCEPTO DE…" sin adjetivo. Si la IA mete "INJUSTIFICADA"
-            #     en esos casos, lo limpiamos.
-            # Variables disponibles del flujo: `prefijo` (TA/SO/AU/...) y
-            # `tiene_contrato` (bool).
-            _injustificada_permitida = (prefijo == "TA" and not tiene_contrato)
-            if not _injustificada_permitida:
-                arg_ia = re.sub(
-                    r"\bLA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
-                    "LA GLOSA APLICADA",
-                    arg_ia, flags=re.IGNORECASE,
-                )
-                arg_ia = re.sub(
-                    r"\bACEPTA\s+LA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\b(?!\s+APLICADA)",
-                    "ACEPTA LA GLOSA",
-                    arg_ia, flags=re.IGNORECASE,
-                )
-            else:
-                # TA + sin contrato: solo limpiar los OTROS adjetivos
-                # (INDEBIDA / IMPROCEDENTE / etc.) pero permitir
-                # INJUSTIFICADA porque corresponde a la regla de negocio.
-                arg_ia = re.sub(
-                    r"\bLA\s+GLOSA\s+(INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
-                    "LA GLOSA APLICADA",
-                    arg_ia, flags=re.IGNORECASE,
-                )
+            # 10b) Sanitizer global: eliminar "injustificado/a/os/as" en
+            # todas sus formas (directiva ESE HUS mayo 2026 — Yesid).
+            # Reemplaza por sinónimos profesionales sin la raíz "injustific".
+            # Ver `limpiar_palabra_injustificado` arriba en este módulo.
+            arg_ia = limpiar_palabra_injustificado(arg_ia)
+
 
             # 11) Limpieza minima de PHI: solo conectores o formatos rotos,
             # PERO conservamos nombres y numero de HC porque son base argumental
