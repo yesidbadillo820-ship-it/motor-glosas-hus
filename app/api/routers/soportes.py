@@ -376,6 +376,15 @@ async def upload_bulk(
             resumen["bytes_escritos"] += len(contenido)
         except OSError as e:
             resumen["rechazados"].append({"rel": rel[:200], "motivo": f"io:{e}"})
+        finally:
+            # Liberar bytes en memoria explícitamente — Python no siempre
+            # libera buffers grandes ad-hoc, y en Render Free 512 MB cada
+            # batch de 50 PDFs acumula 50-200 MB que no se devuelven al
+            # heap hasta el próximo GC. Forzamos del + recolectado.
+            try:
+                del contenido
+            except NameError:
+                pass
 
     # Audit
     try:
@@ -392,6 +401,15 @@ async def upload_bulk(
             ),
             ip=request.client.host if request.client else None,
         )
+    except Exception as _e:
+        import logging as _l
+        _l.getLogger("motor_glosas").debug(f"audit upload-bulk falló: {_e}")
+
+    # Forzar GC después de procesar el batch — Render Free 512 MB
+    # acumula bytes de PDFs sin liberar entre requests si no.
+    try:
+        import gc as _gc
+        _gc.collect()
     except Exception:
         pass
 

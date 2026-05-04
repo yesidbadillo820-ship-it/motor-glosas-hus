@@ -84,7 +84,33 @@ CONTRATOS_DEFAULT = {
 async def lifespan(app: FastAPI):
     logger.info("=== INICIANDO APLICACIÓN ===")
     check_security_config()
-    Base.metadata.create_all(bind=engine)
+
+    # Conexión inicial DB con retry — Render Free Postgres a veces tiene
+    # SSL drops o pausas por inactividad. Antes el startup fallaba en
+    # frío y el contenedor nunca respondía. Ahora reintentamos hasta 5
+    # veces con backoff exponencial (2s, 4s, 8s, 16s, 32s = ~1 min total).
+    import time as _time
+    from sqlalchemy.exc import OperationalError, DBAPIError
+    _max_intentos_db = 5
+    for _intento in range(1, _max_intentos_db + 1):
+        try:
+            Base.metadata.create_all(bind=engine)
+            logger.info(f"Base de datos inicializada (intento {_intento})")
+            break
+        except (OperationalError, DBAPIError) as e:
+            if _intento >= _max_intentos_db:
+                logger.error(
+                    f"DB inalcanzable tras {_max_intentos_db} intentos: {e}. "
+                    "El motor va a arrancar igual; los endpoints que necesiten "
+                    "DB van a devolver 503 hasta que se resuelva."
+                )
+                break
+            espera = 2 ** _intento
+            logger.warning(
+                f"DB no disponible (intento {_intento}/{_max_intentos_db}): "
+                f"{type(e).__name__}. Reintento en {espera}s."
+            )
+            _time.sleep(espera)
 
     db = SessionLocal()
     cfg = get_settings()

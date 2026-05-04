@@ -1245,8 +1245,8 @@ async def generar_lote(
                         eps=gi.eps or "",
                     )
                     hint_gestor = pat.get("hint_para_prompt", "") or ""
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[lote {gid}] memoria_gestor falló: {e}")
                 res = await service.analizar(
                     gi, contexto_pdf="", contratos_db=contratos,
                     few_shots=[p.argumento for p in pg],
@@ -2316,10 +2316,11 @@ def mis_asignaciones(
 
     from app.services.resolver_entidad import resolver_entidad_mostrar
     # Soportes auto-detectados: cuántos PDFs hay en el servidor por
-    # factura. Un lookup por factura única (no por glosa) para no
-    # penalizar listas largas. Silencioso si el indexador no tiene
-    # raíz accesible (servidor desconectado).
+    # factura + tipos detectados. Un lookup por factura única (no por
+    # glosa) para no penalizar listas largas. Silencioso si el
+    # indexador no tiene raíz accesible (servidor desconectado).
     _soportes_por_factura: dict[str, int] = {}
+    _soportes_tipos_por_factura: dict[str, str] = {}
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
         _indexer = get_indexer()
@@ -2331,8 +2332,12 @@ def mis_asignaciones(
                 _hits = _indexer.lookup(_fact)
                 if _hits:
                     _soportes_por_factura[_fact] = len(_hits)
-    except Exception:
+                    _tipos_set = sorted({h.get("tipo_codigo") or "OTRO" for h in _hits})
+                    _soportes_tipos_por_factura[_fact] = ", ".join(_tipos_set[:6])
+    except Exception as _e:
+        logger.debug(f"[mis-asignaciones] indexer lookup falló: {_e}")
         _soportes_por_factura = {}
+        _soportes_tipos_por_factura = {}
 
     items = []
     for g in glosas:
@@ -2381,6 +2386,9 @@ def mis_asignaciones(
             # Soportes auto-detectados en el servidor de archivos
             "soportes_disponibles": _soportes_por_factura.get(
                 (g.factura or "").strip(), 0
+            ),
+            "soportes_tipos": _soportes_tipos_por_factura.get(
+                (g.factura or "").strip(), ""
             ),
         })
     return items

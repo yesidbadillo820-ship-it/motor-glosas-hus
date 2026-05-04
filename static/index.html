@@ -8836,8 +8836,14 @@ function _renderMisGlosas(dataRaw){
       // Indicador de soportes auto-detectados (PDFs en servidor del HUS)
       var soportesIcon = '';
       if(g.soportes_disponibles && g.soportes_disponibles > 0){
-        soportesIcon = ' <span title="' + g.soportes_disponibles + ' soporte(s) detectado(s) en el servidor (Plan Y:\\) — listos para incluir en el análisis" '
-          + 'style="display:inline-flex;align-items:center;gap:2px;background:#dcfce7;color:#065f46;padding:1px 6px;border-radius:8px;font-size:.65rem;font-weight:700;margin-left:4px;cursor:help">📁 ' + g.soportes_disponibles + '</span>';
+        var nSop = g.soportes_disponibles;
+        var tipos = g.soportes_tipos || '';
+        var titulo = nSop + ' soporte(s) en el servidor del HUS (Plan Y:\\)'
+          + (tipos ? ' — tipos: ' + tipos : '')
+          + '. La IA los va a leer automáticamente al analizar esta glosa.';
+        soportesIcon = ' <span title="' + titulo + '" '
+          + 'style="display:inline-flex;align-items:center;gap:2px;background:#dcfce7;color:#065f46;padding:1px 6px;border-radius:8px;font-size:.65rem;font-weight:700;margin-left:4px;cursor:help" '
+          + 'onclick="event.stopPropagation();_verSoportesDetalle(\'' + ((g.factura||'').replace(/\'/g,"\\'")) + '\')">📁 ' + nSop + '</span>';
       }
       var radicadoTxt = g.numero_radicado ? '<span class="chip chip-radicado">' + g.numero_radicado + '</span>' + soportesIcon : '<span style="color:var(--text3)">—</span>' + soportesIcon;
       var tipoCls = g.tipo_glosa_excel ? 'chip-tipo-' + g.tipo_glosa_excel.toLowerCase() : '';
@@ -11319,8 +11325,10 @@ async function buscarSoportesFactura(){
       return;
     }
     var fmtKb = function(kb){
-      if(kb < 1024) return kb + ' KB';
-      return (kb/1024).toFixed(1) + ' MB';
+      var n = Number(kb) || 0;
+      if(n <= 0) return '—';
+      if(n < 1024) return n + ' KB';
+      return (n/1024).toFixed(1) + ' MB';
     };
     var rows = d.soportes.map(function(s){
       var bgTipo = {

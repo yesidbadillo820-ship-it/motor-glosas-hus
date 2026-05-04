@@ -133,11 +133,19 @@ class TestSoportesIndexer:
         idx.rebuild()
         assert idx.lookup("HUS999999") == []
 
-    def test_raiz_inexistente_no_crashea(self, tmp_path: Path):
-        idx = SoportesIndexer(raiz=str(tmp_path / "no_existe"))
+    def test_raiz_inexistente_se_crea_y_no_crashea(self, tmp_path: Path):
+        # Cambio de comportamiento (fix abr 2026): el indexer ahora crea
+        # la raíz on-demand para que el upload-bulk del jump-box agent
+        # pueda escribir desde el primer batch sin FileNotFoundError.
+        ruta = tmp_path / "no_existe_aun"
+        idx = SoportesIndexer(raiz=str(ruta))
+        # Se crea automáticamente
+        assert ruta.exists()
+        # Sigue indexando sin error (raíz vacía → 0 archivos, sin error)
         s = idx.rebuild()
         assert s["facturas_indexadas"] == 0
-        assert s["ultimo_error"]
+        assert s["archivos_indexados"] == 0
+        assert s["ultimo_error"] is None
         assert idx.lookup("HUS487523") == []
 
     def test_stats_reportan_estado(self, tmp_path: Path):

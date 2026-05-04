@@ -14,14 +14,28 @@ if db_url.startswith("postgres://"):
 
 # Lógica de conexión inteligente
 if db_url.startswith("postgresql"):
-    # CONFIGURACIÓN PRO PARA POSTGRESQL (Producción en el HUS)
+    # CONFIGURACIÓN PRO PARA POSTGRESQL (Producción en el HUS).
+    # Tunning para Render Free Postgres que sufre SSL drops y pausas
+    # de inactividad: pool más chico (Render Free limita conexiones),
+    # recycle más agresivo, y connect_args con keepalives TCP para
+    # detectar conexiones zombies más rápido.
     engine = create_engine(
         db_url,
         poolclass=QueuePool,
-        pool_size=10,          # Conexiones simultáneas permitidas
-        max_overflow=20,       # Conexiones extra en picos de tráfico
+        pool_size=5,           # Render Free Postgres = 97 conexiones max,
+                                # con N workers podemos saturar fácil. Bajamos.
+        max_overflow=10,       # Conexiones extra en picos de tráfico
         pool_pre_ping=True,    # Verifica si la conexión está viva antes de usarla
-        pool_recycle=3600,     # Refresca las conexiones cada hora
+        pool_recycle=1800,     # Refresca cada 30 min — Render dropea ~1h
+        pool_timeout=30,       # Espera 30s antes de TimeoutError en pool exhausto
+        connect_args={
+            # Keepalives TCP para detectar conexiones SSL muertas más rápido.
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 3,
+            "connect_timeout": 10,
+        },
     )
 else:
     # CONFIGURACIÓN BÁSICA PARA SQLITE (Fallback local)

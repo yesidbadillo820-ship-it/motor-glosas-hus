@@ -71,8 +71,10 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
             from app.services.soportes_autodiscovery_service import get_indexer
             if g.factura:
                 soportes_count = len(get_indexer().lookup(g.factura) or [])
-        except Exception:
-            soportes_count = 0
+        except Exception as e:
+            logger.debug(
+                f"[auto-responder] indexer lookup falló glosa={glosa_id}: {e}"
+            )
 
         # Reglas pre-IA (gratis)
         evaluacion = evaluar(
@@ -158,7 +160,8 @@ async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
                     f"Puedes referenciar estos soportes en el dictamen como "
                     f"prueba documental."
                 )
-    except Exception:
+    except Exception as e:
+        logger.debug(f"[auto-responder] enriquecer contexto soportes falló: {e}")
         contexto_soportes = ""
 
     glosa_input = GlosaInput(
@@ -241,8 +244,8 @@ async def procesar_lote(glosa_ids: list[int]) -> dict:
     try:
         import gc as _gc
         _gc.collect()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[auto-responder] gc.collect post-lote falló: {e}")
 
     return {
         "total": len(glosa_ids),

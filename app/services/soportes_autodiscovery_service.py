@@ -83,7 +83,7 @@ class SoporteEntry:
     env: Optional[str]      # carpeta ENV-NNN
     mes: Optional[str]      # ABRIL
     anio: Optional[int]     # 2026
-    tamaño_kb: int
+    tamano_kb: int          # sin ñ para compat JSON con front-end
     fecha_mod: float        # epoch
 
 
@@ -128,14 +128,24 @@ def _clasificar_archivo(nombre: str) -> Optional[tuple[str, str]]:
 
 
 def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
-    """Extrae mes, año, EPS y ENV recorriendo el path desde la raíz."""
+    """Extrae mes, año, EPS y ENV recorriendo el path desde la raíz.
+
+    Estructuras soportadas:
+      1. {MES AÑO - SOPORTES RADICACION}/{EPS}/{Persona}/ENV-NNN/.../archivo
+         (formato 2026 — más común)
+      2. {MES AÑO - ...}/1. DD FACTURACION/ESCANEO/{EPS}/ENV-NNN/...
+         (formato histórico con escaneo intermedio)
+    """
     try:
         rel = p.relative_to(raiz)
     except ValueError:
         return {}
     partes = rel.parts
     meta: dict = {}
-    for parte in partes:
+    upper_parts = [pp.upper() for pp in partes]
+
+    # Mes raíz
+    for i, parte in enumerate(partes):
         m = _RE_MES_RAIZ.match(parte)
         if m:
             meta["mes"] = m.group(1).upper()
@@ -143,22 +153,24 @@ def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
                 meta["anio"] = int(m.group(2))
             except ValueError:
                 pass
-        elif parte.upper().startswith("ENV-"):
+            # La EPS es lo que viene DESPUÉS del mes, salvo que sea
+            # "1. DD FACTURACION" / "ESCANEO" / "RIPS" (carpetas
+            # estructurales que no representan EPS).
+            for j in range(i + 1, len(partes)):
+                pj_up = upper_parts[j]
+                if (pj_up not in {"1. DD FACTURACION", "ESCANEO", "RIPS",
+                                  "SOPORTES", "CORRESPONDENCIA"}
+                        and "SOPORTES RADICACION" not in pj_up
+                        and not pj_up.startswith("ENV-")):
+                    meta["eps"] = partes[j]
+                    break
+            break
+
+    # ENV (carpeta de envío/lote)
+    for parte in partes:
+        if parte.upper().startswith("ENV-"):
             meta["env"] = parte
-        elif parte.upper() not in {
-            "1. DD FACTURACION", "ESCANEO", "RIPS",
-        } and "SOPORTES RADICACION" not in parte.upper():
-            # Heurística: si no es carpeta del sistema y no tenemos EPS aún,
-            # asumimos que es la EPS. Solo aplica entre la rama ESCANEO y
-            # la carpeta ENV-NNN.
-            if "eps" not in meta and meta.get("mes") and not meta.get("env"):
-                # ESCANEO/{EPS}/ENV-NNN — la EPS es el directorio que sigue
-                # a ESCANEO. Validamos que el path tenga "ESCANEO" antes.
-                upper_parts = [pp.upper() for pp in partes]
-                if "ESCANEO" in upper_parts:
-                    idx_esc = upper_parts.index("ESCANEO")
-                    if idx_esc + 1 < len(partes):
-                        meta["eps"] = partes[idx_esc + 1]
+            break
     return meta
 
 
@@ -218,10 +230,12 @@ class SoportesIndexer:
         meta = _extraer_metadata_path(archivo, self.raiz)
         try:
             st = archivo.stat()
-            tamaño_kb = max(1, st.st_size // 1024)
+            # Si el archivo es <1KB, redondeamos hacia arriba para que
+            # NO muestre "0 KB" en la UI (cosmético).
+            tamano_kb = max(1, st.st_size // 1024) if st.st_size > 0 else 0
             fmod = st.st_mtime
         except OSError:
-            tamaño_kb = 0
+            tamano_kb = 0
             fmod = 0.0
         return SoporteEntry(
             factura=factura_raw,
@@ -235,7 +249,7 @@ class SoportesIndexer:
             env=meta.get("env"),
             mes=meta.get("mes"),
             anio=meta.get("anio"),
-            tamaño_kb=tamaño_kb,
+            tamano_kb=tamano_kb,
             fecha_mod=fmod,
         )
 
