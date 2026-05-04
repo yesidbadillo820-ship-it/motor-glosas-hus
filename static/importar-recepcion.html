@@ -133,8 +133,30 @@ document.getElementById('btn').addEventListener('click', async ()=>{
 
 function mostrarResultado(d){
   document.getElementById('result').classList.remove('hidden');
-  document.getElementById('result-title').textContent = '✅ Importación completada';
-  document.getElementById('s-total').textContent = d.total || 0;
+  // Si total = 0 mostramos un título distinto y advertencia clara —
+  // sino el "✅ Importación completada" + 0 glosas confunde al gestor.
+  var totalNum = d.total || 0;
+  if(totalNum === 0){
+    document.getElementById('result-title').innerHTML =
+      '<span style="color:#92400e">⚠ Importación procesada — 0 glosas detectadas</span>';
+    var prev = document.getElementById('warn-cero');
+    if(!prev){
+      var warn = document.createElement('div');
+      warn.id = 'warn-cero';
+      warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
+      warn.innerHTML = '<b>Posibles causas:</b><br>'
+        + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
+        + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
+        + '• Las filas están vacías o solo tienen headers.<br>'
+        + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
+      document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
+    }
+  } else {
+    document.getElementById('result-title').textContent = '✅ Importación completada';
+    var prevWarn = document.getElementById('warn-cero');
+    if(prevWarn) prevWarn.remove();
+  }
+  document.getElementById('s-total').textContent = totalNum;
   document.getElementById('s-nuevas').textContent = d.creadas || 0;
   document.getElementById('s-act').textContent = d.actualizadas || 0;
   document.getElementById('s-rat').textContent = d.ratificadas || 0;
