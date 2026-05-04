@@ -569,6 +569,57 @@ async def lifespan(app: FastAPI):
                     u.equipo = equipo_codigo
                     logger.info(f"Usuario {email_eq} asignado a equipo {equipo_codigo}")
 
+        # ─── Seed Plantillas Gold canónicas (contratos ya se siembran arriba) ──
+        # Pone los textos institucionales fijos como "Gold" desde el día 1
+        # para que el motor IA los use como few-shot sin esperar que glosas
+        # LEVANTADAS los pueblen. Idempotente: solo agrega lo que falta.
+        try:
+            from app.models.db import PlantillaGoldRecord as _PGR
+            from app.services.glosa_service import (
+                TEXTO_RATIFICADA as _TXT_RAT,
+                TEXTO_DMBUG_TARIFAS as _TXT_DMBUG,
+            )
+            _GOLD_CANONICAS = [
+                {
+                    "eps": "TODAS", "codigo_glosa": "RATIFICADA",
+                    "tipo": "RATIFICADA",
+                    "titulo": "Glosa ratificada — texto canónico HUS",
+                    "argumento": _TXT_RAT,
+                    "notas": "Plantilla institucional para ratificadas.",
+                },
+                {
+                    "eps": "DISPENSARIO MEDICO", "codigo_glosa": "TA",
+                    "tipo": "TARIFAS_DMBUG",
+                    "titulo": "DMBUG — Tarifas con contrato 440-DIGSA/DMBUG-2025",
+                    "argumento": _TXT_DMBUG,
+                    "notas": "Texto fijo institucional aprobado por Yesid.",
+                },
+            ]
+            gold_creadas = 0
+            for p in _GOLD_CANONICAS:
+                existe = db.query(_PGR).filter(
+                    _PGR.eps == p["eps"],
+                    _PGR.codigo_glosa == p["codigo_glosa"],
+                    _PGR.titulo == p["titulo"],
+                ).first()
+                if existe:
+                    continue
+                db.add(_PGR(
+                    eps=p["eps"], codigo_glosa=p["codigo_glosa"],
+                    tipo=p["tipo"], titulo=p["titulo"],
+                    argumento=p["argumento"], glosa_origen_id=0,
+                    valor_recuperado=0.0, usos=0,
+                    creado_por="auto_seed_lifespan",
+                    notas=p["notas"], activa=1,
+                ))
+                gold_creadas += 1
+            if gold_creadas:
+                db.commit()
+                logger.info(f"Seed Plantillas Gold canónicas: {gold_creadas} creadas.")
+        except Exception as _e:
+            logger.warning(f"Seed Gold canónicas falló (no crítico): {_e}")
+            db.rollback()
+
         db.commit()
         logger.info("Base de datos inicializada correctamente")
     except Exception as e:
