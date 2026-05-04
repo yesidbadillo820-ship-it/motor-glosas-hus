@@ -40,12 +40,13 @@ primary_region = "gru"
   processes = ["app"]
 
   [[http_service.checks]]
-    interval = "30s"
-    # 10s (era 5s) — los uploads pesados (Excel Famisanar 3 hojas, PDFs
-    # de contrato con extracción Claude 30-60s) pueden ocupar un worker
-    # momentáneamente. 10s da margen sin sacrificar detección rápida de
-    # caídas reales.
-    timeout = "10s"
+    # Intervalo más relajado (era 30s) — con 1 solo worker, durante un
+    # upload pesado (Excel Famisanar 3 hojas, PDF contrato con Claude
+    # extrayendo cláusulas 60s) /health puede tardar en responder. Con
+    # interval=60s + timeout=30s, Fly espera lo suficiente sin marcar
+    # la VM unhealthy ni reciclarla a mitad de un upload.
+    interval = "60s"
+    timeout = "30s"
     grace_period = "60s"
     method = "GET"
     path = "/health"

@@ -55,8 +55,10 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsS http://localhost:8080/health || exit 1
 
-# Comando final. 2 workers para que peticiones largas (extracción IA de
-# cláusulas de PDF de contrato, parsing de Excel Famisanar 3 hojas) no
-# bloqueen el endpoint /health del healthcheck de Fly. Con 512MB RAM cada
-# worker consume ~120-150MB; 2 workers + libs entran cómodos en el budget.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]
+# Comando final. 1 worker — la VM shared-cpu-1x con 512MB no soporta 2
+# workers (cada Python con todas las deps pesa ~235MB → 2x235 + OS = OOM).
+# Usamos 1 worker; los uploads pesados se hacen async (Anthropic con
+# await httpx, pdf_service con run_in_executor) por lo que el endpoint
+# /health sigue respondiendo entre await points incluso durante una
+# extracción Claude de 60s.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
