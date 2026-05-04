@@ -273,6 +273,33 @@ class ContratoRecord(Base):
     __tablename__ = "contratos"
     eps = Column(String, primary_key=True, index=True)
     detalles = Column(String)
+    # Ruta absoluta al PDF del contrato vigente (en /data/contratos/...).
+    # Se sobreescribe cuando se sube uno nuevo — solo guardamos el vigente.
+    pdf_path = Column(String(500), nullable=True)
+    pdf_subido_en = Column(DateTime(timezone=True), nullable=True)
+
+
+class ClausulaContrato(Base):
+    """Cláusulas extraídas del PDF del contrato de cada EPS.
+
+    El motor de glosas las inyecta como contexto al prompt IA cuando
+    analiza una glosa de la EPS correspondiente. Permite que el dictamen
+    cite literalmente la cláusula contractual aplicable, lo que hace la
+    defensa mucho más fuerte (la EPS firmó el documento del que se cita).
+
+    El campo `tema` matchea con `codigo_glosa[:2]` (ej: TA, SO, AU, CO,
+    NN, FA) para filtrar solo cláusulas relevantes al tipo de objeción.
+    """
+    __tablename__ = "clausulas_contrato"
+
+    id = Column(Integer, primary_key=True, index=True)
+    eps = Column(String, ForeignKey("contratos.eps", ondelete="CASCADE"), index=True, nullable=False)
+    numero_clausula = Column(String(80))
+    tema = Column(String(20), index=True)
+    titulo = Column(String(300))
+    texto_literal = Column(Text)
+    pagina = Column(Integer, nullable=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class UsuarioRecord(Base):

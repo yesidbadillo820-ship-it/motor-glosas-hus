@@ -385,6 +385,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN conceptos_glosa {col_name}: {e}")
 
+    # Migraciones para contratos (PDF + cláusulas extraídas con IA)
+    # pdf_path / pdf_subido_en se llenan cuando el usuario sube el PDF del
+    # contrato vigente; las cláusulas viven en tabla nueva clausulas_contrato
+    # creada vía Base.metadata.create_all (no requiere ALTER TABLE).
+    _CONTRATOS_MISSING = [
+        ("pdf_path", "VARCHAR(500)"),
+        ("pdf_subido_en", _TS_TIPO),
+    ]
+    for col_name, col_ddl in _CONTRATOS_MISSING:
+        try:
+            if _tiene_tabla("contratos") and not _tiene_columna("contratos", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a contratos")
+                db.execute(text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN contratos {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()

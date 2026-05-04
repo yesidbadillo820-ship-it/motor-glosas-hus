@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import logging
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -6,9 +9,17 @@ from app.database import get_db
 from app.models.schemas import ContratoInput
 from app.repositories.contrato_repository import ContratoRepository
 from app.api.deps import get_usuario_actual
-from app.models.db import UsuarioRecord
+from app.models.db import UsuarioRecord, ContratoRecord, ClausulaContrato
+
+logger = logging.getLogger("motor_glosas")
 
 router = APIRouter(prefix="/contratos", tags=["contratos"])
+
+# Carpeta donde se guardan los PDFs de contratos. En Fly se monta el
+# volumen persistente en /data; en dev cae a /tmp/contratos.
+CONTRATOS_PDF_ROOT = os.getenv("CONTRATOS_PDF_ROOT") or os.path.join(
+    os.getenv("SOPORTES_ROOT", "/data"), "contratos"
+)
 
 @router.get("/", response_model=List[dict])
 def listar_contratos(
@@ -463,3 +474,154 @@ def eliminar_contrato(
     if not exito:
         raise HTTPException(status_code=404, detail="Contrato no encontrado")
     return {"message": f"Contrato con {eps} eliminado correctamente"}
+
+
+# ─── PDF de contrato + extracción automática de cláusulas ─────────────
+# Permite subir el PDF del contrato firmado con cada EPS para que el
+# motor cite cláusulas reales al objetar glosas. Sólo se guarda el
+# vigente: subir uno nuevo reemplaza el anterior y sus cláusulas.
+
+@router.post("/{eps}/pdf")
+async def subir_pdf_contrato(
+    eps: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Sube el PDF del contrato vigente para la EPS y extrae cláusulas.
+
+    Flow:
+      1. Valida que el contrato exista (debe haberse creado antes vía /upsert).
+      2. Lee el PDF, extrae texto con pdf_service.
+      3. Llama a Claude para sacar cláusulas estructuradas.
+      4. Guarda el PDF en /data/contratos/<eps>.pdf (sobreescribe vigente).
+      5. Borra cláusulas viejas + inserta las nuevas.
+
+    Devuelve cantidad de cláusulas extraídas + ruta donde quedó el PDF.
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
+
+    contrato = db.query(ContratoRecord).filter(ContratoRecord.eps == eps).first()
+    if not contrato:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No existe contrato registrado para EPS '{eps}'. Créalo primero en la pestaña Contratos.",
+        )
+
+    contenido = await file.read()
+    if len(contenido) < 1024:
+        raise HTTPException(status_code=400, detail="Archivo PDF demasiado pequeño / corrupto")
+    if len(contenido) > 30 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="PDF mayor a 30MB no soportado")
+
+    # Extraer texto del PDF
+    from app.services.pdf_service import PdfService
+    pdf_svc = PdfService()
+    try:
+        texto = await pdf_svc.extraer(contenido)
+    except Exception as e:
+        logger.error(f"[CONTRATO-PDF] Error extrayendo texto del PDF eps={eps}: {e}")
+        raise HTTPException(status_code=500, detail=f"No se pudo leer el PDF: {e}")
+
+    if not texto or len(texto.strip()) < 200:
+        raise HTTPException(
+            status_code=422,
+            detail="El PDF no contiene texto legible (¿escaneado sin OCR?). Subí una versión con texto seleccionable.",
+        )
+
+    # Guardar el PDF en disco (sobreescribe el vigente)
+    os.makedirs(CONTRATOS_PDF_ROOT, exist_ok=True)
+    eps_safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in eps)[:80]
+    pdf_path = os.path.join(CONTRATOS_PDF_ROOT, f"{eps_safe}.pdf")
+    with open(pdf_path, "wb") as f:
+        f.write(contenido)
+
+    # Extraer cláusulas con Claude
+    from app.services.extractor_clausulas_contrato import extraer_clausulas_desde_texto
+    try:
+        clausulas = await extraer_clausulas_desde_texto(texto, eps)
+    except Exception as e:
+        logger.error(f"[CONTRATO-PDF] Error extrayendo cláusulas eps={eps}: {e}")
+        clausulas = []
+
+    # Reemplazar cláusulas anteriores por las nuevas
+    db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps).delete()
+    for c in clausulas:
+        db.add(ClausulaContrato(
+            eps=eps,
+            numero_clausula=c["numero"],
+            tema=c["tema"],
+            titulo=c["titulo"],
+            texto_literal=c["texto_literal"],
+            pagina=c["pagina"],
+        ))
+
+    contrato.pdf_path = pdf_path
+    contrato.pdf_subido_en = datetime.now(timezone.utc)
+    db.commit()
+
+    logger.info(
+        f"[CONTRATO-PDF] eps={eps} pdf={len(contenido)//1024}KB "
+        f"texto={len(texto)} chars clausulas={len(clausulas)}"
+    )
+
+    return {
+        "eps": eps,
+        "pdf_kb": len(contenido) // 1024,
+        "texto_chars": len(texto),
+        "clausulas_extraidas": len(clausulas),
+        "subido_en": contrato.pdf_subido_en.isoformat(),
+    }
+
+
+@router.get("/{eps}/clausulas")
+def listar_clausulas_contrato(
+    eps: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista cláusulas del contrato de una EPS, agrupadas por tema."""
+    contrato = db.query(ContratoRecord).filter(ContratoRecord.eps == eps).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail=f"Contrato no encontrado para EPS '{eps}'")
+
+    clausulas = (
+        db.query(ClausulaContrato)
+        .filter(ClausulaContrato.eps == eps)
+        .order_by(ClausulaContrato.tema, ClausulaContrato.id)
+        .all()
+    )
+    items = [
+        {
+            "id": c.id,
+            "numero": c.numero_clausula,
+            "tema": c.tema,
+            "titulo": c.titulo,
+            "texto_literal": c.texto_literal,
+            "pagina": c.pagina,
+        }
+        for c in clausulas
+    ]
+    return {
+        "eps": eps,
+        "pdf_subido_en": contrato.pdf_subido_en.isoformat() if contrato.pdf_subido_en else None,
+        "tiene_pdf": bool(contrato.pdf_path and os.path.exists(contrato.pdf_path or "")),
+        "total_clausulas": len(items),
+        "clausulas": items,
+    }
+
+
+@router.delete("/{eps}/clausulas")
+def borrar_clausulas_contrato(
+    eps: str,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Borra todas las cláusulas extraídas (no borra el PDF guardado).
+
+    Útil para forzar re-extracción manual sin borrar el PDF de disco.
+    """
+    n = db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps).delete()
+    db.commit()
+    return {"eps": eps, "clausulas_borradas": n}

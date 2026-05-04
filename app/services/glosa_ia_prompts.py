@@ -1126,6 +1126,20 @@ def build_user_prompt(
     except Exception:
         pass
 
+    # Cláusulas literales del contrato firmado con esta EPS específica
+    # (extraídas del PDF subido). Si están disponibles, son la mejor
+    # munición para el dictamen porque la EPS firmó ese mismo documento.
+    bloque_clausulas_contrato_str = ""
+    try:
+        from app.services.extractor_clausulas_contrato import (
+            bloque_clausulas_contrato_para_prompt,
+        )
+        bloque_clausulas_contrato_str = bloque_clausulas_contrato_para_prompt(
+            str(eps or ""), str(codigo or ""), max_clausulas=3,
+        )
+    except Exception:
+        pass
+
     # ───────────────────────────────────────────────────────────────
     # Bloque AUDITORÍA PREVIA: el sistema audita las afirmaciones de
     # la EPS contra los datos verificados ANTES de gastar tokens del
@@ -1444,7 +1458,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_auditoria_str}{bloque_excedente_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_clausulas_contrato_str}{bloque_auditoria_str}{bloque_excedente_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 

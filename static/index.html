@@ -2207,6 +2207,52 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div id="tar-xlsx-result" style="margin-top:.8rem;"></div>
         </div>
 
+        <!-- Bloque de carga PDF del CONTRATO (cláusulas literales) -->
+        <div class="form-card" style="margin-bottom:1rem;border:2px solid #8b5cf6;">
+          <h3 style="display:flex;align-items:center;gap:.5rem;">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" style="color:#8b5cf6;flex-shrink:0;">
+              <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zM11.5 9.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/>
+            </svg>
+            Subir PDF del contrato (extracción IA de cláusulas)
+            <span style="background:#8b5cf6;color:#fff;font-size:.68rem;padding:.1rem .45rem;border-radius:4px;">NUEVO</span>
+          </h3>
+          <p style="font-size:.82rem;color:var(--text3);margin-bottom:.8rem;line-height:1.5;">
+            Sube el PDF del contrato firmado con la EPS. Claude lee el documento, extrae las
+            <b>cláusulas literales</b> (tarifas, soportes, autorizaciones, cobertura, facturación) y
+            las inyecta como contexto al generar dictámenes.
+            El resultado: el motor cita textualmente la cláusula contractual al objetar — defensa <b>inatacable</b>
+            porque la EPS firmó el documento que se cita.
+          </p>
+          <div class="field">
+            <label>EPS (debe existir en Contratos)</label>
+            <select id="ctr-pdf-eps">
+              <option value="">— Seleccione EPS —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Archivo PDF del contrato (máx 30 MB)</label>
+            <input type="file" id="ctr-pdf-file" accept=".pdf"/>
+          </div>
+          <div style="background:#ede9fe;border-left:3px solid #8b5cf6;padding:.7rem .9rem;border-radius:6px;margin-top:.8rem;font-size:.78rem;line-height:1.45;color:#5b21b6;">
+            <b>ℹ️ Cómo funciona:</b><br>
+            • Se sube SOLO el contrato vigente (subir uno nuevo reemplaza el anterior y sus cláusulas).<br>
+            • Claude tarda 30-60 segundos en analizar contratos de 30-50 páginas.<br>
+            • El PDF debe tener texto seleccionable (no escaneado puro). Si es escaneado, OCR primero.<br>
+            • Costo: ~$0.10-0.30 USD por contrato (one-time).
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="subirContratoPDF()" id="btn-subir-contrato-pdf">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" style="flex-shrink:0;">
+                <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zM11.5 9.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/>
+              </svg>
+              Subir y extraer cláusulas
+            </button>
+            <button class="btn-sm ghost" onclick="cargarClausulasContrato()" id="btn-ver-clausulas">📑 Ver cláusulas existentes</button>
+          </div>
+          <div id="ctr-pdf-result" style="margin-top:.8rem;"></div>
+          <div id="ctr-clausulas-list" style="margin-top:.8rem;"></div>
+        </div>
+
         <!-- Bloque de carga CSV (alternativo) -->
         <details class="form-card" style="margin-bottom:1rem;">
           <summary style="cursor:pointer;font-weight:600;">📤 Opción alternativa: subir CSV manual</summary>
@@ -4633,7 +4679,7 @@ function tab(btn,id){
   if(id==='mi-desempeno') cargarMiDesempeno();
   if(id==='usuarios') cargar2FAEstado();
   if(id==='papelera') cargarPapelera();
-  if(id==='tarifas') cargarTarifas();
+  if(id==='tarifas'){ cargarTarifas(); poblarSelectEpsContratos(); }
   if(id==='soportes') cargarSoportesEstado();
   // Si el usuario vuelve al panel de Analizar y la glosa activa ya
   // está cerrada (lastResult con workflow terminal), limpiar el panel
@@ -4761,6 +4807,130 @@ async function cargarTarifas(){
     }).join('');
   }catch(e){
     body.innerHTML = '<tr><td colspan="9" style="color:#991b1b">'+ escHtml(e.message) +'</td></tr>';
+  }
+}
+
+// ─── PDF de contrato → extracción de cláusulas con Claude ───────────
+async function poblarSelectEpsContratos(){
+  var sel = document.getElementById('ctr-pdf-eps');
+  if(!sel) return;
+  try{
+    var r = await fetch('/contratos/', {headers: authH()});
+    if(!r.ok) return;
+    var contratos = await r.json();
+    var seleccionada = sel.value;
+    sel.innerHTML = '<option value="">— Seleccione EPS —</option>' +
+      (contratos || []).map(function(c){
+        return '<option value="' + escHtml(c.eps) + '">' + escHtml(c.eps) + '</option>';
+      }).join('');
+    if(seleccionada) sel.value = seleccionada;
+  }catch(e){}
+}
+
+async function subirContratoPDF(){
+  var sel = document.getElementById('ctr-pdf-eps');
+  var input = document.getElementById('ctr-pdf-file');
+  var resultDiv = document.getElementById('ctr-pdf-result');
+  var btn = document.getElementById('btn-subir-contrato-pdf');
+  if(!sel || !sel.value){
+    toast('Sin EPS', 'Seleccioná la EPS antes de subir el PDF', 'warning');
+    return;
+  }
+  if(!input || !input.files || !input.files.length){
+    toast('Sin archivo', 'Seleccioná un PDF primero', 'warning');
+    return;
+  }
+  var eps = sel.value;
+  var file = input.files[0];
+  if(file.size > 30 * 1024 * 1024){
+    toast('PDF muy grande', 'El archivo supera 30 MB', 'error');
+    return;
+  }
+  if(btn){ btn.disabled = true; btn.dataset.origLabel = btn.innerHTML; btn.innerHTML = '⏳ Analizando con Claude (30-60s)...'; }
+  if(resultDiv){
+    resultDiv.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;font-size:.8rem;color:#7c2d12;">⏳ Subiendo PDF y extrayendo cláusulas con Claude... Esto puede tardar 30-60 segundos.</div>';
+  }
+  try{
+    var fd = new FormData();
+    fd.append('file', file);
+    var r = await fetch('/contratos/' + encodeURIComponent(eps) + '/pdf', {
+      method: 'POST',
+      headers: authH(),
+      body: fd,
+    });
+    var data = await r.json();
+    if(!r.ok){
+      if(resultDiv){
+        resultDiv.innerHTML = '<div style="background:#fee2e2;border-left:3px solid #b91c1c;padding:.7rem .9rem;border-radius:6px;font-size:.85rem;color:#991b1b;">❌ ' + escHtml(data.detail || ('Error HTTP ' + r.status)) + '</div>';
+      }
+      toast('Error subiendo PDF', data.detail || ('HTTP ' + r.status), 'error');
+      return;
+    }
+    if(resultDiv){
+      resultDiv.innerHTML =
+        '<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#14532d;line-height:1.55;">' +
+          '<b>✅ Contrato procesado correctamente</b><br>' +
+          '• PDF guardado: ' + (data.pdf_kb || 0) + ' KB<br>' +
+          '• Texto extraído: ' + (data.texto_chars || 0).toLocaleString('es-CO') + ' caracteres<br>' +
+          '• Cláusulas detectadas: <b>' + (data.clausulas_extraidas || 0) + '</b><br>' +
+          '<span style="font-size:.75rem;color:#365314;">A partir de ahora el motor citará estas cláusulas literales al objetar glosas de ' + escHtml(eps) + '.</span>' +
+        '</div>';
+    }
+    toast('Contrato cargado', (data.clausulas_extraidas || 0) + ' cláusulas extraídas para ' + eps, 'success');
+    cargarClausulasContrato();
+  }catch(e){
+    if(resultDiv){
+      resultDiv.innerHTML = '<div style="background:#fee2e2;border-left:3px solid #b91c1c;padding:.7rem .9rem;border-radius:6px;font-size:.85rem;color:#991b1b;">❌ Error de red: ' + escHtml(String(e)) + '</div>';
+    }
+    toast('Error de red', String(e), 'error');
+  }finally{
+    if(btn){ btn.disabled = false; if(btn.dataset.origLabel) btn.innerHTML = btn.dataset.origLabel; }
+    if(input) input.value = '';
+  }
+}
+
+async function cargarClausulasContrato(){
+  var sel = document.getElementById('ctr-pdf-eps');
+  var listDiv = document.getElementById('ctr-clausulas-list');
+  if(!sel || !sel.value || !listDiv) return;
+  var eps = sel.value;
+  try{
+    var r = await fetch('/contratos/' + encodeURIComponent(eps) + '/clausulas', {headers: authH()});
+    if(!r.ok){
+      listDiv.innerHTML = '<div style="font-size:.8rem;color:#991b1b;">No se pudieron cargar las cláusulas (HTTP ' + r.status + ').</div>';
+      return;
+    }
+    var data = await r.json();
+    if(!data.total_clausulas){
+      listDiv.innerHTML = '<div style="font-size:.8rem;color:var(--text3);padding:.5rem;">Sin cláusulas extraídas para ' + escHtml(eps) + '. Subí el PDF para empezar.</div>';
+      return;
+    }
+    var TEMAS = {TA:'💰 Tarifas', SO:'📄 Soportes', AU:'🔐 Autorizaciones', CO:'🩺 Cobertura', FA:'🧾 Facturación', NN:'📌 Generales'};
+    var porTema = {};
+    (data.clausulas || []).forEach(function(c){
+      var t = c.tema || 'NN';
+      if(!porTema[t]) porTema[t] = [];
+      porTema[t].push(c);
+    });
+    var html = '<details style="background:#fafafa;border:1px solid var(--line);border-radius:8px;padding:.7rem 1rem;margin-top:.6rem;" open>' +
+      '<summary style="cursor:pointer;font-weight:600;">📑 ' + data.total_clausulas + ' cláusulas extraídas de ' + escHtml(eps) + ' · subido ' +
+      (data.pdf_subido_en ? new Date(data.pdf_subido_en).toLocaleString('es-CO') : 'fecha desconocida') + '</summary>';
+    Object.keys(porTema).sort().forEach(function(t){
+      html += '<div style="margin-top:.7rem;"><div style="font-weight:600;font-size:.85rem;color:#5b21b6;margin-bottom:.3rem;">' + (TEMAS[t] || t) + ' (' + porTema[t].length + ')</div>';
+      porTema[t].forEach(function(c){
+        html += '<div style="background:#fff;border-left:3px solid #8b5cf6;padding:.55rem .8rem;margin-bottom:.4rem;border-radius:4px;">' +
+          '<div style="font-size:.78rem;font-weight:600;color:#5b21b6;">Cláusula ' + escHtml(c.numero || '(s/n)') +
+          (c.titulo ? ' · ' + escHtml(c.titulo) : '') +
+          (c.pagina ? ' · pág ' + c.pagina : '') + '</div>' +
+          '<div style="font-size:.78rem;color:var(--text2);margin-top:.25rem;line-height:1.5;">' + escHtml(c.texto_literal || '') + '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</details>';
+    listDiv.innerHTML = html;
+  }catch(e){
+    listDiv.innerHTML = '<div style="font-size:.8rem;color:#991b1b;">Error: ' + escHtml(String(e)) + '</div>';
   }
 }
 
