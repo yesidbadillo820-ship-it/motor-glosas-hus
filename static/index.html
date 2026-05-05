@@ -5158,10 +5158,33 @@ function limpiarImportMasiva(){
   if(res) res.innerHTML = '';
 }
 
+async function cancelarLote(lote_id){
+  if(!confirm('¿Cancelar este lote?\n\nLas filas que ya estaban procesándose van a terminar (no se interrumpe en mitad), pero el lote se marca como CANCELADO y la UI deja de mostrarlo en progreso.')){
+    return;
+  }
+  try{
+    var r = await fetch('/glosas/importar-masiva/lote/'+lote_id+'/cancelar', {
+      method:'POST', headers: authH(),
+    });
+    var data = await r.json();
+    if(!r.ok){
+      toast('Error', data.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    toast('Lote cancelado', 'Marcado como CANCELADO', 'success');
+    if(_imPollTimer){ clearInterval(_imPollTimer); _imPollTimer = null; }
+    cargarHistorialLotesMasiva(IM_HIST_PAGE);
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
 async function previewImportMasiva(){
   // F1.2: pide preview al backend ANTES de procesar. Muestra modal con
   // summary (filas validas/invalidas, EPS, duplicados, costo USD).
   // Si el costo > umbral configurable, requiere confirmacion explicita.
+  // F1.4: tambien chequea texto_hash contra lotes anteriores para
+  // alertar si el usuario esta a punto de subir el mismo Excel 2 veces.
   var resBox = document.getElementById('im-result');
   resBox.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;font-size:.8rem;color:#7c2d12;">⏳ Generando previsualización del lote...</div>';
 
@@ -5208,6 +5231,18 @@ async function previewImportMasiva(){
       return;
     }
     IM_STATE.preview_data = data;
+    // F1.4: chequear si este texto_excel ya fue procesado antes
+    try{
+      var rd = await fetch('/glosas/importar-masiva/dedupe-check', {
+        method:'POST',
+        headers:{'Content-Type':'application/json', ...authH()},
+        body: JSON.stringify({texto_excel: texto, eps: eps}),
+      });
+      if(rd.ok){
+        var dd = await rd.json();
+        if(dd.duplicado){ data.lote_duplicado = dd; }
+      }
+    }catch(e){}
     _imRenderPreviewModal(data);
   }catch(e){
     resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ Error de red: '+escHtml(String(e))+'</div>';
@@ -5230,9 +5265,22 @@ function _imRenderPreviewModal(data){
   var costoColor = data.bloquear ? '#dc2626' : (data.costo_estimado_usd > data.umbral_alerta_usd / 2 ? '#d97706' : '#16a34a');
   var costoIcon = data.bloquear ? '🚨' : (data.costo_estimado_usd > data.umbral_alerta_usd / 2 ? '⚠️' : '✅');
 
+  // F1.4: banner si este Excel exacto ya se proceso antes
+  var dedupBanner = '';
+  if(data.lote_duplicado){
+    var d = data.lote_duplicado;
+    var fechaDup = d.iniciado_en ? new Date(d.iniciado_en).toLocaleString('es-CO') : '?';
+    dedupBanner = '<div style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem;font-size:.85rem;color:#7c2d12;">'
+      + '<div style="display:flex;align-items:center;gap:.6rem;"><span style="font-size:1.4rem;">⚠️</span>'
+      + '<div style="flex:1;"><b>Este texto YA fue procesado antes</b><br>'
+      + '<span style="font-size:.78rem;">Lote <code>'+escHtml(d.batch_id||'')+'</code> ('+d.estado+') subido por '+escHtml((d.usuario||'').split('@')[0])+' el '+fechaDup+' con '+d.total_filas+' filas. '
+      + 'Si confirmás de nuevo, vas a CREAR DUPLICADOS de esas glosas en BD.</span></div></div></div>';
+  }
+
   var html =
     '<div style="background:#fff;border:2px solid '+(data.bloquear ? '#fca5a5' : '#86efac')+';border-radius:12px;padding:1.2rem;font-size:.85rem;line-height:1.55;">'
     + '<h3 style="margin:0 0 .8rem;font-size:1.05rem;">📋 Previsualización del lote</h3>'
+    + dedupBanner
 
     // KPIs grid
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:1rem;">'
@@ -5383,13 +5431,15 @@ function _imRenderProgresoLote(s, batch_id){
   resBox.innerHTML = html;
 }
 
-async function cargarHistorialLotesMasiva(){
+var IM_HIST_PAGE = 1;
+async function cargarHistorialLotesMasiva(page){
+  if(typeof page === 'number') IM_HIST_PAGE = page;
   var p = document.getElementById('im-historial-panel');
   if(!p) return;
   p.style.display = 'block';
   p.innerHTML = '<div class="form-card"><h3>📜 Historial de lotes</h3><div id="im-hist-tabla">⏳ Cargando…</div></div>';
   try{
-    var r = await fetch('/glosas/importar-masiva/lotes?page=1&per_page=20', {headers:authH()});
+    var r = await fetch('/glosas/importar-masiva/lotes?page='+IM_HIST_PAGE+'&per_page=10', {headers:authH()});
     if(!r.ok){
       document.getElementById('im-hist-tabla').innerHTML = '<div style="color:#991b1b;">Error '+r.status+'</div>';
       return;
@@ -5401,25 +5451,40 @@ async function cargarHistorialLotesMasiva(){
       return;
     }
     var rows = data.items.map(function(l){
-      var col = l.estado === 'COMPLETO' ? '#16a34a' : (l.estado === 'ERROR' ? '#dc2626' : '#0369a1');
+      var col = l.estado === 'COMPLETO' ? '#16a34a' : (l.estado === 'ERROR' ? '#dc2626' : (l.estado === 'CANCELADO' ? '#6b7280' : '#0369a1'));
       var pct = Math.round(100 * (l.procesadas||0) / Math.max(l.total_filas, 1));
       var fechaIni = l.iniciado_en ? new Date(l.iniciado_en).toLocaleString('es-CO') : '—';
+      var btnCancelar = l.estado === 'PROCESANDO' ? '<button class="btn-sm" onclick="cancelarLote('+l.id+')" style="font-size:.65rem;color:#b91c1c;border-color:#fca5a5;background:#fef2f2;">🛑 Cancelar</button>' : '';
+      var btnExportar = '<a href="/glosas/importar-masiva/lote/'+l.id+'/exportar" class="btn-sm" target="_blank" style="font-size:.65rem;text-decoration:none;display:inline-block;">📥 CSV</a>';
       return '<tr>'
-        + '<td><code>'+escHtml(l.batch_id||'')+'</code></td>'
-        + '<td>'+escHtml(l.usuario_email||'')+'</td>'
-        + '<td>'+fechaIni+'</td>'
+        + '<td><code style="font-size:.7rem;">'+escHtml(l.batch_id||'')+'</code></td>'
+        + '<td style="font-size:.72rem;">'+escHtml((l.usuario_email||'').split('@')[0])+'</td>'
+        + '<td style="font-size:.7rem;">'+fechaIni+'</td>'
         + '<td class="num">'+l.total_filas+'</td>'
         + '<td class="num" style="color:#16a34a;">'+l.exitosas+'</td>'
         + '<td class="num" style="color:#dc2626;">'+l.fallidas+'</td>'
-        + '<td><span style="background:'+col+';color:#fff;padding:.15rem .5rem;border-radius:4px;font-size:.7rem;">'+l.estado+'</span></td>'
+        + '<td><span style="background:'+col+';color:#fff;padding:.15rem .5rem;border-radius:4px;font-size:.65rem;">'+l.estado+'</span></td>'
         + '<td><div style="height:6px;background:#e5e7eb;border-radius:3px;width:60px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+col+';"></div></div></td>'
-        + '<td><button class="btn-sm" onclick="_imIniciarPollingLote('+l.id+',\''+escJs(l.batch_id||'')+'\','+l.total_filas+')" style="font-size:.7rem;">Ver</button></td>'
+        + '<td style="white-space:nowrap;">'
+        +   '<button class="btn-sm" onclick="_imIniciarPollingLote('+l.id+',\''+escJs(l.batch_id||'')+'\','+l.total_filas+')" style="font-size:.65rem;">👁 Ver</button> '
+        +   btnCancelar + ' '
+        +   btnExportar
+        + '</td>'
       + '</tr>';
     }).join('');
-    box.innerHTML = '<table style="width:100%;font-size:.78rem;border-collapse:collapse;"><thead><tr>'
-      + '<th>Batch</th><th>Usuario</th><th>Inicio</th><th class="num">Total</th><th class="num">OK</th><th class="num">Falló</th><th>Estado</th><th>Progreso</th><th></th>'
-      + '</tr></thead><tbody>'+rows+'</tbody></table>'
-      + '<div style="font-size:.7rem;color:var(--text3);margin-top:.5rem;">Mostrando '+data.items.length+' de '+data.total+' lotes</div>';
+    var paginadorHtml = '';
+    if(data.pages > 1){
+      paginadorHtml = '<div style="margin-top:.6rem;display:flex;gap:.4rem;align-items:center;font-size:.75rem;">'
+        + (data.page > 1 ? '<button class="btn-sm" onclick="cargarHistorialLotesMasiva('+(data.page-1)+')">‹ Anterior</button>' : '')
+        + '<span style="color:var(--text3);">Página '+data.page+' de '+data.pages+'</span>'
+        + (data.page < data.pages ? '<button class="btn-sm" onclick="cargarHistorialLotesMasiva('+(data.page+1)+')">Siguiente ›</button>' : '')
+        + '</div>';
+    }
+    box.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;font-size:.78rem;border-collapse:collapse;"><thead><tr>'
+      + '<th>Batch</th><th>Usuario</th><th>Inicio</th><th class="num">Total</th><th class="num">OK</th><th class="num">Falló</th><th>Estado</th><th>Progreso</th><th>Acciones</th>'
+      + '</tr></thead><tbody>'+rows+'</tbody></table></div>'
+      + '<div style="font-size:.7rem;color:var(--text3);margin-top:.5rem;">Mostrando '+data.items.length+' de '+data.total+' lotes</div>'
+      + paginadorHtml;
   }catch(e){
     document.getElementById('im-hist-tabla').innerHTML = '<div style="color:#991b1b;">Error: '+escHtml(String(e))+'</div>';
   }
@@ -5462,16 +5527,7 @@ async function _imXlsxOrCsvAsTSV(file){
   throw new Error('Formato no soportado: '+ext);
 }
 
-async function cargarHistorialLotesMasiva(){
-  // F1.3 traerá el endpoint /glosas/lotes-importacion. Por ahora,
-  // placeholder con mensaje informativo.
-  var p = document.getElementById('im-historial-panel');
-  if(!p) return;
-  p.style.display = 'block';
-  p.innerHTML = '<div class="form-card"><h3>📜 Historial de lotes</h3>'
-    + '<p style="font-size:.82rem;color:var(--text3);">El historial detallado de lotes anteriores se habilita en F1.3 (próxima sesión). Por ahora, podés ver las glosas creadas yendo a <b>Mis glosas</b> o <b>Historial</b> y filtrando por fecha de creación.</p>'
-    + '</div>';
-}
+// (cargarHistorialLotesMasiva real esta arriba en el bloque F1.3)
 
 async function subirTarifasExcel(){
   var input = document.getElementById('tar-xlsx-file');

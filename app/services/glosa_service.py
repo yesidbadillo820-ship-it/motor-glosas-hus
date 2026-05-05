@@ -1642,6 +1642,7 @@ class GlosaService:
                             try:
                                 res_ia, modelo_usado = await self._llamar_anthropic_con_tools(
                                     system_prompt, user_prompt,
+                                    modelo_override=_modelo_override,
                                 )
                                 _intento_ok = True
                             except Exception as _e_tools:
@@ -2985,6 +2986,7 @@ class GlosaService:
         system: str,
         user: str,
         max_turns: int = 4,
+        modelo_override: Optional[str] = None,
     ) -> tuple[str, str]:
         """Llama a Claude con TOOL USE habilitado. Multi-turn loop:
         Claude pide tools → ejecutamos → devolvemos resultado → repetimos
@@ -3012,7 +3014,10 @@ class GlosaService:
             "content-type": "application/json",
         }
 
-        modelo_efectivo = self.anthropic_model
+        # Respeta el routing dinamico: si el caller pidio Haiku para
+        # un caso liviano, usar Haiku tambien con Tool Use. Sino,
+        # default Sonnet/configured.
+        modelo_efectivo = modelo_override or self.anthropic_model
         # Historial de mensajes para el multi-turn
         messages = [{"role": "user", "content": user}]
 

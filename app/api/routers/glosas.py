@@ -4046,6 +4046,149 @@ def status_lote(
     }
 
 
+@router.post("/importar-masiva/lote/{lote_id}/cancelar")
+def cancelar_lote(
+    lote_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM F1.4: marca un lote como CANCELADO. Las filas que YA estaban
+    en el queue de background_tasks van a seguir procesandose (FastAPI
+    no permite cancelar tasks ya disparadas), pero el frontend deja de
+    pollear y la UI marca el lote como cancelado.
+
+    En la practica, si el usuario cancela un lote de 50 filas a la
+    fila #20, las 30 restantes igual se ejecutan. Lo que cancela es la
+    visibilidad y deja el registro marcado para auditoria.
+    """
+    from app.models.db import LoteImportacionRecord
+    from datetime import datetime as _dt, timezone as _tz
+
+    l = db.query(LoteImportacionRecord).filter(LoteImportacionRecord.id == lote_id).first()
+    if not l:
+        raise HTTPException(404, "Lote no encontrado")
+    rol = (getattr(current_user, "rol", "") or "").upper()
+    if l.usuario_email != current_user.email and rol not in ("SUPER_ADMIN", "COORDINADOR"):
+        raise HTTPException(403, "Sin permisos")
+    if l.estado != "PROCESANDO":
+        raise HTTPException(400, f"Lote ya esta en estado {l.estado}, no se puede cancelar")
+    l.estado = "CANCELADO"
+    l.terminado_en = _dt.now(_tz.utc)
+    db.commit()
+    logger.info(f"[LOTE-CANCEL] lote_id={lote_id} cancelado por {current_user.email}")
+    return {"ok": True, "lote_id": lote_id, "estado": "CANCELADO"}
+
+
+@router.get("/importar-masiva/lote/{lote_id}/exportar")
+def exportar_lote_csv(
+    lote_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM F1.4: exporta a CSV los detalles del lote (params + errores +
+    glosas creadas) para forensia / reporte SuperSalud."""
+    from app.models.db import LoteImportacionRecord, GlosaRecord
+    from fastapi.responses import StreamingResponse
+    import csv
+    import io
+    import json as _json
+
+    l = db.query(LoteImportacionRecord).filter(LoteImportacionRecord.id == lote_id).first()
+    if not l:
+        raise HTTPException(404, "Lote no encontrado")
+    rol = (getattr(current_user, "rol", "") or "").upper()
+    if l.usuario_email != current_user.email and rol not in ("SUPER_ADMIN", "COORDINADOR"):
+        raise HTTPException(403, "Sin permisos")
+
+    def _generar():
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        # Header section
+        w.writerow(["LOTE IMPORTACION MASIVA"])
+        w.writerow(["Batch ID", l.batch_id])
+        w.writerow(["Usuario", l.usuario_email])
+        w.writerow(["Iniciado", l.iniciado_en.isoformat() if l.iniciado_en else ""])
+        w.writerow(["Terminado", l.terminado_en.isoformat() if l.terminado_en else ""])
+        w.writerow(["Estado", l.estado])
+        w.writerow(["Total filas", l.total_filas])
+        w.writerow(["Exitosas", l.exitosas])
+        w.writerow(["Fallidas", l.fallidas])
+        w.writerow([])
+        # EPS detectadas
+        eps = _json.loads(l.eps_detectadas) if l.eps_detectadas else {}
+        if eps:
+            w.writerow(["EPS DETECTADAS"])
+            w.writerow(["EPS", "Filas"])
+            for k, v in eps.items():
+                w.writerow([k, v])
+            w.writerow([])
+        # Errores por fila
+        errores = _json.loads(l.errores) if l.errores else []
+        if errores:
+            w.writerow(["ERRORES POR FILA"])
+            w.writerow(["Fila", "Error"])
+            for e in errores:
+                w.writerow([e.get("fila", ""), e.get("error", "")])
+            w.writerow([])
+        # Glosas creadas (busqueda por numero_radicado = batch_id)
+        glosas = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.numero_radicado == l.batch_id)
+            .order_by(GlosaRecord.id)
+            .all()
+        )
+        if glosas:
+            w.writerow(["GLOSAS CREADAS"])
+            w.writerow(["ID", "EPS", "Factura", "Codigo", "Valor objetado", "Estado"])
+            for g in glosas:
+                w.writerow([g.id, g.eps, g.factura, g.codigo_glosa,
+                           g.valor_objetado or 0, g.estado or ""])
+        yield buf.getvalue()
+
+    fname = f"lote-{l.batch_id}-{lote_id}.csv"
+    return StreamingResponse(
+        _generar(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.post("/importar-masiva/dedupe-check")
+def check_lote_duplicado(
+    request: ImportacionMasivaRequest,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM F1.4: detecta si el texto pegado coincide con un lote
+    procesado anteriormente (texto_hash matching). Permite advertir
+    al usuario antes de procesar dos veces el mismo Excel."""
+    import hashlib as _hashlib
+    from app.models.db import LoteImportacionRecord
+
+    if not request.texto_excel:
+        return {"duplicado": False}
+    h = _hashlib.sha256(request.texto_excel.encode("utf-8")).hexdigest()
+    lote_existente = (
+        db.query(LoteImportacionRecord)
+        .filter(LoteImportacionRecord.texto_hash == h)
+        .order_by(LoteImportacionRecord.iniciado_en.desc())
+        .first()
+    )
+    if not lote_existente:
+        return {"duplicado": False}
+    return {
+        "duplicado": True,
+        "lote_id": lote_existente.id,
+        "batch_id": lote_existente.batch_id,
+        "usuario": lote_existente.usuario_email,
+        "iniciado_en": (
+            lote_existente.iniciado_en.isoformat() if lote_existente.iniciado_en else None
+        ),
+        "estado": lote_existente.estado,
+        "total_filas": lote_existente.total_filas,
+    }
+
+
 @router.post("/importar-recepcion")
 async def importar_recepcion(
     archivo: UploadFile = File(...),
