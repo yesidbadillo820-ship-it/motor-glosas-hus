@@ -3368,6 +3368,13 @@ async function doLogin(){
       localStorage.setItem('hus_token',TOKEN);
       localStorage.setItem('hus_user',USER_NAME);
       localStorage.setItem('hus_rol',USER_ROL);
+      // Disparar evento hus:auth para que los FABs (Mis tareas + Reportar
+      // fallo) y otros listeners que esperan login completen su setup.
+      // Sin este dispatch, los FABs sólo se muestran si el usuario tenía
+      // token en localStorage al cargar la página (refresh con sesión
+      // persistida) — pero NO si logueó fresh, lo que dejaba a los
+      // AUDITORES sin esos botones para siempre tras login limpio.
+      try { window.dispatchEvent(new CustomEvent('hus:auth')); } catch(e){}
       initApp();
       // Si el usuario debe cambiar su password en el primer login,
       // mostrar modal bloqueante inmediatamente tras initApp.
@@ -3393,6 +3400,17 @@ async function initApp(){
   document.getElementById('app').classList.add('show');
   document.getElementById('hdr-user').textContent=USER_NAME;
   if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
+  // FABs flotantes (Mis tareas + Reportar fallo) — los mostramos AQUÍ
+  // como salvavidas adicional al evento hus:auth, porque initApp se
+  // ejecuta tanto en login fresh como en restore de sesión persistida.
+  // Doble redundancia: si el dispatch del evento falla, igual aparecen.
+  try {
+    var _td = document.getElementById('td-fab');
+    if(_td) _td.style.display = 'flex';
+    var _fb = document.getElementById('fb-fab');
+    if(_fb) _fb.style.display = 'flex';
+    if(typeof refrescarBadgeTareas === 'function') refrescarBadgeTareas();
+  } catch(e){}
   // Restaurar estado colapsado del sidebar
   if(localStorage.getItem('hus_sidebar_collapsed')==='1'){
     var sb=document.getElementById('sidebar-nav');
