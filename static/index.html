@@ -1595,6 +1595,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <div class="stat-card-delta neutral" id="land-alertas-delta">en 5 días</div>
             </div>
           </div>
+          <!-- 📰 Noticias del sector salud Colombia (RSS + scraping) -->
+          <div id="noticias-ticker" style="display:none;margin:1rem 0;"></div>
+
           <!-- 🤖 Asistente IA por glosa (R370) — se muestra cuando hay una cargada -->
           <div id="ficha-asistente-ia" style="display:none;margin:1rem 0"></div>
 
@@ -3422,6 +3425,8 @@ async function initApp(){
   if(typeof filtrarAccionesPorRol === 'function') filtrarAccionesPorRol();
   // Poblar KPIs del landing hero del panel Analizar
   if(typeof poblarLandingKPIs === 'function') poblarLandingKPIs();
+  // Cargar ticker de noticias del sector salud Colombia (RSS)
+  if(typeof cargarTickerNoticias === 'function') cargarTickerNoticias();
   // Verificar si mostrar onboarding (primera vez)
   if(typeof verificarOnboarding === 'function') verificarOnboarding();
   await loadContratos();
@@ -6738,6 +6743,65 @@ function _mostrarBannerFestivoGlobal(tema){
 document.addEventListener('DOMContentLoaded', function(){
   setTimeout(aplicarTemaFestivo, 800);
 });
+
+// ─── Ticker noticias salud Colombia (RSS + scraping minsalud) ────────
+async function cargarTickerNoticias(){
+  var box = document.getElementById('noticias-ticker');
+  if(!box) return;
+  try{
+    var r = await fetch('/noticias/recientes?limite=5&dias=14', {headers: authH()});
+    if(!r.ok) return;
+    var data = await r.json();
+    if(!data.noticias || !data.noticias.length){
+      // Si no hay noticias indexadas todavía, oculto el widget en silencio
+      box.style.display = 'none';
+      return;
+    }
+    var ICONO = {
+      'NORMATIVA': '⚖️', 'NOTICIA': '📰', 'OPINION': '💬', 'ALERTA': '🚨',
+    };
+    var COLOR_CAT = {
+      'NORMATIVA': '#7c3aed', 'NOTICIA': '#0369a1', 'OPINION': '#ea580c', 'ALERTA': '#dc2626',
+    };
+    var html =
+      '<div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:#e2e8f0;border-radius:12px;padding:1rem 1.25rem;box-shadow:0 4px 12px rgba(15,23,42,.18);">'
+      +'<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem;">'
+        +'<span style="font-size:1.3rem;">📰</span>'
+        +'<div style="font-weight:700;font-size:.95rem;color:#fff;">Novedades del sector salud · Colombia</div>'
+        +'<span style="font-size:.7rem;color:#94a3b8;margin-left:auto;">'+ data.total +' recientes</span>'
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:.55rem;">';
+
+    data.noticias.forEach(function(n){
+      var cat = n.categoria || 'NOTICIA';
+      var ico = ICONO[cat] || '📰';
+      var col = COLOR_CAT[cat] || '#0369a1';
+      var fecha = n.fecha_publicacion ? new Date(n.fecha_publicacion).toLocaleDateString('es-CO', {day:'numeric', month:'short'}) : '';
+      var resumenCorto = (n.resumen || '').slice(0, 180);
+      if(n.resumen && n.resumen.length > 180) resumenCorto += '…';
+      html += '<div style="background:rgba(255,255,255,.04);border-left:3px solid '+col+';border-radius:6px;padding:.55rem .8rem;">'
+        + '<div style="display:flex;gap:.5rem;align-items:flex-start;">'
+        +   '<span style="font-size:1rem;flex-shrink:0;">'+ico+'</span>'
+        +   '<div style="flex:1;min-width:0;">'
+        +     '<div style="font-weight:600;font-size:.83rem;color:#fff;line-height:1.35;">'
+        +       (n.url ? '<a href="'+escHtml(n.url)+'" target="_blank" rel="noopener" style="color:#fff;text-decoration:none;border-bottom:1px dotted #94a3b8;">'+escHtml(n.titulo)+'</a>' : escHtml(n.titulo))
+        +     '</div>'
+        +     (resumenCorto ? '<div style="font-size:.74rem;color:#cbd5e1;margin-top:.2rem;line-height:1.4;">'+escHtml(resumenCorto)+'</div>' : '')
+        +     '<div style="font-size:.66rem;color:#94a3b8;margin-top:.25rem;text-transform:uppercase;letter-spacing:.04em;">'
+        +       escHtml(n.fuente) + (fecha ? ' · ' + fecha : '') + ' · ' + cat
+        +     '</div>'
+        +   '</div>'
+        + '</div>'
+      + '</div>';
+    });
+    html += '</div></div>';
+    box.innerHTML = html;
+    box.style.display = 'block';
+  }catch(e){
+    // Silencio: si falla, simplemente no mostramos el ticker
+    box.style.display = 'none';
+  }
+}
 
 async function poblarLandingKPIs(){
   try{

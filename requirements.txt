@@ -26,3 +26,5 @@ pyotp==2.9.0
 qrcode[pil]==8.2
 cryptography>=42.0.0
 sentry-sdk[fastapi]==2.19.2
+feedparser==6.0.11
+

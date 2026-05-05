@@ -680,6 +680,13 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
 
+    # Scheduler noticias salud Colombia (cada 4h fetch RSS + scraping)
+    try:
+        from app.services.noticias_scheduler import iniciar_scheduler as iniciar_noticias_scheduler
+        iniciar_noticias_scheduler()
+    except Exception as _e:
+        logger.warning(f"No se pudo iniciar scheduler de noticias: {_e}")
+
     yield
 
     # Shutdown: detener schedulers limpiamente
@@ -701,6 +708,11 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.soportes_reindex_scheduler import detener_scheduler as detener_soportes
         detener_soportes()
+    except Exception:
+        pass
+    try:
+        from app.services.noticias_scheduler import detener_scheduler as detener_noticias
+        detener_noticias()
     except Exception:
         pass
     logger.info("=== APLICACIÓN CERRADA ===")
@@ -891,6 +903,8 @@ from app.api.routers.auditor_preview import router as auditor_preview_router
 app.include_router(auditor_preview_router)
 from app.api.routers.soportes import router as soportes_auto_router
 app.include_router(soportes_auto_router)
+from app.api.routers.noticias import router as noticias_router
+app.include_router(noticias_router)
 
 
 

@@ -532,3 +532,30 @@ class SugerenciaRecord(Base):
     resuelto_en = Column(DateTime(timezone=True), nullable=True)
     resuelto_por = Column(String(200), nullable=True)
     nota_admin = Column(Text, nullable=True)
+
+
+class NoticiaSaludRecord(Base):
+    """Noticias del sector salud Colombia traídas vía RSS de fuentes
+    oficiales y especializadas (ConsultorSalud, MinSalud, ACHC, etc.).
+
+    Se muestran en el dashboard del auditor al loguearse — directiva
+    Yesid mayo 2026: "que cuando el auditor entre salga como un script
+    con las noticias mas importantes".
+
+    Fuente -> URL del feed/sitio. Hash sirve para dedupe entre fetches
+    (mismo titulo+url pueden venir múltiples veces si el feed se
+    actualiza).
+    """
+    __tablename__ = "noticias_salud"
+
+    id = Column(Integer, primary_key=True, index=True)
+    titulo = Column(String(500), nullable=False)
+    resumen = Column(Text, nullable=True)
+    url = Column(String(800), nullable=True)
+    fuente = Column(String(80), index=True, nullable=False)
+    fecha_publicacion = Column(DateTime(timezone=True), index=True, nullable=True)
+    indexada_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    hash_unico = Column(String(64), index=True, nullable=False)
+    activa = Column(Integer, default=1, nullable=False, index=True)
+    # Categorías típicas: NORMATIVA | NOTICIA | OPINION | ALERTA
+    categoria = Column(String(40), default="NOTICIA", index=True)
