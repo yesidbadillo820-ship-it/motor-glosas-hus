@@ -126,6 +126,60 @@ def soportes_de_factura(
     }
 
 
+@router.get("/buscar")
+def buscar_soportes(
+    q: str,
+    request: Request,
+    limite: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Búsqueda flexible sobre el indice de soportes.
+
+    Acepta:
+      - Numero de factura: "HUS245200", "245200" (con o sin prefijo)
+      - Numero ENV: "ENV-189840", "189840"
+      - Nombre EPS: "ALIANZA MEDELLIN", "FAMISANAR"
+      - Combinaciones: "FAMISANAR ENV-189840"
+      - Substring de archivo: "factura.pdf"
+
+    Devuelve grupos por factura, cada uno con sus archivos detectados,
+    EPS, ENV, año/mes, y la ruta absoluta de la carpeta para que el
+    gestor pueda copiarla y pegarla en el explorador.
+
+    Auditoria PHI: cada llamada se loggea (saber que historias clinicas
+    consulta cada usuario es PHI segun politica HUS).
+    """
+    if not q or len(q.strip()) < 2:
+        raise HTTPException(400, "Query debe tener al menos 2 caracteres")
+    if limite < 1 or limite > 100:
+        limite = 30
+
+    indexer = get_indexer()
+    resultados = indexer.buscar(q.strip(), limite=limite)
+
+    # Audit log
+    try:
+        ip = request.client.host if request.client else None
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=getattr(current_user, "rol", "") or "",
+            accion="BUSCAR_SOPORTES",
+            tabla="soportes_share",
+            detalle=f"q={q[:100]} encontrados={len(resultados)}",
+            ip=ip,
+        )
+    except Exception:
+        pass
+
+    return {
+        "query": q,
+        "total": len(resultados),
+        "limite": limite,
+        "resultados": resultados,
+    }
+
+
 @router.post("/reindex")
 def reindex(
     request: Request,

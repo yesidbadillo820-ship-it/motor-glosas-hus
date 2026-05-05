@@ -370,6 +370,141 @@ class SoportesIndexer:
             "ultimo_error": self._ultimo_error,
         }
 
+    def buscar(self, query: str, limite: int = 30, auto_rebuild: bool = True) -> list[dict]:
+        """Búsqueda flexible sobre el índice — soporta facturas, ENV, EPS,
+        nombres de archivos parciales. Devuelve hasta `limite` resultados
+        AGRUPADOS por factura para que la UI los pueda mostrar como cards.
+
+        Reglas de matching (en orden de prioridad):
+          1. Si query parece factura (contiene 4+ dígitos), busca numérico
+             exacto primero (igual que lookup).
+          2. Sino, busca substring case-insensitive en eps, env, ruta,
+             nombre_archivo de TODOS los entries.
+          3. Si query tiene varias palabras, todas deben matchear (AND).
+
+        Output: lista de grupos por factura:
+            [
+              {
+                "factura": "HUS245200",
+                "factura_norm": "245200",
+                "eps": "ALIANZA MEDELLIN",
+                "env": "ENV-189840-OK",
+                "anio": 2024,
+                "mes": "ENERO",
+                "ruta_carpeta": "X:\\RADICACION DIGITAL\\...\\HUS245200",
+                "archivos_count": 5,
+                "archivos": [...],
+                "tipos_detectados": ["FEV", "HEV", "RIPS"],
+              },
+              ...
+            ]
+        """
+        if auto_rebuild and not self._esta_caliente():
+            self.rebuild()
+        if not query or len(query.strip()) < 2:
+            return []
+
+        q = query.strip().lower()
+        # Limpiar query para detección numérica (ignorar HUS/guiones)
+        q_solo_digitos = re.sub(r"[^\d]", "", q)
+        es_factura_query = len(q_solo_digitos) >= 4
+
+        # 1. Match exacto por factura si el query es numérico
+        if es_factura_query:
+            norm = normalizar_factura(q_solo_digitos)
+            if norm in self._indice:
+                entries = self._indice[norm]
+                grupo = self._agrupar_entries_por_factura(entries)
+                return list(grupo.values())[:limite]
+
+        # 2. Búsqueda substring sobre todos los entries
+        # Tokenizamos el query — todas las palabras deben matchear (AND)
+        tokens = [t for t in re.split(r"\s+", q) if len(t) >= 2]
+        if not tokens:
+            return []
+
+        coincidencias_por_factura: dict[str, list[SoporteEntry]] = {}
+        for entries in self._indice.values():
+            for e in entries:
+                # Texto buscable: ruta + nombre archivo + eps + env + factura
+                blob = " ".join([
+                    (e.ruta or "").lower(),
+                    (e.nombre_archivo or "").lower(),
+                    (e.eps or "").lower(),
+                    (e.env or "").lower(),
+                    (e.factura or "").lower(),
+                ])
+                if all(tok in blob for tok in tokens):
+                    coincidencias_por_factura.setdefault(e.factura, []).append(e)
+
+        # Agrupar y ordenar
+        grupos_dict = {}
+        for factura, entries in coincidencias_por_factura.items():
+            grupos_dict[factura] = self._agrupar_entries_por_factura(entries)[factura]
+
+        # Ordenar: año desc, luego eps alfabético, luego factura
+        grupos_ordenados = sorted(
+            grupos_dict.values(),
+            key=lambda g: (-(g.get("anio") or 0), g.get("eps") or "", g.get("factura") or ""),
+        )
+        return grupos_ordenados[:limite]
+
+    def _agrupar_entries_por_factura(self, entries: list[SoporteEntry]) -> dict:
+        """Helper para agrupar entries por factura. Devuelve dict
+        {factura: grupo_dict}."""
+        if not entries:
+            return {}
+        prioridad = {
+            "factura_electronica": 0,
+            "historia_clinica": 1,
+            "rips": 2,
+            "comprobante_recibido_cobro": 3,
+            "furips": 4,
+            "resultados_msps": 5,
+            "xml_cufe": 6,
+        }
+        out: dict[str, dict] = {}
+        for e in entries:
+            fac = e.factura
+            if fac not in out:
+                # La carpeta del HUS — sube 1 nivel desde el archivo
+                ruta_carpeta = e.ruta
+                try:
+                    import os as _os
+                    ruta_carpeta = _os.path.dirname(e.ruta)
+                except Exception:
+                    pass
+                out[fac] = {
+                    "factura": fac,
+                    "factura_norm": e.factura_norm,
+                    "eps": e.eps,
+                    "env": e.env,
+                    "anio": e.anio,
+                    "mes": e.mes,
+                    "ruta_carpeta": ruta_carpeta,
+                    "archivos": [],
+                    "tipos_detectados": set(),
+                }
+            out[fac]["archivos"].append({
+                "tipo": e.tipo,
+                "tipo_codigo": e.tipo_codigo,
+                "nombre_archivo": e.nombre_archivo,
+                "ruta": e.ruta,
+                "extension": e.extension,
+                "tamano_kb": e.tamano_kb,
+            })
+            if e.tipo_codigo:
+                out[fac]["tipos_detectados"].add(e.tipo_codigo)
+
+        # Ordenar archivos dentro de cada grupo + convertir set a list
+        for fac, g in out.items():
+            g["archivos"].sort(
+                key=lambda a: (prioridad.get(a["tipo"], 99), a["nombre_archivo"])
+            )
+            g["archivos_count"] = len(g["archivos"])
+            g["tipos_detectados"] = sorted(g["tipos_detectados"])
+        return out
+
 
 # Singleton lazy
 _indexer_singleton: Optional[SoportesIndexer] = None

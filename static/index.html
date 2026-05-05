@@ -13386,12 +13386,101 @@ function renderSpotlightResults(query){
     iaHint = '<div class="spot-ia-hint"><button class="spot-ia-btn" onclick="busquedaSemanticaSpot(\''+ escJs(query) +'\')">🧠 Buscar con IA: "' + escHtml(query) + '"</button></div>';
   }
 
+  // Búsqueda en el índice de soportes (X:\RADICACION DIGITAL\...) — async,
+  // solo dispara con query >= 3 chars para evitar ruido. La UI inserta
+  // los resultados tan pronto lleguen. NO bloquea el render principal.
+  if(query && query.trim().length >= 3){
+    html += '<div id="spot-soportes-slot"></div>';
+    buscarSoportesSpot(query);
+  }
+
   if(!html){
     box.innerHTML = iaHint + '<div class="spot-empty">Sin resultados exactos para "<b>' + escHtml(query) + '</b>"</div>';
+    if(query && query.trim().length >= 3){
+      box.innerHTML += '<div id="spot-soportes-slot"></div>';
+      buscarSoportesSpot(query);
+    }
   } else {
     box.innerHTML = iaHint + html;
     SPOT_ACTIVE_IDX = 0;
     highlightSpotItem(0);
+  }
+}
+
+// ─── Búsqueda de soportes en X:\RADICACION DIGITAL\... ─────────────
+// Carga grupos por factura desde el indice del jump-box. Se dispara
+// async mientras el spotlight ya muestra glosas/usuarios/contratos.
+var _spotSoportesAbort = null;
+async function buscarSoportesSpot(query){
+  var slot = document.getElementById('spot-soportes-slot');
+  if(!slot) return;
+  // Cancelar request anterior si existe
+  if(_spotSoportesAbort){ try { _spotSoportesAbort.abort(); } catch(e){} }
+  _spotSoportesAbort = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+
+  slot.innerHTML = '<div class="spot-group-lbl">📁 Soportes (buscando…)</div>';
+  try{
+    var r = await fetch('/soportes/buscar?q=' + encodeURIComponent(query) + '&limite=10', {
+      headers: authH(),
+      signal: _spotSoportesAbort ? _spotSoportesAbort.signal : undefined,
+    });
+    if(!r.ok){
+      slot.innerHTML = '';
+      return;
+    }
+    var data = await r.json();
+    if(!data.resultados || !data.resultados.length){
+      slot.innerHTML = '';
+      return;
+    }
+    var html = '<div class="spot-group-lbl">📁 Soportes en disco (' + data.total + ')</div>';
+    data.resultados.forEach(function(g){
+      var ruta = g.ruta_carpeta || '';
+      var meta = (g.eps || '—') + (g.env ? ' · ' + g.env : '') + (g.anio ? ' · ' + g.mes + ' ' + g.anio : '');
+      var tipos = (g.tipos_detectados || []).join(', ') || '—';
+      html += '<div class="spot-item" onclick="copiarRutaSoporte(\''+ escJs(ruta) +'\', \''+ escJs(g.factura) +'\')" title="Click para copiar la ruta al portapapeles">' +
+        '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>' +
+        '<div class="spot-item-main">' +
+          '<div class="spot-item-title">' + escHtml(g.factura) + ' <span style="font-weight:400;color:var(--text3);">· ' + g.archivos_count + ' archivos · ' + escHtml(tipos) + '</span></div>' +
+          '<div class="spot-item-sub" style="font-family:monospace;font-size:.7rem;">' + escHtml(meta) + '</div>' +
+          (ruta ? '<div class="spot-item-sub" style="font-family:monospace;font-size:.68rem;color:#0369a1;overflow-wrap:anywhere;">' + escHtml(ruta) + '</div>' : '') +
+        '</div>' +
+        '<span class="spot-item-meta" style="font-size:.65rem;">📋 Copiar</span>' +
+      '</div>';
+    });
+    slot.innerHTML = html;
+  } catch(e){
+    if(e.name === 'AbortError') return;  // request canceled, normal
+    slot.innerHTML = '';
+  }
+}
+
+async function copiarRutaSoporte(ruta, factura){
+  if(!ruta){
+    toast('Sin ruta', 'No se pudo determinar la ruta de '+factura, 'warning');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(ruta);
+    toast('📋 Ruta copiada', factura + ' — pegá en el explorador con Win+V o Ctrl+V', 'success');
+    // Cerrar spotlight tras copiar (UX más rápida)
+    var bg = document.getElementById('spot-bg');
+    if(bg) bg.classList.remove('show');
+  } catch(e){
+    // Fallback si clipboard API no está disponible (HTTP / browsers viejos)
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = ruta;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast('📋 Ruta copiada', factura, 'success');
+    } catch(e2){
+      toast('Error', 'No se pudo copiar: ' + e2.message, 'error');
+    }
   }
 }
 
