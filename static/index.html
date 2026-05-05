@@ -5294,8 +5294,6 @@ function _imRenderPreviewModal(data){
 }
 
 async function confirmarImportMasiva(){
-  // F1.2: el segundo paso — el usuario YA vio el preview y confirmó
-  // explicitamente. Disparamos el endpoint de procesamiento real.
   var resBox = document.getElementById('im-result');
   if(!IM_STATE.texto_procesado){
     toast('Sin datos', 'Hacé click primero en Previsualizar lote', 'warning');
@@ -5322,19 +5320,108 @@ async function confirmarImportMasiva(){
       resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ '+escHtml(data.detail || 'Error HTTP '+r.status)+'</div>';
       return;
     }
-    resBox.innerHTML = '<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:.85rem 1rem;border-radius:8px;font-size:.85rem;color:#14532d;line-height:1.55;">'
-      + '<b>✅ Lote enviado a procesar</b><br>'
-      + '• Total filas: <b>'+(data.total_filas||0)+'</b><br>'
-      + '• Batch ID: <code>'+escHtml(data.batch_id||'')+'</code><br>'
-      + '<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px dashed #86efac;font-size:.75rem;color:#365314;">'
-      + 'El procesamiento ocurre en background. Andá a <b>Mis glosas</b> en 1-2 min.'
-      + '</div>'
-      + '</div>';
     toast('Lote enviado', (data.total_filas||0) + ' glosas en cola', 'success');
-    // Limpiar estado tras éxito
-    setTimeout(limpiarImportMasiva, 4000);
+    // F1.3: si el backend devolvio lote_id, arrancar el polling de
+    // progreso. Sino, mostrar mensaje estatico (compat con BDs sin
+    // tabla lotes_importacion todavia migrada).
+    if(data.lote_id){
+      _imIniciarPollingLote(data.lote_id, data.batch_id, data.total_filas);
+    } else {
+      resBox.innerHTML = '<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:.85rem 1rem;border-radius:8px;font-size:.85rem;color:#14532d;line-height:1.55;">'
+        + '<b>✅ Lote enviado a procesar</b><br>'
+        + '• Total filas: <b>'+(data.total_filas||0)+'</b><br>'
+        + '• Batch ID: <code>'+escHtml(data.batch_id||'')+'</code></div>';
+    }
   }catch(e){
     resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ Error de red: '+escHtml(String(e))+'</div>';
+  }
+}
+
+// IM F1.3: polling de progreso del lote en BD
+var _imPollTimer = null;
+function _imIniciarPollingLote(lote_id, batch_id, total_filas){
+  if(_imPollTimer){ clearInterval(_imPollTimer); }
+  var tick = async function(){
+    try{
+      var r = await fetch('/glosas/importar-masiva/lote/'+lote_id+'/status', {headers:authH()});
+      if(!r.ok) return;
+      var s = await r.json();
+      _imRenderProgresoLote(s, batch_id);
+      if(s.estado === 'COMPLETO' || s.estado === 'ERROR' || s.estado === 'CANCELADO'){
+        clearInterval(_imPollTimer);
+        _imPollTimer = null;
+      }
+    }catch(e){}
+  };
+  tick();
+  _imPollTimer = setInterval(tick, 3000);
+}
+
+function _imRenderProgresoLote(s, batch_id){
+  var resBox = document.getElementById('im-result');
+  var pct = s.porcentaje || 0;
+  var color = s.estado === 'COMPLETO' ? '#16a34a' : (s.fallidas > 0 ? '#d97706' : '#0369a1');
+  var icon = s.estado === 'COMPLETO' ? '✅' : (s.fallidas > 0 ? '⚠️' : '⏳');
+  var html =
+    '<div style="background:#fff;border:1.5px solid '+color+';border-radius:10px;padding:1rem 1.2rem;font-size:.85rem;">'
+    + '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem;">'
+    +   '<span style="font-size:1.4rem;">'+icon+'</span>'
+    +   '<div style="flex:1;">'
+    +     '<div style="font-weight:700;color:'+color+';">Lote '+escHtml(batch_id||s.batch_id||'')+' · '+s.estado+'</div>'
+    +     '<div style="font-size:.74rem;color:var(--text3);">'+s.procesadas+' de '+s.total_filas+' procesadas · '+s.exitosas+' OK · '+s.fallidas+' fallidas</div>'
+    +   '</div>'
+    +   '<div style="font-weight:700;color:'+color+';font-size:1.1rem;">'+pct.toFixed(1)+'%</div>'
+    + '</div>'
+    + '<div style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;">'
+    +   '<div style="width:'+pct+'%;height:100%;background:'+color+';transition:width .5s;"></div>'
+    + '</div>'
+    + (s.estado === 'COMPLETO'
+        ? '<div style="margin-top:.7rem;padding-top:.6rem;border-top:1px dashed #86efac;font-size:.75rem;color:#15803d;">Procesamiento finalizado. Las glosas creadas están disponibles en <b>Mis glosas</b> y <b>Historial</b>. Costo aproximado: $'+(s.costo_real_usd||0).toFixed(2)+' USD.</div>'
+        : '<div style="margin-top:.6rem;font-size:.7rem;color:var(--text3);">Polling cada 3s · podés cerrar esta página, el procesamiento continúa en background</div>')
+    + (s.errores && s.errores.length ? '<details style="margin-top:.6rem;"><summary style="cursor:pointer;font-size:.78rem;color:#991b1b;">Errores ('+s.errores.length+')</summary><ul style="margin:.3rem 0 0 1.2rem;font-size:.72rem;padding:0;">'+s.errores.slice(0,10).map(function(er){return '<li>Fila '+er.fila+': '+escHtml(er.error)+'</li>';}).join('')+'</ul></details>' : '')
+    + '</div>';
+  resBox.innerHTML = html;
+}
+
+async function cargarHistorialLotesMasiva(){
+  var p = document.getElementById('im-historial-panel');
+  if(!p) return;
+  p.style.display = 'block';
+  p.innerHTML = '<div class="form-card"><h3>📜 Historial de lotes</h3><div id="im-hist-tabla">⏳ Cargando…</div></div>';
+  try{
+    var r = await fetch('/glosas/importar-masiva/lotes?page=1&per_page=20', {headers:authH()});
+    if(!r.ok){
+      document.getElementById('im-hist-tabla').innerHTML = '<div style="color:#991b1b;">Error '+r.status+'</div>';
+      return;
+    }
+    var data = await r.json();
+    var box = document.getElementById('im-hist-tabla');
+    if(!data.items || !data.items.length){
+      box.innerHTML = '<div style="font-size:.82rem;color:var(--text3);padding:.5rem;">Sin lotes anteriores. Cuando hagas tu primer import, aparecerá acá.</div>';
+      return;
+    }
+    var rows = data.items.map(function(l){
+      var col = l.estado === 'COMPLETO' ? '#16a34a' : (l.estado === 'ERROR' ? '#dc2626' : '#0369a1');
+      var pct = Math.round(100 * (l.procesadas||0) / Math.max(l.total_filas, 1));
+      var fechaIni = l.iniciado_en ? new Date(l.iniciado_en).toLocaleString('es-CO') : '—';
+      return '<tr>'
+        + '<td><code>'+escHtml(l.batch_id||'')+'</code></td>'
+        + '<td>'+escHtml(l.usuario_email||'')+'</td>'
+        + '<td>'+fechaIni+'</td>'
+        + '<td class="num">'+l.total_filas+'</td>'
+        + '<td class="num" style="color:#16a34a;">'+l.exitosas+'</td>'
+        + '<td class="num" style="color:#dc2626;">'+l.fallidas+'</td>'
+        + '<td><span style="background:'+col+';color:#fff;padding:.15rem .5rem;border-radius:4px;font-size:.7rem;">'+l.estado+'</span></td>'
+        + '<td><div style="height:6px;background:#e5e7eb;border-radius:3px;width:60px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+col+';"></div></div></td>'
+        + '<td><button class="btn-sm" onclick="_imIniciarPollingLote('+l.id+',\''+escJs(l.batch_id||'')+'\','+l.total_filas+')" style="font-size:.7rem;">Ver</button></td>'
+      + '</tr>';
+    }).join('');
+    box.innerHTML = '<table style="width:100%;font-size:.78rem;border-collapse:collapse;"><thead><tr>'
+      + '<th>Batch</th><th>Usuario</th><th>Inicio</th><th class="num">Total</th><th class="num">OK</th><th class="num">Falló</th><th>Estado</th><th>Progreso</th><th></th>'
+      + '</tr></thead><tbody>'+rows+'</tbody></table>'
+      + '<div style="font-size:.7rem;color:var(--text3);margin-top:.5rem;">Mostrando '+data.items.length+' de '+data.total+' lotes</div>';
+  }catch(e){
+    document.getElementById('im-hist-tabla').innerHTML = '<div style="color:#991b1b;">Error: '+escHtml(String(e))+'</div>';
   }
 }
 

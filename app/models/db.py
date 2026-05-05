@@ -534,6 +534,43 @@ class SugerenciaRecord(Base):
     nota_admin = Column(Text, nullable=True)
 
 
+class LoteImportacionRecord(Base):
+    """Histórico de lotes de Importación Masiva (IM Fase 1.3).
+
+    Cada lote del flujo /glosas/importar-masiva genera 1 registro.
+    Permite:
+      - Tracking en vivo del progreso (polling /lote/{id}/status)
+      - Historial paginado /lotes
+      - Forensia ("¿quién subió este lote, cuántas glosas creó?")
+      - Auditoría SuperSalud (compliance Habeas Data)
+    """
+    __tablename__ = "lotes_importacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(40), index=True, nullable=False, unique=True)
+    usuario_email = Column(String(200), index=True, nullable=False)
+    total_filas = Column(Integer, default=0, nullable=False)
+    procesadas = Column(Integer, default=0, nullable=False)
+    exitosas = Column(Integer, default=0, nullable=False)
+    fallidas = Column(Integer, default=0, nullable=False)
+    costo_estimado_usd = Column(Float, default=0.0)
+    costo_real_usd = Column(Float, default=0.0)  # se actualiza por fila
+    estado = Column(String(20), default="PROCESANDO", index=True)
+    # PROCESANDO | COMPLETO | CANCELADO | ERROR
+    iniciado_en = Column(DateTime(timezone=True), server_default=func.now())
+    terminado_en = Column(DateTime(timezone=True), nullable=True)
+    # JSON serializado: {eps: count}
+    eps_detectadas = Column(Text, nullable=True)
+    # Lista de IDs de glosas creadas (JSON array)
+    glosas_creadas_ids = Column(Text, nullable=True)
+    # Hash sha256 del texto_excel — para detectar lotes duplicados
+    texto_hash = Column(String(64), index=True, nullable=True)
+    # Si gestor_asignado_id != NULL, las glosas se asignan a ese usuario
+    gestor_asignado_id = Column(Integer, nullable=True, index=True)
+    # Errores por fila (JSON array de {fila, error}) — capped a 100
+    errores = Column(Text, nullable=True)
+
+
 class NoticiaSaludRecord(Base):
     """Noticias del sector salud Colombia traídas vía RSS de fuentes
     oficiales y especializadas (ConsultorSalud, MinSalud, ACHC, etc.).

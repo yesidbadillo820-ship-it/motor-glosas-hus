@@ -402,6 +402,12 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN contratos {col_name}: {e}")
 
+    # IM F1.3: tabla nueva `lotes_importacion` — la crea Base.metadata
+    # .create_all automaticamente si no existe. No requiere ALTER TABLE.
+    # NoticiaSaludRecord (tabla `noticias_salud`) tampoco requiere
+    # migracion porque es nueva. Las dos tablas se crean en el primer
+    # arranque despues de este deploy.
+
     db.close()
 
     db = SessionLocal()

@@ -35,6 +35,10 @@ class ImportacionMasivaRequest(BaseModel):
     texto_excel: str
     fecha_radicacion: Optional[str] = None
     fecha_recepcion: Optional[str] = None
+    # IM F1.3: si se setea, las glosas creadas por el lote quedan
+    # asignadas a ese gestor automáticamente. Si es None, quedan en
+    # buzón colectivo (como antes).
+    gestor_asignado_id: Optional[int] = None
 
 
 # ─── Normalizador de nombres de EPS ──────────────────────────────────────────
@@ -3571,12 +3575,20 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
     return filas
 
 
-async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id: str, eps_formulario: str):
+async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id: str, eps_formulario: str, lote_id=None):
     """Procesa una fila individual en segundo plano.
 
     Si `eps_formulario` viene vacío o "AUTO", se usa la EPS detectada de la
-    primera columna de la fila (razón social del Excel)."""
+    primera columna de la fila (razón social del Excel).
+
+    Si `lote_id` viene seteado, actualiza LoteImportacionRecord al
+    finalizar (incrementa procesadas, exitosas, fallidas; marca COMPLETO
+    cuando procesadas == total_filas).
+    """
     db = SessionLocal()
+    fila_ok = False
+    error_msg = None
+    glosa_id = None
     try:
         cfg = get_settings()
         service = GlosaService(
@@ -3666,9 +3678,48 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             )
         
         logger.info(f"[{req_id}] Fila {fila_data['fila']} procesada: {resultado.codigo_glosa}")
+        fila_ok = True
     except Exception as e:
         logger.error(f"[{req_id}] Error procesando fila {fila_data['fila']}: {e}")
+        error_msg = str(e)[:300]
     finally:
+        # IM F1.3: actualizar el LoteImportacionRecord con el resultado
+        # de esta fila — incrementos atómicos + marcar COMPLETO si es
+        # la última. Sesión propia para no chocar con la principal.
+        if lote_id is not None:
+            try:
+                from app.models.db import LoteImportacionRecord as _LIR
+                from datetime import datetime as _dt, timezone as _tz
+                import json as _json
+                db_lote = SessionLocal()
+                try:
+                    lote = db_lote.query(_LIR).filter(_LIR.id == lote_id).first()
+                    if lote:
+                        lote.procesadas = (lote.procesadas or 0) + 1
+                        if fila_ok:
+                            lote.exitosas = (lote.exitosas or 0) + 1
+                        else:
+                            lote.fallidas = (lote.fallidas or 0) + 1
+                            # Acumular error en el campo `errores` (cap a 100)
+                            try:
+                                actuales = _json.loads(lote.errores) if lote.errores else []
+                            except Exception:
+                                actuales = []
+                            if len(actuales) < 100:
+                                actuales.append({
+                                    "fila": fila_data.get("fila"),
+                                    "error": error_msg or "Error desconocido",
+                                })
+                                lote.errores = _json.dumps(actuales, ensure_ascii=False)
+                        # Si se procesaron todas, marcar COMPLETO
+                        if (lote.procesadas or 0) >= (lote.total_filas or 0):
+                            lote.estado = "COMPLETO"
+                            lote.terminado_en = _dt.now(_tz.utc)
+                        db_lote.commit()
+                finally:
+                    db_lote.close()
+            except Exception as _e:
+                logger.debug(f"[{req_id}] No se pudo actualizar lote {lote_id}: {_e}")
         db.close()
 
 
@@ -3844,6 +3895,33 @@ async def importar_glosas_masiva(
 
     servicio_id = f"BATCH-{req_id}"
 
+    # IM F1.3: persistir el lote en BD para tracking + historial
+    import json as _json
+    import hashlib as _hashlib
+    from app.models.db import LoteImportacionRecord
+    texto_hash = _hashlib.sha256((request.texto_excel or "").encode("utf-8")).hexdigest()
+    gestor_id = getattr(request, "gestor_asignado_id", None)
+    try:
+        lote = LoteImportacionRecord(
+            batch_id=servicio_id,
+            usuario_email=current_user.email,
+            total_filas=len(filas),
+            procesadas=0,
+            exitosas=0,
+            fallidas=0,
+            estado="PROCESANDO",
+            eps_detectadas=_json.dumps(eps_detectadas, ensure_ascii=False),
+            texto_hash=texto_hash,
+            gestor_asignado_id=int(gestor_id) if gestor_id else None,
+        )
+        db.add(lote)
+        db.commit()
+        db.refresh(lote)
+        lote_id = lote.id
+    except Exception as e:
+        logger.warning(f"[{req_id}] No se pudo crear LoteImportacionRecord: {e}")
+        lote_id = None
+
     for fila_data in filas:
         background_tasks.add_task(
             _procesar_fila_en_background,
@@ -3851,21 +3929,120 @@ async def importar_glosas_masiva(
             servicio_id,
             req_id,
             eps_formulario if not modo_auto else "AUTO",
+            lote_id,
         )
 
     logger.info(
         f"[{req_id}] {len(filas)} filas enviadas | batch_id={servicio_id} | "
-        f"EPS detectadas: {dict(eps_detectadas)} | facturas: {len(facturas_detectadas)}"
+        f"lote_id={lote_id} | EPS: {dict(eps_detectadas)} | facturas: {len(facturas_detectadas)}"
     )
 
     return {
         "message": f"{len(filas)} glosas procesándose en segundo plano",
         "batch_id": servicio_id,
+        "lote_id": lote_id,
         "total_filas": len(filas),
         "eps": eps_formulario if not modo_auto else "AUTO",
         "eps_detectadas": eps_detectadas,
         "facturas_detectadas": sorted(facturas_detectadas),
         "estado": "PROCESANDO",
+    }
+
+
+@router.get("/importar-masiva/lotes")
+def listar_lotes_importacion(
+    page: int = 1,
+    per_page: int = 20,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM F1.3: historial paginado de lotes anteriores.
+
+    Filtra automaticamente por usuario actual a menos que sea admin
+    (en cuyo caso ve todos los lotes).
+    """
+    from app.models.db import LoteImportacionRecord
+    from sqlalchemy import desc as _desc
+
+    if per_page < 1 or per_page > 100:
+        per_page = 20
+    if page < 1:
+        page = 1
+
+    q = db.query(LoteImportacionRecord).order_by(_desc(LoteImportacionRecord.iniciado_en))
+    rol = (getattr(current_user, "rol", "") or "").upper()
+    if rol not in ("SUPER_ADMIN", "COORDINADOR"):
+        q = q.filter(LoteImportacionRecord.usuario_email == current_user.email)
+
+    total = q.count()
+    items = q.offset((page - 1) * per_page).limit(per_page).all()
+
+    import json as _json
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page,
+        "items": [
+            {
+                "id": l.id,
+                "batch_id": l.batch_id,
+                "usuario_email": l.usuario_email,
+                "total_filas": l.total_filas,
+                "procesadas": l.procesadas,
+                "exitosas": l.exitosas,
+                "fallidas": l.fallidas,
+                "estado": l.estado,
+                "iniciado_en": l.iniciado_en.isoformat() if l.iniciado_en else None,
+                "terminado_en": l.terminado_en.isoformat() if l.terminado_en else None,
+                "eps_detectadas": (
+                    _json.loads(l.eps_detectadas) if l.eps_detectadas else {}
+                ),
+                "costo_estimado_usd": l.costo_estimado_usd or 0,
+                "costo_real_usd": l.costo_real_usd or 0,
+                "gestor_asignado_id": l.gestor_asignado_id,
+            }
+            for l in items
+        ],
+    }
+
+
+@router.get("/importar-masiva/lote/{lote_id}/status")
+def status_lote(
+    lote_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM F1.3: estado actual de un lote — usado por el polling del
+    frontend cada 3 segundos para actualizar la barra de progreso."""
+    from app.models.db import LoteImportacionRecord
+    import json as _json
+
+    l = db.query(LoteImportacionRecord).filter(LoteImportacionRecord.id == lote_id).first()
+    if not l:
+        raise HTTPException(404, "Lote no encontrado")
+
+    # Permisos: el dueño del lote o admin
+    rol = (getattr(current_user, "rol", "") or "").upper()
+    if l.usuario_email != current_user.email and rol not in ("SUPER_ADMIN", "COORDINADOR"):
+        raise HTTPException(403, "Sin permisos para ver este lote")
+
+    return {
+        "id": l.id,
+        "batch_id": l.batch_id,
+        "estado": l.estado,
+        "total_filas": l.total_filas,
+        "procesadas": l.procesadas,
+        "exitosas": l.exitosas,
+        "fallidas": l.fallidas,
+        "porcentaje": round(100.0 * (l.procesadas or 0) / max(l.total_filas, 1), 1),
+        "iniciado_en": l.iniciado_en.isoformat() if l.iniciado_en else None,
+        "terminado_en": l.terminado_en.isoformat() if l.terminado_en else None,
+        "errores": _json.loads(l.errores) if l.errores else [],
+        "glosas_creadas_ids": (
+            _json.loads(l.glosas_creadas_ids) if l.glosas_creadas_ids else []
+        ),
+        "costo_real_usd": l.costo_real_usd or 0,
     }
 
 
