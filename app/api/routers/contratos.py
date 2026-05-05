@@ -1,15 +1,17 @@
 import os
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
 from app.models.schemas import ContratoInput
 from app.repositories.contrato_repository import ContratoRepository
+from app.repositories.audit_repository import AuditRepository
 from app.api.deps import get_usuario_actual
 from app.models.db import UsuarioRecord, ContratoRecord, ClausulaContrato
+from app.core.rate_limit import limiter
 
 logger = logging.getLogger("motor_glosas")
 
@@ -482,7 +484,9 @@ def eliminar_contrato(
 # vigente: subir uno nuevo reemplaza el anterior y sus cláusulas.
 
 @router.post("/{eps}/pdf")
+@limiter.limit("5/minute")
 async def subir_pdf_contrato(
+    request: Request,
     eps: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -496,6 +500,10 @@ async def subir_pdf_contrato(
       3. Pasa el PDF binario a Claude (soporte nativo Messages API) para
          extraer cláusulas estructuradas — más robusto que pdfplumber.
       4. Borra cláusulas viejas + inserta las nuevas.
+      5. Registra el evento en audit_log (trazabilidad SuperSalud).
+
+    Rate-limit: 5/min por IP (cada subida cuesta ~$0.10-0.15 USD en
+    Claude — proteger contra clicks repetidos accidentales o abuso).
 
     Devuelve cantidad de cláusulas extraídas + ruta donde quedó el PDF.
     """
@@ -553,9 +561,27 @@ async def subir_pdf_contrato(
     contrato.pdf_subido_en = datetime.now(timezone.utc)
     db.commit()
 
+    # Audit log — quién subió qué PDF, cuándo, cuántas cláusulas
+    # extrajo. Sirve para reportes SuperSalud y trazabilidad interna.
+    try:
+        ip_origen = request.client.host if request.client else None
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol or "AUDITOR",
+            accion="UPLOAD_CONTRATO_PDF",
+            tabla="contratos",
+            registro_id=None,
+            campo="pdf_path",
+            valor_nuevo=pdf_path,
+            detalle=f"EPS={eps}, {len(contenido)//1024}KB, {len(clausulas)} cláusulas extraídas",
+            ip=ip_origen,
+        )
+    except Exception as _e_audit:
+        logger.debug(f"[AUDIT] no se pudo registrar UPLOAD_CONTRATO_PDF: {_e_audit}")
+
     logger.info(
         f"[CONTRATO-PDF] eps={eps} pdf={len(contenido)//1024}KB "
-        f"clausulas={len(clausulas)}"
+        f"clausulas={len(clausulas)} usuario={current_user.email}"
     )
 
     return {

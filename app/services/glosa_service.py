@@ -1944,12 +1944,42 @@ class GlosaService:
                 pass
             _vf = locals().get("_val_fact_str") or None
             _vp = locals().get("_val_pact_str") or None
+
+            # Auditor pre-IA: re-ejecutamos (es deterministic + barato,
+            # solo regex matching) para saber si encontró discrepancias
+            # entre lo que afirma la EPS y la realidad de BD. Esto
+            # alimenta el factor "auditor_sin_discrepancias" del scorer.
+            _auditor_ok = False
+            try:
+                from app.services.auditor_glosa import auditar as _auditar
+                def _num(s):
+                    if not s: return 0.0
+                    try: return float("".join(c for c in str(s) if c.isdigit() or c == "."))
+                    except: return 0.0
+                _audit_res = _auditar(
+                    texto_glosa=texto_base,
+                    eps=str(data.eps or ""),
+                    codigo=codigo_det,
+                    tiene_contrato=tiene_contrato,
+                    valor_facturado=_num(_vf),
+                    valor_pactado=_num(_vp),
+                    valor_objetado=_num(valor_raw),
+                    contexto_pdf=contexto_pdf or "",
+                )
+                hallazgos_altos = [h for h in (_audit_res.get("hallazgos") or [])
+                                    if h.get("severidad") == "ALTA"]
+                # Sin discrepancias = auditor no encontró nada ALTA
+                _auditor_ok = len(hallazgos_altos) == 0
+            except Exception as _e_aud:
+                logger.debug(f"[CONFIDENCE] auditor_glosa falló: {_e_aud}")
+                _auditor_ok = False
+
             confianza = calcular_confianza(
                 eps=str(data.eps or ""),
                 codigo=str(codigo_det or ""),
                 dictamen=dictamen,
                 soportes_count=soportes_n,
-                auditor_sin_discrepancias=False,  # placeholder; auditor lo seteará si pasa OK
+                auditor_sin_discrepancias=_auditor_ok,
                 valor_objetado=valor_raw,
                 valor_facturado=_vf,
                 valor_pactado=_vp,
