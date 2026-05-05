@@ -1546,6 +1546,10 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
                 <button type="button" class="btn-sm ghost" onclick="limpiarSoportesPDF()" title="Quitar todos los PDFs seleccionados y volver a empezar" style="padding:.4rem .7rem;font-size:.72rem;color:#b91c1c;border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;cursor:pointer;white-space:nowrap;">🗑 Eliminar soportes</button>
               </div>
               <div id="pdf-info" style="font-size:.72rem;color:var(--text3);margin-top:.25rem;"></div>
+              <label style="display:flex;align-items:flex-start;gap:.45rem;margin-top:.45rem;cursor:pointer;font-size:.72rem;color:var(--text2);text-transform:none;letter-spacing:0;font-weight:400;line-height:1.4;">
+                <input type="checkbox" id="f-multimodal" style="margin-top:.15rem;flex-shrink:0;width:14px;height:14px;cursor:pointer;"/>
+                <span><b>📎 Lectura PDF avanzada</b> — manda los PDFs binarios directos a Claude (más caro, ~3-5x tokens, pero lee tablas, escaneos OCR y fonts no estándar que pdfplumber no maneja). Útil cuando un soporte tiene formato raro o el dictamen sale flojo en lo documental.</span>
+              </label>
             </div>
           </div>
         </div>
@@ -10382,6 +10386,11 @@ async function analizar(modoOverride){
   }
 
   var files=document.getElementById('f-pdf').files;
+  // Multi-modal soportes: opt-in vía checkbox, manda PDFs binarios a Claude
+  var multimodalEl = document.getElementById('f-multimodal');
+  if(multimodalEl && multimodalEl.checked){
+    fd.append('usar_pdf_nativo_soportes', 'true');
+  }
   if(files.length > 10){
     toast('Demasiados archivos','Máximo 10 soportes por glosa. Seleccionaste '+files.length,'error');
     hideLoading();_rehab();return;

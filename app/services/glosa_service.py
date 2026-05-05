@@ -829,6 +829,7 @@ class GlosaService:
         few_shots: list[str] = None,
         info_tarifa: dict = None,
         hint_gestor: str = "",
+        pdfs_raw_para_multimodal: list[tuple[str, bytes]] = None,
     ) -> GlosaResult:
         # `hint_gestor` se inyecta como contexto adicional al few_shots
         # cuando viene del módulo memoria_gestor — lleva el estilo
@@ -1496,28 +1497,52 @@ class GlosaService:
 
             # Si NO se emitió directamente, llamar al LLM como siempre.
             if not res_ia:
-                # Tool Use opt-in vía env var TOOL_USE_HABILITADO=1.
-                # Si está habilitado: Claude trae lo que necesita por
-                # herramientas (cláusula de contrato + precedente +
-                # tarifa + norma) en vez de prompt monolítico.
-                # Si Tool Use falla (timeout, no convergencia, etc.),
-                # cae al flujo normal sin afectar al usuario final.
-                _intento_tools_ok = False
-                try:
-                    from app.services.ia_tools import tool_use_habilitado
-                    if tool_use_habilitado():
-                        try:
-                            res_ia, modelo_usado = await self._llamar_anthropic_con_tools(
-                                system_prompt, user_prompt,
-                            )
-                            _intento_tools_ok = True
-                        except Exception as _e_tools:
-                            logger.warning(
-                                f"[TOOL-USE] Falló, fallback a flujo clásico: {_e_tools}"
-                            )
-                except Exception:
-                    pass
-                if not _intento_tools_ok:
+                # Orden de preferencia para invocar al LLM:
+                #   1. Multi-modal: si data.usar_pdf_nativo_soportes=True
+                #      Y hay PDFs adjuntos, mandar PDFs binarios a Claude.
+                #   2. Tool Use: si env var TOOL_USE_HABILITADO=1, Claude
+                #      decide qué herramientas llamar (clausula, tarifa,
+                #      norma, precedente).
+                #   3. Clásico: prompt monolítico con todo inyectado.
+                # Si 1 o 2 fallan, cascada al siguiente nivel; nunca
+                # romper el análisis para el usuario final.
+                _intento_ok = False
+
+                # Path 1: Multi-modal soportes
+                _quiere_multimodal = (
+                    bool(getattr(data, "usar_pdf_nativo_soportes", False))
+                    and pdfs_raw_para_multimodal
+                )
+                if _quiere_multimodal:
+                    try:
+                        res_ia, modelo_usado = await self._llamar_anthropic_multimodal(
+                            system_prompt, user_prompt, pdfs_raw_para_multimodal,
+                        )
+                        _intento_ok = True
+                    except Exception as _e_mm:
+                        logger.warning(
+                            f"[MULTIMODAL] Falló, fallback a Tool Use/Clásico: {_e_mm}"
+                        )
+
+                # Path 2: Tool Use opt-in vía env var
+                if not _intento_ok:
+                    try:
+                        from app.services.ia_tools import tool_use_habilitado
+                        if tool_use_habilitado():
+                            try:
+                                res_ia, modelo_usado = await self._llamar_anthropic_con_tools(
+                                    system_prompt, user_prompt,
+                                )
+                                _intento_ok = True
+                            except Exception as _e_tools:
+                                logger.warning(
+                                    f"[TOOL-USE] Falló, fallback a clásico: {_e_tools}"
+                                )
+                    except Exception:
+                        pass
+
+                # Path 3: clásico (con caché + fallback a Groq)
+                if not _intento_ok:
                     res_ia, modelo_usado = await self._llamar_ia(
                         system_prompt, user_prompt,
                         eps=str(data.eps), codigo=codigo_det,
@@ -2903,6 +2928,100 @@ class GlosaService:
 
         # Llegamos a max_turns sin texto final
         raise RuntimeError(f"Tool use no convergió en {max_turns} turnos")
+
+    async def _llamar_anthropic_multimodal(
+        self,
+        system: str,
+        user: str,
+        pdfs_raw: list[tuple[str, bytes]],
+    ) -> tuple[str, str]:
+        """Llama a Claude pasándole el user prompt + los PDFs de soportes
+        como `document` content blocks (formato nativo Anthropic).
+
+        Solo se usa cuando `data.usar_pdf_nativo_soportes=True`. Permite
+        que Claude lea TODAS las páginas de soportes complejos (RIPS con
+        tablas, historias clínicas escaneadas, facturas con layout raro)
+        sin perder información por errores de pdfplumber/OCR.
+
+        Args:
+            system: system prompt completo
+            user: user prompt (sin contexto_pdf — los PDFs van por separado)
+            pdfs_raw: lista de tuplas (nombre_archivo, bytes_pdf)
+
+        Devuelve (texto_dictamen, etiqueta_modelo).
+        """
+        import base64
+        import httpx
+
+        if not self.anthropic_key:
+            raise RuntimeError("Anthropic API key no configurada (multimodal)")
+        if not pdfs_raw:
+            raise RuntimeError("multimodal sin PDFs adjuntos")
+
+        # Anthropic acepta múltiples documentos por mensaje. Cap a 5
+        # para no explotar tokens (cada PDF ~5-30k input tokens).
+        pdfs_efectivos = pdfs_raw[:5]
+        content_blocks: list[dict] = []
+        for nombre, b in pdfs_efectivos:
+            if not b or len(b) < 1024:
+                continue
+            if len(b) > 32 * 1024 * 1024:
+                logger.warning(f"[MULTIMODAL] {nombre} excede 32MB, omitido")
+                continue
+            content_blocks.append({
+                "type": "document",
+                "source": {
+                    "type": "base64",
+                    "media_type": "application/pdf",
+                    "data": base64.standard_b64encode(b).decode("ascii"),
+                },
+            })
+        if not content_blocks:
+            raise RuntimeError("multimodal: ningún PDF válido para enviar")
+        # El texto del prompt va al final, después de los documentos
+        content_blocks.append({"type": "text", "text": user})
+
+        timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
+        headers = {
+            "x-api-key": self.anthropic_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers=headers,
+                    json={
+                        "model": self.anthropic_model,
+                        "max_tokens": 3000,
+                        "temperature": 0.10,
+                        "system": system,
+                        "messages": [{"role": "user", "content": content_blocks}],
+                    },
+                )
+        except Exception as e:
+            logger.error(f"[MULTIMODAL] Error red: {e}")
+            raise RuntimeError(f"Multimodal falló por red: {e}")
+
+        if resp.status_code != 200:
+            logger.error(f"[MULTIMODAL] HTTP {resp.status_code}: {resp.text[:500]}")
+            raise RuntimeError(f"Multimodal HTTP {resp.status_code}")
+
+        data = resp.json()
+        contenido = data.get("content") or []
+        texto_final = ""
+        for b in contenido:
+            if b.get("type") == "text":
+                texto_final += b.get("text", "")
+        if not texto_final:
+            raise RuntimeError("Multimodal terminó sin texto final")
+        logger.info(
+            f"[MULTIMODAL] OK con {len(pdfs_efectivos)} PDFs | "
+            f"input_tokens={data.get('usage', {}).get('input_tokens', '?')}"
+        )
+        return texto_final, f"anthropic/{self.anthropic_model}/multimodal"
 
     async def _llamar_ia(
         self,

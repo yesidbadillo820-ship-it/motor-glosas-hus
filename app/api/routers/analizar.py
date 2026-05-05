@@ -160,21 +160,28 @@ async def _extraer_soportes_del_servidor(
 
 
 async def _extraer_pdfs(
-    archivos: Optional[list[UploadFile]], req_id: str,
-) -> tuple[str, int]:
+    archivos: Optional[list[UploadFile]],
+    req_id: str,
+    capturar_raw: bool = False,
+) -> tuple[str, int, Optional[list[tuple[str, bytes]]]]:
     """Extrae texto de los PDFs adjuntos (con OCR Claude opcional).
 
-    Retorna (texto_concatenado, archivos_procesados). Los PDFs se separan
-    con un marker '═══ DOCUMENTO: <filename> ═══' para que la IA distinga
-    entre ellos. Errores por archivo se loguean pero no abortan el batch.
+    Retorna (texto_concatenado, archivos_procesados, pdfs_raw_o_None).
+    Los PDFs se separan con un marker '═══ DOCUMENTO: <filename> ═══'
+    para que la IA distinga entre ellos. Errores por archivo se loguean
+    pero no abortan el batch.
+
+    Si capturar_raw=True, además del texto extraído devuelve los bytes
+    crudos para que el caller los pueda enviar al modo multi-modal.
     """
     if not archivos:
-        return "", 0
+        return "", 0, None
 
     from app.services.pdf_service import PdfService
     pdf_svc = PdfService()
     contexto_pdf = ""
     procesados = 0
+    raw_acumulado: list[tuple[str, bytes]] = [] if capturar_raw else None
 
     for archivo in archivos:
         if procesados >= MAX_ARCHIVOS:
@@ -193,6 +200,8 @@ async def _extraer_pdfs(
             if len(contenido) > MAX_BYTES_PDF:
                 logger.warning(f"[{req_id}] PDF muy grande: {archivo.filename}")
                 continue
+            if raw_acumulado is not None:
+                raw_acumulado.append((archivo.filename, contenido))
             texto, metodo = await pdf_svc.extraer_con_ocr(
                 contenido,
                 anthropic_api_key=cfg.anthropic_api_key,
@@ -212,9 +221,9 @@ async def _extraer_pdfs(
     if procesados:
         logger.info(
             f"[{req_id}] Total PDFs procesados: {procesados}/{MAX_ARCHIVOS} "
-            f"| {len(contexto_pdf)} chars"
+            f"| {len(contexto_pdf)} chars | raw_capturado={raw_acumulado is not None}"
         )
-    return contexto_pdf, procesados
+    return contexto_pdf, procesados, raw_acumulado
 
 
 def _obtener_few_shots(
@@ -600,6 +609,7 @@ async def analizar(
     tono: Optional[str] = Form("conciliador"),
     modo_respuesta: Optional[str] = Form("defender"),
     valor_aceptado_parcial: Optional[float] = Form(0.0),
+    usar_pdf_nativo_soportes: Optional[bool] = Form(False),
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
@@ -628,12 +638,15 @@ async def analizar(
             tono=tono,
             modo_respuesta=modo_respuesta or "defender",
             valor_aceptado_parcial=valor_aceptado_parcial or 0.0,
+            usar_pdf_nativo_soportes=bool(usar_pdf_nativo_soportes),
         )
     except Exception as e:
         logger.error(f"[{req_id}] Validación fallida: {e}")
         raise HTTPException(status_code=422, detail=str(e))
 
-    contexto_pdf, archivos_procesados = await _extraer_pdfs(archivos, req_id)
+    contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
+        archivos, req_id, capturar_raw=bool(usar_pdf_nativo_soportes),
+    )
 
     # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
     # si el gestor NO subió PDFs manualmente, leemos directo del indexador
@@ -664,6 +677,7 @@ async def analizar(
     resultado = await service.analizar(
         data, contexto_pdf, contratos,
         few_shots=few_shots, info_tarifa=info_tarifa_pre,
+        pdfs_raw_para_multimodal=pdfs_raw,
     )
     if plantillas_gold:
         from app.api.routers.plantillas_gold import marcar_usos

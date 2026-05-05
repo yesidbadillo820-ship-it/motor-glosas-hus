@@ -44,6 +44,14 @@ class GlosaInput(BaseModel):
     # Para aceptar_parcial: valor que se acepta (el resto se defiende)
     valor_aceptado_parcial: Optional[float] = Field(default=0.0, ge=0,
                                                      description="Valor COP aceptado por el prestador (solo aplica en aceptar_parcial)")
+    # Multi-modal soportes (Tier 1 #5): cuando True, los PDFs adjuntos
+    # se envían binarios directos a Claude (soporte nativo Messages API)
+    # en lugar de pre-procesarse con pdfplumber/OCR. Más caro en tokens
+    # (~3-5x) pero mucho más preciso para PDFs con tablas complejas,
+    # escaneos con OCR incrustado o fonts no estándar — equivalente al
+    # patrón ya validado en /contratos/{eps}/pdf.
+    usar_pdf_nativo_soportes: Optional[bool] = Field(default=False,
+                                                      description="Lectura PDF avanzada de soportes (más caro, más preciso)")
 
     @field_validator("etapa")
     @classmethod
