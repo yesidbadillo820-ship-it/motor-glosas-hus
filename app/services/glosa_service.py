@@ -2097,6 +2097,27 @@ class GlosaService:
             logger.debug(f"[CONFIDENCE] confidence_scorer falló: {_e}")
             confianza = None
 
+        # Auto-pilot v2 (Yesid mayo 2026): decide si el dictamen es
+        # auto-enviable sin revisión humana basándose en confianza +
+        # detección de "caso difícil" (>=5M COP + multi-conceptos).
+        # El resultado se adjunta al GlosaResult para que la UI pueda
+        # mostrar el badge "AUTO-PILOT: enviable / requiere revisión / intervenir".
+        auto_pilot = None
+        try:
+            from app.services.auto_pilot_decision import decidir_auto_envio
+            score_conf = (confianza or {}).get("score") if confianza else None
+            auto_pilot = decidir_auto_envio(
+                confianza_score=score_conf,
+                valor_objetado_raw=valor_raw,
+                texto_glosa=texto_base,
+                soportes_count=soportes_n,
+                es_ratificacion=es_ratificacion,
+                es_extemporanea=es_extemporanea,
+            )
+        except Exception as _e_ap:
+            logger.debug(f"[AUTO-PILOT] decidir_auto_envio falló: {_e_ap}")
+            auto_pilot = None
+
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
@@ -2119,6 +2140,7 @@ class GlosaService:
             ),
             verificacion_citas=verif_citas,
             confianza=confianza,
+            auto_pilot=auto_pilot,
         )
         # Memoria (Render Free 512 MB): el análisis dejó en memoria PDFs
         # decodificados, prompts grandes, y caché de respuestas IA. Si no

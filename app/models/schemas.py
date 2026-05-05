@@ -152,6 +152,11 @@ class GlosaResult(BaseModel):
     # no romper consumidores que no los esperan.
     verificacion_citas: Optional[dict] = None
     confianza:          Optional[dict] = None
+    # Decisión auto-pilot v2 (Yesid mayo 2026): si confianza >= 0.90 y
+    # no es "caso difícil" (>= 5M COP + multi-conceptos), el sistema
+    # propone AUTO_ENVIABLE. El gestor decide si activa el envío
+    # automático global. Por defecto, cada caso requiere revisión.
+    auto_pilot:         Optional[dict] = None
 
 
 class GlosaHistorialItem(BaseModel):

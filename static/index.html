@@ -10606,6 +10606,39 @@ function renderVerificacionCitas(v){
   return html;
 }
 
+function renderAutoPilotPanel(ap){
+  if(!ap || !ap.estado) return '';
+  var bg = ap.estado === 'AUTO_ENVIABLE' ? '#f0fdf4' : (ap.estado === 'REVISAR_HUMANO' ? '#fefce8' : '#fef2f2');
+  var border = ap.estado === 'AUTO_ENVIABLE' ? '#86efac' : (ap.estado === 'REVISAR_HUMANO' ? '#fde68a' : '#fca5a5');
+  var icono = ap.estado === 'AUTO_ENVIABLE' ? '🤖✓' : (ap.estado === 'REVISAR_HUMANO' ? '👁️' : '🚨');
+  var detId = 'ap-detalle-' + Math.random().toString(36).slice(2,8);
+  var conceptosStr = '';
+  if(ap.diagnostico_caso_dificil && ap.diagnostico_caso_dificil.conceptos_detectados && ap.diagnostico_caso_dificil.conceptos_detectados.length){
+    conceptosStr = ' · Conceptos: ' + ap.diagnostico_caso_dificil.conceptos_detectados.join(', ');
+  }
+  var valorStr = '';
+  if(ap.diagnostico_caso_dificil && ap.diagnostico_caso_dificil.valor_cop){
+    valorStr = ' · Valor: $' + Math.round(ap.diagnostico_caso_dificil.valor_cop).toLocaleString('es-CO');
+  }
+  var html =
+    '<div style="background:'+bg+';border:1.5px solid '+border+';border-radius:10px;padding:.85rem 1rem;margin-top:.6rem;font-size:.83rem;">'
+    +'<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">'
+    +'<span style="font-size:1.4rem;">'+icono+'</span>'
+    +'<div style="flex:1;min-width:200px;">'
+    +'<div style="font-weight:700;color:'+(ap.color||'#6b7280')+';font-size:.95rem;">'+escHtml(ap.label||'')+'</div>'
+    +'<div style="font-size:.72rem;color:var(--text3);">Umbral aplicado: '+Math.round((ap.umbral_aplicado||0.9)*100)+'%' + conceptosStr + valorStr + '</div>'
+    +'</div>'
+    +'<button class="btn-sm ghost" onclick="document.getElementById(\''+detId+'\').style.display = document.getElementById(\''+detId+'\').style.display === \'block\' ? \'none\' : \'block\';" style="font-size:.72rem;">Ver detalle</button>'
+    +'</div>'
+    +'<div id="'+detId+'" style="display:none;margin-top:.7rem;padding-top:.7rem;border-top:1px dashed '+border+';font-size:.78rem;line-height:1.5;">'
+    + (ap.razones_pro_envio_auto && ap.razones_pro_envio_auto.length ? '<div style="margin-bottom:.4rem;"><b style="color:#16a34a;">A favor del envío automático:</b><ul style="margin:.2rem 0 0 1.1rem;padding:0;">' + ap.razones_pro_envio_auto.map(function(r){ return '<li>'+escHtml(r)+'</li>'; }).join('') + '</ul></div>' : '')
+    + (ap.razones_contra_envio_auto && ap.razones_contra_envio_auto.length ? '<div><b style="color:#dc2626;">Razones para revisión humana:</b><ul style="margin:.2rem 0 0 1.1rem;padding:0;">' + ap.razones_contra_envio_auto.map(function(r){ return '<li>'+escHtml(r)+'</li>'; }).join('') + '</ul></div>' : '')
+    + (ap.es_caso_dificil ? '<div style="margin-top:.5rem;padding:.4rem .6rem;background:#fff7ed;border-left:3px solid #ea580c;border-radius:4px;font-size:.74rem;color:#9a3412;"><b>⚠️ Caso difícil detectado</b> — siempre va a revisión humana, independiente de la confianza.</div>' : '')
+    +'</div>'
+    +'</div>';
+  return html;
+}
+
 function renderRiesgoRatificacion(r){
   if(!r) return '';
   var nivelClass = r.nivel === 'BAJO' ? 'low' : (r.nivel === 'MEDIO' ? 'medium' : 'high');
@@ -10667,6 +10700,7 @@ function renderResult(d){
 
     + (d.confianza ? renderConfianzaPanel(d.confianza) : '')
     + (d.verificacion_citas ? renderVerificacionCitas(d.verificacion_citas) : '')
+    + (d.auto_pilot ? renderAutoPilotPanel(d.auto_pilot) : '')
 
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
