@@ -83,15 +83,25 @@ async def fetch_rss(url: str, fuente: str, max_items: int = 10) -> list[dict]:
     try:
         timeout = httpx.Timeout(connect=10.0, read=20.0)
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            resp = await client.get(url, headers={"User-Agent": "Motor-Glosas-HUS/1.0"})
+            resp = await client.get(
+                url,
+                headers={
+                    # User-Agent realista para no ser bloqueado por anti-bot
+                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+                    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+                },
+            )
+        logger.info(f"[NOTICIAS:{fuente}] GET {url} → HTTP {resp.status_code} ({len(resp.content)} bytes)")
         if resp.status_code != 200:
-            logger.warning(f"[NOTICIAS:{fuente}] HTTP {resp.status_code}")
             return []
     except Exception as e:
-        logger.warning(f"[NOTICIAS:{fuente}] Error fetch: {e}")
+        logger.warning(f"[NOTICIAS:{fuente}] Error fetch ({url}): {e}")
         return []
 
     parsed = feedparser.parse(resp.text)
+    if parsed.bozo and parsed.bozo_exception:
+        logger.warning(f"[NOTICIAS:{fuente}] feedparser warning: {parsed.bozo_exception}")
+    logger.info(f"[NOTICIAS:{fuente}] feedparser entries={len(parsed.entries or [])}")
     items = []
     for entry in (parsed.entries or [])[:max_items]:
         titulo = (entry.get("title") or "").strip()

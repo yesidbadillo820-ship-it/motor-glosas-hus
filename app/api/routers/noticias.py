@@ -22,7 +22,7 @@ router = APIRouter(prefix="/noticias", tags=["noticias"])
 
 
 @router.get("/recientes")
-def noticias_recientes(
+async def noticias_recientes(
     limite: int = 5,
     dias: int = 14,
     db: Session = Depends(get_db),
@@ -32,11 +32,31 @@ def noticias_recientes(
     publicadas en los últimos `dias` (default 14).
 
     Usado por el widget del dashboard al iniciar sesión el auditor.
+
+    Si la tabla está vacía (primer arranque, scheduler aún no corrió),
+    dispara un fetch en línea — UX: el primer auditor en loguear el día
+    del deploy ya ve noticias en vez de un widget vacío.
     """
     if limite < 1 or limite > 50:
         limite = 5
     if dias < 1 or dias > 90:
         dias = 14
+
+    # Si BD vacía y la app lleva 5+ minutos corriendo, dispara fetch
+    # ahora (no esperamos al scheduler de 4h). Cap defensivo: solo si
+    # NO hay noticias en absoluto, para no spammear las fuentes.
+    total_existente = (
+        db.query(NoticiaSaludRecord)
+        .filter(NoticiaSaludRecord.activa == 1)
+        .count()
+    )
+    if total_existente == 0:
+        try:
+            from app.services.noticias_salud_co import actualizar_noticias
+            stats = await actualizar_noticias()
+            logger.info(f"[NOTICIAS:auto-fetch] vacío al inicio → {stats}")
+        except Exception as e:
+            logger.warning(f"[NOTICIAS:auto-fetch] falló: {e}")
 
     # Filtrar por fecha_publicacion si existe; sino por indexada_en
     umbral = datetime.now(timezone.utc) - timedelta(days=dias)

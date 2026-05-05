@@ -408,6 +408,9 @@ def detectar_defectos_criticos(
     valor_objetado: Optional[str] = None,
     tiene_contrato: bool = False,
     valor_facturado: Optional[str] = None,
+    es_ratificacion: bool = False,
+    es_extemporanea: bool = False,
+    codigo_respuesta: str = "",
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -421,6 +424,8 @@ def detectar_defectos_criticos(
       - no incluye warnings "soft" (longitud, mayúsculas) que no
         afectan utilidad legal
       - resultado vacío [] significa que el dictamen es usable
+      - email_contacto NO se exige en defensas normales (directiva
+        Yesid mayo 2026): solo para RATIFICADAS / EXTEMPORÁNEAS.
     """
     defectos: list[dict] = []
     if not dictamen_xml or not dictamen_xml.strip():
@@ -466,8 +471,16 @@ def detectar_defectos_criticos(
             ),
         })
 
-    # 3. Email institucional de contacto
-    if not any(e in arg_up for e in _EMAILS_CONTACTO):
+    # 3. Email institucional de contacto — SOLO obligatorio en
+    # respuestas a glosas RATIFICADAS o EXTEMPORÁNEAS (directiva Yesid
+    # mayo 2026). En defensas normales, aceptaciones y demás se omite
+    # el bloque de correos para no inflar el dictamen.
+    cod_resp = (codigo_respuesta or "").upper().strip()
+    codigos_que_exigen_email = {"RE9501", "RE9502", "RE9601", "RE9602"}
+    requiere_email = (
+        es_ratificacion or es_extemporanea or cod_resp in codigos_que_exigen_email
+    )
+    if requiere_email and not any(e in arg_up for e in _EMAILS_CONTACTO):
         defectos.append({
             "regla": "sin_email_contacto",
             "mensaje": "El dictamen no incluye el email institucional de contacto.",

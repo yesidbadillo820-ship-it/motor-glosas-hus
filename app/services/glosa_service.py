@@ -1683,6 +1683,9 @@ class GlosaService:
                     valor_objetado=valor_raw,
                     tiene_contrato=tiene_contrato,
                     valor_facturado=_val_fact_str,
+                    es_ratificacion=es_ratificacion,
+                    es_extemporanea=es_extemporanea,
+                    codigo_respuesta=cod_res,
                 )
                 # Mejora #7: chequear si el dictamen es copia textual
                 # de algún ejemplo Gold inyectado. Si lo es, eso es un
@@ -1757,6 +1760,9 @@ class GlosaService:
                             valor_objetado=valor_raw,
                             tiene_contrato=tiene_contrato,
                             valor_facturado=_val_fact_str,
+                            es_ratificacion=es_ratificacion,
+                            es_extemporanea=es_extemporanea,
+                            codigo_respuesta=cod_res,
                         )
                         if len(_defectos_retry) < len(_defectos):
                             logger.info(
