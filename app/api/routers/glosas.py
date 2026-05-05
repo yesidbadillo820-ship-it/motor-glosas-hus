@@ -3672,6 +3672,137 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         db.close()
 
 
+@router.post("/importar-masiva/preview")
+async def preview_importar_masiva(
+    request: ImportacionMasivaRequest,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM Fase 1.2: previsualiza el lote SIN procesar.
+
+    Devuelve:
+      - total_filas (parseadas vs descartadas)
+      - filas_validas / filas_invalidas con detalle por fila
+      - eps_detectadas {eps: count}
+      - facturas_unicas (count)
+      - posibles_duplicados con BD existente
+      - costo_estimado_usd (segun flags multi-agent/tools)
+      - umbral_alerta_usd (configurable via env var)
+      - bloquear: bool — true si costo > umbral, requiere confirm
+
+    El frontend usa esto para mostrar un modal con el summary antes de
+    disparar /importar-masiva. Si el lote es muy chico (< 5 filas) o
+    barato (< $1), se permite proceder sin confirmacion explicita.
+    """
+    import os
+    import re as _re_prev
+    from app.models.db import GlosaRecord
+
+    eps_formulario = (request.eps or "").strip()
+    modo_auto = not eps_formulario or eps_formulario.upper() == "AUTO"
+
+    # Parseo crudo
+    lineas_raw = (request.texto_excel or "").strip().split("\n")
+    total_lineas = len([l for l in lineas_raw if l.strip()])
+
+    filas_validas = _parsear_filas_excel(request.texto_excel)
+    filas_invalidas: list[dict] = []
+
+    # Re-parsear para detectar lineas que se descartaron
+    for i, linea in enumerate(lineas_raw):
+        linea_clean = linea.strip()
+        if not linea_clean:
+            continue
+        if "\t" in linea_clean:
+            partes = linea_clean.split("\t")
+        elif "|" in linea_clean:
+            partes = linea_clean.split("|")
+        else:
+            filas_invalidas.append({
+                "fila": i + 1,
+                "razon": "Sin separador (TAB o pipe)",
+                "preview": linea_clean[:80],
+            })
+            continue
+        if len(partes) < 4:
+            filas_invalidas.append({
+                "fila": i + 1,
+                "razon": f"Solo {len(partes)} columnas (minimo 4)",
+                "preview": linea_clean[:80],
+            })
+            continue
+        codigo_field = (partes[3] if len(partes) > 3 else "").strip()
+        if not codigo_field or len(codigo_field) < 2:
+            filas_invalidas.append({
+                "fila": i + 1,
+                "razon": "Codigo de glosa vacio o muy corto",
+                "preview": linea_clean[:80],
+            })
+
+    # EPS detectadas
+    eps_detectadas: dict[str, int] = {}
+    facturas_unicas: set[str] = set()
+    for f in filas_validas:
+        clave = _normalizar_eps(f.get("eps", "")) if modo_auto else eps_formulario
+        eps_detectadas[clave or "SIN EPS"] = eps_detectadas.get(clave or "SIN EPS", 0) + 1
+        if f.get("factura"):
+            facturas_unicas.add(f["factura"].strip())
+
+    # Detectar posibles duplicados con BD existente
+    posibles_duplicados: list[dict] = []
+    if facturas_unicas:
+        existentes = (
+            db.query(GlosaRecord.factura, GlosaRecord.codigo_glosa, GlosaRecord.id)
+            .filter(GlosaRecord.factura.in_(facturas_unicas))
+            .limit(500)
+            .all()
+        )
+        existentes_set = {(e[0] or "", e[1] or "") for e in existentes}
+        for f in filas_validas:
+            par = (f.get("factura") or "", f.get("codigo") or "")
+            if par in existentes_set:
+                posibles_duplicados.append({
+                    "factura": par[0],
+                    "codigo": par[1],
+                    "razon": "Ya existe en BD",
+                })
+
+    # Estimacion de costo (USD) basada en flags activos
+    n_validas = len(filas_validas)
+    costo_base_por_glosa = 0.05  # Sonnet 4.5 promedio
+    multiplicador = 1.0
+    multi_agent_on = os.getenv("MULTI_AGENT_HABILITADO", "0").strip() in ("1", "true", "yes")
+    tool_use_on = os.getenv("TOOL_USE_HABILITADO", "0").strip() in ("1", "true", "yes")
+    if multi_agent_on:
+        multiplicador += 0.5  # +50% por Auditor agent extra
+    if tool_use_on:
+        multiplicador += 0.3  # +30% por turnos multi-tool
+    costo_estimado_usd = round(n_validas * costo_base_por_glosa * multiplicador, 2)
+
+    umbral_usd = float(os.getenv("IMPORT_MASIVO_COST_LIMIT_USD", "20"))
+    bloquear = costo_estimado_usd > umbral_usd
+
+    return {
+        "total_lineas_pegadas": total_lineas,
+        "filas_validas": n_validas,
+        "filas_invalidas": filas_invalidas[:50],  # cap para no inflar response
+        "filas_invalidas_total": len(filas_invalidas),
+        "eps_detectadas": eps_detectadas,
+        "facturas_unicas": len(facturas_unicas),
+        "posibles_duplicados": posibles_duplicados[:30],
+        "posibles_duplicados_total": len(posibles_duplicados),
+        "costo_estimado_usd": costo_estimado_usd,
+        "costo_por_glosa_usd": round(costo_base_por_glosa * multiplicador, 4),
+        "flags_activos": {
+            "multi_agent": multi_agent_on,
+            "tool_use": tool_use_on,
+        },
+        "umbral_alerta_usd": umbral_usd,
+        "bloquear": bloquear,
+        "ok_para_procesar": n_validas > 0 and not bloquear,
+    }
+
+
 @router.post("/importar-masiva")
 async def importar_glosas_masiva(
     request: ImportacionMasivaRequest,

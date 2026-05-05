@@ -5159,18 +5159,15 @@ function limpiarImportMasiva(){
 }
 
 async function previewImportMasiva(){
-  // F1.2 endpoint /preview todavía no existe — por ahora mandamos al
-  // /importar-masiva clásico tras la conversión client-side de XLSX
-  // a TSV. Cuando F1.2 esté implementado, este botón abre un modal de
-  // confirmación con: filas válidas, filas inválidas, EPS detectadas,
-  // costo estimado USD.
+  // F1.2: pide preview al backend ANTES de procesar. Muestra modal con
+  // summary (filas validas/invalidas, EPS, duplicados, costo USD).
+  // Si el costo > umbral configurable, requiere confirmacion explicita.
   var resBox = document.getElementById('im-result');
-  resBox.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;font-size:.8rem;color:#7c2d12;">⏳ Procesando lote... (F1.2 traerá preview real con costo estimado)</div>';
+  resBox.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;font-size:.8rem;color:#7c2d12;">⏳ Generando previsualización del lote...</div>';
 
   var ta = document.getElementById('im-textarea');
   var texto = (ta && ta.value || '').trim();
 
-  // Si el usuario subió XLSX, lo convertimos a TSV en cliente
   if(IM_STATE.archivo){
     try{
       texto = await _imXlsxOrCsvAsTSV(IM_STATE.archivo);
@@ -5179,7 +5176,6 @@ async function previewImportMasiva(){
       return;
     }
   }
-
   if(!texto){
     resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ Subí un archivo o pegá filas en el textarea.</div>';
     return;
@@ -5188,10 +5184,15 @@ async function previewImportMasiva(){
   var eps = (document.getElementById('im-eps')||{}).value || 'AUTO';
   var fr = (document.getElementById('im-fecha-rad')||{}).value || null;
   var fcr = (document.getElementById('im-fecha-rec')||{}).value || null;
-  var gestor_id = (document.getElementById('im-gestor')||{}).value || '';
+
+  // Guardar el texto procesado para reusarlo en confirmar()
+  IM_STATE.texto_procesado = texto;
+  IM_STATE.eps_seleccionada = eps;
+  IM_STATE.fecha_rad = fr;
+  IM_STATE.fecha_rec = fcr;
 
   try{
-    var r = await fetch('/glosas/importar-masiva', {
+    var r = await fetch('/glosas/importar-masiva/preview', {
       method:'POST',
       headers:{'Content-Type':'application/json', ...authH()},
       body: JSON.stringify({
@@ -5199,7 +5200,120 @@ async function previewImportMasiva(){
         eps: eps,
         fecha_radicacion: fr,
         fecha_recepcion: fcr,
-        // F1.2 va a soportar gestor_asignado_id; backend lo ignora por ahora
+      }),
+    });
+    var data = await r.json();
+    if(!r.ok){
+      resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ '+escHtml(data.detail || 'Error HTTP '+r.status)+'</div>';
+      return;
+    }
+    IM_STATE.preview_data = data;
+    _imRenderPreviewModal(data);
+  }catch(e){
+    resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ Error de red: '+escHtml(String(e))+'</div>';
+  }
+}
+
+function _imRenderPreviewModal(data){
+  var resBox = document.getElementById('im-result');
+  var epsList = Object.entries(data.eps_detectadas||{}).map(function(kv){
+    return '<li><b>'+escHtml(kv[0])+':</b> '+kv[1]+' filas</li>';
+  }).join('');
+  var invList = (data.filas_invalidas||[]).slice(0,10).map(function(inv){
+    return '<li>Fila '+inv.fila+': '+escHtml(inv.razon)+' <code style="font-size:.7rem;color:#475569;">'+escHtml((inv.preview||'').slice(0,60))+'</code></li>';
+  }).join('');
+  var dupList = (data.posibles_duplicados||[]).slice(0,5).map(function(d){
+    return '<li><code>'+escHtml(d.factura)+'</code> + <code>'+escHtml(d.codigo)+'</code> — '+escHtml(d.razon)+'</li>';
+  }).join('');
+
+  // Costo coloreado segun nivel
+  var costoColor = data.bloquear ? '#dc2626' : (data.costo_estimado_usd > data.umbral_alerta_usd / 2 ? '#d97706' : '#16a34a');
+  var costoIcon = data.bloquear ? '🚨' : (data.costo_estimado_usd > data.umbral_alerta_usd / 2 ? '⚠️' : '✅');
+
+  var html =
+    '<div style="background:#fff;border:2px solid '+(data.bloquear ? '#fca5a5' : '#86efac')+';border-radius:12px;padding:1.2rem;font-size:.85rem;line-height:1.55;">'
+    + '<h3 style="margin:0 0 .8rem;font-size:1.05rem;">📋 Previsualización del lote</h3>'
+
+    // KPIs grid
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:1rem;">'
+    +   '<div style="background:#f0fdf4;padding:.6rem .8rem;border-radius:8px;border-left:3px solid #16a34a;">'
+    +     '<div style="font-size:.7rem;color:#15803d;text-transform:uppercase;letter-spacing:.05em;">Válidas</div>'
+    +     '<div style="font-weight:700;font-size:1.4rem;color:#14532d;">'+data.filas_validas+'</div>'
+    +   '</div>'
+    +   '<div style="background:'+(data.filas_invalidas_total>0 ? '#fef2f2' : '#f1f5f9')+';padding:.6rem .8rem;border-radius:8px;border-left:3px solid '+(data.filas_invalidas_total>0 ? '#dc2626' : '#94a3b8')+';">'
+    +     '<div style="font-size:.7rem;color:'+(data.filas_invalidas_total>0 ? '#991b1b' : '#475569')+';text-transform:uppercase;letter-spacing:.05em;">Inválidas</div>'
+    +     '<div style="font-weight:700;font-size:1.4rem;color:'+(data.filas_invalidas_total>0 ? '#7f1d1d' : '#1e293b')+';">'+data.filas_invalidas_total+'</div>'
+    +   '</div>'
+    +   '<div style="background:#eff6ff;padding:.6rem .8rem;border-radius:8px;border-left:3px solid #0369a1;">'
+    +     '<div style="font-size:.7rem;color:#0369a1;text-transform:uppercase;letter-spacing:.05em;">Facturas únicas</div>'
+    +     '<div style="font-weight:700;font-size:1.4rem;color:#0c4a6e;">'+data.facturas_unicas+'</div>'
+    +   '</div>'
+    +   '<div style="background:'+(data.posibles_duplicados_total>0 ? '#fef3c7' : '#f1f5f9')+';padding:.6rem .8rem;border-radius:8px;border-left:3px solid '+(data.posibles_duplicados_total>0 ? '#d97706' : '#94a3b8')+';">'
+    +     '<div style="font-size:.7rem;color:'+(data.posibles_duplicados_total>0 ? '#92400e' : '#475569')+';text-transform:uppercase;letter-spacing:.05em;">Posibles duplicados</div>'
+    +     '<div style="font-weight:700;font-size:1.4rem;color:'+(data.posibles_duplicados_total>0 ? '#7c2d12' : '#1e293b')+';">'+data.posibles_duplicados_total+'</div>'
+    +   '</div>'
+    + '</div>'
+
+    // Costo destacado
+    + '<div style="background:'+(data.bloquear ? '#fef2f2' : '#f8fafc')+';border:1.5px solid '+(data.bloquear ? '#fca5a5' : '#cbd5e1')+';border-radius:10px;padding:.9rem 1rem;margin-bottom:1rem;">'
+    +   '<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;">'
+    +     '<span style="font-size:1.6rem;">'+costoIcon+'</span>'
+    +     '<div style="flex:1;min-width:200px;">'
+    +       '<div style="font-size:.75rem;color:'+(data.bloquear ? '#991b1b' : '#475569')+';text-transform:uppercase;letter-spacing:.05em;">Costo estimado IA</div>'
+    +       '<div style="font-weight:700;font-size:1.6rem;color:'+costoColor+';">$'+data.costo_estimado_usd.toFixed(2)+' USD</div>'
+    +       '<div style="font-size:.7rem;color:#64748b;">Umbral alerta: $'+data.umbral_alerta_usd.toFixed(2)+' · Por glosa: $'+data.costo_por_glosa_usd.toFixed(4)+'</div>'
+    +       (data.flags_activos.multi_agent || data.flags_activos.tool_use ? '<div style="font-size:.7rem;color:#5b21b6;margin-top:.2rem;">'
+    +         (data.flags_activos.multi_agent ? '🤖 Multi-agent activo (+50%)' : '')
+    +         + (data.flags_activos.multi_agent && data.flags_activos.tool_use ? ' · ' : '')
+    +         + (data.flags_activos.tool_use ? '🛠️ Tool Use activo (+30%)' : '')
+    +       + '</div>' : '')
+    +     '</div>'
+    +   '</div>'
+    +   (data.bloquear ? '<div style="margin-top:.7rem;padding:.6rem .8rem;background:#fee2e2;border-radius:6px;font-size:.78rem;color:#7f1d1d;"><b>⚠️ Costo supera el umbral</b> de $'+data.umbral_alerta_usd.toFixed(2)+'. Para proceder, hacé click en "Confirmar y procesar" (botón rojo). Para subir el umbral, set env var <code>IMPORT_MASIVO_COST_LIMIT_USD</code> en Fly.</div>' : '')
+    + '</div>'
+
+    // EPS detectadas
+    + (epsList ? '<details open style="margin-bottom:.8rem;background:#f8fafc;padding:.7rem .9rem;border-radius:8px;"><summary style="cursor:pointer;font-weight:600;font-size:.85rem;">EPS detectadas ('+Object.keys(data.eps_detectadas||{}).length+')</summary><ul style="margin:.4rem 0 0 1.2rem;padding:0;font-size:.78rem;">'+epsList+'</ul></details>' : '')
+
+    // Filas inválidas (si las hay)
+    + (invList ? '<details style="margin-bottom:.8rem;background:#fef2f2;padding:.7rem .9rem;border-radius:8px;"><summary style="cursor:pointer;font-weight:600;font-size:.85rem;color:#991b1b;">Filas inválidas (mostrando '+Math.min(10,data.filas_invalidas_total)+' de '+data.filas_invalidas_total+')</summary><ul style="margin:.4rem 0 0 1.2rem;padding:0;font-size:.74rem;">'+invList+'</ul></details>' : '')
+
+    // Duplicados (si los hay)
+    + (dupList ? '<details style="margin-bottom:.8rem;background:#fef3c7;padding:.7rem .9rem;border-radius:8px;"><summary style="cursor:pointer;font-weight:600;font-size:.85rem;color:#92400e;">Posibles duplicados (mostrando '+Math.min(5,data.posibles_duplicados_total)+' de '+data.posibles_duplicados_total+')</summary><ul style="margin:.4rem 0 0 1.2rem;padding:0;font-size:.74rem;">'+dupList+'</ul><div style="font-size:.72rem;color:#78350f;margin-top:.4rem;font-style:italic;">Estos pares (factura+código) ya existen en tu BD. Si procedés, se crearán duplicados.</div></details>' : '')
+
+    // Botones
+    + '<div class="btn-row" style="margin-top:1rem;">'
+    +   (data.ok_para_procesar
+        ? '<button class="btn btn-primary" onclick="confirmarImportMasiva()" style="background:'+(data.bloquear?'#dc2626':'')+';">'+(data.bloquear ? '🚨 Confirmar y procesar (sobrepasa umbral)' : '✅ Confirmar y procesar '+data.filas_validas+' glosas')+'</button>'
+        : '<button class="btn btn-primary" disabled style="opacity:.5;cursor:not-allowed;">No hay filas válidas para procesar</button>')
+    +   '<button class="btn btn-ghost" onclick="limpiarImportMasiva()">Cancelar y limpiar</button>'
+    + '</div>'
+    + '</div>';
+
+  resBox.innerHTML = html;
+}
+
+async function confirmarImportMasiva(){
+  // F1.2: el segundo paso — el usuario YA vio el preview y confirmó
+  // explicitamente. Disparamos el endpoint de procesamiento real.
+  var resBox = document.getElementById('im-result');
+  if(!IM_STATE.texto_procesado){
+    toast('Sin datos', 'Hacé click primero en Previsualizar lote', 'warning');
+    return;
+  }
+  resBox.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;font-size:.8rem;color:#7c2d12;">⏳ Enviando lote a procesar...</div>';
+
+  var gestor_id = (document.getElementById('im-gestor')||{}).value || '';
+
+  try{
+    var r = await fetch('/glosas/importar-masiva', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...authH()},
+      body: JSON.stringify({
+        texto_excel: IM_STATE.texto_procesado,
+        eps: IM_STATE.eps_seleccionada,
+        fecha_radicacion: IM_STATE.fecha_rad,
+        fecha_recepcion: IM_STATE.fecha_rec,
         gestor_asignado_id: gestor_id ? parseInt(gestor_id, 10) : null,
       }),
     });
@@ -5208,19 +5322,17 @@ async function previewImportMasiva(){
       resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ '+escHtml(data.detail || 'Error HTTP '+r.status)+'</div>';
       return;
     }
-    var epsList = Object.entries(data.eps_detectadas||{}).map(function(kv){
-      return '<li><b>'+escHtml(kv[0])+':</b> '+kv[1]+' filas</li>';
-    }).join('');
     resBox.innerHTML = '<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:.85rem 1rem;border-radius:8px;font-size:.85rem;color:#14532d;line-height:1.55;">'
       + '<b>✅ Lote enviado a procesar</b><br>'
       + '• Total filas: <b>'+(data.total_filas||0)+'</b><br>'
       + '• Batch ID: <code>'+escHtml(data.batch_id||'')+'</code><br>'
-      + '• Facturas detectadas: '+(data.facturas_detectadas||[]).length+'<br>'
-      + (epsList ? '• EPS detectadas:<ul style="margin:.3rem 0 0 1.2rem;padding:0;">'+epsList+'</ul>' : '')
       + '<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px dashed #86efac;font-size:.75rem;color:#365314;">'
-      + 'El procesamiento ocurre en background. Andá a <b>Mis glosas</b> en 1-2 min para ver las nuevas glosas.</div>'
+      + 'El procesamiento ocurre en background. Andá a <b>Mis glosas</b> en 1-2 min.'
+      + '</div>'
       + '</div>';
     toast('Lote enviado', (data.total_filas||0) + ' glosas en cola', 'success');
+    // Limpiar estado tras éxito
+    setTimeout(limpiarImportMasiva, 4000);
   }catch(e){
     resBox.innerHTML = '<div style="color:#991b1b;font-size:.85rem;">❌ Error de red: '+escHtml(String(e))+'</div>';
   }
