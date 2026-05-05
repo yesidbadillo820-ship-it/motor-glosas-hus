@@ -138,6 +138,12 @@ class GlosaResult(BaseModel):
     accion_ia:       Optional[str] = None
     valor_aceptar_ia: Optional[float] = None
     valor_defender_ia: Optional[float] = None
+    # Verificación de citas legales (citation_verifier) y score de
+    # confianza (confidence_scorer) — calculados post-dictamen para que
+    # la UI pueda mostrar warnings y badge de calidad. Opcionales para
+    # no romper consumidores que no los esperan.
+    verificacion_citas: Optional[dict] = None
+    confianza:          Optional[dict] = None
 
 
 class GlosaHistorialItem(BaseModel):

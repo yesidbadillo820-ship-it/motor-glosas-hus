@@ -1898,6 +1898,45 @@ class GlosaService:
             logger.warning(f"Error calculando riesgo: {_e}")
             riesgo = None
 
+        # Verificación de citas legales (post-IA) — detecta normas
+        # inexistentes, artículos fuera de norma y citas literales falsas.
+        # No bloquea el envío; sirve para que el gestor revise antes.
+        verif_citas = None
+        try:
+            from app.services.citation_verifier import verificar_citas as _vc
+            verif_citas = _vc(dictamen)
+        except Exception as _e:
+            logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")
+            verif_citas = None
+
+        # Score de confianza 0-1 + breakdown — la UI muestra badge color
+        # verde/amarillo/rojo + qué le falta al dictamen.
+        confianza = None
+        try:
+            from app.services.confidence_scorer import calcular_confianza
+            soportes_n = 0
+            try:
+                soportes_n = len((contexto_pdf or "").split("\n--- ARCHIVO ")) - 1
+                soportes_n = max(0, soportes_n)
+            except Exception:
+                pass
+            _vf = locals().get("_val_fact_str") or None
+            _vp = locals().get("_val_pact_str") or None
+            confianza = calcular_confianza(
+                eps=str(data.eps or ""),
+                codigo=str(codigo_det or ""),
+                dictamen=dictamen,
+                soportes_count=soportes_n,
+                auditor_sin_discrepancias=False,  # placeholder; auditor lo seteará si pasa OK
+                valor_objetado=valor_raw,
+                valor_facturado=_vf,
+                valor_pactado=_vp,
+                verificacion_citas=verif_citas,
+            )
+        except Exception as _e:
+            logger.debug(f"[CONFIDENCE] confidence_scorer falló: {_e}")
+            confianza = None
+
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
@@ -1918,6 +1957,8 @@ class GlosaService:
             valor_defender_ia=(
                 valor_defender_ia if valor_defender_ia > 0 else None
             ),
+            verificacion_citas=verif_citas,
+            confianza=confianza,
         )
         # Memoria (Render Free 512 MB): el análisis dejó en memoria PDFs
         # decodificados, prompts grandes, y caché de respuestas IA. Si no

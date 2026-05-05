@@ -10503,6 +10503,82 @@ function aplicarRecomendacionIA(monto, accion){
   }
 }
 
+// ─── Confidence Scorer + Citation Verifier (Commit 1 — Tier 1) ──────
+// Muestran al gestor: (1) qué tan sólido está el dictamen, y (2) si hay
+// citas a normas inexistentes o textos literales falsos. Le permite
+// revisar antes de enviar y reduce la tasa de ratificación EPS.
+
+function renderConfianzaPanel(c){
+  if(!c || typeof c.score !== 'number') return '';
+  var pct = Math.round(c.score * 100);
+  var color = c.color || '#6b7280';
+  var bg = c.nivel === 'alto' ? '#f0fdf4' : (c.nivel === 'medio' ? '#fefce8' : '#fef2f2');
+  var border = c.nivel === 'alto' ? '#86efac' : (c.nivel === 'medio' ? '#fde68a' : '#fca5a5');
+  var icono = c.nivel === 'alto' ? '✅' : (c.nivel === 'medio' ? '⚠️' : '🚫');
+  var faltantesStr = '';
+  if(c.faltantes && c.faltantes.length){
+    faltantesStr = '<div style="margin-top:.55rem;font-size:.75rem;color:#7c2d12;">'
+      + '<b>Para subir el score, te falta:</b><ul style="margin:.3rem 0 0 1.1rem;padding:0;">'
+      + c.faltantes.map(function(f){ return '<li>'+escHtml(f)+'</li>'; }).join('')
+      + '</ul></div>';
+  }
+  var detalleId = 'conf-detalle-' + Math.random().toString(36).slice(2,8);
+  var html =
+    '<div style="background:'+bg+';border:1.5px solid '+border+';border-radius:10px;padding:.85rem 1rem;margin-top:.8rem;font-size:.85rem;">'
+    +'<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;">'
+    +'<span style="font-size:1.4rem;">'+icono+'</span>'
+    +'<div style="flex:1;min-width:200px;">'
+    +'<div style="font-weight:700;color:'+color+';font-size:.95rem;">Confianza del dictamen: '+pct+'% — '+(c.recomendacion||'')+'</div>'
+    +'<div style="height:8px;background:#e5e7eb;border-radius:4px;margin-top:.35rem;overflow:hidden;">'
+      +'<div style="width:'+pct+'%;height:100%;background:'+color+';transition:width .5s;"></div>'
+    +'</div>'
+    +'</div>'
+    +'<button class="btn-sm ghost" onclick="document.getElementById(\''+detalleId+'\').style.display = document.getElementById(\''+detalleId+'\').style.display === \'block\' ? \'none\' : \'block\';" style="font-size:.72rem;">Ver desglose</button>'
+    +'</div>'
+    + faltantesStr
+    +'<div id="'+detalleId+'" style="display:none;margin-top:.7rem;padding-top:.7rem;border-top:1px dashed '+border+';">'
+    + (c.breakdown || []).map(function(b){
+        var icoB = b.ok ? '✓' : '✗';
+        var colB = b.ok ? '#16a34a' : '#9ca3af';
+        return '<div style="display:flex;align-items:flex-start;gap:.5rem;margin-bottom:.4rem;font-size:.78rem;">'
+          + '<span style="color:'+colB+';font-weight:700;font-size:.95rem;width:14px;flex-shrink:0;">'+icoB+'</span>'
+          + '<div style="flex:1;">'
+            + '<div><b>'+escHtml(b.factor)+'</b> <span style="color:#6b7280;">(+'+(b.puntos_obtenidos.toFixed(2))+'/'+b.puntos_max.toFixed(2)+')</span></div>'
+            + '<div style="color:#6b7280;font-size:.72rem;line-height:1.4;">'+escHtml(b.explicacion||'')+'</div>'
+          + '</div>'
+          + '</div>';
+      }).join('')
+    +'</div>'
+    +'</div>';
+  return html;
+}
+
+function renderVerificacionCitas(v){
+  if(!v || !v.issues || !v.issues.length) return '';
+  var graves = v.issues.filter(function(i){ return i.severidad === 'ALTA'; }).length;
+  var headerColor = graves > 0 ? '#dc2626' : '#d97706';
+  var headerBg = graves > 0 ? '#fef2f2' : '#fefce8';
+  var headerBorder = graves > 0 ? '#fca5a5' : '#fde68a';
+  var headerIco = graves > 0 ? '🚨' : '⚠️';
+  var html =
+    '<div style="background:'+headerBg+';border:1.5px solid '+headerBorder+';border-radius:10px;padding:.85rem 1rem;margin-top:.6rem;font-size:.83rem;">'
+    +'<div style="display:flex;align-items:center;gap:.6rem;font-weight:700;color:'+headerColor+';margin-bottom:.5rem;">'
+    +'<span style="font-size:1.2rem;">'+headerIco+'</span>'
+    +'<span>Verificación de citas legales: '+v.issues.length+' problema(s) detectado(s) en '+v.total_citas+' citas'+(graves>0?' — '+graves+' GRAVES':'')+'</span>'
+    +'</div>'
+    + v.issues.map(function(i){
+        var sevColor = i.severidad === 'ALTA' ? '#dc2626' : '#d97706';
+        return '<div style="background:#fff;border-left:3px solid '+sevColor+';padding:.5rem .7rem;margin-bottom:.4rem;border-radius:4px;">'
+          + '<div style="font-size:.77rem;font-weight:600;color:'+sevColor+';">['+i.severidad+'] '+escHtml(i.tipo)+' — '+escHtml(i.cita||'')+'</div>'
+          + '<div style="font-size:.74rem;color:var(--text2);margin-top:.2rem;">'+escHtml(i.detalle||'')+'</div>'
+          + (i.sugerencia ? '<div style="font-size:.73rem;color:#365314;margin-top:.2rem;"><b>Sugerencia:</b> '+escHtml(i.sugerencia)+'</div>' : '')
+          + '</div>';
+      }).join('')
+    +'<div style="font-size:.7rem;color:var(--text3);margin-top:.4rem;font-style:italic;">El gestor decide si corrige o ignora — esto es solo orientativo.</div>'
+    +'</div>';
+  return html;
+}
+
 function renderRiesgoRatificacion(r){
   if(!r) return '';
   var nivelClass = r.nivel === 'BAJO' ? 'low' : (r.nivel === 'MEDIO' ? 'medium' : 'high');
@@ -10561,6 +10637,9 @@ function renderResult(d){
     +'</div>'
     +'<div id="res-dictamen-body" class="res-dictamen-body">'+d.dictamen+'</div>'
     +'</div>'
+
+    + (d.confianza ? renderConfianzaPanel(d.confianza) : '')
+    + (d.verificacion_citas ? renderVerificacionCitas(d.verificacion_citas) : '')
 
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
