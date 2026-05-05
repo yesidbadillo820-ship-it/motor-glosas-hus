@@ -29,9 +29,11 @@ class Settings(BaseSettings):
     # Llaves de IA
     groq_api_key: str = ""
     anthropic_api_key: str = ""
-    # Cuál se usa primero: "groq" (rápido/barato) o "anthropic" (mejor calidad).
-    # Si falla el primario y hay key del otro, se intenta el fallback.
-    primary_ai: str = "groq"
+    # Cuál se usa primero. Default "anthropic" (Claude) por calidad
+    # superior en redacción legal en español. Groq queda como
+    # fallback automático si Anthropic falla. Para forzar Groq
+    # primero (más barato), setear env PRIMARY_AI=groq.
+    primary_ai: str = "anthropic"
     # Modelo Groq — default Llama 3.3 (estable, sin bucles degenerativos).
     # Otros modelos soportados (cambiar con env GROQ_MODEL):
     #   - "llama-3.3-70b-versatile"    (default, balanceado)
