@@ -1496,11 +1496,33 @@ class GlosaService:
 
             # Si NO se emitió directamente, llamar al LLM como siempre.
             if not res_ia:
-                res_ia, modelo_usado = await self._llamar_ia(
-                    system_prompt, user_prompt,
-                    eps=str(data.eps), codigo=codigo_det,
-                    modelo_override=_modelo_override,
-                )
+                # Tool Use opt-in vía env var TOOL_USE_HABILITADO=1.
+                # Si está habilitado: Claude trae lo que necesita por
+                # herramientas (cláusula de contrato + precedente +
+                # tarifa + norma) en vez de prompt monolítico.
+                # Si Tool Use falla (timeout, no convergencia, etc.),
+                # cae al flujo normal sin afectar al usuario final.
+                _intento_tools_ok = False
+                try:
+                    from app.services.ia_tools import tool_use_habilitado
+                    if tool_use_habilitado():
+                        try:
+                            res_ia, modelo_usado = await self._llamar_anthropic_con_tools(
+                                system_prompt, user_prompt,
+                            )
+                            _intento_tools_ok = True
+                        except Exception as _e_tools:
+                            logger.warning(
+                                f"[TOOL-USE] Falló, fallback a flujo clásico: {_e_tools}"
+                            )
+                except Exception:
+                    pass
+                if not _intento_tools_ok:
+                    res_ia, modelo_usado = await self._llamar_ia(
+                        system_prompt, user_prompt,
+                        eps=str(data.eps), codigo=codigo_det,
+                        modelo_override=_modelo_override,
+                    )
 
             # ═══════════════════════════════════════════════════════════
             #  R-CEREBRO #1: Validación post-generación con retry
@@ -2753,6 +2775,104 @@ class GlosaService:
             f"Anthropic falló tras 3 intentos por timeout/red: "
             f"{type(ultimo_error).__name__}: {str(ultimo_error)[:200]}"
         )
+
+    async def _llamar_anthropic_con_tools(
+        self,
+        system: str,
+        user: str,
+        max_turns: int = 4,
+    ) -> tuple[str, str]:
+        """Llama a Claude con TOOL USE habilitado. Multi-turn loop:
+        Claude pide tools → ejecutamos → devolvemos resultado → repetimos
+        hasta que Claude entrega el dictamen final o se alcanza max_turns.
+
+        Solo se usa cuando TOOL_USE_HABILITADO=1. La idea es que Claude
+        traiga del backend solo la información que realmente necesita
+        (cláusulas del contrato relevantes, precedentes internos, normas)
+        en vez de recibir un super-prompt con TODO inyectado a ciegas.
+
+        Devuelve (texto_final_del_dictamen, etiqueta_modelo).
+        Si todas las herramientas fallan o Claude no termina, levanta.
+        """
+        import httpx
+        import json
+        from app.services.ia_tools import TOOLS_DISPONIBLES, execute_tool
+
+        if not self.anthropic_key:
+            raise RuntimeError("Anthropic API key no configurada (tool use)")
+
+        timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+        headers = {
+            "x-api-key": self.anthropic_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+
+        modelo_efectivo = self.anthropic_model
+        # Historial de mensajes para el multi-turn
+        messages = [{"role": "user", "content": user}]
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            for turno in range(max_turns):
+                try:
+                    resp = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers=headers,
+                        json={
+                            "model": modelo_efectivo,
+                            "max_tokens": 4000,
+                            "temperature": 0.10,
+                            "system": system,
+                            "tools": TOOLS_DISPONIBLES,
+                            "messages": messages,
+                        },
+                    )
+                except Exception as e:
+                    logger.error(f"[TOOL-USE] Error de red turno {turno}: {e}")
+                    raise RuntimeError(f"Tool use falló por red: {e}")
+
+                if resp.status_code != 200:
+                    logger.error(f"[TOOL-USE] HTTP {resp.status_code}: {resp.text[:300]}")
+                    raise RuntimeError(f"Tool use HTTP {resp.status_code}")
+
+                data = resp.json()
+                stop_reason = data.get("stop_reason")
+                contenido = data.get("content") or []
+
+                # Agregar respuesta de Claude al historial (assistant)
+                messages.append({"role": "assistant", "content": contenido})
+
+                # ¿Claude pidió ejecutar tools?
+                tool_uses = [b for b in contenido if b.get("type") == "tool_use"]
+                if tool_uses and stop_reason == "tool_use":
+                    # Ejecutar cada tool y devolver resultado en el siguiente mensaje
+                    tool_results_content = []
+                    for tu in tool_uses:
+                        tool_id = tu.get("id")
+                        tool_name = tu.get("name")
+                        tool_input = tu.get("input", {})
+                        logger.info(f"[TOOL-USE] turno={turno} tool={tool_name} input={str(tool_input)[:200]}")
+                        result_str = execute_tool(tool_name, tool_input)
+                        tool_results_content.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": result_str,
+                        })
+                    messages.append({"role": "user", "content": tool_results_content})
+                    continue
+
+                # Sin más tool calls — Claude entregó el dictamen final
+                texto_final = ""
+                for b in contenido:
+                    if b.get("type") == "text":
+                        texto_final += b.get("text", "")
+                if not texto_final:
+                    raise RuntimeError("Tool use terminó sin texto final")
+                logger.info(f"[TOOL-USE] dictamen final tras {turno+1} turnos")
+                return texto_final, f"anthropic/{modelo_efectivo}/tools"
+
+        # Llegamos a max_turns sin texto final
+        raise RuntimeError(f"Tool use no convergió en {max_turns} turnos")
 
     async def _llamar_ia(
         self,
