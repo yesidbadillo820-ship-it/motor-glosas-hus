@@ -292,7 +292,24 @@ def _exec_lookup_norma(args: dict) -> str:
             "info": f"No se encontró {tipo.title()} {numero} de {anio} en el corpus. NO la cites en el dictamen.",
         })
     n = normas[clave]
-    return json.dumps({
+
+    # Knowledge graph: incluir relaciones y sustentos heredados
+    relaciones = []
+    sustentos = []
+    try:
+        from app.services.normativa_grafo import obtener_relaciones, normas_que_sustentan
+        # La clave del grafo usa formato "ley_100_1993" / "res_2284_2023";
+        # construimos la clave canónica desde tipo + numero + anio
+        tipo_short = {"resolucion": "res", "decreto": "decreto", "ley": "ley", "sentencia": "sentencia"}.get(
+            tipo, tipo[:3]
+        )
+        clave_grafo = f"{tipo_short}_{numero.lstrip('0') or numero}_{anio}"
+        relaciones = obtener_relaciones(clave_grafo)
+        sustentos = normas_que_sustentan(clave_grafo, max_profundidad=2)
+    except Exception:
+        pass
+
+    out = {
         "norma": {
             "nombre": n.get("nombre"),
             "texto": (n.get("texto") or "")[:1500],
@@ -303,4 +320,9 @@ def _exec_lookup_norma(args: dict) -> str:
                 for k, v in list((n.get("articulos") or {}).items())[:5]
             },
         }
-    }, ensure_ascii=False)
+    }
+    if relaciones:
+        out["relaciones_grafo"] = relaciones[:8]
+    if sustentos:
+        out["sustentos_heredados"] = sustentos[:5]
+    return json.dumps(out, ensure_ascii=False)
