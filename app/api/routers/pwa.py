@@ -110,7 +110,13 @@ def icon_512():
 
 @router.get("/importar-masiva")
 def importar_masiva():
-    return FileResponse("static/importar-masiva.html", headers=_NO_STORE_HEADERS)
+    """LEGACY: la página standalone fue migrada al SPA principal en
+    el panel `p-importacion-masiva`. Para no romper bookmarks viejos,
+    redirigimos al SPA con un hash que el cliente lee y abre el panel
+    correcto (ver hashchange listener en index.html).
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/#importacion-masiva", status_code=302)
 
 
 @router.get("/importar-recepcion")
