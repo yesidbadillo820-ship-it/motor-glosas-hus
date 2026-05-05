@@ -13484,7 +13484,7 @@ async function buscarSoportesSpot(query){
 
   slot.innerHTML = '<div class="spot-group-lbl">📁 Soportes (buscando…)</div>';
   try{
-    var r = await fetch('/soportes/buscar?q=' + encodeURIComponent(query) + '&limite=10', {
+    var r = await fetch('/soportes-auto/buscar?q=' + encodeURIComponent(query) + '&limite=10', {
       headers: authH(),
       signal: _spotSoportesAbort ? _spotSoportesAbort.signal : undefined,
     });
