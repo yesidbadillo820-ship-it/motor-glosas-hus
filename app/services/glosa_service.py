@@ -1271,6 +1271,44 @@ class GlosaService:
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
             )
 
+            # Multi-agent foundation (env var MULTI_AGENT_HABILITADO=1):
+            # ejecuta el Auditor Agent ANTES de la IA principal para
+            # producir hallazgos estructurados (JSON con fortalezas,
+            # debilidades, soportes faltantes, recomendación). Los
+            # inyectamos como bloque adicional al user_prompt para que
+            # la IA principal redacte con ese contexto verificado.
+            # Si el agente falla (timeout, JSON inválido, etc.), seguimos
+            # sin él — nunca rompemos el análisis para el usuario.
+            try:
+                from app.services.multi_agent import (
+                    multi_agent_habilitado, ejecutar_auditor,
+                )
+                if multi_agent_habilitado() and self.anthropic_key:
+                    _audit_result = await ejecutar_auditor(
+                        texto_glosa=texto_base,
+                        eps=str(data.eps or ""),
+                        codigo=codigo_det,
+                        contexto_pdf=contexto_pdf,
+                        valor_objetado=valor_raw,
+                        valor_facturado=_val_fact_str or "",
+                        valor_pactado=_val_pact_str or "",
+                        api_key=self.anthropic_key,
+                        modelo=self.anthropic_model,
+                    )
+                    if _audit_result and _audit_result.get("json"):
+                        import json as _json
+                        hallazgos_str = _json.dumps(_audit_result["json"], ensure_ascii=False, indent=2)[:4000]
+                        user_prompt += (
+                            "\n\n═══ BLOQUE EXTRA: HALLAZGOS DEL AUDITOR PRE-IA ═══\n"
+                            "(JSON estructurado producido por el Auditor Agent — "
+                            "úsalo para apoyar tu argumentación, citar evidencia y "
+                            "decidir el tono. NO repitas el JSON en tu respuesta.)\n\n"
+                            f"{hallazgos_str}\n"
+                        )
+                        logger.info(f"[MULTI-AGENT] Auditor inyectó hallazgos en el prompt")
+            except Exception as _e_ma:
+                logger.debug(f"[MULTI-AGENT] Auditor falló: {_e_ma}")
+
             # Si hay tarifa pactada específica encontrada en el catálogo del
             # cliente (tarifas_contratadas), inyectar los datos reales al
             # user prompt para que la IA NO use el "tarifa genérica del contrato"
