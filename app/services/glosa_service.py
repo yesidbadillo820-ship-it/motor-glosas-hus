@@ -603,6 +603,71 @@ def _es_dispensario_medico(eps: str) -> bool:
     )
 
 
+def limpiar_cierre_extemporanea_indebido(
+    texto: str,
+    es_ratificacion: bool = False,
+    es_extemporanea: bool = False,
+    codigo_respuesta: str = "",
+) -> str:
+    """Quita el cierre canónico de RATIFICADAS/EXTEMPORÁNEAS cuando NO
+    aplica (es decir, cuando la respuesta es defensiva normal, no es
+    una ratificación ni una extemporánea).
+
+    Directiva institucional ESE HUS (mayo 2026 — Yesid): el cierre
+    «...10 DÍAS HÁBILES PARA PRONUNCIARSE... MESA DE CONCILIACIÓN...
+    COMUNICACIONES: CARTERA@HUS.GOV.CO...» SOLO debe aparecer en:
+      - Respuestas a glosas RATIFICADAS (es_ratificacion=True, RE9601/RE9602)
+      - Respuestas a glosas EXTEMPORÁNEAS (es_extemporanea=True, RE9501/RE9502)
+    En CUALQUIER otra defensa (RE9901 normal, RE9702, RE9801) se limpia
+    porque infla el dictamen sin aportar valor jurídico.
+
+    El sanitizer es idempotente: aplicarlo varias veces no rompe nada.
+    """
+    if not texto or not isinstance(texto, str):
+        return texto
+
+    # ¿La respuesta SÍ debe llevar el cierre?
+    cod = (codigo_respuesta or "").upper().strip()
+    codigos_cierre_obligatorio = {"RE9501", "RE9502", "RE9601", "RE9602"}
+    if es_ratificacion or es_extemporanea or cod in codigos_cierre_obligatorio:
+        return texto
+
+    # Para todos los demás códigos (RE9901 normal, RE9702, RE9801),
+    # limpiamos. Patrones tolerantes a variaciones de mayúsculas y
+    # espacios. Estrategia: hacer match desde el INICIO del cierre
+    # ("LA ENTIDAD PAGADORA CUENTA CON 10..." o "DE PERSISTIR..." o
+    # "COMUNICACIONES:...") hasta que termine en correo @hus.gov.co.
+    import re as _re
+    patrones_cierre = [
+        # Variante completa: "LA ENTIDAD PAGADORA CUENTA CON 10 DÍAS..."
+        # hasta GLOSASYDEVOLUCIONES@HUS.GOV.CO.
+        r"\s*LA\s+ENTIDAD\s+PAGADORA\s+CUENTA\s+CON\s+10\s+D[ÍI]AS\s+H[ÁA]BILES[\s\S]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        # Variante "10 días" sin glosasydevoluciones, hasta CARTERA@HUS
+        r"\s*LA\s+ENTIDAD\s+PAGADORA\s+CUENTA\s+CON\s+10\s+D[ÍI]AS\s+H[ÁA]BILES[\s\S]*?CARTERA@HUS\.GOV\.CO\.",
+        # Variante "DE PERSISTIR... mesa de conciliación... correos"
+        r"\s*DE\s+PERSISTIR\s+LA\s+OBJECI[ÓO]N[\s\S]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        r"\s*DE\s+PERSISTIR\s+LA\s+OBJECI[ÓO]N[\s\S]*?CARTERA@HUS\.GOV\.CO\.",
+        # Variante "EN SUBSIDIO... mesa de conciliación... correos"
+        r"\s*EN\s+SUBSIDIO[\s\S]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        r"\s*EN\s+SUBSIDIO[\s\S]*?CARTERA@HUS\.GOV\.CO\.",
+        # Variante "COMUNICACIONES: ..." con ambos correos
+        r"\s*COMUNICACIONES:\s*CARTERA@HUS\.GOV\.CO[^.]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        # Variante "COMUNICACIONES: ..." con solo CARTERA
+        r"\s*COMUNICACIONES:\s*CARTERA@HUS\.GOV\.CO\.",
+        # Variante "CUALQUIER INFORMACIÓN AL CORREO..." con ambos
+        r"\s*CUALQUIER\s+INFORMACI[ÓO]N\s+A(?:L\s+CORREO\s+ELECTR[ÓO]NICO\s+INSTITUCIONAL)?:?\s*CARTERA@HUS\.GOV\.CO[^.]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        # Variante "CUALQUIER INFORMACIÓN..." solo CARTERA
+        r"\s*CUALQUIER\s+INFORMACI[ÓO]N\s+A(?:L\s+CORREO\s+ELECTR[ÓO]NICO\s+INSTITUCIONAL)?:?\s*CARTERA@HUS\.GOV\.CO\.",
+    ]
+    out = texto
+    for pat in patrones_cierre:
+        out = _re.sub(pat, "", out, flags=_re.IGNORECASE | _re.DOTALL)
+    # Limpiar espacios dobles + tags HTML adyacentes vacíos
+    out = _re.sub(r"\s{2,}", " ", out)
+    out = _re.sub(r"<p>\s*</p>", "", out)
+    return out.strip()
+
+
 def limpiar_palabra_injustificado(texto: str) -> str:
     """Reemplaza todas las formas de "injustificado/a/os/as" por sinónimos
     profesionales que NO contengan la raíz "injustific".
@@ -1047,6 +1112,13 @@ class GlosaService:
             # Sanitizer: aplicar también al camino de texto_fijo para que
             # plantillas hardcoded sin "injustific*" estén garantizadas.
             arg_ia = limpiar_palabra_injustificado(arg_ia)
+            # Sanitizer cierre canónico: solo ratificadas/extemporáneas
+            # llevan el "...10 días hábiles... mesa de conciliación...
+            # CARTERA@HUS.GOV.CO". Cualquier otra defensa lo pierde.
+            arg_ia = limpiar_cierre_extemporanea_indebido(
+                arg_ia, es_ratificacion=es_ratificacion,
+                es_extemporanea=es_extemporanea, codigo_respuesta=cod_res,
+            )
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "texto_fijo"
             servicio_ia = ""
@@ -1813,6 +1885,17 @@ class GlosaService:
             # Reemplaza por sinónimos profesionales sin la raíz "injustific".
             # Ver `limpiar_palabra_injustificado` arriba en este módulo.
             arg_ia = limpiar_palabra_injustificado(arg_ia)
+
+            # 10c) Sanitizer cierre canónico: el bloque "...10 DÍAS HÁBILES...
+            # MESA DE CONCILIACIÓN... COMUNICACIONES: CARTERA@HUS.GOV.CO,
+            # GLOSASYDEVOLUCIONES@HUS.GOV.CO" SOLO debe aparecer en respuestas
+            # de tipo RATIFICADA o EXTEMPORÁNEA. Para defensas normales,
+            # aceptaciones (totales/parciales) y demás casos, este cierre
+            # es ruidoso e innecesario — Yesid pidió eliminarlo.
+            arg_ia = limpiar_cierre_extemporanea_indebido(
+                arg_ia, es_ratificacion=es_ratificacion,
+                es_extemporanea=es_extemporanea, codigo_respuesta=cod_res,
+            )
 
 
             # 11) Limpieza minima de PHI: solo conectores o formatos rotos,
