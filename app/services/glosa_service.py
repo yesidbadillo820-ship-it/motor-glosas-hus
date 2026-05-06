@@ -3236,10 +3236,21 @@ class GlosaService:
         if not self.groq and not self.anthropic_key:
             return "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>", "error"
 
-        # Orden de intento según configuración. Si hay modelo_override,
-        # SOLO usamos Anthropic (Groq no soporta el modelo de Anthropic).
+        # Orden de intento según configuración. Si hay modelo_override
+        # (HAIKU/SONNET/OPUS por routing dinámico), preferimos Anthropic
+        # con ese modelo pero CAEMOS A GROQ si Anthropic falla (e.g.
+        # 400 credit_balance_too_low, 529 overloaded, timeout). Groq
+        # usa su propio modelo default — el override solo aplica a
+        # Anthropic, no se traspasa a Groq.
         if modelo_override and self.anthropic_key:
             intentos = [("anthropic", self._llamar_anthropic)]
+            if self.groq:
+                # FALLBACK CRITICO: si la cuenta Anthropic se queda sin
+                # creditos (caso real reportado por Yesid mayo 2026:
+                # "ANTHROPIC DEVOLVIO SIN content STATUS=400"), Groq
+                # toma el relevo y el motor sigue produciendo dictamenes
+                # en lugar de fallar con un error visible al usuario.
+                intentos.append(("groq", self._llamar_groq_con_retry))
         elif self.primary_ai == "anthropic" and self.anthropic_key:
             intentos = [("anthropic", self._llamar_anthropic)]
             if self.groq:
