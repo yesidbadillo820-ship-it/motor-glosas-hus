@@ -60,6 +60,94 @@ def info_usuario_actual(
             current_user.creado_en.isoformat()
             if getattr(current_user, "creado_en", None) else None
         ),
+        "rustdesk_id": getattr(current_user, "rustdesk_id", None),
+        "rustdesk_etiqueta": getattr(current_user, "rustdesk_etiqueta", None),
+    }
+
+
+@router.post("/yo/rustdesk")
+def actualizar_rustdesk_propio(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """RustDesk: cada usuario configura el ID de su PC para acceso
+    remoto. Si el usuario NO quiere ser accesible remoto, deja el
+    campo vacío.
+
+    Payload: {rustdesk_id: "123456789", rustdesk_etiqueta: "PC HUS"}
+    Para borrar: payload con strings vacíos.
+    """
+    rid = (payload.get("rustdesk_id") or "").strip()
+    etiqueta = (payload.get("rustdesk_etiqueta") or "").strip()
+
+    # Validación: RustDesk IDs son numéricos de 9 dígitos típicamente,
+    # pero permitimos hasta 40 chars por flexibilidad (instalaciones
+    # custom con relay propio pueden tener IDs alfanuméricos).
+    if rid and not (rid.replace("-", "").replace("_", "").isalnum() and len(rid) <= 40):
+        raise HTTPException(400, "rustdesk_id inválido (solo alfanuméricos, máx 40 chars)")
+    if etiqueta and len(etiqueta) > 120:
+        raise HTTPException(400, "rustdesk_etiqueta máx 120 chars")
+
+    user = db.query(UsuarioRecord).filter(UsuarioRecord.id == current_user.id).first()
+    if not user:
+        raise HTTPException(404, "Usuario no encontrado")
+    user.rustdesk_id = rid or None
+    user.rustdesk_etiqueta = etiqueta or None
+    db.commit()
+    return {
+        "ok": True,
+        "rustdesk_id": user.rustdesk_id,
+        "rustdesk_etiqueta": user.rustdesk_etiqueta,
+    }
+
+
+@router.get("/{user_id}/rustdesk-link")
+def obtener_link_rustdesk(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Devuelve el link rustdesk:// para conectarse a la PC del usuario
+    indicado. Solo COORDINADOR/SUPER_ADMIN pueden invocar — para evitar
+    que cualquier usuario vea los IDs de los demás.
+
+    El link `rustdesk://?id=XXX` lo abre el cliente RustDesk local del
+    técnico. RustDesk pide la contraseña del lado remoto al conectar
+    (NO la guardamos en BD por seguridad).
+    """
+    rol = (getattr(current_user, "rol", "") or "").upper()
+    if rol not in ("SUPER_ADMIN", "COORDINADOR"):
+        raise HTTPException(403, "Solo SUPER_ADMIN/COORDINADOR")
+    user = db.query(UsuarioRecord).filter(UsuarioRecord.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "Usuario no encontrado")
+    rid = getattr(user, "rustdesk_id", None)
+    if not rid:
+        raise HTTPException(404, "Usuario sin RustDesk configurado")
+
+    # Audit log — saber quién intentó conectar a qué PC
+    try:
+        from app.repositories.audit_repository import AuditRepository
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=rol,
+            accion="RUSTDESK_CONNECT",
+            tabla="usuarios",
+            registro_id=user.id,
+            detalle=f"a {user.email} (rid={rid})",
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "user_id": user.id,
+        "user_email": user.email,
+        "user_nombre": user.nombre,
+        "rustdesk_id": rid,
+        "rustdesk_etiqueta": getattr(user, "rustdesk_etiqueta", None),
+        "link": f"rustdesk://{rid}",
     }
 
 
@@ -3011,10 +3099,18 @@ def listar_usuarios(
 ):
     """Lista todos los usuarios registrados."""
     usuarios = db.query(UsuarioRecord).order_by(UsuarioRecord.id).all()
-    return [
-        {"id": u.id, "nombre": u.nombre, "email": u.email, "rol": u.rol, "activo": u.activo}
-        for u in usuarios
-    ]
+    # Incluir rustdesk_id solo si current_user es admin/coordinador
+    # (los AUDITOR no necesitan ver IDs ajenos para nada).
+    rol = (getattr(current_user, "rol", "") or "").upper()
+    incluir_rustdesk = rol in ("SUPER_ADMIN", "COORDINADOR")
+    out = []
+    for u in usuarios:
+        d = {"id": u.id, "nombre": u.nombre, "email": u.email, "rol": u.rol, "activo": u.activo}
+        if incluir_rustdesk:
+            d["rustdesk_id"] = getattr(u, "rustdesk_id", None)
+            d["rustdesk_etiqueta"] = getattr(u, "rustdesk_etiqueta", None)
+        out.append(d)
+    return out
 
 
 @router.get("/sin-2fa")

@@ -7659,6 +7659,7 @@ var CP_ACCIONES = [
   {seccion:"Acciones", icono:"🎯", titulo:"Modo Focus", hint:"Ocultar UI para análisis profundo (Esc para salir)", accion:function(){cerrarCommandPalette();toggleModoFocus(true)}},
   {seccion:"Acciones", icono:"🧭", titulo:"Tour guiado de la app", hint:"Recorrido de 1 minuto por las funciones", accion:function(){cerrarCommandPalette();iniciarOnboarding()}},
   {seccion:"Acciones", icono:"🚪", titulo:"Cerrar sesión", hint:"Salir", accion:function(){cerrarCommandPalette();logout()}},
+  {seccion:"Acciones", icono:"🖥️", titulo:"Configurar RustDesk", hint:"Acceso remoto a tu PC desde un coordinador", accion:function(){cerrarCommandPalette();configurarMiRustdesk()}},
   // Acciones admin (solo SUPER_ADMIN)
   {seccion:"Admin", icono:"🧪", titulo:"Test Sentry", hint:"Dispara error intencional", soloAdmin:true, accion:function(){cerrarCommandPalette();dispararSentryTest()}},
 ];
@@ -13104,8 +13105,17 @@ async function loadUsuarios(){
       var rolBadge='<span class="rol-badge '+(ROL_COLORS[u.rol]||'rol-viewer')+'">'+(u.rol||'AUDITOR')+'</span>';
       var activo=u.activo===1?'<span style="color:var(--c-green)">✓</span>':'<span style="color:var(--c-red)">✕</span>';
       var btnEditar = isAdmin ? '<button class="btn-warn-sm" onclick="editarUsuario('+u.id+',\''+escJs(u.nombre)+'\',\''+escJs(u.email)+'\')">Editar</button> ' : '';
+      // RustDesk: si el usuario tiene rustdesk_id configurado, mostrar
+      // boton "🖥️ Conectar" (solo visible para SUPER_ADMIN/COORDINADOR
+      // — el endpoint backend valida permisos tambien)
+      var btnRustdesk = '';
+      if(u.rustdesk_id && (USER_ROL === 'SUPER_ADMIN' || USER_ROL === 'COORDINADOR')){
+        var label = u.rustdesk_etiqueta ? escHtml(u.rustdesk_etiqueta) : 'PC';
+        btnRustdesk = '<button class="btn-sm" onclick="conectarRustdesk('+u.id+')" title="'+label+' · ID '+escHtml(u.rustdesk_id)+'" style="font-size:.7rem;background:#dbeafe;color:#1e40af;border-color:#bfdbfe;">🖥️ Conectar</button> ';
+      }
       return '<tr><td>'+u.id+'</td><td>'+escHtml(u.nombre)+'</td><td>'+escHtml(u.email)+'</td><td>'+rolBadge+'</td><td>'+activo+'</td>'
         +'<td style="white-space:nowrap">'
+        +btnRustdesk
         +btnEditar
         +'<button class="btn-warn-sm" onclick="cambiarRol('+u.id+',\''+escJs(u.rol||'AUDITOR')+'\')">Rol</button> '
         +'<button class="btn-warn-sm" onclick="cambiarPass('+u.id+',\''+escJs(u.email)+'\')">Pass</button> '
@@ -13113,6 +13123,76 @@ async function loadUsuarios(){
         +'</td></tr>';
     }).join('');
   }catch(e){tbody.innerHTML='<tr><td colspan="6" style="color:var(--c-red)">Error: '+e.message+'</td></tr>';}
+}
+
+// ─── RustDesk: acceso remoto a PCs de los gestores ─────────────────
+async function conectarRustdesk(user_id){
+  try{
+    var r = await fetch('/usuarios/'+user_id+'/rustdesk-link', {headers:authH()});
+    var data = await r.json();
+    if(!r.ok){
+      toast('Error', data.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    // Modal con instrucciones (RustDesk debe estar instalado del lado tecnico)
+    var ok = confirm(
+      '🖥️  Conectar a ' + (data.user_nombre || data.user_email) + '\n\n'
+      + 'PC: ' + (data.rustdesk_etiqueta || 'Sin etiqueta') + '\n'
+      + 'RustDesk ID: ' + data.rustdesk_id + '\n\n'
+      + 'Click OK para abrir el cliente RustDesk.\n'
+      + 'Si no tenés RustDesk instalado, descargalo de https://rustdesk.com/'
+    );
+    if(!ok) return;
+    // Abrir el link rustdesk:// — el cliente local toma control
+    window.location.href = data.link;
+    toast('Conectando…', 'Abriendo RustDesk a ' + data.rustdesk_id, 'info');
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
+async function configurarMiRustdesk(){
+  // El usuario configura SU PROPIO ID — para que un coordinador pueda
+  // conectarse cuando lo necesite.
+  var actualId = '';
+  var actualEt = '';
+  try{
+    var r = await fetch('/usuarios/yo', {headers:authH()});
+    if(r.ok){
+      var u = await r.json();
+      actualId = u.rustdesk_id || '';
+      actualEt = u.rustdesk_etiqueta || '';
+    }
+  }catch(e){}
+  var nuevoId = prompt(
+    '🖥️ Configurar RustDesk\n\n'
+    + 'Para que tu coordinador pueda tomar control remoto de tu PC cuando lo necesites.\n\n'
+    + '1. Abrí RustDesk en tu PC (descargalo de https://rustdesk.com si no lo tenés)\n'
+    + '2. Copiá el "ID" que aparece arriba (típicamente 9 dígitos)\n'
+    + '3. Pegalo acá:',
+    actualId
+  );
+  if(nuevoId === null) return;
+  var nuevaEt = prompt(
+    'Etiqueta del equipo (ej: "PC HUS oficina 3", "Laptop casa"):',
+    actualEt
+  );
+  if(nuevaEt === null) return;
+  try{
+    var r = await fetch('/usuarios/yo/rustdesk', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...authH()},
+      body: JSON.stringify({rustdesk_id: nuevoId, rustdesk_etiqueta: nuevaEt}),
+    });
+    var data = await r.json();
+    if(!r.ok){
+      toast('Error', data.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    toast('RustDesk guardado', nuevoId ? 'ID '+nuevoId+' configurado' : 'Borrado', 'success');
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
 }
 
 async function cambiarRol(id,rolActual){

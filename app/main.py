@@ -408,6 +408,20 @@ async def lifespan(app: FastAPI):
     # migracion porque es nueva. Las dos tablas se crean en el primer
     # arranque despues de este deploy.
 
+    # RustDesk: 2 columnas opcionales en usuarios para acceso remoto
+    _USUARIOS_RUSTDESK = [
+        ("rustdesk_id", "VARCHAR(40)"),
+        ("rustdesk_etiqueta", "VARCHAR(120)"),
+    ]
+    for col_name, col_ddl in _USUARIOS_RUSTDESK:
+        try:
+            if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a usuarios")
+                db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()

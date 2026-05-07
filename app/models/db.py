@@ -323,6 +323,13 @@ class UsuarioRecord(Base):
     # correos del mismo equipo, ej. EQUIPO_ASEGURADORAS con 4 emails). Si
     # está seteado, las vistas "Mis glosas" e "Historial" agrupan por equipo.
     equipo = Column(String(50), index=True, nullable=True)
+    # RustDesk ID — para acceso remoto a la PC del gestor desde la UI
+    # admin. El usuario configura el ID de su instalación RustDesk
+    # (ej. "123456789") y un coordinador puede tomar control vía link
+    # rustdesk://?id=XXX. Opcional, no afecta nada si está vacío.
+    rustdesk_id = Column(String(40), nullable=True)
+    # Etiqueta libre para el equipo (ej. "PC HUS oficina 3", "Laptop casa")
+    rustdesk_etiqueta = Column(String(120), nullable=True)
 
 
 class AuditLogRecord(Base):
