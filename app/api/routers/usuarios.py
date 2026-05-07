@@ -62,7 +62,162 @@ def info_usuario_actual(
         ),
         "rustdesk_id": getattr(current_user, "rustdesk_id", None),
         "rustdesk_etiqueta": getattr(current_user, "rustdesk_etiqueta", None),
+        "vacaciones_desde": (
+            current_user.vacaciones_desde.isoformat()
+            if getattr(current_user, "vacaciones_desde", None) else None
+        ),
+        "vacaciones_hasta": (
+            current_user.vacaciones_hasta.isoformat()
+            if getattr(current_user, "vacaciones_hasta", None) else None
+        ),
+        "delega_a_email": getattr(current_user, "delega_a_email", None),
+        "vacaciones_motivo": getattr(current_user, "vacaciones_motivo", None),
     }
+
+
+@router.post("/yo/vacaciones")
+def configurar_vacaciones_propias(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Configura/actualiza las vacaciones del usuario logueado.
+
+    Payload set:
+        {
+            "desde": "2026-05-15",        # ISO date o ISO datetime
+            "hasta": "2026-05-30",
+            "delega_a_email": "juan@hus.gov.co",  # opcional
+            "motivo": "vacaciones programadas"     # opcional
+        }
+    Payload clear:
+        {} o {"clear": true}
+
+    Validaciones:
+        - desde < hasta
+        - delega_a_email debe existir como usuario activo del sistema.
+        - hasta no puede ser más de 90 días en el futuro (sanity).
+    """
+    from datetime import datetime, timedelta, timezone as _tz
+    from app.repositories.audit_repository import AuditRepository
+
+    if not payload or payload.get("clear") is True or (not payload.get("desde") and not payload.get("hasta")):
+        # Limpiar vacaciones
+        user = db.query(UsuarioRecord).filter(UsuarioRecord.id == current_user.id).first()
+        if not user:
+            raise HTTPException(404, "Usuario no encontrado")
+        user.vacaciones_desde = None
+        user.vacaciones_hasta = None
+        user.delega_a_email = None
+        user.vacaciones_motivo = None
+        db.commit()
+        try:
+            AuditRepository(db).registrar(
+                usuario_email=current_user.email, usuario_rol=current_user.rol,
+                accion="VACACIONES_LIMPIAR", tabla="usuarios", registro_id=current_user.id,
+            )
+        except Exception:
+            pass
+        return {"ok": True, "vacaciones": None}
+
+    def _parse_dt(s: str):
+        s = (s or "").strip()
+        if not s:
+            return None
+        # Soporta "YYYY-MM-DD" o ISO completo
+        if "T" not in s and len(s) == 10:
+            s += "T00:00:00"
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=_tz.utc)
+            return dt
+        except Exception:
+            raise HTTPException(400, f"Fecha invalida: {s}")
+
+    desde = _parse_dt(payload.get("desde"))
+    hasta = _parse_dt(payload.get("hasta"))
+    if not desde or not hasta:
+        raise HTTPException(400, "desde y hasta son requeridos")
+    if desde >= hasta:
+        raise HTTPException(400, "desde debe ser anterior a hasta")
+    if hasta > datetime.now(_tz.utc) + timedelta(days=90):
+        raise HTTPException(400, "hasta no puede ser mas de 90 dias en el futuro")
+
+    delega = (payload.get("delega_a_email") or "").strip().lower()
+    if delega:
+        if delega == current_user.email.lower():
+            raise HTTPException(400, "No te podes delegar a vos mismo")
+        u_dest = db.query(UsuarioRecord).filter(UsuarioRecord.email.ilike(delega)).first()
+        if not u_dest or not (u_dest.activo or 0):
+            raise HTTPException(400, f"Usuario delega_a_email no existe o no esta activo: {delega}")
+
+    motivo = (payload.get("motivo") or "").strip()[:200]
+
+    user = db.query(UsuarioRecord).filter(UsuarioRecord.id == current_user.id).first()
+    if not user:
+        raise HTTPException(404, "Usuario no encontrado")
+    user.vacaciones_desde = desde
+    user.vacaciones_hasta = hasta
+    user.delega_a_email = delega or None
+    user.vacaciones_motivo = motivo or None
+    db.commit()
+    try:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email, usuario_rol=current_user.rol,
+            accion="VACACIONES_SET", tabla="usuarios", registro_id=current_user.id,
+            valor_nuevo=f"{desde.date()} -> {hasta.date()} (delega: {delega or 'ninguno'})",
+        )
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "vacaciones": {
+            "desde": user.vacaciones_desde.isoformat(),
+            "hasta": user.vacaciones_hasta.isoformat(),
+            "delega_a_email": user.delega_a_email,
+            "motivo": user.vacaciones_motivo,
+        },
+    }
+
+
+@router.get("/en-vacaciones")
+def listar_en_vacaciones(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista usuarios actualmente en vacaciones (vacaciones_desde <=
+    ahora <= vacaciones_hasta) o programados a corto plazo (proximos
+    7 dias). Util para el coordinador.
+    """
+    from datetime import datetime, timedelta, timezone as _tz
+    ahora = datetime.now(_tz.utc)
+    en_7d = ahora + timedelta(days=7)
+    rows = (
+        db.query(UsuarioRecord)
+        .filter(UsuarioRecord.vacaciones_hasta.isnot(None))
+        .filter(UsuarioRecord.vacaciones_hasta >= ahora)
+        .filter(UsuarioRecord.vacaciones_desde <= en_7d)
+        .order_by(UsuarioRecord.vacaciones_desde.asc())
+        .all()
+    )
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "nombre": u.nombre,
+            "rol": u.rol,
+            "vacaciones_desde": u.vacaciones_desde.isoformat() if u.vacaciones_desde else None,
+            "vacaciones_hasta": u.vacaciones_hasta.isoformat() if u.vacaciones_hasta else None,
+            "delega_a_email": u.delega_a_email,
+            "motivo": u.vacaciones_motivo,
+            "activa_ahora": (
+                u.vacaciones_desde and u.vacaciones_hasta
+                and u.vacaciones_desde <= ahora <= u.vacaciones_hasta
+            ),
+        }
+        for u in rows
+    ]
 
 
 @router.post("/yo/rustdesk")

@@ -3432,6 +3432,26 @@ class BulkAsignarInput(BaseModel):
     auditor_email: str
 
 
+def _resolver_destino_con_vacaciones(db: Session, email: str) -> tuple[str, bool]:
+    """Si el destino esta en vacaciones activas y tiene delega_a_email,
+    retorna el delegado en lugar del original. Retorna (email_real,
+    fue_redirigido).
+    """
+    if not email:
+        return email, False
+    from datetime import datetime, timezone as _tz
+    ahora = datetime.now(_tz.utc)
+    u = db.query(UsuarioRecord).filter(UsuarioRecord.email.ilike(email)).first()
+    if not u:
+        return email, False
+    if (
+        u.vacaciones_desde and u.vacaciones_hasta and u.delega_a_email
+        and u.vacaciones_desde <= ahora <= u.vacaciones_hasta
+    ):
+        return u.delega_a_email, True
+    return email, False
+
+
 @router.post("/bulk/asignar")
 def bulk_asignar(
     data: BulkAsignarInput,
@@ -3443,11 +3463,16 @@ def bulk_asignar(
 
     Aplica `auditor_email` Y `gestor_nombre` para que la glosa
     aparezca en "Mis glosas" del nuevo dueno.
+
+    Si el destino esta en vacaciones activas y configuro delega_a, la
+    asignacion se redirige automaticamente al delegado.
     """
     if not data.glosa_ids:
         raise HTTPException(400, "Lista vacia")
     if len(data.glosa_ids) > 200:
         raise HTTPException(400, "Maximo 200 glosas por bulk")
+
+    destino_real, redirigido = _resolver_destino_con_vacaciones(db, data.auditor_email)
 
     actualizadas = 0
     no_encontradas = 0
@@ -3457,14 +3482,15 @@ def bulk_asignar(
             no_encontradas += 1
             continue
         anterior = g.auditor_email or g.gestor_nombre
-        g.auditor_email = data.auditor_email
-        g.gestor_nombre = data.auditor_email
+        g.auditor_email = destino_real
+        g.gestor_nombre = destino_real
         actualizadas += 1
         try:
             AuditRepository(db).registrar(
                 usuario_email=current_user.email, usuario_rol=current_user.rol,
                 accion="BULK_ASIGNAR", tabla="glosas", registro_id=gid,
-                valor_anterior=anterior, valor_nuevo=data.auditor_email,
+                valor_anterior=anterior, valor_nuevo=destino_real,
+                detalle=("redirigido_vacaciones" if redirigido else None),
             )
         except Exception:
             pass
@@ -3474,7 +3500,9 @@ def bulk_asignar(
         "actualizadas": actualizadas,
         "no_encontradas": no_encontradas,
         "total_solicitadas": len(data.glosa_ids),
-        "auditor_email": data.auditor_email,
+        "auditor_email": destino_real,
+        "redirigido_vacaciones": redirigido,
+        "destino_solicitado": data.auditor_email,
     }
 
 
@@ -3588,16 +3616,38 @@ def bulk_auto_asignar(
         raise HTTPException(400, "Maximo 500 glosas por auto-asignar")
 
     # Determinar candidatos: explicitos o todos los AUDITOR/COORDINADOR activos
+    from datetime import datetime, timezone as _tz
+    ahora_dt = datetime.now(_tz.utc)
     if data.candidatos:
         candidatos = [c.strip() for c in data.candidatos if c and "@" in c]
     else:
         users = (
-            db.query(UsuarioRecord.email)
+            db.query(UsuarioRecord)
             .filter(UsuarioRecord.activo == 1)
             .filter(UsuarioRecord.rol.in_(["AUDITOR", "COORDINADOR", "SUPER_ADMIN"]))
             .all()
         )
-        candidatos = [u[0] for u in users if u[0]]
+        # Excluir usuarios actualmente en vacaciones (sin delegacion).
+        # Si tienen delegacion, el delegado entra en su lugar via _resolver.
+        candidatos = []
+        for u in users:
+            en_vacaciones = (
+                u.vacaciones_desde and u.vacaciones_hasta
+                and u.vacaciones_desde <= ahora_dt <= u.vacaciones_hasta
+            )
+            if en_vacaciones:
+                continue  # se omite — su delegado (si existe) ya estara en la lista
+            candidatos.append(u.email)
+
+    # Resolver vacaciones para cada candidato (deduplica)
+    candidatos_real = []
+    seen = set()
+    for c in candidatos:
+        cr, _ = _resolver_destino_con_vacaciones(db, c)
+        if cr and cr.lower() not in seen:
+            seen.add(cr.lower())
+            candidatos_real.append(cr)
+    candidatos = candidatos_real
 
     if not candidatos:
         raise HTTPException(400, "Sin candidatos disponibles")

@@ -422,6 +422,22 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
 
+    # Vacaciones / delegacion temporal: 4 columnas opcionales
+    _USUARIOS_VACACIONES = [
+        ("vacaciones_desde", _TS_TIPO),
+        ("vacaciones_hasta", _TS_TIPO),
+        ("delega_a_email", "VARCHAR(200)"),
+        ("vacaciones_motivo", "VARCHAR(200)"),
+    ]
+    for col_name, col_ddl in _USUARIOS_VACACIONES:
+        try:
+            if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a usuarios")
+                db.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN usuarios {col_name}: {e}")
+
     db.close()
 
     db = SessionLocal()

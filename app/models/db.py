@@ -330,6 +330,14 @@ class UsuarioRecord(Base):
     rustdesk_id = Column(String(40), nullable=True)
     # Etiqueta libre para el equipo (ej. "PC HUS oficina 3", "Laptop casa")
     rustdesk_etiqueta = Column(String(120), nullable=True)
+    # Delegación temporal (vacaciones / licencia). Si vacaciones_desde
+    # <= ahora <= vacaciones_hasta y delega_a_email está seteado, las
+    # asignaciones automáticas se redirigen al delegado y la UI marca
+    # el badge "Vacaciones" en perfil/cards.
+    vacaciones_desde = Column(DateTime(timezone=True), nullable=True)
+    vacaciones_hasta = Column(DateTime(timezone=True), nullable=True)
+    delega_a_email = Column(String(200), nullable=True)
+    vacaciones_motivo = Column(String(200), nullable=True)
 
 
 class AuditLogRecord(Base):

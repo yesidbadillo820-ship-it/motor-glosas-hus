@@ -2124,6 +2124,14 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </div>
         </div>
 
+        <!-- Vacaciones: lista de gestores ausentes (visible al ejecutivo) -->
+        <div id="mando-vacaciones-wrap" style="margin-top:1rem;display:none">
+          <div class="chart-card">
+            <div class="chart-hdr">🏖️ Gestores en vacaciones (activas o programadas en 7 días)</div>
+            <div id="mando-vacaciones" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+        </div>
+
         <!-- B.3: Detector de actividad inteligente -->
         <div style="margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem">
           <div class="chart-card">
@@ -2458,6 +2466,25 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <span>🔊 Sonidos de notificaciones</span>
             </label>
             <div style="font-size:.68rem;color:var(--text3);margin-top:.25rem;padding-left:1.7rem">Tonos sintéticos cortos al completar un análisis o guardar cambios. Se guarda por navegador.</div>
+          </div>
+          <div class="form-card" id="vacaciones-card">
+            <h3>🏖️ Vacaciones / Licencia <span>Delegación temporal</span></h3>
+            <p style="font-size:.78rem;color:var(--text3);margin-bottom:.7rem">
+              Si te vas de vacaciones o licencia, configurá el rango y opcionalmente
+              un colega que reciba TUS asignaciones automáticas durante ese periodo.
+              Cuando vuelvas, limpiá el periodo y la cosa vuelve a la normalidad.
+            </p>
+            <div id="vacaciones-estado" style="font-size:.8rem;color:var(--text2);margin-bottom:.8rem"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+              <div class="field"><label>Desde</label><input type="date" id="vac-desde"/></div>
+              <div class="field"><label>Hasta</label><input type="date" id="vac-hasta"/></div>
+            </div>
+            <div class="field"><label>Delegar a (email opcional)</label><input type="email" id="vac-delega" placeholder="colega@hus.gov.co"/></div>
+            <div class="field"><label>Motivo (opcional)</label><input type="text" id="vac-motivo" placeholder="Vacaciones programadas"/></div>
+            <div style="display:flex;gap:.5rem">
+              <button class="btn btn-primary" onclick="guardarVacaciones()">Guardar</button>
+              <button class="btn btn-ghost" onclick="limpiarVacaciones()">🧹 Limpiar</button>
+            </div>
           </div>
           <div class="form-card">
             <h3>🔐 Mi seguridad <span>2FA</span></h3>
@@ -5166,7 +5193,7 @@ function tab(btn,id){
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
-  if(id==='usuarios') loadUsuarios();
+  if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
   if(id==='mis-glosas') loadMisGlosas();
@@ -8307,6 +8334,90 @@ async function correrSimulador(){
     html += '</div>';
     cont.innerHTML = html;
   }catch(e){ cont.innerHTML = '<div style="padding:1rem;color:#dc2626;">Conexión: ' + e.message + '</div>'; }
+}
+
+// ─── Vacaciones / delegacion temporal ──────────────────────────────
+async function cargarVacacionesPropias(){
+  var box = document.getElementById('vacaciones-estado');
+  if(!box) return;
+  try{
+    var r = await fetch('/usuarios/yo', {headers:authH()});
+    if(!r.ok) return;
+    var u = await r.json();
+    var dInp = document.getElementById('vac-desde');
+    var hInp = document.getElementById('vac-hasta');
+    var delInp = document.getElementById('vac-delega');
+    var motInp = document.getElementById('vac-motivo');
+    if(u.vacaciones_desde && u.vacaciones_hasta){
+      var desde = u.vacaciones_desde.slice(0,10);
+      var hasta = u.vacaciones_hasta.slice(0,10);
+      var hoy = new Date().toISOString().slice(0,10);
+      var activa = (desde <= hoy && hoy <= hasta);
+      box.innerHTML =
+        '<div style="background:'+(activa ? 'rgba(245,158,11,.10)' : 'rgba(3,105,161,.08)')+
+        ';border-left:4px solid '+(activa ? '#f59e0b' : '#0369a1')+
+        ';padding:.6rem .9rem;border-radius:6px">'+
+          (activa
+            ? '<b style="color:#92400e">🏖️ Vacaciones activas ahora</b>'
+            : '<b style="color:#0c4a6e">📅 Vacaciones programadas</b>')+
+          '<div style="font-size:.78rem;margin-top:.25rem">'+desde+' → '+hasta+
+          (u.delega_a_email ? ' · delega a <code>'+escHtml(u.delega_a_email)+'</code>' : ' · sin delegado')+
+          (u.vacaciones_motivo ? '<br><i>'+escHtml(u.vacaciones_motivo)+'</i>' : '')+
+          '</div>'+
+        '</div>';
+      if(dInp) dInp.value = desde;
+      if(hInp) hInp.value = hasta;
+      if(delInp) delInp.value = u.delega_a_email || '';
+      if(motInp) motInp.value = u.vacaciones_motivo || '';
+    } else {
+      box.innerHTML = '<div style="color:var(--text3);font-size:.8rem">Sin vacaciones configuradas. Tu cuenta funciona normalmente.</div>';
+      if(dInp) dInp.value = '';
+      if(hInp) hInp.value = '';
+      if(delInp) delInp.value = '';
+      if(motInp) motInp.value = '';
+    }
+  }catch(e){ console.warn('vacaciones', e); }
+}
+
+async function guardarVacaciones(){
+  var desde = (document.getElementById('vac-desde')||{}).value;
+  var hasta = (document.getElementById('vac-hasta')||{}).value;
+  var delega = ((document.getElementById('vac-delega')||{}).value || '').trim();
+  var motivo = ((document.getElementById('vac-motivo')||{}).value || '').trim();
+  if(!desde || !hasta){
+    toast('Faltan fechas','Ingresá desde y hasta','warning');
+    return;
+  }
+  if(desde >= hasta){
+    toast('Fechas invalidas','Desde debe ser anterior a hasta','warning');
+    return;
+  }
+  try{
+    var r = await fetch('/usuarios/yo/vacaciones', {
+      method:'POST',
+      headers:{'Content-Type':'application/json',...authH()},
+      body: JSON.stringify({desde: desde, hasta: hasta, delega_a_email: delega, motivo: motivo}),
+    });
+    var d = {};
+    try { d = await r.json(); } catch(_){}
+    if(!r.ok){ toast('Error', d.detail || 'HTTP '+r.status, 'error'); return; }
+    toast('Guardado', 'Vacaciones configuradas', 'success');
+    cargarVacacionesPropias();
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
+async function limpiarVacaciones(){
+  if(!confirm('¿Borrar el periodo de vacaciones? Tu cuenta volverá a recibir asignaciones normalmente.')) return;
+  try{
+    var r = await fetch('/usuarios/yo/vacaciones', {
+      method:'POST',
+      headers:{'Content-Type':'application/json',...authH()},
+      body: JSON.stringify({clear: true}),
+    });
+    if(!r.ok){ toast('Error','HTTP '+r.status,'error'); return; }
+    toast('Limpiado', 'Vacaciones borradas', 'success');
+    cargarVacacionesPropias();
+  }catch(e){ toast('Error de red', String(e), 'error'); }
 }
 
 async function cargar2FAEstado(){
@@ -13726,8 +13837,43 @@ async function loadMando(){
 
     // B.3: cargar detector de actividad en paralelo
     loadMandoDetector(critCount);
+    // Cargar lista de gestores en vacaciones
+    loadMandoVacaciones();
 
   } catch(e){ console.error('Mando error', e); }
+}
+
+async function loadMandoVacaciones(){
+  try{
+    var r = await fetch('/usuarios/en-vacaciones', {headers:authH()});
+    if(!r.ok) return;
+    var lista = await r.json();
+    var wrap = document.getElementById('mando-vacaciones-wrap');
+    var box = document.getElementById('mando-vacaciones');
+    if(!lista.length){
+      if(wrap) wrap.style.display = 'none';
+      return;
+    }
+    if(wrap) wrap.style.display = 'block';
+    if(!box) return;
+    box.innerHTML = lista.map(function(u){
+      var color = u.activa_ahora ? '#f59e0b' : '#0369a1';
+      var bg = u.activa_ahora ? 'rgba(245,158,11,.08)' : 'rgba(3,105,161,.06)';
+      var d1 = (u.vacaciones_desde||'').slice(0,10);
+      var d2 = (u.vacaciones_hasta||'').slice(0,10);
+      return '<div style="background:'+bg+';border-left:3px solid '+color+
+        ';padding:.5rem .8rem;margin-bottom:.4rem;border-radius:4px">'+
+        '<div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap">'+
+          '<div style="font-weight:600">'+escHtml(u.nombre || u.email)+
+            (u.activa_ahora ? ' <span style="background:'+color+';color:#fff;padding:1px 6px;border-radius:8px;font-size:.65rem;margin-left:.25rem">EN VACACIONES</span>' : '')+
+          '</div>'+
+          '<div style="color:var(--text3);font-size:.78rem">'+d1+' → '+d2+'</div>'+
+        '</div>'+
+        (u.delega_a_email ? '<div style="font-size:.72rem;color:var(--text3);margin-top:.2rem">→ delega a <code>'+escHtml(u.delega_a_email)+'</code></div>' : '')+
+        (u.motivo ? '<div style="font-size:.72rem;color:var(--text3);font-style:italic">"'+escHtml(u.motivo)+'"</div>' : '')+
+      '</div>';
+    }).join('');
+  } catch(e){ console.warn('vacaciones mando', e); }
 }
 
 async function loadMandoDetector(critFromAlertas){
