@@ -2865,6 +2865,39 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <div id="soportes-resultados" style="margin-top:1rem"></div>
           </div>
 
+          <!-- F3: Subir ZIP de soportes -->
+          <div class="form-card" style="border:2px dashed #0ea5e9;background:rgba(14,165,233,.04)">
+            <h3 style="color:#0369a1">📦 Subir paquete .zip de soportes</h3>
+            <p style="font-size:.78rem;color:var(--text3);margin-bottom:.8rem">
+              Si el jump-box no esta conectado o necesitas anexar soportes manualmente, podes subir un .zip con la estructura:
+              <code>FACTURA_HUS487233/FEV.pdf</code>, <code>FACTURA_HUS487233/HC.pdf</code>, etc.
+              Max 250 MB comprimido / 800 MB descomprimido / 500 archivos. Solo .pdf .json .xml .txt .csv.
+            </p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.6rem;align-items:flex-end">
+              <div class="field" style="margin:0">
+                <label style="font-size:.7rem">Archivo .zip</label>
+                <input id="zip-file" type="file" accept=".zip" />
+              </div>
+              <div class="field" style="margin:0">
+                <label style="font-size:.7rem">Subcarpeta (opcional)</label>
+                <input id="zip-subcarpeta" type="text" placeholder="Ej: ABRIL 2026 - SOPORTES/COMPENSAR" />
+              </div>
+            </div>
+            <div style="display:flex;gap:.5rem;margin-top:.8rem;flex-wrap:wrap">
+              <button class="btn-primary" onclick="subirSoportesZip()">⬆️ Subir y extraer</button>
+              <button class="btn-ghost" onclick="document.getElementById('zip-file').value='';document.getElementById('zip-subcarpeta').value='';document.getElementById('zip-resumen').innerHTML='';" style="font-size:.78rem">Limpiar</button>
+            </div>
+            <div id="zip-progress" style="margin-top:.8rem;display:none">
+              <div style="font-size:.75rem;color:var(--text2);margin-bottom:.3rem">
+                <span id="zip-progress-pct">0%</span> · <span id="zip-progress-name">—</span>
+              </div>
+              <div style="background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden">
+                <div id="zip-progress-bar" style="background:#0ea5e9;height:100%;width:0%;transition:width .2s ease"></div>
+              </div>
+            </div>
+            <div id="zip-resumen" style="margin-top:.8rem"></div>
+          </div>
+
           <!-- Cómo conectar el servidor -->
           <div class="form-card" style="border:2px dashed #f59e0b;background:#fffbeb">
             <h3 style="color:#92400e">🔌 Cómo conectar tu servidor de archivos</h3>
@@ -13265,6 +13298,108 @@ async function reindexarSoportes(){
       'success');
     cargarSoportesEstado();
   }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+// F3: Subir ZIP de soportes — POST /soportes-auto/upload-zip
+async function subirSoportesZip(){
+  var inp = document.getElementById('zip-file');
+  var subInp = document.getElementById('zip-subcarpeta');
+  if(!inp || !inp.files || !inp.files.length){
+    toast('Falta archivo', 'Seleccioná un .zip primero', 'warning');
+    return;
+  }
+  var f = inp.files[0];
+  if(!/\.zip$/i.test(f.name)){
+    toast('Formato', 'Solo se permite .zip', 'warning');
+    return;
+  }
+  var maxBytes = 250 * 1024 * 1024;
+  if(f.size > maxBytes){
+    toast('Demasiado grande', 'Max 250 MB. Tu archivo: ' + Math.round(f.size/1024/1024) + ' MB', 'error');
+    return;
+  }
+
+  var fd = new FormData();
+  fd.append('file', f);
+  if(subInp && subInp.value.trim()){
+    fd.append('subcarpeta', subInp.value.trim());
+  }
+
+  var prog = document.getElementById('zip-progress');
+  var bar = document.getElementById('zip-progress-bar');
+  var pct = document.getElementById('zip-progress-pct');
+  var nameEl = document.getElementById('zip-progress-name');
+  var resumen = document.getElementById('zip-resumen');
+  if(prog) prog.style.display = 'block';
+  if(nameEl) nameEl.textContent = f.name + ' · ' + Math.round(f.size/1024/1024) + ' MB';
+  if(resumen) resumen.innerHTML = '';
+
+  // XHR para tener progress real
+  await new Promise(function(resolve){
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/soportes-auto/upload-zip', true);
+    var auth = authH();
+    Object.keys(auth).forEach(function(k){ xhr.setRequestHeader(k, auth[k]); });
+    xhr.upload.onprogress = function(e){
+      if(!e.lengthComputable) return;
+      var p = Math.round(e.loaded * 100 / e.total);
+      if(bar) bar.style.width = p + '%';
+      if(pct) pct.textContent = p + '%';
+    };
+    xhr.onload = function(){
+      var d = {};
+      try { d = JSON.parse(xhr.responseText); } catch(_){}
+      if(xhr.status >= 200 && xhr.status < 300){
+        if(bar) bar.style.width = '100%';
+        if(pct) pct.textContent = '100% — extrayendo';
+        var rechCount = (d.rechazados || []).length;
+        var rechHtml = rechCount
+          ? '<details style="margin-top:.5rem"><summary style="cursor:pointer;color:#dc2626;font-size:.78rem">'+
+              rechCount+' rechazados (click para ver)</summary>'+
+              '<div style="font-size:.7rem;color:var(--text3);margin-top:.4rem;font-family:monospace">'+
+              (d.rechazados||[]).slice(0,20).map(function(r){
+                return escHtml(r.rel) + ' → ' + escHtml(r.motivo);
+              }).join('<br>')+
+              (rechCount > 20 ? '<br>… +'+(rechCount-20)+' mas' : '')+
+            '</div></details>'
+          : '';
+        if(resumen){
+          resumen.innerHTML =
+            '<div style="background:rgba(16,185,129,.08);border-left:4px solid #10b981;padding:.7rem 1rem;border-radius:6px;font-size:.82rem">'+
+              '<div style="font-weight:700;color:#065f46">✅ Extraccion completa</div>'+
+              '<div style="color:var(--text2);margin-top:.3rem">'+
+                '<b>'+(d.guardados||0)+'</b> guardados · '+
+                '<b>'+(d.ignorados_iguales||0)+'</b> ya existentes · '+
+                '<b>'+rechCount+'</b> rechazados · '+
+                Math.round((d.bytes_escritos||0)/1024)+' KB escritos'+
+                (d.subcarpeta ? ' · subcarpeta: <code>'+escHtml(d.subcarpeta)+'</code>' : '')+
+              '</div>'+
+              rechHtml+
+              '<div style="margin-top:.6rem">'+
+                '<button class="btn-secondary btn-sm" onclick="reindexarSoportes()" style="font-size:.72rem">🔄 Reindexar ahora</button>'+
+              '</div>'+
+            '</div>';
+        }
+        toast('ZIP procesado', (d.guardados||0) + ' archivos guardados', 'success');
+      } else {
+        if(resumen){
+          resumen.innerHTML =
+            '<div style="background:rgba(220,38,38,.08);border-left:4px solid #dc2626;padding:.7rem 1rem;border-radius:6px;font-size:.82rem">'+
+              '<div style="font-weight:700;color:#991b1b">❌ Error '+xhr.status+'</div>'+
+              '<div style="color:var(--text2);margin-top:.3rem">'+escHtml(d.detail || xhr.statusText || 'Error desconocido')+'</div>'+
+            '</div>';
+        }
+        toast('Error', d.detail || ('HTTP '+xhr.status), 'error');
+      }
+      resolve();
+    };
+    xhr.onerror = function(){
+      if(resumen) resumen.innerHTML = '<div style="color:#dc2626;font-size:.78rem">Error de red. Verificá tu conexión.</div>';
+      toast('Error de red', 'No se pudo subir', 'error');
+      resolve();
+    };
+    xhr.send(fd);
+  });
 }
 
 // Auto-detección de soportes al abrir una glosa.

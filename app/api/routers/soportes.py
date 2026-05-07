@@ -468,3 +468,173 @@ async def upload_bulk(
         pass
 
     return resumen
+
+
+# ─── F3: Importacion masiva via ZIP ────────────────────────────────────
+# Permite subir un .zip con la estructura:
+#   <FACTURA_HUS>/<archivo1.pdf>
+#   <FACTURA_HUS>/<archivo2.pdf>
+#   <FACTURA_HUS_2>/<...>
+# El servidor extrae preservando la estructura (factura/archivo) bajo
+# SOPORTES_LOCAL_ROOT/<periodo opcional>/<factura>/<archivo>. Cada
+# archivo pasa por las mismas validaciones que upload-bulk:
+# extension permitida, tamaño individual y total, y path traversal
+# bloqueado. Util para casos donde el gestor tiene un paquete ya
+# armado y no quiere subirlo archivo por archivo.
+_MAX_BYTES_ZIP = 250 * 1024 * 1024  # 250 MB el .zip comprimido
+_MAX_BYTES_DESCOMPRIMIDO = 800 * 1024 * 1024  # 800 MB descomprimido (anti-bomb)
+_MAX_ARCHIVOS_EN_ZIP = 500
+
+
+@router.post("/upload-zip")
+async def upload_zip(
+    request: Request,
+    file: UploadFile = File(...),
+    subcarpeta: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Sube un .zip con soportes y los extrae bajo SOPORTES_LOCAL_ROOT.
+
+    Args:
+        file: archivo .zip (max 250 MB comprimido, 800 MB descomprimido).
+        subcarpeta: prefijo opcional bajo SOPORTES_LOCAL_ROOT donde
+            extraer (ej. "ABRIL 2026 - SOPORTES RADICACION/COMPENSAR").
+            Si se omite, extrae directamente en la raiz.
+
+    Estructura recomendada del zip:
+        FACTURA_HUS487233/
+            FEV_documento1.pdf
+            HC_historia.pdf
+        FACTURA_HUS123456/
+            ...
+
+    Validaciones:
+        - Solo extension .zip aceptada en `file`.
+        - Anti-zip-bomb: limite de bytes descomprimido total y por archivo.
+        - Cada archivo extraido pasa por _safe_join + _EXT_PERMITIDAS.
+        - Max 500 archivos dentro del zip.
+
+    Tras la extraccion NO dispara reindex automatico — el cliente debe
+    llamar /soportes-auto/reindex cuando termine.
+    """
+    import zipfile
+    import io
+
+    nombre_zip = (file.filename or "").lower()
+    if not nombre_zip.endswith(".zip"):
+        raise HTTPException(400, "El archivo debe ser .zip")
+
+    # Leer en memoria con tope
+    blob = await file.read(_MAX_BYTES_ZIP + 1)
+    if len(blob) > _MAX_BYTES_ZIP:
+        raise HTTPException(400, f"ZIP excede {_MAX_BYTES_ZIP // (1024*1024)} MB")
+    if len(blob) < 22:
+        raise HTTPException(400, "ZIP vacio o corrupto")
+
+    raiz = _local_root()
+    raiz.mkdir(parents=True, exist_ok=True)
+
+    # Si hay subcarpeta, validar que sea segura tambien
+    if subcarpeta:
+        prefijo = _safe_join(raiz, subcarpeta)
+        if prefijo is None:
+            raise HTTPException(400, "subcarpeta invalida")
+        prefijo.mkdir(parents=True, exist_ok=True)
+    else:
+        prefijo = raiz
+
+    resumen = {
+        "guardados": 0,
+        "ignorados_iguales": 0,
+        "rechazados": [],
+        "bytes_escritos": 0,
+        "subcarpeta": subcarpeta or "",
+    }
+    total_descomprimido = 0
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(blob))
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "ZIP corrupto o no valido")
+
+    miembros = [m for m in zf.infolist() if not m.is_dir()]
+    if len(miembros) > _MAX_ARCHIVOS_EN_ZIP:
+        raise HTTPException(400, f"Max {_MAX_ARCHIVOS_EN_ZIP} archivos por ZIP")
+
+    for info in miembros:
+        rel = info.filename
+        # Anti-zip-slip: rel no debe escapar
+        destino = _safe_join(prefijo, rel)
+        if destino is None:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "path_invalido"})
+            continue
+        # Solo extensiones permitidas
+        if destino.suffix.lower() not in _EXT_PERMITIDAS:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "extension_no_permitida"})
+            continue
+        # Tamaño descomprimido por archivo
+        if info.file_size > _MAX_BYTES_POR_ARCHIVO:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "demasiado_grande"})
+            continue
+        if total_descomprimido + info.file_size > _MAX_BYTES_DESCOMPRIMIDO:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": "lote_excede_total"})
+            continue
+        # Skip si ya existe con mismo tamaño
+        if destino.exists() and destino.stat().st_size == info.file_size:
+            resumen["ignorados_iguales"] += 1
+            total_descomprimido += info.file_size
+            continue
+        try:
+            with zf.open(info) as src:
+                contenido = src.read(_MAX_BYTES_POR_ARCHIVO + 1)
+            if len(contenido) > _MAX_BYTES_POR_ARCHIVO:
+                resumen["rechazados"].append({"rel": rel[:200], "motivo": "demasiado_grande_real"})
+                continue
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            tmp = destino.with_suffix(destino.suffix + ".tmp")
+            tmp.write_bytes(contenido)
+            tmp.replace(destino)
+            resumen["guardados"] += 1
+            resumen["bytes_escritos"] += len(contenido)
+            total_descomprimido += len(contenido)
+        except Exception as e:
+            resumen["rechazados"].append({"rel": rel[:200], "motivo": f"io:{str(e)[:60]}"})
+        finally:
+            try:
+                del contenido
+            except Exception:
+                pass
+
+    try:
+        zf.close()
+    except Exception:
+        pass
+
+    # Audit
+    try:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=getattr(current_user, "rol", "") or "",
+            accion="UPLOAD_ZIP_SOPORTES",
+            tabla="soportes_share",
+            detalle=(
+                f"zip={file.filename} guardados={resumen['guardados']} "
+                f"ignorados={resumen['ignorados_iguales']} "
+                f"rechazados={len(resumen['rechazados'])} "
+                f"bytes={resumen['bytes_escritos']} "
+                f"subcarpeta={subcarpeta or '/'}"
+            ),
+            ip=request.client.host if request.client else None,
+        )
+    except Exception:
+        pass
+
+    try:
+        del blob
+        import gc as _gc
+        _gc.collect()
+    except Exception:
+        pass
+
+    return resumen
