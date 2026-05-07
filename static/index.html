@@ -1083,6 +1083,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     display:block;text-align:center;font-size:9pt;font-weight:700;
     padding:6px 0;border-bottom:1.5px solid #0b3d91;margin-bottom:12px;color:#0b3d91;
   }
+  /* Mando ejecutivo en modo impresion: ocultar controles efimeros */
+  body.printing-mando #mando-auto, body.printing-mando label[for*="mando-auto"]{display:none!important}
+  body.printing-mando .panel:not(#p-mando){display:none!important}
+  body.printing-mando #p-mando{display:flex!important}
+  body.printing-mando .kpi{break-inside:avoid;page-break-inside:avoid}
+  body.printing-mando .chart-card{break-inside:avoid;page-break-inside:avoid;margin-bottom:8pt}
+  body.printing-mando .kpi-num{font-size:14pt!important}
+  body.printing-mando #p-mando button{display:none!important}
+  body.printing-mando #p-mando::after{
+    content:"Generado el " attr(data-print-ts) " — Motor Glosas HUS";
+    display:block;text-align:right;font-size:8pt;color:#475569;margin-top:1cm
+  }
 }
 
 /* ─── ONBOARDING TOUR ──────────────────────────────────────── */
@@ -2100,6 +2112,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div style="display:flex;gap:.4rem;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:var(--text3)"><input type="checkbox" id="mando-auto" checked style="width:auto;margin:0"> auto-refresh</label>
             <button class="btn btn-ghost" onclick="autoBalancearCarga()" style="font-size:.8rem;background:#0d9488;color:#fff;border:0" title="Distribuir glosas pendientes sin asignar entre gestores activos (round-robin balanceado)">⚖️ Auto-balancear</button>
+            <button class="btn btn-ghost" onclick="imprimirMando()" style="font-size:.8rem" title="Imprimir/exportar PDF del Mando ejecutivo (Ctrl+P)">🖨️ Imprimir</button>
             <button class="btn btn-ghost" onclick="loadMando()" style="font-size:.8rem">Actualizar</button>
           </div>
         </div>
@@ -2126,6 +2139,21 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div class="chart-card">
             <div class="chart-hdr">⚠️ EPS con más ratificación (revisar argumentación)</div>
             <div id="mando-eps-ratif" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+        </div>
+
+        <!-- Métricas IA por gestor (costos del mes) -->
+        <div style="margin-top:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr" style="display:flex;justify-content:space-between;align-items:center">
+              <span>💸 Costo IA por gestor (últimos 30 días)</span>
+              <select id="mando-ia-ventana" onchange="loadMandoIAPorUsuario()" class="no-print" style="font-size:.7rem;padding:.15rem .4rem;width:auto">
+                <option value="1">24h</option>
+                <option value="7">7d</option>
+                <option value="30" selected>30d</option>
+              </select>
+            </div>
+            <div id="mando-ia-usuarios" style="padding:.6rem;font-size:.8rem">—</div>
           </div>
         </div>
 
@@ -4389,6 +4417,43 @@ document.addEventListener('keydown', function(e){
   } else if(e.key === 'a' || e.key === 'A'){
     abrirAsistenteDrawer();
     e.preventDefault();
+  } else if(e.key === 's' || e.key === 'S'){
+    // Abrir Spotlight (alternativa a Ctrl+K)
+    if(typeof abrirSpotlight === 'function'){ abrirSpotlight(); e.preventDefault(); }
+  } else if(e.key === 'h' || e.key === 'H'){
+    // Historial
+    sidebarTab(document.querySelector('.sn-item[data-tip="Historial"]'), 'historial');
+    e.preventDefault();
+  } else if(e.key === 'c' || e.key === 'C'){
+    // Mando ejecutivo (cockpit)
+    var btnM = document.getElementById('sn-mando');
+    if(btnM && btnM.style.display !== 'none'){
+      sidebarTab(btnM, 'mando');
+      e.preventDefault();
+    }
+  } else if(e.key === 'v' || e.key === 'V'){
+    // Vacaciones / Usuarios
+    sidebarTab(document.querySelector('.sn-item[data-tip="Usuarios"]'), 'usuarios');
+    e.preventDefault();
+  } else if(e.key === 'r' || e.key === 'R'){
+    // Refrescar el panel activo
+    var activeId = (document.querySelector('.panel.active')||{}).id || '';
+    var fnMap = {
+      'p-mando': 'loadMando', 'p-dashboard': 'loadDash',
+      'p-mis-glosas': 'loadMisGlosas', 'p-historial': 'loadHist',
+      'p-alertas': 'loadAlertas', 'p-resumen-mes': 'loadResumenMes',
+      'p-cobranza-live': 'loadDashCobranza', 'p-usuarios': 'loadUsuarios',
+      'p-conciliacion': 'loadConciliaciones', 'p-audit': 'loadAudit',
+      'p-mi-desempeno': 'cargarMiDesempeno', 'p-papelera': 'cargarPapelera',
+      'p-tarifas': 'cargarTarifas', 'p-soportes': 'cargarSoportesEstado',
+      'p-diagnostico': 'cargarDiagnostico',
+    };
+    var fnName = fnMap[activeId];
+    if(fnName && typeof window[fnName] === 'function'){
+      window[fnName]();
+      if(typeof toast === 'function') toast('Refrescando','Panel actualizado','info');
+      e.preventDefault();
+    }
   }
 });
 
@@ -4427,11 +4492,16 @@ function abrirAtajosPanel(){
           [
             ['?','Mostrar este panel'],
             ['/','Buscar (Command Palette)'],
+            ['s','Spotlight (Ctrl+K)'],
             ['n','Nueva glosa'],
             ['m','Ir a Mis glosas'],
             ['d','Ir al Dashboard'],
+            ['c','Ir al Mando ejecutivo (coord/admin)'],
+            ['h','Ir al Historial'],
+            ['v','Ir a Usuarios / Vacaciones'],
             ['g','Ir a glosa por ID'],
             ['a','Abrir asistente IA (drawer)'],
+            ['r','Refrescar el panel activo'],
             ['b','Reportar fallo o sugerencia'],
             ['Esc','Cerrar modales'],
           ].map(function(p){
@@ -13927,8 +13997,70 @@ async function loadMando(){
     loadMandoDetector(critCount);
     // Cargar lista de gestores en vacaciones
     loadMandoVacaciones();
+    // Métricas IA por usuario
+    loadMandoIAPorUsuario();
 
   } catch(e){ console.error('Mando error', e); }
+}
+
+async function loadMandoIAPorUsuario(){
+  var sel = document.getElementById('mando-ia-ventana');
+  var box = document.getElementById('mando-ia-usuarios');
+  if(!box) return;
+  var dias = sel ? parseInt(sel.value, 10) : 30;
+  try{
+    var r = await fetch('/sistema/metricas-ia/por-usuario?dias='+dias, {headers:authH()});
+    if(r.status === 403){
+      box.innerHTML = '<div style="color:#b45309;font-size:.78rem;text-align:center;padding:1rem">Solo COORDINADOR / SUPER_ADMIN</div>';
+      return;
+    }
+    if(!r.ok){ box.innerHTML = '<div style="color:var(--text3);font-size:.78rem">Sin datos disponibles</div>'; return; }
+    var d = await r.json();
+    var ranking = d.ranking || [];
+    if(!ranking.length){
+      box.innerHTML = '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin actividad IA en los últimos '+dias+' días</div>';
+      return;
+    }
+    var totalCost = ranking.reduce(function(a,r){return a + (r.cost_usd||0);}, 0);
+    var totalCalls = ranking.reduce(function(a,r){return a + (r.calls||0);}, 0);
+    var totalTokens = ranking.reduce(function(a,r){return a + (r.tokens_total||0);}, 0);
+    box.innerHTML =
+      '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:2px solid var(--border);font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.4px">'+
+        '<span>Total: '+ranking.length+' gestores</span>'+
+        '<span>$'+totalCost.toFixed(2)+' · '+totalCalls.toLocaleString('es-CO')+' calls · '+(totalTokens/1000).toFixed(1)+'K tokens</span>'+
+      '</div>'+
+      ranking.slice(0, 10).map(function(u, i){
+        var pctCost = totalCost ? (u.cost_usd / totalCost * 100) : 0;
+        var color = u.cost_usd > 1.0 ? '#dc2626' : (u.cost_usd > 0.30 ? '#f59e0b' : '#475569');
+        return '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);gap:.5rem;align-items:center">'+
+          '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1">'+
+            '<span style="font-weight:600">'+escHtml((u.user_email||'—').split('@')[0])+'</span>'+
+            '<div style="font-size:.7rem;color:var(--text3)">'+u.calls+' calls · '+(u.tokens_total/1000).toFixed(1)+'K tokens · ~'+u.latency_ms_promedio+'ms</div>'+
+          '</div>'+
+          '<div style="text-align:right;flex-shrink:0;min-width:90px">'+
+            '<div style="color:'+color+';font-weight:700;font-variant-numeric:tabular-nums">$'+u.cost_usd.toFixed(4)+'</div>'+
+            '<div style="font-size:.65rem;color:var(--text3)">'+pctCost.toFixed(1)+'% del total</div>'+
+          '</div>'+
+        '</div>';
+      }).join('') +
+      (ranking.length > 10 ? '<div style="font-size:.7rem;color:var(--text3);text-align:center;padding:.4rem">+'+(ranking.length-10)+' más</div>' : '');
+  }catch(e){ console.warn('mando ia', e); }
+}
+
+// Imprimir Mando ejecutivo. Aprovecha @media print global para ocultar
+// sidebar/header/botones. Marca body con print-mando para customizaciones
+// adicionales (numeros mas grandes, ocultar auto-refresh checkbox, etc).
+function imprimirMando(){
+  document.body.classList.add('printing-mando');
+  var p = document.getElementById('p-mando');
+  if(p) p.setAttribute('data-print-ts', new Date().toLocaleString('es-CO'));
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){
+      document.body.classList.remove('printing-mando');
+      if(p) p.removeAttribute('data-print-ts');
+    }, 800);
+  }, 80);
 }
 
 async function loadMandoVacaciones(){
