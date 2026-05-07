@@ -1937,6 +1937,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <button class="btn" style="background:#7c3aed;color:#fff;border:0" onclick="reabrirParaCorregirLote()" title="Reabre glosas RESPONDIDAS o CONCILIADAS para poder regenerar el dictamen (vuelven a Pendientes con dictamen actual). Útil para corregir dictámenes que quedaron mal por error de auditor o falta de contrato">🔧 Reabrir para corregir</button>
           <button class="btn" style="background:#16a34a;color:#fff;border:0" onclick="decisionEpsLote('LEVANTADA')" title="Decisión EPS: levantó (aceptó nuestra defensa) las glosas seleccionadas">⬆ EPS LEVANTÓ</button>
           <button class="btn" style="background:#dc2626;color:#fff;border:0" onclick="decisionEpsLote('RATIFICADA')" title="Decisión EPS: ratificó (rechazó) las glosas seleccionadas">❌ EPS RATIFICÓ</button>
+          <!-- F2: bulk asignar a otro gestor (solo COORDINADOR/SUPER_ADMIN) -->
+          <button id="bulk-btn-asignar" class="btn" style="background:#0369a1;color:#fff;border:0;display:none" onclick="bulkAsignarGestor()" title="Reasignar glosas seleccionadas a otro gestor">👤 Asignar a...</button>
+          <button class="btn" style="background:#475569;color:#fff;border:0" onclick="bulkExportarCSV()" title="Descargar las glosas seleccionadas en CSV">📥 Exportar CSV</button>
           <button class="btn btn-ghost" onclick="limpiarSeleccionLote()">Limpiar</button>
         </div>
 
@@ -10238,6 +10241,111 @@ function limpiarSeleccionLote(){
   var all = document.getElementById('bulk-chk-all'); if(all) all.checked = false;
   actualizarContadorLote();
 }
+
+// ─── BULK F2: asignar selección a otro gestor + exportar a CSV ─────
+async function bulkAsignarGestor(){
+  var ids = _idsSeleccionados();
+  if(!ids.length){ toast('Nada seleccionado','Marca glosas con los checkboxes','warning'); return; }
+  if(ids.length > 200){ toast('Demasiadas','Máximo 200 por bulk','warning'); return; }
+  // Cargar lista de auditores activos para el dropdown
+  var users = [];
+  try{
+    var ru = await fetch('/usuarios/', {headers: authH()});
+    if(ru.ok){
+      users = (await ru.json()).filter(function(u){
+        var rol = (u.rol||'').toUpperCase();
+        return ['AUDITOR','COORDINADOR','SUPER_ADMIN'].indexOf(rol) >= 0
+            && (u.activo === 1 || u.activo === true);
+      });
+    }
+  }catch(e){}
+  if(!users.length){
+    toast('Sin gestores','No hay usuarios activos para asignar','warning');
+    return;
+  }
+  // Modal simple con dropdown
+  var lista = users.map(function(u, i){
+    return (i+1) + '. ' + (u.nombre || u.email) + ' (' + u.email + ' · ' + (u.rol||'AUDITOR') + ')';
+  }).join('\n');
+  var sel = prompt(
+    '👤 Reasignar ' + ids.length + ' glosa(s) a:\n\n' + lista
+    + '\n\nEscribí el NÚMERO del gestor (1-' + users.length + ') o pegá el email exacto:'
+  );
+  if(!sel) return;
+  var emailDestino = '';
+  if(/^\d+$/.test(sel.trim())){
+    var idx = parseInt(sel, 10) - 1;
+    if(idx < 0 || idx >= users.length){ toast('Número inválido','Fuera de rango','warning'); return; }
+    emailDestino = users[idx].email;
+  } else {
+    emailDestino = sel.trim();
+  }
+  if(!emailDestino || emailDestino.indexOf('@') === -1){
+    toast('Email inválido','Formato no reconocido','warning');
+    return;
+  }
+  if(!confirm('¿Reasignar ' + ids.length + ' glosas a ' + emailDestino + '?')) return;
+  try{
+    var r = await fetch('/glosas/bulk/asignar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', ...authH()},
+      body: JSON.stringify({glosa_ids: ids, auditor_email: emailDestino}),
+    });
+    var data = {};
+    try { data = await r.json(); } catch(_){}
+    if(!r.ok){
+      toast('Error', data.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    toast('Asignadas', data.actualizadas + '/' + data.total_solicitadas + ' a ' + emailDestino, 'success');
+    limpiarSeleccionLote();
+    if(typeof loadMisGlosas === 'function') loadMisGlosas();
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
+async function bulkExportarCSV(){
+  var ids = _idsSeleccionados();
+  if(!ids.length){ toast('Nada seleccionado','Marca glosas con los checkboxes','warning'); return; }
+  if(ids.length > 1000){ toast('Demasiadas','Máximo 1000 por export','warning'); return; }
+  try{
+    var r = await fetch('/glosas/bulk/exportar-csv', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', ...authH()},
+      body: JSON.stringify({glosa_ids: ids}),
+    });
+    if(!r.ok){
+      var data = {};
+      try { data = await r.json(); } catch(_){}
+      toast('Error', data.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var ahora = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.download = 'glosas-seleccion-' + ahora + '.csv';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    toast('CSV descargado', ids.length + ' glosas exportadas', 'success');
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
+// Mostrar el botón "Asignar a..." solo si el usuario es admin/coord
+(function(){
+  var check = function(){
+    var btn = document.getElementById('bulk-btn-asignar');
+    if(!btn) return;
+    var rol = (window.USER_ROL||'').toUpperCase();
+    btn.style.display = (rol === 'SUPER_ADMIN' || rol === 'COORDINADOR') ? '' : 'none';
+  };
+  setTimeout(check, 800);
+  setTimeout(check, 3000);
+})();
 
 async function generarRespuestasLote(idsForzados, forzarSobrescribir){
   var ids = Array.isArray(idsForzados) && idsForzados.length ? idsForzados.slice() : _idsSeleccionados();

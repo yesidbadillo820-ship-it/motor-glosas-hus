@@ -3422,8 +3422,123 @@ def asignar_auditor(glosa_id: int, data: AsignarAuditorInput,
     AuditRepository(db).registrar(
         usuario_email=current_user.email, usuario_rol=current_user.rol,
         accion="ASIGNAR", tabla="glosas", registro_id=glosa_id,
-        campo="auditor_email", valor_anterior=anterior, valor_nuevo=data.auditor_email)
-    return {"message": f"Glosa #{glosa_id} asignada a {data.auditor_email}"}
+        valor_anterior=anterior, valor_nuevo=data.auditor_email,
+    )
+    return {"ok": True, "id": glosa_id, "auditor_email": data.auditor_email}
+
+
+class BulkAsignarInput(BaseModel):
+    glosa_ids: list[int]
+    auditor_email: str
+
+
+@router.post("/bulk/asignar")
+def bulk_asignar(
+    data: BulkAsignarInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Bulk: reasigna N glosas seleccionadas a otro gestor en una sola
+    operacion. Solo COORDINADOR/SUPER_ADMIN.
+
+    Aplica `auditor_email` Y `gestor_nombre` para que la glosa
+    aparezca en "Mis glosas" del nuevo dueno.
+    """
+    if not data.glosa_ids:
+        raise HTTPException(400, "Lista vacia")
+    if len(data.glosa_ids) > 200:
+        raise HTTPException(400, "Maximo 200 glosas por bulk")
+
+    actualizadas = 0
+    no_encontradas = 0
+    for gid in data.glosa_ids:
+        g = GlosaRepository(db).obtener_por_id(gid)
+        if not g:
+            no_encontradas += 1
+            continue
+        anterior = g.auditor_email or g.gestor_nombre
+        g.auditor_email = data.auditor_email
+        g.gestor_nombre = data.auditor_email
+        actualizadas += 1
+        try:
+            AuditRepository(db).registrar(
+                usuario_email=current_user.email, usuario_rol=current_user.rol,
+                accion="BULK_ASIGNAR", tabla="glosas", registro_id=gid,
+                valor_anterior=anterior, valor_nuevo=data.auditor_email,
+            )
+        except Exception:
+            pass
+    db.commit()
+    return {
+        "ok": True,
+        "actualizadas": actualizadas,
+        "no_encontradas": no_encontradas,
+        "total_solicitadas": len(data.glosa_ids),
+        "auditor_email": data.auditor_email,
+    }
+
+
+class BulkIdsInput(BaseModel):
+    glosa_ids: list[int]
+
+
+@router.post("/bulk/exportar-csv")
+def bulk_exportar_csv(
+    data: BulkIdsInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Exporta a CSV las glosas seleccionadas. StreamingResponse para
+    no cargar todo en memoria.
+    """
+    from fastapi.responses import StreamingResponse
+    import csv as _csv
+    import io as _io
+    from datetime import datetime as _dt
+
+    if not data.glosa_ids:
+        raise HTTPException(400, "Lista vacia")
+    if len(data.glosa_ids) > 1000:
+        raise HTTPException(400, "Maximo 1000 glosas por export")
+
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.id.in_(data.glosa_ids))
+        .order_by(GlosaRecord.id)
+        .all()
+    )
+
+    def _gen():
+        buf = _io.StringIO()
+        w = _csv.writer(buf)
+        w.writerow([
+            "id", "factura", "eps", "codigo_glosa", "valor_objetado",
+            "valor_aceptado", "valor_recuperado", "estado", "etapa",
+            "auditor_email", "gestor_nombre", "fecha_recepcion",
+            "fecha_entrega", "decision_eps", "creado_en",
+        ])
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+        for g in glosas:
+            w.writerow([
+                g.id, g.factura or "", g.eps or "", g.codigo_glosa or "",
+                float(g.valor_objetado or 0), float(g.valor_aceptado or 0),
+                float(g.valor_recuperado or 0), g.estado or "", g.etapa or "",
+                g.auditor_email or "", g.gestor_nombre or "",
+                g.fecha_recepcion.isoformat() if g.fecha_recepcion else "",
+                g.fecha_entrega.isoformat() if g.fecha_entrega else "",
+                g.decision_eps or "",
+                g.creado_en.isoformat() if g.creado_en else "",
+            ])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
+
+    fname = f"glosas-seleccion-{_dt.now().strftime('%Y%m%d-%H%M%S')}.csv"
+    return StreamingResponse(
+        _gen(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/casos-similares/{glosa_id}")
