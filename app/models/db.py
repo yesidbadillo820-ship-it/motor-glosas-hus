@@ -666,3 +666,29 @@ class PresetFiltroRecord(Base):
     __table_args__ = (
         Index("ix_preset_usuario", "usuario_email", "creado_en"),
     )
+
+
+class RutaFacturaRecord(Base):
+    """Mapeo factura HUS -> ruta de la carpeta de soportes en el share
+    local del HUS (ej. Y:\\FEBRERO 2026 - SOPORTES RADICACION CARPETA
+    2\\DISPENSARIO\\VANESSA\\ENV-221979-C\\HUS466775).
+
+    El gestor sube un CSV/XLSX con dos columnas (factura, ruta) y la
+    UI consulta esta tabla cuando va a auditar una factura. El
+    browser del gestor (que SI tiene visibilidad de Y:) descarga los
+    PDFs del servidor HTTP local y los sube al motor para auditarlos
+    con Claude.
+
+    El motor en cloud no necesita acceso al share — solo necesita el
+    string de la ruta para que el frontend pueda construir la URL.
+    """
+    __tablename__ = "rutas_factura"
+
+    factura_hus = Column(String(50), primary_key=True)
+    ruta_carpeta = Column(String(800), nullable=False)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now())
+    importado_por = Column(String(200), nullable=True)
+    # Metadatos extra opcionales (eps, mes, ambiente) deserializados de
+    # las columnas de la fuente original. JSON blob.
+    meta = Column(Text, nullable=True)

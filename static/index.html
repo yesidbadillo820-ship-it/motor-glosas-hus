@@ -3059,12 +3059,45 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </div>
         </div>
 
+        <!-- Configuración del servidor de archivos local del HUS -->
+        <div class="form-card" style="margin-bottom:1rem;border:2px solid #f59e0b;background:rgba(245,158,11,.04)">
+          <h3 style="color:#92400e">📁 Servidor de archivos local del HUS</h3>
+          <p style="font-size:.78rem;color:var(--text3);margin-bottom:.8rem;line-height:1.5">
+            El motor en cloud no ve <code>Y:\\</code>, pero TU navegador sí. Configurá la URL base del servidor HTTP local
+            (ej. <code>http://localhost:8000/</code> si corrés <code>python -m http.server</code> en <code>Y:\\</code>),
+            subí un CSV con el mapeo <code>factura → ruta_carpeta</code>, y la IA descargará los PDFs vía tu navegador.
+            <b>No requiere mirror ni jump-box.</b>
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;align-items:end">
+            <div class="field" style="margin:0">
+              <label style="font-size:.72rem">URL base del servidor local</label>
+              <input type="text" id="af-server-url" placeholder="http://localhost:8000/" style="font-family:monospace;font-size:.78rem"/>
+            </div>
+            <div style="display:flex;gap:.4rem">
+              <button class="btn btn-ghost" onclick="guardarUrlServidorLocal()" style="font-size:.75rem">💾 Guardar</button>
+              <button class="btn btn-ghost" onclick="probarServidorLocal()" style="font-size:.75rem">🧪 Probar</button>
+            </div>
+          </div>
+          <div id="af-server-status" style="font-size:.72rem;color:var(--text3);margin-top:.5rem"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.85rem;align-items:end">
+            <div class="field" style="margin:0">
+              <label style="font-size:.72rem">CSV de rutas (factura, ruta)</label>
+              <input type="file" id="af-rutas-csv" accept=".csv,.tsv,.txt" style="font-size:.78rem"/>
+            </div>
+            <div>
+              <button class="btn-primary" onclick="importarRutasCsv()" style="font-size:.78rem;padding:.4rem .9rem">⬆️ Importar rutas</button>
+            </div>
+          </div>
+          <div id="af-rutas-result" style="font-size:.72rem;margin-top:.5rem"></div>
+        </div>
+
         <div class="form-card" style="margin-bottom:1rem;border:2px solid #8b5cf6;">
           <h3 style="display:flex;align-items:center;gap:.5rem;color:#5b21b6;">🔍 Nueva consulta forense</h3>
           <div class="field">
             <label>Factura HUS *</label>
-            <input type="text" id="af-factura" placeholder="HUS487233 (con o sin prefijo HUS)" style="font-family:monospace;"/>
+            <input type="text" id="af-factura" placeholder="HUS487233 (con o sin prefijo HUS)" style="font-family:monospace;" oninput="_afOnFacturaChange()"/>
             <p style="font-size:.7rem;color:var(--text3);margin-top:.2rem;">Si no sabés el número exacto, usá <kbd>Ctrl+K</kbd> para buscar facturas.</p>
+            <div id="af-ruta-detectada" style="font-size:.72rem;margin-top:.35rem"></div>
           </div>
           <div class="field">
             <label>¿Qué necesitás saber sobre los soportes? *</label>
@@ -3073,12 +3106,15 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div style="background:#ede9fe;border-left:3px solid #8b5cf6;padding:.6rem .8rem;border-radius:6px;font-size:.74rem;color:#5b21b6;line-height:1.5;">
             <b>ℹ️ Cómo funciona</b>: el motor abre los hasta 5 PDFs indexados de esa factura, los manda binarios a Claude (PDF nativo) y produce un análisis forense estructurado en 4 secciones (Contexto / Evidencia con Folios / Fundamento Jurídico / Conclusión). Costo: $0.10-0.30 USD por consulta. Tiempo: 60-120s.
           </div>
-          <div class="btn-row">
-            <button class="btn btn-primary" onclick="auditorForenseStandalone()" id="af-btn-go">
+          <div class="btn-row" style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="auditorForenseStandalone()" id="af-btn-go" title="Usa los soportes mirror del motor (jump-box). Requiere que el motor tenga acceso.">
               <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="vertical-align:middle;margin-right:.25rem;"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zM11.5 9.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/></svg>
-              Auditar factura
+              Auditar (mirror)
             </button>
-            <button class="btn btn-ghost" onclick="document.getElementById('af-pregunta').value='';document.getElementById('af-factura').value='';">🗑 Limpiar</button>
+            <button class="btn btn-primary" onclick="auditorForenseDesdeServidorLocal()" id="af-btn-local" style="background:#f59e0b;border:0" title="Tu navegador descarga los PDFs del servidor local del HUS y los sube al motor. NO requiere mirror.">
+              📁 Auditar (mi PC)
+            </button>
+            <button class="btn btn-ghost" onclick="document.getElementById('af-pregunta').value='';document.getElementById('af-factura').value='';document.getElementById('af-ruta-detectada').innerHTML='';">🗑 Limpiar</button>
           </div>
           <div id="af-out" style="margin-top:1rem;"></div>
         </div>
@@ -5390,7 +5426,7 @@ function tab(btn,id){
   if(id==='soportes') cargarSoportesEstado();
   if(id==='importacion-masiva') initImportacionMasiva();
   if(id==='diagnostico') cargarDiagnostico();
-  if(id==='auditor-forense'){ /* nada extra al abrir, el user llena el form */ }
+  if(id==='auditor-forense'){ _afCargarServerUrlEnInput(); }
   // Si el usuario vuelve al panel de Analizar y la glosa activa ya
   // está cerrada (lastResult con workflow terminal), limpiar el panel
   // para no mostrar un dictamen viejo. Si no hay glosa activa, no
@@ -12435,6 +12471,243 @@ document.addEventListener('keydown', function(e){
 });
 
 // ─── AUDITOR FORENSE STANDALONE (panel sidebar) ────────────────────
+// ─── Servidor de archivos local del HUS (Y:\) ───────────────────────────
+// El motor en cloud no ve Y:\ pero el navegador del gestor sí. Esta seccion
+// configura la URL base, importa el CSV factura->ruta, y descarga los PDFs
+// del servidor HTTP local para subirlos al motor cuando se audita una
+// factura. NO requiere mirror ni jump-box.
+function _afServerUrl(){
+  return (localStorage.getItem('hus_servidor_archivos_url') || '').trim();
+}
+function _afCargarServerUrlEnInput(){
+  var inp = document.getElementById('af-server-url');
+  if(inp) inp.value = _afServerUrl();
+}
+function guardarUrlServidorLocal(){
+  var inp = document.getElementById('af-server-url');
+  if(!inp) return;
+  var url = (inp.value || '').trim();
+  if(url && !/^https?:\/\//i.test(url)) url = 'http://' + url;
+  if(url && !url.endsWith('/')) url = url + '/';
+  localStorage.setItem('hus_servidor_archivos_url', url);
+  var st = document.getElementById('af-server-status');
+  if(st) st.innerHTML = '<span style="color:#10b981">✓ Guardada</span> · ' + escHtml(url || '(vacía)');
+  toast('Guardado','URL del servidor local','success');
+}
+async function probarServidorLocal(){
+  var url = _afServerUrl();
+  var st = document.getElementById('af-server-status');
+  if(!url){
+    if(st) st.innerHTML = '<span style="color:#dc2626">No hay URL configurada</span>';
+    return;
+  }
+  if(st) st.innerHTML = '⏳ Probando…';
+  try{
+    var r = await fetch(url, {mode:'cors'});
+    if(r.ok){
+      if(st) st.innerHTML = '<span style="color:#10b981">✓ OK ('+r.status+')</span> — el servidor responde. CORS permitido.';
+    } else {
+      if(st) st.innerHTML = '<span style="color:#f59e0b">⚠️ HTTP '+r.status+'</span> — el servidor responde pero con error.';
+    }
+  }catch(e){
+    if(st) st.innerHTML = '<span style="color:#dc2626">❌ '+escHtml(String(e))+'</span>'+
+      '<br><span style="color:var(--text3);font-size:.7rem">Tip: si CORS bloquea, abrí Chrome con <code>--disable-web-security --user-data-dir=/tmp/chrome</code> o configurá CORS en el servidor.</span>';
+  }
+}
+async function importarRutasCsv(){
+  var inp = document.getElementById('af-rutas-csv');
+  var out = document.getElementById('af-rutas-result');
+  if(!inp || !inp.files || !inp.files.length){
+    if(out) out.innerHTML = '<span style="color:#f59e0b">Seleccioná un CSV/TSV primero</span>';
+    return;
+  }
+  var fd = new FormData();
+  fd.append('file', inp.files[0]);
+  if(out) out.innerHTML = '⏳ Subiendo…';
+  try{
+    var r = await fetch('/rutas-facturas/import-csv', {
+      method:'POST', headers: authH(), body: fd,
+    });
+    var d = {};
+    try { d = await r.json(); } catch(_){}
+    if(!r.ok){
+      if(out) out.innerHTML = '<span style="color:#dc2626">❌ '+escHtml(d.detail || 'HTTP '+r.status)+'</span>';
+      return;
+    }
+    if(out) out.innerHTML =
+      '<div style="background:rgba(16,185,129,.08);border-left:3px solid #10b981;padding:.5rem .8rem;border-radius:5px">'+
+      '<b>✅ Importadas</b> '+d.insertadas+' nuevas · '+d.actualizadas+' actualizadas · '+d.invalidas+' invalidas'+
+      '<br><span style="color:var(--text3);font-size:.7rem">Sep: '+escHtml(d.separador_detectado)+' · '+
+      'Cols: <code>'+escHtml(d.columna_factura_usada)+'</code> + <code>'+escHtml(d.columna_ruta_usada)+'</code></span>'+
+      '</div>';
+    toast('Rutas importadas', d.insertadas+'+'+d.actualizadas+' rutas', 'success');
+  }catch(e){
+    if(out) out.innerHTML = '<span style="color:#dc2626">❌ '+escHtml(String(e))+'</span>';
+  }
+}
+// Lookup automático cuando el user escribe la factura
+var _afFacTimer = null;
+function _afOnFacturaChange(){
+  clearTimeout(_afFacTimer);
+  _afFacTimer = setTimeout(_afLookupFactura, 350);
+}
+async function _afLookupFactura(){
+  var fac = ((document.getElementById('af-factura')||{}).value || '').trim();
+  var box = document.getElementById('af-ruta-detectada');
+  if(!box) return;
+  if(!fac || fac.length < 4){ box.innerHTML = ''; return; }
+  try{
+    var r = await fetch('/rutas-facturas/' + encodeURIComponent(fac), {headers:authH()});
+    if(r.status === 404){
+      box.innerHTML = '<span style="color:#f59e0b">⚠️ Sin ruta registrada para '+escHtml(fac)+'</span>';
+      return;
+    }
+    if(!r.ok) return;
+    var d = await r.json();
+    box.innerHTML = '<span style="color:#10b981">✓ Ruta:</span> <code style="font-size:.68rem;color:var(--text2)">'+escHtml(d.ruta_carpeta||'')+'</code>';
+  }catch(e){ /* silencioso */ }
+}
+// Mapea ruta Windows (Y:\FOO\BAR) a URL HTTP usando la base configurada.
+// Reemplaza separadores y encodea caracteres especiales por segmento.
+function _afConstruirUrl(rutaWin){
+  var base = _afServerUrl();
+  if(!base) return '';
+  // Quitar prefijo de unidad "Y:\" → ""
+  var ruta = String(rutaWin || '').replace(/^[A-Z]:\\?/i, '');
+  // Convertir \ a /
+  ruta = ruta.replace(/\\/g, '/');
+  // Encodear cada segmento individualmente
+  var segs = ruta.split('/').map(function(s){
+    return s ? encodeURIComponent(s) : '';
+  }).filter(function(s){ return s !== ''; });
+  return base + segs.join('/') + '/';
+}
+// Parsea HTML de directory listing (Apache/nginx/python -m http.server)
+// y devuelve los nombres de archivo (.pdf, .xml, .json) ignorando "Parent
+// Directory", carpetas y todo lo demás.
+function _afParseDirListing(html){
+  var div = document.createElement('div');
+  div.innerHTML = html;
+  var anchors = div.querySelectorAll('a[href]');
+  var pdfs = [];
+  for(var i=0;i<anchors.length;i++){
+    var a = anchors[i];
+    var href = a.getAttribute('href') || '';
+    if(!href || href.indexOf('?') === 0 || href === '..' || href === '/' || href.endsWith('/')) continue;
+    var lower = href.toLowerCase();
+    // Solo nos interesan PDFs para Claude PDF nativo
+    if(lower.endsWith('.pdf')){
+      // Decodear si está URL-encoded
+      try { href = decodeURIComponent(href); } catch(_){}
+      // Solo el filename (sin path)
+      var nombre = href.split('/').pop();
+      if(nombre) pdfs.push(nombre);
+    }
+  }
+  return pdfs;
+}
+// Flow completo: factura -> lookup ruta -> URL http://local/... ->
+// fetch listing -> fetch PDFs -> upload al motor multipart.
+async function auditorForenseDesdeServidorLocal(){
+  var fact = ((document.getElementById('af-factura')||{}).value || '').trim().toUpperCase();
+  var preg = ((document.getElementById('af-pregunta')||{}).value || '').trim();
+  if(!fact){ toast('Falta factura','HUS#####','warning'); return; }
+  if(preg.length < 5){ toast('Pregunta muy corta','min 5 chars','warning'); return; }
+  var serverUrl = _afServerUrl();
+  if(!serverUrl){
+    toast('Falta URL','Configurá el servidor local primero','warning');
+    return;
+  }
+  var btn = document.getElementById('af-btn-local');
+  var out = document.getElementById('af-out');
+  if(btn){ btn.disabled = true; btn.dataset.orig = btn.innerHTML; btn.innerHTML = '⏳ Buscando ruta…'; }
+  if(out) out.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem 1rem;border-radius:6px;font-size:.82rem;color:#7c2d12">⏳ Paso 1/4: buscando ruta de la factura…</div>';
+
+  try{
+    // 1. Lookup ruta_carpeta
+    var rR = await fetch('/rutas-facturas/' + encodeURIComponent(fact), {headers:authH()});
+    if(rR.status === 404){
+      out.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.7rem 1rem;border-radius:6px;font-size:.82rem;color:#991b1b">❌ No hay ruta registrada para '+escHtml(fact)+'.<br>Importá primero el CSV con el mapeo factura → ruta_carpeta arriba.</div>';
+      return;
+    }
+    if(!rR.ok) throw new Error('Error lookup HTTP '+rR.status);
+    var dR = await rR.json();
+    var rutaWin = dR.ruta_carpeta;
+    var url = _afConstruirUrl(rutaWin);
+    if(!url){ throw new Error('No se pudo construir URL desde "'+rutaWin+'"'); }
+
+    // 2. Fetch directory listing
+    if(btn) btn.innerHTML = '⏳ Listando archivos…';
+    if(out) out.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem 1rem;border-radius:6px;font-size:.82rem;color:#7c2d12">⏳ Paso 2/4: leyendo carpeta del servidor local…<br><code style="font-size:.7rem">'+escHtml(url)+'</code></div>';
+    var rL = await fetch(url, {mode:'cors'});
+    if(!rL.ok) throw new Error('No se pudo leer la carpeta ('+rL.status+'). Verificá que el servidor local esté corriendo y CORS permitido.');
+    var html = await rL.text();
+    var pdfs = _afParseDirListing(html);
+    if(!pdfs.length) throw new Error('La carpeta no tiene PDFs visibles.');
+
+    // 3. Descargar cada PDF (max 5 — limite Claude)
+    pdfs = pdfs.slice(0, 5);
+    if(btn) btn.innerHTML = '⏳ Descargando PDFs…';
+    if(out) out.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem 1rem;border-radius:6px;font-size:.82rem;color:#7c2d12">⏳ Paso 3/4: descargando '+pdfs.length+' PDF(s) del servidor local…<br>'+pdfs.map(function(n){return '· '+escHtml(n);}).join('<br>')+'</div>';
+    var blobs = [];
+    for(var i=0;i<pdfs.length;i++){
+      var nombre = pdfs[i];
+      try{
+        var rB = await fetch(url + encodeURIComponent(nombre), {mode:'cors'});
+        if(!rB.ok) continue;
+        var blob = await rB.blob();
+        if(blob.size < 1024 || blob.size > 30*1024*1024) continue;
+        blobs.push({nombre: nombre, blob: blob});
+      }catch(_){ /* sigue con el siguiente */ }
+    }
+    if(!blobs.length) throw new Error('No se pudo descargar ningún PDF del servidor local.');
+
+    // 4. Upload multipart al motor
+    if(btn) btn.innerHTML = '⏳ Auditando con Claude…';
+    if(out) out.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem 1rem;border-radius:6px;font-size:.82rem;color:#7c2d12">⏳ Paso 4/4: '+blobs.length+' PDFs subidos. Claude está leyendo… (60-120s)</div>';
+    var fd = new FormData();
+    fd.append('factura', fact);
+    fd.append('pregunta', preg);
+    fd.append('refrescar', 'false');
+    blobs.forEach(function(b){ fd.append('files', b.blob, b.nombre); });
+    var rU = await fetch('/auditor-forense/upload', {method:'POST', headers: authH(), body: fd});
+    var dU = {};
+    try { dU = await rU.json(); } catch(_){}
+    if(!rU.ok){
+      var msg = '';
+      if(typeof dU.detail === 'string') msg = dU.detail;
+      else if(Array.isArray(dU.detail)) msg = dU.detail.map(function(e){return e.msg || JSON.stringify(e);}).join(' · ');
+      else msg = 'HTTP '+rU.status;
+      out.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.7rem 1rem;border-radius:6px;font-size:.82rem;color:#991b1b">❌ '+escHtml(msg)+'</div>';
+      return;
+    }
+
+    var cacheBadge = dU.cache_hit
+      ? '<span style="background:#10b981;color:#fff;padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700;margin-left:.4rem">CACHE</span>'
+      : '';
+    var meta = '<div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem;padding:.5rem .8rem;background:#f8fafc;border-radius:6px;border-left:3px solid '+(dU.cache_hit?'#10b981':'#f59e0b')+';">'
+      + (dU.cache_hit
+          ? '⚡ <b>Respuesta cacheada</b>' + cacheBadge + ' · 0 tokens · '
+          : '✅ <b>'+blobs.length+' PDFs leídos del servidor local</b> · '
+            + 'Tokens: '+(dU.input_tokens||0).toLocaleString()+' in / '+(dU.output_tokens||0).toLocaleString()+' out · '
+            + (dU.bytes_recibidos ? Math.round(dU.bytes_recibidos/1024)+' KB · ' : ''))
+      + 'Modelo: ' + escHtml(dU.modelo||'?')
+      + '</div>';
+    var bloque = '<div style="background:#fafaf9;border:1px solid #d6d3d1;border-radius:8px;padding:1.2rem 1.4rem;font-family:Georgia,serif;line-height:1.6;color:#1c1917;font-size:.88rem;">' + (dU.html||'') + '</div>';
+    var btns = '<div style="margin-top:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">'
+      + '<button class="btn-sm" onclick="copiarAFOut()">📋 Copiar texto</button>'
+      + '<button class="btn-sm" onclick="descargarAFOut(\'' + escJs(fact) + '\')">💾 Descargar HTML</button>'
+      + '<button class="btn-sm" onclick="window.print()">🖨️ Imprimir</button>'
+      + '</div>';
+    out.innerHTML = meta + bloque + btns;
+    toast('Auditoría lista', blobs.length+' PDFs analizados', 'success');
+  }catch(e){
+    if(out) out.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.7rem 1rem;border-radius:6px;font-size:.82rem;color:#991b1b">❌ '+escHtml(String(e.message||e))+'</div>';
+  }finally{
+    if(btn){ btn.disabled = false; if(btn.dataset.orig) btn.innerHTML = btn.dataset.orig; }
+  }
+}
+
 async function auditorForenseStandalone(forzarRefresco){
   var fact = (document.getElementById('af-factura')||{}).value || '';
   var preg = (document.getElementById('af-pregunta')||{}).value || '';

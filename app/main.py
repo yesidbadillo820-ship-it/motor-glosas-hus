@@ -878,6 +878,7 @@ from app.api.routers.notificaciones import router as notificaciones_router
 from app.api.routers.eventos_live import router as eventos_live_router
 from app.api.routers.preset_filtros import router as preset_filtros_router
 from app.api.routers.notas_privadas import router as notas_privadas_router
+from app.api.routers.rutas_factura import router as rutas_factura_router
 
 app.include_router(auth_router)
 app.include_router(glosas_router)
@@ -923,6 +924,7 @@ app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)
 app.include_router(preset_filtros_router)
 app.include_router(notas_privadas_router)
+app.include_router(rutas_factura_router)
 from app.api.routers.cups import router as cups_router
 app.include_router(cups_router)
 from app.api.routers.pwa import router as pwa_router
