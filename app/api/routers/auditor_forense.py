@@ -33,6 +33,9 @@ class AuditorForenseRequest(BaseModel):
     # Default True porque el caso de uso del gestor (citar folios) lo
     # exige. Si soportes son muchos o pesados, fallback a texto extraído.
     usar_pdf_nativo: bool = True
+    # Si True, ignora el cache y re-llama a Claude. Util cuando los
+    # soportes cambiaron y queremos respuesta fresca antes del TTL (14d).
+    refrescar: bool = False
 
 
 @router.post("/")
@@ -117,12 +120,13 @@ async def auditar_factura(
     if not pdfs_raw and not contexto_texto:
         raise HTTPException(500, "No se pudo leer ningún soporte de esta factura")
 
-    # Llamar al auditor forense
+    # Llamar al auditor forense (con cache TTL 14d, key: factura+pregunta+pdfs+modelo)
     resultado = await auditar_forense(
         factura=factura,
         pregunta_gestor=pregunta,
         pdfs_raw=pdfs_raw if pdfs_raw else None,
         contexto_pdf_texto=contexto_texto if not pdfs_raw else "",
+        bypass_cache=bool(payload.refrescar),
     )
 
     if resultado.get("error"):
@@ -153,4 +157,5 @@ async def auditar_factura(
         "output_tokens": resultado.get("output_tokens", 0),
         "soportes_usados": soportes_usados,
         "modo": "pdf_nativo" if pdfs_raw else "texto_extraido",
+        "cache_hit": bool(resultado.get("cache_hit")),
     }

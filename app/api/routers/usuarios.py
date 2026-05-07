@@ -75,6 +75,153 @@ def info_usuario_actual(
     }
 
 
+@router.get("/yo/digest")
+def digest_desde_ultima_visita(
+    desde: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Smart digest: que paso desde la ultima visita del usuario.
+
+    Args:
+        desde: ISO timestamp UTC. Si no se pasa, usa "hace 24 horas".
+
+    Returns:
+        Resumen estructurado con asignaciones, decisiones, vencimientos
+        y comentarios que afectan al usuario logueado.
+    """
+    from datetime import datetime, timedelta, timezone as _tz
+    from app.models.db import GlosaRecord, AuditLogRecord
+    if desde:
+        try:
+            cursor = datetime.fromisoformat(desde.replace("Z", "+00:00"))
+            if cursor.tzinfo is None:
+                cursor = cursor.replace(tzinfo=_tz.utc)
+        except Exception:
+            cursor = datetime.now(_tz.utc) - timedelta(hours=24)
+    else:
+        cursor = datetime.now(_tz.utc) - timedelta(hours=24)
+
+    ahora = datetime.now(_tz.utc)
+    en_24h = ahora + timedelta(hours=24)
+    miEmail = current_user.email.lower()
+
+    # 1. Asignaciones nuevas dirigidas a mi (audit_log con BULK_ASIGNAR/ASIGNAR/AUTO_ASIGNAR)
+    nuevas_asignaciones = (
+        db.query(AuditLogRecord)
+        .filter(AuditLogRecord.timestamp > cursor)
+        .filter(AuditLogRecord.accion.in_(["ASIGNAR", "BULK_ASIGNAR", "AUTO_ASIGNAR"]))
+        .filter(AuditLogRecord.valor_nuevo.ilike(f"%{miEmail}%"))
+        .order_by(AuditLogRecord.timestamp.desc())
+        .limit(50)
+        .all()
+    )
+
+    # 2. Decisiones EPS sobre mis glosas
+    decisiones_eps = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
+        .filter(GlosaRecord.fecha_decision_eps > cursor)
+        .filter(
+            (GlosaRecord.auditor_email == current_user.email) |
+            (GlosaRecord.gestor_nombre == current_user.email)
+        )
+        .order_by(GlosaRecord.fecha_decision_eps.desc())
+        .limit(30)
+        .all()
+    )
+
+    # 3. Mis glosas que vencen en las proximas 24h
+    proximas_a_vencer = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+        .filter(GlosaRecord.fecha_vencimiento.isnot(None))
+        .filter(GlosaRecord.fecha_vencimiento <= en_24h)
+        .filter(GlosaRecord.fecha_vencimiento >= ahora)
+        .filter(
+            (GlosaRecord.auditor_email == current_user.email) |
+            (GlosaRecord.gestor_nombre == current_user.email)
+        )
+        .order_by(GlosaRecord.fecha_vencimiento.asc())
+        .limit(20)
+        .all()
+    )
+
+    # 4. Mis glosas YA VENCIDAS sin responder (urgente!)
+    mias_vencidas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+        .filter(GlosaRecord.fecha_vencimiento.isnot(None))
+        .filter(GlosaRecord.fecha_vencimiento < ahora)
+        .filter(
+            (GlosaRecord.auditor_email == current_user.email) |
+            (GlosaRecord.gestor_nombre == current_user.email)
+        )
+        .order_by(GlosaRecord.fecha_vencimiento.asc())
+        .limit(10)
+        .all()
+    )
+
+    # Severidad global del digest
+    severidad = "ok"
+    if mias_vencidas:
+        severidad = "critica"
+    elif len(proximas_a_vencer) >= 5:
+        severidad = "alta"
+    elif nuevas_asignaciones:
+        severidad = "info"
+
+    return {
+        "desde": cursor.isoformat(),
+        "hasta": ahora.isoformat(),
+        "severidad": severidad,
+        "totales": {
+            "nuevas_asignaciones": len(nuevas_asignaciones),
+            "decisiones_eps": len(decisiones_eps),
+            "proximas_a_vencer_24h": len(proximas_a_vencer),
+            "mias_vencidas": len(mias_vencidas),
+        },
+        "nuevas_asignaciones": [
+            {
+                "registro_id": a.registro_id,
+                "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+                "asignado_por": (a.usuario_email or "").split("@")[0],
+                "accion": a.accion,
+            }
+            for a in nuevas_asignaciones[:10]
+        ],
+        "decisiones_eps": [
+            {
+                "id": g.id,
+                "factura": g.factura,
+                "eps": g.eps,
+                "decision": g.decision_eps,
+                "fecha": g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None,
+                "valor_recuperado": float(g.valor_recuperado or 0),
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+            for g in decisiones_eps[:10]
+        ],
+        "proximas_a_vencer_24h": [
+            {
+                "id": g.id, "factura": g.factura, "eps": g.eps,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
+                "horas_restantes": int((g.fecha_vencimiento - ahora).total_seconds() // 3600) if g.fecha_vencimiento else None,
+            }
+            for g in proximas_a_vencer
+        ],
+        "mias_vencidas": [
+            {
+                "id": g.id, "factura": g.factura, "eps": g.eps,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "vencida_hace_horas": int((ahora - g.fecha_vencimiento).total_seconds() // 3600) if g.fecha_vencimiento else None,
+            }
+            for g in mias_vencidas
+        ],
+    }
+
+
 @router.post("/yo/vacaciones")
 def configurar_vacaciones_propias(
     payload: dict,

@@ -2,6 +2,14 @@
 auditor_forense.py — IA conversacional para auditoria profunda de
 soportes documentales por factura.
 
+Cache de respuestas:
+    Cada llamada cuesta tokens caros de Claude Sonnet (5-50K input por
+    PDFs grandes). Si el mismo gestor repite la misma pregunta sobre
+    la misma factura con los mismos PDFs, devolvemos la respuesta
+    cacheada. Key: SHA256(factura | pregunta_norm | hash_pdfs | modelo).
+    TTL 14 dias (los soportes pueden cambiar y queremos respuestas
+    actualizadas en plazo razonable).
+
 Diferente del flujo `analizar` (que produce dictamen para enviar a la
 EPS), este agente responde preguntas en LENGUAJE NATURAL del gestor
 sobre los soportes de una factura, citando folios y fechas concretas.
@@ -82,6 +90,90 @@ Si en los soportes NO encuentras la información que pregunta el gestor, sé hon
 Devuelve SOLO el HTML, sin texto adicional ni markdown."""
 
 
+_CACHE_TTL_DIAS_FORENSE = 14
+
+
+def _clave_cache_forense(
+    factura: str,
+    pregunta: str,
+    pdfs_raw: Optional[list[tuple[str, bytes]]],
+    contexto_texto: str,
+    modelo: str,
+) -> str:
+    """Calcula clave SHA256 de cache para auditor forense.
+
+    Incluye factura + pregunta normalizada + hash de PDFs (o del
+    texto fallback) + modelo. Asi cualquier cambio en cualquiera
+    invalida el cache.
+    """
+    import hashlib
+    h = hashlib.sha256()
+    h.update(f"forense|{modelo}|{(factura or '').strip().upper()}|".encode("utf-8"))
+    # Normalizar pregunta: lowercase, collapse spaces, strip
+    norm = " ".join((pregunta or "").lower().split())
+    h.update(f"q={norm}|".encode("utf-8"))
+    if pdfs_raw:
+        for nombre, data in pdfs_raw[:5]:
+            if data:
+                h.update(hashlib.sha256(data).digest())
+                h.update(b"|")
+    elif contexto_texto:
+        # Hash del texto extraido (limitado a 60KB para alinear con el envio)
+        h.update(hashlib.sha256(contexto_texto[:60000].encode("utf-8")).digest())
+    return h.hexdigest()
+
+
+def _buscar_cache_forense(clave: str) -> Optional[dict]:
+    """Busca respuesta cacheada en AICacheRecord. Si esta expirada,
+    la borra y devuelve None.
+    """
+    try:
+        from datetime import timedelta
+        from app.core.tz import a_utc, ahora_utc
+        from app.database import SessionLocal
+        from app.models.db import AICacheRecord
+        db = SessionLocal()
+        try:
+            r = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
+            if not r:
+                return None
+            if r.creado_en and (ahora_utc() - a_utc(r.creado_en)) > timedelta(days=_CACHE_TTL_DIAS_FORENSE):
+                db.delete(r)
+                db.commit()
+                return None
+            r.hit_count = (r.hit_count or 0) + 1
+            from sqlalchemy.sql import func as _f
+            r.ultimo_hit = _f.now()
+            db.commit()
+            return {"html": r.respuesta, "modelo": r.modelo or "cache-forense"}
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug(f"_buscar_cache_forense fallo: {e}")
+        return None
+
+
+def _guardar_cache_forense(clave: str, html: str, modelo: str) -> None:
+    try:
+        from app.database import SessionLocal
+        from app.models.db import AICacheRecord
+        if not html or len(html) > 500_000:
+            return
+        db = SessionLocal()
+        try:
+            existente = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
+            if existente:
+                existente.respuesta = html
+                existente.modelo = modelo
+            else:
+                db.add(AICacheRecord(clave=clave, respuesta=html, modelo=modelo, hit_count=0))
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug(f"_guardar_cache_forense fallo: {e}")
+
+
 async def auditar_forense(
     factura: str,
     pregunta_gestor: str,
@@ -89,6 +181,7 @@ async def auditar_forense(
     contexto_pdf_texto: str = "",
     api_key: str = None,
     modelo: str = None,
+    bypass_cache: bool = False,
 ) -> dict:
     """Ejecuta el auditor forense sobre los soportes de una factura.
 
@@ -101,9 +194,11 @@ async def auditar_forense(
                             si pdfs_raw no está disponible)
         api_key: ANTHROPIC_API_KEY
         modelo: claude-sonnet-4-5 o similar
+        bypass_cache: si True, no consulta ni escribe cache (forzar
+                      recalculo, util cuando los soportes cambiaron).
 
     Returns:
-        {"html": str, "modelo": str, "input_tokens": int, "output_tokens": int, "error": str|None}
+        {"html": str, "modelo": str, "input_tokens": int, "output_tokens": int, "error": str|None, "cache_hit": bool}
     """
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
     modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
@@ -113,6 +208,21 @@ async def auditar_forense(
 
     if not pregunta_gestor or len(pregunta_gestor.strip()) < 5:
         return {"html": "", "error": "Pregunta vacía o muy corta"}
+
+    # ─── Cache lookup ─────────────────────────────────────────────────
+    cache_key = _clave_cache_forense(factura, pregunta_gestor, pdfs_raw, contexto_pdf_texto, modelo)
+    if not bypass_cache:
+        cached = _buscar_cache_forense(cache_key)
+        if cached:
+            logger.info(f"[AUDITOR-FORENSE] CACHE HIT factura={factura} key={cache_key[:12]}")
+            return {
+                "html": cached["html"],
+                "modelo": cached["modelo"],
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "error": None,
+                "cache_hit": True,
+            }
 
     timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
     headers = {
@@ -193,10 +303,18 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
         f"in={usage.get('input_tokens', 0)} out={usage.get('output_tokens', 0)}"
     )
 
+    # Guardar en cache para futuras consultas identicas
+    if not bypass_cache:
+        try:
+            _guardar_cache_forense(cache_key, texto, f"anthropic/{modelo}/forense")
+        except Exception as _e:
+            logger.debug(f"forense cache write fallo: {_e}")
+
     return {
         "html": texto,
         "modelo": f"anthropic/{modelo}/forense",
         "input_tokens": usage.get("input_tokens", 0),
         "output_tokens": usage.get("output_tokens", 0),
         "error": None,
+        "cache_hit": False,
     }

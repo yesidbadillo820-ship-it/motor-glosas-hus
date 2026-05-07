@@ -372,6 +372,11 @@ body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
   to{opacity:1;transform:translateY(0) scale(1)}
 }
 .toast-wrap > div{animation:toastIn .22s var(--ease, ease-out)}
+/* Slide-in para banners flotantes (digest) */
+@keyframes slideInRight{
+  from{opacity:0;transform:translateX(40px)}
+  to{opacity:1;transform:translateX(0)}
+}
 /* Botones — pulse sutil al hacer clic */
 .btn:active,.btn-sm:active,.btn-primary:active,.btn-secondary:active{
   transform:scale(.98);
@@ -3830,6 +3835,8 @@ async function initApp(){
   }, 800);
   // B.2: live channel — polling de eventos recientes y refresco automatico
   setTimeout(iniciarLiveChannel, 2000);
+  // Smart digest: que paso desde la ultima visita
+  setTimeout(mostrarDigestUltimaVisita, 1800);
 }
 
 async function checkHealth(){
@@ -3960,6 +3967,87 @@ function toggleDark(){
 // websockets. Pausa cuando la pestana esta oculta para no quemar
 // recursos.
 window._LIVE = { since: null, timer: null, ultimoToast: 0 };
+
+// ─── Smart digest: que paso desde la ultima visita ────────────────────
+async function mostrarDigestUltimaVisita(){
+  if(!localStorage.getItem('hus_token')) return;
+  try{
+    var lastVisit = localStorage.getItem('hus_ultima_visita');
+    var qs = lastVisit ? ('?desde=' + encodeURIComponent(lastVisit)) : '';
+    var r = await fetch('/usuarios/yo/digest' + qs, {headers:authH()});
+    if(!r.ok){
+      // marcar nueva visita y salir
+      localStorage.setItem('hus_ultima_visita', new Date().toISOString());
+      return;
+    }
+    var d = await r.json();
+    var t = d.totales || {};
+    var totalActividad = (t.nuevas_asignaciones||0) + (t.decisiones_eps||0) +
+                         (t.proximas_a_vencer_24h||0) + (t.mias_vencidas||0);
+    if(totalActividad === 0){
+      localStorage.setItem('hus_ultima_visita', new Date().toISOString());
+      return;
+    }
+    // Construir banner
+    var color = d.severidad === 'critica' ? '#dc2626'
+              : d.severidad === 'alta' ? '#f59e0b'
+              : '#0369a1';
+    var bg = d.severidad === 'critica' ? 'rgba(220,38,38,.06)'
+           : d.severidad === 'alta' ? 'rgba(245,158,11,.08)'
+           : 'rgba(3,105,161,.06)';
+    var titulo = d.severidad === 'critica' ? '⚠️ Atención requerida'
+               : d.severidad === 'alta' ? '🟡 Alertas pendientes'
+               : '👋 Bienvenido de vuelta';
+    var lineas = [];
+    if(t.mias_vencidas){
+      lineas.push('<b style="color:#dc2626">'+t.mias_vencidas+' tuyas VENCIDAS</b> sin responder');
+    }
+    if(t.proximas_a_vencer_24h){
+      lineas.push('<b style="color:#f59e0b">'+t.proximas_a_vencer_24h+' tuyas vencen en 24h</b>');
+    }
+    if(t.nuevas_asignaciones){
+      lineas.push(t.nuevas_asignaciones+' asignaciones nuevas');
+    }
+    if(t.decisiones_eps){
+      var lev = (d.decisiones_eps||[]).filter(function(x){return x.decision==='LEVANTADA';}).length;
+      var rat = (d.decisiones_eps||[]).filter(function(x){return x.decision==='RATIFICADA';}).length;
+      lineas.push(t.decisiones_eps+' decisiones EPS ('+lev+' LEV / '+rat+' RAT)');
+    }
+    var banner = document.createElement('div');
+    banner.id = 'digest-banner';
+    banner.style.cssText = 'position:fixed;bottom:20px;right:20px;max-width:380px;background:'+bg+';border:1px solid '+color+';border-left:4px solid '+color+';border-radius:8px;padding:1rem;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:9999;font-family:var(--font);animation:slideInRight .35s ease-out';
+    banner.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'+
+        '<div style="font-weight:700;color:'+color+';font-size:.9rem">'+titulo+'</div>'+
+        '<button onclick="document.getElementById(\'digest-banner\').remove()" style="background:transparent;border:0;color:var(--text3);cursor:pointer;font-size:1.1rem;line-height:1">×</button>'+
+      '</div>'+
+      '<div style="font-size:.78rem;color:var(--text2);line-height:1.7">'+
+        'Desde tu última visita ('+(lastVisit ? new Date(lastVisit).toLocaleString('es-CO') : 'hace 24h')+'):<br>'+
+        '<ul style="margin:.4rem 0 .4rem 1.2rem;padding:0">'+
+          lineas.map(function(l){return '<li>'+l+'</li>';}).join('')+
+        '</ul>'+
+      '</div>'+
+      '<div style="display:flex;gap:.4rem;margin-top:.6rem">'+
+        ((t.mias_vencidas || t.proximas_a_vencer_24h)
+          ? '<button class="btn btn-sm" style="background:'+color+';color:#fff;border:0;font-size:.75rem;padding:.3rem .6rem" onclick="document.getElementById(\'digest-banner\').remove();sidebarTab(document.querySelector(\'.sn-item[data-tip=\\\'Mis glosas\\\']\'),\'mis-glosas\')">Ver mis glosas →</button>'
+          : '')+
+        '<button class="btn btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--text2);font-size:.75rem;padding:.3rem .6rem" onclick="document.getElementById(\'digest-banner\').remove()">Cerrar</button>'+
+      '</div>';
+    document.body.appendChild(banner);
+    // Auto-cerrar despues de 25s para severidad info
+    if(d.severidad === 'info' || d.severidad === 'ok'){
+      setTimeout(function(){
+        var el = document.getElementById('digest-banner');
+        if(el) el.remove();
+      }, 25000);
+    }
+    // Marcar nueva visita
+    localStorage.setItem('hus_ultima_visita', new Date().toISOString());
+  }catch(e){
+    console.warn('digest', e);
+    localStorage.setItem('hus_ultima_visita', new Date().toISOString());
+  }
+}
 
 async function iniciarLiveChannel(){
   if(!localStorage.getItem('hus_token')) return;  // no logueado
@@ -15804,6 +15892,86 @@ function _spotComandos(query){
     }
   }
 
+  // "alertas hoy" / "vencidas" — atajo a panel alertas
+  if(/^(?:alertas\s*hoy|vencidas|vencidas\s*hoy)$/i.test(q)){
+    out.push({
+      icon:'⏰', label:'Ver glosas alertas / vencidas',
+      sub:'Abre el panel Alertas',
+      run:function(){
+        var btn = document.querySelector('.sn-item[onclick*="\'alertas\'"]');
+        if(btn){ cerrarSpotlight(); btn.click(); }
+      }
+    });
+  }
+
+  // "mi resumen" / "mi performance" — abrir mi desempeño
+  if(/^(?:mi\s+resumen|mi\s+performance|mi\s+desempen[oó]|mi\s+desempe[ñn]o)$/i.test(q)){
+    out.push({
+      icon:'📊', label:'Mi desempeño del mes',
+      sub:'Abre el panel personal con KPIs propios',
+      run:function(){
+        var btn = document.querySelector('.sn-item[onclick*="\'mi-desempeno\'"]');
+        if(btn){ cerrarSpotlight(); btn.click(); }
+      }
+    });
+  }
+
+  // "mando" / "tablero" / "cockpit" — atajo al Mando ejecutivo
+  if(/^(?:mando|cockpit|comando|panel\s+ejecutivo)$/i.test(q)){
+    out.push({
+      icon:'⚡', label:'Mando ejecutivo',
+      sub:'KPIs, alertas y rankings en una sola vista (coord/admin)',
+      run:function(){
+        var btn = document.querySelector('.sn-item[onclick*="\'mando\'"]');
+        if(btn){ cerrarSpotlight(); btn.click(); }
+        else toast('No disponible','Solo coord/admin','warning');
+      }
+    });
+  }
+
+  // "vacaciones" — atajo a configurar vacaciones
+  if(/^(?:vacaciones|licencia)$/i.test(q)){
+    out.push({
+      icon:'🏖️', label:'Configurar vacaciones / licencia',
+      sub:'Delega tus asignaciones a un colega temporalmente',
+      run:function(){
+        var btn = document.querySelector('.sn-item[onclick*="\'usuarios\'"]');
+        if(btn){ cerrarSpotlight(); btn.click(); }
+      }
+    });
+  }
+
+  // "auto-balancear" / "rebalancear" — disparar el balance desde Spotlight
+  if(/^(?:auto[\s-]*balancear|rebalancear|balancear\s+carga)$/i.test(q)){
+    var rolBal = (window.USER_ROL||'').toUpperCase();
+    if(rolBal === 'SUPER_ADMIN' || rolBal === 'COORDINADOR'){
+      out.push({
+        icon:'⚖️', label:'Auto-balancear glosas pendientes sin asignar',
+        sub:'Distribuye con algoritmo de menor carga',
+        run:function(){
+          cerrarSpotlight();
+          if(typeof autoBalancearCarga === 'function') autoBalancearCarga();
+        }
+      });
+    }
+  }
+
+  // "nueva glosa" / "analizar" — atajo al panel analizar
+  if(/^(?:nueva\s+glosa|analizar|analiza|nueva)$/i.test(q)){
+    out.push({
+      icon:'🆕', label:'Nueva glosa (panel Analizar)',
+      sub:'Limpia el formulario y abre Analizar',
+      run:function(){
+        var btn = document.querySelector('.sn-item[onclick*="\'analizar\'"]');
+        if(btn){
+          cerrarSpotlight();
+          btn.click();
+          if(typeof nuevaGlosa === 'function') setTimeout(nuevaGlosa, 200);
+        }
+      }
+    });
+  }
+
   // Refrescar: "refrescar", "reload", "f5"
   if(/^(?:refrescar|recargar|reload|refresh|f5)$/i.test(q)){
     out.push({
@@ -15866,11 +16034,16 @@ function renderSpotlightResults(query){
   if(!q){
     box.innerHTML = '<div class="spot-empty" style="line-height:1.7">'+
       '<div style="margin-bottom:.5rem"><b>Comandos rápidos:</b></div>'+
+      '<span class="spot-kbd">mando</span> · '+
+      '<span class="spot-kbd">mi resumen</span> · '+
+      '<span class="spot-kbd">alertas hoy</span> · '+
+      '<span class="spot-kbd">vacaciones</span><br>'+
       '<span class="spot-kbd">> dashboard</span> ir a panel · '+
       '<span class="spot-kbd">#123</span> abrir glosa por ID<br>'+
-      '<span class="spot-kbd">factura:HUS487</span> buscar factura · '+
-      '<span class="spot-kbd">exportar mes</span> CSV del mes<br>'+
-      '<span class="spot-kbd">asignar 12,15 a juan@hus.gov.co</span> reasignar<br>'+
+      '<span class="spot-kbd">factura:HUS487</span> · '+
+      '<span class="spot-kbd">exportar mes</span> · '+
+      '<span class="spot-kbd">auto-balancear</span><br>'+
+      '<span class="spot-kbd">asignar 12,15 a juan@hus.gov.co</span><br>'+
       '<span class="spot-kbd">tema oscuro</span> · '+
       '<span class="spot-kbd">salir</span> · '+
       '<span class="spot-kbd">refrescar</span>'+
