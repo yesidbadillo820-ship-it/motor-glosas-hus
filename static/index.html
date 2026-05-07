@@ -11310,6 +11310,94 @@ function renderVerificacionCitas(v){
   return html;
 }
 
+// ─── AUDITOR FORENSE — Q&A conversacional sobre soportes (Yesid mayo 2026) ─
+function renderAuditorForensePanel(d){
+  // Mostrar siempre que haya factura — el gestor puede preguntar lo
+  // que quiera sobre los soportes de esa factura.
+  var factura = (d && (d.factura || d.numero_factura)) || '';
+  if(!factura) return '';
+  var rndId = 'auditor-fnse-' + Math.random().toString(36).slice(2,8);
+  return '<div style="background:#fff;border:1.5px dashed #8b5cf6;border-radius:10px;padding:.85rem 1rem;margin-top:.6rem;font-size:.85rem;">'
+    + '<div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem;">'
+    +   '<span style="font-size:1.3rem;">🔍</span>'
+    +   '<div style="flex:1;">'
+    +     '<div style="font-weight:700;color:#5b21b6;">Auditor Forense IA · ' + escHtml(factura) + '</div>'
+    +     '<div style="font-size:.72rem;color:var(--text3);">Preguntá en lenguaje natural lo que necesités saber de los soportes. Cita folios y fechas exactas.</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:.5rem;align-items:flex-start;">'
+    +   '<textarea id="' + rndId + '-q" placeholder="Ej: necesito buscar si en los soportes se encuentra la BACILOSCOPIA COLORACION ACIDO ALCOHOL-RESISTENTE [ZIEHL-NEELSEN]" rows="2" style="flex:1;font-size:.78rem;padding:.5rem;border:1px solid var(--line);border-radius:6px;resize:vertical;"></textarea>'
+    +   '<button class="btn btn-primary" onclick="auditarForense(\'' + escJs(factura) + '\',\'' + rndId + '\')" style="white-space:nowrap;font-size:.78rem;">'
+    +     '<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="vertical-align:middle;margin-right:.25rem;"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zM11.5 9.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/></svg>'
+    +     'Auditar'
+    +   '</button>'
+    + '</div>'
+    + '<div id="' + rndId + '-out" style="margin-top:.7rem;"></div>'
+    + '</div>';
+}
+
+async function auditarForense(factura, rndId){
+  var qEl = document.getElementById(rndId + '-q');
+  var outEl = document.getElementById(rndId + '-out');
+  if(!qEl || !outEl) return;
+  var pregunta = (qEl.value || '').trim();
+  if(pregunta.length < 5){
+    toast('Pregunta muy corta', 'Escribí algo más específico (mínimo 5 chars)', 'warning');
+    return;
+  }
+  outEl.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;font-size:.8rem;color:#7c2d12;">⏳ Auditor leyendo soportes y analizando... (60-120 seg)</div>';
+  try{
+    var r = await fetch('/auditor-forense', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', ...authH()},
+      body: JSON.stringify({factura: factura, pregunta: pregunta, usar_pdf_nativo: true}),
+    });
+    var data = await r.json();
+    if(!r.ok){
+      outEl.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.7rem .9rem;border-radius:6px;font-size:.82rem;color:#991b1b;">❌ ' + escHtml(data.detail || ('Error HTTP ' + r.status)) + '</div>';
+      return;
+    }
+    // Render del HTML producido por el auditor + meta
+    var meta = '<div style="font-size:.7rem;color:var(--text3);margin-bottom:.5rem;padding:.4rem .6rem;background:#f8fafc;border-radius:4px;">'
+      + '✅ ' + (data.soportes_usados || []).length + ' soportes leídos · '
+      + 'Modelo ' + escHtml(data.modelo || '?') + ' · '
+      + 'Tokens: ' + (data.input_tokens || 0) + ' in / ' + (data.output_tokens || 0) + ' out · '
+      + 'Modo ' + escHtml(data.modo || 'pdf_nativo')
+      + '</div>';
+    var bloque = '<div style="background:#fafaf9;border:1px solid #d6d3d1;border-radius:8px;padding:1rem 1.2rem;font-family:Georgia,serif;line-height:1.55;color:#1c1917;">' + (data.html || '') + '</div>';
+    var btnCopy = '<div style="margin-top:.5rem;display:flex;gap:.4rem;">'
+      + '<button class="btn-sm" onclick="copiarAuditoriaForense(\'' + rndId + '\')">📋 Copiar texto</button>'
+      + '<button class="btn-sm" onclick="descargarAuditoriaForense(\'' + rndId + '\',\'' + escJs(factura) + '\')">💾 Descargar HTML</button>'
+      + '</div>';
+    outEl.innerHTML = meta + bloque + btnCopy;
+  }catch(e){
+    outEl.innerHTML = '<div style="color:#991b1b;font-size:.82rem;">❌ Error de red: ' + escHtml(String(e)) + '</div>';
+  }
+}
+
+function copiarAuditoriaForense(rndId){
+  var out = document.getElementById(rndId + '-out');
+  if(!out) return;
+  var texto = (out.innerText || out.textContent || '').replace(/\s{3,}/g, '\n\n');
+  navigator.clipboard.writeText(texto).then(function(){
+    toast('Copiado', 'Auditoria forense en el portapapeles', 'success');
+  }, function(){ toast('Error', 'No se pudo copiar', 'error'); });
+}
+
+function descargarAuditoriaForense(rndId, factura){
+  var out = document.getElementById(rndId + '-out');
+  if(!out) return;
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Auditoria Forense ' + factura + '</title><style>body{font-family:Georgia,serif;max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.55;}h3{color:#5b21b6;margin-top:1.5rem;}table{border-collapse:collapse;width:100%;}td{padding:.4rem .6rem;border-bottom:1px solid #ddd;}</style></head><body>' + out.innerHTML + '</body></html>';
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'auditoria-forense-' + factura + '.html';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  toast('Descargado', 'Archivo guardado', 'success');
+}
+
 function renderAutoPilotPanel(ap){
   if(!ap || !ap.estado) return '';
   var bg = ap.estado === 'AUTO_ENVIABLE' ? '#f0fdf4' : (ap.estado === 'REVISAR_HUMANO' ? '#fefce8' : '#fef2f2');
@@ -11405,6 +11493,7 @@ function renderResult(d){
     + (d.confianza ? renderConfianzaPanel(d.confianza) : '')
     + (d.verificacion_citas ? renderVerificacionCitas(d.verificacion_citas) : '')
     + (d.auto_pilot ? renderAutoPilotPanel(d.auto_pilot) : '')
+    + renderAuditorForensePanel(d)
 
     +'<div class="res-actions">'
     +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'

@@ -925,6 +925,10 @@ from app.api.routers.soportes import router as soportes_auto_router
 app.include_router(soportes_auto_router)
 from app.api.routers.noticias import router as noticias_router
 app.include_router(noticias_router)
+from app.api.routers.diagnostico import router as diagnostico_router
+app.include_router(diagnostico_router)
+from app.api.routers.auditor_forense import router as auditor_forense_router
+app.include_router(auditor_forense_router)
 
 
 
