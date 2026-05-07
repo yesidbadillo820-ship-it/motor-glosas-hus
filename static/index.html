@@ -3396,6 +3396,30 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   <button id="fb-fab" class="fab fab-feedback" onclick="abrirModalSugerencia()" title="Reportar fallo o sugerir mejora" style="display:none">
     <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>
   </button>
+  <button id="nota-fab" class="fab" style="background:linear-gradient(135deg,#ca8a04,#f59e0b);display:none" onclick="abrirNotaPrivada()" title="Mi nota privada para esta glosa (solo vos la ves)">
+    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    <span id="nota-fab-badge" class="fab-badge" style="display:none">●</span>
+  </button>
+</div>
+
+<!-- Panel flotante de nota privada -->
+<div id="nota-panel" style="display:none;position:fixed;right:18px;bottom:80px;width:min(380px,calc(100vw - 36px));background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(15,23,42,.18);z-index:9996;overflow:hidden;border:1px solid var(--border)">
+  <div style="background:linear-gradient(135deg,#ca8a04,#f59e0b);color:#fff;padding:.75rem 1rem;display:flex;align-items:center;gap:.5rem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/></svg>
+    <b style="font-size:.92rem;flex:1">📝 Mi nota privada · <span id="nota-glosa-id">—</span></b>
+    <button onclick="document.getElementById('nota-panel').style.display='none'" style="background:transparent;border:0;color:#fff;cursor:pointer;font-size:1.2rem;line-height:1;padding:0 .25rem">×</button>
+  </div>
+  <div style="padding:.85rem">
+    <div style="font-size:.7rem;color:var(--text3);margin-bottom:.5rem">Solo vos ves esta nota. Util para recordatorios personales: pendientes, dudas, contactos, etc.</div>
+    <textarea id="nota-textarea" placeholder="Escribí lo que quieras recordar sobre esta glosa..." style="width:100%;min-height:100px;max-height:200px;border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;font-size:.85rem;resize:vertical;font-family:var(--font)"></textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;gap:.4rem">
+      <span id="nota-status" style="font-size:.7rem;color:var(--text3)">—</span>
+      <div style="display:flex;gap:.3rem">
+        <button onclick="borrarNotaPrivada()" class="btn btn-ghost" style="font-size:.72rem">🗑️ Borrar</button>
+        <button onclick="guardarNotaPrivada()" class="btn-primary" style="font-size:.78rem;padding:.35rem .8rem;background:#ca8a04;border:0">Guardar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Panel del Asistente Maestro IA — chat unificado con tools -->
@@ -11482,6 +11506,10 @@ async function responderGlosa(id){
     var r = await fetch('/glosas/' + id, {headers: authH()});
     if(!r.ok){ alert('No se pudo cargar la glosa'); return; }
     var g = await r.json();
+    // Recent items: trackear esta glosa en localStorage
+    try { _trackRecentGlosa(g); } catch(_){}
+    // Cargar nota privada del usuario para esta glosa (lazy)
+    try { setTimeout(function(){ _cargarNotaPrivada(id); }, 200); } catch(_){}
     // Soportes auto-detectados del servidor (\\Prime\radicacion_2026)
     // — corre en paralelo, no bloqueante. Aparece como banner verde
     // si hay PDFs disponibles para esta factura.
@@ -16001,6 +16029,138 @@ function cerrarSpotlight(){
   document.getElementById('spot-bg').classList.remove('show');
 }
 
+// ─── Notas privadas por glosa ───────────────────────────────────────
+window._currentGlosaIdNota = null;
+
+async function _cargarNotaPrivada(glosaId){
+  if(!glosaId) return;
+  window._currentGlosaIdNota = glosaId;
+  var fab = document.getElementById('nota-fab');
+  var fabBadge = document.getElementById('nota-fab-badge');
+  if(fab){
+    fab.style.display = 'flex';
+    fab.dataset.glosaId = glosaId;
+  }
+  try{
+    var r = await fetch('/notas-privadas/' + glosaId, {headers:authH()});
+    if(r.ok){
+      var d = await r.json();
+      window._notaActual = d;
+      if(fabBadge && d.contenido){
+        fabBadge.style.display = 'inline-flex';
+      } else if(fabBadge){
+        fabBadge.style.display = 'none';
+      }
+      var ta = document.getElementById('nota-textarea');
+      if(ta) ta.value = d.contenido || '';
+    } else if(r.status === 404){
+      window._notaActual = null;
+      if(fabBadge) fabBadge.style.display = 'none';
+      var ta2 = document.getElementById('nota-textarea');
+      if(ta2) ta2.value = '';
+    }
+  }catch(e){ /* silencioso */ }
+}
+
+function abrirNotaPrivada(){
+  var glosaId = window._currentGlosaIdNota;
+  if(!glosaId){ toast('Sin glosa abierta','Abrí una glosa primero','warning'); return; }
+  var panel = document.getElementById('nota-panel');
+  if(!panel) return;
+  document.getElementById('nota-glosa-id').textContent = '#'+glosaId;
+  var st = document.getElementById('nota-status');
+  if(window._notaActual && window._notaActual.actualizado_en){
+    st.textContent = 'última edición: ' + new Date(window._notaActual.actualizado_en).toLocaleString('es-CO');
+  } else {
+    st.textContent = 'nota nueva';
+  }
+  panel.style.display = 'block';
+  setTimeout(function(){
+    var ta = document.getElementById('nota-textarea');
+    if(ta) ta.focus();
+  }, 80);
+}
+
+async function guardarNotaPrivada(){
+  var glosaId = window._currentGlosaIdNota;
+  if(!glosaId) return;
+  var ta = document.getElementById('nota-textarea');
+  if(!ta) return;
+  var contenido = ta.value || '';
+  try{
+    var r = await fetch('/notas-privadas/' + glosaId, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json',...authH()},
+      body: JSON.stringify({contenido: contenido}),
+    });
+    var d = {};
+    try { d = await r.json(); } catch(_){}
+    if(!r.ok){ toast('Error', d.detail || 'No se pudo guardar', 'error'); return; }
+    if(d.borrada){
+      toast('Nota borrada', 'Vacía', 'info');
+      window._notaActual = null;
+      var fb = document.getElementById('nota-fab-badge');
+      if(fb) fb.style.display = 'none';
+    } else {
+      toast('Nota guardada', '#'+glosaId, 'success');
+      window._notaActual = d;
+      var fb2 = document.getElementById('nota-fab-badge');
+      if(fb2) fb2.style.display = 'inline-flex';
+    }
+    document.getElementById('nota-panel').style.display = 'none';
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
+async function borrarNotaPrivada(){
+  var glosaId = window._currentGlosaIdNota;
+  if(!glosaId) return;
+  if(!confirm('¿Borrar tu nota de esta glosa?')) return;
+  try{
+    var r = await fetch('/notas-privadas/' + glosaId, {method:'DELETE', headers:authH()});
+    if(!r.ok && r.status !== 404){ toast('Error','No se pudo borrar','error'); return; }
+    var ta = document.getElementById('nota-textarea');
+    if(ta) ta.value = '';
+    window._notaActual = null;
+    var fb = document.getElementById('nota-fab-badge');
+    if(fb) fb.style.display = 'none';
+    toast('Nota borrada','#'+glosaId,'success');
+    document.getElementById('nota-panel').style.display = 'none';
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
+// ─── Recent items: ultimas glosas vistas ────────────────────────────
+// Persiste en localStorage los últimos N glosa-IDs abiertos por el
+// usuario, con metadata mínima (factura, EPS, valor) para mostrar
+// como atajos en el Spotlight cuando el input está vacío. Mejor UX
+// que tener que buscar la glosa de hace 5 minutos.
+var _RECENT_KEY = 'hus_recent_glosas';
+var _RECENT_MAX = 12;
+
+function _trackRecentGlosa(g){
+  if(!g || !g.id) return;
+  var lista = [];
+  try { lista = JSON.parse(localStorage.getItem(_RECENT_KEY) || '[]'); } catch(_){}
+  // Quitar duplicado existente
+  lista = lista.filter(function(x){ return x.id !== g.id; });
+  // Insertar al frente
+  lista.unshift({
+    id: g.id,
+    factura: g.factura || '',
+    eps: g.eps || g.entidad || '',
+    valor_objetado: g.valor_objetado || 0,
+    codigo_glosa: g.codigo_glosa || '',
+    visto_en: Date.now(),
+  });
+  // Cap
+  if(lista.length > _RECENT_MAX) lista = lista.slice(0, _RECENT_MAX);
+  try { localStorage.setItem(_RECENT_KEY, JSON.stringify(lista)); } catch(_){}
+}
+
+function _getRecentGlosas(){
+  try { return JSON.parse(localStorage.getItem(_RECENT_KEY) || '[]'); }
+  catch(_){ return []; }
+}
+
 // ─── Spotlight: comandos rápidos (A.4) ──────────────────────────────
 // Acciones que se reconocen por verbo en lenguaje natural. Cada comando
 // devuelve {label, sub, run()} y se inserta arriba de los resultados.
@@ -16286,7 +16446,24 @@ function renderSpotlightResults(query){
   var q = (query||'').trim().toLowerCase();
   var box = document.getElementById('spot-results');
   if(!q){
-    box.innerHTML = '<div class="spot-empty" style="line-height:1.7">'+
+    var recientes = _getRecentGlosas();
+    var recentHtml = '';
+    if(recientes.length){
+      recentHtml = '<div class="spot-group-lbl">🕒 Recientes ('+recientes.length+')</div>' +
+        recientes.slice(0, 8).map(function(g){
+          var hace = Math.round((Date.now() - g.visto_en) / 60000);
+          var haceTxt = hace < 1 ? 'recién' : (hace < 60 ? hace+'min' : Math.round(hace/60)+'h');
+          return '<div class="spot-item" onclick="accionSpotGlosa('+g.id+')">' +
+            '<div class="spot-icon"><svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+            '<div class="spot-item-main">' +
+              '<div class="spot-item-title">'+escHtml(g.factura||'#'+g.id)+' · '+escHtml(g.eps||'—')+'</div>' +
+              '<div class="spot-item-sub">'+escHtml(g.codigo_glosa||'—')+' · $'+(g.valor_objetado||0).toLocaleString('es-CO')+' · visto '+haceTxt+'</div>' +
+            '</div>' +
+            '<span class="spot-item-meta">ID '+g.id+'</span>' +
+          '</div>';
+        }).join('');
+    }
+    box.innerHTML = recentHtml + '<div class="spot-empty" style="line-height:1.7">'+
       '<div style="margin-bottom:.5rem"><b>Comandos rápidos:</b></div>'+
       '<span class="spot-kbd">mando</span> · '+
       '<span class="spot-kbd">mi resumen</span> · '+
@@ -16302,6 +16479,10 @@ function renderSpotlightResults(query){
       '<span class="spot-kbd">salir</span> · '+
       '<span class="spot-kbd">refrescar</span>'+
       '</div>';
+    if(recientes.length){
+      SPOT_ACTIVE_IDX = 0;
+      highlightSpotItem(0);
+    }
     return;
   }
 

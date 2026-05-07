@@ -613,6 +613,32 @@ class NoticiaSaludRecord(Base):
     categoria = Column(String(40), default="NOTICIA", index=True)
 
 
+class NotaPrivadaRecord(Base):
+    """Notas privadas por glosa, una por gestor.
+
+    Cada gestor puede dejar notas asociadas a una glosa que SOLO el
+    ve. Util para recordatorios personales: "preguntar a Mario sobre
+    esta", "esperar respuesta tecnica del Dr. Lopez", "pendiente
+    confirmar dosis con HC".
+
+    Diferente de ComentarioGlosaRecord (publico, todos los
+    auditores ven). El indice unico (glosa_id + autor_email)
+    asegura una sola nota por par.
+    """
+    __tablename__ = "notas_privadas"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    glosa_id = Column(Integer, index=True, nullable=False)
+    autor_email = Column(String(200), index=True, nullable=False)
+    contenido = Column(Text, nullable=False)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_nota_privada_unico", "glosa_id", "autor_email", unique=True),
+    )
+
+
 class PresetFiltroRecord(Base):
     """Presets de filtros guardados por usuario para Mis Glosas /
     Historial. Permite que cada gestor configure sus filtros
