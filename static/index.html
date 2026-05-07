@@ -2092,8 +2092,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <div style="font-size:1.15rem;font-weight:700;color:var(--text)">⚡ Mando ejecutivo</div>
             <div style="font-size:.78rem;color:var(--text3)">Single-pane-of-glass · refresca cada 30s · <span id="mando-ts" style="color:var(--text2)">—</span></div>
           </div>
-          <div style="display:flex;gap:.4rem">
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:var(--text3)"><input type="checkbox" id="mando-auto" checked style="width:auto;margin:0"> auto-refresh</label>
+            <button class="btn btn-ghost" onclick="autoBalancearCarga()" style="font-size:.8rem;background:#0d9488;color:#fff;border:0" title="Distribuir glosas pendientes sin asignar entre gestores activos (round-robin balanceado)">⚖️ Auto-balancear</button>
             <button class="btn btn-ghost" onclick="loadMando()" style="font-size:.8rem">Actualizar</button>
           </div>
         </div>
@@ -13741,8 +13742,9 @@ async function loadMandoDetector(critFromAlertas){
       ? inact.map(function(g){
           var dias = g.dias_sin_actividad >= 999 ? '∞' : g.dias_sin_actividad;
           var color = g.pendientes >= 5 ? '#dc2626' : (g.pendientes >= 2 ? '#f59e0b' : '#475569');
-          return '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border)">'+
-            '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+          var emailFull = g.email_full || g.email;
+          return '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);align-items:center;gap:.5rem">'+
+            '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1">'+
               '<span style="font-weight:600">'+escHtml(g.email||'—')+'</span>'+
               '<div style="font-size:.7rem;color:var(--text3)">'+g.pendientes+' pendientes · '+cop(g.valor_en_juego)+'</div>'+
             '</div>'+
@@ -13750,6 +13752,7 @@ async function loadMandoDetector(critFromAlertas){
               '<div style="color:'+color+';font-weight:700">'+dias+'d</div>'+
               '<div style="font-size:.65rem;color:var(--text3)">sin actividad</div>'+
             '</div>'+
+            (g.pendientes > 0 ? '<button class="btn btn-sm" style="background:#0369a1;color:#fff;border:0;font-size:.7rem;padding:.25rem .5rem" title="Reasignar las '+g.pendientes+' pendientes a otro gestor" onclick="reasignarDeGestor(\''+escJs(emailFull)+'\','+g.pendientes+')">→</button>' : '')+
           '</div>';
         }).join('')
       : '<div style="color:#16a34a;font-size:.78rem;text-align:center;padding:1rem">✅ Todos los gestores activos</div>';
@@ -13818,6 +13821,110 @@ async function loadMandoDetector(critFromAlertas){
       if(badge){ badge.textContent = String(totalCrit); badge.style.display = 'inline-flex'; }
     }
   } catch(e){ console.error('Detector error', e); }
+}
+
+// ─── Reasignar pendientes desde gestor inactivo ──────────────────────────
+async function reasignarDeGestor(emailOrigen, totalPend){
+  // Cargar lista de candidatos activos
+  var users = [];
+  try{
+    var ru = await fetch('/usuarios/', {headers: authH()});
+    if(ru.ok){
+      users = (await ru.json()).filter(function(u){
+        var rol = (u.rol||'').toUpperCase();
+        return ['AUDITOR','COORDINADOR','SUPER_ADMIN'].indexOf(rol) >= 0
+            && (u.activo === 1 || u.activo === true)
+            && (u.email||'').toLowerCase() !== (emailOrigen||'').toLowerCase();
+      });
+    }
+  }catch(e){}
+  if(!users.length){
+    toast('Sin candidatos','No hay otros gestores activos','warning');
+    return;
+  }
+  var lista = users.map(function(u, i){
+    return (i+1) + '. ' + (u.nombre || u.email) + ' (' + u.email + ' · ' + (u.rol||'AUDITOR') + ')';
+  }).join('\n');
+  var sel = prompt(
+    '🔄 Reasignar las ' + totalPend + ' pendientes de\n'+
+    emailOrigen + '\n\na:\n\n' + lista +
+    '\n\nEscribí el NÚMERO o el email exacto:'
+  );
+  if(!sel) return;
+  var emailDestino = '';
+  if(/^\d+$/.test(sel.trim())){
+    var idx = parseInt(sel,10) - 1;
+    if(idx < 0 || idx >= users.length){ toast('Inválido','Fuera de rango','warning'); return; }
+    emailDestino = users[idx].email;
+  } else {
+    emailDestino = sel.trim();
+  }
+  if(!emailDestino || emailDestino.indexOf('@') === -1){
+    toast('Email inválido','Formato no reconocido','warning');
+    return;
+  }
+  if(!confirm('¿Mover las pendientes de\n  '+emailOrigen+'\na\n  '+emailDestino+' ?\n\n(Hasta 100 a la vez. Repetí si hay más.)')) return;
+  try{
+    var r = await fetch('/glosas/bulk/reasignar-de-gestor', {
+      method:'POST',
+      headers:{'Content-Type':'application/json',...authH()},
+      body: JSON.stringify({
+        gestor_origen: emailOrigen,
+        gestor_destino: emailDestino,
+        solo_pendientes: true,
+        limite: 100,
+      }),
+    });
+    var d = {};
+    try { d = await r.json(); } catch(_){}
+    if(!r.ok){
+      toast('Error', d.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    toast('Reasignadas',
+      d.actualizadas+' glosas movidas · '+cop(d.valor_movido||0)+' transferidos',
+      'success');
+    loadMando();
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
+// ─── Auto-balancear glosas SIN ASIGNAR entre gestores activos ────────────
+async function autoBalancearCarga(){
+  // Buscar glosas pendientes sin asignar
+  if(!confirm('⚖️ Auto-balancear distribuye las glosas PENDIENTES SIN ASIGNAR entre gestores activos usando algoritmo de menor carga.\n\n¿Continuar?')) return;
+
+  toast('Buscando','Glosas pendientes sin asignar…','info');
+  try{
+    // Listar pendientes sin auditor_email
+    var r = await fetch('/glosas/historial-paginado?estado=RADICADA&per_page=100', {headers:authH()});
+    if(!r.ok){ toast('Error','HTTP '+r.status,'error'); return; }
+    var d = await r.json();
+    var sinAsignar = (d.items||[]).filter(function(g){
+      return !g.gestor_nombre || g.gestor_nombre.trim() === '';
+    });
+    if(!sinAsignar.length){
+      toast('Nada que balancear','Todas las pendientes ya tienen gestor','info');
+      return;
+    }
+    if(!confirm('Encontradas '+sinAsignar.length+' glosas sin asignar.\n\n¿Distribuir entre todos los gestores activos?')) return;
+
+    var ids = sinAsignar.map(function(g){return g.id;});
+    var rx = await fetch('/glosas/bulk/auto-asignar', {
+      method:'POST',
+      headers:{'Content-Type':'application/json',...authH()},
+      body: JSON.stringify({glosa_ids: ids, incluir_carga_actual: true}),
+    });
+    var dx = {};
+    try { dx = await rx.json(); } catch(_){}
+    if(!rx.ok){ toast('Error', dx.detail || 'Falló', 'error'); return; }
+
+    var distLines = (dx.distribucion||[]).map(function(x){
+      return '· '+x.email+': '+x.asignadas+' glosas';
+    }).join('\n');
+    alert('✅ '+dx.actualizadas+' glosas distribuidas:\n\n'+distLines);
+    toast('Balanceo OK', dx.actualizadas+' glosas asignadas a '+dx.candidatos_usados+' gestores', 'success');
+    loadMando();
+  }catch(e){ toast('Error', String(e), 'error'); }
 }
 
 function startMandoAutoRefresh(){

@@ -3482,6 +3482,191 @@ class BulkIdsInput(BaseModel):
     glosa_ids: list[int]
 
 
+class ReasignarDeGestorInput(BaseModel):
+    gestor_origen: str
+    gestor_destino: str
+    solo_pendientes: bool = True
+    limite: int = 100
+
+
+@router.post("/bulk/reasignar-de-gestor")
+def bulk_reasignar_de_gestor(
+    data: ReasignarDeGestorInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Mueve TODAS las glosas (o solo las pendientes) de un gestor a
+    otro en una sola operacion. Util cuando un gestor entra a
+    vacaciones, esta inactivo o el coordinador rebalancea carga.
+
+    Args:
+        gestor_origen: email del gestor que actualmente tiene las
+            glosas asignadas.
+        gestor_destino: email del gestor que recibira las glosas.
+        solo_pendientes: si True (default), solo mueve glosas en
+            estado RADICADA/EN_REVISION/BORRADOR. Si False, mueve
+            tambien las cerradas (rara vez util — para limpieza).
+        limite: max glosas a mover en una sola llamada (default 100,
+            max 500). Por seguridad operacional.
+
+    Solo COORDINADOR/SUPER_ADMIN.
+    """
+    if not data.gestor_origen or not data.gestor_destino:
+        raise HTTPException(400, "Origen y destino son requeridos")
+    if data.gestor_origen.strip().lower() == data.gestor_destino.strip().lower():
+        raise HTTPException(400, "Origen y destino no pueden ser iguales")
+    limite = max(1, min(int(data.limite or 100), 500))
+
+    q = db.query(GlosaRecord).filter(
+        (GlosaRecord.auditor_email == data.gestor_origen) |
+        (GlosaRecord.gestor_nombre == data.gestor_origen)
+    )
+    if data.solo_pendientes:
+        q = q.filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+    glosas = q.order_by(GlosaRecord.creado_en.asc()).limit(limite).all()
+
+    actualizadas = 0
+    valor_movido = 0.0
+    for g in glosas:
+        g.auditor_email = data.gestor_destino
+        g.gestor_nombre = data.gestor_destino
+        valor_movido += float(g.valor_objetado or 0)
+        actualizadas += 1
+        try:
+            AuditRepository(db).registrar(
+                usuario_email=current_user.email, usuario_rol=current_user.rol,
+                accion="REASIGNAR_DE_GESTOR", tabla="glosas", registro_id=g.id,
+                valor_anterior=data.gestor_origen, valor_nuevo=data.gestor_destino,
+                detalle=("solo_pendientes" if data.solo_pendientes else "todas"),
+            )
+        except Exception:
+            pass
+    db.commit()
+    return {
+        "ok": True,
+        "actualizadas": actualizadas,
+        "limite": limite,
+        "valor_movido": valor_movido,
+        "gestor_origen": data.gestor_origen,
+        "gestor_destino": data.gestor_destino,
+        "solo_pendientes": data.solo_pendientes,
+    }
+
+
+class AutoAsignarInput(BaseModel):
+    glosa_ids: list[int]
+    candidatos: list[str] = []   # opcional: lista de emails candidatos
+    incluir_carga_actual: bool = True
+
+
+@router.post("/bulk/auto-asignar")
+def bulk_auto_asignar(
+    data: AutoAsignarInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Distribuye N glosas equitativamente entre auditores activos
+    usando algoritmo de balanceo: el que tiene MENOS pendientes recibe
+    primero, hasta nivelar.
+
+    Args:
+        glosa_ids: glosas a repartir (max 500).
+        candidatos: si se pasa, solo se distribuye entre estos emails.
+            Si esta vacio, se usan todos los AUDITOR/COORDINADOR
+            activos del sistema.
+        incluir_carga_actual: si True (default), considera la carga
+            actual de pendientes de cada candidato como base, asi el
+            balance es real (no solo entre las nuevas). Si False, solo
+            balancea las nuevas (primer asignado = primero recibe).
+
+    Solo COORDINADOR/SUPER_ADMIN.
+    """
+    from sqlalchemy import func as _func
+    if not data.glosa_ids:
+        raise HTTPException(400, "Lista vacia")
+    if len(data.glosa_ids) > 500:
+        raise HTTPException(400, "Maximo 500 glosas por auto-asignar")
+
+    # Determinar candidatos: explicitos o todos los AUDITOR/COORDINADOR activos
+    if data.candidatos:
+        candidatos = [c.strip() for c in data.candidatos if c and "@" in c]
+    else:
+        users = (
+            db.query(UsuarioRecord.email)
+            .filter(UsuarioRecord.activo == 1)
+            .filter(UsuarioRecord.rol.in_(["AUDITOR", "COORDINADOR", "SUPER_ADMIN"]))
+            .all()
+        )
+        candidatos = [u[0] for u in users if u[0]]
+
+    if not candidatos:
+        raise HTTPException(400, "Sin candidatos disponibles")
+
+    # Carga actual por candidato (pendientes asignados)
+    carga: dict[str, int] = {c: 0 for c in candidatos}
+    if data.incluir_carga_actual:
+        rows = (
+            db.query(
+                GlosaRecord.auditor_email,
+                _func.count(GlosaRecord.id),
+            )
+            .filter(GlosaRecord.auditor_email.in_(candidatos))
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+            .group_by(GlosaRecord.auditor_email)
+            .all()
+        )
+        for email, n in rows:
+            if email in carga:
+                carga[email] = int(n)
+
+    # Asignar usando heap de menor carga
+    import heapq
+    heap = [(carga[c], c) for c in candidatos]
+    heapq.heapify(heap)
+
+    asignaciones: dict[str, list[int]] = {c: [] for c in candidatos}
+    actualizadas = 0
+    no_encontradas = 0
+
+    for gid in data.glosa_ids:
+        g = GlosaRepository(db).obtener_por_id(gid)
+        if not g:
+            no_encontradas += 1
+            continue
+        carga_actual, email_destino = heapq.heappop(heap)
+        anterior = g.auditor_email or g.gestor_nombre
+        g.auditor_email = email_destino
+        g.gestor_nombre = email_destino
+        asignaciones[email_destino].append(gid)
+        actualizadas += 1
+        heapq.heappush(heap, (carga_actual + 1, email_destino))
+        try:
+            AuditRepository(db).registrar(
+                usuario_email=current_user.email, usuario_rol=current_user.rol,
+                accion="AUTO_ASIGNAR", tabla="glosas", registro_id=gid,
+                valor_anterior=anterior, valor_nuevo=email_destino,
+                detalle="round-robin balanceado",
+            )
+        except Exception:
+            pass
+    db.commit()
+
+    distribucion = [
+        {"email": k, "asignadas": len(v), "ids_sample": v[:5]}
+        for k, v in asignaciones.items() if v
+    ]
+    distribucion.sort(key=lambda x: -x["asignadas"])
+
+    return {
+        "ok": True,
+        "actualizadas": actualizadas,
+        "no_encontradas": no_encontradas,
+        "total_solicitadas": len(data.glosa_ids),
+        "candidatos_usados": len(candidatos),
+        "distribucion": distribucion,
+    }
+
+
 @router.post("/bulk/exportar-csv")
 def bulk_exportar_csv(
     data: BulkIdsInput,
