@@ -213,6 +213,101 @@ button, .btn, .btn-sm, .btn-primary, .btn-secondary, .btn-ghost{
 
 /* Sutileza en separadores para que no parezcan harsh */
 hr{border:none;height:1px;background:linear-gradient(to right, transparent 0%, var(--border) 18%, var(--border) 82%, transparent 100%);margin:1rem 0}
+
+/* ─── SKELETON LOADERS (mientras carga datos, vista premium) ─────── */
+.skel{
+  background: linear-gradient(90deg,
+    var(--bg-subtle) 0%,
+    rgba(148,163,184,.10) 50%,
+    var(--bg-subtle) 100%);
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+  display: inline-block;
+}
+.skel-line{height:.85em;width:100%;border-radius:4px}
+.skel-line.short{width:38%}
+.skel-line.med{width:62%}
+.skel-circle{width:32px;height:32px;border-radius:50%}
+.skel-card{height:80px;width:100%;border-radius:8px;margin-bottom:.5rem}
+@keyframes skel-shimmer{
+  0%{background-position: 200% 0}
+  100%{background-position: -200% 0}
+}
+@media (prefers-reduced-motion: reduce){
+  .skel{animation: none; opacity: .55}
+}
+
+/* ─── EMPTY STATES (cuando no hay datos) ──────────────────────────── */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:3rem 1.5rem;text-align:center;color:var(--text3);
+}
+.empty-state-icon{
+  width:48px;height:48px;border-radius:50%;
+  background:var(--bg-subtle);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:.85rem;color:var(--text3);
+  font-size:1.4rem;
+}
+.empty-state-title{
+  font-size:.92rem;font-weight:600;color:var(--text2);margin-bottom:.3rem
+}
+.empty-state-sub{font-size:.78rem;line-height:1.55;max-width:340px}
+
+/* ─── TOAST refinado (mas sutil, glass premium) ─────────────────────── */
+.toast-wrap > div{
+  backdrop-filter: blur(12px) saturate(1.05);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  box-shadow: 0 4px 14px rgba(15,23,42,.10), 0 0 0 1px rgba(15,23,42,.04);
+  border-radius: var(--r-lg);
+}
+
+/* ─── KEYBOARD FOCUS RING premium (solo en :focus-visible) ───────── */
+*:focus{outline:none}
+button:focus-visible, .btn:focus-visible, a:focus-visible,
+.sn-item:focus-visible, .mis-tab:focus-visible, .spot-item:focus-visible,
+.fab:focus-visible{
+  box-shadow: 0 0 0 3px rgba(2,132,199,.35);
+  border-radius: var(--r);
+}
+
+/* ─── NUMEROS TABULARES (alineamiento perfecto en columnas) ─────── */
+.kpi-num, .stat-card .n, .ap-tbl td:not(:first-child),
+[data-tabular], .num{
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* ─── REDUCIR SATURACION sutil en botones de accent fuerte ────── */
+.btn[style*="background:#16a34a"], .btn[style*="background:#15803d"]{
+  filter: saturate(.85);
+}
+.btn[style*="background:#dc2626"], .btn[style*="background:#b91c1c"]{
+  filter: saturate(.88);
+}
+
+/* ─── BADGES y CHIPS estilo Linear (suaves, no agresivos) ────── */
+.badge, .chip, .pstate-badge{
+  font-weight:600;letter-spacing:.01em;
+  transition: background .15s var(--ease-out);
+}
+
+/* ─── KBD elementos (Linear-perfect) ────────────────────────────── */
+kbd, .spot-kbd{
+  display:inline-block;
+  padding: 2px 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: .72em;
+  font-weight: 500;
+  color: var(--text2);
+  line-height: 1.2;
+  vertical-align: 1px;
+}
 /* Jerarquía tipográfica premium */
 h1,h2,h3,h4,h5,h6{font-family:var(--font-display);letter-spacing:-.02em;line-height:1.25}
 h1{font-size:1.75rem;font-weight:700}
@@ -3534,9 +3629,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   .fab:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(15,23,42,.22),0 2px 4px rgba(15,23,42,.14);filter:brightness(1.06)}
   .fab:active{transform:translateY(0)}
   .fab svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  .fab-tareas{background:linear-gradient(135deg,#15803d,#22c55e)}
-  .fab-feedback{background:linear-gradient(135deg,#0369a1,#0ea5e9)}
-  .fab-asistente{background:linear-gradient(135deg,#7c3aed,#a855f7);width:54px;height:54px}
+  .fab-tareas{background:linear-gradient(135deg,#334155,#475569)}
+  .fab-feedback{background:linear-gradient(135deg,#1e293b,#334155)}
+  .fab-asistente{background:linear-gradient(135deg,#1e293b,#475569);width:54px;height:54px}
   .fab-asistente svg{width:24px;height:24px}
   .fab-asistente:hover{transform:scale(1.06)}
   .fab-asistente.pulsing{animation:fab-pulse 2.5s ease-in-out infinite}
@@ -3547,7 +3642,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   .asist-panel{position:fixed;right:18px;bottom:80px;width:min(420px,calc(100vw - 36px));max-height:calc(100vh - 120px);background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(15,23,42,.18),0 4px 12px rgba(15,23,42,.10);display:none;flex-direction:column;z-index:9997;overflow:hidden;border:1px solid var(--line)}
   .asist-panel.open{display:flex;animation:asist-in .18s ease-out}
   @keyframes asist-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-  .asist-header{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:.85rem 1rem;display:flex;align-items:center;gap:.5rem}
+  .asist-header{background:linear-gradient(135deg,#1e293b,#475569);color:#fff;padding:.85rem 1rem;display:flex;align-items:center;gap:.5rem}
   .asist-header svg{width:18px;height:18px}
   .asist-header b{font-size:.92rem;flex:1}
   .asist-header button{background:transparent;border:none;color:#fff;cursor:pointer;font-size:1.3rem;line-height:1;padding:0 .25rem}
