@@ -1622,11 +1622,20 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     </div>
     <div class="hdr-right">
       <div class="hdr-kpis" id="hdr-kpis" style="display:flex;align-items:center;gap:.8rem;padding:.25rem .7rem;margin-right:.4rem;background:rgba(255,255,255,.08);border-radius:20px;font-size:.7rem;color:rgba(255,255,255,.85);font-weight:600;letter-spacing:.2px;">
-        <span id="hdr-kpi-glosas" title="Glosas analizadas hoy">📊 —</span>
+        <span id="hdr-kpi-glosas" title="Glosas analizadas hoy" style="display:inline-flex;align-items:center;gap:.3rem">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span data-num="—">—</span>
+        </span>
         <span style="opacity:.3">·</span>
-        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes">💰 —</span>
+        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes" style="display:inline-flex;align-items:center;gap:.3rem">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span data-num="—">—</span>
+        </span>
         <span style="opacity:.3">·</span>
-        <span id="hdr-kpi-pendientes" style="color:#fbbf24" title="Glosas pendientes de responder">⏳ —</span>
+        <span id="hdr-kpi-pendientes" style="color:#fbbf24;display:inline-flex;align-items:center;gap:.3rem" title="Glosas pendientes de responder">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span data-num="—">—</span>
+        </span>
       </div>
       <button id="hdr-notif-btn" onclick="toggleDrawerNotif()" title="Mis notificaciones" style="position:relative;background:rgba(255,255,255,.08);border:0;color:#fff;border-radius:50%;width:34px;height:34px;cursor:pointer;margin-right:.5rem;display:flex;align-items:center;justify-content:center;">
         <span style="font-size:17px;">🔔</span>
@@ -3331,22 +3340,28 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         </div>
 
         <!-- Configuración del servidor de archivos local del HUS -->
-        <div class="form-card" style="margin-bottom:1rem;border:2px solid #f59e0b;background:rgba(245,158,11,.04)">
-          <h3 style="color:#92400e">📁 Servidor de archivos local del HUS</h3>
-          <p style="font-size:.78rem;color:var(--text3);margin-bottom:.8rem;line-height:1.5">
-            El motor en cloud no ve <code>Y:\\</code>, pero TU navegador sí. Configurá la URL base del servidor HTTP local
-            (ej. <code>http://localhost:8000/</code> si corrés <code>python -m http.server</code> en <code>Y:\\</code>),
+        <div class="form-card" style="margin-bottom:1rem;border:1px solid var(--border);background:var(--bg-card)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <h3 style="margin:0">Servidor de archivos local del HUS</h3>
+            <span id="af-setup-pill" style="background:var(--bg-subtle);color:var(--text3);font-size:.68rem;font-weight:600;padding:3px 9px;border-radius:10px;letter-spacing:.4px;text-transform:uppercase;border:1px solid var(--border)">Sin configurar</span>
+          </div>
+          <p style="font-size:.78rem;color:var(--text3);margin:.4rem 0 .8rem;line-height:1.55">
+            El motor en cloud no ve <code>Y:\\</code>, pero TU navegador sí. Configurá la URL base del servidor HTTP local,
             subí un CSV con el mapeo <code>factura → ruta_carpeta</code>, y la IA descargará los PDFs vía tu navegador.
             <b>No requiere mirror ni jump-box.</b>
           </p>
+
+          <!-- Steps de setup, formato Linear/Vercel -->
+          <div id="af-setup-steps" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.85rem"></div>
+
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;align-items:end">
             <div class="field" style="margin:0">
               <label style="font-size:.72rem">URL base del servidor local</label>
               <input type="text" id="af-server-url" placeholder="http://localhost:8000/" style="font-family:monospace;font-size:.78rem"/>
             </div>
             <div style="display:flex;gap:.4rem">
-              <button class="btn btn-ghost" onclick="guardarUrlServidorLocal()" style="font-size:.75rem">💾 Guardar</button>
-              <button class="btn btn-ghost" onclick="probarServidorLocal()" style="font-size:.75rem">🧪 Probar</button>
+              <button class="btn btn-ghost" onclick="guardarUrlServidorLocal()" style="font-size:.75rem">Guardar</button>
+              <button class="btn btn-ghost" onclick="probarServidorLocal()" style="font-size:.75rem">Probar</button>
             </div>
           </div>
           <div id="af-server-status" style="font-size:.72rem;color:var(--text3);margin-top:.5rem"></div>
@@ -3356,10 +3371,24 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <input type="file" id="af-rutas-csv" accept=".csv,.tsv,.txt" style="font-size:.78rem"/>
             </div>
             <div>
-              <button class="btn-primary" onclick="importarRutasCsv()" style="font-size:.78rem;padding:.4rem .9rem">⬆️ Importar rutas</button>
+              <button class="btn-primary" onclick="importarRutasCsv()" style="font-size:.78rem;padding:.4rem .9rem">Importar rutas</button>
             </div>
           </div>
           <div id="af-rutas-result" style="font-size:.72rem;margin-top:.5rem"></div>
+
+          <details style="margin-top:.85rem;font-size:.74rem;color:var(--text2)">
+            <summary style="cursor:pointer;font-weight:600">Cómo arrancar el servidor local en mi PC</summary>
+            <div style="background:var(--bg-subtle);border-radius:6px;padding:.7rem .9rem;margin-top:.5rem;line-height:1.7">
+              <b>Opción A — PowerShell:</b><br>
+              <code style="background:var(--bg-card);padding:1px 6px;border-radius:3px">cd Y:\</code><br>
+              <code style="background:var(--bg-card);padding:1px 6px;border-radius:3px">python -m http.server 8000</code><br><br>
+              <b>Opción B — CMD (Símbolo del sistema):</b><br>
+              <code style="background:var(--bg-card);padding:1px 6px;border-radius:3px">cd /d Y:\</code><br>
+              <code style="background:var(--bg-card);padding:1px 6px;border-radius:3px">python -m http.server 8000</code><br><br>
+              Después abrí <code>http://localhost:8000/</code> en este navegador. Si ves el directorio listado,
+              configurá la URL arriba y dale <b>Probar</b>.
+            </div>
+          </details>
         </div>
 
         <div class="form-card" style="margin-bottom:1rem;border:2px solid #8b5cf6;">
@@ -4526,20 +4555,26 @@ async function refrescarKpisHeader(){
     var r = await fetch('/analytics/', {headers: authH()});
     if(!r.ok) return;
     var a = await r.json();
-    if($('hdr-kpi-glosas')) $('hdr-kpi-glosas').textContent = '📊 ' + (a.glosas_mes || 0).toLocaleString('es-CO') + ' glosas';
-    if($('hdr-kpi-recuperado')){
-      var rec = a.valor_recuperado_mes || 0;
-      $('hdr-kpi-recuperado').textContent = '💰 ' + (rec > 0 ? cop(rec) : '$0');
+    // Helper que actualiza solo el span [data-num] sin tocar el SVG hermano
+    function _setKpi(el, valor){
+      if(!el) return;
+      var span = el.querySelector('[data-num]');
+      if(span) span.textContent = valor;
+      else el.textContent = valor;  // fallback si la estructura cambia
     }
+    _setKpi($('hdr-kpi-glosas'), (a.glosas_mes || 0).toLocaleString('es-CO') + ' glosas');
+    var rec = a.valor_recuperado_mes || 0;
+    _setKpi($('hdr-kpi-recuperado'), (rec > 0 ? cop(rec) : '$0'));
     // Pendientes: glosas con fecha_vencimiento próxima
     try{
       var a2 = await fetch('/glosas/alertas', {headers: authH()});
       if(a2.ok){
         var alertas = await a2.json();
         var pend = (alertas && alertas.length) || 0;
-        if($('hdr-kpi-pendientes')){
-          $('hdr-kpi-pendientes').textContent = (pend > 0 ? '⚠️ ' : '✓ ') + pend + ' pendientes';
-          $('hdr-kpi-pendientes').style.color = pend > 0 ? '#fbbf24' : '#10b981';
+        var elP = $('hdr-kpi-pendientes');
+        if(elP){
+          _setKpi(elP, pend + ' pendientes');
+          elP.style.color = pend > 0 ? '#fbbf24' : '#86efac';
         }
       }
     }catch(_){}
@@ -12753,6 +12788,93 @@ function _afServerUrl(){
 function _afCargarServerUrlEnInput(){
   var inp = document.getElementById('af-server-url');
   if(inp) inp.value = _afServerUrl();
+  _afRefrescarSetupSteps();
+}
+
+// Renderiza los 3 pasos del setup con check/pendiente y actualiza la
+// pildora "Sin configurar / Listo / Necesita atencion" en el header.
+function _afRefrescarSetupSteps(){
+  var box = document.getElementById('af-setup-steps');
+  var pill = document.getElementById('af-setup-pill');
+  if(!box) return;
+
+  var step1Done = !!_afServerUrl();
+  // Estado del test del servidor (cached): 'ok' | 'fail' | null
+  var step2State = window._afServerTestState || null;
+  // Conteo de rutas importadas (cached)
+  var step3Count = (window._afRutasStats || {}).total_rutas;
+  // Los 3 pasos visualmente
+  var pasos = [
+    {
+      n: 1, done: step1Done,
+      titulo: 'URL del servidor local configurada',
+      sub: step1Done ? _afServerUrl() : 'Aún no configurada',
+    },
+    {
+      n: 2,
+      done: step2State === 'ok',
+      pending: step1Done && !step2State,
+      fail: step2State === 'fail',
+      titulo: 'Servidor local responde y permite CORS',
+      sub: step2State === 'ok' ? 'Conexión verificada' :
+           step2State === 'fail' ? 'Falló — corré python -m http.server o revisá CORS' :
+           step1Done ? 'Click en Probar arriba' : 'Configurá la URL primero',
+    },
+    {
+      n: 3,
+      done: typeof step3Count === 'number' && step3Count > 0,
+      titulo: 'CSV de rutas importado',
+      sub: typeof step3Count === 'number' ?
+           (step3Count > 0 ? step3Count + ' rutas factura → carpeta indexadas' : 'Aún no hay rutas') :
+           'Subí tu CSV con factura,ruta',
+    },
+  ];
+
+  box.innerHTML = pasos.map(function(p){
+    var icon, color;
+    if(p.done){ icon = '✓'; color = '#16a34a'; }
+    else if(p.fail){ icon = '✕'; color = '#dc2626'; }
+    else if(p.pending){ icon = '!'; color = '#d97706'; }
+    else { icon = '○'; color = 'var(--text3)'; }
+    return '<div style="display:flex;align-items:center;gap:.7rem;padding:.5rem .7rem;background:var(--bg-subtle);border-radius:6px;border-left:3px solid '+color+'">'+
+      '<div style="width:22px;height:22px;border-radius:50%;border:1.5px solid '+color+';color:'+color+';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:.78rem;background:var(--bg-card)">'+icon+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:.8rem;font-weight:600;color:var(--text)">'+p.n+'. '+escHtml(p.titulo)+'</div>'+
+        '<div style="font-size:.7rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p.sub)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  // Pildora del estado global
+  if(pill){
+    var listo = pasos.every(function(p){ return p.done; });
+    var algoFalla = pasos.some(function(p){ return p.fail; });
+    if(listo){
+      pill.textContent = '● Listo';
+      pill.style.background = 'rgba(22,163,74,.10)';
+      pill.style.color = '#15803d';
+      pill.style.borderColor = 'rgba(22,163,74,.35)';
+    } else if(algoFalla){
+      pill.textContent = '● Necesita atención';
+      pill.style.background = 'rgba(220,38,38,.08)';
+      pill.style.color = '#b91c1c';
+      pill.style.borderColor = 'rgba(220,38,38,.30)';
+    } else {
+      pill.textContent = '○ Sin configurar';
+      pill.style.background = 'var(--bg-subtle)';
+      pill.style.color = 'var(--text3)';
+      pill.style.borderColor = 'var(--border)';
+    }
+  }
+
+  // Lazy: cargar contador de rutas si no esta en cache
+  if(typeof step3Count !== 'number'){
+    fetch('/rutas-facturas/stats', {headers: authH()})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(d){ window._afRutasStats = d; _afRefrescarSetupSteps(); }
+      }).catch(function(){});
+  }
 }
 function guardarUrlServidorLocal(){
   var inp = document.getElementById('af-server-url');
@@ -12762,28 +12884,52 @@ function guardarUrlServidorLocal(){
   if(url && !url.endsWith('/')) url = url + '/';
   localStorage.setItem('hus_servidor_archivos_url', url);
   var st = document.getElementById('af-server-status');
-  if(st) st.innerHTML = '<span style="color:#10b981">✓ Guardada</span> · ' + escHtml(url || '(vacía)');
+  if(st) st.innerHTML = '<span style="color:#15803d">✓ Guardada</span> · ' + escHtml(url || '(vacía)');
   toast('Guardado','URL del servidor local','success');
+  // Reset estado de test (la URL puede haber cambiado)
+  window._afServerTestState = null;
+  _afRefrescarSetupSteps();
 }
 async function probarServidorLocal(){
   var url = _afServerUrl();
   var st = document.getElementById('af-server-status');
   if(!url){
     if(st) st.innerHTML = '<span style="color:#dc2626">No hay URL configurada</span>';
+    window._afServerTestState = 'fail';
+    _afRefrescarSetupSteps();
     return;
   }
-  if(st) st.innerHTML = '⏳ Probando…';
+  if(st) st.innerHTML = 'Probando…';
   try{
     var r = await fetch(url, {mode:'cors'});
     if(r.ok){
-      if(st) st.innerHTML = '<span style="color:#10b981">✓ OK ('+r.status+')</span> — el servidor responde. CORS permitido.';
+      if(st) st.innerHTML = '<span style="color:#15803d">✓ OK ('+r.status+')</span> — el servidor responde. CORS permitido.';
+      window._afServerTestState = 'ok';
     } else {
-      if(st) st.innerHTML = '<span style="color:#f59e0b">⚠️ HTTP '+r.status+'</span> — el servidor responde pero con error.';
+      if(st) st.innerHTML = '<span style="color:#b45309">⚠ HTTP '+r.status+'</span> — el servidor responde pero con error.';
+      window._afServerTestState = 'fail';
     }
   }catch(e){
-    if(st) st.innerHTML = '<span style="color:#dc2626">❌ '+escHtml(String(e))+'</span>'+
-      '<br><span style="color:var(--text3);font-size:.7rem">Tip: si CORS bloquea, abrí Chrome con <code>--disable-web-security --user-data-dir=/tmp/chrome</code> o configurá CORS en el servidor.</span>';
+    var msg = String(e);
+    var esCors = /CORS|cors|Access-Control|opaque|blocked/i.test(msg) ||
+                 (msg.indexOf('Failed to fetch') >= 0);
+    if(st){
+      st.innerHTML = '<span style="color:#b91c1c">✕ ' + escHtml(msg) + '</span>';
+      if(esCors){
+        st.innerHTML += '<br><span style="color:var(--text3);font-size:.7rem;line-height:1.55">' +
+          '<b>Probable causa: CORS</b>. Soluciones:<br>' +
+          '· Si usás <code>python -m http.server</code>, descargá <a href="https://gist.github.com/enjalot/2904124" target="_blank" style="color:#0369a1">cors-http-server.py</a> y corré <code>python cors-http-server.py 8000</code><br>' +
+          '· O instalá <code>pip install -U httpserver-cors</code> y corré <code>http-server-cors</code><br>' +
+          '· O usá <code>npx http-server -p 8000 --cors</code> (Node.js, mas simple).<br>' +
+          '· Verificá tambien que la URL termine con <code>/</code> (con slash).' +
+          '</span>';
+      } else {
+        st.innerHTML += '<br><span style="color:var(--text3);font-size:.7rem">¿Está corriendo el servidor? Probá abrir la URL directo en este navegador.</span>';
+      }
+    }
+    window._afServerTestState = 'fail';
   }
+  _afRefrescarSetupSteps();
 }
 async function importarRutasCsv(){
   var inp = document.getElementById('af-rutas-csv');
@@ -12806,12 +12952,15 @@ async function importarRutasCsv(){
       return;
     }
     if(out) out.innerHTML =
-      '<div style="background:rgba(16,185,129,.08);border-left:3px solid #10b981;padding:.5rem .8rem;border-radius:5px">'+
-      '<b>✅ Importadas</b> '+d.insertadas+' nuevas · '+d.actualizadas+' actualizadas · '+d.invalidas+' invalidas'+
+      '<div style="background:rgba(22,163,74,.08);border-left:3px solid #16a34a;padding:.5rem .8rem;border-radius:5px">'+
+      '<b>Importadas</b> '+d.insertadas+' nuevas · '+d.actualizadas+' actualizadas · '+d.invalidas+' invalidas'+
       '<br><span style="color:var(--text3);font-size:.7rem">Sep: '+escHtml(d.separador_detectado)+' · '+
       'Cols: <code>'+escHtml(d.columna_factura_usada)+'</code> + <code>'+escHtml(d.columna_ruta_usada)+'</code></span>'+
       '</div>';
     toast('Rutas importadas', d.insertadas+'+'+d.actualizadas+' rutas', 'success');
+    // Refrescar el indicador de setup steps
+    delete window._afRutasStats;
+    _afRefrescarSetupSteps();
   }catch(e){
     if(out) out.innerHTML = '<span style="color:#dc2626">❌ '+escHtml(String(e))+'</span>';
   }
