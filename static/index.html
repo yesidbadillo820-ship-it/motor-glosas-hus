@@ -283,7 +283,8 @@ header::after{
   transition:background .2s var(--ease-out),color .2s var(--ease-out),transform .15s var(--ease-out);
   position:relative;border-radius:0;
 }
-.sn-item:hover{background:var(--bg-subtle);color:var(--text);transform:translateX(2px)}
+.sn-item:hover{background:var(--bg-subtle);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(14,165,233,.08)}
+.sn-item:hover svg{color:var(--c-teal2)}
 .sn-item.active{
   background:linear-gradient(90deg,rgba(14,165,233,.10) 0%,rgba(14,165,233,.04) 100%);
   color:var(--c-teal2);font-weight:600;
@@ -293,6 +294,28 @@ header::after{
   background:linear-gradient(180deg,var(--c-teal2),var(--c-teal));
   border-radius:0 3px 3px 0;
   box-shadow:0 0 8px rgba(14,165,233,.4);
+  animation:snActivePulse 2.4s ease-in-out infinite;
+}
+@keyframes snActivePulse{
+  0%,100%{box-shadow:0 0 8px rgba(14,165,233,.4)}
+  50%{box-shadow:0 0 14px rgba(14,165,233,.65)}
+}
+/* Cascade slide-in al cargar el sidebar */
+.sn-group .sn-item{opacity:0;animation:snItemIn .35s var(--ease-out) forwards}
+.sn-group .sn-item:nth-child(2){animation-delay:.04s}
+.sn-group .sn-item:nth-child(3){animation-delay:.08s}
+.sn-group .sn-item:nth-child(4){animation-delay:.12s}
+.sn-group .sn-item:nth-child(5){animation-delay:.16s}
+.sn-group .sn-item:nth-child(6){animation-delay:.20s}
+.sn-group .sn-item:nth-child(7){animation-delay:.24s}
+.sn-group .sn-item:nth-child(8){animation-delay:.28s}
+@keyframes snItemIn{
+  from{opacity:0;transform:translateX(-8px)}
+  to{opacity:1;transform:translateX(0)}
+}
+@media (prefers-reduced-motion: reduce){
+  .sn-group .sn-item{opacity:1;animation:none}
+  .sn-item.active::before{animation:none}
 }
 body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 .sn-item svg{flex-shrink:0;color:var(--text3)}
@@ -301,7 +324,13 @@ body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
 .sidebar-nav.collapsed .sn-item-label{display:none}
 .sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
 .sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:4px 10px;border-radius:6px;font-size:.72rem;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
-.sn-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0}
+.sn-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0;box-shadow:0 0 0 0 rgba(239,68,68,.65);animation:snBadgePulse 2s ease-out infinite}
+@keyframes snBadgePulse{
+  0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}
+  70%{box-shadow:0 0 0 6px rgba(239,68,68,0)}
+  100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
+}
+@media (prefers-reduced-motion: reduce){.sn-badge{animation:none}}
 .sidebar-nav.collapsed .sn-badge{position:absolute;top:4px;right:4px;margin-left:0;min-width:14px;height:14px;font-size:9px}
 .sn-brand-footer{margin-top:auto;padding:1rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
 .sidebar-nav.collapsed .sn-brand-footer{padding:.6rem .3rem}
@@ -9619,10 +9648,28 @@ function syncSidebarBadge(idLegacy, idSide){
   var legacy = document.getElementById(idLegacy);
   var side = document.getElementById(idSide);
   if(!legacy || !side) return;
-  var txt = legacy.textContent;
+  var txt = (legacy.textContent || '').trim();
+  var n = parseInt(txt, 10);
   var vis = legacy.style.display !== 'none' && txt && txt !== '0';
-  side.textContent = txt;
+  // Color graduado por volumen (verde→ámbar→rojo)
+  if(!isNaN(n)){
+    if(n >= 20) side.style.background = 'var(--c-red)';
+    else if(n >= 5) side.style.background = '#f59e0b';
+    else side.style.background = '#10b981';
+  }
+  // Pulse rojo solo cuando hay urgencia
+  side.style.animation = (n >= 20) ? '' : 'none';
+  // Truncar 99+ para no romper el layout
+  side.textContent = (!isNaN(n) && n > 99) ? '99+' : txt;
   side.style.display = vis ? 'inline-flex' : 'none';
+  // Detectar incremento → flash visual
+  var prev = parseInt(side.dataset.prev || '0', 10);
+  if(!isNaN(n) && n > prev && prev > 0){
+    side.style.transition = 'transform .25s var(--ease-out)';
+    side.style.transform = 'scale(1.4)';
+    setTimeout(function(){ side.style.transform = 'scale(1)'; }, 280);
+  }
+  side.dataset.prev = String(isNaN(n) ? 0 : n);
 }
 
 // ─── MIS GLOSAS ───────────────────────────────────────────────────────────
