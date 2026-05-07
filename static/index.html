@@ -1973,6 +1973,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </button>
         </div>
 
+        <!-- Presets de filtros guardados -->
+        <div id="mis-presets" style="display:flex;gap:.4rem;margin-bottom:.85rem;flex-wrap:wrap;align-items:center"></div>
+
         <div class="stat-grid" id="mis-stats">
           <div class="stat-card accent-verde"><div class="n" id="mis-v">0</div><div class="l">Óptimo · &gt;10 días</div></div>
           <div class="stat-card accent-amarillo"><div class="n" id="mis-a">0</div><div class="l">Atención · 5-10 días</div></div>
@@ -5354,7 +5357,7 @@ function tab(btn,id){
   if(id==='usuarios'){ loadUsuarios(); cargarVacacionesPropias(); }
   if(id==='conciliacion') loadConciliaciones();
   if(id==='audit') loadAudit(1);
-  if(id==='mis-glosas') loadMisGlosas();
+  if(id==='mis-glosas'){ loadMisGlosas(); cargarPresetsMisGlosas(); }
   if(id==='gold') cargarPlantillasGold();
   if(id==='mi-desempeno') cargarMiDesempeno();
   if(id==='usuarios') cargar2FAEstado();
@@ -10298,6 +10301,117 @@ function renderSaludoAsistente(stats){
   box.style.display = 'flex';
 }
 
+// ─── Presets de filtros guardados (Mis Glosas) ──────────────────────────
+window._mis_presets_cache = [];
+
+function _capturarFiltrosActuales(){
+  var todasCheck = document.getElementById('mis-todas');
+  return {
+    filtro: window._mis_filtro || 'pendientes',
+    vista: window._mis_vista || '',
+    todas_admin: todasCheck ? todasCheck.checked : false,
+    creado_desde: 'mis-glosas',
+    v: 1,
+  };
+}
+
+function _aplicarFiltros(f){
+  if(!f) return;
+  if(f.filtro && typeof setMisFiltro === 'function'){
+    setMisFiltro(f.filtro);
+  }
+  window._mis_vista = f.vista || '';
+  var todasCheck = document.getElementById('mis-todas');
+  if(todasCheck) todasCheck.checked = !!f.todas_admin;
+  loadMisGlosas();
+}
+
+async function cargarPresetsMisGlosas(){
+  var box = document.getElementById('mis-presets');
+  if(!box) return;
+  try{
+    var r = await fetch('/presets-filtros', {headers: authH()});
+    if(!r.ok){ box.innerHTML = ''; return; }
+    var presets = await r.json();
+    presets = presets.filter(function(p){
+      // Solo presets compatibles con Mis Glosas
+      var f = p.filtros || {};
+      return !f.creado_desde || f.creado_desde === 'mis-glosas';
+    });
+    window._mis_presets_cache = presets;
+    var html = '<span style="font-size:.7rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Presets:</span>';
+    if(!presets.length){
+      html += '<span style="font-size:.78rem;color:var(--text3);font-style:italic">Sin presets aún</span>';
+    } else {
+      html += presets.slice(0, 10).map(function(p){
+        var icono = p.icono || '⭐';
+        var visBadge = p.visibilidad === 'GLOBAL' ? ' 🌐' : (p.visibilidad === 'EQUIPO' ? ' 👥' : '');
+        return '<button class="mis-preset-chip" data-id="'+p.id+'" '+
+          'style="background:var(--bg-card);border:1px solid var(--border);color:var(--text2);padding:.3rem .65rem;border-radius:14px;cursor:pointer;font-size:.74rem;font-weight:500;display:inline-flex;align-items:center;gap:.3rem;transition:all .15s ease" '+
+          'onclick="aplicarPreset('+p.id+')" '+
+          'oncontextmenu="event.preventDefault();borrarPreset('+p.id+',event);return false" '+
+          'title="Click: aplicar · click derecho: borrar · '+escHtml(p.visibilidad)+' · usado '+(p.uso_count||0)+'x">'+
+          icono+' '+escHtml(p.nombre)+visBadge+
+          '</button>';
+      }).join('');
+    }
+    html += '<button class="mis-preset-add" style="background:transparent;border:1px dashed var(--border);color:var(--text3);padding:.3rem .55rem;border-radius:14px;cursor:pointer;font-size:.74rem;font-weight:600" onclick="guardarPresetActual()" title="Guardar la combinacion de filtros actual como preset">＋ Guardar</button>';
+    box.innerHTML = html;
+  }catch(e){ console.warn('presets', e); }
+}
+
+async function aplicarPreset(presetId){
+  var p = (window._mis_presets_cache||[]).find(function(x){return x.id === presetId;});
+  if(!p) return;
+  _aplicarFiltros(p.filtros);
+  // Registrar uso (fire and forget)
+  fetch('/presets-filtros/'+presetId+'/usar', {method:'POST', headers: authH()}).catch(function(){});
+  toast('Preset aplicado', p.nombre, 'info');
+}
+
+async function guardarPresetActual(){
+  var nombre = prompt('Nombre del preset (ej. "EPS COMPENSAR + pendientes"):');
+  if(!nombre) return;
+  var icono = prompt('Emoji del preset (opcional, ej. 🩺 ⚡ 🔥):') || '';
+  var rol = (window.USER_ROL||'').toUpperCase();
+  var visibilidad = 'PRIVADO';
+  if(rol === 'COORDINADOR' || rol === 'SUPER_ADMIN'){
+    var visAns = prompt('Visibilidad: PRIVADO (default) | EQUIPO | GLOBAL', 'PRIVADO') || 'PRIVADO';
+    visibilidad = visAns.trim().toUpperCase();
+    if(['PRIVADO','EQUIPO','GLOBAL'].indexOf(visibilidad) === -1) visibilidad = 'PRIVADO';
+  }
+  try{
+    var r = await fetch('/presets-filtros', {
+      method:'POST',
+      headers:{'Content-Type':'application/json',...authH()},
+      body: JSON.stringify({
+        nombre: nombre.trim().slice(0, 80),
+        filtros: _capturarFiltrosActuales(),
+        visibilidad: visibilidad,
+        icono: icono.trim().slice(0, 8),
+      }),
+    });
+    var d = {};
+    try { d = await r.json(); } catch(_){}
+    if(!r.ok){ toast('Error', d.detail || 'No se pudo guardar', 'error'); return; }
+    toast('Preset guardado', nombre, 'success');
+    cargarPresetsMisGlosas();
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
+async function borrarPreset(presetId, ev){
+  if(ev && ev.preventDefault) ev.preventDefault();
+  var p = (window._mis_presets_cache||[]).find(function(x){return x.id === presetId;});
+  if(!p) return;
+  if(!confirm('¿Borrar el preset "'+p.nombre+'"?')) return;
+  try{
+    var r = await fetch('/presets-filtros/'+presetId, {method:'DELETE', headers: authH()});
+    if(!r.ok){ toast('Error','No se pudo borrar','error'); return; }
+    toast('Borrado', p.nombre, 'success');
+    cargarPresetsMisGlosas();
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var vista = window._mis_vista || '';
@@ -12293,7 +12407,7 @@ document.addEventListener('keydown', function(e){
 });
 
 // ─── AUDITOR FORENSE STANDALONE (panel sidebar) ────────────────────
-async function auditorForenseStandalone(){
+async function auditorForenseStandalone(forzarRefresco){
   var fact = (document.getElementById('af-factura')||{}).value || '';
   var preg = (document.getElementById('af-pregunta')||{}).value || '';
   fact = fact.trim().toUpperCase();
@@ -12308,14 +12422,14 @@ async function auditorForenseStandalone(){
   }
   var btn = document.getElementById('af-btn-go');
   var out = document.getElementById('af-out');
-  if(btn){ btn.disabled = true; btn.dataset.orig = btn.innerHTML; btn.innerHTML = '⏳ Auditando…'; }
+  if(btn){ btn.disabled = true; btn.dataset.orig = btn.innerHTML; btn.innerHTML = forzarRefresco ? '⏳ Re-auditando…' : '⏳ Auditando…'; }
   out.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.8rem 1rem;border-radius:6px;font-size:.82rem;color:#7c2d12;">⏳ Auditor leyendo soportes y analizando con Claude... (60-120 segundos)</div>';
 
   try{
     var r = await fetch('/auditor-forense/', {
       method: 'POST',
       headers: {'Content-Type':'application/json', ...authH()},
-      body: JSON.stringify({factura: fact, pregunta: preg, usar_pdf_nativo: true}),
+      body: JSON.stringify({factura: fact, pregunta: preg, usar_pdf_nativo: true, refrescar: !!forzarRefresco}),
     });
     var data = {};
     try { data = await r.json(); } catch(_e){ data = {detail: 'Respuesta no JSON'}; }
@@ -12337,17 +12451,25 @@ async function auditorForenseStandalone(){
       out.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#991b1b;">❌ ' + escHtml(msg) + '</div>';
       return;
     }
-    var meta = '<div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem;padding:.5rem .8rem;background:#f8fafc;border-radius:6px;border-left:3px solid #8b5cf6;">'
-      + '✅ <b>' + (data.soportes_usados||[]).length + ' soportes leídos</b> · '
+    var cacheBadge = data.cache_hit
+      ? '<span style="background:#10b981;color:#fff;padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700;margin-left:.4rem">CACHE</span>'
+      : '';
+    var meta = '<div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem;padding:.5rem .8rem;background:#f8fafc;border-radius:6px;border-left:3px solid '+(data.cache_hit?'#10b981':'#8b5cf6')+';">'
+      + (data.cache_hit
+          ? '⚡ <b>Respuesta cacheada</b>' + cacheBadge + ' · 0 tokens consumidos · '
+          : '✅ <b>' + (data.soportes_usados||[]).length + ' soportes leídos</b> · '
+            + 'Tokens: ' + (data.input_tokens||0).toLocaleString() + ' in / ' + (data.output_tokens||0).toLocaleString() + ' out · ')
       + 'Modelo: ' + escHtml(data.modelo||'?') + ' · '
-      + 'Tokens: ' + (data.input_tokens||0).toLocaleString() + ' in / ' + (data.output_tokens||0).toLocaleString() + ' out · '
       + 'Modo: ' + escHtml(data.modo||'pdf_nativo')
       + '</div>';
     var bloque = '<div style="background:#fafaf9;border:1px solid #d6d3d1;border-radius:8px;padding:1.2rem 1.4rem;font-family:Georgia,serif;line-height:1.6;color:#1c1917;font-size:.88rem;">' + (data.html||'') + '</div>';
-    var btns = '<div style="margin-top:.6rem;display:flex;gap:.4rem;">'
+    var btns = '<div style="margin-top:.6rem;display:flex;gap:.4rem;flex-wrap:wrap">'
       + '<button class="btn-sm" onclick="copiarAFOut()">📋 Copiar texto</button>'
       + '<button class="btn-sm" onclick="descargarAFOut(\'' + escJs(fact) + '\')">💾 Descargar HTML</button>'
       + '<button class="btn-sm" onclick="window.print()">🖨️ Imprimir</button>'
+      + (data.cache_hit
+          ? '<button class="btn-sm" style="background:#f59e0b;color:#fff;border:0" onclick="auditorForenseStandalone(true)" title="Forzar nueva consulta a Claude (ignora cache)">🔄 Refrescar (nueva consulta)</button>'
+          : '')
       + '</div>';
     out.innerHTML = meta + bloque + btns;
     toast('Auditoría lista', 'Forense generada', 'success');

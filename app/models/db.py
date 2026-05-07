@@ -611,3 +611,32 @@ class NoticiaSaludRecord(Base):
     activa = Column(Integer, default=1, nullable=False, index=True)
     # Categorías típicas: NORMATIVA | NOTICIA | OPINION | ALERTA
     categoria = Column(String(40), default="NOTICIA", index=True)
+
+
+class PresetFiltroRecord(Base):
+    """Presets de filtros guardados por usuario para Mis Glosas /
+    Historial. Permite que cada gestor configure sus filtros
+    favoritos (EPS X + estado Y + ordenado por valor) y los reutilice
+    con un click. Tambien soporta presets compartidos (visibilidad
+    EQUIPO o GLOBAL) cuando un coordinador comparte un filtro util.
+    """
+    __tablename__ = "preset_filtros"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_email = Column(String(200), index=True, nullable=False)
+    nombre = Column(String(80), nullable=False)
+    # JSON serializado con los filtros: {eps, estado, valor_min,
+    # valor_max, orden, etc.}. Sin esquema rigido — el frontend
+    # serializa lo que necesita y el backend lo guarda como blob.
+    filtros = Column(Text, nullable=False)
+    # PRIVADO (solo el dueno) | EQUIPO (todos los del mismo equipo) |
+    # GLOBAL (todos los usuarios). Default PRIVADO.
+    visibilidad = Column(String(20), default="PRIVADO", nullable=False)
+    icono = Column(String(8), nullable=True)  # emoji opcional
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    ultimo_uso = Column(DateTime(timezone=True), nullable=True)
+    uso_count = Column(Integer, default=0, nullable=False)
+
+    __table_args__ = (
+        Index("ix_preset_usuario", "usuario_email", "creado_en"),
+    )
