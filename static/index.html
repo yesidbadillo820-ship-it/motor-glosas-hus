@@ -402,6 +402,7 @@ body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
 .panel.active#p-papelera,
 .panel.active#p-conciliacion,
 .panel.active#p-audit,
+.panel.active#p-mando,
 .panel.active#p-dashboard{flex-direction:column;min-height:0}
 
 /* ─── SIDEBAR ────────────────────────────── */
@@ -1452,8 +1453,13 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
       <div class="sn-group">
         <div class="sn-label">Reportes</div>
+        <button id="sn-mando" class="sn-item" data-tip="Mando ejecutivo (single-pane-of-glass)" onclick="sidebarTab(this,'mando')" style="display:none">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M13 2L3 14H12L11 22L21 10H12L13 2Z"/></svg>
+          <span class="sn-item-label">Mando ejecutivo</span>
+          <span class="sn-badge" id="mando-badge" style="display:none">0</span>
+        </button>
         <button class="sn-item" data-tip="Dashboard" onclick="sidebarTab(this,'dashboard')">
-          <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="9"/></svg>
           <span class="sn-item-label">Dashboard</span>
         </button>
         <button class="sn-item" data-tip="Cobranza Live (saldos y aging)" onclick="sidebarTab(this,'cobranza-live')">
@@ -2074,6 +2080,52 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <div class="chart-hdr">Top 3 gestores por volumen</div>
             <div id="rm-top-gestor" style="padding:.6rem"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B.1: Mando ejecutivo single-pane-of-glass (coord/admin) -->
+    <div class="panel" id="p-mando">
+      <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">⚡ Mando ejecutivo</div>
+            <div style="font-size:.78rem;color:var(--text3)">Single-pane-of-glass · refresca cada 30s · <span id="mando-ts" style="color:var(--text2)">—</span></div>
+          </div>
+          <div style="display:flex;gap:.4rem">
+            <label style="display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:var(--text3)"><input type="checkbox" id="mando-auto" checked style="width:auto;margin:0"> auto-refresh</label>
+            <button class="btn btn-ghost" onclick="loadMando()" style="font-size:.8rem">Actualizar</button>
+          </div>
+        </div>
+
+        <!-- Alertas proactivas (banner) -->
+        <div id="mando-alertas" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem"></div>
+
+        <!-- KPIs grandes -->
+        <div class="kpi-grid" style="margin-bottom:1rem">
+          <div class="kpi"><div class="kpi-lbl">Recuperado mes</div><div class="kpi-num" id="mando-rec" style="color:#16a34a">—</div><div class="kpi-sub" id="mando-rec-sub">—</div></div>
+          <div class="kpi"><div class="kpi-lbl">Tasa recuperación</div><div class="kpi-num" id="mando-tasa">—</div><div class="kpi-sub">% sobre objetado</div></div>
+          <div class="kpi"><div class="kpi-lbl">Glosas hoy</div><div class="kpi-num" id="mando-hoy">—</div><div class="kpi-sub">analizadas</div></div>
+          <div class="kpi"><div class="kpi-lbl">Pendientes</div><div class="kpi-num" id="mando-pend" style="color:#0369a1">—</div><div class="kpi-sub">sin resolver</div></div>
+          <div class="kpi"><div class="kpi-lbl">Crit. 48h</div><div class="kpi-num" id="mando-48h" style="color:#f59e0b">—</div><div class="kpi-sub">vencen pronto</div></div>
+          <div class="kpi"><div class="kpi-lbl">Vencidas</div><div class="kpi-num" id="mando-venc" style="color:#dc2626">—</div><div class="kpi-sub">fuera de plazo</div></div>
+        </div>
+
+        <!-- Rankings lado a lado -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">🏆 Top gestores del mes (por valor recuperado)</div>
+            <div id="mando-top-gestores" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">⚠️ EPS con más ratificación (revisar argumentación)</div>
+            <div id="mando-eps-ratif" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top:1rem;font-size:.7rem;color:var(--text3);text-align:center">
+          Datos en tiempo real · Endpoint: <code>/dashboard-ejecutivo/vivo</code> ·
+          Solo COORDINADOR / SUPER_ADMIN
         </div>
       </div>
     </div>
@@ -4942,6 +4994,7 @@ function tab(btn,id){
   if(id==='dashboard') loadDash();
   if(id==='cobranza-live') loadDashCobranza();
   if(id==='resumen-mes') loadResumenMes();
+  if(id==='mando') loadMando();
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -13309,6 +13362,128 @@ async function loadResumenMes(){
       : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin datos del mes</div>';
   } catch(e){ console.error('Resumen mes error', e); }
 }
+
+// ─── B.1: Mando ejecutivo (single-pane-of-glass) ─────────────────────────
+var MANDO_TIMER = null;
+async function loadMando(){
+  var box = document.getElementById('p-mando');
+  if(!box) return;
+  try{
+    var r = await fetch('/dashboard-ejecutivo/vivo', {headers: authH()});
+    if(r.status === 403){
+      box.querySelector('.dash-area').innerHTML =
+        '<div style="text-align:center;padding:3rem;color:#b45309">'+
+        '<div style="font-size:2rem;margin-bottom:.5rem">🔒</div>'+
+        'Este panel es solo para COORDINADOR / SUPER_ADMIN</div>';
+      return;
+    }
+    if(!r.ok){ console.error('mando HTTP', r.status); return; }
+    var d = await r.json();
+
+    document.getElementById('mando-ts').textContent =
+      'actualizado ' + new Date(d.timestamp || Date.now()).toLocaleTimeString('es-CO');
+
+    document.getElementById('mando-rec').textContent = cop(d.valor_recuperado_mes||0);
+    document.getElementById('mando-rec-sub').textContent =
+      'de ' + cop(d.valor_objetado_mes||0) + ' objetados';
+    document.getElementById('mando-tasa').textContent = (d.tasa_recuperacion_pct||0).toFixed(1)+'%';
+    document.getElementById('mando-hoy').textContent = (d.glosas_analizadas_hoy||0).toLocaleString('es-CO');
+    document.getElementById('mando-pend').textContent = (d.glosas_pendientes||0).toLocaleString('es-CO');
+    document.getElementById('mando-48h').textContent = (d.glosas_criticas_48h||0).toLocaleString('es-CO');
+    document.getElementById('mando-venc').textContent = (d.glosas_vencidas||0).toLocaleString('es-CO');
+
+    // Alertas proactivas
+    var alertasBox = document.getElementById('mando-alertas');
+    var alertas = d.alertas_proactivas || [];
+    if(!alertas.length){
+      alertasBox.innerHTML =
+        '<div style="background:rgba(16,185,129,.08);border-left:4px solid #10b981;padding:.65rem .9rem;border-radius:6px;font-size:.82rem;color:var(--text2)">'+
+        '✅ Todo en orden. No hay alertas críticas en este momento.'+
+        '</div>';
+    } else {
+      alertasBox.innerHTML = alertas.map(function(a){
+        var color = {critica:'#dc2626',alta:'#f59e0b',media:'#0369a1',info:'#16a34a'}[a.severidad] || '#475569';
+        var bg = {critica:'rgba(220,38,38,.08)',alta:'rgba(245,158,11,.08)',media:'rgba(3,105,161,.08)',info:'rgba(22,163,74,.08)'}[a.severidad] || 'rgba(71,85,105,.08)';
+        return '<div style="background:'+bg+';border-left:4px solid '+color+';padding:.7rem 1rem;border-radius:6px">'+
+          '<div style="font-weight:700;color:'+color+';font-size:.88rem">'+escHtml(a.titulo)+'</div>'+
+          '<div style="color:var(--text2);font-size:.78rem;margin-top:.2rem">'+escHtml(a.cuerpo)+'</div>'+
+        '</div>';
+      }).join('');
+    }
+
+    // Top gestores
+    var rg = d.ranking_auditores || [];
+    document.getElementById('mando-top-gestores').innerHTML = rg.length
+      ? rg.map(function(g,i){
+          var medal = ['🥇','🥈','🥉'][i] || '·';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border);gap:.6rem">'+
+            '<div style="display:flex;align-items:center;gap:.5rem;min-width:0">'+
+              '<span style="font-size:1rem;flex-shrink:0">'+medal+'</span>'+
+              '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.email||'—')+'</span>'+
+            '</div>'+
+            '<div style="text-align:right;flex-shrink:0">'+
+              '<div style="color:#16a34a;font-weight:700;font-variant-numeric:tabular-nums">'+cop(g.valor_recuperado||0)+'</div>'+
+              '<div style="font-size:.7rem;color:var(--text3)">'+g.glosas_respondidas+' glosas · '+(g.pct_exito||0).toFixed(1)+'% éxito</div>'+
+            '</div>'+
+          '</div>';
+        }).join('')
+      : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin datos del mes</div>';
+
+    // EPS ratificación
+    var re = d.ranking_eps_ratificacion || [];
+    document.getElementById('mando-eps-ratif').innerHTML = re.length
+      ? re.map(function(e){
+          var color = e.ratif_pct >= 50 ? '#dc2626' : (e.ratif_pct >= 30 ? '#f59e0b' : '#475569');
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border);gap:.6rem">'+
+            '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(e.eps)+'</div>'+
+            '<div style="text-align:right">'+
+              '<div style="color:'+color+';font-weight:700;font-variant-numeric:tabular-nums">'+(e.ratif_pct||0).toFixed(1)+'%</div>'+
+              '<div style="font-size:.7rem;color:var(--text3)">'+e.ratificadas+'/'+e.cantidad+' ratificadas</div>'+
+            '</div>'+
+          '</div>';
+        }).join('')
+      : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin decisiones de EPS este mes</div>';
+
+    // Badge en sidebar: mostrar count de alertas críticas + altas
+    var critCount = alertas.filter(function(a){
+      return a.severidad === 'critica' || a.severidad === 'alta';
+    }).length;
+    var badge = document.getElementById('mando-badge');
+    if(badge){
+      if(critCount > 0){ badge.textContent = String(critCount); badge.style.display = 'inline-flex'; }
+      else { badge.style.display = 'none'; }
+    }
+
+  } catch(e){ console.error('Mando error', e); }
+}
+
+function startMandoAutoRefresh(){
+  if(MANDO_TIMER) return;
+  MANDO_TIMER = setInterval(function(){
+    var auto = document.getElementById('mando-auto');
+    var visible = document.getElementById('p-mando');
+    if(auto && auto.checked && visible && visible.classList.contains('active')){
+      loadMando();
+    }
+  }, 30000);
+}
+
+// Mostrar boton del sidebar solo a coordinador/super_admin
+(function(){
+  var check = function(){
+    var btn = document.getElementById('sn-mando');
+    if(!btn) return;
+    var rol = (window.USER_ROL||'').toUpperCase();
+    btn.style.display = (rol === 'SUPER_ADMIN' || rol === 'COORDINADOR') ? '' : 'none';
+    if(rol === 'SUPER_ADMIN' || rol === 'COORDINADOR'){
+      // Pre-cargar metrica para que el badge aparezca aunque el panel no este abierto
+      setTimeout(loadMando, 1500);
+      startMandoAutoRefresh();
+    }
+  };
+  setTimeout(check, 800);
+  setTimeout(check, 3500);
+})();
 
 // ─── R376: Panel admin de Sugerencias ────────────────────────────────────
 async function cargarPanelSugerencias(){
