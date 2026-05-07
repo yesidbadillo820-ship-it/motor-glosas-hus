@@ -1362,7 +1362,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <span>Buscar…</span>
         <span class="kbd">⌘K</span>
       </button>
-      <div class="status-pill"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span></div>
+      <div class="status-pill" title="Estado del backend (verde) + indicador live (parpadea cuando llega evento)"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span><div id="hdr-live-dot" style="width:6px;height:6px;border-radius:50%;background:#94a3b8;margin-left:6px;transition:all .3s ease" title="Live channel"></div></div>
       <span class="hdr-user" id="hdr-user"></span>
       <button class="hdr-btn" id="btn-install-pwa" onclick="instalarPWA()" title="Instalar app" style="display:none"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
       <button class="hdr-btn" onclick="toggleDark()" title="Modo oscuro" aria-label="Cambiar modo"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
@@ -3767,6 +3767,8 @@ async function initApp(){
     syncSidebarBadge('mis-badge','mis-badge-side');
     syncSidebarBadge('alert-badge','alert-badge-side');
   }, 800);
+  // B.2: live channel — polling de eventos recientes y refresco automatico
+  setTimeout(iniciarLiveChannel, 2000);
 }
 
 async function checkHealth(){
@@ -3889,6 +3891,118 @@ function _mostrarBannerNuevoDeploy(versionInfo){
 function toggleDark(){
   document.body.classList.toggle('dark');
   localStorage.setItem('dark',document.body.classList.contains('dark')?'1':'0');
+}
+
+// ─── B.2: Live channel — polling de eventos recientes ─────────────────
+// Cada 10s consulta /eventos/recientes con cursor incremental y dispara
+// refresh de los paneles afectados, asi la UI parece "tiempo real" sin
+// websockets. Pausa cuando la pestana esta oculta para no quemar
+// recursos.
+window._LIVE = { since: null, timer: null, ultimoToast: 0 };
+
+async function iniciarLiveChannel(){
+  if(!localStorage.getItem('hus_token')) return;  // no logueado
+  if(window._LIVE.timer) return;  // ya iniciado
+
+  // Sincronizar cursor con server_time inicial
+  try {
+    var rh = await fetch('/eventos/heartbeat', {headers:authH()});
+    if(rh.ok){
+      var d = await rh.json();
+      window._LIVE.since = d.server_time;
+    }
+  } catch(_){}
+
+  function tick(){
+    // Si la pestana esta oculta, saltar (ahorrar batería/red)
+    if(document.hidden) return;
+    pollLiveEventos();
+  }
+  window._LIVE.timer = setInterval(tick, 10000);
+  setTimeout(tick, 1500);
+
+  // Cuando vuelve la pestana, hacer un tick inmediato
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) setTimeout(tick, 200);
+  });
+}
+
+async function pollLiveEventos(){
+  try{
+    var qs = window._LIVE.since ? '?since=' + encodeURIComponent(window._LIVE.since) : '';
+    var r = await fetch('/eventos/recientes' + qs, {headers:authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    window._LIVE.since = d.server_time;
+    if(!d.eventos || !d.eventos.length) return;
+
+    // Conjuntos de paneles a refrescar segun los tipos de evento
+    var refrescar = {
+      misGlosas: false, mando: false, alertas: false, historial: false,
+      dashboard: false,
+    };
+    var tiposMios = 0;  // eventos que afectan al usuario actual
+    var miEmail = (localStorage.getItem('hus_email')||'').toLowerCase();
+
+    d.eventos.forEach(function(ev){
+      var a = ev.accion || '';
+      if(a === 'CREAR' || a === 'IMPORTAR_RECEPCION' || a === 'CLONAR_GLOSA'){
+        refrescar.misGlosas = true;
+        refrescar.mando = true;
+        refrescar.dashboard = true;
+        refrescar.historial = true;
+      } else if(a === 'ASIGNAR' || a === 'BULK_ASIGNAR'){
+        refrescar.misGlosas = true;
+        refrescar.mando = true;
+        // Si me asignaron a mi -> notificacion personal
+        if(ev.valor_nuevo && miEmail && String(ev.valor_nuevo).toLowerCase().indexOf(miEmail) >= 0){
+          tiposMios++;
+        }
+      } else if(a === 'DECISION_EPS' || a === 'DECISION_EPS_LOTE' || a === 'WORKFLOW' || a === 'BULK_UPDATE_ESTADO'){
+        refrescar.misGlosas = true;
+        refrescar.mando = true;
+        refrescar.historial = true;
+      } else if(a === 'GENERAR_LOTE' || a === 'REANALIZAR_GLOSA'){
+        refrescar.misGlosas = true;
+        refrescar.historial = true;
+      }
+    });
+
+    // Refrescar paneles activos (solo el que el usuario esta viendo)
+    var activeId = (document.querySelector('.panel.active')||{}).id || '';
+    if(refrescar.misGlosas && activeId === 'p-mis-glosas' && typeof loadMisGlosas==='function') loadMisGlosas();
+    if(refrescar.mando && activeId === 'p-mando' && typeof loadMando==='function') loadMando();
+    if(refrescar.alertas && activeId === 'p-alertas' && typeof loadAlertas==='function') loadAlertas();
+    if(refrescar.historial && activeId === 'p-historial' && typeof loadHist==='function') loadHist(1);
+    if(refrescar.dashboard && activeId === 'p-dashboard' && typeof loadDash==='function') loadDash();
+
+    // Siempre refrescar contadores de badges (livianos)
+    if(typeof loadAlertCount==='function') loadAlertCount();
+
+    // Toast si eventos importantes me involucran (max 1 cada 5s)
+    var ahora = Date.now();
+    if(tiposMios > 0 && (ahora - window._LIVE.ultimoToast) > 5000){
+      window._LIVE.ultimoToast = ahora;
+      toast(
+        '🔔 Actividad nueva',
+        tiposMios + ' evento' + (tiposMios>1?'s':'') + ' que te involucra',
+        'info'
+      );
+    }
+
+    // Actualizar indicador "live" del header si existe
+    var dot = document.getElementById('hdr-live-dot');
+    if(dot){
+      dot.style.background = '#10b981';
+      dot.style.boxShadow = '0 0 8px rgba(16,185,129,.6)';
+      setTimeout(function(){
+        dot.style.background = '#94a3b8';
+        dot.style.boxShadow = 'none';
+      }, 1500);
+    }
+  } catch(e){
+    console.warn('live poll', e.message);
+  }
 }
 
 // ─── KPIs LIVE EN HEADER ─────────────────────────────────────────────────

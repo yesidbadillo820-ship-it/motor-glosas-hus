@@ -859,6 +859,7 @@ from app.api.routers.autopilot import router as autopilot_router
 from app.api.routers.digest import router as digest_router
 from app.api.routers.control_center import router as control_center_router
 from app.api.routers.notificaciones import router as notificaciones_router
+from app.api.routers.eventos_live import router as eventos_live_router
 
 app.include_router(auth_router)
 app.include_router(glosas_router)
@@ -901,6 +902,7 @@ app.include_router(autopilot_router)
 app.include_router(digest_router)
 app.include_router(control_center_router)
 app.include_router(notificaciones_router)
+app.include_router(eventos_live_router)
 from app.api.routers.cups import router as cups_router
 app.include_router(cups_router)
 from app.api.routers.pwa import router as pwa_router
