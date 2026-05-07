@@ -67,6 +67,10 @@ class GlosaRepository:
         concepto_glosa: Optional[str] = None,
         fecha_recepcion=None,
         fecha_entrega=None,
+        # IM F2: si se setea, la glosa queda asignada al gestor (su
+        # email se guarda en gestor_nombre y auditor_email para que la
+        # vista "Mis glosas" la encuentre por ambos caminos).
+        asignado_a_email: Optional[str] = None,
     ) -> GlosaRecord:
         from datetime import datetime, timezone as _tz
         record = GlosaRecord(
@@ -94,6 +98,8 @@ class GlosaRepository:
             concepto_glosa=concepto_glosa,
             fecha_recepcion=fecha_recepcion,
             fecha_entrega=fecha_entrega,
+            gestor_nombre=asignado_a_email,
+            auditor_email=asignado_a_email,
         )
         self.db.add(record)
         self.db.commit()

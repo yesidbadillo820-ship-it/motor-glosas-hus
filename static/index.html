@@ -2848,6 +2848,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <p class="page-sub">Subí un Excel/CSV o pegá filas. El motor parsea, valida y procesa cada glosa con IA.</p>
           </div>
           <div class="page-actions toolbar-inline">
+            <a href="/glosas/importar-masiva/plantilla.csv" class="btn-sm ghost" title="Descargar plantilla TSV con columnas correctas" style="text-decoration:none;display:inline-block;">📋 Plantilla</a>
             <button class="btn-sm ghost" onclick="cargarHistorialLotesMasiva()" title="Ver lotes anteriores">📜 Historial</button>
           </div>
         </div>
@@ -5158,6 +5159,72 @@ function limpiarImportMasiva(){
   if(res) res.innerHTML = '';
 }
 
+function _imRenderErroresConRetry(errores, lote_id){
+  // F2: cada error de fila tiene un boton "Reintentar" que dispara
+  // /retry-fila con la fila_data guardada en el JSON del error.
+  var html = '<details style="margin-top:.6rem;" open><summary style="cursor:pointer;font-size:.78rem;color:#991b1b;font-weight:600;">⚠️ Errores ('+errores.length+')</summary>'
+    + '<div style="margin-top:.4rem;">';
+  errores.slice(0, 20).forEach(function(er, idx){
+    var puedeRetry = er.fila_data && Object.keys(er.fila_data).length > 0;
+    html += '<div style="background:#fef2f2;border-left:3px solid #dc2626;border-radius:4px;padding:.45rem .7rem;margin-bottom:.3rem;font-size:.74rem;">'
+      + '<div style="display:flex;align-items:flex-start;gap:.5rem;">'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div><b>Fila ' + er.fila + ':</b> ' + escHtml(er.error||'') + '</div>'
+      +     (puedeRetry
+          ? '<div style="font-size:.68rem;color:#7f1d1d;margin-top:.2rem;">'
+            + escHtml((er.fila_data.eps||'').slice(0,40)) + ' · '
+            + escHtml((er.fila_data.codigo||'')) + ' · '
+            + escHtml((er.fila_data.factura||''))
+            + '</div>'
+          : '')
+      +   '</div>'
+      + (puedeRetry
+          ? '<button class="btn-sm" onclick="reintentarFilaError('+lote_id+','+idx+')" style="font-size:.65rem;color:#0369a1;border-color:#bae6fd;background:#eff6ff;flex-shrink:0;">🔄 Reintentar</button>'
+          : '')
+      + '</div></div>';
+  });
+  if(errores.length > 20){
+    html += '<div style="font-size:.7rem;color:#7f1d1d;text-align:center;margin-top:.3rem;">… y ' + (errores.length - 20) + ' más. Descargá el CSV del lote para ver el detalle completo.</div>';
+  }
+  html += '</div></details>';
+  return html;
+}
+
+// Cache del último status del lote para resolver fila_data en retry
+var IM_ULTIMO_STATUS = null;
+async function reintentarFilaError(lote_id, idx){
+  if(!IM_ULTIMO_STATUS || !IM_ULTIMO_STATUS.errores) {
+    toast('No disponible', 'Datos del lote no cargados', 'warning');
+    return;
+  }
+  var er = IM_ULTIMO_STATUS.errores[idx];
+  if(!er || !er.fila_data){
+    toast('Sin datos', 'Esta fila no tiene fila_data guardado', 'warning');
+    return;
+  }
+  // Construir payload completo (incluir el numero de fila original)
+  var payload = Object.assign({fila: er.fila}, er.fila_data);
+  try{
+    var r = await fetch('/glosas/importar-masiva/lote/'+lote_id+'/retry-fila', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...authH()},
+      body: JSON.stringify(payload),
+    });
+    var data = await r.json();
+    if(!r.ok){
+      toast('Error', data.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    toast('Reintentando', 'Fila '+er.fila+' enviada de nuevo', 'success');
+    // Re-arrancar polling si no estaba activo
+    setTimeout(function(){
+      _imIniciarPollingLote(lote_id, IM_ULTIMO_STATUS.batch_id, IM_ULTIMO_STATUS.total_filas + 1);
+    }, 800);
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
 async function cancelarLote(lote_id){
   if(!confirm('¿Cancelar este lote?\n\nLas filas que ya estaban procesándose van a terminar (no se interrumpe en mitad), pero el lote se marca como CANCELADO y la UI deja de mostrarlo en progreso.')){
     return;
@@ -5406,6 +5473,9 @@ function _imIniciarPollingLote(lote_id, batch_id, total_filas){
 }
 
 function _imRenderProgresoLote(s, batch_id){
+  // Cache para que reintentarFilaError() pueda acceder a fila_data
+  IM_ULTIMO_STATUS = s;
+  IM_ULTIMO_STATUS.batch_id = batch_id || s.batch_id;
   var resBox = document.getElementById('im-result');
   var pct = s.porcentaje || 0;
   var color = s.estado === 'COMPLETO' ? '#16a34a' : (s.fallidas > 0 ? '#d97706' : '#0369a1');
@@ -5426,7 +5496,7 @@ function _imRenderProgresoLote(s, batch_id){
     + (s.estado === 'COMPLETO'
         ? '<div style="margin-top:.7rem;padding-top:.6rem;border-top:1px dashed #86efac;font-size:.75rem;color:#15803d;">Procesamiento finalizado. Las glosas creadas están disponibles en <b>Mis glosas</b> y <b>Historial</b>. Costo aproximado: $'+(s.costo_real_usd||0).toFixed(2)+' USD.</div>'
         : '<div style="margin-top:.6rem;font-size:.7rem;color:var(--text3);">Polling cada 3s · podés cerrar esta página, el procesamiento continúa en background</div>')
-    + (s.errores && s.errores.length ? '<details style="margin-top:.6rem;"><summary style="cursor:pointer;font-size:.78rem;color:#991b1b;">Errores ('+s.errores.length+')</summary><ul style="margin:.3rem 0 0 1.2rem;font-size:.72rem;padding:0;">'+s.errores.slice(0,10).map(function(er){return '<li>Fila '+er.fila+': '+escHtml(er.error)+'</li>';}).join('')+'</ul></details>' : '')
+    + (s.errores && s.errores.length ? _imRenderErroresConRetry(s.errores, s.id) : '')
     + '</div>';
   resBox.innerHTML = html;
 }

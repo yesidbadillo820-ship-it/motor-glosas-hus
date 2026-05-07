@@ -3642,6 +3642,23 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             kwargs_extra['cups_servicio'] = fila_data['cups'][:20]
         # Texto glosa original para que el auditor pueda revisar
         kwargs_extra['texto_glosa_original'] = texto_glosa[:2000]
+
+        # IM F2: si el lote tiene gestor_asignado_id, resolvemos el
+        # email del usuario y lo pasamos como asignado_a_email para
+        # que la glosa quede en su bandeja "Mis glosas" automaticamente.
+        asignado_email = None
+        if lote_id is not None:
+            try:
+                from app.models.db import LoteImportacionRecord, UsuarioRecord
+                lote = db.query(LoteImportacionRecord).filter(LoteImportacionRecord.id == lote_id).first()
+                if lote and lote.gestor_asignado_id:
+                    user = db.query(UsuarioRecord).filter(UsuarioRecord.id == lote.gestor_asignado_id).first()
+                    if user and user.email:
+                        asignado_email = user.email
+                        kwargs_extra['asignado_a_email'] = asignado_email
+            except Exception as _e_asg:
+                logger.debug(f"[{req_id}] No se pudo resolver gestor del lote {lote_id}: {_e_asg}")
+
         try:
             repo.crear(
                 eps=eps_final,
@@ -3706,9 +3723,17 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
                             except Exception:
                                 actuales = []
                             if len(actuales) < 100:
+                                # F2: guardamos tambien la fila_data completa
+                                # para soportar retry desde la UI sin que el
+                                # usuario tenga que volver a pegar el Excel.
                                 actuales.append({
                                     "fila": fila_data.get("fila"),
                                     "error": error_msg or "Error desconocido",
+                                    "fila_data": {
+                                        k: (str(v)[:500] if v else "")
+                                        for k, v in fila_data.items()
+                                        if k != "fila"
+                                    },
                                 })
                                 lote.errores = _json.dumps(actuales, ensure_ascii=False)
                         # Si se procesaron todas, marcar COMPLETO
@@ -4151,6 +4176,123 @@ def exportar_lote_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+@router.get("/importar-masiva/plantilla.csv")
+def descargar_plantilla_masiva(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM F2: descarga plantilla CSV con headers correctos y 3 filas
+    ejemplo. El usuario abre con Excel, llena las filas, exporta como
+    CSV o pega directamente desde Excel en el textarea.
+    """
+    from fastapi.responses import StreamingResponse
+    import csv
+    import io
+
+    def _generar():
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter='\t')  # TAB para compat con paste-from-Excel
+        # Header
+        w.writerow([
+            "ENTIDAD", "FACTURA", "VALOR", "CODIGO", "CONCEPTO",
+            "CUPS", "SERVICIO", "MOTIVO",
+        ])
+        # 3 filas ejemplo cubriendo casos comunes
+        w.writerow([
+            "FAMISANAR EPS", "HUS0000123456", "$ 150.000", "TA0801",
+            "Tarifa diferente a la pactada en contrato",
+            "890301", "Consulta de control",
+            "El valor facturado no corresponde a la tarifa SOAT pactada",
+        ])
+        w.writerow([
+            "NUEVA EPS", "HUS0000123457", "$ 75.000", "SO0101",
+            "Soporte ilegible",
+            "", "", "Historia clínica con tinta corrida en página 3",
+        ])
+        w.writerow([
+            "COMPENSAR", "HUS0000123458", "$ 200.000", "FA0601",
+            "Cargos no facturables",
+            "FMQ0114", "Catéter intravenoso",
+            "Cantidad facturada no coincide con registros de uso",
+        ])
+        yield buf.getvalue()
+
+    return StreamingResponse(
+        _generar(),
+        media_type="text/tab-separated-values",
+        headers={
+            "Content-Disposition": 'attachment; filename="plantilla-importacion-masiva.tsv"',
+        },
+    )
+
+
+@router.post("/importar-masiva/lote/{lote_id}/retry-fila")
+async def retry_fila_lote(
+    lote_id: int,
+    fila_payload: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """IM F2: re-ejecuta una fila específica que fallo en un lote
+    anterior. El payload debe traer las 8 campos: eps, factura, valor,
+    codigo, descripcion, cups, servicio, motivo.
+
+    Útil cuando el dictamen falló por un error transitorio (Anthropic
+    overloaded, timeout) y el usuario quiere reintentar sin re-importar
+    todo el lote.
+    """
+    from app.models.db import LoteImportacionRecord
+    import json as _json
+
+    l = db.query(LoteImportacionRecord).filter(LoteImportacionRecord.id == lote_id).first()
+    if not l:
+        raise HTTPException(404, "Lote no encontrado")
+    rol = (getattr(current_user, "rol", "") or "").upper()
+    if l.usuario_email != current_user.email and rol not in ("SUPER_ADMIN", "COORDINADOR"):
+        raise HTTPException(403, "Sin permisos")
+
+    # Validar minimos
+    if not fila_payload.get("codigo") or not fila_payload.get("eps"):
+        raise HTTPException(400, "Faltan campos minimos: codigo, eps")
+
+    # Asegurar que tenga 'fila' para tracking
+    if "fila" not in fila_payload:
+        fila_payload["fila"] = 999  # sentinel para retry
+
+    # Disparar background task con el lote_id existente
+    req_id = f"retry-{l.batch_id}"
+    background_tasks.add_task(
+        _procesar_fila_en_background,
+        fila_payload,
+        l.batch_id,
+        req_id,
+        l.usuario_email,  # mantener "AUTO" o eps
+        lote_id,
+    )
+
+    # Sumar 1 al total_filas y resetear estado a PROCESANDO si estaba COMPLETO
+    l.total_filas = (l.total_filas or 0) + 1
+    if l.estado in ("COMPLETO", "ERROR"):
+        l.estado = "PROCESANDO"
+        l.terminado_en = None
+        # Limpiar el error correspondiente a esta fila si existe
+        try:
+            errores = _json.loads(l.errores) if l.errores else []
+            errores = [e for e in errores if e.get("fila") != fila_payload.get("fila")]
+            l.errores = _json.dumps(errores, ensure_ascii=False) if errores else None
+        except Exception:
+            pass
+    db.commit()
+
+    logger.info(f"[RETRY] lote_id={lote_id} fila={fila_payload.get('fila')} re-procesando")
+    return {
+        "ok": True,
+        "lote_id": lote_id,
+        "fila": fila_payload.get("fila"),
+        "estado": "EN_PROCESO",
+    }
 
 
 @router.post("/importar-masiva/dedupe-check")
