@@ -155,7 +155,7 @@ def diagnostico_completo(
             "data": {},
         }
 
-    # ─── Anthropic API key configurada ────────────────────────────
+    # ─── Anthropic API key configurada + test ping ─────────────────
     anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not anthropic_key:
         out["secciones"]["anthropic"] = {
@@ -164,14 +164,71 @@ def diagnostico_completo(
             "data": {},
         }
     else:
+        # Test ping real a Anthropic — request mínimo (1 token) para
+        # verificar que la key tiene créditos. Si falla con
+        # credit_balance_too_low, lo reportamos.
+        ping_estado = "ok"
+        ping_msg = f"API key configurada (prefijo {anthropic_key[:10]}…)"
+        try:
+            import httpx
+            timeout = httpx.Timeout(connect=8.0, read=15.0, write=8.0, pool=5.0)
+            with httpx.Client(timeout=timeout) as client:
+                resp = client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": anthropic_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": "claude-haiku-4-5-20251001",
+                        "max_tokens": 4,
+                        "messages": [{"role": "user", "content": "ok"}],
+                    },
+                )
+            if resp.status_code == 200:
+                ping_estado = "ok"
+                ping_msg = f"API key OK · ping Haiku exitoso · {anthropic_key[:10]}…"
+            elif resp.status_code == 400:
+                err_msg = ""
+                try:
+                    err_msg = resp.json().get("error", {}).get("message", "")
+                except Exception:
+                    err_msg = resp.text[:120]
+                if "credit" in err_msg.lower():
+                    ping_estado = "error"
+                    ping_msg = (
+                        f"🚨 Sin créditos — recargar en console.anthropic.com/settings/billing. "
+                        f"({err_msg[:120]})"
+                    )
+                else:
+                    ping_estado = "warning"
+                    ping_msg = f"HTTP 400: {err_msg[:120]}"
+            elif resp.status_code in (401, 403):
+                ping_estado = "error"
+                ping_msg = f"API key inválida o revocada (HTTP {resp.status_code})"
+            elif resp.status_code == 429:
+                ping_estado = "warning"
+                ping_msg = "Rate limit hit (429) — esperá 60s"
+            elif resp.status_code == 529:
+                ping_estado = "warning"
+                ping_msg = "Anthropic overloaded (529) — temporal"
+            else:
+                ping_estado = "warning"
+                ping_msg = f"HTTP {resp.status_code} inesperado"
+        except Exception as e:
+            ping_estado = "warning"
+            ping_msg = f"No se pudo hacer ping: {e}"
+
         out["secciones"]["anthropic"] = {
-            "estado": "ok",
-            "mensaje": f"API key configurada (prefijo {anthropic_key[:10]}…)",
+            "estado": ping_estado,
+            "mensaje": ping_msg,
             "data": {
                 "primary_ai": os.getenv("PRIMARY_AI", "anthropic"),
                 "modelo_default": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
                 "tool_use_habilitado": os.getenv("TOOL_USE_HABILITADO", "0") == "1",
                 "multi_agent_habilitado": os.getenv("MULTI_AGENT_HABILITADO", "0") == "1",
+                "key_prefix": anthropic_key[:12],
             },
         }
 

@@ -368,9 +368,48 @@ async def chat_con_asistente(
                 return {"respuesta": "", "error": f"Error red: {e}", "tools_llamadas": tools_usadas}
 
             if resp.status_code != 200:
+                # Detectar específicamente errores de billing de Anthropic
+                # y devolver mensaje útil al usuario en lugar de raw HTTP.
+                error_body = resp.text[:500]
+                error_user = ""
+                try:
+                    err_json = resp.json()
+                    msg = err_json.get("error", {}).get("message", "")
+                    if "credit balance is too low" in msg.lower() or "credits" in msg.lower():
+                        error_user = (
+                            "🚨 **Anthropic se quedó sin créditos**\n\n"
+                            "Tu cuenta Anthropic no tiene créditos suficientes para responder. "
+                            "Para resolver:\n\n"
+                            "1. Recargá créditos en https://console.anthropic.com/settings/billing\n"
+                            "2. Verificá que la API key activa esté en el workspace donde recargaste\n"
+                            "3. Mientras tanto, podés usar los paneles directos del menú lateral "
+                            "(Auditor Forense, Importación Masiva, etc.) que tienen fallback automático a Groq.\n\n"
+                            "El sistema sigue funcionando — solo el chat unificado del asistente requiere Anthropic "
+                            "específicamente porque usa tool calling avanzado."
+                        )
+                    elif resp.status_code == 429:
+                        error_user = (
+                            "⏳ **Rate limit Anthropic alcanzado**\n\n"
+                            "Demasiadas requests en poco tiempo (Tier 1: 30K tokens/min Sonnet). "
+                            "Esperá 30-60 segundos y reintentá. Si pasa seguido, considera subir a Tier 2 "
+                            "(automático tras gastar $40 acumulado) o desactivar Multi-agent para reducir tokens."
+                        )
+                    elif resp.status_code == 529:
+                        error_user = (
+                            "⚠️ **Anthropic API sobrecargada**\n\n"
+                            "Servidor Anthropic devuelve 529 (overloaded). Es un problema temporal de su lado. "
+                            "Reintentá en 30-60 segundos."
+                        )
+                except Exception:
+                    pass
+                if not error_user:
+                    error_user = f"Error HTTP {resp.status_code}: {error_body[:200]}"
                 return {
-                    "respuesta": "", "error": f"HTTP {resp.status_code}: {resp.text[:300]}",
+                    "respuesta": error_user,
+                    "error": None,  # NO marcamos error — devolvemos mensaje al usuario
                     "tools_llamadas": tools_usadas,
+                    "modelo": "fallback-error",
+                    "tokens": tokens_total,
                 }
 
             data = resp.json()

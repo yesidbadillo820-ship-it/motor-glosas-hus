@@ -1611,6 +1611,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
           <!-- 🎯 R400: Copilot ejecutivo (estado del sistema) -->
           <div id="copilot-banner" style="display:none;margin:1rem 0"></div>
+          <div id="anthropic-billing-banner" style="display:none;margin:1rem 0"></div>
 
           <!-- Empty state con logo SINAC de fondo + tema festivo dinámico -->
           <div class="empty-state" id="landing-empty-state" style="margin:1rem auto;position:relative;overflow:hidden;">
@@ -11426,6 +11427,52 @@ function renderVerificacionCitas(v){
     +'</div>';
   return html;
 }
+
+// ─── Banner Anthropic billing — alerta visible cuando hay problema ────
+async function chequearEstadoAnthropic(){
+  // Solo admins/coordinadores ven el banner — los AUDITOR no necesitan
+  // gestionar billing. Hacemos polling silencioso al diagnostico.
+  try{
+    var rol = (window.USER_ROL || '').toUpperCase();
+    if(['SUPER_ADMIN', 'COORDINADOR'].indexOf(rol) === -1) return;
+    var r = await fetch('/admin/diagnostico', {headers: authH()});
+    if(!r.ok) return;
+    var data = await r.json();
+    var anth = (data.secciones || {}).anthropic;
+    var banner = document.getElementById('anthropic-billing-banner');
+    if(!banner) return;
+    if(!anth || anth.estado === 'ok'){
+      banner.style.display = 'none';
+      return;
+    }
+    var esCreditos = (anth.mensaje || '').toLowerCase().indexOf('crédit') > -1
+                  || (anth.mensaje || '').toLowerCase().indexOf('credit') > -1;
+    var col = anth.estado === 'error' ? '#dc2626' : '#d97706';
+    var bg = anth.estado === 'error' ? '#fef2f2' : '#fefce8';
+    var ico = anth.estado === 'error' ? '🚨' : '⚠️';
+    banner.innerHTML = '<div style="background:'+bg+';border:1.5px solid '+col+';border-radius:10px;padding:.8rem 1rem;display:flex;align-items:center;gap:.7rem;">'
+      + '<span style="font-size:1.5rem;">'+ico+'</span>'
+      + '<div style="flex:1;">'
+      +   '<div style="font-weight:700;color:'+col+';">Anthropic API: ' + anth.estado.toUpperCase() + '</div>'
+      +   '<div style="font-size:.8rem;color:var(--text2);margin-top:.15rem;">' + escHtml(anth.mensaje || '') + '</div>'
+      +   (esCreditos
+        ? '<div style="font-size:.74rem;color:var(--text3);margin-top:.3rem;">'
+          + '<a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:'+col+';font-weight:600;">→ Recargar créditos</a> · '
+          + 'Mientras tanto, el sistema usa Groq como fallback automático en los endpoints que lo soportan.'
+          + '</div>'
+        : '')
+      + '</div>'
+      + '<button onclick="document.getElementById(\'anthropic-billing-banner\').style.display=\'none\'" style="background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:1.2rem;">×</button>'
+      + '</div>';
+    banner.style.display = 'block';
+  }catch(e){}
+}
+
+// Chequear al cargar la app + cada 5 min
+(function(){
+  setTimeout(chequearEstadoAnthropic, 5000);
+  setInterval(chequearEstadoAnthropic, 5 * 60 * 1000);
+})();
 
 // ─── ASISTENTE MAESTRO IA — chat conversacional unificado ───────────
 // Mente maestra que puede auditar, buscar soportes, lookup norma,
