@@ -14868,15 +14868,230 @@ function cerrarSpotlight(){
   document.getElementById('spot-bg').classList.remove('show');
 }
 
+// ─── Spotlight: comandos rápidos (A.4) ──────────────────────────────
+// Acciones que se reconocen por verbo en lenguaje natural. Cada comando
+// devuelve {label, sub, run()} y se inserta arriba de los resultados.
+function _spotComandos(query){
+  var q = (query||'').trim();
+  if(!q) return [];
+  var ql = q.toLowerCase();
+  var out = [];
+
+  // Atajos a paneles: "ir a X", "go X", "> X"
+  var paneles = {
+    'analizar':'analizar','analiz':'analizar',
+    'mis glosas':'mis-glosas','pendientes':'mis-glosas',
+    'historial':'historial',
+    'alertas':'alertas','vencidas':'alertas',
+    'dashboard':'dashboard','tablero':'dashboard',
+    'cobranza':'cobranza-live',
+    'resumen del mes':'resumen-mes','resumen mes':'resumen-mes','resumen':'resumen-mes',
+    'auditoria':'audit','auditoría':'audit','audit log':'audit',
+    'usuarios':'usuarios','equipo':'usuarios',
+    'contratos':'contratos',
+    'tarifas':'tarifas',
+    'gold':'gold','plantillas':'gold',
+    'papelera':'papelera',
+    'consulta normativa':'consulta-normativa','normativa':'consulta-normativa',
+    'salud total':'salud-total',
+    'soportes':'soportes',
+    'auditor forense':'auditor-forense','forense':'auditor-forense',
+    'diagnostico':'diagnostico','diagnóstico':'diagnostico',
+    'mi desempeño':'mi-desempeno','desempeno':'mi-desempeno','desempeño':'mi-desempeno',
+    'conciliacion':'conciliacion','conciliación':'conciliacion',
+    'sugerencias':'admin-sugerencias','feedback':'admin-sugerencias',
+    'importacion masiva':'importacion-masiva','importar masivo':'importacion-masiva',
+  };
+  var verbos = ['ir a ','go ','goto ','>','abrir ','open ','panel '];
+  var resto = ql;
+  for(var i=0;i<verbos.length;i++){
+    if(resto.indexOf(verbos[i]) === 0){ resto = resto.slice(verbos[i].length).trim(); break; }
+  }
+  Object.keys(paneles).forEach(function(k){
+    if(k && resto && k.indexOf(resto) === 0){
+      out.push({
+        icon:'➜', label:'Ir a: '+k.charAt(0).toUpperCase()+k.slice(1),
+        sub:'Abre el panel '+paneles[k],
+        run:function(){
+          var btn = document.querySelector('.sn-item[onclick*="\''+paneles[k]+'\'"]');
+          if(btn){ cerrarSpotlight(); btn.click(); }
+          else toast('Panel no disponible', paneles[k], 'warning');
+        }
+      });
+    }
+  });
+
+  // Abrir glosa por ID: "#123", "id 123", "glosa 123"
+  var mId = q.match(/^(?:#|id[:\s]+|glosa[:\s]+)(\d{1,7})\s*$/i);
+  if(mId){
+    var gid = parseInt(mId[1],10);
+    out.push({
+      icon:'🔢', label:'Abrir glosa #'+gid,
+      sub:'Carga la glosa por ID y abre detalle',
+      run:function(){
+        cerrarSpotlight();
+        if(typeof verDetalleGlosa === 'function') verDetalleGlosa(gid);
+        else if(typeof accionSpotGlosa === 'function') accionSpotGlosa(gid);
+        else toast('Sin handler', 'No se pudo abrir glosa #'+gid, 'warning');
+      }
+    });
+  }
+
+  // Buscar factura: "factura:HUS123" o "fact 123"
+  var mFac = q.match(/^(?:factura|fac|fact)[:\s]+(.+)$/i);
+  if(mFac){
+    var fac = mFac[1].trim();
+    out.push({
+      icon:'📄', label:'Buscar factura "'+fac+'"',
+      sub:'Lista glosas y soportes asociados',
+      run:function(){
+        var inp = document.getElementById('spot-input');
+        if(inp){ inp.value = fac; renderSpotlightResults(fac); }
+      }
+    });
+  }
+
+  // Exportar mes actual: "exportar mes", "export mes"
+  if(/^(?:exportar|export)\s*(?:mes|del mes)?$/i.test(q)){
+    out.push({
+      icon:'📥', label:'Exportar glosas del mes (CSV)',
+      sub:'Descarga las glosas creadas este mes (max 100)',
+      run:async function(){
+        cerrarSpotlight();
+        var hoy = new Date();
+        var desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
+        var hasta = hoy.toISOString().slice(0,10);
+        toast('Buscando glosas', desde+' → '+hasta, 'info');
+        try {
+          var r = await fetch('/glosas/historial-paginado?fecha_desde='+desde+'&fecha_hasta='+hasta+'&per_page=100', {headers:authH()});
+          if(!r.ok) throw new Error('HTTP '+r.status);
+          var d = await r.json();
+          var ids = (d.items||[]).map(function(g){return g.id;});
+          if(!ids.length){ toast('Vacío','No hay glosas en '+desde+' → '+hasta,'warning'); return; }
+          var rx = await fetch('/glosas/bulk/exportar-csv', {
+            method:'POST', headers:{'Content-Type':'application/json',...authH()},
+            body: JSON.stringify({glosa_ids: ids}),
+          });
+          if(!rx.ok) throw new Error('export HTTP '+rx.status);
+          var b = await rx.blob();
+          var u = URL.createObjectURL(b);
+          var a = document.createElement('a');
+          a.href = u; a.download = 'glosas-'+desde+'-'+hasta+'.csv'; a.click();
+          setTimeout(function(){ URL.revokeObjectURL(u); }, 1000);
+          toast('CSV listo', ids.length+' glosas · '+desde+' → '+hasta, 'success');
+        } catch(e){ toast('Error', String(e), 'error'); }
+      }
+    });
+  }
+
+  // Asignar: "asignar #123 a juan@hus.com" o "asignar 123,456 a juan@..."
+  // Solo COORDINADOR/SUPER_ADMIN
+  var rol = (window.USER_ROL||'').toUpperCase();
+  var puedeAsignar = (rol === 'SUPER_ADMIN' || rol === 'COORDINADOR');
+  var mAsig = puedeAsignar ? q.match(/^asignar\s+([\d,#\s]+)\s+a\s+([^\s]+@[^\s]+)\s*$/i) : null;
+  if(mAsig){
+    var ids = mAsig[1].replace(/#/g,'').split(/[,\s]+/).map(function(s){return parseInt(s,10);}).filter(function(n){return n && !isNaN(n);});
+    var email = mAsig[2].trim();
+    if(ids.length){
+      out.push({
+        icon:'👤', label:'Asignar '+ids.length+' glosa(s) a '+email,
+        sub:'IDs: '+ids.slice(0,5).join(', ')+(ids.length>5?'...':''),
+        run:function(){
+          if(!confirm('Reasignar '+ids.length+' glosa(s) a '+email+'?')) return;
+          fetch('/glosas/bulk/asignar', {
+            method:'POST', headers:{'Content-Type':'application/json',...authH()},
+            body: JSON.stringify({glosa_ids: ids, auditor_email: email}),
+          }).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+          .then(function(x){
+            if(!x.ok){ toast('Error', x.d.detail||'Falló asignación', 'error'); return; }
+            toast('Asignadas', x.d.actualizadas+'/'+x.d.total_solicitadas+' a '+email, 'success');
+            cerrarSpotlight();
+            if(typeof loadMisGlosas==='function') loadMisGlosas();
+          }).catch(function(e){ toast('Error de red', String(e), 'error'); });
+        }
+      });
+    }
+  }
+
+  // Refrescar: "refrescar", "reload", "f5"
+  if(/^(?:refrescar|recargar|reload|refresh|f5)$/i.test(q)){
+    out.push({
+      icon:'🔄', label:'Refrescar la página',
+      sub:'window.location.reload()',
+      run:function(){ window.location.reload(); }
+    });
+  }
+
+  // Logout: "salir", "logout", "cerrar sesion"
+  if(/^(?:salir|logout|cerrar\s*sesi[óo]n)$/i.test(q)){
+    out.push({
+      icon:'🚪', label:'Cerrar sesión',
+      sub:'Borra el token y vuelve al login',
+      run:function(){
+        if(typeof logout === 'function') logout();
+        else { try{ localStorage.removeItem('hus_token'); }catch(e){} window.location.reload(); }
+      }
+    });
+  }
+
+  // Tema: "tema oscuro", "dark", "claro", "light"
+  if(/^(?:tema\s+oscuro|modo\s+oscuro|dark|noche)$/i.test(q)){
+    out.push({
+      icon:'🌙', label:'Activar tema oscuro',
+      sub:'document.body.classList.add(\'dark\')',
+      run:function(){
+        document.body.classList.add('dark');
+        try{ localStorage.setItem('hus_tema', 'dark'); }catch(e){}
+        cerrarSpotlight();
+        toast('Tema oscuro', 'Activado', 'success');
+      }
+    });
+  }
+  if(/^(?:tema\s+claro|modo\s+claro|light|d[ií]a)$/i.test(q)){
+    out.push({
+      icon:'☀️', label:'Activar tema claro',
+      sub:'document.body.classList.remove(\'dark\')',
+      run:function(){
+        document.body.classList.remove('dark');
+        try{ localStorage.setItem('hus_tema', 'light'); }catch(e){}
+        cerrarSpotlight();
+        toast('Tema claro', 'Activado', 'success');
+      }
+    });
+  }
+
+  return out.slice(0, 6);
+}
+
+window._SPOT_CMDS = [];
+function _spotEjecutarCmd(idx){
+  var cmd = (window._SPOT_CMDS||[])[idx];
+  if(cmd && typeof cmd.run === 'function') cmd.run();
+}
+
 function renderSpotlightResults(query){
   var q = (query||'').trim().toLowerCase();
   var box = document.getElementById('spot-results');
   if(!q){
-    box.innerHTML = '<div class="spot-empty">Escribe para buscar en todo el sistema. Atajos: <span class="spot-kbd">↑</span> <span class="spot-kbd">↓</span> <span class="spot-kbd">↵</span></div>';
+    box.innerHTML = '<div class="spot-empty" style="line-height:1.7">'+
+      '<div style="margin-bottom:.5rem"><b>Comandos rápidos:</b></div>'+
+      '<span class="spot-kbd">> dashboard</span> ir a panel · '+
+      '<span class="spot-kbd">#123</span> abrir glosa por ID<br>'+
+      '<span class="spot-kbd">factura:HUS487</span> buscar factura · '+
+      '<span class="spot-kbd">exportar mes</span> CSV del mes<br>'+
+      '<span class="spot-kbd">asignar 12,15 a juan@hus.gov.co</span> reasignar<br>'+
+      '<span class="spot-kbd">tema oscuro</span> · '+
+      '<span class="spot-kbd">salir</span> · '+
+      '<span class="spot-kbd">refrescar</span>'+
+      '</div>';
     return;
   }
 
   function match(str){ return str && String(str).toLowerCase().indexOf(q) > -1; }
+
+  // Comandos rápidos al tope
+  var comandos = _spotComandos(query);
+  window._SPOT_CMDS = comandos;
 
   var glosas = SPOT_DATA.glosas.filter(function(g){
     return match(g.codigo_glosa) || match(g.factura) || match(g.entidad||g.eps) ||
@@ -14893,6 +15108,19 @@ function renderSpotlightResults(query){
   }).slice(0, 5);
 
   var html = '';
+  if(comandos.length){
+    html += '<div class="spot-group-lbl">⚡ Comandos (' + comandos.length + ')</div>';
+    comandos.forEach(function(c, i){
+      html += '<div class="spot-item spot-cmd" onclick="_spotEjecutarCmd(' + i + ')" style="border-left:3px solid var(--c-teal2)">' +
+        '<div class="spot-icon" style="font-size:1.1rem">' + c.icon + '</div>' +
+        '<div class="spot-item-main">' +
+          '<div class="spot-item-title">' + escHtml(c.label) + '</div>' +
+          '<div class="spot-item-sub">' + escHtml(c.sub||'') + '</div>' +
+        '</div>' +
+        '<span class="spot-item-meta">↵</span>' +
+      '</div>';
+    });
+  }
   if(glosas.length){
     html += '<div class="spot-group-lbl">Glosas (' + glosas.length + ')</div>';
     glosas.forEach(function(g, i){
