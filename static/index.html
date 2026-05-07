@@ -2123,6 +2123,26 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           </div>
         </div>
 
+        <!-- B.3: Detector de actividad inteligente -->
+        <div style="margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">😴 Gestores inactivos (con pendientes asignados)</div>
+            <div id="mando-inactivos" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">⏳ Glosas estancadas (sin progreso ≥7 días)</div>
+            <div id="mando-estancadas" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">💰 Alto valor en riesgo (>1M, vence en 48h o vencido)</div>
+            <div id="mando-alto-valor" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">📊 Carga concentrada (top 5 con más pendientes)</div>
+            <div id="mando-carga" style="padding:.6rem;font-size:.8rem">—</div>
+          </div>
+        </div>
+
         <div style="margin-top:1rem;font-size:.7rem;color:var(--text3);text-align:center">
           Datos en tiempo real · Endpoint: <code>/dashboard-ejecutivo/vivo</code> ·
           Solo COORDINADOR / SUPER_ADMIN
@@ -13454,7 +13474,101 @@ async function loadMando(){
       else { badge.style.display = 'none'; }
     }
 
+    // B.3: cargar detector de actividad en paralelo
+    loadMandoDetector(critCount);
+
   } catch(e){ console.error('Mando error', e); }
+}
+
+async function loadMandoDetector(critFromAlertas){
+  try{
+    var r = await fetch('/dashboard-ejecutivo/detector-actividad', {headers:authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+
+    // Gestores inactivos
+    var inact = d.gestores_inactivos || [];
+    document.getElementById('mando-inactivos').innerHTML = inact.length
+      ? inact.map(function(g){
+          var dias = g.dias_sin_actividad >= 999 ? '∞' : g.dias_sin_actividad;
+          var color = g.pendientes >= 5 ? '#dc2626' : (g.pendientes >= 2 ? '#f59e0b' : '#475569');
+          return '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border)">'+
+            '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+              '<span style="font-weight:600">'+escHtml(g.email||'—')+'</span>'+
+              '<div style="font-size:.7rem;color:var(--text3)">'+g.pendientes+' pendientes · '+cop(g.valor_en_juego)+'</div>'+
+            '</div>'+
+            '<div style="text-align:right;flex-shrink:0">'+
+              '<div style="color:'+color+';font-weight:700">'+dias+'d</div>'+
+              '<div style="font-size:.65rem;color:var(--text3)">sin actividad</div>'+
+            '</div>'+
+          '</div>';
+        }).join('')
+      : '<div style="color:#16a34a;font-size:.78rem;text-align:center;padding:1rem">✅ Todos los gestores activos</div>';
+
+    // Glosas estancadas
+    var est = d.glosas_estancadas || [];
+    document.getElementById('mando-estancadas').innerHTML = est.length
+      ? est.slice(0,8).map(function(g){
+          return '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);gap:.5rem;cursor:pointer" onclick="responderGlosa('+g.id+')">'+
+            '<div style="overflow:hidden;min-width:0">'+
+              '<div style="font-weight:600;font-size:.78rem">'+escHtml(g.eps||'—')+' · '+escHtml(g.factura||'—')+'</div>'+
+              '<div style="font-size:.7rem;color:var(--text3)">'+escHtml(g.codigo||'—')+' · '+(g.auditor||'sin asignar')+'</div>'+
+            '</div>'+
+            '<div style="text-align:right;flex-shrink:0">'+
+              '<div style="color:#f59e0b;font-weight:700">'+(g.dias_sin_progreso||0)+'d</div>'+
+              '<div style="font-size:.65rem;color:var(--text3)">'+cop(g.valor||0)+'</div>'+
+            '</div>'+
+          '</div>';
+        }).join('') + (est.length > 8 ? '<div style="font-size:.7rem;color:var(--text3);text-align:center;padding:.4rem">+'+(est.length-8)+' más</div>' : '')
+      : '<div style="color:#16a34a;font-size:.78rem;text-align:center;padding:1rem">✅ Sin estancadas</div>';
+
+    // Alto valor en riesgo
+    var av = d.alto_valor_riesgo || [];
+    document.getElementById('mando-alto-valor').innerHTML = av.length
+      ? av.slice(0,8).map(function(g){
+          var hr = g.horas_restantes;
+          var hrTxt = hr === null || hr === undefined ? '—' : (hr < 0 ? Math.abs(hr)+'h vencida' : hr+'h restantes');
+          var hrColor = hr === null || hr === undefined ? '#475569' : (hr < 0 ? '#dc2626' : (hr < 24 ? '#f59e0b' : '#0369a1'));
+          return '<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);gap:.5rem;cursor:pointer" onclick="responderGlosa('+g.id+')">'+
+            '<div style="overflow:hidden;min-width:0">'+
+              '<div style="font-weight:600;font-size:.78rem">'+escHtml(g.eps||'—')+' · '+escHtml(g.factura||'—')+'</div>'+
+              '<div style="font-size:.7rem;color:var(--text3)">'+escHtml(g.codigo||'—')+' · '+(g.auditor||'sin asignar')+'</div>'+
+            '</div>'+
+            '<div style="text-align:right;flex-shrink:0">'+
+              '<div style="color:#dc2626;font-weight:700">'+cop(g.valor||0)+'</div>'+
+              '<div style="font-size:.65rem;color:'+hrColor+'">'+hrTxt+'</div>'+
+            '</div>'+
+          '</div>';
+        }).join('') + (av.length > 8 ? '<div style="font-size:.7rem;color:var(--text3);text-align:center;padding:.4rem">+'+(av.length-8)+' más</div>' : '')
+      : '<div style="color:#16a34a;font-size:.78rem;text-align:center;padding:1rem">✅ Sin alto valor en riesgo</div>';
+
+    // Carga concentrada
+    var carga = d.carga_concentrada_top || [];
+    document.getElementById('mando-carga').innerHTML = carga.length
+      ? carga.map(function(g,i){
+          var medal = ['🥇','🥈','🥉','4°','5°'][i] || (i+1)+'°';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border);gap:.5rem">'+
+            '<div style="display:flex;align-items:center;gap:.4rem;min-width:0">'+
+              '<span style="flex-shrink:0">'+medal+'</span>'+
+              '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.email||'—')+'</span>'+
+            '</div>'+
+            '<div style="text-align:right;flex-shrink:0">'+
+              '<div style="font-weight:700">'+g.pendientes+' glosas</div>'+
+              '<div style="font-size:.65rem;color:var(--text3)">'+cop(g.valor_en_juego||0)+'</div>'+
+            '</div>'+
+          '</div>';
+        }).join('')
+      : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin pendientes asignados</div>';
+
+    // Actualizar badge global combinando alertas + detector
+    var sev = d.severidad_global || 'ok';
+    var detectorCount = (d.totales||{}).gestores_inactivos + (d.totales||{}).alto_valor_riesgo;
+    var totalCrit = (critFromAlertas||0) + (sev === 'critica' ? detectorCount : 0);
+    if(totalCrit > 0){
+      var badge = document.getElementById('mando-badge');
+      if(badge){ badge.textContent = String(totalCrit); badge.style.display = 'inline-flex'; }
+    }
+  } catch(e){ console.error('Detector error', e); }
 }
 
 function startMandoAutoRefresh(){

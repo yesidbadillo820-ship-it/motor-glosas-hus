@@ -202,3 +202,173 @@ def dashboard_vivo(
         "ranking_eps_ratificacion": ranking_eps,
         "alertas_proactivas": alertas,
     }
+
+
+# ─── B.3: Detector de actividad inteligente ────────────────────────────────
+# Sintetiza patrones que requieren intervencion del coordinador:
+#  - gestores inactivos: tienen pendientes asignados pero no han hecho
+#    nada en X dias (segun audit_log).
+#  - glosas estancadas: mismo estado por > Y dias.
+#  - carga concentrada: top 5 gestores con mas pendientes.
+#  - alertas de alto valor: glosas vencidas/criticas con saldo > umbral.
+@router.get("/detector-actividad")
+def detector_actividad(
+    dias_inactividad: int = 3,
+    dias_estancada: int = 7,
+    valor_alto_umbral: float = 1_000_000.0,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Detecta patrones que requieren intervencion del coordinador.
+
+    Parametros (con default razonables):
+    - dias_inactividad: gestores sin audit-log en >= N dias se reportan.
+    - dias_estancada: glosas en mismo estado por >= N dias se reportan.
+    - valor_alto_umbral: COP, glosas con valor_objetado > umbral y
+      vencidas o criticas se priorizan en la lista.
+    """
+    from app.models.db import AuditLogRecord
+    ahora = ahora_utc()
+    corte_inactividad = ahora - timedelta(days=dias_inactividad)
+    corte_estancada = ahora - timedelta(days=dias_estancada)
+    en_48h = ahora + timedelta(hours=48)
+
+    # ─── Gestores con pendientes asignados ───────────────────────────────
+    try:
+        gestores_con_carga = (
+            db.query(
+                GlosaRecord.auditor_email,
+                func.count(GlosaRecord.id).label("pend"),
+                func.coalesce(func.sum(GlosaRecord.valor_objetado), 0).label("valor"),
+            )
+            .filter(GlosaRecord.auditor_email.isnot(None))
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+            .group_by(GlosaRecord.auditor_email)
+            .all()
+        )
+    except Exception:
+        gestores_con_carga = []
+
+    # Para cada gestor con carga, comprobar ultima actividad en audit_log
+    gestores_inactivos = []
+    carga_concentrada = []
+    for email, pend, valor in gestores_con_carga:
+        if not email:
+            continue
+        try:
+            ultima = (
+                db.query(func.max(AuditLogRecord.timestamp))
+                .filter(AuditLogRecord.usuario_email == email)
+                .scalar()
+            )
+        except Exception:
+            ultima = None
+        if ultima is None or ultima < corte_inactividad:
+            dias_sin_act = (ahora - ultima).days if ultima else 999
+            gestores_inactivos.append({
+                "email": (email or "").split("@")[0],
+                "email_full": email,
+                "pendientes": int(pend),
+                "valor_en_juego": float(valor or 0),
+                "dias_sin_actividad": dias_sin_act,
+                "ultima_actividad": ultima.isoformat() if ultima else None,
+            })
+        carga_concentrada.append({
+            "email": (email or "").split("@")[0],
+            "pendientes": int(pend),
+            "valor_en_juego": float(valor or 0),
+        })
+
+    gestores_inactivos.sort(key=lambda x: -x["dias_sin_actividad"])
+    gestores_inactivos = gestores_inactivos[:10]
+    carga_concentrada.sort(key=lambda x: -x["pendientes"])
+    carga_concentrada = carga_concentrada[:5]
+
+    # ─── Glosas estancadas: mismo estado >= N dias y aun pendientes ──────
+    try:
+        estancadas_rows = (
+            db.query(
+                GlosaRecord.id, GlosaRecord.eps, GlosaRecord.factura,
+                GlosaRecord.codigo_glosa, GlosaRecord.estado,
+                GlosaRecord.valor_objetado, GlosaRecord.creado_en,
+                GlosaRecord.auditor_email, GlosaRecord.fecha_vencimiento,
+            )
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+            .filter(GlosaRecord.creado_en <= corte_estancada)
+            .order_by(GlosaRecord.creado_en.asc())
+            .limit(20)
+            .all()
+        )
+        glosas_estancadas = [
+            {
+                "id": gid, "eps": eps, "factura": factura,
+                "codigo": cod, "estado": estado,
+                "valor": float(valor or 0),
+                "auditor": (email or "").split("@")[0] if email else None,
+                "dias_sin_progreso": (ahora - creado).days if creado else None,
+                "vencimiento": fv.isoformat() if fv else None,
+            }
+            for gid, eps, factura, cod, estado, valor, creado, email, fv in estancadas_rows
+        ]
+    except Exception:
+        glosas_estancadas = []
+
+    # ─── Glosas alto valor en riesgo (vencidas o crit-48h) ───────────────
+    try:
+        riesgo_rows = (
+            db.query(
+                GlosaRecord.id, GlosaRecord.eps, GlosaRecord.factura,
+                GlosaRecord.codigo_glosa, GlosaRecord.valor_objetado,
+                GlosaRecord.fecha_vencimiento, GlosaRecord.auditor_email,
+                GlosaRecord.estado,
+            )
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+            .filter(GlosaRecord.valor_objetado >= valor_alto_umbral)
+            .filter(GlosaRecord.fecha_vencimiento <= en_48h)
+            .order_by(GlosaRecord.valor_objetado.desc())
+            .limit(15)
+            .all()
+        )
+        alto_valor_riesgo = [
+            {
+                "id": gid, "eps": eps, "factura": factura,
+                "codigo": cod, "valor": float(valor or 0),
+                "vencimiento": fv.isoformat() if fv else None,
+                "auditor": (email or "").split("@")[0] if email else "sin asignar",
+                "estado": estado,
+                "horas_restantes": int((fv - ahora).total_seconds() // 3600) if fv else None,
+            }
+            for gid, eps, factura, cod, valor, fv, email, estado in riesgo_rows
+        ]
+    except Exception:
+        alto_valor_riesgo = []
+
+    # Senal global de severidad para badge
+    severidad_global = "ok"
+    if gestores_inactivos and any(g["pendientes"] >= 5 for g in gestores_inactivos):
+        severidad_global = "critica"
+    elif gestores_inactivos:
+        severidad_global = "alta"
+    elif glosas_estancadas:
+        severidad_global = "media"
+    elif alto_valor_riesgo:
+        severidad_global = "media"
+
+    return {
+        "timestamp": ahora.isoformat(),
+        "parametros": {
+            "dias_inactividad": dias_inactividad,
+            "dias_estancada": dias_estancada,
+            "valor_alto_umbral": valor_alto_umbral,
+        },
+        "severidad_global": severidad_global,
+        "gestores_inactivos": gestores_inactivos,
+        "carga_concentrada_top": carga_concentrada,
+        "glosas_estancadas": glosas_estancadas,
+        "alto_valor_riesgo": alto_valor_riesgo,
+        "totales": {
+            "gestores_inactivos": len(gestores_inactivos),
+            "glosas_estancadas": len(glosas_estancadas),
+            "alto_valor_riesgo": len(alto_valor_riesgo),
+        },
+    }
