@@ -3149,9 +3149,44 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   .fab svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .fab-tareas{background:linear-gradient(135deg,#15803d,#22c55e)}
   .fab-feedback{background:linear-gradient(135deg,#0369a1,#0ea5e9)}
+  .fab-asistente{background:linear-gradient(135deg,#7c3aed,#a855f7);width:54px;height:54px}
+  .fab-asistente svg{width:24px;height:24px}
+  .fab-asistente:hover{transform:scale(1.06)}
+  .fab-asistente.pulsing{animation:fab-pulse 2.5s ease-in-out infinite}
+  @keyframes fab-pulse{0%,100%{box-shadow:0 4px 10px rgba(124,58,237,.35)}50%{box-shadow:0 6px 18px rgba(124,58,237,.65)}}
   .fab-badge{position:absolute;top:-3px;right:-3px;background:#dc2626;color:#fff;font-size:.6rem;font-weight:700;border-radius:9px;padding:1px 5px;min-width:16px;text-align:center;border:1.5px solid #fff;line-height:1.1;font-family:var(--font)}
+
+  /* ─── Asistente Maestro: panel de chat flotante ───────────── */
+  .asist-panel{position:fixed;right:18px;bottom:80px;width:min(420px,calc(100vw - 36px));max-height:calc(100vh - 120px);background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(15,23,42,.18),0 4px 12px rgba(15,23,42,.10);display:none;flex-direction:column;z-index:9997;overflow:hidden;border:1px solid var(--line)}
+  .asist-panel.open{display:flex;animation:asist-in .18s ease-out}
+  @keyframes asist-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .asist-header{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:.85rem 1rem;display:flex;align-items:center;gap:.5rem}
+  .asist-header svg{width:18px;height:18px}
+  .asist-header b{font-size:.92rem;flex:1}
+  .asist-header button{background:transparent;border:none;color:#fff;cursor:pointer;font-size:1.3rem;line-height:1;padding:0 .25rem}
+  .asist-msgs{flex:1;overflow-y:auto;padding:.85rem 1rem;background:#fafafa;font-size:.85rem;line-height:1.5}
+  .asist-msg{margin-bottom:.85rem}
+  .asist-msg.user{text-align:right}
+  .asist-msg .bubble{display:inline-block;max-width:88%;padding:.55rem .85rem;border-radius:12px;text-align:left;white-space:pre-wrap;word-wrap:break-word}
+  .asist-msg.user .bubble{background:#7c3aed;color:#fff;border-bottom-right-radius:4px}
+  .asist-msg.assistant .bubble{background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px;color:var(--text)}
+  .asist-msg.assistant .bubble h1,.asist-msg.assistant .bubble h2,.asist-msg.assistant .bubble h3{margin:.5rem 0 .3rem;font-size:.95rem;color:#5b21b6}
+  .asist-msg.assistant .bubble ul{margin:.3rem 0 .5rem 1.2rem;padding:0}
+  .asist-tools{font-size:.7rem;color:#6b7280;margin-top:.3rem;padding-left:.7rem}
+  .asist-tools span{background:#ede9fe;color:#5b21b6;padding:.1rem .35rem;border-radius:4px;margin-right:.25rem;font-family:monospace}
+  .asist-input-wrap{display:flex;gap:.45rem;padding:.7rem .8rem;border-top:1px solid var(--line);background:#fff}
+  .asist-input-wrap textarea{flex:1;border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem;font-size:.85rem;resize:none;font-family:var(--font);max-height:120px;min-height:38px}
+  .asist-input-wrap textarea:focus{outline:none;border-color:#a855f7}
+  .asist-input-wrap button{background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:.4rem .8rem;cursor:pointer;font-size:.82rem;font-weight:600}
+  .asist-input-wrap button:disabled{opacity:.5;cursor:not-allowed}
+  .asist-empty{text-align:center;color:var(--text3);padding:1.5rem 1rem;font-size:.82rem}
+  .asist-empty .ej{display:block;text-align:left;margin-top:.5rem;font-size:.75rem;background:#fff;border:1px solid var(--line);padding:.4rem .55rem;border-radius:6px;cursor:pointer}
+  .asist-empty .ej:hover{background:#f5f3ff;border-color:#c4b5fd}
 </style>
 <div class="fab-stack">
+  <button id="asist-fab" class="fab fab-asistente pulsing" onclick="toggleAsistente()" title="Asistente Maestro IA — preguntá lo que sea" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zM11.5 9.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z" fill="white" stroke="none"/></svg>
+  </button>
   <button id="td-fab" class="fab fab-tareas" onclick="abrirPanelTareas()" title="Mis tareas del día" style="display:none">
     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
     <span id="td-badge" class="fab-badge" style="display:none">0</span>
@@ -3159,6 +3194,21 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   <button id="fb-fab" class="fab fab-feedback" onclick="abrirModalSugerencia()" title="Reportar fallo o sugerir mejora" style="display:none">
     <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>
   </button>
+</div>
+
+<!-- Panel del Asistente Maestro IA — chat unificado con tools -->
+<div id="asist-panel" class="asist-panel">
+  <div class="asist-header">
+    <svg viewBox="0 0 24 24" fill="white" stroke="none"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zM11.5 9.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/></svg>
+    <b>Asistente Maestro IA</b>
+    <button onclick="limpiarAsistente()" title="Nueva conversación" style="font-size:.95rem;">↻</button>
+    <button onclick="toggleAsistente(false)" title="Cerrar">×</button>
+  </div>
+  <div id="asist-msgs" class="asist-msgs"></div>
+  <div class="asist-input-wrap">
+    <textarea id="asist-input" placeholder="Pregúntame: 'auditá HUS487233', 'busca facturas Famisanar', 'estadísticas del mes'..." rows="1" onkeydown="asistKeydown(event)"></textarea>
+    <button id="asist-send" onclick="enviarAsistente()">Enviar</button>
+  </div>
 </div>
 
 <!-- ✅ PANEL: Tareas diarias -->
@@ -3565,6 +3615,8 @@ async function initApp(){
     if(_td) _td.style.display = 'flex';
     var _fb = document.getElementById('fb-fab');
     if(_fb) _fb.style.display = 'flex';
+    var _asist = document.getElementById('asist-fab');
+    if(_asist) _asist.style.display = 'flex';
     if(typeof refrescarBadgeTareas === 'function') refrescarBadgeTareas();
   } catch(e){}
   // Restaurar estado colapsado del sidebar
@@ -11375,6 +11427,179 @@ function renderVerificacionCitas(v){
   return html;
 }
 
+// ─── ASISTENTE MAESTRO IA — chat conversacional unificado ───────────
+// Mente maestra que puede auditar, buscar soportes, lookup norma,
+// estadísticas, etc. en una sola conversación. Yesid mayo 2026:
+// "una sola mente maestra capaz de auditar, predecir, buscar soportes,
+//  conciliar, verificar y argumentar sin que haga falta entrar a
+//  muchos botones".
+
+var ASIST_HISTORIAL = [];
+
+function toggleAsistente(forceOpen){
+  var p = document.getElementById('asist-panel');
+  if(!p) return;
+  var abierto = p.classList.contains('open');
+  var nuevoEstado = (typeof forceOpen === 'boolean') ? forceOpen : !abierto;
+  p.classList.toggle('open', nuevoEstado);
+  if(nuevoEstado){
+    var fab = document.getElementById('asist-fab');
+    if(fab) fab.classList.remove('pulsing');
+    if(ASIST_HISTORIAL.length === 0) renderAsistEmpty();
+    setTimeout(function(){
+      var inp = document.getElementById('asist-input');
+      if(inp) inp.focus();
+    }, 200);
+  }
+}
+
+function renderAsistEmpty(){
+  var box = document.getElementById('asist-msgs');
+  if(!box) return;
+  box.innerHTML = '<div class="asist-empty">'
+    + '<div style="font-size:1.6rem;margin-bottom:.5rem;">✨</div>'
+    + '<div><b>Hola, soy tu asistente maestro</b></div>'
+    + '<div style="margin-top:.3rem;">Puedo auditar facturas, buscar soportes, mostrar estadísticas, citar normas, encontrar precedentes. Pregúntame en lenguaje natural.</div>'
+    + '<div style="margin-top:.7rem;text-align:left;font-size:.74rem;color:var(--text2);"><b>Ejemplos</b>:</div>'
+    + '<div class="ej" onclick="asistEjemplo(this)">Audita la factura HUS487233 buscando la baciloscopia coloración Ziehl-Neelsen</div>'
+    + '<div class="ej" onclick="asistEjemplo(this)">Busca todas las facturas de FAMISANAR del envío 189840</div>'
+    + '<div class="ej" onclick="asistEjemplo(this)">¿Cuáles son las estadísticas globales del sistema este mes?</div>'
+    + '<div class="ej" onclick="asistEjemplo(this)">Mostrame las últimas 5 glosas de NUEVA EPS pendientes</div>'
+    + '<div class="ej" onclick="asistEjemplo(this)">¿Qué dice la Resolución 2284 de 2023?</div>'
+    + '<div class="ej" onclick="asistEjemplo(this)">Buscame precedentes levantados de FAMISANAR código TA0801</div>'
+    + '</div>';
+}
+
+function asistEjemplo(el){
+  var inp = document.getElementById('asist-input');
+  if(!inp) return;
+  inp.value = el.textContent.trim();
+  inp.focus();
+  asistAutoresize(inp);
+}
+
+function asistAutoresize(el){
+  el.style.height = 'auto';
+  el.style.height = Math.min(120, el.scrollHeight) + 'px';
+}
+
+function asistKeydown(e){
+  asistAutoresize(e.target);
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    enviarAsistente();
+  }
+}
+
+function limpiarAsistente(){
+  ASIST_HISTORIAL = [];
+  renderAsistEmpty();
+  var inp = document.getElementById('asist-input');
+  if(inp){ inp.value = ''; inp.focus(); }
+}
+
+function renderHistorialAsist(){
+  var box = document.getElementById('asist-msgs');
+  if(!box) return;
+  if(ASIST_HISTORIAL.length === 0){ renderAsistEmpty(); return; }
+  var html = '';
+  ASIST_HISTORIAL.forEach(function(m){
+    var bubble = m.role === 'assistant'
+      ? renderAsistContenidoHTML(m.content)
+      : escHtml(m.content);
+    html += '<div class="asist-msg ' + m.role + '"><div class="bubble">' + bubble + '</div>';
+    if(m.tools_llamadas && m.tools_llamadas.length){
+      html += '<div class="asist-tools">' + m.tools_llamadas.map(function(t){
+        return '<span>' + escHtml(t.name) + '</span>';
+      }).join('') + '</div>';
+    }
+    html += '</div>';
+  });
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+
+function renderAsistContenidoHTML(texto){
+  // Permitimos HTML básico que la IA pudo generar (h3, ul, b, etc.)
+  // Para texto plano, escapamos y conservamos saltos de línea.
+  if(!texto) return '';
+  var esHtml = /<(h[1-6]|p|ul|li|b|strong|em|table|tr|td)[\s>]/i.test(texto);
+  if(esHtml) return texto;
+  return escHtml(texto).replace(/\n/g, '<br>');
+}
+
+async function enviarAsistente(){
+  var inp = document.getElementById('asist-input');
+  var btn = document.getElementById('asist-send');
+  if(!inp || !btn) return;
+  var msg = (inp.value || '').trim();
+  if(msg.length < 2) return;
+  inp.value = '';
+  asistAutoresize(inp);
+  ASIST_HISTORIAL.push({role: 'user', content: msg});
+  renderHistorialAsist();
+
+  // Indicador "pensando…"
+  var box = document.getElementById('asist-msgs');
+  var thinking = document.createElement('div');
+  thinking.id = 'asist-thinking';
+  thinking.className = 'asist-msg assistant';
+  thinking.innerHTML = '<div class="bubble" style="opacity:.7;font-style:italic;">⏳ Pensando…</div>';
+  box.appendChild(thinking);
+  box.scrollTop = box.scrollHeight;
+  btn.disabled = true;
+
+  try{
+    var r = await fetch('/asistente/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', ...authH()},
+      body: JSON.stringify({mensajes: ASIST_HISTORIAL.filter(function(m){return m.role==='user'||m.role==='assistant';}).map(function(m){return {role:m.role, content:m.content};})}),
+    });
+    var th = document.getElementById('asist-thinking');
+    if(th) th.remove();
+    var data = {};
+    try { data = await r.json(); } catch(_e){ data = {detail: 'Respuesta no JSON'}; }
+    if(!r.ok){
+      var msgErr = '';
+      if(typeof data.detail === 'string') msgErr = data.detail;
+      else if(Array.isArray(data.detail)) msgErr = data.detail.map(function(e){return (e.msg||'');}).join(' · ');
+      else msgErr = 'Error HTTP ' + r.status;
+      ASIST_HISTORIAL.push({
+        role: 'assistant',
+        content: '⚠️ Error: ' + msgErr,
+      });
+      renderHistorialAsist();
+      return;
+    }
+    ASIST_HISTORIAL.push({
+      role: 'assistant',
+      content: data.respuesta || '(sin respuesta)',
+      tools_llamadas: data.tools_llamadas || [],
+    });
+    renderHistorialAsist();
+  }catch(e){
+    var th2 = document.getElementById('asist-thinking');
+    if(th2) th2.remove();
+    ASIST_HISTORIAL.push({
+      role: 'assistant',
+      content: '⚠️ Error de red: ' + String(e),
+    });
+    renderHistorialAsist();
+  } finally {
+    btn.disabled = false;
+    var inp2 = document.getElementById('asist-input');
+    if(inp2) inp2.focus();
+  }
+}
+
+// Atajo: Ctrl+J o Cmd+J abre el asistente
+document.addEventListener('keydown', function(e){
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j'){
+    e.preventDefault();
+    toggleAsistente();
+  }
+});
+
 // ─── AUDITOR FORENSE STANDALONE (panel sidebar) ────────────────────
 async function auditorForenseStandalone(){
   var fact = (document.getElementById('af-factura')||{}).value || '';
@@ -11395,14 +11620,29 @@ async function auditorForenseStandalone(){
   out.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.8rem 1rem;border-radius:6px;font-size:.82rem;color:#7c2d12;">⏳ Auditor leyendo soportes y analizando con Claude... (60-120 segundos)</div>';
 
   try{
-    var r = await fetch('/auditor-forense', {
+    var r = await fetch('/auditor-forense/', {
       method: 'POST',
       headers: {'Content-Type':'application/json', ...authH()},
       body: JSON.stringify({factura: fact, pregunta: preg, usar_pdf_nativo: true}),
     });
-    var data = await r.json();
+    var data = {};
+    try { data = await r.json(); } catch(_e){ data = {detail: 'Respuesta no JSON'}; }
     if(!r.ok){
-      out.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#991b1b;">❌ ' + escHtml(data.detail || ('HTTP '+r.status)) + '</div>';
+      // Manejar correctamente errores de Pydantic (data.detail puede ser
+      // un array de errores o un string). Sin esto, mostraba [object Object].
+      var msg = '';
+      if(typeof data.detail === 'string'){
+        msg = data.detail;
+      } else if(Array.isArray(data.detail)){
+        msg = data.detail.map(function(e){
+          return (e.loc ? e.loc.join('.') + ': ' : '') + (e.msg || JSON.stringify(e));
+        }).join(' · ');
+      } else if(data.detail){
+        msg = JSON.stringify(data.detail);
+      } else {
+        msg = 'HTTP ' + r.status;
+      }
+      out.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#991b1b;">❌ ' + escHtml(msg) + '</div>';
       return;
     }
     var meta = '<div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem;padding:.5rem .8rem;background:#f8fafc;border-radius:6px;border-left:3px solid #8b5cf6;">'
@@ -11579,14 +11819,19 @@ async function auditarForense(factura, rndId){
   }
   outEl.innerHTML = '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.7rem .9rem;border-radius:6px;font-size:.8rem;color:#7c2d12;">⏳ Auditor leyendo soportes y analizando... (60-120 seg)</div>';
   try{
-    var r = await fetch('/auditor-forense', {
+    var r = await fetch('/auditor-forense/', {
       method: 'POST',
       headers: {'Content-Type':'application/json', ...authH()},
       body: JSON.stringify({factura: factura, pregunta: pregunta, usar_pdf_nativo: true}),
     });
-    var data = await r.json();
+    var data = {};
+    try { data = await r.json(); } catch(_e){ data = {detail: 'Respuesta no JSON'}; }
     if(!r.ok){
-      outEl.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.7rem .9rem;border-radius:6px;font-size:.82rem;color:#991b1b;">❌ ' + escHtml(data.detail || ('Error HTTP ' + r.status)) + '</div>';
+      var msg = '';
+      if(typeof data.detail === 'string') msg = data.detail;
+      else if(Array.isArray(data.detail)) msg = data.detail.map(function(e){return (e.loc?e.loc.join('.')+': ':'')+(e.msg||'');}).join(' · ');
+      else msg = 'Error HTTP ' + r.status;
+      outEl.innerHTML = '<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.7rem .9rem;border-radius:6px;font-size:.82rem;color:#991b1b;">❌ ' + escHtml(msg) + '</div>';
       return;
     }
     // Render del HTML producido por el auditor + meta

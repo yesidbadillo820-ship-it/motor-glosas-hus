@@ -929,6 +929,8 @@ from app.api.routers.diagnostico import router as diagnostico_router
 app.include_router(diagnostico_router)
 from app.api.routers.auditor_forense import router as auditor_forense_router
 app.include_router(auditor_forense_router)
+from app.api.routers.asistente_maestro import router as asistente_maestro_router
+app.include_router(asistente_maestro_router)
 
 
 

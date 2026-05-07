@@ -81,7 +81,7 @@ async def fetch_rss(url: str, fuente: str, max_items: int = 10) -> list[dict]:
         return []
 
     try:
-        timeout = httpx.Timeout(connect=10.0, read=20.0)
+        timeout = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=5.0)
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             resp = await client.get(
                 url,
@@ -146,9 +146,9 @@ async def fetch_html_scrape_minsalud(url: str, max_items: int = 10) -> list[dict
     sitio cambia su estructura, devuelve [] sin romper.
     """
     try:
-        timeout = httpx.Timeout(connect=10.0, read=20.0)
+        timeout = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=5.0)
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            resp = await client.get(url, headers={"User-Agent": "Motor-Glosas-HUS/1.0"})
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"})
         if resp.status_code != 200:
             return []
     except Exception as e:

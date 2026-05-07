@@ -20,7 +20,6 @@ from app.database import get_db
 from app.api.deps import get_usuario_actual
 from app.models.db import UsuarioRecord
 from app.repositories.audit_repository import AuditRepository
-from app.core.rate_limit import limiter
 
 logger = logging.getLogger("motor_glosas")
 
@@ -36,11 +35,10 @@ class AuditorForenseRequest(BaseModel):
     usar_pdf_nativo: bool = True
 
 
-@router.post("")
-@limiter.limit("10/minute")
+@router.post("/")
 async def auditar_factura(
-    request: Request,
     payload: AuditorForenseRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
