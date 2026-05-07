@@ -279,12 +279,39 @@ button:focus-visible, .btn:focus-visible, a:focus-visible,
   font-feature-settings: 'tnum';
 }
 
-/* ─── REDUCIR SATURACION sutil en botones de accent fuerte ────── */
-.btn[style*="background:#16a34a"], .btn[style*="background:#15803d"]{
-  filter: saturate(.85);
+/* ─── REDUCIR SATURACION sutil en botones de accent fuerte ──────
+   Botones con backgrounds inline saturados se ven "calmos" en reposo
+   y recuperan saturacion al hacer hover. Da el look "premium muted"
+   estilo Linear sin perder la jerarquia visual de las acciones. */
+.btn[style*="background:#16a34a"], .btn[style*="background:#15803d"],
+.btn[style*="background:#22c55e"], .btn[style*="background:#10b981"],
+.btn[style*="background:#047857"], .btn[style*="background:#065f46"],
+.btn[style*="background:#166534"]{ filter: saturate(.78) brightness(.96) }
+
+.btn[style*="background:#dc2626"], .btn[style*="background:#b91c1c"],
+.btn[style*="background:#991b1b"], .btn[style*="background:#7f1d1d"],
+.btn[style*="background:#ef4444"]{ filter: saturate(.82) brightness(.97) }
+
+.btn[style*="background:#1e40af"], .btn[style*="background:#2563eb"],
+.btn[style*="background:#1d4ed8"], .btn[style*="background:#0ea5e9"],
+.btn[style*="background:#0284c7"], .btn[style*="background:#0369a1"],
+.btn[style*="background:#0d9488"], .btn[style*="background:#0f766e"]{
+  filter: saturate(.85) brightness(.97)
 }
-.btn[style*="background:#dc2626"], .btn[style*="background:#b91c1c"]{
-  filter: saturate(.88);
+
+.btn[style*="background:#7c3aed"], .btn[style*="background:#8b5cf6"],
+.btn[style*="background:#a855f7"]{ filter: saturate(.7) brightness(.95) }
+
+.btn[style*="background:#d97706"], .btn[style*="background:#f59e0b"],
+.btn[style*="background:#ca8a04"], .btn[style*="background:#b8860b"]{
+  filter: saturate(.85) brightness(.97)
+}
+
+/* Al hacer hover sobre botones con color, restaurar saturacion para
+   indicar la accion claramente. Linear-style: muted en reposo, vivido
+   al hover. */
+.btn[style*="background:#"]:hover{
+  filter: saturate(1) brightness(1.04);
 }
 
 /* ─── BADGES y CHIPS estilo Linear (suaves, no agresivos) ────── */
