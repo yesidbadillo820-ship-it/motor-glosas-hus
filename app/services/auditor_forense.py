@@ -100,16 +100,10 @@ def _clave_cache_forense(
     contexto_texto: str,
     modelo: str,
 ) -> str:
-    """Calcula clave SHA256 de cache para auditor forense.
-
-    Incluye factura + pregunta normalizada + hash de PDFs (o del
-    texto fallback) + modelo. Asi cualquier cambio en cualquiera
-    invalida el cache.
-    """
+    """Calcula clave SHA256 de cache para auditor forense."""
     import hashlib
     h = hashlib.sha256()
     h.update(f"forense|{modelo}|{(factura or '').strip().upper()}|".encode("utf-8"))
-    # Normalizar pregunta: lowercase, collapse spaces, strip
     norm = " ".join((pregunta or "").lower().split())
     h.update(f"q={norm}|".encode("utf-8"))
     if pdfs_raw:
@@ -118,15 +112,11 @@ def _clave_cache_forense(
                 h.update(hashlib.sha256(data).digest())
                 h.update(b"|")
     elif contexto_texto:
-        # Hash del texto extraido (limitado a 60KB para alinear con el envio)
         h.update(hashlib.sha256(contexto_texto[:60000].encode("utf-8")).digest())
     return h.hexdigest()
 
 
 def _buscar_cache_forense(clave: str) -> Optional[dict]:
-    """Busca respuesta cacheada en AICacheRecord. Si esta expirada,
-    la borra y devuelve None.
-    """
     try:
         from datetime import timedelta
         from app.core.tz import a_utc, ahora_utc
@@ -183,45 +173,27 @@ async def auditar_forense(
     modelo: str = None,
     bypass_cache: bool = False,
 ) -> dict:
-    """Ejecuta el auditor forense sobre los soportes de una factura.
-
-    Args:
-        factura: número de factura (HUSXXXXX)
-        pregunta_gestor: lo que el gestor escribió en lenguaje natural
-        pdfs_raw: lista de tuplas (filename, bytes) — si está, manda
-                  los PDFs binarios nativos a Claude (mejor calidad)
-        contexto_pdf_texto: texto extraído de los soportes (fallback
-                            si pdfs_raw no está disponible)
-        api_key: ANTHROPIC_API_KEY
-        modelo: claude-sonnet-4-5 o similar
-        bypass_cache: si True, no consulta ni escribe cache (forzar
-                      recalculo, util cuando los soportes cambiaron).
-
-    Returns:
-        {"html": str, "modelo": str, "input_tokens": int, "output_tokens": int, "error": str|None, "cache_hit": bool}
-    """
+    """Triple fallback: Anthropic PDF -> Gemini PDF -> Gemini Vision con imagenes."""
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
     modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
-    if not api_key:
-        return {"html": "", "error": "ANTHROPIC_API_KEY no configurada"}
+    if not api_key and not gemini_key:
+        return {"html": "", "error": "Sin proveedores con PDF nativo (Anthropic ni Gemini configurados)"}
 
     if not pregunta_gestor or len(pregunta_gestor.strip()) < 5:
         return {"html": "", "error": "Pregunta vacía o muy corta"}
 
-    # ─── Cache lookup ─────────────────────────────────────────────────
     cache_key = _clave_cache_forense(factura, pregunta_gestor, pdfs_raw, contexto_pdf_texto, modelo)
     if not bypass_cache:
         cached = _buscar_cache_forense(cache_key)
         if cached:
             logger.info(f"[AUDITOR-FORENSE] CACHE HIT factura={factura} key={cache_key[:12]}")
             return {
-                "html": cached["html"],
-                "modelo": cached["modelo"],
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "error": None,
-                "cache_hit": True,
+                "html": cached["html"], "modelo": cached["modelo"],
+                "input_tokens": 0, "output_tokens": 0,
+                "error": None, "cache_hit": True,
             }
 
     timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
@@ -231,7 +203,6 @@ async def auditar_forense(
         "content-type": "application/json",
     }
 
-    # Construir mensaje con PDFs nativos si están disponibles
     user_text = f"""FACTURA: {factura}
 
 CONSULTA DEL GESTOR:
@@ -241,7 +212,6 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
 
     content_blocks: list = []
     if pdfs_raw:
-        # Multi-modal: enviar hasta 5 PDFs binarios
         for nombre, data in pdfs_raw[:5]:
             if not data or len(data) < 1024 or len(data) > 32 * 1024 * 1024:
                 continue
@@ -254,7 +224,6 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
                 },
             })
     elif contexto_pdf_texto:
-        # Fallback texto extraído
         user_text = (
             f"SOPORTES DOCUMENTALES (TEXTO EXTRAÍDO):\n\n"
             f"{contexto_pdf_texto[:60000]}\n\n"
@@ -265,56 +234,137 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
 
     content_blocks.append({"type": "text", "text": user_text})
 
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json={
-                    "model": modelo,
-                    "max_tokens": 6000,
-                    "temperature": 0.0,
-                    "system": SYSTEM_AUDITOR_FORENSE,
-                    "messages": [{"role": "user", "content": content_blocks}],
-                },
-            )
-    except Exception as e:
-        logger.error(f"[AUDITOR-FORENSE] Error red: {e}")
-        return {"html": "", "error": f"Error de red: {e}"}
-
-    if resp.status_code != 200:
-        err = resp.text[:300]
-        logger.error(f"[AUDITOR-FORENSE] HTTP {resp.status_code}: {err}")
-        return {"html": "", "error": f"HTTP {resp.status_code}: {err}"}
-
-    data = resp.json()
-    contenido = data.get("content") or []
-    texto = ""
-    for b in contenido:
-        if b.get("type") == "text":
-            texto += b.get("text", "")
-
-    if not texto:
-        return {"html": "", "error": "Respuesta sin texto"}
-
-    usage = data.get("usage", {})
-    logger.info(
-        f"[AUDITOR-FORENSE] OK factura={factura} pdfs={len(pdfs_raw or [])} "
-        f"in={usage.get('input_tokens', 0)} out={usage.get('output_tokens', 0)}"
-    )
-
-    # Guardar en cache para futuras consultas identicas
-    if not bypass_cache:
+    # Intento 1: Anthropic Claude (PDF nativo)
+    anthropic_error = None
+    if api_key:
         try:
-            _guardar_cache_forense(cache_key, texto, f"anthropic/{modelo}/forense")
-        except Exception as _e:
-            logger.debug(f"forense cache write fallo: {_e}")
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers=headers,
+                    json={
+                        "model": modelo, "max_tokens": 6000, "temperature": 0.0,
+                        "system": SYSTEM_AUDITOR_FORENSE,
+                        "messages": [{"role": "user", "content": content_blocks}],
+                    },
+                )
+            if resp.status_code == 200:
+                data = resp.json()
+                contenido = data.get("content") or []
+                texto = ""
+                for b in contenido:
+                    if b.get("type") == "text":
+                        texto += b.get("text", "")
+                if texto:
+                    usage = data.get("usage", {})
+                    if not bypass_cache:
+                        try:
+                            _guardar_cache_forense(cache_key, texto, f"anthropic/{modelo}/forense")
+                        except Exception:
+                            pass
+                    return {
+                        "html": texto, "modelo": f"anthropic/{modelo}/forense",
+                        "input_tokens": usage.get("input_tokens", 0),
+                        "output_tokens": usage.get("output_tokens", 0),
+                        "error": None, "cache_hit": False,
+                    }
+                anthropic_error = "Anthropic devolvió respuesta vacía"
+            else:
+                anthropic_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                logger.warning(f"[AUDITOR-FORENSE] Anthropic fallo: {anthropic_error}")
+        except Exception as e:
+            anthropic_error = f"Error red Anthropic: {e}"
+            logger.warning(f"[AUDITOR-FORENSE] {anthropic_error}")
+
+    # Intento 2a: Gemini con PDF nativo via inlineData
+    gemini_pdf_error = None
+    if gemini_key:
+        logger.info(f"[AUDITOR-FORENSE] Fallback a Gemini PDF nativo factura={factura}")
+        try:
+            from app.services.gemini_service import GeminiService
+            gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
+            texto, modelo_usado = await gem.completar(
+                system=SYSTEM_AUDITOR_FORENSE, user=user_text,
+                modelo=gemini_model, temperature=0.0, max_tokens=6000,
+                pdfs_raw=pdfs_raw if pdfs_raw else None,
+            )
+            if texto:
+                logger.info(f"[AUDITOR-FORENSE] OK Gemini-PDF factura={factura} pdfs={len(pdfs_raw or [])}")
+                if not bypass_cache:
+                    try:
+                        _guardar_cache_forense(cache_key, texto, modelo_usado + "/forense")
+                    except Exception:
+                        pass
+                return {
+                    "html": texto, "modelo": modelo_usado + "/forense",
+                    "input_tokens": 0, "output_tokens": 0,
+                    "error": None, "cache_hit": False,
+                    "fallback_motivo": anthropic_error if anthropic_error else "Anthropic no configurado",
+                }
+        except Exception as e:
+            gemini_pdf_error = f"Gemini-PDF: {e}"
+            logger.warning(f"[AUDITOR-FORENSE] {gemini_pdf_error}")
+
+    # Intento 2b: Gemini con PDFs convertidos a imagenes (vision)
+    if gemini_key and pdfs_raw:
+        logger.info(f"[AUDITOR-FORENSE] Fallback a Gemini con imagenes factura={factura}")
+        try:
+            from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
+            from app.services.gemini_service import GeminiService
+            imagenes = pdfs_a_imagenes_combinadas(pdfs_raw, max_imagenes_total=20, dpi=130)
+            if imagenes:
+                gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
+                user_text_vision = (
+                    f"FACTURA: {factura}\n\n"
+                    f"Las imagenes adjuntas son las paginas escaneadas de los soportes "
+                    f"(historia clinica, ordenes, RIPS, FEV, HEV, etc). "
+                    f"Lee TODO el contenido visible (texto, tablas, firmas, sellos, fechas) "
+                    f"y respondela siguiente consulta del gestor:\n\n"
+                    f"{pregunta_gestor.strip()}\n\n"
+                    f"Cita folios y fechas concretas. Si una pagina es ilegible, "
+                    f"dilo. Si no encuentras la informacion, se honesto."
+                )
+                texto, modelo_usado = await gem.completar(
+                    system=SYSTEM_AUDITOR_FORENSE, user=user_text_vision,
+                    modelo=gemini_model, temperature=0.0, max_tokens=6000,
+                    imagenes_raw=imagenes,
+                )
+                if texto:
+                    logger.info(
+                        f"[AUDITOR-FORENSE] OK Gemini-IMG factura={factura} "
+                        f"imgs={len(imagenes)} (de {len(pdfs_raw)} PDFs)"
+                    )
+                    if not bypass_cache:
+                        try:
+                            _guardar_cache_forense(cache_key, texto, modelo_usado + "/forense-img")
+                        except Exception:
+                            pass
+                    return {
+                        "html": texto, "modelo": modelo_usado + "/forense-img",
+                        "input_tokens": 0, "output_tokens": 0,
+                        "error": None, "cache_hit": False,
+                        "fallback_motivo": (
+                            (anthropic_error or "Anthropic no configurado")
+                            + " | " + (gemini_pdf_error or "Gemini-PDF no intentado")
+                        ),
+                        "modo": "gemini-vision-imagenes",
+                        "imagenes_usadas": len(imagenes),
+                    }
+        except Exception as e:
+            logger.error(f"[AUDITOR-FORENSE] Gemini-IMG fallo: {e}")
+            error_combinado = (
+                f"Anthropic: {anthropic_error or 'no intentado'}. "
+                f"Gemini-PDF: {gemini_pdf_error or 'no intentado'}. "
+                f"Gemini-IMG: {str(e)[:200]}"
+            )
+            return {"html": "", "error": error_combinado}
 
     return {
-        "html": texto,
-        "modelo": f"anthropic/{modelo}/forense",
-        "input_tokens": usage.get("input_tokens", 0),
-        "output_tokens": usage.get("output_tokens", 0),
-        "error": None,
-        "cache_hit": False,
+        "html": "",
+        "error": (
+            f"Todos los proveedores con vision/PDF fallaron. "
+            f"Anthropic: {anthropic_error or 'no configurado'}. "
+            f"Gemini-PDF: {gemini_pdf_error or 'no intentado'}. "
+            f"Sin GEMINI_API_KEY o sin PDFs para convertir a imagenes."
+        )
     }
