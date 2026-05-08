@@ -880,6 +880,8 @@ from app.api.routers.preset_filtros import router as preset_filtros_router
 from app.api.routers.notas_privadas import router as notas_privadas_router
 from app.api.routers.rutas_factura import router as rutas_factura_router
 from app.api.routers.snippets import router as snippets_router
+from app.api.routers.prediccion_ia import router as prediccion_ia_router
+from app.api.routers.chat_history import router as chat_history_router
 
 app.include_router(auth_router)
 app.include_router(glosas_router)
@@ -927,6 +929,8 @@ app.include_router(preset_filtros_router)
 app.include_router(notas_privadas_router)
 app.include_router(rutas_factura_router)
 app.include_router(snippets_router)
+app.include_router(prediccion_ia_router)
+app.include_router(chat_history_router)
 from app.api.routers.cups import router as cups_router
 app.include_router(cups_router)
 from app.api.routers.pwa import router as pwa_router

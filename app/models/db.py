@@ -668,6 +668,34 @@ class PresetFiltroRecord(Base):
     )
 
 
+class ChatConversacionRecord(Base):
+    """Conversacion del Asistente Maestro IA (chat persistente).
+
+    Cada usuario tiene N conversaciones, cada una con M mensajes.
+    Sirve para volver a una sesion anterior y continuar el contexto.
+    """
+    __tablename__ = "chat_conversaciones"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_email = Column(String(200), index=True, nullable=False)
+    titulo = Column(String(200), nullable=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    ultimo_mensaje_en = Column(DateTime(timezone=True), server_default=func.now())
+    archivado = Column(Integer, default=0, nullable=False)
+
+
+class ChatMensajeRecord(Base):
+    """Mensaje individual de una conversacion. Rol = user|assistant."""
+    __tablename__ = "chat_mensajes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conversacion_id = Column(Integer, index=True, nullable=False)
+    rol = Column(String(20), nullable=False)  # user | assistant | tool_use | tool_result
+    contenido = Column(Text, nullable=False)
+    metadata_json = Column(Text, nullable=True)  # tool_use info, tokens, etc
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class SnippetRecord(Base):
     """Snippets / abreviaciones expandibles del usuario.
 
