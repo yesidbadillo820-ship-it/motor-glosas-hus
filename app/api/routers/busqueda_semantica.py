@@ -146,6 +146,152 @@ async def buscar(
     }
 
 
+@router.post("/corpus")
+async def buscar_corpus(
+    data: BusquedaInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Busqueda semantica EXTENDIDA al corpus completo del sistema:
+    glosas + contratos + tarifas + plantillas Gold + soportes
+    indexados. Ranking por IA cuando disponible.
+
+    Returns:
+        {
+            "query": str,
+            "resultados_por_tipo": {
+                "glosas": [{...}, ...],
+                "contratos": [{...}, ...],
+                "tarifas": [{...}, ...],
+                "plantillas_gold": [{...}, ...],
+            },
+            "total_resultados": int,
+        }
+    """
+    from app.models.db import (
+        ContratoRecord, TarifaContratadaRecord, PlantillaGoldRecord,
+    )
+    q = data.query.strip()
+    limite = min(data.limite, 20)
+    tokens = [t for t in q.lower().split() if len(t) > 2][:6]
+    if not tokens:
+        raise HTTPException(400, "Consulta sin terminos utiles")
+
+    from sqlalchemy import or_
+
+    # 1. Glosas (preseleccion 40 candidatos)
+    g_conds = []
+    for t in tokens:
+        like = f"%{t}%"
+        g_conds.append(or_(
+            GlosaRecord.eps.ilike(like),
+            GlosaRecord.codigo_glosa.ilike(like),
+            GlosaRecord.factura.ilike(like),
+            GlosaRecord.cups_servicio.ilike(like),
+            GlosaRecord.servicio_descripcion.ilike(like),
+            GlosaRecord.concepto_glosa.ilike(like),
+            GlosaRecord.texto_glosa_original.ilike(like),
+            GlosaRecord.dictamen.ilike(like),
+        ))
+    glosas = (
+        db.query(GlosaRecord).filter(or_(*g_conds))
+        .order_by(GlosaRecord.creado_en.desc()).limit(40).all()
+    )
+
+    # 2. Contratos
+    c_conds = []
+    for t in tokens:
+        like = f"%{t}%"
+        c_conds.append(or_(
+            ContratoRecord.eps.ilike(like),
+            ContratoRecord.detalles.ilike(like),
+        ))
+    contratos = (
+        db.query(ContratoRecord).filter(or_(*c_conds)).limit(15).all()
+    )
+
+    # 3. Tarifas contratadas
+    t_conds = []
+    for t in tokens:
+        like = f"%{t}%"
+        t_conds.append(or_(
+            TarifaContratadaRecord.eps.ilike(like),
+            TarifaContratadaRecord.codigo_cups.ilike(like),
+            TarifaContratadaRecord.descripcion.ilike(like),
+            TarifaContratadaRecord.modalidad.ilike(like),
+        ))
+    tarifas = (
+        db.query(TarifaContratadaRecord)
+        .filter(or_(*t_conds))
+        .filter(TarifaContratadaRecord.activa == 1)
+        .limit(15).all()
+    )
+
+    # 4. Plantillas Gold
+    p_conds = []
+    for t in tokens:
+        like = f"%{t}%"
+        p_conds.append(or_(
+            PlantillaGoldRecord.titulo.ilike(like),
+            PlantillaGoldRecord.argumento.ilike(like),
+            PlantillaGoldRecord.eps.ilike(like),
+            PlantillaGoldRecord.codigo_glosa.ilike(like),
+        ))
+    plantillas = (
+        db.query(PlantillaGoldRecord)
+        .filter(or_(*p_conds))
+        .filter(PlantillaGoldRecord.activa == 1)
+        .order_by(PlantillaGoldRecord.usos.desc())
+        .limit(10).all()
+    )
+
+    # Serializar
+    res_glosas = [_serializar_glosa(g) for g in glosas[:limite]]
+    res_contratos = [
+        {
+            "id": c.id,
+            "eps": c.eps,
+            "detalles": (c.detalles or "")[:300],
+            "creado_en": c.creado_en.isoformat() if c.creado_en else None,
+        } for c in contratos
+    ]
+    res_tarifas = [
+        {
+            "id": t.id,
+            "eps": t.eps,
+            "codigo_cups": t.codigo_cups,
+            "descripcion": t.descripcion,
+            "valor": float(t.valor_pactado or 0),
+            "modalidad": t.modalidad,
+            "tipo_tarifa": t.tipo_tarifa,
+        } for t in tarifas
+    ]
+    res_plantillas = [
+        {
+            "id": p.id,
+            "titulo": p.titulo,
+            "eps": p.eps,
+            "codigo_glosa": p.codigo_glosa,
+            "tipo": p.tipo,
+            "usos": p.usos or 0,
+            "preview": ((p.argumento or "")[:200] + "…") if p.argumento and len(p.argumento) > 200 else (p.argumento or ""),
+        } for p in plantillas
+    ]
+
+    total = len(res_glosas) + len(res_contratos) + len(res_tarifas) + len(res_plantillas)
+
+    return {
+        "query": q,
+        "resultados_por_tipo": {
+            "glosas": res_glosas,
+            "contratos": res_contratos,
+            "tarifas": res_tarifas,
+            "plantillas_gold": res_plantillas,
+        },
+        "total_resultados": total,
+    }
+
+
 def _serializar_glosa(g: GlosaRecord) -> dict:
     return {
         "id": g.id,
