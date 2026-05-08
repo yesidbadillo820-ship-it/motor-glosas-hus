@@ -336,6 +336,104 @@ def metricas_ia_por_usuario(
     }
 
 
+@router.get("/metricas-ia/billing-forense")
+def metricas_ia_billing_forense(
+    dias: int = 30,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Breakdown forense del costo IA: identifica QUE feature/endpoint
+    consume mas $$$ con detalle de las top 20 calls mas caras y un
+    resumen agregado por modelo y por user.
+
+    Util cuando el balance de Anthropic se vacia inesperadamente y
+    queres saber donde se fue la plata.
+    """
+    from datetime import timedelta
+    from sqlalchemy import desc
+    from app.core.tz import ahora_utc
+    from app.models.db import AICallRecord, GlosaRecord
+
+    desde = ahora_utc() - timedelta(days=max(1, int(dias)))
+    todas = (
+        db.query(AICallRecord)
+        .filter(AICallRecord.creado_en >= desde)
+        .all()
+    )
+
+    # Agregar por modelo
+    por_modelo: dict[str, dict] = {}
+    por_proveedor: dict[str, dict] = {}
+    por_user: dict[str, dict] = {}
+    todas_costos = []
+    for c in todas:
+        cost = c.cost_usd or 0
+        toks = (c.input_tokens or 0) + (c.cache_creation_input_tokens or 0) + (c.cache_read_input_tokens or 0) + (c.output_tokens or 0)
+        d = por_modelo.setdefault(c.modelo or "?", {"calls": 0, "cost_usd": 0.0, "tokens": 0})
+        d["calls"] += 1
+        d["cost_usd"] += cost
+        d["tokens"] += toks
+        d2 = por_proveedor.setdefault(c.proveedor or "?", {"calls": 0, "cost_usd": 0.0, "tokens": 0})
+        d2["calls"] += 1
+        d2["cost_usd"] += cost
+        d2["tokens"] += toks
+        u = c.user_email or "(sistema)"
+        d3 = por_user.setdefault(u, {"calls": 0, "cost_usd": 0.0, "tokens": 0})
+        d3["calls"] += 1
+        d3["cost_usd"] += cost
+        d3["tokens"] += toks
+        # Top calls por costo
+        todas_costos.append({
+            "id": c.id,
+            "creado_en": c.creado_en.isoformat() if c.creado_en else None,
+            "modelo": c.modelo,
+            "user": c.user_email,
+            "glosa_id": c.glosa_id,
+            "cost_usd": round(cost, 6),
+            "tokens": toks,
+            "input": c.input_tokens or 0,
+            "cache_read": c.cache_read_input_tokens or 0,
+            "output": c.output_tokens or 0,
+            "latency_ms": c.latency_ms or 0,
+        })
+    todas_costos.sort(key=lambda x: -x["cost_usd"])
+    top_calls = todas_costos[:20]
+
+    # Cost total
+    total_cost = sum((c.cost_usd or 0) for c in todas)
+    total_calls = len(todas)
+
+    # Cuanto del costo va a glosas (las que tienen glosa_id) vs sistema
+    cost_glosas = sum((c.cost_usd or 0) for c in todas if c.glosa_id)
+    cost_sistema = total_cost - cost_glosas
+    n_glosas_unicas = len({c.glosa_id for c in todas if c.glosa_id})
+
+    return {
+        "ventana_dias": dias,
+        "total_cost_usd": round(total_cost, 4),
+        "total_calls": total_calls,
+        "cost_promedio_call": round(total_cost / total_calls, 6) if total_calls else 0,
+        "cost_en_glosas": round(cost_glosas, 4),
+        "cost_en_sistema": round(cost_sistema, 4),
+        "glosas_unicas_que_consumieron": n_glosas_unicas,
+        "por_modelo": [
+            {"modelo": m, **{k: (round(v, 4) if k=="cost_usd" else v) for k,v in d.items()}}
+            for m, d in sorted(por_modelo.items(), key=lambda x: -x[1]["cost_usd"])
+        ],
+        "por_proveedor": [
+            {"proveedor": p, **{k: (round(v, 4) if k=="cost_usd" else v) for k,v in d.items()}}
+            for p, d in sorted(por_proveedor.items(), key=lambda x: -x[1]["cost_usd"])
+        ],
+        "por_user": [
+            {"user_email": u, **{k: (round(v, 4) if k=="cost_usd" else v) for k,v in d.items()}}
+            for u, d in sorted(por_user.items(), key=lambda x: -x[1]["cost_usd"])
+        ][:15],
+        "top_calls_caras": top_calls,
+        "anthropic_console_url": "https://console.anthropic.com/settings/usage",
+        "tip": "Si el costo total excede tu balance esperado, revisa top_calls_caras para identificar features problematicas. PDFs nativos en Auditor Forense son los mas caros: 30-100K tokens por PDF.",
+    }
+
+
 @router.get("/alertas-criticas")
 def alertas_criticas_consolidadas(
     db: Session = Depends(get_db),

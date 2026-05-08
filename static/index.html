@@ -3511,12 +3511,14 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <p class="page-sub">Health en vivo de todos los componentes. Útil para resolver "por qué no carga X".</p>
           </div>
           <div class="page-actions toolbar-inline">
-            <button class="btn-sm" onclick="cargarDiagnostico()">🔄 Actualizar</button>
-            <button class="btn-sm" onclick="diagRefrescarNoticias()" style="background:#fef3c7;color:#92400e;border-color:#fde68a;">📰 Refrescar noticias</button>
-            <button class="btn-sm" onclick="diagReindexarSoportes()" style="background:#dbeafe;color:#1e40af;border-color:#bfdbfe;">📁 Reindexar soportes</button>
+            <button class="btn-sm" onclick="cargarDiagnostico()">Actualizar</button>
+            <button class="btn-sm" onclick="diagRefrescarNoticias()" style="background:#fef3c7;color:#92400e;border-color:#fde68a;">Refrescar noticias</button>
+            <button class="btn-sm" onclick="diagReindexarSoportes()" style="background:#dbeafe;color:#1e40af;border-color:#bfdbfe;">Reindexar soportes</button>
+            <button class="btn-sm" onclick="cargarBillingForense()" style="background:#fef2f2;color:#991b1b;border-color:#fecaca;">Billing forense IA</button>
           </div>
         </div>
         <div id="diag-resumen" style="margin-bottom:1rem;"></div>
+        <div id="diag-billing" style="margin-bottom:1rem;"></div>
         <div id="diag-secciones"></div>
       </div>
     </div>
@@ -14076,6 +14078,71 @@ function nuevaGlosa(){
   window._glosa_id_actual = null;
   // Limpiar draft de auto-save tras nueva glosa
   if(typeof _draftClear === 'function') _draftClear('nueva');
+}
+
+// ─── BILLING FORENSE IA (donde se va el dinero de Claude) ─────────
+async function cargarBillingForense(){
+  var box = document.getElementById('diag-billing');
+  if(!box) return;
+  box.innerHTML = '<div style="color:var(--text3);padding:1rem">Analizando consumo IA de los últimos 30 días...</div>';
+  try{
+    var r = await fetch('/sistema/metricas-ia/billing-forense?dias=30', {headers:authH()});
+    if(!r.ok){
+      box.innerHTML = '<div style="color:#dc2626;padding:1rem">No se pudo cargar (status '+r.status+')</div>';
+      return;
+    }
+    var d = await r.json();
+    var totalCost = d.total_cost_usd || 0;
+    var pctGlosas = totalCost ? Math.round(100 * d.cost_en_glosas / totalCost) : 0;
+    var pctSistema = totalCost ? Math.round(100 * d.cost_en_sistema / totalCost) : 0;
+
+    var modeloRows = (d.por_modelo||[]).slice(0, 6).map(function(m){
+      var pct = totalCost ? Math.round(100 * m.cost_usd / totalCost) : 0;
+      return '<tr><td><code>'+escHtml(m.modelo)+'</code></td>'+
+        '<td style="text-align:right">'+m.calls+'</td>'+
+        '<td style="text-align:right">'+(m.tokens/1000).toFixed(1)+'K</td>'+
+        '<td style="text-align:right;font-weight:700">$'+m.cost_usd.toFixed(4)+'</td>'+
+        '<td style="text-align:right;color:var(--text3)">'+pct+'%</td></tr>';
+    }).join('');
+
+    var topRows = (d.top_calls_caras||[]).slice(0, 10).map(function(c){
+      var fecha = c.creado_en ? new Date(c.creado_en).toLocaleString('es-CO') : '—';
+      return '<tr><td>'+escHtml(fecha)+'</td>'+
+        '<td><code>'+escHtml(c.modelo||'?')+'</code></td>'+
+        '<td>'+(c.glosa_id ? '#'+c.glosa_id : '<span style="color:var(--text3)">sistema</span>')+'</td>'+
+        '<td>'+(c.user||'').split('@')[0]+'</td>'+
+        '<td style="text-align:right">'+(c.tokens/1000).toFixed(1)+'K</td>'+
+        '<td style="text-align:right;font-weight:700;color:'+(c.cost_usd>0.5?'#dc2626':c.cost_usd>0.1?'#d97706':'var(--text2)')+'">$'+c.cost_usd.toFixed(4)+'</td></tr>';
+    }).join('');
+
+    box.innerHTML = '<div class="form-card" style="border:1px solid var(--border)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem">'+
+        '<div>'+
+          '<h3 style="margin:0">Consumo IA · últimos '+d.ventana_dias+' días</h3>'+
+          '<div style="font-size:.72rem;color:var(--text3)">Total invertido: <b style="color:'+(totalCost>10?'#dc2626':totalCost>5?'#d97706':'#16a34a')+';font-size:.95rem">$'+totalCost.toFixed(4)+'</b> en '+d.total_calls+' calls (~$'+d.cost_promedio_call.toFixed(4)+'/call)</div>'+
+        '</div>'+
+        '<a href="'+d.anthropic_console_url+'" target="_blank" class="btn btn-sm btn-ghost" style="font-size:.7rem">Anthropic console →</a>'+
+      '</div>'+
+      '<div style="background:var(--bg-subtle);padding:.85rem;border-radius:8px;margin-bottom:.85rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem">'+
+        '<div><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">En glosas</div><div style="font-weight:700">$'+d.cost_en_glosas.toFixed(2)+' ('+pctGlosas+'%)</div></div>'+
+        '<div><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">En sistema</div><div style="font-weight:700">$'+d.cost_en_sistema.toFixed(2)+' ('+pctSistema+'%)</div></div>'+
+        '<div><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Glosas únicas</div><div style="font-weight:700">'+d.glosas_unicas_que_consumieron+'</div></div>'+
+        '<div><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Costo promedio</div><div style="font-weight:700">$'+(d.cost_en_glosas/Math.max(1,d.glosas_unicas_que_consumieron)).toFixed(4)+'/glosa</div></div>'+
+      '</div>'+
+      '<h4 style="margin:.5rem 0 .35rem;font-size:.85rem">Por modelo</h4>'+
+      '<table style="width:100%;font-size:.78rem;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border);text-align:left">'+
+        '<th style="padding:.3rem">Modelo</th><th style="text-align:right;padding:.3rem">Calls</th><th style="text-align:right;padding:.3rem">Tokens</th><th style="text-align:right;padding:.3rem">Costo</th><th style="text-align:right;padding:.3rem">%</th></tr></thead>'+
+        '<tbody>'+modeloRows+'</tbody></table>'+
+      '<h4 style="margin:1rem 0 .35rem;font-size:.85rem">Top 10 calls más caras</h4>'+
+      '<div style="overflow-x:auto"><table style="width:100%;font-size:.74rem;border-collapse:collapse;min-width:600px"><thead><tr style="border-bottom:1px solid var(--border);text-align:left">'+
+        '<th style="padding:.3rem">Cuándo</th><th style="padding:.3rem">Modelo</th><th style="padding:.3rem">Glosa</th><th style="padding:.3rem">User</th><th style="text-align:right;padding:.3rem">Tokens</th><th style="text-align:right;padding:.3rem">Costo</th></tr></thead>'+
+        '<tbody>'+topRows+'</tbody></table></div>'+
+      '<div style="background:rgba(220,38,38,.06);border-left:3px solid #dc2626;padding:.6rem .85rem;margin-top:.85rem;font-size:.78rem;color:var(--text2);line-height:1.55">'+
+        '<b>Tip:</b> '+escHtml(d.tip)+'</div>'+
+    '</div>';
+  }catch(e){
+    box.innerHTML = '<div style="color:#dc2626;padding:1rem">Error: '+escHtml(String(e))+'</div>';
+  }
 }
 
 // ─── VISTA KANBAN DRAG-DROP (Tier 5 #17) ─────────────────────────
