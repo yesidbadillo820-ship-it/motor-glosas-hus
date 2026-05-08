@@ -1,7 +1,7 @@
 // Service Worker para Motor Glosas HUS - cache shell + estrategia red-primero para datos.
 // ⚠ IMPORTANTE: subir la versión del cache cada vez que cambie el HTML/CSS/JS
 //   estático para que los clientes existentes reciban la nueva versión.
-const CACHE = 'hus-glosas-v4';
+const CACHE = 'hus-glosas-v5';
 const SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -21,6 +21,46 @@ self.addEventListener('activate', (e) => {
     ))
   );
   self.clients.claim();
+});
+
+// ─── PUSH NOTIFICATIONS (Tier 4 #15) ──────────────────────────────
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (_) {
+    data = { title: 'Motor Glosas HUS', body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'Motor Glosas HUS';
+  const opts = {
+    body: data.body || '',
+    icon: data.icon || '/static/icon-192.png',
+    badge: data.badge || '/static/icon-192.png',
+    tag: data.tag || 'motor-glosas',
+    data: { url: data.url || '/' },
+    requireInteraction: data.requireInteraction || false,
+  };
+  event.waitUntil(self.registration.showNotification(title, opts));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then((wins) => {
+      for (const w of wins) {
+        if (w.url.includes(url) && 'focus' in w) return w.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
+});
+
+// ─── SYNC OFFLINE (Tier 4 #18 stub) ────────────────────────────────
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'flush-drafts') {
+    // Hook futuro: empujar drafts pendientes guardados en IndexedDB
+  }
 });
 
 self.addEventListener('fetch', (e) => {

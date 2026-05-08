@@ -668,6 +668,51 @@ class PresetFiltroRecord(Base):
     )
 
 
+class ComentarioThreadRecord(Base):
+    """Comentarios threaded por seccion del dictamen.
+
+    Cada comentario asociado a un (glosa_id, seccion). seccion es un
+    label libre del frontend ("intro", "argumento", "conclusion") o
+    un anchor de un parrafo especifico ("p:5"). parent_id permite
+    respuestas anidadas estilo Linear/GitHub.
+    """
+    __tablename__ = "comentarios_thread"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    glosa_id = Column(Integer, index=True, nullable=False)
+    seccion = Column(String(50), index=True, nullable=False)
+    parent_id = Column(Integer, nullable=True, index=True)
+    autor_email = Column(String(200), nullable=False)
+    contenido = Column(Text, nullable=False)
+    resuelto = Column(Integer, default=0, nullable=False)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class WebhookRecord(Base):
+    """Webhooks salientes configurables. Cuando ocurre un evento
+    cuyo nombre coincide con `eventos` (CSV), se envia un POST al
+    `url` con el payload del evento. Util para integrar con Slack,
+    Teams, n8n, Zapier, etc.
+
+    Solo COORDINADOR/SUPER_ADMIN puede crear/borrar.
+    """
+    __tablename__ = "webhooks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nombre = Column(String(100), nullable=False)
+    url = Column(String(800), nullable=False)
+    secret = Column(String(64), nullable=True)  # HMAC firma opcional
+    eventos = Column(String(500), nullable=False)  # CSV: "DECISION_EPS,CREAR,..."
+    activo = Column(Integer, default=1, nullable=False)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    creado_por = Column(String(200))
+    ultimo_disparo = Column(DateTime(timezone=True), nullable=True)
+    ultimo_status = Column(String(20), nullable=True)
+    disparos_total = Column(Integer, default=0, nullable=False)
+    disparos_fallidos = Column(Integer, default=0, nullable=False)
+
+
 class ChatConversacionRecord(Base):
     """Conversacion del Asistente Maestro IA (chat persistente).
 

@@ -883,6 +883,8 @@ from app.api.routers.snippets import router as snippets_router
 from app.api.routers.prediccion_ia import router as prediccion_ia_router
 from app.api.routers.chat_history import router as chat_history_router
 from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
+from app.api.routers.comentarios_thread import router as comentarios_thread_router
+from app.api.routers.webhooks import router as webhooks_router
 
 app.include_router(auth_router)
 app.include_router(glosas_router)
@@ -933,6 +935,8 @@ app.include_router(snippets_router)
 app.include_router(prediccion_ia_router)
 app.include_router(chat_history_router)
 app.include_router(dictamen_pdf_router)
+app.include_router(comentarios_thread_router)
+app.include_router(webhooks_router)
 from app.api.routers.cups import router as cups_router
 app.include_router(cups_router)
 from app.api.routers.pwa import router as pwa_router

@@ -84,6 +84,64 @@ def unsubscribe(
     return {"message": "Desuscrito"}
 
 
+@router.post("/enviar")
+def enviar_push(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Envia un push a todas las suscripciones del usuario actual.
+
+    Payload: {
+        "title": str,
+        "body": str,
+        "url": str (opcional, ruta a abrir al hacer click),
+        "tag": str (opcional, agrupa notificaciones)
+    }
+
+    Usa pywebpush + VAPID. Si VAPID_PRIVATE_KEY no esta configurado,
+    devuelve 503 con mensaje claro.
+    """
+    import os
+    import json as _json
+    private_key = os.getenv("VAPID_PRIVATE_KEY", "").strip()
+    public_key = os.getenv("VAPID_PUBLIC_KEY", "").strip()
+    vapid_claims_email = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:notificaciones@hus.gov.co")
+    if not private_key or not public_key:
+        raise HTTPException(503, "VAPID_PRIVATE_KEY/PUBLIC_KEY no configurados")
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        raise HTTPException(503, "pywebpush no instalado en el motor")
+    subs = db.query(PushSubscriptionRecord).filter(
+        PushSubscriptionRecord.usuario_email == current_user.email
+    ).all()
+    if not subs:
+        return {"ok": True, "enviadas": 0, "msg": "Sin suscripciones"}
+    enviadas = 0
+    fallidas = 0
+    for s in subs:
+        try:
+            sub_info = {
+                "endpoint": s.endpoint,
+                "keys": {"p256dh": s.p256dh, "auth": s.auth},
+            }
+            webpush(
+                subscription_info=sub_info,
+                data=_json.dumps(payload),
+                vapid_private_key=private_key,
+                vapid_claims={"sub": vapid_claims_email},
+            )
+            enviadas += 1
+        except Exception as e:
+            fallidas += 1
+            # Si la suscripcion expiro, borrarla
+            if "410" in str(e) or "404" in str(e):
+                db.delete(s)
+    db.commit()
+    return {"ok": True, "enviadas": enviadas, "fallidas": fallidas}
+
+
 @router.get("/mis-suscripciones")
 def mis_suscripciones(
     db: Session = Depends(get_db),

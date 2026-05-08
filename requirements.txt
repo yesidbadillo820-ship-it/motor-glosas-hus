@@ -27,4 +27,5 @@ qrcode[pil]==8.2
 cryptography>=42.0.0
 sentry-sdk[fastapi]==2.19.2
 feedparser==6.0.11
+pywebpush==2.0.0
 
