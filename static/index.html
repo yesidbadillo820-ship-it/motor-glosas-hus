@@ -2291,6 +2291,13 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <!-- Presets de filtros guardados -->
         <div id="mis-presets" style="display:flex;gap:.4rem;margin-bottom:.85rem;flex-wrap:wrap;align-items:center"></div>
 
+        <!-- Toggle vista lista/kanban (Tier 5 #17) -->
+        <div style="display:flex;gap:.4rem;margin-bottom:.85rem;align-items:center">
+          <span style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Vista:</span>
+          <button id="mis-vista-lista" class="btn btn-sm" onclick="cambiarVistaMis('lista')" style="background:var(--c-teal2);color:#fff;border:0;font-size:.75rem">Lista</button>
+          <button id="mis-vista-kanban" class="btn btn-sm btn-ghost" onclick="cambiarVistaMis('kanban')" style="font-size:.75rem">Kanban</button>
+        </div>
+
         <div class="stat-grid" id="mis-stats">
           <div class="stat-card accent-verde"><div class="n" id="mis-v">0</div><div class="l">Óptimo · &gt;10 días</div></div>
           <div class="stat-card accent-amarillo"><div class="n" id="mis-a">0</div><div class="l">Atención · 5-10 días</div></div>
@@ -2352,6 +2359,36 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <tr class="empty-row"><td colspan="13">Cargando...</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Vista Kanban (Tier 5 #17) -->
+        <div id="mis-kanban" style="display:none;overflow-x:auto">
+          <div style="display:flex;gap:.85rem;min-width:fit-content;padding:.5rem 0">
+            <div class="kanban-col" data-estado="RADICADA" style="min-width:280px;flex:1;background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;padding:.7rem;display:flex;flex-direction:column">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;font-size:.78rem;font-weight:700;color:var(--text2)">
+                <span>Radicadas</span><span class="kanban-count" style="background:var(--bg-card);padding:1px 8px;border-radius:8px;font-size:.7rem;color:var(--text3)">0</span>
+              </div>
+              <div class="kanban-cards" style="display:flex;flex-direction:column;gap:.4rem;min-height:120px"></div>
+            </div>
+            <div class="kanban-col" data-estado="EN_REVISION" style="min-width:280px;flex:1;background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;padding:.7rem;display:flex;flex-direction:column">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;font-size:.78rem;font-weight:700;color:var(--text2)">
+                <span>En revisión</span><span class="kanban-count" style="background:var(--bg-card);padding:1px 8px;border-radius:8px;font-size:.7rem;color:var(--text3)">0</span>
+              </div>
+              <div class="kanban-cards" style="display:flex;flex-direction:column;gap:.4rem;min-height:120px"></div>
+            </div>
+            <div class="kanban-col" data-estado="RESPONDIDA" style="min-width:280px;flex:1;background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;padding:.7rem;display:flex;flex-direction:column">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;font-size:.78rem;font-weight:700;color:var(--text2)">
+                <span>Respondidas</span><span class="kanban-count" style="background:var(--bg-card);padding:1px 8px;border-radius:8px;font-size:.7rem;color:var(--text3)">0</span>
+              </div>
+              <div class="kanban-cards" style="display:flex;flex-direction:column;gap:.4rem;min-height:120px"></div>
+            </div>
+            <div class="kanban-col" data-estado="CONCILIADA" style="min-width:280px;flex:1;background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;padding:.7rem;display:flex;flex-direction:column">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;font-size:.78rem;font-weight:700;color:var(--text2)">
+                <span>Conciliadas / Levantadas</span><span class="kanban-count" style="background:var(--bg-card);padding:1px 8px;border-radius:8px;font-size:.7rem;color:var(--text3)">0</span>
+              </div>
+              <div class="kanban-cards" style="display:flex;flex-direction:column;gap:.4rem;min-height:120px"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -14041,6 +14078,137 @@ function nuevaGlosa(){
   if(typeof _draftClear === 'function') _draftClear('nueva');
 }
 
+// ─── VISTA KANBAN DRAG-DROP (Tier 5 #17) ─────────────────────────
+window._misVista = window._misVista || 'lista';
+function cambiarVistaMis(vista){
+  window._misVista = vista;
+  var bL = document.getElementById('mis-vista-lista');
+  var bK = document.getElementById('mis-vista-kanban');
+  var lista = document.querySelector('#p-mis-glosas table');
+  var kanban = document.getElementById('mis-kanban');
+  if(vista === 'kanban'){
+    if(lista) lista.parentNode.style.display = 'none';
+    if(kanban) kanban.style.display = 'block';
+    if(bK){ bK.style.background = 'var(--c-teal2)'; bK.style.color = '#fff'; bK.classList.remove('btn-ghost'); }
+    if(bL){ bL.style.background = ''; bL.style.color = ''; bL.classList.add('btn-ghost'); }
+    _renderKanbanFromData();
+  } else {
+    if(lista) lista.parentNode.style.display = '';
+    if(kanban) kanban.style.display = 'none';
+    if(bL){ bL.style.background = 'var(--c-teal2)'; bL.style.color = '#fff'; bL.classList.remove('btn-ghost'); }
+    if(bK){ bK.style.background = ''; bK.style.color = ''; bK.classList.add('btn-ghost'); }
+  }
+}
+function _renderKanbanFromData(){
+  var data = window._mis_data_raw || [];
+  // Mapear estados a columnas
+  function _bucket(g){
+    var e = (g.estado || '').toUpperCase();
+    var wf = (g.workflow_state || '').toUpperCase();
+    if(['CONCILIADA','LEVANTADA','RATIFICADA','ACEPTADA'].indexOf(e) >= 0) return 'CONCILIADA';
+    if(['CONCILIADA','LEVANTADA'].indexOf(wf) >= 0) return 'CONCILIADA';
+    if(e === 'RESPONDIDA' || wf === 'RESPONDIDA') return 'RESPONDIDA';
+    if(e === 'EN_REVISION' || wf === 'EN_REVISION') return 'EN_REVISION';
+    return 'RADICADA';
+  }
+  var cols = {RADICADA:[], EN_REVISION:[], RESPONDIDA:[], CONCILIADA:[]};
+  data.forEach(function(g){
+    var b = _bucket(g);
+    if(cols[b]) cols[b].push(g);
+  });
+  document.querySelectorAll('.kanban-col').forEach(function(col){
+    var estado = col.dataset.estado;
+    var lista = cols[estado] || [];
+    var cardsBox = col.querySelector('.kanban-cards');
+    var count = col.querySelector('.kanban-count');
+    if(count) count.textContent = lista.length;
+    if(!cardsBox) return;
+    cardsBox.innerHTML = lista.slice(0, 50).map(function(g){
+      var dias = g.dias_restantes !== undefined && g.dias_restantes !== null ? g.dias_restantes : '—';
+      var diasColor = (typeof dias === 'number' && dias < 0) ? '#dc2626' :
+                      (typeof dias === 'number' && dias <= 5) ? '#d97706' :
+                      'var(--text3)';
+      return '<div class="kanban-card" draggable="true" data-id="'+g.id+'" data-estado="'+estado+'" '+
+        'style="background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:.55rem .7rem;cursor:grab;transition:box-shadow .15s,transform .12s">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:var(--text3);margin-bottom:.2rem">'+
+          '<b style="color:var(--text2)">'+escHtml(g.factura||'#'+g.id)+'</b>'+
+          '<span style="color:'+diasColor+';font-weight:600">'+(typeof dias === 'number' ? dias+'d' : '—')+'</span>'+
+        '</div>'+
+        '<div style="font-size:.78rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.eps||g.entidad||'—')+'</div>'+
+        '<div style="font-size:.7rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.codigo_glosa||'—')+' · '+cop(g.valor_objetado||0)+'</div>'+
+      '</div>';
+    }).join('');
+    if(lista.length > 50){
+      cardsBox.innerHTML += '<div style="text-align:center;font-size:.7rem;color:var(--text3);padding:.4rem">+'+(lista.length-50)+' más</div>';
+    }
+  });
+  _bindKanbanDragDrop();
+}
+function _bindKanbanDragDrop(){
+  document.querySelectorAll('.kanban-card').forEach(function(card){
+    card.ondragstart = function(ev){
+      ev.dataTransfer.setData('text/plain', card.dataset.id);
+      ev.dataTransfer.setData('text/estado-anterior', card.dataset.estado);
+      card.style.opacity = '.5';
+    };
+    card.ondragend = function(){ card.style.opacity = '1'; };
+    card.onclick = function(){
+      var gid = parseInt(card.dataset.id, 10);
+      if(typeof responderGlosa === 'function') responderGlosa(gid);
+    };
+  });
+  document.querySelectorAll('.kanban-col').forEach(function(col){
+    col.ondragover = function(ev){
+      ev.preventDefault();
+      col.style.background = 'rgba(2,132,199,.06)';
+      col.style.borderColor = 'var(--c-teal2)';
+    };
+    col.ondragleave = function(){
+      col.style.background = '';
+      col.style.borderColor = '';
+    };
+    col.ondrop = async function(ev){
+      ev.preventDefault();
+      col.style.background = '';
+      col.style.borderColor = '';
+      var gid = parseInt(ev.dataTransfer.getData('text/plain'), 10);
+      var estadoAnterior = ev.dataTransfer.getData('text/estado-anterior');
+      var estadoNuevo = col.dataset.estado;
+      if(!gid || estadoAnterior === estadoNuevo) return;
+      // Workflow transitions soportadas via /glosas/{id}/workflow
+      var wf = estadoNuevo === 'EN_REVISION' ? 'EN_REVISION' :
+               estadoNuevo === 'RESPONDIDA' ? 'RESPONDIDA' :
+               estadoNuevo === 'CONCILIADA' ? 'CONCILIADA' : 'RADICADA';
+      try{
+        var r = await fetch('/glosas/'+gid+'/workflow', {
+          method:'POST', headers:{'Content-Type':'application/json',...authH()},
+          body: JSON.stringify({estado_nuevo: wf, nota: 'Drag desde Kanban'}),
+        });
+        if(r.ok){
+          toast('Movido', 'Glosa #'+gid+' → '+estadoNuevo, 'success');
+          // Refrescar
+          if(typeof loadMisGlosas === 'function') loadMisGlosas();
+        } else {
+          toast('Error', 'No se pudo cambiar el estado', 'error');
+        }
+      }catch(e){ toast('Error', String(e), 'error'); }
+    };
+  });
+}
+// Hook al final de loadMisGlosas para re-render kanban si esta activo
+(function _hookKanban(){
+  var orig = window.loadMisGlosas;
+  if(typeof orig !== 'function'){
+    setTimeout(_hookKanban, 1500);
+    return;
+  }
+  window.loadMisGlosas = async function(){
+    var ret = await orig.apply(this, arguments);
+    if(window._misVista === 'kanban') setTimeout(_renderKanbanFromData, 100);
+    return ret;
+  };
+})();
+
 // ─── PUSH NOTIFICATIONS REALES (Tier 4 #15) ────────────────────────
 function _urlBase64ToUint8Array(b64){
   var pad = '='.repeat((4 - b64.length % 4) % 4);
@@ -17532,6 +17700,23 @@ window.addEventListener('DOMContentLoaded',function(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/sw.js').catch(function(){});
   }
+  // Online/offline indicator (Tier 5 #18)
+  function _renderOfflineBanner(){
+    var ex = document.getElementById('offline-banner');
+    if(navigator.onLine){
+      if(ex) ex.remove();
+      return;
+    }
+    if(ex) return;
+    var b = document.createElement('div');
+    b.id = 'offline-banner';
+    b.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-size:.75rem;font-weight:600;padding:6px 16px;border-radius:0 0 8px 8px;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,.2);letter-spacing:.3px';
+    b.textContent = '○ Sin conexión — los cambios se guardarán localmente y se sincronizarán al volver';
+    document.body.appendChild(b);
+  }
+  window.addEventListener('online', _renderOfflineBanner);
+  window.addEventListener('offline', _renderOfflineBanner);
+  _renderOfflineBanner();
 });
 
 // PWA install prompt
