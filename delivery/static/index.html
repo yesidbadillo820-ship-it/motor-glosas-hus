@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Panel Domicilios — Operaciones</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; }
+  .badge { padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .b-PENDIENTE { background:#fef3c7; color:#92400e; }
+  .b-ASIGNADO  { background:#dbeafe; color:#1e40af; }
+  .b-EN_RUTA   { background:#e0e7ff; color:#4338ca; }
+  .b-ENTREGADO { background:#dcfce7; color:#166534; }
+  .b-CANCELADO { background:#fee2e2; color:#991b1b; }
+  .nav-btn.active { background:#1e3a8a; color:#fff; }
+  .modal-bg { background: rgba(15,23,42,0.55); }
+</style>
+</head>
+<body class="min-h-screen">
+  <header class="bg-slate-900 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🛵</span>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">Panel de Domicilios</h1>
+          <p class="text-xs text-slate-300">Centro de operaciones</p>
+        </div>
+      </div>
+      <nav class="flex gap-1 flex-wrap">
+        <button data-view="dashboard"   class="nav-btn px-3 py-1.5 rounded-lg text-sm hover:bg-slate-800">📊 Dashboard</button>
+        <button data-view="pedidos"     class="nav-btn px-3 py-1.5 rounded-lg text-sm hover:bg-slate-800">📦 Pedidos</button>
+        <button data-view="repartidores" class="nav-btn px-3 py-1.5 rounded-lg text-sm hover:bg-slate-800">🛵 Repartidores</button>
+        <button data-view="clientes"    class="nav-btn px-3 py-1.5 rounded-lg text-sm hover:bg-slate-800">👤 Clientes</button>
+        <button data-view="comercios"   class="nav-btn px-3 py-1.5 rounded-lg text-sm hover:bg-slate-800">🏪 Comercios</button>
+        <button data-view="zonas"       class="nav-btn px-3 py-1.5 rounded-lg text-sm hover:bg-slate-800">📍 Zonas</button>
+      </nav>
+      <div class="flex items-center gap-3">
+        <span id="userBadge" class="text-sm text-slate-200"></span>
+        <button id="logoutBtn" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg">Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <section id="view-dashboard" class="view"></section>
+    <section id="view-pedidos" class="view hidden"></section>
+    <section id="view-repartidores" class="view hidden"></section>
+    <section id="view-clientes" class="view hidden"></section>
+    <section id="view-comercios" class="view hidden"></section>
+    <section id="view-zonas" class="view hidden"></section>
+  </main>
+
+  <div id="modal" class="fixed inset-0 modal-bg hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b px-5 py-3">
+        <h3 id="modalTitle" class="font-bold text-lg text-slate-800"></h3>
+        <button onclick="closeModal()" class="text-slate-500 hover:text-slate-800 text-2xl leading-none">&times;</button>
+      </div>
+      <div id="modalBody" class="p-5"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 right-6 hidden bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg z-50"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
