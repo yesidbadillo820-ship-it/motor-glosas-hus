@@ -45,6 +45,8 @@ async def simular(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        gemini_api_key=cfg.gemini_api_key,
+        gemini_model=cfg.gemini_model,
     )
     if not service.groq and not service.anthropic_key:
         raise HTTPException(503, "IA no configurada para simular")

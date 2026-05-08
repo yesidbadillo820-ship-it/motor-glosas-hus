@@ -249,6 +249,51 @@ def diagnostico_completo(
             },
         }
 
+    # ─── Gemini API key + ping (tercer proveedor, free tier) ────────
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        out["secciones"]["gemini"] = {
+            "estado": "warning",
+            "mensaje": "GEMINI_API_KEY no configurada — agrega clave en aistudio.google.com/apikey (15 RPM gratis)",
+            "data": {},
+        }
+    else:
+        gemini_modelo = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+        ping_msg = f"API key configurada (prefijo {gemini_key[:10]}…)"
+        ping_estado = "ok"
+        try:
+            import httpx as _httpx_g
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent?key={gemini_key}"
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
+                "generationConfig": {"maxOutputTokens": 4, "temperature": 0},
+            }
+            with _httpx_g.Client(timeout=10.0) as client:
+                rg = client.post(url, json=payload)
+            if rg.status_code == 200:
+                ping_msg = f"API key OK · ping {gemini_modelo} exitoso · {gemini_key[:10]}…"
+            elif rg.status_code in (400, 401, 403):
+                ping_estado = "error"
+                ping_msg = f"API key INVALIDA o sin permisos (HTTP {rg.status_code})"
+            elif rg.status_code == 429:
+                ping_estado = "warning"
+                ping_msg = f"Rate limit del tier gratis hit (HTTP 429). Esperar 60s o usar Anthropic/Groq."
+            else:
+                ping_estado = "warning"
+                ping_msg = f"Ping HTTP {rg.status_code}: {rg.text[:120]}"
+        except Exception as _eg:
+            ping_estado = "warning"
+            ping_msg = f"No se pudo hacer ping: {str(_eg)[:120]}"
+        out["secciones"]["gemini"] = {
+            "estado": ping_estado,
+            "mensaje": ping_msg,
+            "data": {
+                "modelo": gemini_modelo,
+                "key_prefix": gemini_key[:10],
+                "free_tier_info": "15 RPM / 1500 RPD para Flash · 2 RPM / 50 RPD para Pro",
+            },
+        }
+
     # ─── Lotes de importación recientes (últimos 7 días) ──────────
     try:
         umbral_lote = datetime.now(timezone.utc) - timedelta(days=7)

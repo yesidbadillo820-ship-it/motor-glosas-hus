@@ -75,6 +75,8 @@ async def buscar(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        gemini_api_key=cfg.gemini_api_key,
+        gemini_model=cfg.gemini_model,
     )
 
     # Si no hay IA disponible, devolver la preselección por relevancia básica

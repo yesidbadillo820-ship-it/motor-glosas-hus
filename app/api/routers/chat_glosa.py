@@ -170,6 +170,10 @@ async def enviar_mensaje(
                 groq_api_key=cfg.groq_api_key,
                 anthropic_api_key=cfg.anthropic_api_key,
                 primary_ai=cfg.primary_ai,
+                anthropic_model=cfg.anthropic_model,
+                groq_model=cfg.groq_model,
+                gemini_api_key=cfg.gemini_api_key,
+                gemini_model=cfg.gemini_model,
             )
             nuevo = await svc.refinar_dictamen(
                 dictamen_actual_html=glosa.dictamen or "",

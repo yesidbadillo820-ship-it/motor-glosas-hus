@@ -3515,9 +3515,11 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <button class="btn-sm" onclick="diagRefrescarNoticias()" style="background:#fef3c7;color:#92400e;border-color:#fde68a;">Refrescar noticias</button>
             <button class="btn-sm" onclick="diagReindexarSoportes()" style="background:#dbeafe;color:#1e40af;border-color:#bfdbfe;">Reindexar soportes</button>
             <button class="btn-sm" onclick="cargarBillingForense()" style="background:#fef2f2;color:#991b1b;border-color:#fecaca;">Billing forense IA</button>
+            <button class="btn-sm" onclick="cargarIAStatus()" style="background:#f0fdf4;color:#15803d;border-color:#bbf7d0;">Estado de IAs</button>
           </div>
         </div>
         <div id="diag-resumen" style="margin-bottom:1rem;"></div>
+        <div id="diag-ia-status" style="margin-bottom:1rem;"></div>
         <div id="diag-billing" style="margin-bottom:1rem;"></div>
         <div id="diag-secciones"></div>
       </div>
@@ -14078,6 +14080,102 @@ function nuevaGlosa(){
   window._glosa_id_actual = null;
   // Limpiar draft de auto-save tras nueva glosa
   if(typeof _draftClear === 'function') _draftClear('nueva');
+}
+
+// ─── IA STATUS: 3 proveedores + roles + health-check ─────────────
+async function cargarIAStatus(){
+  var box = document.getElementById('diag-ia-status');
+  if(!box) return;
+  box.innerHTML = '<div style="color:var(--text3);padding:1rem">Cargando estado de proveedores IA...</div>';
+  try{
+    var rP = await fetch('/ia-status/proveedores', {headers:authH()});
+    var dP = await rP.json();
+    var primary = dP.primary_ai;
+    var chain = dP.fallback_chain || [];
+
+    // Tiles por proveedor
+    var tilesHtml = (dP.proveedores||[]).map(function(p){
+      var orden = chain.indexOf(p.clave);
+      var ordenLabel = orden === 0 ? 'PRIMARIO' : orden > 0 ? 'fallback #'+orden : 'sin uso';
+      var badgeColor = !p.api_key_configurada ? '#94a3b8' :
+                       orden === 0 ? '#15803d' :
+                       orden === 1 ? '#0369a1' : '#64748b';
+      var bgColor = !p.api_key_configurada ? 'var(--bg-subtle)' :
+                    orden === 0 ? 'rgba(22,163,74,.06)' :
+                    'var(--bg-card)';
+      var tipoLabel = p.tipo === 'premium' ? 'Pago' : p.tipo === 'free-tier' ? 'Free' : 'Free·rapido';
+      return '<div style="background:'+bgColor+';border:1px solid var(--border);border-left:3px solid '+badgeColor+';border-radius:8px;padding:.85rem 1rem">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem">'+
+          '<div>'+
+            '<div style="font-weight:700;font-size:.92rem">'+escHtml(p.nombre)+'</div>'+
+            '<div style="font-size:.7rem;color:var(--text3)">'+escHtml(p.fortaleza)+'</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center">'+
+            '<span style="background:'+badgeColor+';color:#fff;font-size:.62rem;padding:2px 8px;border-radius:8px;font-weight:700;letter-spacing:.4px;text-transform:uppercase">'+ordenLabel+'</span>'+
+            '<span style="background:var(--bg-subtle);color:var(--text2);font-size:.62rem;padding:2px 8px;border-radius:8px;font-weight:600">'+tipoLabel+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div style="font-size:.74rem;color:var(--text2);margin-bottom:.3rem"><b>Rol:</b> '+escHtml(p.rol)+'</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.4rem;font-size:.7rem;color:var(--text3);margin-top:.4rem">'+
+          '<div><b>API key:</b> '+(p.api_key_configurada ? '<code>'+escHtml(p.api_key_prefix)+'…</code>' : '<span style="color:#dc2626">no configurada</span>')+'</div>'+
+          '<div><b>Modelo:</b> <code>'+escHtml(p.modelo_actual||'?')+'</code></div>'+
+          '<div style="grid-column:1/-1"><b>Rate limit:</b> '+escHtml(p.rate_limit)+'</div>'+
+        '</div>'+
+        '<div style="margin-top:.5rem;text-align:right">'+
+          '<a href="'+p.console_url+'" target="_blank" style="font-size:.7rem;color:var(--c-teal2);text-decoration:none">Console del proveedor →</a>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+
+    box.innerHTML = '<div class="form-card" style="border:1px solid var(--border)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem">'+
+        '<div>'+
+          '<h3 style="margin:0">3 proveedores IA · roles funcionales</h3>'+
+          '<div style="font-size:.72rem;color:var(--text3)">Cadena de fallback actual: <code>'+escHtml(chain.join(' → '))+'</code></div>'+
+        '</div>'+
+        '<button class="btn btn-ghost" onclick="iaHealthCheck()" style="font-size:.74rem">Ping en vivo a los 3</button>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.7rem">'+tilesHtml+'</div>'+
+      '<div id="diag-ia-pings" style="margin-top:.85rem"></div>'+
+    '</div>';
+  }catch(e){
+    box.innerHTML = '<div style="color:#dc2626;padding:1rem">Error cargando IA status: '+escHtml(String(e))+'</div>';
+  }
+}
+
+async function iaHealthCheck(){
+  var box = document.getElementById('diag-ia-pings');
+  if(!box) return;
+  box.innerHTML = '<div style="background:var(--bg-subtle);padding:.7rem .9rem;border-radius:6px;font-size:.78rem">Pingeando los 3 proveedores...</div>';
+  try{
+    var r = await fetch('/ia-status/health-check', {headers:authH()});
+    if(!r.ok){
+      box.innerHTML = '<div style="color:#dc2626">Error: HTTP '+r.status+'</div>';
+      return;
+    }
+    var d = await r.json();
+    var p = d.proveedores || {};
+    var nombres = {anthropic:'Anthropic', gemini:'Gemini', groq:'Groq'};
+    var rows = ['anthropic','gemini','groq'].map(function(k){
+      var x = p[k] || {};
+      var color = x.ok ? '#15803d' : (x.error ? '#dc2626' : '#d97706');
+      var icon = x.ok ? '●' : '○';
+      var msg = x.ok ?
+        '<span style="color:#15803d">OK</span> · '+escHtml(x.modelo||'?')+(x.latency_ms ? ' · '+x.latency_ms+'ms' : '') :
+        '<span style="color:#dc2626">'+escHtml(x.error||'sin respuesta')+'</span>';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .85rem;background:var(--bg-card);border-left:3px solid '+color+';border-radius:6px;margin-bottom:.3rem">'+
+        '<div style="display:flex;align-items:center;gap:.5rem"><span style="color:'+color+';font-size:.9rem">'+icon+'</span><b>'+nombres[k]+'</b></div>'+
+        '<div style="font-size:.78rem">'+msg+'</div>'+
+      '</div>';
+    }).join('');
+    var headerColor = d.todos_ok ? '#15803d' : (d.alguno_ok ? '#d97706' : '#dc2626');
+    var headerText = d.todos_ok ? '✓ Los 3 proveedores responden' :
+                     d.alguno_ok ? '⚠ Algunos fallan, pero hay fallback' :
+                     '✕ Ningún proveedor responde';
+    box.innerHTML = '<div style="font-weight:700;color:'+headerColor+';font-size:.85rem;margin-bottom:.4rem">'+headerText+'</div>'+rows;
+  }catch(e){
+    box.innerHTML = '<div style="color:#dc2626">Error: '+escHtml(String(e))+'</div>';
+  }
 }
 
 // ─── BILLING FORENSE IA (donde se va el dinero de Claude) ─────────

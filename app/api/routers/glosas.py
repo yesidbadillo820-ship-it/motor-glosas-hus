@@ -1134,6 +1134,8 @@ async def generar_lote(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        gemini_api_key=cfg.gemini_api_key,
+        gemini_model=cfg.gemini_model,
     )
 
     sem = asyncio.Semaphore(5)
@@ -1317,6 +1319,8 @@ async def refinar_dictamen_endpoint(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        gemini_api_key=cfg.gemini_api_key,
+        gemini_model=cfg.gemini_model,
     )
     nuevo_argumento = await service.refinar_dictamen(
         dictamen_actual_html=glosa.dictamen,
@@ -1418,6 +1422,8 @@ async def validar_pre_radicacion(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        gemini_api_key=cfg.gemini_api_key,
+        gemini_model=cfg.gemini_model,
     )
 
     # Calcular días hábiles si hay fechas
@@ -3947,6 +3953,8 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             primary_ai=cfg.primary_ai,
             anthropic_model=cfg.anthropic_model,
             groq_model=cfg.groq_model,
+            gemini_api_key=cfg.gemini_api_key,
+            gemini_model=cfg.gemini_model,
         )
 
         from app.models.schemas import GlosaInput
@@ -4952,6 +4960,8 @@ async def reanalizar_glosa(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        gemini_api_key=cfg.gemini_api_key,
+        gemini_model=cfg.gemini_model,
     )
 
     contrato_repo = ContratoRepository(db)

@@ -878,6 +878,8 @@ class GlosaService:
         primary_ai: str = "groq",
         anthropic_model: str = "claude-sonnet-4-6",
         groq_model: str = "llama-3.3-70b-versatile",
+        gemini_api_key: str = None,
+        gemini_model: str = "gemini-2.0-flash-exp",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
@@ -885,6 +887,11 @@ class GlosaService:
         self.primary_ai = (primary_ai or "groq").lower()
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
         self.groq_model = groq_model or "llama-3.3-70b-versatile"
+        # Tercer proveedor: Google Gemini (tier gratis generoso)
+        from app.services.gemini_service import GeminiService
+        gem_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
+        self.gemini = GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
+        self.gemini_model = gemini_model
 
     async def analizar(
         self,
@@ -2808,6 +2815,21 @@ class GlosaService:
         out = out.upper()
         return _expandir_abreviaturas_tipo(out)
 
+    async def _llamar_gemini_con_retry(self, system: str, user: str, max_intentos: int = 3) -> tuple[str, str]:
+        """Llama a Gemini con retry. Tier free 15 RPM en Flash 2.0,
+        2 RPM en Pro 1.5. El service maneja retry interno con
+        exponential backoff cuando hits 429/503/504."""
+        if not self.gemini:
+            raise RuntimeError("Gemini no configurado (GEMINI_API_KEY)")
+        return await self.gemini.completar_con_retry(
+            system=system,
+            user=user,
+            modelo=self.gemini_model,
+            temperature=0.2,
+            max_tokens=3000,
+            max_intentos=max_intentos,
+        )
+
     async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 4) -> tuple[str, str]:
         """Llama a Groq con retry exponencial para manejar rate limits y timeouts."""
         ultimo_error: Exception = Exception("Groq: sin intentos")
@@ -3233,32 +3255,39 @@ class GlosaService:
 
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
-        if not self.groq and not self.anthropic_key:
+        if not self.groq and not self.anthropic_key and not self.gemini:
             return "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>", "error"
 
-        # Orden de intento según configuración. Si hay modelo_override
-        # (HAIKU/SONNET/OPUS por routing dinámico), preferimos Anthropic
-        # con ese modelo pero CAEMOS A GROQ si Anthropic falla (e.g.
-        # 400 credit_balance_too_low, 529 overloaded, timeout). Groq
-        # usa su propio modelo default — el override solo aplica a
-        # Anthropic, no se traspasa a Groq.
+        # Orden de intento segun configuracion. Estrategia 3-tier:
+        # primary -> Gemini (free, alta calidad) -> Groq (rapido).
+        # Asi cuando Anthropic se queda sin creditos, Gemini toma el
+        # relevo (free, sin gastar plata), y solo si Gemini tambien
+        # falla cae a Groq como ultimo respaldo.
         if modelo_override and self.anthropic_key:
             intentos = [("anthropic", self._llamar_anthropic)]
+            if self.gemini:
+                intentos.append(("gemini", self._llamar_gemini_con_retry))
             if self.groq:
-                # FALLBACK CRITICO: si la cuenta Anthropic se queda sin
-                # creditos (caso real reportado por Yesid mayo 2026:
-                # "ANTHROPIC DEVOLVIO SIN content STATUS=400"), Groq
-                # toma el relevo y el motor sigue produciendo dictamenes
-                # en lugar de fallar con un error visible al usuario.
                 intentos.append(("groq", self._llamar_groq_con_retry))
         elif self.primary_ai == "anthropic" and self.anthropic_key:
             intentos = [("anthropic", self._llamar_anthropic)]
+            if self.gemini:
+                intentos.append(("gemini", self._llamar_gemini_con_retry))
+            if self.groq:
+                intentos.append(("groq", self._llamar_groq_con_retry))
+        elif self.primary_ai == "gemini" and self.gemini:
+            intentos = [("gemini", self._llamar_gemini_con_retry)]
+            if self.anthropic_key:
+                intentos.append(("anthropic", self._llamar_anthropic))
             if self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
         else:
+            # primary_ai == "groq" (default historico) o cualquier otro
             intentos = []
             if self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
+            if self.gemini:
+                intentos.append(("gemini", self._llamar_gemini_con_retry))
             if self.anthropic_key:
                 intentos.append(("anthropic", self._llamar_anthropic))
 
