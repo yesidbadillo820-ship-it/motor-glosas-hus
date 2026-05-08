@@ -1662,6 +1662,7 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
       <div class="status-pill" title="Estado del backend (verde) + indicador live (parpadea cuando llega evento)"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span><div id="hdr-live-dot" style="width:6px;height:6px;border-radius:50%;background:#94a3b8;margin-left:6px;transition:all .3s ease" title="Live channel"></div></div>
       <span class="hdr-user" id="hdr-user"></span>
       <button class="hdr-btn" id="btn-install-pwa" onclick="instalarPWA()" title="Instalar app" style="display:none"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+      <button class="hdr-btn" onclick="toggleFocusMode()" title="Modo focus (Esc para salir)" aria-label="Modo focus"><svg class="i i-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg></button>
       <button class="hdr-btn" onclick="toggleDark()" title="Modo oscuro" aria-label="Cambiar modo"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <button class="hdr-btn" onclick="logout()" title="Cerrar sesión" style="font-size:11px;font-weight:600">Salir</button>
     </div>
@@ -2103,8 +2104,30 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
 
         <div id="md-alertas"></div>
 
-        <!-- 🤖 Asistente Proactivo (R368): la IA dice qué hacer HOY -->
+        <!-- Asistente Proactivo (R368): la IA dice qué hacer HOY -->
         <div id="md-asistente" style="margin-bottom:1rem"></div>
+
+        <!-- Heatmap actividad estilo GitHub (Tier 3 #6) -->
+        <div class="form-card" style="margin-bottom:1rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;flex-wrap:wrap;gap:.5rem">
+            <div>
+              <h3 style="margin:0;font-size:.95rem">Actividad del último año</h3>
+              <p style="margin:.15rem 0 0;font-size:.72rem;color:var(--text3)" id="md-heatmap-summary">—</p>
+            </div>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <span style="font-size:.65rem;color:var(--text3)">Menos</span>
+              <span style="display:flex;gap:2px">
+                <span style="width:11px;height:11px;background:var(--bg-subtle);border-radius:2px;border:1px solid var(--border)"></span>
+                <span style="width:11px;height:11px;background:rgba(2,132,199,.18);border-radius:2px"></span>
+                <span style="width:11px;height:11px;background:rgba(2,132,199,.42);border-radius:2px"></span>
+                <span style="width:11px;height:11px;background:rgba(2,132,199,.65);border-radius:2px"></span>
+                <span style="width:11px;height:11px;background:rgba(2,132,199,.92);border-radius:2px"></span>
+              </span>
+              <span style="font-size:.65rem;color:var(--text3)">Más</span>
+            </div>
+          </div>
+          <div id="md-heatmap" style="overflow-x:auto;padding:.3rem 0"></div>
+        </div>
 
         <div class="md-kpis" id="md-kpis">
           <div class="md-kpi"><div class="md-lbl">Mis glosas</div><div class="md-num" id="mk-total">—</div></div>
@@ -14005,6 +14028,320 @@ function nuevaGlosa(){
   // Limpiar draft de auto-save tras nueva glosa
   if(typeof _draftClear === 'function') _draftClear('nueva');
 }
+
+// ─── HEATMAP DE ACTIVIDAD GITHUB-STYLE (Tier 3 #6) ─────────────────
+async function cargarHeatmapActividad(){
+  var box = document.getElementById('md-heatmap');
+  var summary = document.getElementById('md-heatmap-summary');
+  if(!box) return;
+  try{
+    var r = await fetch('/usuarios/yo/heatmap?dias=365', {headers:authH()});
+    if(!r.ok) return;
+    var d = await r.json();
+    var dias = d.dias || [];
+    if(!dias.length){ box.innerHTML = '<div style="color:var(--text3);font-size:.78rem">Sin datos</div>'; return; }
+    if(summary){
+      summary.textContent = d.total + ' glosas en el último año · pico de '+d.max_dia+'/día';
+    }
+    // Construir grid 7 filas (dias) × ~52 cols (semanas)
+    // Agrupar por semana usando dia.fecha → dia de la semana
+    var maxDia = d.max_dia || 1;
+    function _intensity(count){
+      if(count === 0) return 0;
+      var p = count / maxDia;
+      if(p < .15) return 1;
+      if(p < .35) return 2;
+      if(p < .65) return 3;
+      return 4;
+    }
+    function _bg(level){
+      return ['var(--bg-subtle)','rgba(2,132,199,.18)','rgba(2,132,199,.42)','rgba(2,132,199,.65)','rgba(2,132,199,.92)'][level];
+    }
+    // Organizar por semana — primer dia es desde, deducir su weekday
+    var firstDate = new Date(dias[0].fecha + 'T00:00:00');
+    var firstWeekday = firstDate.getDay();  // 0=domingo
+    var grid = [];
+    var col = [];
+    // Padding: agregar celdas vacias al inicio para alinear el primer dia
+    for(var p=0; p<firstWeekday; p++){ col.push(null); }
+    dias.forEach(function(dia){
+      col.push(dia);
+      if(col.length === 7){ grid.push(col); col = []; }
+    });
+    if(col.length){ while(col.length < 7) col.push(null); grid.push(col); }
+    var cellSize = 11;
+    var gap = 2;
+    var html = '<div style="display:flex;gap:'+gap+'px;font-family:var(--font-mono,monospace);user-select:none">';
+    grid.forEach(function(week){
+      html += '<div style="display:flex;flex-direction:column;gap:'+gap+'px">';
+      week.forEach(function(dia){
+        if(!dia){ html += '<div style="width:'+cellSize+'px;height:'+cellSize+'px"></div>'; return; }
+        var lvl = _intensity(dia.count);
+        var tip = dia.fecha + ': ' + dia.count + ' glosas' + (dia.valor ? ' · '+cop(dia.valor) : '');
+        html += '<div title="'+escHtml(tip)+'" style="width:'+cellSize+'px;height:'+cellSize+'px;background:'+_bg(lvl)+';border-radius:2px;border:1px solid '+(lvl===0?'var(--border)':'transparent')+';cursor:pointer;transition:transform .12s"></div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    box.innerHTML = html;
+  }catch(e){ console.warn('heatmap', e); }
+}
+// Hook al panel mi-desempeno
+(function _bindHeatmap(){
+  var orig = window.cargarMiDesempeno;
+  if(typeof orig !== 'function'){
+    setTimeout(_bindHeatmap, 1500);
+    return;
+  }
+  window.cargarMiDesempeno = function(){
+    var ret = orig.apply(this, arguments);
+    setTimeout(cargarHeatmapActividad, 300);
+    return ret;
+  };
+})();
+
+// ─── CONFETTI MICRO-CELEBRACIONES (Tier 3 #7) ─────────────────────
+// Animacion sutil de confetti gris+teal cuando llega un decision
+// LEVANTADA por una glosa de >$5M. Aprovecha el live channel B.2.
+function _confetti(){
+  // Crear contenedor
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;overflow:hidden';
+  document.body.appendChild(wrap);
+  var colores = ['#0ea5e9','#0284c7','#94a3b8','#cbd5e1','#0d9488','#475569','#fbbf24'];
+  var n = 60;
+  for(var i=0; i<n; i++){
+    var p = document.createElement('span');
+    var c = colores[i % colores.length];
+    var sz = 6 + Math.random()*8;
+    var startX = Math.random()*100;
+    var rot = Math.random()*360;
+    p.style.cssText = 'position:absolute;top:-20px;left:'+startX+'%;width:'+sz+'px;height:'+(sz*0.4)+'px;background:'+c+';border-radius:1px;transform:rotate('+rot+'deg);animation:confetti-fall '+(2.2+Math.random()*1.4)+'s cubic-bezier(.3,.7,.4,1) forwards;animation-delay:'+(Math.random()*.4)+'s';
+    wrap.appendChild(p);
+  }
+  setTimeout(function(){ wrap.remove(); }, 4500);
+}
+// CSS para la animacion (inyectar una vez)
+(function _ensureConfettiCss(){
+  if(document.getElementById('confetti-css')) return;
+  var s = document.createElement('style');
+  s.id = 'confetti-css';
+  s.textContent = '@keyframes confetti-fall{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}';
+  document.head.appendChild(s);
+})();
+
+// Hook live channel para detectar LEVANTADA + valor alto
+(function _hookConfetti(){
+  // Wrap pollLiveEventos para inspeccionar eventos
+  var orig = window.pollLiveEventos;
+  if(typeof orig !== 'function'){
+    setTimeout(_hookConfetti, 2000);
+    return;
+  }
+  window.pollLiveEventos = async function(){
+    var prevSince = window._LIVE && window._LIVE.since;
+    var ret = await orig.apply(this, arguments);
+    // No facil interceptar eventos sin reescribir todo, asi que escuchamos
+    // un custom event que disparamos en otro hook
+    return ret;
+  };
+})();
+// Funcion publica para disparar manualmente (uso desde decisionEpsLote)
+window.celebrarLevantamiento = function(valor){
+  if(typeof valor === 'number' && valor >= 5000000){
+    _confetti();
+    setTimeout(function(){
+      if(typeof toast === 'function') toast('Victoria','Levantamiento confirmado · '+cop(valor),'success');
+    }, 200);
+  }
+};
+
+// ─── MODO FOCUS EXTREMO POLISH (Tier 3 #8) ─────────────────────────
+// Boton + atajo F11-style para entrar/salir del focus mode (oculta
+// sidebar, header, FABs y deja solo el panel actual).
+function toggleFocusMode(){
+  document.body.classList.toggle('focus-mode');
+  if(document.body.classList.contains('focus-mode')){
+    if(typeof toast === 'function') toast('Modo focus','Esc para salir','info');
+  }
+}
+document.addEventListener('keydown', function(ev){
+  if(ev.key === 'Escape' && document.body.classList.contains('focus-mode')){
+    document.body.classList.remove('focus-mode');
+    ev.preventDefault();
+  }
+});
+
+// ─── QUICK-PASTE EXCEL (Tier 2 #3) ─────────────────────────────────
+// Cuando el usuario pega texto en f-glosa que parece una fila de Excel
+// (tabs/multiples columnas), auto-detectamos los campos y los
+// distribuimos en los inputs correctos (factura, EPS, valor, etc).
+function _initQuickPaste(){
+  var ta = document.getElementById('f-glosa');
+  if(!ta || ta.dataset.qpBound === '1') return;
+  ta.dataset.qpBound = '1';
+  ta.addEventListener('paste', function(ev){
+    try{
+      var clipboardData = ev.clipboardData || window.clipboardData;
+      if(!clipboardData) return;
+      var text = clipboardData.getData('text/plain') || '';
+      // Solo procesar si parece tabular (TAB o pipe), no toca paste normal
+      if(text.indexOf('\t') === -1 && text.split('|').length < 4) return;
+      // Tomar la primera linea no vacia como muestra
+      var lines = text.split(/\r?\n/).filter(function(l){return l.trim();});
+      if(!lines.length) return;
+      var sep = lines[0].indexOf('\t') >= 0 ? '\t' : '|';
+      var partes = lines[0].split(sep).map(function(s){return s.trim();});
+      if(partes.length < 3) return;
+      // Heuristica: detectar columnas por contenido
+      // factura: HUS#### o numerico de 4-8 digitos
+      // eps: contiene 'EPS', 'SALUD', o esta en lista conocida
+      // codigo: alfanumerico tipo RE9601 o 8 chars
+      // valor: numerico con coma o punto
+      var detectado = {factura:'', eps:'', codigo:'', valor:'', concepto:''};
+      partes.forEach(function(p){
+        if(!p) return;
+        if(/^HUS\d+$|^\d{5,9}$/i.test(p) && !detectado.factura) detectado.factura = p;
+        else if(/EPS|SALUD|FAMISANAR|COMPENSAR|SANITAS|NUEVA|CAFESALUD|MEDIMAS|COOMEVA|ALIANSALUD|CRUZ\s*BLANCA/i.test(p) && !detectado.eps) detectado.eps = p;
+        else if(/^[A-Z]\d{4}$|^\d{4}[A-Z]?$/i.test(p) && !detectado.codigo) detectado.codigo = p;
+        else if(/^[\d.,]+$/.test(p.replace(/\s/g,'')) && parseFloat(p.replace(/\./g,'').replace(',','.')) > 100 && !detectado.valor){
+          detectado.valor = p;
+        }
+      });
+      // Si detectamos al menos 2 campos, ofrecer auto-fill
+      var detectados = Object.keys(detectado).filter(function(k){return detectado[k];});
+      if(detectados.length < 2) return;
+      // No interferir con paste normal — solo mostrar toast con accion
+      setTimeout(function(){
+        if(typeof toast === 'function'){
+          var msg = detectados.length+' campos detectados: ' + detectados.join(', ');
+          var el = document.createElement('div');
+          el.style.cssText = 'position:fixed;top:80px;right:20px;background:var(--bg-card);border:1px solid var(--c-teal2);border-left:4px solid var(--c-teal2);border-radius:8px;padding:.75rem 1rem;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:9999;max-width:340px;animation:slideInRight .3s ease-out';
+          el.innerHTML = '<div style="font-weight:700;color:var(--c-teal2);font-size:.85rem">Quick-paste detectado</div>'+
+            '<div style="font-size:.75rem;color:var(--text2);margin:.25rem 0 .5rem">'+escHtml(msg)+'</div>'+
+            '<div style="display:flex;gap:.4rem">'+
+              '<button id="qp-apply" class="btn btn-sm" style="background:var(--c-teal2);color:#fff;border:0;font-size:.75rem">Aplicar</button>'+
+              '<button onclick="this.parentNode.parentNode.remove()" class="btn btn-sm btn-ghost" style="font-size:.75rem">Ignorar</button>'+
+            '</div>';
+          document.body.appendChild(el);
+          el.querySelector('#qp-apply').onclick = function(){
+            if(detectado.factura){ var f = document.getElementById('f-factura'); if(f) f.value = detectado.factura; }
+            if(detectado.valor){
+              var v = document.getElementById('f-valacp');
+              if(v) v.value = detectado.valor.replace(/[.,\s]/g,'').replace(/^0+/,'') || '0';
+            }
+            if(detectado.eps){
+              var sel = document.getElementById('eps-sel');
+              if(sel){
+                for(var i=0;i<sel.options.length;i++){
+                  if(sel.options[i].value.toUpperCase().indexOf(detectado.eps.toUpperCase().split(/\s/)[0]) >= 0){
+                    sel.value = sel.options[i].value;
+                    break;
+                  }
+                }
+              }
+            }
+            el.remove();
+            toast('Auto-fill aplicado', detectados.length+' campos', 'success');
+          };
+          setTimeout(function(){ if(el.parentNode) el.remove(); }, 12000);
+        }
+      }, 100);
+    }catch(e){ /* silencioso */ }
+  });
+}
+setTimeout(_initQuickPaste, 1500);
+
+// ─── MULTI-SELECT SHIFT+CLICK + ATAJOS j/k (Tier 2 #4 #5) ─────────
+// En cualquier tabla con tbody#mis-body o similares listas con
+// checkboxes data-id, soportar:
+//   shift+click en checkbox → selecciona el rango entre el ultimo y este
+//   j/k → navega entre filas (cuando no estas en input/textarea)
+//   x → toggle selected en la fila actual
+//   Enter/e → abrir/responder la fila actual
+window._lastClickedCheckbox = null;
+window._currentRowIdx = -1;
+
+function _setupMultiSelectShiftClick(){
+  // Bind delegated listener al body para todos los checkboxes de bulk
+  document.addEventListener('click', function(ev){
+    var t = ev.target;
+    if(!t || t.tagName !== 'INPUT' || t.type !== 'checkbox') return;
+    if(!t.classList.contains('lote-chk') && !t.classList.contains('mis-chk')) return;
+    if(ev.shiftKey && window._lastClickedCheckbox){
+      // Encontrar todos los checkboxes del mismo grupo
+      var todos = Array.from(t.closest('table, tbody, .lista, body').querySelectorAll('input[type=checkbox].'+t.classList[0]));
+      var idxA = todos.indexOf(window._lastClickedCheckbox);
+      var idxB = todos.indexOf(t);
+      if(idxA >= 0 && idxB >= 0){
+        var lo = Math.min(idxA, idxB);
+        var hi = Math.max(idxA, idxB);
+        for(var i = lo; i <= hi; i++){
+          todos[i].checked = t.checked;
+          try { todos[i].dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+        }
+        ev.preventDefault();
+      }
+    }
+    window._lastClickedCheckbox = t;
+  });
+}
+_setupMultiSelectShiftClick();
+
+// j/k para navegar filas
+document.addEventListener('keydown', function(ev){
+  // Skip si en input/textarea
+  var t = ev.target;
+  if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if(ev.altKey || ev.ctrlKey || ev.metaKey) return;
+  // Solo activar en panel mis-glosas o historial
+  var activeId = (document.querySelector('.panel.active')||{}).id || '';
+  if(activeId !== 'p-mis-glosas' && activeId !== 'p-historial') return;
+  var tbodyId = activeId === 'p-mis-glosas' ? 'mis-body' : 'tbl-body';
+  var tbody = document.getElementById(tbodyId) || document.querySelector('.panel.active tbody');
+  if(!tbody) return;
+  var rows = tbody.querySelectorAll('tr:not(.empty-row)');
+  if(!rows.length) return;
+  var idx = window._currentRowIdx;
+  function _highlightRow(i){
+    rows.forEach(function(r){ r.style.outline = ''; });
+    if(i >= 0 && i < rows.length){
+      rows[i].style.outline = '2px solid var(--c-teal2)';
+      rows[i].style.outlineOffset = '-2px';
+      rows[i].scrollIntoView({block:'nearest'});
+    }
+    window._currentRowIdx = i;
+  }
+  if(ev.key === 'j'){
+    ev.preventDefault();
+    _highlightRow(Math.min(rows.length - 1, idx + 1));
+  } else if(ev.key === 'k'){
+    ev.preventDefault();
+    _highlightRow(Math.max(0, idx - 1));
+  } else if(ev.key === 'x' && idx >= 0){
+    ev.preventDefault();
+    var chk = rows[idx].querySelector('input[type=checkbox]');
+    if(chk){ chk.checked = !chk.checked; try{chk.dispatchEvent(new Event('change',{bubbles:true}));}catch(_){} }
+  } else if((ev.key === 'Enter' || ev.key === 'e') && idx >= 0){
+    ev.preventDefault();
+    var btn = rows[idx].querySelector('button[onclick*="responderGlosa"], button[onclick*="verDetalleGlosa"]');
+    if(btn) btn.click();
+    else {
+      var dataId = rows[idx].getAttribute('data-id');
+      if(dataId && typeof responderGlosa === 'function') responderGlosa(parseInt(dataId,10));
+    }
+  } else if(ev.key === 'g' && !ev.shiftKey){
+    // gg → top
+    if(window._lastG && (Date.now() - window._lastG) < 800){
+      ev.preventDefault();
+      _highlightRow(0);
+      window._lastG = 0;
+    } else window._lastG = Date.now();
+  } else if(ev.key === 'G' && ev.shiftKey){
+    ev.preventDefault();
+    _highlightRow(rows.length - 1);
+  }
+}, true);
 
 // ─── SNIPPETS / ABREVIACIONES EXPANDIBLES (Tier 2 #2) ─────────────
 // Cada gestor define atajos como /ratif que se expanden a textos

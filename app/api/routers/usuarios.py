@@ -75,6 +75,76 @@ def info_usuario_actual(
     }
 
 
+@router.get("/yo/heatmap")
+def heatmap_actividad(
+    dias: int = 365,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Heatmap GitHub-style: cuenta de glosas resueltas por dia
+    en los ultimos N dias.
+
+    Returns:
+        {
+            "desde": "2025-05-08",
+            "hasta": "2026-05-08",
+            "max_dia": int,
+            "total": int,
+            "dias": [{"fecha": "2025-05-08", "count": 5, "valor": 1234}, ...]
+        }
+    """
+    from datetime import datetime, timedelta, timezone as _tz, date as _date
+    from sqlalchemy import func as _func, and_
+    from app.models.db import GlosaRecord
+    ahora = datetime.now(_tz.utc)
+    desde = (ahora - timedelta(days=max(7, min(int(dias), 730)))).date()
+    # Agregar por fecha de decision o creacion - usamos fecha_decision_eps
+    # cuando existe, sino creado_en. Simplificamos a creado_en por ahora.
+    rows = (
+        db.query(
+            _func.date(GlosaRecord.creado_en).label("fecha"),
+            _func.count(GlosaRecord.id).label("n"),
+            _func.coalesce(_func.sum(GlosaRecord.valor_objetado), 0).label("v"),
+        )
+        .filter(
+            (GlosaRecord.auditor_email == current_user.email) |
+            (GlosaRecord.gestor_nombre == current_user.email)
+        )
+        .filter(_func.date(GlosaRecord.creado_en) >= desde)
+        .group_by(_func.date(GlosaRecord.creado_en))
+        .order_by(_func.date(GlosaRecord.creado_en).asc())
+        .all()
+    )
+    por_dia = {}
+    total = 0
+    max_dia = 0
+    for fecha, n, v in rows:
+        # fecha puede ser date o str segun el dialecto
+        if hasattr(fecha, 'isoformat'):
+            key = fecha.isoformat()
+        else:
+            key = str(fecha)[:10]
+        por_dia[key] = {"count": int(n), "valor": float(v or 0)}
+        total += int(n)
+        if int(n) > max_dia: max_dia = int(n)
+    # Fill in zeros for missing days for cleaner heatmap
+    cursor = desde
+    end = ahora.date()
+    dias_list = []
+    while cursor <= end:
+        key = cursor.isoformat()
+        d = por_dia.get(key, {"count": 0, "valor": 0})
+        dias_list.append({"fecha": key, "count": d["count"], "valor": d["valor"]})
+        cursor = cursor + timedelta(days=1)
+    return {
+        "desde": desde.isoformat(),
+        "hasta": end.isoformat(),
+        "max_dia": max_dia,
+        "total": total,
+        "dias": dias_list,
+    }
+
+
 @router.get("/yo/digest")
 def digest_desde_ultima_visita(
     desde: Optional[str] = None,
