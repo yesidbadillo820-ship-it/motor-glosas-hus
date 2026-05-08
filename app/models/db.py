@@ -668,6 +668,30 @@ class PresetFiltroRecord(Base):
     )
 
 
+class SnippetRecord(Base):
+    """Snippets / abreviaciones expandibles del usuario.
+
+    Cada gestor define atajos como '/ratif' -> texto fijo de 200
+    palabras. Al escribir el atajo en cualquier textarea grande
+    (con clase .snippet-enabled), se expande automaticamente.
+
+    Visibilidad similar a presets: PRIVADO (default) | EQUIPO | GLOBAL.
+    Los GLOBAL los crea el coordinador y todos los usan (plantillas
+    institucionales).
+    """
+    __tablename__ = "snippets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_email = Column(String(200), index=True, nullable=False)
+    atajo = Column(String(50), nullable=False)
+    contenido = Column(Text, nullable=False)
+    descripcion = Column(String(200), nullable=True)
+    visibilidad = Column(String(20), default="PRIVADO", nullable=False)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+    uso_count = Column(Integer, default=0, nullable=False)
+    ultimo_uso = Column(DateTime(timezone=True), nullable=True)
+
+
 class RutaFacturaRecord(Base):
     """Mapeo factura HUS -> ruta de la carpeta de soportes en el share
     local del HUS (ej. Y:\\FEBRERO 2026 - SOPORTES RADICACION CARPETA

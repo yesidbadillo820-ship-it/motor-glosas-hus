@@ -2783,6 +2783,15 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             </label>
             <div style="font-size:.68rem;color:var(--text3);margin-top:.25rem;padding-left:1.7rem">Tonos sintéticos cortos al completar un análisis o guardar cambios. Se guarda por navegador.</div>
           </div>
+          <div class="form-card">
+            <h3>Snippets / Atajos de texto <span>productividad</span></h3>
+            <p style="font-size:.78rem;color:var(--text3);margin-bottom:.7rem;line-height:1.5">
+              Configurá tus atajos de texto. Escribí <code>/ratif</code> + Tab/Espacio en cualquier textarea
+              y se expande a tu plantilla. Ahorra ~30s por dictamen.
+            </p>
+            <button class="btn-primary" onclick="abrirGestorSnippets()" style="font-size:.85rem">Gestionar mis snippets</button>
+          </div>
+
           <div class="form-card" id="vacaciones-card">
             <h3>🏖️ Vacaciones / Licencia <span>Delegación temporal</span></h3>
             <p style="font-size:.78rem;color:var(--text3);margin-bottom:.7rem">
@@ -12387,6 +12396,8 @@ async function analizar(modoOverride){
     lastResult=d;
     renderResult(d);
     toast('Análisis completado','Defensa jurídica generada','success');
+    // Limpiar draft tras submit exitoso
+    if(typeof _draftClear === 'function'){ _draftClear(); _draftClear('nueva'); }
   } catch(e){
     toast('Error de conexión','No se pudo conectar con el servidor','error');
   }
@@ -13991,6 +14002,301 @@ function nuevaGlosa(){
   // próximo "Analizar" SÍ cree una glosa nueva (no reanalice la
   // que estaba abierta antes).
   window._glosa_id_actual = null;
+  // Limpiar draft de auto-save tras nueva glosa
+  if(typeof _draftClear === 'function') _draftClear('nueva');
+}
+
+// ─── SNIPPETS / ABREVIACIONES EXPANDIBLES (Tier 2 #2) ─────────────
+// Cada gestor define atajos como /ratif que se expanden a textos
+// fijos al escribirlos seguidos de Tab o Space en cualquier textarea.
+window._SNIPPETS_CACHE = null;
+
+async function _cargarSnippetsCache(){
+  if(window._SNIPPETS_CACHE) return window._SNIPPETS_CACHE;
+  try{
+    var r = await fetch('/snippets', {headers: authH()});
+    if(!r.ok){ window._SNIPPETS_CACHE = []; return []; }
+    var d = await r.json();
+    window._SNIPPETS_CACHE = Array.isArray(d) ? d : [];
+    return window._SNIPPETS_CACHE;
+  }catch(_){ window._SNIPPETS_CACHE = []; return []; }
+}
+
+// Detecta si el cursor esta justo despues de "/atajo" + tab/space y lo
+// expande inline reemplazando el atajo por contenido. Soporta textarea
+// e input.
+function _trySnippetExpand(el, ev){
+  if(!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return false;
+  if(!window._SNIPPETS_CACHE || !window._SNIPPETS_CACHE.length) return false;
+  var trigger = ev.key === 'Tab' || ev.key === ' ' || ev.key === 'Enter';
+  if(!trigger) return false;
+  var pos = el.selectionStart;
+  if(pos === null || pos === undefined) return false;
+  var text = el.value || '';
+  var before = text.slice(0, pos);
+  // Buscar "/" mas reciente sin espacios desde el cursor
+  var m = before.match(/\/([\w-]{1,40})$/);
+  if(!m) return false;
+  var atajo = '/' + m[1];
+  var snip = window._SNIPPETS_CACHE.find(function(s){
+    return s.atajo === atajo;
+  });
+  if(!snip) return false;
+  ev.preventDefault();
+  var startReplace = pos - atajo.length;
+  el.value = text.slice(0, startReplace) + snip.contenido + text.slice(pos);
+  // Cursor al final del contenido insertado
+  var nuevoPos = startReplace + snip.contenido.length;
+  el.setSelectionRange(nuevoPos, nuevoPos);
+  // Disparar input event para que listeners (auto-save) se enteren
+  try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(_){}
+  // Toast sutil
+  if(typeof toast === 'function') toast('Snippet expandido', atajo, 'info');
+  // Registrar uso (fire and forget)
+  fetch('/snippets/'+snip.id+'/usar', {method:'POST', headers:authH()}).catch(function(){});
+  return true;
+}
+
+// Listener global: cualquier Tab/Space/Enter en input/textarea intenta expandir
+document.addEventListener('keydown', function(ev){
+  var t = ev.target;
+  if(!t) return;
+  if(t.tagName !== 'TEXTAREA' && t.tagName !== 'INPUT') return;
+  if(t.type === 'password' || t.type === 'email' || t.type === 'number') return;
+  _trySnippetExpand(t, ev);
+}, true);
+
+// Cargar snippets al login (lazy si no esta logueado todavia)
+setTimeout(function(){
+  if(localStorage.getItem('hus_token')) _cargarSnippetsCache();
+}, 1500);
+
+// ─── UI panel para gestionar snippets (en panel Usuarios) ──────────
+async function abrirGestorSnippets(){
+  var modal = document.getElementById('snip-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'snip-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(11,18,32,.55);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);padding:1rem';
+    modal.onclick = function(e){ if(e.target === modal) modal.remove(); };
+    modal.innerHTML = '<div style="background:var(--bg-card);border-radius:12px;width:min(640px,100%);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+
+      '<div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'+
+        '<div><div style="font-weight:700;font-size:1rem">Snippets / Abreviaciones</div><div style="font-size:.72rem;color:var(--text3)">Escribí <code>/atajo</code> + Tab/Espacio en cualquier textarea para expandir</div></div>'+
+        '<button class="btn btn-ghost" onclick="document.getElementById(\'snip-modal\').remove()" style="font-size:1.1rem;padding:0 .55rem">×</button>'+
+      '</div>'+
+      '<div id="snip-list" style="flex:1;overflow-y:auto;padding:1rem 1.25rem"></div>'+
+      '<div style="border-top:1px solid var(--border);padding:.85rem 1.25rem;background:var(--bg-subtle)">'+
+        '<div style="display:grid;grid-template-columns:1fr 2fr;gap:.4rem;margin-bottom:.4rem">'+
+          '<input id="snip-atajo" placeholder="/ratif" style="font-family:monospace;font-size:.8rem" maxlength="40"/>'+
+          '<input id="snip-desc" placeholder="Descripción (opcional)" style="font-size:.8rem"/>'+
+        '</div>'+
+        '<textarea id="snip-content" placeholder="Texto que se expande al escribir el atajo..." rows="3" style="width:100%;font-size:.78rem;margin-bottom:.4rem"></textarea>'+
+        '<div style="display:flex;gap:.4rem;justify-content:flex-end">'+
+          '<button class="btn btn-primary" onclick="_guardarSnippetNuevo()" style="font-size:.78rem">Crear snippet</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+    document.body.appendChild(modal);
+  } else {
+    modal.style.display = 'flex';
+  }
+  await _renderListaSnippets();
+}
+
+async function _renderListaSnippets(){
+  var box = document.getElementById('snip-list');
+  if(!box) return;
+  window._SNIPPETS_CACHE = null;  // forzar refresco
+  var snips = await _cargarSnippetsCache();
+  if(!snips.length){
+    box.innerHTML = '<div style="text-align:center;padding:2rem 1rem;color:var(--text3);font-size:.85rem">Aún no tenés snippets. Crea el primero abajo.<br><br><b>Ejemplos útiles:</b><br><code>/ratif</code> → tu plantilla de ratificación<br><code>/levantada</code> → plantilla de levantamiento<br><code>/eps</code> → "EPS Compensar EPS S.A.S NIT 800.130.907-4"</div>';
+    return;
+  }
+  box.innerHTML = snips.map(function(s){
+    var visBadge = s.visibilidad === 'GLOBAL' ? '<span style="background:rgba(2,132,199,.10);color:#0369a1;padding:1px 6px;border-radius:8px;font-size:.65rem;margin-left:.3rem">GLOBAL</span>' :
+                   s.visibilidad === 'EQUIPO' ? '<span style="background:rgba(101,114,140,.10);color:var(--text2);padding:1px 6px;border-radius:8px;font-size:.65rem;margin-left:.3rem">EQUIPO</span>' : '';
+    return '<div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:.7rem .85rem;margin-bottom:.5rem">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.3rem">'+
+        '<div><code style="font-weight:700;color:var(--c-teal2);font-size:.85rem">'+escHtml(s.atajo)+'</code>'+visBadge+'</div>'+
+        '<div style="display:flex;gap:.3rem">'+
+          '<span style="font-size:.65rem;color:var(--text3)">usado '+(s.uso_count||0)+'x</span>'+
+          '<button class="btn btn-ghost" onclick="_borrarSnippet('+s.id+')" style="font-size:.7rem;padding:.15rem .4rem">×</button>'+
+        '</div>'+
+      '</div>'+
+      (s.descripcion ? '<div style="font-size:.7rem;color:var(--text3);margin-bottom:.3rem">'+escHtml(s.descripcion)+'</div>' : '')+
+      '<div style="font-size:.74rem;color:var(--text2);background:var(--bg-card);border-radius:5px;padding:.5rem .6rem;max-height:80px;overflow-y:auto;font-family:monospace;white-space:pre-wrap">'+escHtml(s.contenido.substring(0, 500))+(s.contenido.length>500?'…':'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function _guardarSnippetNuevo(){
+  var atajo = (document.getElementById('snip-atajo')||{}).value || '';
+  var contenido = (document.getElementById('snip-content')||{}).value || '';
+  var desc = (document.getElementById('snip-desc')||{}).value || '';
+  if(!atajo.trim() || !contenido.trim()){
+    toast('Faltan datos','Atajo y contenido son requeridos','warning');
+    return;
+  }
+  try{
+    var r = await fetch('/snippets', {
+      method:'POST', headers:{'Content-Type':'application/json',...authH()},
+      body: JSON.stringify({atajo: atajo.trim(), contenido: contenido.trim(), descripcion: desc.trim(), visibilidad: 'PRIVADO'}),
+    });
+    var d = {};
+    try{ d = await r.json(); }catch(_){}
+    if(!r.ok){ toast('Error', d.detail || 'Falló', 'error'); return; }
+    document.getElementById('snip-atajo').value = '';
+    document.getElementById('snip-content').value = '';
+    document.getElementById('snip-desc').value = '';
+    toast('Snippet creado', d.atajo, 'success');
+    await _renderListaSnippets();
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
+async function _borrarSnippet(id){
+  if(!confirm('¿Borrar este snippet?')) return;
+  try{
+    var r = await fetch('/snippets/'+id, {method:'DELETE', headers:authH()});
+    if(!r.ok){ toast('Error','No se pudo borrar','error'); return; }
+    await _renderListaSnippets();
+  }catch(e){ toast('Error de red', String(e), 'error'); }
+}
+
+// ─── AUTO-SAVE DRAFTS (Tier 1 #1) ─────────────────────────────────
+// Cada 3s tras un cambio, snapshot del formulario al localStorage.
+// Si el browser crashea, recargar, o cerrar tab, el draft persiste y
+// la UI ofrece restaurarlo al volver. Multi-glosa: una clave por
+// glosa_id (o "nueva" para sin guardar aun).
+var _DRAFT_KEY_PREFIX = 'hus_draft_glosa_';
+var _DRAFT_DEBOUNCE = null;
+var _DRAFT_FIELDS = ['f-glosa','f-factura','f-radicado','f-valacp','eps-sel','f-paciente','f-cups','f-servicio','f-codigo','f-concepto'];
+
+function _draftKey(){
+  var gid = window._glosa_id_actual;
+  return _DRAFT_KEY_PREFIX + (gid ? String(gid) : 'nueva');
+}
+function _draftSnapshot(){
+  var snap = {};
+  _DRAFT_FIELDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if(el && el.value !== undefined) snap[id] = el.value;
+  });
+  snap._ts = Date.now();
+  snap._glosa_id = window._glosa_id_actual || null;
+  return snap;
+}
+function _draftSave(){
+  try{
+    var snap = _draftSnapshot();
+    // Solo guardar si hay contenido significativo en f-glosa
+    var glosaTxt = (snap['f-glosa']||'').trim();
+    if(glosaTxt.length < 8) return;
+    localStorage.setItem(_draftKey(), JSON.stringify(snap));
+    var ind = document.getElementById('draft-indicator');
+    if(ind){
+      ind.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-CO');
+      ind.style.opacity = '1';
+      setTimeout(function(){ if(ind) ind.style.opacity = '.55'; }, 1200);
+    }
+  }catch(e){ /* localStorage lleno: ignorar */ }
+}
+function _draftScheduleSave(){
+  clearTimeout(_DRAFT_DEBOUNCE);
+  _DRAFT_DEBOUNCE = setTimeout(_draftSave, 1500);
+}
+function _draftClear(scope){
+  // scope: "actual" borra solo la draft activa; "nueva" borra la "nueva"
+  if(scope === 'nueva'){
+    localStorage.removeItem(_DRAFT_KEY_PREFIX + 'nueva');
+  } else {
+    localStorage.removeItem(_draftKey());
+  }
+  var ind = document.getElementById('draft-indicator');
+  if(ind){ ind.textContent = ''; ind.style.opacity = '0'; }
+}
+function _draftRestore(snap){
+  if(!snap || typeof snap !== 'object') return;
+  Object.keys(snap).forEach(function(id){
+    if(id.indexOf('_') === 0) return;
+    var el = document.getElementById(id);
+    if(el && el.value !== undefined){ el.value = snap[id]; }
+  });
+}
+function _draftCheckRestore(){
+  // Verificar si hay draft sin restaurar al cargar el panel
+  try{
+    var key = _draftKey();
+    var raw = localStorage.getItem(key);
+    if(!raw) return;
+    var snap = JSON.parse(raw);
+    if(!snap || !snap['f-glosa'] || snap['f-glosa'].trim().length < 8) return;
+    // Si el formulario ya tiene contenido similar, no re-prompt
+    var glosaActual = ((document.getElementById('f-glosa')||{}).value||'').trim();
+    if(glosaActual === (snap['f-glosa']||'').trim()) return;
+    // Mostrar banner ofreciendo restaurar
+    var area = document.getElementById('result-area');
+    if(!area) return;
+    var hace = Math.max(1, Math.round((Date.now() - (snap._ts||Date.now())) / 60000));
+    var haceTxt = hace < 60 ? hace+' min' : Math.round(hace/60)+'h';
+    var bannerId = 'draft-restore-banner';
+    if(document.getElementById(bannerId)) return;
+    var html = '<div id="'+bannerId+'" style="background:rgba(2,132,199,.06);border-left:3px solid var(--c-teal2);padding:.75rem 1rem;border-radius:6px;margin-bottom:.75rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:600;color:var(--text);font-size:.85rem">Borrador no enviado</div>'+
+        '<div style="font-size:.75rem;color:var(--text3)">Hay un dictamen en progreso de hace '+haceTxt+'. ¿Querés restaurarlo?</div>'+
+      '</div>'+
+      '<button class="btn btn-sm" onclick="_draftRestoreClick()" style="background:var(--c-teal2);color:#fff;border:0">Restaurar</button>'+
+      '<button class="btn btn-sm btn-ghost" onclick="_draftDismissClick()">Descartar</button>'+
+    '</div>';
+    var existente = area.querySelector('.empty-state');
+    if(existente){
+      existente.insertAdjacentHTML('beforebegin', html);
+    } else {
+      area.insertAdjacentHTML('afterbegin', html);
+    }
+  }catch(_){}
+}
+function _draftRestoreClick(){
+  try{
+    var snap = JSON.parse(localStorage.getItem(_draftKey())||'{}');
+    _draftRestore(snap);
+    var b = document.getElementById('draft-restore-banner');
+    if(b) b.remove();
+    toast('Restaurado','Borrador recuperado','success');
+  }catch(_){}
+}
+function _draftDismissClick(){
+  _draftClear();
+  var b = document.getElementById('draft-restore-banner');
+  if(b) b.remove();
+}
+// Bind change/input listeners + indicador visible
+function _draftInit(){
+  _DRAFT_FIELDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el || el.dataset.draftBound === '1') return;
+    el.dataset.draftBound = '1';
+    el.addEventListener('input', _draftScheduleSave);
+    el.addEventListener('change', _draftScheduleSave);
+  });
+  // Indicador discreto en algun lugar visible (junto al boton Analizar)
+  if(!document.getElementById('draft-indicator')){
+    var btnAnalizar = document.querySelector('[onclick*="analizarGlosa"]');
+    if(btnAnalizar && btnAnalizar.parentNode){
+      var ind = document.createElement('span');
+      ind.id = 'draft-indicator';
+      ind.style.cssText = 'font-size:.68rem;color:var(--text3);margin-left:.5rem;opacity:0;transition:opacity .25s ease;font-style:italic';
+      btnAnalizar.parentNode.appendChild(ind);
+    }
+  }
+  // Check inicial
+  setTimeout(_draftCheckRestore, 300);
+}
+// Trigger init en cuanto la pagina cargue
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', _draftInit);
+} else {
+  setTimeout(_draftInit, 1000);
 }
 
 function copiarDictamen(event){
