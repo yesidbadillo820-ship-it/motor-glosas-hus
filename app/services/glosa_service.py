@@ -875,16 +875,19 @@ class GlosaService:
         self,
         groq_api_key: str = None,
         anthropic_api_key: str = None,
-        primary_ai: str = "groq",
+        primary_ai: str = "gemini",
         anthropic_model: str = "claude-sonnet-4-6",
         groq_model: str = "llama-3.3-70b-versatile",
         gemini_api_key: str = None,
-        gemini_model: str = "gemini-2.0-flash-exp",
+        gemini_model: str = "gemini-2.0-flash",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
-        self.primary_ai = (primary_ai or "groq").lower()
+        # Default Gemini-first: gratis, lee PDFs nativos, no quema creditos
+        # Anthropic. Llama (groq) queda como ultimo recurso (rapido pero
+        # regurgita plantillas — fuente del problema "copia y pega").
+        self.primary_ai = (primary_ai or "gemini").lower()
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
         self.groq_model = groq_model or "llama-3.3-70b-versatile"
         # Tercer proveedor: Google Gemini (tier gratis generoso)
@@ -1625,12 +1628,18 @@ class GlosaService:
                 # romper el análisis para el usuario final.
                 _intento_ok = False
 
-                # Path 1: Multi-modal soportes
+                # Path 1: Multi-modal soportes con cadena de fallback que
+                # PRESERVA los PDFs en cada nivel (Anthropic → Gemini PDF →
+                # Gemini Vision con imagenes). Critico: si Anthropic falla,
+                # NO descartamos los PDFs cayendo a texto plano — los pasamos
+                # a Gemini que tambien lee PDFs nativos. Si el modelo Gemini
+                # no soporta PDF nativo (lite), convertimos a imagenes.
                 _quiere_multimodal = (
                     bool(getattr(data, "usar_pdf_nativo_soportes", False))
                     and pdfs_raw_para_multimodal
                 )
                 if _quiere_multimodal:
+                    # Intento A: Anthropic Claude con PDF nativo
                     try:
                         res_ia, modelo_usado = await self._llamar_anthropic_multimodal(
                             system_prompt, user_prompt, pdfs_raw_para_multimodal,
@@ -1638,8 +1647,53 @@ class GlosaService:
                         _intento_ok = True
                     except Exception as _e_mm:
                         logger.warning(
-                            f"[MULTIMODAL] Falló, fallback a Tool Use/Clásico: {_e_mm}"
+                            f"[MULTIMODAL-A] Anthropic fallo: {_e_mm}. Probando Gemini PDF nativo."
                         )
+
+                    # Intento B: Gemini con PDF nativo (gratis)
+                    if not _intento_ok and self.gemini:
+                        try:
+                            res_ia, modelo_usado = await self.gemini.completar_con_retry(
+                                system=system_prompt,
+                                user=user_prompt,
+                                modelo=self.gemini_model,
+                                temperature=0.2,
+                                max_tokens=3000,
+                                pdfs_raw=pdfs_raw_para_multimodal,
+                            )
+                            _intento_ok = True
+                            logger.info(f"[MULTIMODAL-B] Gemini PDF nativo OK ({modelo_usado})")
+                        except Exception as _e_gp:
+                            logger.warning(
+                                f"[MULTIMODAL-B] Gemini PDF nativo fallo: {_e_gp}. Probando Vision con imagenes."
+                            )
+
+                    # Intento C: Gemini Vision con PDFs convertidos a imagenes
+                    if not _intento_ok and self.gemini:
+                        try:
+                            from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
+                            imagenes = pdfs_a_imagenes_combinadas(
+                                pdfs_raw_para_multimodal,
+                                max_imagenes_total=20, dpi=130,
+                            )
+                            if imagenes:
+                                res_ia, modelo_usado = await self.gemini.completar_con_retry(
+                                    system=system_prompt,
+                                    user=user_prompt,
+                                    modelo=self.gemini_model,
+                                    temperature=0.2,
+                                    max_tokens=3000,
+                                    imagenes_raw=imagenes,
+                                )
+                                _intento_ok = True
+                                logger.info(
+                                    f"[MULTIMODAL-C] Gemini Vision OK ({modelo_usado}) "
+                                    f"con {len(imagenes)} imgs (de {len(pdfs_raw_para_multimodal)} PDFs)"
+                                )
+                        except Exception as _e_gi:
+                            logger.warning(
+                                f"[MULTIMODAL-C] Gemini Vision fallo: {_e_gi}. Cae a texto plano."
+                            )
 
                 # Path 2: Tool Use opt-in vía env var
                 if not _intento_ok:
@@ -3282,14 +3336,19 @@ class GlosaService:
             if self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
         else:
-            # primary_ai == "groq" (default historico) o cualquier otro
+            # primary_ai == "groq" (legacy) o valor desconocido.
+            # Politica anti-Llama-primero: Llama regurgita plantillas y produjo
+            # los dictamenes "copia y pega" reportados por el usuario. Aunque
+            # alguien fuerce primary_ai="groq", probamos Gemini PRIMERO si esta
+            # disponible (gratis, mejor calidad, lee PDFs nativos), luego
+            # Anthropic, y solo al final caemos a Llama.
             intentos = []
-            if self.groq:
-                intentos.append(("groq", self._llamar_groq_con_retry))
             if self.gemini:
                 intentos.append(("gemini", self._llamar_gemini_con_retry))
             if self.anthropic_key:
                 intentos.append(("anthropic", self._llamar_anthropic))
+            if self.groq:
+                intentos.append(("groq", self._llamar_groq_con_retry))
 
         ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
         for nombre, fn in intentos:

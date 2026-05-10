@@ -1,112 +1,110 @@
-"""Patch en runtime que agrega fallback Anthropic -> Gemini PDF -> Gemini Vision
-al metodo _llamar_anthropic_multimodal de GlosaService.
+"""Monkey patch: cadena de fallback de PDFs para GlosaService.
 
-Resuelve el bug critico reportado por Yesid (HUS, mayo 2026): cuando subis
-PDFs en analizar y Anthropic falla por sin creditos, el sistema descartaba
-los PDFs y caia a texto plano (perdiendo 60% de la info y produciendo
-dictamenes pobres genericos).
+Problema:
+    El archivo glosa_service.py es demasiado grande (>100KB) para
+    editarse via tooling MCP. Para corregir el bug critico "la IA
+    deja de leer PDFs cuando Anthropic falla", aplicamos un parche
+    en runtime que envuelve `_llamar_anthropic_multimodal` con una
+    cadena de 3 niveles que PRESERVA los PDFs en cada nivel:
 
-Con este patch: si Anthropic multimodal falla:
-  1. Intenta Gemini PDF nativo (gratis, modelos 2.5-flash/2.5-pro)
-  2. Si Gemini PDF falla (modelo lite no soporta PDF nativo), convierte
-     los PDFs a imagenes PNG via pdfplumber y los manda como vision
-  3. Solo si los 3 fallan, cae a texto plano
+        Nivel A: Anthropic Claude (PDF nativo)
+              -> si falla:
+        Nivel B: Gemini Flash (PDF nativo, gratis)
+              -> si falla:
+        Nivel C: Gemini Vision (PDFs convertidos a PNGs)
 
-Se aplica desde app/api/routers/__init__.py al primer import de routers,
-sin requerir modificar el archivo glosa_service.py (172KB).
+    Solo si los 3 niveles fallan se levanta excepcion para que el
+    caller decida (ej. cae a modo solo-texto).
+
+Aplicacion:
+    Llamar `apply()` una sola vez al iniciar la app (idempotente).
+    Lo hace `app/api/routers/__init__.py` cuando los routers se
+    cargan por primera vez.
 """
 from __future__ import annotations
 import logging
+from typing import Any
 
 logger = logging.getLogger("motor_glosas")
 
+_FLAG = "_pdf_fallback_patch_applied"
 
-def apply():
-    """Aplica el monkey patch a GlosaService. Idempotente."""
+
+def apply() -> bool:
+    """Aplica el monkey patch. Retorna True si se aplico, False si ya estaba."""
     try:
         from app.services.glosa_service import GlosaService
     except Exception as e:
-        logger.warning(f"[PDF-FALLBACK-PATCH] No se pudo importar GlosaService: {e}")
+        logger.warning(f"[pdf_fallback_patch] no se pudo importar GlosaService: {e}")
         return False
 
-    if getattr(GlosaService, "_pdf_fallback_patch_applied", False):
-        return True
-    GlosaService._pdf_fallback_patch_applied = True
-
-    if not hasattr(GlosaService, "_llamar_anthropic_multimodal"):
-        logger.warning("[PDF-FALLBACK-PATCH] GlosaService no tiene _llamar_anthropic_multimodal")
+    if getattr(GlosaService, _FLAG, False):
         return False
 
     original = GlosaService._llamar_anthropic_multimodal
 
-    async def _wrapped_multimodal(self, system, user, pdfs_raw):
-        # Intento 1: Anthropic Claude (PDF nativo) — el original
+    async def _llamar_anthropic_multimodal_con_fallback(
+        self: Any,
+        system: str,
+        user: str,
+        pdfs_raw: list[tuple[str, bytes]],
+    ) -> tuple[str, str]:
+        # ---- Nivel A: Anthropic Claude (PDF nativo) ----
         try:
             return await original(self, system, user, pdfs_raw)
-        except Exception as e_anthropic:
-            logger.warning(
-                f"[PDF-FALLBACK] Anthropic multimodal fallo: {e_anthropic}. "
-                f"Probando Gemini PDF nativo..."
-            )
+        except Exception as e_a:
+            logger.warning(f"[FALLBACK-A] Anthropic multimodal fallo: {e_a}")
 
+        # ---- Nivel B: Gemini Flash con PDFs nativos ----
         gemini = getattr(self, "gemini", None)
-        gemini_model = getattr(self, "gemini_model", "gemini-2.0-flash")
+        gemini_model = getattr(self, "gemini_model", None) or "gemini-2.0-flash"
+        if gemini is not None:
+            try:
+                texto, modelo = await gemini.completar_con_retry(
+                    system=system,
+                    user=user,
+                    modelo=gemini_model,
+                    temperature=0.2,
+                    max_tokens=3000,
+                    pdfs_raw=pdfs_raw,
+                )
+                logger.info(f"[FALLBACK-B] Gemini PDF nativo OK ({modelo})")
+                return texto, modelo
+            except Exception as e_b:
+                logger.warning(f"[FALLBACK-B] Gemini PDF nativo fallo: {e_b}")
+        else:
+            logger.warning("[FALLBACK-B] Gemini no disponible (sin api key)")
 
-        if not gemini:
-            logger.error("[PDF-FALLBACK] Sin Gemini disponible. Re-raise Anthropic error.")
-            # Re-ejecutar el original para que el error suba
-            return await original(self, system, user, pdfs_raw)
+        # ---- Nivel C: Gemini Vision con PDFs -> imagenes PNG ----
+        if gemini is not None:
+            try:
+                from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
+                imagenes = pdfs_a_imagenes_combinadas(
+                    pdfs_raw, max_imagenes_total=20, dpi=130,
+                )
+                if not imagenes:
+                    raise RuntimeError("conversion PDF->PNG vacia")
+                texto, modelo = await gemini.completar_con_retry(
+                    system=system,
+                    user=user,
+                    modelo=gemini_model,
+                    temperature=0.2,
+                    max_tokens=3000,
+                    imagenes_raw=imagenes,
+                )
+                logger.info(
+                    f"[FALLBACK-C] Gemini Vision OK con {len(imagenes)} imgs "
+                    f"de {len(pdfs_raw)} PDFs ({modelo})"
+                )
+                return texto, modelo
+            except Exception as e_c:
+                logger.warning(f"[FALLBACK-C] Gemini Vision fallo: {e_c}")
 
-        # Intento 2: Gemini con PDF nativo (gratis)
-        try:
-            res = await gemini.completar_con_retry(
-                system=system,
-                user=user,
-                modelo=gemini_model,
-                temperature=0.2,
-                max_tokens=3000,
-                pdfs_raw=pdfs_raw,
-            )
-            logger.info(f"[PDF-FALLBACK] OK Gemini PDF nativo ({res[1]})")
-            return res
-        except Exception as e_gp:
-            logger.warning(
-                f"[PDF-FALLBACK] Gemini PDF nativo fallo: {e_gp}. "
-                f"Probando Gemini Vision con imagenes..."
-            )
+        raise RuntimeError(
+            "Cadena multimodal agotada: Anthropic + Gemini PDF + Gemini Vision fallaron"
+        )
 
-        # Intento 3: Gemini Vision con PDFs convertidos a PNG
-        try:
-            from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
-            imagenes = pdfs_a_imagenes_combinadas(
-                pdfs_raw, max_imagenes_total=20, dpi=130,
-            )
-            if not imagenes:
-                logger.error("[PDF-FALLBACK] No se pudo convertir ningun PDF a imagen")
-                return await original(self, system, user, pdfs_raw)
-            res = await gemini.completar_con_retry(
-                system=system,
-                user=user,
-                modelo=gemini_model,
-                temperature=0.2,
-                max_tokens=3000,
-                imagenes_raw=imagenes,
-            )
-            logger.info(
-                f"[PDF-FALLBACK] OK Gemini Vision ({res[1]}) con {len(imagenes)} "
-                f"imagenes (de {len(pdfs_raw)} PDFs)"
-            )
-            return res
-        except Exception as e_gi:
-            logger.error(f"[PDF-FALLBACK] Gemini Vision tambien fallo: {e_gi}")
-
-        # Si todos fallaron, re-raise via original (que volvera a fallar)
-        return await original(self, system, user, pdfs_raw)
-
-    GlosaService._llamar_anthropic_multimodal = _wrapped_multimodal
-    logger.info(
-        "[PDF-FALLBACK-PATCH] APLICADO: GlosaService.analizar() ahora hace "
-        "fallback Anthropic -> Gemini PDF -> Gemini Vision (con imagenes) "
-        "preservando los PDFs en cada nivel."
-    )
+    GlosaService._llamar_anthropic_multimodal = _llamar_anthropic_multimodal_con_fallback
+    setattr(GlosaService, _FLAG, True)
+    logger.info("[pdf_fallback_patch] aplicado: A=Anthropic B=Gemini-PDF C=Gemini-Vision")
     return True
