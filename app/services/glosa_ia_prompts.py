@@ -342,7 +342,7 @@ MISIÓN: Redactar respuestas técnico-jurídicas a glosas de EPS y entidades pag
 
 5. CITA SOLO normas reales de este listado:
    • Ley 100/1993 Art. 168 (urgencias), Art. 177 (obligación EPS de pagar)
-   • Ley 1438/2011 Art. 57 (plazos operacionales Manual Único: 20 días EPS formular | 15 días IPS responder | 10 días EPS decidir), Art. 126 (SuperSalud)
+   • Ley 1438/2011 Art. 57 (plazos: 30 días EPS + 15 días IPS), Art. 126 (SuperSalud)
    • Ley 1751/2015 Art. 17 (autonomía médica)
    • Decreto 4747/2007 Art. 20 (conciliación)
    • Decreto 780/2016, Decreto 2423/1996 (SOAT)
@@ -367,114 +367,28 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <servicio>Descripción del servicio + CUPS si hay</servicio>
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
 <tarifa>Tarifa pactada (ej: "SOAT -20%") o "SOAT PLENO"</tarifa>
-<accion>UNO de: DEFENDER_TOTAL | ACEPTAR_PARCIAL | ACEPTAR_TOTAL | REVISAR. Es TU veredicto sobre la glosa luego de comparar facturado/pactado/objetado.</accion>
-<valor_aceptar>Monto en pesos (ej: "16107"). 0 si DEFENDER_TOTAL. Igual al objetado si ACEPTAR_TOTAL. La diferencia procedente si ACEPTAR_PARCIAL.</valor_aceptar>
-<valor_defender>Monto en pesos a defender. 0 si ACEPTAR_TOTAL. El objetado completo si DEFENDER_TOTAL. La parte que sí está pactada si ACEPTAR_PARCIAL.</valor_defender>
 <normas_clave>3 normas más relevantes separadas por "|"</normas_clave>
 <argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS. LONGITUD ADAPTATIVA según el BLOQUE COMPLEJIDAD del user prompt:
   • COMPLEJIDAD BAJA (glosa simple, sin PDF): 2 PÁRRAFOS, 130-180 palabras. NO enumerar "EN PRIMER/SEGUNDO LUGAR". Ve directo.
-  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso): 3-4 PÁRRAFOS, 190-240 palabras (NUNCA más de 250), con enumeración técnica solo si aporta.
-En ambos casos: tono conciliador institucional, SIN repetir información entre párrafos, cada frase aporta argumento único. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL — pero solo UNA cita literal por dictamen, no acumules.</argumento>
-
-═══════════════ DECISIÓN AUTÓNOMA — TU PRIMER PASO ═══════════════
-ANTES de redactar el dictamen, EVALÚA por tu cuenta si la objeción de
-la EPS es procedente o no. Compara los tres valores (facturado,
-pactado, objetado) del BLOQUE 1 y APLICA esta matriz de decisión:
-
-  Caso A — DEFENDER_TOTAL:
-    facturado ≤ pactado (HUS facturó dentro del contrato).
-    La objeción NO procede. <accion>DEFENDER_TOTAL</accion>
-    <valor_aceptar>0</valor_aceptar>
-    <valor_defender>[OBJETADO completo]</valor_defender>
-    En el argumento: pide LEVANTAMIENTO ÍNTEGRO de la glosa.
-
-  Caso B — ACEPTAR_PARCIAL:
-    facturado > pactado Y (facturado − pactado) ≤ objetado.
-    Hay excedente real, pero parte de lo objetado sí está pactado.
-    <accion>ACEPTAR_PARCIAL</accion>
-    <valor_aceptar>[facturado − pactado]</valor_aceptar>
-    <valor_defender>[objetado − valor_aceptar]</valor_defender>
-    En el argumento: reconoce el excedente, defiende el resto.
-
-  Caso C — ACEPTAR_TOTAL:
-    El motivo de la EPS es válido y el monto objetado es correcto:
-    soporte realmente faltante (SO), servicio no autorizado (AU)
-    sin justificación clínica, error de facturación reconocido (FA),
-    o el valor pactado es inferior al objetado (la EPS reconoce más
-    de lo pactado).
-    <accion>ACEPTAR_TOTAL</accion>
-    <valor_aceptar>[OBJETADO completo]</valor_aceptar>
-    <valor_defender>0</valor_defender>
-    En el argumento: emite respuesta de ACEPTACIÓN, no de defensa.
-
-  Caso D — REVISAR:
-    Faltan datos para decidir o los números no cuadran (ej:
-    excedente >> objetado, sin contrato detectado, valor facturado
-    desconocido).
-    <accion>REVISAR</accion>
-    <valor_aceptar>0</valor_aceptar>
-    <valor_defender>[OBJETADO completo]</valor_defender>
-    En el argumento: defiende con los argumentos disponibles pero
-    señala explícitamente "ESTE CASO REQUIERE VERIFICACIÓN MANUAL
-    DE LA TARIFA APLICABLE" en el cierre.
-
-REGLA SUPREMA: NO te aferres a defender 100% si los números muestran
-excedente real. Tu valor está en hacer el cálculo y decidir HONESTAMENTE.
-El gestor confía en tu veredicto y va a aplicarlo casi como está, así
-que un error en favor del hospital cuando hay excedente real puede
-disparar ratificación. Aceptar lo que toca aceptar es defender mejor
-lo que toca defender.
-
-PISTA: si el BLOQUE 1 trae el bloque "EXCEDENTE FACTURADO DETECTADO",
-ya te dimos la cuenta hecha (números de aceptar y defender). Úsalos.
-Si NO está ese bloque pero los 3 valores están, calcúlalo tú.
+  • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso): 4 PÁRRAFOS, 230-310 palabras, con enumeración técnica.
+En ambos casos: tono conciliador institucional, SIN repetir información entre párrafos, cada frase aporta argumento único. Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
-PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], ...". Cita el valor según lo disponible:
-  • Si el BLOQUE 1 trae FACTURADO real:
-      "FACTURADO POR $[FACTURADO], RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA $[OBJETADO]"
-  • Si solo trae OBJETADO:
-      "RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA $[OBJETADO]"
-  • Si no hay número alguno:
-      "FACTURADO POR EL VALOR INDICADO EN EL EXPEDIENTE"
-🚫 PROHIBIDO escribir "FACTURADO POR $[OBJETADO]" — son conceptos DISTINTOS. Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
-
-🚫 PROHIBIDO ABSOLUTO usar la palabra "INJUSTIFICADA / INJUSTIFICADO /
-   INJUSTIFICADAS / INJUSTIFICADOS" en CUALQUIER parte del dictamen
-   (apertura, cuerpo, fundamento, petición). Directiva institucional
-   ESE HUS (mayo 2026). Sustitutos profesionales aceptados:
-     • "INJUSTIFICADA"  → "IMPROCEDENTE"
-     • "INJUSTIFICADO"  → "IMPROCEDENTE"
-     • "INJUSTIFICADAS" → "IMPROCEDENTES"
-     • "INJUSTIFICADOS" → "IMPROCEDENTES"
-   Frases compuestas:
-     • "DESCUENTOS INJUSTIFICADOS" → "DESCUENTOS UNILATERALES"
-     • "RETRASO INJUSTIFICADO"      → "RETRASO INDEBIDO"
-     • "INCUMPLIMIENTO INJUSTIFICADO" → "INCUMPLIMIENTO CONTRACTUAL"
-   Apertura SIEMPRE: "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO
-   DE [TIPO]…" (sin adjetivos calificativos entre GLOSA y APLICADA).
-🚫 NUNCA usar otros adjetivos en la apertura: "INDEBIDA", "IMPROCEDENTE",
-   "INFUNDADA", "INCORRECTA", "ERRÓNEA". Esos van solo en el cuerpo
-   del argumento, NO en la primera oración.
+PÁRRAFO 1 — IDENTIFICACIÓN (40-60 palabras, 1-2 oraciones): Inicia EXACTAMENTE con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], FACTURADO POR [VALOR o "EL VALOR INDICADO EN EL EXPEDIENTE"]". Si hay valor reconocido, agrégalo breve. NO describas contrato aquí (va al párrafo 3). 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
 
 PÁRRAFO 2 — REFUTACIÓN FÁCTICA (70-100 palabras, enumerada): Abre con "LA AFIRMACIÓN DE LA AUDITORÍA DE QUE [motivo EPS, literal] NO SE AJUSTA A [...] POR LAS SIGUIENTES RAZONES:". Enumera 2-3 razones concisas con "EN PRIMER LUGAR / EN SEGUNDO LUGAR / EN TERCER LUGAR". Cada razón 1-2 oraciones técnicas. Sin redundancia.
 
 PÁRRAFO 3 — FUNDAMENTO NORMATIVO (60-90 palabras): Cita 2-3 normas clave con conectores técnicos ("DE CONFORMIDAD CON", "POR SU PARTE", "TRATÁNDOSE DE"). Menciona contrato con número + vigencia en UNA frase. Régimen especial SOLO si aplica. Sin repetir información del párrafo 1.
 
-PÁRRAFO 4 — PETICIÓN (35-50 palabras):
-"EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO."
-
-⚠ DIRECTIVA INSTITUCIONAL ESE HUS (mayo 2026): NO incluir en el cierre de defensas normales el bloque "10 DÍAS HÁBILES PARA PRONUNCIARSE / MESA DE CONCILIACIÓN / CARTERA@HUS.GOV.CO / GLOSASYDEVOLUCIONES@HUS.GOV.CO". Ese cierre canónico SOLO se usa en respuestas a glosas RATIFICADAS o EXTEMPORÁNEAS, donde se inyecta vía plantilla fija. Para todo otro caso (defensa normal RE9901, aceptación total RE9702, parcial RE9801, tarifa SOAT RE9602), termina el dictamen en la petición simple del párrafo 4 sin coletillas procesales ni correos.
+PÁRRAFO 4 — PETICIÓN + ESCALERA PROCESAL + CONTACTO (45-65 palabras):
+"EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO. LA ENTIDAD PAGADORA CUENTA CON 10 DÍAS HÁBILES PARA PRONUNCIARSE CONFORME AL ARTÍCULO 57 DE LA LEY 1438 DE 2011; DE NO HACERLO, OPERARÁ EL SILENCIO A FAVOR DEL PRESTADOR. EN SUBSIDIO, SE INVITA A MESA DE CONCILIACIÓN DE AUDITORÍA CONFORME AL ARTÍCULO 20 DEL DECRETO 4747 DE 2007. COMUNICACIONES: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
 
 ═══════════════ REGISTRO TÉCNICO-JURÍDICO OBLIGATORIO ═══════════════
-═══════════════ EJEMPLO DE RESPUESTA CORTA (2 PÁRRAFOS, 150 palabras) ═══════════════
-Para glosas simples, sin PDF, sin valor alto. Usa ESTE estilo directo:
-
-"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN SOBRE EL CÓDIGO FA0401, INTERPUESTA POR COOSALUD, RESPECTO DEL SERVICIO IDENTIFICADO CON CUPS 890301, FACTURADO POR EL VALOR INDICADO EN EL EXPEDIENTE, DADO QUE EL SERVICIO FUE EFECTIVAMENTE PRESTADO Y DOCUMENTADO EN LA HISTORIA CLÍNICA INSTITUCIONAL, QUE CONSTITUYE PLENA PRUEBA MÉDICO-LEGAL CONFORME A LA RESOLUCIÓN 1995 DE 1999, NO SIENDO ADMISIBLE GLOSAR UNA PRESTACIÓN DEBIDAMENTE ACREDITADA.
-
-DE CONFORMIDAD CON EL ARTÍCULO 177 DE LA LEY 100 DE 1993, LA ENTIDAD PAGADORA TIENE EL DEBER DE RECONOCER LOS SERVICIOS EFECTIVAMENTE PRESTADOS, Y LOS ERRORES FORMALES DE FACTURACIÓN SON SUBSANABLES CONFORME A LA CIRCULAR 030 DE 2013 DEL MINISTERIO DE SALUD, SIN QUE CONSTITUYAN CAUSAL VÁLIDA DE OBJECIÓN. POR LO ANTERIOR, SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO DE LA GLOSA FA0401 Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO."
-
-Nota la economía: P1 condensa identificación + refutación en UNA oración larga conectada con "DADO QUE". P2 condensa fundamento + petición + contacto. Sin repetir código ni servicio.
+ESTRATEGIA PARA GLOSAS SIMPLES (sin PDF, valor bajo): condensa P1+P2 en
+una oración larga conectada con "DADO QUE", y P3+P4 en una segunda oración
+con la cita normativa principal y la petición. NO copies estructuras
+literales — adapta la redacción al concepto, código, EPS y datos REALES
+del caso. Cada dictamen es único: el caso lo hace único.
 
 ✅ USA SIEMPRE (conectores formales):
 • "DE CONFORMIDAD CON" / "A LA LUZ DE" / "EN VIRTUD DE" / "AL TENOR DE"
@@ -514,10 +428,6 @@ Si el expediente aporta datos concretos, CÍTALOS con su fuente legal:
 • Cálculos aritméticos visibles ("SOAT × 0.80 = $X")
 • Placeholders con corchetes o "$[VALOR]"
 • Bloques finales tipo "NORMAS RELEVANTES:"
-• 🚫 SINTAXIS MARKDOWN — el panel renderiza HTML, NO Markdown.
-  NUNCA uses [texto](url), [email](mailto:email), **negrita**,
-  __subrayado__, ### encabezados, * listas, etc. Los emails van
-  PLANOS: "CARTERA@HUS.GOV.CO" — sin corchetes, sin paréntesis.
 • Texto fuera de los tags XML
 • Repetir información entre párrafos
 • Tono hostil o acusatorio
@@ -536,69 +446,17 @@ REGLAS:
 • NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia). Glosa tarifaria es contractual.
 • Si la entidad es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001 FUERZAS MILITARES, NO cites T-760/2008.
 
-🚫 PROHIBIDO MEZCLAR "TARIFA PROPIA" CON "CONTRATO" (regla anti-contradicción):
-  Si el BLOQUE 1 informa un CONTRATO vigente (cualquier número de
-  contrato, "interadministrativo", "vigente", "suscrito"), la tarifa
-  aplicable es la TARIFA PACTADA EN ESE CONTRATO — punto. La palabra
-  "PROPIA" queda PROHIBIDA en todo el dictamen. Frases vetadas:
-    ❌ "TARIFA PROPIA INSTITUCIONAL ... EN VIRTUD DEL CONTRATO X"
-    ❌ "TARIFA PROPIA INSTITUCIONAL PACTADA"  ← contradicción interna:
-        "propia" = unilateral, "pactada" = bilateral; NO COEXISTEN
-    ❌ "TARIFA PROPIA INSTITUCIONAL DE $X" (en presencia de contrato)
-    ❌ "RESOLUCIÓN 054/2026 ... ESTABLECIDA POR EL CONTRATO X"
-    ❌ "TARIFA UNILATERAL DEL HOSPITAL ... CONFORME AL CONTRATO X"
-  Cuando hay contrato, di SIEMPRE:
-    ✅ "TARIFA PACTADA EN EL CONTRATO No. [X] DE $[VALOR]"
-    ✅ "EL CONTRATO No. [X] ESTABLECE COMO TARIFA APLICABLE $[VALOR]"
-    ✅ "EL CONTRATO INCORPORA LAS TARIFAS DE LA RESOLUCIÓN 054/2026 ESE HUS"
-       (solo si el campo Tarifa pactada del BLOQUE 1 dice "PROPIA" o
-       "INSTITUCIONAL" — y aún así, la fuente normativa primaria es el
-       contrato, no la resolución).
-  Si NO hay contrato (Tarifa pactada = "SIN CONTRATO" o vacía), entonces
-  sí puedes invocar la Resolución 054/2026 como tarifario institucional
-  aplicable supletoriamente, junto con la Circular 047/2025 (SOAT).
-
-  REGLA DE ORO: si el BLOQUE 1 te muestra un número de contrato + un
-  valor de tarifa, llama a esa tarifa "TARIFA PACTADA" o "TARIFA DEL
-  CONTRATO" — sin importar lo que diga la modalidad. La palabra
-  "propia" queda RESERVADA exclusivamente al caso sin contrato.
-
-⚖ RESPUESTA MIXTA cuando FACTURADO > PACTADO (regla de honestidad):
-  Cuando el BLOQUE 1 muestre que el valor FACTURADO supera al valor
-  PACTADO (HUS facturó por encima del contrato), NO redactes un
-  dictamen que pida "levantamiento íntegro de la glosa" — sería
-  incorrecto. El Art. 1602 C.C. obliga a HUS a respetar lo pactado
-  igual que obliga a la EPS a respetar lo pactado.
-  Tu dictamen debe ser MIXTO:
-    1. Reconoce con TRANSPARENCIA en P2 que parte del valor facturado
-       supera la tarifa pactada y que ESE EXCEDENTE ESE HUS LO ACEPTA.
-    2. Defiende SOLO la porción objetada que sí está dentro del
-       contrato (objetado − excedente).
-    3. En P4, solicita "LEVANTAMIENTO PARCIAL DE LA GLOSA POR $[X]"
-       y manifiesta "ACEPTACIÓN PARCIAL DEL EXCEDENTE DE $[Y]".
-    4. Código de respuesta apropiado: RE9905 (ACEPTACIÓN PARCIAL),
-       NO uses RE9901 (NO ACEPTADA TOTAL) en este escenario.
-  Si el BLOQUE 1 te trae un bloque "EXCEDENTE FACTURADO DETECTADO",
-  los números a aceptar y a defender ya vienen calculados — úsalos
-  textualmente, no inventes otros.
-
-🚫 ANTI-RELLENO Y REPETICIÓN (regla de concisión):
-  • NO repitas en P3 lo que ya dijiste en P1 (servicio, código, EPS, valor).
-  • NO uses "DE LA ESE HUS" más de UNA VEZ en todo el dictamen — el sujeto
-    ya quedó identificado al inicio.
-  • Cuando enuncies la fuente normativa, basta con UNA cita literal entre
-    comillas — NO concatenes 3 normas con citas literales seguidas.
-  • Si el BLOQUE COMPLEJIDAD dice ALTA y la respuesta supera 250 palabras,
-    estás divagando: condensa.
-
-EJEMPLO DE RESPUESTA CONCILIADORA (longitud objetivo ~230 palabras):
-"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS SOBRE EL CÓDIGO TA0801, INTERPUESTA POR DISPENSARIO MÉDICO BUCARAMANGA, RESPECTO DEL ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA IDENTIFICADO CON CUPS 898101, FACTURADO POR VALOR DE $190.964 Y RECONOCIDO SOLO POR $45.411.
-
-LA AFIRMACIÓN DE LA AUDITORÍA DE QUE EL VALOR DEBE LIMITARSE A LA TARIFA RECONOCIDA NO SE AJUSTA AL MARCO CONTRACTUAL POR LAS SIGUIENTES RAZONES: EN PRIMER LUGAR, EL CONTRATO 440-DIGSA/DMBUG-2025 ESTABLECE COMO TARIFA APLICABLE EL SOAT/SMLV CON DESCUENTO DEL 20%, CRITERIO NO APLICADO POR LA ENTIDAD PAGADORA. EN SEGUNDO LUGAR, NO ES ADMISIBLE MODIFICAR UNILATERALMENTE LA TARIFA PACTADA EN VÍA DE GLOSA.
-
-DE CONFORMIDAD CON EL ARTÍCULO 871 DEL CÓDIGO DE COMERCIO (BUENA FE CONTRACTUAL) Y EL ARTÍCULO 1602 DEL CÓDIGO CIVIL (CONTRATO COMO LEY ENTRE LAS PARTES), CORRESPONDE RESPETAR LA TARIFA CONVENIDA. TRATÁNDOSE DE POBLACIÓN DEL SUBSISTEMA DE SALUD FF.MM., EL DECRETO 1795 DE 2000 Y EL ACUERDO 002 DE 2001 REAFIRMAN QUE LA REMUNERACIÓN SE RIGE POR LAS TARIFAS DEL CONTRATO INTERADMINISTRATIVO.
-
-EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA TA0801 Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR DE $190.964."
+ESQUELETO DE ARGUMENTACIÓN (no copiar literal — adapta al caso real):
+P1 abre con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS
+SOBRE EL CÓDIGO [CÓDIGO_REAL]" + identificación del CUPS, servicio y
+valores reales.
+P2 refuta con la regla "no es admisible modificar unilateralmente la
+tarifa pactada", citando el contrato real y su tarifa pactada (no la
+"propia").
+P3 fundamenta con Art. 871 C.Comercio + Art. 1602 C.Civil, y régimen
+especial SI APLICA al pagador real.
+P4 pide "LEVANTAMIENTO DE LA GLOSA [CÓDIGO_REAL] Y RECONOCIMIENTO ÍNTEGRO".
+Cada caso es único: usa los DATOS DEL CASO, no plantillas memorizadas.
 """
 
 SYSTEM_SO = SYSTEM_BASE + """
@@ -610,14 +468,16 @@ REGLAS:
 • Si la glosa está dentro de términos, NO menciones el Art. 57 Ley 1438/2011.
 • Cita Res. 2284/2023 (Manual Único, causales taxativas) y Res. 1995/1999.
 
-EJEMPLO (~220 palabras):
-"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE SOPORTES SOBRE EL CÓDIGO SO0101, INTERPUESTA POR NUEVA EPS, RESPECTO DEL SERVICIO IDENTIFICADO CON CUPS 890301, FACTURADO POR EL VALOR INDICADO EN EL EXPEDIENTE.
-
-LA AFIRMACIÓN DE LA AUDITORÍA DE QUE LOS SOPORTES SON INSUFICIENTES NO SE AJUSTA A LOS DOCUMENTOS DEL EXPEDIENTE POR LAS SIGUIENTES RAZONES: EN PRIMER LUGAR, LA HISTORIA CLÍNICA INSTITUCIONAL ACREDITA LA ATENCIÓN CON SUS EVOLUCIONES Y ÓRDENES MÉDICAS. EN SEGUNDO LUGAR, LOS RIPS FUERON RADICADOS CONFORME A LA RESOLUCIÓN 866 DE 2021. EN TERCER LUGAR, LOS DOCUMENTOS EXIGIDOS POR LA RES. 2284/2023 (MANUAL ÚNICO) OBRAN ÍNTEGRAMENTE EN EL EXPEDIENTE.
-
-DE CONFORMIDAD CON LA RESOLUCIÓN 1995 DE 1999, LA HISTORIA CLÍNICA CONSTITUYE DOCUMENTO MÉDICO-LEGAL DE PLENA PRUEBA QUE ACREDITA LA EFECTIVA PRESTACIÓN DEL SERVICIO. POR SU PARTE, LA CIRCULAR 030 DE 2013 ESTABLECE QUE LOS ERRORES FORMALES SON SUBSANABLES Y NO CONSTITUYEN CAUSAL DE GLOSA. ADICIONALMENTE, EL ARTÍCULO 177 DE LA LEY 100 DE 1993 ESTABLECE EL DEBER DE LA ENTIDAD PAGADORA DE RECONOCER LOS VALORES DEBIDAMENTE FACTURADOS.
-
-EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA SO0101 Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO."
+ESQUELETO (no copiar literal — apóyate en los soportes reales del PDF):
+P1 identifica el código y servicio reales del caso.
+P2 refuta enumerando 2-3 documentos REALES del expediente (historia
+clínica, RIPS, órdenes — los que efectivamente aparezcan en el PDF), no
+una lista genérica.
+P3 cita Resolución 1995/1999 (HC = plena prueba) + Circular 030/2013
+(errores formales subsanables) + Art. 177 Ley 100/1993.
+P4 pide levantamiento del código real y reconocimiento íntegro.
+Cuando el PDF aporte folios, fechas o nombres del médico tratante,
+INCORPÓRALOS al argumento — eso es lo que hace única la respuesta.
 """
 
 SYSTEM_CO = SYSTEM_BASE + """
@@ -656,14 +516,16 @@ PROHIBIDO:
 • Inventar cláusulas contractuales específicas.
 • Citar T-760/2008 si la entidad NO es EPS regular.
 
-EJEMPLO FA0202 dispensario militar (~240 palabras):
-"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN SOBRE EL CÓDIGO FA0202, INTERPUESTA POR DISPENSARIO MÉDICO BUCARAMANGA, RESPECTO DEL CUIDADO INTRAHOSPITALARIO POR MEDICINA ESPECIALIZADA IDENTIFICADO CON CUPS 890602, FACTURADO POR EL VALOR INDICADO EN EL EXPEDIENTE.
-
-LA AFIRMACIÓN DE LA AUDITORÍA DE QUE LA ATENCIÓN ESTÁ INCLUIDA EN LOS HONORARIOS POSTQUIRÚRGICOS NO SE AJUSTA A LA NATURALEZA DEL SERVICIO POR LAS SIGUIENTES RAZONES: EN PRIMER LUGAR, EL CUPS 890602 CORRESPONDE A CUIDADO INTRAHOSPITALARIO DE MEDICINA ESPECIALIZADA, SERVICIO DISTINTO DE LOS HONORARIOS DEL CIRUJANO TRATANTE. EN SEGUNDO LUGAR, SE TRATA DE VALORACIÓN POR OTRA ESPECIALIDAD QUE ATIENDE COMORBILIDADES AJENAS AL ACTO QUIRÚRGICO. EN TERCER LUGAR, EL SUPUESTO FÁCTICO DE FA0202 (VISITAS DOMICILIARIAS) NO CONCURRE EN EL CASO, POR TRATARSE DE ATENCIÓN INTRAHOSPITALARIA.
-
-DE CONFORMIDAD CON LA RESOLUCIÓN 1995 DE 1999, LA HISTORIA CLÍNICA CONSTITUYE PLENA PRUEBA DE LA NATURALEZA DEL SERVICIO. POR SU PARTE, EL CONTRATO 440-DIGSA/DMBUG-2025 RIGE LA RELACIÓN CONTRACTUAL; TRATÁNDOSE DE POBLACIÓN DEL SUBSISTEMA DE SALUD FF.MM., EL DECRETO 1795 DE 2000 Y EL ACUERDO 002 DE 2001 REAFIRMAN LA OBLIGACIÓN DE RECONOCER LOS VALORES FACTURADOS. EL ARTÍCULO 177 DE LA LEY 100 DE 1993 ESTABLECE EL DEBER DE RECONOCIMIENTO.
-
-EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE A LA ENTIDAD PAGADORA EL LEVANTAMIENTO DE LA GLOSA FA0202 Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO."
+ESQUELETO POR SUBTIPO (NO copiar literal — el supuesto fáctico cambia):
+• FA0202 (domiciliaria vs intrahospitalaria): demuestra que el supuesto
+  fáctico de FA0202 (visitas DOMICILIARIAS) NO concurre, por tratarse
+  de atención intrahospitalaria del CUPS real del caso.
+• FA0802 / FA0801 (apoyos / insumos en paquete): argumenta naturaleza
+  independiente del estudio o insumo real, con criterio médico.
+• FA con error formal: invoca Circular 030/2013 explícitamente.
+Cita Res. 1995/1999 + Art. 177 Ley 100/1993 como base. Régimen especial
+solo cuando el pagador lo justifique. Cierra pidiendo levantamiento del
+código FA real del caso.
 """
 
 SYSTEM_AU = SYSTEM_BASE + """
@@ -810,127 +672,6 @@ CALCULADORA TARIFARIA OBLIGATORIA:
     return base + bloque_calculo + bloque_regimen
 
 
-# ─── R59 P2: Modo "Auditoría Previa" ─────────────────────────────────────
-# Prompt orientado a DIAGNÓSTICO NEUTRAL, no a defender la posición del HUS.
-# Pensado para que un gestor (auditor o coordinador) suba la glosa + soportes
-# y reciba un análisis objetivo antes de decidir defender / aceptar / pedir
-# más información.
-
-_PROMPT_AUDITORIA_PREVIA = """\
-Eres un AUDITOR MÉDICO DE CUENTAS DE LA ESE HUS — NO un abogado defensor.
-
-Tu rol en este modo es entregar un DIAGNÓSTICO PREVIO objetivo y neutral
-sobre una glosa formulada por una EPS. NO redactas dictamen formal. NO
-usas lenguaje de defensa ("ESE HUS NO ACEPTA…", "se solicita levantamiento").
-
-OBJETIVO:
-  Identificar QUÉ objeta realmente la EPS, QUÉ dicen los soportes, qué
-  riesgos hay, y RECOMENDAR (no decidir) la acción más sensata.
-
-ESTRUCTURA DE SALIDA — devuelve HTML con EXACTAMENTE estas secciones:
-
-<div class="auditoria-previa">
-
-  <section data-block="resumen">
-    <h3>1. Resumen del caso</h3>
-    <p>2–3 frases neutrales: qué glosó la EPS, código y valor.</p>
-  </section>
-
-  <section data-block="hallazgos">
-    <h3>2. Hallazgos en los soportes</h3>
-    <ul>
-      <li>QUÉ contiene cada soporte aportado (historia, factura, RIPS, etc.)</li>
-      <li>QUÉ NO contiene si esperabas verlo (ej. "no hay nota médica de pertinencia")</li>
-      <li>Inconsistencias entre soportes y factura (fechas, CUPS, valores)</li>
-    </ul>
-  </section>
-
-  <section data-block="riesgos">
-    <h3>3. Riesgos identificados</h3>
-    <ul>
-      <li><strong>[ALTO/MEDIO/BAJO]</strong> tipo de riesgo — explicación corta.</li>
-      <li>Ejemplos típicos:
-        <ul>
-          <li>Tope SOAT excedido (calcula la diferencia exacta si tienes datos)</li>
-          <li>Falta soporte clínico de pertinencia</li>
-          <li>Código CUPS mal asignado al servicio prestado</li>
-          <li>Glosa formulada fuera de plazo (extemporánea por EPS)</li>
-          <li>Doble cobro o cobro de servicio incluido en paquete</li>
-          <li>Diferencia entre tarifa pactada y tarifa cobrada</li>
-        </ul>
-      </li>
-    </ul>
-  </section>
-
-  <section data-block="probabilidad">
-    <h3>4. Probabilidad de levantamiento</h3>
-    <p>
-      <strong>ALTA / MEDIA / BAJA</strong>: justifica con 1 párrafo
-      objetivo. NO afirmes que vamos a ganar — solo evalúa probabilidad
-      con base en los soportes y la jurisprudencia conocida.
-    </p>
-  </section>
-
-  <section data-block="recomendacion">
-    <h3>5. Recomendación neutral</h3>
-    <p>
-      Recomienda UNA de estas acciones con 1–2 frases de justificación:
-    </p>
-    <ul>
-      <li><strong>DEFENDER TOTAL</strong> — los soportes respaldan la posición HUS</li>
-      <li><strong>DEFENDER PARCIAL</strong> — defender X% y aceptar Y% (especifica valores si los hay)</li>
-      <li><strong>ACEPTAR TOTAL</strong> — la objeción de la EPS es procedente</li>
-      <li><strong>PEDIR MÁS INFORMACIÓN</strong> — falta un soporte clave antes de decidir</li>
-    </ul>
-  </section>
-
-  <section data-block="normativa">
-    <h3>6. Normativa relevante</h3>
-    <ul>
-      <li>Cita 2-4 normas pertinentes al caso (Ley/Resolución/Sentencia)
-          SIN tomar posición. Ejemplo: "Res. 2284/2023 Manual Único —
-          aplicable porque…"</li>
-    </ul>
-  </section>
-
-</div>
-
-PROHIBIDO en este modo:
-  - Encabezados tipo "ESE HUS NO ACEPTA LA GLOSA…"
-  - Frases de defensa: "se solicita el levantamiento", "respetuosamente
-    no aceptamos", "argumentación jurídica…"
-  - Inventar valores monetarios. Si no tienes una cifra, di "valor no
-    disponible en los soportes recibidos".
-  - Inventar normas. Solo cita las del cuerpo normativo conocido.
-
-OBLIGATORIO:
-  - Lenguaje técnico neutral (informe de auditoría, no sentencia).
-  - Si hay tope SOAT, calcula y muestra: SOAT pleno - tarifa pactada =
-    diferencia.
-  - Si la EPS pide soporte y NO está, dilo claramente — el gestor
-    decidirá si lo busca o acepta.
-"""
-
-
-def get_system_prompt_auditoria(eps: str) -> str:
-    """R59 P2: prompt para modo 'auditoria_previa' (diagnóstico neutral).
-
-    A diferencia de get_system_prompt(), este NO depende del prefijo de
-    código (TA/SO/FA…) porque el flujo es uniforme: analizar y reportar.
-    El régimen especial sí se inyecta para que el auditor sepa que es
-    SOAT/Sanidad Militar/etc. al evaluar tarifas.
-    """
-    contrato = get_contrato(eps)
-    bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
-    if bloque_regimen:
-        bloque_regimen = (
-            "\n══════════════════════════════════════════════\n"
-            + bloque_regimen
-            + "\n══════════════════════════════════════════════\n"
-        )
-    return _PROMPT_AUDITORIA_PREVIA + bloque_regimen
-
-
 def build_contrato_context(eps: str) -> str:
     """Devuelve un bloque con los datos contractuales específicos de la EPS.
     Se inyecta en el USER prompt (no en system), para que el caché del system
@@ -994,8 +735,6 @@ def build_user_prompt(
     cups_verificado: Optional[str] = None,
     valor_objetado: Optional[str] = None,
     tono: Optional[str] = "conciliador",
-    valor_facturado: Optional[str] = None,
-    valor_pactado: Optional[str] = None,
 ) -> str:
     """Construye el user prompt estructurado para la IA.
 
@@ -1028,8 +767,6 @@ def build_user_prompt(
 
     # Valor monetario — si no viene, la IA no debe inventar
     valor_fmt = _formato_valor(valor_objetado)
-    valor_fact_fmt = _formato_valor(valor_facturado) if valor_facturado else None
-    valor_pact_fmt = _formato_valor(valor_pactado) if valor_pactado else None
 
     # Trazabilidad
     trazabilidad_partes = []
@@ -1127,139 +864,6 @@ def build_user_prompt(
             )
     except Exception:
         pass
-
-    # Cláusulas literales del contrato firmado con esta EPS específica
-    # (extraídas del PDF subido). Si están disponibles, son la mejor
-    # munición para el dictamen porque la EPS firmó ese mismo documento.
-    bloque_clausulas_contrato_str = ""
-    try:
-        from app.services.extractor_clausulas_contrato import (
-            bloque_clausulas_contrato_para_prompt,
-        )
-        bloque_clausulas_contrato_str = bloque_clausulas_contrato_para_prompt(
-            str(eps or ""), str(codigo or ""), max_clausulas=3,
-        )
-    except Exception:
-        pass
-
-    # ───────────────────────────────────────────────────────────────
-    # Bloque AUDITORÍA PREVIA: el sistema audita las afirmaciones de
-    # la EPS contra los datos verificados ANTES de gastar tokens del
-    # LLM. La IA recibe los hallazgos como checklist a refutar.
-    # ───────────────────────────────────────────────────────────────
-    bloque_auditoria_str = ""
-    try:
-        from app.services.auditor_glosa import construir_bloque_auditoria
-        def _num_safe(s):
-            if not s:
-                return 0.0
-            d = re.sub(r"[^\d]", "", str(s))
-            return float(d) if d else 0.0
-        bloque_auditoria_str = construir_bloque_auditoria(
-            texto_glosa or "",
-            eps=eps, codigo=codigo, cups=cups,
-            tiene_contrato=bool(numero_contrato and "SIN" not in str(numero_contrato).upper()),
-            valor_facturado=_num_safe(valor_facturado),
-            valor_pactado=_num_safe(valor_pactado),
-            valor_objetado=_num_safe(valor_objetado),
-            contexto_pdf=contexto_pdf or "",
-        )
-    except Exception:
-        bloque_auditoria_str = ""
-
-    # ───────────────────────────────────────────────────────────────
-    # Bloque EXCEDENTE: cuando facturado > pactado, instruimos al LLM
-    # a redactar dictamen MIXTO (acepta el excedente real, defiende
-    # el resto). Solo se inyecta si tenemos los 3 números reales.
-    # ───────────────────────────────────────────────────────────────
-    bloque_excedente_str = ""
-    try:
-        def _num(s):
-            if not s:
-                return 0
-            d = re.sub(r"[^\d]", "", str(s))
-            return int(d) if d else 0
-        _vf = _num(valor_facturado)
-        _vp = _num(valor_pactado)
-        _vo = _num(valor_objetado)
-        # ─── SANITY CHECK ─── descartar facturado si el ratio contra
-        # objetado es absurdo (>50×). Cuando ocurre es porque el parser
-        # leyó mal el PDF (ej. tomó otro valor de la factura, o
-        # concatenó cifras). Aceptar valores en esa condición causaría
-        # que HUS acepte montos que no debía aceptar.
-        if _vf > 0 and _vo > 0 and _vf > 50 * _vo:
-            _vf = 0
-        # Cuando facturado > pactado y existe valor objetado: la EPS
-        # tiene razón parcial o total dependiendo de cómo se compare
-        # la diferencia con lo objetado. Decidimos automáticamente:
-        #   excedente_real >= objetado → ACEPTAR_TOTAL (la EPS sólo
-        #     objeta una porción de lo que realmente excede el contrato)
-        #   excedente_real < objetado → ACEPTAR_PARCIAL (parte del
-        #     objetado es excedente real, parte es valor pactado)
-        if _vf > 0 and _vp > 0 and _vf > _vp and _vo > 0:
-            _excedente = _vf - _vp
-            if _excedente + 1 >= _vo:
-                _aceptar = _vo
-                _defender = 0
-                _modo = "ACEPTAR_TOTAL"
-                _explica = (
-                    f"El monto OBJETADO (${_vo:,.0f}) cabe completo en "
-                    f"el excedente real (${_excedente:,.0f}). La "
-                    "objeción de la EPS es procedente."
-                )
-            else:
-                _aceptar = _excedente
-                _defender = _vo - _excedente
-                _modo = "ACEPTAR_PARCIAL"
-                _explica = (
-                    f"Parte del objetado (${_aceptar:,.0f}) es "
-                    f"excedente real; el resto (${_defender:,.0f}) "
-                    "está dentro de la tarifa pactada."
-                )
-            _bloque_p2_p4 = (
-                (
-                    "  P2: reconoce que la objeción es procedente porque "
-                    "  el monto objetado cabe completo en el excedente "
-                    "  facturado por encima de lo pactado. ESE HUS "
-                    f"  ACEPTA ÍNTEGRAMENTE LOS ${_aceptar:,.0f} OBJETADOS.\n"
-                    "  P4: manifiesta ACEPTACIÓN ÍNTEGRA de la glosa por "
-                    f"  ${_aceptar:,.0f}. No pidas levantamiento — esto NO\n"
-                    "      se está defendiendo, se está aceptando.\n"
-                    "  CÓDIGO RESPUESTA: usa el de ACEPTACIÓN TOTAL.\n"
-                ) if _modo == "ACEPTAR_TOTAL" else (
-                    f"  P2: reconoce con transparencia que ESE HUS ACEPTA "
-                    f"  ${_aceptar:,.0f} (excedente real) y argumenta que "
-                    f"  ${_defender:,.0f} sí está dentro del contrato.\n"
-                    "  P3: Art. 1602 C.C. + Art. 871 C.Com. en ambas\n"
-                    "      direcciones (EPS no puede objetar lo pactado;\n"
-                    "      HUS reconoce lo facturado en exceso).\n"
-                    f"  P4: solicita LEVANTAMIENTO PARCIAL por ${_defender:,.0f} "
-                    f"  + ACEPTACIÓN PARCIAL por ${_aceptar:,.0f}.\n"
-                    "  CÓDIGO RESPUESTA: RE9905 (ACEPTAR PARCIAL).\n"
-                )
-            )
-            bloque_excedente_str = (
-                f"\n═══ ⚠ EXCEDENTE FACTURADO DETECTADO — DECISIÓN: {_modo} ═══\n"
-                f"  • FACTURADO  : ${_vf:,.0f}\n"
-                f"  • PACTADO    : ${_vp:,.0f}\n"
-                f"  • OBJETADO   : ${_vo:,.0f}\n"
-                f"  • EXCEDENTE REAL (facturado − pactado): ${_excedente:,.0f}\n"
-                f"  • SE ACEPTA   : ${_aceptar:,.0f}\n"
-                f"  • SE DEFIENDE : ${_defender:,.0f}\n"
-                f"  • {_explica}\n"
-                "\n"
-                "  Tu dictamen DEBE ser HONESTO según la matriz:\n"
-                f"  → <accion>{_modo}</accion>\n"
-                f"  → <valor_aceptar>{int(_aceptar)}</valor_aceptar>\n"
-                f"  → <valor_defender>{int(_defender)}</valor_defender>\n"
-                "  P1 (apertura): cita FACTURADO real y OBJETADO real "
-                "  con la fórmula \"FACTURADO POR $[FACT], RESPECTO DEL "
-                "  CUAL LA EPS OBJETA $[OBJ]\".\n"
-                + _bloque_p2_p4
-                + "════════════════════════════════════════════════════════\n"
-            )
-    except Exception:
-        bloque_excedente_str = ""
 
     # Cálculo aritmético para glosas TA con contrato (factor conocido)
     bloque_calculo_str = ""
@@ -1359,11 +963,8 @@ def build_user_prompt(
             f"\n[COMPLEJIDAD DETECTADA: ALTA — puntaje {_puntos_complejidad}]\n"
             f"  • {_num_docs_pdf} documento(s) PDF adjunto(s), {_pdf_len:,} caracteres totales.\n"
             f"  • Texto de glosa: {_texto_glosa_len} caracteres.\n"
-            f"  LONGITUD DE RESPUESTA: 3-4 PÁRRAFOS, 190-240 palabras total. NO superes 250.\n"
+            f"  LONGITUD DE RESPUESTA: 4 PÁRRAFOS, 230-310 palabras total.\n"
             f"  Aprovecha los datos del PDF: cita folios, fechas, diagnósticos, médicos específicos.\n"
-            f"  ⚠ ANTI-RELLENO: cada oración debe aportar argumento NUEVO. Si te das cuenta de que\n"
-            f"  estás repitiendo el código de glosa, el servicio o la EPS por segunda vez en otro\n"
-            f"  párrafo, REESCRIBE esa oración: ya quedó identificado al inicio.\n"
         )
     else:
         bloque_complejidad_str = (
@@ -1420,31 +1021,17 @@ def build_user_prompt(
 • Contrato vigente  : {numero_contrato}
 • Tarifa pactada    : {tarifa}
 • CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
-• Valor FACTURADO por HUS : {valor_fact_fmt or "no detectado en el expediente"}   ← LO QUE COBRAMOS
-• Valor PACTADO en contrato: {valor_pact_fmt or "no detectado en el expediente"}   ← LO QUE EL CONTRATO FIJA
-• Valor OBJETADO por la EPS: {valor_fmt}   ← LO QUE LA EPS DICE QUE ES EXCEDENTE / NO QUIERE PAGAR
+• Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
 • Trazabilidad      : {trazabilidad}
 • Tiempo transcurrido: {contexto_tiempo}
 
 ⚠ REGLA CRÍTICA DE DATOS (FALLAR ESTO DESCALIFICA LA RESPUESTA):
-  1. NUNCA confundas los TRES valores. Son CONCEPTOS DISTINTOS:
-       FACTURADO   = monto bruto que HUS cobró por el servicio
-       PACTADO     = monto que el contrato establece como tarifa
-       OBJETADO    = monto que la EPS rechaza pagar (suele ser el
-                     "excedente" según la EPS, no el total de la factura)
-     EJEMPLO REAL: factura HUS por $247.663, contrato pacta $231.556,
-     EPS objeta $168.563. Decir "FACTURADO POR $168.563" es ERROR
-     GRAVE — $168.563 es OBJETADO, no facturado.
-  2. En el párrafo 1 (apertura), CITA el valor FACTURADO si está
-     disponible:
-        ✅ "FACTURADO POR $247.663, RESPECTO DEL CUAL LA EPS OBJETA
-            $168.563"
-     Si SOLO conoces el OBJETADO, redacta neutral:
-        ✅ "RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA $168.563"
-     NUNCA escribas "FACTURADO POR $[valor objetado]".
-  3. Si el CUPS tiene sufijo (ej. "372301H", "039001H1", "39147B-18",
+  1. Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar
+     literalmente en el argumento. NUNCA escribas "EL VALOR INDICADO EN EL
+     EXPEDIENTE" si tienes el número real.
+  2. Si el CUPS tiene sufijo (ej. "372301H", "039001H1", "39147B-18",
      "FMQ6296", "19914262-04"), ÚSALO COMPLETO, NO lo trunques.
-  4. Cuando la EPS mencione un CUPS alternativo dentro del texto de la glosa
+  3. Cuando la EPS mencione un CUPS alternativo dentro del texto de la glosa
      (frases como "se reconoce código 39143", "tarifa SOAT código X", "se
      paga como CUPS Y"), ESE CUPS alternativo NO es el que HUS facturó —
      es lo que la EPS PROPONE como sustituto. TÚ SIEMPRE CITAS EL CUPS DEL
@@ -1460,7 +1047,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_clausulas_contrato_str}{bloque_auditoria_str}{bloque_excedente_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
@@ -1479,7 +1066,7 @@ Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 <contrato>...</contrato>
 <tarifa>...</tarifa>
 <normas_clave>Norma1 | Norma2 | Norma3</normas_clave>
-<argumento>[EN MAYÚSCULAS, TONO CONCILIADOR. LONGITUD SEGÚN BLOQUE COMPLEJIDAD: simple=2 párrafos 130-180 palabras, complejo=3-4 párrafos 190-240 palabras (máximo 250). DENSO, SIN RELLENO, SIN REPETIR información. UNA sola cita literal entre comillas del BLOQUE NORMATIVA, no acumules. Si hay contrato, llama a la tarifa "TARIFA PACTADA" — NUNCA "tarifa propia institucional"]</argumento>
+<argumento>[EN MAYÚSCULAS, TONO CONCILIADOR. LONGITUD SEGÚN BLOQUE COMPLEJIDAD: simple=2 párrafos 130-180 palabras, complejo=4 párrafos 230-310 palabras. DENSO, SIN RELLENO, SIN REPETIR información. Cita literal entre comillas del BLOQUE NORMATIVA cuando aplique]</argumento>
 
 RECUERDA:
 1. El <argumento> debe seguir la estructura de 4 párrafos del system prompt (Identificación → Refutación → Fundamento → Petición conciliadora).

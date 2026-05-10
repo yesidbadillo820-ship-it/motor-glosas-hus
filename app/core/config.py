@@ -22,8 +22,12 @@ class Settings(BaseSettings):
     # Google Gemini API key (tier gratis muy generoso: 15 RPM, 1500 RPD)
     # Conseguir en: https://aistudio.google.com/apikey
     gemini_api_key: str = ""
-    # Cual se usa primero. Default "anthropic". Tambien soportado: "groq" | "gemini"
-    primary_ai: str = "anthropic"
+    # Cual se usa primero. Default "gemini" (gratis, calidad alta, lee PDFs nativos).
+    # Tambien soportado: "anthropic" | "groq". El fallback automatico es:
+    #   gemini    -> gemini -> anthropic -> groq
+    #   anthropic -> anthropic -> gemini -> groq
+    #   groq      -> gemini -> anthropic -> groq  (groq SIEMPRE ultimo recurso)
+    primary_ai: str = "gemini"
     groq_model: str = "llama-3.3-70b-versatile"
     anthropic_model: str = "claude-sonnet-4-6"
     # Modelo Gemini por defecto (Flash 2.0 GA - gratis 15 RPM / 1500 RPD).
