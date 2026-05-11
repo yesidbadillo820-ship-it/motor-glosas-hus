@@ -87,7 +87,35 @@ def _buscar_clave_norma(tipo: str, numero: str, anio: str, normas: dict) -> Opti
     return None
 
 
-def verificar_citas(dictamen_html: str) -> dict:
+def _corpus_clausulas_contrato(eps: Optional[str] = None) -> str:
+    """Construye un corpus normalizado con el texto literal de las
+    clausulas extraidas del PDF del contrato firmado.
+
+    Si se pasa `eps`, filtra solo las clausulas de esa EPS; si no, incluye
+    TODAS las clausulas de TODOS los contratos. Lo segundo es mas permisivo
+    (una cita del contrato de Compensar podria pasar como valida en una
+    glosa de Sanitas) pero evita falsos positivos cuando el call site no
+    conoce la EPS.
+
+    Retorna string normalizado vacio si no hay clausulas o si la BD falla.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato
+        db = SessionLocal()
+        try:
+            q = db.query(ClausulaContrato)
+            if eps:
+                q = q.filter(ClausulaContrato.eps == eps.upper())
+            textos = [(cl.texto_literal or "") for cl in q.all()]
+            return " ".join(_normalizar(t) for t in textos if t)
+        finally:
+            db.close()
+    except Exception:
+        return ""
+
+
+def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
     """Escanea el dictamen y devuelve un reporte de validación.
 
     Estructura:
@@ -189,7 +217,7 @@ def verificar_citas(dictamen_html: str) -> dict:
     citas_literales = PAT_CITA_LITERAL.findall(texto)
     if citas_literales:
         # Construir corpus completo de TODOS los textos normativos para búsqueda
-        corpus_normalizado = " ".join(
+        corpus_normas = " ".join(
             _normalizar(n.get("texto", ""))
             + " "
             + _normalizar(n.get("ratio_literal", ""))
@@ -201,6 +229,12 @@ def verificar_citas(dictamen_html: str) -> dict:
             )
             for n in normas.values()
         )
+        # Ampliar corpus con clausulas literales extraidas del PDF del contrato
+        # firmado con la EPS. Una cita textual del contrato debe pasar como
+        # VALIDA (no como CITA_LITERAL_FALSA) — el contrato es texto autoritativo
+        # tan valido como una norma.
+        corpus_clausulas = _corpus_clausulas_contrato(eps=eps)
+        corpus_normalizado = corpus_normas + " " + corpus_clausulas
         for cita in citas_literales:
             total_citas += 1
             cita_norm = _normalizar(cita)
