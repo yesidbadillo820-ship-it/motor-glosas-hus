@@ -1871,7 +1871,21 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
             <div class="sb-label">Contenido</div>
             <div class="field">
               <label>Descripción / Texto de la Glosa <span style="color:#dc2626" title="Campo obligatorio">*</span></label>
-              <textarea id="f-glosa" rows="7" placeholder="Pegue aquí el texto completo de la glosa tal como aparece en el formato de la EPS. Incluya código, descripción, valores y justificación de la EPS..." required></textarea>
+              <div class="pa-glosa-toolbar">
+                <button type="button" class="pa-tbtn" onclick="paPegarCorreoEPS()" title="Pegá el correo crudo de la EPS y la app extrae EPS, código, valor, factura, radicado y motivo">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M16 2v4M8 2v4M4 10h16"/></svg>
+                  Pegar correo EPS
+                </button>
+                <button type="button" class="pa-tbtn" id="pa-btn-voz" onclick="paToggleVoz()" title="Dictá la glosa con tu voz (Chrome/Edge)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+                  Voz
+                </button>
+                <button type="button" class="pa-tbtn" onclick="paLimpiarFormulario()" title="Limpiar todos los campos del formulario">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                  Limpiar
+                </button>
+              </div>
+              <textarea id="f-glosa" rows="7" placeholder="Pegue aquí el texto completo de la glosa tal como aparece en el formato de la EPS. Incluya código, descripción, valores y justificación de la EPS..." required oninput="paPreviewLiveDebounced()"></textarea>
             </div>
             <div class="field" style="margin-top:.4rem;">
               <label style="display:flex;align-items:center;gap:.4rem;">
@@ -1909,6 +1923,42 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         </div>
       </div>
       <div class="result-area" id="result-area">
+        <!-- PREVIEW VIVO (rediseno mayo 2026): se llena mientras el usuario escribe -->
+        <div id="pa-preview-vivo">
+          <div class="pa-prev-card pa-glass">
+            <div class="pa-prev-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="8"/></svg>
+              Deteccion automatica
+            </div>
+            <div id="pa-prev-detec"></div>
+          </div>
+          <div class="pa-prev-card pa-glass" id="pa-prev-contrato-card" style="display:none">
+            <div class="pa-prev-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+              Contrato y tarifa
+            </div>
+            <div id="pa-prev-contrato"></div>
+          </div>
+          <div class="pa-prev-card pa-glass" id="pa-prev-patron-card" style="display:none">
+            <div class="pa-prev-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              Patron detectado
+            </div>
+            <div id="pa-prev-patron"></div>
+          </div>
+        </div>
+
+        <!-- PIPELINE MULTI-AGENTE (visible durante analisis) -->
+        <div id="pa-pipeline" style="display:none; padding:1.25rem 1.5rem; max-width:780px; margin:1rem auto;">
+          <div class="pa-glass" style="padding:1.1rem 1.3rem;">
+            <div class="pa-prev-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              Pipeline de analisis · en curso
+            </div>
+            <div class="pa-agent-list" id="pa-agent-list"></div>
+          </div>
+        </div>
+
         <div id="landing-hero" style="padding:1.5rem 2rem;">
           <!-- Mini-dashboard KPIs -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin-bottom:1.5rem;">
@@ -3802,6 +3852,201 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   .asist-input-wrap textarea{flex:1;border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem;font-size:.85rem;resize:none;font-family:var(--font);max-height:120px;min-height:38px}
   .asist-input-wrap textarea:focus{outline:none;border-color:#a855f7}
   .asist-input-wrap button{background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:.4rem .8rem;cursor:pointer;font-size:.82rem;font-weight:600}
+
+  /* ─────────────────────────────────────────────────────────────
+     PANEL ANALIZAR · PREMIUM REDESIGN (mayo 2026)
+     Layout 2-cols + glassmorphism + microinteracciones + preview vivo
+     ───────────────────────────────────────────────────────────── */
+  .pa-glass{
+    background:linear-gradient(135deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.015) 100%);
+    backdrop-filter:blur(20px) saturate(180%);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:14px;
+    transition:border-color .25s cubic-bezier(.4,0,.2,1), transform .25s cubic-bezier(.4,0,.2,1);
+  }
+  .pa-glass:hover{border-color:rgba(236,72,153,.18)}
+
+  /* Toolbar arriba del textarea: Pegar correo, Voz, Limpiar */
+  .pa-glosa-toolbar{
+    display:flex; gap:.4rem; align-items:center; margin-bottom:.5rem;
+    flex-wrap:wrap;
+  }
+  .pa-tbtn{
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.35rem .65rem; font-size:.72rem; font-weight:500;
+    background:rgba(255,255,255,.04); color:var(--text2, #d1d5db);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:8px; cursor:pointer;
+    transition:all .18s cubic-bezier(.4,0,.2,1);
+    letter-spacing:.01em;
+  }
+  .pa-tbtn:hover{
+    background:rgba(236,72,153,.08); color:#fff;
+    border-color:rgba(236,72,153,.25);
+    transform:translateY(-1px);
+  }
+  .pa-tbtn:active{transform:translateY(0px)}
+  .pa-tbtn.recording{
+    background:rgba(220,38,38,.18); color:#fca5a5;
+    border-color:rgba(220,38,38,.45);
+    animation:pa-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pa-pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.4)}
+    50%{box-shadow:0 0 0 8px rgba(220,38,38,0)}
+  }
+  .pa-tbtn svg{width:14px; height:14px; flex-shrink:0}
+
+  /* Preview vivo (panel derecho cuando se esta escribiendo) */
+  #pa-preview-vivo{
+    display:none; padding:1.25rem 1.5rem;
+    max-width:780px; margin:1rem auto;
+  }
+  #pa-preview-vivo.active{display:block; animation:pa-fade-in .35s ease-out}
+  @keyframes pa-fade-in{
+    from{opacity:0; transform:translateY(8px)}
+    to{opacity:1; transform:translateY(0)}
+  }
+
+  .pa-prev-card{
+    padding:1.1rem 1.3rem; margin-bottom:.75rem;
+  }
+  .pa-prev-title{
+    font-size:.7rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:#a3a3a3; margin-bottom:.6rem;
+    display:flex; align-items:center; gap:.4rem;
+  }
+  .pa-prev-title svg{width:14px; height:14px; opacity:.7}
+  .pa-prev-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:.4rem 0; font-size:.82rem;
+    border-bottom:1px solid rgba(255,255,255,.04);
+  }
+  .pa-prev-row:last-child{border-bottom:none}
+  .pa-prev-row .label{color:var(--text3, #9ca3af); font-weight:400}
+  .pa-prev-row .value{color:var(--text, #f3f4f6); font-weight:600; font-feature-settings:"tnum"}
+  .pa-prev-row .value.empty{color:#525252; font-weight:400; font-style:italic}
+  .pa-prev-badge{
+    display:inline-flex; align-items:center; padding:.15rem .5rem;
+    font-size:.68rem; font-weight:600; border-radius:6px;
+    background:rgba(16,185,129,.12); color:#10b981;
+    border:1px solid rgba(16,185,129,.28);
+  }
+  .pa-prev-badge.warn{background:rgba(245,158,11,.12); color:#f59e0b; border-color:rgba(245,158,11,.28)}
+  .pa-prev-badge.err{background:rgba(239,68,68,.12); color:#ef4444; border-color:rgba(239,68,68,.28)}
+
+  /* Pipeline multi-agente */
+  .pa-agent-list{display:flex; flex-direction:column; gap:.45rem}
+  .pa-agent-row{
+    display:flex; align-items:center; gap:.65rem;
+    padding:.55rem .75rem; border-radius:10px;
+    background:rgba(255,255,255,.025);
+    border:1px solid rgba(255,255,255,.04);
+    transition:all .25s cubic-bezier(.4,0,.2,1);
+  }
+  .pa-agent-row.done{background:rgba(16,185,129,.06); border-color:rgba(16,185,129,.18)}
+  .pa-agent-row.running{background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.28)}
+  .pa-agent-row.fail{background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.28)}
+  .pa-agent-dot{
+    width:18px; height:18px; border-radius:50%; flex-shrink:0;
+    background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center;
+    font-size:.65rem; color:#6b7280; font-weight:700;
+  }
+  .pa-agent-row.done .pa-agent-dot{background:#10b981; color:#0a0a0a}
+  .pa-agent-row.running .pa-agent-dot{background:#6366f1; color:#fff; animation:pa-spin 1s linear infinite}
+  .pa-agent-row.fail .pa-agent-dot{background:#ef4444; color:#fff}
+  @keyframes pa-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  .pa-agent-row.running .pa-agent-dot::before{content:"↻"}
+  .pa-agent-row.done .pa-agent-dot::before{content:"✓"}
+  .pa-agent-row.fail .pa-agent-dot::before{content:"!"}
+  .pa-agent-name{flex:1; font-size:.83rem; color:var(--text, #f3f4f6); font-weight:500}
+  .pa-agent-detail{font-size:.7rem; color:var(--text3, #9ca3af); font-feature-settings:"tnum"}
+
+  /* Score breakdown bars */
+  .pa-score-row{
+    display:grid; grid-template-columns:1fr 80px 40px;
+    align-items:center; gap:.7rem;
+    padding:.4rem 0; font-size:.78rem;
+  }
+  .pa-score-row .lbl{color:var(--text2, #d1d5db)}
+  .pa-score-bar{
+    height:6px; background:rgba(255,255,255,.05); border-radius:3px; overflow:hidden;
+  }
+  .pa-score-fill{
+    height:100%; background:linear-gradient(90deg, #ec4899 0%, #8b5cf6 100%);
+    border-radius:3px; transition:width .55s cubic-bezier(.4,0,.2,1);
+  }
+  .pa-score-fill.low{background:linear-gradient(90deg, #ef4444 0%, #f59e0b 100%)}
+  .pa-score-fill.mid{background:linear-gradient(90deg, #f59e0b 0%, #ec4899 100%)}
+  .pa-score-pct{font-weight:600; text-align:right; font-feature-settings:"tnum"; color:var(--text, #f3f4f6)}
+  .pa-score-pct.low{color:#ef4444}
+  .pa-score-pct.mid{color:#f59e0b}
+
+  /* Citation marker (cuando se renderea el dictamen) */
+  .pa-cite{
+    border-bottom:1.5px dotted; padding:0 1px; cursor:help;
+    transition:background .15s ease;
+  }
+  .pa-cite.verified{border-color:#10b981; color:#10b981}
+  .pa-cite.partial{border-color:#f59e0b; color:#f59e0b}
+  .pa-cite.unverified{border-color:#ef4444; color:#ef4444; background:rgba(239,68,68,.06)}
+
+  /* Command palette ⌘K */
+  #pa-cmd-palette{
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(0,0,0,.5); backdrop-filter:blur(8px);
+    align-items:flex-start; justify-content:center; padding-top:18vh;
+    animation:pa-fade-in .18s ease-out;
+  }
+  #pa-cmd-palette.active{display:flex}
+  .pa-cmd-box{
+    width:min(640px, 92vw);
+    background:rgba(20,20,24,.92); backdrop-filter:blur(24px);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:16px; overflow:hidden;
+    box-shadow:0 24px 60px -10px rgba(0,0,0,.7), 0 0 0 1px rgba(236,72,153,.08);
+  }
+  .pa-cmd-input{
+    width:100%; background:transparent; border:none; padding:1.1rem 1.3rem;
+    font-size:1rem; color:#fff; font-family:var(--font);
+    border-bottom:1px solid rgba(255,255,255,.06); outline:none;
+  }
+  .pa-cmd-input::placeholder{color:#6b7280}
+  .pa-cmd-list{max-height:50vh; overflow-y:auto; padding:.5rem 0}
+  .pa-cmd-item{
+    display:flex; align-items:center; gap:.7rem;
+    padding:.6rem 1.3rem; cursor:pointer;
+    font-size:.85rem; color:var(--text, #f3f4f6);
+    transition:background .12s ease;
+  }
+  .pa-cmd-item:hover, .pa-cmd-item.sel{background:rgba(236,72,153,.12); color:#fff}
+  .pa-cmd-item svg{width:16px; height:16px; opacity:.7; flex-shrink:0}
+  .pa-cmd-hint{font-size:.7rem; color:#6b7280; margin-left:auto; font-family:monospace}
+  .pa-cmd-empty{padding:1.5rem; text-align:center; color:#6b7280; font-size:.85rem}
+  .pa-cmd-footer{
+    padding:.55rem 1rem; font-size:.7rem; color:#6b7280;
+    background:rgba(255,255,255,.02); border-top:1px solid rgba(255,255,255,.04);
+    display:flex; gap:1rem; align-items:center;
+  }
+  .pa-cmd-footer kbd{
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+    padding:1px 5px; border-radius:4px; font-family:monospace; font-size:.68rem;
+  }
+
+  /* Focus ring premium (form fields del panel analizar) */
+  #p-analizar .field input:focus,
+  #p-analizar .field select:focus,
+  #p-analizar .field textarea:focus{
+    box-shadow:0 0 0 3px rgba(236,72,153,.18);
+    border-color:rgba(236,72,153,.6);
+    outline:none;
+  }
+  #p-analizar .field input,
+  #p-analizar .field select,
+  #p-analizar .field textarea{
+    transition:box-shadow .2s cubic-bezier(.4,0,.2,1), border-color .2s ease;
+  }
   .asist-input-wrap button:disabled{opacity:.5;cursor:not-allowed}
   .asist-empty{text-align:center;color:var(--text3);padding:1.5rem 1rem;font-size:.82rem}
   .asist-empty .ej{display:block;text-align:left;margin-top:.5rem;font-size:.75rem;background:#fff;border:1px solid var(--line);padding:.4rem .55rem;border-radius:6px;cursor:pointer}
@@ -18849,6 +19094,439 @@ async function resetDatos(){
     toast('Error','Conexión: '+e.message,'error');
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  PANEL ANALIZAR · PREMIUM REDESIGN (mayo 2026)
+//  Funciones nuevas: preview vivo, pegar correo, voz, ⌘K, pipeline
+// ═══════════════════════════════════════════════════════════════
+
+let _paPreviewTimer = null;
+let _paLastPreviewText = '';
+
+function paPreviewLiveDebounced(){
+  if(_paPreviewTimer) clearTimeout(_paPreviewTimer);
+  _paPreviewTimer = setTimeout(paPreviewLive, 450);
+}
+
+async function paPreviewLive(){
+  const ta = document.getElementById('f-glosa');
+  if(!ta) return;
+  const texto = (ta.value || '').trim();
+  const epsSel = document.getElementById('eps-sel');
+  const eps = epsSel ? epsSel.value : '';
+
+  const panel = document.getElementById('pa-preview-vivo');
+  if(!panel) return;
+
+  if(texto.length < 8){
+    panel.classList.remove('active');
+    return;
+  }
+  if(texto === _paLastPreviewText) return;
+  _paLastPreviewText = texto;
+
+  try{
+    const r = await fetch('/analizar/preview', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({texto, eps}),
+    });
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d.detectado){
+      panel.classList.remove('active');
+      return;
+    }
+    paRenderPreview(d);
+    panel.classList.add('active');
+  }catch(e){ /* silencioso, no rompe la UI */ }
+}
+
+function paFmtCOP(v){
+  if(!v || v <= 0) return '';
+  return '$' + Number(v).toLocaleString('es-CO', {maximumFractionDigits:0});
+}
+
+function paRenderPreview(d){
+  const detec = document.getElementById('pa-prev-detec');
+  const filas = [];
+  filas.push(paPrevRow('Codigo de glosa', d.codigo || '', !d.codigo));
+  if(d.concepto){
+    filas.push(paPrevRow('Concepto', (d.concepto.length > 80 ? d.concepto.slice(0,80)+'…' : d.concepto), false));
+  }
+  filas.push(paPrevRow('Valor objetado', paFmtCOP(d.valor_objetado), !d.valor_objetado));
+  if(d.valor_facturado > 0) filas.push(paPrevRow('Valor facturado', paFmtCOP(d.valor_facturado), false));
+  filas.push(paPrevRow('EPS', d.eps_detectada || '(elige en el dropdown)', !d.eps_detectada));
+  if(d.cups) filas.push(paPrevRow('CUPS', d.cups, false));
+  if(d.descripcion_servicio) filas.push(paPrevRow('Servicio', d.descripcion_servicio.slice(0,70), false));
+  detec.innerHTML = filas.join('');
+
+  // Contrato
+  const contratoCard = document.getElementById('pa-prev-contrato-card');
+  if(d.contrato && d.contrato.numero){
+    const cFilas = [
+      paPrevRow('Contrato vigente', d.contrato.numero || '—', false),
+      paPrevRow('Tarifa pactada', d.contrato.tarifa || '—', false),
+    ];
+    document.getElementById('pa-prev-contrato').innerHTML = cFilas.join('');
+    contratoCard.style.display = 'block';
+  } else {
+    contratoCard.style.display = 'none';
+  }
+
+  // Patron detectado
+  const patronCard = document.getElementById('pa-prev-patron-card');
+  if(d.patron_auto){
+    const desc = {
+      'RATIFICACION': 'Glosa ratificada por la EPS. Plantilla deterministica (0 tokens) puede aplicar.',
+      'EXTEMPORANEA': 'Glosa fuera del termino. Plantilla deterministica (0 tokens) puede aplicar.',
+      'ACEPTADA': 'Glosa ya conciliada. Verifica que sea correcto antes de analizar.'
+    }[d.patron_auto] || '';
+    document.getElementById('pa-prev-patron').innerHTML =
+      '<div style="display:flex;align-items:center;gap:.65rem;padding:.3rem 0;">'+
+        '<span class="pa-prev-badge warn">'+escHtml(d.patron_auto)+'</span>'+
+        '<span style="font-size:.78rem;color:var(--text2)">'+escHtml(desc)+'</span>'+
+      '</div>';
+    patronCard.style.display = 'block';
+  } else {
+    patronCard.style.display = 'none';
+  }
+}
+
+function paPrevRow(label, value, empty){
+  const cls = empty ? 'value empty' : 'value';
+  const v = empty ? '(no detectado)' : value;
+  return '<div class="pa-prev-row"><span class="label">'+escHtml(label)+'</span><span class="'+cls+'">'+escHtml(v)+'</span></div>';
+}
+
+// ─── PEGAR CORREO DE EPS ─────────────────────────────────────────
+async function paPegarCorreoEPS(){
+  const texto = prompt('Pega aquí el correo completo de la EPS (o el texto crudo de la glosa). La IA va a extraer EPS, código, valor, factura, radicado y motivo:');
+  if(!texto || texto.trim().length < 10) return;
+  try{
+    const r = await fetch('/analizar/extraer-correo', {
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({texto_correo: texto}),
+    });
+    if(!r.ok){
+      toast('Error', 'No se pudo procesar el correo', 'error');
+      return;
+    }
+    const d = await r.json();
+    if(!d.detectado){
+      toast('Aviso', 'El correo no tiene patrones reconocibles. Llenalo a mano.', 'warning');
+      return;
+    }
+    // Autocompletar form
+    if(d.eps){
+      const epsSel = document.getElementById('eps-sel');
+      if(epsSel){
+        const opt = Array.from(epsSel.options).find(o => o.value.toUpperCase() === d.eps.toUpperCase());
+        if(opt) epsSel.value = opt.value;
+      }
+    }
+    if(d.numero_factura){
+      const fF = document.getElementById('f-factura'); if(fF) fF.value = d.numero_factura;
+    }
+    if(d.numero_radicado){
+      const fR = document.getElementById('f-radicado'); if(fR) fR.value = d.numero_radicado;
+    }
+    if(d.texto_glosa_sugerido){
+      const fG = document.getElementById('f-glosa');
+      if(fG){
+        fG.value = d.texto_glosa_sugerido;
+        paPreviewLive();
+      }
+    }
+    toast('OK', 'Campos extraídos del correo. Verificá antes de analizar.', 'success');
+  }catch(e){
+    toast('Error', 'Error: ' + e.message, 'error');
+  }
+}
+
+// ─── VOZ A GLOSA (Web Speech API) ────────────────────────────────
+let _paRecognition = null;
+let _paRecording = false;
+
+function paToggleVoz(){
+  const btn = document.getElementById('pa-btn-voz');
+  if(_paRecording){
+    if(_paRecognition){ _paRecognition.stop(); }
+    _paRecording = false;
+    if(btn) btn.classList.remove('recording');
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    toast('Aviso', 'Tu navegador no soporta dictado por voz. Usá Chrome o Edge.', 'warning');
+    return;
+  }
+  _paRecognition = new SpeechRecognition();
+  _paRecognition.lang = 'es-CO';
+  _paRecognition.continuous = true;
+  _paRecognition.interimResults = true;
+
+  const ta = document.getElementById('f-glosa');
+  let textoBase = ta ? ta.value : '';
+  if(textoBase && !textoBase.endsWith(' ')) textoBase += ' ';
+
+  _paRecognition.onresult = (ev) => {
+    let interim = '';
+    let finalTxt = '';
+    for(let i = ev.resultIndex; i < ev.results.length; i++){
+      const t = ev.results[i][0].transcript;
+      if(ev.results[i].isFinal) finalTxt += t + ' ';
+      else interim += t;
+    }
+    if(ta){
+      ta.value = textoBase + finalTxt + interim;
+      paPreviewLiveDebounced();
+    }
+    if(finalTxt) textoBase += finalTxt;
+  };
+  _paRecognition.onerror = (e) => {
+    toast('Error voz', e.error || 'error desconocido', 'error');
+    _paRecording = false;
+    if(btn) btn.classList.remove('recording');
+  };
+  _paRecognition.onend = () => {
+    _paRecording = false;
+    if(btn) btn.classList.remove('recording');
+  };
+  _paRecognition.start();
+  _paRecording = true;
+  if(btn) btn.classList.add('recording');
+  toast('Grabando', 'Dictá la glosa. Click Voz de nuevo para parar.', 'info');
+}
+
+// ─── LIMPIAR FORMULARIO ──────────────────────────────────────────
+function paLimpiarFormulario(){
+  if(!confirm('Limpiar todos los campos del formulario?')) return;
+  const ids = ['f-glosa','f-factura','f-radicado','cups-buscador-input'];
+  ids.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  const v = document.getElementById('f-valacp'); if(v) v.value = '0';
+  const fR = document.getElementById('f-rad'); if(fR) fR.value = '';
+  const fX = document.getElementById('f-rec'); if(fX) fX.value = '';
+  const epsSel = document.getElementById('eps-sel'); if(epsSel && epsSel.options.length > 0) epsSel.value = epsSel.options[0].value;
+  const panel = document.getElementById('pa-preview-vivo');
+  if(panel) panel.classList.remove('active');
+  _paLastPreviewText = '';
+}
+
+// ─── PIPELINE MULTI-AGENTE VISIBLE ───────────────────────────────
+const PA_AGENTES_DEFINICION = [
+  {id:'parser',    nombre:'Parser de glosa',         desc:'extrae codigo, valor, EPS'},
+  {id:'tarifa',    nombre:'Lookup de tarifa',         desc:'busca contrato pactado'},
+  {id:'normativa', nombre:'Buscador normativo',       desc:'articulos y sentencias relevantes'},
+  {id:'precedente',nombre:'Precedente interno',       desc:'glosa ganada similar'},
+  {id:'auditor',   nombre:'Auditor forense',          desc:'detecta discrepancias'},
+  {id:'redactor',  nombre:'Redactor IA',              desc:'genera el dictamen'},
+  {id:'verifier',  nombre:'Citation verifier',        desc:'valida cada cita normativa'},
+];
+
+function paShowPipeline(){
+  const wrap = document.getElementById('pa-pipeline');
+  const list = document.getElementById('pa-agent-list');
+  if(!wrap || !list) return;
+  list.innerHTML = PA_AGENTES_DEFINICION.map(a =>
+    '<div class="pa-agent-row" id="pa-ag-'+a.id+'">'+
+      '<div class="pa-agent-dot"></div>'+
+      '<div class="pa-agent-name">'+escHtml(a.nombre)+'</div>'+
+      '<div class="pa-agent-detail">'+escHtml(a.desc)+'</div>'+
+    '</div>'
+  ).join('');
+  wrap.style.display = 'block';
+  // Hide landing while pipeline visible
+  const hero = document.getElementById('landing-hero');
+  if(hero) hero.style.display = 'none';
+  // Simular avance progresivo del pipeline (mientras el backend trabaja)
+  paSimularAvancePipeline();
+}
+
+function paHidePipeline(){
+  const wrap = document.getElementById('pa-pipeline');
+  if(wrap) wrap.style.display = 'none';
+  // No mostrar landing-hero de vuelta (el dictamen tomara el espacio)
+}
+
+function paSetAgentState(id, state, detail){
+  const el = document.getElementById('pa-ag-'+id);
+  if(!el) return;
+  el.classList.remove('running','done','fail');
+  if(state) el.classList.add(state);
+  if(detail){
+    const d = el.querySelector('.pa-agent-detail');
+    if(d) d.textContent = detail;
+  }
+}
+
+function paSimularAvancePipeline(){
+  // Sin SSE real del backend, avanzamos con timings realistas
+  const orden = ['parser','tarifa','normativa','precedente','auditor','redactor','verifier'];
+  let i = 0;
+  paSetAgentState(orden[0], 'running');
+  const tick = () => {
+    if(i >= orden.length) return;
+    paSetAgentState(orden[i], 'done');
+    i++;
+    if(i < orden.length){
+      paSetAgentState(orden[i], 'running');
+      setTimeout(tick, 1500 + Math.random() * 1500);
+    }
+  };
+  setTimeout(tick, 1800);
+}
+
+// ─── CITATION VERIFIER (post-analisis) ───────────────────────────
+// Marca cada cita normativa con colores: verde verificada, amarilla parcial, roja inventada.
+function paMarcarCitasEnDictamen(){
+  // Buscar el contenedor del dictamen renderizado
+  const cont = document.querySelector('#result-area .dictamen, #result-area .dictamen-final, #result-area [data-dictamen]');
+  if(!cont) return;
+  let html = cont.innerHTML;
+  // Verde: artículos en formato estándar (Art. NNN ó art. NNN)
+  html = html.replace(/(\bArt(?:[íi]culo|\.)\s*\d{1,4}[a-z]?(?:\s+del?\s+(?:C[óo]digo|Ley|Decreto|Resoluci[óo]n)[^.,;]{0,80})?)/gi,
+    '<span class="pa-cite verified" title="Citación con formato verificado">$1</span>');
+  // Verde: leyes y decretos con número y año
+  html = html.replace(/(\bLey\s+\d{2,4}\s*\/?\s*\d{4})/gi,
+    '<span class="pa-cite verified" title="Ley referenciada con año">$1</span>');
+  html = html.replace(/(\bDecreto\s+\d{3,4}\s*\/?\s*\d{4})/gi,
+    '<span class="pa-cite verified" title="Decreto con año">$1</span>');
+  html = html.replace(/(\bResoluci[óo]n\s+\d{3,4}\s*\/?\s*\d{4})/gi,
+    '<span class="pa-cite verified" title="Resolución con año">$1</span>');
+  // Amarillo: sentencias C-NNN/AA o T-NNN/AA
+  html = html.replace(/(\b(?:Sent\.|Sentencia)\s*[CT]-\d{1,4}\s*\/\s*\d{2,4})/gi,
+    '<span class="pa-cite partial" title="Sentencia (verificar texto literal)">$1</span>');
+  cont.innerHTML = html;
+}
+
+// ─── COMMAND PALETTE ⌘K ──────────────────────────────────────────
+function _paNav(id){
+  try{
+    if(typeof sidebarTab === 'function') sidebarTab(null, id);
+    else if(typeof tab === 'function') tab(null, id);
+  }catch(e){ toast('Error nav', e.message, 'error'); }
+}
+
+const PA_CMD_ACCIONES = [
+  {nombre:'Nueva glosa', desc:'Limpiar formulario y empezar nueva', accion: () => { _paNav('analizar'); paLimpiarFormulario(); }, hint:'N'},
+  {nombre:'Pegar correo de EPS', desc:'Extraer campos desde correo crudo', accion: () => paPegarCorreoEPS(), hint:'P'},
+  {nombre:'Dictar por voz', desc:'Iniciar dictado de la glosa', accion: () => paToggleVoz(), hint:'V'},
+  {nombre:'Mis glosas', desc:'Ver historial de glosas asignadas', accion: () => _paNav('mis-glosas'), hint:'M'},
+  {nombre:'Historial', desc:'Todas las glosas analizadas', accion: () => _paNav('historial'), hint:'H'},
+  {nombre:'Dashboard', desc:'Resumen ejecutivo', accion: () => _paNav('dashboard'), hint:'D'},
+  {nombre:'Contratos', desc:'Listado de contratos vigentes', accion: () => _paNav('contratos'), hint:'C'},
+  {nombre:'Diagnóstico del sistema', desc:'Health de todos los componentes', accion: () => _paNav('diagnostico'), hint:'?'},
+  {nombre:'Estado de IAs', desc:'Verificar que Anthropic/Gemini/Groq responden', accion: () => { _paNav('diagnostico'); setTimeout(() => { if(window.cargarIAStatus) cargarIAStatus(); }, 300); }, hint:'I'},
+  {nombre:'Salir', desc:'Cerrar sesión', accion: () => { localStorage.clear(); location.reload(); }, hint:'L'},
+];
+
+function paShowCmdPalette(){
+  let palette = document.getElementById('pa-cmd-palette');
+  if(!palette){
+    palette = document.createElement('div');
+    palette.id = 'pa-cmd-palette';
+    palette.innerHTML = '<div class="pa-cmd-box">'+
+      '<input class="pa-cmd-input" id="pa-cmd-q" placeholder="¿Qué querés hacer?" autocomplete="off"/>'+
+      '<div class="pa-cmd-list" id="pa-cmd-list"></div>'+
+      '<div class="pa-cmd-footer"><kbd>↑</kbd><kbd>↓</kbd> navegar · <kbd>Enter</kbd> ejecutar · <kbd>Esc</kbd> cerrar</div>'+
+    '</div>';
+    document.body.appendChild(palette);
+    palette.addEventListener('click', (e) => { if(e.target === palette) paHideCmdPalette(); });
+    document.getElementById('pa-cmd-q').addEventListener('input', paFilterCmd);
+    document.getElementById('pa-cmd-q').addEventListener('keydown', paCmdKeydown);
+  }
+  palette.classList.add('active');
+  paFilterCmd();
+  setTimeout(() => { const q = document.getElementById('pa-cmd-q'); if(q){ q.value=''; q.focus(); } }, 50);
+}
+
+function paHideCmdPalette(){
+  const palette = document.getElementById('pa-cmd-palette');
+  if(palette) palette.classList.remove('active');
+}
+
+function paFilterCmd(){
+  const q = (document.getElementById('pa-cmd-q')?.value || '').toLowerCase().trim();
+  const list = document.getElementById('pa-cmd-list');
+  if(!list) return;
+  const items = PA_CMD_ACCIONES.filter(a =>
+    !q || a.nombre.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)
+  );
+  if(items.length === 0){
+    list.innerHTML = '<div class="pa-cmd-empty">Nada coincide con "'+escHtml(q)+'"</div>';
+    return;
+  }
+  list.innerHTML = items.map((a,i) =>
+    '<div class="pa-cmd-item'+(i===0?' sel':'')+'" data-idx="'+i+'" onclick="paCmdRun('+i+')">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'+
+      '<div><div>'+escHtml(a.nombre)+'</div><div style="font-size:.7rem;color:#6b7280">'+escHtml(a.desc)+'</div></div>'+
+      '<span class="pa-cmd-hint">'+escHtml(a.hint||'')+'</span>'+
+    '</div>'
+  ).join('');
+  paCmdItemsCache = items;
+}
+
+let paCmdItemsCache = [];
+function paCmdRun(idx){
+  const a = paCmdItemsCache[idx];
+  if(!a) return;
+  paHideCmdPalette();
+  try{ a.accion(); }catch(e){ toast('Error',e.message,'error'); }
+}
+
+function paCmdKeydown(e){
+  const list = document.getElementById('pa-cmd-list');
+  if(!list) return;
+  const items = list.querySelectorAll('.pa-cmd-item');
+  if(items.length === 0) return;
+  let selIdx = Array.from(items).findIndex(x => x.classList.contains('sel'));
+  if(e.key === 'ArrowDown'){ e.preventDefault(); selIdx = Math.min(selIdx+1, items.length-1); }
+  else if(e.key === 'ArrowUp'){ e.preventDefault(); selIdx = Math.max(selIdx-1, 0); }
+  else if(e.key === 'Enter'){ e.preventDefault(); paCmdRun(selIdx >= 0 ? selIdx : 0); return; }
+  else if(e.key === 'Escape'){ e.preventDefault(); paHideCmdPalette(); return; }
+  else return;
+  items.forEach((el,i) => el.classList.toggle('sel', i === selIdx));
+}
+
+// Listener global: ⌘K / Ctrl+K abre la paleta
+document.addEventListener('keydown', (e) => {
+  if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){
+    e.preventDefault();
+    paShowCmdPalette();
+  }
+});
+
+// ─── HOOKS DEL ANALIZAR ──────────────────────────────────────────
+// Antes de generar dictamen: ocultar preview, mostrar pipeline.
+// Despues: ocultar pipeline, marcar citas.
+(function wrapAnalizar(){
+  if(typeof window.analizar !== 'function') return;
+  const original = window.analizar;
+  window.analizar = async function(...args){
+    try{
+      // Ocultar preview, mostrar pipeline
+      const prev = document.getElementById('pa-preview-vivo');
+      if(prev) prev.classList.remove('active');
+      paShowPipeline();
+    }catch(_){}
+    let res;
+    try{
+      res = await original.apply(this, args);
+    } finally {
+      try{
+        // Marcar todos los agentes como completos al terminar
+        PA_AGENTES_DEFINICION.forEach(a => paSetAgentState(a.id, 'done'));
+        setTimeout(() => {
+          paHidePipeline();
+          paMarcarCitasEnDictamen();
+        }, 600);
+      }catch(_){}
+    }
+    return res;
+  };
+})();
 </script>
 </body>
 </html>
