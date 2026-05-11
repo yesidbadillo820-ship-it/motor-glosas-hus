@@ -1861,9 +1861,9 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <div class="field pa-field-tight">
                 <label class="pa-lbl-tiny">Tono</label>
                 <div class="etapa-btns pa-seg">
-                  <div class="etapa-btn sel" data-v="conciliador" onclick="setTono(this)" title="Etapa inicial — busca levantamiento sin ratificación">Conciliador</div>
-                  <div class="etapa-btn" data-v="neutral" onclick="setTono(this)" title="Estrictamente técnico-jurídico">Neutral</div>
-                  <div class="etapa-btn" data-v="firme" onclick="setTono(this)" title="Ratificación / segunda respuesta — más contundente">Firme</div>
+                  <div class="etapa-btn sel" data-v="conciliador" onclick="setTono(this)" title="Conciliador — Etapa inicial, busca levantamiento sin ratificación">Concil.</div>
+                  <div class="etapa-btn" data-v="neutral" onclick="setTono(this)" title="Neutral — Estrictamente técnico-jurídico">Neutral</div>
+                  <div class="etapa-btn" data-v="firme" onclick="setTono(this)" title="Firme — Ratificación / segunda respuesta más contundente">Firme</div>
                 </div>
                 <input type="hidden" id="tono-v" value="conciliador"/>
               </div>
@@ -4130,18 +4130,23 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   }
   .pa-seg{
     display:grid; grid-template-columns:repeat(3, 1fr);
-    gap:2px; padding:2px; border-radius:8px;
+    gap:1px; padding:1px; border-radius:8px;
     background:var(--bg-subtle);
     border:1px solid var(--border);
   }
   .pa-seg .etapa-btn{
     border:none !important;
-    padding:.35rem .4rem !important;
-    font-size:.72rem !important;
+    padding:.32rem .2rem !important;
+    font-size:.66rem !important;
     border-radius:6px !important;
     text-align:center; cursor:pointer;
     color:var(--text2); background:transparent;
     transition:all .15s ease;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:clip;
+    letter-spacing:0 !important;
+    line-height:1.2;
   }
   .pa-seg .etapa-btn:hover{background:var(--bg-card); color:var(--text);}
   .pa-seg .etapa-btn.sel{
@@ -15053,14 +15058,31 @@ function nuevaGlosa(){
   document.getElementById('f-valacp').value='0';
   document.getElementById('f-factura').value='';
   document.getElementById('f-radicado').value='';
-  document.getElementById('result-area').innerHTML='<div class="empty-state"><div class="empty-icon">⚖</div><div class="empty-h">IA GLOSAS SINAC SC</div><div class="empty-p">Complete los datos y presione Analizar</div></div>';
+  // 12-features-premium: en vez del empty state viejo, recargar el rico.
+  // El landing-empty-state queda como fallback dentro de #landing-hero, pero
+  // intentamos primero cargar el dashboard del dia.
+  const area = document.getElementById('result-area');
+  if(area){
+    // Restaurar la estructura original (con landing-hero + pa-empty-rich)
+    // para que paCargarEmptyStateRico encuentre los containers.
+    area.innerHTML =
+      '<div id="pa-empty-rich" class="pre-empty-rich" style="display:none"></div>'+
+      '<div class="empty-state" id="landing-empty-state" style="margin:1rem auto">'+
+        '<div class="empty-state-icon">⚖️</div>'+
+        '<h3>IA GLOSAS SINAC SC</h3>'+
+        '<p>Complete los datos y presione <b>Analizar</b></p>'+
+      '</div>';
+    if(typeof paCargarEmptyStateRico === 'function'){
+      paCargarEmptyStateRico();
+    }
+  }
   lastResult=null;
-  // R-UI 27-abr-2026: limpiar tracker de glosa activa para que el
-  // próximo "Analizar" SÍ cree una glosa nueva (no reanalice la
-  // que estaba abierta antes).
   window._glosa_id_actual = null;
-  // Limpiar draft de auto-save tras nueva glosa
   if(typeof _draftClear === 'function') _draftClear('nueva');
+  // Reset del preview vivo
+  if(typeof _paLastPreviewText !== 'undefined') _paLastPreviewText = '';
+  const prev = document.getElementById('pa-preview-vivo');
+  if(prev) prev.classList.remove('active');
 }
 
 // ─── IA STATUS: 3 proveedores + roles + health-check ─────────────
