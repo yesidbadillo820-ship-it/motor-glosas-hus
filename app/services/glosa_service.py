@@ -668,7 +668,7 @@ def limpiar_cierre_extemporanea_indebido(
     return out.strip()
 
 
-def limpiar_palabra_injustificado(texto: str) -> str:
+def limpiar_palabra_injustificado(texto: str, codigo_respuesta: str = "") -> str:
     """Reemplaza todas las formas de "injustificado/a/os/as" por sinónimos
     profesionales que NO contengan la raíz "injustific".
 
@@ -677,7 +677,13 @@ def limpiar_palabra_injustificado(texto: str) -> str:
     fundamento, petición). Esta función es idempotente y safe en
     múltiples pases.
 
-    Reemplazos:
+    EXCEPCION (ampliacion mayo 2026): cuando el codigo_respuesta es RE9602
+    ('Glosa Injustificada al 100% — IPS aporta evidencia que lo demuestra'),
+    la palabra SI debe aparecer porque ESE es el concepto canonico del
+    catalogo oficial (catalogo_glosas.py). En ese caso retornamos el texto
+    SIN modificar.
+
+    Reemplazos para todos los demas casos:
       • Frases compuestas (más específicas primero):
         - "DESCUENTOS INJUSTIFICADOS" → "DESCUENTOS UNILATERALES"
         - "RETRASO INJUSTIFICADO"     → "RETRASO INDEBIDO"
@@ -689,6 +695,9 @@ def limpiar_palabra_injustificado(texto: str) -> str:
     Preserva mayúsculas/minúsculas del original.
     """
     if not texto:
+        return texto
+    # EXCEPCION RE9602: la palabra SI debe aparecer (concepto canonico)
+    if (codigo_respuesta or "").upper().strip() == "RE9602":
         return texto
     out = texto
     # Apertura — primero los adjetivos calificativos colados.
@@ -1119,9 +1128,10 @@ class GlosaService:
                 "TARIFA_MATCH_PERFECTO",
             )
             arg_ia = argumento_fijo if _saltar_suavizar else _suavizar_tono(argumento_fijo)
-            # Sanitizer: aplicar también al camino de texto_fijo para que
-            # plantillas hardcoded sin "injustific*" estén garantizadas.
-            arg_ia = limpiar_palabra_injustificado(arg_ia)
+            # Sanitizer: aplicar al camino de texto_fijo para garantizar que
+            # ninguna plantilla hardcoded use "injustific*", EXCEPTO cuando el
+            # codigo de respuesta es RE9602 (concepto canonico del catalogo).
+            arg_ia = limpiar_palabra_injustificado(arg_ia, codigo_respuesta=cod_res)
             # Sanitizer cierre canónico: solo ratificadas/extemporáneas
             # llevan el "...10 días hábiles... mesa de conciliación...
             # CARTERA@HUS.GOV.CO". Cualquier otra defensa lo pierde.
@@ -2009,8 +2019,10 @@ class GlosaService:
             # 10b) Sanitizer global: eliminar "injustificado/a/os/as" en
             # todas sus formas (directiva ESE HUS mayo 2026 — Yesid).
             # Reemplaza por sinónimos profesionales sin la raíz "injustific".
-            # Ver `limpiar_palabra_injustificado` arriba en este módulo.
-            arg_ia = limpiar_palabra_injustificado(arg_ia)
+            # EXCEPCION: si el codigo de respuesta resuelto es RE9602
+            # ('Glosa Injustificada al 100%'), la palabra SI debe aparecer
+            # porque es el concepto canonico del catalogo oficial.
+            arg_ia = limpiar_palabra_injustificado(arg_ia, codigo_respuesta=cod_res)
 
             # 10c) Sanitizer cierre canónico: el bloque "...10 DÍAS HÁBILES...
             # MESA DE CONCILIACIÓN... COMUNICACIONES: CARTERA@HUS.GOV.CO,

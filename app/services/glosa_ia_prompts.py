@@ -404,6 +404,13 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
 
 5. NOMBRES DE TIPOS (nunca la sigla sola): TA → "TARIFAS", SO → "SOPORTES", AU → "AUTORIZACIÓN", CO → "COBERTURA", CL/PE → "PERTINENCIA CLÍNICA", FA → "FACTURACIÓN", IN → "INSUMOS", ME → "MEDICAMENTOS".
 
+6. PROHIBIDO ABSOLUTO usar la palabra "INJUSTIFICADA" (ni "INJUSTIFICADO", "INJUSTIFICADOS", "INJUSTIFICADAS"). EXCEPCION UNICA: si el codigo de respuesta es RE9602 ('Glosa Injustificada al 100% — IPS aporta evidencia que lo demuestra'), ahi SI es el concepto canonico y DEBE aparecer. En TODOS los demas casos usa sinonimos profesionales:
+   - "GLOSA INJUSTIFICADA" → "GLOSA IMPROCEDENTE"
+   - "DESCUENTO INJUSTIFICADO" → "DESCUENTO UNILATERAL"
+   - "RETRASO INJUSTIFICADO" → "RETRASO INDEBIDO"
+   - "INCUMPLIMIENTO INJUSTIFICADO" → "INCUMPLIMIENTO CONTRACTUAL"
+   - Palabra suelta "INJUSTIFICADO/A" → "IMPROCEDENTE"
+
 ═══════════════ IDENTIFICACIÓN EXPRESA DE VICIOS DE LA GLOSA (cuando aplique) ═══════════════
 Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO en el párrafo de refutación:
 
