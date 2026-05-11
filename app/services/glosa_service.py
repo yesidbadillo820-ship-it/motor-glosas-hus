@@ -1265,6 +1265,25 @@ class GlosaService:
             except Exception:
                 pass
 
+            # CLAUSULAS LITERALES del contrato firmado con esta EPS — extraidas
+            # del PDF via /contratos/extraer-clausulas-pdf. Si la EPS no tiene
+            # contrato cargado, devuelve [] y el prompt no agrega bloque.
+            _clausulas_contrato = []
+            try:
+                from app.services.glosa_ia_prompts import get_clausulas_para_glosa
+                _clausulas_contrato = get_clausulas_para_glosa(
+                    eps=str(data.eps or ""),
+                    codigo_glosa=codigo_det,
+                    max_clausulas=5,
+                )
+                if _clausulas_contrato:
+                    logger.info(
+                        f"[CLAUSULAS-CONTRATO] {len(_clausulas_contrato)} clausulas "
+                        f"inyectadas para EPS={data.eps} codigo={codigo_det}"
+                    )
+            except Exception as _e_cc:
+                logger.debug(f"[CLAUSULAS-CONTRATO] no disponibles: {_e_cc}")
+
             user_prompt = build_user_prompt(
                 texto_glosa=texto_base,
                 contexto_pdf=contexto_pdf,
@@ -1279,6 +1298,7 @@ class GlosaService:
                 valor_facturado=_val_fact_str,
                 valor_pactado=_val_pact_str,
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
+                clausulas_contrato=_clausulas_contrato,
             )
 
             # Multi-agent foundation (env var MULTI_AGENT_HABILITADO=1):

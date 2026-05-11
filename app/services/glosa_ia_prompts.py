@@ -801,6 +801,69 @@ def _formato_valor(valor_raw: Optional[str]) -> str:
     return v
 
 
+def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5) -> list:
+    """Consulta la BD de clausulas extraidas del PDF del contrato firmado
+    con esta EPS, filtrando por tema correspondiente al codigo de glosa.
+
+    Mapeo de tema:
+        TA -> tarifas (TA0201, TA0202, etc.)
+        SO -> soportes (SO0101, SO4201, SO0604, etc.)
+        AU -> autorizaciones (AU0301, AU0302, etc.)
+        CO -> cobertura (CO0101, CO0201, etc.)
+        FA -> facturacion (FA0201, FA0205, FA0301, etc.)
+        CL/PE -> pertinencia clinica (mapea a CO o NN segun caso)
+        NN -> notas generales / clausulas comodin del contrato
+
+    Devuelve lista de dicts: [{numero_clausula, titulo, texto_literal, pagina}, ...]
+    Lista vacia si no hay clausulas (contrato no subido aun, EPS desconocida, etc.).
+
+    NO rompe si la BD no esta disponible — degrada a [] silenciosamente.
+    """
+    if not eps or not codigo_glosa:
+        return []
+    prefijo = (codigo_glosa[:2] or "").upper()
+    # Mapeo amplio: para CL/PE buscamos en CO + NN (pertinencia suele estar ahi)
+    temas_relevantes = {
+        "TA": ["TA", "NN"],
+        "SO": ["SO", "NN"],
+        "AU": ["AU", "NN"],
+        "CO": ["CO", "NN"],
+        "CL": ["CO", "NN"],
+        "PE": ["CO", "NN"],
+        "FA": ["FA", "NN"],
+        "IN": ["FA", "TA", "NN"],
+        "ME": ["FA", "CO", "NN"],
+    }.get(prefijo, ["NN"])
+
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato
+        db = SessionLocal()
+        try:
+            q = (
+                db.query(ClausulaContrato)
+                .filter(ClausulaContrato.eps == eps.upper())
+                .filter(ClausulaContrato.tema.in_(temas_relevantes))
+                .order_by(ClausulaContrato.tema, ClausulaContrato.id)
+                .limit(max_clausulas)
+            )
+            resultados = []
+            for cl in q.all():
+                resultados.append({
+                    "numero_clausula": cl.numero_clausula or "",
+                    "tema": cl.tema or "",
+                    "titulo": cl.titulo or "",
+                    "texto_literal": cl.texto_literal or "",
+                    "pagina": cl.pagina,
+                })
+            return resultados
+        finally:
+            db.close()
+    except Exception:
+        # Si la tabla no existe aun o algo falla, degrada silenciosamente
+        return []
+
+
 def build_user_prompt(
     texto_glosa: str,
     contexto_pdf: str,
@@ -816,6 +879,7 @@ def build_user_prompt(
     valor_facturado: Optional[str] = None,
     valor_pactado: Optional[str] = None,
     tono: Optional[str] = "conciliador",
+    clausulas_contrato: Optional[list] = None,
 ) -> str:
     """Construye el user prompt estructurado para la IA.
 
@@ -948,6 +1012,40 @@ def build_user_prompt(
             )
     except Exception:
         pass
+
+    # CLAUSULAS LITERALES DEL CONTRATO ESPECIFICO con la EPS — extraidas
+    # del PDF firmado por la ESE HUS y la entidad pagadora. Cuando estan
+    # disponibles, la IA puede citarlas TEXTUALMENTE entre comillas,
+    # haciendo la defensa "inatacable" (la EPS firmo el documento).
+    # Las clausulas vienen filtradas por (eps, tema) desde el call site
+    # — solo se inyectan las relevantes al codigo de glosa actual.
+    bloque_clausulas_contrato_str = ""
+    if clausulas_contrato:
+        lineas_cc = []
+        for cl in clausulas_contrato[:5]:  # Max 5 para no saturar el prompt
+            num = (cl.get("numero_clausula") or "").strip() or "—"
+            titulo = (cl.get("titulo") or "").strip()
+            texto = (cl.get("texto_literal") or "").strip()
+            if not texto:
+                continue
+            # Truncar texto literal a 500 chars para no explotar tokens
+            if len(texto) > 500:
+                texto = texto[:500] + "…"
+            pagina = cl.get("pagina")
+            pag_str = f" (pag. {pagina})" if pagina else ""
+            lineas_cc.append(
+                f"  • CLÁUSULA {num}{pag_str} — {titulo}:\n"
+                f"    «{texto}»"
+            )
+        if lineas_cc:
+            bloque_clausulas_contrato_str = (
+                "\n[CLÁUSULAS LITERALES DEL CONTRATO CON " + (eps or "ENTIDAD PAGADORA").upper() + " — CITA TEXTUALMENTE]\n"
+                "IMPORTANTE: estas cláusulas son TEXTO LITERAL del contrato firmado. "
+                "Cuando defiendas, CITA UNA O DOS entre comillas usando su número de cláusula "
+                "para que la EPS no pueda rebatir (firmó el documento que se cita).\n"
+                + "\n".join(lineas_cc)
+                + "\n"
+            )
 
     # Cálculo aritmético para glosas TA con contrato (factor conocido)
     bloque_calculo_str = ""
@@ -1133,7 +1231,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
