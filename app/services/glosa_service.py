@@ -2160,7 +2160,7 @@ class GlosaService:
         verif_citas = None
         try:
             from app.services.citation_verifier import verificar_citas as _vc
-            verif_citas = _vc(dictamen)
+            verif_citas = _vc(dictamen, eps=str(data.eps or ""))
         except Exception as _e:
             logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")
             verif_citas = None
