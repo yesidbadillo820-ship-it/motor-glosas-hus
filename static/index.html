@@ -19755,7 +19755,7 @@ function paSimularAvancePipeline(){
 
 // ─── CITATION VERIFIER (post-analisis) ───────────────────────────
 // Marca cada cita normativa con colores: verde verificada, amarilla parcial, roja inventada.
-function paMarcarCitasEnDictamen(){
+function paMarcarCitasEnDictamen_v1_disabled(){
   // Buscar el contenedor del dictamen renderizado
   const cont = document.querySelector('#result-area .dictamen, #result-area .dictamen-final, #result-area [data-dictamen]');
   if(!cont) return;
@@ -19962,6 +19962,13 @@ document.addEventListener('keydown', (e) => {
 // leyes, decretos, resoluciones y sentencias. ROJO si el backend
 // citation_verifier las marco como falsas (CITA_LITERAL_FALSA, etc).
 function paMarcarCitasEnDictamen(){
+  // TEMPORALMENTE DESACTIVADO — corrompia el HTML del dictamen al hacer
+  // innerHTML = html.replace(regex, ...) sobre contenedores con tablas.
+  // El citation_verifier del backend YA detecta las alucinaciones y las
+  // muestra en su propia card (renderVerificacionCitas) — eso es suficiente
+  // por ahora hasta encontrar una forma segura de marcar sin romper layout.
+  return;
+
   const area = document.getElementById('result-area');
   if(!area) return;
 
