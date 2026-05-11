@@ -184,7 +184,17 @@ async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
         modo_respuesta="defender",
     )
 
-    service = GlosaService()
+    from app.core.config import get_settings
+    _cfg = get_settings()
+    service = GlosaService(
+        groq_api_key=_cfg.groq_api_key,
+        anthropic_api_key=_cfg.anthropic_api_key,
+        primary_ai=_cfg.primary_ai,
+        anthropic_model=_cfg.anthropic_model,
+        groq_model=_cfg.groq_model,
+        gemini_api_key=_cfg.gemini_api_key,
+        gemini_model=_cfg.gemini_model,
+    )
     resultado = await service.analizar(glosa_input, contexto_pdf="")
 
     # Actualizar la glosa existente con el dictamen generado
