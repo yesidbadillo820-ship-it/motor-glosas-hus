@@ -1660,6 +1660,19 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <span class="kbd">⌘K</span>
       </button>
       <div class="status-pill" title="Estado del backend (verde) + indicador live (parpadea cuando llega evento)"><div class="status-dot" id="sdot"></div><span id="stxt">Conectado</span><div id="hdr-live-dot" style="width:6px;height:6px;border-radius:50%;background:#94a3b8;margin-left:6px;transition:all .3s ease" title="Live channel"></div></div>
+
+      <!-- 12-features-premium: Indicador del modelo IA activo (refrescado cada 5min) -->
+      <div class="ia-badge" id="pa-ia-badge" onclick="sidebarTab(null,'diagnostico')" style="cursor:pointer" title="Modelo IA actualmente activo (click para ver diagnostico)">
+        <span class="ia-dot"></span>
+        <span class="ia-prov" id="pa-ia-prov">…</span>
+      </div>
+
+      <!-- 12-features-premium: Hint del Ctrl+K + modal atajos (boton ? abre el modal) -->
+      <button class="pa-cmdk-hint" onclick="paAbrirModalAtajos()" title="Ver atajos de teclado (?)">
+        <span>Atajos</span>
+        <kbd>?</kbd>
+      </button>
+
       <span class="hdr-user" id="hdr-user"></span>
       <button class="hdr-btn" id="btn-install-pwa" onclick="instalarPWA()" title="Instalar app" style="display:none"><svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
       <button class="hdr-btn" onclick="toggleFocusMode()" title="Modo focus (Esc para salir)" aria-label="Modo focus"><svg class="i i-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg></button>
@@ -1690,6 +1703,12 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <svg class="i i-md" viewBox="0 0 24 24"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
         </button>
       </div>
+
+      <!-- 12-features-premium: Search input para filtrar items del sidebar -->
+      <div class="sn-search" style="position:relative">
+        <input type="text" id="sn-search-input" placeholder="Buscar en menú…" autocomplete="off" oninput="paFiltrarSidebar(this.value)" />
+      </div>
+      <div class="sn-search-empty" id="sn-search-empty" style="display:none">Nada coincide con tu búsqueda.</div>
 
       <div class="sn-group">
         <div class="sn-label">Análisis</div>
@@ -2015,7 +2034,12 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
           <div id="copilot-banner" style="display:none;margin:1rem 0"></div>
           <div id="anthropic-billing-banner" style="display:none;margin:1rem 0"></div>
 
-          <!-- Empty state con logo SINAC de fondo + tema festivo dinámico -->
+          <!-- 12-features-premium: Empty state rico (dashboard del dia)
+               Se llena con paCargarEmptyStateRico() al cargar el panel.
+               Si los fetches fallan, el landing-empty-state de abajo queda visible como fallback. -->
+          <div id="pa-empty-rich" class="pre-empty-rich" style="display:none"></div>
+
+          <!-- Empty state con logo SINAC de fondo + tema festivo dinámico (fallback) -->
           <div class="empty-state" id="landing-empty-state" style="margin:1rem auto;position:relative;overflow:hidden;">
             <img src="/static/sinac-logo.png" alt=""
                  style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -4364,6 +4388,399 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   .asist-empty{text-align:center;color:var(--text3);padding:1.5rem 1rem;font-size:.82rem}
   .asist-empty .ej{display:block;text-align:left;margin-top:.5rem;font-size:.75rem;background:#fff;border:1px solid var(--line);padding:.4rem .55rem;border-radius:6px;cursor:pointer}
   .asist-empty .ej:hover{background:#f5f3ff;border-color:#c4b5fd}
+
+  /* ═══════════════════════════════════════════════════════════════
+     PANEL ANALIZAR · 12 FEATURES PREMIUM (mayo 2026)
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* 1. EMPTY STATE RICO — dashboard del día cuando no hay análisis */
+  .pre-empty-rich{
+    padding:1.25rem 1.5rem;
+    max-width:880px;
+    margin:0 auto;
+    display:flex; flex-direction:column; gap:1rem;
+  }
+  .pre-card{
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:1.1rem 1.3rem;
+    box-shadow:var(--sh);
+    transition:transform .2s var(--ease), box-shadow .2s var(--ease);
+  }
+  .pre-card:hover{transform:translateY(-1px); box-shadow:var(--sh-md);}
+  .pre-card-hdr{
+    display:flex; align-items:center; gap:.5rem;
+    font-size:.72rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--text3);
+    margin-bottom:.85rem;
+  }
+  .pre-card-hdr svg{width:14px; height:14px; opacity:.7}
+  .pre-card-hdr .pre-counter{
+    margin-left:auto; background:var(--bg-subtle); color:var(--text2);
+    padding:.12rem .5rem; border-radius:10px; font-size:.7rem;
+    letter-spacing:.02em; font-weight:600; text-transform:none;
+  }
+  .pre-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:.55rem 0; gap:.65rem;
+    border-bottom:1px solid var(--border);
+    font-size:.85rem;
+    cursor:pointer; transition:background .15s ease;
+  }
+  .pre-row:last-child{border-bottom:none}
+  .pre-row:hover{background:var(--bg-subtle); padding-left:.5rem; padding-right:.5rem; margin-left:-.5rem; margin-right:-.5rem; border-radius:6px;}
+  .pre-row .pre-eps{font-weight:600; color:var(--text)}
+  .pre-row .pre-fact{color:var(--text3); font-family:var(--font-mono); font-size:.78rem}
+  .pre-row .pre-val{color:var(--text); font-weight:600; font-feature-settings:"tnum"}
+  .pre-row .pre-h{
+    background:#fef3c7; color:#92400e; padding:.15rem .55rem;
+    border-radius:6px; font-size:.7rem; font-weight:600;
+    font-feature-settings:"tnum";
+  }
+  .pre-row .pre-h.urgent{background:#fee2e2; color:#991b1b}
+  .pre-empty-blurb{
+    color:var(--text3); font-size:.82rem; padding:.4rem 0;
+    line-height:1.55;
+  }
+
+  /* KPIs con sparklines */
+  .pre-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:.85rem;
+  }
+  .pre-kpi{
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:.85rem 1rem;
+    box-shadow:var(--sh);
+  }
+  .pre-kpi-label{
+    font-size:.65rem; font-weight:600; text-transform:uppercase;
+    letter-spacing:.07em; color:var(--text3);
+    margin-bottom:.35rem;
+  }
+  .pre-kpi-row{
+    display:flex; align-items:flex-end; gap:.5rem; justify-content:space-between;
+  }
+  .pre-kpi-value{
+    font-size:1.4rem; font-weight:700; color:var(--text);
+    font-feature-settings:"tnum"; line-height:1;
+  }
+  .pre-kpi-delta{
+    font-size:.72rem; font-weight:600; padding:.1rem .45rem;
+    border-radius:5px; font-feature-settings:"tnum";
+  }
+  .pre-kpi-delta.up{background:#dcfce7; color:#166534}
+  .pre-kpi-delta.down{background:#fee2e2; color:#991b1b}
+  .pre-kpi-delta.neutral{background:var(--bg-subtle); color:var(--text3)}
+  .pre-kpi-spark{
+    margin-top:.55rem; display:block; width:100%; height:24px;
+  }
+  .pre-kpi-spark path{
+    fill:none; stroke:#6366f1; stroke-width:2;
+    stroke-linecap:round; stroke-linejoin:round;
+  }
+  .pre-kpi-spark .spark-fill{
+    fill:rgba(99,102,241,.08); stroke:none;
+  }
+
+  /* Sugerencia del día */
+  .pre-sug-card{
+    background:linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
+    border:1px solid #c7d2fe;
+    border-radius:14px;
+    padding:1rem 1.2rem;
+    display:flex; align-items:flex-start; gap:.85rem;
+  }
+  .pre-sug-icon{
+    width:36px; height:36px; flex-shrink:0;
+    background:linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+  }
+  .pre-sug-body{flex:1; font-size:.85rem; line-height:1.5; color:var(--text)}
+  .pre-sug-body b{color:#4338ca}
+  .pre-sug-cta{
+    display:inline-block; margin-top:.45rem;
+    padding:.32rem .7rem; background:#fff; color:#4338ca;
+    border:1px solid #c7d2fe; border-radius:7px;
+    font-size:.75rem; font-weight:600; cursor:pointer;
+    transition:all .15s ease; text-decoration:none;
+  }
+  .pre-sug-cta:hover{background:#eef2ff; border-color:#a5b4fc}
+
+  /* 2. INDICADOR MODELO IA ACTIVO (badge en header) */
+  .ia-badge{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.32rem .65rem; border-radius:8px;
+    background:var(--bg-card); border:1px solid var(--border);
+    font-size:.72rem; font-weight:600; color:var(--text2);
+    cursor:default;
+    transition:all .2s ease;
+  }
+  .ia-badge:hover{border-color:var(--border2); color:var(--text)}
+  .ia-badge .ia-dot{
+    width:7px; height:7px; border-radius:50%;
+    background:#10b981;
+    box-shadow:0 0 0 3px rgba(16,185,129,.15);
+    animation:ia-pulse 2s ease-in-out infinite;
+  }
+  .ia-badge.warning .ia-dot{background:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.15)}
+  .ia-badge.error .ia-dot{background:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.15); animation:none}
+  @keyframes ia-pulse{
+    0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+    50%{box-shadow:0 0 0 6px rgba(16,185,129,.05)}
+  }
+  .ia-badge .ia-prov{color:var(--text); font-weight:700}
+
+  /* 3. SIDEBAR PREMIUM: search input + favoritos + recientes */
+  .sn-search{
+    margin:.5rem .75rem .65rem; position:sticky; top:0; z-index:5;
+    background:var(--bg-card);
+  }
+  .sn-search input{
+    width:100%; padding:.45rem .6rem .45rem 2rem;
+    font-size:.78rem;
+    background:var(--bg-subtle); border:1px solid var(--border);
+    border-radius:8px; color:var(--text);
+    transition:all .15s ease;
+  }
+  .sn-search input:focus{
+    outline:none; border-color:var(--c-teal2);
+    background:var(--bg-card);
+    box-shadow:0 0 0 3px rgba(2,132,199,.1);
+  }
+  .sn-search::before{
+    content:""; position:absolute; left:.55rem; top:50%;
+    transform:translateY(-50%); width:12px; height:12px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
+    background-size:contain; background-repeat:no-repeat; opacity:.6;
+    pointer-events:none;
+  }
+  .sn-search-empty{
+    padding:1rem .75rem; text-align:center;
+    font-size:.74rem; color:var(--text3); font-style:italic;
+  }
+  body.dark .sn-search input{background:rgba(255,255,255,.05); color:#f1f5f9}
+  body.dark .sn-search input:focus{background:rgba(255,255,255,.08)}
+
+  /* 4. KPIs HEADER con sparklines (mejora al header existente) */
+  .hdr-kpi-spark{display:inline-block; margin-left:.4rem; vertical-align:middle}
+  .hdr-kpi-spark svg{width:48px; height:12px}
+  .hdr-kpi-spark path{fill:none; stroke:currentColor; stroke-width:1.8; opacity:.7}
+
+  /* 5. SKELETON LOADER PREMIUM (para análisis en curso) */
+  .pa-skel{
+    background:var(--bg-card); border:1px solid var(--border);
+    border-radius:12px; padding:1rem 1.2rem;
+    max-width:760px; margin:0 auto;
+  }
+  .pa-skel-line{
+    height:14px; background:linear-gradient(90deg,
+      var(--bg-subtle) 0%, var(--border) 50%, var(--bg-subtle) 100%);
+    background-size:200% 100%; border-radius:7px;
+    animation:pa-skel-shimmer 1.5s linear infinite;
+    margin-bottom:.7rem;
+  }
+  .pa-skel-line.short{width:40%}
+  .pa-skel-line.medium{width:70%}
+  .pa-skel-line.long{width:90%}
+  .pa-skel-line.title{height:20px; width:50%; margin-bottom:1.2rem}
+  @keyframes pa-skel-shimmer{
+    0%{background-position:200% 0}
+    100%{background-position:-200% 0}
+  }
+
+  /* 6. MODAL DE ATAJOS DE TECLADO */
+  #pa-shortcuts-modal{
+    display:none; position:fixed; inset:0; z-index:9998;
+    background:rgba(0,0,0,.55); backdrop-filter:blur(8px);
+    align-items:center; justify-content:center; padding:5vh 2rem;
+    animation:pa-fade-in .18s ease-out;
+  }
+  #pa-shortcuts-modal.active{display:flex}
+  .pa-sc-box{
+    width:min(560px, 92vw);
+    background:var(--bg-card); border:1px solid var(--border);
+    border-radius:16px; overflow:hidden;
+    box-shadow:0 24px 60px -10px rgba(0,0,0,.4);
+    max-height:80vh; display:flex; flex-direction:column;
+  }
+  .pa-sc-hdr{
+    padding:1.05rem 1.4rem;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--bg-subtle);
+  }
+  .pa-sc-hdr h3{font-size:1rem; font-weight:700; color:var(--text); margin:0}
+  .pa-sc-hdr button{
+    background:transparent; border:none; cursor:pointer;
+    color:var(--text3); font-size:1.3rem; padding:.2rem .4rem;
+    border-radius:6px;
+  }
+  .pa-sc-hdr button:hover{background:var(--border); color:var(--text)}
+  .pa-sc-body{padding:.6rem 1.4rem 1.2rem; overflow-y:auto}
+  .pa-sc-section-title{
+    font-size:.7rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--text3);
+    margin-top:1.05rem; margin-bottom:.55rem;
+  }
+  .pa-sc-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.55rem 0; font-size:.82rem; color:var(--text);
+    border-bottom:1px solid var(--border);
+  }
+  .pa-sc-row:last-child{border-bottom:none}
+  .pa-sc-keys{display:flex; gap:.25rem; align-items:center}
+  .pa-sc-keys kbd{
+    background:var(--bg-subtle); border:1px solid var(--border2);
+    color:var(--text2); padding:.12rem .45rem;
+    border-radius:5px; font-family:var(--font-mono); font-size:.72rem;
+    font-weight:600; min-width:1.2em; text-align:center;
+    box-shadow:0 1px 0 var(--border);
+  }
+  .pa-sc-keys .plus{color:var(--text4); margin:0 .1rem; font-weight:600}
+
+  /* Hint Ctrl+K visible en header */
+  .pa-cmdk-hint{
+    display:inline-flex; align-items:center; gap:.3rem;
+    padding:.25rem .55rem;
+    background:var(--bg-subtle);
+    border:1px solid var(--border);
+    border-radius:7px;
+    font-size:.7rem; color:var(--text3);
+    cursor:pointer; transition:all .15s ease;
+    user-select:none;
+  }
+  .pa-cmdk-hint:hover{
+    background:var(--bg-card); color:var(--text);
+    border-color:var(--border2);
+  }
+  .pa-cmdk-hint kbd{
+    background:var(--bg-card); border:1px solid var(--border);
+    color:var(--text2); padding:.05rem .35rem; border-radius:4px;
+    font-family:var(--font-mono); font-size:.65rem; font-weight:700;
+  }
+
+  /* 7. ANIMACIONES GLOBALES de transición */
+  .panel{
+    transition:opacity .25s var(--ease);
+  }
+
+  /* 8. OCULTAR INDICADORES RUIDOSOS DEL HEADER */
+  /* "Lento (Xms)" cuando latencia > 1000ms — ocultar visualmente,
+     conservar accesible via /diagnostico */
+  .hdr-latency-indicator.noisy,
+  .hdr-pct-zero,
+  .hdr-percent-banner:empty{
+    display:none !important;
+  }
+
+  /* 9. ONBOARDING TOUR */
+  #pa-tour-overlay{
+    display:none; position:fixed; inset:0; z-index:9990;
+    background:rgba(0,0,0,.35); backdrop-filter:blur(2px);
+    animation:pa-fade-in .25s ease-out;
+  }
+  #pa-tour-overlay.active{display:block}
+  .pa-tour-tip{
+    position:fixed; max-width:320px;
+    background:var(--bg-card); border:1px solid var(--border);
+    border-radius:12px; padding:1.05rem 1.2rem;
+    box-shadow:0 24px 48px -10px rgba(0,0,0,.4);
+    color:var(--text); font-size:.85rem; line-height:1.55;
+    z-index:9991;
+    animation:pa-tour-pop .35s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  @keyframes pa-tour-pop{
+    from{opacity:0; transform:scale(.94)}
+    to{opacity:1; transform:scale(1)}
+  }
+  .pa-tour-step{
+    font-size:.66rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--text3);
+    margin-bottom:.4rem;
+  }
+  .pa-tour-tip h4{
+    font-size:.95rem; font-weight:700; color:var(--text);
+    margin:0 0 .5rem 0;
+  }
+  .pa-tour-actions{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:.85rem; gap:.5rem;
+  }
+  .pa-tour-skip{
+    background:transparent; border:none; color:var(--text3);
+    cursor:pointer; font-size:.74rem; padding:.3rem .5rem;
+  }
+  .pa-tour-skip:hover{color:var(--text)}
+  .pa-tour-next{
+    background:#6366f1; color:#fff; border:none;
+    padding:.4rem .9rem; border-radius:7px;
+    font-size:.78rem; font-weight:600; cursor:pointer;
+    transition:background .15s ease;
+  }
+  .pa-tour-next:hover{background:#4f46e5}
+
+  /* 10. TOAST PREMIUM con micro-animations */
+  /* Mejora del toast existente — se aplica como override */
+  .toast-bubble.toast-premium{
+    transform:translateY(-8px) scale(.94);
+    opacity:0;
+    transition:transform .35s cubic-bezier(.34, 1.56, .64, 1),
+               opacity .25s ease-out;
+  }
+  .toast-bubble.toast-premium.show{
+    transform:translateY(0) scale(1);
+    opacity:1;
+  }
+
+  /* 11. PULSE DEL SISTEMA — badge en empty state */
+  .pa-pulse{
+    display:flex; align-items:center; gap:.5rem;
+    padding:.55rem .85rem;
+    background:var(--bg-subtle); border:1px solid var(--border);
+    border-radius:10px;
+    font-size:.74rem; color:var(--text2);
+  }
+  .pa-pulse-dot{
+    width:6px; height:6px; border-radius:50%;
+    background:#10b981;
+    animation:ia-pulse 2.5s ease-in-out infinite;
+    box-shadow:0 0 0 3px rgba(16,185,129,.12);
+    flex-shrink:0;
+  }
+  .pa-pulse-text{flex:1}
+  .pa-pulse-text b{color:var(--text); font-weight:600}
+
+  /* 12. BOTON ANALIZAR con feedback rico */
+  #btn-analizar{
+    position:relative; overflow:hidden;
+    transition:transform .15s ease, box-shadow .25s ease;
+  }
+  #btn-analizar:not(:disabled):hover{
+    transform:translateY(-1px);
+    box-shadow:0 8px 20px -6px rgba(99,102,241,.4);
+  }
+  #btn-analizar:not(:disabled):active{transform:translateY(0)}
+  #btn-analizar.loading{
+    background:linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    color:#fff !important;
+    pointer-events:none;
+  }
+  #btn-analizar.loading::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+    animation:pa-btn-shimmer 1.5s linear infinite;
+  }
+  @keyframes pa-btn-shimmer{
+    0%{transform:translateX(-100%)}
+    100%{transform:translateX(100%)}
+  }
 </style>
 <div class="fab-stack">
   <button id="asist-fab" class="fab fab-asistente pulsing" onclick="toggleAsistente()" title="Asistente Maestro IA — preguntá lo que sea" style="display:none">
@@ -20043,6 +20460,534 @@ function paSugerirSoportes(prefijoTipo){
   window.paRenderPreview = function(d){
     origRender(d);
     if(d && d.prefijo) paSugerirSoportes(d.prefijo);
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// 12 FEATURES PREMIUM (mayo 2026) — JS implementación
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── 1. EMPTY STATE RICO — dashboard del día ─────────────────────
+async function paCargarEmptyStateRico(){
+  const box = document.getElementById('pa-empty-rich');
+  const landing = document.getElementById('landing-empty-state');
+  if(!box) return;
+
+  // Estructura inicial (placeholder cargando)
+  box.innerHTML =
+    '<div class="pre-card"><div class="pre-empty-blurb">Cargando dashboard…</div></div>';
+  box.style.display = 'flex';
+
+  try{
+    // 4 fetches paralelos a endpoints existentes
+    const [vencenR, analyticsR, presenceR, tendR] = await Promise.allSettled([
+      fetch('/glosas/vencen-24h', { headers: authH() }),
+      fetch('/analytics/', { headers: authH() }),
+      fetch('/sistema/ia-presence'),
+      fetch('/analytics/tendencias?meses=3', { headers: authH() }),
+    ]);
+
+    const vencen = vencenR.status === 'fulfilled' && vencenR.value.ok
+      ? await vencenR.value.json() : null;
+    const analytics = analyticsR.status === 'fulfilled' && analyticsR.value.ok
+      ? await analyticsR.value.json() : null;
+    const presence = presenceR.status === 'fulfilled' && presenceR.value.ok
+      ? await presenceR.value.json() : null;
+    const tend = tendR.status === 'fulfilled' && tendR.value.ok
+      ? await tendR.value.json() : null;
+
+    // Si TODO falló, mostrar landing original como fallback
+    if(!vencen && !analytics && !presence){
+      box.style.display = 'none';
+      if(landing) landing.style.display = '';
+      return;
+    }
+
+    // Ocultar el landing original
+    if(landing) landing.style.display = 'none';
+
+    box.innerHTML = paBuildEmptyStateHTML({ vencen, analytics, presence, tend });
+  }catch(e){
+    box.style.display = 'none';
+    if(landing) landing.style.display = '';
+  }
+}
+
+function paBuildEmptyStateHTML(data){
+  const { vencen, analytics, presence, tend } = data;
+  const partes = [];
+
+  // ─── PULSE del sistema (modelo IA + estado) ───
+  if(presence){
+    const proveedores = [];
+    if(presence.anthropic && presence.anthropic.cargada) proveedores.push('Anthropic');
+    if(presence.gemini && presence.gemini.cargada) proveedores.push('Gemini');
+    if(presence.groq && presence.groq.cargada) proveedores.push('Groq');
+    const primary = (presence.primary_ai || 'auto').toLowerCase();
+    const primaryLabel = {anthropic:'Anthropic Claude', gemini:'Google Gemini', groq:'Groq Llama'}[primary] || primary.toUpperCase();
+    partes.push(
+      '<div class="pa-pulse">'+
+        '<span class="pa-pulse-dot"></span>'+
+        '<span class="pa-pulse-text">'+
+          'Motor IA activo · <b>'+escHtml(primaryLabel)+'</b> · '+
+          proveedores.length+' proveedor'+(proveedores.length===1?'':'es')+' cargado'+(proveedores.length===1?'':'s')+
+        '</span>'+
+      '</div>'
+    );
+  }
+
+  // ─── KPIs con sparklines ───
+  const sparkVals = (tend && tend.serie) ? (tend.serie.slice(-8).map(p => Number(p.valor||p.total||0))) : null;
+  const totalGlosasMes = (analytics && (analytics.glosas_mes||analytics.total)) || 0;
+  const valorRecuperado = (analytics && (analytics.valor_recuperado_mes||analytics.valor_levantado)) || 0;
+  const tasaExito = (analytics && (analytics.tasa_exito||analytics.tasa)) || 0;
+  const valorObjetado = (analytics && (analytics.valor_objetado||analytics.valor_objetado_mes)) || 0;
+
+  partes.push(
+    '<div class="pre-kpi-grid">'+
+      paBuildKpi('Glosas del mes', totalGlosasMes.toLocaleString('es-CO'), sparkVals, null)+
+      paBuildKpi('Tasa de éxito', (typeof tasaExito==='number' ? tasaExito.toFixed(1)+'%' : '—'), null,
+        tasaExito >= 80 ? {label:'excelente', cls:'up'} : null)+
+      paBuildKpi('Valor objetado', paFmtCOP(valorObjetado), null, null)+
+      paBuildKpi('Recuperado', paFmtCOP(valorRecuperado), null,
+        valorRecuperado > 0 ? {label:'mes en curso', cls:'neutral'} : null)+
+    '</div>'
+  );
+
+  // ─── Glosas que vencen HOY/MAÑANA ───
+  if(vencen && Array.isArray(vencen.glosas) && vencen.glosas.length > 0){
+    const rows = vencen.glosas.slice(0, 5).map(g => {
+      const horas = g.horas_restantes != null ? Math.round(g.horas_restantes) : (g.dias_restantes != null ? Math.round(g.dias_restantes*24) : null);
+      const urgent = horas != null && horas < 6;
+      const horasLabel = horas != null ? (horas <= 0 ? 'venció' : horas < 24 ? horas+'h' : Math.round(horas/24)+'d') : '';
+      const fact = g.numero_factura || g.factura || '—';
+      const val = g.valor_objetado != null ? paFmtCOP(g.valor_objetado) : '—';
+      const eps = g.eps || '—';
+      return '<div class="pre-row" onclick="paAbrirGlosa('+(g.id||0)+')">'+
+        '<div style="display:flex;flex-direction:column;gap:.15rem;flex:1;min-width:0">'+
+          '<span class="pre-eps">'+escHtml(eps)+'</span>'+
+          '<span class="pre-fact">'+escHtml(fact)+'</span>'+
+        '</div>'+
+        '<span class="pre-val">'+val+'</span>'+
+        (horasLabel ? '<span class="pre-h'+(urgent?' urgent':'')+'">'+horasLabel+'</span>' : '')+
+      '</div>';
+    }).join('');
+    partes.push(
+      '<div class="pre-card">'+
+        '<div class="pre-card-hdr">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'+
+          'Glosas que vencen pronto'+
+          '<span class="pre-counter">'+vencen.glosas.length+'</span>'+
+        '</div>'+
+        rows+
+      '</div>'
+    );
+  }
+
+  // ─── Sugerencia del día ───
+  const sug = paGenerarSugerencia(presence, analytics);
+  if(sug){
+    partes.push(
+      '<div class="pre-sug-card">'+
+        '<div class="pre-sug-icon">'+
+          '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21h6M12 17v4M12 3a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-1.26A7 7 0 0 0 12 3Z"/></svg>'+
+        '</div>'+
+        '<div class="pre-sug-body">'+sug.html+'</div>'+
+      '</div>'
+    );
+  }
+
+  // ─── Acciones rápidas (mismas que había en empty original) ───
+  partes.push(
+    '<div class="pre-card" style="text-align:center">'+
+      '<div class="pre-card-hdr" style="justify-content:center">Acciones rápidas</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:.55rem;justify-content:center">'+
+        '<button class="pa-tbtn" onclick="prepararElDia()" style="background:linear-gradient(90deg,#047857,#10b981);color:#fff;border-color:#10b981;font-weight:700">⚡ Preparar el día</button>'+
+        '<button class="pa-tbtn" onclick="sidebarTab(null,\'mis-glosas\')">📋 Mis glosas</button>'+
+        '<button class="pa-tbtn" onclick="nuevaGlosa()">🆕 Nueva glosa</button>'+
+        '<button class="pa-tbtn" onclick="window.location.href=\'/importar-recepcion\'">📥 Importar Excel</button>'+
+      '</div>'+
+    '</div>'
+  );
+
+  return partes.join('');
+}
+
+function paBuildKpi(label, value, sparkVals, delta){
+  let spark = '';
+  if(sparkVals && sparkVals.length >= 2){
+    spark = '<div style="margin-top:.4rem">'+paRenderSparkline(sparkVals, 100, 24)+'</div>';
+  }
+  let deltaHtml = '';
+  if(delta){
+    deltaHtml = '<span class="pre-kpi-delta '+(delta.cls||'neutral')+'">'+escHtml(delta.label)+'</span>';
+  }
+  return '<div class="pre-kpi">'+
+    '<div class="pre-kpi-label">'+escHtml(label)+'</div>'+
+    '<div class="pre-kpi-row">'+
+      '<span class="pre-kpi-value">'+value+'</span>'+
+      deltaHtml+
+    '</div>'+
+    spark+
+  '</div>';
+}
+
+function paRenderSparkline(vals, w, h){
+  if(!vals || vals.length < 2) return '';
+  const min = Math.min.apply(null, vals);
+  const max = Math.max.apply(null, vals);
+  const range = max - min || 1;
+  const dx = w / (vals.length - 1);
+  const pts = vals.map((v, i) => [i*dx, h - ((v - min) / range) * (h-2) - 1]);
+  const d = 'M' + pts.map(p => p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L');
+  const dFill = d + ' L'+w+','+h+' L0,'+h+' Z';
+  return '<svg class="pre-kpi-spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+
+    '<path class="spark-fill" d="'+dFill+'"/>'+
+    '<path d="'+d+'"/>'+
+  '</svg>';
+}
+
+function paGenerarSugerencia(presence, analytics){
+  // Sugerencias contextuales según estado
+  if(presence){
+    if(!presence.anthropic || !presence.anthropic.cargada){
+      return { html: '<b>Anthropic Claude</b> no está cargado. Configurá <code>ANTHROPIC_API_KEY</code> en Fly Secrets para tener calidad premium de dictamen. <a class="pre-sug-cta" href="https://console.anthropic.com" target="_blank">Obtener API key</a>' };
+    }
+    if(!presence.gemini || !presence.gemini.cargada){
+      return { html: '<b>Google Gemini</b> sería un excelente fallback gratis (1500 reqs/dia). <a class="pre-sug-cta" href="https://aistudio.google.com/app/apikey" target="_blank">Crear API key</a>' };
+    }
+  }
+  if(analytics && analytics.top_eps && analytics.top_eps.length > 0){
+    const top = analytics.top_eps[0];
+    return { html: 'Tu top EPS por volumen es <b>'+escHtml(top.eps||top.nombre||'—')+'</b> ('+(top.count||top.total||0)+' glosas). Subir su PDF de contrato al módulo Contratos te daría cláusulas literales para citar en cada dictamen.' };
+  }
+  return { html: 'Subí los PDFs de los contratos firmados en <b>Contratos</b>. Cada contrato extrae 10-20 cláusulas literales que el motor citará textualmente en las defensas — <i>la EPS firmó el documento que se cita</i>.' };
+}
+
+function paFmtCOP(v){
+  if(!v || v <= 0) return '$0';
+  return '$' + Number(v).toLocaleString('es-CO', {maximumFractionDigits:0});
+}
+
+function paAbrirGlosa(id){
+  if(!id) return;
+  // Navegar a Mis glosas con la glosa específica abierta
+  try{ sidebarTab(null, 'mis-glosas'); }catch(_){}
+  setTimeout(() => {
+    if(typeof verGlosa === 'function') verGlosa(id);
+  }, 250);
+}
+
+// Disparar al cargar el panel de analizar
+(function autoCargarEmptyStateRico(){
+  // Cargar 1.5s después del DOM ready para no competir con carga inicial
+  const fire = () => {
+    if(document.getElementById('p-analizar') && document.getElementById('p-analizar').classList.contains('active')){
+      paCargarEmptyStateRico();
+    }
+  };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', () => setTimeout(fire, 1500));
+  } else {
+    setTimeout(fire, 1500);
+  }
+})();
+
+// ─── 2. INDICADOR MODELO IA ACTIVO (polling cada 5min) ───────────
+async function paActualizarIABadge(){
+  const badge = document.getElementById('pa-ia-badge');
+  const prov = document.getElementById('pa-ia-prov');
+  if(!badge || !prov) return;
+  try{
+    const r = await fetch('/sistema/ia-presence');
+    if(!r.ok) throw new Error('http '+r.status);
+    const d = await r.json();
+    const primary = (d.primary_ai || 'auto').toLowerCase();
+    const label = {anthropic:'Anthropic', gemini:'Gemini', groq:'Groq'}[primary] || primary.toUpperCase();
+    prov.textContent = label;
+    // Color: verde si primary cargado, amarillo si no
+    const primaryOk = d[primary] && d[primary].cargada;
+    badge.classList.remove('warning','error');
+    if(!primaryOk) badge.classList.add('warning');
+    badge.title = 'primary='+primary+' · '+
+      'anthropic='+((d.anthropic||{}).estado||'?')+' · '+
+      'gemini='+((d.gemini||{}).estado||'?')+' · '+
+      'groq='+((d.groq||{}).estado||'?');
+  }catch(e){
+    prov.textContent = '—';
+    badge.classList.add('error');
+  }
+}
+(function bootIABadge(){
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', () => { paActualizarIABadge(); setInterval(paActualizarIABadge, 5 * 60 * 1000); });
+  } else {
+    paActualizarIABadge();
+    setInterval(paActualizarIABadge, 5 * 60 * 1000);
+  }
+})();
+
+// ─── 3. SIDEBAR SEARCH (filtrar items) ─────────────────────────────
+function paFiltrarSidebar(query){
+  const q = (query || '').toLowerCase().trim();
+  const sidebar = document.getElementById('sidebar-nav');
+  if(!sidebar) return;
+  const items = sidebar.querySelectorAll('.sn-item');
+  let visibles = 0;
+  items.forEach(it => {
+    const txt = (it.textContent || '').toLowerCase();
+    const tip = (it.getAttribute('data-tip') || '').toLowerCase();
+    const match = !q || txt.indexOf(q) >= 0 || tip.indexOf(q) >= 0;
+    it.style.display = match ? '' : 'none';
+    if(match) visibles++;
+  });
+  // Ocultar grupos sin items visibles
+  sidebar.querySelectorAll('.sn-group').forEach(g => {
+    const tieneVisible = Array.from(g.querySelectorAll('.sn-item')).some(i => i.style.display !== 'none');
+    g.style.display = tieneVisible ? '' : 'none';
+  });
+  const empty = document.getElementById('sn-search-empty');
+  if(empty) empty.style.display = (q && visibles === 0) ? 'block' : 'none';
+}
+
+// ─── 6. MODAL ATAJOS DE TECLADO (tecla ?) ──────────────────────────
+function paAbrirModalAtajos(){
+  let modal = document.getElementById('pa-shortcuts-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'pa-shortcuts-modal';
+    modal.innerHTML =
+      '<div class="pa-sc-box">'+
+        '<div class="pa-sc-hdr">'+
+          '<h3>Atajos de teclado</h3>'+
+          '<button onclick="paCerrarModalAtajos()" title="Cerrar (Esc)">✕</button>'+
+        '</div>'+
+        '<div class="pa-sc-body">'+
+          '<div class="pa-sc-section-title">Generales</div>'+
+          paScRow('Abrir paleta de comandos', ['Ctrl','K'])+
+          paScRow('Ver atajos (esta ventana)', ['?'])+
+          paScRow('Cerrar overlay/modal', ['Esc'])+
+          '<div class="pa-sc-section-title">Analizar glosa</div>'+
+          paScRow('Nueva glosa', ['Ctrl','Shift','N'])+
+          paScRow('Disparar análisis', ['Ctrl','Enter'])+
+          paScRow('Pegar correo EPS', ['Ctrl','Shift','V'])+
+          paScRow('Dictar por voz', ['Ctrl','Shift','M'])+
+          '<div class="pa-sc-section-title">Navegación</div>'+
+          paScRow('Ir a Mis glosas', ['G','M'])+
+          paScRow('Ir a Dashboard', ['G','D'])+
+          paScRow('Ir a Diagnóstico', ['G','?'])+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if(e.target === modal) paCerrarModalAtajos(); });
+  }
+  modal.classList.add('active');
+}
+function paCerrarModalAtajos(){
+  const m = document.getElementById('pa-shortcuts-modal');
+  if(m) m.classList.remove('active');
+}
+function paScRow(label, keys){
+  const keyHtml = keys.map((k,i) =>
+    (i > 0 ? '<span class="plus">+</span>' : '') + '<kbd>'+escHtml(k)+'</kbd>'
+  ).join('');
+  return '<div class="pa-sc-row"><span>'+escHtml(label)+'</span><span class="pa-sc-keys">'+keyHtml+'</span></div>';
+}
+
+// Listener global: tecla ? abre el modal (cuando no estás escribiendo)
+document.addEventListener('keydown', e => {
+  if(e.key === '?' && !e.ctrlKey && !e.metaKey){
+    const t = e.target;
+    if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    paAbrirModalAtajos();
+  } else if(e.key === 'Escape'){
+    paCerrarModalAtajos();
+  }
+});
+
+// ─── 8. OCULTAR INDICADORES RUIDOSOS DEL HEADER ────────────────────
+function paOcultarRuidoUI(){
+  try{
+    // El indicador de latencia "Lento (Xms)" — ocultar si dice "Lento" o "Degradado"
+    const txt = document.getElementById('stxt');
+    if(txt){
+      const v = txt.textContent || '';
+      if(/Lento|Degradado/i.test(v)){
+        const pill = txt.closest('.status-pill');
+        if(pill) pill.style.opacity = '0.5';
+      }
+    }
+    // KPIs con "0%" o "0 pendientes" en header — atenuar
+    document.querySelectorAll('.hdr-stat, .hdr-kpi').forEach(el => {
+      const txt = (el.textContent || '').trim();
+      if(/^0\s*%?\s*pendient/i.test(txt) || /^0\s*%$/.test(txt)){
+        el.classList.add('hdr-pct-zero');
+      }
+    });
+  }catch(_){}
+}
+(function bootOcultarRuido(){
+  const fn = () => { paOcultarRuidoUI(); setInterval(paOcultarRuidoUI, 30 * 1000); };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', fn);
+  } else { fn(); }
+})();
+
+// ─── 9. ONBOARDING TOUR (primera vez) ──────────────────────────────
+const PA_TOUR_STEPS = [
+  {
+    target: '#sn-search-input',
+    title: 'Búsqueda rápida del menú',
+    text: 'Escribí cualquier palabra para filtrar las opciones del menú. Útil cuando ya hay muchas.',
+    pos: 'right',
+  },
+  {
+    target: '.pa-cmdk-hint',
+    title: 'Comandos rápidos',
+    text: 'Tocá este botón (o tecla <kbd>?</kbd>) para ver todos los atajos de teclado disponibles.',
+    pos: 'bottom',
+  },
+  {
+    target: '#pa-ia-badge',
+    title: 'Modelo IA activo',
+    text: 'Acá ves qué proveedor de IA está respondiendo (Anthropic, Gemini, Groq). Click para diagnóstico.',
+    pos: 'bottom',
+  },
+  {
+    target: '#f-glosa',
+    title: 'Texto de la glosa',
+    text: 'Pegá el texto de la glosa de la EPS. Mientras escribís, el panel derecho te muestra el análisis en vivo.',
+    pos: 'right',
+  },
+];
+let _paTourIdx = 0;
+function paTourArrancar(){
+  if(localStorage.getItem('pa_tour_completado') === '1') return;
+  _paTourIdx = 0;
+  paTourMostrarStep();
+}
+function paTourMostrarStep(){
+  // Cleanup previos
+  document.querySelectorAll('.pa-tour-tip').forEach(t => t.remove());
+  const overlay = document.getElementById('pa-tour-overlay') || (() => {
+    const o = document.createElement('div');
+    o.id = 'pa-tour-overlay';
+    document.body.appendChild(o);
+    return o;
+  })();
+  overlay.classList.add('active');
+
+  if(_paTourIdx >= PA_TOUR_STEPS.length){ paTourTerminar(true); return; }
+  const step = PA_TOUR_STEPS[_paTourIdx];
+  const target = document.querySelector(step.target);
+  if(!target){ _paTourIdx++; paTourMostrarStep(); return; }
+  const rect = target.getBoundingClientRect();
+
+  const tip = document.createElement('div');
+  tip.className = 'pa-tour-tip';
+  tip.innerHTML =
+    '<div class="pa-tour-step">Paso '+(_paTourIdx+1)+' de '+PA_TOUR_STEPS.length+'</div>'+
+    '<h4>'+escHtml(step.title)+'</h4>'+
+    '<div>'+step.text+'</div>'+
+    '<div class="pa-tour-actions">'+
+      '<button class="pa-tour-skip" onclick="paTourTerminar(false)">Saltar</button>'+
+      '<button class="pa-tour-next" onclick="paTourSiguiente()">'+(_paTourIdx === PA_TOUR_STEPS.length-1 ? 'Terminar' : 'Siguiente')+' →</button>'+
+    '</div>';
+  document.body.appendChild(tip);
+
+  // Posicionar
+  let top, left;
+  if(step.pos === 'right'){
+    top = rect.top + rect.height/2 - 60;
+    left = rect.right + 14;
+  } else if(step.pos === 'bottom'){
+    top = rect.bottom + 14;
+    left = rect.left;
+  } else {
+    top = rect.top - 140;
+    left = rect.left;
+  }
+  // Ajustar para no salir de viewport
+  top = Math.max(12, Math.min(top, window.innerHeight - 200));
+  left = Math.max(12, Math.min(left, window.innerWidth - 340));
+  tip.style.top = top + 'px';
+  tip.style.left = left + 'px';
+}
+function paTourSiguiente(){
+  _paTourIdx++;
+  paTourMostrarStep();
+}
+function paTourTerminar(completado){
+  document.querySelectorAll('.pa-tour-tip').forEach(t => t.remove());
+  const overlay = document.getElementById('pa-tour-overlay');
+  if(overlay) overlay.classList.remove('active');
+  if(completado){
+    localStorage.setItem('pa_tour_completado', '1');
+  } else {
+    // El usuario lo saltó — no insistas más por 30 días
+    localStorage.setItem('pa_tour_saltado', String(Date.now()));
+  }
+}
+
+// Disparar tour 3 segundos después del login (no antes para no abrumar)
+(function bootTour(){
+  setTimeout(() => {
+    try{
+      if(!localStorage.getItem('hus_token')) return;
+      if(localStorage.getItem('pa_tour_completado') === '1') return;
+      const saltado = parseInt(localStorage.getItem('pa_tour_saltado') || '0', 10);
+      if(saltado && (Date.now() - saltado) < 30 * 24 * 60 * 60 * 1000) return;
+      paTourArrancar();
+    }catch(_){}
+  }, 3000);
+})();
+
+// ─── 12. BOTÓN ANALIZAR con feedback rico ──────────────────────────
+(function bootBotonAnalizar(){
+  const fn = () => {
+    const btn = document.getElementById('btn-analizar');
+    if(!btn || btn.dataset.paFeedback === '1') return;
+    btn.dataset.paFeedback = '1';
+    btn.addEventListener('click', () => {
+      btn.classList.add('loading');
+      // Cuando aparezca el dictamen, MutationObserver del PR anterior lo quita
+      setTimeout(() => btn.classList.remove('loading'), 60000); // safety net 60s
+    });
+    // Observer que quita 'loading' cuando el dictamen aparece
+    const area = document.getElementById('result-area');
+    if(area && !area.dataset.paBtnObs){
+      area.dataset.paBtnObs = '1';
+      new MutationObserver(() => {
+        const html = area.innerHTML || '';
+        if(html.indexOf('ARGUMENTACI') >= 0 || html.indexOf('DEFENSA T') >= 0){
+          btn.classList.remove('loading');
+        }
+      }).observe(area, { childList:true, subtree:true });
+    }
+  };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+  else fn();
+  setTimeout(fn, 1500);
+})();
+
+// ─── 10. TOAST PREMIUM (override) ──────────────────────────────────
+(function upgradeToast(){
+  if(typeof window.toast !== 'function') return;
+  const origToast = window.toast;
+  window.toast = function(title, msg, type, opciones){
+    const r = origToast.call(this, title, msg, type, opciones);
+    // Buscar el toast recién creado y aplicar clase premium
+    setTimeout(() => {
+      const bubbles = document.querySelectorAll('.toast-bubble:not(.toast-premium)');
+      bubbles.forEach(b => {
+        b.classList.add('toast-premium');
+        // Forzar reflow + clase show para activar animación
+        void b.offsetWidth;
+        b.classList.add('show');
+      });
+    }, 10);
+    return r;
   };
 })();
 </script>
