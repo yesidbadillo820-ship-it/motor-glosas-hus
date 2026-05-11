@@ -773,6 +773,42 @@ def resumen_mensual_ejecutivo(
     }
 
 
+@router.get("/ia-presence")
+def ia_presence_publica():
+    """Diagnostico PUBLICO de carga de API keys de los 3 proveedores IA.
+
+    NO expone las keys — solo si estan presentes (true/false) y el prefijo
+    de 10 chars (suficiente para verificar que la key correcta esta cargada
+    pero no para abusar).
+
+    Util cuando el usuario reporta "Anthropic se agoto sin gastar credito":
+    abre esta URL en navegador y ve si la env var realmente llego al proceso.
+    """
+    import os
+    def _info(env_key: str) -> dict:
+        v = os.getenv(env_key, "")
+        if not v:
+            return {"cargada": False, "estado": "AUSENTE"}
+        return {
+            "cargada": True,
+            "estado": "OK",
+            "prefijo": v[:10] + "...",
+            "longitud": len(v),
+        }
+    return {
+        "primary_ai": os.getenv("PRIMARY_AI", "gemini"),
+        "anthropic": _info("ANTHROPIC_API_KEY"),
+        "gemini": _info("GEMINI_API_KEY"),
+        "groq": _info("GROQ_API_KEY"),
+        "nota": (
+            "Si un proveedor muestra estado=AUSENTE, la API key NO llego al "
+            "proceso (revisa 'fly secrets list'). Si muestra estado=OK pero "
+            "los dictamenes siguen cayendo a Llama, mandame logs de un POST "
+            "/analizar para diagnosticar mas profundo."
+        ),
+    }
+
+
 @router.get("/version")
 def info_version():
     """R64 P1: información de versión PÚBLICA (sin auth).

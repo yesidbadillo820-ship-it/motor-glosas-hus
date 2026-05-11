@@ -4529,6 +4529,7 @@ async function mostrarDigestUltimaVisita(){
 async function iniciarLiveChannel(){
   if(!localStorage.getItem('hus_token')) return;  // no logueado
   if(window._LIVE.timer) return;  // ya iniciado
+  return;
 
   // Sincronizar cursor con server_time inicial
   try {
@@ -8399,6 +8400,7 @@ async function cargarTickerNoticias(){
   var box = document.getElementById('noticias-ticker');
   if(!box) return;
   try{
+    return;
     var r = await fetch('/noticias/recientes?limite=5&dias=14', {headers: authH()});
     if(!r.ok) return;
     var data = await r.json();
@@ -10446,7 +10448,7 @@ async function refrescarBadgeTareas(){
   var badge = document.getElementById('td-badge');
   if(!badge) return;
   try {
-    var r = await fetch('/usuarios/yo/tareas/resumen', { headers: authH() });
+    var r = await fetch('/usuarios/yo/resumen', { headers: authH() });
     if(!r.ok) return;
     var d = await r.json();
     if(d.pendientes > 0){
@@ -10677,6 +10679,7 @@ async function _cargarMapaAutopilot(){
   // Ronda 29: enriquece la lista con el estado autopilot por glosa_id.
   // Un solo fetch; si falla no rompe la UI.
   try{
+    return {};
     var url = _soyCoordinador() ? '/autopilot/bandeja?limite=300' : '/autopilot/mi-bandeja?limite=300';
     var r = await fetch(url, {headers: authH()});
     if(!r.ok) return {};
