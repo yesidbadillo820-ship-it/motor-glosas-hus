@@ -13813,6 +13813,8 @@ function renderResult(d){
   var scoreColor=d.score>=85?'#15803d':d.score>=65?'#b45309':'#b91c1c';
   // Fijar la glosa actual para que los botones Refinar/Gold operen sobre ella
   CURRENT_GLOSA_ID = d.glosa_id || null;
+  // Guardar verificacion_citas para que paMarcarCitasEnDictamen marque en rojo las falsas
+  window._paVerificacionCitas = d.verificacion_citas || null;
 
   var html='<div class="res-header">'
     +'<div class="res-title">'+d.resumen+'</div>'
@@ -19156,7 +19158,15 @@ function paRenderPreview(d){
   }
   filas.push(paPrevRow('Valor objetado', paFmtCOP(d.valor_objetado), !d.valor_objetado));
   if(d.valor_facturado > 0) filas.push(paPrevRow('Valor facturado', paFmtCOP(d.valor_facturado), false));
-  filas.push(paPrevRow('EPS', d.eps_detectada || '(elige en el dropdown)', !d.eps_detectada));
+  // Fix EPS: si el usuario ya eligio en el dropdown, mostralo. Si no, lo detectado del texto.
+  let epsParaPreview = d.eps_detectada || '';
+  if(!epsParaPreview){
+    const epsSel = document.getElementById('eps-sel');
+    if(epsSel && epsSel.value && epsSel.value !== 'OTRA / SIN DEFINIR'){
+      epsParaPreview = epsSel.value + ' (seleccionada)';
+    }
+  }
+  filas.push(paPrevRow('EPS', epsParaPreview || '(elige en el dropdown)', !epsParaPreview));
   if(d.cups) filas.push(paPrevRow('CUPS', d.cups, false));
   if(d.descripcion_servicio) filas.push(paPrevRow('Servicio', d.descripcion_servicio.slice(0,70), false));
   detec.innerHTML = filas.join('');
@@ -19513,6 +19523,18 @@ document.addEventListener('keydown', (e) => {
         const prev = document.getElementById('pa-preview-vivo');
         if(prev) prev.classList.remove('active');
         paShowPipeline();
+        // Ocultar overlay viejo #loading mientras el pipeline esta visible
+        if(window._paLoaderInterval) clearInterval(window._paLoaderInterval);
+        window._paLoaderInterval = setInterval(() => {
+          const loader = document.getElementById('loading');
+          if(loader && loader.classList.contains('show')){
+            loader.classList.remove('show');
+          }
+        }, 200);
+        // Auto-stop tras 90s por si algo falla
+        setTimeout(() => {
+          if(window._paLoaderInterval){ clearInterval(window._paLoaderInterval); window._paLoaderInterval = null; }
+        }, 90000);
       }catch(_){}
     });
   };
@@ -19546,6 +19568,8 @@ document.addEventListener('keydown', (e) => {
           paHidePipeline();
           paMarcarCitasEnDictamen();
         }, 350);
+        // Detener cleanup del overlay viejo
+        if(window._paLoaderInterval){ clearInterval(window._paLoaderInterval); window._paLoaderInterval = null; }
       }catch(_){}
     } else if(!tieneDic && _paLastDictamenSeen){
       // El usuario limpio o navego a otro panel
@@ -19570,10 +19594,18 @@ document.addEventListener('keydown', (e) => {
 
 // ─── CITATION MARKER MEJORADO ─────────────────────────────────────
 // Busca el bloque del dictamen DENTRO del resultado, marca articulos,
-// leyes, decretos, resoluciones y sentencias.
+// leyes, decretos, resoluciones y sentencias. ROJO si el backend
+// citation_verifier las marco como falsas (CITA_LITERAL_FALSA, etc).
 function paMarcarCitasEnDictamen(){
   const area = document.getElementById('result-area');
   if(!area) return;
+
+  // Construir set de fragmentos falsos para marcar en rojo
+  const issues = (window._paVerificacionCitas && window._paVerificacionCitas.issues) || [];
+  const fragmentosFalsos = issues
+    .filter(i => i && i.cita && (i.severidad === 'ALTA' || i.severidad === 'MEDIA'))
+    .map(i => (i.cita || '').trim());
+
   // Buscar el contenedor del argumento juridico (no marcar dos veces)
   const candidatos = area.querySelectorAll('div, td, p');
   candidatos.forEach((el) => {
@@ -19582,6 +19614,17 @@ function paMarcarCitasEnDictamen(){
     if(t.indexOf('ARGUMENTACI') < 0 && t.indexOf('FUNDAMENTO NORMATIVO') < 0) return;
     let html = el.innerHTML;
     let cambios = 0;
+    // Primero: marcar en ROJO las citas reportadas como falsas por el backend
+    fragmentosFalsos.forEach((frag) => {
+      if(!frag || frag.length < 5) return;
+      const escFrag = frag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escFrag, 'gi');
+      const before = html;
+      html = html.replace(re, (m) =>
+        '<span class="pa-cite unverified" title="Citation verifier detectó este fragmento como ALUCINACIÓN (no existe en corpus normativo)">' + m + '</span>'
+      );
+      if(html !== before) cambios++;
+    });
     // Verde: articulos con formato verificable
     html = html.replace(/(\bArt(?:[íi]culo|\.)\s*\d{1,4}[a-z]?(?:\s+del?\s+(?:C[óo]digo|Ley|Decreto|Resoluci[óo]n)[^.,;<]{0,80})?)/gi, (m) => {
       cambios++;

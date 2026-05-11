@@ -330,7 +330,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y GLOSAS de la ESE HOSPITAL UNIVERSITARIO DE
 MISIÓN: Redactar respuestas técnico-jurídicas a glosas de EPS y entidades pagadoras, con tono INSTITUCIONAL Y CONCILIADOR para lograr LEVANTAMIENTO en etapa inicial (evitar ratificación).
 
 ═══════════════ REGLAS ABSOLUTAS ═══════════════
-1. NO INVENTES NADA. Si un dato (CUPS, valor, médico, paciente, contrato) no está en los DATOS DEL CASO, usa frases neutras: "CUPS INDICADO EN EL EXPEDIENTE", "EL VALOR INDICADO EN EL EXPEDIENTE", "PACIENTE IDENTIFICADO EN EXPEDIENTE", "MÉDICO TRATANTE". Nunca cifras, nombres o números inventados.
+1. NO INVENTES NADA. Si un dato (CUPS, valor, médico, paciente, contrato) no está en los DATOS DEL CASO, redacta FLUIDO con frases naturales en minúsculas tipo "el procedimiento facturado conforme al CUPS detallado en la factura", "el valor objetado consignado en el expediente", "el paciente identificado en el expediente", "el médico tratante". NUNCA copies frases con mayúsculas tipo placeholder como "CUPS INDICADO EN EL EXPEDIENTE" — eso se ve a copia-pega. Nunca cifras, nombres ni números inventados.
 
 2. CUPS = el código de 6 dígitos que APARECE EN EL TEXTO DE LA GLOSA (después del código TA/SO/FA y antes del servicio). NO uses número de ingreso, historia clínica, folio, edad ni nada del PDF como CUPS.
 
@@ -760,7 +760,10 @@ def build_user_prompt(
     datos = extraer_datos_soporte(contexto_pdf)
     cups = cups_verificado or datos["cups"]
     if cups == "NO IDENTIFICADO":
-        cups = "CUPS INDICADO EN EL EXPEDIENTE"
+        # Antes: "CUPS INDICADO EN EL EXPEDIENTE" -- aparecia literal en el
+        # dictamen y sonaba a placeholder sin reemplazar. Ahora damos un
+        # fallback mas natural que la IA puede usar fluido sin parecer copy/paste.
+        cups = "el procedimiento facturado conforme al CUPS detallado en la factura electronica"
 
     paciente = datos.get("paciente", "NO IDENTIFICADO")
     medico = datos.get("medico", "NO IDENTIFICADO")
@@ -1074,7 +1077,7 @@ Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 
 RECUERDA:
 1. El <argumento> debe seguir la estructura de 4 párrafos del system prompt (Identificación → Refutación → Fundamento → Petición conciliadora).
-2. Si un dato del BLOQUE 1 dice "EL VALOR INDICADO EN EL EXPEDIENTE" o "CUPS INDICADO EN EL EXPEDIENTE", úsalo TEXTUALMENTE así — NO inventes cifras ni códigos.
+2. Si un dato del BLOQUE 1 dice "EL VALOR INDICADO EN EL EXPEDIENTE" o describe el CUPS de forma genérica (por ejemplo "el procedimiento facturado conforme al CUPS detallado en la factura electronica"), redactalo FLUIDO en el argumento — NUNCA inventes cifras ni códigos, pero TAMPOCO copies frases con mayúsculas tipo placeholder. Hablá natural: "el procedimiento facturado bajo el CUPS de la factura" en vez de "CUPS INDICADO EN EL EXPEDIENTE".
 3. Tono: conciliador institucional. NUNCA "SE EXIGE", "OBLIGA A", "ACTO ABUSIVO".
 4. Texto fuera de los tags XML será rechazado.
 """
