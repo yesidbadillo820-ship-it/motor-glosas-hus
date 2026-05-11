@@ -695,3 +695,303 @@ async def analizar(
         db, resultado, eps, etapa, valor_aceptado, tabla_excel, contexto_pdf,
         numero_factura, numero_radicado, data, current_user, req_id,
     )
+
+
+# ════════════════════════════════════════════════════════════════════
+# Endpoints de soporte para el rediseno del panel "Analizar glosa"
+# ════════════════════════════════════════════════════════════════════
+
+@router.post("/analizar/preview")
+async def preview_glosa(
+    request: Request,
+    payload: dict,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    """Detecta automaticamente desde el texto crudo de la glosa:
+      - codigo (TA0201, FA0101, etc)
+      - valor objetado / facturado / reconocido
+      - EPS si aparece mencionada
+      - CUPS y descripcion del servicio
+      - tipo de glosa (TA, FA, SO, etc)
+      - probable patron determinista (RATIFICADA, EXTEMPORANEA, etc)
+
+    Sirve para alimentar el panel preview EN VIVO del frontend mientras
+    el usuario escribe. NO invoca IA — solo regex y heuristicas.
+    """
+    texto = (payload or {}).get("texto", "")
+    eps_form = (payload or {}).get("eps", "")
+    if not texto or len(texto) < 5:
+        return {"detectado": False}
+
+    texto_upper = texto.upper()
+
+    codigo_match = re.search(
+        r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\s*\d{2,4}\b",
+        texto_upper,
+    )
+    codigo = re.sub(r"\s+", "", codigo_match.group(0)) if codigo_match else ""
+
+    prefijo = codigo[:2] if len(codigo) >= 2 else ""
+    concepto = _concepto_glosa(codigo) if codigo else ""
+
+    valores = _extraer_valores_glosa(texto)
+
+    if (valores.get("objetado", 0) or 0) <= 0:
+        m_simple = re.search(r"\$\s*([\d][\d\.,]{2,})", texto)
+        if m_simple:
+            raw = re.sub(r"[^\d]", "", m_simple.group(1))
+            if raw:
+                try:
+                    v = float(raw)
+                    if 0 < v < 1_000_000_000:
+                        valores["objetado"] = v
+                except ValueError:
+                    pass
+
+    eps_detectada = ""
+    if not eps_form or eps_form.upper() in ("OTRA / SIN DEFINIR", "OTRA/SIN DEFINIR", ""):
+        eps_lista = [
+            "NUEVA EPS", "COMPENSAR", "COOSALUD", "POSITIVA", "FOMAG",
+            "POLICIA NACIONAL", "AURORA", "SUMIMEDICAL", "PRECIMED",
+            "SALUD MIA", "SANITAS", "SURA", "MEDIMAS", "FAMISANAR",
+            "MUTUAL SER", "EPS SURA", "SAVIA SALUD",
+        ]
+        for eps_nombre in eps_lista:
+            if eps_nombre in texto_upper:
+                eps_detectada = eps_nombre
+                break
+
+    cups, descripcion = _extraer_cups_servicio(texto, "")
+
+    contrato_info = None
+    eps_para_contrato = eps_form or eps_detectada
+    if eps_para_contrato:
+        try:
+            contrato = get_contrato(eps_para_contrato)
+            contrato_info = {
+                "numero": contrato.get("numero", ""),
+                "tarifa": contrato.get("tarifa", ""),
+                "tipo": contrato.get("tipo", ""),
+            }
+        except Exception:
+            pass
+
+    patron_auto = None
+    if "RATIFICA" in texto_upper or "INSISTE" in texto_upper:
+        patron_auto = "RATIFICACION"
+    elif "EXTEMPORANE" in texto_upper or "FUERA DE TERMINO" in texto_upper:
+        patron_auto = "EXTEMPORANEA"
+    elif "ACEPTADA" in texto_upper or "CONCILIADA" in texto_upper:
+        patron_auto = "ACEPTADA"
+
+    return {
+        "detectado": True,
+        "codigo": codigo,
+        "prefijo": prefijo,
+        "concepto": concepto,
+        "valor_objetado": valores.get("objetado", 0) or 0,
+        "valor_facturado": valores.get("facturado", 0) or 0,
+        "valor_reconocido": valores.get("reconocido", 0) or 0,
+        "eps_detectada": eps_detectada,
+        "cups": cups,
+        "descripcion_servicio": descripcion,
+        "contrato": contrato_info,
+        "patron_auto": patron_auto,
+        "longitud_texto": len(texto),
+    }
+
+
+@router.post("/analizar/extraer-correo")
+async def extraer_de_correo(
+    request: Request,
+    payload: dict,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Recibe el texto crudo de un correo de EPS y extrae los campos
+    estructurados (EPS, codigo, valor, factura, radicado, motivo).
+
+    Usa solo regex y heuristica. Si el correo es muy desestructurado y
+    no detecta lo basico, devuelve {"detectado": false}.
+    """
+    raw = (payload or {}).get("texto_correo", "")
+    if not raw or len(raw) < 20:
+        return {"detectado": False, "razon": "texto vacio o muy corto"}
+
+    texto_upper = raw.upper()
+
+    factura_match = re.search(r"(?:FACTURA|FACT|FV[-\s]?)\s*[:\-]?\s*([A-Z0-9\-]{4,20})", texto_upper)
+    radicado_match = re.search(r"(?:RADIC|GLS[-\s]?)\s*[:\-]?\s*([A-Z0-9\-]{4,20})", texto_upper)
+    fecha_match = re.search(r"\b(\d{1,2}[\-/]\d{1,2}[\-/]\d{2,4})\b", raw)
+
+    eps_detectada = ""
+    eps_lista = [
+        "NUEVA EPS", "COMPENSAR", "COOSALUD", "POSITIVA", "FOMAG",
+        "POLICIA NACIONAL", "AURORA", "SUMIMEDICAL", "PRECIMED",
+        "SALUD MIA", "SANITAS", "SURA", "MEDIMAS", "FAMISANAR",
+    ]
+    for eps_nombre in eps_lista:
+        if eps_nombre in texto_upper:
+            eps_detectada = eps_nombre
+            break
+
+    codigo_match = re.search(
+        r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\s*\d{2,4}\b",
+        texto_upper,
+    )
+    codigo = re.sub(r"\s+", "", codigo_match.group(0)) if codigo_match else ""
+
+    valores = _extraer_valores_glosa(raw)
+
+    motivo = ""
+    lineas = [l.strip() for l in raw.split("\n") if l.strip()]
+    palabras_clave = ["motivo", "razon", "concepto", "observacion", "se glosa", "se objeta"]
+    for l in lineas:
+        if any(k in l.lower() for k in palabras_clave):
+            motivo = l[:300]
+            break
+    if not motivo and lineas:
+        motivo = max(lineas, key=len)[:300]
+
+    return {
+        "detectado": bool(eps_detectada or codigo or factura_match),
+        "eps": eps_detectada,
+        "codigo": codigo,
+        "numero_factura": factura_match.group(1) if factura_match else "",
+        "numero_radicado": radicado_match.group(1) if radicado_match else "",
+        "fecha_detectada": fecha_match.group(1) if fecha_match else "",
+        "valor_objetado": valores.get("objetado", 0) or 0,
+        "valor_facturado": valores.get("facturado", 0) or 0,
+        "motivo": motivo,
+        "texto_glosa_sugerido": _construir_texto_glosa(codigo, valores, motivo),
+    }
+
+
+def _construir_texto_glosa(codigo: str, valores: dict, motivo: str) -> str:
+    """Construye un texto-glosa estandar a partir de los campos detectados."""
+    partes = []
+    if codigo:
+        partes.append(codigo)
+    obj = valores.get("objetado", 0)
+    if obj:
+        partes.append(f"- se glosa valor de ${int(obj):,}".replace(",", "."))
+    if motivo:
+        partes.append(f"por {motivo.lower().lstrip('por ').strip()}")
+    return " ".join(partes) if partes else ""
+
+
+@router.get("/analizar/score-breakdown/{glosa_id}")
+async def score_breakdown(
+    glosa_id: int,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    """Devuelve el desglose explicable del score de una glosa ya analizada.
+
+    Factores que componen el score:
+      - datos_completos:      todos los campos del caso estan llenos
+      - normativa_relevante:  se encontraron articulos/sentencias
+      - tarifa_pactada:       el contrato pactado tiene la tarifa
+      - precedente_interno:   existe glosa similar ya ganada
+      - soportes_adjuntos:    se subieron PDFs / OCR
+      - auditor_ok:           el agente auditor no encontro discrepancias
+    """
+    from app.models.db import GlosaRecord
+    g = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if not g:
+        raise HTTPException(status_code=404, detail="glosa no encontrada")
+
+    factores = []
+
+    datos_completos = bool(g.eps and g.codigo_glosa and (g.valor_objetado or 0) > 0)
+    factores.append({
+        "id": "datos_completos",
+        "etiqueta": "Datos del caso completos",
+        "peso": 15,
+        "score": 100 if datos_completos else 40,
+        "ok": datos_completos,
+        "sugerencia": "" if datos_completos else "Faltan datos basicos (EPS, codigo o valor)",
+    })
+
+    tarifa_ok = bool(
+        getattr(g, "tarifa_pactada", None)
+        or getattr(g, "tarifa_match", None)
+        or (g.dictamen and "tarifa" in (g.dictamen or "").lower())
+    )
+    factores.append({
+        "id": "tarifa_pactada",
+        "etiqueta": "Tarifa pactada conocida",
+        "peso": 20,
+        "score": 100 if tarifa_ok else 30,
+        "ok": tarifa_ok,
+        "sugerencia": "" if tarifa_ok else "Subir el contrato firmado al modulo de Contratos",
+    })
+
+    soportes_ok = bool(
+        getattr(g, "tiene_soportes", False)
+        or (g.dictamen and "soporte" in (g.dictamen or "").lower())
+    )
+    factores.append({
+        "id": "soportes_adjuntos",
+        "etiqueta": "Soportes documentales",
+        "peso": 25,
+        "score": 100 if soportes_ok else 0,
+        "ok": soportes_ok,
+        "sugerencia": "" if soportes_ok else "Adjuntar historia clinica, RIPS o evolutivas",
+    })
+
+    precedente_ok = False
+    try:
+        from sqlalchemy import and_
+        prev = db.query(GlosaRecord).filter(
+            and_(
+                GlosaRecord.codigo_glosa == g.codigo_glosa,
+                GlosaRecord.eps == g.eps,
+                GlosaRecord.estado == "GANADA",
+                GlosaRecord.id != glosa_id,
+            )
+        ).limit(1).first()
+        precedente_ok = prev is not None
+    except Exception:
+        pass
+    factores.append({
+        "id": "precedente_interno",
+        "etiqueta": "Precedente interno (glosa ganada similar)",
+        "peso": 15,
+        "score": 100 if precedente_ok else 0,
+        "ok": precedente_ok,
+        "sugerencia": "" if precedente_ok else "Sin precedente interno; el dictamen igual procede via normativa",
+    })
+
+    normativa_ok = bool(g.dictamen and any(k in (g.dictamen or "").upper() for k in ["ART.", "ARTICULO", "RES.", "LEY", "DECRETO", "SENT."]))
+    factores.append({
+        "id": "normativa_relevante",
+        "etiqueta": "Normativa citada en el dictamen",
+        "peso": 15,
+        "score": 100 if normativa_ok else 50,
+        "ok": normativa_ok,
+        "sugerencia": "" if normativa_ok else "El dictamen no cita normativa explicita",
+    })
+
+    auditor_ok = bool(getattr(g, "auditor_ok", True))
+    factores.append({
+        "id": "auditor_ok",
+        "etiqueta": "Auditor forense sin discrepancias",
+        "peso": 10,
+        "score": 100 if auditor_ok else 40,
+        "ok": auditor_ok,
+        "sugerencia": "" if auditor_ok else "El agente auditor detecto inconsistencias en el caso",
+    })
+
+    total_peso = sum(f["peso"] for f in factores)
+    total_score = sum(f["score"] * f["peso"] for f in factores) / total_peso
+
+    return {
+        "glosa_id": glosa_id,
+        "score_total": round(total_score, 1),
+        "factores": factores,
+        "sugerencias_priorizadas": [
+            f["sugerencia"] for f in sorted(factores, key=lambda x: -x["peso"])
+            if f["sugerencia"]
+        ][:3],
+    }
