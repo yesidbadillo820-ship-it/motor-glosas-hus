@@ -2169,7 +2169,7 @@ class GlosaService:
                 def _num(s):
                     if not s: return 0.0
                     try: return float("".join(c for c in str(s) if c.isdigit() or c == "."))
-                    except: return 0.0
+                    except (ValueError, TypeError): return 0.0
                 _audit_res = _auditar(
                     texto_glosa=texto_base,
                     eps=str(data.eps or ""),
