@@ -1822,59 +1822,68 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     <!-- ANALIZAR -->
     <div class="panel active" id="p-analizar">
       <div class="sidebar">
-        <div class="sb-body">
-          <div class="sb-section">
-            <div class="sb-label">Pagador</div>
-            <div class="field">
-              <label>EPS / Entidad Pagadora <span style="color:#dc2626" title="Campo obligatorio">*</span></label>
+        <div class="sb-body pa-compact">
+          <!-- BLOQUE 1 · PAGADOR + PROCESO (unificado, compacto) -->
+          <div class="sb-section pa-sec-clean">
+            <div class="field pa-field-tight">
+              <label class="pa-lbl-tiny">EPS / Entidad Pagadora <span style="color:#ef4444">*</span></label>
               <select id="eps-sel" required></select>
             </div>
-          </div>
-          <div class="sb-section">
-            <div class="sb-label">Proceso</div>
-            <div class="field">
-              <label>Etapa</label>
-              <div class="etapa-btns">
-                <div class="etapa-btn sel" data-v="INICIAL" onclick="setEtapa(this)">Inicial</div>
-                <div class="etapa-btn" data-v="RATIFICACION" onclick="setEtapa(this)">Ratific.</div>
-                <div class="etapa-btn" data-v="RESPUESTA" onclick="setEtapa(this)">Respuesta</div>
+            <div class="pa-row-2">
+              <div class="field pa-field-tight">
+                <label class="pa-lbl-tiny">Etapa</label>
+                <div class="etapa-btns pa-seg">
+                  <div class="etapa-btn sel" data-v="INICIAL" onclick="setEtapa(this)">Inicial</div>
+                  <div class="etapa-btn" data-v="RATIFICACION" onclick="setEtapa(this)">Ratific.</div>
+                  <div class="etapa-btn" data-v="RESPUESTA" onclick="setEtapa(this)">Resp.</div>
+                </div>
+                <input type="hidden" id="etapa-v" value="INICIAL"/>
               </div>
-              <input type="hidden" id="etapa-v" value="INICIAL"/>
-            </div>
-            <div class="field">
-              <label>Tono de la respuesta</label>
-              <div class="etapa-btns">
-                <div class="etapa-btn sel" data-v="conciliador" onclick="setTono(this)" title="Etapa inicial — busca levantamiento sin ratificación">Conciliador</div>
-                <div class="etapa-btn" data-v="neutral" onclick="setTono(this)" title="Estrictamente técnico-jurídico">Neutral</div>
-                <div class="etapa-btn" data-v="firme" onclick="setTono(this)" title="Ratificación / segunda respuesta — más contundente">Firme</div>
+              <div class="field pa-field-tight">
+                <label class="pa-lbl-tiny">Tono</label>
+                <div class="etapa-btns pa-seg">
+                  <div class="etapa-btn sel" data-v="conciliador" onclick="setTono(this)" title="Etapa inicial — busca levantamiento sin ratificación">Conciliador</div>
+                  <div class="etapa-btn" data-v="neutral" onclick="setTono(this)" title="Estrictamente técnico-jurídico">Neutral</div>
+                  <div class="etapa-btn" data-v="firme" onclick="setTono(this)" title="Ratificación / segunda respuesta — más contundente">Firme</div>
+                </div>
+                <input type="hidden" id="tono-v" value="conciliador"/>
               </div>
-              <input type="hidden" id="tono-v" value="conciliador"/>
             </div>
-            <div class="date-row">
-              <div class="field"><label>Fecha Radicación</label><input type="date" id="f-rad"/></div>
-              <div class="field"><label>Fecha Recepción</label><input type="date" id="f-rec"/></div>
+            <div class="pa-row-2">
+              <div class="field pa-field-tight"><label class="pa-lbl-tiny">F. Radicación</label><input type="date" id="f-rad"/></div>
+              <div class="field pa-field-tight"><label class="pa-lbl-tiny">F. Recepción</label><input type="date" id="f-rec"/></div>
             </div>
           </div>
-          <div class="sb-section">
-            <div class="sb-label">Facturación</div>
-            <div class="field">
-              <label>Número de Factura</label>
-              <input type="text" id="f-factura" placeholder="FV-2024-00001" oninput="buscarConceptosFactura(this.value)"/>
-              <div id="f-factura-hint" style="font-size:.72rem;color:var(--text3);margin-top:.25rem;min-height:1em;"></div>
-              <!-- Dropdown con conceptos detectados -->
-              <div id="f-factura-conceptos" style="display:none;margin-top:.6rem;padding:.7rem;background:var(--c-blue-light);border:1.5px solid var(--c-teal2);border-radius:8px;"></div>
+
+          <!-- BLOQUE 2 · FACTURACION (COLAPSADA por default) -->
+          <details class="pa-accordion">
+            <summary class="pa-acc-summary">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pa-chev"><polyline points="9 18 15 12 9 6"/></svg>
+              <span>Facturación</span>
+              <span class="pa-acc-hint">opcional</span>
+            </summary>
+            <div class="pa-acc-body">
+              <div class="field pa-field-tight">
+                <label class="pa-lbl-tiny">N° Factura</label>
+                <input type="text" id="f-factura" placeholder="FV-2024-00001" oninput="buscarConceptosFactura(this.value)"/>
+                <div id="f-factura-hint" style="font-size:.7rem;color:var(--text3);margin-top:.2rem;min-height:1em;"></div>
+                <div id="f-factura-conceptos" style="display:none;margin-top:.5rem;padding:.6rem .8rem;background:rgba(20,184,166,.06);border:1px solid rgba(20,184,166,.25);border-radius:8px;"></div>
+              </div>
+              <div class="pa-row-2">
+                <div class="field pa-field-tight"><label class="pa-lbl-tiny">N° Radicado</label><input type="text" id="f-radicado" placeholder="GLS-2024-00001"/></div>
+                <div class="field pa-field-tight"><label class="pa-lbl-tiny">Valor aceptado</label><input type="number" id="f-valacp" value="0" min="0" placeholder="0"/></div>
+              </div>
             </div>
-            <div class="field"><label>Número de Radicado</label><input type="text" id="f-radicado" placeholder="GLS-2024-00001"/></div>
-            <div class="field"><label>Valor Aceptado (COP)</label><input type="number" id="f-valacp" value="0" min="0" placeholder="0"/></div>
-          </div>
-          <div class="sb-section">
-            <div class="sb-label">Contenido</div>
-            <div class="field">
-              <label>Descripción / Texto de la Glosa <span style="color:#dc2626" title="Campo obligatorio">*</span></label>
-              <div class="pa-glosa-toolbar">
+          </details>
+
+          <!-- BLOQUE 3 · CONTENIDO (lo esencial, siempre visible) -->
+          <div class="sb-section pa-sec-clean">
+            <div class="field pa-field-tight">
+              <label class="pa-lbl-tiny">Texto de la glosa <span style="color:#ef4444">*</span></label>
+              <div class="pa-glosa-toolbar pa-tb-clean">
                 <button type="button" class="pa-tbtn" onclick="paPegarCorreoEPS()" title="Pegá el correo crudo de la EPS y la app extrae EPS, código, valor, factura, radicado y motivo">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M16 2v4M8 2v4M4 10h16"/></svg>
-                  Pegar correo EPS
+                  Correo
                 </button>
                 <button type="button" class="pa-tbtn" id="pa-btn-voz" onclick="paToggleVoz()" title="Dictá la glosa con tu voz (Chrome/Edge)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
@@ -1885,29 +1894,38 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
                   Limpiar
                 </button>
               </div>
-              <textarea id="f-glosa" rows="7" placeholder="Pegue aquí el texto completo de la glosa tal como aparece en el formato de la EPS. Incluya código, descripción, valores y justificación de la EPS..." required oninput="paPreviewLiveDebounced()"></textarea>
+              <textarea id="f-glosa" rows="6" placeholder="Pegá el texto de la glosa tal como aparece en el formato de la EPS. Incluí código, descripción, valores y justificación." required oninput="paPreviewLiveDebounced()"></textarea>
             </div>
-            <div class="field" style="margin-top:.4rem;">
-              <label style="display:flex;align-items:center;gap:.4rem;">
-                <span>Buscador rápido de CUPS</span>
-                <span style="font-size:.7rem;color:var(--text3);font-weight:400;">por descripción del procedimiento (ej: "hemograma", "TAC cráneo")</span>
-              </label>
-              <input type="text" id="cups-buscador-input" placeholder='Escriba el procedimiento y se autocompleta el código CUPS 2025...' autocomplete="off" style="font-size:.85rem;" />
+            <div class="field pa-field-tight" style="margin-top:.5rem;">
+              <label class="pa-lbl-tiny">CUPS (buscar por descripción)</label>
+              <input type="text" id="cups-buscador-input" placeholder='hemograma, TAC cráneo, etc.' autocomplete="off"/>
               <div id="cups-buscador-sugerencias" style="display:none;margin-top:.3rem;border:1px solid var(--border);border-radius:6px;background:var(--card-bg, #fff);max-height:240px;overflow-y:auto;"></div>
             </div>
-            <div class="field">
-              <label>Soportes PDF <span style="font-weight:400;color:var(--text3)">(hasta 10 archivos, 15MB c/u)</span></label>
-              <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
-                <input type="file" id="f-pdf" multiple accept=".pdf" onchange="validarPDFs(this)" style="flex:1;min-width:180px;padding:.4rem .6rem;font-size:.75rem"/>
-                <button type="button" class="btn-sm ghost" onclick="limpiarSoportesPDF()" title="Quitar todos los PDFs seleccionados y volver a empezar" style="padding:.4rem .7rem;font-size:.72rem;color:#b91c1c;border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;cursor:pointer;white-space:nowrap;">🗑 Eliminar soportes</button>
+            <div class="field pa-field-tight">
+              <label class="pa-lbl-tiny">Soportes PDF <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;">hasta 10 / 15MB c/u</span></label>
+              <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;">
+                <input type="file" id="f-pdf" multiple accept=".pdf" onchange="validarPDFs(this)" style="flex:1;min-width:160px;padding:.35rem .55rem;font-size:.72rem"/>
+                <button type="button" class="pa-tbtn" onclick="limpiarSoportesPDF()" title="Quitar todos los PDFs">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                </button>
               </div>
-              <div id="pdf-info" style="font-size:.72rem;color:var(--text3);margin-top:.25rem;"></div>
-              <label style="display:flex;align-items:flex-start;gap:.45rem;margin-top:.45rem;cursor:pointer;font-size:.72rem;color:var(--text2);text-transform:none;letter-spacing:0;font-weight:400;line-height:1.4;">
-                <input type="checkbox" id="f-multimodal" style="margin-top:.15rem;flex-shrink:0;width:14px;height:14px;cursor:pointer;"/>
-                <span><b>📎 Lectura PDF avanzada</b> — manda los PDFs binarios directos a Claude (más caro, ~3-5x tokens, pero lee tablas, escaneos OCR y fonts no estándar que pdfplumber no maneja). Útil cuando un soporte tiene formato raro o el dictamen sale flojo en lo documental.</span>
-              </label>
+              <div id="pdf-info" style="font-size:.7rem;color:var(--text3);margin-top:.2rem;"></div>
             </div>
           </div>
+
+          <!-- BLOQUE 4 · OPCIONES AVANZADAS (COLAPSADA por default) -->
+          <details class="pa-accordion">
+            <summary class="pa-acc-summary">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pa-chev"><polyline points="9 18 15 12 9 6"/></svg>
+              <span>Opciones avanzadas</span>
+            </summary>
+            <div class="pa-acc-body">
+              <label style="display:flex;align-items:flex-start;gap:.45rem;cursor:pointer;font-size:.72rem;color:var(--text2);text-transform:none;letter-spacing:0;font-weight:400;line-height:1.4;">
+                <input type="checkbox" id="f-multimodal" style="margin-top:.15rem;flex-shrink:0;width:14px;height:14px;cursor:pointer;"/>
+                <span><b>Lectura PDF avanzada</b> — manda los PDFs binarios directos a Claude (~3-5x tokens, pero lee tablas/escaneos/fonts raros). Útil cuando el dictamen sale flojo en lo documental.</span>
+              </label>
+            </div>
+          </details>
         </div>
         <div class="sb-footer">
           <button class="btn btn-primary" id="btn-analizar" onclick="analizar()" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;">
@@ -4046,6 +4064,195 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   #p-analizar .field select,
   #p-analizar .field textarea{
     transition:box-shadow .2s cubic-bezier(.4,0,.2,1), border-color .2s ease;
+  }
+
+  /* ── Compactacion del sidebar (reducir ruido visual) ── */
+  .pa-compact{padding:.85rem .9rem !important; gap:.85rem !important;}
+  .pa-compact .sb-section,
+  .pa-compact .pa-sec-clean{
+    background:transparent !important;
+    border:none !important;
+    padding:0 !important;
+    margin:0 !important;
+    box-shadow:none !important;
+    display:flex; flex-direction:column; gap:.55rem;
+  }
+  .pa-compact .sb-label{display:none !important;}
+  .pa-compact .field{margin:0 !important; padding:0 !important;}
+  .pa-field-tight label,
+  .pa-lbl-tiny{
+    font-size:.65rem !important;
+    font-weight:600 !important;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--text3, #9ca3af) !important;
+    margin-bottom:.25rem !important;
+    display:block;
+  }
+  .pa-compact input,
+  .pa-compact select,
+  .pa-compact textarea{
+    padding:.45rem .65rem !important;
+    font-size:.83rem !important;
+    border-radius:8px !important;
+  }
+  .pa-compact textarea{font-size:.82rem !important; line-height:1.45;}
+  .pa-row-2{
+    display:grid; grid-template-columns:1fr 1fr; gap:.55rem;
+  }
+  .pa-seg{
+    display:grid; grid-template-columns:repeat(3, 1fr);
+    gap:2px; padding:2px; border-radius:8px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.06);
+  }
+  .pa-seg .etapa-btn{
+    border:none !important;
+    padding:.32rem .4rem !important;
+    font-size:.7rem !important;
+    border-radius:6px !important;
+    text-align:center; cursor:pointer;
+    color:var(--text2, #d1d5db); background:transparent;
+    transition:all .15s ease;
+  }
+  .pa-seg .etapa-btn:hover{background:rgba(255,255,255,.04); color:#fff;}
+  .pa-seg .etapa-btn.sel{
+    background:linear-gradient(180deg, rgba(236,72,153,.85), rgba(168,85,247,.7)) !important;
+    color:#fff !important; font-weight:600;
+    box-shadow:0 1px 3px rgba(236,72,153,.3);
+  }
+
+  /* Accordion (Facturacion + Opciones avanzadas) */
+  .pa-accordion{
+    border:1px solid rgba(255,255,255,.05);
+    border-radius:10px;
+    background:rgba(255,255,255,.015);
+    overflow:hidden;
+    transition:background .2s ease;
+  }
+  .pa-accordion[open]{background:rgba(255,255,255,.025);}
+  .pa-acc-summary{
+    list-style:none; cursor:pointer;
+    padding:.55rem .75rem;
+    display:flex; align-items:center; gap:.5rem;
+    font-size:.74rem; font-weight:600;
+    color:var(--text2, #d1d5db);
+    user-select:none;
+  }
+  .pa-acc-summary::-webkit-details-marker{display:none;}
+  .pa-acc-summary:hover{color:#fff;}
+  .pa-chev{transition:transform .2s ease; opacity:.6;}
+  .pa-accordion[open] .pa-chev{transform:rotate(90deg); opacity:.9;}
+  .pa-acc-hint{
+    margin-left:auto; font-size:.65rem; font-weight:400;
+    color:var(--text3, #9ca3af); font-style:italic;
+  }
+  .pa-acc-body{
+    padding:.4rem .75rem .75rem;
+    display:flex; flex-direction:column; gap:.55rem;
+  }
+
+  /* Toolbar limpia */
+  .pa-tb-clean{
+    margin-bottom:.35rem; gap:.3rem;
+  }
+  .pa-tb-clean .pa-tbtn{
+    padding:.28rem .55rem; font-size:.68rem;
+    background:transparent;
+    border:1px solid rgba(255,255,255,.06);
+  }
+
+  /* ═══ REDUCCION DE SATURACION DEL PANEL DERECHO (dictamen) ═══ */
+  /* Header res-header (DEFENSA TECNICA) - mas sutil */
+  #p-analizar .res-header{
+    padding:.85rem 1.1rem !important;
+    background:linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.015)) !important;
+    border:1px solid rgba(255,255,255,.06) !important;
+    border-radius:12px !important;
+    margin-bottom:.75rem !important;
+    box-shadow:none !important;
+  }
+  #p-analizar .res-title{
+    font-size:.95rem !important;
+    font-weight:600 !important;
+    letter-spacing:.01em !important;
+    text-transform:none !important;
+    margin-bottom:.5rem !important;
+    color:var(--text, #f3f4f6) !important;
+  }
+  #p-analizar .res-pills{gap:.35rem !important;}
+  #p-analizar .res-pills .pill{
+    padding:.15rem .55rem !important;
+    font-size:.7rem !important;
+    border-radius:5px !important;
+    font-weight:500 !important;
+  }
+
+  /* Score - barra delgada inline */
+  #p-analizar .res-score{
+    background:transparent !important;
+    border:none !important;
+    padding:.65rem 1.1rem !important;
+    margin-bottom:.55rem !important;
+    box-shadow:none !important;
+  }
+  #p-analizar .score-row{align-items:baseline;}
+  #p-analizar .score-label{
+    font-size:.72rem !important; color:var(--text3, #9ca3af) !important;
+    text-transform:uppercase; letter-spacing:.08em; font-weight:600 !important;
+  }
+  #p-analizar .score-val{
+    font-size:1.4rem !important; font-weight:700 !important;
+    font-feature-settings:"tnum";
+  }
+  #p-analizar .score-bar-bg{
+    height:4px !important; background:rgba(255,255,255,.05) !important;
+    border-radius:2px !important; margin-top:.35rem !important;
+  }
+  #p-analizar .score-bar{transition:width .6s cubic-bezier(.4,0,.2,1) !important;}
+
+  /* Header del dictamen — sin fondo saturado */
+  #p-analizar .res-dictamen{
+    background:rgba(255,255,255,.015) !important;
+    border:1px solid rgba(255,255,255,.05) !important;
+    border-radius:12px !important;
+    padding:0 !important;
+    overflow:hidden;
+    margin-bottom:.65rem !important;
+    box-shadow:none !important;
+  }
+  #p-analizar .res-dictamen-hdr{
+    background:linear-gradient(180deg, rgba(255,255,255,.04), transparent) !important;
+    padding:.55rem .9rem !important;
+    border-bottom:1px solid rgba(255,255,255,.04) !important;
+    font-size:.72rem !important; font-weight:600 !important;
+    color:var(--text2, #d1d5db) !important;
+    text-transform:uppercase; letter-spacing:.07em;
+  }
+  #p-analizar .res-dictamen-body{
+    padding:.85rem 1.1rem !important;
+    font-size:.82rem !important;
+    line-height:1.55 !important;
+  }
+
+  /* Cards confianza/auto-pilot/auditor en colapsable suave */
+  /* Riesgo de ratificacion - card mas chica */
+  #p-analizar .res-dictamen-body table{margin-bottom:.6rem !important;}
+  #p-analizar .res-dictamen-body table th{
+    background:rgba(255,255,255,.04) !important;
+    color:var(--text2, #d1d5db) !important;
+    font-size:.68rem !important; padding:.5rem .7rem !important;
+    text-transform:uppercase; letter-spacing:.06em; font-weight:600;
+  }
+  #p-analizar .res-dictamen-body table td{
+    background:rgba(255,255,255,.02) !important;
+    padding:.55rem .7rem !important; font-size:.78rem !important;
+    border:none !important;
+  }
+
+  /* Reduccion general de padding de cards de analisis avanzado */
+  #p-analizar .res-area > div[style*="background"]{
+    /* targets de cards inline-styled del backend (confianza, auto-pilot, etc) */
   }
   .asist-input-wrap button:disabled{opacity:.5;cursor:not-allowed}
   .asist-empty{text-align:center;color:var(--text3);padding:1.5rem 1rem;font-size:.82rem}
