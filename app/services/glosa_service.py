@@ -2921,14 +2921,35 @@ class GlosaService:
         ultimo_error: Exception = Exception("Groq: sin intentos")
 
         _ANTI_COPIA_PREFIX = (
-            "ATENCION CRITICA - Vas a ser evaluado por anti-copia-pega. NO copies frases "
-            "del prompt en tu respuesta. PROHIBIDO usar: 'siendo este el sustento normativo "
-            "principal', 'queda en firme la presente glosa', 'EL VALOR INDICADO EN EL "
-            "EXPEDIENTE', 'CUPS INDICADO EN EL EXPEDIENTE', 'DESCRIPCION DEL SERVICIO + CUPS', "
-            "ni ningun placeholder del ESQUELETO. Si te falta un dato real, escribe "
-            "[DATO NO IDENTIFICADO]. NUNCA inventes valores monetarios, codigos ni nombres. "
-            "Usa unicamente lo que aparece en el bloque DATOS DEL CASO del prompt de usuario. "
-            "Si tu respuesta repite literalmente partes del prompt, sera rechazada.\n\n"
+            "ATENCION CRITICA — INSTRUCCIONES OBLIGATORIAS PARA LLAMA 3.3:\n\n"
+            "1. PROHIBIDO copia-pega del prompt. NO uses frases de los ESQUELETOS, "
+            "placeholders, listas, ejemplos. Cada frase DEBE redactarse desde cero "
+            "usando exclusivamente los DATOS DEL CASO concretos.\n\n"
+            "2. PROHIBIDAS estas frases (las usaron antes y sonaron a plantilla):\n"
+            "   - 'siendo este el sustento normativo principal'\n"
+            "   - 'queda en firme la presente glosa'\n"
+            "   - 'EL VALOR INDICADO EN EL EXPEDIENTE' / 'CUPS INDICADO EN EL EXPEDIENTE'\n"
+            "   - 'DESCRIPCION DEL SERVICIO + CUPS' / cualquier placeholder con corchetes\n\n"
+            "3. SIN DATOS = TEXTO NATURAL:\n"
+            "   - Si falta valor: 'el valor objetado consignado en el expediente'\n"
+            "   - Si falta CUPS: 'el procedimiento facturado conforme al CUPS de la factura'\n"
+            "   - Si falta medico: 'el medico tratante registrado en historia clinica'\n\n"
+            "4. NUNCA inventes: cifras, codigos CUPS, nombres, fechas, numeros de contrato.\n\n"
+            "5. ESTRUCTURA OBLIGATORIA (4 parrafos NO numerados):\n"
+            "   P1 IDENTIFICACION (40-60 palabras): 'ESE HUS NO ACEPTA LA GLOSA APLICADA POR "
+            "CONCEPTO DE [TIPO COMPLETO] SOBRE EL CODIGO [CODIGO REAL], INTERPUESTA POR "
+            "[ENTIDAD], RESPECTO DEL [SERVICIO] FACTURADO POR [VALOR REAL]...'\n"
+            "   P2 REFUTACION (60-100 palabras): inicia con 'LA AFIRMACION DE LA AUDITORIA DE "
+            "QUE [motivo literal EPS] NO SE AJUSTA A...' + 2-3 razones tecnicas.\n"
+            "   P3 FUNDAMENTO (50-80 palabras): cita 2-3 normas reales con su numero exacto "
+            "(Art. X Ley YYYY/AAAA). Si tienes CLAUSULAS DEL CONTRATO en el prompt, CITALAS "
+            "TEXTUALMENTE entre comillas con su numero.\n"
+            "   P4 PETICION + ESCALERA: 'EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE "
+            "EL LEVANTAMIENTO DE LA GLOSA [CODIGO] Y EL RECONOCIMIENTO INTEGRO. LA ENTIDAD "
+            "CUENTA CON 10 DIAS HABILES (ART. 57 LEY 1438/2011). COMUNICACIONES: "
+            "CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO.'\n\n"
+            "6. SALIDA EN XML estricto: <paciente>, <servicio>, <contrato>, <tarifa>, "
+            "<normas_clave>, <argumento>. NADA fuera de tags.\n\n"
         )
         system_reforzado = _ANTI_COPIA_PREFIX + system
 
@@ -3356,12 +3377,12 @@ class GlosaService:
         if not self.groq and not self.anthropic_key and not self.gemini:
             return "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>", "error"
 
-        # Orden de intento segun configuracion. Estrategia 3-tier:
-        # primary -> Gemini (free, alta calidad) -> Groq (rapido).
-        # Asi cuando Anthropic se queda sin creditos, Gemini toma el
-        # relevo (free, sin gastar plata), y solo si Gemini tambien
-        # falla cae a Groq como ultimo respaldo.
+        # Orden de intento segun primary_ai configurado por el usuario.
+        # RESPETAMOS la decision del usuario: si dice 'groq', va groq primero
+        # (etapa de testing donde no quiere gastar tokens pagos). Solo si
+        # tecnicamente falla (timeout, error, rate limit), cae al fallback.
         if modelo_override and self.anthropic_key:
+            # modelo_override SIEMPRE va a Anthropic (Opus/Haiku especifico)
             intentos = [("anthropic", self._llamar_anthropic)]
             if self.gemini:
                 intentos.append(("gemini", self._llamar_gemini_con_retry))
@@ -3379,13 +3400,20 @@ class GlosaService:
                 intentos.append(("anthropic", self._llamar_anthropic))
             if self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
+        elif self.primary_ai == "groq" and self.groq:
+            # USUARIO ELIGIO GROQ — respetar (no gastar tokens pagos).
+            # Fallback: si Groq falla tecnicamente, intentar gratis (Gemini)
+            # antes que pago (Anthropic).
+            intentos = [("groq", self._llamar_groq_con_retry)]
+            if self.gemini:
+                intentos.append(("gemini", self._llamar_gemini_con_retry))
+            if self.anthropic_key:
+                intentos.append(("anthropic", self._llamar_anthropic))
         else:
-            # primary_ai == "groq" (legacy) o valor desconocido.
-            # Politica anti-Llama-primero: Llama regurgita plantillas y produjo
-            # los dictamenes "copia y pega" reportados por el usuario. Aunque
-            # alguien fuerce primary_ai="groq", probamos Gemini PRIMERO si esta
-            # disponible (gratis, mejor calidad, lee PDFs nativos), luego
-            # Anthropic, y solo al final caemos a Llama.
+            # primary_ai desconocido o sin proveedor disponible para el primary
+            # elegido. Estrategia balanceada: Gemini (gratis) -> Anthropic
+            # (pago calidad) -> Groq (rapido). Groq al final para evitar
+            # copy-paste si los otros 2 estan disponibles.
             intentos = []
             if self.gemini:
                 intentos.append(("gemini", self._llamar_gemini_con_retry))
