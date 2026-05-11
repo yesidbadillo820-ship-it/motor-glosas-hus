@@ -681,6 +681,20 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
+    try:
+        _ant = os.getenv("ANTHROPIC_API_KEY", "")
+        _gem = os.getenv("GEMINI_API_KEY", "")
+        _grq = os.getenv("GROQ_API_KEY", "")
+        _prim = os.getenv("PRIMARY_AI", "gemini")
+        logger.info(
+            f"[IA-PROVIDERS] primary={_prim} | "
+            f"anthropic={'OK ' + _ant[:10] + '...' if _ant else 'AUSENTE'} | "
+            f"gemini={'OK ' + _gem[:10] + '...' if _gem else 'AUSENTE'} | "
+            f"groq={'OK ' + _grq[:10] + '...' if _grq else 'AUSENTE'}"
+        )
+    except Exception as _e_diag:
+        logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
+
     # Ronda 2: iniciar scheduler de IA auditora proactiva (6 AM diario).
     # No bloquea el startup si falla; sólo deja logs.
     try:

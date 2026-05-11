@@ -1,4 +1,5 @@
 import io
+import os
 import base64
 import asyncio
 import logging
@@ -93,40 +94,74 @@ class PdfService:
         file_content: bytes,
         anthropic_api_key: str = "",
         anthropic_model: str = "claude-sonnet-4-6",
+        gemini_api_key: str = "",
+        gemini_model: str = "gemini-2.0-flash",
     ) -> tuple[str, str]:
-        """Intenta extracción nativa; si el texto es pobre y hay Anthropic,
-        manda el PDF a Claude para transcripción (OCR vision).
+        """Intenta extracción nativa; si el texto es pobre intenta OCR via
+        Anthropic, y si Anthropic falla (sin créditos, 401, etc.) hace
+        fallback a Gemini PDF nativo (gratis).
 
-        Retorna (texto, metodo) donde metodo ∈ {"nativo", "anthropic-vision", "vacio"}.
+        Retorna (texto, metodo) donde metodo ∈
+        {"nativo", "anthropic-vision", "gemini-pdf", "vacio"}.
         """
         texto = await self.extraer(file_content)
-        # Medir texto real (sin markers de página)
         texto_real = "".join([l for l in texto.split("\n") if "--- PÁG" not in l]).strip()
 
         if len(texto_real) >= UMBRAL_TEXTO_MINIMO:
             return texto, "nativo"
 
-        if not anthropic_api_key:
+        gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
+
+        if anthropic_api_key:
+            logger.info(
+                f"PDF parece escaneado ({len(texto_real)} chars nativos). "
+                f"Probando Anthropic vision…"
+            )
+            try:
+                texto_ocr = await self._ocr_anthropic(
+                    file_content, anthropic_api_key, anthropic_model
+                )
+                if texto_ocr and len(texto_ocr.strip()) > len(texto_real):
+                    return texto_ocr, "anthropic-vision"
+            except Exception as e:
+                logger.warning(f"OCR anthropic falló: {e}. Probando Gemini PDF nativo.")
+
+        if gemini_api_key:
+            try:
+                texto_ocr = await self._ocr_gemini(
+                    file_content, gemini_api_key, gemini_model
+                )
+                if texto_ocr and len(texto_ocr.strip()) > len(texto_real):
+                    return texto_ocr, "gemini-pdf"
+            except Exception as e:
+                logger.error(f"OCR gemini falló: {e}")
+
+        if not anthropic_api_key and not gemini_api_key:
             logger.warning(
-                f"PDF con texto pobre ({len(texto_real)} chars) y sin ANTHROPIC_API_KEY; "
+                f"PDF con texto pobre ({len(texto_real)} chars) y sin ANTHROPIC_API_KEY ni GEMINI_API_KEY; "
                 "devolviendo lo extraído nativamente."
             )
-            return texto, "vacio"
+        return texto, "vacio"
 
-        logger.info(
-            f"PDF parece escaneado ({len(texto_real)} chars nativos). "
-            f"Enviando a Claude vision para OCR…"
+    async def _ocr_gemini(
+        self, pdf_bytes: bytes, api_key: str, model: str
+    ) -> str:
+        """OCR vía Gemini PDF nativo (gratis en tier free)."""
+        from app.services.gemini_service import GeminiService
+        prompt = (
+            "Transcribe fielmente todo el contenido textual de este documento PDF. "
+            "Mantén la estructura (tablas, encabezados, filas). No resumas. No interpretes. "
+            "Entrega solo el texto transcrito, sin preámbulos."
         )
-        try:
-            texto_ocr = await self._ocr_anthropic(
-                file_content, anthropic_api_key, anthropic_model
-            )
-            if texto_ocr and len(texto_ocr.strip()) > len(texto_real):
-                return texto_ocr, "anthropic-vision"
-            return texto, "vacio"
-        except Exception as e:
-            logger.error(f"OCR anthropic falló: {e}")
-            return texto, "vacio"
+        gem = GeminiService(api_key=api_key, default_model=model, timeout=180.0)
+        texto, _modelo = await gem.completar(
+            system="Eres un OCR fiel. Transcribe sin interpretar.",
+            user=prompt,
+            max_tokens=8000,
+            temperature=0.0,
+            pdfs_raw=[("documento.pdf", pdf_bytes)],
+        )
+        return texto or ""
 
     async def _ocr_anthropic(
         self, pdf_bytes: bytes, api_key: str, model: str
