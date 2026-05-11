@@ -2887,12 +2887,24 @@ class GlosaService:
     async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 4) -> tuple[str, str]:
         """Llama a Groq con retry exponencial para manejar rate limits y timeouts."""
         ultimo_error: Exception = Exception("Groq: sin intentos")
-        
+
+        _ANTI_COPIA_PREFIX = (
+            "ATENCION CRITICA - Vas a ser evaluado por anti-copia-pega. NO copies frases "
+            "del prompt en tu respuesta. PROHIBIDO usar: 'siendo este el sustento normativo "
+            "principal', 'queda en firme la presente glosa', 'EL VALOR INDICADO EN EL "
+            "EXPEDIENTE', 'CUPS INDICADO EN EL EXPEDIENTE', 'DESCRIPCION DEL SERVICIO + CUPS', "
+            "ni ningun placeholder del ESQUELETO. Si te falta un dato real, escribe "
+            "[DATO NO IDENTIFICADO]. NUNCA inventes valores monetarios, codigos ni nombres. "
+            "Usa unicamente lo que aparece en el bloque DATOS DEL CASO del prompt de usuario. "
+            "Si tu respuesta repite literalmente partes del prompt, sera rechazada.\n\n"
+        )
+        system_reforzado = _ANTI_COPIA_PREFIX + system
+
         for intento in range(max_intentos):
             try:
                 resp = await self.groq.chat.completions.create(
                     messages=[
-                        {"role": "system", "content": system},
+                        {"role": "system", "content": system_reforzado},
                         {"role": "user", "content": user}
                     ],
                     # Modelo configurable via env GROQ_MODEL (default: llama-3.3-70b-versatile).

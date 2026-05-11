@@ -206,6 +206,8 @@ async def _extraer_pdfs(
                 contenido,
                 anthropic_api_key=cfg.anthropic_api_key,
                 anthropic_model=cfg.anthropic_model,
+                gemini_api_key=cfg.gemini_api_key,
+                gemini_model=cfg.gemini_model,
             )
             sep = (
                 f"\n\n═══ DOCUMENTO: {archivo.filename} ═══\n\n"

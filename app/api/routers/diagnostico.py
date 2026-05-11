@@ -36,6 +36,22 @@ logger = logging.getLogger("motor_glosas")
 router = APIRouter(prefix="/admin/diagnostico", tags=["diagnostico"])
 
 
+_PING_CACHE: dict = {}
+_PING_TTL_S = 15 * 60
+
+
+def _ping_cached(key: str, fn):
+    now = datetime.now(timezone.utc)
+    cached = _PING_CACHE.get(key)
+    if cached is not None:
+        estado, mensaje, data, ts = cached
+        if (now - ts).total_seconds() < _PING_TTL_S:
+            return estado, mensaje, data
+    estado, mensaje, data = fn()
+    _PING_CACHE[key] = (estado, mensaje, data, now)
+    return estado, mensaje, data
+
+
 @router.get("")
 def diagnostico_completo(
     db: Session = Depends(get_db),
@@ -164,61 +180,47 @@ def diagnostico_completo(
             "data": {},
         }
     else:
-        # Test ping real a Anthropic — request mínimo (1 token) para
-        # verificar que la key tiene créditos. Si falla con
-        # credit_balance_too_low, lo reportamos.
-        ping_estado = "ok"
-        ping_msg = f"API key configurada (prefijo {anthropic_key[:10]}…)"
-        try:
-            import httpx
-            timeout = httpx.Timeout(connect=8.0, read=15.0, write=8.0, pool=5.0)
-            with httpx.Client(timeout=timeout) as client:
-                resp = client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": anthropic_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": "claude-haiku-4-5-20251001",
-                        "max_tokens": 4,
-                        "messages": [{"role": "user", "content": "ok"}],
-                    },
-                )
-            if resp.status_code == 200:
-                ping_estado = "ok"
-                ping_msg = f"API key OK · ping Haiku exitoso · {anthropic_key[:10]}…"
-            elif resp.status_code == 400:
-                err_msg = ""
-                try:
-                    err_msg = resp.json().get("error", {}).get("message", "")
-                except Exception:
-                    err_msg = resp.text[:120]
-                if "credit" in err_msg.lower():
-                    ping_estado = "error"
-                    ping_msg = (
-                        f"🚨 Sin créditos — recargar en console.anthropic.com/settings/billing. "
-                        f"({err_msg[:120]})"
+        def _do_ping_anthropic():
+            try:
+                import httpx
+                timeout = httpx.Timeout(connect=8.0, read=15.0, write=8.0, pool=5.0)
+                with httpx.Client(timeout=timeout) as client:
+                    resp = client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": anthropic_key,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json",
+                        },
+                        json={
+                            "model": "claude-haiku-4-5-20251001",
+                            "max_tokens": 4,
+                            "messages": [{"role": "user", "content": "ok"}],
+                        },
                     )
-                else:
-                    ping_estado = "warning"
-                    ping_msg = f"HTTP 400: {err_msg[:120]}"
-            elif resp.status_code in (401, 403):
-                ping_estado = "error"
-                ping_msg = f"API key inválida o revocada (HTTP {resp.status_code})"
-            elif resp.status_code == 429:
-                ping_estado = "warning"
-                ping_msg = "Rate limit hit (429) — esperá 60s"
-            elif resp.status_code == 529:
-                ping_estado = "warning"
-                ping_msg = "Anthropic overloaded (529) — temporal"
-            else:
-                ping_estado = "warning"
-                ping_msg = f"HTTP {resp.status_code} inesperado"
-        except Exception as e:
-            ping_estado = "warning"
-            ping_msg = f"No se pudo hacer ping: {e}"
+                if resp.status_code == 200:
+                    return "ok", f"API key OK · ping Haiku exitoso · {anthropic_key[:10]}…", {}
+                if resp.status_code == 400:
+                    err_msg = ""
+                    try:
+                        err_msg = resp.json().get("error", {}).get("message", "")
+                    except Exception:
+                        err_msg = resp.text[:120]
+                    if "credit" in err_msg.lower():
+                        return "error", f"🚨 Sin créditos — recargar en console.anthropic.com/settings/billing. ({err_msg[:120]})", {}
+                    return "warning", f"HTTP 400: {err_msg[:120]}", {}
+                if resp.status_code in (401, 403):
+                    return "error", f"API key inválida o revocada (HTTP {resp.status_code})", {}
+                if resp.status_code == 429:
+                    return "warning", "Rate limit hit (429) — esperá 60s", {}
+                if resp.status_code == 529:
+                    return "warning", "Anthropic overloaded (529) — temporal", {}
+                return "warning", f"HTTP {resp.status_code} inesperado", {}
+            except Exception as e:
+                return "warning", f"No se pudo hacer ping: {e}", {}
+
+        cache_key = f"anthropic::{anthropic_key[:6]}"
+        ping_estado, ping_msg, _ = _ping_cached(cache_key, _do_ping_anthropic)
 
         out["secciones"]["anthropic"] = {
             "estado": ping_estado,
@@ -258,32 +260,30 @@ def diagnostico_completo(
             "data": {},
         }
     else:
-        gemini_modelo = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
-        ping_msg = f"API key configurada (prefijo {gemini_key[:10]}…)"
-        ping_estado = "ok"
-        try:
-            import httpx as _httpx_g
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent?key={gemini_key}"
-            payload = {
-                "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
-                "generationConfig": {"maxOutputTokens": 4, "temperature": 0},
-            }
-            with _httpx_g.Client(timeout=10.0) as client:
-                rg = client.post(url, json=payload)
-            if rg.status_code == 200:
-                ping_msg = f"API key OK · ping {gemini_modelo} exitoso · {gemini_key[:10]}…"
-            elif rg.status_code in (400, 401, 403):
-                ping_estado = "error"
-                ping_msg = f"API key INVALIDA o sin permisos (HTTP {rg.status_code})"
-            elif rg.status_code == 429:
-                ping_estado = "warning"
-                ping_msg = f"Rate limit del tier gratis hit (HTTP 429). Esperar 60s o usar Anthropic/Groq."
-            else:
-                ping_estado = "warning"
-                ping_msg = f"Ping HTTP {rg.status_code}: {rg.text[:120]}"
-        except Exception as _eg:
-            ping_estado = "warning"
-            ping_msg = f"No se pudo hacer ping: {str(_eg)[:120]}"
+        gemini_modelo = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
+        def _do_ping_gemini():
+            try:
+                import httpx as _httpx_g
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent?key={gemini_key}"
+                payload = {
+                    "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
+                    "generationConfig": {"maxOutputTokens": 4, "temperature": 0},
+                }
+                with _httpx_g.Client(timeout=10.0) as client:
+                    rg = client.post(url, json=payload)
+                if rg.status_code == 200:
+                    return "ok", f"API key OK · ping {gemini_modelo} exitoso · {gemini_key[:10]}…", {}
+                if rg.status_code in (400, 401, 403):
+                    return "error", f"API key INVALIDA o sin permisos (HTTP {rg.status_code})", {}
+                if rg.status_code == 429:
+                    return "warning", "Rate limit del tier gratis hit (HTTP 429). Esperar 60s o usar Anthropic/Groq.", {}
+                return "warning", f"Ping HTTP {rg.status_code}: {rg.text[:120]}", {}
+            except Exception as _eg:
+                return "warning", f"No se pudo hacer ping: {str(_eg)[:120]}", {}
+
+        cache_key = f"gemini::{gemini_modelo}::{gemini_key[:6]}"
+        ping_estado, ping_msg, _ = _ping_cached(cache_key, _do_ping_gemini)
         out["secciones"]["gemini"] = {
             "estado": ping_estado,
             "mensaje": ping_msg,
