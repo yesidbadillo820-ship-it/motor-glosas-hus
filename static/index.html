@@ -19499,32 +19499,175 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ─── HOOKS DEL ANALIZAR ──────────────────────────────────────────
-// Antes de generar dictamen: ocultar preview, mostrar pipeline.
-// Despues: ocultar pipeline, marcar citas.
-(function wrapAnalizar(){
-  if(typeof window.analizar !== 'function') return;
-  const original = window.analizar;
-  window.analizar = async function(...args){
-    try{
-      // Ocultar preview, mostrar pipeline
-      const prev = document.getElementById('pa-preview-vivo');
-      if(prev) prev.classList.remove('active');
-      paShowPipeline();
-    }catch(_){}
-    let res;
-    try{
-      res = await original.apply(this, args);
-    } finally {
+// Estrategia: addEventListener al boton + MutationObserver al result-area.
+// El wrap a window.analizar no funcionaba porque el onclick="analizar()"
+// del HTML llama a la funcion del scope global directamente, no a window.analizar.
+(function paHookAnalizar(){
+  // 1. Mostrar pipeline + ocultar preview cuando se click "Analizar con IA"
+  const attachClickHook = () => {
+    const btn = document.getElementById('btn-analizar');
+    if(!btn || btn.dataset.paHooked === '1') return;
+    btn.dataset.paHooked = '1';
+    btn.addEventListener('click', () => {
       try{
-        // Marcar todos los agentes como completos al terminar
+        const prev = document.getElementById('pa-preview-vivo');
+        if(prev) prev.classList.remove('active');
+        paShowPipeline();
+      }catch(_){}
+    });
+  };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', attachClickHook);
+  } else {
+    attachClickHook();
+  }
+  // Reintento por si el boton se renderea tarde
+  setTimeout(attachClickHook, 1000);
+  setTimeout(attachClickHook, 3000);
+
+  // 2. MutationObserver al result-area: detecta cuando aparece dictamen final
+  //    -> oculta pipeline, marca citas, restaura UI
+  let _paLastDictamenSeen = false;
+  const onResultMutate = (mutations) => {
+    const area = document.getElementById('result-area');
+    if(!area) return;
+    const html = area.innerHTML || '';
+    // Heuristica: el dictamen final contiene "ARGUMENTACI" o "DEFENSA TECNICA"
+    // o el bloque distintivo del refinar-inline
+    const tieneDic =
+      html.indexOf('ARGUMENTACI') >= 0 ||
+      html.indexOf('DEFENSA T') >= 0 ||
+      html.indexOf('refinar-inline-status') >= 0;
+    if(tieneDic && !_paLastDictamenSeen){
+      _paLastDictamenSeen = true;
+      try{
         PA_AGENTES_DEFINICION.forEach(a => paSetAgentState(a.id, 'done'));
         setTimeout(() => {
           paHidePipeline();
           paMarcarCitasEnDictamen();
-        }, 600);
+        }, 350);
       }catch(_){}
+    } else if(!tieneDic && _paLastDictamenSeen){
+      // El usuario limpio o navego a otro panel
+      _paLastDictamenSeen = false;
     }
-    return res;
+  };
+  const startObserver = () => {
+    const area = document.getElementById('result-area');
+    if(!area) return;
+    if(area.dataset.paObserved === '1') return;
+    area.dataset.paObserved = '1';
+    const obs = new MutationObserver(onResultMutate);
+    obs.observe(area, {childList:true, subtree:true});
+  };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', startObserver);
+  } else {
+    startObserver();
+  }
+  setTimeout(startObserver, 1000);
+})();
+
+// ─── CITATION MARKER MEJORADO ─────────────────────────────────────
+// Busca el bloque del dictamen DENTRO del resultado, marca articulos,
+// leyes, decretos, resoluciones y sentencias.
+function paMarcarCitasEnDictamen(){
+  const area = document.getElementById('result-area');
+  if(!area) return;
+  // Buscar el contenedor del argumento juridico (no marcar dos veces)
+  const candidatos = area.querySelectorAll('div, td, p');
+  candidatos.forEach((el) => {
+    if(el.dataset.paCited === '1') return;
+    const t = (el.textContent || '').toUpperCase();
+    if(t.indexOf('ARGUMENTACI') < 0 && t.indexOf('FUNDAMENTO NORMATIVO') < 0) return;
+    let html = el.innerHTML;
+    let cambios = 0;
+    // Verde: articulos con formato verificable
+    html = html.replace(/(\bArt(?:[íi]culo|\.)\s*\d{1,4}[a-z]?(?:\s+del?\s+(?:C[óo]digo|Ley|Decreto|Resoluci[óo]n)[^.,;<]{0,80})?)/gi, (m) => {
+      cambios++;
+      return '<span class="pa-cite verified" title="Cita con formato verificado (articulo)">' + m + '</span>';
+    });
+    html = html.replace(/(\bLey\s+\d{2,4}\s*\/?\s*\d{4})(?!<\/span>)/gi, (m) => {
+      cambios++;
+      return '<span class="pa-cite verified" title="Ley con año explicito">' + m + '</span>';
+    });
+    html = html.replace(/(\bDecreto\s+\d{3,4}\s*\/?\s*\d{4})(?!<\/span>)/gi, (m) => {
+      cambios++;
+      return '<span class="pa-cite verified" title="Decreto con año">' + m + '</span>';
+    });
+    html = html.replace(/(\bResoluci[óo]n\s+\d{3,4}\s*(?:\/|de)\s*\d{4})(?!<\/span>)/gi, (m) => {
+      cambios++;
+      return '<span class="pa-cite verified" title="Resolución con año">' + m + '</span>';
+    });
+    // Amarillo: sentencias - revisar literal
+    html = html.replace(/(\b(?:Sent\.|Sentencia)\s*[CT]-\d{1,4}\s*\/\s*\d{2,4})(?!<\/span>)/gi, (m) => {
+      cambios++;
+      return '<span class="pa-cite partial" title="Sentencia — verificar texto literal en corpus normativo">' + m + '</span>';
+    });
+    if(cambios > 0){
+      el.innerHTML = html;
+      el.dataset.paCited = '1';
+    }
+  });
+}
+
+// ─── AUTO-SUGGEST SOPORTES FALTANTES (pre-analisis) ───────────────
+// Cuando el preview vivo detecta tipo de glosa, sugiere los soportes
+// tipicamente necesarios para reforzar la defensa.
+const PA_SOPORTES_POR_TIPO = {
+  'TA': ['Tarifario pactado vigente', 'Acta de conciliación de tarifas si existe', 'Comprobante de tarifa SOAT'],
+  'FA': ['Factura electrónica (FEV)', 'RIPS detallado', 'Comprobante de pago a IPS si aplica'],
+  'SO': ['Autorización previa de la EPS', 'Solicitud de autorización con número'],
+  'AU': ['Autorización electrónica MIPRES o equivalente', 'Cadena de tramite de autorización'],
+  'CO': ['Historia clínica evolutiva', 'Notas médicas del periodo glosado'],
+  'PE': ['Pertinencia médica firmada por especialista', 'Protocolo clínico aplicado'],
+  'CL': ['Constancia de afiliación vigente', 'Consulta BDUA del paciente'],
+  'SE': ['Soporte de servicio entregado', 'Firma del paciente / acudiente'],
+  'IN': ['Insumos / medicamentos: factura del proveedor', 'Trazabilidad lote'],
+  'ME': ['Receta médica firmada', 'Vademécum si es no-POS'],
+  'EX': ['Excedente: tabla comparativa POS vs pactado'],
+};
+
+function paSugerirSoportes(prefijoTipo){
+  if(!prefijoTipo || prefijoTipo.length < 2) return;
+  const tipo = prefijoTipo.substring(0,2).toUpperCase();
+  const sugeridos = PA_SOPORTES_POR_TIPO[tipo];
+  if(!sugeridos) return;
+
+  // Solo sugerir si no hay PDFs ya cargados
+  const fpdf = document.getElementById('f-pdf');
+  if(fpdf && fpdf.files && fpdf.files.length > 0) return;
+
+  // Renderizar tarjeta de sugerencia en el preview
+  let box = document.getElementById('pa-prev-soportes-card');
+  if(!box){
+    const panel = document.getElementById('pa-preview-vivo');
+    if(!panel) return;
+    box = document.createElement('div');
+    box.id = 'pa-prev-soportes-card';
+    box.className = 'pa-prev-card pa-glass';
+    box.innerHTML = '<div class="pa-prev-title">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>'+
+      'Soportes recomendados</div><div id="pa-prev-soportes"></div>';
+    panel.appendChild(box);
+  }
+  const cont = document.getElementById('pa-prev-soportes');
+  if(!cont) return;
+  cont.innerHTML = sugeridos.map(s =>
+    '<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;font-size:.78rem;color:var(--text2,#d1d5db)">'+
+      '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'+
+      '<span>'+escHtml(s)+'</span>'+
+    '</div>'
+  ).join('');
+}
+
+// Hook al renderPreview existente para llamar a sugerencia
+(function hookRenderPreview(){
+  const origRender = window.paRenderPreview;
+  if(typeof origRender !== 'function') return;
+  window.paRenderPreview = function(d){
+    origRender(d);
+    if(d && d.prefijo) paSugerirSoportes(d.prefijo);
   };
 })();
 </script>
