@@ -4762,6 +4762,198 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   .pa-pulse-text{flex:1}
   .pa-pulse-text b{color:var(--text); font-weight:600}
 
+  /* ═══════════════════════════════════════════════════════════════
+     PANEL MIS GLOSAS · REDISEÑO PREMIUM (mayo 2026)
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* Header del panel mas sutil */
+  #p-mis-glosas .page-head{
+    margin-bottom:1rem !important;
+  }
+  #p-mis-glosas .page-title{
+    font-size:1.05rem !important; font-weight:700 !important;
+  }
+  #p-mis-glosas .page-sub{
+    font-size:.78rem !important; color:var(--text3) !important;
+  }
+
+  /* Asistente saludo — colapsable y mas sutil */
+  #p-mis-glosas #asistente-saludo{
+    background:linear-gradient(135deg, rgba(99,102,241,.06), rgba(168,85,247,.06)) !important;
+    border:1px solid rgba(99,102,241,.18) !important;
+    padding:.8rem 1.15rem !important;
+    margin-bottom:.85rem !important;
+    border-radius:10px !important;
+  }
+  #p-mis-glosas #asistente-emoji{font-size:1.5rem !important}
+  #p-mis-glosas #asistente-saludo-texto{
+    font-size:.88rem !important; color:var(--text) !important;
+  }
+  #p-mis-glosas #asistente-tip{
+    font-size:.78rem !important; color:var(--text2) !important;
+  }
+
+  /* Tabs mas pulidos */
+  #p-mis-glosas .mis-tab{
+    font-size:.82rem !important;
+    transition:all .15s ease;
+  }
+  #p-mis-glosas .mis-tab:hover{
+    color:var(--text) !important;
+    background:var(--bg-subtle) !important;
+  }
+
+  /* Toggle vista lista/kanban — sutil */
+  #p-mis-glosas .btn.btn-sm{
+    box-shadow:none !important;
+  }
+
+  /* KPI grid (4 cards) — mas compacto y con tilt suave */
+  #p-mis-glosas .stat-grid{
+    gap:.7rem !important;
+    margin-bottom:1rem !important;
+  }
+  #p-mis-glosas .stat-card{
+    padding:.85rem 1.05rem !important;
+    border-radius:11px !important;
+    border:1px solid var(--border) !important;
+    background:var(--bg-card) !important;
+    box-shadow:var(--sh) !important;
+    transition:transform .15s var(--ease), box-shadow .2s var(--ease);
+  }
+  #p-mis-glosas .stat-card:hover{
+    transform:translateY(-1px);
+    box-shadow:var(--sh-md) !important;
+  }
+  #p-mis-glosas .stat-card .n{
+    font-size:1.6rem !important; font-weight:700 !important; line-height:1 !important;
+  }
+  #p-mis-glosas .stat-card .l{
+    font-size:.7rem !important; color:var(--text3) !important;
+    text-transform:uppercase; letter-spacing:.06em; font-weight:600;
+    margin-top:.4rem !important;
+  }
+  /* Cuando los 4 KPIs son 0 — la clase se aplica via JS */
+  #p-mis-glosas .stat-grid.all-zero{display:none !important}
+
+  /* Vistas-bar con chips mas pulidos */
+  #p-mis-glosas .vista-chip{
+    padding:.32rem .65rem !important;
+    font-size:.72rem !important;
+    background:var(--bg-card) !important;
+    border:1px solid var(--border) !important;
+    color:var(--text2) !important;
+    border-radius:7px !important;
+    transition:all .15s ease;
+  }
+  #p-mis-glosas .vista-chip:hover{
+    background:var(--bg-subtle) !important;
+    color:var(--text) !important;
+    border-color:var(--border2) !important;
+  }
+  #p-mis-glosas .vista-chip.vista-active{
+    background:linear-gradient(180deg, #6366f1, #8b5cf6) !important;
+    color:#fff !important;
+    border-color:transparent !important;
+    box-shadow:0 1px 3px rgba(99,102,241,.3);
+  }
+
+  /* TABLA premium: menos densidad, hover suave, separadores sutiles */
+  #p-mis-glosas table{
+    border-collapse:separate !important;
+    border-spacing:0 !important;
+    width:100%;
+    background:var(--bg-card);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:var(--sh);
+  }
+  #p-mis-glosas thead th{
+    background:var(--bg-subtle) !important;
+    color:var(--text3) !important;
+    font-size:.66rem !important;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    font-weight:700 !important;
+    padding:.65rem .8rem !important;
+    border-bottom:1px solid var(--border) !important;
+    text-align:left;
+  }
+  #p-mis-glosas tbody td{
+    padding:.7rem .8rem !important;
+    border-bottom:1px solid var(--border) !important;
+    font-size:.82rem !important;
+    vertical-align:middle !important;
+    color:var(--text) !important;
+  }
+  #p-mis-glosas tbody tr{
+    transition:background .12s ease;
+  }
+  #p-mis-glosas tbody tr:hover{
+    background:var(--bg-subtle) !important;
+  }
+  #p-mis-glosas tbody tr:hover td{
+    background:transparent !important;
+  }
+  #p-mis-glosas tbody tr:last-child td{border-bottom:none !important}
+
+  /* Chips premium dentro de la tabla */
+  #p-mis-glosas .chip{
+    display:inline-flex !important; align-items:center;
+    padding:.18rem .55rem !important;
+    font-size:.7rem !important;
+    border-radius:5px !important;
+    font-weight:600 !important;
+    letter-spacing:.01em;
+  }
+
+  /* Botones de accion mas sutiles */
+  #p-mis-glosas .btn-sm.btn-primary{
+    background:linear-gradient(180deg, #6366f1, #8b5cf6) !important;
+    color:#fff !important;
+    border:none !important;
+    padding:.32rem .75rem !important;
+    font-size:.74rem !important;
+    border-radius:6px !important;
+    box-shadow:0 1px 3px rgba(99,102,241,.3);
+  }
+  #p-mis-glosas .btn-sm.btn-primary:hover{
+    transform:translateY(-1px);
+    box-shadow:0 4px 8px rgba(99,102,241,.4);
+  }
+
+  /* Empty row mas pulido */
+  #p-mis-glosas .empty-row td{
+    text-align:center !important;
+    padding:2.5rem 1rem !important;
+    background:var(--bg-card) !important;
+  }
+
+  /* Bulk bar mas premium cuando aparece */
+  #p-mis-glosas .bulk-bar{
+    background:var(--bg-card) !important;
+    border:1px solid var(--border) !important;
+    border-radius:10px !important;
+    padding:.7rem 1rem !important;
+    margin-bottom:.8rem !important;
+    box-shadow:var(--sh) !important;
+    align-items:center !important;
+    flex-wrap:wrap !important;
+    gap:.4rem !important;
+  }
+
+  /* Banner "vencen 24h" mas integrado */
+  #p-mis-glosas .alert-vencen-24h{
+    background:linear-gradient(135deg, rgba(239,68,68,.08), rgba(245,158,11,.08)) !important;
+    border:1px solid rgba(239,68,68,.25) !important;
+    border-radius:11px !important;
+    padding:.85rem 1.15rem !important;
+    margin-bottom:.9rem !important;
+  }
+
+  /* Columnas vacias ocultas (se aplica clase via JS) */
+  #p-mis-glosas .col-hidden{display:none !important}
+
   /* 12. BOTON ANALIZAR con feedback rico */
   #btn-analizar{
     position:relative; overflow:hidden;
@@ -20558,22 +20750,36 @@ function paBuildEmptyStateHTML(data){
     );
   }
 
-  // ─── KPIs con sparklines ───
-  const sparkVals = (tend && tend.serie) ? (tend.serie.slice(-8).map(p => Number(p.valor||p.total||0))) : null;
-  const totalGlosasMes = (analytics && (analytics.glosas_mes||analytics.total)) || 0;
-  const valorRecuperado = (analytics && (analytics.valor_recuperado_mes||analytics.valor_levantado)) || 0;
-  const tasaExito = (analytics && (analytics.tasa_exito||analytics.tasa)) || 0;
-  const valorObjetado = (analytics && (analytics.valor_objetado||analytics.valor_objetado_mes)) || 0;
+  // ─── KPIs con sparklines REALES ───
+  // Fix #1: /analytics/tendencias devuelve lista directa, no {serie:...}
+  // Construimos 3 series de sparkline (count, objetado, recuperado) por mes
+  const tendList = Array.isArray(tend) ? tend.slice(-8) : null;
+  const sparkCount = tendList && tendList.length >= 2 ? tendList.map(p => Number(p.count||0)) : null;
+  const sparkObj = tendList && tendList.length >= 2 ? tendList.map(p => Number(p.objetado||0)) : null;
+  const sparkRec = tendList && tendList.length >= 2 ? tendList.map(p => Number(p.recuperado||0)) : null;
+
+  const totalGlosasMes = (analytics && analytics.glosas_mes) || 0;
+  const valorObjetado = (analytics && analytics.valor_objetado_mes) || 0;
+  const valorRecuperado = (analytics && analytics.valor_recuperado_mes) || 0;
+  const tasaExito = (analytics && analytics.tasa_exito_pct) || 0;
+
+  // Fix #2: $383M duplicado.
+  // Backend: recuperado = objetado - aceptado. Si aceptado=0 -> recuperado=objetado.
+  // En ese caso "Recuperado" es EQUÍVOCO porque es lo "A DEFENDER", no lo ganado.
+  // Mostrar 3 KPIs si los valores son iguales; mostrar 4 con etiqueta clara si difieren.
+  const sonIguales = Math.abs(valorObjetado - valorRecuperado) < 1;
+  const kpis = [];
+  kpis.push(paBuildKpi('Glosas del mes', totalGlosasMes.toLocaleString('es-CO'), sparkCount, null));
+  kpis.push(paBuildKpi('Tasa de éxito', (typeof tasaExito === 'number' ? tasaExito.toFixed(1)+'%' : '—'), null,
+    tasaExito >= 80 ? {label:'excelente', cls:'up'} : (tasaExito > 0 ? {label:'parcial', cls:'neutral'} : null)));
+  kpis.push(paBuildKpi('Valor objetado', paFmtCOP(valorObjetado), sparkObj, null));
+  // Solo mostrar "A defender" si difiere del objetado (señal de que hay aceptados parciales)
+  if(!sonIguales){
+    kpis.push(paBuildKpi('A defender', paFmtCOP(valorRecuperado), sparkRec, {label:'sin aceptados', cls:'neutral'}));
+  }
 
   partes.push(
-    '<div class="pre-kpi-grid">'+
-      paBuildKpi('Glosas del mes', totalGlosasMes.toLocaleString('es-CO'), sparkVals, null)+
-      paBuildKpi('Tasa de éxito', (typeof tasaExito==='number' ? tasaExito.toFixed(1)+'%' : '—'), null,
-        tasaExito >= 80 ? {label:'excelente', cls:'up'} : null)+
-      paBuildKpi('Valor objetado', paFmtCOP(valorObjetado), null, null)+
-      paBuildKpi('Recuperado', paFmtCOP(valorRecuperado), null,
-        valorRecuperado > 0 ? {label:'mes en curso', cls:'neutral'} : null)+
-    '</div>'
+    '<div class="pre-kpi-grid">'+kpis.join('')+'</div>'
   );
 
   // ─── Glosas que vencen HOY/MAÑANA ───
@@ -20847,6 +21053,18 @@ function paOcultarRuidoUI(){
         el.classList.add('hdr-pct-zero');
       }
     });
+    // Fix 3: Donut de progreso del mes con valor 0 -> ocultar (es ruido)
+    const donut = document.getElementById('hdr-progreso-btn');
+    const donutNum = document.getElementById('hdr-progreso-num');
+    if(donut && donutNum){
+      const v = (donutNum.textContent || '').trim();
+      // Oculta el botón si valor es 0, 0%, '—', vacio o cero
+      if(/^0%?$/.test(v) || v === '—' || v === '' || v === '0%'){
+        donut.style.display = 'none';
+      } else {
+        donut.style.display = '';  // mostrar si tiene valor real
+      }
+    }
   }catch(_){}
 }
 (function bootOcultarRuido(){
@@ -20991,6 +21209,103 @@ function paTourTerminar(completado){
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
   else fn();
   setTimeout(fn, 1500);
+})();
+
+// ─── REDISEÑO MIS GLOSAS — hooks post-render ───────────────────────
+// Se ejecutan despues de _renderMisGlosas para:
+// 1. Ocultar KPI grid cuando los 4 contadores son 0
+// 2. Ocultar columnas que estan TODAS en "—" (Factura/Consec/Radicado/Tipo
+//    cuando esos campos no se llenaron en la importacion)
+// 3. Anadir clase glassmorphism al banner "vencen 24h"
+function paAjustarMisGlosas(){
+  try{
+    const panel = document.getElementById('p-mis-glosas');
+    if(!panel) return;
+
+    // 1) KPI grid: ocultar si los 4 son 0
+    const grid = panel.querySelector('.stat-grid');
+    if(grid){
+      const ns = ['mis-v','mis-a','mis-r','mis-n'].map(id => {
+        const el = document.getElementById(id);
+        return el ? parseInt((el.textContent||'0').replace(/[^\d]/g, ''), 10) || 0 : 0;
+      });
+      const todosZero = ns.every(n => n === 0);
+      grid.classList.toggle('all-zero', todosZero);
+    }
+
+    // 2) Banner "vencen 24h" — buscar y dar clase premium
+    const alertas = panel.querySelectorAll('[style*="background:#fef2f2"],[style*="background:rgba(239"]');
+    alertas.forEach(el => {
+      if(el.textContent && el.textContent.indexOf('vencen') >= 0){
+        el.classList.add('alert-vencen-24h');
+      }
+    });
+
+    // 3) Ocultar columnas con TODOS los valores en "—"
+    const tabla = panel.querySelector('table');
+    if(!tabla) return;
+    const ths = tabla.querySelectorAll('thead th');
+    const rows = tabla.querySelectorAll('tbody tr:not(.empty-row)');
+    if(rows.length === 0) return;
+
+    ths.forEach((th, idx) => {
+      // No ocultar columnas estructurales (checkbox, gestor, EPS, acciones)
+      const label = (th.textContent || '').trim().toUpperCase();
+      if(['','GESTOR','EPS','VALOR','WORKFLOW','SEMÁFORO','SEMAFORO','ACCIONES','VER'].indexOf(label) >= 0) return;
+
+      let todasVacias = true;
+      rows.forEach(tr => {
+        const td = tr.children[idx];
+        if(!td) return;
+        const txt = (td.textContent || '').trim();
+        if(txt && txt !== '—' && txt !== '-' && txt !== '') todasVacias = false;
+      });
+      if(todasVacias){
+        th.classList.add('col-hidden');
+        rows.forEach(tr => {
+          const td = tr.children[idx];
+          if(td) td.classList.add('col-hidden');
+        });
+      } else {
+        th.classList.remove('col-hidden');
+        rows.forEach(tr => {
+          const td = tr.children[idx];
+          if(td) td.classList.remove('col-hidden');
+        });
+      }
+    });
+  }catch(_){}
+}
+
+// Hook al render de Mis glosas — wrappear _renderMisGlosas para auto-ajustar
+(function hookMisGlosas(){
+  const tryHook = () => {
+    if(typeof window._renderMisGlosas !== 'function') return false;
+    if(window._renderMisGlosas._paWrapped) return true;
+    const orig = window._renderMisGlosas;
+    window._renderMisGlosas = function(...args){
+      const r = orig.apply(this, args);
+      setTimeout(paAjustarMisGlosas, 80);
+      return r;
+    };
+    window._renderMisGlosas._paWrapped = true;
+    return true;
+  };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', () => { tryHook() || setTimeout(tryHook, 1500); });
+  } else { tryHook() || setTimeout(tryHook, 1500); }
+  // MutationObserver al panel mis-glosas: si el contenido cambia, reajusta
+  setTimeout(() => {
+    const panel = document.getElementById('p-mis-glosas');
+    if(!panel || panel.dataset.paObserved === '1') return;
+    panel.dataset.paObserved = '1';
+    new MutationObserver(() => {
+      if(panel.classList.contains('active')){
+        clearTimeout(window._paMisAjustTimer);
+        window._paMisAjustTimer = setTimeout(paAjustarMisGlosas, 150);
+      }
+    }).observe(panel, { childList:true, subtree:true });
+  }, 1000);
 })();
 
 // ─── 10. TOAST PREMIUM (override) ──────────────────────────────────
