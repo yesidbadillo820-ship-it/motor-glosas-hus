@@ -734,6 +734,8 @@ def build_user_prompt(
     variante: int = -1,
     cups_verificado: Optional[str] = None,
     valor_objetado: Optional[str] = None,
+    valor_facturado: Optional[str] = None,
+    valor_pactado: Optional[str] = None,
     tono: Optional[str] = "conciliador",
 ) -> str:
     """Construye el user prompt estructurado para la IA.
@@ -1022,6 +1024,8 @@ def build_user_prompt(
 • Tarifa pactada    : {tarifa}
 • CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
 • Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
+• Valor facturado   : {valor_facturado or "—"}
+• Valor pactado     : {valor_pactado or "—"}
 • Trazabilidad      : {trazabilidad}
 • Tiempo transcurrido: {contexto_tiempo}
 
