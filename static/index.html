@@ -4254,6 +4254,113 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   #p-analizar .res-area > div[style*="background"]{
     /* targets de cards inline-styled del backend (confianza, auto-pilot, etc) */
   }
+
+  /* ═══ CARDS DE ANALISIS AVANZADO — reducir saturacion ═══ */
+  /* Confianza del dictamen + AUTO-PILOT + Auditor Forense */
+  #p-analizar .res-area > div[style*="border-radius:10px"][style*="border:1.5px solid"]{
+    padding:.65rem .85rem !important;
+    border-width:1px !important;
+    border-radius:10px !important;
+    margin-top:.45rem !important;
+    font-size:.78rem !important;
+  }
+  /* Confianza barra (gigante en rojo) */
+  #p-analizar .res-area div[style*="background:#fef2f2"],
+  #p-analizar .res-area div[style*="background:#fefce8"]{
+    background:rgba(239,68,68,.06) !important;
+    border-color:rgba(239,68,68,.25) !important;
+  }
+  #p-analizar .res-area div[style*="background:#ecfdf5"]{
+    background:rgba(16,185,129,.06) !important;
+    border-color:rgba(16,185,129,.25) !important;
+  }
+  /* Headers de cards (la frase principal saturada) */
+  #p-analizar .res-area div[style*="font-weight:700"][style*="font-size:.95rem"],
+  #p-analizar .res-area div[style*="color:#dc2626"][style*="font-weight:700"]{
+    font-size:.82rem !important; font-weight:600 !important;
+  }
+  /* Iconos gigantes (🚫 🚨 👁️ ⚠️ 🛡 💡) */
+  #p-analizar .res-area span[style*="font-size:1.5rem"],
+  #p-analizar .res-area span[style*="font-size:1.4rem"],
+  #p-analizar .res-area span[style*="font-size:1.2rem"]{
+    font-size:1rem !important;
+  }
+  /* Barras de progreso de score interno (8px → 4px) */
+  #p-analizar .res-area div[style*="height:8px"][style*="background:#e5e7eb"]{
+    height:4px !important;
+  }
+
+  /* Auditor Forense textarea — reducir altura */
+  #p-analizar .af-input,
+  #p-analizar textarea[placeholder*="BACILOSCOPIA"],
+  #p-analizar textarea[id*="auditor"],
+  #p-analizar textarea[id^="af-"]{
+    min-height:45px !important; max-height:90px !important;
+    font-size:.78rem !important;
+  }
+
+  /* ═══ TOOLBAR DE ACCIONES (7 botones) — compacta ═══ */
+  #p-analizar .res-actions{
+    display:flex; flex-wrap:wrap;
+    gap:.35rem !important;
+    padding:.65rem 0 !important; margin-top:.5rem !important;
+    border-top:1px solid rgba(255,255,255,.05);
+  }
+  #p-analizar .res-actions .btn,
+  #p-analizar .res-actions .btn-primary,
+  #p-analizar .res-actions .btn-ghost{
+    padding:.4rem .75rem !important;
+    font-size:.74rem !important;
+    border-radius:7px !important;
+    font-weight:500 !important;
+    box-shadow:none !important;
+  }
+  #p-analizar .res-actions .btn-primary{
+    background:linear-gradient(180deg, rgba(99,102,241,.85), rgba(139,92,246,.7)) !important;
+    color:#fff !important;
+    border:1px solid rgba(139,92,246,.5);
+  }
+  #p-analizar .res-actions .btn-ghost{
+    background:rgba(255,255,255,.025) !important;
+    border:1px solid rgba(255,255,255,.06) !important;
+    color:var(--text2, #d1d5db) !important;
+  }
+  #p-analizar .res-actions .btn-ghost:hover{
+    background:rgba(236,72,153,.08) !important;
+    color:#fff !important;
+    border-color:rgba(236,72,153,.25) !important;
+  }
+
+  /* Banner Marcar como RESPONDIDA — mas chico */
+  #p-analizar #result-area div[style*="background:#ecfdf5"][style*="border:2px solid #10b981"]{
+    padding:.65rem .9rem !important;
+    border-width:1px !important;
+    border-radius:10px !important;
+    font-size:.78rem !important;
+    background:rgba(16,185,129,.07) !important;
+    border-color:rgba(16,185,129,.3) !important;
+  }
+  #p-analizar #btn-indiv-respondida{
+    padding:.4rem .85rem !important;
+    font-size:.78rem !important;
+    box-shadow:none !important;
+  }
+
+  /* "Ver desglose" / "Ver detalle" — botones pequeños sutiles */
+  #p-analizar .res-area .btn-sm.ghost{
+    padding:.25rem .5rem !important;
+    font-size:.68rem !important;
+    background:transparent !important;
+    border:1px solid rgba(255,255,255,.08) !important;
+    color:var(--text2, #d1d5db) !important;
+  }
+
+  /* "Para subir el score, te falta" listas más sutiles */
+  #p-analizar .res-area ul,
+  #p-analizar .res-area .factores{
+    font-size:.74rem !important;
+    line-height:1.5;
+  }
   .asist-input-wrap button:disabled{opacity:.5;cursor:not-allowed}
   .asist-empty{text-align:center;color:var(--text3);padding:1.5rem 1rem;font-size:.82rem}
   .asist-empty .ej{display:block;text-align:left;margin-top:.5rem;font-size:.75rem;background:#fff;border:1px solid var(--line);padding:.4rem .55rem;border-radius:6px;cursor:pointer}
