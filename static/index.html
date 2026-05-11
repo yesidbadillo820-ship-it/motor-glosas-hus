@@ -4237,27 +4237,47 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
     background:var(--bg-card) !important;
     border:1px solid var(--border) !important;
     border-radius:12px !important;
-    padding:0 !important;
-    overflow:hidden;
     margin-bottom:.65rem !important;
     box-shadow:var(--sh) !important;
     color:var(--text) !important;
+    display:block !important;
+    overflow:visible !important;
+    min-height:120px !important;
   }
   #p-analizar .res-dictamen-hdr{
     background:var(--bg-subtle) !important;
     padding:.6rem .95rem !important;
     border-bottom:1px solid var(--border) !important;
-    font-size:.72rem !important; font-weight:600 !important;
+    font-size:.78rem !important; font-weight:600 !important;
     color:var(--text2) !important;
     text-transform:uppercase; letter-spacing:.07em;
+    display:flex !important; justify-content:space-between; align-items:center;
+    border-radius:12px 12px 0 0;
   }
   #p-analizar .res-dictamen-body{
-    padding:.95rem 1.15rem !important;
-    font-size:.83rem !important;
-    line-height:1.6 !important;
+    padding:1rem 1.2rem !important;
+    font-size:.85rem !important;
+    line-height:1.65 !important;
     color:var(--text) !important;
     background:var(--bg-card) !important;
+    display:block !important;
+    min-height:80px !important;
   }
+  /* Forzar color de texto a TODOS los descendientes del dictamen body
+     (algunos pueden venir con color inline del backend que se pierde
+     contra el nuevo fondo blanco — esto garantiza legibilidad) */
+  #p-analizar .res-dictamen-body p,
+  #p-analizar .res-dictamen-body div:not(.pa-cite),
+  #p-analizar .res-dictamen-body span:not(.pa-cite),
+  #p-analizar .res-dictamen-body li,
+  #p-analizar .res-dictamen-body b,
+  #p-analizar .res-dictamen-body strong{
+    color:var(--text) !important;
+  }
+  /* Mantener colores de las citas marcadas (verde/amarillo/rojo) */
+  #p-analizar .res-dictamen-body .pa-cite.verified{color:#15803d !important;}
+  #p-analizar .res-dictamen-body .pa-cite.partial{color:#b45309 !important;}
+  #p-analizar .res-dictamen-body .pa-cite.unverified{color:#b91c1c !important;}
 
   /* Tablas internas del dictamen */
   #p-analizar .res-dictamen-body table{margin-bottom:.6rem !important;}
@@ -19951,12 +19971,24 @@ function paMarcarCitasEnDictamen(){
     .filter(i => i && i.cita && (i.severidad === 'ALTA' || i.severidad === 'MEDIA'))
     .map(i => (i.cita || '').trim());
 
-  // Buscar el contenedor del argumento juridico (no marcar dos veces)
-  const candidatos = area.querySelectorAll('div, td, p');
+  // Buscar el contenedor del argumento juridico (no marcar dos veces).
+  // SOLO procesamos elementos terminales pequeños (sin <table> ni <div>
+  // hijos) para evitar romper la estructura HTML del dictamen al
+  // reemplazar el innerHTML con regex.
+  const candidatos = area.querySelectorAll('p, td, span:not(.pa-cite), li');
   candidatos.forEach((el) => {
     if(el.dataset.paCited === '1') return;
+    // No tocar elementos que contengan otros bloques importantes
+    if(el.querySelector('table, .res-dictamen, .res-dictamen-hdr, .res-dictamen-body')) return;
     const t = (el.textContent || '').toUpperCase();
-    if(t.indexOf('ARGUMENTACI') < 0 && t.indexOf('FUNDAMENTO NORMATIVO') < 0) return;
+    // Procesamos elementos que contienen citas (Art./Ley/Decreto/Resol/Sent)
+    // pero NO el contenedor entero del dictamen (que contiene mucho mas).
+    if(t.indexOf('ART.') < 0 && t.indexOf('ARTÍCULO') < 0 &&
+       t.indexOf('LEY ') < 0 && t.indexOf('DECRETO') < 0 &&
+       t.indexOf('RESOLUCI') < 0 && t.indexOf('SENT') < 0) return;
+    // Si el elemento es muy grande (>5000 chars), saltar — probable
+    // contenedor padre que rompimos al hacer innerHTML replace
+    if((el.textContent || '').length > 5000) return;
     let html = el.innerHTML;
     let cambios = 0;
     // Primero: marcar en ROJO las citas reportadas como falsas por el backend
