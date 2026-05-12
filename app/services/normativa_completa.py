@@ -772,6 +772,23 @@ RESOLUCIONES = {
         "vigente": True,
         "keywords": ["PVE", "vigilancia epidemiológica", "periodicidad reporte"],
     },
+    "RESOLUCION 042 DE 2020": {
+        "nombre": "Resolución 000042 de 2020 (DIAN)",
+        "titulo": "Sistema de facturación electrónica de venta",
+        "ambito": "Factura Electrónica de Venta (FEV), CUFE, requisitos técnicos DIAN",
+        "vigente": True,
+        "keywords": [
+            "factura electrónica", "FEV", "CUFE", "facturación electrónica",
+            "DIAN", "Res. 042/2020", "Resolución 042 2020",
+        ],
+        "texto": (
+            "La Resolución 000042 de 2020 expedida por la DIAN establece los "
+            "requisitos del sistema de facturación electrónica de venta en Colombia, "
+            "incluyendo la generación del CUFE (Código Único de Facturación "
+            "Electrónica), los formatos XML, los plazos de transmisión y los "
+            "requisitos formales de la Factura Electrónica de Venta (FEV)."
+        ),
+    },
 }
 
 

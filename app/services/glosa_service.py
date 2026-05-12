@@ -1110,7 +1110,8 @@ class GlosaService:
             }
             accion_ia = _mapa_accion.get(tipo_glosa, "")
             try:
-                _vobj = float(re.sub(r"[^\d.]", "", str(valor_raw or "")) or 0)
+                from app.services.auto_pilot_decision import _parse_valor as _pval_vobj
+                _vobj = _pval_vobj(valor_raw)
             except Exception:
                 _vobj = 0.0
             if accion_ia == "DEFENDER_TOTAL":
@@ -1525,12 +1526,12 @@ class GlosaService:
                         f"solo aplica cuando primary_ai=anthropic."
                     )
                 else:
-                    _valor_num_route = 0
-                    if valor_raw:
-                        import re as _re_route
-                        _digits = _re_route.sub(r"[^\d]", "", str(valor_raw))
-                        if _digits:
-                            _valor_num_route = int(_digits)
+                    # Usa el parser robusto que respeta formato colombiano
+                    # ("7.700,00" = 7700, no 770000 como hacía el regex viejo).
+                    # Bug detectado 12-may-2026: Sonnet se activaba para casos de
+                    # $7.700 porque el parser interpretaba mal los puntos de miles.
+                    from app.services.auto_pilot_decision import _parse_valor as _pval_route
+                    _valor_num_route = int(_pval_route(valor_raw)) if valor_raw else 0
                     _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
                     _len_glosa_route = len(str(texto_base or ""))
                     _len_pdf_route = len(str(contexto_pdf or ""))
@@ -1589,9 +1590,8 @@ class GlosaService:
                     )
                 _obj_num = 0.0
                 if valor_raw:
-                    _d = re.sub(r"[^\d]", "", str(valor_raw))
-                    if _d:
-                        _obj_num = float(_d)
+                    from app.services.auto_pilot_decision import _parse_valor as _pval_obj
+                    _obj_num = _pval_obj(valor_raw)
                 _aud = auditar(
                     texto_base or "",
                     eps=str(data.eps), codigo=codigo_det,
@@ -2195,9 +2195,17 @@ class GlosaService:
         confianza = None
         try:
             from app.services.confidence_scorer import calcular_confianza
+            # Cuenta soportes contando el separador que usa
+            # app/api/routers/analizar.py:212-216 ("═══ DOCUMENTO: ... ═══").
+            # Antes contaba "\n--- ARCHIVO " que no existe → soportes_n=0 siempre.
             soportes_n = 0
             try:
-                soportes_n = len((contexto_pdf or "").split("\n--- ARCHIVO ")) - 1
+                txt = contexto_pdf or ""
+                # Si tiene el separador ═══ DOCUMENTO: → un PDF por aparición
+                soportes_n = max(soportes_n, txt.count("═══ DOCUMENTO:"))
+                # Fallback al formato viejo "--- ARCHIVO " por si algún call site
+                # aún lo usa (no se ha encontrado, pero defensivo).
+                soportes_n = max(soportes_n, len(txt.split("\n--- ARCHIVO ")) - 1)
                 soportes_n = max(0, soportes_n)
             except Exception:
                 pass
