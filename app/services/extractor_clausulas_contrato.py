@@ -182,7 +182,7 @@ async def extraer_clausulas_desde_pdf_bytes(
     eps: str,
     api_key: str = None,
     modelo: str = None,
-) -> list[dict]:
+) -> tuple[list[dict], str]:
     """Llama a Claude pasándole el PDF binario directo (sin pdfplumber).
 
     Usa el soporte nativo de PDFs de Anthropic — Claude lee todas las
@@ -190,23 +190,25 @@ async def extraer_clausulas_desde_pdf_bytes(
     raros, encoding no estándar, tablas complejas, escaneos con OCR
     incrustado). Mucho más robusto.
 
-    Si la API falla devuelve []. El caller (router) loggea y continúa.
+    Devuelve (clausulas, diagnostico). Cuando la lista está vacía, el
+    string `diagnostico` explica POR QUÉ — el router lo manda al UI para
+    que el gestor sepa si subir otro PDF, hacer OCR, etc.
     """
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
     modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
 
     if not api_key:
         logger.warning("[CLAUSULAS] ANTHROPIC_API_KEY no configurada — saltando")
-        return []
+        return [], "ANTHROPIC_API_KEY no está configurada en el servidor."
 
     if not pdf_bytes or len(pdf_bytes) < 1024:
         logger.warning(f"[CLAUSULAS] PDF muy chico ({len(pdf_bytes or b'')} bytes)")
-        return []
+        return [], "El archivo es muy pequeño (<1KB) o está corrupto."
 
     # Anthropic acepta PDFs hasta 32MB. Cap defensivo.
     if len(pdf_bytes) > 32 * 1024 * 1024:
         logger.warning(f"[CLAUSULAS] PDF >32MB ({len(pdf_bytes)//1024//1024}MB)")
-        return []
+        return [], f"PDF de {len(pdf_bytes)//1024//1024}MB excede el límite de 32MB."
 
     pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("ascii")
 
@@ -230,7 +232,7 @@ async def extraer_clausulas_desde_pdf_bytes(
                 headers=headers,
                 json={
                     "model": modelo,
-                    "max_tokens": 8000,
+                    "max_tokens": 16000,
                     "temperature": 0.0,
                     "system": SYSTEM_EXTRACCION,
                     "messages": [
@@ -256,33 +258,45 @@ async def extraer_clausulas_desde_pdf_bytes(
             )
     except Exception as e:
         logger.error(f"[CLAUSULAS-PDF] Error llamando a Anthropic: {e}")
-        return []
+        return [], f"Falla de red llamando a Anthropic: {e}"
 
     if resp.status_code != 200:
-        logger.error(
-            f"[CLAUSULAS-PDF] Anthropic HTTP {resp.status_code}: {resp.text[:500]}"
-        )
-        return []
+        body = resp.text[:500]
+        logger.error(f"[CLAUSULAS-PDF] Anthropic HTTP {resp.status_code}: {body}")
+        if resp.status_code == 401:
+            return [], "ANTHROPIC_API_KEY inválida o sin saldo."
+        if resp.status_code == 429:
+            return [], "Rate limit de Anthropic — esperá 1 min y reintentá."
+        if resp.status_code == 400 and "image" in body.lower():
+            return [], "El PDF parece ser escaneado sin texto. Hacé OCR primero."
+        return [], f"Anthropic HTTP {resp.status_code}: {body[:200]}"
 
     data = resp.json()
     if not data.get("content"):
         logger.error(f"[CLAUSULAS-PDF] Respuesta sin content: {str(data)[:300]}")
-        return []
+        return [], "Anthropic devolvió respuesta vacía. Reintentá."
 
     texto_resp = data["content"][0].get("text", "")
+    stop_reason = data.get("stop_reason", "")
     json_text = _limpiar_json_respuesta(texto_resp)
 
     try:
         parsed = json.loads(json_text)
     except json.JSONDecodeError as e:
         logger.error(
-            f"[CLAUSULAS-PDF] JSON inválido: {e} — texto: {json_text[:300]}"
+            f"[CLAUSULAS-PDF] JSON inválido: {e} — stop_reason={stop_reason} "
+            f"— inicio: {json_text[:300]}"
         )
-        return []
+        if stop_reason == "max_tokens":
+            return [], (
+                "El contrato es muy largo y se cortó la respuesta IA. "
+                "Subí solo las páginas con cláusulas (no anexos tarifarios)."
+            )
+        return [], f"JSON inválido en respuesta IA (stop={stop_reason}). Reintentá."
 
     clausulas = parsed.get("clausulas", [])
     if not isinstance(clausulas, list):
-        return []
+        return [], "La IA no devolvió la estructura esperada (lista de cláusulas)."
 
     TEMAS_VALIDOS = {"TA", "SO", "AU", "CO", "FA", "NN"}
     sanas = []
@@ -305,9 +319,23 @@ async def extraer_clausulas_desde_pdf_bytes(
 
     logger.info(
         f"[CLAUSULAS-PDF] Extraídas {len(sanas)} cláusulas válidas para "
-        f"EPS={eps} desde PDF de {len(pdf_bytes)//1024}KB"
+        f"EPS={eps} desde PDF de {len(pdf_bytes)//1024}KB (stop={stop_reason})"
     )
-    return sanas
+
+    if not sanas:
+        # La IA respondió pero no encontró cláusulas útiles — típicamente
+        # el PDF es un anexo tarifario (tablas de precios) sin cláusulas
+        # narrativas. El gestor debe subir el contrato real, no el Excel-PDF.
+        diag = (
+            "Anthropic procesó el PDF pero no encontró cláusulas contractuales "
+            "útiles. Es probable que el archivo sea un anexo tarifario "
+            "(tablas de precios) y no el contrato firmado con cláusulas "
+            "narrativas. Subí el documento que dice 'CONTRATO' con cláusulas "
+            "PRIMERA, SEGUNDA, etc. — no el Excel/tarifario."
+        )
+        return [], diag
+
+    return sanas, f"OK — {len(sanas)} cláusulas extraídas."
 
 
 # ─── Helper para inyectar cláusulas relevantes al prompt IA ────────────

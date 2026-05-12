@@ -540,10 +540,10 @@ async def subir_pdf_contrato(
         extraer_clausulas_desde_pdf_bytes,
     )
     try:
-        clausulas = await extraer_clausulas_desde_pdf_bytes(contenido, eps)
+        clausulas, diagnostico = await extraer_clausulas_desde_pdf_bytes(contenido, eps)
     except Exception as e:
         logger.error(f"[CONTRATO-PDF] Error extrayendo cláusulas eps={eps}: {e}")
-        clausulas = []
+        clausulas, diagnostico = [], f"Excepción inesperada: {e}"
 
     # Reemplazar cláusulas anteriores por las nuevas
     db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps).delete()
@@ -588,6 +588,7 @@ async def subir_pdf_contrato(
         "eps": eps,
         "pdf_kb": len(contenido) // 1024,
         "clausulas_extraidas": len(clausulas),
+        "diagnostico": diagnostico,
         "subido_en": contrato.pdf_subido_en.isoformat(),
     }
 
