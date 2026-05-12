@@ -472,22 +472,64 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas del BLOQUE NORMATIVA CON TEXTO LITERAL. Si tienes acceso a CLÁUSULAS DEL CONTRATO en el user prompt, CITA TEXTUALMENTE la cláusula entre comillas.</argumento>
 
 ═══════════════ ESTRUCTURA OBLIGATORIA DEL <argumento> ═══════════════
-COMPLEJIDAD BAJA — 4 PÁRRAFOS:
-P1 IDENTIFICACIÓN (40-60 palabras): "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO COMPLETO] SOBRE EL CÓDIGO [CÓDIGO], INTERPUESTA POR [ENTIDAD], RESPECTO DEL [SERVICIO] IDENTIFICADO CON CUPS [CUPS], FACTURADO POR [VALOR]". 🚫 NUNCA "RESPETUOSAMENTE" al inicio.
-P2 REFUTACIÓN FÁCTICA (70-100 palabras): "LA AFIRMACIÓN DE LA AUDITORÍA DE QUE [motivo EPS literal] NO SE AJUSTA A [...] POR LAS SIGUIENTES RAZONES:" + 2-3 razones técnicas con "EN PRIMER LUGAR/EN SEGUNDO LUGAR/EN TERCER LUGAR". Si hay VICIO de la glosa, IDENTIFÍCALO POR NOMBRE.
-P3 FUNDAMENTO NORMATIVO (60-90 palabras): cita 2-3 normas + contrato con cláusula específica si está disponible + 1 principio doctrinal nombrado.
-P4 PETICIÓN + ESCALERA PROCESAL: "EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO DE LA GLOSA [CÓDIGO] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO. LA ENTIDAD CUENTA CON 10 DÍAS HÁBILES PARA PRONUNCIARSE (ART. 57 LEY 1438/2011); EN SUBSIDIO, SE INVITA A CONCILIACIÓN (ART. 20 DEC. 4747/2007). COMUNICACIONES: CARTERA@HUS.GOV.CO, GLOSASYDEVOLUCIONES@HUS.GOV.CO."
 
-COMPLEJIDAD ALTA — 5-8 PUNTOS ENUMERADOS (estilo dictamen forense premium):
-APERTURA: "ESE HUS NO ACEPTA GLOSA POR CONCEPTO DE [tipo], APLICADA A LA FACTURA [Nº], POR LAS SIGUIENTES RAZONES TÉCNICO-NORMATIVAS QUE DESVIRTÚAN INTEGRALMENTE LA OBJECIÓN:"
-(I) Identificación específica + contrato vigente + cláusulas que respaldan la facturación.
-(II) Refutación técnica con cita literal de cláusula contractual si aplica.
-(III) Identificación expresa del VICIO de la glosa con su nombre técnico.
-(IV) Fundamento normativo: 2-3 normas + 1 principio doctrinal nombrado (Pacta Sunt Servanda / Lex Artis Ad Hoc / etc.).
-(V) Anclaje probatorio: cita HC folio, RIPS, epicrisis, autorización si están en los soportes.
-(VI) Si la glosa es atípica/contradictoria/inmotivada: argumenta defecto formal.
-(VII) Régimen especial si aplica (FF.MM., PPL, FOMAG, ARL).
-(VIII) PETICIÓN: "SE SOLICITA EL LEVANTAMIENTO TOTAL DE LA GLOSA POR VALOR DE [VALOR] Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO, CONFORME AL CONTRATO Y LAS NORMAS CITADAS."
+📌 PRINCIPIO RECTOR (mayo 2026, directiva del coordinador):
+   Los auditores de las EPS — y el propio auditor del HUS — NO quieren leer
+   muros de citas legales. Quieren EVIDENCIA REAL: cifras, fechas, números
+   de factura, valor pactado vs valor objetado, cláusulas específicas del
+   contrato firmado. La normativa es soporte, NO el protagonista.
+
+   REGLA DURA: máximo 3 normas citadas en TODO el dictamen. Si tenés 5
+   normas pensando en citarlas, elegí las 3 más fuertes y desechá las otras.
+   Las normas vienen al final del argumento técnico, NO en cada párrafo.
+
+   REGLA DURA: el dictamen DEBE cerrar con la frase exacta:
+       "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA."
+   Nada de "10 días hábiles", "Art. 57 Ley 1438", emails institucionales,
+   "escalera procesal" ni invitaciones a conciliación. Esa coda repetitiva
+   distrae y el auditor de la EPS la salta. Una frase, clara, final.
+
+COMPLEJIDAD BAJA — 3 PÁRRAFOS (no 4):
+P1 IDENTIFICACIÓN + EVIDENCIA (60-90 palabras):
+   "ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE [TIPO] SOBRE EL CÓDIGO [CÓDIGO]
+    APLICADA POR [ENTIDAD] A LA FACTURA [Nº], POR VALOR OBJETADO DE [VALOR].
+    EL SERVICIO PRESTADO ES [DESCRIPCIÓN], CUPS [CUPS], FACTURADO A [VALOR FACT]
+    CONFORME A LA TARIFA PACTADA DE [TARIFA] EN EL CONTRATO [Nº] VIGENTE
+    ENTRE [FECHA INICIO] Y [FECHA FIN]."
+   ⚠ Si NO tenés fecha, valor o número de factura: NO los inventes; redactalos
+     como "consignado en el expediente", pero el primer párrafo sí debe
+     incluir TODOS los datos disponibles del caso.
+
+P2 REFUTACIÓN CON EVIDENCIA (80-120 palabras):
+   Comparación visual cuando hay cifras:
+     • Valor facturado: $X
+     • Valor reconocido por EPS: $Y
+     • Diferencia objetada: $X - $Y = $Z
+     • Tarifa contractual: [SOAT x factor / UVB x factor / Valor Fijo]
+     • Cálculo correcto según contrato: [muestra el número]
+   Luego una refutación de 2 razones técnicas con "PRIMERO / SEGUNDO".
+   Si tenés cláusula del contrato citada literalmente entre « », es OBLIGATORIO
+   incluirla aquí (es la evidencia más fuerte).
+
+P3 PETICIÓN FINAL — UNA SOLA FRASE:
+   "POR LO EXPUESTO Y CON BASE EN EL CONTRATO [Nº] VIGENTE Y EN [norma1, norma2 si aplica],
+    SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA."
+   🚫 NADA después de "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA."
+   🚫 Ni "10 días", ni Art. 57, ni correos, ni escaleras procesales.
+
+COMPLEJIDAD ALTA — 4 PÁRRAFOS (no 5-8 puntos enumerados):
+P1 IDENTIFICACIÓN + EVIDENCIA — igual que arriba, más completo.
+P2 REFUTACIÓN TÉCNICA — comparación visual + 3 razones máximo.
+P3 SOPORTE CONTRACTUAL — cita LITERAL de la cláusula aplicable entre « »
+   (solo si la tenés del bloque [CLÁUSULAS LITERALES DEL CONTRATO]). Si NO
+   la tenés, redactá la sección sin chevrones diciendo "el contrato establece
+   en su cláusula [N] que el valor pactado corresponde a [...]".
+P4 PETICIÓN FINAL — UNA SOLA FRASE igual que arriba.
+
+(La estructura ALTA con 5-8 puntos enumerados quedó OBSOLETA — generaba
+muros de citas. Para casos complejos, usá la versión de 4 párrafos descrita
+arriba con MÁS detalle en P2 y P3, pero NUNCA enumerás 5-8 puntos y NUNCA
+agregás más de 3 normas. La meta es claridad, no longitud.)
 
 ═══════════════ REGISTRO TÉCNICO-JURÍDICO OBLIGATORIO ═══════════════
 ✅ USA SIEMPRE (conectores formales):
@@ -794,8 +836,119 @@ CALCULADORA TARIFARIA OBLIGATORIA:
     return base + bloque_calculo + bloque_regimen
 
 
-def build_contrato_context(eps: str) -> str:
+def _parsear_vigencia(s: str) -> tuple:
+    """Convierte 'dd/mm/yyyy — dd/mm/yyyy' a (date_inicio, date_fin) o (None, None).
+    También maneja '2025' (asume 01/01/2025 — 31/12/2025) o formatos parciales.
+    """
+    import re as _re
+    from datetime import date as _date
+    if not s:
+        return None, None
+    s = str(s)
+    fechas = _re.findall(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+    if len(fechas) >= 2:
+        d1, m1, y1 = map(int, fechas[0])
+        d2, m2, y2 = map(int, fechas[1])
+        try:
+            return _date(y1, m1, d1), _date(y2, m2, d2)
+        except ValueError:
+            return None, None
+    # Solo año (ej. "2025")
+    m_anio = _re.search(r"\b(20\d{2})\b", s)
+    if m_anio:
+        y = int(m_anio.group(1))
+        try:
+            return _date(y, 1, 1), _date(y, 12, 31)
+        except ValueError:
+            return None, None
+    return None, None
+
+
+def validar_factura_en_vigencia(eps: str, fecha_factura: str) -> dict:
+    """Verifica si la fecha de la factura cae dentro de la vigencia del contrato.
+
+    Args:
+        eps: nombre EPS
+        fecha_factura: ISO date "yyyy-mm-dd" o "dd/mm/yyyy"
+
+    Returns:
+        {
+          "en_vigencia": bool,      # True si la factura está dentro del contrato
+          "fecha_factura": str,     # fecha parseada o vacía
+          "vigencia_str": str,      # texto vigencia del contrato
+          "vigencia_inicio": str,
+          "vigencia_fin": str,
+          "diagnostico": str,       # mensaje legible
+        }
+    Si NO se puede determinar (sin fecha factura o sin vigencia parseable),
+    devuelve en_vigencia=True con diagnostico="indeterminado" para no
+    bloquear el flujo cuando faltan datos.
+    """
+    import re as _re
+    from datetime import date as _date
+
+    contrato = get_contrato(eps)
+    v_str = contrato.get("vigencia", "")
+    v_ini, v_fin = _parsear_vigencia(v_str)
+
+    f_factura = None
+    if fecha_factura:
+        s = str(fecha_factura).strip()
+        # ISO
+        m_iso = _re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", s)
+        if m_iso:
+            try:
+                f_factura = _date(int(m_iso.group(1)), int(m_iso.group(2)), int(m_iso.group(3)))
+            except ValueError:
+                f_factura = None
+        else:
+            # dd/mm/yyyy
+            m_col = _re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+            if m_col:
+                try:
+                    f_factura = _date(int(m_col.group(3)), int(m_col.group(2)), int(m_col.group(1)))
+                except ValueError:
+                    f_factura = None
+
+    if not f_factura or not v_ini or not v_fin:
+        return {
+            "en_vigencia": True,
+            "fecha_factura": str(f_factura) if f_factura else "",
+            "vigencia_str": v_str,
+            "vigencia_inicio": str(v_ini) if v_ini else "",
+            "vigencia_fin": str(v_fin) if v_fin else "",
+            "diagnostico": "indeterminado: faltan fecha factura o vigencia parseable",
+        }
+
+    en_vig = v_ini <= f_factura <= v_fin
+    if en_vig:
+        diag = f"OK · factura {f_factura} dentro de vigencia {v_ini} → {v_fin}"
+    else:
+        if f_factura < v_ini:
+            diag = (
+                f"ATENCION: factura {f_factura} ANTERIOR al inicio del contrato "
+                f"({v_ini}). Verificar si aplica contrato anterior."
+            )
+        else:
+            diag = (
+                f"ATENCION: factura {f_factura} POSTERIOR al fin del contrato "
+                f"({v_fin}). Verificar si hubo prorroga o nuevo contrato."
+            )
+    return {
+        "en_vigencia": en_vig,
+        "fecha_factura": str(f_factura),
+        "vigencia_str": v_str,
+        "vigencia_inicio": str(v_ini),
+        "vigencia_fin": str(v_fin),
+        "diagnostico": diag,
+    }
+
+
+def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
     """Devuelve un bloque con los datos contractuales específicos de la EPS.
+    Si se pasa fecha_factura, valida que esté dentro de la vigencia del
+    contrato y agrega una alerta visible cuando NO matchea.
+
     Se inyecta en el USER prompt (no en system), para que el caché del system
     se mantenga estable entre EPS. Ver get_system_prompt() para contexto."""
     contrato = get_contrato(eps)
@@ -803,6 +956,22 @@ def build_contrato_context(eps: str) -> str:
     descuento_txt = ""
     if factor < 1.0:
         descuento_txt = f"\nFACTOR PACTADO: {factor} (descuento {int(round((1 - factor) * 100))}% sobre SOAT)"
+
+    alerta_vigencia = ""
+    if fecha_factura:
+        v = validar_factura_en_vigencia(eps, fecha_factura)
+        if not v["en_vigencia"]:
+            alerta_vigencia = (
+                "\n⚠ ⚠ ⚠ ALERTA DE VIGENCIA — LEE ANTES DE REDACTAR ⚠ ⚠ ⚠\n"
+                f"  {v['diagnostico']}\n"
+                "  El contrato indicado arriba NO cubre esta factura. NO cites "
+                "ese contrato como base de tu defensa. En su lugar, redactá:\n"
+                "    \"el servicio se prestó en una fecha que está fuera de la "
+                "vigencia del contrato citado por la EPS; corresponde validar el "
+                "contrato vigente para esa fecha o aplicar las normas generales\".\n"
+                "─────────────────────────────────────────────────\n"
+            )
+
     return (
         "DATOS CONTRACTUALES VERIFICADOS (USA EXACTAMENTE ESTO, NO INVENTES OTROS):\n"
         "─────────────────────────────────────────────────\n"
@@ -814,7 +983,8 @@ def build_contrato_context(eps: str) -> str:
         f"TIPO          : {contrato['tipo']}\n"
         f"NOTA CONTRATO : {contrato['nota']}"
         f"{descuento_txt}\n"
-        "─────────────────────────────────────────────────\n"
+        "─────────────────────────────────────────────────"
+        f"{alerta_vigencia}\n"
     )
 
 
@@ -1106,6 +1276,35 @@ def build_user_prompt(
     else:
         contexto_tiempo = "Sin datos de fechas"
 
+    # Validacion vigencia: si tenemos fecha de la factura, verificar que caiga
+    # dentro de la vigencia del contrato. La IA no puede defenderse con un
+    # contrato que ya estaba vencido en la fecha del servicio.
+    _alerta_vigencia_block = ""
+    try:
+        # Tomamos la fecha de factura desde numero_factura si trae fecha,
+        # desde radicado, o desde los datos del PDF. Como heuristica usamos
+        # cualquier "yyyy-mm-dd" o "dd/mm/yyyy" que aparezca en trazabilidad.
+        import re as _re_vig
+        fechas_candidatas = _re_vig.findall(
+            r"\b(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}/\d{4})\b",
+            (numero_factura or "") + " " + (numero_radicado or "") + " " + (contexto_pdf or "")[:5000],
+        )
+        if fechas_candidatas:
+            fecha_factura_str = fechas_candidatas[0]
+            v = validar_factura_en_vigencia(eps, fecha_factura_str)
+            if not v["en_vigencia"]:
+                _alerta_vigencia_block = (
+                    "\n\n⚠ ⚠ ⚠ ALERTA DE VIGENCIA ⚠ ⚠ ⚠\n"
+                    f"  {v['diagnostico']}\n"
+                    "  El contrato indicado arriba NO cubre esta factura.\n"
+                    "  NO cites ese contrato como base de defensa. Redactá:\n"
+                    "  \"el servicio se prestó fuera de la vigencia del contrato\n"
+                    "  citado por la EPS; corresponde validar el contrato vigente\n"
+                    "  para esa fecha o aplicar el marco normativo general\".\n"
+                )
+    except Exception:
+        pass
+
     # Concepto Manual Único
     try:
         from app.services.catalogo_glosas import obtener_concepto
@@ -1374,13 +1573,14 @@ def build_user_prompt(
 • Tipo de glosa     : {nombre_tipo} ({codigo})
 • Entidad pagadora  : {eps}
 • Contrato vigente  : {numero_contrato}
+• Vigencia contrato : {contrato.get("vigencia","—")}
 • Tarifa pactada    : {tarifa}
 • CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
 • Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
 • Valor facturado   : {valor_facturado or "—"}
 • Valor pactado     : {valor_pactado or "—"}
 • Trazabilidad      : {trazabilidad}
-• Tiempo transcurrido: {contexto_tiempo}
+• Tiempo transcurrido: {contexto_tiempo}{_alerta_vigencia_block}
 
 ⚠ REGLA CRÍTICA DE DATOS (FALLAR ESTO DESCALIFICA LA RESPUESTA):
   1. Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar

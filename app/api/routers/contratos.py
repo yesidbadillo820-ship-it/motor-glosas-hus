@@ -3,7 +3,8 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.schemas import ContratoInput
@@ -672,3 +673,86 @@ def borrar_clausulas_contrato(
     )
     db.commit()
     return {"eps": eps, "clausulas_borradas": n}
+
+
+# ─── Cargar cláusulas MANUALMENTE (sin gastar tokens IA) ──────────────
+# Útil cuando ya tenés el texto del contrato y querés inyectarlo
+# directamente, en lugar de subir el PDF y pagar a Claude por extraerlo.
+# El gestor copia/pega cada cláusula desde el contrato firmado.
+
+class ClausulaManualInput(BaseModel):
+    numero: str
+    tema: str       # TA / SO / AU / CO / FA / NN
+    titulo: str = ""
+    texto_literal: str
+    pagina: Optional[int] = None
+
+
+class ClausulasManualBatch(BaseModel):
+    reemplazar: bool = True   # si True, borra las existentes antes de insertar
+    clausulas: list[ClausulaManualInput]
+
+
+@router.post("/{eps}/clausulas-manual")
+def cargar_clausulas_manual(
+    eps: str,
+    batch: ClausulasManualBatch,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Inserta cláusulas escritas a mano (no requiere subir PDF ni gastar
+    tokens IA). El gestor copia el texto literal del contrato firmado.
+
+    Si reemplazar=True: borra las cláusulas existentes para esa EPS antes.
+    Si reemplazar=False: las agrega a las existentes.
+
+    Devuelve cuántas se insertaron y total después de la operación.
+    """
+    eps_norm = (eps or "").upper().strip()
+    if not eps_norm:
+        raise HTTPException(status_code=400, detail="EPS vacía")
+    if not batch.clausulas:
+        raise HTTPException(status_code=400, detail="batch.clausulas vacío")
+
+    TEMAS_VALIDOS = {"TA", "SO", "AU", "CO", "FA", "NN"}
+
+    if batch.reemplazar:
+        db.query(ClausulaContrato).filter(
+            ClausulaContrato.eps.in_([eps, eps_norm])
+        ).delete(synchronize_session=False)
+
+    insertadas = 0
+    for c in batch.clausulas:
+        texto = (c.texto_literal or "").strip()
+        if len(texto) < 30:
+            continue
+        tema = (c.tema or "NN").upper().strip()
+        if tema not in TEMAS_VALIDOS:
+            tema = "NN"
+        db.add(ClausulaContrato(
+            eps=eps_norm,
+            numero_clausula=(c.numero or "").strip()[:80],
+            tema=tema,
+            titulo=(c.titulo or "").strip()[:300],
+            texto_literal=texto[:5000],
+            pagina=c.pagina,
+        ))
+        insertadas += 1
+
+    db.commit()
+
+    total = (
+        db.query(ClausulaContrato)
+        .filter(ClausulaContrato.eps == eps_norm)
+        .count()
+    )
+    logger.info(
+        f"[CONTRATO-MANUAL] eps={eps_norm} insertadas={insertadas} "
+        f"reemplazar={batch.reemplazar} total_actual={total}"
+    )
+    return {
+        "eps": eps_norm,
+        "insertadas": insertadas,
+        "total_actual": total,
+        "modo": "reemplazar" if batch.reemplazar else "agregar",
+    }
