@@ -1509,6 +1509,79 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
   pointer-events:none;
 }
 
+/* ─── LANDING PREMIUM: saludo personal + insights ─────────── */
+.land-saludo{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;
+  flex-wrap:wrap;margin-bottom:1rem;padding:0 .15rem;
+}
+.land-saludo-title{
+  font-family:var(--font-display);font-size:1.55rem;font-weight:700;
+  color:var(--text);letter-spacing:-.02em;line-height:1.15;
+}
+.land-saludo-title b{font-weight:700;color:var(--c-teal2,#0ea5a4)}
+.land-saludo-sub{
+  font-size:.82rem;color:var(--text2);margin-top:.25rem;line-height:1.4;
+  display:flex;flex-wrap:wrap;gap:.4rem .9rem;align-items:center;
+}
+.land-saludo-sub .pill{
+  display:inline-flex;align-items:center;gap:.3rem;
+  padding:.22rem .65rem;border-radius:999px;
+  background:var(--bg-subtle,rgba(15,23,42,.06));
+  color:var(--text2);font-size:.74rem;font-weight:600;
+  border:1px solid var(--border);
+}
+.land-saludo-sub .pill.warn{background:rgba(245,158,11,.12);color:#b45309;border-color:rgba(245,158,11,.35)}
+.land-saludo-sub .pill.good{background:rgba(16,185,129,.12);color:#047857;border-color:rgba(16,185,129,.35)}
+body.dark .land-saludo-sub .pill.warn{color:#fbbf24}
+body.dark .land-saludo-sub .pill.good{color:#34d399}
+
+.land-insights{
+  display:grid;grid-template-columns:1.3fr 1fr;gap:.9rem;margin:.4rem 0 1.4rem;
+}
+@media (max-width:780px){ .land-insights{grid-template-columns:1fr} }
+.land-insight-card{
+  background:var(--grad-card,var(--bg-card));border:1px solid var(--border);
+  border-radius:var(--r-lg,12px);padding:.95rem 1.1rem;
+}
+.land-insight-hdr{
+  font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;
+  font-weight:700;margin-bottom:.7rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+}
+.land-eps-row{
+  display:flex;align-items:center;gap:.65rem;padding:.35rem 0;font-size:.82rem;
+}
+.land-eps-row + .land-eps-row{border-top:1px dashed var(--border)}
+.land-eps-row .eps-name{flex:1;min-width:0;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.land-eps-row .eps-count{font-variant-numeric:tabular-nums;color:var(--text2);font-size:.78rem;font-weight:600;min-width:32px;text-align:right}
+.land-eps-bar{
+  flex:1.4;height:6px;border-radius:99px;background:var(--bg-subtle,rgba(15,23,42,.06));overflow:hidden;
+}
+.land-eps-bar > span{display:block;height:100%;background:linear-gradient(90deg,#0ea5a4,#10b981);border-radius:99px}
+.land-causal-chip{
+  display:inline-flex;align-items:baseline;gap:.3rem;
+  padding:.3rem .65rem;border-radius:8px;margin:.18rem .25rem .18rem 0;
+  font-size:.76rem;font-weight:700;border:1px solid transparent;font-variant-numeric:tabular-nums;
+}
+.land-causal-chip .n{font-weight:600;opacity:.8;font-size:.72rem}
+.land-causal-chip.t-TARIFA      {background:rgba(244,114,182,.16);color:#be185d;border-color:rgba(244,114,182,.35)}
+.land-causal-chip.t-SOPORTES    {background:rgba(96,165,250,.18);color:#1d4ed8;border-color:rgba(96,165,250,.35)}
+.land-causal-chip.t-AUTORIZACION{background:rgba(168,85,247,.16);color:#6d28d9;border-color:rgba(168,85,247,.35)}
+.land-causal-chip.t-COBERTURA   {background:rgba(251,146,60,.18);color:#c2410c;border-color:rgba(251,146,60,.35)}
+.land-causal-chip.t-PERTINENCIA {background:rgba(34,197,94,.16);color:#15803d;border-color:rgba(34,197,94,.35)}
+.land-causal-chip.t-FACTURACION {background:rgba(14,165,164,.16);color:#0f766e;border-color:rgba(14,165,164,.35)}
+.land-causal-chip.t-INSUMOS     {background:rgba(234,179,8,.18);color:#a16207;border-color:rgba(234,179,8,.4)}
+.land-causal-chip.t-MEDICAMENTOS{background:rgba(239,68,68,.14);color:#b91c1c;border-color:rgba(239,68,68,.32)}
+.land-causal-chip.t-OTROS       {background:var(--bg-subtle,rgba(15,23,42,.06));color:var(--text2);border-color:var(--border)}
+body.dark .land-causal-chip.t-TARIFA      {color:#f9a8d4}
+body.dark .land-causal-chip.t-SOPORTES    {color:#93c5fd}
+body.dark .land-causal-chip.t-AUTORIZACION{color:#c4b5fd}
+body.dark .land-causal-chip.t-COBERTURA   {color:#fdba74}
+body.dark .land-causal-chip.t-PERTINENCIA {color:#86efac}
+body.dark .land-causal-chip.t-FACTURACION {color:#5eead4}
+body.dark .land-causal-chip.t-INSUMOS     {color:#fde68a}
+body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
+.land-empty-mini{font-size:.78rem;color:var(--text3);padding:.4rem 0}
+
 /* ─── COMMAND PALETTE (Cmd+K) ─────────────────────────────── */
 .cp-backdrop{
   position:fixed;inset:0;background:rgba(11,18,32,.65);z-index:9998;
@@ -1993,19 +2066,30 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         </div>
 
         <div id="landing-hero" style="padding:1.5rem 2rem;">
+          <!-- Saludo personal + resumen contextual -->
+          <div id="land-saludo" class="land-saludo">
+            <div>
+              <div class="land-saludo-title" id="land-saludo-title">Buen día</div>
+              <div class="land-saludo-sub" id="land-saludo-sub">
+                <span class="pill" id="land-saludo-pill-vencen">— glosas vencen pronto</span>
+                <span class="pill" id="land-saludo-pill-contratos">— contratos cargados</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Mini-dashboard KPIs -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin-bottom:1.5rem;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin-bottom:1rem;">
             <div class="stat-card">
               <div class="stat-card-accent"></div>
               <div class="stat-card-label">Glosas del mes</div>
               <div class="stat-card-value" id="land-total">—</div>
-              <div class="stat-card-delta neutral" id="land-total-delta">—</div>
+              <div class="stat-card-delta neutral" id="land-total-delta">este mes</div>
             </div>
             <div class="stat-card">
               <div class="stat-card-accent"></div>
               <div class="stat-card-label">Valor objetado</div>
               <div class="stat-card-value" id="land-valor">—</div>
-              <div class="stat-card-delta neutral" id="land-valor-delta">—</div>
+              <div class="stat-card-delta neutral" id="land-valor-delta">acumulado mensual</div>
             </div>
             <div class="stat-card">
               <div class="stat-card-accent"></div>
@@ -2018,6 +2102,18 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
               <div class="stat-card-label">Próximas a vencer</div>
               <div class="stat-card-value" id="land-alertas">—</div>
               <div class="stat-card-delta neutral" id="land-alertas-delta">en 5 días</div>
+            </div>
+          </div>
+
+          <!-- Top entidades + Top causales (insights premium) -->
+          <div class="land-insights" id="land-insights" style="display:none;">
+            <div class="land-insight-card">
+              <div class="land-insight-hdr">Top entidades del mes <span style="font-weight:600;color:var(--text3);text-transform:none;letter-spacing:0;font-size:.7rem" id="land-top-eps-total"></span></div>
+              <div id="land-top-eps"><div class="land-empty-mini">Sin datos suficientes este mes.</div></div>
+            </div>
+            <div class="land-insight-card">
+              <div class="land-insight-hdr">Top causales</div>
+              <div id="land-top-causales"><div class="land-empty-mini">Sin glosas analizadas aún.</div></div>
             </div>
           </div>
           <!-- 📰 Noticias del sector salud Colombia (RSS + scraping) -->
@@ -8957,11 +9053,37 @@ async function cargarTickerNoticias(){
 }
 
 async function poblarLandingKPIs(){
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ─── Saludo personal: "Buen día, Yesid" ───
   try{
-    var r = await fetch('/analytics/', {headers: authH()});
-    if(!r.ok) return;
-    var a = await r.json();
-    var $ = function(id){ return document.getElementById(id); };
+    var nombreCompleto = (USER_NAME || window._user_nombre || '').trim();
+    var primerNombre = nombreCompleto.split(/\s+/)[0] || '';
+    var hora = new Date().getHours();
+    var saludo = hora < 12 ? 'Buen día' : (hora < 19 ? 'Buenas tardes' : 'Buenas noches');
+    var titleEl = $('land-saludo-title');
+    if(titleEl){
+      titleEl.innerHTML = primerNombre
+        ? saludo + ', <b>' + escHtml(primerNombre) + '</b>'
+        : saludo;
+    }
+  }catch(e){}
+
+  // ─── Lanzamos todo en paralelo ───
+  var pAnalytics = fetch('/analytics/',        {headers: authH()}).then(r => r.ok ? r.json() : null).catch(()=>null);
+  var pMetrics   = fetch('/analytics/metrics', {headers: authH()}).then(r => r.ok ? r.json() : null).catch(()=>null);
+  var pTend      = fetch('/analytics/tendencias?meses=3', {headers: authH()}).then(r => r.ok ? r.json() : null).catch(()=>null);
+  var pAlertas   = fetch('/glosas/alertas',    {headers: authH()}).then(r => r.ok ? r.json() : null).catch(()=>null);
+  var pContratos = fetch('/contratos/',        {headers: authH()}).then(r => r.ok ? r.json() : null).catch(()=>null);
+
+  var a = await pAnalytics;
+  var metrics = await pMetrics;
+  var tend = await pTend;
+  var alertas = await pAlertas;
+  var contratos = await pContratos;
+
+  // ─── KPIs principales ───
+  if(a){
     if($('land-total')) $('land-total').textContent = (a.glosas_mes||0).toLocaleString('es-CO');
     if($('land-valor')) $('land-valor').textContent = cop(a.valor_objetado_mes||0);
     if($('land-tasa')){
@@ -8969,19 +9091,107 @@ async function poblarLandingKPIs(){
       $('land-tasa').textContent = tasa + '%';
       var delta = $('land-tasa-delta');
       if(delta){
-        delta.textContent = tasa >= 70 ? '↗ Excelente' : (tasa >= 50 ? '→ Estable' : '↘ Mejorable');
-        delta.className = 'stat-card-delta ' + (tasa >= 70 ? 'up' : (tasa >= 50 ? 'neutral' : 'down'));
+        delta.textContent = tasa >= 70 ? '↗ Excelente desempeño' : (tasa >= 50 ? '→ Estable' : (tasa > 0 ? '↘ Mejorable' : 'sin glosas decididas'));
+        delta.className = 'stat-card-delta ' + (tasa >= 70 ? 'up' : (tasa >= 50 ? 'neutral' : (tasa > 0 ? 'down' : 'neutral')));
       }
     }
-    // Alertas próximas
+    // Delta "vs mes anterior" en glosas y valor objetado
     try{
-      var r2 = await fetch('/glosas/alertas', {headers: authH()});
-      if(r2.ok){
-        var alert = await r2.json();
-        if($('land-alertas')) $('land-alertas').textContent = (alert.alertas||[]).length;
+      var serie = Array.isArray(tend) ? tend : [];
+      if(serie.length >= 2){
+        var curr = serie[serie.length-1];
+        var prev = serie[serie.length-2];
+        var pctCnt = prev.count > 0 ? Math.round(((curr.count - prev.count) / prev.count) * 100) : null;
+        var pctObj = prev.objetado > 0 ? Math.round(((curr.objetado - prev.objetado) / prev.objetado) * 100) : null;
+        var dCnt = $('land-total-delta');
+        if(dCnt && pctCnt !== null){
+          dCnt.textContent = (pctCnt >= 0 ? '↗ +' : '↘ ') + pctCnt + '% vs mes anterior';
+          dCnt.className = 'stat-card-delta ' + (pctCnt > 0 ? 'up' : (pctCnt < 0 ? 'down' : 'neutral'));
+        }
+        var dObj = $('land-valor-delta');
+        if(dObj && pctObj !== null){
+          dObj.textContent = (pctObj >= 0 ? '↗ +' : '↘ ') + pctObj + '% vs mes anterior';
+          dObj.className = 'stat-card-delta ' + (pctObj > 0 ? 'up' : (pctObj < 0 ? 'down' : 'neutral'));
+        }
       }
     }catch(e){}
-  }catch(e){ /* silent */ }
+  }
+
+  // ─── Alertas: número + texto del pill ───
+  var nVencen = 0;
+  if(alertas && Array.isArray(alertas.alertas)) nVencen = alertas.alertas.length;
+  if($('land-alertas')) $('land-alertas').textContent = nVencen;
+
+  // ─── Saludo: pills de contexto ───
+  var nContratos = (contratos && Array.isArray(contratos) ? contratos.length : 0);
+  var pillV = $('land-saludo-pill-vencen');
+  if(pillV){
+    if(nVencen > 0){
+      pillV.innerHTML = '⏰ <b>' + nVencen + '</b> glosa' + (nVencen===1?'':'s') + ' vence' + (nVencen===1?'':'n') + ' pronto';
+      pillV.className = 'pill warn';
+    } else {
+      pillV.innerHTML = '✓ sin glosas próximas a vencer';
+      pillV.className = 'pill good';
+    }
+  }
+  var pillC = $('land-saludo-pill-contratos');
+  if(pillC){
+    pillC.innerHTML = '📄 <b>' + nContratos + '</b> contrato' + (nContratos===1?'':'s') + ' cargado' + (nContratos===1?'':'s');
+    pillC.className = 'pill' + (nContratos > 0 ? ' good' : '');
+  }
+
+  // ─── Top entidades + Top causales ───
+  poblarLandingInsights(metrics);
+}
+
+function poblarLandingInsights(metrics){
+  var $ = function(id){ return document.getElementById(id); };
+  if(!metrics){ return; }
+  var byEps = Array.isArray(metrics.by_eps) ? metrics.by_eps.slice() : [];
+  var byTipo = Array.isArray(metrics.by_tipo) ? metrics.by_tipo.slice() : [];
+
+  // Top entidades por # glosas (top 5)
+  byEps.sort(function(a,b){ return (b.count||0) - (a.count||0); });
+  var totalGlosas = byEps.reduce(function(s,r){ return s + (r.count||0); }, 0);
+  var top = byEps.slice(0, 5);
+  var elEps = $('land-top-eps');
+  if(elEps){
+    if(top.length === 0){
+      elEps.innerHTML = '<div class="land-empty-mini">Sin datos suficientes este mes.</div>';
+    } else {
+      var max = top[0].count || 1;
+      elEps.innerHTML = top.map(function(r){
+        var pct = Math.round(((r.count||0) / max) * 100);
+        return '<div class="land-eps-row">' +
+          '<span class="eps-name" title="'+escHtml(r.eps||'—')+'">'+escHtml(r.eps||'—')+'</span>' +
+          '<div class="land-eps-bar"><span style="width:'+pct+'%"></span></div>' +
+          '<span class="eps-count">'+(r.count||0)+'</span>' +
+        '</div>';
+      }).join('');
+    }
+  }
+  var elTot = $('land-top-eps-total');
+  if(elTot && totalGlosas > 0) elTot.textContent = '· ' + totalGlosas.toLocaleString('es-CO') + ' glosas';
+
+  // Top causales por tipo (chips coloreados)
+  byTipo.sort(function(a,b){ return (b.count||0) - (a.count||0); });
+  var elCau = $('land-top-causales');
+  if(elCau){
+    if(byTipo.length === 0){
+      elCau.innerHTML = '<div class="land-empty-mini">Sin glosas analizadas aún.</div>';
+    } else {
+      elCau.innerHTML = byTipo.slice(0, 8).map(function(r){
+        var t = (r.tipo||'OTROS').toUpperCase();
+        return '<span class="land-causal-chip t-'+escHtml(t)+'" title="'+(r.obj ? cop(r.obj) : '')+'">'+
+          escHtml(t)+' <span class="n">·'+(r.count||0)+'</span>'+
+        '</span>';
+      }).join('');
+    }
+  }
+
+  // Mostrar el bloque solo si hay algo que mostrar
+  var box = $('land-insights');
+  if(box && (top.length > 0 || byTipo.length > 0)) box.style.display = '';
 }
 
 // ─── TEST SENTRY (solo SUPER_ADMIN) ─────────────────────────────
@@ -19959,37 +20169,9 @@ function paBuildEmptyStateHTML(data){
     );
   }
 
-  // ─── KPIs con sparklines REALES ───
-  // Fix #1: /analytics/tendencias devuelve lista directa, no {serie:...}
-  // Construimos 3 series de sparkline (count, objetado, recuperado) por mes
-  const tendList = Array.isArray(tend) ? tend.slice(-8) : null;
-  const sparkCount = tendList && tendList.length >= 2 ? tendList.map(p => Number(p.count||0)) : null;
-  const sparkObj = tendList && tendList.length >= 2 ? tendList.map(p => Number(p.objetado||0)) : null;
-  const sparkRec = tendList && tendList.length >= 2 ? tendList.map(p => Number(p.recuperado||0)) : null;
-
-  const totalGlosasMes = (analytics && analytics.glosas_mes) || 0;
-  const valorObjetado = (analytics && analytics.valor_objetado_mes) || 0;
-  const valorRecuperado = (analytics && analytics.valor_recuperado_mes) || 0;
-  const tasaExito = (analytics && analytics.tasa_exito_pct) || 0;
-
-  // Fix #2: $383M duplicado.
-  // Backend: recuperado = objetado - aceptado. Si aceptado=0 -> recuperado=objetado.
-  // En ese caso "Recuperado" es EQUÍVOCO porque es lo "A DEFENDER", no lo ganado.
-  // Mostrar 3 KPIs si los valores son iguales; mostrar 4 con etiqueta clara si difieren.
-  const sonIguales = Math.abs(valorObjetado - valorRecuperado) < 1;
-  const kpis = [];
-  kpis.push(paBuildKpi('Glosas del mes', totalGlosasMes.toLocaleString('es-CO'), sparkCount, null));
-  kpis.push(paBuildKpi('Tasa de éxito', (typeof tasaExito === 'number' ? tasaExito.toFixed(1)+'%' : '—'), null,
-    tasaExito >= 80 ? {label:'excelente', cls:'up'} : (tasaExito > 0 ? {label:'parcial', cls:'neutral'} : null)));
-  kpis.push(paBuildKpi('Valor objetado', paFmtCOP(valorObjetado), sparkObj, null));
-  // Solo mostrar "A defender" si difiere del objetado (señal de que hay aceptados parciales)
-  if(!sonIguales){
-    kpis.push(paBuildKpi('A defender', paFmtCOP(valorRecuperado), sparkRec, {label:'sin aceptados', cls:'neutral'}));
-  }
-
-  partes.push(
-    '<div class="pre-kpi-grid">'+kpis.join('')+'</div>'
-  );
+  // KPI duplicados: removidos en R-UI premium-landing-2026 — los stat-cards
+  // de #landing-hero ya muestran Glosas del mes, Valor objetado, Tasa de éxito
+  // y Próximas a vencer con deltas vs mes anterior. Evitamos repetir aquí.
 
   // ─── Glosas que vencen HOY/MAÑANA ───
   if(vencen && Array.isArray(vencen.glosas) && vencen.glosas.length > 0){
