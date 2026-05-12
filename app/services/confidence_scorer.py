@@ -8,12 +8,14 @@ El score sirve para que el gestor (Yesid) sepa si el dictamen es:
   - Débil (< 0.60, rojo) → reformular, faltan piezas clave
 
 Variables ponderadas:
-  +0.25  Cláusula contractual literal aplicable (ClausulaContrato del PDF)
-  +0.20  Precedente interno: glosa similar levantada (mismo código + EPS)
-  +0.15  Soportes adjuntados al expediente
+  +0.20  Cláusula contractual literal aplicable (ClausulaContrato del PDF)
+  +0.15  Precedente interno: glosa similar levantada (mismo código + EPS)
+  +0.10  Soportes adjuntados al expediente
   +0.20  Norma citada existe en corpus + sin citas literales falsas
   +0.10  Auditor pre-IA verificó datos contra BD sin discrepancias
   +0.10  Cálculo numérico verificable (valor objetado/facturado/pactado)
+  +0.15  Calidad intrínseca del dictamen (chevrones « », doctrina invocada,
+         tabla códigos, estructura argumentativa)
 
 El gestor puede ver el breakdown completo en la UI para entender qué
 le falta al dictamen y reforzarlo si toca.
@@ -126,6 +128,63 @@ def _verificar_calculo_numerico(
     return True
 
 
+def _evaluar_calidad_intrinseca(dictamen: str) -> tuple[float, str]:
+    """Mide la calidad estructural del dictamen sin importar PDFs/precedentes.
+
+    Puntos hasta 0.15:
+      +0.04  Cita literal entre chevrones franceses « ... » (mínimo 1)
+      +0.04  Invoca doctrina jurídica colombiana (Pacta Sunt Servanda,
+             Art. 1602 CC, Art. 871 CCo, Lex Artis, Carga Dinámica, etc.)
+      +0.03  Estructura: tabla código/valor/respuesta + bloque servicio
+      +0.04  Cita ≥3 normas distintas (Ley/Decreto/Resolución/Sentencia)
+
+    Devuelve (puntos, explicacion).
+    """
+    if not dictamen:
+        return 0.0, "Dictamen vacío — sin calidad evaluable."
+
+    txt = dictamen.upper()
+    pts = 0.0
+    razones = []
+
+    if "«" in dictamen and "»" in dictamen:
+        pts += 0.04
+        razones.append("cita literal entre chevrones")
+
+    doctrina = [
+        "PACTA SUNT SERVANDA", "ART. 1602", "ARTICULO 1602", "ARTÍCULO 1602",
+        "ART. 871", "ARTICULO 871", "ARTÍCULO 871",
+        "LEX ARTIS", "CARGA DINÁMICA", "CARGA DINAMICA",
+        "BUENA FE CONTRACTUAL", "CARGA DE LA PRUEBA",
+    ]
+    if any(d in txt for d in doctrina):
+        pts += 0.04
+        razones.append("doctrina jurídica invocada")
+
+    if "<TABLE" in txt or "CÓDIGO GLOSA" in txt or "CODIGO RESPUESTA" in txt:
+        pts += 0.03
+        razones.append("estructura tabular completa")
+
+    import re as _re
+    normas_distintas = set()
+    for m in _re.finditer(
+        r"(LEY\s*\d+|DECRETO\s*\d+|RESOLUCI[OÓ]N\s*\d+|SENTENCIA\s+[TCSU][\-\d/]+)",
+        txt,
+    ):
+        normas_distintas.add(m.group(1).strip())
+    if len(normas_distintas) >= 3:
+        pts += 0.04
+        razones.append(f"{len(normas_distintas)} normas distintas")
+
+    pts = round(min(pts, 0.15), 3)
+    expl = (
+        "Dictamen bien estructurado: " + " · ".join(razones) + "."
+        if razones
+        else "Dictamen pobre: sin chevrones, sin doctrina, sin tabla. Reforzar argumentación."
+    )
+    return pts, expl
+
+
 def calcular_confianza(
     eps: str,
     codigo: str,
@@ -157,11 +216,11 @@ def calcular_confianza(
 
     # 1. Cláusula contractual literal
     tiene_clausula = _tiene_clausula_contractual(eps, codigo)
-    pts = 0.25 if tiene_clausula else 0.0
+    pts = 0.20 if tiene_clausula else 0.0
     score += pts
     breakdown.append({
         "factor": "Cláusula del contrato vigente con esta EPS",
-        "puntos_max": 0.25,
+        "puntos_max": 0.20,
         "puntos_obtenidos": pts,
         "ok": tiene_clausula,
         "explicacion": (
@@ -173,11 +232,11 @@ def calcular_confianza(
 
     # 2. Precedente interno (glosa similar levantada)
     tiene_precedente = _tiene_precedente_interno(eps, codigo)
-    pts = 0.20 if tiene_precedente else 0.0
+    pts = 0.15 if tiene_precedente else 0.0
     score += pts
     breakdown.append({
         "factor": "Precedente interno: glosa similar ya levantada antes",
-        "puntos_max": 0.20,
+        "puntos_max": 0.15,
         "puntos_obtenidos": pts,
         "ok": tiene_precedente,
         "explicacion": (
@@ -189,11 +248,11 @@ def calcular_confianza(
 
     # 3. Soportes adjuntados
     tiene_soportes = soportes_count > 0
-    pts = 0.15 if tiene_soportes else 0.0
+    pts = 0.10 if tiene_soportes else 0.0
     score += pts
     breakdown.append({
         "factor": "Soportes documentales adjuntados",
-        "puntos_max": 0.15,
+        "puntos_max": 0.10,
         "puntos_obtenidos": pts,
         "ok": tiene_soportes,
         "explicacion": (
@@ -264,12 +323,27 @@ def calcular_confianza(
         ),
     })
 
+    # 7. Calidad intrínseca del dictamen (chevrones, doctrina, tabla, normas)
+    pts_intr, expl_intr = _evaluar_calidad_intrinseca(dictamen)
+    score += pts_intr
+    breakdown.append({
+        "factor": "Calidad intrínseca del dictamen",
+        "puntos_max": 0.15,
+        "puntos_obtenidos": pts_intr,
+        "ok": pts_intr >= 0.10,
+        "explicacion": expl_intr,
+    })
+
     # Cap a 1.0 por las dudas
     score = max(0.0, min(1.0, round(score, 3)))
 
-    if score >= 0.80:
+    # Umbrales calibrados sobre 7 factores (suma máxima 1.05, capeada a 1.0):
+    #   ≥0.70 ENVIAR  — dictamen completo, listo
+    #   0.50-0.69 REVISAR — buenas piezas, le falta una clave (PDF/soporte)
+    #   <0.50 REFORMULAR — débil, reescribir
+    if score >= 0.70:
         nivel, color, recom = "alto", "#16a34a", "ENVIAR"
-    elif score >= 0.60:
+    elif score >= 0.50:
         nivel, color, recom = "medio", "#d97706", "REVISAR"
     else:
         nivel, color, recom = "bajo", "#dc2626", "REFORMULAR"

@@ -2411,8 +2411,32 @@ class GlosaService:
         return vistos
 
     def _extraer_valor(self, texto: str) -> str:
-        m = re.search(r"\$\s*([\d\.,]+)", texto)
-        return f"$ {m.group(1)}" if m else "$ 0.00"
+        """Extrae el valor monetario de la glosa. Tolera errores comunes:
+          - "%150.000" o "%150000"  → typo '%' por '$' (frecuente en correos)
+          - "$ 150.000" / "$150,000" / "150.000 pesos"
+          - "por valor de 150.000" / "valor objetado: 150000"
+          - "1'500.000" (separador apóstrofe colombiano)
+        Devuelve "$ <num>" formateado, o "$ 0.00" si no encuentra nada.
+        """
+        if not texto:
+            return "$ 0.00"
+        t = texto.replace("'", ".")  # 1'500.000 → 1.500.000
+
+        patrones = [
+            r"\$\s*([\d][\d\.,]{2,})",
+            r"%\s*([\d][\d\.,]{2,})",
+            r"\bvalor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
+            r"\bvalor\s+objetado[:\s]*\$?\s*([\d][\d\.,]{2,})",
+            r"\bpor\s+valor\s+de\s*\$?\s*([\d][\d\.,]{2,})",
+            r"\b([\d][\d\.,]{4,})\s*(?:pesos|cop|cop\.|col\$)\b",
+        ]
+        for p in patrones:
+            m = re.search(p, t, re.IGNORECASE)
+            if m:
+                raw = m.group(1).strip().rstrip(".,")
+                if any(ch.isdigit() for ch in raw):
+                    return f"$ {raw}"
+        return "$ 0.00"
 
     def _calcular_dias_habiles(self, f1, f2):
         try:
