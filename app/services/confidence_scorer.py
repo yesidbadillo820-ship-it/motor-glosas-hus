@@ -41,9 +41,14 @@ def _tiene_clausula_contractual(eps: str, codigo: str) -> bool:
         return False
     db = SessionLocal()
     try:
+        # Match contra eps normalizado + raw, por compat con registros viejos
+        eps_norm = eps.upper().strip()
         n = (
             db.query(ClausulaContrato)
-            .filter(ClausulaContrato.eps == eps, ClausulaContrato.tema.in_([tema, "NN"]))
+            .filter(
+                ClausulaContrato.eps.in_([eps, eps_norm]),
+                ClausulaContrato.tema.in_([tema, "NN"]),
+            )
             .count()
         )
         return n > 0

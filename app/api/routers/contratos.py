@@ -545,17 +545,38 @@ async def subir_pdf_contrato(
         logger.error(f"[CONTRATO-PDF] Error extrayendo cláusulas eps={eps}: {e}")
         clausulas, diagnostico = [], f"Excepción inesperada: {e}"
 
-    # Reemplazar cláusulas anteriores por las nuevas
-    db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps).delete()
-    for c in clausulas:
-        db.add(ClausulaContrato(
-            eps=eps,
-            numero_clausula=c["numero"],
-            tema=c["tema"],
-            titulo=c["titulo"],
-            texto_literal=c["texto_literal"],
-            pagina=c["pagina"],
-        ))
+    # Normalizar el eps para guardar (upper + strip). Las queries del motor
+    # (RAG, citation_verifier) usan .upper() — guardar igual previene
+    # mismatch entre "SALUD MIA" guardado y "Salud Mia" buscado.
+    eps_norm = (eps or "").upper().strip()
+
+    # CRÍTICO: solo BORRAR cláusulas viejas si la IA devolvió cláusulas nuevas.
+    # Antes el código hacía DELETE incondicional → si la IA fallaba (0 cláusulas)
+    # se perdían las cláusulas previamente cargadas. Bug reportado por el
+    # gestor: "subí SALUD MIA con éxito ayer, hoy no aparecen".
+    clausulas_previas = (
+        db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).count()
+    )
+    if clausulas:
+        db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).delete()
+        for c in clausulas:
+            db.add(ClausulaContrato(
+                eps=eps_norm,
+                numero_clausula=c["numero"],
+                tema=c["tema"],
+                titulo=c["titulo"],
+                texto_literal=c["texto_literal"],
+                pagina=c["pagina"],
+            ))
+        logger.info(
+            f"[CONTRATO-PDF] eps={eps_norm} reemplazadas {clausulas_previas} → "
+            f"{len(clausulas)} cláusulas"
+        )
+    else:
+        logger.warning(
+            f"[CONTRATO-PDF] eps={eps_norm} extracción IA devolvió 0 cláusulas. "
+            f"PRESERVANDO {clausulas_previas} cláusulas previas. Diag: {diagnostico}"
+        )
 
     contrato.pdf_path = pdf_path
     contrato.pdf_subido_en = datetime.now(timezone.utc)
@@ -604,9 +625,12 @@ def listar_clausulas_contrato(
     if not contrato:
         raise HTTPException(status_code=404, detail=f"Contrato no encontrado para EPS '{eps}'")
 
+    # Buscar con eps normalizado (upper+strip) y también con el raw original
+    # para encontrar registros que se guardaron antes del fix (sin normalizar).
+    eps_norm = (eps or "").upper().strip()
     clausulas = (
         db.query(ClausulaContrato)
-        .filter(ClausulaContrato.eps == eps)
+        .filter(ClausulaContrato.eps.in_([eps, eps_norm]))
         .order_by(ClausulaContrato.tema, ClausulaContrato.id)
         .all()
     )
@@ -640,6 +664,11 @@ def borrar_clausulas_contrato(
 
     Útil para forzar re-extracción manual sin borrar el PDF de disco.
     """
-    n = db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps).delete()
+    eps_norm = (eps or "").upper().strip()
+    n = (
+        db.query(ClausulaContrato)
+        .filter(ClausulaContrato.eps.in_([eps, eps_norm]))
+        .delete(synchronize_session=False)
+    )
     db.commit()
     return {"eps": eps, "clausulas_borradas": n}

@@ -369,11 +369,16 @@ def bloque_clausulas_contrato_para_prompt(eps: str, codigo: str, max_clausulas: 
 
     db = SessionLocal()
     try:
+        # Match contra eps normalizado + raw, por compat con registros viejos
+        eps_norm = (eps or "").upper().strip()
         # Prioridad 1: cláusulas del tema exacto (TA, SO, AU, etc.)
         # Prioridad 2: cláusulas NN (generales) como respaldo si hay <3
         clausulas_tema = (
             db.query(ClausulaContrato)
-            .filter(ClausulaContrato.eps == eps, ClausulaContrato.tema == tema)
+            .filter(
+                ClausulaContrato.eps.in_([eps, eps_norm]),
+                ClausulaContrato.tema == tema,
+            )
             .order_by(ClausulaContrato.id)
             .limit(max_clausulas)
             .all()
@@ -385,7 +390,7 @@ def bloque_clausulas_contrato_para_prompt(eps: str, codigo: str, max_clausulas: 
             clausulas_nn = (
                 db.query(ClausulaContrato)
                 .filter(
-                    ClausulaContrato.eps == eps,
+                    ClausulaContrato.eps.in_([eps, eps_norm]),
                     ClausulaContrato.tema == "NN",
                 )
                 .order_by(ClausulaContrato.id)
