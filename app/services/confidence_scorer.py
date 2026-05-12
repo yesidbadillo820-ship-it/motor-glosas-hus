@@ -106,10 +106,11 @@ def _verificar_calculo_numerico(
         if not s:
             return None
         try:
-            cleaned = "".join(c for c in str(s) if c.isdigit() or c in ".-")
-            if not cleaned:
-                return None
-            return float(cleaned)
+            # Reusar el parser robusto que respeta formato colombiano
+            # (puntos = miles, coma = decimal). Antes "7.700,00" → 7.7 (bug).
+            from app.services.auto_pilot_decision import _parse_valor
+            v = _parse_valor(s)
+            return v if v > 0 else None
         except Exception:
             return None
 

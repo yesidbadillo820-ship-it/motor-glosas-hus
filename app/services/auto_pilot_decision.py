@@ -61,14 +61,29 @@ def _parse_valor(valor_raw) -> float:
         return 0.0
     if isinstance(valor_raw, (int, float)):
         return float(valor_raw)
-    s = str(valor_raw)
+    s = str(valor_raw).strip()
+    # Quitar prefijos no numéricos al inicio ($, %, espacios, COL$, etc.)
+    s = re.sub(r"^[^\d\-]+", "", s)
+    if not s:
+        return 0.0
+    # Formato colombiano: puntos = miles, coma = decimal ("7.700,00" = 7700.00).
+    # Antes hacía re.sub(r"[^\d]", "", s) que para "7.700,00" daba "770000"
+    # (lectura como $770.000). Bug detectado el 12-may-2026.
+    if "," in s:
+        partes = s.rsplit(",", 1)
+        enteros = re.sub(r"[^\d\-]", "", partes[0])
+        decimales = partes[1].strip()
+        if 1 <= len(decimales) <= 2 and decimales.isdigit():
+            try:
+                return float(f"{enteros}.{decimales}")
+            except Exception:
+                return 0.0
+        # Coma no era decimal (más de 2 dígitos detrás) → todo a entero
+        cleaned = re.sub(r"[^\d]", "", s)
+        return float(cleaned) if cleaned else 0.0
+    # Sin coma: los puntos se asumen separadores de miles (Colombia)
     cleaned = re.sub(r"[^\d]", "", s)
-    if not cleaned:
-        return 0.0
-    try:
-        return float(cleaned)
-    except Exception:
-        return 0.0
+    return float(cleaned) if cleaned else 0.0
 
 
 def evaluar_caso_dificil(
