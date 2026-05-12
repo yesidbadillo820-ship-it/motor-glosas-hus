@@ -417,7 +417,18 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
    • T-478/1995 (autonomía médica)
    • T-121/2015 (GPC son recomendativas, no imperativas)
    • C-313/2014 (régimen general derecho a la salud)
-   Si necesitas referirte a jurisprudencia que NO está en esta lista, NO inventes número y año. Usa fórmulas neutras: "la jurisprudencia constitucional ha establecido…", "la línea jurisprudencial reconoce…", "la doctrina contencioso-administrativa dispone…". JAMAS escribir números como T-56/1957, T-300/1990, ni números fuera del rango 1995-2026.
+   Si necesitas referirte a jurisprudencia que NO está en esta lista blanca, NO inventes número y año. Usa fórmulas neutras sin números: "la jurisprudencia constitucional ha establecido…", "la línea jurisprudencial reconoce…", "la doctrina contencioso-administrativa dispone…". Está absolutamente prohibido fabricar identificadores de sentencias.
+
+7.bis. PROHIBIDO ABSOLUTO USAR CHEVRONES « » SOBRE TEXTO QUE NO SEA COPIA EXACTA.
+   Los chevrones franceses « » son SAGRADOS — solo encierran COPIA LITERAL palabra-por-palabra de:
+   (a) Una cláusula de contrato presente en el bloque [CLAUSULAS LITERALES DEL CONTRATO ...] del USER prompt, O
+   (b) Una norma cuyo texto exacto figure en el MARCO NORMATIVO del system prompt.
+   Si no tenés el texto literal frente a vos, NO uses chevrones — parafraseá sin comillas:
+     • MAL:  El Decreto 1295/1994 establece que «la afiliación al SGRL es obligatoria…»  (parafraseo con chevrones = INVENCIÓN)
+     • MAL:  La Ley 1709/2014 dispone que «la atención en salud de las PPL será integral y continua»
+     • BIEN: El Decreto 1295/1994 (Art. 1, 9, 40) regula la afiliación obligatoria al SGRL y la competencia de la junta calificadora.
+     • BIEN: La Ley 1709/2014 establece el régimen de atención en salud integral y continua para personas privadas de la libertad.
+   Si el usuario detecta una cita literal falsa, el dictamen pierde toda credibilidad ante la EPS.
 
 8. CODIGO DE GLOSA vs CUPS — NO los confundas:
    - CODIGO DE GLOSA: formato letras+digitos tipo TA0201, SO0604, FA0205, AU0301 (catalogo Res. 2284/2023).
@@ -926,41 +937,75 @@ def build_user_prompt(
         prefijo = "FA"
     nombre_tipo = _NOMBRE_TIPO[prefijo]
 
-    # ─── DETECCION DE GLOSAS MULTI-CONCEPTO (mayo 2026) ───
-    # Si el texto contiene >1 codigo de glosa (TA0201 + FA0205, p.ej.), la IA
-    # debe defender CADA uno por separado, no tratar solo el primero. Sin esto
-    # Llama trata todo como una sola glosa y pierde los demas conceptos.
-    codigos_detectados = re.findall(
-        r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b",
-        (texto_glosa or "").upper(),
-    )
-    codigos_unicos = []
-    for c in codigos_detectados:
-        if c not in codigos_unicos:
-            codigos_unicos.append(c)
+    # ─── DETECCION DE GLOSAS MULTI-CONCEPTO (mayo 2026, refinado) ───
+    # Estrategia en 3 capas — la EPS escribe de muchas formas distintas:
+    #   1) Codigos con digitos: "TA0201" + "SO0501"
+    #   2) Prefijos sueltos: "TA - LA TARIFA..." + "SO - NO ADJUNTAN..."
+    #   3) Keywords de concepto sin codigo: "tarifa", "soportes", "autorizacion"
+    # Necesitamos detectar TODAS para que Haiku/Sonnet defienda cada eje.
+    texto_up = (texto_glosa or "").upper()
+
+    # Capa 1: codigos completos
+    codigos_completos = []
+    for m in re.finditer(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\s*\d{2,4}\b", texto_up):
+        cstr = re.sub(r"\s+", "", m.group(0))
+        if cstr not in codigos_completos:
+            codigos_completos.append(cstr)
+    familias = set(re.findall(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto_up))
+
+    # Capa 2: prefijos sueltos seguidos de separador "—", "-", ":", ".", ")"
+    # (ej: "1) TA - LA TARIFA", "2) SO - NO ADJUNTAN")
+    for m in re.finditer(r"\b(TA|SO|AU|CO|CL|PE|FA|IN|ME)\b\s*[-–:\.\)]", texto_up):
+        familias.add(m.group(1))
+
+    # Capa 3: keywords de concepto en español (sin codigo formal)
+    KEYWORDS_CONCEPTO = [
+        ("TA", [r"\bTARIFA(S)?\b", r"\bSOAT\b", r"\bUVB\b", r"\bMANUAL TARIFARIO\b"]),
+        ("SO", [r"\bSOPORTE(S)?\b", r"\bHISTORIA CL[ÍI]NICA\b", r"\bEPICRISIS\b",
+                r"\bRIPS\b", r"\bANEXO(S)? CL[ÍI]NICO(S)?\b", r"\bFIRMA M[ÉE]DICA\b"]),
+        ("AU", [r"\bAUTORIZACI[ÓO]N(?:ES)?\b", r"\bORDEN PREVIA\b", r"\bSIN AUTORIZACI[ÓO]N\b"]),
+        ("CO", [r"\bCOBERTURA\b", r"\bPBS\b", r"\bPLAN DE BENEFICIOS\b", r"\bEXCLUSI[ÓO]N\b"]),
+        ("CL", [r"\bPERTINENCIA\b", r"\bINDICACI[ÓO]N CL[ÍI]NICA\b"]),
+        ("FA", [r"\bFACTURACI[ÓO]N\b", r"\bDOBLE FACTURACI[ÓO]N\b", r"\bFACTURA ELECTR[ÓO]NICA\b"]),
+        ("IN", [r"\bINSUMOS?\b", r"\bDISPOSITIVOS?\b"]),
+        ("ME", [r"\bMEDICAMENTOS?\b", r"\bF[ÁA]RMACO(S)?\b"]),
+    ]
+    for fam, patrones in KEYWORDS_CONCEPTO:
+        if any(re.search(p, texto_up) for p in patrones):
+            familias.add(fam)
+
     bloque_multicodigo_str = ""
-    if len(codigos_unicos) >= 2:
-        # Reconstruir codigos completos (con numeros)
-        codigos_completos = []
-        for m in re.finditer(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\s*\d{2,4}\b", (texto_glosa or "").upper()):
-            cstr = re.sub(r"\s+", "", m.group(0))
-            if cstr not in codigos_completos:
-                codigos_completos.append(cstr)
+    if len(familias) >= 2:
+        # Mostrar codigos completos si los hubo; si no, los prefijos detectados
+        if codigos_completos:
+            etiquetas = codigos_completos
+        else:
+            etiquetas = sorted(familias)
+        # Etiquetas legibles con el tipo (TARIFAS, SOPORTES, ...)
+        etiquetas_full = []
+        for e in etiquetas:
+            fam = e[:2] if len(e) >= 2 else e
+            nombre = _NOMBRE_TIPO.get(fam, fam)
+            etiquetas_full.append(f"{e} ({nombre})")
         bloque_multicodigo_str = (
-            "\n[⚠ GLOSA MULTI-CONCEPTO DETECTADA — codigos: " + ", ".join(codigos_completos) + "]\n"
-            "ATENCION: el texto de la glosa contiene MAS DE UN codigo de objecion. "
-            "El argumento DEBE defender CADA codigo por separado, no solo el primero. "
-            "Estructura sugerida en el argumento (parrafo 2 o 3):\n"
-            "  • (i) En relacion con el codigo " + codigos_completos[0] + ": [defensa especifica]\n"
-            "  • (ii) En relacion con el codigo " + (codigos_completos[1] if len(codigos_completos) > 1 else "—") + ": [defensa especifica]\n"
-            "El valor total a defender es la SUMA de las objeciones individuales.\n"
+            "\n[⚠ GLOSA MULTI-CONCEPTO DETECTADA — " + ", ".join(etiquetas_full) + "]\n"
+            "ATENCION: el texto de la glosa objeta MAS DE UN concepto distinto. "
+            "El argumento DEBE defender CADA concepto por separado, no solo el primero. "
+            "Estructura obligatoria en el argumento (parrafo 2 o 3):\n"
+            f"  • (i) En relacion con {etiquetas_full[0]}: [defensa especifica con norma propia]\n"
+            f"  • (ii) En relacion con {etiquetas_full[1] if len(etiquetas_full) > 1 else '—'}: [defensa especifica con norma propia]\n"
+            "Cada concepto tiene normas distintas: TARIFAS=PACTA SUNT SERVANDA + contrato; "
+            "SOPORTES=Res. 1995/1999 + Decreto 4747/2007 Art. 21; AUTORIZACION=Art. 168 Ley 100; "
+            "COBERTURA=Ley 1751/2015. NO mezcles las defensas en un solo parrafo generico.\n"
+            "En la TABLA CODIGOS DE LA RESPUESTA debe aparecer una FILA por cada concepto, "
+            "no una sola fila combinada.\n"
         )
 
     # ─── DETECCION AUTOMATICA DE VICIOS PROCEDIMENTALES (mayo 2026) ───
     # Analiza el texto de la glosa para detectar vicios tipicos y los pasa al
     # prompt como sugerencias EXPLICITAS de argumentos. Sin esto Llama no
     # identifica vicios por nombre tecnico.
-    texto_up = (texto_glosa or "").upper()
+    # (texto_up ya esta definido arriba — multi-concepto lo usa primero)
     vicios_detectados = []
     # Glosa contradictoria/mal imputada (el auditor confiesa intencion distinta)
     if re.search(r"EN REALIDAD|LA INTENCI[ÓO]N (REAL )?ES|AUNQUE LA TIPIFICACI[ÓO]N", texto_up):
