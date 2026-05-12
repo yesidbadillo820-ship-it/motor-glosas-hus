@@ -92,8 +92,14 @@ LEYES = {
                 "aplicacion": "Función jurisdiccional SuperSalud para conflictos de glosas",
                 "keywords": ["SuperSalud", "superintendencia", "conflicto", "jurisdiccional", "arbitraje"],
             },
+            "105": {
+                "titulo": "Prohibición de intromisión en el acto médico",
+                "texto": "Las entidades responsables del pago de los servicios de salud no podrán interferir en la autonomía profesional del médico tratante, ni sustituir sus decisiones clínicas por consideraciones administrativas o económicas. El criterio del médico tratante prevalece sobre la opinión del auditor médico que no examinó al paciente. La violación de esta prohibición compromete la responsabilidad civil de la entidad pagadora por las consecuencias en la salud del usuario.",
+                "aplicacion": "Defensa en glosas de PERTINENCIA CLÍNICA (CL/PE) — proscribe revisión administrativa del criterio médico",
+                "keywords": ["intromisión", "acto médico", "autonomía profesional", "pertinencia clínica", "criterio médico tratante", "Art. 105"],
+            },
         },
-        "keywords": ["glosa", "plazo", "30 días", "trámite de glosas", "ratificación"],
+        "keywords": ["glosa", "plazo", "30 días", "trámite de glosas", "ratificación", "intromisión acto médico"],
     },
 
     "LEY 1751 DE 2015": {
@@ -200,6 +206,49 @@ LEYES = {
         "ambito": "Distribución competencias y recursos del SGP en salud",
         "vigente": True,
         "keywords": ["SGP", "participaciones", "recursos", "competencias territoriales"],
+    },
+    "LEY 80 DE 1993": {
+        "nombre": "Ley 80 de 1993 (Estatuto General de Contratación)",
+        "titulo": "Estatuto General de la Contratación de la Administración Pública",
+        "ambito": "Contratos estatales — aplicable a ESE HUS por ser ESE pública",
+        "vigente": True,
+        "articulos": {
+            "23": {
+                "titulo": "Principios de las actuaciones contractuales",
+                "texto": "Las actuaciones de quienes intervengan en la contratación estatal se desarrollarán con arreglo a los principios de transparencia, economía y responsabilidad y de conformidad con los postulados que rigen la función administrativa. Igualmente, se aplicarán en las mismas las normas que regulan la conducta de los servidores públicos, las reglas de interpretación de la contratación, los principios generales del derecho y los particulares del derecho administrativo.",
+                "aplicacion": "Principios rectores de los contratos estatales",
+                "keywords": ["transparencia", "economía", "responsabilidad", "principios contratación estatal", "Art. 23"],
+            },
+            "27": {
+                "titulo": "Ecuación contractual y equilibrio económico",
+                "texto": "En los contratos estatales se mantendrá la igualdad o equivalencia entre derechos y obligaciones surgidos al momento de proponer o de contratar, según el caso. Si dicha igualdad o equivalencia se rompe por causas no imputables a quien resulte afectado, las partes adoptarán en el menor tiempo posible las medidas necesarias para su restablecimiento.",
+                "aplicacion": "Defensa en glosas que rompen equilibrio económico del contrato (tarifas, descuentos unilaterales)",
+                "keywords": ["equilibrio económico", "ecuación contractual", "remuneración pactada", "Art. 27"],
+            },
+        },
+        "keywords": ["contratación estatal", "Ley 80", "contrato interadministrativo", "ESE pública"],
+    },
+    "LEY 1150 DE 2007": {
+        "nombre": "Ley 1150 de 2007",
+        "titulo": "Medidas para la eficiencia y transparencia en la Ley 80 de 1993",
+        "ambito": "Contratación estatal — modalidades de selección y régimen aplicable",
+        "vigente": True,
+        "keywords": ["contratación estatal", "selección abreviada", "régimen ESE", "Ley 1150"],
+    },
+    "DECRETO 1082 DE 2015": {
+        "nombre": "Decreto 1082 de 2015 (DUR Planeación)",
+        "titulo": "Decreto Único Reglamentario del sector Administrativo de Planeación Nacional",
+        "ambito": "Contratación estatal — reglamentación operativa",
+        "vigente": True,
+        "articulos": {
+            "2.2.1.2.1.4.4": {
+                "titulo": "Contratación de prestadores de servicios de salud",
+                "texto": "Las entidades estatales que requieran contratar servicios de salud deberán seguir las reglas establecidas en este decreto, garantizando la libre concurrencia, la igualdad de los oferentes, la selección objetiva y el respeto a los principios de la función administrativa.",
+                "aplicacion": "Reglamenta contratación de servicios de salud por ESE públicas",
+                "keywords": ["contratación servicios salud", "ESE", "Subsección IV", "Art. 2.2.1.2.1.4.4"],
+            },
+        },
+        "keywords": ["contratación estatal", "DUR", "servicios de salud", "Decreto 1082"],
     },
     "LEY 599 DE 2000": {
         "nombre": "Ley 599 de 2000 (Código Penal)",
@@ -944,6 +993,23 @@ JURISPRUDENCIA = {
         ),
         "aplica_a": "Glosas de pertinencia clínica (CL/PE)",
         "keywords": ["T-478", "autonomía médica", "médico tratante", "pertinencia"],
+    },
+
+    "SENTENCIA T-121 DE 2015": {
+        "nombre": "Sentencia T-121 de 2015",
+        "corte": "Corte Constitucional",
+        "titulo": "Carácter recomendativo de las Guías de Práctica Clínica (GPC)",
+        "ratio": "Las Guías de Práctica Clínica del Ministerio de Salud tienen carácter recomendativo, no imperativo. La autonomía profesional del médico tratante permite apartarse de ellas cuando las particularidades clínicas del paciente lo justifiquen.",
+        "ratio_literal": "Las guías de práctica clínica constituyen recomendaciones que orientan la decisión médica, pero no la sustituyen. La autonomía profesional del médico tratante permite, e incluso obliga, apartarse de ellas cuando las particularidades del paciente así lo demanden.",
+        "extracto_judicial": (
+            "«Las guías de práctica clínica son instrumentos orientadores, no imperativos, "
+            "que reconocen la naturaleza individual de cada paciente. La medicina no es una "
+            "ciencia algorítmica; el médico tratante, con la información clínica del caso "
+            "concreto, conserva la potestad de adoptar la decisión más adecuada para la "
+            "salud del paciente, aún cuando esta difiera de la recomendación general.»"
+        ),
+        "aplica_a": "Glosas CL0103 (no acorde a GPC) — defiende la autonomía sobre la recomendación",
+        "keywords": ["T-121", "GPC", "guías de práctica clínica", "recomendativo", "autonomía"],
     },
 
     "SENTENCIA T-171 DE 2018": {
