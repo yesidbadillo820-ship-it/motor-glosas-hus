@@ -1,7 +1,7 @@
 // Service Worker para Motor Glosas HUS - cache shell + estrategia red-primero para datos.
 // ⚠ IMPORTANTE: subir la versión del cache cada vez que cambie el HTML/CSS/JS
 //   estático para que los clientes existentes reciban la nueva versión.
-const CACHE = 'hus-glosas-v6';
+const CACHE = 'hus-glosas-v7';
 const RUNTIME_CACHE = 'hus-runtime-v1';
 const SHELL = [
   '/',
