@@ -411,6 +411,31 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
    - "INCUMPLIMIENTO INJUSTIFICADO" → "INCUMPLIMIENTO CONTRACTUAL"
    - Palabra suelta "INJUSTIFICADO/A" → "IMPROCEDENTE"
 
+7. PROHIBIDO INVENTAR SENTENCIAS. Solo puedes citar sentencias de esta LISTA BLANCA:
+   • T-760/2008 (régimen general — NO usar en FF.MM./PPL/FOMAG/ARL)
+   • T-1025/2002 (urgencias sin autorización)
+   • T-478/1995 (autonomía médica)
+   • T-121/2015 (GPC son recomendativas, no imperativas)
+   • C-313/2014 (régimen general derecho a la salud)
+   Si necesitas referirte a jurisprudencia que NO está en esta lista, NO inventes número y año. Usa fórmulas neutras: "la jurisprudencia constitucional ha establecido…", "la línea jurisprudencial reconoce…", "la doctrina contencioso-administrativa dispone…". JAMAS escribir números como T-56/1957, T-300/1990, ni números fuera del rango 1995-2026.
+
+8. CODIGO DE GLOSA vs CUPS — NO los confundas:
+   - CODIGO DE GLOSA: formato letras+digitos tipo TA0201, SO0604, FA0205, AU0301 (catalogo Res. 2284/2023).
+   - CUPS: codigo numerico de 5-6 digitos del procedimiento (87010, 890201H, 882371).
+   - Cuando redactes "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE [TIPO] SOBRE EL CODIGO [X]", X es el CODIGO DE GLOSA (TA0201), NO el CUPS. El CUPS va en una frase aparte tipo "respecto del procedimiento facturado con CUPS [Y]".
+   - NUNCA escribas el numero de factura (HUS0000XXXXXX) como si fuera un codigo de glosa o CUPS.
+
+9. CLAUSULAS DEL CONTRATO — uso OBLIGATORIO cuando estan disponibles:
+   - Si el user prompt incluye un bloque "[CLAUSULAS LITERALES DEL CONTRATO CON XXX]", DEBES citar al menos UNA clausula textualmente entre comillas en el parrafo 3 del argumento (FUNDAMENTO NORMATIVO).
+   - Formato: "CONFORME A LA [NUMERO DE CLAUSULA] DEL CONTRATO QUE ESTABLECE TEXTUALMENTE: «[texto literal entre chevrones]»".
+   - NO inventes numeros de clausula. Solo cita las que aparecen en el bloque.
+   - Si NO hay bloque de clausulas, omite y usa el numero de contrato generico.
+
+10. VICIOS PROCEDIMENTALES — identificacion OBLIGATORIA:
+    - Si el user prompt incluye un bloque "[VICIOS PROCEDIMENTALES DETECTADOS]", IDENTIFICA POR NOMBRE TECNICO al menos UNO de los vicios listados en el parrafo 2 (refutacion).
+    - Formula: "CONFIGURANDO UN VICIO DE [NOMBRE]" o "CONSTITUYE [NOMBRE]".
+    - Sin este bloque, intenta detectar vicios por ti mismo y nombrarlos.
+
 ═══════════════ IDENTIFICACIÓN EXPRESA DE VICIOS DE LA GLOSA (cuando aplique) ═══════════════
 Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO en el párrafo de refutación:
 
@@ -901,6 +926,102 @@ def build_user_prompt(
         prefijo = "FA"
     nombre_tipo = _NOMBRE_TIPO[prefijo]
 
+    # ─── DETECCION DE GLOSAS MULTI-CONCEPTO (mayo 2026) ───
+    # Si el texto contiene >1 codigo de glosa (TA0201 + FA0205, p.ej.), la IA
+    # debe defender CADA uno por separado, no tratar solo el primero. Sin esto
+    # Llama trata todo como una sola glosa y pierde los demas conceptos.
+    codigos_detectados = re.findall(
+        r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b",
+        (texto_glosa or "").upper(),
+    )
+    codigos_unicos = []
+    for c in codigos_detectados:
+        if c not in codigos_unicos:
+            codigos_unicos.append(c)
+    bloque_multicodigo_str = ""
+    if len(codigos_unicos) >= 2:
+        # Reconstruir codigos completos (con numeros)
+        codigos_completos = []
+        for m in re.finditer(r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\s*\d{2,4}\b", (texto_glosa or "").upper()):
+            cstr = re.sub(r"\s+", "", m.group(0))
+            if cstr not in codigos_completos:
+                codigos_completos.append(cstr)
+        bloque_multicodigo_str = (
+            "\n[⚠ GLOSA MULTI-CONCEPTO DETECTADA — codigos: " + ", ".join(codigos_completos) + "]\n"
+            "ATENCION: el texto de la glosa contiene MAS DE UN codigo de objecion. "
+            "El argumento DEBE defender CADA codigo por separado, no solo el primero. "
+            "Estructura sugerida en el argumento (parrafo 2 o 3):\n"
+            "  • (i) En relacion con el codigo " + codigos_completos[0] + ": [defensa especifica]\n"
+            "  • (ii) En relacion con el codigo " + (codigos_completos[1] if len(codigos_completos) > 1 else "—") + ": [defensa especifica]\n"
+            "El valor total a defender es la SUMA de las objeciones individuales.\n"
+        )
+
+    # ─── DETECCION AUTOMATICA DE VICIOS PROCEDIMENTALES (mayo 2026) ───
+    # Analiza el texto de la glosa para detectar vicios tipicos y los pasa al
+    # prompt como sugerencias EXPLICITAS de argumentos. Sin esto Llama no
+    # identifica vicios por nombre tecnico.
+    texto_up = (texto_glosa or "").upper()
+    vicios_detectados = []
+    # Glosa contradictoria/mal imputada (el auditor confiesa intencion distinta)
+    if re.search(r"EN REALIDAD|LA INTENCI[ÓO]N (REAL )?ES|AUNQUE LA TIPIFICACI[ÓO]N", texto_up):
+        vicios_detectados.append({
+            "nombre": "GLOSA CONTRADICTORIA / MAL IMPUTADA",
+            "ataque": "El propio auditor confiesa contradiccion entre el motivo escrito y el codigo aplicado. "
+                      "TRANSCRIBE LITERALMENTE entre comillas la confesion del auditor y solicita "
+                      "DESESTIMACION POR VICIO DE MOTIVACION (Decreto 4747/2007 Art. 21 + Ley 1438/2011 Art. 57).",
+        })
+    # Inversion carga probatoria (exige soportes no tipificados)
+    if re.search(r"SE EXIGE.*(FACTURA DE COMPRA|FORMATO PDF|FIRMA DE RECIBIDO|DOCUMENTOS ADICIONALES)", texto_up) or \
+       re.search(r"AL NO APORTAR|FALTA DE SOPORTE.*ADICIONAL", texto_up):
+        vicios_detectados.append({
+            "nombre": "INVERSION INDEBIDA DE LA CARGA PROBATORIA",
+            "ataque": "La EPS exige soportes NO tipificados en Res. 3047/2008 Anexo Tecnico No. 5 ni Res. 2284/2023 "
+                      "Anexo Tecnico No. 1. Cita Ley 1438/2011 Art. 57 (carga dinamica) + Art. 29 C.P. (debido proceso).",
+        })
+    # Glosa atipica (porcentaje no taxativo)
+    if re.search(r"SE GLOSA EL \d+\s*%|GLOSA DEL? \d+\s*%", texto_up):
+        vicios_detectados.append({
+            "nombre": "GLOSA ATIPICA",
+            "ataque": "El porcentaje de objecion NO existe en el Catalogo Unico de Glosas "
+                      "(Res. 3047/2008 Anexo Tecnico No. 6). La causal carece de TIPICIDAD.",
+        })
+    # Modificacion unilateral de tarifa
+    if re.search(r"TARIFA NO PACTADA|MAYOR VALOR COBRADO.*TARIFA|APLICAR.*MANUAL.*SOAT", texto_up):
+        vicios_detectados.append({
+            "nombre": "MODIFICACION UNILATERAL DEL CONTRATO",
+            "ataque": "La EPS pretende aplicar tarifa distinta a la pactada en via de glosa. Vulnera "
+                      "PACTA SUNT SERVANDA (Art. 1602 C.C.) y buena fe contractual (Art. 871 C.Co.).",
+        })
+    # Aplicacion indebida de causal (FA0202 sobre servicio intrahospitalario)
+    if "FA0202" in texto_up and re.search(r"INTRAHOSPITALARIO|HOSPITALIZACI[ÓO]N", texto_up):
+        vicios_detectados.append({
+            "nombre": "APLICACION INDEBIDA DE CAUSAL",
+            "ataque": "FA0202 aplica a consulta DOMICILIARIA. Aqui el servicio es INTRAHOSPITALARIO, "
+                      "lo cual configura tipificacion indebida (Res. 3047/2008 Anexo Tecnico No. 6).",
+        })
+    # Glosa de pertinencia sin concepto de par academico
+    if prefijo in ("CL", "PE") and not re.search(r"PAR ACAD[ÉE]MICO|AUDITOR M[ÉE]DICO.*MISMA ESPECIALIDAD", texto_up):
+        vicios_detectados.append({
+            "nombre": "AUSENCIA DE CONCEPTO TECNICO ESPECIALIZADO",
+            "ataque": "La glosa de pertinencia clinica REQUIERE concepto tecnico de par academico "
+                      "o auditor medico de la MISMA ESPECIALIDAD que emitio la indicacion "
+                      "(Res. 3047/2008 Anexo Tecnico No. 6). Sin ese soporte la glosa es invalida.",
+        })
+
+    bloque_vicios_str = ""
+    if vicios_detectados:
+        lineas_v = []
+        for v in vicios_detectados:
+            lineas_v.append(f"  • {v['nombre']}: {v['ataque']}")
+        bloque_vicios_str = (
+            "\n[⚠ VICIOS PROCEDIMENTALES DETECTADOS — debes nombrarlos por su nombre tecnico]\n"
+            "OBLIGACION: en el parrafo 2 (refutacion) del argumento, IDENTIFICA POR NOMBRE TECNICO "
+            "al menos UNO de los siguientes vicios detectados en esta glosa. Usa la formula "
+            "'CONFIGURANDO UN VICIO DE [NOMBRE]' o 'CONSTITUYE [NOMBRE]':\n"
+            + "\n".join(lineas_v)
+            + "\n"
+        )
+
     # Datos contractuales
     contrato = get_contrato(eps)
     numero_contrato = contrato["numero"]
@@ -1238,7 +1359,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_referencias_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
