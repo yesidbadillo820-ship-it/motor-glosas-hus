@@ -2196,18 +2196,6 @@ body.focus-mode .focus-exit:hover{background:var(--c-navy2)}
         <!-- Asistente Proactivo (R368): la IA dice qué hacer HOY -->
         <div id="md-asistente" style="margin-bottom:1rem"></div>
 
-        <!-- Coaching IA (Tier 4 #10) -->
-        <div class="form-card" style="margin-bottom:1rem;background:linear-gradient(135deg, var(--bg-card), var(--bg-subtle))">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem">
-            <div>
-              <h3 style="margin:0;font-size:.95rem">Coaching personal IA</h3>
-              <p style="margin:.15rem 0 0;font-size:.72rem;color:var(--text3)">Análisis de tus últimos 90 días con sugerencias accionables</p>
-            </div>
-            <button class="btn-primary" onclick="cargarCoachingIA()" style="font-size:.78rem;padding:.35rem .8rem" id="md-coaching-btn">Generar coaching</button>
-          </div>
-          <div id="md-coaching-out"></div>
-        </div>
-
         <!-- Heatmap actividad estilo GitHub (Tier 3 #6) -->
         <div class="form-card" style="margin-bottom:1rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;flex-wrap:wrap;gap:.5rem">
@@ -9615,9 +9603,18 @@ async function desactivar2FA(){
 
 async function cargarMiDesempeno(){
   var ventana = (document.getElementById('md-ventana')||{value:30}).value || 30;
+  var saludo = document.getElementById('md-saludo');
+  var alertasBox = document.getElementById('md-alertas');
   try{
     var r = await fetch('/mi-desempeno/?ventana_dias='+ventana, {headers: authH()});
-    if(!r.ok) return;
+    if(!r.ok){
+      var msg = r.status === 401 ? 'Sesión expirada — volvé a iniciar sesión.'
+              : r.status === 403 ? 'Sin permisos para ver este panel.'
+              : 'No se pudo cargar tu desempeño (HTTP '+r.status+'). Reintentá en unos segundos.';
+      if(alertasBox) alertasBox.innerHTML = '<div class="md-alerta rojo">'+escHtml(msg)+'</div>';
+      if(saludo) saludo.textContent = msg;
+      return;
+    }
     var d = await r.json();
     document.getElementById('md-saludo').textContent = 'Hola ' + (d.usuario.nombre||'') + ' · Últimos ' + d.ventana_dias + ' días';
     document.getElementById('mk-total').textContent = d.kpis.total_glosas.toLocaleString('es-CO');
@@ -9691,7 +9688,10 @@ async function cargarMiDesempeno(){
 
     // ─── Tarjetas premium nuevas (FE3..FE8): consume nuevos endpoints R270/R279/R356/R310/R303 ───
     cargarMiDesempenoPremium();
-  }catch(e){ console.error('mi-desempeno:', e); }
+  }catch(e){
+    console.error('mi-desempeno:', e);
+    if(alertasBox) alertasBox.innerHTML = '<div class="md-alerta rojo">Error de red: '+escHtml(String(e.message||e))+'</div>';
+  }
 }
 
 // 🤖 Asistente Proactivo: carga acciones priorizadas y las pinta
@@ -14998,113 +14998,9 @@ async function _borrarComentario(id, glosaId){
   if(r.ok) await _renderComentarios(glosaId);
 }
 
-// ─── COACHING IA PERSONAL (Tier 4 #10) ─────────────────────────────
-async function cargarCoachingIA(){
-  var out = document.getElementById('md-coaching-out');
-  var btn = document.getElementById('md-coaching-btn');
-  if(!out) return;
-  out.innerHTML = '<div style="color:var(--text3);font-size:.85rem;padding:.5rem">Analizando tus 90 dias...</div>';
-  if(btn){ btn.disabled = true; }
-  try{
-    var r = await fetch('/prediccion-ia/coaching', {headers:authH()});
-    if(!r.ok){ out.innerHTML = '<div style="color:#dc2626">No se pudo cargar el coaching</div>'; return; }
-    var d = await r.json();
-    var s = d.stats || {};
-    var statHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem;margin-bottom:.85rem">'+
-      '<div style="background:var(--bg-card);padding:.5rem .65rem;border-radius:6px;border:1px solid var(--border)">'+
-        '<div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Tu tasa éxito</div>'+
-        '<div style="font-size:1.15rem;font-weight:700">'+(s.pct_exito||0)+'%</div>'+
-      '</div>'+
-      '<div style="background:var(--bg-card);padding:.5rem .65rem;border-radius:6px;border:1px solid var(--border)">'+
-        '<div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Equipo prom</div>'+
-        '<div style="font-size:1.15rem;font-weight:700">'+(d.team_pct_exito||0)+'%</div>'+
-      '</div>'+
-      '<div style="background:var(--bg-card);padding:.5rem .65rem;border-radius:6px;border:1px solid var(--border)">'+
-        '<div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Decididas</div>'+
-        '<div style="font-size:1.15rem;font-weight:700">'+(s.decididas||0)+'</div>'+
-      '</div>'+
-      '<div style="background:var(--bg-card);padding:.5rem .65rem;border-radius:6px;border:1px solid var(--border)">'+
-        '<div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Recuperado</div>'+
-        '<div style="font-size:1.15rem;font-weight:700">'+cop(s.valor_recuperado||0)+'</div>'+
-      '</div>'+
-    '</div>';
-    var acHtml = (d.acciones||[]).map(function(a){
-      var color = a.prioridad === 'alta' ? '#dc2626' : (a.prioridad === 'info' ? '#0369a1' : '#475569');
-      var bg = a.prioridad === 'alta' ? 'rgba(220,38,38,.06)' : 'rgba(2,132,199,.04)';
-      return '<div style="background:'+bg+';border-left:3px solid '+color+';padding:.65rem .85rem;border-radius:6px;margin-bottom:.4rem">'+
-        '<div style="display:flex;align-items:center;gap:.4rem"><div style="width:22px;height:22px;border-radius:50%;background:'+color+';color:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0">'+escHtml(a.icono||'·')+'</div>'+
-        '<b style="font-size:.85rem">'+escHtml(a.titulo)+'</b></div>'+
-        '<div style="font-size:.78rem;color:var(--text2);margin-top:.3rem;line-height:1.55">'+escHtml(a.detalle)+'</div>'+
-      '</div>';
-    }).join('');
-    out.innerHTML = statHtml + acHtml;
-  }catch(e){ out.innerHTML = '<div style="color:#dc2626">Error: '+escHtml(String(e))+'</div>'; }
-  finally { if(btn) btn.disabled = false; }
-}
-
-// ─── PREDICCION RATIFICACION (Tier 1 #9) ───────────────────────────
-// Hook: cuando el usuario pone EPS + codigo en el form de Analizar,
-// muestra widget con probabilidad de ratificacion y recomendaciones.
-window._predDebounce = null;
-async function actualizarPrediccionRatif(){
-  var eps = ((document.getElementById('eps-sel')||{}).value || '').trim();
-  var cod = ((document.getElementById('f-codigo')||{}).value || '').trim();
-  var out = document.getElementById('pred-ratif-widget');
-  if(!out){
-    // Crear el widget si no existe — debajo del campo codigo
-    var anchor = document.getElementById('f-codigo') || document.getElementById('f-glosa');
-    if(!anchor) return;
-    var w = document.createElement('div');
-    w.id = 'pred-ratif-widget';
-    w.style.cssText = 'margin-top:.5rem;font-size:.78rem';
-    anchor.parentNode.insertBefore(w, anchor.nextSibling);
-    out = w;
-  }
-  if(!eps || !cod || cod.length < 2){
-    out.innerHTML = '';
-    return;
-  }
-  out.innerHTML = '<div style="color:var(--text3);font-size:.72rem">Calculando probabilidad...</div>';
-  try{
-    var r = await fetch('/prediccion-ia/probabilidad-ratificacion?eps='+encodeURIComponent(eps)+'&codigo='+encodeURIComponent(cod), {headers:authH()});
-    if(!r.ok){ out.innerHTML = ''; return; }
-    var d = await r.json();
-    if(d.probabilidad_ratificacion_pct === null){
-      out.innerHTML = '<div style="background:var(--bg-subtle);border-left:3px solid var(--border2);padding:.5rem .7rem;border-radius:5px;font-size:.72rem;color:var(--text3)">Sin histórico para esta combinación EPS+código.</div>';
-      return;
-    }
-    var p = d.probabilidad_ratificacion_pct;
-    var color = p >= 60 ? '#dc2626' : (p >= 35 ? '#d97706' : '#15803d');
-    var bg = p >= 60 ? 'rgba(220,38,38,.06)' : (p >= 35 ? 'rgba(217,119,6,.06)' : 'rgba(21,128,61,.06)');
-    var label = p >= 60 ? 'Alto riesgo' : (p >= 35 ? 'Riesgo moderado' : 'Bajo riesgo');
-    out.innerHTML = '<div style="background:'+bg+';border-left:3px solid '+color+';padding:.55rem .8rem;border-radius:5px">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.25rem">'+
-        '<b style="color:'+color+';font-size:.82rem">'+label+': '+p+'% probabilidad de RATIFICACIÓN</b>'+
-        '<span style="font-size:.65rem;color:var(--text3)">'+d.muestra_total+' casos · confianza '+d.confianza+'</span>'+
-      '</div>'+
-      '<div style="font-size:.72rem;color:var(--text2);line-height:1.5"><ul style="margin:.2rem 0 0 1.1rem;padding:0">'+
-        (d.recomendaciones||[]).map(function(r){return '<li>'+escHtml(r)+'</li>';}).join('')+
-      '</ul></div>'+
-    '</div>';
-  }catch(_){ out.innerHTML = ''; }
-}
-
-// Bind a los inputs de codigo + eps
-function _initPredRatif(){
-  ['eps-sel','f-codigo'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(!el || el.dataset.predBound === '1') return;
-    el.dataset.predBound = '1';
-    var trigger = function(){
-      clearTimeout(window._predDebounce);
-      window._predDebounce = setTimeout(actualizarPrediccionRatif, 700);
-    };
-    el.addEventListener('change', trigger);
-    el.addEventListener('input', trigger);
-  });
-}
-setTimeout(_initPredRatif, 1200);
-setTimeout(_initPredRatif, 3000);
+// Coaching IA y predicción ratificación: eliminados porque consumían
+// /_removed/prediccion-ia/* (router retirado). Se reemplazarán cuando el
+// motor estadístico tenga datos suficientes para predecir sin alucinar.
 
 // ─── CHAT HISTORY del Asistente Maestro (Tier 4 #11) ──────────────
 window._currentConvId = null;
