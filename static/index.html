@@ -6492,15 +6492,30 @@ async function subirContratoPDF(){
       return;
     }
     if(resultDiv){
-      resultDiv.innerHTML =
-        '<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#14532d;line-height:1.55;">' +
-          '<b>✅ Contrato procesado correctamente</b><br>' +
-          '• PDF guardado: ' + (data.pdf_kb || 0) + ' KB<br>' +
-          '• Cláusulas detectadas: <b>' + (data.clausulas_extraidas || 0) + '</b><br>' +
-          '<span style="font-size:.75rem;color:#365314;">A partir de ahora el motor citará estas cláusulas literales al objetar glosas de ' + escHtml(eps) + '.</span>' +
-        '</div>';
+      var n = data.clausulas_extraidas || 0;
+      var diag = escHtml(data.diagnostico || '');
+      if(n > 0){
+        resultDiv.innerHTML =
+          '<div style="background:#dcfce7;border-left:3px solid #16a34a;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#14532d;line-height:1.55;">' +
+            '<b>✅ Contrato procesado correctamente</b><br>' +
+            '• PDF guardado: ' + (data.pdf_kb || 0) + ' KB<br>' +
+            '• Cláusulas detectadas: <b>' + n + '</b><br>' +
+            '<span style="font-size:.75rem;color:#365314;">A partir de ahora el motor citará estas cláusulas literales al objetar glosas de ' + escHtml(eps) + '.</span>' +
+          '</div>';
+      } else {
+        resultDiv.innerHTML =
+          '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:.8rem 1rem;border-radius:6px;font-size:.85rem;color:#78350f;line-height:1.55;">' +
+            '<b>⚠️ PDF subido pero NO se extrajeron cláusulas</b><br>' +
+            '• PDF guardado: ' + (data.pdf_kb || 0) + ' KB<br>' +
+            '• Cláusulas detectadas: <b>0</b><br>' +
+            (diag ? '<span style="display:block;margin-top:.4rem;padding:.5rem .65rem;background:rgba(255,255,255,.7);border-radius:4px;font-size:.75rem;color:#7c2d12;line-height:1.5;"><b>Diagnóstico:</b> ' + diag + '</span>' : '') +
+          '</div>';
+      }
     }
-    toast('Contrato cargado', (data.clausulas_extraidas || 0) + ' cláusulas extraídas para ' + eps, 'success');
+    var msgToast = (data.clausulas_extraidas || 0) > 0
+      ? (data.clausulas_extraidas + ' cláusulas extraídas para ' + eps)
+      : '0 cláusulas — ver diagnóstico abajo';
+    toast('Contrato procesado', msgToast, (data.clausulas_extraidas || 0) > 0 ? 'success' : 'warning');
     cargarClausulasContrato();
   }catch(e){
     if(resultDiv){
