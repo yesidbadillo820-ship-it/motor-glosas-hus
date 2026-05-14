@@ -292,3 +292,64 @@ def lanzar_lote_background(glosa_ids: list[int]) -> None:
         )
     except Exception as e:
         logger.error(f"[AUTO-RESPONDER] No se pudo lanzar lote: {e}")
+
+
+async def procesar_lote_y_enviar_excel(
+    glosa_ids: list[int],
+    excel_original: bytes,
+    resumen: dict,
+) -> dict:
+    """Procesa el lote IA y, al terminar, manda a cada gestor el Excel
+    original anotado con las respuestas generadas.
+
+    Pensado para correr en background tras `/glosas/importar-recepcion`.
+    Abre su propia sesión DB para el email — la del endpoint ya cerró.
+    """
+    resultado_lote = await procesar_lote(glosa_ids)
+
+    from app.database import SessionLocal
+    from app.services.email_service import (
+        enviar_excel_recepcion_con_respuestas,
+    )
+
+    db_email = SessionLocal()
+    try:
+        envio = await enviar_excel_recepcion_con_respuestas(
+            resumen=resumen,
+            excel_original=excel_original,
+            glosa_ids=glosa_ids,
+            db=db_email,
+        )
+        resultado_lote["excel_emails"] = envio
+    except Exception as e:
+        logger.error(
+            f"[AUTO-RESPONDER] Falló el envío del Excel-respuesta: {e}"
+        )
+        resultado_lote["excel_emails"] = {"error": str(e)[:200]}
+    finally:
+        db_email.close()
+    return resultado_lote
+
+
+def lanzar_lote_y_enviar_excel_background(
+    glosa_ids: list[int],
+    excel_original: bytes,
+    resumen: dict,
+) -> None:
+    """Variante de `lanzar_lote_background` que, al terminar el lote,
+    dispara el envío del Excel-respuesta a cada gestor."""
+    if not glosa_ids:
+        return
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(
+            procesar_lote_y_enviar_excel(glosa_ids, excel_original, resumen)
+        )
+        logger.info(
+            f"[AUTO-RESPONDER] Lote de {len(glosa_ids)} glosas encolado + "
+            "envío Excel-respuesta programado para al terminar"
+        )
+    except Exception as e:
+        logger.error(
+            f"[AUTO-RESPONDER] No se pudo lanzar lote+excel: {e}"
+        )

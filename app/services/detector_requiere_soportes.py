@@ -158,19 +158,47 @@ def evaluar(
             "puede_procesar_ia": False,
         }
 
-    # Regla 5: valor alto + texto/PDF escasos → casos críticos
-    if valor_objetado >= 1_000_000 and len(texto) < 200 and len(pdf) < 1000:
+    # Regla 4-bis: facturación (FA*) — directiva mayo 2026: el coordinador
+    # marca facturación como concepto que SIEMPRE requiere revisión manual
+    # del gestor (CUFE, FEV, contracuentas), aunque haya texto suficiente.
+    # La IA puede generar borrador pero NO debe auto-enviarse.
+    if pref == "FA" and len(pdf) < 500:
         return {
             "requiere": True,
             "motivo": (
-                f"Glosa de alta cuantía (${valor_objetado:,.0f}) sin "
-                "contexto suficiente. Los casos relevantes requieren "
-                "expediente completo para no exponer al hospital."
+                "Código FA (Facturación): requiere validación manual de "
+                "FEV, CUFE, contracuentas o numeración consecutiva. La "
+                "IA puede asistir pero el gestor debe verificar el "
+                "documento original."
+            ),
+            "soportes_sugeridos": [
+                "Factura electrónica de venta (FEV) en PDF",
+                "Constancia DIAN si aplica (Res. 042/2020)",
+                "Notas crédito o débito relacionadas si existen",
+            ],
+            "puede_procesar_ia": False,
+        }
+
+    # Regla 5: valor alto INCONDICIONAL — directiva mayo 2026 del
+    # coordinador: glosas de valor objetado superior a $2M SIEMPRE pasan
+    # a verificación manual del gestor, aunque su concepto sea
+    # auto-respondible (TA/CO). La IA puede preparar borrador en otra
+    # ruta, pero el detector las marca como REQUIERE_SOPORTES para que el
+    # gestor confirme el caso antes de radicar respuesta.
+    if valor_objetado >= 2_000_000:
+        return {
+            "requiere": True,
+            "motivo": (
+                f"Glosa de alta cuantía (${valor_objetado:,.0f}, >$2M) — "
+                "regla del coordinador: requiere verificación manual del "
+                "gestor con expediente completo antes de radicar "
+                "respuesta a la EPS."
             ),
             "soportes_sugeridos": [
                 "Expediente completo del paciente",
                 "Factura electrónica de la atención",
                 "Soportes específicos según tipo de glosa",
+                "Verificación por parte del gestor antes de enviar",
             ],
             "puede_procesar_ia": False,
         }

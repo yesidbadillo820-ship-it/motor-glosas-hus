@@ -4734,20 +4734,30 @@ async def importar_recepcion(
 
     resumen_dict = resumen.to_dict()
 
-    # Auto-respuesta de glosas en background (R-cerebro #11):
-    # encolamos las glosas creadas/actualizadas para que el motor
-    # IA genere su dictamen sin esperar a que el gestor las abra.
-    # Usa detector REQUIERE_SOPORTES para no gastar tokens en
-    # casos donde sin PDFs el dictamen sería pobre.
+    # Auto-respuesta de glosas en background (R-cerebro #11) + envío
+    # del Excel anotado con respuestas IA a cada gestor (directiva
+    # mayo 2026 del coordinador). El flujo:
+    #   1. encolamos las glosas creadas/actualizadas para que el motor
+    #      IA genere su dictamen sin esperar a que el gestor las abra.
+    #   2. al terminar el lote, el servicio dispara el envío del Excel
+    #      original anotado con columnas RESPUESTA IA + ESTADO IA y la
+    #      fila del gestor resaltada en amarillo.
+    # Usa detector REQUIERE_SOPORTES para no gastar tokens en casos
+    # donde sin PDFs el dictamen sería pobre y dejarlos en revisión
+    # manual del gestor.
     glosas_para_auto = list(getattr(resumen, "glosas_ids_para_auto_responder", []) or [])
     auto_respuesta_lanzada = False
     if glosas_para_auto:
         try:
-            from app.services.auto_responder_service import lanzar_lote_background
-            lanzar_lote_background(glosas_para_auto)
+            from app.services.auto_responder_service import (
+                lanzar_lote_y_enviar_excel_background,
+            )
+            lanzar_lote_y_enviar_excel_background(
+                glosas_para_auto, contenido, resumen_dict,
+            )
             auto_respuesta_lanzada = True
             logger.info(
-                f"[{req_id}] Auto-respuesta encolada: "
+                f"[{req_id}] Auto-respuesta + envío Excel programado: "
                 f"{len(glosas_para_auto)} glosas en background"
             )
         except Exception as e:
