@@ -504,6 +504,34 @@ header::after{
 .skeleton-line.short{width:45%}
 .skeleton-line.medium{width:70%}
 .skeleton-box{height:60px;width:100%;margin:6px 0}
+
+/* Skeleton row para tablas — reemplaza el "Cargando…" plano */
+.skeleton-row td{padding:.6rem .55rem;background:var(--bg-card);border-bottom:1px solid var(--border)}
+.skeleton-row .skeleton{display:inline-block;height:12px;border-radius:4px;vertical-align:middle}
+.skeleton-cells{display:flex;gap:.7rem;align-items:center}
+.skeleton-cells > .skeleton{flex:0 0 auto}
+
+/* Empty state premium — para "todo al día" en Mis Glosas, Alertas, etc. */
+.empty-state{padding:3rem 1.5rem;text-align:center;color:var(--text2)}
+.empty-state .es-emoji{font-size:2.6rem;line-height:1;margin-bottom:.6rem;animation:esBounce 2.5s ease-in-out infinite}
+.empty-state .es-title{font-size:1rem;font-weight:600;color:var(--text);margin-bottom:.3rem;letter-spacing:-.01em}
+.empty-state .es-hint{font-size:.82rem;color:var(--text3);max-width:380px;margin:0 auto;line-height:1.5}
+@keyframes esBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+/* Confetti burst cuando radicar una glosa — pure CSS, sin librería */
+@keyframes confettiFall {
+  0% { transform: translate(-50%,-50%) rotate(0deg); opacity: 1 }
+  100% {
+    transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy))) rotate(var(--cr));
+    opacity: 0;
+  }
+}
+.confetti-container{position:fixed;inset:0;pointer-events:none;z-index:99999;overflow:hidden}
+.confetti-particle{position:absolute;left:50vw;top:50vh;width:8px;height:14px;border-radius:2px;will-change:transform,opacity}
+@media (prefers-reduced-motion: reduce) {
+  .confetti-particle{display:none}
+  .empty-state .es-emoji{animation:none}
+}
 .hdr-title{font-size:.95rem;font-weight:700;color:#fff;letter-spacing:-.015em;line-height:1.2}
 .hdr-sub{font-size:.68rem;color:rgba(255,255,255,.55);margin-top:3px;font-weight:500;letter-spacing:.02em}
 .hdr-right{display:flex;align-items:center;gap:.75rem}
@@ -11598,7 +11626,12 @@ async function loadMisGlosas(){
   if(vista) qs.push('vista=' + encodeURIComponent(vista));
   var url = '/glosas/mis-asignaciones' + (qs.length ? '?' + qs.join('&') : '');
   var body = document.getElementById('mis-body');
-  body.innerHTML = '<tr class="empty-row"><td colspan="13">Cargando…</td></tr>';
+  // UX premium: skeleton rows en vez del texto "Cargando…" plano.
+  if(typeof renderTableSkeleton === 'function'){
+    renderTableSkeleton('mis-body', 13, 6);
+  } else {
+    body.innerHTML = '<tr class="empty-row"><td colspan="13">Cargando…</td></tr>';
+  }
   // Cargar banner 24h en paralelo (sin bloquear)
   if(typeof cargarBannerVencen24h === 'function') cargarBannerVencen24h();
   try{
@@ -11693,6 +11726,24 @@ function _renderMisGlosas(dataRaw){
     }
 
     if(data.length === 0){
+      // UX premium: si el gestor SÍ tiene glosas pero el filtro actual las oculta
+      // (ej. pestaña "Pendientes" con 0 pendientes porque ya respondió todas),
+      // mostramos celebración en vez del "no tienes glosas".
+      var filtroActual = window._mis_filtro || 'pendientes';
+      var tieneGlosasGlobales = Array.isArray(dataRaw) && dataRaw.length > 0;
+      if(tieneGlosasGlobales && filtroActual === 'pendientes'){
+        body.innerHTML = '<tr class="empty-row"><td colspan="13" style="border:none;padding:0">'
+          + '<div class="empty-state">'
+          + '<div class="es-emoji">🎉</div>'
+          + '<div class="es-title">¡Todo al día!</div>'
+          + '<div class="es-hint">No tenés glosas pendientes en este momento. '
+          + 'Buen trabajo — la EPS no va a operar el silencio en contra tuya hoy.</div>'
+          + '<div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-top:1.2rem">'
+          + '<button class="btn-sm ghost" onclick="setMisFiltro(\'respondidas\')">Ver respondidas</button> '
+          + '<button class="btn-sm ghost" onclick="setMisFiltro(\'todas\')">Ver todas</button>'
+          + '</div></div></td></tr>';
+        return;
+      }
       body.innerHTML = '<tr class="empty-row"><td colspan="13">' +
         '<svg class="empty-state-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M9 11H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/>' +
@@ -12341,6 +12392,86 @@ function _bulkRegenerarSaltadas(){
 }
 
 // ─── WORKFLOW DE APROBACION ───────────────────────────────────────────────
+// ─── UX premium: skeleton loaders, empty states, confetti ─────────────
+//
+// renderTableSkeleton(tbodyId, colspan, rows=6)
+//   Pinta filas-skeleton animadas en una <tbody> mientras llega data.
+//   Mejora la percepción de velocidad vs. el texto "Cargando…" plano.
+function renderTableSkeleton(tbodyId, colspan, rows){
+  rows = rows || 6;
+  var tbody = document.getElementById(tbodyId);
+  if(!tbody) return;
+  var html = '';
+  // Anchos variables por columna para que se vea "natural", no robótico.
+  var anchos = ['18%','22%','12%','15%','10%','18%','14%','20%','12%'];
+  for(var i = 0; i < rows; i++){
+    html += '<tr class="skeleton-row"><td colspan="'+colspan+'"><div class="skeleton-cells">';
+    html += '<span class="skeleton" style="width:14px;height:14px;border-radius:50%"></span>';
+    for(var j = 0; j < Math.min(5, anchos.length); j++){
+      // pequeña variación por fila para que no parezcan clones perfectos
+      var w = anchos[(j + i) % anchos.length];
+      html += '<span class="skeleton" style="width:'+w+'"></span>';
+    }
+    html += '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// renderEmptyState(containerId, opts)
+//   opts = {emoji, titulo, hint, html}
+//   Pinta un empty state elegante en lugar de "(sin resultados)".
+function renderEmptyState(containerId, opts){
+  var el = document.getElementById(containerId);
+  if(!el) return;
+  opts = opts || {};
+  var emoji = opts.emoji || '✨';
+  var titulo = opts.titulo || '¡Todo al día!';
+  var hint = opts.hint || '';
+  // Si es <tbody>, usar fila con colspan; si es <div>, usar div suelto.
+  var isTbody = (el.tagName || '').toLowerCase() === 'tbody';
+  var colspan = opts.colspan || 13;
+  var inner = '<div class="empty-state">'
+    + '<div class="es-emoji">'+emoji+'</div>'
+    + '<div class="es-title">'+titulo+'</div>'
+    + (hint ? '<div class="es-hint">'+hint+'</div>' : '')
+    + (opts.html || '')
+    + '</div>';
+  el.innerHTML = isTbody
+    ? '<tr><td colspan="'+colspan+'" style="border:none;padding:0">'+inner+'</td></tr>'
+    : inner;
+}
+
+// mostrarConfettiBurst()
+//   Lanza ~30 partículas confetti desde el centro de la pantalla.
+//   Pura CSS, sin librería. Respeta prefers-reduced-motion.
+function mostrarConfettiBurst(){
+  try{
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var colores = ['#10b981','#3b82f6','#f59e0b','#ec4899','#8b5cf6','#ef4444','#06b6d4'];
+    var n = 30;
+    var container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+    for(var i = 0; i < n; i++){
+      var p = document.createElement('div');
+      p.className = 'confetti-particle';
+      var ang = Math.random() * Math.PI * 2;
+      var dist = 180 + Math.random() * 280;
+      var dur = 800 + Math.random() * 700;
+      var cx = Math.cos(ang) * dist;
+      var cy = Math.sin(ang) * dist + 180;  // sesgo hacia abajo (gravedad)
+      var cr = (Math.random() * 720 - 360) + 'deg';
+      p.style.background = colores[i % colores.length];
+      p.style.setProperty('--cx', cx + 'px');
+      p.style.setProperty('--cy', cy + 'px');
+      p.style.setProperty('--cr', cr);
+      p.style.animation = 'confettiFall ' + dur + 'ms cubic-bezier(.3,.7,.4,1) forwards';
+      container.appendChild(p);
+    }
+    setTimeout(function(){ if(container.parentNode) container.remove(); }, 1700);
+  }catch(_){ /* nunca romper UI por una animación */ }
+}
+
 async function cambiarWorkflow(id, nuevoEstado, etiqueta){
   var comentario = prompt('Comentario opcional para esta transición a ' + etiqueta + ':') || '';
   try{
@@ -12352,6 +12483,8 @@ async function cambiarWorkflow(id, nuevoEstado, etiqueta){
     var d = await r.json();
     if(r.ok){
       toast('Estado actualizado', etiqueta + ' ✓', 'success');
+      // Celebración visual cuando radicar — el momento "feliz" del flujo.
+      if(nuevoEstado === 'RADICADA') mostrarConfettiBurst();
       if(typeof loadMisGlosas === 'function') loadMisGlosas();
     } else {
       toast('Error', d.detail || 'No se pudo cambiar el estado', 'error');
