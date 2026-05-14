@@ -394,49 +394,6 @@ def diagnostico_completo(
             },
         }
 
-    # ─── Telegram bot (alertas push) ──────────────────────────────
-    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    if not telegram_token:
-        out["secciones"]["telegram"] = {
-            "estado": "warning",
-            "mensaje": (
-                "TELEGRAM_BOT_TOKEN no configurado — los gestores no "
-                "reciben alertas push de glosas urgentes. Setup en 2 min: "
-                "@BotFather → /newbot → copiar token → "
-                "`fly secrets set TELEGRAM_BOT_TOKEN=123:abc...`. Tras "
-                "eso registrar webhook (curl -X POST .../setWebhook)."
-            ),
-            "data": {},
-        }
-    else:
-        # Verificación liviana sin hacer ping (que cuesta network).
-        # El usuario puede llamar /telegram/health autenticado para el ping real.
-        vinculados = 0
-        try:
-            from sqlalchemy import func as _f
-            from app.models.db import UsuarioRecord
-            vinculados = (
-                db.query(_f.count(UsuarioRecord.id))
-                .filter(UsuarioRecord.telegram_chat_id.isnot(None))
-                .filter(UsuarioRecord.activo == 1)
-                .scalar() or 0
-            )
-        except Exception:
-            pass
-        out["secciones"]["telegram"] = {
-            "estado": "ok",
-            "mensaje": (
-                f"Bot configurado · {vinculados} gestor/es vinculado/s. "
-                f"Resumen diario corre a las 8:00 AM. "
-                f"Probar: GET /telegram/health (autenticado)."
-            ),
-            "data": {
-                "token_prefix": telegram_token[:10] + "...",
-                "webhook_secret_set": bool(os.getenv("TELEGRAM_WEBHOOK_SECRET")),
-                "vinculados": vinculados,
-            },
-        }
-
     # ─── PostHog (product analytics) ──────────────────────────────
     posthog_key = os.getenv("POSTHOG_API_KEY", "")
     if not posthog_key:
