@@ -338,6 +338,16 @@ class UsuarioRecord(Base):
     vacaciones_hasta = Column(DateTime(timezone=True), nullable=True)
     delega_a_email = Column(String(200), nullable=True)
     vacaciones_motivo = Column(String(200), nullable=True)
+    # Telegram chat_id para notificaciones push. El gestor escribe
+    # /start al bot @MotorGlosasHUS_bot (o el nombre que se elija) y
+    # el bot guarda aquí su chat_id contra el email del usuario. Si
+    # está vacío, el gestor no recibe alertas push (no bloquea nada).
+    telegram_chat_id = Column(String(40), nullable=True, index=True)
+    # Preferencias de notificación Telegram (bitmask serializado simple):
+    #   "rojas,negras,resumen_diario,vence_hoy"  → todo activado
+    #   ""  → todo desactivado
+    # Default: todo activado cuando vinculan el chat.
+    telegram_preferencias = Column(String(200), nullable=True)
 
 
 class AuditLogRecord(Base):

@@ -324,10 +324,12 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"MIGRACIÓN resize {col_name}: {e}")
 
-    # Migraciones para usuarios - 2FA TOTP
+    # Migraciones para usuarios - 2FA TOTP + Telegram bot push
     _USUARIOS_MISSING_2FA = [
         ("totp_secret", "VARCHAR(64)"),
         ("totp_activo", "INTEGER DEFAULT 0"),
+        ("telegram_chat_id", "VARCHAR(40)"),
+        ("telegram_preferencias", "VARCHAR(200)"),
     ]
     for col_name, col_ddl in _USUARIOS_MISSING_2FA:
         try:
@@ -725,6 +727,15 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de mantenimiento: {_e}")
 
+    # Scheduler diario del resumen Telegram (8 AM) — push a cada gestor
+    # vinculado con sus glosas ROJAS/NEGRAS pendientes. No-op si
+    # TELEGRAM_BOT_TOKEN no está configurado.
+    try:
+        from app.services.telegram_scheduler import iniciar_scheduler as iniciar_tg_scheduler
+        iniciar_tg_scheduler()
+    except Exception as _e:
+        logger.warning(f"No se pudo iniciar scheduler Telegram: {_e}")
+
     # Reindex diario del share de soportes (2 AM) + build inicial al
     # arrancar para que el primer gestor del día encuentre el índice
     # caliente. No bloquea startup si el mount aún no está disponible
@@ -988,6 +999,8 @@ from app.api.routers.auditor_forense import router as auditor_forense_router
 app.include_router(auditor_forense_router)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 app.include_router(asistente_maestro_router)
+from app.api.routers.telegram import router as telegram_router
+app.include_router(telegram_router)
 
 
 
