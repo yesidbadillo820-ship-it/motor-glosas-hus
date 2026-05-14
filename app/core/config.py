@@ -22,12 +22,29 @@ class Settings(BaseSettings):
     # Google Gemini API key (tier gratis muy generoso: 15 RPM, 1500 RPD)
     # Conseguir en: https://aistudio.google.com/apikey
     gemini_api_key: str = ""
-    # Cual se usa primero. Default "gemini" (gratis, calidad alta, lee PDFs nativos).
-    # Tambien soportado: "anthropic" | "groq". El fallback automatico es:
-    #   gemini    -> gemini -> anthropic -> groq
-    #   anthropic -> anthropic -> gemini -> groq
-    #   groq      -> gemini -> anthropic -> groq  (groq SIEMPRE ultimo recurso)
-    primary_ai: str = "gemini"
+    # OpenRouter — meta-router que da acceso a 100+ modelos con 1 sola
+    # API key. Util para meter DeepSeek V3 (extremadamente barato y de
+    # calidad cercana a Sonnet) o Llama 3.3 70B (gratis) sin agregar
+    # otra integracion. Conseguir en https://openrouter.ai/keys
+    # Pricing referencia: deepseek-chat ~ $0.27/M in, $1.10/M out (30x
+    # mas barato que Sonnet); meta-llama:free es 100% gratis con
+    # rate-limit moderado (50 RPD aprox).
+    openrouter_api_key: str = ""
+    # Modelo OpenRouter default. Lista completa: openrouter.ai/models
+    # Recomendados:
+    #   - "deepseek/deepseek-chat"           (V3, barato, calidad alta)
+    #   - "deepseek/deepseek-r1"             (reasoning, top calidad)
+    #   - "meta-llama/llama-3.3-70b-instruct:free"  (100% gratis)
+    #   - "qwen/qwen-2.5-72b-instruct"       (alternativa solida)
+    openrouter_model: str = "deepseek/deepseek-chat"
+    # Cual se usa primero. Default "anthropic" (mejor calidad, paid).
+    # Tambien soportado: "anthropic" | "openrouter" | "gemini" | "groq".
+    # Cadena de fallback automatica:
+    #   anthropic  -> anthropic -> openrouter -> gemini -> groq
+    #   openrouter -> openrouter -> anthropic -> gemini -> groq
+    #   gemini     -> gemini -> openrouter -> anthropic -> groq
+    #   groq       -> openrouter -> anthropic -> gemini -> groq (groq ult.)
+    primary_ai: str = "anthropic"
     groq_model: str = "llama-3.3-70b-versatile"
     anthropic_model: str = "claude-sonnet-4-6"
     # Modelo Gemini por defecto (Flash 2.0 GA - gratis 15 RPM / 1500 RPD).

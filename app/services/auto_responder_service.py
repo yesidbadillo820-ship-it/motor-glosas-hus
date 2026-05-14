@@ -201,6 +201,8 @@ async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
         groq_model=_cfg.groq_model,
         gemini_api_key=_cfg.gemini_api_key,
         gemini_model=_cfg.gemini_model,
+        openrouter_api_key=_cfg.openrouter_api_key,
+        openrouter_model=_cfg.openrouter_model,
     )
     resultado = await service.analizar(glosa_input, contexto_pdf="")
 

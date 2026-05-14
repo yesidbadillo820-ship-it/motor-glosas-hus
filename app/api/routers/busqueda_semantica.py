@@ -77,6 +77,8 @@ async def buscar(
         groq_model=cfg.groq_model,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
+        openrouter_api_key=cfg.openrouter_api_key,
+        openrouter_model=cfg.openrouter_model,
     )
 
     # Si no hay IA disponible, devolver la preselección por relevancia básica
