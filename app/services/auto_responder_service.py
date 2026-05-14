@@ -29,6 +29,13 @@ logger = logging.getLogger(__name__)
 _MAX_CONCURRENCIA = 2
 _SEMAFORO = asyncio.Semaphore(_MAX_CONCURRENCIA)
 
+# Python 3.11+: `asyncio.create_task` sólo guarda referencia débil a la
+# task. Si nadie más la referencia, el GC puede recolectarla antes de
+# que termine — perdiendo el resultado sin warning. Mantenemos un set
+# fuerte a nivel módulo y la sacamos al terminar (callback).
+# Ver https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+_BG_TASKS: set[asyncio.Task] = set()
+
 
 async def procesar_glosa_id(glosa_id: int) -> dict:
     """Procesa una sola glosa en una NUEVA sesión DB.
@@ -274,6 +281,33 @@ async def procesar_lote(glosa_ids: list[int]) -> dict:
     }
 
 
+def _registrar_bg_task(task: asyncio.Task, etiqueta: str) -> asyncio.Task:
+    """Guarda referencia fuerte a la task y loguea fallos no-capturados.
+
+    Sin esto, Python 3.11+ puede recolectar la task antes de que termine
+    porque create_task sólo guarda weakref. El callback la saca del set
+    cuando termina (éxito o error) y deja registro si lanzó excepción
+    no manejada — esos errores serían invisibles de otro modo.
+    """
+    _BG_TASKS.add(task)
+
+    def _on_done(t: asyncio.Task) -> None:
+        _BG_TASKS.discard(t)
+        if t.cancelled():
+            logger.warning(f"[AUTO-RESPONDER] Task {etiqueta} cancelada")
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.error(
+                f"[AUTO-RESPONDER] Task {etiqueta} terminó con excepción "
+                f"no capturada: {type(exc).__name__}: {exc}",
+                exc_info=exc,
+            )
+
+    task.add_done_callback(_on_done)
+    return task
+
+
 def lanzar_lote_background(glosa_ids: list[int]) -> None:
     """Crea una task asyncio que procesa el lote sin bloquear al caller.
 
@@ -285,7 +319,8 @@ def lanzar_lote_background(glosa_ids: list[int]) -> None:
         return
     try:
         loop = asyncio.get_event_loop()
-        loop.create_task(procesar_lote(glosa_ids))
+        task = loop.create_task(procesar_lote(glosa_ids))
+        _registrar_bg_task(task, f"procesar_lote({len(glosa_ids)})")
         logger.info(
             f"[AUTO-RESPONDER] Lote de {len(glosa_ids)} glosas encolado "
             "para auto-procesamiento"
@@ -304,8 +339,33 @@ async def procesar_lote_y_enviar_excel(
 
     Pensado para correr en background tras `/glosas/importar-recepcion`.
     Abre su propia sesión DB para el email — la del endpoint ya cerró.
+
+    Logging agresivo en cada checkpoint para que si falla en producción
+    Fly logs muestre exactamente dónde se cayó (lote IA, generación del
+    .xlsx, o envío SMTP).
     """
-    resultado_lote = await procesar_lote(glosa_ids)
+    logger.info(
+        f"[EXCEL-EMAIL] ➡️  start: glosa_ids={len(glosa_ids)}, "
+        f"excel_bytes={len(excel_original) if excel_original else 0}, "
+        f"resumen.total={resumen.get('total', '?')}"
+    )
+
+    try:
+        resultado_lote = await procesar_lote(glosa_ids)
+        logger.info(
+            f"[EXCEL-EMAIL] ✅ lote IA terminado: "
+            f"{resultado_lote.get('respondidas', 0)} respondidas, "
+            f"{resultado_lote.get('requieren_soportes', 0)} requieren soportes, "
+            f"{resultado_lote.get('errores', 0)} errores"
+        )
+    except Exception as e:
+        logger.error(
+            f"[EXCEL-EMAIL] ❌ procesar_lote crasheó: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        # Intentamos seguir con el envío del Excel original aunque la IA
+        # haya fallado — el gestor al menos recibe el archivo crudo.
+        resultado_lote = {"total": len(glosa_ids), "error_lote": str(e)[:200]}
 
     from app.database import SessionLocal
     from app.services.email_service import (
@@ -314,6 +374,7 @@ async def procesar_lote_y_enviar_excel(
 
     db_email = SessionLocal()
     try:
+        logger.info("[EXCEL-EMAIL] ➡️  llamando enviar_excel_recepcion_con_respuestas")
         envio = await enviar_excel_recepcion_con_respuestas(
             resumen=resumen,
             excel_original=excel_original,
@@ -321,9 +382,14 @@ async def procesar_lote_y_enviar_excel(
             db=db_email,
         )
         resultado_lote["excel_emails"] = envio
+        logger.info(
+            f"[EXCEL-EMAIL] ✅ envío terminó: {envio}"
+        )
     except Exception as e:
         logger.error(
-            f"[AUTO-RESPONDER] Falló el envío del Excel-respuesta: {e}"
+            f"[EXCEL-EMAIL] ❌ enviar_excel_recepcion_con_respuestas crasheó: "
+            f"{type(e).__name__}: {e}",
+            exc_info=True,
         )
         resultado_lote["excel_emails"] = {"error": str(e)[:200]}
     finally:
@@ -339,17 +405,34 @@ def lanzar_lote_y_enviar_excel_background(
     """Variante de `lanzar_lote_background` que, al terminar el lote,
     dispara el envío del Excel-respuesta a cada gestor."""
     if not glosa_ids:
+        logger.warning(
+            "[AUTO-RESPONDER] No se lanza lote+excel: glosa_ids vacío "
+            "(¿la importación no creó/actualizó ninguna glosa?)"
+        )
+        return
+    if not excel_original:
+        logger.warning(
+            "[AUTO-RESPONDER] No se lanza lote+excel: excel_original vacío "
+            "— se llamará al lote sin envío de Excel"
+        )
+        lanzar_lote_background(glosa_ids)
         return
     try:
         loop = asyncio.get_event_loop()
-        loop.create_task(
+        task = loop.create_task(
             procesar_lote_y_enviar_excel(glosa_ids, excel_original, resumen)
+        )
+        _registrar_bg_task(
+            task, f"procesar_lote_y_enviar_excel({len(glosa_ids)})",
         )
         logger.info(
             f"[AUTO-RESPONDER] Lote de {len(glosa_ids)} glosas encolado + "
-            "envío Excel-respuesta programado para al terminar"
+            f"envío Excel-respuesta programado para al terminar "
+            f"(excel={len(excel_original)} bytes)"
         )
     except Exception as e:
         logger.error(
-            f"[AUTO-RESPONDER] No se pudo lanzar lote+excel: {e}"
+            f"[AUTO-RESPONDER] No se pudo lanzar lote+excel: "
+            f"{type(e).__name__}: {e}",
+            exc_info=True,
         )

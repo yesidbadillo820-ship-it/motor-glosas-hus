@@ -526,21 +526,23 @@ async def enviar_excel_recepcion_con_respuestas(
 ) -> dict:
     """Envía el Excel original + respuestas IA a cada gestor.
 
-    Cada gestor recibe el archivo completo (todas las filas) con las
-    suyas resaltadas en amarillo. Además, ALERTAS_EMAIL recibe una
-    copia broadcast sin resaltado para la coordinación.
+    Orden de envío:
+      1. PRIMERO el broadcast a ALERTAS_EMAIL (sin resaltado) — así
+         coordinación siempre recibe una copia aunque después fallen
+         las generaciones individuales por gestor.
+      2. Luego un correo por cada gestor con su nombre resaltado.
 
-    Retorna {'destinatarios', 'enviados', 'gestores_atendidos'}.
+    Retorna {'destinatarios', 'enviados', 'gestores_atendidos', 'broadcast_ok'}.
     """
     cfg = get_settings()
     if not cfg.smtp_user or not cfg.smtp_password:
         logger.warning(
-            "Excel-respuesta no enviado: SMTP_USER/SMTP_PASSWORD vacíos"
+            "[EXCEL-EMAIL] no enviado: SMTP_USER/SMTP_PASSWORD vacíos"
         )
         return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
 
     if not excel_original:
-        logger.warning("Excel-respuesta no enviado: archivo original vacío")
+        logger.warning("[EXCEL-EMAIL] no enviado: archivo original vacío")
         return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
 
     # Imports diferidos para evitar ciclo email_service ↔ recepcion_*
@@ -550,14 +552,23 @@ async def enviar_excel_recepcion_con_respuestas(
     )
 
     respuestas_por_clave = construir_respuestas_por_clave(db, list(glosa_ids or []))
+    logger.info(
+        f"[EXCEL-EMAIL] respuestas_por_clave: {len(respuestas_por_clave)} "
+        f"glosas con dictamen persistido / {len(glosa_ids or [])} pedidas"
+    )
     if not respuestas_por_clave:
         logger.info(
-            "Excel-respuesta: sin glosas auto-procesadas para anotar — "
+            "[EXCEL-EMAIL] sin glosas auto-procesadas para anotar — "
             "se envía Excel original sin columnas IA."
         )
 
     por_gestor = resumen.get("por_gestor", {}) or {}
     mapa = _mapear_gestor_a_emails(db)
+    logger.info(
+        f"[EXCEL-EMAIL] por_gestor={len(por_gestor)} gestores en el lote, "
+        f"mapa_usuarios={len(mapa)} usuarios activos con email, "
+        f"alertas_email='{cfg.alertas_email}'"
+    )
     total = resumen.get("total", 0)
     fecha = datetime.now().strftime("%Y-%m-%d")
     archivo_base = f"glosas_recepcion_{fecha}.xlsx"
@@ -565,16 +576,71 @@ async def enviar_excel_recepcion_con_respuestas(
     enviados = 0
     destinatarios_unicos: set[str] = set()
     gestores_atendidos = 0
+    broadcast_ok = False
 
+    # ── 1. BROADCAST a ALERTAS_EMAIL primero ────────────────────────
+    # Lo hacemos antes del loop por-gestor para garantizar que al menos
+    # coordinación reciba una copia aunque después falle algo.
+    if cfg.alertas_email:
+        try:
+            logger.info("[EXCEL-EMAIL] generando broadcast sin resaltado...")
+            xlsx_broadcast = generar_excel_con_respuestas(
+                excel_original, respuestas_por_clave, gestor_destacar=None,
+            )
+            logger.info(
+                f"[EXCEL-EMAIL] broadcast generado: {len(xlsx_broadcast)} bytes"
+            )
+            asunto_bc = (
+                f"📋 Recepción HUS — {total} glosas procesadas por la IA (copia coordinación)"
+            )
+            contenido_bc = """
+            <p style="color:#374151;font-size:14px;line-height:1.6">
+                Copia de seguimiento para la coordinación. El Excel adjunto trae el archivo
+                de recepción del día con las respuestas IA en las últimas columnas.
+            </p>
+            <p style="color:#6b7280;font-size:12px">
+                Cada gestor recibió su propio correo con su nombre resaltado en amarillo.
+            </p>
+            """
+            html_bc = _build_html_base(asunto_bc, contenido_bc)
+            adj_bc: Adjunto = (
+                f"glosas_recepcion_{fecha}_coordinacion.xlsx",
+                xlsx_broadcast,
+                _XLSX_MIME_SUBTYPE,
+            )
+            for d in (e.strip() for e in cfg.alertas_email.split(",") if e.strip()):
+                destinatarios_unicos.add(d.lower())
+                if await enviar_email(d, asunto_bc, html_bc, adjuntos=[adj_bc]):
+                    enviados += 1
+                    broadcast_ok = True
+            logger.info(
+                f"[EXCEL-EMAIL] broadcast: enviados={enviados}, ok={broadcast_ok}"
+            )
+        except Exception as e:
+            logger.error(
+                f"[EXCEL-EMAIL] broadcast coordinación falló: "
+                f"{type(e).__name__}: {e}",
+                exc_info=True,
+            )
+    else:
+        logger.warning(
+            "[EXCEL-EMAIL] ALERTAS_EMAIL vacío — no hay broadcast de respaldo"
+        )
+
+    # ── 2. Loop por gestor ──────────────────────────────────────────
     for nombre_gestor, filas in sorted(por_gestor.items()):
         emails = _emails_para_gestor(nombre_gestor, mapa)
         if not emails:
             logger.info(
-                f"Gestor '{nombre_gestor}' sin email asociado — su Excel "
-                "no se envía por correo (queda solo en la app)."
+                f"[EXCEL-EMAIL] Gestor '{nombre_gestor}' ({len(filas)} glosas) "
+                f"sin email asociado en UsuarioRecord — su Excel queda solo "
+                f"en la app. Nombres en mapa: {list(mapa.keys())[:5]}..."
             )
             continue
         gestores_atendidos += 1
+        logger.info(
+            f"[EXCEL-EMAIL] Gestor '{nombre_gestor}' → emails={emails}"
+        )
 
         try:
             xlsx_bytes = generar_excel_con_respuestas(
@@ -584,8 +650,9 @@ async def enviar_excel_recepcion_con_respuestas(
             )
         except Exception as e:
             logger.error(
-                f"Excel-respuesta: falló generación para gestor "
-                f"'{nombre_gestor}': {e}"
+                f"[EXCEL-EMAIL] generación falló para gestor "
+                f"'{nombre_gestor}': {type(e).__name__}: {e}",
+                exc_info=True,
             )
             continue
 
@@ -642,44 +709,14 @@ async def enviar_excel_recepcion_con_respuestas(
             if await enviar_email(email, asunto, html, adjuntos=[adjunto]):
                 enviados += 1
 
-    # Copia broadcast a ALERTAS_EMAIL (sin resaltado) — para coordinación.
-    if cfg.alertas_email:
-        try:
-            xlsx_broadcast = generar_excel_con_respuestas(
-                excel_original, respuestas_por_clave, gestor_destacar=None,
-            )
-            asunto_bc = (
-                f"📋 Recepción HUS — {total} glosas procesadas por la IA (copia coordinación)"
-            )
-            contenido_bc = """
-            <p style="color:#374151;font-size:14px;line-height:1.6">
-                Copia de seguimiento para la coordinación. El Excel adjunto trae el archivo
-                de recepción del día con las respuestas IA en las últimas columnas.
-            </p>
-            <p style="color:#6b7280;font-size:12px">
-                Cada gestor recibió su propio correo con su nombre resaltado en amarillo.
-            </p>
-            """
-            html_bc = _build_html_base(asunto_bc, contenido_bc)
-            adj_bc: Adjunto = (
-                f"glosas_recepcion_{fecha}_coordinacion.xlsx",
-                xlsx_broadcast,
-                _XLSX_MIME_SUBTYPE,
-            )
-            for d in (e.strip() for e in cfg.alertas_email.split(",") if e.strip()):
-                destinatarios_unicos.add(d.lower())
-                if await enviar_email(d, asunto_bc, html_bc, adjuntos=[adj_bc]):
-                    enviados += 1
-        except Exception as e:
-            logger.error(f"Excel-respuesta broadcast coordinación falló: {e}")
-
     logger.info(
-        f"Excel-respuesta: {enviados} correos enviados a "
-        f"{len(destinatarios_unicos)} destinatarios "
-        f"({gestores_atendidos} gestor/es con email)"
+        f"[EXCEL-EMAIL] ✅ flujo terminó: enviados={enviados}, "
+        f"destinatarios_unicos={len(destinatarios_unicos)}, "
+        f"gestores_atendidos={gestores_atendidos}, broadcast_ok={broadcast_ok}"
     )
     return {
         "destinatarios": len(destinatarios_unicos),
         "enviados": enviados,
         "gestores_atendidos": gestores_atendidos,
+        "broadcast_ok": broadcast_ok,
     }
