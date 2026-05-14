@@ -114,6 +114,33 @@ def init_sentry() -> bool:
         event_level=logging.ERROR,  # nivel mínimo para crear event en Sentry
     )
 
+    # Endpoints ruidosos que NO queremos en performance traces — los
+    # consume el load balancer y monitoring cada 30s. Si los muestreamos
+    # al 10%, en 1 mes son ~8K eventos solo de health-checks que se
+    # comen el quota free (5K/mes).
+    _ENDPOINTS_RUIDOSOS = {
+        "/health",
+        "/sistema/version",
+        "/sistema/ia-presence",
+        "/notificaciones/badge",
+        "/analytics/",
+        "/glosas/alertas",
+        "/metrics",
+        "/favicon.ico",
+    }
+
+    def traces_sampler(sampling_context: dict) -> float:
+        """Decide qué tracear. Excluye endpoints ruidosos al 100% y
+        respeta el sample_rate base para el resto."""
+        request = sampling_context.get("asgi_scope") or {}
+        path = request.get("path") or ""
+        if any(path == p or path.startswith(p + "?") for p in _ENDPOINTS_RUIDOSOS):
+            return 0.0  # nunca tracear
+        # WordPress probe spam (wp-admin/install.php, etc) tampoco vale la pena
+        if path.startswith("/wp-") or path.startswith("/.env"):
+            return 0.0
+        return traces_sample_rate
+
     # Hook para filtrar información sensible antes de enviar
     def before_send(event, hint):
         # Redactar headers de autorización / cookies
@@ -139,7 +166,9 @@ def init_sentry() -> bool:
             dsn=dsn,
             environment=environment,
             release=release,
-            traces_sample_rate=traces_sample_rate,
+            # traces_sampler tiene PREFERENCIA sobre traces_sample_rate
+            # cuando ambos están — nos permite excluir endpoints ruidosos.
+            traces_sampler=traces_sampler,
             profiles_sample_rate=0.0,  # desactivado por defecto (overhead)
             send_default_pii=False,    # no enviar PII por defecto
             integrations=[

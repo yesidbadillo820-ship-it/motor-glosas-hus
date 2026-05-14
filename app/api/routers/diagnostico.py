@@ -352,6 +352,48 @@ def diagnostico_completo(
             },
         }
 
+    # ─── Sentry (error tracking) ──────────────────────────────────
+    sentry_dsn = os.getenv("SENTRY_DSN", "")
+    if not sentry_dsn:
+        out["secciones"]["sentry"] = {
+            "estado": "warning",
+            "mensaje": (
+                "SENTRY_DSN no configurado — los errores en producción "
+                "se pierden silenciosamente. Setup en 5 min: crear cuenta "
+                "en sentry.io (free 5K events/mes), copiar DSN del "
+                "proyecto y `fly secrets set SENTRY_DSN=https://...`"
+            ),
+            "data": {},
+        }
+    else:
+        # Verificación liviana: ¿el SDK quedó inicializado con un cliente activo?
+        sentry_activo = False
+        cliente_info = ""
+        try:
+            import sentry_sdk
+            cliente = sentry_sdk.Hub.current.client
+            if cliente and cliente.dsn:
+                sentry_activo = True
+                # Sólo mostramos el host del DSN (sin la key)
+                from urllib.parse import urlparse
+                host = urlparse(cliente.dsn).hostname or "?"
+                cliente_info = f"host={host} env={cliente.options.get('environment', '?')}"
+        except Exception as _es:
+            cliente_info = f"verif. falló: {str(_es)[:80]}"
+
+        out["secciones"]["sentry"] = {
+            "estado": "ok" if sentry_activo else "warning",
+            "mensaje": (
+                f"Sentry activo · {cliente_info}" if sentry_activo
+                else f"SENTRY_DSN configurado pero el cliente no quedó activo ({cliente_info})"
+            ),
+            "data": {
+                "dsn_prefix": sentry_dsn[:30] + "..." if len(sentry_dsn) > 30 else sentry_dsn,
+                "environment": os.getenv("SENTRY_ENVIRONMENT", "production"),
+                "traces_sample_rate": os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"),
+            },
+        }
+
     # ─── Lotes de importación recientes (últimos 7 días) ──────────
     try:
         umbral_lote = datetime.now(timezone.utc) - timedelta(days=7)
