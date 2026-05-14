@@ -257,6 +257,26 @@ async def procesar_lote(glosa_ids: list[int]) -> dict:
         f"ya_procesadas={ya_procesadas} errores={errores}"
     )
 
+    # PostHog: medir conversión real del auto-responder.
+    try:
+        from app.services.posthog_service import capture
+        capture(
+            event="lote_auto_responder_completo",
+            distinct_id="auto-responder",
+            properties={
+                "total": len(glosa_ids),
+                "respondidas": respondidas,
+                "requieren_soportes": req_soportes,
+                "ya_procesadas": ya_procesadas,
+                "errores": errores,
+                "tasa_respondidas": (
+                    round(respondidas / len(glosa_ids), 3) if glosa_ids else 0
+                ),
+            },
+        )
+    except Exception:
+        pass
+
     # Memoria (Render Free 512 MB): el `detalle` puede contener referencias
     # a dictámenes HTML grandes (varios KB c/u) × N glosas. En lotes de
     # 50-100 glosas eso son varios MB que no se liberan hasta que la
