@@ -1,13 +1,20 @@
 import smtplib
+from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Sequence, Tuple
 
 from app.core.config import get_settings
 from app.core.logging_utils import logger
 
 _executor = ThreadPoolExecutor(max_workers=2)
+
+# Tipo: lista de (nombre_archivo, bytes, mime_subtype). mime_subtype
+# es opcional — para .xlsx usar
+# "vnd.openxmlformats-officedocument.spreadsheetml.sheet".
+Adjunto = Tuple[str, bytes, Optional[str]]
 
 
 def _build_html_base(titulo: str, contenido: str) -> str:
@@ -41,34 +48,68 @@ def _build_html_base(titulo: str, contenido: str) -> str:
 """
 
 
-def _enviar_sync(destinatario: str, asunto: str, html: str) -> bool:
+def _enviar_sync(
+    destinatario: str,
+    asunto: str,
+    html: str,
+    adjuntos: Optional[Sequence[Adjunto]] = None,
+) -> bool:
     cfg = get_settings()
     if not cfg.smtp_user or not cfg.smtp_password:
         logger.warning("Email no configurado: SMTP_USER o SMTP_PASSWORD vacíos")
         return False
-    
+
     try:
-        msg = MIMEMultipart("alternative")
+        # Si hay adjuntos usamos multipart/mixed con el cuerpo HTML
+        # anidado como multipart/alternative; sin adjuntos basta el
+        # alternative directo (más simple para clientes antiguos).
+        if adjuntos:
+            msg = MIMEMultipart("mixed")
+            cuerpo = MIMEMultipart("alternative")
+            cuerpo.attach(MIMEText(html, "html"))
+            msg.attach(cuerpo)
+            for nombre, contenido, subtype in adjuntos:
+                if subtype:
+                    parte = MIMEApplication(contenido, _subtype=subtype)
+                else:
+                    parte = MIMEApplication(contenido)
+                parte.add_header(
+                    "Content-Disposition", "attachment", filename=nombre,
+                )
+                msg.attach(parte)
+        else:
+            msg = MIMEMultipart("alternative")
+            msg.attach(MIMEText(html, "html"))
+
         msg["Subject"] = asunto
         msg["From"] = cfg.smtp_user
         msg["To"] = destinatario
-        msg.attach(MIMEText(html, "html"))
-        
+
         with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port, timeout=30) as server:
             server.starttls()
             server.login(cfg.smtp_user, cfg.smtp_password)
             server.send_message(msg)
-        
-        logger.info(f"Email enviado a {destinatario}: {asunto}")
+
+        logger.info(
+            f"Email enviado a {destinatario}: {asunto}"
+            + (f" (con {len(adjuntos)} adjunto/s)" if adjuntos else "")
+        )
         return True
     except Exception as e:
         logger.error(f"Error enviando email a {destinatario}: {e}")
         return False
 
 
-async def enviar_email(destinatario: str, asunto: str, html: str) -> bool:
+async def enviar_email(
+    destinatario: str,
+    asunto: str,
+    html: str,
+    adjuntos: Optional[Sequence[Adjunto]] = None,
+) -> bool:
     loop = __import__("asyncio").get_event_loop()
-    return await loop.run_in_executor(_executor, _enviar_sync, destinatario, asunto, html)
+    return await loop.run_in_executor(
+        _executor, _enviar_sync, destinatario, asunto, html, adjuntos,
+    )
 
 
 async def notificar_alerta_vencimiento(eps: str, dias_restantes: int, valor: float, destinatario: str):
@@ -435,3 +476,210 @@ async def enviar_resumen_semanal(destinatario: str, metricas: dict):
     </div>
     """
     await enviar_email(destinatario, asunto, _build_html_base(asunto, contenido))
+
+
+_XLSX_MIME_SUBTYPE = (
+    "vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+
+def _mapear_gestor_a_emails(db) -> dict[str, list[str]]:
+    """Devuelve {nombre_gestor_upper: [emails]} desde UsuarioRecord
+    activos. Sirve para dirigir el Excel-respuesta al gestor concreto.
+    """
+    if db is None:
+        return {}
+    try:
+        from app.models.db import UsuarioRecord
+        usuarios = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all()
+        out: dict[str, list[str]] = {}
+        for u in usuarios:
+            if not u.nombre or not u.email:
+                continue
+            nombre = u.nombre.strip().upper()
+            out.setdefault(nombre, []).append(u.email.strip().lower())
+        return out
+    except Exception as e:
+        logger.warning(f"_mapear_gestor_a_emails falló: {e}")
+        return {}
+
+
+def _emails_para_gestor(
+    nombre_gestor: str, mapa_gestor_emails: dict[str, list[str]]
+) -> list[str]:
+    """Match flexible: igualdad, contains en ambos sentidos."""
+    g = (nombre_gestor or "").strip().upper()
+    if not g:
+        return []
+    candidatos: set[str] = set()
+    for nombre, emails in mapa_gestor_emails.items():
+        if nombre == g or g in nombre or nombre in g:
+            candidatos.update(emails)
+    return sorted(candidatos)
+
+
+async def enviar_excel_recepcion_con_respuestas(
+    resumen: dict,
+    excel_original: bytes,
+    glosa_ids: list,
+    db,
+) -> dict:
+    """Envía el Excel original + respuestas IA a cada gestor.
+
+    Cada gestor recibe el archivo completo (todas las filas) con las
+    suyas resaltadas en amarillo. Además, ALERTAS_EMAIL recibe una
+    copia broadcast sin resaltado para la coordinación.
+
+    Retorna {'destinatarios', 'enviados', 'gestores_atendidos'}.
+    """
+    cfg = get_settings()
+    if not cfg.smtp_user or not cfg.smtp_password:
+        logger.warning(
+            "Excel-respuesta no enviado: SMTP_USER/SMTP_PASSWORD vacíos"
+        )
+        return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
+
+    if not excel_original:
+        logger.warning("Excel-respuesta no enviado: archivo original vacío")
+        return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
+
+    # Imports diferidos para evitar ciclo email_service ↔ recepcion_*
+    from app.services.recepcion_excel_response import (
+        construir_respuestas_por_clave,
+        generar_excel_con_respuestas,
+    )
+
+    respuestas_por_clave = construir_respuestas_por_clave(db, list(glosa_ids or []))
+    if not respuestas_por_clave:
+        logger.info(
+            "Excel-respuesta: sin glosas auto-procesadas para anotar — "
+            "se envía Excel original sin columnas IA."
+        )
+
+    por_gestor = resumen.get("por_gestor", {}) or {}
+    mapa = _mapear_gestor_a_emails(db)
+    total = resumen.get("total", 0)
+    fecha = datetime.now().strftime("%Y-%m-%d")
+    archivo_base = f"glosas_recepcion_{fecha}.xlsx"
+
+    enviados = 0
+    destinatarios_unicos: set[str] = set()
+    gestores_atendidos = 0
+
+    for nombre_gestor, filas in sorted(por_gestor.items()):
+        emails = _emails_para_gestor(nombre_gestor, mapa)
+        if not emails:
+            logger.info(
+                f"Gestor '{nombre_gestor}' sin email asociado — su Excel "
+                "no se envía por correo (queda solo en la app)."
+            )
+            continue
+        gestores_atendidos += 1
+
+        try:
+            xlsx_bytes = generar_excel_con_respuestas(
+                excel_original,
+                respuestas_por_clave,
+                gestor_destacar=nombre_gestor,
+            )
+        except Exception as e:
+            logger.error(
+                f"Excel-respuesta: falló generación para gestor "
+                f"'{nombre_gestor}': {e}"
+            )
+            continue
+
+        n_filas = len(filas)
+        n_respondidas = sum(
+            1 for f in filas
+            if respuestas_por_clave.get((
+                (f.get("factura") or "").strip().upper(),
+                (f.get("consecutivo_dgh") or "").strip().upper(),
+            ), {}).get("estado", "").upper() == "RESPONDIDA"
+        )
+        n_requieren = sum(
+            1 for f in filas
+            if respuestas_por_clave.get((
+                (f.get("factura") or "").strip().upper(),
+                (f.get("consecutivo_dgh") or "").strip().upper(),
+            ), {}).get("estado", "").upper() == "REQUIERE_SOPORTES"
+        )
+
+        asunto = (
+            f"📋 Recepción HUS — {n_filas} glosas para {nombre_gestor} "
+            f"(IA respondió {n_respondidas}, manual {n_requieren})"
+        )
+        contenido = f"""
+        <p style="color:#374151;font-size:14px;line-height:1.6">
+            Hola <b>{nombre_gestor}</b>, adjuntamos el Excel de recepción del día.
+        </p>
+        <div style="background:#eff6ff;border-radius:8px;padding:15px;margin:15px 0;border-left:3px solid #2563eb">
+            <p style="margin:0 0 8px;font-size:14px;color:#1e40af;font-weight:600">
+                🤖 La IA ya procesó tus glosas
+            </p>
+            <ul style="margin:0;padding-left:20px;font-size:13px;color:#374151;line-height:1.6">
+                <li><b>{n_filas}</b> glosas asignadas a ti (resaltadas en amarillo en la columna GESTOR)</li>
+                <li><b>{n_respondidas}</b> con respuesta IA lista (estado <span style="background:#dcfce7;padding:1px 6px;border-radius:4px;color:#166534;font-weight:600">RESPONDIDA</span>)</li>
+                <li><b>{n_requieren}</b> requieren tu revisión manual + PDFs (estado <span style="background:#fee2e2;padding:1px 6px;border-radius:4px;color:#991b1b;font-weight:600">REQUIERE_SOPORTES</span>)</li>
+            </ul>
+        </div>
+        <p style="color:#374151;font-size:13px;line-height:1.6">
+            Abrí el archivo adjunto: las nuevas columnas <b>RESPUESTA IA</b>, <b>ESTADO IA</b> e
+            <b>ID GLOSA</b> al final tienen todo lo que la IA generó. Las que dicen
+            <i>REQUIERE_SOPORTES</i> son las que necesitan que cargues PDFs y le des
+            "Re-analizar" en la app antes de radicar.
+        </p>
+        <p style="margin-top:25px;padding:15px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
+            🔗 <a href="https://motor-glosas-hus.fly.dev/" style="color:#92400e;font-weight:600">Abrir Motor Glosas HUS</a>
+            — revisá los borradores y radicá los que estén OK.
+        </p>
+        """
+        html = _build_html_base(asunto, contenido)
+        adjunto: Adjunto = (archivo_base, xlsx_bytes, _XLSX_MIME_SUBTYPE)
+
+        for email in emails:
+            destinatarios_unicos.add(email)
+            if await enviar_email(email, asunto, html, adjuntos=[adjunto]):
+                enviados += 1
+
+    # Copia broadcast a ALERTAS_EMAIL (sin resaltado) — para coordinación.
+    if cfg.alertas_email:
+        try:
+            xlsx_broadcast = generar_excel_con_respuestas(
+                excel_original, respuestas_por_clave, gestor_destacar=None,
+            )
+            asunto_bc = (
+                f"📋 Recepción HUS — {total} glosas procesadas por la IA (copia coordinación)"
+            )
+            contenido_bc = """
+            <p style="color:#374151;font-size:14px;line-height:1.6">
+                Copia de seguimiento para la coordinación. El Excel adjunto trae el archivo
+                de recepción del día con las respuestas IA en las últimas columnas.
+            </p>
+            <p style="color:#6b7280;font-size:12px">
+                Cada gestor recibió su propio correo con su nombre resaltado en amarillo.
+            </p>
+            """
+            html_bc = _build_html_base(asunto_bc, contenido_bc)
+            adj_bc: Adjunto = (
+                f"glosas_recepcion_{fecha}_coordinacion.xlsx",
+                xlsx_broadcast,
+                _XLSX_MIME_SUBTYPE,
+            )
+            for d in (e.strip() for e in cfg.alertas_email.split(",") if e.strip()):
+                destinatarios_unicos.add(d.lower())
+                if await enviar_email(d, asunto_bc, html_bc, adjuntos=[adj_bc]):
+                    enviados += 1
+        except Exception as e:
+            logger.error(f"Excel-respuesta broadcast coordinación falló: {e}")
+
+    logger.info(
+        f"Excel-respuesta: {enviados} correos enviados a "
+        f"{len(destinatarios_unicos)} destinatarios "
+        f"({gestores_atendidos} gestor/es con email)"
+    )
+    return {
+        "destinatarios": len(destinatarios_unicos),
+        "enviados": enviados,
+        "gestores_atendidos": gestores_atendidos,
+    }

@@ -2277,6 +2277,14 @@ class GlosaService:
             logger.debug(f"[AUTO-PILOT] decidir_auto_envio falló: {_e_ap}")
             auto_pilot = None
 
+        # Guard-rail: recortar todo lo que venga después del cierre
+        # canónico "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA." aunque
+        # la IA haya ignorado la regla del system prompt.
+        from app.services.dictamen_postprocesor import (
+            truncar_despues_de_levantamiento,
+        )
+        dictamen = truncar_despues_de_levantamiento(dictamen)
+
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
