@@ -2333,6 +2333,37 @@ class GlosaService:
             _gc.collect()
         except Exception:
             pass
+
+        # PostHog event tracking. Best-effort, no falla si está down.
+        # OJO: solo enviamos métricas, NUNCA texto del paciente / dictamen.
+        try:
+            from app.services.posthog_service import capture
+            capture(
+                event="glosa_analizada",
+                distinct_id=hint_gestor or "anonimo",
+                properties={
+                    "eps": (data.eps or "").upper()[:80],
+                    "codigo_glosa": codigo_det,
+                    "codigo_respuesta": cod_res,
+                    "tipo_glosa": tipo_glosa,
+                    "modelo_ia": modelo_usado,
+                    "score": score,
+                    "es_extemporanea": bool(es_extemporanea),
+                    "es_ratificacion": bool(es_ratificacion),
+                    "tiene_pdf": bool(tiene_pdf),
+                    "valor_objetado_bucket": (
+                        "<100K" if valor_raw < 100_000
+                        else "<1M" if valor_raw < 1_000_000
+                        else "<10M" if valor_raw < 10_000_000
+                        else ">=10M"
+                    ),
+                    "primary_ai_config": self.primary_ai,
+                    "modo_resp": modo_resp,
+                },
+            )
+        except Exception:
+            pass  # tracking no debe romper el flujo
+
         return resultado
 
     def _calcular_score(self, tipo_glosa: str, es_extemporanea: bool, es_ratificacion: bool,

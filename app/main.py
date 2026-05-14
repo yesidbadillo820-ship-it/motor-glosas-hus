@@ -28,10 +28,15 @@ from app.core.config import get_settings, check_security_config
 from app.auth import get_password_hash
 from app.core.logging_utils import logger
 from app.core.sentry_init import init_sentry
+from app.services.posthog_service import init_posthog
 
 # Sentry debe inicializarse ANTES de cualquier import que pueda fallar.
 # Si SENTRY_DSN no está definido, no hace nada.
 init_sentry()
+
+# PostHog product analytics — server-side event tracking.
+# Si POSTHOG_API_KEY no está definida, no hace nada.
+init_posthog()
 
 
 # Ronda 50 Paso 9: parsers extraídos a app/utils/parsers_glosa.py

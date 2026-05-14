@@ -26,6 +26,10 @@ pyotp==2.9.0
 qrcode[pil]==8.2
 cryptography>=42.0.0
 sentry-sdk[fastapi]==2.19.2
+# PostHog (product analytics) — tracking de eventos server-side para
+# ver qué gestores usan qué features y dónde se traban. Free tier:
+# 1M eventos/mes. https://posthog.com/pricing
+posthog==3.7.4
 feedparser==6.0.11
 pywebpush==2.0.0
 psutil==6.1.1

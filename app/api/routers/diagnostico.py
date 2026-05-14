@@ -394,6 +394,40 @@ def diagnostico_completo(
             },
         }
 
+    # ─── PostHog (product analytics) ──────────────────────────────
+    posthog_key = os.getenv("POSTHOG_API_KEY", "")
+    if not posthog_key:
+        out["secciones"]["posthog"] = {
+            "estado": "warning",
+            "mensaje": (
+                "POSTHOG_API_KEY no configurada — no estamos midiendo "
+                "qué gestores usan qué features ni dónde se traban. "
+                "Setup en 3 min: posthog.com (free 1M eventos/mes), "
+                "Project Settings → API Key → "
+                "`fly secrets set POSTHOG_API_KEY=phc_...`"
+            ),
+            "data": {},
+        }
+    else:
+        try:
+            from app.services.posthog_service import disponible as ph_disponible
+            activo = ph_disponible()
+        except Exception:
+            activo = False
+        out["secciones"]["posthog"] = {
+            "estado": "ok" if activo else "warning",
+            "mensaje": (
+                f"PostHog activo · trackeando glosa_analizada, "
+                f"recepcion_importada, lote_auto_responder_completo"
+                if activo
+                else "POSTHOG_API_KEY configurada pero cliente no quedó activo"
+            ),
+            "data": {
+                "key_prefix": posthog_key[:10],
+                "host": os.getenv("POSTHOG_HOST", "https://us.posthog.com"),
+            },
+        }
+
     # ─── Lotes de importación recientes (últimos 7 días) ──────────
     try:
         umbral_lote = datetime.now(timezone.utc) - timedelta(days=7)

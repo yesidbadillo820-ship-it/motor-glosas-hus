@@ -4785,6 +4785,28 @@ async def importar_recepcion(
         resumen_dict["correos_enviados"] = 0
         resumen_dict["email_error"] = str(e)
 
+    # PostHog tracking — recepción importada. Best-effort.
+    try:
+        from app.services.posthog_service import capture
+        capture(
+            event="recepcion_importada",
+            distinct_id=str(getattr(current_user, "id", "anonimo")),
+            properties={
+                "total_glosas": resumen_dict.get("total", 0),
+                "nuevas": resumen_dict.get("creadas", 0),
+                "actualizadas": resumen_dict.get("actualizadas", 0),
+                "duplicadas": resumen_dict.get("duplicadas", 0),
+                "ratificadas": resumen_dict.get("ratificadas", 0),
+                "extemporaneas": resumen_dict.get("extemporaneas", 0),
+                "gestores_afectados": len(resumen_dict.get("por_gestor", {})),
+                "rojo": resumen_dict.get("semaforo", {}).get("ROJO", 0),
+                "negro": resumen_dict.get("semaforo", {}).get("NEGRO", 0),
+                "auto_respuesta_lanzada": resumen_dict.get("auto_respuesta_lanzada", False),
+            },
+        )
+    except Exception:
+        pass
+
     return resumen_dict
 
 
