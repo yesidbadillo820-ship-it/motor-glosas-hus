@@ -174,6 +174,8 @@ async def enviar_mensaje(
                 groq_model=cfg.groq_model,
                 gemini_api_key=cfg.gemini_api_key,
                 gemini_model=cfg.gemini_model,
+                openrouter_api_key=cfg.openrouter_api_key,
+                openrouter_model=cfg.openrouter_model,
             )
             nuevo = await svc.refinar_dictamen(
                 dictamen_actual_html=glosa.dictamen or "",
