@@ -17,9 +17,13 @@ import re
 
 # Ancla: "SE SOLICITA [RESPETUOSAMENTE] [EL RECONOCIMIENTO Y] EL
 # LEVANTAMIENTO [ÍNTEGRO] [Y EL X] DE LA GLOSA". Acepta variantes con
-# acentos, mayús/minús y palabras intermedias hasta ~80 chars.
+# acentos, mayús/minús, puntuación intermedia (—, —, comas, paréntesis)
+# y tags HTML hasta ~150 chars entre cada palabra ancla. Usamos [\s\S]
+# en vez de [\s\w,] para tolerar cualquier carácter, incluyendo guiones
+# largos, comillas tipográficas, y `<br/>` que pueda haber quedado de
+# pasos previos del pipeline.
 _CIERRE_ANCLA = re.compile(
-    r"\bSE\s+SOLICITA\b[\s\w,]{0,80}?\bLEVANTAMIENTO\b[\s\w,]{0,80}?\bDE\s+LA\s+GLOSA\b",
+    r"\bSE\s+SOLICITA\b[\s\S]{0,150}?\bLEVANTAMIENTO\b[\s\S]{0,150}?\bDE\s+LA\s+GLOSA\b",
     re.IGNORECASE | re.UNICODE,
 )
 

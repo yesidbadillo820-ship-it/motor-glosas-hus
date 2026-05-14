@@ -2137,6 +2137,16 @@ class GlosaService:
             if modo_resp != "auditoria_previa":
                 arg_ia = _suavizar_tono(arg_ia)
 
+            # Guard-rail: recortar coda procesal después del cierre canónico
+            # ("SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA..."). Se aplica AQUÍ
+            # — sobre el texto plano del argumento, antes de envolverlo en
+            # HTML — para no romper la estructura del dictamen ni cortar los
+            # bloques posteriores (Servicio/Contrato/Tarifa/Normativa).
+            from app.services.dictamen_postprocesor import (
+                truncar_despues_de_levantamiento,
+            )
+            arg_ia = truncar_despues_de_levantamiento(arg_ia)
+
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
@@ -2276,14 +2286,6 @@ class GlosaService:
         except Exception as _e_ap:
             logger.debug(f"[AUTO-PILOT] decidir_auto_envio falló: {_e_ap}")
             auto_pilot = None
-
-        # Guard-rail: recortar todo lo que venga después del cierre
-        # canónico "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA." aunque
-        # la IA haya ignorado la regla del system prompt.
-        from app.services.dictamen_postprocesor import (
-            truncar_despues_de_levantamiento,
-        )
-        dictamen = truncar_despues_de_levantamiento(dictamen)
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
