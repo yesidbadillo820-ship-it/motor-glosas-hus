@@ -304,6 +304,49 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
         return json.dumps({"error": str(e)[:200]})
 
 
+def _sanear_content(content):
+    """Sanea el `content` de un mensaje para Anthropic.
+
+    Devuelve un content válido (str no vacío o list de bloques no vacía)
+    o None si el mensaje quedaría sin contenido y debe descartarse.
+
+    Anthropic devuelve 400 ("text content blocks must be non-empty") si
+    se envía un bloque text con texto vacío/whitespace, un content string
+    vacío, o un tool_result sin contenido.
+    """
+    if isinstance(content, str):
+        return content if content.strip() else None
+
+    if isinstance(content, list):
+        bloques = []
+        for b in content:
+            if not isinstance(b, dict):
+                if str(b).strip():
+                    bloques.append({"type": "text", "text": str(b)})
+                continue
+            tipo = b.get("type")
+            if tipo == "text":
+                if (b.get("text") or "").strip():
+                    bloques.append(b)
+                # texto vacío → se descarta el bloque
+            elif tipo == "tool_result":
+                cont = b.get("content")
+                if isinstance(cont, str) and not cont.strip():
+                    b = {**b, "content": "(sin resultado)"}
+                elif cont in (None, [], ""):
+                    b = {**b, "content": "(sin resultado)"}
+                bloques.append(b)
+            else:
+                # tool_use, image, etc. se conservan tal cual
+                bloques.append(b)
+        return bloques or None
+
+    if content is None:
+        return None
+    # Cualquier otro tipo: convertir a texto si no es vacío
+    return str(content) if str(content).strip() else None
+
+
 async def chat_con_asistente(
     mensajes: list[dict],
     db,
@@ -339,12 +382,19 @@ async def chat_con_asistente(
         "content-type": "application/json",
     }
 
-    # Convertir historial a formato Anthropic
-    msgs_anthropic = [
-        {"role": m["role"], "content": m["content"]}
-        for m in mensajes
-        if m.get("role") in ("user", "assistant") and m.get("content")
-    ]
+    # Convertir historial a formato Anthropic, saneando bloques vacíos.
+    # Anthropic rechaza con 400 "messages: text content blocks must be
+    # non-empty" cualquier bloque de texto vacío/whitespace o un content
+    # string vacío. Esto pasa típicamente al reenviar la respuesta del
+    # modelo (que puede traer un bloque text vacío junto a un tool_use).
+    msgs_anthropic = []
+    for m in mensajes:
+        if m.get("role") not in ("user", "assistant"):
+            continue
+        contenido_limpio = _sanear_content(m.get("content"))
+        if contenido_limpio is None:
+            continue
+        msgs_anthropic.append({"role": m["role"], "content": contenido_limpio})
 
     tools_usadas = []
     tokens_total = {"input": 0, "output": 0}
@@ -418,9 +468,20 @@ async def chat_con_asistente(
             tokens_total["output"] += usage.get("output_tokens", 0)
             contenido = data.get("content") or []
             stop_reason = data.get("stop_reason")
-            msgs_anthropic.append({"role": "assistant", "content": contenido})
+            # Saneamos la respuesta del modelo ANTES de reinyectarla: puede
+            # traer un bloque text vacío junto al tool_use, lo que rompería
+            # el siguiente turno con 400 "text content blocks must be
+            # non-empty".
+            contenido_asistente = _sanear_content(contenido)
+            if contenido_asistente is not None:
+                msgs_anthropic.append(
+                    {"role": "assistant", "content": contenido_asistente}
+                )
 
-            tool_uses = [b for b in contenido if b.get("type") == "tool_use"]
+            tool_uses = [
+                b for b in contenido
+                if isinstance(b, dict) and b.get("type") == "tool_use"
+            ]
             if tool_uses and stop_reason == "tool_use":
                 # Ejecutar cada tool
                 tool_results_content = []
@@ -430,6 +491,8 @@ async def chat_con_asistente(
                     tool_input = tu.get("input", {})
                     logger.info(f"[ASISTENTE] turno={turno} tool={tool_name}")
                     result_str = await execute_tool_asistente(tool_name, tool_input, db, current_user)
+                    if not (result_str or "").strip():
+                        result_str = "(sin resultado)"
                     tools_usadas.append({
                         "name": tool_name,
                         "args": tool_input,
@@ -446,7 +509,7 @@ async def chat_con_asistente(
             # Stop final — extraer texto
             texto_final = ""
             for b in contenido:
-                if b.get("type") == "text":
+                if isinstance(b, dict) and b.get("type") == "text":
                     texto_final += b.get("text", "")
             return {
                 "respuesta": texto_final,
