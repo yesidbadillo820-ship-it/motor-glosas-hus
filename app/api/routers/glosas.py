@@ -4773,6 +4773,65 @@ async def importar_recepcion(
     resumen_dict["auto_respuesta_lanzada"] = auto_respuesta_lanzada
     resumen_dict["glosas_en_auto_proceso"] = len(glosas_para_auto)
 
+    # Persistir la importación + guardar el Excel original en disco para
+    # poder regenerar y DESCARGAR el Excel-respuesta desde la app cuando
+    # el gestor quiera (no solo si llega por correo). Best-effort: nunca
+    # debe romper la importación.
+    try:
+        import os as _os
+        import json as _json
+        from app.models.db import ImportacionRecepcionRecord
+
+        rec = ImportacionRecepcionRecord(
+            usuario_email=current_user.email,
+            archivo_nombre=(archivo.filename or "recepcion.xlsx")[:300],
+            total_glosas=len(glosas_para_auto),
+            glosa_ids=_json.dumps(glosas_para_auto),
+            estado="LISTO",
+        )
+        db.add(rec)
+        db.commit()
+        db.refresh(rec)
+
+        base_dir = _os.path.join(
+            _os.getenv("SOPORTES_ROOT", "/data"), "recepcion",
+        )
+        _os.makedirs(base_dir, exist_ok=True)
+        ruta = _os.path.join(base_dir, f"{rec.id}.xlsx")
+        with open(ruta, "wb") as fh:
+            fh.write(contenido)
+        rec.ruta_original = ruta
+        db.commit()
+
+        # Prune: conservar solo las últimas 30 importaciones en disco.
+        viejas = (
+            db.query(ImportacionRecepcionRecord)
+            .order_by(ImportacionRecepcionRecord.id.desc())
+            .offset(30)
+            .all()
+        )
+        for v in viejas:
+            if v.ruta_original and _os.path.exists(v.ruta_original):
+                try:
+                    _os.remove(v.ruta_original)
+                    v.ruta_original = None
+                    v.estado = "SIN_ARCHIVO"
+                except OSError:
+                    pass
+        if viejas:
+            db.commit()
+
+        resumen_dict["recepcion_import_id"] = rec.id
+        logger.info(
+            f"[{req_id}] Importación recepción persistida id={rec.id} "
+            f"({len(glosas_para_auto)} glosas, archivo en {ruta})"
+        )
+    except Exception as e:
+        logger.warning(
+            f"[{req_id}] No se pudo persistir la importación de recepción "
+            f"(el Excel-respuesta no quedará descargable): {e}"
+        )
+
     # Notificación broadcast (no bloquea la respuesta si falla)
     # Pasamos db para que la funcion busque usuarios cuyo nombre matchee
     # con los gestores del resumen (ej. EQUIPO ASEGURADORAS) y los incluya
@@ -4808,6 +4867,102 @@ async def importar_recepcion(
         pass
 
     return resumen_dict
+
+
+@router.get("/importar-recepcion/historial")
+def historial_importaciones_recepcion(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Últimas importaciones de recepción, para listar y ofrecer la
+    descarga del Excel-respuesta anotado de cada una."""
+    from app.models.db import ImportacionRecepcionRecord
+
+    regs = (
+        db.query(ImportacionRecepcionRecord)
+        .order_by(ImportacionRecepcionRecord.id.desc())
+        .limit(30)
+        .all()
+    )
+    return {
+        "importaciones": [
+            {
+                "id": r.id,
+                "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+                "usuario_email": r.usuario_email,
+                "archivo_nombre": r.archivo_nombre,
+                "total_glosas": r.total_glosas,
+                "estado": r.estado,
+                "descargable": bool(r.ruta_original),
+            }
+            for r in regs
+        ]
+    }
+
+
+@router.get("/importar-recepcion/{rec_id}/excel-respuesta")
+def descargar_excel_respuesta_recepcion(
+    rec_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Regenera y descarga el Excel-respuesta anotado de una importación.
+
+    Se regenera al vuelo desde el Excel original guardado + el estado
+    actual de las glosas en BD, así incluye los dictámenes que la IA
+    haya producido después de la importación.
+    """
+    import os as _os
+    import json as _json
+
+    from fastapi.responses import StreamingResponse
+
+    from app.models.db import ImportacionRecepcionRecord
+    from app.services.recepcion_excel_response import (
+        construir_respuestas_por_clave,
+        generar_excel_con_respuestas,
+    )
+
+    rec = (
+        db.query(ImportacionRecepcionRecord)
+        .filter(ImportacionRecepcionRecord.id == rec_id)
+        .first()
+    )
+    if not rec:
+        raise HTTPException(404, "Importación no encontrada")
+    if not rec.ruta_original or not _os.path.exists(rec.ruta_original):
+        raise HTTPException(
+            410,
+            "El Excel original de esta importación ya no está disponible "
+            "(se conservan solo las últimas 30). Volvé a subir el archivo.",
+        )
+
+    try:
+        with open(rec.ruta_original, "rb") as fh:
+            contenido_original = fh.read()
+    except OSError as e:
+        raise HTTPException(500, f"No se pudo leer el archivo original: {e}")
+
+    try:
+        ids = _json.loads(rec.glosa_ids or "[]")
+    except (ValueError, TypeError):
+        ids = []
+
+    respuestas = construir_respuestas_por_clave(db, ids)
+    xlsx = generar_excel_con_respuestas(
+        contenido_original, respuestas, gestor_destacar=None,
+    )
+
+    fecha = (rec.creado_en or datetime.now()).strftime("%Y-%m-%d")
+    nombre = f"glosas_recepcion_{fecha}_respuesta.xlsx"
+    return StreamingResponse(
+        iter([xlsx]),
+        media_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
 
 
 @router.get("/batch/{batch_id}")
