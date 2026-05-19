@@ -338,15 +338,34 @@ async function cargarHistorial(){
       cont.innerHTML = '<div style="color:#6b7280;font-size:13px">Todavía no hay importaciones.</div>';
       return;
     }
+    const estadoBadge = (e)=>{
+      const m = {
+        ENVIADO:['#dcfce7','#166534','✓ correo enviado'],
+        PARCIAL:['#fef3c7','#92400e','⚠ envío parcial'],
+        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ sin destinatarios'],
+        ERROR:['#fee2e2','#991b1b','✗ error de envío'],
+        SIN_ARCHIVO:['#f3f4f6','#6b7280','archivo purgado'],
+        LISTO:['#dbeafe','#1e40af','procesando…'],
+      }[e] || ['#f3f4f6','#6b7280', e||'—'];
+      return `<span style="background:${m[0]};color:${m[1]};font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px">${m[2]}</span>`;
+    };
     cont.innerHTML = imps.map(im=>{
       const fecha = im.creado_en ? new Date(im.creado_en).toLocaleString('es-CO') : '—';
       const dl = im.descargable
         ? `<button onclick="descargarExcelRecepcion(${im.id}, this)" style="background:#10b981;color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">⬇ Excel-respuesta</button>`
         : `<span style="color:#9ca3af;font-size:12px">archivo ya no disponible</span>`;
+      const pend = im.dictamenes_pendientes||0;
+      const listos = im.dictamenes_listos||0;
+      const iaInfo = (listos+pend) > 0
+        ? (pend > 0
+            ? `<span style="color:#b45309;font-size:12px">🤖 IA: ${listos}/${listos+pend} listas · ${pend} en proceso</span>`
+            : `<span style="color:#166534;font-size:12px">🤖 IA: ${listos}/${listos} listas</span>`)
+        : '';
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px">
         <div style="font-size:13px;color:#374151">
-          <b>#${im.id}</b> · ${fecha}<br>
+          <b>#${im.id}</b> · ${fecha} · ${estadoBadge(im.estado)}<br>
           <span style="color:#6b7280">${im.archivo_nombre||'recepcion.xlsx'} · ${im.total_glosas} glosa(s) · ${im.usuario_email||''}</span>
+          ${iaInfo?'<br>'+iaInfo:''}
         </div>
         <div>${dl}</div>
       </div>`;

@@ -4755,42 +4755,12 @@ async def importar_recepcion(
     # manual del gestor.
     glosas_para_auto = list(getattr(resumen, "glosas_ids_para_auto_responder", []) or [])
     glosas_todas = list(getattr(resumen, "glosas_ids_todas", []) or [])
-    auto_respuesta_lanzada = False
-    excel_enviado_programado = False
-    # Enviar el Excel-respuesta SIEMPRE que la importación haya tocado al
-    # menos una glosa (creada, actualizada o duplicada). Antes esto estaba
-    # detrás de `if glosas_para_auto:` → reimportar un Excel ya cargado
-    # (solo duplicados) no enviaba ningún correo a los gestores.
-    if glosas_todas:
-        try:
-            from app.services.auto_responder_service import (
-                lanzar_lote_y_enviar_excel_background,
-            )
-            lanzar_lote_y_enviar_excel_background(
-                glosas_todas, contenido, resumen_dict, ids_ia=glosas_para_auto,
-            )
-            excel_enviado_programado = True
-            auto_respuesta_lanzada = bool(glosas_para_auto)
-            logger.info(
-                f"[{req_id}] Excel-respuesta programado: "
-                f"{len(glosas_todas)} glosas tocadas "
-                f"({len(glosas_para_auto)} para IA) en background"
-            )
-        except Exception as e:
-            logger.warning(f"[{req_id}] Error encolando lote/Excel: {e}")
-    else:
-        logger.info(
-            f"[{req_id}] Importación sin glosas tocadas — no se programa "
-            f"envío de Excel-respuesta"
-        )
-    resumen_dict["auto_respuesta_lanzada"] = auto_respuesta_lanzada
-    resumen_dict["excel_respuesta_programado"] = excel_enviado_programado
-    resumen_dict["glosas_en_auto_proceso"] = len(glosas_para_auto)
 
-    # Persistir la importación + guardar el Excel original en disco para
-    # poder regenerar y DESCARGAR el Excel-respuesta desde la app cuando
-    # el gestor quiera (no solo si llega por correo). Best-effort: nunca
-    # debe romper la importación.
+    # 1) Persistir la importación + guardar el Excel original en disco PRIMERO
+    # (antes del background) para tener rec_id y poder: (a) descargar el
+    # Excel-respuesta desde la app aunque no llegue el correo, y (b) que el
+    # background actualice el estado de envío de este registro.
+    rec_id = None
     try:
         import os as _os
         import json as _json
@@ -4806,6 +4776,7 @@ async def importar_recepcion(
         db.add(rec)
         db.commit()
         db.refresh(rec)
+        rec_id = rec.id
 
         base_dir = _os.path.join(
             _os.getenv("SOPORTES_ROOT", "/data"), "recepcion",
@@ -4838,13 +4809,46 @@ async def importar_recepcion(
         resumen_dict["recepcion_import_id"] = rec.id
         logger.info(
             f"[{req_id}] Importación recepción persistida id={rec.id} "
-            f"({len(glosas_para_auto)} glosas, archivo en {ruta})"
+            f"({len(glosas_todas)} glosas tocadas, archivo en {ruta})"
         )
     except Exception as e:
         logger.warning(
             f"[{req_id}] No se pudo persistir la importación de recepción "
             f"(el Excel-respuesta no quedará descargable): {e}"
         )
+
+    # 2) Enviar el Excel-respuesta SIEMPRE que la importación haya tocado al
+    # menos una glosa (creada, actualizada o duplicada). Antes esto estaba
+    # detrás de `if glosas_para_auto:` → reimportar un Excel ya cargado
+    # (solo duplicados) no enviaba ningún correo a los gestores.
+    auto_respuesta_lanzada = False
+    excel_enviado_programado = False
+    if glosas_todas:
+        try:
+            from app.services.auto_responder_service import (
+                lanzar_lote_y_enviar_excel_background,
+            )
+            lanzar_lote_y_enviar_excel_background(
+                glosas_todas, contenido, resumen_dict,
+                ids_ia=glosas_para_auto, rec_id=rec_id,
+            )
+            excel_enviado_programado = True
+            auto_respuesta_lanzada = bool(glosas_para_auto)
+            logger.info(
+                f"[{req_id}] Excel-respuesta programado: "
+                f"{len(glosas_todas)} glosas tocadas "
+                f"({len(glosas_para_auto)} para IA) en background"
+            )
+        except Exception as e:
+            logger.warning(f"[{req_id}] Error encolando lote/Excel: {e}")
+    else:
+        logger.info(
+            f"[{req_id}] Importación sin glosas tocadas — no se programa "
+            f"envío de Excel-respuesta"
+        )
+    resumen_dict["auto_respuesta_lanzada"] = auto_respuesta_lanzada
+    resumen_dict["excel_respuesta_programado"] = excel_enviado_programado
+    resumen_dict["glosas_en_auto_proceso"] = len(glosas_para_auto)
 
     # Notificación broadcast (no bloquea la respuesta si falla)
     # Pasamos db para que la funcion busque usuarios cuyo nombre matchee
@@ -4890,7 +4894,8 @@ def historial_importaciones_recepcion(
 ):
     """Últimas importaciones de recepción, para listar y ofrecer la
     descarga del Excel-respuesta anotado de cada una."""
-    from app.models.db import ImportacionRecepcionRecord
+    import json as _json
+    from app.models.db import ImportacionRecepcionRecord, GlosaRecord
 
     regs = (
         db.query(ImportacionRecepcionRecord)
@@ -4898,20 +4903,36 @@ def historial_importaciones_recepcion(
         .limit(30)
         .all()
     )
-    return {
-        "importaciones": [
-            {
-                "id": r.id,
-                "creado_en": r.creado_en.isoformat() if r.creado_en else None,
-                "usuario_email": r.usuario_email,
-                "archivo_nombre": r.archivo_nombre,
-                "total_glosas": r.total_glosas,
-                "estado": r.estado,
-                "descargable": bool(r.ruta_original),
-            }
-            for r in regs
-        ]
-    }
+    out = []
+    for r in regs:
+        try:
+            ids = _json.loads(r.glosa_ids or "[]")
+        except (ValueError, TypeError):
+            ids = []
+        listos = 0
+        if ids:
+            listos = (
+                db.query(GlosaRecord.id)
+                .filter(
+                    GlosaRecord.id.in_(ids),
+                    GlosaRecord.dictamen.isnot(None),
+                    GlosaRecord.dictamen != "",
+                )
+                .count()
+            )
+        pendientes = max(0, len(ids) - listos)
+        out.append({
+            "id": r.id,
+            "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+            "usuario_email": r.usuario_email,
+            "archivo_nombre": r.archivo_nombre,
+            "total_glosas": r.total_glosas,
+            "estado": r.estado,
+            "descargable": bool(r.ruta_original),
+            "dictamenes_listos": listos,
+            "dictamenes_pendientes": pendientes,
+        })
+    return {"importaciones": out}
 
 
 @router.get("/importar-recepcion/{rec_id}/excel-respuesta")
