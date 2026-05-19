@@ -14,10 +14,10 @@ audiencia sea más eficiente.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    pass
 
 
 # Catálogo de contraargumentos típicos por tipo de glosa, con respuestas

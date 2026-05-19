@@ -397,7 +397,6 @@ async def upload_bulk(
     total_bytes = 0
 
     for upload, rel in zip(files, rel_paths):
-        nombre = upload.filename or rel.split("/")[-1]
         # Validación de path
         destino = _safe_join(raiz, rel)
         if destino is None:

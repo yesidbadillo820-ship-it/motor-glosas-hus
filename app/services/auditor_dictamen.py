@@ -17,11 +17,10 @@ Cada hallazgo trae `tip` con la acción concreta que el gestor puede tomar.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from app.models.db import GlosaRecord
+    pass
 
 
 _FRASES_ART_56_INCORRECTO = (

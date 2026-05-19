@@ -10,7 +10,6 @@ otros binarios externos como pdf2image.
 from __future__ import annotations
 import io
 import logging
-from typing import Optional
 
 import pdfplumber
 

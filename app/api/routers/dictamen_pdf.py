@@ -9,7 +9,6 @@ import hashlib
 import io
 import re
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -67,12 +66,11 @@ def descargar_pdf_dictamen(
 
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
-    from reportlab.lib.units import cm, inch
-    from reportlab.lib.colors import HexColor, black
+    from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+    from reportlab.lib.units import cm
+    from reportlab.lib.colors import HexColor
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-        PageBreak, KeepTogether,
     )
 
     buf = io.BytesIO()

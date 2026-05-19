@@ -156,7 +156,6 @@ def metricas_ia(
       - top 5 modelos por costo
     """
     from datetime import timedelta
-    from sqlalchemy import func as _f
 
     from app.core.tz import ahora_utc
     from app.models.db import AICallRecord
@@ -350,9 +349,8 @@ def metricas_ia_billing_forense(
     queres saber donde se fue la plata.
     """
     from datetime import timedelta
-    from sqlalchemy import desc
     from app.core.tz import ahora_utc
-    from app.models.db import AICallRecord, GlosaRecord
+    from app.models.db import AICallRecord
 
     desde = ahora_utc() - timedelta(days=max(1, int(dias)))
     todas = (
@@ -666,7 +664,7 @@ def resumen_mensual_ejecutivo(
 
     Sin parámetros → mes actual.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     from sqlalchemy import func as _f
 
@@ -2005,7 +2003,7 @@ def info_health_score(
       - desglose: cada componente con su valor y contribución
     """
     import os
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     from app.core.tz import ahora_utc
     from app.models.db import AuditLogRecord, GlosaRecord
@@ -2208,7 +2206,6 @@ def metricas_ia_budget(
       - alerta: GREEN | YELLOW | RED
       - pct_consumido / pct_proyectado
     """
-    from datetime import datetime, timezone
     from calendar import monthrange
 
     from app.core.tz import ahora_utc
@@ -2607,7 +2604,7 @@ def info_zonas_horarias(
       - python_tz_module (zoneinfo / pytz / fallback)
     """
     import os
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.core.tz import ahora_utc
 

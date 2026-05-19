@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import logging
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -417,8 +417,8 @@ def diagnostico_completo(
         out["secciones"]["posthog"] = {
             "estado": "ok" if activo else "warning",
             "mensaje": (
-                f"PostHog activo · trackeando glosa_analizada, "
-                f"recepcion_importada, lote_auto_responder_completo"
+                "PostHog activo · trackeando glosa_analizada, "
+                "recepcion_importada, lote_auto_responder_completo"
                 if activo
                 else "POSTHOG_API_KEY configurada pero cliente no quedó activo"
             ),

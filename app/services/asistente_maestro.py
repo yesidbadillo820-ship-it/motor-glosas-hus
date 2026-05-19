@@ -37,7 +37,6 @@ from __future__ import annotations
 import os
 import json
 import logging
-from typing import Optional
 import httpx
 
 logger = logging.getLogger("motor_glosas")
@@ -281,7 +280,7 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
         if name == "estadisticas_sistema":
             from app.models.db import GlosaRecord
             from sqlalchemy import func
-            from datetime import datetime, timedelta, timezone
+            from datetime import datetime, timezone
             ahora = datetime.now(timezone.utc)
             inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             n_total = db.query(func.count(GlosaRecord.id)).scalar() or 0

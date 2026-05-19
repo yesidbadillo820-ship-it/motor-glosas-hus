@@ -16,7 +16,6 @@ Por defecto, todo va a revisión humana.
 """
 import re
 import logging
-from typing import Optional
 
 logger = logging.getLogger("motor_glosas")
 
