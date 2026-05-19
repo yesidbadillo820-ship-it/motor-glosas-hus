@@ -534,8 +534,15 @@ class RecepcionService:
             # Escaneo rápido de los primeros 5 encabezados para detectar tipo.
             # CONCEPTOS gana si aparecen columnas ListadoConceptos.*;
             # RECEPCION si aparecen factura+vence o factura+fecha_recepcion.
-            fila_h_rec, idx_rec = _buscar_fila_encabezado(ws, max_filas=5, mapa=COLUMN_ALIASES, min_aciertos=3)
-            fila_h_con, idx_con = _buscar_fila_encabezado(ws, max_filas=5, mapa=CONCEPTO_COLS, min_aciertos=4)
+            # Ventana amplia (20 filas): los export reales del DGH ponen
+            # una fila título ("ENTREGA GLOSA INICIAL") + filas de
+            # formato/banner antes del encabezado real. Con max_filas=5 el
+            # encabezado de la hoja INICIAL quedaba fuera de la ventana y
+            # la hoja se descartaba entera → las glosas INICIAL (las
+            # nuevas) NO se importaban. Las filas de datos no matchean ≥3
+            # alias de encabezado, así que ampliar es seguro.
+            fila_h_rec, idx_rec = _buscar_fila_encabezado(ws, max_filas=20, mapa=COLUMN_ALIASES, min_aciertos=3)
+            fila_h_con, idx_con = _buscar_fila_encabezado(ws, max_filas=20, mapa=CONCEPTO_COLS, min_aciertos=4)
 
             if idx_con and "concepto_codigo" in idx_con and "factura" in idx_con:
                 plan.append(("CONCEPTOS", nombre_hoja, fila_h_con, idx_con))
