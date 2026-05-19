@@ -706,17 +706,27 @@ class RecepcionService:
                 else:
                     numero_radicado_real = radicado_info or None
 
+                # requiere_ia: SOLO las glosas INICIAL pendientes necesitan
+                # que el cerebro IA redacte el dictamen (usando el concepto
+                # de las hojas I/R como contexto). RATIFICADA y EXTEMPORÁNEA
+                # ya traen su TEXTO FIJO definitivo → mandarlas a la IA solo
+                # quema tokens y tiempo (directiva Yesid 2026-05-19). Igual
+                # se incluyen en glosas_ids_todas para que salgan en el
+                # Excel-respuesta con su texto fijo.
                 if ratificada:
                     estado = "RATIFICADA"
                     texto_ref = radicado_info or referencia
                     dictamen = _dictamen_ratificada(entidad, factura, texto_ref)
                     resumen.ratificadas += 1
+                    requiere_ia = False
                 elif es_extemporanea:
                     estado = "EXTEMPORANEA"
                     dictamen = _dictamen_extemporanea(entidad, factura, dias_transcurridos)
                     resumen.extemporaneas += 1
+                    requiere_ia = False
                 else:
                     estado = "RADICADA"
+                    requiere_ia = True
                     nota_obs = (
                         f'<div style="margin-top:10px;padding:10px;background:#fef3c7;border-left:3px solid #eab308;border-radius:6px;font-size:12px">'
                         f'<b>⚠ Observación técnico:</b> {observacion_tecnico}</div>'
@@ -795,7 +805,8 @@ class RecepcionService:
                         setattr(existente, k, v)
                     resumen.actualizadas += 1
                     if existente.id is not None:
-                        resumen.glosas_ids_para_auto_responder.append(existente.id)
+                        if requiere_ia:
+                            resumen.glosas_ids_para_auto_responder.append(existente.id)
                         resumen.glosas_ids_todas.append(existente.id)
                 else:
                     nueva = GlosaRecord(**campos)
@@ -803,7 +814,8 @@ class RecepcionService:
                     self.db.flush()  # asignar nueva.id antes del commit final
                     resumen.creadas += 1
                     if nueva.id is not None:
-                        resumen.glosas_ids_para_auto_responder.append(nueva.id)
+                        if requiere_ia:
+                            resumen.glosas_ids_para_auto_responder.append(nueva.id)
                         resumen.glosas_ids_todas.append(nueva.id)
 
                 resumen.total += 1
@@ -849,6 +861,15 @@ class RecepcionService:
         como clave de idempotencia. La glosa padre debe existir (cargada antes
         desde INICIAL/RATIFICADA); si no, el concepto se reporta como huérfano.
         """
+        # Cache de la glosa padre por (factura, consecutivo). Una hoja I/R
+        # trae DECENAS de filas-concepto por glosa; sin cache se hacían
+        # 3 queries/fila + se re-logueaba el mismo fallback cientos de
+        # veces, dejando la importación corriendo MINUTOS. Resolviendo
+        # una sola vez por clave: O(filas) → unas pocas queries.
+        _MISS = object()
+        _padre_cache: dict = {}
+        _logged_facturas: set = set()
+
         for num_fila, fila in enumerate(filas, start=2):
             if all(c is None or str(c).strip() == "" for c in fila):
                 continue
@@ -892,58 +913,70 @@ class RecepcionService:
                 # En ese caso, completamos el consecutivo del padre con el
                 # de esta fila — así el resto de la metadata (NIT, valor
                 # factura, tercero, fecha objecion) sí se llena.
-                glosa_padre = (
-                    self.db.query(GlosaRecord)
-                    .filter(
-                        GlosaRecord.factura == factura,
-                        GlosaRecord.consecutivo_dgh == consecutivo,
-                    )
-                    .first()
-                )
-                if not glosa_padre and consecutivo:
-                    # Fallback 1: factura + consecutivo NULL (parent fue
-                    # creado sin consecutivo). Le seteamos el consecutivo
-                    # ahora.
+                _ck = (factura, consecutivo)
+                glosa_padre = _padre_cache.get(_ck, _MISS)
+                if glosa_padre is _MISS:
                     glosa_padre = (
                         self.db.query(GlosaRecord)
                         .filter(
                             GlosaRecord.factura == factura,
-                            (GlosaRecord.consecutivo_dgh.is_(None))
-                            | (GlosaRecord.consecutivo_dgh == ""),
+                            GlosaRecord.consecutivo_dgh == consecutivo,
                         )
-                        .order_by(GlosaRecord.id.desc())
                         .first()
                     )
-                    if glosa_padre:
-                        glosa_padre.consecutivo_dgh = consecutivo
-                        logger.info(
-                            f"[I/R] Fallback match: glosa_id={glosa_padre.id} "
-                            f"factura={factura} sin consecutivo previo, "
-                            f"se le asigna {consecutivo}"
-                        )
-                if not glosa_padre:
-                    # Fallback 2: factura sola (cualquier glosa con esa
-                    # factura — escogemos la más reciente). Si la encontrada
-                    # tiene un consecutivo distinto pero la factura coincide,
-                    # asumimos que es la misma glosa (puede haber inconsistencia
-                    # entre lo que el técnico de recepción cargó y lo que el
-                    # DGH oficial trae). Logeamos la divergencia.
-                    glosa_padre = (
-                        self.db.query(GlosaRecord)
-                        .filter(GlosaRecord.factura == factura)
-                        .order_by(GlosaRecord.id.desc())
-                        .first()
-                    )
-                    if glosa_padre:
-                        prev_consec = glosa_padre.consecutivo_dgh
-                        if prev_consec and prev_consec != consecutivo:
-                            logger.warning(
-                                f"[I/R] Divergencia consecutivo factura={factura}: "
-                                f"BD tiene '{prev_consec}', I/R trae '{consecutivo}'. "
-                                f"Vinculando igual y conservando el de BD."
+                    if not glosa_padre and consecutivo:
+                        # Fallback 1: factura + consecutivo NULL (parent
+                        # creado sin consecutivo). Se lo seteamos ahora.
+                        glosa_padre = (
+                            self.db.query(GlosaRecord)
+                            .filter(
+                                GlosaRecord.factura == factura,
+                                (GlosaRecord.consecutivo_dgh.is_(None))
+                                | (GlosaRecord.consecutivo_dgh == ""),
                             )
-                        elif not prev_consec:
+                            .order_by(GlosaRecord.id.desc())
+                            .first()
+                        )
+                        if glosa_padre:
                             glosa_padre.consecutivo_dgh = consecutivo
+                            if factura not in _logged_facturas:
+                                _logged_facturas.add(factura)
+                                logger.info(
+                                    f"[I/R] Fallback match: glosa_id={glosa_padre.id} "
+                                    f"factura={factura} sin consecutivo previo, "
+                                    f"se le asigna {consecutivo}"
+                                )
+                    if not glosa_padre:
+                        # Fallback 2: factura sola (la más reciente). Si
+                        # tiene consecutivo distinto, asumimos misma glosa
+                        # y logueamos la divergencia (una vez por factura).
+                        glosa_padre = (
+                            self.db.query(GlosaRecord)
+                            .filter(GlosaRecord.factura == factura)
+                            .order_by(GlosaRecord.id.desc())
+                            .first()
+                        )
+                        if glosa_padre:
+                            prev_consec = glosa_padre.consecutivo_dgh
+                            if prev_consec and prev_consec != consecutivo:
+                                if factura not in _logged_facturas:
+                                    _logged_facturas.add(factura)
+                                    logger.warning(
+                                        f"[I/R] Divergencia consecutivo factura={factura}: "
+                                        f"BD tiene '{prev_consec}', I/R trae '{consecutivo}'. "
+                                        f"Vinculando igual y conservando el de BD."
+                                    )
+                            elif not prev_consec:
+                                glosa_padre.consecutivo_dgh = consecutivo
+                    # Flush para que la asignación de consecutivo sea
+                    # visible a queries siguientes; cachear el resultado
+                    # (incluido None = huérfano) para no re-resolver.
+                    if glosa_padre is not None:
+                        try:
+                            self.db.flush()
+                        except Exception:
+                            pass
+                    _padre_cache[_ck] = glosa_padre
                 if not glosa_padre:
                     resumen.conceptos_huerfanos.append({
                         "fila": num_fila,
