@@ -729,6 +729,14 @@ class RecepcionService:
                         f'</div>'
                     )
 
+                # Solo las glosas INICIAL pendientes (estado RADICADA) van al
+                # cerebro IA: requieren que la IA redacte la respuesta. Las
+                # RATIFICADA y EXTEMPORANEA ya tienen su dictamen de texto fijo
+                # (_dictamen_ratificada / _dictamen_extemporanea), así que NO se
+                # mandan a la IA (no gastan tokens ni tiempo) pero SÍ entran al
+                # Excel-respuesta vía glosas_ids_todas.
+                requiere_ia = estado == "RADICADA"
+
                 # Upsert por (factura + consecutivo_dgh) o solo factura si no hay consecutivo
                 q = self.db.query(GlosaRecord).filter(GlosaRecord.factura == factura)
                 if consecutivo:
@@ -795,7 +803,8 @@ class RecepcionService:
                         setattr(existente, k, v)
                     resumen.actualizadas += 1
                     if existente.id is not None:
-                        resumen.glosas_ids_para_auto_responder.append(existente.id)
+                        if requiere_ia:
+                            resumen.glosas_ids_para_auto_responder.append(existente.id)
                         resumen.glosas_ids_todas.append(existente.id)
                 else:
                     nueva = GlosaRecord(**campos)
@@ -803,7 +812,8 @@ class RecepcionService:
                     self.db.flush()  # asignar nueva.id antes del commit final
                     resumen.creadas += 1
                     if nueva.id is not None:
-                        resumen.glosas_ids_para_auto_responder.append(nueva.id)
+                        if requiere_ia:
+                            resumen.glosas_ids_para_auto_responder.append(nueva.id)
                         resumen.glosas_ids_todas.append(nueva.id)
 
                 resumen.total += 1
