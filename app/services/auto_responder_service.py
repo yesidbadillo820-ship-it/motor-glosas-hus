@@ -355,6 +355,7 @@ async def procesar_lote_y_enviar_excel(
     glosa_ids: list[int],
     excel_original: bytes,
     resumen: dict,
+    ids_ia: list[int] | None = None,
 ) -> dict:
     """Procesa el lote IA y, al terminar, manda a cada gestor el Excel
     original anotado con las respuestas generadas.
@@ -366,28 +367,43 @@ async def procesar_lote_y_enviar_excel(
     Fly logs muestre exactamente dónde se cayó (lote IA, generación del
     .xlsx, o envío SMTP).
     """
+    # ids_ia = subconjunto a procesar con IA (creadas/actualizadas). Si es
+    # None se usa glosa_ids (compat). En una reimportación 100% duplicada
+    # ids_ia llega vacío: NO se re-corre la IA (los dictámenes ya existen)
+    # pero el Excel-respuesta SÍ se envía con glosa_ids (todas las tocadas).
+    if ids_ia is None:
+        ids_ia = glosa_ids
     logger.info(
         f"[EXCEL-EMAIL] ➡️  start: glosa_ids={len(glosa_ids)}, "
+        f"ids_ia={len(ids_ia)}, "
         f"excel_bytes={len(excel_original) if excel_original else 0}, "
         f"resumen.total={resumen.get('total', '?')}"
     )
 
-    try:
-        resultado_lote = await procesar_lote(glosa_ids)
+    if ids_ia:
+        try:
+            resultado_lote = await procesar_lote(ids_ia)
+            logger.info(
+                f"[EXCEL-EMAIL] ✅ lote IA terminado: "
+                f"{resultado_lote.get('respondidas', 0)} respondidas, "
+                f"{resultado_lote.get('requieren_soportes', 0)} requieren soportes, "
+                f"{resultado_lote.get('errores', 0)} errores"
+            )
+        except Exception as e:
+            logger.error(
+                f"[EXCEL-EMAIL] ❌ procesar_lote crasheó: {type(e).__name__}: {e}",
+                exc_info=True,
+            )
+            # Intentamos seguir con el envío del Excel original aunque la IA
+            # haya fallado — el gestor al menos recibe el archivo crudo.
+            resultado_lote = {"total": len(ids_ia), "error_lote": str(e)[:200]}
+    else:
         logger.info(
-            f"[EXCEL-EMAIL] ✅ lote IA terminado: "
-            f"{resultado_lote.get('respondidas', 0)} respondidas, "
-            f"{resultado_lote.get('requieren_soportes', 0)} requieren soportes, "
-            f"{resultado_lote.get('errores', 0)} errores"
+            "[EXCEL-EMAIL] ↪️  sin glosas para IA (reimportación duplicada): "
+            "se omite el lote y se envía el Excel-respuesta con los "
+            "dictámenes ya existentes"
         )
-    except Exception as e:
-        logger.error(
-            f"[EXCEL-EMAIL] ❌ procesar_lote crasheó: {type(e).__name__}: {e}",
-            exc_info=True,
-        )
-        # Intentamos seguir con el envío del Excel original aunque la IA
-        # haya fallado — el gestor al menos recibe el archivo crudo.
-        resultado_lote = {"total": len(glosa_ids), "error_lote": str(e)[:200]}
+        resultado_lote = {"total": 0, "lote_omitido": True}
 
     from app.database import SessionLocal
     from app.services.email_service import (
@@ -423,13 +439,24 @@ def lanzar_lote_y_enviar_excel_background(
     glosa_ids: list[int],
     excel_original: bytes,
     resumen: dict,
+    ids_ia: list[int] | None = None,
 ) -> None:
     """Variante de `lanzar_lote_background` que, al terminar el lote,
-    dispara el envío del Excel-respuesta a cada gestor."""
+    dispara el envío del Excel-respuesta a cada gestor.
+
+    `glosa_ids`: TODAS las glosas tocadas (creadas+actualizadas+duplicadas)
+    — se usan para construir el Excel-respuesta.
+    `ids_ia`: subconjunto a procesar con IA. Si None == glosa_ids. Si llega
+    vacío (reimportación 100% duplicada) NO se corre IA pero el Excel SÍ
+    se envía. Esto corrige el bug por el que reimportar un Excel ya
+    cargado no enviaba ningún correo a los gestores.
+    """
+    if ids_ia is None:
+        ids_ia = glosa_ids
     if not glosa_ids:
         logger.warning(
             "[AUTO-RESPONDER] No se lanza lote+excel: glosa_ids vacío "
-            "(¿la importación no creó/actualizó ninguna glosa?)"
+            "(la importación no tocó ninguna glosa)"
         )
         return
     if not excel_original:
@@ -437,19 +464,22 @@ def lanzar_lote_y_enviar_excel_background(
             "[AUTO-RESPONDER] No se lanza lote+excel: excel_original vacío "
             "— se llamará al lote sin envío de Excel"
         )
-        lanzar_lote_background(glosa_ids)
+        if ids_ia:
+            lanzar_lote_background(ids_ia)
         return
     try:
         loop = asyncio.get_event_loop()
         task = loop.create_task(
-            procesar_lote_y_enviar_excel(glosa_ids, excel_original, resumen)
+            procesar_lote_y_enviar_excel(
+                glosa_ids, excel_original, resumen, ids_ia,
+            )
         )
         _registrar_bg_task(
             task, f"procesar_lote_y_enviar_excel({len(glosa_ids)})",
         )
         logger.info(
-            f"[AUTO-RESPONDER] Lote de {len(glosa_ids)} glosas encolado + "
-            f"envío Excel-respuesta programado para al terminar "
+            f"[AUTO-RESPONDER] {len(glosa_ids)} glosas tocadas "
+            f"({len(ids_ia)} para IA) — Excel-respuesta programado "
             f"(excel={len(excel_original)} bytes)"
         )
     except Exception as e:

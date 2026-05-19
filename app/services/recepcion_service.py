@@ -248,12 +248,55 @@ def _a_fecha(valor) -> Optional[datetime]:
 
 
 def _a_float(valor) -> float:
+    """Convierte un valor monetario a float preservando decimales y signo.
+
+    Maneja formato colombiano ("1.234.567,89" → 1234567.89), formato US
+    ("1,234,567.89"), símbolos de moneda, espacios y negativos (incluido
+    paréntesis contable "(1.234,50)"). El bug previo borraba TODO lo que
+    no fuera dígito → "1.234,50" se convertía en 123450 (×100, sin signo).
+    """
     if valor is None or valor == "":
         return 0.0
     if isinstance(valor, (int, float)):
         return float(valor)
-    s = re.sub(r"[^\d]", "", str(valor))
-    return float(s) if s else 0.0
+
+    s = str(valor).strip()
+    if not s:
+        return 0.0
+
+    negativo = s.startswith("-") or (s.startswith("(") and s.endswith(")"))
+    # Dejar solo dígitos y separadores . ,
+    s = re.sub(r"[^\d.,]", "", s)
+    if not s:
+        return 0.0
+
+    tiene_punto = "." in s
+    tiene_coma = "," in s
+    if tiene_punto and tiene_coma:
+        # El separador decimal es el que aparece más a la derecha.
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")  # 1.234.567,89
+        else:
+            s = s.replace(",", "")                     # 1,234,567.89
+    elif tiene_coma:
+        # Una sola coma con 1-2 decimales → decimal; si no, miles.
+        if s.count(",") == 1 and len(s.split(",")[1]) in (1, 2):
+            s = s.replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif tiene_punto:
+        # Un solo punto con 1-2 decimales → decimal; si no (o varios
+        # puntos), son separadores de miles.
+        if s.count(".") == 1 and len(s.split(".")[1]) in (1, 2):
+            pass
+        else:
+            s = s.replace(".", "")
+
+    try:
+        n = float(s)
+    except ValueError:
+        return 0.0
+    return -n if negativo else n
 
 
 def _dias_habiles(desde: datetime, hasta: datetime) -> int:
@@ -379,6 +422,12 @@ class ResumenImportacion:
         # IDs de glosas creadas/actualizadas para auto-procesamiento
         # post-importación (cerebro IA en background).
         self.glosas_ids_para_auto_responder: list[int] = []
+        # IDs de TODAS las glosas tocadas por la importación (creadas +
+        # actualizadas + duplicados exactos). Se usa para generar y enviar
+        # el Excel-respuesta aunque la importación sea una reimportación
+        # 100% duplicada (en ese caso glosas_ids_para_auto_responder queda
+        # vacío pero el gestor igual debe recibir el Excel anotado).
+        self.glosas_ids_todas: list[int] = []
 
     def to_dict(self) -> dict:
         return {
@@ -661,6 +710,8 @@ class RecepcionService:
                             "glosa_existente_id": existente.id,
                             "motivo": "Misma factura + consecutivo + valor + fecha recepción",
                         })
+                        if existente.id is not None:
+                            resumen.glosas_ids_todas.append(existente.id)
                         continue
                     # Distinto en algún campo → actualizar (posible reimportación con correcciones)
                     for k, v in campos.items():
@@ -668,6 +719,7 @@ class RecepcionService:
                     resumen.actualizadas += 1
                     if existente.id is not None:
                         resumen.glosas_ids_para_auto_responder.append(existente.id)
+                        resumen.glosas_ids_todas.append(existente.id)
                 else:
                     nueva = GlosaRecord(**campos)
                     self.db.add(nueva)
@@ -675,6 +727,7 @@ class RecepcionService:
                     resumen.creadas += 1
                     if nueva.id is not None:
                         resumen.glosas_ids_para_auto_responder.append(nueva.id)
+                        resumen.glosas_ids_todas.append(nueva.id)
 
                 resumen.total += 1
                 resumen.semaforo[semaforo] = resumen.semaforo.get(semaforo, 0) + 1

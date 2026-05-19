@@ -4754,23 +4754,37 @@ async def importar_recepcion(
     # donde sin PDFs el dictamen sería pobre y dejarlos en revisión
     # manual del gestor.
     glosas_para_auto = list(getattr(resumen, "glosas_ids_para_auto_responder", []) or [])
+    glosas_todas = list(getattr(resumen, "glosas_ids_todas", []) or [])
     auto_respuesta_lanzada = False
-    if glosas_para_auto:
+    excel_enviado_programado = False
+    # Enviar el Excel-respuesta SIEMPRE que la importación haya tocado al
+    # menos una glosa (creada, actualizada o duplicada). Antes esto estaba
+    # detrás de `if glosas_para_auto:` → reimportar un Excel ya cargado
+    # (solo duplicados) no enviaba ningún correo a los gestores.
+    if glosas_todas:
         try:
             from app.services.auto_responder_service import (
                 lanzar_lote_y_enviar_excel_background,
             )
             lanzar_lote_y_enviar_excel_background(
-                glosas_para_auto, contenido, resumen_dict,
+                glosas_todas, contenido, resumen_dict, ids_ia=glosas_para_auto,
             )
-            auto_respuesta_lanzada = True
+            excel_enviado_programado = True
+            auto_respuesta_lanzada = bool(glosas_para_auto)
             logger.info(
-                f"[{req_id}] Auto-respuesta + envío Excel programado: "
-                f"{len(glosas_para_auto)} glosas en background"
+                f"[{req_id}] Excel-respuesta programado: "
+                f"{len(glosas_todas)} glosas tocadas "
+                f"({len(glosas_para_auto)} para IA) en background"
             )
         except Exception as e:
-            logger.warning(f"[{req_id}] Error encolando auto-respuesta: {e}")
+            logger.warning(f"[{req_id}] Error encolando lote/Excel: {e}")
+    else:
+        logger.info(
+            f"[{req_id}] Importación sin glosas tocadas — no se programa "
+            f"envío de Excel-respuesta"
+        )
     resumen_dict["auto_respuesta_lanzada"] = auto_respuesta_lanzada
+    resumen_dict["excel_respuesta_programado"] = excel_enviado_programado
     resumen_dict["glosas_en_auto_proceso"] = len(glosas_para_auto)
 
     # Persistir la importación + guardar el Excel original en disco para
@@ -4785,8 +4799,8 @@ async def importar_recepcion(
         rec = ImportacionRecepcionRecord(
             usuario_email=current_user.email,
             archivo_nombre=(archivo.filename or "recepcion.xlsx")[:300],
-            total_glosas=len(glosas_para_auto),
-            glosa_ids=_json.dumps(glosas_para_auto),
+            total_glosas=(resumen.total + resumen.duplicadas),
+            glosa_ids=_json.dumps(glosas_todas),
             estado="LISTO",
         )
         db.add(rec)
