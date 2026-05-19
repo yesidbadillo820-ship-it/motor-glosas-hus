@@ -20,8 +20,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from app.models.db import GlosaRecord, TarifaContratadaRecord
+    pass
 
 
 # Frases que delatan un dictamen generado SIN saber del contrato/tarifario

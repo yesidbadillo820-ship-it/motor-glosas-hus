@@ -18,10 +18,10 @@ tenga que pedirlo cada vez.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    pass
 
 
 # Patrones legales/estilísticos comunes que detectamos en los mensajes
@@ -31,6 +31,7 @@ _PATRONES = (
     # (regex case-insensitive, hint canónico, etiqueta corta)
     (r"\bT-?760(/?2008)?\b|sentencia\s+t-?760", "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.", "T-760"),
     (r"\bt-?1025\b", "Cita Sentencia T-1025/2002 (urgencias sin autorización previa).", "T-1025"),
+    (r"\bt-?760(/?2008)?\b|sentencia\s+t-?760", "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.", "T-760"),
     (r"\bart[íi]?culo\s+177\b|art\.?\s*177\b", "Cita Art. 177 Ley 100/1993 (deber EPS de pagar lo facturado).", "Art. 177"),
     (r"\bart[íi]?culo\s+871\b|art\.?\s*871\b", "Cita Art. 871 Código de Comercio (buena fe contractual).", "Art. 871"),
     (r"\bart[íi]?culo\s+1602\b|art\.?\s*1602\b", "Cita Art. 1602 Código Civil (contrato como ley entre partes).", "Art. 1602"),
@@ -40,7 +41,7 @@ _PATRONES = (
     (r"\bres\.?\s*2641\b|2641\s*/?\s*2025", "Cita Res. 2641/2025 MinSalud (homologación CUPS).", "Res. 2641"),
     (r"baj[áa]?(r)?\s+(el\s+)?tono|m[áa]s\s+conciliador|ton[oa]\s+conciliador", "Usa tono conciliador (sin verbos imperativos).", "tono conciliador"),
     (r"sub[ií]r?\s+(el\s+)?tono|m[áa]s\s+firme|ton[oa]\s+firme", "Usa tono firme con verbos enfáticos.", "tono firme"),
-    (r"acort(a|ar|á)|m[áa]s\s+corto|reduc[ií]r?", "Mantén el dictamen corto y directo.", "corto"),
+    (r"ac[óo]rt|m[áa]s\s+corto|reduc[ií]r?", "Mantén el dictamen corto y directo.", "corto"),
     (r"detall|m[áa]s\s+(largo|completo|extenso)|amplia[rd]?", "Amplía el detalle técnico y normativo.", "detallado"),
     (r"silenci[oa]\s+(administrativo|positivo|favorable)", "Menciona el silencio favorable al prestador (Art. 57 Ley 1438/2011).", "silencio favorable"),
     (r"supersalud|sns|art[íi]?culo\s+126", "Menciona escalamiento a SuperSalud (Art. 126 Ley 1438/2011).", "SuperSalud"),

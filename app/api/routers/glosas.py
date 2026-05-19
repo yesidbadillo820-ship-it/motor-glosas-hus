@@ -1578,7 +1578,6 @@ def dashboard_plata_recuperada(
     cuánto plata el motor le ha hecho recuperar al hospital.
     Filtros opcionales: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD.
     """
-    from sqlalchemy import func as _fn
 
     base_q = db.query(GlosaRecord).filter(
         GlosaRecord.estado.notin_(["DUPLICADA_OCULTA"])
@@ -3950,7 +3949,6 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
     db = SessionLocal()
     fila_ok = False
     error_msg = None
-    glosa_id = None
     try:
         cfg = get_settings()
         service = GlosaService(
@@ -4137,7 +4135,6 @@ async def preview_importar_masiva(
     barato (< $1), se permite proceder sin confirmacion explicita.
     """
     import os
-    import re as _re_prev
     from app.models.db import GlosaRecord
 
     eps_formulario = (request.eps or "").strip()
@@ -4720,7 +4717,14 @@ async def importar_recepcion(
     from app.repositories.audit_repository import AuditRepository
 
     servicio = RecepcionService(db)
-    resumen = servicio.procesar_excel(contenido)
+    # procesar_excel es CPU/IO-pesado y SÍNCRONO (openpyxl parsea hojas
+    # CONCEPTOS 'I'/'R' del DGH que pueden tardar MINUTOS). Si se ejecuta
+    # directo en este endpoint async bloquea el event loop del único
+    # worker → /health deja de responder → Fly marca la máquina crítica
+    # y tumba la app para todos (incidente 2026-05-19). Lo movemos a un
+    # threadpool para mantener el event loop libre.
+    from fastapi.concurrency import run_in_threadpool
+    resumen = await run_in_threadpool(servicio.procesar_excel, contenido)
 
     logger.info(
         f"[{req_id}] Importación recepción por {current_user.email} | "
@@ -6304,7 +6308,6 @@ def stats_concentracion_pareto(
 
     # Pareto: cuántas EPS para 80%
     acumulado = 0.0
-    eps_80 = 0
     cuantas_para_80 = 0
     for i, v in enumerate(valores):
         acumulado += v
@@ -6744,7 +6747,7 @@ def stats_cobranza_pendiente(
       - tasa_recuperacion_historica_pct (estimada del histórico)
       - valor_recuperable_estimado
     """
-    from datetime import timedelta, timezone
+    from datetime import timezone
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
@@ -7369,7 +7372,7 @@ def stats_forecast_cierres(
       [{"semana": "2026-W18", "cierres_estimados": 35,
         "pendientes_restantes_estimados": 465}, ...]
     """
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
@@ -7432,7 +7435,7 @@ def stats_velocidad_equipo(
       - velocidad_diaria_promedio_30d
       - dias_para_cerrar_pendientes (estimado)
     """
-    from datetime import timedelta, timezone
+    from datetime import timezone
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
@@ -9274,7 +9277,6 @@ def stats_eps_volumen_mes_anterior(
 
     Ordenado DESC por count_glosas.
     """
-    from datetime import timezone
 
     from app.core.tz import ahora_utc
 
@@ -15230,7 +15232,6 @@ def stats_creadas_hoy(
 
     Útil para refresh frecuente en pantalla de monitoreo.
     """
-    from sqlalchemy import func as _f
 
     inicio_hoy = ahora_utc().replace(
         hour=0, minute=0, second=0, microsecond=0,
@@ -15278,7 +15279,6 @@ def stats_analizadas_hoy(
       - por_accion (CREAR/REFINAR/REGENERAR/RESTAURAR)
       - por_autor: top 5
     """
-    from datetime import timedelta, timezone
 
     from app.models.db import DictamenVersionRecord
 
@@ -15719,7 +15719,7 @@ def stats_comentarios_globales(
 
     Ventana default 30d.
     """
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     from app.models.db import ComentarioGlosaRecord
 
@@ -17101,7 +17101,7 @@ def stats_tendencia_diaria(
         ]
       }
     """
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     from sqlalchemy import func as _f
 
@@ -17389,7 +17389,6 @@ def contexto_completo_glosa(
         raise HTTPException(404, "Glosa no encontrada")
 
     # ─── SLA ─────────────────────────────────────────────────
-    ahora = ahora_utc()
     estado = (glosa.estado or "").upper()
     cerrada = estado in ESTADOS_CERRADOS
 

@@ -626,15 +626,8 @@ def detectar_defectos_criticos(
         #   - NO conocemos un valor_facturado distinto, o lo conocemos y
         #     es distinto del objetado (caso real).
         if len(digitos_obj) >= 4 and digitos_obj != digitos_fact:
-            # Buscar "FACTURAD(O|A) POR ... $<digitos_obj>" tolerando
-            # puntos/comas y palabras intermedias cortas.
-            patron = (
-                r"FACTURAD[OA]S?\s+POR\b[^.]{0,30}?"
-                r"\$?\s*[\d.,]*"
-                + r"".join([d for d in digitos_obj])
-            )
-            # construimos un patrón laxo: permitimos puntos como
-            # separadores de miles entre dígitos.
+            # Patrón laxo: detecta "FACTURADO POR ... $<digitos_obj>"
+            # permitiendo puntos como separadores de miles entre dígitos.
             laxo = (
                 r"FACTURAD[OA]S?\s+POR\b[^.\n]{0,40}?\$\s*"
                 + r"[\.,]?".join(list(digitos_obj))

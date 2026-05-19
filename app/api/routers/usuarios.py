@@ -93,8 +93,8 @@ def heatmap_actividad(
             "dias": [{"fecha": "2025-05-08", "count": 5, "valor": 1234}, ...]
         }
     """
-    from datetime import datetime, timedelta, timezone as _tz, date as _date
-    from sqlalchemy import func as _func, and_
+    from datetime import datetime, timedelta, timezone as _tz
+    from sqlalchemy import func as _func
     from app.models.db import GlosaRecord
     ahora = datetime.now(_tz.utc)
     desde = (ahora - timedelta(days=max(7, min(int(dias), 730)))).date()
@@ -1281,7 +1281,7 @@ def yo_proyeccion_mes(
       - confianza (BAJA/MEDIA/ALTA según muestras)
     """
     from calendar import monthrange
-    from datetime import timedelta, timezone
+    from datetime import timezone
 
     from app.core.tz import ahora_utc
     from app.models.db import GlosaRecord
@@ -1589,7 +1589,7 @@ def yo_insights(
     Cada insight: titulo, frase, tipo (POSITIVO,
     NEUTRAL, ATENCION), accion_sugerida.
     """
-    from datetime import timedelta, timezone
+    from datetime import timezone
 
     from app.core.tz import ahora_utc
     from app.models.db import GlosaRecord
@@ -1955,7 +1955,6 @@ def yo_inicio(
     Optimizado: una sola llamada para una pantalla
     completa de bienvenida.
     """
-    from datetime import timedelta
 
     from app.core.tz import ahora_utc
     from app.models.db import (
@@ -2222,7 +2221,6 @@ def yo_asistente_proactivo(
       tipo, prioridad (1=más urgente), mensaje,
       count, glosa_ids (top 5), accion_recomendada
     """
-    from datetime import timedelta
 
     from app.core.tz import ahora_utc
     from app.models.db import (
@@ -3354,7 +3352,6 @@ def permisos_del_usuario_actual(
     """
     rol = (current_user.rol or "").upper().strip()
     es_super = rol == "SUPER_ADMIN"
-    es_admin = rol in ("SUPER_ADMIN", "ADMIN")
     es_coord = rol in ("SUPER_ADMIN", "ADMIN", "COORDINADOR")
     es_aud = rol in ("SUPER_ADMIN", "ADMIN", "COORDINADOR", "AUDITOR")
 

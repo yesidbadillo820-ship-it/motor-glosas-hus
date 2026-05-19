@@ -210,7 +210,7 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                     "severidad": "MEDIA",
                     "cita": f"Art. {art_num} {norma_tipo} {norma_num}/{norma_anio}",
                     "detalle": f"La {norma_tipo} {norma_num}/{norma_anio} no contiene el Art. {art_num} en el corpus cargado.",
-                    "sugerencia": f"Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
+                    "sugerencia": "Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
                 })
 
     # 4. Verificar citas literales entre chevrones

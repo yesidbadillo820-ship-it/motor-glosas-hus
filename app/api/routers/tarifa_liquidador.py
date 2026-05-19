@@ -20,9 +20,8 @@ Modalidades soportadas:
 """
 from __future__ import annotations
 
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_usuario_actual
@@ -31,15 +30,10 @@ from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
     TARIFAS_SOAT_2026,
-    buscar_tarifa_propia_hus,
-    buscar_tarifa_soat_2026,
 )
 from app.services.uvb import (
-    UVB_2026,
-    SMDLV_2026,
     calcular_soat_con_factor,
     calcular_propia_hus,
-    calcular_valor_pesos,
     valor_smdlv_vigente,
     valor_uvb_vigente,
 )

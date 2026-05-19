@@ -1358,7 +1358,7 @@ class GlosaService:
                             "decidir el tono. NO repitas el JSON en tu respuesta.)\n\n"
                             f"{hallazgos_str}\n"
                         )
-                        logger.info(f"[MULTI-AGENT] Auditor inyectó hallazgos en el prompt")
+                        logger.info("[MULTI-AGENT] Auditor inyectó hallazgos en el prompt")
             except Exception as _e_ma:
                 logger.debug(f"[MULTI-AGENT] Auditor falló: {_e_ma}")
 
@@ -1787,7 +1787,6 @@ class GlosaService:
             try:
                 from app.services.detector_copia import (
                     detectar_copia_gold,
-                    instruccion_anti_copia,
                 )
                 from app.services.validador_dictamen import (
                     detectar_defectos_criticos,
@@ -3261,7 +3260,6 @@ class GlosaService:
         Si todas las herramientas fallan o Claude no termina, levanta.
         """
         import httpx
-        import json
         from app.services.ia_tools import TOOLS_DISPONIBLES, execute_tool
 
         if not self.anthropic_key:

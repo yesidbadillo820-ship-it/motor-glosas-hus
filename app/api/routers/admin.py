@@ -39,7 +39,6 @@ def dedup_historial(
     Por defecto dry_run=True (solo reporta cuántas movería). Para
     ejecutar de verdad: ?dry_run=false.
     """
-    from sqlalchemy import text
     from app.models.db import GlosaRecord
 
     grupos: dict[tuple, list] = {}
@@ -686,7 +685,6 @@ def admin_snapshot_json(
 
     Solo SUPER_ADMIN.
     """
-    from datetime import timezone
     import json
     from fastapi.responses import Response
 
@@ -916,7 +914,7 @@ def admin_glosas_revisar_bandeja(
 
     Solo SUPER_ADMIN.
     """
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     from app.core.tz import ahora_utc
     from app.models.db import GlosaRecord
@@ -1361,7 +1359,7 @@ def admin_digest_diario(
 
     Solo SUPER_ADMIN.
     """
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     from app.core.tz import ahora_utc
 
@@ -2484,7 +2482,6 @@ def admin_cierre_mes_anterior(
     Útil para reporte mensual al comité directivo.
     Solo SUPER_ADMIN.
     """
-    from datetime import timezone
 
     from app.core.tz import ahora_utc
 
@@ -3196,7 +3193,6 @@ def admin_eps_conteos(
 
     Solo SUPER_ADMIN.
     """
-    from sqlalchemy import func as _f
 
     from app.models.db import GlosaRecord
 
@@ -3701,7 +3697,6 @@ def admin_incidentes_criticos(
 
     Solo SUPER_ADMIN.
     """
-    from datetime import timedelta, timezone
 
     from app.core.tz import ahora_utc
     from app.models.db import (
@@ -3862,7 +3857,6 @@ def admin_usuarios_sin_glosas(
 
     Solo SUPER_ADMIN.
     """
-    from sqlalchemy import func as _f
 
     from app.models.db import GlosaRecord
 
@@ -4522,7 +4516,7 @@ def admin_cierre_del_dia(
 
     Solo SUPER_ADMIN.
     """
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     from app.core.tz import ahora_utc
     from app.models.db import (

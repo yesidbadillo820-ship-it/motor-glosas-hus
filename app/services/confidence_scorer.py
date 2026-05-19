@@ -74,7 +74,6 @@ def _tiene_precedente_interno(eps: str, codigo: str) -> bool:
         return False
     db = SessionLocal()
     try:
-        from sqlalchemy import func
         n = (
             db.query(GlosaRecord)
             .filter(

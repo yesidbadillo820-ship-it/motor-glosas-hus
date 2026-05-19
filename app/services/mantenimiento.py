@@ -10,7 +10,6 @@ loguee/registre cuántas filas se afectaron y cuánto espacio se liberó.
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Optional
 
 from sqlalchemy.orm import Session
 

@@ -19,7 +19,6 @@ Spec Anthropic Tool Use:
 """
 import os
 import logging
-from typing import Optional
 
 logger = logging.getLogger("motor_glosas")
 
