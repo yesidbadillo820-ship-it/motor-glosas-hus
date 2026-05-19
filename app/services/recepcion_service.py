@@ -428,6 +428,18 @@ class ResumenImportacion:
         # 100% duplicada (en ese caso glosas_ids_para_auto_responder queda
         # vacío pero el gestor igual debe recibir el Excel anotado).
         self.glosas_ids_todas: list[int] = []
+        # Filas válidas pero saltadas (sin ENTIDAD/FACTURA, fechas inválidas)
+        # — antes se descartaban en silencio y el usuario veía total=0 sin
+        # entender por qué. Guardamos motivo + muestra acotada.
+        self.filas_omitidas: int = 0
+        self.filas_omitidas_detalle: list[dict] = []
+        # Hojas descartadas por no tener columnas reconocibles.
+        self.hojas_descartadas: list[dict] = []
+
+    def registrar_omitida(self, fila: int, motivo: str) -> None:
+        self.filas_omitidas += 1
+        if len(self.filas_omitidas_detalle) < 50:
+            self.filas_omitidas_detalle.append({"fila": fila, "motivo": motivo})
 
     def to_dict(self) -> dict:
         return {
@@ -444,6 +456,9 @@ class ResumenImportacion:
             "conceptos_creados": self.conceptos_creados,
             "conceptos_actualizados": self.conceptos_actualizados,
             "conceptos_huerfanos": self.conceptos_huerfanos[:50],
+            "filas_omitidas": self.filas_omitidas,
+            "filas_omitidas_detalle": self.filas_omitidas_detalle,
+            "hojas_descartadas": self.hojas_descartadas,
         }
 
 
@@ -497,8 +512,22 @@ class RecepcionService:
             elif idx_rec and {"factura", "vence"}.issubset(set(idx_rec.keys())):
                 plan.append(("RECEPCION", nombre_hoja, fila_h_rec, idx_rec))
             else:
+                detectadas = sorted(set((idx_rec or {}).keys()))
+                faltan = sorted({"factura", "vence"} - set(detectadas))
+                resumen.hojas_descartadas.append({
+                    "hoja": nombre_hoja,
+                    "columnas_detectadas": detectadas,
+                    "columnas_faltantes": faltan,
+                })
+                resumen.errores.append(
+                    f"Hoja '{nombre_hoja}' descartada: no se reconocieron "
+                    f"las columnas mínimas (faltan: "
+                    f"{', '.join(faltan) or 'encabezados no mapeables'}). "
+                    f"Detectadas: {', '.join(detectadas) or 'ninguna'}."
+                )
                 logger.warning(
-                    f"Hoja '{nombre_hoja}' sin columnas reconocibles — saltando"
+                    f"Hoja '{nombre_hoja}' sin columnas reconocibles — "
+                    f"saltando (faltan: {faltan})"
                 )
 
         # Procesar RECEPCION primero, CONCEPTOS después
@@ -576,6 +605,17 @@ class RecepcionService:
                 entidad = entidad_raw.upper()
                 factura = str(_get("factura") or "").strip()
                 if not entidad or not factura:
+                    # Antes: skip silencioso → el usuario veía total=0 sin
+                    # saber por qué. Ahora se reporta (salvo fila vacía,
+                    # ya filtrada arriba).
+                    falta = []
+                    if not entidad:
+                        falta.append("ENTIDAD/EPS")
+                    if not factura:
+                        falta.append("FACTURA")
+                    resumen.registrar_omitida(
+                        num_fila, f"sin {' y '.join(falta)}",
+                    )
                     continue
 
                 # Separar código plan (U220181) del nombre para normalización
