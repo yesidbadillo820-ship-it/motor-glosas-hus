@@ -4717,7 +4717,14 @@ async def importar_recepcion(
     from app.repositories.audit_repository import AuditRepository
 
     servicio = RecepcionService(db)
-    resumen = servicio.procesar_excel(contenido)
+    # procesar_excel es CPU/IO-pesado y SÍNCRONO (openpyxl parsea hojas
+    # CONCEPTOS 'I'/'R' del DGH que pueden tardar MINUTOS). Si se ejecuta
+    # directo en este endpoint async bloquea el event loop del único
+    # worker → /health deja de responder → Fly marca la máquina crítica
+    # y tumba la app para todos (incidente 2026-05-19). Lo movemos a un
+    # threadpool para mantener el event loop libre.
+    from fastapi.concurrency import run_in_threadpool
+    resumen = await run_in_threadpool(servicio.procesar_excel, contenido)
 
     logger.info(
         f"[{req_id}] Importación recepción por {current_user.email} | "
