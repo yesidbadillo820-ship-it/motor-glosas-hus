@@ -396,6 +396,18 @@ async def chat_con_asistente(
             continue
         msgs_anthropic.append({"role": m["role"], "content": contenido_limpio})
 
+    # Anthropic exige que el primer mensaje sea de rol "user" y que la
+    # lista no esté vacía; si el saneo dejó mensajes assistant al frente
+    # los descartamos.
+    while msgs_anthropic and msgs_anthropic[0]["role"] != "user":
+        msgs_anthropic.pop(0)
+    if not msgs_anthropic:
+        return {
+            "respuesta": "",
+            "error": "Sin mensajes válidos para enviar",
+            "tools_llamadas": [],
+        }
+
     tools_usadas = []
     tokens_total = {"input": 0, "output": 0}
 

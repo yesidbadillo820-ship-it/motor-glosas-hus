@@ -138,6 +138,7 @@ class Agent:
 
                 # Multi-turn con tools
                 from app.services.ia_tools import execute_tool
+                from app.services.asistente_maestro import _sanear_content
                 for turno in range(max_turns):
                     resp = await client.post(
                         "https://api.anthropic.com/v1/messages",
@@ -161,16 +162,26 @@ class Agent:
                     usage = data.get("usage", {})
                     usage_acumulado["input_tokens"] += usage.get("input_tokens", 0)
                     usage_acumulado["output_tokens"] += usage.get("output_tokens", 0)
-                    messages.append({"role": "assistant", "content": contenido})
+                    # Sanear ANTES de reinyectar: el modelo suele emitir un
+                    # bloque text vacío/whitespace junto al tool_use, y
+                    # reenviarlo dispara 400 "text content blocks must be
+                    # non-empty" en el siguiente turno.
+                    contenido_asistente = _sanear_content(contenido)
+                    if contenido_asistente is not None:
+                        messages.append(
+                            {"role": "assistant", "content": contenido_asistente}
+                        )
                     tool_uses = [b for b in contenido if b.get("type") == "tool_use"]
                     if tool_uses and data.get("stop_reason") == "tool_use":
                         results = []
                         for tu in tool_uses:
                             r = execute_tool(tu.get("name"), tu.get("input", {}))
+                            if not (str(r) if r is not None else "").strip():
+                                r = "(sin resultado)"
                             results.append({
                                 "type": "tool_result",
                                 "tool_use_id": tu.get("id"),
-                                "content": r,
+                                "content": str(r),
                             })
                         messages.append({"role": "user", "content": results})
                         continue
