@@ -4694,16 +4694,201 @@ def check_lote_duplicado(
     }
 
 
+def _recepcion_base_dir() -> str:
+    import os as _os
+    d = _os.path.join(_os.getenv("SOPORTES_ROOT", "/data"), "recepcion")
+    _os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _guardar_resumen_json(rec_id: int, data: dict) -> None:
+    """Persiste el resumen de la importación junto al Excel en disco para
+    que el endpoint de estado / la UI lo muestren cuando termine el
+    procesamiento en background."""
+    import os as _os
+    import json as _json
+    try:
+        ruta = _os.path.join(_recepcion_base_dir(), f"{rec_id}.resumen.json")
+        with open(ruta, "w", encoding="utf-8") as fh:
+            _json.dump(data, fh, ensure_ascii=False, default=str)
+    except Exception as e:
+        logger.warning(f"[recepcion bg] no se pudo guardar resumen json {rec_id}: {e}")
+
+
+async def _procesar_recepcion_bg(
+    rec_id: int,
+    contenido: bytes,
+    usuario_email: str,
+    usuario_rol: str,
+    usuario_id,
+    req_id: str,
+) -> None:
+    """Procesa el Excel de recepción FUERA del request (BackgroundTasks).
+
+    El parseo de hojas CONCEPTOS del DGH puede tardar minutos; hacerlo en
+    el request bloqueaba el único worker y tumbaba la app (incidente
+    2026-05-19). Acá:
+      1. procesar_excel corre en un thread (no bloquea el event loop).
+      2. Se actualiza ImportacionRecepcionRecord (estado, totales, ids).
+      3. Se guarda el resumen en disco para que la UI lo muestre al hacer
+         polling de /importar-recepcion/{id}/status.
+      4. Se dispara el lote IA + envío del Excel-respuesta y el broadcast.
+    """
+    import asyncio as _asyncio
+    import json as _json
+
+    from app.database import SessionLocal
+    from app.services.recepcion_service import RecepcionService
+    from app.services.email_service import enviar_resumen_importacion_recepcion
+    from app.repositories.audit_repository import AuditRepository
+    from app.models.db import ImportacionRecepcionRecord
+
+    db = SessionLocal()
+    try:
+        servicio = RecepcionService(db)
+        resumen = await _asyncio.to_thread(servicio.procesar_excel, contenido)
+
+        logger.info(
+            f"[{req_id}] Importación recepción (bg) por {usuario_email} | "
+            f"total={resumen.total} nuevas={resumen.creadas} "
+            f"actualizadas={resumen.actualizadas} "
+            f"ratificadas={resumen.ratificadas} "
+            f"extemporaneas={resumen.extemporaneas}"
+        )
+
+        try:
+            AuditRepository(db).registrar(
+                usuario_email=usuario_email,
+                usuario_rol=usuario_rol,
+                accion="IMPORTAR_RECEPCION",
+                tabla="historial",
+                detalle=(
+                    f"total={resumen.total} nuevas={resumen.creadas} "
+                    f"actualizadas={resumen.actualizadas} "
+                    f"ratificadas={resumen.ratificadas} "
+                    f"extemporaneas={resumen.extemporaneas}"
+                ),
+            )
+        except Exception as e:
+            logger.warning(f"[{req_id}] audit recepción falló: {e}")
+
+        glosas_para_auto = list(
+            getattr(resumen, "glosas_ids_para_auto_responder", []) or []
+        )
+        glosas_todas = list(getattr(resumen, "glosas_ids_todas", []) or [])
+
+        resumen_dict = resumen.to_dict()
+        resumen_dict["recepcion_import_id"] = rec_id
+        resumen_dict["auto_respuesta_lanzada"] = bool(glosas_para_auto)
+        resumen_dict["excel_respuesta_programado"] = bool(glosas_todas)
+        resumen_dict["glosas_en_auto_proceso"] = len(glosas_para_auto)
+
+        rec = (
+            db.query(ImportacionRecepcionRecord)
+            .filter(ImportacionRecepcionRecord.id == rec_id)
+            .first()
+        )
+        if rec:
+            rec.total_glosas = resumen.total + resumen.duplicadas
+            rec.glosa_ids = _json.dumps(glosas_todas)
+            # PROCESANDO → LISTO; el envío del Excel luego lo pasa a
+            # ENVIADO/PARCIAL/SIN_DESTINATARIOS (no pisar SIN_ARCHIVO).
+            if rec.estado == "PROCESANDO":
+                rec.estado = "LISTO"
+            db.commit()
+
+        # El resumen ya es mostrable al usuario (procesar_excel terminó).
+        _guardar_resumen_json(rec_id, resumen_dict)
+
+        # Lote IA + envío del Excel-respuesta a cada gestor. Secuencial
+        # dentro de este background (mantiene el event loop libre porque
+        # procesar_lote_y_enviar_excel ya es async/awaitable).
+        if glosas_todas:
+            try:
+                from app.services.auto_responder_service import (
+                    procesar_lote_y_enviar_excel,
+                )
+                await procesar_lote_y_enviar_excel(
+                    glosas_todas, contenido, resumen_dict,
+                    ids_ia=glosas_para_auto, rec_id=rec_id,
+                )
+            except Exception as e:
+                logger.error(
+                    f"[{req_id}] lote/Excel recepción falló: {e}",
+                    exc_info=True,
+                )
+
+        # Broadcast resumen (best-effort).
+        try:
+            enviados = await enviar_resumen_importacion_recepcion(
+                resumen_dict, db=db,
+            )
+            resumen_dict["correos_enviados"] = enviados
+        except Exception as e:
+            logger.error(f"[{req_id}] Error enviando correo resumen: {e}")
+            resumen_dict["correos_enviados"] = 0
+            resumen_dict["email_error"] = str(e)
+        _guardar_resumen_json(rec_id, resumen_dict)
+
+        try:
+            from app.services.posthog_service import capture
+            capture(
+                event="recepcion_importada",
+                distinct_id=str(usuario_id if usuario_id is not None else "anonimo"),
+                properties={
+                    "total_glosas": resumen_dict.get("total", 0),
+                    "nuevas": resumen_dict.get("creadas", 0),
+                    "actualizadas": resumen_dict.get("actualizadas", 0),
+                    "duplicadas": resumen_dict.get("duplicadas", 0),
+                    "ratificadas": resumen_dict.get("ratificadas", 0),
+                    "extemporaneas": resumen_dict.get("extemporaneas", 0),
+                    "gestores_afectados": len(resumen_dict.get("por_gestor", {})),
+                    "rojo": resumen_dict.get("semaforo", {}).get("ROJO", 0),
+                    "negro": resumen_dict.get("semaforo", {}).get("NEGRO", 0),
+                    "auto_respuesta_lanzada": resumen_dict.get(
+                        "auto_respuesta_lanzada", False
+                    ),
+                },
+            )
+        except Exception:
+            pass
+    except Exception as e:
+        logger.error(
+            f"[{req_id}] Importación recepción (bg) falló: "
+            f"{type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        try:
+            rec = (
+                db.query(ImportacionRecepcionRecord)
+                .filter(ImportacionRecepcionRecord.id == rec_id)
+                .first()
+            )
+            if rec and rec.estado == "PROCESANDO":
+                rec.estado = "ERROR"
+                db.commit()
+        except Exception:
+            pass
+        _guardar_resumen_json(
+            rec_id, {"estado": "ERROR", "error": str(e)[:300], "total": 0},
+        )
+    finally:
+        db.close()
+
+
 @router.post("/importar-recepcion")
 async def importar_recepcion(
+    background_tasks: BackgroundTasks,
     archivo: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Sube el Excel que envía el equipo de recepción (GESTOR, FECHAS, EPS,
-    FACTURA, CONSECUTIVO DGH, VALOR, VENCE, RADICADO, etc.) y registra cada
-    fila como una glosa, detectando automáticamente extemporaneidad y
-    ratificaciones. Al terminar envía un correo broadcast a ALERTAS_EMAIL.
+    """Sube el Excel de recepción y lo procesa EN SEGUNDO PLANO.
+
+    Devuelve de inmediato el id de la importación; el cliente hace polling
+    a /importar-recepcion/{id}/status para ver el resultado. Esto evita
+    que el parseo (minutos para hojas CONCEPTOS del DGH) bloquee el worker
+    y tumbe la app (incidente 2026-05-19).
     """
     req_id = set_request_id()
     contenido = await archivo.read()
@@ -4712,81 +4897,24 @@ async def importar_recepcion(
     if len(contenido) > 15_000_000:
         raise HTTPException(status_code=413, detail="Archivo demasiado grande (>15 MB)")
 
-    from app.services.recepcion_service import RecepcionService
-    from app.services.email_service import enviar_resumen_importacion_recepcion
-    from app.repositories.audit_repository import AuditRepository
+    import os as _os
+    from app.models.db import ImportacionRecepcionRecord
 
-    servicio = RecepcionService(db)
-    # procesar_excel es CPU/IO-pesado y SÍNCRONO (openpyxl parsea hojas
-    # CONCEPTOS 'I'/'R' del DGH que pueden tardar MINUTOS). Si se ejecuta
-    # directo en este endpoint async bloquea el event loop del único
-    # worker → /health deja de responder → Fly marca la máquina crítica
-    # y tumba la app para todos (incidente 2026-05-19). Lo movemos a un
-    # threadpool para mantener el event loop libre.
-    from fastapi.concurrency import run_in_threadpool
-    resumen = await run_in_threadpool(servicio.procesar_excel, contenido)
-
-    logger.info(
-        f"[{req_id}] Importación recepción por {current_user.email} | "
-        f"total={resumen.total} nuevas={resumen.creadas} actualizadas={resumen.actualizadas} "
-        f"ratificadas={resumen.ratificadas} extemporaneas={resumen.extemporaneas}"
-    )
-
-    AuditRepository(db).registrar(
-        usuario_email=current_user.email,
-        usuario_rol=current_user.rol,
-        accion="IMPORTAR_RECEPCION",
-        tabla="historial",
-        detalle=(
-            f"total={resumen.total} nuevas={resumen.creadas} "
-            f"actualizadas={resumen.actualizadas} ratificadas={resumen.ratificadas} "
-            f"extemporaneas={resumen.extemporaneas}"
-        ),
-    )
-
-    resumen_dict = resumen.to_dict()
-
-    # Auto-respuesta de glosas en background (R-cerebro #11) + envío
-    # del Excel anotado con respuestas IA a cada gestor (directiva
-    # mayo 2026 del coordinador). El flujo:
-    #   1. encolamos las glosas creadas/actualizadas para que el motor
-    #      IA genere su dictamen sin esperar a que el gestor las abra.
-    #   2. al terminar el lote, el servicio dispara el envío del Excel
-    #      original anotado con columnas RESPUESTA IA + ESTADO IA y la
-    #      fila del gestor resaltada en amarillo.
-    # Usa detector REQUIERE_SOPORTES para no gastar tokens en casos
-    # donde sin PDFs el dictamen sería pobre y dejarlos en revisión
-    # manual del gestor.
-    glosas_para_auto = list(getattr(resumen, "glosas_ids_para_auto_responder", []) or [])
-    glosas_todas = list(getattr(resumen, "glosas_ids_todas", []) or [])
-
-    # 1) Persistir la importación + guardar el Excel original en disco PRIMERO
-    # (antes del background) para tener rec_id y poder: (a) descargar el
-    # Excel-respuesta desde la app aunque no llegue el correo, y (b) que el
-    # background actualice el estado de envío de este registro.
     rec_id = None
     try:
-        import os as _os
-        import json as _json
-        from app.models.db import ImportacionRecepcionRecord
-
         rec = ImportacionRecepcionRecord(
             usuario_email=current_user.email,
             archivo_nombre=(archivo.filename or "recepcion.xlsx")[:300],
-            total_glosas=(resumen.total + resumen.duplicadas),
-            glosa_ids=_json.dumps(glosas_todas),
-            estado="LISTO",
+            total_glosas=0,
+            glosa_ids="[]",
+            estado="PROCESANDO",
         )
         db.add(rec)
         db.commit()
         db.refresh(rec)
         rec_id = rec.id
 
-        base_dir = _os.path.join(
-            _os.getenv("SOPORTES_ROOT", "/data"), "recepcion",
-        )
-        _os.makedirs(base_dir, exist_ok=True)
-        ruta = _os.path.join(base_dir, f"{rec.id}.xlsx")
+        ruta = _os.path.join(_recepcion_base_dir(), f"{rec.id}.xlsx")
         with open(ruta, "wb") as fh:
             fh.write(contenido)
         rec.ruta_original = ruta
@@ -4803,92 +4931,53 @@ async def importar_recepcion(
             if v.ruta_original and _os.path.exists(v.ruta_original):
                 try:
                     _os.remove(v.ruta_original)
+                    rj = _os.path.join(
+                        _recepcion_base_dir(), f"{v.id}.resumen.json",
+                    )
+                    if _os.path.exists(rj):
+                        _os.remove(rj)
                     v.ruta_original = None
                     v.estado = "SIN_ARCHIVO"
                 except OSError:
                     pass
         if viejas:
             db.commit()
-
-        resumen_dict["recepcion_import_id"] = rec.id
-        logger.info(
-            f"[{req_id}] Importación recepción persistida id={rec.id} "
-            f"({len(glosas_todas)} glosas tocadas, archivo en {ruta})"
-        )
     except Exception as e:
-        logger.warning(
-            f"[{req_id}] No se pudo persistir la importación de recepción "
-            f"(el Excel-respuesta no quedará descargable): {e}"
+        logger.error(
+            f"[{req_id}] No se pudo iniciar la importación de recepción: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo iniciar la importación. Reintentá.",
         )
 
-    # 2) Enviar el Excel-respuesta SIEMPRE que la importación haya tocado al
-    # menos una glosa (creada, actualizada o duplicada). Antes esto estaba
-    # detrás de `if glosas_para_auto:` → reimportar un Excel ya cargado
-    # (solo duplicados) no enviaba ningún correo a los gestores.
-    auto_respuesta_lanzada = False
-    excel_enviado_programado = False
-    if glosas_todas:
-        try:
-            from app.services.auto_responder_service import (
-                lanzar_lote_y_enviar_excel_background,
-            )
-            lanzar_lote_y_enviar_excel_background(
-                glosas_todas, contenido, resumen_dict,
-                ids_ia=glosas_para_auto, rec_id=rec_id,
-            )
-            excel_enviado_programado = True
-            auto_respuesta_lanzada = bool(glosas_para_auto)
-            logger.info(
-                f"[{req_id}] Excel-respuesta programado: "
-                f"{len(glosas_todas)} glosas tocadas "
-                f"({len(glosas_para_auto)} para IA) en background"
-            )
-        except Exception as e:
-            logger.warning(f"[{req_id}] Error encolando lote/Excel: {e}")
-    else:
-        logger.info(
-            f"[{req_id}] Importación sin glosas tocadas — no se programa "
-            f"envío de Excel-respuesta"
-        )
-    resumen_dict["auto_respuesta_lanzada"] = auto_respuesta_lanzada
-    resumen_dict["excel_respuesta_programado"] = excel_enviado_programado
-    resumen_dict["glosas_en_auto_proceso"] = len(glosas_para_auto)
+    background_tasks.add_task(
+        _procesar_recepcion_bg,
+        rec_id,
+        contenido,
+        current_user.email,
+        current_user.rol,
+        getattr(current_user, "id", None),
+        req_id,
+    )
+    logger.info(
+        f"[{req_id}] Importación recepción id={rec_id} encolada "
+        f"(archivo {len(contenido)} bytes) — procesando en background"
+    )
 
-    # Notificación broadcast (no bloquea la respuesta si falla)
-    # Pasamos db para que la funcion busque usuarios cuyo nombre matchee
-    # con los gestores del resumen (ej. EQUIPO ASEGURADORAS) y los incluya
-    # en la lista de destinatarios aunque no esten en ALERTAS_EMAIL.
-    try:
-        enviados = await enviar_resumen_importacion_recepcion(resumen_dict, db=db)
-        resumen_dict["correos_enviados"] = enviados
-    except Exception as e:
-        logger.error(f"[{req_id}] Error enviando correo: {e}")
-        resumen_dict["correos_enviados"] = 0
-        resumen_dict["email_error"] = str(e)
-
-    # PostHog tracking — recepción importada. Best-effort.
-    try:
-        from app.services.posthog_service import capture
-        capture(
-            event="recepcion_importada",
-            distinct_id=str(getattr(current_user, "id", "anonimo")),
-            properties={
-                "total_glosas": resumen_dict.get("total", 0),
-                "nuevas": resumen_dict.get("creadas", 0),
-                "actualizadas": resumen_dict.get("actualizadas", 0),
-                "duplicadas": resumen_dict.get("duplicadas", 0),
-                "ratificadas": resumen_dict.get("ratificadas", 0),
-                "extemporaneas": resumen_dict.get("extemporaneas", 0),
-                "gestores_afectados": len(resumen_dict.get("por_gestor", {})),
-                "rojo": resumen_dict.get("semaforo", {}).get("ROJO", 0),
-                "negro": resumen_dict.get("semaforo", {}).get("NEGRO", 0),
-                "auto_respuesta_lanzada": resumen_dict.get("auto_respuesta_lanzada", False),
-            },
-        )
-    except Exception:
-        pass
-
-    return resumen_dict
+    return {
+        "recepcion_import_id": rec_id,
+        "estado": "PROCESANDO",
+        "procesando": True,
+        "archivo_nombre": (archivo.filename or "recepcion.xlsx"),
+        "mensaje": (
+            "Importación recibida. El Excel se está procesando en segundo "
+            "plano (puede tardar varios minutos en archivos grandes). "
+            "Podés esperar acá o cerrar — el resultado queda en "
+            "'Importaciones recientes'."
+        ),
+    }
 
 
 @router.get("/importar-recepcion/historial")
@@ -4937,6 +5026,52 @@ def historial_importaciones_recepcion(
             "dictamenes_pendientes": pendientes,
         })
     return {"importaciones": out}
+
+
+@router.get("/importar-recepcion/{rec_id}/status")
+def estado_importacion_recepcion(
+    rec_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Estado de una importación en background. La UI hace polling acá.
+
+    `resumen` viene null mientras procesar_excel no termina; cuando el
+    background lo guarda en disco, se devuelve para que la UI lo muestre.
+    """
+    import os as _os
+    import json as _json
+    from app.models.db import ImportacionRecepcionRecord
+
+    rec = (
+        db.query(ImportacionRecepcionRecord)
+        .filter(ImportacionRecepcionRecord.id == rec_id)
+        .first()
+    )
+    if not rec:
+        raise HTTPException(404, "Importación no encontrada")
+
+    resumen = None
+    rp = _os.path.join(_recepcion_base_dir(), f"{rec_id}.resumen.json")
+    if _os.path.exists(rp):
+        try:
+            with open(rp, "r", encoding="utf-8") as fh:
+                resumen = _json.load(fh)
+        except Exception:
+            resumen = None
+
+    # "Terminado para mostrar" = procesar_excel terminó (hay resumen) o
+    # falló (estado ERROR). El envío IA/correo sigue después y se refleja
+    # en el badge de estado del historial.
+    procesando = rec.estado == "PROCESANDO" and resumen is None
+    return {
+        "id": rec.id,
+        "estado": rec.estado,
+        "procesando": procesando,
+        "descargable": bool(rec.ruta_original),
+        "total_glosas": rec.total_glosas,
+        "resumen": resumen,
+    }
 
 
 @router.get("/importar-recepcion/{rec_id}/excel-respuesta")

@@ -127,16 +127,85 @@ document.getElementById('btn').addEventListener('click', async ()=>{
     const d = await r.json();
     if(!r.ok){
       alert('Error: '+(d.detail || r.status));
+      btn.disabled = false;
+      btn.innerHTML = 'Subir y procesar';
       return;
     }
-    mostrarResultado(d);
+    // Nuevo flujo: el server procesa en background y responde al toque
+    // con el id. Hacemos polling del estado.
+    if(d && d.recepcion_import_id && (d.procesando || d.estado === 'PROCESANDO')){
+      mostrarProcesando(d);
+      cargarHistorial();
+      pollEstado(d.recepcion_import_id);
+    } else {
+      mostrarResultado(d);
+      btn.disabled = false;
+      btn.innerHTML = 'Subir y procesar';
+    }
   }catch(e){
     alert('Error de red: '+e.message);
-  }finally{
     btn.disabled = false;
     btn.innerHTML = 'Subir y procesar';
   }
 });
+
+function mostrarProcesando(d){
+  const res = document.getElementById('result');
+  res.classList.remove('hidden');
+  document.getElementById('result-title').innerHTML =
+    '<span style="color:#1e40af"><span class="spin" style="border-color:#1e40af;border-top-color:transparent"></span>Procesando importación #'+d.recepcion_import_id+'…</span>';
+  let box = document.getElementById('proc-box');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'proc-box';
+    box.style.cssText='background:#dbeafe;border:1px solid #2563eb;border-radius:8px;padding:14px;margin:10px 0;color:#1e3a8a;font-size:13px;line-height:1.6';
+    res.insertBefore(box, res.children[1] || null);
+  }
+  box.innerHTML = (d.mensaje || 'Procesando el Excel en segundo plano…')
+    + '<br><span style="font-size:12px;opacity:.8">Esta página se actualiza sola cuando termine. También podés cerrarla: el resultado queda en «Importaciones recientes».</span>';
+}
+
+let _pollTimer = null;
+async function pollEstado(id){
+  const btn = document.getElementById('btn');
+  let intentos = 0;
+  if(_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(async ()=>{
+    intentos++;
+    try{
+      const r = await fetch('/glosas/importar-recepcion/'+id+'/status', {
+        headers:{'Authorization':'Bearer '+TOKEN}
+      });
+      if(!r.ok) return;
+      const s = await r.json();
+      cargarHistorial();
+      if(s.estado === 'ERROR'){
+        clearInterval(_pollTimer); _pollTimer=null;
+        const pb = document.getElementById('proc-box');
+        if(pb){ pb.style.cssText='background:#fee2e2;border:1px solid #dc2626;border-radius:8px;padding:14px;margin:10px 0;color:#991b1b;font-size:13px';
+          pb.innerHTML = '✗ La importación falló' + (s.resumen && s.resumen.error ? ': '+s.resumen.error : '') + '. Revisá el archivo y reintentá.'; }
+        document.getElementById('result-title').innerHTML='<span style="color:#991b1b">✗ Importación con error</span>';
+        btn.disabled=false; btn.innerHTML='Subir y procesar';
+        return;
+      }
+      if(!s.procesando && s.resumen){
+        clearInterval(_pollTimer); _pollTimer=null;
+        const pb=document.getElementById('proc-box'); if(pb) pb.remove();
+        mostrarResultado(s.resumen);
+        cargarHistorial();
+        btn.disabled=false; btn.innerHTML='Subir y procesar';
+        return;
+      }
+      // Sigue procesando — corte de seguridad a ~10 min (200 * 3s)
+      if(intentos > 200){
+        clearInterval(_pollTimer); _pollTimer=null;
+        const pb=document.getElementById('proc-box');
+        if(pb) pb.innerHTML='Sigue procesando en segundo plano. Cuando termine aparecerá en «Importaciones recientes» con su botón de descarga.';
+        btn.disabled=false; btn.innerHTML='Subir y procesar';
+      }
+    }catch(e){ /* reintenta en el próximo tick */ }
+  }, 3000);
+}
 
 function mostrarResultado(d){
   document.getElementById('result').classList.remove('hidden');
