@@ -80,7 +80,14 @@
     <h3 style="margin:20px 0 10px">Asignaciones por gestor</h3>
     <div id="gestores"></div>
 
+    <div id="omitidas" style="margin-top:16px"></div>
     <div id="errores" style="margin-top:20px"></div>
+  </div>
+
+  <div id="historial-card" class="card">
+    <h2 style="color:#1e3a8a;margin-bottom:6px">🗂️ Importaciones recientes</h2>
+    <p class="lead" style="margin-bottom:14px">Descargá el Excel-respuesta anotado (RESPUESTA IA / ESTADO IA / ID GLOSA) de cualquier importación, aunque no haya llegado el correo. Se regenera al momento con los dictámenes que la IA tenga listos.</p>
+    <div id="historial-lista"><div style="color:#6b7280;font-size:13px">Cargando…</div></div>
   </div>
 </div>
 
@@ -253,13 +260,103 @@ function mostrarResultado(d){
     cont.appendChild(div);
   });
 
+  const om = document.getElementById('omitidas');
+  om.innerHTML = '';
+  const nOm = d.filas_omitidas || 0;
+  const hojasDesc = d.hojas_descartadas || [];
+  if(nOm > 0 || hojasDesc.length){
+    let html = '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;color:#92400e;font-size:13px;line-height:1.6">';
+    if(nOm > 0){
+      html += `<b>⚠ ${nOm} fila(s) no se importaron</b> (faltaba ENTIDAD/EPS, FACTURA o fechas válidas).`;
+      const det = (d.filas_omitidas_detalle||[]).slice(0,8)
+        .map(o=>`fila ${o.fila}: ${o.motivo}`).join(' · ');
+      if(det) html += `<br><span style="font-size:12px;opacity:.85">${det}</span>`;
+    }
+    if(hojasDesc.length){
+      html += (nOm>0?'<br><br>':'') + '<b>Hojas descartadas:</b> ' +
+        hojasDesc.map(h=>`"${h.hoja}" (faltan: ${(h.columnas_faltantes||[]).join(', ')||'encabezados'})`).join(' · ');
+    }
+    html += '</div>';
+    om.innerHTML = html;
+  }
+
   const errs = document.getElementById('errores');
   errs.innerHTML = '';
   if(d.errores && d.errores.length){
-    errs.innerHTML = '<h3 style="color:#991b1b;margin-bottom:6px">Errores</h3>' +
+    errs.innerHTML = '<h3 style="color:#991b1b;margin-bottom:6px">Avisos / Errores</h3>' +
       d.errores.map(e=>`<div class="err">${e}</div>`).join('');
   }
+
+  // Refrescar el historial para que la nueva importación quede
+  // descargable aunque el usuario recargue la página.
+  cargarHistorial();
 }
+
+async function descargarExcelRecepcion(id, btn){
+  const txt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generando…';
+  try{
+    const rr = await fetch('/glosas/importar-recepcion/'+id+'/excel-respuesta', {
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    if(!rr.ok){
+      let de={}; try{ de = await rr.json(); }catch(_e){}
+      alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
+      return;
+    }
+    const blob = await rr.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glosas_recepcion_'+id+'_respuesta.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert('Error de red al descargar: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = txt;
+  }
+}
+
+async function cargarHistorial(){
+  const cont = document.getElementById('historial-lista');
+  try{
+    const r = await fetch('/glosas/importar-recepcion/historial', {
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    if(!r.ok){
+      cont.innerHTML = '<div style="color:#991b1b;font-size:13px">No se pudo cargar el historial ('+r.status+')</div>';
+      return;
+    }
+    const d = await r.json();
+    const imps = d.importaciones || [];
+    if(!imps.length){
+      cont.innerHTML = '<div style="color:#6b7280;font-size:13px">Todavía no hay importaciones.</div>';
+      return;
+    }
+    cont.innerHTML = imps.map(im=>{
+      const fecha = im.creado_en ? new Date(im.creado_en).toLocaleString('es-CO') : '—';
+      const dl = im.descargable
+        ? `<button onclick="descargarExcelRecepcion(${im.id}, this)" style="background:#10b981;color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">⬇ Excel-respuesta</button>`
+        : `<span style="color:#9ca3af;font-size:12px">archivo ya no disponible</span>`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px">
+        <div style="font-size:13px;color:#374151">
+          <b>#${im.id}</b> · ${fecha}<br>
+          <span style="color:#6b7280">${im.archivo_nombre||'recepcion.xlsx'} · ${im.total_glosas} glosa(s) · ${im.usuario_email||''}</span>
+        </div>
+        <div>${dl}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    cont.innerHTML = '<div style="color:#991b1b;font-size:13px">Error de red cargando historial</div>';
+  }
+}
+
+cargarHistorial();
 </script>
 </body>
 </html>
