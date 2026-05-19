@@ -586,6 +586,30 @@ class LoteImportacionRecord(Base):
     errores = Column(Text, nullable=True)
 
 
+class ImportacionRecepcionRecord(Base):
+    """Histórico de importaciones de recepción (Excel subido por el
+    equipo de recepción vía /glosas/importar-recepcion).
+
+    Guarda la ruta al Excel original en disco (/data/recepcion) y los
+    IDs de glosas creadas/actualizadas, para poder regenerar y descargar
+    el Excel-respuesta anotado desde la app en cualquier momento — no
+    solo cuando llega por correo. Sirve además de respaldo si el envío
+    SMTP falla.
+    """
+    __tablename__ = "importaciones_recepcion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    usuario_email = Column(String(200), index=True, nullable=False)
+    archivo_nombre = Column(String(300), nullable=True)
+    ruta_original = Column(String(500), nullable=True)
+    total_glosas = Column(Integer, default=0, nullable=False)
+    # JSON array con los IDs de glosas creadas/actualizadas del lote
+    glosa_ids = Column(Text, nullable=True)
+    estado = Column(String(20), default="LISTO", index=True)
+    # LISTO | SIN_ARCHIVO | ERROR
+
+
 class NoticiaSaludRecord(Base):
     """Noticias del sector salud Colombia traídas vía RSS de fuentes
     oficiales y especializadas (ConsultorSalud, MinSalud, ACHC, etc.).

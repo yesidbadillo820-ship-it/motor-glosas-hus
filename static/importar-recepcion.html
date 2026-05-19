@@ -190,6 +190,56 @@ function mostrarResultado(d){
     if(wrap) wrap.insertBefore(banner, wrap.children[1] || null);
   }
 
+  // ⬇ Descarga directa del Excel-respuesta anotado (RESPUESTA IA /
+  // ESTADO IA / ID GLOSA). Disponible aunque el correo no llegue.
+  if(d.recepcion_import_id){
+    var prevDl = document.getElementById('dl-excel-wrap');
+    if(prevDl) prevDl.remove();
+    var dlWrap = document.createElement('div');
+    dlWrap.id = 'dl-excel-wrap';
+    dlWrap.style.cssText = 'margin:1rem 0;padding:1rem 1.2rem;background:#ecfdf5;border:2px solid #10b981;border-radius:12px;color:#065f46;';
+    dlWrap.innerHTML =
+      '<div style="font-weight:800;font-size:.98rem;margin-bottom:.5rem;">📊 Excel-respuesta listo para descargar</div>'
+      + '<div style="font-size:.84rem;opacity:.9;margin-bottom:.7rem;">'
+      + 'Trae el Excel original con las columnas <b>RESPUESTA IA</b>, <b>ESTADO IA</b> e <b>ID GLOSA</b>. '
+      + 'Se regenera al momento, así incluye los dictámenes que la IA termine después.'
+      + '</div>'
+      + '<button id="dl-excel-btn" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:.6rem 1.1rem;font-weight:700;cursor:pointer;">⬇ Descargar Excel-respuesta</button>';
+    var wrapR = document.getElementById('result');
+    if(wrapR) wrapR.insertBefore(dlWrap, wrapR.children[1] || null);
+    document.getElementById('dl-excel-btn').addEventListener('click', async function(){
+      var b = this;
+      b.disabled = true;
+      var txt = b.textContent;
+      b.textContent = 'Generando...';
+      try{
+        var rr = await fetch('/glosas/importar-recepcion/'+d.recepcion_import_id+'/excel-respuesta', {
+          headers:{'Authorization':'Bearer '+TOKEN}
+        });
+        if(!rr.ok){
+          var de = {};
+          try{ de = await rr.json(); }catch(_e){}
+          alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
+          return;
+        }
+        var blob = await rr.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'glosas_recepcion_respuesta.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }catch(e){
+        alert('Error de red al descargar: '+e.message);
+      }finally{
+        b.disabled = false;
+        b.textContent = txt;
+      }
+    });
+  }
+
   const cont = document.getElementById('gestores');
   cont.innerHTML = '';
   const porG = d.por_gestor || {};
