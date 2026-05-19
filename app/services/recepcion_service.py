@@ -234,16 +234,46 @@ def _a_fecha(valor) -> Optional[datetime]:
         return valor
     if isinstance(valor, date):
         return datetime(valor.year, valor.month, valor.day)
+    # Serial de Excel (días desde 1899-12-30) que llegó como número o
+    # como texto numérico — frecuente cuando la celda perdió formato.
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        try:
+            if 1 < float(valor) < 100000:
+                return datetime(1899, 12, 30) + timedelta(days=int(valor))
+        except (ValueError, OverflowError):
+            return None
     s = str(valor).strip()
+    if not s:
+        return None
+    s_norm = re.sub(r"[.\s-]+", "/", s)
     for fmt in (
         "%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S",
         "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
         "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y", "%m/%d/%Y",
+        "%Y/%m/%d", "%d-%m-%y",
     ):
         try:
             return datetime.strptime(s, fmt)
         except ValueError:
             continue
+    # Segundo intento con separadores normalizados (ej. "2025.01.15",
+    # "15 01 2025" → "15/01/2025").
+    for fmt in ("%d/%m/%Y", "%Y/%m/%d", "%d/%m/%y"):
+        try:
+            return datetime.strptime(s_norm, fmt)
+        except ValueError:
+            continue
+    # ISO con 'T' (ej. "2025-01-15T00:00:00").
+    try:
+        return datetime.fromisoformat(s.replace("Z", "").split("+")[0])
+    except ValueError:
+        pass
+    # Serial de Excel que llegó como texto numérico ("45672").
+    if s.isdigit() and 1 < int(s) < 100000:
+        try:
+            return datetime(1899, 12, 30) + timedelta(days=int(s))
+        except (ValueError, OverflowError):
+            return None
     return None
 
 

@@ -577,6 +577,8 @@ async def enviar_excel_recepcion_con_respuestas(
     destinatarios_unicos: set[str] = set()
     gestores_atendidos = 0
     broadcast_ok = False
+    gestores_sin_email: list[str] = []
+    gestores_detalle: list[dict] = []
 
     # ── 1. BROADCAST a ALERTAS_EMAIL primero ────────────────────────
     # Lo hacemos antes del loop por-gestor para garantizar que al menos
@@ -631,6 +633,11 @@ async def enviar_excel_recepcion_con_respuestas(
     for nombre_gestor, filas in sorted(por_gestor.items()):
         emails = _emails_para_gestor(nombre_gestor, mapa)
         if not emails:
+            gestores_sin_email.append(nombre_gestor)
+            gestores_detalle.append({
+                "gestor": nombre_gestor, "glosas": len(filas),
+                "emails": 0, "enviado": False, "motivo": "sin email en UsuarioRecord",
+            })
             logger.info(
                 f"[EXCEL-EMAIL] Gestor '{nombre_gestor}' ({len(filas)} glosas) "
                 f"sin email asociado en UsuarioRecord — su Excel queda solo "
@@ -704,19 +711,30 @@ async def enviar_excel_recepcion_con_respuestas(
         html = _build_html_base(asunto, contenido)
         adjunto: Adjunto = (archivo_base, xlsx_bytes, _XLSX_MIME_SUBTYPE)
 
+        enviado_gestor = False
         for email in emails:
             destinatarios_unicos.add(email)
             if await enviar_email(email, asunto, html, adjuntos=[adjunto]):
                 enviados += 1
+                enviado_gestor = True
+        gestores_detalle.append({
+            "gestor": nombre_gestor, "glosas": len(filas),
+            "emails": len(emails), "enviado": enviado_gestor,
+            "motivo": "" if enviado_gestor else "fallo SMTP",
+        })
 
     logger.info(
         f"[EXCEL-EMAIL] ✅ flujo terminó: enviados={enviados}, "
         f"destinatarios_unicos={len(destinatarios_unicos)}, "
-        f"gestores_atendidos={gestores_atendidos}, broadcast_ok={broadcast_ok}"
+        f"gestores_atendidos={gestores_atendidos}, "
+        f"sin_email={len(gestores_sin_email)} {gestores_sin_email[:5]}, "
+        f"broadcast_ok={broadcast_ok}"
     )
     return {
         "destinatarios": len(destinatarios_unicos),
         "enviados": enviados,
         "gestores_atendidos": gestores_atendidos,
+        "gestores_sin_email": gestores_sin_email,
+        "gestores_detalle": gestores_detalle,
         "broadcast_ok": broadcast_ok,
     }

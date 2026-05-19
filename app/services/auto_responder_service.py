@@ -351,11 +351,56 @@ def lanzar_lote_background(glosa_ids: list[int]) -> None:
         logger.error(f"[AUTO-RESPONDER] No se pudo lanzar lote: {e}")
 
 
+def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
+    """Actualiza ImportacionRecepcionRecord.estado según el resultado del
+    envío (usa solo la columna `estado` ya existente — sin migración):
+      ENVIADO          → al menos un correo salió y ningún gestor sin email
+      PARCIAL          → salieron correos pero hubo gestores sin email
+      SIN_DESTINATARIOS→ no salió ningún correo
+    """
+    if not rec_id:
+        return
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ImportacionRecepcionRecord
+
+        enviados = int(envio.get("enviados", 0) or 0)
+        sin_email = envio.get("gestores_sin_email") or []
+        if enviados <= 0:
+            nuevo = "SIN_DESTINATARIOS"
+        elif sin_email:
+            nuevo = "PARCIAL"
+        else:
+            nuevo = "ENVIADO"
+        s = SessionLocal()
+        try:
+            rec = (
+                s.query(ImportacionRecepcionRecord)
+                .filter(ImportacionRecepcionRecord.id == rec_id)
+                .first()
+            )
+            # No pisar SIN_ARCHIVO (prune) — solo si sigue en LISTO.
+            if rec and rec.estado in ("LISTO", "PARCIAL", "SIN_DESTINATARIOS"):
+                rec.estado = nuevo
+                s.commit()
+                logger.info(
+                    f"[EXCEL-EMAIL] rec_id={rec_id} estado→{nuevo} "
+                    f"(enviados={enviados}, sin_email={len(sin_email)})"
+                )
+        finally:
+            s.close()
+    except Exception as e:
+        logger.warning(
+            f"[EXCEL-EMAIL] no se pudo actualizar estado rec_id={rec_id}: {e}"
+        )
+
+
 async def procesar_lote_y_enviar_excel(
     glosa_ids: list[int],
     excel_original: bytes,
     resumen: dict,
     ids_ia: list[int] | None = None,
+    rec_id: int | None = None,
 ) -> dict:
     """Procesa el lote IA y, al terminar, manda a cada gestor el Excel
     original anotado con las respuestas generadas.
@@ -423,6 +468,7 @@ async def procesar_lote_y_enviar_excel(
         logger.info(
             f"[EXCEL-EMAIL] ✅ envío terminó: {envio}"
         )
+        _actualizar_estado_recepcion(rec_id, envio)
     except Exception as e:
         logger.error(
             f"[EXCEL-EMAIL] ❌ enviar_excel_recepcion_con_respuestas crasheó: "
@@ -430,6 +476,24 @@ async def procesar_lote_y_enviar_excel(
             exc_info=True,
         )
         resultado_lote["excel_emails"] = {"error": str(e)[:200]}
+        if rec_id:
+            try:
+                from app.database import SessionLocal
+                from app.models.db import ImportacionRecepcionRecord
+                s = SessionLocal()
+                try:
+                    rec = (
+                        s.query(ImportacionRecepcionRecord)
+                        .filter(ImportacionRecepcionRecord.id == rec_id)
+                        .first()
+                    )
+                    if rec and rec.estado == "LISTO":
+                        rec.estado = "ERROR"
+                        s.commit()
+                finally:
+                    s.close()
+            except Exception:
+                pass
     finally:
         db_email.close()
     return resultado_lote
@@ -440,6 +504,7 @@ def lanzar_lote_y_enviar_excel_background(
     excel_original: bytes,
     resumen: dict,
     ids_ia: list[int] | None = None,
+    rec_id: int | None = None,
 ) -> None:
     """Variante de `lanzar_lote_background` que, al terminar el lote,
     dispara el envío del Excel-respuesta a cada gestor.
@@ -471,7 +536,7 @@ def lanzar_lote_y_enviar_excel_background(
         loop = asyncio.get_event_loop()
         task = loop.create_task(
             procesar_lote_y_enviar_excel(
-                glosa_ids, excel_original, resumen, ids_ia,
+                glosa_ids, excel_original, resumen, ids_ia, rec_id,
             )
         )
         _registrar_bg_task(
