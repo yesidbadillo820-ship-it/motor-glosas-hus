@@ -576,13 +576,12 @@ async def lifespan(app: FastAPI):
         force_reset_pwd = os.getenv("FORCE_RESET_PASSWORDS", "").lower() in ("1", "true", "yes")
         for email, rol, nombre in USUARIOS_CORPORATIVOS:
             password_inicial = email.split("@")[0]  # prefijo
-            password_hash_inicial = get_password_hash(password_inicial)
             existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
             if not existente:
                 db.add(UsuarioRecord(
                     nombre=nombre,
                     email=email,
-                    password_hash=password_hash_inicial,
+                    password_hash=get_password_hash(password_inicial),
                     rol=rol,
                     activo=1,
                     must_change_password=1,  # obligado a cambiar en primer login
@@ -603,7 +602,7 @@ async def lifespan(app: FastAPI):
                     cambios.append(f"nombre '{existente.nombre}'->'{nombre}'")
                     existente.nombre = nombre
                 if force_reset_pwd:
-                    existente.password_hash = password_hash_inicial
+                    existente.password_hash = get_password_hash(password_inicial)
                     existente.must_change_password = 1
                     cambios.append("password reset a prefijo email + must_change=1")
                 if cambios:
