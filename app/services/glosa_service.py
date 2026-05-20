@@ -2361,10 +2361,15 @@ class GlosaService:
 
             arg_ia = truncar_despues_de_levantamiento(arg_ia)
 
-            # AUTO-CRÍTICA: valida el borrador y pide corrección si es pobre
+            # AUTO-CRÍTICA: valida el borrador y pide corrección si es pobre.
             # Solo aplica en modo normal (no auditoria_previa, no texto-fijo).
             # Se limita a 1 iteración para no aumentar latencia >2x.
-            if modo_resp != "auditoria_previa" and self.anthropic_key:
+            # Funciona con cualquier proveedor (Anthropic/Groq/Gemini/OpenRouter)
+            # via _llamar_ia que respeta primary_ai + fallbacks.
+            _hay_proveedor = bool(
+                self.anthropic_key or self.groq or self.gemini or self.openrouter
+            )
+            if modo_resp != "auditoria_previa" and _hay_proveedor:
                 try:
                     from app.services.validador_dictamen import evaluar_dictamen
 
@@ -2401,17 +2406,26 @@ class GlosaService:
                             "el dictamen mejorado dentro de <argumento>...</argumento>."
                         )
                         try:
-                            _res_refinado, _ = await self._llamar_anthropic(
+                            # Usa el proveedor primary_ai (Groq/Gemini/Anthropic) con su
+                            # cadena de fallbacks. Temperature 0.05 solo se aplica si el
+                            # proveedor es Anthropic; los demás usan su default (0.2).
+                            # bypass_cache=True para no servir el mismo dictamen defectuoso
+                            # ya cacheado — necesitamos fuerza nueva generación.
+                            _res_refinado, _modelo_refinado = await self._llamar_ia(
                                 system=_sys_refine,
                                 user=_refine_prompt,
+                                eps=str(data.eps or ""),
+                                codigo=codigo_det,
                                 temperature_override=0.05,
+                                bypass_cache=True,
                             )
                             _arg_refinado = self._xml("argumento", _res_refinado, "")
                             if _arg_refinado and len(_arg_refinado) > 100:
                                 arg_ia = _arg_refinado
                                 logger.info(
                                     f"[AUTO-CRITICA] score={_score_val}→refinado "
-                                    f"({len(_defectos)} defectos corregidos)"
+                                    f"({len(_defectos)} defectos corregidos) "
+                                    f"via {_modelo_refinado}"
                                 )
                         except Exception as _e_ref:
                             logger.warning(f"[AUTO-CRITICA] refinamiento falló: {_e_ref}")
