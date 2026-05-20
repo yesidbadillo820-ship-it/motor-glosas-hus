@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/contexto-completo (R94 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,9 +50,14 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        factura="F-001", valor_objetado=1000, etapa="X",
-        estado="RADICADA", creado_en=ahora_utc(),
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        factura="F-001",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(GlosaRecord(**base))
@@ -69,16 +76,17 @@ class TestContextoCompleto:
         d = r.json()
         # 4 secciones top-level
         assert set(d.keys()) == {
-            "glosa", "sla", "audit_resumen", "relacionadas_count",
+            "glosa",
+            "sla",
+            "audit_resumen",
+            "relacionadas_count",
         }
         assert d["glosa"]["id"] == g.id
         assert d["glosa"]["eps"] == "SANITAS"
         assert d["glosa"]["valor_objetado"] == 5000.0
 
     def test_sla_seccion(self, client, db_session):
-        g = _seed(db_session,
-                  fecha_vencimiento=ahora_utc() + timedelta(days=2),
-                  dias_restantes=2)
+        g = _seed(db_session, fecha_vencimiento=ahora_utc() + timedelta(days=2), dias_restantes=2)
         r = client.get(f"/glosas/{g.id}/contexto-completo")
         d = r.json()
         assert d["sla"]["estado_sla"] == "CRITICA"
@@ -89,10 +97,15 @@ class TestContextoCompleto:
         g = _seed(db_session)
         # 3 eventos de audit
         for u in ["a@x", "b@x", "a@x"]:
-            db_session.add(AuditLogRecord(
-                usuario_email=u, accion="UPDATE", tabla="glosas",
-                registro_id=g.id, timestamp=ahora_utc(),
-            ))
+            db_session.add(
+                AuditLogRecord(
+                    usuario_email=u,
+                    accion="UPDATE",
+                    tabla="glosas",
+                    registro_id=g.id,
+                    timestamp=ahora_utc(),
+                )
+            )
         db_session.commit()
 
         r = client.get(f"/glosas/{g.id}/contexto-completo")
@@ -101,13 +114,10 @@ class TestContextoCompleto:
         assert d["audit_resumen"]["usuarios_que_intervinieron"] == ["a@x", "b@x"]
 
     def test_relacionadas_count(self, client, db_session):
-        g1 = _seed(db_session, factura="F-X", paciente="Pedro",
-                   eps="E", codigo_glosa="C")
+        g1 = _seed(db_session, factura="F-X", paciente="Pedro", eps="E", codigo_glosa="C")
         # 2 misma factura + 1 mismo paciente (que también es misma factura)
-        _seed(db_session, factura="F-X", paciente="Pedro",
-              eps="E", codigo_glosa="C")
-        _seed(db_session, factura="F-X", paciente="Otro",
-              eps="OtraEps", codigo_glosa="C")
+        _seed(db_session, factura="F-X", paciente="Pedro", eps="E", codigo_glosa="C")
+        _seed(db_session, factura="F-X", paciente="Otro", eps="OtraEps", codigo_glosa="C")
 
         r = client.get(f"/glosas/{g1.id}/contexto-completo")
         d = r.json()

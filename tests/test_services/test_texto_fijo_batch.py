@@ -1,4 +1,5 @@
 """Tests del batch retro-aplicación de texto fijo (Ronda 22)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -26,9 +27,13 @@ def db_session():
 
 def _crear(db, **kw):
     defaults = dict(
-        eps="FAMISANAR", paciente="X", factura="F",
-        codigo_glosa="TA0201", valor_objetado=100_000,
-        estado="PENDIENTE", creado_en=datetime.now(timezone.utc),
+        eps="FAMISANAR",
+        paciente="X",
+        factura="F",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        estado="PENDIENTE",
+        creado_en=datetime.now(timezone.utc),
     )
     defaults.update(kw)
     g = GlosaRecord(**defaults)

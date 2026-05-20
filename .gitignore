@@ -43,3 +43,11 @@ Thumbs.db
 uploads/
 temp/
 tmp/
+
+# Test artifacts
+junit.xml
+.coverage
+htmlcov/
+
+# Pre-commit cache
+.pre-commit-cache/

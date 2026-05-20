@@ -9,6 +9,7 @@ Endpoints:
     Versión liviana sin datos sensibles: solo estado_general + timestamp.
     Sirve como healthcheck para monitoreo externo (Render, UptimeRobot).
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -74,12 +75,14 @@ def observabilidad(
     scheduler_ia = {"activo": False, "ultima": None}
     try:
         from app.services.ia_auditora_proactiva import obtener_estado as _ia_state
+
         scheduler_ia = _ia_state()
     except Exception:
         pass
     scheduler_digest = {"activo": False, "ultima": None}
     try:
         from app.services.digest_scheduler import obtener_estado as _dg_state
+
         scheduler_digest = _dg_state()
     except Exception:
         pass
@@ -102,13 +105,21 @@ def observabilidad(
     if not sentry_ok:
         recomendaciones.append("Configurar SENTRY_DSN para tracking de errores en producción.")
     if not (anthropic_ok or groq_ok):
-        recomendaciones.append("CRÍTICO: configurar ANTHROPIC_API_KEY o GROQ_API_KEY (sin IA, no hay análisis).")
+        recomendaciones.append(
+            "CRÍTICO: configurar ANTHROPIC_API_KEY o GROQ_API_KEY (sin IA, no hay análisis)."
+        )
     if not firma_rsa_ok:
-        recomendaciones.append("Configurar FIRMA_DIGITAL_PRIVATE_KEY para firmas asimétricas (más seguras que HMAC).")
+        recomendaciones.append(
+            "Configurar FIRMA_DIGITAL_PRIVATE_KEY para firmas asimétricas (más seguras que HMAC)."
+        )
     if not cifrado_ok:
-        recomendaciones.append("Configurar GLOSAS_ENCRYPTION_KEY para cifrar datos sensibles del paciente.")
+        recomendaciones.append(
+            "Configurar GLOSAS_ENCRYPTION_KEY para cifrar datos sensibles del paciente."
+        )
     if not digest_dest_ok:
-        recomendaciones.append("Configurar DIGEST_DESTINATARIOS para envío automático del resumen diario.")
+        recomendaciones.append(
+            "Configurar DIGEST_DESTINATARIOS para envío automático del resumen diario."
+        )
     if not (whatsapp_ok or telegram_ok):
         recomendaciones.append("Configurar al menos un canal de bot (Meta WhatsApp o Telegram).")
 
@@ -207,7 +218,8 @@ def metricas_ia(
         )
     desglose = sorted(
         [{"modelo": m, **v} for m, v in por_modelo.items()],
-        key=lambda x: x["cost_usd"], reverse=True,
+        key=lambda x: x["cost_usd"],
+        reverse=True,
     )
 
     return {
@@ -319,13 +331,15 @@ def metricas_ia_por_usuario(
 
     items = []
     for email, d in por_usuario.items():
-        items.append({
-            "user_email": email,
-            "calls": d["calls"],
-            "cost_usd": round(d["cost_usd"], 6),
-            "tokens_total": d["tokens_total"],
-            "latency_ms_promedio": int(d["latency_ms_total"] / d["calls"]) if d["calls"] else 0,
-        })
+        items.append(
+            {
+                "user_email": email,
+                "calls": d["calls"],
+                "cost_usd": round(d["cost_usd"], 6),
+                "tokens_total": d["tokens_total"],
+                "latency_ms_promedio": int(d["latency_ms_total"] / d["calls"]) if d["calls"] else 0,
+            }
+        )
     items.sort(key=lambda x: x["cost_usd"], reverse=True)
 
     return {
@@ -353,11 +367,7 @@ def metricas_ia_billing_forense(
     from app.models.db import AICallRecord
 
     desde = ahora_utc() - timedelta(days=max(1, int(dias)))
-    todas = (
-        db.query(AICallRecord)
-        .filter(AICallRecord.creado_en >= desde)
-        .all()
-    )
+    todas = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
 
     # Agregar por modelo
     por_modelo: dict[str, dict] = {}
@@ -366,12 +376,19 @@ def metricas_ia_billing_forense(
     todas_costos = []
     for c in todas:
         cost = c.cost_usd or 0
-        toks = (c.input_tokens or 0) + (c.cache_creation_input_tokens or 0) + (c.cache_read_input_tokens or 0) + (c.output_tokens or 0)
+        toks = (
+            (c.input_tokens or 0)
+            + (c.cache_creation_input_tokens or 0)
+            + (c.cache_read_input_tokens or 0)
+            + (c.output_tokens or 0)
+        )
         d = por_modelo.setdefault(c.modelo or "?", {"calls": 0, "cost_usd": 0.0, "tokens": 0})
         d["calls"] += 1
         d["cost_usd"] += cost
         d["tokens"] += toks
-        d2 = por_proveedor.setdefault(c.proveedor or "?", {"calls": 0, "cost_usd": 0.0, "tokens": 0})
+        d2 = por_proveedor.setdefault(
+            c.proveedor or "?", {"calls": 0, "cost_usd": 0.0, "tokens": 0}
+        )
         d2["calls"] += 1
         d2["cost_usd"] += cost
         d2["tokens"] += toks
@@ -381,19 +398,21 @@ def metricas_ia_billing_forense(
         d3["cost_usd"] += cost
         d3["tokens"] += toks
         # Top calls por costo
-        todas_costos.append({
-            "id": c.id,
-            "creado_en": c.creado_en.isoformat() if c.creado_en else None,
-            "modelo": c.modelo,
-            "user": c.user_email,
-            "glosa_id": c.glosa_id,
-            "cost_usd": round(cost, 6),
-            "tokens": toks,
-            "input": c.input_tokens or 0,
-            "cache_read": c.cache_read_input_tokens or 0,
-            "output": c.output_tokens or 0,
-            "latency_ms": c.latency_ms or 0,
-        })
+        todas_costos.append(
+            {
+                "id": c.id,
+                "creado_en": c.creado_en.isoformat() if c.creado_en else None,
+                "modelo": c.modelo,
+                "user": c.user_email,
+                "glosa_id": c.glosa_id,
+                "cost_usd": round(cost, 6),
+                "tokens": toks,
+                "input": c.input_tokens or 0,
+                "cache_read": c.cache_read_input_tokens or 0,
+                "output": c.output_tokens or 0,
+                "latency_ms": c.latency_ms or 0,
+            }
+        )
     todas_costos.sort(key=lambda x: -x["cost_usd"])
     top_calls = todas_costos[:20]
 
@@ -415,15 +434,15 @@ def metricas_ia_billing_forense(
         "cost_en_sistema": round(cost_sistema, 4),
         "glosas_unicas_que_consumieron": n_glosas_unicas,
         "por_modelo": [
-            {"modelo": m, **{k: (round(v, 4) if k=="cost_usd" else v) for k,v in d.items()}}
+            {"modelo": m, **{k: (round(v, 4) if k == "cost_usd" else v) for k, v in d.items()}}
             for m, d in sorted(por_modelo.items(), key=lambda x: -x[1]["cost_usd"])
         ],
         "por_proveedor": [
-            {"proveedor": p, **{k: (round(v, 4) if k=="cost_usd" else v) for k,v in d.items()}}
+            {"proveedor": p, **{k: (round(v, 4) if k == "cost_usd" else v) for k, v in d.items()}}
             for p, d in sorted(por_proveedor.items(), key=lambda x: -x[1]["cost_usd"])
         ],
         "por_user": [
-            {"user_email": u, **{k: (round(v, 4) if k=="cost_usd" else v) for k,v in d.items()}}
+            {"user_email": u, **{k: (round(v, 4) if k == "cost_usd" else v) for k, v in d.items()}}
             for u, d in sorted(por_user.items(), key=lambda x: -x[1]["cost_usd"])
         ][:15],
         "top_calls_caras": top_calls,
@@ -466,15 +485,18 @@ def alertas_criticas_consolidadas(
         db.query(_f.count(GlosaRecord.id))
         .filter(GlosaRecord.dias_restantes <= 0)
         .filter(GlosaRecord.estado.in_(estados_activos))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     if cnt_vencidas > 0:
-        items.append({
-            "nivel": "CRITICO",
-            "mensaje": f"{cnt_vencidas} glosa(s) VENCIDA(S) sin resolver",
-            "count": cnt_vencidas,
-            "link_sugerido": "/glosas/historial-paginado?estado=RADICADA",
-        })
+        items.append(
+            {
+                "nivel": "CRITICO",
+                "mensaje": f"{cnt_vencidas} glosa(s) VENCIDA(S) sin resolver",
+                "count": cnt_vencidas,
+                "link_sugerido": "/glosas/historial-paginado?estado=RADICADA",
+            }
+        )
 
     # 2. Glosas críticas (1-2 días)
     cnt_criticas = (
@@ -482,15 +504,18 @@ def alertas_criticas_consolidadas(
         .filter(GlosaRecord.dias_restantes > 0)
         .filter(GlosaRecord.dias_restantes <= 2)
         .filter(GlosaRecord.estado.in_(estados_activos))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     if cnt_criticas > 0:
-        items.append({
-            "nivel": "ALTO",
-            "mensaje": f"{cnt_criticas} glosa(s) vencen en 1-2 días",
-            "count": cnt_criticas,
-            "link_sugerido": "/glosas/historial-paginado?estado=RADICADA",
-        })
+        items.append(
+            {
+                "nivel": "ALTO",
+                "mensaje": f"{cnt_criticas} glosa(s) vencen en 1-2 días",
+                "count": cnt_criticas,
+                "link_sugerido": "/glosas/historial-paginado?estado=RADICADA",
+            }
+        )
 
     # 3. Borradores antiguos (>5 días sin avance)
     corte_borrador = ahora_utc() - timedelta(days=5)
@@ -498,52 +523,62 @@ def alertas_criticas_consolidadas(
         db.query(_f.count(GlosaRecord.id))
         .filter(GlosaRecord.estado == "BORRADOR")
         .filter(GlosaRecord.creado_en < corte_borrador)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     if cnt_borradores_viejos > 0:
-        items.append({
-            "nivel": "MEDIO",
-            "mensaje": f"{cnt_borradores_viejos} borrador(es) sin avance >5 días",
-            "count": cnt_borradores_viejos,
-            "link_sugerido": "/glosas/historial-paginado?estado=BORRADOR",
-        })
+        items.append(
+            {
+                "nivel": "MEDIO",
+                "mensaje": f"{cnt_borradores_viejos} borrador(es) sin avance >5 días",
+                "count": cnt_borradores_viejos,
+                "link_sugerido": "/glosas/historial-paginado?estado=BORRADOR",
+            }
+        )
 
     # 4. Costo IA del día (si supera $10 USD)
     desde_24h = ahora_utc() - timedelta(hours=24)
     cost_24h = (
-        db.query(_f.sum(AICallRecord.cost_usd))
-        .filter(AICallRecord.creado_en >= desde_24h)
-        .scalar() or 0
+        db.query(_f.sum(AICallRecord.cost_usd)).filter(AICallRecord.creado_en >= desde_24h).scalar()
+        or 0
     )
     if float(cost_24h) > 10.0:
-        items.append({
-            "nivel": "MEDIO",
-            "mensaje": f"Costo IA hoy: ${float(cost_24h):.2f} USD (umbral $10)",
-            "count": 1,
-            "link_sugerido": "/sistema/metricas-ia?dias=1",
-        })
+        items.append(
+            {
+                "nivel": "MEDIO",
+                "mensaje": f"Costo IA hoy: ${float(cost_24h):.2f} USD (umbral $10)",
+                "count": 1,
+                "link_sugerido": "/sistema/metricas-ia?dias=1",
+            }
+        )
 
     # 5. Schedulers caídos
     try:
         from app.services.ia_auditora_proactiva import _task as _t_pa
+
         if _t_pa is None or _t_pa.done():
-            items.append({
-                "nivel": "ALTO",
-                "mensaje": "Scheduler de pre-análisis NO está corriendo",
-                "count": 1,
-                "link_sugerido": "/sistema/observabilidad",
-            })
+            items.append(
+                {
+                    "nivel": "ALTO",
+                    "mensaje": "Scheduler de pre-análisis NO está corriendo",
+                    "count": 1,
+                    "link_sugerido": "/sistema/observabilidad",
+                }
+            )
     except Exception:
         pass
     try:
         from app.services.mantenimiento_scheduler import _task as _t_mant
+
         if _t_mant is None or _t_mant.done():
-            items.append({
-                "nivel": "MEDIO",
-                "mensaje": "Scheduler de mantenimiento NO está corriendo",
-                "count": 1,
-                "link_sugerido": "/sistema/observabilidad",
-            })
+            items.append(
+                {
+                    "nivel": "MEDIO",
+                    "mensaje": "Scheduler de mantenimiento NO está corriendo",
+                    "count": 1,
+                    "link_sugerido": "/sistema/observabilidad",
+                }
+            )
     except Exception:
         pass
 
@@ -608,6 +643,7 @@ def healthcheck_profundo(
     # Check scheduler pre-análisis
     try:
         from app.services.ia_auditora_proactiva import _task as _t_pa
+
         ok = (_t_pa is not None) and not _t_pa.done()
         componentes["scheduler_pre_analisis"] = {"ok": bool(ok)}
         if not ok:
@@ -619,6 +655,7 @@ def healthcheck_profundo(
     # Check scheduler mantenimiento
     try:
         from app.services.mantenimiento_scheduler import _task as _t_mant
+
         ok = (_t_mant is not None) and not _t_mant.done()
         componentes["scheduler_mantenimiento"] = {"ok": bool(ok)}
         if not ok:
@@ -639,6 +676,7 @@ def healthcheck_profundo(
 def _select_1():
     """Helper para abstraer la query SELECT 1 con SQLAlchemy 2."""
     from sqlalchemy import text
+
     return text("SELECT 1")
 
 
@@ -758,15 +796,14 @@ def resumen_mensual_ejecutivo(
         "variacion_pct": {
             "count": _variacion(actual["count"], anterior["count"]),
             "valor_objetado": _variacion(actual["valor_objetado"], anterior["valor_objetado"]),
-            "valor_recuperado": _variacion(actual["valor_recuperado"], anterior["valor_recuperado"]),
+            "valor_recuperado": _variacion(
+                actual["valor_recuperado"], anterior["valor_recuperado"]
+            ),
         },
         "top_3_eps": [
-            {"eps": e, "count": int(c), "valor_objetado": float(v or 0)}
-            for e, c, v in top_eps
+            {"eps": e, "count": int(c), "valor_objetado": float(v or 0)} for e, c, v in top_eps
         ],
-        "top_3_tipos": [
-            {"prefijo": p, "count": int(c)} for p, c in top_tipos
-        ],
+        "top_3_tipos": [{"prefijo": p, "count": int(c)} for p, c in top_tipos],
         "generado_en": ahora_utc().isoformat(),
     }
 
@@ -783,6 +820,7 @@ def ia_presence_publica():
     abre esta URL en navegador y ve si la env var realmente llego al proceso.
     """
     import os
+
     def _info(env_key: str) -> dict:
         v = os.getenv(env_key, "")
         if not v:
@@ -793,6 +831,7 @@ def ia_presence_publica():
             "prefijo": v[:10] + "...",
             "longitud": len(v),
         }
+
     return {
         "primary_ai": os.getenv("PRIMARY_AI", "gemini"),
         "anthropic": _info("ANTHROPIC_API_KEY"),
@@ -839,19 +878,13 @@ def info_version():
 
     # Render expone RENDER_GIT_COMMIT con el hash del commit deployado.
     # Localmente usamos "dev" como fallback.
-    commit_full = (
-        os.getenv("RENDER_GIT_COMMIT")
-        or os.getenv("GIT_COMMIT")
-        or "dev"
-    )
+    commit_full = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "dev"
     commit_short = commit_full[:7] if len(commit_full) >= 7 else commit_full
 
     # Build time: lo más cercano disponible — Render no expone el timestamp
     # del build, así que usamos el del proceso (cuándo arrancó la app).
     build_time = (
-        os.getenv("RENDER_BUILD_TIME")
-        or os.getenv("APP_BUILD_TIME")
-        or ahora_utc().isoformat()
+        os.getenv("RENDER_BUILD_TIME") or os.getenv("APP_BUILD_TIME") or ahora_utc().isoformat()
     )
 
     return {
@@ -909,20 +942,20 @@ def info_test_suite(
             tamano = path.stat().st_size
             with open(path, "r", encoding="utf-8") as f:
                 lineas = sum(1 for _ in f)
-            items.append({
-                "archivo": str(rel),
-                "tamano_bytes": tamano,
-                "lineas": lineas,
-            })
+            items.append(
+                {
+                    "archivo": str(rel),
+                    "tamano_bytes": tamano,
+                    "lineas": lineas,
+                }
+            )
         except Exception:
             continue
 
     return {
         "total_archivos": len(items),
         "total_lineas": sum(it["lineas"] for it in items),
-        "por_directorio": dict(
-            sorted(por_dir.items(), key=lambda x: x[1], reverse=True)
-        ),
+        "por_directorio": dict(sorted(por_dir.items(), key=lambda x: x[1], reverse=True)),
         "items": items,
     }
 
@@ -1007,19 +1040,13 @@ def info_kpis_negocio(
         else:
             valor_pendiente_actual += v_obj
 
-    tasa_lev = (
-        round(100 * levantadas / decididas, 2) if decididas else 0.0
-    )
-    tasa_rec = (
-        round(100 * valor_rec_total / valor_obj_cerradas, 2)
-        if valor_obj_cerradas else 0.0
-    )
-    tiempo_prom = (
-        round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
-    )
+    tasa_lev = round(100 * levantadas / decididas, 2) if decididas else 0.0
+    tasa_rec = round(100 * valor_rec_total / valor_obj_cerradas, 2) if valor_obj_cerradas else 0.0
+    tiempo_prom = round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
     tasa_sla = (
         round(100 * cerradas_a_tiempo_30d / cerradas_total_con_venc_30d, 2)
-        if cerradas_total_con_venc_30d else 0.0
+        if cerradas_total_con_venc_30d
+        else 0.0
     )
     eps_top = max(rec_por_eps, key=rec_por_eps.get) if rec_por_eps else None
 
@@ -1041,7 +1068,7 @@ def info_milestones(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
-    """R150 P1: hitos cuantitativos del sistema.
+    r"""R150 P1: hitos cuantitativos del sistema.
 
     Útil para celebrar el avance y comunicar progreso a gerencia:
       "¡Llegamos a 1.000 glosas procesadas!"
@@ -1060,10 +1087,7 @@ def info_milestones(
     from app.models.db import GlosaRecord
 
     total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
-    valor_recuperado = (
-        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0))
-        .scalar() or 0
-    )
+    valor_recuperado = db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0)).scalar() or 0
     valor_recuperado = int(valor_recuperado)
 
     # Hito glosas
@@ -1075,7 +1099,7 @@ def info_milestones(
 
     # Hito valor recuperado en COP
     M = 1_000_000
-    hitos_valor = [10*M, 50*M, 100*M, 500*M, 1_000*M, 5_000*M]
+    hitos_valor = [10 * M, 50 * M, 100 * M, 500 * M, 1_000 * M, 5_000 * M]
     siguiente_valor = next(
         (h for h in hitos_valor if h > valor_recuperado),
         valor_recuperado * 2,
@@ -1087,6 +1111,7 @@ def info_milestones(
     dias_operacion = None
     if primera_glosa:
         from datetime import timezone
+
         ahora = ahora_utc()
         if primera_glosa.tzinfo is None:
             primera_glosa = primera_glosa.replace(tzinfo=timezone.utc)
@@ -1163,8 +1188,7 @@ def info_api_endpoints(
 
     return {
         "total_endpoints": len(items),
-        "por_tag": dict(sorted(por_tag.items(), key=lambda x: x[1],
-                               reverse=True)),
+        "por_tag": dict(sorted(por_tag.items(), key=lambda x: x[1], reverse=True)),
         "items": items,
     }
 
@@ -1241,8 +1265,7 @@ def cumplimiento_resolucion(
     items = [
         {
             "articulo": "Art. 6 - Códigos canónicos",
-            "requisito": "Sistema debe usar códigos TA, FA, AU, SO, "
-                         "CL, AT del manual",
+            "requisito": "Sistema debe usar códigos TA, FA, AU, SO, CL, AT del manual",
             "cumple": True,
             "evidencia": "GlosaRecord.codigo_glosa con catálogo Res 2284",
         },
@@ -1256,13 +1279,11 @@ def cumplimiento_resolucion(
             "articulo": "Art. 12 - Códigos de respuesta",
             "requisito": "Soporte RE9901, RE9502, RE9801, RE9702, RE9602",
             "cumple": True,
-            "evidencia": "GlosaRecord.codigo_respuesta + "
-                         "/stats/exito-por-codigo-respuesta",
+            "evidencia": "GlosaRecord.codigo_respuesta + /stats/exito-por-codigo-respuesta",
         },
         {
             "articulo": "Art. 16 - Conciliación bilateral",
-            "requisito": "Acta de conciliación con valor_conciliado y "
-                         "estado_bilateral",
+            "requisito": "Acta de conciliación con valor_conciliado y estado_bilateral",
             "cumple": True,
             "evidencia": "ConciliacionRecord + /stats/conciliaciones",
         },
@@ -1283,7 +1304,7 @@ def cumplimiento_resolucion(
             "requisito": "Protección PII, audit de accesos, retención",
             "cumple": True,
             "evidencia": "Cifrado opcional + retención audit + "
-                         "/admin/usuarios/exportar.csv (sin secretos)",
+            "/admin/usuarios/exportar.csv (sin secretos)",
         },
         {
             "articulo": "Historia Clínica Res 1995/1999",
@@ -1296,8 +1317,7 @@ def cumplimiento_resolucion(
     cumple = sum(1 for it in items if it["cumple"])
     return {
         "regulacion": (
-            "Resolución 2284/2023 (Manual Único Glosas) + "
-            "Habeas Data + Historia Clínica"
+            "Resolución 2284/2023 (Manual Único Glosas) + Habeas Data + Historia Clínica"
         ),
         "total_items": len(items),
         "items_cumplidos": cumple,
@@ -1338,7 +1358,11 @@ def copilot_resumen(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     todas = db.query(GlosaRecord).all()
@@ -1357,9 +1381,7 @@ def copilot_resumen(
                 eps_count[eps] = eps_count.get(eps, 0) + 1
             gestor = (g.gestor_nombre or "").strip()
             if gestor:
-                gestor_carga[gestor] = (
-                    gestor_carga.get(gestor, 0) + 1
-                )
+                gestor_carga[gestor] = gestor_carga.get(gestor, 0) + 1
         if e in ESTADOS_DECIDIDOS:
             f = g.fecha_decision_eps
             if f and f.tzinfo is None:
@@ -1369,29 +1391,22 @@ def copilot_resumen(
 
     # Métricas
     n_abiertas = len(abiertas)
-    n_vencidas = sum(
-        1 for g in abiertas if (g.dias_restantes or 0) < 0
-    )
+    n_vencidas = sum(1 for g in abiertas if (g.dias_restantes or 0) < 0)
     n_vencidas_grandes = sum(
-        1 for g in abiertas
-        if (g.dias_restantes or 0) < 0
-        and float(g.valor_objetado or 0) >= 5_000_000
+        1
+        for g in abiertas
+        if (g.dias_restantes or 0) < 0 and float(g.valor_objetado or 0) >= 5_000_000
     )
 
     n_dec_mes = len(decididas_mes)
-    n_lev_mes = sum(
-        1 for g in decididas_mes
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    rec_mes = sum(
-        float(g.valor_recuperado or 0) for g in decididas_mes
-    )
-    tasa_mes = (
-        100.0 * n_lev_mes / n_dec_mes if n_dec_mes else 0.0
-    )
+    n_lev_mes = sum(1 for g in decididas_mes if (g.estado or "").upper() == "LEVANTADA")
+    rec_mes = sum(float(g.valor_recuperado or 0) for g in decididas_mes)
+    tasa_mes = 100.0 * n_lev_mes / n_dec_mes if n_dec_mes else 0.0
 
     top_eps = sorted(
-        eps_count.items(), key=lambda x: x[1], reverse=True,
+        eps_count.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:1]
 
     # Detectar gestor sobrecargado (mediana × 1.5)
@@ -1408,74 +1423,76 @@ def copilot_resumen(
     # Highlights
     highlights = []
     if n_vencidas_grandes > 0:
-        highlights.append({
-            "tipo": "ATENCION",
-            "titulo": f"🚨 {n_vencidas_grandes} glosa(s) grandes vencidas",
-            "valor": f"{n_vencidas_grandes}",
-            "detalle": "Alto valor + en mora. Acción inmediata.",
-        })
+        highlights.append(
+            {
+                "tipo": "ATENCION",
+                "titulo": f"🚨 {n_vencidas_grandes} glosa(s) grandes vencidas",
+                "valor": f"{n_vencidas_grandes}",
+                "detalle": "Alto valor + en mora. Acción inmediata.",
+            }
+        )
     elif n_vencidas > 0:
-        highlights.append({
-            "tipo": "ATENCION",
-            "titulo": f"⏰ {n_vencidas} vencida(s) en el sistema",
-            "valor": f"{n_vencidas}",
-            "detalle": "Cierre en orden de antigüedad.",
-        })
+        highlights.append(
+            {
+                "tipo": "ATENCION",
+                "titulo": f"⏰ {n_vencidas} vencida(s) en el sistema",
+                "valor": f"{n_vencidas}",
+                "detalle": "Cierre en orden de antigüedad.",
+            }
+        )
 
     if n_dec_mes > 0:
-        highlights.append({
-            "tipo": "POSITIVO" if tasa_mes >= 60 else "NEUTRAL",
-            "titulo": f"Tasa del mes {tasa_mes:.1f}%",
-            "valor": f"{tasa_mes:.0f}%",
-            "detalle": f"{n_lev_mes} de {n_dec_mes} decididas",
-        })
+        highlights.append(
+            {
+                "tipo": "POSITIVO" if tasa_mes >= 60 else "NEUTRAL",
+                "titulo": f"Tasa del mes {tasa_mes:.1f}%",
+                "valor": f"{tasa_mes:.0f}%",
+                "detalle": f"{n_lev_mes} de {n_dec_mes} decididas",
+            }
+        )
 
     if rec_mes > 0:
-        highlights.append({
-            "tipo": "POSITIVO",
-            "titulo": "💰 Recuperado del mes",
-            "valor": f"${int(rec_mes):,}",
-            "detalle": f"de {n_dec_mes} cierres del mes",
-        })
+        highlights.append(
+            {
+                "tipo": "POSITIVO",
+                "titulo": "💰 Recuperado del mes",
+                "valor": f"${int(rec_mes):,}",
+                "detalle": f"de {n_dec_mes} cierres del mes",
+            }
+        )
 
     if top_eps:
         eps_n, eps_c = top_eps[0]
-        highlights.append({
-            "tipo": "INFO",
-            "titulo": f"📊 EPS dominante: {eps_n}",
-            "valor": f"{eps_c}",
-            "detalle": "abiertas en pipeline",
-        })
+        highlights.append(
+            {
+                "tipo": "INFO",
+                "titulo": f"📊 EPS dominante: {eps_n}",
+                "valor": f"{eps_c}",
+                "detalle": "abiertas en pipeline",
+            }
+        )
 
     if gestor_alerta:
-        highlights.append({
-            "tipo": "ATENCION",
-            "titulo": f"⚖️ {gestor_alerta['gestor']} sobrecargado",
-            "valor": f"{gestor_alerta['abiertas']}",
-            "detalle": "abiertas — considera rebalancear",
-        })
+        highlights.append(
+            {
+                "tipo": "ATENCION",
+                "titulo": f"⚖️ {gestor_alerta['gestor']} sobrecargado",
+                "valor": f"{gestor_alerta['abiertas']}",
+                "detalle": "abiertas — considera rebalancear",
+            }
+        )
 
     # Frase ejecutiva
     if n_vencidas_grandes >= 5:
         frase = (
-            f"⚠️ {n_vencidas_grandes} glosas grandes vencidas — "
-            "atención urgente del coordinador."
+            f"⚠️ {n_vencidas_grandes} glosas grandes vencidas — atención urgente del coordinador."
         )
     elif n_vencidas == 0 and tasa_mes >= 70:
-        frase = (
-            f"✅ Todo bajo control · tasa del mes "
-            f"{tasa_mes:.0f}% · sin vencidas."
-        )
+        frase = f"✅ Todo bajo control · tasa del mes {tasa_mes:.0f}% · sin vencidas."
     elif n_vencidas == 0:
-        frase = (
-            f"✅ Sin vencidas · {n_abiertas} abiertas · "
-            f"tasa {tasa_mes:.0f}%."
-        )
+        frase = f"✅ Sin vencidas · {n_abiertas} abiertas · tasa {tasa_mes:.0f}%."
     else:
-        frase = (
-            f"📋 {n_abiertas} abiertas · {n_vencidas} "
-            f"vencidas · tasa del mes {tasa_mes:.0f}%."
-        )
+        frase = f"📋 {n_abiertas} abiertas · {n_vencidas} vencidas · tasa del mes {tasa_mes:.0f}%."
 
     return {
         "generado_en": ahora.isoformat(),
@@ -1608,10 +1625,7 @@ def info_about(
             "hosting": "Render",
         },
         "soporte": {
-            "github_issues": (
-                "https://github.com/yesidbadillo820-ship-it/"
-                "motor-glosas-hus/issues"
-            ),
+            "github_issues": ("https://github.com/yesidbadillo820-ship-it/motor-glosas-hus/issues"),
         },
     }
 
@@ -1639,6 +1653,7 @@ def info_uptime_aprox(
     inicio = None
     try:
         import psutil
+
         p = psutil.Process(pid)
         inicio = p.create_time()
     except Exception:
@@ -1761,8 +1776,7 @@ def info_deploy(
         "render_service_id": os.getenv("RENDER_SERVICE_ID"),
         "render_external_url": os.getenv("RENDER_EXTERNAL_URL"),
         "python_version": (
-            f"{sys.version_info.major}.{sys.version_info.minor}."
-            f"{sys.version_info.micro}"
+            f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
         ),
         "build_id": commit[:8] if commit else "local",
     }
@@ -1789,10 +1803,7 @@ def info_inventario_funcionalidades(
         "dominios": [
             {
                 "nombre": "Glosas",
-                "descripcion": (
-                    "Gestión completa (CRUD, workflow, dictamen "
-                    "IA, exportación)"
-                ),
+                "descripcion": ("Gestión completa (CRUD, workflow, dictamen IA, exportación)"),
                 "endpoints_aprox": 100,
                 "funcionalidades_clave": [
                     "Importación masiva Excel DGH",
@@ -1817,9 +1828,7 @@ def info_inventario_funcionalidades(
             },
             {
                 "nombre": "Auditoría",
-                "descripcion": (
-                    "Trazabilidad completa, compliance Habeas Data"
-                ),
+                "descripcion": ("Trazabilidad completa, compliance Habeas Data"),
                 "endpoints_aprox": 15,
                 "funcionalidades_clave": [
                     "Audit log estructurado",
@@ -1919,20 +1928,20 @@ def info_health_completo(
         bd_ok = False
 
     # 2. IA configurada
-    ia_ok = bool(
-        os.getenv("ANTHROPIC_API_KEY") or os.getenv("GROQ_API_KEY")
-    )
+    ia_ok = bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("GROQ_API_KEY"))
 
     # 3. Schedulers
     sched_ok = 0
     try:
         from app.services.ia_auditora_proactiva import _task as t1
+
         if t1 and not t1.done():
             sched_ok += 1
     except Exception:
         pass
     try:
         from app.services.mantenimiento_scheduler import _task as t2
+
         if t2 and not t2.done():
             sched_ok += 1
     except Exception:
@@ -1943,13 +1952,15 @@ def info_health_completo(
     abiertas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     vencidas_graves = (
         db.query(_f.count(GlosaRecord.id))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.dias_restantes < -30)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     estado_global = "OK"
@@ -2013,46 +2024,53 @@ def info_health_score(
     # 1) BD responsiva
     try:
         from sqlalchemy import text
+
         db.execute(text("SELECT 1")).fetchone()
         bd_score = 100
     except Exception:
         bd_score = 0
-    desglose.append({
-        "componente": "bd_responsiva",
-        "score": bd_score,
-        "peso": 30,
-    })
+    desglose.append(
+        {
+            "componente": "bd_responsiva",
+            "score": bd_score,
+            "peso": 30,
+        }
+    )
 
     # 2) Schedulers corriendo
     schedulers_ok = 0
     try:
         from app.services.ia_auditora_proactiva import _task as t1
+
         if t1 and not t1.done():
             schedulers_ok += 1
     except Exception:
         pass
     try:
         from app.services.mantenimiento_scheduler import _task as t2
+
         if t2 and not t2.done():
             schedulers_ok += 1
     except Exception:
         pass
     sched_score = schedulers_ok * 50  # 0, 50 o 100
-    desglose.append({
-        "componente": "schedulers_corriendo",
-        "score": sched_score,
-        "peso": 20,
-    })
+    desglose.append(
+        {
+            "componente": "schedulers_corriendo",
+            "score": sched_score,
+            "peso": 20,
+        }
+    )
 
     # 3) IA disponible
-    ia_score = 100 if (
-        os.getenv("ANTHROPIC_API_KEY") or os.getenv("GROQ_API_KEY")
-    ) else 0
-    desglose.append({
-        "componente": "ia_disponible",
-        "score": ia_score,
-        "peso": 20,
-    })
+    ia_score = 100 if (os.getenv("ANTHROPIC_API_KEY") or os.getenv("GROQ_API_KEY")) else 0
+    desglose.append(
+        {
+            "componente": "ia_disponible",
+            "score": ia_score,
+            "peso": 20,
+        }
+    )
 
     # 4) Sin alertas críticas
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
@@ -2070,20 +2088,20 @@ def info_health_score(
         alertas_score = 50
     else:
         alertas_score = 0
-    desglose.append({
-        "componente": "sin_alertas_criticas",
-        "score": alertas_score,
-        "peso": 15,
-        "detalle": f"glosas vencidas >30d: {muy_vencidas}",
-    })
+    desglose.append(
+        {
+            "componente": "sin_alertas_criticas",
+            "score": alertas_score,
+            "peso": 15,
+            "detalle": f"glosas vencidas >30d: {muy_vencidas}",
+        }
+    )
 
     # 5) Audit log activo (eventos recientes)
     ahora = ahora_utc()
     desde_24h = ahora - timedelta(hours=24)
     eventos_recientes = (
-        db.query(AuditLogRecord)
-        .filter(AuditLogRecord.timestamp >= desde_24h)
-        .count()
+        db.query(AuditLogRecord).filter(AuditLogRecord.timestamp >= desde_24h).count()
     )
     if eventos_recientes >= 10:
         actividad_score = 100
@@ -2091,12 +2109,14 @@ def info_health_score(
         actividad_score = 60
     else:
         actividad_score = 30
-    desglose.append({
-        "componente": "actividad_reciente",
-        "score": actividad_score,
-        "peso": 15,
-        "detalle": f"eventos audit últimas 24h: {eventos_recientes}",
-    })
+    desglose.append(
+        {
+            "componente": "actividad_reciente",
+            "score": actividad_score,
+            "peso": 15,
+            "detalle": f"eventos audit últimas 24h: {eventos_recientes}",
+        }
+    )
 
     # Suma ponderada
     total = sum(d["score"] * d["peso"] / 100 for d in desglose)
@@ -2144,30 +2164,19 @@ def metricas_ia_cache_eficiencia(
 
     desde = ahora_utc() - timedelta(days=int(dias))
 
-    rows = (
-        db.query(AICallRecord)
-        .filter(AICallRecord.creado_en >= desde)
-        .all()
-    )
+    rows = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
 
     total_input = sum(r.input_tokens or 0 for r in rows)
     total_cache_read = sum(r.cache_read_input_tokens or 0 for r in rows)
-    total_cache_creation = sum(
-        r.cache_creation_input_tokens or 0 for r in rows
-    )
+    total_cache_creation = sum(r.cache_creation_input_tokens or 0 for r in rows)
     total_cost = sum(float(r.cost_usd or 0) for r in rows)
 
-    hit_rate = (
-        round(100 * total_cache_read / total_input, 2)
-        if total_input else 0.0
-    )
+    hit_rate = round(100 * total_cache_read / total_input, 2) if total_input else 0.0
 
     # Asumimos precio Claude Sonnet input ~$3/Mtok. Cache_read
     # ~10% del precio → ahorro = cache_read × 0.9 × $3/Mtok.
     PRECIO_INPUT_USD_PER_MTOK = 3.0
-    ahorro_estimado = (
-        total_cache_read * 0.9 * PRECIO_INPUT_USD_PER_MTOK / 1_000_000
-    )
+    ahorro_estimado = total_cache_read * 0.9 * PRECIO_INPUT_USD_PER_MTOK / 1_000_000
 
     cache_total = db.query(AICacheRecord).count()
 
@@ -2213,28 +2222,26 @@ def metricas_ia_budget(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     dias_mes_total = monthrange(ahora.year, ahora.month)[1]
     dias_transcurridos = max(1, ahora.day)
 
-    rows = (
-        db.query(AICallRecord)
-        .filter(AICallRecord.creado_en >= inicio_mes)
-        .all()
-    )
+    rows = db.query(AICallRecord).filter(AICallRecord.creado_en >= inicio_mes).all()
     gastado = sum(float(r.cost_usd or 0) for r in rows)
 
     # Proyección lineal
     proyeccion = gastado * (dias_mes_total / dias_transcurridos)
 
     pct_consumido = (
-        round(100 * gastado / presupuesto_mensual_usd, 2)
-        if presupuesto_mensual_usd else 0.0
+        round(100 * gastado / presupuesto_mensual_usd, 2) if presupuesto_mensual_usd else 0.0
     )
     pct_proyectado = (
-        round(100 * proyeccion / presupuesto_mensual_usd, 2)
-        if presupuesto_mensual_usd else 0.0
+        round(100 * proyeccion / presupuesto_mensual_usd, 2) if presupuesto_mensual_usd else 0.0
     )
 
     if pct_proyectado >= 100:
@@ -2287,11 +2294,7 @@ def metricas_ia_por_modelo(
     from app.models.db import AICallRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
-    rows = (
-        db.query(AICallRecord)
-        .filter(AICallRecord.creado_en >= desde)
-        .all()
-    )
+    rows = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
 
     por_modelo: dict[str, dict] = {}
     for r in rows:
@@ -2317,29 +2320,24 @@ def metricas_ia_por_modelo(
 
     items = []
     for clave, b in por_modelo.items():
-        latency_avg = (
-            round(b["latency_total_ms"] / b["calls"], 0)
-            if b["calls"] else 0
-        )
+        latency_avg = round(b["latency_total_ms"] / b["calls"], 0) if b["calls"] else 0
         cache_hit = (
-            round(100 * b["cache_read"] / b["input_tokens"], 2)
-            if b["input_tokens"] else 0.0
+            round(100 * b["cache_read"] / b["input_tokens"], 2) if b["input_tokens"] else 0.0
         )
-        cost_per_call = (
-            round(b["cost_usd"] / b["calls"], 6)
-            if b["calls"] else 0.0
+        cost_per_call = round(b["cost_usd"] / b["calls"], 6) if b["calls"] else 0.0
+        items.append(
+            {
+                "proveedor": b["proveedor"],
+                "modelo": b["modelo"],
+                "calls": b["calls"],
+                "cost_usd_total": round(b["cost_usd"], 4),
+                "cost_per_call_usd": cost_per_call,
+                "latency_promedio_ms": int(latency_avg),
+                "tokens_input": b["input_tokens"],
+                "tokens_output": b["output_tokens"],
+                "cache_hit_rate_pct": cache_hit,
+            }
         )
-        items.append({
-            "proveedor": b["proveedor"],
-            "modelo": b["modelo"],
-            "calls": b["calls"],
-            "cost_usd_total": round(b["cost_usd"], 4),
-            "cost_per_call_usd": cost_per_call,
-            "latency_promedio_ms": int(latency_avg),
-            "tokens_input": b["input_tokens"],
-            "tokens_output": b["output_tokens"],
-            "cache_hit_rate_pct": cache_hit,
-        })
     items.sort(key=lambda x: x["cost_usd_total"], reverse=True)
 
     return {
@@ -2389,6 +2387,7 @@ def info_runtime(
     # Memoria si psutil disponible
     try:
         import psutil
+
         proc = psutil.Process(os.getpid())
         mem_info = proc.memory_info()
         info["memoria_rss_mb"] = round(mem_info.rss / 1024 / 1024, 2)
@@ -2424,18 +2423,22 @@ def info_db_schema(
         cols = []
         if incluir_columnas:
             for col in tabla.columns:
-                cols.append({
-                    "nombre": col.name,
-                    "tipo": str(col.type),
-                    "nullable": bool(col.nullable),
-                    "primary_key": bool(col.primary_key),
-                    "indexado": bool(col.index) or bool(col.primary_key),
-                })
-        items.append({
-            "tabla": tname,
-            "total_columnas": len(tabla.columns),
-            "columnas": cols if incluir_columnas else None,
-        })
+                cols.append(
+                    {
+                        "nombre": col.name,
+                        "tipo": str(col.type),
+                        "nullable": bool(col.nullable),
+                        "primary_key": bool(col.primary_key),
+                        "indexado": bool(col.index) or bool(col.primary_key),
+                    }
+                )
+        items.append(
+            {
+                "tabla": tname,
+                "total_columnas": len(tabla.columns),
+                "columnas": cols if incluir_columnas else None,
+            }
+        )
 
     items.sort(key=lambda x: x["tabla"])
 
@@ -2474,11 +2477,7 @@ def info_import_history(
     from app.models.db import GlosaRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= desde)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= desde).all()
 
     por_hora: dict[str, dict] = {}
     for g in glosas:
@@ -2500,12 +2499,14 @@ def info_import_history(
     for hora, b in por_hora.items():
         if b["count"] < 10:
             continue
-        items.append({
-            "hora": hora,
-            "glosas_creadas": b["count"],
-            "valor_total": int(b["valor"]),
-            "eps_distintas": len(b["epss"]),
-        })
+        items.append(
+            {
+                "hora": hora,
+                "glosas_creadas": b["count"],
+                "valor_total": int(b["valor"]),
+                "eps_distintas": len(b["epss"]),
+            }
+        )
     items.sort(key=lambda x: x["glosas_creadas"], reverse=True)
 
     return {
@@ -2538,46 +2539,55 @@ def info_jobs_programados(
     pre_activo = None
     try:
         from app.services.ia_auditora_proactiva import _task as _t
+
         pre_activo = _t is not None and not _t.done()
     except Exception:
         pre_activo = None
-    jobs.append({
-        "nombre": "pre_analisis_ia",
-        "descripcion": "Pre-análisis IA proactivo de glosas pendientes",
-        "frecuencia": "diaria 06:00 UTC",
-        "activo": pre_activo,
-        "modulo": "app.services.ia_auditora_proactiva",
-    })
+    jobs.append(
+        {
+            "nombre": "pre_analisis_ia",
+            "descripcion": "Pre-análisis IA proactivo de glosas pendientes",
+            "frecuencia": "diaria 06:00 UTC",
+            "activo": pre_activo,
+            "modulo": "app.services.ia_auditora_proactiva",
+        }
+    )
 
     # Mantenimiento
     mant_activo = None
     try:
         from app.services.mantenimiento_scheduler import _task as _t
+
         mant_activo = _t is not None and not _t.done()
     except Exception:
         mant_activo = None
-    jobs.append({
-        "nombre": "mantenimiento_bd",
-        "descripcion": "Purga ai_cache, ai_calls y papelera caducada",
-        "frecuencia": "diaria 03:00 UTC",
-        "activo": mant_activo,
-        "modulo": "app.services.mantenimiento_scheduler",
-    })
+    jobs.append(
+        {
+            "nombre": "mantenimiento_bd",
+            "descripcion": "Purga ai_cache, ai_calls y papelera caducada",
+            "frecuencia": "diaria 03:00 UTC",
+            "activo": mant_activo,
+            "modulo": "app.services.mantenimiento_scheduler",
+        }
+    )
 
     # Digest
     digest_activo = None
     try:
         from app.services.digest_scheduler import _task as _t
+
         digest_activo = _t is not None and not _t.done()
     except Exception:
         digest_activo = None
-    jobs.append({
-        "nombre": "digest_email",
-        "descripcion": "Resumen diario por email (requiere DIGEST_DESTINATARIOS)",
-        "frecuencia": "diaria 07:00 UTC",
-        "activo": digest_activo,
-        "modulo": "app.services.digest_scheduler",
-    })
+    jobs.append(
+        {
+            "nombre": "digest_email",
+            "descripcion": "Resumen diario por email (requiere DIGEST_DESTINATARIOS)",
+            "frecuencia": "diaria 07:00 UTC",
+            "activo": digest_activo,
+            "modulo": "app.services.digest_scheduler",
+        }
+    )
 
     return {
         "total_jobs": len(jobs),
@@ -2614,10 +2624,12 @@ def info_zonas_horarias(
     # Detección de modulo TZ disponible
     try:
         from zoneinfo import ZoneInfo  # noqa: F401
+
         tz_module = "zoneinfo"
     except ImportError:
         try:
             import pytz  # noqa: F401
+
             tz_module = "pytz"
         except ImportError:
             tz_module = "ninguno"
@@ -2625,10 +2637,10 @@ def info_zonas_horarias(
     bogota_offset = None
     if tz_module == "zoneinfo":
         from zoneinfo import ZoneInfo
+
         bogota_now = datetime.now(ZoneInfo("America/Bogota"))
         bogota_offset = (
-            bogota_now.utcoffset().total_seconds() / 3600
-            if bogota_now.utcoffset() else None
+            bogota_now.utcoffset().total_seconds() / 3600 if bogota_now.utcoffset() else None
         )
 
     return {
@@ -2663,37 +2675,35 @@ def info_observabilidad_completa(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        AICacheRecord, AICallRecord, AuditLogRecord, GlosaRecord,
+        AICacheRecord,
+        AICallRecord,
+        AuditLogRecord,
+        GlosaRecord,
     )
 
     ahora = ahora_utc()
     desde_1h = ahora - timedelta(hours=1)
 
     eventos_1h = (
-        db.query(_f.count(AuditLogRecord.id))
-        .filter(AuditLogRecord.timestamp >= desde_1h)
-        .scalar() or 0
+        db.query(_f.count(AuditLogRecord.id)).filter(AuditLogRecord.timestamp >= desde_1h).scalar()
+        or 0
     )
     ai_calls_1h = (
-        db.query(_f.count(AICallRecord.id))
-        .filter(AICallRecord.creado_en >= desde_1h)
-        .scalar() or 0
+        db.query(_f.count(AICallRecord.id)).filter(AICallRecord.creado_en >= desde_1h).scalar() or 0
     )
-    cache_size = (
-        db.query(_f.count()).select_from(AICacheRecord).scalar() or 0
-    )
-    total_glosas = (
-        db.query(_f.count(GlosaRecord.id)).scalar() or 0
-    )
+    cache_size = db.query(_f.count()).select_from(AICacheRecord).scalar() or 0
+    total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
 
     schedulers = {}
     try:
         from app.services.ia_auditora_proactiva import _task as t1
+
         schedulers["pre_analisis"] = bool(t1 and not t1.done())
     except Exception:
         schedulers["pre_analisis"] = False
     try:
         from app.services.mantenimiento_scheduler import _task as t2
+
         schedulers["mantenimiento"] = bool(t2 and not t2.done())
     except Exception:
         schedulers["mantenimiento"] = False
@@ -2733,10 +2743,17 @@ def info_snapshot_general(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        AICacheRecord, AICallRecord, AuditLogRecord,
-        ConciliacionRecord, ContratoRecord,
-        DictamenVersionRecord, GlosaEliminadaRecord, GlosaRecord,
-        PlantillaGoldRecord, PlantillaRecord, UsuarioRecord,
+        AICacheRecord,
+        AICallRecord,
+        AuditLogRecord,
+        ConciliacionRecord,
+        ContratoRecord,
+        DictamenVersionRecord,
+        GlosaEliminadaRecord,
+        GlosaRecord,
+        PlantillaGoldRecord,
+        PlantillaRecord,
+        UsuarioRecord,
     )
 
     def _count(model):
@@ -2791,11 +2808,7 @@ def info_glosas_con_ia(
 
     desde = ahora_utc() - timedelta(days=int(dias))
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= desde)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= desde).all()
     total_glosas = len(glosas)
     glosa_ids = {g.id for g in glosas}
 
@@ -2809,11 +2822,7 @@ def info_glosas_con_ia(
             "cost_promedio_usd_por_glosa": 0.0,
         }
 
-    calls = (
-        db.query(AICallRecord)
-        .filter(AICallRecord.glosa_id.in_(glosa_ids))
-        .all()
-    )
+    calls = db.query(AICallRecord).filter(AICallRecord.glosa_id.in_(glosa_ids)).all()
 
     glosas_con_ia: set[int] = set()
     cost_total = 0.0
@@ -2823,14 +2832,8 @@ def info_glosas_con_ia(
         cost_total += float(c.cost_usd or 0)
 
     cobertura = round(100 * len(glosas_con_ia) / total_glosas, 2)
-    calls_promedio = (
-        round(len(calls) / len(glosas_con_ia), 2)
-        if glosas_con_ia else 0.0
-    )
-    cost_promedio = (
-        round(cost_total / len(glosas_con_ia), 6)
-        if glosas_con_ia else 0.0
-    )
+    calls_promedio = round(len(calls) / len(glosas_con_ia), 2) if glosas_con_ia else 0.0
+    cost_promedio = round(cost_total / len(glosas_con_ia), 6) if glosas_con_ia else 0.0
 
     return {
         "ventana_dias": int(dias),
@@ -2896,8 +2899,7 @@ def info_feature_flags(
         {
             "nombre": "whatsapp_business",
             "activo": bool(
-                os.getenv("WHATSAPP_META_TOKEN")
-                and os.getenv("WHATSAPP_META_PHONE_ID")
+                os.getenv("WHATSAPP_META_TOKEN") and os.getenv("WHATSAPP_META_PHONE_ID")
             ),
             "descripcion": "WhatsApp Business API (Meta)",
         },
@@ -2908,10 +2910,7 @@ def info_feature_flags(
         },
         {
             "nombre": "push_notifications",
-            "activo": bool(
-                os.getenv("VAPID_PUBLIC_KEY")
-                and os.getenv("VAPID_PRIVATE_KEY")
-            ),
+            "activo": bool(os.getenv("VAPID_PUBLIC_KEY") and os.getenv("VAPID_PRIVATE_KEY")),
             "descripcion": "Web Push (VAPID)",
         },
         {
@@ -3008,12 +3007,10 @@ def info_configuracion(
             "algorithm": cfg.algorithm,
             "access_token_expire_minutes": cfg.access_token_expire_minutes,
             "secret_key_configurado": bool(
-                cfg.secret_key
-                and cfg.secret_key != "dev-only-secret-key-change-in-production"
+                cfg.secret_key and cfg.secret_key != "dev-only-secret-key-change-in-production"
             ),
             "admin_password_configurado": bool(
-                cfg.admin_password
-                and cfg.admin_password != "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
+                cfg.admin_password and cfg.admin_password != "CHANGEME_SET_ADMIN_PASSWORD_ENV_VAR"
             ),
         },
         "cors": {
@@ -3053,15 +3050,33 @@ def info_dependencias(
     # Heurística: dependencias declaradas explícitamente en requirements.txt.
     # Hardcoded para evitar parseo en runtime (rápido, deterministic).
     DECLARADAS_DIRECTAS = {
-        "fastapi", "uvicorn", "sqlalchemy", "psycopg2-binary",
-        "pydantic", "pydantic-settings", "python-jose",
-        "passlib", "bcrypt", "python-multipart",
-        "anthropic", "groq", "openai",
-        "openpyxl", "reportlab", "pypdf2", "pdfminer-six",
-        "pytesseract", "pillow", "weasyprint",
-        "python-dotenv", "httpx", "requests",
-        "pytest", "pytest-asyncio",
-        "sentry-sdk", "cryptography",
+        "fastapi",
+        "uvicorn",
+        "sqlalchemy",
+        "psycopg2-binary",
+        "pydantic",
+        "pydantic-settings",
+        "python-jose",
+        "passlib",
+        "bcrypt",
+        "python-multipart",
+        "anthropic",
+        "groq",
+        "openai",
+        "openpyxl",
+        "reportlab",
+        "pypdf2",
+        "pdfminer-six",
+        "pytesseract",
+        "pillow",
+        "weasyprint",
+        "python-dotenv",
+        "httpx",
+        "requests",
+        "pytest",
+        "pytest-asyncio",
+        "sentry-sdk",
+        "cryptography",
     }
 
     paquetes = []
@@ -3071,10 +3086,12 @@ def info_dependencias(
             continue
         if not incluir_indirectas and nombre not in DECLARADAS_DIRECTAS:
             continue
-        paquetes.append({
-            "nombre": nombre,
-            "version": dist.version,
-        })
+        paquetes.append(
+            {
+                "nombre": nombre,
+                "version": dist.version,
+            }
+        )
 
     paquetes.sort(key=lambda p: p["nombre"])
 

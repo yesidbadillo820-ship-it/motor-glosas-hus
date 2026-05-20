@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/usuarios-inactivos (R98 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,8 +35,12 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", nombre="Root", rol="SUPER_ADMIN",
-        activo=1, password_hash=get_password_hash("xxxx"),
+        id=1,
+        email="root@hus.gov.co",
+        nombre="Root",
+        rol="SUPER_ADMIN",
+        activo=1,
+        password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
     db_session.commit()
@@ -46,6 +51,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -54,19 +60,28 @@ def client(db_session, usuario_super):
 
 
 def _seed_user(db, id, email, activo=1):
-    db.add(UsuarioRecord(
-        id=id, email=email, nombre=email.split("@")[0],
-        rol="AUDITOR", activo=activo,
-        password_hash=get_password_hash("x"),
-    ))
+    db.add(
+        UsuarioRecord(
+            id=id,
+            email=email,
+            nombre=email.split("@")[0],
+            rol="AUDITOR",
+            activo=activo,
+            password_hash=get_password_hash("x"),
+        )
+    )
     db.commit()
 
 
 def _seed_audit(db, email, dias_atras):
-    db.add(AuditLogRecord(
-        usuario_email=email, accion="X", tabla="T",
-        timestamp=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=email,
+            accion="X",
+            tabla="T",
+            timestamp=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 

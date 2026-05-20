@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cumplimiento-sla-mensual (R335 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,13 +51,19 @@ def client(db_session, usuario):
 def _seed(db, a_tiempo, estado="LEVANTADA"):
     dec = ahora_utc()
     venc = dec + timedelta(days=5) if a_tiempo else dec - timedelta(days=5)
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_decision_eps=dec,
-        fecha_vencimiento=venc,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_decision_eps=dec,
+            fecha_vencimiento=venc,
+        )
+    )
     db.commit()
 
 

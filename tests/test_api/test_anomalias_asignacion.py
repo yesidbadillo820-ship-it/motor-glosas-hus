@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/anomalias-asignacion (R390 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def admin():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def admin():
 def client(db_session, admin):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin
     with TestClient(app) as c:
@@ -47,12 +52,18 @@ def client(db_session, admin):
 
 
 def _seed(db, eps="X", gestor=None, estado="RADICADA", valor=1000):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+        )
+    )
     db.commit()
 
 
@@ -65,9 +76,7 @@ class TestAnomaliasAsignacion:
         r = client.get("/admin/anomalias-asignacion")
         d = r.json()
         items = [
-            x for x in d["items"]
-            if x["tipo"] == "GESTOR_ESPECIALIZADO"
-            and x["gestor"] == "Alice"
+            x for x in d["items"] if x["tipo"] == "GESTOR_ESPECIALIZADO" and x["gestor"] == "Alice"
         ]
         assert len(items) >= 1
 
@@ -78,8 +87,6 @@ class TestAnomaliasAsignacion:
         r = client.get("/admin/anomalias-asignacion")
         d = r.json()
         items = [
-            x for x in d["items"]
-            if x["tipo"] == "VALOR_CONCENTRADO"
-            and x["gestor"] == "Alice"
+            x for x in d["items"] if x["tipo"] == "VALOR_CONCENTRADO" and x["gestor"] == "Alice"
         ]
         assert len(items) == 1

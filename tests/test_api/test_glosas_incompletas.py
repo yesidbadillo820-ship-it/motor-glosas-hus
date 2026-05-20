@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/incompletas (R96 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
         texto_glosa_original="texto",
         dictamen="<p>" + "x" * 100 + "</p>",
@@ -105,8 +111,7 @@ class TestGlosasIncompletas:
         # Glosa con 1 hueco
         _seed(db_session, factura="N/A")
         # Glosa con 3 huecos
-        _seed(db_session, factura="N/A", valor_objetado=0,
-              texto_glosa_original=None)
+        _seed(db_session, factura="N/A", valor_objetado=0, texto_glosa_original=None)
         r = client.get("/glosas/incompletas")
         d = r.json()
         # Primera debe ser la de 3 huecos

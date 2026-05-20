@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cobranza-pendiente (R120 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,14 +48,19 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, dias_atras=10, valor=1000, estado="RADICADA",
-          valor_rec=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+def _seed(db, dias_atras=10, valor=1000, estado="RADICADA", valor_rec=0):
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -68,9 +75,9 @@ class TestCobranzaPendiente:
         assert len(d["buckets"]) == 4
 
     def test_clasifica_por_antiguedad(self, client, db_session):
-        _seed(db_session, dias_atras=5, valor=1000)    # <30d
-        _seed(db_session, dias_atras=45, valor=2000)   # 30-60d
-        _seed(db_session, dias_atras=70, valor=3000)   # 60-90d
+        _seed(db_session, dias_atras=5, valor=1000)  # <30d
+        _seed(db_session, dias_atras=45, valor=2000)  # 30-60d
+        _seed(db_session, dias_atras=70, valor=3000)  # 60-90d
         _seed(db_session, dias_atras=120, valor=4000)  # >90d
 
         r = client.get("/glosas/stats/cobranza-pendiente")

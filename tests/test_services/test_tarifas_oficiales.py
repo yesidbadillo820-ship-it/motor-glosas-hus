@@ -1,4 +1,5 @@
 """Tests del catálogo oficial de tarifas HUS + SOAT 2026."""
+
 from app.services.tarifas_oficiales import (
     TARIFAS_PROPIAS_HUS,
     TARIFAS_SOAT_2026,

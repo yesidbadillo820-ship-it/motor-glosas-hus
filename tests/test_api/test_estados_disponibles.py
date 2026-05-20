@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/estados-disponibles (R136 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -36,6 +37,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -57,8 +59,14 @@ class TestEstadosDisponibles:
         r = client.get("/glosas/estados-disponibles")
         d = r.json()
         claves = {e["clave"] for e in d["estados"]}
-        for clave in ("RADICADA", "RESPONDIDA", "RATIFICADA",
-                      "LEVANTADA", "ACEPTADA", "CONCILIADA"):
+        for clave in (
+            "RADICADA",
+            "RESPONDIDA",
+            "RATIFICADA",
+            "LEVANTADA",
+            "ACEPTADA",
+            "CONCILIADA",
+        ):
             assert clave in claves
 
     def test_cada_estado_tiene_metadata(self, client):

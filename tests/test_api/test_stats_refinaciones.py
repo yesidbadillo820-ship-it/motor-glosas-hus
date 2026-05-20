@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/refinaciones (R129 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,15 @@ def client(db_session, usuario):
 
 
 def _seed(db, glosa_id, accion, autor, dias_atras=1):
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id, dictamen_html="<p>x</p>",
-        accion=accion, autor_email=autor,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html="<p>x</p>",
+            accion=accion,
+            autor_email=autor,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cerradas-por-etapa (R173 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, etapa, estado="LEVANTADA", valor_rec=1000):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, valor_recuperado=valor_rec,
-        etapa=etapa, estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            valor_recuperado=valor_rec,
+            etapa=etapa,
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -69,15 +77,11 @@ class TestCerradasPorEtapa:
 
     def test_distribucion_y_tasa(self, client, db_session):
         # PRIMERA: 2 LEVANTADA + 1 ACEPTADA = 66.67% lev
-        _seed(db_session, "PRIMERA", estado="LEVANTADA",
-              valor_rec=5000)
-        _seed(db_session, "PRIMERA", estado="LEVANTADA",
-              valor_rec=3000)
-        _seed(db_session, "PRIMERA", estado="ACEPTADA",
-              valor_rec=0)
+        _seed(db_session, "PRIMERA", estado="LEVANTADA", valor_rec=5000)
+        _seed(db_session, "PRIMERA", estado="LEVANTADA", valor_rec=3000)
+        _seed(db_session, "PRIMERA", estado="ACEPTADA", valor_rec=0)
         # CONCILIACION: 1 CONCILIADA
-        _seed(db_session, "CONCILIACION", estado="CONCILIADA",
-              valor_rec=1000)
+        _seed(db_session, "CONCILIACION", estado="CONCILIADA", valor_rec=1000)
 
         r = client.get("/glosas/stats/cerradas-por-etapa")
         d = r.json()

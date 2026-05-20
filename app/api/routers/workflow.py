@@ -38,24 +38,20 @@ def obtener_estados_disponibles(
     """
     repo = GlosaRepository(db)
     glosa = repo.obtener_por_id(glosa_id)
-    
+
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
-    
+
     estado_actual = glosa.workflow_state or glosa.estado
     transiciones = WorkflowService.obtener_transiciones_validas(estado_actual)
     info_accion = WorkflowService.requiere_accion(estado_actual)
-    
+
     return {
         "glosa_id": glosa_id,
         "estado_actual": estado_actual,
         "es_terminal": WorkflowService.es_terminal(estado_actual),
         "transiciones_validas": [
-            {
-                "hacia": t.hacia,
-                "accion": t.accion,
-                "requiere_nota": t.requiere_nota
-            }
+            {"hacia": t.hacia, "accion": t.accion, "requiere_nota": t.requiere_nota}
             for t in transiciones
         ],
         "info_accion": info_accion,
@@ -71,7 +67,7 @@ def transicionar_glosa(
 ):
     """
     Transiciona una glosa a un nuevo estado.
-    
+
     Estados válidos:
     - RADICADA → RESPONDIDA
     - RESPONDIDA → RATIFICADA, LEVANTADA, CONCILIADA
@@ -80,10 +76,10 @@ def transicionar_glosa(
     """
     repo = GlosaRepository(db)
     glosa = repo.obtener_por_id(glosa_id)
-    
+
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
-    
+
     exito, mensaje = WorkflowService.transicionar(
         glosa=glosa,
         nuevo_estado=data.hacia.upper(),
@@ -91,10 +87,10 @@ def transicionar_glosa(
         nota=data.nota,
         responsable=current_user.email,
     )
-    
+
     if not exito:
         raise HTTPException(status_code=400, detail=mensaje)
-    
+
     return {
         "success": True,
         "message": mensaje,
@@ -167,14 +163,14 @@ def reabrir_para_corregir(
     # Auditoría: una sola entrada agregada
     try:
         from app.repositories.audit_repository import AuditRepository
+
         AuditRepository(db).registrar(
             usuario_email=current_user.email,
             usuario_rol=current_user.rol,
             accion="REABRIR_PARA_CORREGIR",
             tabla="historial",
             detalle=(
-                f"total={resumen['total']} reabiertas={resumen['reabiertas']} "
-                f"motivo='{nota[:100]}'"
+                f"total={resumen['total']} reabiertas={resumen['reabiertas']} motivo='{nota[:100]}'"
             ),
         )
     except Exception:
@@ -255,5 +251,5 @@ def obtener_definiciones_estados(
     estados = {}
     for estado in EstadoGlosa:
         estados[estado.value] = WorkflowService.requiere_accion(estado.value)
-    
+
     return {"estados": estados}

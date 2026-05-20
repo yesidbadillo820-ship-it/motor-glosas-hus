@@ -1,4 +1,5 @@
 """Tests de catalogo_glosas — mapeo códigos Res. 2284/2023 (R51 P3)."""
+
 from __future__ import annotations
 
 from app.services.catalogo_glosas import (

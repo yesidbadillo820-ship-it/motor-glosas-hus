@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-pacientes-distintos (R321 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, paciente):
-    db.add(GlosaRecord(
-        eps=eps, paciente=paciente, codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente=paciente,
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -60,9 +68,7 @@ class TestEPSPacientesDistintos:
         _seed(db_session, "X", "P1")  # paciente repetido
         # 3 glosas, 2 pacientes distintos, ratio 1.5
 
-        r = client.get(
-            "/glosas/stats/eps-pacientes-distintos?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/eps-pacientes-distintos?min_glosas=1")
         d = r.json()
         item = d["items"][0]
         assert item["count_glosas"] == 3

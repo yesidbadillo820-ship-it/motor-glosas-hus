@@ -3,6 +3,7 @@
 Cubren el bug "messages: text content blocks must be non-empty": ningún
 bloque text vacío ni content string vacío debe enviarse a la API.
 """
+
 from app.services.asistente_maestro import _sanear_content
 
 
@@ -30,9 +31,11 @@ def test_lista_solo_con_text_vacio_devuelve_none():
 
 
 def test_tool_result_vacio_recibe_placeholder():
-    out = _sanear_content([
-        {"type": "tool_result", "tool_use_id": "a", "content": ""},
-    ])
+    out = _sanear_content(
+        [
+            {"type": "tool_result", "tool_use_id": "a", "content": ""},
+        ]
+    )
     assert out == [
         {"type": "tool_result", "tool_use_id": "a", "content": "(sin resultado)"},
     ]

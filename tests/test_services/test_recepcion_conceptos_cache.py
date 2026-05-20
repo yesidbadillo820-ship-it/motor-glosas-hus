@@ -4,6 +4,7 @@ el mismo fallback cientos de veces (importación tardaba MINUTOS / parecía
 colgada). Con cache por (factura, consecutivo): se resuelve una vez y se
 loguea una sola vez por factura.
 """
+
 import logging
 from io import BytesIO
 
@@ -18,22 +19,51 @@ from app.models.db import ConceptoGlosaRecord, GlosaRecord
 from app.services.recepcion_service import RecepcionService
 
 _HDR_INI = [
-    "RESPONSABLE", "FECHA DE ENTREGA", "FECHA RADICACION",
-    "FECHA DOCUMENTO DGH", "FECHA RECEPCION", "ENTIDAD", "FACTURA",
-    "CONSECUTIVO DGH", "VALOR GLOSA", "VENCE", "DEVOLUCION S/N",
-    "DIAS RADICACION VS RECEPCION", "RADICADO", "REFERENCIA",
-    "OBSERVACION TECNICO", "TECNICO QUE RECEPCIONO", "TIPO GLOSA",
+    "RESPONSABLE",
+    "FECHA DE ENTREGA",
+    "FECHA RADICACION",
+    "FECHA DOCUMENTO DGH",
+    "FECHA RECEPCION",
+    "ENTIDAD",
+    "FACTURA",
+    "CONSECUTIVO DGH",
+    "VALOR GLOSA",
+    "VENCE",
+    "DEVOLUCION S/N",
+    "DIAS RADICACION VS RECEPCION",
+    "RADICADO",
+    "REFERENCIA",
+    "OBSERVACION TECNICO",
+    "TECNICO QUE RECEPCIONO",
+    "TIPO GLOSA",
     "PROFESIONAL(MEDICO)",
 ]
 # Glosa INICIAL SIN consecutivo → fuerza el Fallback 1 en CONCEPTOS.
 _ROW_INI = [
-    "YESID PEREZ", "28/04/2026", "14/04/2026", "24/04/2026", "24/04/2026",
-    "U240061 - FOMAG", "HUS0000496016", "", " 1.234,50 ", "14/05/2026",
-    "N", "4", "", "", "", "ELIAS CARVAJAL", "", "Administrativo",
+    "YESID PEREZ",
+    "28/04/2026",
+    "14/04/2026",
+    "24/04/2026",
+    "24/04/2026",
+    "U240061 - FOMAG",
+    "HUS0000496016",
+    "",
+    " 1.234,50 ",
+    "14/05/2026",
+    "N",
+    "4",
+    "",
+    "",
+    "",
+    "ELIAS CARVAJAL",
+    "",
+    "Administrativo",
 ]
 _HDR_CON = [
-    "FacturaCartera.Factura", "Consecutivo",
-    "ListadoConceptos.ConceptoObjecion.Codigo", "ListadoConceptos.Oid",
+    "FacturaCartera.Factura",
+    "Consecutivo",
+    "ListadoConceptos.ConceptoObjecion.Codigo",
+    "ListadoConceptos.Oid",
     "ListadoConceptos.ConceptoObjecion.Nombre",
     "ListadoConceptos.ValorObjecion",
 ]
@@ -65,10 +95,16 @@ def _excel(n_conceptos: int) -> bytes:
     ci = wb.create_sheet("I")
     ci.append(_HDR_CON)
     for k in range(n_conceptos):
-        ci.append([
-            "HUS0000496016", "174999", "TA0201", f"OID-{k}",
-            "Diferencia de valores pactados", "100",
-        ])
+        ci.append(
+            [
+                "HUS0000496016",
+                "174999",
+                "TA0201",
+                f"OID-{k}",
+                "Diferencia de valores pactados",
+                "100",
+            ]
+        )
     out = BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -88,16 +124,10 @@ def test_conceptos_cache_resuelve_padre_una_vez(db_session, caplog):
     # El consecutivo se completó vía Fallback 1.
     assert g.consecutivo_dgh == "174999"
     assert (
-        db_session.query(ConceptoGlosaRecord)
-        .filter(ConceptoGlosaRecord.glosa_id == g.id)
-        .count()
+        db_session.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.glosa_id == g.id).count()
         == 6
     )
 
     # CLAVE: el "Fallback match" se loguea UNA sola vez (no una por fila).
-    fallback_logs = [
-        m for m in caplog.messages if "[I/R] Fallback match" in m
-    ]
-    assert len(fallback_logs) == 1, (
-        f"esperaba 1 log de fallback, hubo {len(fallback_logs)}"
-    )
+    fallback_logs = [m for m in caplog.messages if "[I/R] Fallback match" in m]
+    assert len(fallback_logs) == 1, f"esperaba 1 log de fallback, hubo {len(fallback_logs)}"

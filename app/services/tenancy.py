@@ -20,6 +20,7 @@ Fases:
 Este módulo expone la API mínima que el resto del código puede empezar a
 usar desde ya, sin disrupción.
 """
+
 from __future__ import annotations
 
 from contextvars import ContextVar
@@ -80,10 +81,10 @@ def info_tenant(tenant_id: Optional[str] = None) -> dict:
 
 def resolver_tenant_desde_request(request) -> str:
     """Extrae el tenant del request. Prioridad:
-      1. header X-Tenant-ID
-      2. query param ?tenant=XXX
-      3. subdominio (host tipo 'hus.ia-glosas.com' → 'hus')
-      4. default HUS
+    1. header X-Tenant-ID
+    2. query param ?tenant=XXX
+    3. subdominio (host tipo 'hus.ia-glosas.com' → 'hus')
+    4. default HUS
     """
     try:
         # 1) Header explícito

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/factura-grandes-pendientes (R362 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, factura, valor_factura, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C", factura=factura,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        valor_factura=valor_factura,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            factura=factura,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            valor_factura=valor_factura,
+        )
+    )
     db.commit()
 
 
@@ -61,14 +70,13 @@ class TestFacturaGrandesPendientes:
         _seed(db_session, "F200", valor_factura=10_000_000)
         # Grande pero todas cerradas, no cuenta
         _seed(
-            db_session, "F300", valor_factura=70_000_000,
+            db_session,
+            "F300",
+            valor_factura=70_000_000,
             estado="LEVANTADA",
         )
 
-        r = client.get(
-            "/glosas/stats/factura-grandes-pendientes"
-            "?umbral=50000000"
-        )
+        r = client.get("/glosas/stats/factura-grandes-pendientes?umbral=50000000")
         d = r.json()
         assert d["total_facturas"] == 1
         assert d["items"][0]["factura"] == "F100"

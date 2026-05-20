@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/ranking-gestores (R148 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -54,13 +59,19 @@ def client(db_session, usuario_super):
 
 
 def _seed(db, gestor, estado="LEVANTADA", dias_atras_dec=10):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        fecha_decision_eps=ahora_utc() - timedelta(days=dias_atras_dec),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            fecha_decision_eps=ahora_utc() - timedelta(days=dias_atras_dec),
+        )
+    )
     db.commit()
 
 
@@ -69,8 +80,7 @@ class TestRankingGestores:
         r = client.get("/admin/ranking-gestores?min_glosas=1")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "min_glosas_filtro",
-                    "total_gestores_evaluados", "items"):
+        for key in ("ventana_dias", "min_glosas_filtro", "total_gestores_evaluados", "items"):
             assert key in d
 
     def test_top_performer_5_estrellas(self, client, db_session):

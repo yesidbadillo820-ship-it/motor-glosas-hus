@@ -22,6 +22,7 @@ Reglas:
   • Valor objetado >= $1M y texto + PDF muy escasos → REQUIERE_SOPORTES.
   • CL/PE (pertinencia clínica) sin contexto clínico → REQUIERE_SOPORTES.
 """
+
 from __future__ import annotations
 
 from typing import Optional

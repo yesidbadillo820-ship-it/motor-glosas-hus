@@ -1,4 +1,5 @@
 """Router de auditoría forense — búsqueda por IP e IPs frecuentes."""
+
 from __future__ import annotations
 
 from datetime import timedelta

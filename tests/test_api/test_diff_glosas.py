@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/diff/{otra_id} (R93 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -76,10 +82,12 @@ class TestDiffGlosas:
         assert d["total_diferencias"] == 0
 
     def test_destaca_campos_diferentes(self, client, db_session):
-        g1 = _seed(db_session, eps="SANITAS", paciente="Pedro",
-                   estado="LEVANTADA", valor_objetado=5000)
-        g2 = _seed(db_session, eps="SANITAS", paciente="Juan",
-                   estado="RATIFICADA", valor_objetado=5000)
+        g1 = _seed(
+            db_session, eps="SANITAS", paciente="Pedro", estado="LEVANTADA", valor_objetado=5000
+        )
+        g2 = _seed(
+            db_session, eps="SANITAS", paciente="Juan", estado="RATIFICADA", valor_objetado=5000
+        )
         r = client.get(f"/glosas/{g1.id}/diff/{g2.id}")
         d = r.json()
         # paciente y estado son distintos; eps y valor son iguales

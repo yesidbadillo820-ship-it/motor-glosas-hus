@@ -47,146 +47,147 @@ def _fmt_cop(n: float) -> str:
 
 CONTRATOS_HUS: dict[str, dict] = {
     "FAMISANAR": {
-        "numero":   "CONTRATO S-13-1-03-1-04958",
-        "tarifa":   "SOAT UVB VIGENTE -5 % (servicios CUPS) / VALOR FIJO (medicamentos y suministros)",
-        "factor":   0.95,
-        "tipo":     "EPS CONTRIBUTIVO / RÉGIMEN SUBSIDIADO",
-        "nit":      "830003564-7",
+        "numero": "CONTRATO S-13-1-03-1-04958",
+        "tarifa": "SOAT UVB VIGENTE -5 % (servicios CUPS) / VALOR FIJO (medicamentos y suministros)",
+        "factor": 0.95,
+        "tipo": "EPS CONTRIBUTIVO / RÉGIMEN SUBSIDIADO",
+        "nit": "830003564-7",
         "vigencia": "15/04/2026 — 14/04/2027 (prórroga automática)",
         "contacto": "mhernandez@famisanar.com.co (Martha Biviana Hernández, Glosas) · cadarme@famisanar.com.co (Auditoría Médica)",
-        "nota":     "Estructura mixta: Anexo 3 servicios CUPS = SOAT UVB VIGENTE -5%; Anexo 3.1 medicamentos y 3.2 suministros = valores fijos pactados. Catálogo completo cargado en tabla tarifas_contratadas (panel Tarifas).",
+        "nota": "Estructura mixta: Anexo 3 servicios CUPS = SOAT UVB VIGENTE -5%; Anexo 3.1 medicamentos y 3.2 suministros = valores fijos pactados. Catálogo completo cargado en tabla tarifas_contratadas (panel Tarifas).",
     },
     "NUEVA EPS": {
-        "numero":   "ACTA DE NEGOCIACIÓN No. 1388 DE 2024 / ACTA 2025",
-        "tarifa":   "SOAT -20 %",
-        "factor":   0.80,
-        "tipo":     "EPS CONTRIBUTIVO / RÉGIMEN SUBSIDIADO",
-        "nit":      "800.149.436-2",
+        "numero": "ACTA DE NEGOCIACIÓN No. 1388 DE 2024 / ACTA 2025",
+        "tarifa": "SOAT -20 %",
+        "factor": 0.80,
+        "tipo": "EPS CONTRIBUTIVO / RÉGIMEN SUBSIDIADO",
+        "nit": "800.149.436-2",
         "vigencia": "2025",
         "contacto": "john.sanabria@nuevaeps.com.co — Coordinador Estructuración de Redes y Contratación, Regional Nororiente",
-        "nota":     "Incluye contrato MAOS No. 319 de 2024 para servicios oncológicos y de alta complejidad.",
+        "nota": "Incluye contrato MAOS No. 319 de 2024 para servicios oncológicos y de alta complejidad.",
     },
     "COOSALUD": {
-        "numero":   "68001C00060340-24 / 68001S00060339-24",
-        "tarifa":   "SOAT -15 %",
-        "factor":   0.85,
-        "tipo":     "EPS SUBSIDIADO / CONTRIBUTIVO",
-        "nit":      "800.250.119-4",
+        "numero": "68001C00060340-24 / 68001S00060339-24",
+        "tarifa": "SOAT -15 %",
+        "factor": 0.85,
+        "tipo": "EPS SUBSIDIADO / CONTRIBUTIVO",
+        "nit": "800.250.119-4",
         "vigencia": "2025",
         "contacto": "Reunión de proveedores presencial — Acta 21-01-2025",
-        "nota":     "Dos contratos activos: contributivo C00060340 y subsidiado S00060339. Tarifario HUS 2025 en dos hojas: SOAT y Servicios Institucionales.",
+        "nota": "Dos contratos activos: contributivo C00060340 y subsidiado S00060339. Tarifario HUS 2025 en dos hojas: SOAT y Servicios Institucionales.",
     },
     "COMPENSAR": {
-        "numero":   "CONTRATO CSS009-2024 + ANEXO No 1 (Acuerdo de Servicios y Tarifas 2025)",
-        "tarifa":   "SOAT -10 %",
-        "factor":   0.90,
-        "tipo":     "EPS CONTRIBUTIVO",
-        "nit":      "860.063.996-9",
+        "numero": "CONTRATO CSS009-2024 + ANEXO No 1 (Acuerdo de Servicios y Tarifas 2025)",
+        "tarifa": "SOAT -10 %",
+        "factor": 0.90,
+        "tipo": "EPS CONTRIBUTIVO",
+        "nit": "860.063.996-9",
         "vigencia": "01/02/2025 — 31/01/2026 (Anexo No 1 al CSS009-2024)",
         "contacto": "Flor Alba Merchán Acero — Coord. Negociador Red REGIONAL Compensar | negociacionregional@compensarsalud.com",
-        "nota":     "Acuerdo tarifario con dos componentes: SOAT homologado CUPS (descuento -10%) y servicios institucionales HUS valorados en tarifa propia. Tope Plan Complementario IV nivel catastróficas: $109.959.400. Medicamentos: tarifas IPS según listado trimestral (Res. 2641/2024). Material de osteosíntesis: 12% sobre valor facturado (Res. 171/2024).",
+        "nota": "Acuerdo tarifario con dos componentes: SOAT homologado CUPS (descuento -10%) y servicios institucionales HUS valorados en tarifa propia. Tope Plan Complementario IV nivel catastróficas: $109.959.400. Medicamentos: tarifas IPS según listado trimestral (Res. 2641/2024). Material de osteosíntesis: 12% sobre valor facturado (Res. 171/2024).",
     },
     "POSITIVA": {
-        "numero":   "CONTRATO No. 0525 DE 2017 + OTROSÍ No. 03 (diciembre 2025)",
-        "tarifa":   "SOAT -15 %",
-        "factor":   0.85,
-        "tipo":     "ARL / RIESGOS LABORALES",
-        "nit":      "860.011.153-6",
+        "numero": "CONTRATO No. 0525 DE 2017 + OTROSÍ No. 03 (diciembre 2025)",
+        "tarifa": "SOAT -15 %",
+        "factor": 0.85,
+        "tipo": "ARL / RIESGOS LABORALES",
+        "nit": "860.011.153-6",
         "vigencia": "Extendida hasta 19/01/2027 por Otrosí No. 03 al Contrato 0525/2017",
         "contacto": "CHARLES RODOLFO BAYONA MOLANO — Vicepresidente Técnico Positiva",
-        "nota":     "Contrato de riesgos laborales. El Otrosí 03 modifica obligaciones del contratista, duración, interventoría y garantías.",
+        "nota": "Contrato de riesgos laborales. El Otrosí 03 modifica obligaciones del contratista, duración, interventoría y garantías.",
     },
     "PPL": {
-        "numero":   "CONTRATO IPS-001B-2022 — OTROSÍ No. 26 (2025)",
-        "tarifa":   "SOAT -15 % (homologación CUPS-SOAT HUS 2022)",
-        "factor":   0.85,
-        "tipo":     "POBLACIÓN PRIVADA DE LA LIBERTAD",
-        "nit":      "830.053.105-3",
+        "numero": "CONTRATO IPS-001B-2022 — OTROSÍ No. 26 (2025)",
+        "tarifa": "SOAT -15 % (homologación CUPS-SOAT HUS 2022)",
+        "factor": 0.85,
+        "tipo": "POBLACIÓN PRIVADA DE LA LIBERTAD",
+        "nit": "830.053.105-3",
         "vigencia": "Hasta 31/07/2026 (PA Fondo de Atención en Salud PPL 2025 — Otrosí No. 26)",
         "contacto": "MARÍA FERNANDA JARAMILLO GUTIÉRREZ — Vicepresidente Negocios Fiduciarios, Fiduprevisora S.A.",
-        "nota":     "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora (cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo especial: Resolución 5159/2015 y Ley 1709/2014.",
+        "nota": "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora (cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo especial: Resolución 5159/2015 y Ley 1709/2014.",
     },
     "FOMAG": {
-        "numero":   "CONTRATO No. 12076-359-2025",
-        "tarifa":   "SOAT -15 %",
-        "factor":   0.85,
-        "tipo":     "MAGISTERIO — DOCENTES OFICIALES",
-        "nit":      "830.053.105-3",
+        "numero": "CONTRATO No. 12076-359-2025",
+        "tarifa": "SOAT -15 %",
+        "factor": 0.85,
+        "tipo": "MAGISTERIO — DOCENTES OFICIALES",
+        "nit": "830.053.105-3",
         "vigencia": "2025",
         "contacto": "CHRISTIAN RAMIRO FANDIÑO RIVEROS — Vicepresidente de Contratación, Fiduprevisora S.A. | notjudicial@fiduprevisora.com.co",
-        "nota":     "Patrimonio Autónomo FOMAG administrado por Fiduprevisora. Registro especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, Bucaramanga.",
+        "nota": "Patrimonio Autónomo FOMAG administrado por Fiduprevisora. Registro especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, Bucaramanga.",
     },
     "POLICIA NACIONAL": {
-        "numero":   "CONTRATO No. 068-5-200004-26 (SFI 004) — MEDIANA Y ALTA COMPLEJIDAD",
-        "tarifa":   "UVB 2026 – 8 %",
-        "factor":   0.92,
-        "tipo":     "POLICÍA NACIONAL — SUBSISTEMA DE SALUD",
-        "nit":      "804.012.688-5",
+        "numero": "CONTRATO No. 068-5-200004-26 (SFI 004) — MEDIANA Y ALTA COMPLEJIDAD",
+        "tarifa": "UVB 2026 – 8 %",
+        "factor": 0.92,
+        "tipo": "POLICÍA NACIONAL — SUBSISTEMA DE SALUD",
+        "nit": "804.012.688-5",
         "vigencia": "2026",
         "contacto": "TTE. CRNL. ANDREA CAROLINA CONTRERAS BOHORQUEZ — Jefe Regional de Aseguramiento en Salud N° 5",
-        "nota":     "Contrato interadministrativo. Cobertura: consulta ambulatoria, urgencias, hospitalización, UCI, procedimientos quirúrgicos, diagnósticos y terapéuticos. Resolución 00011 de enero 2025 y Orden Interna 26-055.",
+        "nota": "Contrato interadministrativo. Cobertura: consulta ambulatoria, urgencias, hospitalización, UCI, procedimientos quirúrgicos, diagnósticos y terapéuticos. Resolución 00011 de enero 2025 y Orden Interna 26-055.",
     },
     "POLICIA NACIONAL ONCOLOGIA": {
-        "numero":   "CONTRATO No. 068-5-200006-26 — ONCOLOGÍA",
-        "tarifa":   "TARIFAS INSTITUCIONALES HUS",
-        "factor":   1.00,
-        "tipo":     "POLICÍA NACIONAL — ONCOLOGÍA",
-        "nit":      "804.012.688-5",
+        "numero": "CONTRATO No. 068-5-200006-26 — ONCOLOGÍA",
+        "tarifa": "TARIFAS INSTITUCIONALES HUS",
+        "factor": 1.00,
+        "tipo": "POLICÍA NACIONAL — ONCOLOGÍA",
+        "nit": "804.012.688-5",
         "vigencia": "2026",
         "contacto": "MAYOR LEONARDO VEGA CALA — Jefe Regional Aseguramiento en Salud N° 5 | Delegación Res. 00011/2025 + Resolución 364/12-02-2025",
-        "nota":     "Contrato interadministrativo exclusivo oncología. Minuta firmada marzo 2026. Inicio de ejecución certificado.",
+        "nota": "Contrato interadministrativo exclusivo oncología. Minuta firmada marzo 2026. Inicio de ejecución certificado.",
     },
     "SUMIMEDICAL": {
-        "numero":   "TARIFARIO ESE HUS 2025 — SUMIMEDICAL",
-        "tarifa":   "SOAT -15 %",
-        "factor":   0.85,
-        "tipo":     "EMPRESA COMPLEMENTARIA DE SALUD",
-        "nit":      "N/D",
+        "numero": "TARIFARIO ESE HUS 2025 — SUMIMEDICAL",
+        "tarifa": "SOAT -15 %",
+        "factor": 0.85,
+        "tipo": "EMPRESA COMPLEMENTARIA DE SALUD",
+        "nit": "N/D",
         "vigencia": "2025",
         "contacto": "Correo contratación HUS",
-        "nota":     "Tarifario en dos hojas: SOAT homologado CUPS y servicios institucionales HUS.",
+        "nota": "Tarifario en dos hojas: SOAT homologado CUPS y servicios institucionales HUS.",
     },
     "DISPENSARIO MEDICO": {
-        "numero":   "CONTRATO No. 440-DIGSA/DMBUG-2025 (Proceso CD477)",
-        "tarifa":   "SOAT/SMLV -20 % (Manual tarifario homologado SOAT-SMLV con descuento del 20%)",
-        "factor":   0.80,
-        "tipo":     "FUERZAS MILITARES — EJÉRCITO NACIONAL",
-        "nit":      "901.541.137-1",
+        "numero": "CONTRATO No. 440-DIGSA/DMBUG-2025 (Proceso CD477)",
+        "tarifa": "SOAT/SMLV -20 % (Manual tarifario homologado SOAT-SMLV con descuento del 20%)",
+        "factor": 0.80,
+        "tipo": "FUERZAS MILITARES — EJÉRCITO NACIONAL",
+        "nit": "901.541.137-1",
         "vigencia": "Dic 2025 – Jul 2026 o hasta agotar presupuesto",
         "contacto": "DIRECCIÓN DE SANIDAD EJÉRCITO — DISPENSARIO MÉDICO BUCARAMANGA | gerencia@hus.gov.co",
-        "nota":     "Contrato interadministrativo. Valor: $3.235.050.000 M/CTE. Cobertura: servicios de salud mediana y alta complejidad para afiliados Fuerzas Militares Regional 2. Tarifa pactada: SOAT/SMLV -20%. Objeto idéntico al ACUERDO 002 del 27-04-2001 del Consejo Superior de Salud FF.MM.",
+        "nota": "Contrato interadministrativo. Valor: $3.235.050.000 M/CTE. Cobertura: servicios de salud mediana y alta complejidad para afiliados Fuerzas Militares Regional 2. Tarifa pactada: SOAT/SMLV -20%. Objeto idéntico al ACUERDO 002 del 27-04-2001 del Consejo Superior de Salud FF.MM.",
     },
     "SALUD MIA": {
-        "numero":   "CONTRATOS CSA2025EVE3A005 + SSA2025EVE3A005",
-        "tarifa":   "SOAT -15 %",
-        "factor":   0.85,
-        "tipo":     "EPS / ASEGURADORA",
-        "nit":      "N/D",
+        "numero": "CONTRATOS CSA2025EVE3A005 + SSA2025EVE3A005",
+        "tarifa": "SOAT -15 %",
+        "factor": 0.85,
+        "tipo": "EPS / ASEGURADORA",
+        "nit": "N/D",
         "vigencia": "Desde 01/06/2025 con renovación automática",
         "contacto": "Correo contratación HUS",
-        "nota":     "Dos documentos firmados: CSA2025EVE3A005 (Contributivo) y SSA2025EVE3A005 (Subsidiado). Cláusula décima séptima #10/#11 y vigésima cuarta (parágrafo eventos adversos) son defensivas clave.",
+        "nota": "Dos documentos firmados: CSA2025EVE3A005 (Contributivo) y SSA2025EVE3A005 (Subsidiado). Cláusula décima séptima #10/#11 y vigésima cuarta (parágrafo eventos adversos) son defensivas clave.",
     },
     "PRECIMED": {
-        "numero":   "CONTRATO No. 319 DE 2024",
-        "tarifa":   "SOAT -15 %",
-        "factor":   0.85,
-        "tipo":     "EMPRESA DE MEDICINA PREPAGADA",
-        "nit":      "N/D",
+        "numero": "CONTRATO No. 319 DE 2024",
+        "tarifa": "SOAT -15 %",
+        "factor": 0.85,
+        "tipo": "EMPRESA DE MEDICINA PREPAGADA",
+        "nit": "N/D",
         "vigencia": "2024-2025",
         "contacto": "Correo contratación HUS",
-        "nota":     "Contrato de prestación de servicios de salud.",
+        "nota": "Contrato de prestación de servicios de salud.",
     },
     "AURORA": {
-        "numero":   "MINUTA ARL + MINUTA VIDA AP — FIRMADAS SEP 2024",
-        "tarifa":   "SOAT PLENO (sin descuento)",
-        "factor":   1.00,
-        "tipo":     "COMPAÑÍA DE SEGUROS — ARL Y VIDA",
-        "nit":      "N/D",
+        "numero": "MINUTA ARL + MINUTA VIDA AP — FIRMADAS SEP 2024",
+        "tarifa": "SOAT PLENO (sin descuento)",
+        "factor": 1.00,
+        "tipo": "COMPAÑÍA DE SEGUROS — ARL Y VIDA",
+        "nit": "N/D",
         "vigencia": "2024-2025",
         "contacto": "Compañía de Seguros de Vida Aurora S.A.",
-        "nota":     "Dos minutas: ARL y Vida AP. SOAT pleno aplicable.",
+        "nota": "Dos minutas: ARL y Vida AP. SOAT pleno aplicable.",
     },
 }
+
 
 def get_contrato(eps: str) -> dict:
     """Retorna los datos del contrato para una EPS dada (búsqueda flexible)."""
@@ -195,14 +196,14 @@ def get_contrato(eps: str) -> dict:
         if key in eps_upper or eps_upper in key:
             return val
     return {
-        "numero":   "SIN CONTRATO PACTADO",
-        "tarifa":   "SOAT PLENO — Manual Tarifario SOAT 2026 (Circular 047/2025 MinSalud + UVB 2026 = $12.110)",
-        "factor":   1.00,
-        "tipo":     "SIN RELACIÓN CONTRACTUAL",
-        "nit":      "N/D",
+        "numero": "SIN CONTRATO PACTADO",
+        "tarifa": "SOAT PLENO — Manual Tarifario SOAT 2026 (Circular 047/2025 MinSalud + UVB 2026 = $12.110)",
+        "factor": 1.00,
+        "tipo": "SIN RELACIÓN CONTRACTUAL",
+        "nit": "N/D",
         "vigencia": "N/A",
         "contacto": "cartera@hus.gov.co",
-        "nota":     "Sin contrato. Se aplica tarifa SOAT plena según Circular Externa 047 de 2025 del MinSalud (Manual SOAT 2026 indexado a UVB — UVB 2026 = $12.110) y Decreto 780 de 2016.",
+        "nota": "Sin contrato. Se aplica tarifa SOAT plena según Circular Externa 047 de 2025 del MinSalud (Manual SOAT 2026 indexado a UVB — UVB 2026 = $12.110) y Decreto 780 de 2016.",
     }
 
 
@@ -211,14 +212,57 @@ def get_contrato(eps: str) -> dict:
 # ══════════════════════════════════════════════════════════════════
 
 TIPO_ATENCION_KEYWORDS = {
-    "CONSULTA EXTERNA":   ["consulta externa", "consulta medica", "cita medica", "consulta ambulatoria", "valoracion ambulatoria"],
-    "URGENCIAS":          ["urgencia", "urgente", "emergencia", "triage", "reanimacion", "shock", "rcp"],
-    "HOSPITALIZACIÓN":    ["hospitalizacion", "hospitalizado", "cama hospitalaria", "internacion", "estancia hospitalaria", "dia cama"],
-    "CIRUGÍA":            ["cirugia", "quirurgico", "procedimiento quirurgico", "sala de cirugia", "procedimiento", "intervencion quirurgica"],
-    "UCI":                ["uci", "unidad de cuidados intensivos", "cuidado critico", "ventilacion mecanica", "cuidado intensivo"],
-    "ONCOLOGÍA":          ["oncologia", "quimioterapia", "radioterapia", "oncologico", "cancer", "tumor", "neoplasia"],
-    "PROCEDIMIENTO Dx":   ["imagen diagnostica", "ecografia", "tomografia", "resonancia", "endoscopia", "biopsia", "laboratorio"],
+    "CONSULTA EXTERNA": [
+        "consulta externa",
+        "consulta medica",
+        "cita medica",
+        "consulta ambulatoria",
+        "valoracion ambulatoria",
+    ],
+    "URGENCIAS": ["urgencia", "urgente", "emergencia", "triage", "reanimacion", "shock", "rcp"],
+    "HOSPITALIZACIÓN": [
+        "hospitalizacion",
+        "hospitalizado",
+        "cama hospitalaria",
+        "internacion",
+        "estancia hospitalaria",
+        "dia cama",
+    ],
+    "CIRUGÍA": [
+        "cirugia",
+        "quirurgico",
+        "procedimiento quirurgico",
+        "sala de cirugia",
+        "procedimiento",
+        "intervencion quirurgica",
+    ],
+    "UCI": [
+        "uci",
+        "unidad de cuidados intensivos",
+        "cuidado critico",
+        "ventilacion mecanica",
+        "cuidado intensivo",
+    ],
+    "ONCOLOGÍA": [
+        "oncologia",
+        "quimioterapia",
+        "radioterapia",
+        "oncologico",
+        "cancer",
+        "tumor",
+        "neoplasia",
+    ],
+    "PROCEDIMIENTO Dx": [
+        "imagen diagnostica",
+        "ecografia",
+        "tomografia",
+        "resonancia",
+        "endoscopia",
+        "biopsia",
+        "laboratorio",
+    ],
 }
+
 
 def extraer_tipo_atencion(contexto_pdf: str, texto_glosa: str) -> str:
     texto = (contexto_pdf + " " + texto_glosa).lower()
@@ -227,108 +271,134 @@ def extraer_tipo_atencion(contexto_pdf: str, texto_glosa: str) -> str:
             return tipo
     return "NO ESPECIFICADO EN SOPORTES"
 
+
 def extraer_datos_soporte(contexto_pdf: str) -> dict:
     datos = {
-        "cups":          "NO IDENTIFICADO",
-        "diagnostico":   "NO IDENTIFICADO",
-        "medico":        "NO IDENTIFICADO",
-        "fecha_atencion":"NO IDENTIFICADA",
-        "servicio":      "NO IDENTIFICADO",
-        "paciente":      "NO IDENTIFICADO",
-        "edad":          "NO IDENTIFICADA",
-        "sexo":          "NO IDENTIFICADO",
-        "signos_vitales":"NO IDENTIFICADOS",
-        "glasgow":       "NO IDENTIFICADO",
-        "laboratorios":  "NO IDENTIFICADOS",
-        "medicamentos":  "NO IDENTIFICADOS",
-        "evolucion":     "NO IDENTIFICADA",
+        "cups": "NO IDENTIFICADO",
+        "diagnostico": "NO IDENTIFICADO",
+        "medico": "NO IDENTIFICADO",
+        "fecha_atencion": "NO IDENTIFICADA",
+        "servicio": "NO IDENTIFICADO",
+        "paciente": "NO IDENTIFICADO",
+        "edad": "NO IDENTIFICADA",
+        "sexo": "NO IDENTIFICADO",
+        "signos_vitales": "NO IDENTIFICADOS",
+        "glasgow": "NO IDENTIFICADO",
+        "laboratorios": "NO IDENTIFICADOS",
+        "medicamentos": "NO IDENTIFICADOS",
+        "evolucion": "NO IDENTIFICADA",
     }
     if not contexto_pdf:
         return datos
 
     # CUPS
-    m = re.search(r'\b(\d{5,6})\b', contexto_pdf)
-    if m: datos["cups"] = m.group(1)
+    m = re.search(r"\b(\d{5,6})\b", contexto_pdf)
+    if m:
+        datos["cups"] = m.group(1)
 
     # CIE-10
-    m = re.search(r'\b([A-Z]\d{2}\.?\d*)\b', contexto_pdf)
-    if m: datos["diagnostico"] = m.group(1)
+    m = re.search(r"\b([A-Z]\d{2}\.?\d*)\b", contexto_pdf)
+    if m:
+        datos["diagnostico"] = m.group(1)
 
     # Médico tratante
     m = re.search(
-        r'(?:m[eé]dico|dr\.?|dra\.?|profesional|especialista|tratante)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-záéíóú]+){1,3})',
-        contexto_pdf, re.I
+        r"(?:m[eé]dico|dr\.?|dra\.?|profesional|especialista|tratante)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-záéíóú]+){1,3})",
+        contexto_pdf,
+        re.I,
     )
-    if m: datos["medico"] = m.group(1).strip()
+    if m:
+        datos["medico"] = m.group(1).strip()
 
     # Fecha atención
-    m = re.search(r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b', contexto_pdf)
-    if m: datos["fecha_atencion"] = m.group(1)
+    m = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", contexto_pdf)
+    if m:
+        datos["fecha_atencion"] = m.group(1)
 
     # Servicio / procedimiento
     m = re.search(
-        r'(?:servicio|procedimiento|actividad|descripci[oó]n)[:\s]+([A-ZÁÉÍÓÚ][^\n]{5,80})',
-        contexto_pdf, re.I
+        r"(?:servicio|procedimiento|actividad|descripci[oó]n)[:\s]+([A-ZÁÉÍÓÚ][^\n]{5,80})",
+        contexto_pdf,
+        re.I,
     )
-    if m: datos["servicio"] = m.group(1).strip()[:100]
+    if m:
+        datos["servicio"] = m.group(1).strip()[:100]
 
     # Paciente
     m = re.search(
-        r'(?:paciente|nombre\s+del\s+paciente|nombres?\s+y\s+apellidos?)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-záéíóú]+){1,4})',
-        contexto_pdf, re.I
+        r"(?:paciente|nombre\s+del\s+paciente|nombres?\s+y\s+apellidos?)[:\s]+([A-ZÁÉÍÓÚ][a-záéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-záéíóú]+){1,4})",
+        contexto_pdf,
+        re.I,
     )
-    if m: datos["paciente"] = m.group(1).strip()
+    if m:
+        datos["paciente"] = m.group(1).strip()
 
     # Edad
-    m = re.search(r'(?:edad|años)[:\s]*(\d{1,3})\s*(?:años?)?', contexto_pdf, re.I)
+    m = re.search(r"(?:edad|años)[:\s]*(\d{1,3})\s*(?:años?)?", contexto_pdf, re.I)
     if m and int(m.group(1)) < 120:
         datos["edad"] = f"{m.group(1)} años"
 
     # Sexo
-    m = re.search(r'(?:sexo|g[eé]nero)[:\s]*(masculino|femenino|hombre|mujer|m|f)\b', contexto_pdf, re.I)
+    m = re.search(
+        r"(?:sexo|g[eé]nero)[:\s]*(masculino|femenino|hombre|mujer|m|f)\b", contexto_pdf, re.I
+    )
     if m:
         s = m.group(1).upper()
         datos["sexo"] = "MASCULINO" if s in ("MASCULINO", "HOMBRE", "M") else "FEMENINO"
 
     # Signos vitales
     sv = []
-    m = re.search(r'(?:ta|tensi[oó]n\s+arterial|presi[oó]n)[:\s]*(\d{2,3}/\d{2,3})', contexto_pdf, re.I)
-    if m: sv.append(f"TA {m.group(1)} mmHg")
-    m = re.search(r'(?:fc|frecuencia\s+cardiaca)[:\s]*(\d{2,3})', contexto_pdf, re.I)
-    if m: sv.append(f"FC {m.group(1)} lpm")
-    m = re.search(r'(?:fr|frecuencia\s+respiratoria)[:\s]*(\d{2})', contexto_pdf, re.I)
-    if m: sv.append(f"FR {m.group(1)} rpm")
-    m = re.search(r'(?:t°|temp|temperatura)[:\s]*(\d{2}[\.,]?\d?)', contexto_pdf, re.I)
-    if m: sv.append(f"T° {m.group(1)}°C")
-    m = re.search(r'(?:sa?02|saturaci[oó]n)[:\s]*(\d{2,3})', contexto_pdf, re.I)
-    if m: sv.append(f"SatO2 {m.group(1)}%")
-    if sv: datos["signos_vitales"] = " | ".join(sv)
+    m = re.search(
+        r"(?:ta|tensi[oó]n\s+arterial|presi[oó]n)[:\s]*(\d{2,3}/\d{2,3})", contexto_pdf, re.I
+    )
+    if m:
+        sv.append(f"TA {m.group(1)} mmHg")
+    m = re.search(r"(?:fc|frecuencia\s+cardiaca)[:\s]*(\d{2,3})", contexto_pdf, re.I)
+    if m:
+        sv.append(f"FC {m.group(1)} lpm")
+    m = re.search(r"(?:fr|frecuencia\s+respiratoria)[:\s]*(\d{2})", contexto_pdf, re.I)
+    if m:
+        sv.append(f"FR {m.group(1)} rpm")
+    m = re.search(r"(?:t°|temp|temperatura)[:\s]*(\d{2}[\.,]?\d?)", contexto_pdf, re.I)
+    if m:
+        sv.append(f"T° {m.group(1)}°C")
+    m = re.search(r"(?:sa?02|saturaci[oó]n)[:\s]*(\d{2,3})", contexto_pdf, re.I)
+    if m:
+        sv.append(f"SatO2 {m.group(1)}%")
+    if sv:
+        datos["signos_vitales"] = " | ".join(sv)
 
     # Glasgow
-    m = re.search(r'(?:glasgow|gcs)[:\s]*(\d{1,2}\s*/\s*15|\d{1,2})', contexto_pdf, re.I)
-    if m: datos["glasgow"] = f"Glasgow {m.group(1).replace(' ', '')}"
+    m = re.search(r"(?:glasgow|gcs)[:\s]*(\d{1,2}\s*/\s*15|\d{1,2})", contexto_pdf, re.I)
+    if m:
+        datos["glasgow"] = f"Glasgow {m.group(1).replace(' ', '')}"
 
     # Laboratorios relevantes
     labs = []
     for pat, label in [
-        (r'(?:leucocitos?)[:\s]*(\d{3,6})', "leucocitos"),
-        (r'(?:hemoglobina|hb)[:\s]*(\d{1,2}[\.,]?\d?)', "Hb"),
-        (r'(?:pcr|prote[ií]na\s+c\s+reactiva)[:\s]*(\d+[\.,]?\d*)', "PCR"),
-        (r'(?:creatinina)[:\s]*(\d+[\.,]?\d*)', "creatinina"),
-        (r'(?:troponina)[:\s]*(\d+[\.,]?\d*)', "troponina"),
+        (r"(?:leucocitos?)[:\s]*(\d{3,6})", "leucocitos"),
+        (r"(?:hemoglobina|hb)[:\s]*(\d{1,2}[\.,]?\d?)", "Hb"),
+        (r"(?:pcr|prote[ií]na\s+c\s+reactiva)[:\s]*(\d+[\.,]?\d*)", "PCR"),
+        (r"(?:creatinina)[:\s]*(\d+[\.,]?\d*)", "creatinina"),
+        (r"(?:troponina)[:\s]*(\d+[\.,]?\d*)", "troponina"),
     ]:
         m = re.search(pat, contexto_pdf, re.I)
-        if m: labs.append(f"{label} {m.group(1)}")
-    if labs: datos["laboratorios"] = " | ".join(labs)
+        if m:
+            labs.append(f"{label} {m.group(1)}")
+    if labs:
+        datos["laboratorios"] = " | ".join(labs)
 
     # Evolución / notas relevantes (primeras líneas tras "EVOLUCIÓN" o "NOTA")
     m = re.search(
-        r'(?:evoluci[oó]n|nota\s+m[eé]dica|diagnostico\s+principal)[:\s]+([^\n]{20,250})',
-        contexto_pdf, re.I
+        r"(?:evoluci[oó]n|nota\s+m[eé]dica|diagnostico\s+principal)[:\s]+([^\n]{20,250})",
+        contexto_pdf,
+        re.I,
     )
-    if m: datos["evolucion"] = m.group(1).strip()[:300]
+    if m:
+        datos["evolucion"] = m.group(1).strip()[:300]
 
     return datos
+
 
 def tiene_soportes_reales(contexto_pdf: str) -> bool:
     return bool(contexto_pdf and len(contexto_pdf.strip()) > 80)
@@ -632,7 +702,9 @@ Verifica MENTALMENTE antes de cerrar el <argumento>:
 """
 
 
-SYSTEM_TA = SYSTEM_BASE + """
+SYSTEM_TA = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: TARIFAS (TA) ═══════════════
 ARGUMENTO CENTRAL: La tarifa facturada corresponde al contrato vigente y/o al Manual Tarifario aplicable:
 • MANUAL SOAT 2026: Circular Externa 047 de 2025 MinSalud — valores indexados a UVB. UVB 2026 = $12.110 (Res. MinHacienda 31/12/2025). Fórmula: valor_pesos = Tarifa_UVB × $12.110, ajustado a la centena más próxima.
@@ -656,8 +728,11 @@ especial SI APLICA al pagador real.
 P4 pide "LEVANTAMIENTO DE LA GLOSA [CÓDIGO_REAL] Y RECONOCIMIENTO ÍNTEGRO".
 Cada caso es único: usa los DATOS DEL CASO, no plantillas memorizadas.
 """
+)
 
-SYSTEM_SO = SYSTEM_BASE + """
+SYSTEM_SO = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: SOPORTES (SO) ═══════════════
 ARGUMENTO CENTRAL: Los soportes exigidos (historia clínica, RIPS, órdenes) obran en el expediente institucional. La historia clínica es documento médico-legal de plena prueba (Res. 1995/1999). Los errores formales son subsanables (Circular 030/2013).
 
@@ -677,8 +752,11 @@ P4 pide levantamiento del código real y reconocimiento íntegro.
 Cuando el PDF aporte folios, fechas o nombres del médico tratante,
 INCORPÓRALOS al argumento — eso es lo que hace única la respuesta.
 """
+)
 
-SYSTEM_CO = SYSTEM_BASE + """
+SYSTEM_CO = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: COBERTURA (CO) ═══════════════
 ARGUMENTO CENTRAL: El servicio está incluido en el Plan de Beneficios (Res. 5269/2017) o en el régimen especial aplicable. Las exclusiones son taxativas (Art. 15 Ley 1751/2015).
 
@@ -687,8 +765,11 @@ REGLAS:
 • Para ARL (Positiva/Aurora): cita Dec. 1295/1994 + Dec. 1072/2015 + Ley 1562/2012.
 • NO cites T-760/2008 si NO es EPS regular.
 """
+)
 
-SYSTEM_CL = SYSTEM_BASE + """
+SYSTEM_CL = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: PERTINENCIA CLÍNICA (CL/PE) ═══════════════
 ARGUMENTO CENTRAL: La autonomía médica está protegida (Art. 17 Ley 1751/2015; T-478/1995). El médico tratante es quien examina al paciente; el auditor administrativo no puede invalidar un juicio clínico desde revisión documental.
 
@@ -697,8 +778,11 @@ REGLAS:
 • Si hay diagnóstico documentado en PDF, menciónalo genéricamente ("conforme al diagnóstico registrado en historia clínica").
 • Cierra solicitando conciliación de auditoría médica conjunta (Art. 20 Dec. 4747/2007).
 """
+)
 
-SYSTEM_FA = SYSTEM_BASE + """
+SYSTEM_FA = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: FACTURACIÓN (FA) ═══════════════
 ARGUMENTO CENTRAL: El servicio fue efectivamente prestado y documentado (Res. 1995/1999). La prestación genera obligación de pago (Art. 177 Ley 100/1993).
 
@@ -725,8 +809,11 @@ Cita Res. 1995/1999 + Art. 177 Ley 100/1993 como base. Régimen especial
 solo cuando el pagador lo justifique. Cierra pidiendo levantamiento del
 código FA real del caso.
 """
+)
 
-SYSTEM_AU = SYSTEM_BASE + """
+SYSTEM_AU = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: AUTORIZACIÓN (AU) ═══════════════
 ARGUMENTO CENTRAL: La atención de URGENCIAS no requiere autorización previa (Art. 168 Ley 100/1993; T-1025/2002). El Decreto 4747/2007 Art. 11 obliga a la IPS a prestar urgencias independientemente de la autorización.
 
@@ -735,8 +822,11 @@ REGLAS:
 • Para FF.MM./Dispensario: T-760/2008 NO aplica. T-1025/2002 SÍ es transversal a urgencias.
 • NO digas "FACTURACIÓN" ni "SOPORTES". Es AUTORIZACIÓN.
 """
+)
 
-SYSTEM_IN = SYSTEM_BASE + """
+SYSTEM_IN = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: INSUMOS (IN) ═══════════════
 ARGUMENTO CENTRAL: Los insumos son inherentes al acto médico (Dec. 780/2016) y se facturan al costo más porcentaje administrativo pactado (Art. 871 C.Comercio).
 
@@ -744,8 +834,11 @@ REGLAS:
 • NO inventes precios ni proveedores.
 • Para FF.MM.: Dec. 1795/2000 + Acuerdo 002/2001; NO cites T-760/2008.
 """
+)
 
-SYSTEM_ME = SYSTEM_BASE + """
+SYSTEM_ME = (
+    SYSTEM_BASE
+    + """
 ═══════════════ MÓDULO: MEDICAMENTOS (ME) ═══════════════
 ARGUMENTO CENTRAL: El medicamento se dispensa bajo fórmula médica del tratante (Art. 17 Ley 1751/2015). La prescripción clínica prevalece sobre criterio administrativo (T-478/1995). Medicamentos no PBS se gestionan ante ADRES, no se glosan a la IPS.
 
@@ -753,6 +846,7 @@ REGLAS:
 • NO inventes nombres comerciales ni concentraciones.
 • Para FF.MM.: NO cites T-760/2008; cita Dec. 1795/2000 + Acuerdo 002/2001.
 """
+)
 
 
 SYSTEM_MAP = {
@@ -865,7 +959,11 @@ CALCULADORA TARIFARIA OBLIGATORIA:
 
     bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
     if bloque_regimen:
-        bloque_regimen = "\n══════════════════════════════════════════════\n" + bloque_regimen + "\n══════════════════════════════════════════════\n"
+        bloque_regimen = (
+            "\n══════════════════════════════════════════════\n"
+            + bloque_regimen
+            + "\n══════════════════════════════════════════════\n"
+        )
 
     return base + bloque_calculo + bloque_regimen
 
@@ -876,6 +974,7 @@ def _parsear_vigencia(s: str) -> tuple:
     """
     import re as _re
     from datetime import date as _date
+
     if not s:
         return None, None
     s = str(s)
@@ -989,7 +1088,9 @@ def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
     factor = contrato.get("factor", 1.0)
     descuento_txt = ""
     if factor < 1.0:
-        descuento_txt = f"\nFACTOR PACTADO: {factor} (descuento {int(round((1 - factor) * 100))}% sobre SOAT)"
+        descuento_txt = (
+            f"\nFACTOR PACTADO: {factor} (descuento {int(round((1 - factor) * 100))}% sobre SOAT)"
+        )
 
     alerta_vigencia = ""
     if fecha_factura:
@@ -1000,9 +1101,9 @@ def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
                 f"  {v['diagnostico']}\n"
                 "  El contrato indicado arriba NO cubre esta factura. NO cites "
                 "ese contrato como base de tu defensa. En su lugar, redactá:\n"
-                "    \"el servicio se prestó en una fecha que está fuera de la "
+                '    "el servicio se prestó en una fecha que está fuera de la '
                 "vigencia del contrato citado por la EPS; corresponde validar el "
-                "contrato vigente para esa fecha o aplicar las normas generales\".\n"
+                'contrato vigente para esa fecha o aplicar las normas generales".\n'
                 "─────────────────────────────────────────────────\n"
             )
 
@@ -1022,7 +1123,6 @@ def build_contrato_context(eps: str, fecha_factura: str = "") -> str:
     )
 
 
-
 FALLBACK_SIN_SOPORTES = (
     "NO SE ADJUNTARON DOCUMENTOS COMPLEMENTARIOS EN ESTA RADICACIÓN. "
     "EL REGISTRO CLÍNICO INSTITUCIONAL RESPALDA LA ATENCIÓN PRESTADA. "
@@ -1031,10 +1131,15 @@ FALLBACK_SIN_SOPORTES = (
 
 
 _NOMBRE_TIPO = {
-    "TA": "TARIFAS", "SO": "SOPORTES", "AU": "AUTORIZACIÓN",
-    "CO": "COBERTURA", "CL": "PERTINENCIA CLÍNICA",
-    "PE": "PERTINENCIA CLÍNICA", "FA": "FACTURACIÓN",
-    "IN": "INSUMOS", "ME": "MEDICAMENTOS",
+    "TA": "TARIFAS",
+    "SO": "SOPORTES",
+    "AU": "AUTORIZACIÓN",
+    "CO": "COBERTURA",
+    "CL": "PERTINENCIA CLÍNICA",
+    "PE": "PERTINENCIA CLÍNICA",
+    "FA": "FACTURACIÓN",
+    "IN": "INSUMOS",
+    "ME": "MEDICAMENTOS",
 }
 
 
@@ -1085,6 +1190,7 @@ def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5
     try:
         from app.database import SessionLocal
         from app.models.db import ClausulaContrato
+
         db = SessionLocal()
         try:
             q = (
@@ -1096,13 +1202,15 @@ def get_clausulas_para_glosa(eps: str, codigo_glosa: str, max_clausulas: int = 5
             )
             resultados = []
             for cl in q.all():
-                resultados.append({
-                    "numero_clausula": cl.numero_clausula or "",
-                    "tema": cl.tema or "",
-                    "titulo": cl.titulo or "",
-                    "texto_literal": cl.texto_literal or "",
-                    "pagina": cl.pagina,
-                })
+                resultados.append(
+                    {
+                        "numero_clausula": cl.numero_clausula or "",
+                        "tema": cl.tema or "",
+                        "titulo": cl.titulo or "",
+                        "texto_literal": cl.texto_literal or "",
+                        "pagina": cl.pagina,
+                    }
+                )
             return resultados
         finally:
             db.close()
@@ -1136,7 +1244,7 @@ def build_user_prompt(
       3. GLOSA ORIGINAL (texto exacto del motivo EPS)
       4. INSTRUCCIÓN (salida XML + estructura 4 párrafos)
     """
-    prefijo = (codigo[:2].upper() if codigo and len(codigo) >= 2 else "FA")
+    prefijo = codigo[:2].upper() if codigo and len(codigo) >= 2 else "FA"
     if prefijo not in _NOMBRE_TIPO:
         prefijo = "FA"
     nombre_tipo = _NOMBRE_TIPO[prefijo]
@@ -1165,8 +1273,17 @@ def build_user_prompt(
     # Capa 3: keywords de concepto en español (sin codigo formal)
     KEYWORDS_CONCEPTO = [
         ("TA", [r"\bTARIFA(S)?\b", r"\bSOAT\b", r"\bUVB\b", r"\bMANUAL TARIFARIO\b"]),
-        ("SO", [r"\bSOPORTE(S)?\b", r"\bHISTORIA CL[ÍI]NICA\b", r"\bEPICRISIS\b",
-                r"\bRIPS\b", r"\bANEXO(S)? CL[ÍI]NICO(S)?\b", r"\bFIRMA M[ÉE]DICA\b"]),
+        (
+            "SO",
+            [
+                r"\bSOPORTE(S)?\b",
+                r"\bHISTORIA CL[ÍI]NICA\b",
+                r"\bEPICRISIS\b",
+                r"\bRIPS\b",
+                r"\bANEXO(S)? CL[ÍI]NICO(S)?\b",
+                r"\bFIRMA M[ÉE]DICA\b",
+            ],
+        ),
         ("AU", [r"\bAUTORIZACI[ÓO]N(?:ES)?\b", r"\bORDEN PREVIA\b", r"\bSIN AUTORIZACI[ÓO]N\b"]),
         ("CO", [r"\bCOBERTURA\b", r"\bPBS\b", r"\bPLAN DE BENEFICIOS\b", r"\bEXCLUSI[ÓO]N\b"]),
         ("CL", [r"\bPERTINENCIA\b", r"\bINDICACI[ÓO]N CL[ÍI]NICA\b"]),
@@ -1213,49 +1330,65 @@ def build_user_prompt(
     vicios_detectados = []
     # Glosa contradictoria/mal imputada (el auditor confiesa intencion distinta)
     if re.search(r"EN REALIDAD|LA INTENCI[ÓO]N (REAL )?ES|AUNQUE LA TIPIFICACI[ÓO]N", texto_up):
-        vicios_detectados.append({
-            "nombre": "GLOSA CONTRADICTORIA / MAL IMPUTADA",
-            "ataque": "El propio auditor confiesa contradiccion entre el motivo escrito y el codigo aplicado. "
-                      "TRANSCRIBE LITERALMENTE entre comillas la confesion del auditor y solicita "
-                      "DESESTIMACION POR VICIO DE MOTIVACION (Decreto 4747/2007 Art. 21 + Ley 1438/2011 Art. 57).",
-        })
+        vicios_detectados.append(
+            {
+                "nombre": "GLOSA CONTRADICTORIA / MAL IMPUTADA",
+                "ataque": "El propio auditor confiesa contradiccion entre el motivo escrito y el codigo aplicado. "
+                "TRANSCRIBE LITERALMENTE entre comillas la confesion del auditor y solicita "
+                "DESESTIMACION POR VICIO DE MOTIVACION (Decreto 4747/2007 Art. 21 + Ley 1438/2011 Art. 57).",
+            }
+        )
     # Inversion carga probatoria (exige soportes no tipificados)
-    if re.search(r"SE EXIGE.*(FACTURA DE COMPRA|FORMATO PDF|FIRMA DE RECIBIDO|DOCUMENTOS ADICIONALES)", texto_up) or \
-       re.search(r"AL NO APORTAR|FALTA DE SOPORTE.*ADICIONAL", texto_up):
-        vicios_detectados.append({
-            "nombre": "INVERSION INDEBIDA DE LA CARGA PROBATORIA",
-            "ataque": "La EPS exige soportes NO tipificados en Res. 3047/2008 Anexo Tecnico No. 5 ni Res. 2284/2023 "
-                      "Anexo Tecnico No. 1. Cita Ley 1438/2011 Art. 57 (carga dinamica) + Art. 29 C.P. (debido proceso).",
-        })
+    if re.search(
+        r"SE EXIGE.*(FACTURA DE COMPRA|FORMATO PDF|FIRMA DE RECIBIDO|DOCUMENTOS ADICIONALES)",
+        texto_up,
+    ) or re.search(r"AL NO APORTAR|FALTA DE SOPORTE.*ADICIONAL", texto_up):
+        vicios_detectados.append(
+            {
+                "nombre": "INVERSION INDEBIDA DE LA CARGA PROBATORIA",
+                "ataque": "La EPS exige soportes NO tipificados en Res. 3047/2008 Anexo Tecnico No. 5 ni Res. 2284/2023 "
+                "Anexo Tecnico No. 1. Cita Ley 1438/2011 Art. 57 (carga dinamica) + Art. 29 C.P. (debido proceso).",
+            }
+        )
     # Glosa atipica (porcentaje no taxativo)
     if re.search(r"SE GLOSA EL \d+\s*%|GLOSA DEL? \d+\s*%", texto_up):
-        vicios_detectados.append({
-            "nombre": "GLOSA ATIPICA",
-            "ataque": "El porcentaje de objecion NO existe en el Catalogo Unico de Glosas "
-                      "(Res. 3047/2008 Anexo Tecnico No. 6). La causal carece de TIPICIDAD.",
-        })
+        vicios_detectados.append(
+            {
+                "nombre": "GLOSA ATIPICA",
+                "ataque": "El porcentaje de objecion NO existe en el Catalogo Unico de Glosas "
+                "(Res. 3047/2008 Anexo Tecnico No. 6). La causal carece de TIPICIDAD.",
+            }
+        )
     # Modificacion unilateral de tarifa
     if re.search(r"TARIFA NO PACTADA|MAYOR VALOR COBRADO.*TARIFA|APLICAR.*MANUAL.*SOAT", texto_up):
-        vicios_detectados.append({
-            "nombre": "MODIFICACION UNILATERAL DEL CONTRATO",
-            "ataque": "La EPS pretende aplicar tarifa distinta a la pactada en via de glosa. Vulnera "
-                      "PACTA SUNT SERVANDA (Art. 1602 C.C.) y buena fe contractual (Art. 871 C.Co.).",
-        })
+        vicios_detectados.append(
+            {
+                "nombre": "MODIFICACION UNILATERAL DEL CONTRATO",
+                "ataque": "La EPS pretende aplicar tarifa distinta a la pactada en via de glosa. Vulnera "
+                "PACTA SUNT SERVANDA (Art. 1602 C.C.) y buena fe contractual (Art. 871 C.Co.).",
+            }
+        )
     # Aplicacion indebida de causal (FA0202 sobre servicio intrahospitalario)
     if "FA0202" in texto_up and re.search(r"INTRAHOSPITALARIO|HOSPITALIZACI[ÓO]N", texto_up):
-        vicios_detectados.append({
-            "nombre": "APLICACION INDEBIDA DE CAUSAL",
-            "ataque": "FA0202 aplica a consulta DOMICILIARIA. Aqui el servicio es INTRAHOSPITALARIO, "
-                      "lo cual configura tipificacion indebida (Res. 3047/2008 Anexo Tecnico No. 6).",
-        })
+        vicios_detectados.append(
+            {
+                "nombre": "APLICACION INDEBIDA DE CAUSAL",
+                "ataque": "FA0202 aplica a consulta DOMICILIARIA. Aqui el servicio es INTRAHOSPITALARIO, "
+                "lo cual configura tipificacion indebida (Res. 3047/2008 Anexo Tecnico No. 6).",
+            }
+        )
     # Glosa de pertinencia sin concepto de par academico
-    if prefijo in ("CL", "PE") and not re.search(r"PAR ACAD[ÉE]MICO|AUDITOR M[ÉE]DICO.*MISMA ESPECIALIDAD", texto_up):
-        vicios_detectados.append({
-            "nombre": "AUSENCIA DE CONCEPTO TECNICO ESPECIALIZADO",
-            "ataque": "La glosa de pertinencia clinica REQUIERE concepto tecnico de par academico "
-                      "o auditor medico de la MISMA ESPECIALIDAD que emitio la indicacion "
-                      "(Res. 3047/2008 Anexo Tecnico No. 6). Sin ese soporte la glosa es invalida.",
-        })
+    if prefijo in ("CL", "PE") and not re.search(
+        r"PAR ACAD[ÉE]MICO|AUDITOR M[ÉE]DICO.*MISMA ESPECIALIDAD", texto_up
+    ):
+        vicios_detectados.append(
+            {
+                "nombre": "AUSENCIA DE CONCEPTO TECNICO ESPECIALIZADO",
+                "ataque": "La glosa de pertinencia clinica REQUIERE concepto tecnico de par academico "
+                "o auditor medico de la MISMA ESPECIALIDAD que emitio la indicacion "
+                "(Res. 3047/2008 Anexo Tecnico No. 6). Sin ese soporte la glosa es invalida.",
+            }
+        )
 
     bloque_vicios_str = ""
     if vicios_detectados:
@@ -1304,7 +1437,8 @@ def build_user_prompt(
     # Tiempo
     if dias_habiles is not None:
         contexto_tiempo = (
-            f"{dias_habiles} días hábiles (EXTEMPORÁNEA)" if es_extemporanea
+            f"{dias_habiles} días hábiles (EXTEMPORÁNEA)"
+            if es_extemporanea
             else f"{dias_habiles} días hábiles (DENTRO DE TÉRMINOS)"
         )
     else:
@@ -1319,9 +1453,14 @@ def build_user_prompt(
         # desde radicado, o desde los datos del PDF. Como heuristica usamos
         # cualquier "yyyy-mm-dd" o "dd/mm/yyyy" que aparezca en trazabilidad.
         import re as _re_vig
+
         fechas_candidatas = _re_vig.findall(
             r"\b(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}/\d{4})\b",
-            (numero_factura or "") + " " + (numero_radicado or "") + " " + (contexto_pdf or "")[:5000],
+            (numero_factura or "")
+            + " "
+            + (numero_radicado or "")
+            + " "
+            + (contexto_pdf or "")[:5000],
         )
         if fechas_candidatas:
             fecha_factura_str = fechas_candidatas[0]
@@ -1332,9 +1471,9 @@ def build_user_prompt(
                     f"  {v['diagnostico']}\n"
                     "  El contrato indicado arriba NO cubre esta factura.\n"
                     "  NO cites ese contrato como base de defensa. Redactá:\n"
-                    "  \"el servicio se prestó fuera de la vigencia del contrato\n"
+                    '  "el servicio se prestó fuera de la vigencia del contrato\n'
                     "  citado por la EPS; corresponde validar el contrato vigente\n"
-                    "  para esa fecha o aplicar el marco normativo general\".\n"
+                    '  para esa fecha o aplicar el marco normativo general".\n'
                 )
     except Exception:
         pass
@@ -1342,13 +1481,16 @@ def build_user_prompt(
     # Concepto Manual Único
     try:
         from app.services.catalogo_glosas import obtener_concepto
+
         concepto_oficial = obtener_concepto(codigo) or "(sin concepto oficial en catálogo)"
     except Exception:
         concepto_oficial = "(catálogo no disponible)"
 
     # Régimen especial
     bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
-    bloque_regimen_str = f"\n[RÉGIMEN ESPECIAL APLICABLE]\n{bloque_regimen}\n" if bloque_regimen else ""
+    bloque_regimen_str = (
+        f"\n[RÉGIMEN ESPECIAL APLICABLE]\n{bloque_regimen}\n" if bloque_regimen else ""
+    )
 
     # Normativa relevante con TEXTO EXACTO de artículos (para citación literal)
     bloque_normativa_str = ""
@@ -1357,6 +1499,7 @@ def build_user_prompt(
             normas_relevantes_para_codigo,
             _TODAS_LAS_NORMAS,
         )
+
         claves_relevantes = normas_relevantes_para_codigo(codigo)
         lineas = []
         for clave in claves_relevantes[:5]:
@@ -1391,6 +1534,7 @@ def build_user_prompt(
     bloque_taxativo_str = ""
     try:
         from app.services.catalogo_glosas import obtener_concepto
+
         concepto = obtener_concepto(codigo) or ""
         if concepto:
             bloque_taxativo_str = (
@@ -1408,6 +1552,7 @@ def build_user_prompt(
     bloque_antirebatimiento_str = ""
     try:
         from app.services.clausulas_anti_rebatimiento import clausulas_para_codigo
+
         cls = clausulas_para_codigo(codigo, max_clausulas=2)
         if cls:
             lineas_cl = [f"  • {c}" for c in cls]
@@ -1439,13 +1584,12 @@ def build_user_prompt(
                 texto = texto[:500] + "…"
             pagina = cl.get("pagina")
             pag_str = f" (pag. {pagina})" if pagina else ""
-            lineas_cc.append(
-                f"  • CLÁUSULA {num}{pag_str} — {titulo}:\n"
-                f"    «{texto}»"
-            )
+            lineas_cc.append(f"  • CLÁUSULA {num}{pag_str} — {titulo}:\n    «{texto}»")
         if lineas_cc:
             bloque_clausulas_contrato_str = (
-                "\n[CLÁUSULAS LITERALES DEL CONTRATO CON " + (eps or "ENTIDAD PAGADORA").upper() + " — CITA TEXTUALMENTE]\n"
+                "\n[CLÁUSULAS LITERALES DEL CONTRATO CON "
+                + (eps or "ENTIDAD PAGADORA").upper()
+                + " — CITA TEXTUALMENTE]\n"
                 "IMPORTANTE: estas cláusulas son TEXTO LITERAL del contrato firmado. "
                 "Cuando defiendas, CITA UNA O DOS entre comillas usando su número de cláusula "
                 "para que la EPS no pueda rebatir (firmó el documento que se cita).\n"
@@ -1472,6 +1616,7 @@ def build_user_prompt(
     bloque_perfil_str = ""
     try:
         from app.services.perfil_eps import bloque_perfil_para_prompt
+
         bloque_perfil_str = bloque_perfil_para_prompt(str(eps or ""))
     except Exception:
         pass
@@ -1482,14 +1627,15 @@ def build_user_prompt(
     bloque_referencias_str = ""
     try:
         from app.services.extractor_folios import extraer_referencias_documentales
+
         refs = extraer_referencias_documentales(contexto_pdf or "")
         if refs["resumen_citable"]:
             bloque_referencias_str = (
                 "\n[REFERENCIAS DOCUMENTALES EXTRAÍDAS DEL EXPEDIENTE]\n"
                 f"{refs['resumen_citable']}\n"
                 "⚠ Cuando sea pertinente, CITA en la respuesta estas referencias de forma "
-                "textual (ej. \"según consta en el folio 59 del expediente\", \"conforme a la "
-                "historia clínica N° 1234567 suscrita por el Dr. X\"). Esto hace la respuesta "
+                'textual (ej. "según consta en el folio 59 del expediente", "conforme a la '
+                'historia clínica N° 1234567 suscrita por el Dr. X"). Esto hace la respuesta '
                 "casi imposible de ratificar.\n"
             )
     except Exception:
@@ -1505,12 +1651,15 @@ def build_user_prompt(
         clinicos.append(f"  • Diagnóstico CIE-10: {diagnostico}")
     if servicio != "NO IDENTIFICADO":
         clinicos.append(f"  • Servicio (PDF): {servicio}")
-    clinicos_str = "\n".join(clinicos) if clinicos else "  • (No se extrajeron datos clínicos del expediente)"
+    clinicos_str = (
+        "\n".join(clinicos) if clinicos else "  • (No se extrajeron datos clínicos del expediente)"
+    )
 
     # ═══ DETECCIÓN DE COMPLEJIDAD ═══
     # Analiza señales para decidir si es caso SIMPLE (respuesta 2 párrafos,
     # ~130-180 palabras) o COMPLEJO (4 párrafos, 230-310 palabras).
     import re as _re
+
     _texto_glosa_len = len(texto_glosa or "")
     _pdf_len = len(contexto_pdf or "")
     _num_docs_pdf = (contexto_pdf or "").count("═══ DOCUMENTO:")
@@ -1526,13 +1675,20 @@ def build_user_prompt(
 
     # Heurística de complejidad
     _puntos_complejidad = 0
-    if _num_docs_pdf >= 2: _puntos_complejidad += 3
-    elif _num_docs_pdf == 1: _puntos_complejidad += 1
-    if _pdf_len > 5000: _puntos_complejidad += 2
-    if _texto_glosa_len > 400: _puntos_complejidad += 2
-    if _texto_glosa_len > 800: _puntos_complejidad += 2
-    if _tiene_valor_especifico and _valor_numerico > 500000: _puntos_complejidad += 2
-    if _tiene_cups_especifico: _puntos_complejidad += 1
+    if _num_docs_pdf >= 2:
+        _puntos_complejidad += 3
+    elif _num_docs_pdf == 1:
+        _puntos_complejidad += 1
+    if _pdf_len > 5000:
+        _puntos_complejidad += 2
+    if _texto_glosa_len > 400:
+        _puntos_complejidad += 2
+    if _texto_glosa_len > 800:
+        _puntos_complejidad += 2
+    if _tiene_valor_especifico and _valor_numerico > 500000:
+        _puntos_complejidad += 2
+    if _tiene_cups_especifico:
+        _puntos_complejidad += 1
 
     es_complejo = _puntos_complejidad >= 4
 
@@ -1543,7 +1699,7 @@ def build_user_prompt(
         _max_pdf_chars = 40000
     else:
         _max_pdf_chars = 2000
-    pdf_texto = (contexto_pdf[:_max_pdf_chars].strip() if contexto_pdf else FALLBACK_SIN_SOPORTES)
+    pdf_texto = contexto_pdf[:_max_pdf_chars].strip() if contexto_pdf else FALLBACK_SIN_SOPORTES
 
     # Instrucción adaptativa de longitud
     if es_complejo:
@@ -1651,7 +1807,7 @@ def build_user_prompt(
 • Tipo de glosa     : {nombre_tipo} ({codigo})
 • Entidad pagadora  : {eps}
 • Contrato vigente  : {numero_contrato}
-• Vigencia contrato : {contrato.get("vigencia","—")}
+• Vigencia contrato : {contrato.get("vigencia", "—")}
 • Tarifa pactada    : {tarifa}
 • CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
 • Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
@@ -1723,8 +1879,14 @@ def build_all_variants(
 ) -> list[str]:
     """Compatibilidad: genera el mismo prompt 4 veces (antes producía 4 variantes hostiles)."""
     base = build_user_prompt(
-        texto_glosa, contexto_pdf, codigo, eps,
-        numero_factura, numero_radicado, dias_habiles, es_extemporanea,
+        texto_glosa,
+        contexto_pdf,
+        codigo,
+        eps,
+        numero_factura,
+        numero_radicado,
+        dias_habiles,
+        es_extemporanea,
     )
     return [base] * 4
 
@@ -1845,4 +2007,3 @@ def get_system_prompt_auditoria(eps: str) -> str:
             + "\n══════════════════════════════════════════════\n"
         )
     return _PROMPT_AUDITORIA_PREVIA + bloque_regimen
-

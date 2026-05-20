@@ -10,11 +10,11 @@ from app.api.routers.analytics import router as analytics_router
 # preserva los PDFs en cada nivel del fallback.
 try:
     from app.services.pdf_fallback_patch import apply as _apply_pdf_patch
+
     _apply_pdf_patch()
 except Exception as _e:  # pragma: no cover
     import logging
-    logging.getLogger("motor_glosas").warning(
-        f"pdf_fallback_patch no aplicado: {_e}"
-    )
+
+    logging.getLogger("motor_glosas").warning(f"pdf_fallback_patch no aplicado: {_e}")
 
 __all__ = ["auth_router", "glosas_router", "contratos_router", "analytics_router"]

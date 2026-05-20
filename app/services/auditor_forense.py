@@ -33,6 +33,7 @@ Funciona via:
   3. Prompt forense focalizado
   4. Devolver respuesta estructurada
 """
+
 from __future__ import annotations
 import os
 import base64
@@ -102,6 +103,7 @@ def _clave_cache_forense(
 ) -> str:
     """Calcula clave SHA256 de cache para auditor forense."""
     import hashlib
+
     h = hashlib.sha256()
     h.update(f"forense|{modelo}|{(factura or '').strip().upper()}|".encode("utf-8"))
     norm = " ".join((pregunta or "").lower().split())
@@ -122,17 +124,21 @@ def _buscar_cache_forense(clave: str) -> Optional[dict]:
         from app.core.tz import a_utc, ahora_utc
         from app.database import SessionLocal
         from app.models.db import AICacheRecord
+
         db = SessionLocal()
         try:
             r = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
             if not r:
                 return None
-            if r.creado_en and (ahora_utc() - a_utc(r.creado_en)) > timedelta(days=_CACHE_TTL_DIAS_FORENSE):
+            if r.creado_en and (ahora_utc() - a_utc(r.creado_en)) > timedelta(
+                days=_CACHE_TTL_DIAS_FORENSE
+            ):
                 db.delete(r)
                 db.commit()
                 return None
             r.hit_count = (r.hit_count or 0) + 1
             from sqlalchemy.sql import func as _f
+
             r.ultimo_hit = _f.now()
             db.commit()
             return {"html": r.respuesta, "modelo": r.modelo or "cache-forense"}
@@ -147,6 +153,7 @@ def _guardar_cache_forense(clave: str, html: str, modelo: str) -> None:
     try:
         from app.database import SessionLocal
         from app.models.db import AICacheRecord
+
         if not html or len(html) > 500_000:
             return
         db = SessionLocal()
@@ -180,7 +187,10 @@ async def auditar_forense(
     gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
     if not api_key and not gemini_key:
-        return {"html": "", "error": "Sin proveedores con PDF nativo (Anthropic ni Gemini configurados)"}
+        return {
+            "html": "",
+            "error": "Sin proveedores con PDF nativo (Anthropic ni Gemini configurados)",
+        }
 
     if not pregunta_gestor or len(pregunta_gestor.strip()) < 5:
         return {"html": "", "error": "Pregunta vacía o muy corta"}
@@ -191,9 +201,12 @@ async def auditar_forense(
         if cached:
             logger.info(f"[AUDITOR-FORENSE] CACHE HIT factura={factura} key={cache_key[:12]}")
             return {
-                "html": cached["html"], "modelo": cached["modelo"],
-                "input_tokens": 0, "output_tokens": 0,
-                "error": None, "cache_hit": True,
+                "html": cached["html"],
+                "modelo": cached["modelo"],
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "error": None,
+                "cache_hit": True,
             }
 
     timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
@@ -215,14 +228,16 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
         for nombre, data in pdfs_raw[:5]:
             if not data or len(data) < 1024 or len(data) > 32 * 1024 * 1024:
                 continue
-            content_blocks.append({
-                "type": "document",
-                "source": {
-                    "type": "base64",
-                    "media_type": "application/pdf",
-                    "data": base64.standard_b64encode(data).decode("ascii"),
-                },
-            })
+            content_blocks.append(
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": base64.standard_b64encode(data).decode("ascii"),
+                    },
+                }
+            )
     elif contexto_pdf_texto:
         user_text = (
             f"SOPORTES DOCUMENTALES (TEXTO EXTRAÍDO):\n\n"
@@ -243,7 +258,9 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
                     "https://api.anthropic.com/v1/messages",
                     headers=headers,
                     json={
-                        "model": modelo, "max_tokens": 6000, "temperature": 0.0,
+                        "model": modelo,
+                        "max_tokens": 6000,
+                        "temperature": 0.0,
                         "system": SYSTEM_AUDITOR_FORENSE,
                         "messages": [{"role": "user", "content": content_blocks}],
                     },
@@ -263,10 +280,12 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
                         except Exception:
                             pass
                     return {
-                        "html": texto, "modelo": f"anthropic/{modelo}/forense",
+                        "html": texto,
+                        "modelo": f"anthropic/{modelo}/forense",
                         "input_tokens": usage.get("input_tokens", 0),
                         "output_tokens": usage.get("output_tokens", 0),
-                        "error": None, "cache_hit": False,
+                        "error": None,
+                        "cache_hit": False,
                     }
                 anthropic_error = "Anthropic devolvió respuesta vacía"
             else:
@@ -282,24 +301,35 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
         logger.info(f"[AUDITOR-FORENSE] Fallback a Gemini PDF nativo factura={factura}")
         try:
             from app.services.gemini_service import GeminiService
+
             gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
             texto, modelo_usado = await gem.completar(
-                system=SYSTEM_AUDITOR_FORENSE, user=user_text,
-                modelo=gemini_model, temperature=0.0, max_tokens=6000,
+                system=SYSTEM_AUDITOR_FORENSE,
+                user=user_text,
+                modelo=gemini_model,
+                temperature=0.0,
+                max_tokens=6000,
                 pdfs_raw=pdfs_raw if pdfs_raw else None,
             )
             if texto:
-                logger.info(f"[AUDITOR-FORENSE] OK Gemini-PDF factura={factura} pdfs={len(pdfs_raw or [])}")
+                logger.info(
+                    f"[AUDITOR-FORENSE] OK Gemini-PDF factura={factura} pdfs={len(pdfs_raw or [])}"
+                )
                 if not bypass_cache:
                     try:
                         _guardar_cache_forense(cache_key, texto, modelo_usado + "/forense")
                     except Exception:
                         pass
                 return {
-                    "html": texto, "modelo": modelo_usado + "/forense",
-                    "input_tokens": 0, "output_tokens": 0,
-                    "error": None, "cache_hit": False,
-                    "fallback_motivo": anthropic_error if anthropic_error else "Anthropic no configurado",
+                    "html": texto,
+                    "modelo": modelo_usado + "/forense",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "error": None,
+                    "cache_hit": False,
+                    "fallback_motivo": anthropic_error
+                    if anthropic_error
+                    else "Anthropic no configurado",
                 }
         except Exception as e:
             gemini_pdf_error = f"Gemini-PDF: {e}"
@@ -311,6 +341,7 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
         try:
             from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
             from app.services.gemini_service import GeminiService
+
             imagenes = pdfs_a_imagenes_combinadas(pdfs_raw, max_imagenes_total=20, dpi=130)
             if imagenes:
                 gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
@@ -325,8 +356,11 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
                     f"dilo. Si no encuentras la informacion, se honesto."
                 )
                 texto, modelo_usado = await gem.completar(
-                    system=SYSTEM_AUDITOR_FORENSE, user=user_text_vision,
-                    modelo=gemini_model, temperature=0.0, max_tokens=6000,
+                    system=SYSTEM_AUDITOR_FORENSE,
+                    user=user_text_vision,
+                    modelo=gemini_model,
+                    temperature=0.0,
+                    max_tokens=6000,
                     imagenes_raw=imagenes,
                 )
                 if texto:
@@ -340,12 +374,16 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
                         except Exception:
                             pass
                     return {
-                        "html": texto, "modelo": modelo_usado + "/forense-img",
-                        "input_tokens": 0, "output_tokens": 0,
-                        "error": None, "cache_hit": False,
+                        "html": texto,
+                        "modelo": modelo_usado + "/forense-img",
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "error": None,
+                        "cache_hit": False,
                         "fallback_motivo": (
                             (anthropic_error or "Anthropic no configurado")
-                            + " | " + (gemini_pdf_error or "Gemini-PDF no intentado")
+                            + " | "
+                            + (gemini_pdf_error or "Gemini-PDF no intentado")
                         ),
                         "modo": "gemini-vision-imagenes",
                         "imagenes_usadas": len(imagenes),
@@ -366,5 +404,5 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
             f"Anthropic: {anthropic_error or 'no configurado'}. "
             f"Gemini-PDF: {gemini_pdf_error or 'no intentado'}. "
             f"Sin GEMINI_API_KEY o sin PDFs para convertir a imagenes."
-        )
+        ),
     }

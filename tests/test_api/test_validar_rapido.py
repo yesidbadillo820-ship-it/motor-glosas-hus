@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/{id}/validar-rapido (R70 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -35,8 +36,12 @@ def usuario():
 
 def _seed_glosa(db, **kw):
     base = dict(
-        eps="FAMISANAR", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=168_563, etapa="X", estado="RADICADA",
+        eps="FAMISANAR",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=168_563,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -51,6 +56,7 @@ def _seed_glosa(db, **kw):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -83,7 +89,8 @@ class TestValidarRapido:
             "conforme al Art. 20 Dec. 4747. "
         ) * 5
         g = _seed_glosa(
-            db_session, dictamen=dictamen_ok,
+            db_session,
+            dictamen=dictamen_ok,
             codigo_respuesta="RE9901",
         )
         r = client.get(f"/glosas/{g.id}/validar-rapido")

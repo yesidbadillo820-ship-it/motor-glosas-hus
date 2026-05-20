@@ -5,6 +5,7 @@ tomaba el TOTAL ORDEN DE SERVICIO y se lo pasaba al LLM como
 "valor facturado del CUPS", llevando a dictámenes que aceptaban
 montos de OTROS servicios legítimos como excedente.
 """
+
 from __future__ import annotations
 
 from app.utils.parsers_glosa import (

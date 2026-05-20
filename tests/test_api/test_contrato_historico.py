@@ -1,4 +1,5 @@
 """Tests del endpoint GET /contratos/{eps}/glosas-historico (R100 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,10 @@ def client(db_session, usuario):
 
 def _seed(db, eps, estado="RADICADA", **kw):
     base = dict(
-        paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -65,12 +69,9 @@ class TestContratoHistorico:
         assert d["top_5_codigos"] == []
 
     def test_metricas_basicas(self, client, db_session):
-        _seed(db_session, "SANITAS", "LEVANTADA",
-              valor_objetado=10000, valor_recuperado=10000)
-        _seed(db_session, "SANITAS", "ACEPTADA",
-              valor_objetado=5000, valor_recuperado=0)
-        _seed(db_session, "SANITAS", "RADICADA",
-              valor_objetado=3000)
+        _seed(db_session, "SANITAS", "LEVANTADA", valor_objetado=10000, valor_recuperado=10000)
+        _seed(db_session, "SANITAS", "ACEPTADA", valor_objetado=5000, valor_recuperado=0)
+        _seed(db_session, "SANITAS", "RADICADA", valor_objetado=3000)
         r = client.get("/contratos/SANITAS/glosas-historico")
         d = r.json()
         assert d["total_glosas"] == 3

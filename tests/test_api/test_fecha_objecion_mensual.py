@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/fecha-objecion-mensual (R309 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,14 +49,21 @@ def client(db_session, usuario):
 
 
 def _seed(db, dias_atras_objecion, valor=1000):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-        fecha_objecion_eps=ahora_utc() - timedelta(
-            days=dias_atras_objecion,
-        ),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            fecha_objecion_eps=ahora_utc()
+            - timedelta(
+                days=dias_atras_objecion,
+            ),
+        )
+    )
     db.commit()
 
 
@@ -63,9 +72,7 @@ class TestFechaObjecionMensual:
         _seed(db_session, dias_atras_objecion=5, valor=1000)
         _seed(db_session, dias_atras_objecion=10, valor=2000)
 
-        r = client.get(
-            "/glosas/stats/fecha-objecion-mensual?meses=2"
-        )
+        r = client.get("/glosas/stats/fecha-objecion-mensual?meses=2")
         d = r.json()
         # Ambas en el mismo mes
         assert len(d["serie"]) == 1
@@ -74,8 +81,6 @@ class TestFechaObjecionMensual:
 
     def test_excluye_fuera_ventana(self, client, db_session):
         _seed(db_session, dias_atras_objecion=400)
-        r = client.get(
-            "/glosas/stats/fecha-objecion-mensual?meses=2"
-        )
+        r = client.get("/glosas/stats/fecha-objecion-mensual?meses=2")
         d = r.json()
         assert d["serie"] == []

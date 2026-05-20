@@ -45,6 +45,7 @@ prompt monolítico actual para casos complejos. Mientras tanto, el
 Auditor aporta hallazgos estructurados que se pueden inyectar como
 contexto adicional en el flujo clásico.
 """
+
 from __future__ import annotations
 import os
 import json
@@ -68,6 +69,7 @@ class Agent:
     El método `run` ejecuta una llamada single-turn (sin tool use) o
     multi-turn (con tool use), según `tools` esté vacío o no.
     """
+
     name: str
     system_prompt: str
     tools: Optional[list[dict]] = None
@@ -89,7 +91,12 @@ class Agent:
         Si `tools` es None, hace single-turn simple.
         """
         if not api_key:
-            return {"texto": "", "json": None, "uso": {}, "error": "ANTHROPIC_API_KEY no configurada"}
+            return {
+                "texto": "",
+                "json": None,
+                "uso": {},
+                "error": "ANTHROPIC_API_KEY no configurada",
+            }
 
         timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
         headers = {
@@ -118,12 +125,14 @@ class Agent:
                     )
                     if resp.status_code != 200:
                         return {
-                            "texto": "", "json": None, "uso": usage_acumulado,
+                            "texto": "",
+                            "json": None,
+                            "uso": usage_acumulado,
                             "error": f"HTTP {resp.status_code}: {resp.text[:300]}",
                         }
                     data = resp.json()
                     texto = ""
-                    for b in (data.get("content") or []):
+                    for b in data.get("content") or []:
                         if b.get("type") == "text":
                             texto += b.get("text", "")
                     usage = data.get("usage", {})
@@ -139,6 +148,7 @@ class Agent:
                 # Multi-turn con tools
                 from app.services.ia_tools import execute_tool
                 from app.services.asistente_maestro import _sanear_content
+
                 for turno in range(max_turns):
                     resp = await client.post(
                         "https://api.anthropic.com/v1/messages",
@@ -154,7 +164,9 @@ class Agent:
                     )
                     if resp.status_code != 200:
                         return {
-                            "texto": "", "json": None, "uso": usage_acumulado,
+                            "texto": "",
+                            "json": None,
+                            "uso": usage_acumulado,
                             "error": f"Agent {self.name} HTTP {resp.status_code}",
                         }
                     data = resp.json()
@@ -168,9 +180,7 @@ class Agent:
                     # non-empty" en el siguiente turno.
                     contenido_asistente = _sanear_content(contenido)
                     if contenido_asistente is not None:
-                        messages.append(
-                            {"role": "assistant", "content": contenido_asistente}
-                        )
+                        messages.append({"role": "assistant", "content": contenido_asistente})
                     tool_uses = [b for b in contenido if b.get("type") == "tool_use"]
                     if tool_uses and data.get("stop_reason") == "tool_use":
                         results = []
@@ -178,11 +188,13 @@ class Agent:
                             r = execute_tool(tu.get("name"), tu.get("input", {}))
                             if not (str(r) if r is not None else "").strip():
                                 r = "(sin resultado)"
-                            results.append({
-                                "type": "tool_result",
-                                "tool_use_id": tu.get("id"),
-                                "content": str(r),
-                            })
+                            results.append(
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": tu.get("id"),
+                                    "content": str(r),
+                                }
+                            )
                         messages.append({"role": "user", "content": results})
                         continue
                     # Final
@@ -192,12 +204,14 @@ class Agent:
                             texto += b.get("text", "")
                     parsed = _intentar_parse_json(texto)
                     logger.info(
-                        f"[AGENT:{self.name}] OK tras {turno+1} turnos | "
+                        f"[AGENT:{self.name}] OK tras {turno + 1} turnos | "
                         f"in={usage_acumulado['input_tokens']} out={usage_acumulado['output_tokens']}"
                     )
                     return {"texto": texto, "json": parsed, "uso": usage_acumulado, "error": None}
                 return {
-                    "texto": "", "json": None, "uso": usage_acumulado,
+                    "texto": "",
+                    "json": None,
+                    "uso": usage_acumulado,
                     "error": f"Agent {self.name} no convergió en {max_turns} turnos",
                 }
         except Exception as e:
@@ -212,6 +226,7 @@ def _intentar_parse_json(texto: str) -> Optional[dict]:
     t = texto.strip()
     if t.startswith("```"):
         import re as _re
+
         t = _re.sub(r"^```(?:json)?\s*", "", t)
         t = _re.sub(r"\s*```$", "", t)
     try:
@@ -283,15 +298,15 @@ async def ejecutar_auditor(
 
 EPS: {eps}
 Código de glosa: {codigo}
-Valor objetado: {valor_objetado or '—'}
-Valor facturado: {valor_facturado or '—'}
-Valor pactado: {valor_pactado or '—'}
+Valor objetado: {valor_objetado or "—"}
+Valor facturado: {valor_facturado or "—"}
+Valor pactado: {valor_pactado or "—"}
 
 ═══ TEXTO DE LA GLOSA ═══
 {texto_glosa[:8000]}
 
 ═══ SOPORTES DOCUMENTALES ═══
-{(contexto_pdf or '(sin soportes adjuntos)')[:30000]}
+{(contexto_pdf or "(sin soportes adjuntos)")[:30000]}
 
 Identifica los hallazgos y devuelve el JSON especificado."""
 

@@ -1,4 +1,5 @@
 """DEPRECATED: exportar gerencial removido en cleanup mayo 2026. Stub."""
+
 import io
 
 

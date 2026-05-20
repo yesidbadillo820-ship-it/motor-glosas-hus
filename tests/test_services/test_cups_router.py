@@ -1,4 +1,5 @@
 """Tests del router /cups (Ronda 50 Paso 4)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -18,20 +19,30 @@ def db():
     S = sessionmaker(bind=engine)
     s = S()
     # Seed datos típicos
-    s.add(TarifaContratadaRecord(
-        eps="DISPENSARIO MEDICO DMBUG", codigo_cups="890348",
-        codigo_ips="39147B-18",
-        descripcion="CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
-        valor_pactado=231556, modalidad="TARIFA PROPIA",
-        contrato_numero="440-DIGSA/DMBUG-2025", activa=1,
-        creado_en=datetime.now(timezone.utc),
-    ))
-    s.add(TarifaContratadaRecord(
-        eps="FAMISANAR EPS", codigo_cups="890750",
-        descripcion="CONSULTA DE URGENCIAS, POR ESPECIALISTA EN GINECOLOGIA Y OBSTETRICIA",
-        valor_pactado=114900, modalidad="SOAT UVB VIGENTE", activa=1,
-        creado_en=datetime.now(timezone.utc),
-    ))
+    s.add(
+        TarifaContratadaRecord(
+            eps="DISPENSARIO MEDICO DMBUG",
+            codigo_cups="890348",
+            codigo_ips="39147B-18",
+            descripcion="CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
+            valor_pactado=231556,
+            modalidad="TARIFA PROPIA",
+            contrato_numero="440-DIGSA/DMBUG-2025",
+            activa=1,
+            creado_en=datetime.now(timezone.utc),
+        )
+    )
+    s.add(
+        TarifaContratadaRecord(
+            eps="FAMISANAR EPS",
+            codigo_cups="890750",
+            descripcion="CONSULTA DE URGENCIAS, POR ESPECIALISTA EN GINECOLOGIA Y OBSTETRICIA",
+            valor_pactado=114900,
+            modalidad="SOAT UVB VIGENTE",
+            activa=1,
+            creado_en=datetime.now(timezone.utc),
+        )
+    )
     s.commit()
     try:
         yield s
@@ -42,6 +53,7 @@ def db():
 def test_import_cups_router_ok():
     """El router existe y es importable."""
     from app.api.routers.cups import router, buscar_cups, detalle_cups
+
     assert router is not None
     assert buscar_cups is not None
     assert detalle_cups is not None
@@ -50,6 +62,7 @@ def test_import_cups_router_ok():
 def test_buscar_por_codigo_cups_exacto(db):
     from app.api.routers.cups import buscar_cups
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = buscar_cups(q="890348", limite=10, eps=None, db=db, current_user=user)
     assert r["total"] >= 1
@@ -60,6 +73,7 @@ def test_buscar_por_codigo_cups_exacto(db):
 def test_buscar_por_codigo_ips_devuelve_tarifa(db):
     from app.api.routers.cups import buscar_cups
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = buscar_cups(q="39147B-18", limite=10, eps=None, db=db, current_user=user)
     assert r["total"] >= 1
@@ -70,6 +84,7 @@ def test_buscar_por_codigo_ips_devuelve_tarifa(db):
 def test_buscar_por_descripcion(db):
     from app.api.routers.cups import buscar_cups
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     # Usamos "CONSULTA" que está literal (sin tildes) en ambas descripciones
     r = buscar_cups(q="CONSULTA", limite=10, eps=None, db=db, current_user=user)
@@ -80,6 +95,7 @@ def test_buscar_por_descripcion(db):
 def test_filtro_por_eps(db):
     from app.api.routers.cups import buscar_cups
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = buscar_cups(q="CONSULTA", limite=10, eps="FAMISANAR", db=db, current_user=user)
     # Solo debe devolver Famisanar
@@ -90,6 +106,7 @@ def test_filtro_por_eps(db):
 def test_detalle_cups_con_contratos(db):
     from app.api.routers.cups import detalle_cups
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = detalle_cups("890348", db=db, current_user=user)
     assert r["total_contratos"] == 1
@@ -100,6 +117,7 @@ def test_detalle_cups_con_contratos(db):
 def test_detalle_cups_inexistente(db):
     from app.api.routers.cups import detalle_cups
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = detalle_cups("999999", db=db, current_user=user)
     assert r["total_contratos"] == 0
@@ -107,10 +125,12 @@ def test_detalle_cups_inexistente(db):
 
 # ─── Ronda 51 Paso 2: búsqueda insensible a tildes ──────────────────────
 
+
 def test_buscar_sin_tildes_encuentra_con_tilde(db):
     """'GENETICA' debe encontrar 'GENÉTICA' aun cuando BD tiene tildes."""
     from app.api.routers.cups import buscar_cups
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = buscar_cups(q="GENETICA", limite=10, eps=None, db=db, current_user=user)
     assert r["total"] >= 1
@@ -120,20 +140,24 @@ def test_buscar_sin_tildes_encuentra_con_tilde(db):
 
 def test_normalizacion_quita_tildes():
     from app.api.routers.cups import _sin_tildes
+
     assert _sin_tildes("GENÉTICA") == "GENETICA"
     assert _sin_tildes("MÉDICO") == "MEDICO"
     assert _sin_tildes("ñandú") == "NANDU"
     assert _sin_tildes("") == ""
     assert _sin_tildes(None) == ""
 
+
 from app.api.routers.cups import _sin_tildes  # para el primer test
 
 
 # ─── R53 P4: endpoint /cups/sugerencias/por-descripcion ─────────────────
 
+
 def test_sugerencias_por_descripcion_hemograma(db):
     from app.api.routers.cups import sugerencias_cups_por_descripcion
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = sugerencias_cups_por_descripcion(q="hemograma", limite=5, db=db, current_user=user)
     assert r["total"] >= 1
@@ -144,6 +168,7 @@ def test_sugerencias_por_descripcion_hemograma(db):
 def test_sugerencias_por_descripcion_radiografia_torax(db):
     from app.api.routers.cups import sugerencias_cups_por_descripcion
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = sugerencias_cups_por_descripcion(q="radiografia torax", limite=3, db=db, current_user=user)
     assert r["total"] >= 1
@@ -154,6 +179,7 @@ def test_sugerencias_por_descripcion_query_solo_stopwords(db):
     """Query con solo palabras vacías debe devolver lista vacía sin crash."""
     from app.api.routers.cups import sugerencias_cups_por_descripcion
     from unittest.mock import MagicMock
+
     user = MagicMock(email="test@hus.com")
     r = sugerencias_cups_por_descripcion(q="cual es el", limite=5, db=db, current_user=user)
     assert r["total"] == 0

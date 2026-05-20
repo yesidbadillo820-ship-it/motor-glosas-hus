@@ -21,11 +21,11 @@ IDEMPOTENTE
   Si los registros ya existen (mismo email, misma EPS, mismo título Gold),
   se saltan. Podés correrlo varias veces sin riesgo.
 """
+
 from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime, timezone
 
 # Asegurar que app/ está en PYTHONPATH si se corre desde scripts/
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,9 +50,7 @@ ADMIN_ROL = "SUPER_ADMIN"
 
 def _crear_usuario_admin(db) -> bool:
     """True si lo creó, False si ya existía."""
-    existente = db.query(UsuarioRecord).filter(
-        UsuarioRecord.email == ADMIN_EMAIL
-    ).first()
+    existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == ADMIN_EMAIL).first()
     if existente:
         print(f"  ↳ Usuario {ADMIN_EMAIL} ya existe (id={existente.id}). Skip.")
         return False
@@ -70,7 +68,7 @@ def _crear_usuario_admin(db) -> bool:
     db.refresh(user)
     print(f"  ✓ Usuario admin creado: {ADMIN_EMAIL} (id={user.id}, rol={ADMIN_ROL})")
     print(f"    Password inicial: {ADMIN_PASSWORD}")
-    print(f"    ⚠ El sistema te va a pedir cambiarla en el primer login.")
+    print("    ⚠ El sistema te va a pedir cambiarla en el primer login.")
     return True
 
 
@@ -79,9 +77,7 @@ def _seed_contratos(db) -> tuple[int, int]:
     creados = 0
     ya_existian = 0
     for eps_key, detalles in CONTRATOS_DEFAULT.items():
-        existente = db.query(ContratoRecord).filter(
-            ContratoRecord.eps == eps_key
-        ).first()
+        existente = db.query(ContratoRecord).filter(ContratoRecord.eps == eps_key).first()
         if existente:
             ya_existian += 1
             continue
@@ -97,11 +93,13 @@ def _seed_contratos(db) -> tuple[int, int]:
 # los use como few-shot desde el día uno (sin esperar que glosas LEVANTADAS
 # vayan poblando el set de aprendizaje).
 
+
 def _plantillas_gold_canonicas() -> list[dict]:
     from app.services.glosa_service import (
         TEXTO_RATIFICADA,
         TEXTO_DMBUG_TARIFAS,
     )
+
     return [
         {
             "eps": "TODAS",
@@ -134,11 +132,15 @@ def _seed_plantillas_gold(db) -> tuple[int, int]:
     creadas = 0
     ya_existian = 0
     for p in _plantillas_gold_canonicas():
-        existente = db.query(PlantillaGoldRecord).filter(
-            PlantillaGoldRecord.eps == p["eps"],
-            PlantillaGoldRecord.codigo_glosa == p["codigo_glosa"],
-            PlantillaGoldRecord.titulo == p["titulo"],
-        ).first()
+        existente = (
+            db.query(PlantillaGoldRecord)
+            .filter(
+                PlantillaGoldRecord.eps == p["eps"],
+                PlantillaGoldRecord.codigo_glosa == p["codigo_glosa"],
+                PlantillaGoldRecord.titulo == p["titulo"],
+            )
+            .first()
+        )
         if existente:
             ya_existian += 1
             continue
@@ -196,7 +198,7 @@ def main() -> None:
         print("=" * 70)
         print("SEED COMPLETO")
         print("=" * 70)
-        print(f"Loguearse en https://motor-glosas-hus.onrender.com con:")
+        print("Loguearse en https://motor-glosas-hus.onrender.com con:")
         print(f"  Email:    {ADMIN_EMAIL}")
         print(f"  Password: {ADMIN_PASSWORD}  (cambiala en el primer login)")
     finally:

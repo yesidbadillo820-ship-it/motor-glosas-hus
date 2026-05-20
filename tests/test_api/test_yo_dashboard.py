@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/dashboard (R255 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice", rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -39,6 +44,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,8 +54,12 @@ def client(db_session, usuario):
 
 def _seed(db, gestor="Alice", **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -61,16 +71,21 @@ class TestYoDashboard:
     def test_estructura(self, client):
         r = client.get("/usuarios/yo/dashboard")
         d = r.json()
-        for key in ("usuario_email", "mis_glosas_abiertas",
-                    "mis_vencidas", "mis_criticas",
-                    "mis_menciones_pendientes", "cerradas_mes"):
+        for key in (
+            "usuario_email",
+            "mis_glosas_abiertas",
+            "mis_vencidas",
+            "mis_criticas",
+            "mis_menciones_pendientes",
+            "cerradas_mes",
+        ):
             assert key in d
 
     def test_counts(self, client, db_session):
-        _seed(db_session, dias_restantes=10)         # abierta normal
-        _seed(db_session, dias_restantes=2)          # crítica
-        _seed(db_session, dias_restantes=-5)         # vencida
-        _seed(db_session, gestor="Bob")              # otro user
+        _seed(db_session, dias_restantes=10)  # abierta normal
+        _seed(db_session, dias_restantes=2)  # crítica
+        _seed(db_session, dias_restantes=-5)  # vencida
+        _seed(db_session, gestor="Bob")  # otro user
 
         r = client.get("/usuarios/yo/dashboard")
         d = r.json()

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/{id}/actividad (R95 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,11 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", nombre="Coord", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        nombre="Coord",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -45,7 +50,11 @@ def usuario_coord(db_session):
 @pytest.fixture
 def usuario_target(db_session):
     u = UsuarioRecord(
-        id=2, email="alice@hus.com", nombre="Alice", rol="AUDITOR", activo=1,
+        id=2,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -57,6 +66,7 @@ def usuario_target(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -65,18 +75,26 @@ def client(db_session, usuario_coord):
 
 
 def _seed_audit(db, usuario, accion, tabla, dias_atras=0):
-    db.add(AuditLogRecord(
-        usuario_email=usuario, usuario_rol="AUDITOR",
-        accion=accion, tabla=tabla,
-        timestamp=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=usuario,
+            usuario_rol="AUDITOR",
+            accion=accion,
+            tabla=tabla,
+            timestamp=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
 def _seed_glosa(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=100, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=100,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -111,8 +129,7 @@ class TestUsuarioActividad:
         assert d["audit"]["por_accion"] == {"UPDATE": 2, "DELETE": 1}
         assert d["audit"]["por_tabla"] == {"glosas": 2, "usuarios": 1}
 
-    def test_excluye_eventos_fuera_de_ventana(self, client, db_session,
-                                              usuario_target):
+    def test_excluye_eventos_fuera_de_ventana(self, client, db_session, usuario_target):
         _seed_audit(db_session, "alice@hus.com", "X", "T", dias_atras=5)
         _seed_audit(db_session, "alice@hus.com", "X", "T", dias_atras=60)
         r = client.get(f"/usuarios/{usuario_target.id}/actividad")
@@ -128,8 +145,7 @@ class TestUsuarioActividad:
         assert d["audit"]["total_eventos"] == 2
         assert d["ventana_dias"] == 90
 
-    def test_glosas_asignadas_y_auditadas(self, client, db_session,
-                                          usuario_target):
+    def test_glosas_asignadas_y_auditadas(self, client, db_session, usuario_target):
         # gestor_nombre = nombre del usuario
         _seed_glosa(db_session, gestor_nombre="Alice")
         _seed_glosa(db_session, gestor_nombre="Alice")

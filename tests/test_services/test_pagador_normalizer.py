@@ -1,4 +1,5 @@
 """Tests para app.services.pagador_normalizer."""
+
 from app.services.pagador_normalizer import (
     codigo,
     nombre_corto,
@@ -31,7 +32,9 @@ class TestNombreCorto:
         assert nombre_corto("DISPENSARIO MEDICO BUCARAMANG") == "DISPENSARIO MEDICO BUCARAMANGA"
 
     def test_idempotente(self):
-        once = nombre_corto("U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANG")
+        once = nombre_corto(
+            "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANG"
+        )
         twice = nombre_corto(once)
         assert once == twice
 

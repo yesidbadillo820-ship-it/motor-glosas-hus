@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/stats/por-codigo-respuesta (R68 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -37,8 +38,12 @@ def usuario():
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100_000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -50,6 +55,7 @@ def _seed(db, **kw):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -107,10 +113,8 @@ class TestStatsCodigoRespuesta:
         assert "no aceptada" in desc.lower() or "defensa" in desc.lower()
 
     def test_filtro_ventana_dias(self, client, db_session):
-        _seed(db_session, codigo_respuesta="RE9901",
-              creado_en=ahora_utc() - timedelta(days=60))
-        _seed(db_session, codigo_respuesta="RE9702",
-              creado_en=ahora_utc() - timedelta(days=2))
+        _seed(db_session, codigo_respuesta="RE9901", creado_en=ahora_utc() - timedelta(days=60))
+        _seed(db_session, codigo_respuesta="RE9702", creado_en=ahora_utc() - timedelta(days=2))
         # Default 30 días → solo el reciente
         r = client.get("/glosas/stats/por-codigo-respuesta?dias=30")
         d = r.json()

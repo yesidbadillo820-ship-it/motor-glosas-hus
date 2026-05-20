@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cups-mas-objetados (R140 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -7,10 +8,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import (
-    ConceptoGlosaRecord, GlosaRecord, UsuarioRecord,
+    ConceptoGlosaRecord,
+    UsuarioRecord,
 )
 
 
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,16 @@ def client(db_session, usuario):
 
 
 def _seed_concepto(db, cups, valor=1000, factura="F-1", descripcion=None):
-    db.add(ConceptoGlosaRecord(
-        glosa_id=1, codigo_glosa="C", factura=factura,
-        cups_codigo=cups, cups_descripcion=descripcion,
-        valor_objetado=valor,
-    ))
+    db.add(
+        ConceptoGlosaRecord(
+            glosa_id=1,
+            codigo_glosa="C",
+            factura=factura,
+            cups_codigo=cups,
+            cups_descripcion=descripcion,
+            valor_objetado=valor,
+        )
+    )
     db.commit()
 
 
@@ -67,8 +74,7 @@ class TestCupsMasObjetados:
         for _ in range(5):
             _seed_concepto(db_session, "906625", descripcion="Gonadotropina")
         for _ in range(2):
-            _seed_concepto(db_session, "FMQ0163",
-                           descripcion="Procedimiento Q")
+            _seed_concepto(db_session, "FMQ0163", descripcion="Procedimiento Q")
         _seed_concepto(db_session, "39143A", descripcion="Otro")
 
         r = client.get("/glosas/stats/cups-mas-objetados")
@@ -94,10 +100,15 @@ class TestCupsMasObjetados:
 
     def test_excluye_cups_null(self, client, db_session):
         # Concepto sin CUPS no aparece
-        db_session.add(ConceptoGlosaRecord(
-            glosa_id=1, codigo_glosa="C", factura="F-1",
-            cups_codigo=None, valor_objetado=99999,
-        ))
+        db_session.add(
+            ConceptoGlosaRecord(
+                glosa_id=1,
+                codigo_glosa="C",
+                factura="F-1",
+                cups_codigo=None,
+                valor_objetado=99999,
+            )
+        )
         db_session.commit()
         r = client.get("/glosas/stats/cups-mas-objetados")
         d = r.json()

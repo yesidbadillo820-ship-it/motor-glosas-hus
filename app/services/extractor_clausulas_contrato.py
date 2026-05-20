@@ -20,6 +20,7 @@ todas las páginas (incluso aquellas que pdfplumber falla en extraer
 por formato raro o fonts no estándar) y entiende layout/tablas. Más
 robusto que pdfplumber → texto plano → Claude.
 """
+
 import os
 import json
 import base64
@@ -90,7 +91,9 @@ async def extraer_clausulas_desde_texto(
         return []
 
     if not texto_contrato or len(texto_contrato.strip()) < 200:
-        logger.warning(f"[CLAUSULAS] Texto del contrato muy corto ({len(texto_contrato or '')} chars) — saltando")
+        logger.warning(
+            f"[CLAUSULAS] Texto del contrato muy corto ({len(texto_contrato or '')} chars) — saltando"
+        )
         return []
 
     # Truncar para no explotar tokens. Contratos típicos 30-50 páginas
@@ -165,13 +168,15 @@ async def extraer_clausulas_desde_texto(
         tema = (c.get("tema") or "NN").upper().strip()
         if tema not in TEMAS_VALIDOS:
             tema = "NN"
-        sanas.append({
-            "numero": (c.get("numero") or "").strip()[:80],
-            "tema": tema,
-            "titulo": (c.get("titulo") or "").strip()[:300],
-            "texto_literal": texto[:5000],
-            "pagina": c.get("pagina") if isinstance(c.get("pagina"), int) else None,
-        })
+        sanas.append(
+            {
+                "numero": (c.get("numero") or "").strip()[:80],
+                "tema": tema,
+                "titulo": (c.get("titulo") or "").strip()[:300],
+                "texto_literal": texto[:5000],
+                "pagina": c.get("pagina") if isinstance(c.get("pagina"), int) else None,
+            }
+        )
 
     logger.info(f"[CLAUSULAS] Extraídas {len(sanas)} cláusulas válidas para EPS={eps}")
     return sanas
@@ -207,8 +212,8 @@ async def extraer_clausulas_desde_pdf_bytes(
 
     # Anthropic acepta PDFs hasta 32MB. Cap defensivo.
     if len(pdf_bytes) > 32 * 1024 * 1024:
-        logger.warning(f"[CLAUSULAS] PDF >32MB ({len(pdf_bytes)//1024//1024}MB)")
-        return [], f"PDF de {len(pdf_bytes)//1024//1024}MB excede el límite de 32MB."
+        logger.warning(f"[CLAUSULAS] PDF >32MB ({len(pdf_bytes) // 1024 // 1024}MB)")
+        return [], f"PDF de {len(pdf_bytes) // 1024 // 1024}MB excede el límite de 32MB."
 
     pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("ascii")
 
@@ -309,17 +314,19 @@ async def extraer_clausulas_desde_pdf_bytes(
         tema = (c.get("tema") or "NN").upper().strip()
         if tema not in TEMAS_VALIDOS:
             tema = "NN"
-        sanas.append({
-            "numero": (c.get("numero") or "").strip()[:80],
-            "tema": tema,
-            "titulo": (c.get("titulo") or "").strip()[:300],
-            "texto_literal": texto[:5000],
-            "pagina": c.get("pagina") if isinstance(c.get("pagina"), int) else None,
-        })
+        sanas.append(
+            {
+                "numero": (c.get("numero") or "").strip()[:80],
+                "tema": tema,
+                "titulo": (c.get("titulo") or "").strip()[:300],
+                "texto_literal": texto[:5000],
+                "pagina": c.get("pagina") if isinstance(c.get("pagina"), int) else None,
+            }
+        )
 
     logger.info(
         f"[CLAUSULAS-PDF] Extraídas {len(sanas)} cláusulas válidas para "
-        f"EPS={eps} desde PDF de {len(pdf_bytes)//1024}KB (stop={stop_reason})"
+        f"EPS={eps} desde PDF de {len(pdf_bytes) // 1024}KB (stop={stop_reason})"
     )
 
     if not sanas:
@@ -342,6 +349,7 @@ async def extraer_clausulas_desde_pdf_bytes(
 # Lo invoca `glosa_ia_prompts.build_user_prompt` para que el dictamen
 # pueda citar literalmente la cláusula contractual aplicable al código
 # de glosa que se está respondiendo.
+
 
 def bloque_clausulas_contrato_para_prompt(eps: str, codigo: str, max_clausulas: int = 3) -> str:
     """Devuelve el bloque de cláusulas del contrato vigente, formateado

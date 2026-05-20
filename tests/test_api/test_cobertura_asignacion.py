@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cobertura-asignacion (R313 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -63,9 +69,7 @@ class TestCoberturaAsignacion:
         r = client.get("/glosas/stats/cobertura-asignacion")
         d = r.json()
         assert d["total_glosas"] == 2
-        gestor = next(
-            x for x in d["items"] if x["campo"] == "gestor_nombre"
-        )
+        gestor = next(x for x in d["items"] if x["campo"] == "gestor_nombre")
         assert gestor["count"] == 1
         assert gestor["pct_cobertura"] == 50.0
         assert gestor["faltantes"] == 1

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /audit/export.csv (R62 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -37,8 +38,11 @@ def usuario_admin():
 
 def _seed(db, **kw):
     base = dict(
-        usuario_email="auditor@hus.com", usuario_rol="AUDITOR",
-        accion="CREAR", tabla="glosas", registro_id=1,
+        usuario_email="auditor@hus.com",
+        usuario_rol="AUDITOR",
+        accion="CREAR",
+        tabla="glosas",
+        registro_id=1,
         timestamp=ahora_utc(),
     )
     base.update(kw)
@@ -50,6 +54,7 @@ def _seed(db, **kw):
 def client(db_session, usuario_admin):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_admin
     with TestClient(app) as c:
@@ -100,10 +105,8 @@ class TestAuditExportCsv:
         assert body.count(",glosas,") == 0
 
     def test_filtro_fecha_desde(self, client, db_session):
-        _seed(db_session, accion="VIEJO",
-              timestamp=ahora_utc() - timedelta(days=60))
-        _seed(db_session, accion="NUEVO",
-              timestamp=ahora_utc() - timedelta(days=2))
+        _seed(db_session, accion="VIEJO", timestamp=ahora_utc() - timedelta(days=60))
+        _seed(db_session, accion="NUEVO", timestamp=ahora_utc() - timedelta(days=2))
         desde = (ahora_utc() - timedelta(days=7)).strftime("%Y-%m-%d")
         r = client.get(f"/audit/export.csv?desde={desde}")
         assert r.status_code == 200

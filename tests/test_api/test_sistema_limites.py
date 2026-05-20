@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/limites (R110 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,7 +31,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -38,6 +42,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -50,8 +55,14 @@ class TestSistemaLimites:
         r = client.get("/sistema/limites")
         assert r.status_code == 200, r.text
         d = r.json()
-        for sec in ("rate_limit_ia", "export_limits", "upload_limits",
-                    "search_limits", "retention", "ui_limits"):
+        for sec in (
+            "rate_limit_ia",
+            "export_limits",
+            "upload_limits",
+            "search_limits",
+            "retention",
+            "ui_limits",
+        ):
             assert sec in d
 
     def test_rate_limit_ia_tiene_quotas(self, client):

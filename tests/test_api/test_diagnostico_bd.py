@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/diagnostico-bd (R101 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -71,11 +76,17 @@ class TestDiagnosticoBD:
 
     def test_conteo_correcto_glosas(self, client, db_session):
         for _ in range(5):
-            db_session.add(GlosaRecord(
-                eps="X", paciente="X", codigo_glosa="C",
-                valor_objetado=100, etapa="X", estado="RADICADA",
-                creado_en=ahora_utc(),
-            ))
+            db_session.add(
+                GlosaRecord(
+                    eps="X",
+                    paciente="X",
+                    codigo_glosa="C",
+                    valor_objetado=100,
+                    etapa="X",
+                    estado="RADICADA",
+                    creado_en=ahora_utc(),
+                )
+            )
         db_session.commit()
 
         r = client.get("/admin/diagnostico-bd")

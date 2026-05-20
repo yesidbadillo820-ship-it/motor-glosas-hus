@@ -12,6 +12,7 @@ Uso:
     from app.services.normativa_completa import consultar_normativa
     resp = consultar_normativa("¿cuál es el plazo para que una EPS formule glosa?")
 """
+
 from __future__ import annotations
 
 from typing import List
@@ -34,7 +35,13 @@ LEYES = {
                 "titulo": "Atención inicial de urgencias",
                 "texto": "La atención inicial de urgencias debe ser prestada en forma obligatoria por todas las entidades públicas y privadas que presten servicios de salud, a todas las personas, independientemente de la capacidad de pago. Su prestación no requiere contrato ni orden previa. El costo de estos servicios será pagado por el Fondo de Solidaridad y Garantía en los casos previstos en el artículo anterior, o por la Entidad Promotora de Salud al cual esté afiliado, en cualquier otro evento.",
                 "aplicacion": "Urgencias obligatorias sin autorización previa",
-                "keywords": ["urgencia", "urgencias", "autorización previa", "atención inicial", "obligatoria"],
+                "keywords": [
+                    "urgencia",
+                    "urgencias",
+                    "autorización previa",
+                    "atención inicial",
+                    "obligatoria",
+                ],
             },
             "177": {
                 "titulo": "Obligaciones de las Entidades Promotoras de Salud",
@@ -51,7 +58,6 @@ LEYES = {
         },
         "keywords": ["sistema general", "seguridad social", "SGSSS", "salud", "pensiones"],
     },
-
     "LEY 1122 DE 2007": {
         "nombre": "Ley 1122 de 2007",
         "titulo": "Por la cual se hacen modificaciones al Sistema General de Seguridad Social en Salud",
@@ -67,7 +73,6 @@ LEYES = {
         },
         "keywords": ["flujo recursos", "anticipo", "pagos"],
     },
-
     "LEY 1438 DE 2011": {
         "nombre": "Ley 1438 de 2011",
         "titulo": "Por medio de la cual se reforma el Sistema General de Seguridad Social en Salud",
@@ -78,30 +83,68 @@ LEYES = {
                 "titulo": "Trámite de pagos",
                 "texto": "Las entidades responsables del pago de los servicios de salud deberán pagar a los prestadores el monto total de las facturas dentro de los treinta (30) días hábiles siguientes a la presentación de la factura. Cuando existan glosas, se aplicará el procedimiento señalado en el artículo siguiente. Sin perjuicio de lo anterior, dentro del mismo término, deberán haber efectuado un pago mínimo del 50% del valor neto facturado no sujeto a glosas, según corresponda. Nota operativa (Manual Único de Glosas Res. 2284/2023 + Manual SIIFA 2026): una vez levantada o aceptada la glosa, el pago al prestador debe efectuarse dentro de los cinco (5) días hábiles siguientes.",
                 "aplicacion": "Pago total 30 días hábiles + anticipo 50% no sujeto a glosa + pago 5 días hábiles post-levantamiento",
-                "keywords": ["pago", "30 días", "50%", "anticipo", "trámite de pagos", "5 días pago"],
+                "keywords": [
+                    "pago",
+                    "30 días",
+                    "50%",
+                    "anticipo",
+                    "trámite de pagos",
+                    "5 días pago",
+                ],
             },
             "57": {
                 "titulo": "Trámite de glosas",
                 "texto": "Las entidades responsables del pago de servicios de salud formularán y comunicarán a los prestadores de servicios de salud las glosas a cada factura, con base en la codificación y alcance definidos por el Ministerio de Salud y Protección Social. Una vez formuladas las glosas a una factura, no se podrán formular nuevas glosas a la misma factura, salvo las que surjan de hechos nuevos detectados en la respuesta dada a la glosa inicial. El prestador de servicios de salud deberá dar respuesta a las glosas presentadas por las entidades responsables del pago dentro del plazo fijado por la norma. Si los prestadores no contestan en el plazo señalado, se entenderá aceptada la glosa. Si no hay acuerdo entre las partes, la entidad responsable del pago podrá optar por la conciliación, el arbitraje o acudir ante las autoridades judiciales.\n\nPLAZOS OPERATIVOS VIGENTES (Ley 1438/2011 + Manual Único Res. 2284/2023 + Manual SIIFA 2026):\n• FORMULACIÓN (EPS/ERP): 20 días hábiles tras radicación de la factura.\n• RESPUESTA (IPS/Prestador): 15 días hábiles tras recepción de la glosa.\n• SUBSANACIÓN (IPS): 7 días hábiles adicionales si la glosa es subsanable.\n• DECISIÓN FINAL (EPS): 10 días hábiles tras la respuesta de la IPS para levantar o ratificar.\n• PAGO POST-LEVANTAMIENTO: 5 días hábiles siguientes al levantamiento de la glosa.\n\nCRITERIO INSTITUCIONAL HUS: toda glosa formulada después de 20 días hábiles es EXTEMPORÁNEA e improcedente (aceptación tácita).",
                 "aplicacion": "PLAZOS: 20 días EPS formular | 15 días IPS responder | 7 días IPS subsanar | 10 días EPS decidir | 5 días EPS pagar tras levantamiento",
-                "keywords": ["glosa", "20 días", "15 días", "7 días", "10 días", "5 días", "plazo", "trámite de glosas", "extemporánea", "subsanación", "SIIFA"],
+                "keywords": [
+                    "glosa",
+                    "20 días",
+                    "15 días",
+                    "7 días",
+                    "10 días",
+                    "5 días",
+                    "plazo",
+                    "trámite de glosas",
+                    "extemporánea",
+                    "subsanación",
+                    "SIIFA",
+                ],
             },
             "126": {
                 "titulo": "Supervisión, inspección y vigilancia",
                 "texto": "La Superintendencia Nacional de Salud tendrá la función jurisdiccional, sin perjuicio de la competencia de los jueces de la República, para conocer y fallar en derecho con carácter definitivo y con las facultades propias de un juez, los conflictos entre las entidades promotoras de salud y sus afiliados o entre las entidades territoriales y las entidades responsables del pago de los servicios de salud, y los prestadores de servicios de salud, en materia de glosas de facturas.",
                 "aplicacion": "Función jurisdiccional SuperSalud para conflictos de glosas",
-                "keywords": ["SuperSalud", "superintendencia", "conflicto", "jurisdiccional", "arbitraje"],
+                "keywords": [
+                    "SuperSalud",
+                    "superintendencia",
+                    "conflicto",
+                    "jurisdiccional",
+                    "arbitraje",
+                ],
             },
             "105": {
                 "titulo": "Prohibición de intromisión en el acto médico",
                 "texto": "Las entidades responsables del pago de los servicios de salud no podrán interferir en la autonomía profesional del médico tratante, ni sustituir sus decisiones clínicas por consideraciones administrativas o económicas. El criterio del médico tratante prevalece sobre la opinión del auditor médico que no examinó al paciente. La violación de esta prohibición compromete la responsabilidad civil de la entidad pagadora por las consecuencias en la salud del usuario.",
                 "aplicacion": "Defensa en glosas de PERTINENCIA CLÍNICA (CL/PE) — proscribe revisión administrativa del criterio médico",
-                "keywords": ["intromisión", "acto médico", "autonomía profesional", "pertinencia clínica", "criterio médico tratante", "Art. 105"],
+                "keywords": [
+                    "intromisión",
+                    "acto médico",
+                    "autonomía profesional",
+                    "pertinencia clínica",
+                    "criterio médico tratante",
+                    "Art. 105",
+                ],
             },
         },
-        "keywords": ["glosa", "plazo", "30 días", "trámite de glosas", "ratificación", "intromisión acto médico"],
+        "keywords": [
+            "glosa",
+            "plazo",
+            "30 días",
+            "trámite de glosas",
+            "ratificación",
+            "intromisión acto médico",
+        ],
     },
-
     "LEY 1751 DE 2015": {
         "nombre": "Ley 1751 de 2015 (Estatutaria de Salud)",
         "titulo": "Por medio de la cual se regula el derecho fundamental a la salud",
@@ -124,12 +167,16 @@ LEYES = {
                 "titulo": "Autonomía profesional",
                 "texto": "Se garantiza la autonomía de los profesionales de la salud para adoptar decisiones sobre el diagnóstico y tratamiento de los pacientes que tienen a su cargo. Esta autonomía será ejercida en el marco de esquemas de autorregulación, la ética, la racionalidad y la evidencia científica. Se prohíbe todo constreñimiento, presión o restricción del ejercicio profesional que atente contra la autonomía de los profesionales de la salud.",
                 "aplicacion": "Autonomía médica = derecho fundamental",
-                "keywords": ["autonomía médica", "médico tratante", "criterio clínico", "diagnóstico"],
+                "keywords": [
+                    "autonomía médica",
+                    "médico tratante",
+                    "criterio clínico",
+                    "diagnóstico",
+                ],
             },
         },
         "keywords": ["estatutaria", "derecho fundamental", "autonomía"],
     },
-
     "LEY 1709 DE 2014": {
         "nombre": "Ley 1709 de 2014",
         "titulo": "Reforma Código Penitenciario y Carcelario — atención en salud a PPL",
@@ -145,7 +192,6 @@ LEYES = {
         },
         "keywords": ["PPL", "penitenciario", "reclusos"],
     },
-
     "LEY 1562 DE 2012": {
         "nombre": "Ley 1562 de 2012",
         "titulo": "Modifica el Sistema de Riesgos Laborales",
@@ -161,7 +207,6 @@ LEYES = {
         },
         "keywords": ["ARL", "riesgos laborales", "Positiva", "Aurora"],
     },
-
     "LEY 352 DE 1997": {
         "nombre": "Ley 352 de 1997",
         "titulo": "Régimen de Salud de las Fuerzas Militares y Policía Nacional",
@@ -177,7 +222,6 @@ LEYES = {
         },
         "keywords": ["FF.MM.", "fuerzas militares", "policía", "sanidad"],
     },
-
     "LEY 91 DE 1989": {
         "nombre": "Ley 91 de 1989",
         "titulo": "Fondo Nacional de Prestaciones Sociales del Magisterio",
@@ -185,7 +229,6 @@ LEYES = {
         "vigente": True,
         "keywords": ["FOMAG", "magisterio", "docentes"],
     },
-
     # ─── R52 B: ampliación catálogo legal ──────────────────────────────────
     "LEY 23 DE 1981": {
         "nombre": "Ley 23 de 1981",
@@ -217,16 +260,32 @@ LEYES = {
                 "titulo": "Principios de las actuaciones contractuales",
                 "texto": "Las actuaciones de quienes intervengan en la contratación estatal se desarrollarán con arreglo a los principios de transparencia, economía y responsabilidad y de conformidad con los postulados que rigen la función administrativa. Igualmente, se aplicarán en las mismas las normas que regulan la conducta de los servidores públicos, las reglas de interpretación de la contratación, los principios generales del derecho y los particulares del derecho administrativo.",
                 "aplicacion": "Principios rectores de los contratos estatales",
-                "keywords": ["transparencia", "economía", "responsabilidad", "principios contratación estatal", "Art. 23"],
+                "keywords": [
+                    "transparencia",
+                    "economía",
+                    "responsabilidad",
+                    "principios contratación estatal",
+                    "Art. 23",
+                ],
             },
             "27": {
                 "titulo": "Ecuación contractual y equilibrio económico",
                 "texto": "En los contratos estatales se mantendrá la igualdad o equivalencia entre derechos y obligaciones surgidos al momento de proponer o de contratar, según el caso. Si dicha igualdad o equivalencia se rompe por causas no imputables a quien resulte afectado, las partes adoptarán en el menor tiempo posible las medidas necesarias para su restablecimiento.",
                 "aplicacion": "Defensa en glosas que rompen equilibrio económico del contrato (tarifas, descuentos unilaterales)",
-                "keywords": ["equilibrio económico", "ecuación contractual", "remuneración pactada", "Art. 27"],
+                "keywords": [
+                    "equilibrio económico",
+                    "ecuación contractual",
+                    "remuneración pactada",
+                    "Art. 27",
+                ],
             },
         },
-        "keywords": ["contratación estatal", "Ley 80", "contrato interadministrativo", "ESE pública"],
+        "keywords": [
+            "contratación estatal",
+            "Ley 80",
+            "contrato interadministrativo",
+            "ESE pública",
+        ],
     },
     "LEY 1150 DE 2007": {
         "nombre": "Ley 1150 de 2007",
@@ -245,7 +304,12 @@ LEYES = {
                 "titulo": "Contratación de prestadores de servicios de salud",
                 "texto": "Las entidades estatales que requieran contratar servicios de salud deberán seguir las reglas establecidas en este decreto, garantizando la libre concurrencia, la igualdad de los oferentes, la selección objetiva y el respeto a los principios de la función administrativa.",
                 "aplicacion": "Reglamenta contratación de servicios de salud por ESE públicas",
-                "keywords": ["contratación servicios salud", "ESE", "Subsección IV", "Art. 2.2.1.2.1.4.4"],
+                "keywords": [
+                    "contratación servicios salud",
+                    "ESE",
+                    "Subsección IV",
+                    "Art. 2.2.1.2.1.4.4",
+                ],
             },
         },
         "keywords": ["contratación estatal", "DUR", "servicios de salud", "Decreto 1082"],
@@ -360,7 +424,6 @@ DECRETOS = {
         },
         "keywords": ["glosa", "conciliación", "4747"],
     },
-
     "DECRETO 780 DE 2016": {
         "nombre": "Decreto 780 de 2016 (Decreto Único Reglamentario Sector Salud)",
         "titulo": "Decreto Único Reglamentario del Sector Salud y Protección Social",
@@ -376,7 +439,6 @@ DECRETOS = {
         },
         "keywords": ["decreto único", "reglamentario", "780"],
     },
-
     "DECRETO 441 DE 2022": {
         "nombre": "Decreto 441 de 2022",
         "titulo": "Actualiza acuerdos de voluntades entre prestadores y pagadores",
@@ -384,7 +446,6 @@ DECRETOS = {
         "vigente": True,
         "keywords": ["acuerdos voluntades", "auditoría concurrente", "contratación"],
     },
-
     "DECRETO 1795 DE 2000": {
         "nombre": "Decreto 1795 de 2000",
         "titulo": "Sistema de Salud de las Fuerzas Militares y la Policía Nacional",
@@ -400,7 +461,6 @@ DECRETOS = {
         },
         "keywords": ["FF.MM.", "policía", "sanidad militar"],
     },
-
     "DECRETO 2423 DE 1996": {
         "nombre": "Decreto 2423 de 1996",
         "titulo": "Manual de Tarifas SOAT",
@@ -408,7 +468,6 @@ DECRETOS = {
         "vigente": True,
         "keywords": ["SOAT", "tarifa", "manual tarifario"],
     },
-
     "DECRETO 3752 DE 2003": {
         "nombre": "Decreto 3752 de 2003",
         "titulo": "Plan de Salud del Magisterio",
@@ -416,7 +475,6 @@ DECRETOS = {
         "vigente": True,
         "keywords": ["FOMAG", "magisterio", "docentes"],
     },
-
     "DECRETO 1295 DE 1994": {
         "nombre": "Decreto 1295 de 1994",
         "titulo": "Sistema General de Riesgos Profesionales",
@@ -424,7 +482,6 @@ DECRETOS = {
         "vigente": True,
         "keywords": ["ARL", "riesgos profesionales"],
     },
-
     "DECRETO 1072 DE 2015": {
         "nombre": "Decreto 1072 de 2015",
         "titulo": "Decreto Único Reglamentario del Sector Trabajo",
@@ -432,7 +489,6 @@ DECRETOS = {
         "vigente": True,
         "keywords": ["ARL", "riesgos laborales", "decreto único trabajo"],
     },
-
     # ─── R52 B: ampliación catálogo ────────────────────────────────────────
     "DECRETO 1011 DE 2006": {
         "nombre": "Decreto 1011 de 2006",
@@ -453,7 +509,12 @@ DECRETOS = {
         "titulo": "Régimen unificado de afiliación al SGSSS",
         "ambito": "Afiliación, traslado, movilidad de regímenes",
         "vigente": True,
-        "keywords": ["afiliación", "traslado", "movilidad régimen", "régimen contributivo subsidiado"],
+        "keywords": [
+            "afiliación",
+            "traslado",
+            "movilidad régimen",
+            "régimen contributivo subsidiado",
+        ],
     },
     "DECRETO 866 DE 2017": {
         "nombre": "Decreto 866 de 2017",
@@ -496,7 +557,6 @@ RESOLUCIONES = {
         "reemplaza": "Resolución 3047/2008 Anexo Técnico 5 (que queda como antecedente procedimental)",
         "keywords": ["manual único", "glosas", "códigos taxativos", "2284", "anexo técnico 3"],
     },
-
     "RESOLUCION 1885 DE 2024": {
         "nombre": "Resolución 1885 de 2024 (MinSalud)",
         "titulo": "Cronograma gradual implementación Manual Único",
@@ -512,7 +572,6 @@ RESOLUCIONES = {
         },
         "keywords": ["cronograma", "implementación", "2025"],
     },
-
     "RESOLUCION 2275 DE 2023": {
         "nombre": "Resolución 2275 de 2023 (MinSalud)",
         "titulo": "Factura Electrónica de Venta en Salud (FEV) + RIPS",
@@ -520,7 +579,6 @@ RESOLUCIONES = {
         "vigente": True,
         "keywords": ["FEV", "RIPS", "factura electrónica", "validación"],
     },
-
     "RESOLUCION 3047 DE 2008": {
         "nombre": "Resolución 3047 de 2008",
         "titulo": "Procedimiento glosas (antecedente)",
@@ -529,7 +587,6 @@ RESOLUCIONES = {
         "notas": "Sigue vigente como referente histórico y para casos en transición. El anexo técnico 5 fue reemplazado por Res. 2284/2023 Anexo 3.",
         "keywords": ["3047", "anexo técnico 5", "glosa", "antecedente"],
     },
-
     "RESOLUCION 5269 DE 2017": {
         "nombre": "Resolución 5269 de 2017 (MinSalud)",
         "titulo": "Plan de Beneficios en Salud (PBS)",
@@ -537,7 +594,6 @@ RESOLUCIONES = {
         "vigente": True,
         "keywords": ["PBS", "plan beneficios", "UPC", "cobertura"],
     },
-
     "RESOLUCION 1995 DE 1999": {
         "nombre": "Resolución 1995 de 1999 (MinSalud)",
         "titulo": "Historia Clínica",
@@ -548,12 +604,16 @@ RESOLUCIONES = {
                 "titulo": "Características de la historia clínica",
                 "texto": "La historia clínica debe cumplir con las siguientes características: INTEGRALIDAD, SECUENCIALIDAD, RACIONALIDAD CIENTÍFICA, DISPONIBILIDAD y OPORTUNIDAD. La historia clínica es un documento privado, obligatorio y sometido a reserva.",
                 "aplicacion": "Historia clínica = documento médico-legal de plena prueba",
-                "keywords": ["historia clínica", "plena prueba", "reserva", "documento médico-legal"],
+                "keywords": [
+                    "historia clínica",
+                    "plena prueba",
+                    "reserva",
+                    "documento médico-legal",
+                ],
             },
         },
         "keywords": ["historia clínica", "1995", "documento médico-legal"],
     },
-
     "RESOLUCION 866 DE 2021": {
         "nombre": "Resolución 866 de 2021 (MinSalud)",
         "titulo": "Registros Individuales de Prestación de Servicios de Salud (RIPS)",
@@ -561,7 +621,6 @@ RESOLUCIONES = {
         "vigente": True,
         "keywords": ["RIPS", "registros individuales", "866"],
     },
-
     "CIRCULAR 047 DE 2025": {
         "nombre": "Circular Externa 047 de 2025 (MinSalud)",
         "titulo": "Manual Tarifario SOAT 2026 indexado a UVB",
@@ -574,16 +633,31 @@ RESOLUCIONES = {
         "titulo": "Listado unificado de tarifas institucionales propias del HUS",
         "ambito": "Tarifas propias expresadas en FACTOR SMDLV. Aplica cuando el contrato dice 'TIPO TARIFA = PROPIAS'",
         "vigente": True,
-        "keywords": ["tarifas propias", "HUS", "054", "propia", "manual HUS", "SMDLV", "institucional"],
+        "keywords": [
+            "tarifas propias",
+            "HUS",
+            "054",
+            "propia",
+            "manual HUS",
+            "SMDLV",
+            "institucional",
+        ],
     },
     "RESOLUCION 124 DE 2026": {
         "nombre": "Resolución 124 de marzo 25 de 2026 (ESE HUS)",
         "titulo": "Nuevas tarifas institucionales HUS + modificaciones Res. 054",
         "ambito": "Laboratorio clínico, quirúrgicos, electrofisiología, patología, gineco-oncológicos. Fórmula: FACTOR × SMDLV 2026 (≈ $58.375)",
         "vigente": True,
-        "keywords": ["tarifas propias", "HUS", "124", "institucional", "SMDLV", "laboratorio", "quirurgicos"],
+        "keywords": [
+            "tarifas propias",
+            "HUS",
+            "124",
+            "institucional",
+            "SMDLV",
+            "laboratorio",
+            "quirurgicos",
+        ],
     },
-
     "RESOLUCION 2175 DE 2015": {
         "nombre": "Resolución 2175 de 2015",
         "titulo": "Procedimiento de conciliación de glosas médicas",
@@ -591,7 +665,6 @@ RESOLUCIONES = {
         "vigente": True,
         "keywords": ["conciliación", "auditoría médica", "2175"],
     },
-
     "RESOLUCION 5159 DE 2015": {
         "nombre": "Resolución 5159 de 2015 (MinSalud)",
         "titulo": "Procedimiento atención salud PPL",
@@ -599,7 +672,6 @@ RESOLUCIONES = {
         "vigente": True,
         "keywords": ["PPL", "reclusos", "5159"],
     },
-
     # Ronda 48: Resolución 2641 de 2025 — Clasificación CUPS y tabla de
     # homologación oficial entre códigos internos de prestadores y la
     # numeración vigente (CUPS 2025).
@@ -638,17 +710,27 @@ RESOLUCIONES = {
                     "homologador_cups.py."
                 ),
                 "keywords": [
-                    "CUPS 2025", "homologación", "equivalencia", "código interno",
-                    "código viejo", "2641", "RIPS", "FEV",
+                    "CUPS 2025",
+                    "homologación",
+                    "equivalencia",
+                    "código interno",
+                    "código viejo",
+                    "2641",
+                    "RIPS",
+                    "FEV",
                 ],
             },
         },
         "keywords": [
-            "CUPS", "2641", "homologación", "clasificación única",
-            "procedimientos", "código interno", "MinSalud 2025",
+            "CUPS",
+            "2641",
+            "homologación",
+            "clasificación única",
+            "procedimientos",
+            "código interno",
+            "MinSalud 2025",
         ],
     },
-
     "RESOLUCION 2341 DE 2024": {
         "nombre": "Resolución 2341 de 2024 (MinSalud)",
         "titulo": "Clasificación Única de Procedimientos en Salud (CUPS) versión 2024 (antecedente)",
@@ -660,14 +742,18 @@ RESOLUCIONES = {
         "vigente": False,
         "keywords": ["CUPS 2024", "2341", "clasificación única"],
     },
-
     # ─── R52 B: ampliación catálogo ────────────────────────────────────────
     "RESOLUCION 412 DE 2000": {
         "nombre": "Resolución 412 de 2000 (MinSalud)",
         "titulo": "Guías de Atención Integral y normas técnicas obligatorias",
         "ambito": "Pertinencia clínica — actividades, intervenciones y procedimientos POS",
         "vigente": True,
-        "keywords": ["guías de atención", "PAI", "promoción y prevención", "actividades de detección"],
+        "keywords": [
+            "guías de atención",
+            "PAI",
+            "promoción y prevención",
+            "actividades de detección",
+        ],
     },
     "RESOLUCION 5261 DE 1994": {
         "nombre": "Resolución 5261 de 1994 (MAPIPOS)",
@@ -778,8 +864,13 @@ RESOLUCIONES = {
         "ambito": "Factura Electrónica de Venta (FEV), CUFE, requisitos técnicos DIAN",
         "vigente": True,
         "keywords": [
-            "factura electrónica", "FEV", "CUFE", "facturación electrónica",
-            "DIAN", "Res. 042/2020", "Resolución 042 2020",
+            "factura electrónica",
+            "FEV",
+            "CUFE",
+            "facturación electrónica",
+            "DIAN",
+            "Res. 042/2020",
+            "Resolución 042 2020",
         ],
         "texto": (
             "La Resolución 000042 de 2020 expedida por la DIAN establece los "
@@ -805,7 +896,6 @@ CIRCULARES = {
         "notas": "Reemplaza el uso de UVT (2023-2024). Todos los valores tarifarios SOAT se expresan ahora en UVB.",
         "keywords": ["UVB", "unidad valor básico", "025/2024", "SOAT"],
     },
-
     "CIRCULAR 030 DE 2013": {
         "nombre": "Circular 030 de 2013 (MinSalud)",
         "titulo": "Errores formales subsanables en facturación",
@@ -814,7 +904,6 @@ CIRCULARES = {
         "notas": "APLICA solo a errores verdaderamente formales (firma, fecha, código mal digitado). NO aplica a disputas sobre la naturaleza del servicio facturado (ej. FA0202 domiciliaria vs intrahospitalaria).",
         "keywords": ["errores formales", "subsanables", "030/2013", "circular"],
     },
-
     "CIRCULAR 007 DE 2025": {
         "nombre": "Circular Externa 007 de 2025 (MinSalud)",
         "titulo": "Cronograma implementación Manual Único de Glosas",
@@ -822,7 +911,6 @@ CIRCULARES = {
         "vigente": True,
         "keywords": ["cronograma", "implementación", "007/2025"],
     },
-
     "CIRCULAR 0000022 DE 2023": {
         "nombre": "Circular 0000022 de 2023 (MinSalud + DIAN)",
         "titulo": "Factura Electrónica de Venta en Salud",
@@ -830,7 +918,6 @@ CIRCULARES = {
         "vigente": True,
         "keywords": ["FEV", "factura electrónica", "DIAN"],
     },
-
     "MANUAL SIIFA 2026": {
         "nombre": "Manual SIIFA 2026",
         "titulo": "Sistema Integrado de Información Financiera y Administrativa — Gestión de Cuentas Médicas",
@@ -842,12 +929,31 @@ CIRCULARES = {
                 "titulo": "Cronograma completo del trámite de glosas",
                 "texto": "1. FORMULACIÓN: La Entidad Responsable del Pago (EPS/ERP) dispone de 20 días hábiles desde la radicación de la factura para formular glosas. Vencido este plazo, se configura aceptación tácita. 2. RESPUESTA: La IPS dispone de 15 días hábiles desde la recepción de la glosa para presentar respuesta técnica. 3. SUBSANACIÓN: Si la glosa es subsanable, la IPS cuenta con 7 días hábiles adicionales para corregir y reenviar. 4. DECISIÓN FINAL: La EPS dispone de 10 días hábiles tras la respuesta de la IPS para levantar (parcial o total) o ratificar la glosa. 5. PAGO: Una vez levantada o aceptada la glosa, el pago debe efectuarse dentro de los 5 días hábiles siguientes. Nota: Una vez formulada la glosa inicial, no se pueden presentar nuevas glosas sobre la misma factura, salvo hechos nuevos detectados en la respuesta.",
                 "aplicacion": "Cronograma operativo completo vigente 2026",
-                "keywords": ["plazos", "cronograma", "20 días", "15 días", "7 días", "10 días", "5 días", "formulación", "respuesta", "subsanación", "decisión", "pago"],
+                "keywords": [
+                    "plazos",
+                    "cronograma",
+                    "20 días",
+                    "15 días",
+                    "7 días",
+                    "10 días",
+                    "5 días",
+                    "formulación",
+                    "respuesta",
+                    "subsanación",
+                    "decisión",
+                    "pago",
+                ],
             },
         },
-        "keywords": ["SIIFA", "manual SIIFA", "cuentas médicas", "plazos", "cronograma glosas", "2026"],
+        "keywords": [
+            "SIIFA",
+            "manual SIIFA",
+            "cuentas médicas",
+            "plazos",
+            "cronograma glosas",
+            "2026",
+        ],
     },
-
     # ─── R52 B: ampliación catálogo ────────────────────────────────────────
     "CIRCULAR 010 DE 2017": {
         "nombre": "Circular 010 de 2017 (Supersalud)",
@@ -901,7 +1007,6 @@ CODIGOS = {
         "aplicacion": "Buena fe contractual — obliga a respetar tarifas pactadas y ejecutar contrato íntegramente",
         "keywords": ["buena fe", "contrato", "Art. 871", "C.Comercio"],
     },
-
     "CODIGO CIVIL - ARTICULO 1602": {
         "nombre": "Código Civil Art. 1602",
         "titulo": "Fuerza vinculante del contrato",
@@ -911,7 +1016,6 @@ CODIGOS = {
         "aplicacion": "El contrato es ley entre las partes. NO es 1601 — error común.",
         "keywords": ["contrato ley", "1602", "C.Civil", "fuerza vinculante"],
     },
-
     "CODIGO CIVIL - ARTICULO 1603": {
         "nombre": "Código Civil Art. 1603",
         "titulo": "Ejecución de buena fe",
@@ -921,7 +1025,6 @@ CODIGOS = {
         "aplicacion": "Ejecución contractual de buena fe (complemento Art. 1602)",
         "keywords": ["buena fe", "ejecución", "1603", "C.Civil"],
     },
-
     # ─── R52 B: ampliación ────────────────────────────────────────────────
     "CODIGO CIVIL - ARTICULO 1494": {
         "nombre": "Código Civil — Artículo 1494",
@@ -977,7 +1080,6 @@ JURISPRUDENCIA = {
         "aplica_a": "EPS del régimen contributivo/subsidiado (NO aplica a Sanidad Militar, PPL, FOMAG, Policía)",
         "keywords": ["T-760", "derecho salud", "EPS", "negación servicios", "riesgo vital"],
     },
-
     "SENTENCIA T-1025 DE 2002": {
         "nombre": "Sentencia T-1025 de 2002",
         "corte": "Corte Constitucional",
@@ -994,7 +1096,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Urgencias — transversal a todos los regímenes",
         "keywords": ["T-1025", "urgencias", "autorización", "cobertura obligatoria"],
     },
-
     "SENTENCIA T-478 DE 1995": {
         "nombre": "Sentencia T-478 de 1995",
         "corte": "Corte Constitucional",
@@ -1011,7 +1112,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Glosas de pertinencia clínica (CL/PE)",
         "keywords": ["T-478", "autonomía médica", "médico tratante", "pertinencia"],
     },
-
     "SENTENCIA T-121 DE 2015": {
         "nombre": "Sentencia T-121 de 2015",
         "corte": "Corte Constitucional",
@@ -1028,7 +1128,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Glosas CL0103 (no acorde a GPC) — defiende la autonomía sobre la recomendación",
         "keywords": ["T-121", "GPC", "guías de práctica clínica", "recomendativo", "autonomía"],
     },
-
     "SENTENCIA T-171 DE 2018": {
         "nombre": "Sentencia T-171 de 2018",
         "corte": "Corte Constitucional",
@@ -1038,7 +1137,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Defensa de pertinencia clínica y servicios especializados",
         "keywords": ["T-171", "pertinencia", "autoridad médica"],
     },
-
     "SENTENCIA T-134 DE 2022": {
         "nombre": "Sentencia T-134 de 2022",
         "corte": "Corte Constitucional",
@@ -1048,7 +1146,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Glosas administrativas que trasladan cargas indebidas a la IPS",
         "keywords": ["T-134", "oportunidad", "demoras administrativas"],
     },
-
     "SENTENCIA T-050 DE 2017": {
         "nombre": "Sentencia T-050 de 2017",
         "corte": "Corte Constitucional",
@@ -1058,9 +1155,7 @@ JURISPRUDENCIA = {
         "aplica_a": "Continuidad de tratamiento, oncología, crónicos",
         "keywords": ["T-050", "continuidad", "atención integral"],
     },
-
     # ─── Ronda 50 Paso 11: ampliación jurisprudencia ─────────────────────
-
     "SENTENCIA T-235 DE 1998": {
         "nombre": "Sentencia T-235 de 1998",
         "corte": "Corte Constitucional",
@@ -1070,7 +1165,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Glosas SO0101, SO0102 (soportes faltantes) cuando la HC sí documenta",
         "keywords": ["T-235", "historia clínica", "soportes", "plena prueba", "1995/1999"],
     },
-
     "SENTENCIA SU-480 DE 1997": {
         "nombre": "Sentencia SU-480 de 1997",
         "corte": "Corte Constitucional (Sala Plena)",
@@ -1080,7 +1174,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Urgencias — autoridad de unificación (vincula a todas las salas)",
         "keywords": ["SU-480", "urgencias", "unificación", "sala plena", "autorización previa"],
     },
-
     "SENTENCIA T-313 DE 2007": {
         "nombre": "Sentencia T-313 de 2007",
         "corte": "Corte Constitucional",
@@ -1090,7 +1183,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Glosas AU0101, AU0201 cuando hubo solicitud sin respuesta dentro del plazo",
         "keywords": ["T-313", "silencio positivo", "autorización tácita", "plazo respuesta"],
     },
-
     "SENTENCIA T-642 DE 2008": {
         "nombre": "Sentencia T-642 de 2008",
         "corte": "Corte Constitucional",
@@ -1100,7 +1192,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Defensa frente a glosas usadas como herramienta dilatoria de pago",
         "keywords": ["T-642", "pago oportuno", "flujo recursos", "Ley 1122 art 13"],
     },
-
     "SENTENCIA T-053 DE 2009": {
         "nombre": "Sentencia T-053 de 2009",
         "corte": "Corte Constitucional",
@@ -1110,7 +1201,6 @@ JURISPRUDENCIA = {
         "aplica_a": "Glosas FA injustificadas, glosas sin fundamento normativo o probatorio",
         "keywords": ["T-053", "glosas injustificadas", "buena fe", "abuso del derecho", "Art. 871"],
     },
-
     "CONSEJO_ESTADO_2018_00154": {
         "nombre": "Consejo de Estado, Sec. Tercera, Rad. 2018-00154",
         "corte": "Consejo de Estado — Sala Contencioso Administrativa, Sección Tercera",
@@ -1118,9 +1208,14 @@ JURISPRUDENCIA = {
         "ratio": "Si la EPS no responde la respuesta a glosa del prestador dentro de los 10 días hábiles legales, opera el LEVANTAMIENTO TÁCITO de la objeción. La EPS pierde el derecho a discutir y debe pagar.",
         "ratio_literal": "El silencio de la entidad responsable del pago frente a la respuesta motivada del prestador configura un levantamiento tácito de la glosa, no susceptible de revocatoria posterior.",
         "aplica_a": "Defensa cuando la EPS deja vencer el plazo de 10 días tras la respuesta del HUS",
-        "keywords": ["Consejo de Estado", "silencio positivo", "Art. 57", "levantamiento tácito", "Ley 1438"],
+        "keywords": [
+            "Consejo de Estado",
+            "silencio positivo",
+            "Art. 57",
+            "levantamiento tácito",
+            "Ley 1438",
+        ],
     },
-
     # ─── R52 B: ampliación catálogo de jurisprudencia ──────────────────────
     "SENTENCIA T-024 DE 2009": {
         "nombre": "Sentencia T-024 de 2009",
@@ -1325,13 +1420,15 @@ def consultar_normativa(pregunta: str, limite: int = 5) -> List[dict]:
                 prefijo = plantilla.split(" ")[0] + " " + grupos[0] + " "
                 for k, norma in _TODAS_LAS_NORMAS.items():
                     if _normalizar(k).startswith(_normalizar(prefijo)):
-                        resultados_directos.append({
-                            "norma": norma["nombre"],
-                            "tipo": norma.get("ambito", ""),
-                            "titulo": norma.get("titulo", ""),
-                            "texto": norma.get("texto", ""),
-                            "match_directo": True,
-                        })
+                        resultados_directos.append(
+                            {
+                                "norma": norma["nombre"],
+                                "tipo": norma.get("ambito", ""),
+                                "titulo": norma.get("titulo", ""),
+                                "texto": norma.get("texto", ""),
+                                "match_directo": True,
+                            }
+                        )
                         break
         except (IndexError, KeyError):
             continue
@@ -1352,47 +1449,59 @@ def consultar_normativa(pregunta: str, limite: int = 5) -> List[dict]:
                 if t in kw or kw in t:
                     score += 3
         # coincidencia en título/texto general
-        texto_norma = _normalizar(" ".join([
-            norma.get("titulo", ""),
-            norma.get("ambito", ""),
-            norma.get("texto", ""),
-        ]))
+        texto_norma = _normalizar(
+            " ".join(
+                [
+                    norma.get("titulo", ""),
+                    norma.get("ambito", ""),
+                    norma.get("texto", ""),
+                ]
+            )
+        )
         for t in terminos:
             if t in texto_norma:
                 score += 1
         # artículos internos
         for art_num, art in norma.get("articulos", {}).items():
-            art_text = _normalizar(" ".join([
-                art.get("titulo", ""),
-                art.get("texto", ""),
-                art.get("aplicacion", ""),
-                " ".join(art.get("keywords", [])),
-            ]))
+            art_text = _normalizar(
+                " ".join(
+                    [
+                        art.get("titulo", ""),
+                        art.get("texto", ""),
+                        art.get("aplicacion", ""),
+                        " ".join(art.get("keywords", [])),
+                    ]
+                )
+            )
             art_score = 0
             for t in terminos:
                 if t in art_text:
                     art_score += 2
             if art_score > 0:
-                scored.append((
-                    art_score + score,
+                scored.append(
+                    (
+                        art_score + score,
+                        {
+                            "norma": norma["nombre"],
+                            "articulo": art_num,
+                            "titulo": art["titulo"],
+                            "texto": art["texto"],
+                            "aplicacion": art.get("aplicacion", ""),
+                        },
+                    )
+                )
+        if score > 0:
+            scored.append(
+                (
+                    score,
                     {
                         "norma": norma["nombre"],
-                        "articulo": art_num,
-                        "titulo": art["titulo"],
-                        "texto": art["texto"],
-                        "aplicacion": art.get("aplicacion", ""),
+                        "tipo": norma.get("ambito", ""),
+                        "titulo": norma.get("titulo", ""),
+                        "texto": norma.get("texto", ""),
                     },
-                ))
-        if score > 0:
-            scored.append((
-                score,
-                {
-                    "norma": norma["nombre"],
-                    "tipo": norma.get("ambito", ""),
-                    "titulo": norma.get("titulo", ""),
-                    "texto": norma.get("texto", ""),
-                },
-            ))
+                )
+            )
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return [r[1] for r in scored[:limite]]
@@ -1419,15 +1528,40 @@ def normas_relevantes_para_codigo(codigo_glosa: str) -> List[str]:
     """
     prefijo = (codigo_glosa or "")[:2].upper()
     mapping = {
-        "TA": ["LEY 100 DE 1993", "CODIGO CIVIL - ARTICULO 1602", "CODIGO DE COMERCIO - ARTICULO 871", "CIRCULAR 047 DE 2025", "RESOLUCION 054 DE 2026", "RESOLUCION 124 DE 2026"],
-        "SO": ["RESOLUCION 1995 DE 1999", "RESOLUCION 866 DE 2021", "CIRCULAR 030 DE 2013", "RESOLUCION 2284 DE 2023"],
+        "TA": [
+            "LEY 100 DE 1993",
+            "CODIGO CIVIL - ARTICULO 1602",
+            "CODIGO DE COMERCIO - ARTICULO 871",
+            "CIRCULAR 047 DE 2025",
+            "RESOLUCION 054 DE 2026",
+            "RESOLUCION 124 DE 2026",
+        ],
+        "SO": [
+            "RESOLUCION 1995 DE 1999",
+            "RESOLUCION 866 DE 2021",
+            "CIRCULAR 030 DE 2013",
+            "RESOLUCION 2284 DE 2023",
+        ],
         "AU": ["LEY 100 DE 1993", "SENTENCIA T-1025 DE 2002", "DECRETO 4747 DE 2007"],
         "CO": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-760 DE 2008"],
-        "CL": ["LEY 1751 DE 2015", "SENTENCIA T-478 DE 1995", "SENTENCIA T-171 DE 2018", "RESOLUCION 1995 DE 1999"],
+        "CL": [
+            "LEY 1751 DE 2015",
+            "SENTENCIA T-478 DE 1995",
+            "SENTENCIA T-171 DE 2018",
+            "RESOLUCION 1995 DE 1999",
+        ],
         "PE": ["LEY 1751 DE 2015", "SENTENCIA T-478 DE 1995", "RESOLUCION 1995 DE 1999"],
-        "FA": ["LEY 100 DE 1993", "RESOLUCION 1995 DE 1999", "RESOLUCION 2284 DE 2023", "CODIGO DE COMERCIO - ARTICULO 871"],
-        "IN": ["DECRETO 780 DE 2016", "CODIGO DE COMERCIO - ARTICULO 871", "RESOLUCION 5269 DE 2017"],
+        "FA": [
+            "LEY 100 DE 1993",
+            "RESOLUCION 1995 DE 1999",
+            "RESOLUCION 2284 DE 2023",
+            "CODIGO DE COMERCIO - ARTICULO 871",
+        ],
+        "IN": [
+            "DECRETO 780 DE 2016",
+            "CODIGO DE COMERCIO - ARTICULO 871",
+            "RESOLUCION 5269 DE 2017",
+        ],
         "ME": ["LEY 1751 DE 2015", "RESOLUCION 5269 DE 2017", "SENTENCIA T-478 DE 1995"],
     }
     return mapping.get(prefijo, ["LEY 100 DE 1993", "RESOLUCION 2284 DE 2023"])
-

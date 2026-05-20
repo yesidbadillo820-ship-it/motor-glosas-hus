@@ -2,12 +2,12 @@
 
 Verifica la regla dura: RATIFICADA SIEMPRE gana sobre EXTEMPORÁNEA.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-import pytest
 
 from app.services.texto_fijo_detector import (
     DIAS_HABILES_LIMITE,
@@ -43,6 +43,7 @@ def _mock_glosa(**kw):
 
 # ─── _es_ratificada ────────────────────────────────────────────────────────
 
+
 class TestEsRatificada:
     def test_estado_ratificada(self):
         g = _mock_glosa(estado="RATIFICADA")
@@ -67,6 +68,7 @@ class TestEsRatificada:
 
 # ─── _no_aplicar_extemporaneidad ───────────────────────────────────────────
 
+
 class TestNoAplicarExtemporaneidad:
     def test_flag_explicito(self):
         g = _mock_glosa(observacion_tecnico="NO APLICAR EXTEMPORANEIDAD - FOMAG")
@@ -78,6 +80,7 @@ class TestNoAplicarExtemporaneidad:
 
 
 # ─── _es_extemporanea ──────────────────────────────────────────────────────
+
 
 class TestEsExtemporanea:
     def test_por_campo_precalculado(self):
@@ -119,6 +122,7 @@ class TestEsExtemporanea:
 
 # ─── clasificar_texto_fijo — regla de prioridad ────────────────────────────
 
+
 class TestPrioridad:
     def test_ratificada_sola(self):
         g = _mock_glosa(estado="RATIFICADA")
@@ -139,7 +143,7 @@ class TestPrioridad:
         NO menciona extemporaneidad."""
         g = _mock_glosa(
             estado="RATIFICADA",
-            dias_radicacion_dgh=30,   # también extemporánea
+            dias_radicacion_dgh=30,  # también extemporánea
         )
         r = clasificar_texto_fijo(g)
         assert r is not None
@@ -153,7 +157,7 @@ class TestPrioridad:
         g = _mock_glosa(
             estado="PENDIENTE",
             radicado_info="GLOSA RATIFICADA POR LA EPS",
-            dias_radicacion_dgh=35,   # también extemporánea
+            dias_radicacion_dgh=35,  # también extemporánea
         )
         r = clasificar_texto_fijo(g)
         assert r["tipo"] == "RATIFICADA"
@@ -167,6 +171,7 @@ class TestPrioridad:
 
 
 # ─── aplicar_texto_fijo_si_corresponde ─────────────────────────────────────
+
 
 class TestAplicar:
     def test_aplica_y_muta(self):
@@ -258,6 +263,7 @@ class TestAplicar:
 
 
 # ─── DIAS_HABILES_LIMITE ───────────────────────────────────────────────────
+
 
 def test_limite_legal_es_20():
     """Constante alineada con Art. 56/57 Ley 1438/2011."""

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/inventario-funcionalidades (R200 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,7 +31,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -38,6 +42,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -57,8 +62,7 @@ class TestInventarioFuncionalidades:
         r = client.get("/sistema/inventario-funcionalidades")
         d = r.json()
         nombres = [dom["nombre"] for dom in d["dominios"]]
-        for n in ("Glosas", "Estadísticas", "Auditoría",
-                  "Operación", "IA y prompts", "Sistema"):
+        for n in ("Glosas", "Estadísticas", "Auditoría", "Operación", "IA y prompts", "Sistema"):
             assert n in nombres
 
     def test_dominios_tienen_metadata(self, client):

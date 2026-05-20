@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/proceso-bilateral (R197 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, estado, valor=1000):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -67,9 +75,16 @@ class TestProcesoBilateral:
         r = client.get("/glosas/stats/proceso-bilateral")
         d = r.json()
         estados = [it["estado"] for it in d["pipeline"]]
-        for e in ("RADICADA", "RESPONDIDA", "RATIFICADA",
-                  "CONCILIADA", "LEVANTADA", "ACEPTADA",
-                  "ARCHIVADA", "EXTEMPORANEA"):
+        for e in (
+            "RADICADA",
+            "RESPONDIDA",
+            "RATIFICADA",
+            "CONCILIADA",
+            "LEVANTADA",
+            "ACEPTADA",
+            "ARCHIVADA",
+            "EXTEMPORANEA",
+        ):
             assert e in estados
 
     def test_counts_correctos(self, client, db_session):

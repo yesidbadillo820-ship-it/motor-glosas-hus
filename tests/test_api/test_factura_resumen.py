@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/factura-resumen (R325 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, factura, estado="RADICADA", valor=1000, recuperado=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C", factura=factura,
-        valor_objetado=valor, valor_recuperado=recuperado,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            factura=factura,
+            valor_objetado=valor,
+            valor_recuperado=recuperado,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -58,14 +67,15 @@ class TestFacturaResumen:
     def test_drilldown(self, client, db_session):
         _seed(db_session, "F100", estado="RADICADA", valor=2000)
         _seed(
-            db_session, "F100", estado="LEVANTADA",
-            valor=3000, recuperado=2500,
+            db_session,
+            "F100",
+            estado="LEVANTADA",
+            valor=3000,
+            recuperado=2500,
         )
         _seed(db_session, "OTRA", estado="RADICADA")
 
-        r = client.get(
-            "/glosas/stats/factura-resumen?factura=F100"
-        )
+        r = client.get("/glosas/stats/factura-resumen?factura=F100")
         d = r.json()
         assert d["factura"] == "F100"
         assert d["count_total"] == 2
@@ -76,8 +86,6 @@ class TestFacturaResumen:
         assert len(d["glosas"]) == 2
 
     def test_factura_inexistente(self, client):
-        r = client.get(
-            "/glosas/stats/factura-resumen?factura=NOEXISTE"
-        )
+        r = client.get("/glosas/stats/factura-resumen?factura=NOEXISTE")
         d = r.json()
         assert d["count_total"] == 0

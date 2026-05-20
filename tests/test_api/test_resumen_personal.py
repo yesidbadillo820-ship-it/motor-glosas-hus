@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/resumen (R123 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice", rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -41,6 +46,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -50,8 +56,11 @@ def client(db_session, usuario):
 
 def _seed(db, gestor, estado="RADICADA", **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -64,13 +73,16 @@ class TestResumenPersonal:
         r = client.get("/usuarios/yo/resumen")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("usuario_email", "ventana_dias",
-                    "mis_glosas_asignadas",
-                    "mis_glosas_cerradas_periodo",
-                    "mi_valor_recuperado_periodo",
-                    "mi_tasa_levantamiento_pct",
-                    "mi_tiempo_promedio_resolucion_dias",
-                    "posicion_ranking"):
+        for key in (
+            "usuario_email",
+            "ventana_dias",
+            "mis_glosas_asignadas",
+            "mis_glosas_cerradas_periodo",
+            "mi_valor_recuperado_periodo",
+            "mi_tasa_levantamiento_pct",
+            "mi_tiempo_promedio_resolucion_dias",
+            "posicion_ranking",
+        ):
             assert key in d
 
     def test_solo_mis_glosas(self, client, db_session):
@@ -82,13 +94,21 @@ class TestResumenPersonal:
         assert d["mis_glosas_asignadas"] == 2
 
     def test_cerradas_y_recuperado(self, client, db_session):
-        _seed(db_session, "Alice", estado="LEVANTADA",
-              valor_recuperado=5000,
-              fecha_decision_eps=ahora_utc() - timedelta(days=10))
+        _seed(
+            db_session,
+            "Alice",
+            estado="LEVANTADA",
+            valor_recuperado=5000,
+            fecha_decision_eps=ahora_utc() - timedelta(days=10),
+        )
         # Cerrada hace 60 días (fuera de ventana 30d)
-        _seed(db_session, "Alice", estado="LEVANTADA",
-              valor_recuperado=99999,
-              fecha_decision_eps=ahora_utc() - timedelta(days=60))
+        _seed(
+            db_session,
+            "Alice",
+            estado="LEVANTADA",
+            valor_recuperado=99999,
+            fecha_decision_eps=ahora_utc() - timedelta(days=60),
+        )
 
         r = client.get("/usuarios/yo/resumen")
         d = r.json()
@@ -97,10 +117,18 @@ class TestResumenPersonal:
 
     def test_tasa_levantamiento(self, client, db_session):
         # 1 levantada / 2 decididas = 50%
-        _seed(db_session, "Alice", estado="LEVANTADA",
-              fecha_decision_eps=ahora_utc() - timedelta(days=5))
-        _seed(db_session, "Alice", estado="ACEPTADA",
-              fecha_decision_eps=ahora_utc() - timedelta(days=5))
+        _seed(
+            db_session,
+            "Alice",
+            estado="LEVANTADA",
+            fecha_decision_eps=ahora_utc() - timedelta(days=5),
+        )
+        _seed(
+            db_session,
+            "Alice",
+            estado="ACEPTADA",
+            fecha_decision_eps=ahora_utc() - timedelta(days=5),
+        )
         r = client.get("/usuarios/yo/resumen")
         d = r.json()
         assert d["mi_tasa_levantamiento_pct"] == 50.0
@@ -108,15 +136,27 @@ class TestResumenPersonal:
     def test_posicion_ranking(self, client, db_session):
         # Bob: 5 levantamientos
         for _ in range(5):
-            _seed(db_session, "Bob", estado="LEVANTADA",
-                  fecha_decision_eps=ahora_utc() - timedelta(days=5))
+            _seed(
+                db_session,
+                "Bob",
+                estado="LEVANTADA",
+                fecha_decision_eps=ahora_utc() - timedelta(days=5),
+            )
         # Alice: 2 levantamientos
         for _ in range(2):
-            _seed(db_session, "Alice", estado="LEVANTADA",
-                  fecha_decision_eps=ahora_utc() - timedelta(days=5))
+            _seed(
+                db_session,
+                "Alice",
+                estado="LEVANTADA",
+                fecha_decision_eps=ahora_utc() - timedelta(days=5),
+            )
         # Carol: 1
-        _seed(db_session, "Carol", estado="LEVANTADA",
-              fecha_decision_eps=ahora_utc() - timedelta(days=5))
+        _seed(
+            db_session,
+            "Carol",
+            estado="LEVANTADA",
+            fecha_decision_eps=ahora_utc() - timedelta(days=5),
+        )
 
         r = client.get("/usuarios/yo/resumen")
         d = r.json()

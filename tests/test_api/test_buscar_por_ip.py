@@ -1,4 +1,5 @@
 """Tests del endpoint GET /auditoria-forense/buscar-por-ip (R131 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -54,11 +59,15 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, ip, usuario, accion="UPDATE", min_atras=0):
-    db.add(AuditLogRecord(
-        usuario_email=usuario, accion=accion, tabla="glosas",
-        ip=ip,
-        timestamp=ahora_utc() - timedelta(minutes=min_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=usuario,
+            accion=accion,
+            tabla="glosas",
+            ip=ip,
+            timestamp=ahora_utc() - timedelta(minutes=min_atras),
+        )
+    )
     db.commit()
 
 

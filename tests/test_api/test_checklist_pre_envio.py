@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/checklist-pre-envio (R215 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,9 +48,14 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        id=1, eps="SANITAS", paciente="X", codigo_glosa="TA0201",
-        factura="F-1", valor_objetado=1000,
-        etapa="X", estado="RADICADA",
+        id=1,
+        eps="SANITAS",
+        paciente="X",
+        codigo_glosa="TA0201",
+        factura="F-1",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
         dictamen="x" * 300,
         codigo_respuesta="RE9901",
@@ -82,9 +89,11 @@ class TestChecklistPreEnvio:
         assert d["faltantes"] == []
 
     def test_glosa_con_faltantes(self, client, db_session):
-        _seed(db_session,
-              dictamen="corto",  # < 200 chars
-              gestor_nombre=None)
+        _seed(
+            db_session,
+            dictamen="corto",  # < 200 chars
+            gestor_nombre=None,
+        )
         r = client.get("/glosas/1/checklist-pre-envio")
         d = r.json()
         assert d["todos_ok"] is False

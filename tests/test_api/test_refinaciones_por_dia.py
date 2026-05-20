@@ -1,7 +1,7 @@
 """Tests del endpoint GET /glosas/stats/refinaciones-por-dia (R193 P1)."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,10 +48,14 @@ def client(db_session, usuario):
 
 
 def _seed(db, fecha, accion="REFINAR"):
-    db.add(DictamenVersionRecord(
-        glosa_id=1, dictamen_html="<p>X</p>",
-        accion=accion, creado_en=fecha,
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=1,
+            dictamen_html="<p>X</p>",
+            accion=accion,
+            creado_en=fecha,
+        )
+    )
     db.commit()
 
 
@@ -63,12 +68,11 @@ class TestRefinacionesPorDia:
             assert key in d
 
     def test_agrupa_por_fecha(self, client, db_session):
-        _seed(db_session,
-              ahora_utc().replace(microsecond=0))
-        _seed(db_session,
-              ahora_utc().replace(microsecond=0))
+        _seed(db_session, ahora_utc().replace(microsecond=0))
+        _seed(db_session, ahora_utc().replace(microsecond=0))
         # Ayer
         from datetime import timedelta
+
         ayer = ahora_utc() - timedelta(days=1)
         _seed(db_session, ayer.replace(microsecond=0))
 

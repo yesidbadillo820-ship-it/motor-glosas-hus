@@ -19,16 +19,22 @@ Filosofía:
   • Si la plantilla no produce dictamen válido (datos faltantes,
     error de formato), retorna None y se cae al LLM normal.
 """
+
 from __future__ import annotations
 
 from typing import Optional
 
 
 _NOMBRE_TIPO = {
-    "TA": "TARIFAS", "SO": "SOPORTES", "AU": "AUTORIZACIÓN",
-    "CO": "COBERTURA", "CL": "PERTINENCIA CLÍNICA",
-    "PE": "PERTINENCIA CLÍNICA", "FA": "FACTURACIÓN",
-    "IN": "INSUMOS", "ME": "MEDICAMENTOS",
+    "TA": "TARIFAS",
+    "SO": "SOPORTES",
+    "AU": "AUTORIZACIÓN",
+    "CO": "COBERTURA",
+    "CL": "PERTINENCIA CLÍNICA",
+    "PE": "PERTINENCIA CLÍNICA",
+    "FA": "FACTURACIÓN",
+    "IN": "INSUMOS",
+    "ME": "MEDICAMENTOS",
 }
 
 
@@ -103,11 +109,19 @@ def _formato_pesos(v: float) -> str:
 
 def _es_sanidad_militar(eps: str) -> bool:
     e = (eps or "").upper()
-    return any(k in e for k in (
-        "DISPENSARIO MEDICO", "DIGSA", "FORMA",
-        "SANIDAD MILITAR", "FUERZAS MILITARES",
-        "DMBUG", "BSALUD", "CERMI",
-    ))
+    return any(
+        k in e
+        for k in (
+            "DISPENSARIO MEDICO",
+            "DIGSA",
+            "FORMA",
+            "SANIDAD MILITAR",
+            "FUERZAS MILITARES",
+            "DMBUG",
+            "BSALUD",
+            "CERMI",
+        )
+    )
 
 
 def _refutaciones_de_hallazgos(hallazgos: list, max_n: int = 3) -> list:
@@ -144,7 +158,7 @@ def _refutaciones_de_hallazgos(hallazgos: list, max_n: int = 3) -> list:
             )
         elif hid == "diferencia_sin_referente":
             frases.append(
-                "LA OBJECIÓN POR \"DIFERENCIA\" SIN ACREDITAR EL "
+                'LA OBJECIÓN POR "DIFERENCIA" SIN ACREDITAR EL '
                 "REFERENTE TARIFARIO APLICADO INCUMPLE EL DEBER DE "
                 "MOTIVACIÓN ESTABLECIDO EN LA RESOLUCIÓN 2284 DE 2023, "
                 "QUE EXIGE PRECISIÓN EN LA OBJECIÓN"
@@ -153,7 +167,7 @@ def _refutaciones_de_hallazgos(hallazgos: list, max_n: int = 3) -> list:
             frases.append(
                 "LA HISTORIA CLÍNICA OBRA EN AUTOS Y CONSTITUYE PLENA "
                 "PRUEBA MÉDICO-LEGAL CONFORME A LA RESOLUCIÓN 1995 DE "
-                "1999, POR LO QUE LA AFIRMACIÓN DE \"FALTA\" CARECE DE "
+                '1999, POR LO QUE LA AFIRMACIÓN DE "FALTA" CARECE DE '
                 "FUNDAMENTO FÁCTICO"
             )
     return frases
@@ -192,7 +206,8 @@ def generar_dictamen_directo(
     # quede dentro del rango de longitud (con cita literal Art. 1602
     # + bloque Sanidad Militar el P3 ya pesa ~120 palabras).
     refutaciones = _refutaciones_de_hallazgos(
-        auditoria.get("hallazgos") or [], max_n=2,
+        auditoria.get("hallazgos") or [],
+        max_n=2,
     )
     if not refutaciones:
         return None
@@ -200,8 +215,7 @@ def generar_dictamen_directo(
     # ── PÁRRAFO 1 — IDENTIFICACIÓN
     if fact_str and fact_str != "EL VALOR INDICADO EN EL EXPEDIENTE":
         valor_p1 = (
-            f"FACTURADO POR {fact_str}, RESPECTO DEL CUAL LA "
-            f"ENTIDAD PAGADORA OBJETA {obj_str}"
+            f"FACTURADO POR {fact_str}, RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA {obj_str}"
         )
     else:
         valor_p1 = f"RESPECTO DEL CUAL LA ENTIDAD PAGADORA OBJETA {obj_str}"
@@ -220,16 +234,12 @@ def generar_dictamen_directo(
         razones.append(f"{conectores[i]}, {frase}")
     p2 = (
         "LA AFIRMACIÓN DE LA AUDITORÍA NO SE AJUSTA AL MARCO "
-        "CONTRACTUAL POR LAS SIGUIENTES RAZONES: "
-        + "; ".join(razones)
-        + "."
+        "CONTRACTUAL POR LAS SIGUIENTES RAZONES: " + "; ".join(razones) + "."
     )
 
     # ── PÁRRAFO 3 — FUNDAMENTO NORMATIVO
     pacto_pesos = (
-        _formato_pesos(valor_pactado)
-        if valor_pactado > 0
-        else "LO PACTADO EN EL CONTRATO"
+        _formato_pesos(valor_pactado) if valor_pactado > 0 else "LO PACTADO EN EL CONTRATO"
     )
     norma_extra = ""
     if _es_sanidad_militar(eps_clean):
@@ -273,11 +283,10 @@ def generar_dictamen_directo(
     if n_palabras < 130 or n_palabras > 340:
         return None
 
-    normas_clave = (
-        "Art. 1602 Código Civil | Art. 871 Código de Comercio"
-        + (" | Decreto 1795/2000 + Acuerdo 002/2001 FF.MM."
-           if _es_sanidad_militar(eps_clean) else
-           " | Resolución 2284/2023")
+    normas_clave = "Art. 1602 Código Civil | Art. 871 Código de Comercio" + (
+        " | Decreto 1795/2000 + Acuerdo 002/2001 FF.MM."
+        if _es_sanidad_militar(eps_clean)
+        else " | Resolución 2284/2023"
     )
 
     xml = (

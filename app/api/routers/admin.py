@@ -3,6 +3,7 @@
 Requiere rol SUPER_ADMIN y confirmación explícita para todas las acciones.
 Cada operación queda registrada en audit_log para trazabilidad.
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -66,15 +67,14 @@ def dedup_historial(
             es_terminal = est in terminales or wf in terminales
             ts = g.creado_en.timestamp() if g.creado_en else 0
             return (1 if es_terminal else 0, ts)
+
         lista_ordenada = sorted(lista, key=_score, reverse=True)
         # El primero se queda, el resto se oculta
         for g in lista_ordenada[1:]:
             candidatos_a_ocultar.append(g.id)
 
     if not dry_run and candidatos_a_ocultar:
-        db.query(GlosaRecord).filter(
-            GlosaRecord.id.in_(candidatos_a_ocultar)
-        ).update(
+        db.query(GlosaRecord).filter(GlosaRecord.id.in_(candidatos_a_ocultar)).update(
             {GlosaRecord.estado: "DUPLICADA_OCULTA"},
             synchronize_session=False,
         )
@@ -127,18 +127,12 @@ def migracion_emergencia(
     antes = []
     try:
         rows = db.execute(diag_query).fetchall()
-        antes = [
-            {"col": r[0], "tipo": r[1], "tamaño": r[2]}
-            for r in rows
-        ]
+        antes = [{"col": r[0], "tipo": r[1], "tamaño": r[2]} for r in rows]
     except Exception as e:
         return {"error_diag_antes": str(e)}
 
     # 2. Identificar candidatas: VARCHAR(N) con N <= 50
-    candidatas = [
-        x["col"] for x in antes
-        if x["tamaño"] is not None and x["tamaño"] <= 50
-    ]
+    candidatas = [x["col"] for x in antes if x["tamaño"] is not None and x["tamaño"] <= 50]
 
     # 3. Aplicar ALTER TYPE a 300 a cada candidata
     resultados = []
@@ -156,10 +150,7 @@ def migracion_emergencia(
     despues = []
     try:
         rows = db.execute(diag_query).fetchall()
-        despues = [
-            {"col": r[0], "tipo": r[1], "tamaño": r[2]}
-            for r in rows
-        ]
+        despues = [{"col": r[0], "tipo": r[1], "tamaño": r[2]} for r in rows]
     except Exception:
         pass
 
@@ -172,8 +163,7 @@ def migracion_emergencia(
         "antes": antes,
         "despues": despues,
         "mensaje": (
-            f"Aplicados {ok}/{len(candidatas)} ALTER. "
-            "Reintenta la importación del Excel."
+            f"Aplicados {ok}/{len(candidatas)} ALTER. Reintenta la importación del Excel."
             if ok == len(candidatas)
             else f"Solo {ok}/{len(candidatas)} OK — revisa los mensajes."
         ),
@@ -218,7 +208,9 @@ def reset_datos(
     try:
         if data.borrar_conciliaciones:
             # Primero conciliaciones (referencian historial por FK)
-            resumen["conciliaciones"] = db.query(ConciliacionRecord).delete(synchronize_session=False)
+            resumen["conciliaciones"] = db.query(ConciliacionRecord).delete(
+                synchronize_session=False
+            )
 
         if data.borrar_historial:
             resumen["historial"] = db.query(GlosaRecord).delete(synchronize_session=False)
@@ -290,6 +282,7 @@ async def disparar_pre_analisis(
     para pre-calentar respuestas).
     """
     from app.services.ia_auditora_proactiva import ejecutar_pre_analisis_background
+
     stats = await ejecutar_pre_analisis_background(limite=limite)
     AuditRepository(db).registrar(
         usuario_email=current_user.email,
@@ -307,6 +300,7 @@ def estado_pre_analisis(
 ):
     """Estado del scheduler de pre-análisis (activo, última ejecución)."""
     from app.services.ia_auditora_proactiva import obtener_estado
+
     return obtener_estado()
 
 
@@ -333,9 +327,9 @@ def consumo_tokens_hoy(
     total = len(glosas_hoy)
     # Desglose por modelo usado
     desglose: dict[str, int] = {}
-    ahorro_tpl = 0       # plantillas fijas (extemp, ratif, aceptadas, match)
-    ahorro_cache = 0     # respuestas de caché
-    llamadas_ia = 0      # llamadas reales a Groq/Claude
+    ahorro_tpl = 0  # plantillas fijas (extemp, ratif, aceptadas, match)
+    ahorro_cache = 0  # respuestas de caché
+    llamadas_ia = 0  # llamadas reales a Groq/Claude
     for g in glosas_hoy:
         mod = (g.modelo_ia or "desconocido").strip()
         desglose[mod] = desglose.get(mod, 0) + 1
@@ -348,9 +342,12 @@ def consumo_tokens_hoy(
 
     # Consumo del caché BD del día (cuántas veces se sirvieron respuestas cacheadas)
     try:
-        cache_hits_hoy = db.query(_func.sum(AICacheRecord.hit_count)).filter(
-            AICacheRecord.ultimo_hit >= hoy_ini
-        ).scalar() or 0
+        cache_hits_hoy = (
+            db.query(_func.sum(AICacheRecord.hit_count))
+            .filter(AICacheRecord.ultimo_hit >= hoy_ini)
+            .scalar()
+            or 0
+        )
         cache_total_entradas = db.query(AICacheRecord).count()
     except Exception:
         cache_hits_hoy = 0
@@ -358,6 +355,7 @@ def consumo_tokens_hoy(
 
     # Top usuarios (para detectar abuso)
     from app.models.db import AuditLogRecord
+
     try:
         top_users_rows = (
             db.query(
@@ -398,6 +396,7 @@ async def enviar_alertas_vencimiento(
     o vencidas a todos los gestores configurados en ALERTAS_EMAIL.
     Solo SUPER_ADMIN."""
     from app.services.email_service import enviar_alertas_vencimiento_masivo
+
     try:
         resumen = await enviar_alertas_vencimiento_masivo(db)
     except Exception as e:
@@ -408,7 +407,7 @@ async def enviar_alertas_vencimiento(
         usuario_rol=current_user.rol,
         accion="ENVIAR_ALERTAS",
         tabla="historial",
-        detalle=f"Destinatarios={resumen.get('destinatarios',0)} Enviados={resumen.get('correos_enviados',0)} Glosas={resumen.get('glosas_alertadas',0)}",
+        detalle=f"Destinatarios={resumen.get('destinatarios', 0)} Enviados={resumen.get('correos_enviados', 0)} Glosas={resumen.get('glosas_alertadas', 0)}",
     )
     return resumen
 
@@ -429,12 +428,16 @@ def backfill_historial(
     from app.main import _concepto_glosa, _extraer_cups_servicio
 
     # Query: glosas con al menos un campo nuevo en NULL
-    glosas = db.query(GlosaRecord).filter(
-        (GlosaRecord.concepto_glosa.is_(None)) |
-        (GlosaRecord.codigo_respuesta.is_(None)) |
-        (GlosaRecord.cups_servicio.is_(None)) |
-        (GlosaRecord.servicio_descripcion.is_(None))
-    ).all()
+    glosas = (
+        db.query(GlosaRecord)
+        .filter(
+            (GlosaRecord.concepto_glosa.is_(None))
+            | (GlosaRecord.codigo_respuesta.is_(None))
+            | (GlosaRecord.cups_servicio.is_(None))
+            | (GlosaRecord.servicio_descripcion.is_(None))
+        )
+        .all()
+    )
 
     actualizadas = 0
     for g in glosas:
@@ -446,7 +449,7 @@ def backfill_historial(
             cambios = True
 
         # 2. CUPS y servicio desde el texto_glosa_original o desde el dictamen
-        if (not g.cups_servicio or not g.servicio_descripcion):
+        if not g.cups_servicio or not g.servicio_descripcion:
             fuente = g.texto_glosa_original or ""
             if not fuente and g.dictamen:
                 # Del dictamen HTML quitamos tags y tomamos texto
@@ -529,18 +532,12 @@ def ai_cache_stats(
     avg_hits = (hit_total / total) if total else 0
     max_hits = db.query(_f.max(AICacheRecord.hit_count)).scalar() or 0
 
-    top_5 = (
-        db.query(AICacheRecord)
-        .order_by(AICacheRecord.hit_count.desc())
-        .limit(5)
-        .all()
-    )
+    top_5 = db.query(AICacheRecord).order_by(AICacheRecord.hit_count.desc()).limit(5).all()
 
     corte_30 = ahora_utc() - timedelta(days=30)
     viejas = (
-        db.query(_f.count(AICacheRecord.id))
-        .filter(AICacheRecord.creado_en < corte_30)
-        .scalar() or 0
+        db.query(_f.count(AICacheRecord.id)).filter(AICacheRecord.creado_en < corte_30).scalar()
+        or 0
     )
 
     return {
@@ -580,6 +577,7 @@ def limpiar_ai_cache(
     Reusa la función pura de R57 P1.
     """
     from app.services.mantenimiento import purgar_ai_cache_viejo
+
     return purgar_ai_cache_viejo(db, dias=int(dias), dry_run=dry_run)
 
 
@@ -600,6 +598,7 @@ def mantenimiento_purgar(
     Solo SUPER_ADMIN.
     """
     from app.services.mantenimiento import ejecutar_mantenimiento_completo
+
     return ejecutar_mantenimiento_completo(db, dry_run=dry_run)
 
 
@@ -632,32 +631,42 @@ def admin_exportar_usuarios_csv(
     def _generar():
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow([
-            "id", "email", "nombre", "rol", "activo",
-            "totp_activo", "must_change_password",
-            "creado_en", "ultimo_login", "fallos_login",
-        ])
+        w.writerow(
+            [
+                "id",
+                "email",
+                "nombre",
+                "rol",
+                "activo",
+                "totp_activo",
+                "must_change_password",
+                "creado_en",
+                "ultimo_login",
+                "fallos_login",
+            ]
+        )
         yield buf.getvalue()
-        buf.seek(0); buf.truncate(0)
+        buf.seek(0)
+        buf.truncate(0)
 
         for u in usuarios:
-            w.writerow([
-                u.id,
-                u.email or "",
-                u.nombre or "",
-                u.rol or "",
-                int(bool(u.activo)),
-                int(bool(getattr(u, "totp_activo", 0))),
-                int(bool(getattr(u, "must_change_password", 0))),
-                u.creado_en.isoformat() if getattr(u, "creado_en", None) else "",
-                (
-                    u.ultimo_login.isoformat()
-                    if getattr(u, "ultimo_login", None) else ""
-                ),
-                getattr(u, "fallos_login_consecutivos", 0) or 0,
-            ])
+            w.writerow(
+                [
+                    u.id,
+                    u.email or "",
+                    u.nombre or "",
+                    u.rol or "",
+                    int(bool(u.activo)),
+                    int(bool(getattr(u, "totp_activo", 0))),
+                    int(bool(getattr(u, "must_change_password", 0))),
+                    u.creado_en.isoformat() if getattr(u, "creado_en", None) else "",
+                    (u.ultimo_login.isoformat() if getattr(u, "ultimo_login", None) else ""),
+                    getattr(u, "fallos_login_consecutivos", 0) or 0,
+                ]
+            )
             yield buf.getvalue()
-            buf.seek(0); buf.truncate(0)
+            buf.seek(0)
+            buf.truncate(0)
 
     fname = f"usuarios-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
@@ -692,8 +701,12 @@ def admin_snapshot_json(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        AICacheRecord, AICallRecord, AuditLogRecord,
-        ContratoRecord, GlosaEliminadaRecord, GlosaRecord,
+        AICacheRecord,
+        AICallRecord,
+        AuditLogRecord,
+        ContratoRecord,
+        GlosaEliminadaRecord,
+        GlosaRecord,
         PlantillaGoldRecord,
     )
 
@@ -705,22 +718,14 @@ def admin_snapshot_json(
     counts = {
         "glosas_total": db.query(_f.count(GlosaRecord.id)).scalar() or 0,
         "usuarios_activos": (
-            db.query(_f.count(UsuarioRecord.id))
-            .filter(UsuarioRecord.activo == 1)
-            .scalar() or 0
+            db.query(_f.count(UsuarioRecord.id)).filter(UsuarioRecord.activo == 1).scalar() or 0
         ),
-        "contratos": (
-            db.query(_f.count(ContratoRecord.eps)).scalar() or 0
-        ),
-        "plantillas_gold": (
-            db.query(_f.count(PlantillaGoldRecord.id)).scalar() or 0
-        ),
+        "contratos": (db.query(_f.count(ContratoRecord.eps)).scalar() or 0),
+        "plantillas_gold": (db.query(_f.count(PlantillaGoldRecord.id)).scalar() or 0),
         "ai_cache": db.query(_f.count(AICacheRecord.id)).scalar() or 0,
         "ai_calls": db.query(_f.count(AICallRecord.id)).scalar() or 0,
         "audit_log": db.query(_f.count(AuditLogRecord.id)).scalar() or 0,
-        "papelera": (
-            db.query(_f.count(GlosaEliminadaRecord.id)).scalar() or 0
-        ),
+        "papelera": (db.query(_f.count(GlosaEliminadaRecord.id)).scalar() or 0),
     }
 
     # Glosas por estado (snapshot)
@@ -781,9 +786,15 @@ def admin_diagnostico_bd(
     from sqlalchemy import func as _f
 
     from app.models.db import (
-        AICacheRecord, AICallRecord, AuditLogRecord,
-        ContratoRecord, DictamenVersionRecord, GlosaEliminadaRecord,
-        GlosaRecord, PlantillaGoldRecord, TarifaContratadaRecord,
+        AICacheRecord,
+        AICallRecord,
+        AuditLogRecord,
+        ContratoRecord,
+        DictamenVersionRecord,
+        GlosaEliminadaRecord,
+        GlosaRecord,
+        PlantillaGoldRecord,
+        TarifaContratadaRecord,
     )
 
     # Heurística de tamaño promedio por fila (bytes, aproximado)
@@ -809,11 +820,13 @@ def admin_diagnostico_bd(
         except Exception:
             n = 0
         mb = round(n * bytes_por_fila / 1024 / 1024, 2)
-        items.append({
-            "tabla": nombre,
-            "filas": n,
-            "tamano_estimado_mb": mb,
-        })
+        items.append(
+            {
+                "tabla": nombre,
+                "filas": n,
+                "tamano_estimado_mb": mb,
+            }
+        )
         total_filas += n
         total_mb += mb
 
@@ -865,30 +878,44 @@ def admin_exportar_glosas_csv(
     def _generar():
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow([
-            "id", "creado_en", "eps", "factura", "codigo_glosa",
-            "valor_objetado", "valor_recuperado", "estado", "etapa",
-            "decision_eps", "gestor_nombre",
-        ])
+        w.writerow(
+            [
+                "id",
+                "creado_en",
+                "eps",
+                "factura",
+                "codigo_glosa",
+                "valor_objetado",
+                "valor_recuperado",
+                "estado",
+                "etapa",
+                "decision_eps",
+                "gestor_nombre",
+            ]
+        )
         yield buf.getvalue()
-        buf.seek(0); buf.truncate(0)
+        buf.seek(0)
+        buf.truncate(0)
 
         for g in glosas:
-            w.writerow([
-                g.id,
-                g.creado_en.isoformat() if g.creado_en else "",
-                g.eps or "",
-                g.factura or "",
-                g.codigo_glosa or "",
-                float(g.valor_objetado or 0),
-                float(g.valor_recuperado or 0),
-                g.estado or "",
-                g.etapa or "",
-                g.decision_eps or "",
-                g.gestor_nombre or "",
-            ])
+            w.writerow(
+                [
+                    g.id,
+                    g.creado_en.isoformat() if g.creado_en else "",
+                    g.eps or "",
+                    g.factura or "",
+                    g.codigo_glosa or "",
+                    float(g.valor_objetado or 0),
+                    float(g.valor_recuperado or 0),
+                    g.estado or "",
+                    g.etapa or "",
+                    g.decision_eps or "",
+                    g.gestor_nombre or "",
+                ]
+            )
             yield buf.getvalue()
-            buf.seek(0); buf.truncate(0)
+            buf.seek(0)
+            buf.truncate(0)
 
     fname = f"glosas-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
@@ -938,25 +965,30 @@ def admin_glosas_revisar_bandeja(
         .filter(GlosaRecord.dictamen.isnot(None))
         .all()
     )
-    para_revision = [
-        g for g in para_revision
-        if g.dictamen and len(g.dictamen) >= 200
-    ]
+    para_revision = [g for g in para_revision if g.dictamen and len(g.dictamen) >= 200]
 
     items_pe = []
     for g in pendientes_eps:
-        items_pe.append({
-            "id": g.id, "eps": g.eps, "factura": g.factura,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "razon": "EPS no responde tras 7d",
-        })
+        items_pe.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "razon": "EPS no responde tras 7d",
+            }
+        )
     items_pr = []
     for g in para_revision:
-        items_pr.append({
-            "id": g.id, "eps": g.eps, "factura": g.factura,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "razon": "Dictamen listo, falta envío",
-        })
+        items_pr.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "razon": "Dictamen listo, falta envío",
+            }
+        )
 
     return {
         "total_pendiente_eps": len(items_pe),
@@ -996,17 +1028,17 @@ def admin_audit_recientes(
 
     items = []
     for e in eventos:
-        items.append({
-            "id": e.id,
-            "timestamp": (
-                e.timestamp.isoformat() if e.timestamp else None
-            ),
-            "usuario_email": e.usuario_email,
-            "accion": e.accion,
-            "tabla": e.tabla,
-            "registro_id": e.registro_id,
-            "campo": e.campo,
-        })
+        items.append(
+            {
+                "id": e.id,
+                "timestamp": (e.timestamp.isoformat() if e.timestamp else None),
+                "usuario_email": e.usuario_email,
+                "accion": e.accion,
+                "tabla": e.tabla,
+                "registro_id": e.registro_id,
+                "campo": e.campo,
+            }
+        )
 
     return {
         "ventana_horas": int(horas),
@@ -1047,18 +1079,16 @@ def admin_dictamenes_recientes(
 
     items = []
     for v in versiones:
-        items.append({
-            "id": v.id,
-            "glosa_id": v.glosa_id,
-            "accion": v.accion,
-            "autor_email": v.autor_email,
-            "creado_en": (
-                v.creado_en.isoformat() if v.creado_en else None
-            ),
-            "longitud_dictamen": (
-                len(v.dictamen_html) if v.dictamen_html else 0
-            ),
-        })
+        items.append(
+            {
+                "id": v.id,
+                "glosa_id": v.glosa_id,
+                "accion": v.accion,
+                "autor_email": v.autor_email,
+                "creado_en": (v.creado_en.isoformat() if v.creado_en else None),
+                "longitud_dictamen": (len(v.dictamen_html) if v.dictamen_html else 0),
+            }
+        )
 
     return {
         "ventana_horas": int(horas),
@@ -1154,9 +1184,14 @@ def admin_usuarios_actividad_resumen(
         email = (e.usuario_email or "").strip()
         if not email:
             continue
-        b = bucket.setdefault(email, {
-            "count": 0, "acciones": {}, "tablas": {},
-        })
+        b = bucket.setdefault(
+            email,
+            {
+                "count": 0,
+                "acciones": {},
+                "tablas": {},
+            },
+        )
         b["count"] += 1
         a = (e.accion or "?").upper()
         t = (e.tabla or "?").lower()
@@ -1165,12 +1200,14 @@ def admin_usuarios_actividad_resumen(
 
     items = []
     for email, b in bucket.items():
-        items.append({
-            "usuario_email": email,
-            "count_total": b["count"],
-            "acciones": b["acciones"],
-            "tablas": b["tablas"],
-        })
+        items.append(
+            {
+                "usuario_email": email,
+                "count_total": b["count"],
+                "acciones": b["acciones"],
+                "tablas": b["tablas"],
+            }
+        )
     items.sort(key=lambda x: x["count_total"], reverse=True)
 
     return {
@@ -1210,16 +1247,16 @@ def admin_asignaciones_recientes(
 
     items = []
     for e in rows:
-        items.append({
-            "audit_id": e.id,
-            "timestamp": (
-                e.timestamp.isoformat() if e.timestamp else None
-            ),
-            "glosa_id": e.registro_id,
-            "valor_anterior": e.valor_anterior,
-            "valor_nuevo": e.valor_nuevo,
-            "usuario_email": e.usuario_email,
-        })
+        items.append(
+            {
+                "audit_id": e.id,
+                "timestamp": (e.timestamp.isoformat() if e.timestamp else None),
+                "glosa_id": e.registro_id,
+                "valor_anterior": e.valor_anterior,
+                "valor_nuevo": e.valor_nuevo,
+                "usuario_email": e.usuario_email,
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
@@ -1255,7 +1292,11 @@ def admin_dashboard_coordinador(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     todas = db.query(GlosaRecord).all()
@@ -1275,28 +1316,18 @@ def admin_dashboard_coordinador(
 
     n_abiertas = len(abiertas)
     n_vencidas = sum(1 for g in abiertas if (g.dias_restantes or 0) < 0)
-    n_sin_gestor = sum(
-        1 for g in abiertas
-        if not (g.gestor_nombre or "").strip()
-    )
+    n_sin_gestor = sum(1 for g in abiertas if not (g.gestor_nombre or "").strip())
     n_alto_valor_vencido = sum(
-        1 for g in abiertas
-        if (g.dias_restantes or 0) < 0
-        and float(g.valor_objetado or 0) >= 5_000_000
+        1
+        for g in abiertas
+        if (g.dias_restantes or 0) < 0 and float(g.valor_objetado or 0) >= 5_000_000
     )
 
     # Mes
     n_dec_mes = len(decididas_mes)
-    n_lev_mes = sum(
-        1 for g in decididas_mes
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    rec_mes = sum(
-        float(g.valor_recuperado or 0) for g in decididas_mes
-    )
-    tasa_mes = (
-        round(100 * n_lev_mes / n_dec_mes, 2) if n_dec_mes else 0.0
-    )
+    n_lev_mes = sum(1 for g in decididas_mes if (g.estado or "").upper() == "LEVANTADA")
+    rec_mes = sum(float(g.valor_recuperado or 0) for g in decididas_mes)
+    tasa_mes = round(100 * n_lev_mes / n_dec_mes, 2) if n_dec_mes else 0.0
 
     # Top 3 EPS por volumen abierto
     eps_count: dict[str, int] = {}
@@ -1305,7 +1336,9 @@ def admin_dashboard_coordinador(
         if eps:
             eps_count[eps] = eps_count.get(eps, 0) + 1
     top_eps = sorted(
-        eps_count.items(), key=lambda x: x[1], reverse=True,
+        eps_count.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
 
     # Top 3 gestores por decididas mes
@@ -1315,7 +1348,9 @@ def admin_dashboard_coordinador(
         if gestor:
             gestor_count[gestor] = gestor_count.get(gestor, 0) + 1
     top_gestores = sorted(
-        gestor_count.items(), key=lambda x: x[1], reverse=True,
+        gestor_count.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
 
     return {
@@ -1334,12 +1369,8 @@ def admin_dashboard_coordinador(
             "alto_valor_vencidas": n_alto_valor_vencido,
             "sin_gestor": n_sin_gestor,
         },
-        "top_3_eps_volumen": [
-            {"eps": e, "abiertas": n} for e, n in top_eps
-        ],
-        "top_3_gestores_decididas_mes": [
-            {"gestor": g, "decididas": n} for g, n in top_gestores
-        ],
+        "top_3_eps_volumen": [{"eps": e, "abiertas": n} for e, n in top_eps],
+        "top_3_gestores_decididas_mes": [{"gestor": g, "decididas": n} for g, n in top_gestores],
     }
 
 
@@ -1368,7 +1399,10 @@ def admin_digest_diario(
 
     ahora = ahora_utc()
     inicio_hoy = ahora.replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     inicio_ayer = inicio_hoy - timedelta(days=1)
     inicio_anteayer = inicio_ayer - timedelta(days=1)
@@ -1394,34 +1428,20 @@ def admin_digest_diario(
         .all()
     )
     decididas_ayer = len(decididas_ayer_q)
-    levantadas_ayer = sum(
-        1 for g in decididas_ayer_q
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    recuperado_ayer = sum(
-        float(g.valor_recuperado or 0) for g in decididas_ayer_q
-    )
+    levantadas_ayer = sum(1 for g in decididas_ayer_q if (g.estado or "").upper() == "LEVANTADA")
+    recuperado_ayer = sum(float(g.valor_recuperado or 0) for g in decididas_ayer_q)
 
     # HOY (estado vivo)
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
-    vencidas_globales = sum(
-        1 for g in abiertas if (g.dias_restantes or 0) < 0
-    )
-    sin_gestor = sum(
-        1 for g in abiertas
-        if not (g.gestor_nombre or "").strip()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
+    vencidas_globales = sum(1 for g in abiertas if (g.dias_restantes or 0) < 0)
+    sin_gestor = sum(1 for g in abiertas if not (g.gestor_nombre or "").strip())
 
     # Top riesgo: alto valor + vencida
     top_riesgo = sorted(
         [
-            g for g in abiertas
-            if (g.dias_restantes or 0) < 0
-            and float(g.valor_objetado or 0) >= 5_000_000
+            g
+            for g in abiertas
+            if (g.dias_restantes or 0) < 0 and float(g.valor_objetado or 0) >= 5_000_000
         ],
         key=lambda g: float(g.valor_objetado or 0),
         reverse=True,
@@ -1430,8 +1450,8 @@ def admin_digest_diario(
     # Delta vs anteayer
     if creadas_anteayer > 0:
         delta_pct = round(
-            100 * (creadas_ayer - creadas_anteayer)
-            / creadas_anteayer, 1,
+            100 * (creadas_ayer - creadas_anteayer) / creadas_anteayer,
+            1,
         )
     elif creadas_ayer > 0:
         delta_pct = 100.0
@@ -1491,10 +1511,7 @@ def admin_anomalias_asignacion(
     ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
 
     todas = db.query(GlosaRecord).all()
-    abiertas = [
-        g for g in todas
-        if (g.estado or "").upper() not in ESTADOS_CERRADOS
-    ]
+    abiertas = [g for g in todas if (g.estado or "").upper() not in ESTADOS_CERRADOS]
 
     # GESTOR_ESPECIALIZADO: por EPS, qué gestor toma > 80%
     eps_glosas: dict[str, dict[str, int]] = {}
@@ -1514,19 +1531,21 @@ def admin_anomalias_asignacion(
         for gestor, count in by_gestor.items():
             ratio = count / total
             if ratio >= 0.8:
-                items.append({
-                    "tipo": "GESTOR_ESPECIALIZADO",
-                    "gestor": gestor,
-                    "eps": eps,
-                    "count": count,
-                    "ratio_pct": round(100 * ratio, 1),
-                    "mensaje": (
-                        f"{gestor} concentra el "
-                        f"{ratio*100:.0f}% de las {total} "
-                        f"glosas abiertas de {eps}. "
-                        "Considera repartir para reducir bus-factor."
-                    ),
-                })
+                items.append(
+                    {
+                        "tipo": "GESTOR_ESPECIALIZADO",
+                        "gestor": gestor,
+                        "eps": eps,
+                        "count": count,
+                        "ratio_pct": round(100 * ratio, 1),
+                        "mensaje": (
+                            f"{gestor} concentra el "
+                            f"{ratio * 100:.0f}% de las {total} "
+                            f"glosas abiertas de {eps}. "
+                            "Considera repartir para reducir bus-factor."
+                        ),
+                    }
+                )
 
     # EPS_DESATENDIDA: EPS con >5 abiertas y ningún gestor con histórico
     historico_decidido_por_eps: dict[str, set] = {}
@@ -1548,16 +1567,18 @@ def admin_anomalias_asignacion(
         if count < 6:
             continue
         if not historico_decidido_por_eps.get(eps):
-            items.append({
-                "tipo": "EPS_DESATENDIDA",
-                "eps": eps,
-                "abiertas": count,
-                "mensaje": (
-                    f"{eps} tiene {count} glosas abiertas y "
-                    "ningún gestor del equipo cerró nunca una. "
-                    "Asignar a alguien con experiencia."
-                ),
-            })
+            items.append(
+                {
+                    "tipo": "EPS_DESATENDIDA",
+                    "eps": eps,
+                    "abiertas": count,
+                    "mensaje": (
+                        f"{eps} tiene {count} glosas abiertas y "
+                        "ningún gestor del equipo cerró nunca una. "
+                        "Asignar a alguien con experiencia."
+                    ),
+                }
+            )
 
     # VALOR_CONCENTRADO: gestor con >50% del valor pendiente
     bucket_v: dict[str, float] = {}
@@ -1573,18 +1594,20 @@ def admin_anomalias_asignacion(
         for gestor, v in bucket_v.items():
             ratio = v / valor_total
             if ratio >= 0.5:
-                items.append({
-                    "tipo": "VALOR_CONCENTRADO",
-                    "gestor": gestor,
-                    "valor_pendiente": int(v),
-                    "ratio_pct": round(100 * ratio, 1),
-                    "mensaje": (
-                        f"{gestor} concentra el "
-                        f"{ratio*100:.0f}% del valor pendiente "
-                        f"(${int(v):,}). Riesgo financiero "
-                        "si se va o se atrasa."
-                    ),
-                })
+                items.append(
+                    {
+                        "tipo": "VALOR_CONCENTRADO",
+                        "gestor": gestor,
+                        "valor_pendiente": int(v),
+                        "ratio_pct": round(100 * ratio, 1),
+                        "mensaje": (
+                            f"{gestor} concentra el "
+                            f"{ratio * 100:.0f}% del valor pendiente "
+                            f"(${int(v):,}). Riesgo financiero "
+                            "si se va o se atrasa."
+                        ),
+                    }
+                )
 
     return {
         "total_anomalias": len(items),
@@ -1611,9 +1634,11 @@ def admin_insight_financiero(
     """
     decididas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.eps.isnot(None))
         .all()
     )
@@ -1639,28 +1664,28 @@ def admin_insight_financiero(
         if b["n"] < 3 or b["obj"] <= 0:
             continue
         tasa = round(100 * b["rec"] / b["obj"], 2)
-        items.append({
-            "eps": eps,
-            "n_decididas": b["n"],
-            "valor_objetado": int(b["obj"]),
-            "valor_recuperado": int(b["rec"]),
-            "tasa_recuperacion_pct": tasa,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "n_decididas": b["n"],
+                "valor_objetado": int(b["obj"]),
+                "valor_recuperado": int(b["rec"]),
+                "tasa_recuperacion_pct": tasa,
+            }
+        )
     items.sort(
-        key=lambda x: x["tasa_recuperacion_pct"], reverse=True,
+        key=lambda x: x["tasa_recuperacion_pct"],
+        reverse=True,
     )
 
-    tasa_global = (
-        round(100 * rec_global / obj_global, 2) if obj_global else 0.0
-    )
+    tasa_global = round(100 * rec_global / obj_global, 2) if obj_global else 0.0
 
     return {
         "tasa_recuperacion_global_pct": tasa_global,
         "valor_objetado_total": int(obj_global),
         "valor_recuperado_total": int(rec_global),
         "top_3_eps_recuperacion": items[:3],
-        "bottom_3_eps_recuperacion": list(reversed(items[-3:]))
-        if len(items) >= 3 else [],
+        "bottom_3_eps_recuperacion": list(reversed(items[-3:])) if len(items) >= 3 else [],
         "total_eps_evaluadas": len(items),
     }
 
@@ -1682,15 +1707,9 @@ def admin_equipo_pulse(
     """
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
     n_total_abiertas = len(abiertas)
-    n_total_vencidas = sum(
-        1 for g in abiertas if (g.dias_restantes or 0) < 0
-    )
+    n_total_vencidas = sum(1 for g in abiertas if (g.dias_restantes or 0) < 0)
 
     bucket: dict[str, dict] = {}
     sin_gestor = 0
@@ -1699,9 +1718,14 @@ def admin_equipo_pulse(
         if not gestor:
             sin_gestor += 1
             continue
-        b = bucket.setdefault(gestor, {
-            "count": 0, "vencidas": 0, "valor": 0.0,
-        })
+        b = bucket.setdefault(
+            gestor,
+            {
+                "count": 0,
+                "vencidas": 0,
+                "valor": 0.0,
+            },
+        )
         b["count"] += 1
         b["valor"] += float(g.valor_objetado or 0)
         if (g.dias_restantes or 0) < 0:
@@ -1719,16 +1743,20 @@ def admin_equipo_pulse(
     subcargados = []
     for gestor, b in bucket.items():
         if b["count"] >= umbral_alto:
-            sobrecargados.append({
-                "gestor": gestor,
-                "abiertas": b["count"],
-                "vencidas": b["vencidas"],
-            })
+            sobrecargados.append(
+                {
+                    "gestor": gestor,
+                    "abiertas": b["count"],
+                    "vencidas": b["vencidas"],
+                }
+            )
         elif b["count"] <= umbral_bajo:
-            subcargados.append({
-                "gestor": gestor,
-                "abiertas": b["count"],
-            })
+            subcargados.append(
+                {
+                    "gestor": gestor,
+                    "abiertas": b["count"],
+                }
+            )
 
     top_vencidas = sorted(
         [
@@ -1737,17 +1765,15 @@ def admin_equipo_pulse(
                 "vencidas": b["vencidas"],
                 "abiertas": b["count"],
             }
-            for g, b in bucket.items() if b["vencidas"] > 0
+            for g, b in bucket.items()
+            if b["vencidas"] > 0
         ],
-        key=lambda x: x["vencidas"], reverse=True,
+        key=lambda x: x["vencidas"],
+        reverse=True,
     )[:3]
 
     # Sugerencias usuarios SUPER_ADMIN/COORDINADOR
-    activos = (
-        db.query(UsuarioRecord)
-        .filter(UsuarioRecord.activo == 1)
-        .count()
-    )
+    activos = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).count()
 
     return {
         "total_gestores_con_carga": len(bucket),
@@ -1793,9 +1819,15 @@ def admin_balance_carga_gestores(
         gestor = (g.gestor_nombre or "").strip()
         if not gestor:
             continue
-        b = bucket.setdefault(gestor, {
-            "count": 0, "vencidas": 0, "criticas": 0, "valor": 0.0,
-        })
+        b = bucket.setdefault(
+            gestor,
+            {
+                "count": 0,
+                "vencidas": 0,
+                "criticas": 0,
+                "valor": 0.0,
+            },
+        )
         b["count"] += 1
         b["valor"] += float(g.valor_objetado or 0)
         dr = g.dias_restantes if g.dias_restantes is not None else 0
@@ -1820,14 +1852,16 @@ def admin_balance_carga_gestores(
             estado = "SUBCARGADO"
         else:
             estado = "NORMAL"
-        items.append({
-            "gestor": gestor,
-            "count_abiertas": b["count"],
-            "count_vencidas": b["vencidas"],
-            "count_criticas": b["criticas"],
-            "valor_objetado_pendiente": int(b["valor"]),
-            "estado_carga": estado,
-        })
+        items.append(
+            {
+                "gestor": gestor,
+                "count_abiertas": b["count"],
+                "count_vencidas": b["vencidas"],
+                "count_criticas": b["criticas"],
+                "valor_objetado_pendiente": int(b["valor"]),
+                "estado_carga": estado,
+            }
+        )
     items.sort(key=lambda x: x["count_abiertas"], reverse=True)
 
     return {
@@ -1867,10 +1901,7 @@ def admin_auto_asignacion_sugerencias(
     sin_gestor = (
         db.query(GlosaRecord)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .filter(
-            (GlosaRecord.gestor_nombre.is_(None))
-            | (GlosaRecord.gestor_nombre == "")
-        )
+        .filter((GlosaRecord.gestor_nombre.is_(None)) | (GlosaRecord.gestor_nombre == ""))
         .order_by(GlosaRecord.valor_objetado.desc())
         .limit(int(limit))
         .all()
@@ -1885,12 +1916,16 @@ def admin_auto_asignacion_sugerencias(
     # Pre-cargar histórico decidido relevante en una sola pasada
     epss = {(g.eps or "").strip() for g in sin_gestor if g.eps}
     historicas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
-        .filter(GlosaRecord.gestor_nombre.isnot(None))
-        .filter(GlosaRecord.eps.in_(epss))
-        .all()
-    ) if epss else []
+        (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+            .filter(GlosaRecord.gestor_nombre.isnot(None))
+            .filter(GlosaRecord.eps.in_(epss))
+            .all()
+        )
+        if epss
+        else []
+    )
 
     # Indexamos por par y por eps
     par_idx: dict[tuple, dict] = {}
@@ -1929,12 +1964,13 @@ def admin_auto_asignacion_sugerencias(
         razon = None
         if candidatos_par:
             candidatos_par.sort(
-                key=lambda x: (100*x[2]/x[1], x[1]), reverse=True,
+                key=lambda x: (100 * x[2] / x[1], x[1]),
+                reverse=True,
             )
             ge, dec, lev = candidatos_par[0]
             sugerido = {
                 "gestor": ge,
-                "tasa_pct": round(100*lev/dec, 2),
+                "tasa_pct": round(100 * lev / dec, 2),
                 "muestras": dec,
                 "fuente": "par_eps_codigo",
             }
@@ -1948,12 +1984,13 @@ def admin_auto_asignacion_sugerencias(
             ]
             if candidatos_eps:
                 candidatos_eps.sort(
-                    key=lambda x: (100*x[2]/x[1], x[1]), reverse=True,
+                    key=lambda x: (100 * x[2] / x[1], x[1]),
+                    reverse=True,
                 )
                 ge, dec, lev = candidatos_eps[0]
                 sugerido = {
                     "gestor": ge,
-                    "tasa_pct": round(100*lev/dec, 2),
+                    "tasa_pct": round(100 * lev / dec, 2),
                     "muestras": dec,
                     "fuente": "eps_global",
                 }
@@ -1961,15 +1998,17 @@ def admin_auto_asignacion_sugerencias(
             else:
                 razon = "Sin datos históricos suficientes"
 
-        items.append({
-            "glosa_id": g.id,
-            "eps": eps,
-            "codigo_glosa": cod,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dias_restantes": g.dias_restantes,
-            "gestor_sugerido": sugerido,
-            "razon": razon,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": eps,
+                "codigo_glosa": cod,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_restantes": g.dias_restantes,
+                "gestor_sugerido": sugerido,
+                "razon": razon,
+            }
+        )
 
     return {
         "total_pendientes": len(items),
@@ -2006,15 +2045,17 @@ def admin_glosas_altas_cuantia_vencidas(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dias_vencido": abs(int(g.dias_restantes or 0)),
-            "gestor_nombre": g.gestor_nombre,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_vencido": abs(int(g.dias_restantes or 0)),
+                "gestor_nombre": g.gestor_nombre,
+            }
+        )
 
     return {
         "umbral": int(umbral),
@@ -2043,10 +2084,7 @@ def admin_glosas_saldo_cero_detalle(
     rows = (
         db.query(GlosaRecord)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .filter(
-            (GlosaRecord.saldo_factura == 0)
-            | (GlosaRecord.saldo_factura.is_(None))
-        )
+        .filter((GlosaRecord.saldo_factura == 0) | (GlosaRecord.saldo_factura.is_(None)))
         .filter(GlosaRecord.valor_factura > 0)
         .order_by(GlosaRecord.valor_factura.desc())
         .all()
@@ -2054,15 +2092,17 @@ def admin_glosas_saldo_cero_detalle(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_factura": int(float(g.valor_factura or 0)),
-            "saldo_factura": int(float(g.saldo_factura or 0)),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_factura": int(float(g.valor_factura or 0)),
+                "saldo_factura": int(float(g.saldo_factura or 0)),
+            }
+        )
 
     return {
         "total_glosas_anomalas": len(items),
@@ -2092,15 +2132,17 @@ def admin_glosas_vencen_manana(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "gestor_nombre": g.gestor_nombre,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "gestor_nombre": g.gestor_nombre,
+            }
+        )
 
     return {
         "total_vencen_manana": len(items),
@@ -2128,11 +2170,16 @@ def admin_eps_tendencia_volumen(
 
     ahora = ahora_utc()
     inicio_actual = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     if inicio_actual.month == 1:
         inicio_anterior = inicio_actual.replace(
-            year=inicio_actual.year - 1, month=12,
+            year=inicio_actual.year - 1,
+            month=12,
         )
     else:
         inicio_anterior = inicio_actual.replace(
@@ -2171,13 +2218,15 @@ def admin_eps_tendencia_volumen(
             delta_pct = 100.0 if a > 0 else 0.0
         else:
             delta_pct = round(100 * (a - p) / p, 2)
-        items.append({
-            "eps": eps,
-            "count_actual": a,
-            "count_anterior": p,
-            "delta_abs": a - p,
-            "delta_pct": delta_pct,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_actual": a,
+                "count_anterior": p,
+                "delta_abs": a - p,
+                "delta_pct": delta_pct,
+            }
+        )
     items.sort(key=lambda x: x["delta_pct"], reverse=True)
 
     return {
@@ -2205,10 +2254,7 @@ def admin_comentarios_no_resueltos(
 
     rows = (
         db.query(ComentarioGlosaRecord)
-        .filter(
-            (ComentarioGlosaRecord.resuelto == 0)
-            | (ComentarioGlosaRecord.resuelto.is_(None))
-        )
+        .filter((ComentarioGlosaRecord.resuelto == 0) | (ComentarioGlosaRecord.resuelto.is_(None)))
         .all()
     )
 
@@ -2216,9 +2262,14 @@ def admin_comentarios_no_resueltos(
     for c in rows:
         if not c.glosa_id:
             continue
-        b = bucket.setdefault(c.glosa_id, {
-            "count": 0, "menciones": 0, "ultimo_autor": None,
-        })
+        b = bucket.setdefault(
+            c.glosa_id,
+            {
+                "count": 0,
+                "menciones": 0,
+                "ultimo_autor": None,
+            },
+        )
         b["count"] += 1
         if c.mencion:
             b["menciones"] += 1
@@ -2226,14 +2277,17 @@ def admin_comentarios_no_resueltos(
 
     items = []
     for g_id, b in bucket.items():
-        items.append({
-            "glosa_id": g_id,
-            "comentarios_no_resueltos": b["count"],
-            "menciones_pendientes": b["menciones"],
-            "ultimo_autor": b["ultimo_autor"],
-        })
+        items.append(
+            {
+                "glosa_id": g_id,
+                "comentarios_no_resueltos": b["count"],
+                "menciones_pendientes": b["menciones"],
+                "ultimo_autor": b["ultimo_autor"],
+            }
+        )
     items.sort(
-        key=lambda x: x["comentarios_no_resueltos"], reverse=True,
+        key=lambda x: x["comentarios_no_resueltos"],
+        reverse=True,
     )
 
     return {
@@ -2272,9 +2326,14 @@ def admin_codigo_respuesta_cobertura(
         c = (g.codigo_respuesta or "").strip()
         if not c:
             continue
-        b = bucket.setdefault(c, {
-            "count": 0, "eps": set(), "codigos": set(),
-        })
+        b = bucket.setdefault(
+            c,
+            {
+                "count": 0,
+                "eps": set(),
+                "codigos": set(),
+            },
+        )
         b["count"] += 1
         if g.eps:
             b["eps"].add(g.eps.strip())
@@ -2285,13 +2344,15 @@ def admin_codigo_respuesta_cobertura(
     for c, b in bucket.items():
         n_eps = len(b["eps"])
         ratio = round(n_eps / b["count"], 3) if b["count"] else 0.0
-        items.append({
-            "codigo_respuesta": c,
-            "count_total": b["count"],
-            "eps_distintas": n_eps,
-            "codigos_glosa_distintos": len(b["codigos"]),
-            "ratio_eps_por_uso": ratio,
-        })
+        items.append(
+            {
+                "codigo_respuesta": c,
+                "count_total": b["count"],
+                "eps_distintas": n_eps,
+                "codigos_glosa_distintos": len(b["codigos"]),
+                "ratio_eps_por_uso": ratio,
+            }
+        )
     items.sort(key=lambda x: x["count_total"], reverse=True)
 
     return {
@@ -2324,8 +2385,12 @@ def admin_audit_cambios_criticos(
     from app.core.tz import ahora_utc
 
     CAMPOS_CRITICOS = [
-        "estado", "eps", "valor_objetado", "gestor_nombre",
-        "auditor_email", "fecha_decision_eps",
+        "estado",
+        "eps",
+        "valor_objetado",
+        "gestor_nombre",
+        "auditor_email",
+        "fecha_decision_eps",
     ]
 
     desde = ahora_utc() - timedelta(days=int(dias))
@@ -2339,9 +2404,13 @@ def admin_audit_cambios_criticos(
     bucket: dict[str, dict] = {}
     for e in rows:
         campo = e.campo
-        b = bucket.setdefault(campo, {
-            "count": 0, "usuarios": {},
-        })
+        b = bucket.setdefault(
+            campo,
+            {
+                "count": 0,
+                "usuarios": {},
+            },
+        )
         b["count"] += 1
         u = e.usuario_email or "?"
         b["usuarios"][u] = b["usuarios"].get(u, 0) + 1
@@ -2349,17 +2418,18 @@ def admin_audit_cambios_criticos(
     items = []
     for campo, b in bucket.items():
         top3 = sorted(
-            b["usuarios"].items(), key=lambda x: x[1], reverse=True,
+            b["usuarios"].items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:3]
-        items.append({
-            "campo": campo,
-            "count_cambios": b["count"],
-            "usuarios_distintos": len(b["usuarios"]),
-            "top_3_usuarios": [
-                {"usuario_email": u, "count": c}
-                for u, c in top3
-            ],
-        })
+        items.append(
+            {
+                "campo": campo,
+                "count_cambios": b["count"],
+                "usuarios_distintos": len(b["usuarios"]),
+                "top_3_usuarios": [{"usuario_email": u, "count": c} for u, c in top3],
+            }
+        )
     items.sort(key=lambda x: x["count_cambios"], reverse=True)
 
     return {
@@ -2392,21 +2462,28 @@ def admin_conciliaciones_bilateral_resumen(
     bucket: dict[str, dict] = {}
     for c in rows:
         estado = (c.estado_bilateral or "?").upper()
-        b = bucket.setdefault(estado, {
-            "count": 0, "valor": 0.0, "valor_ratificado": 0.0,
-        })
+        b = bucket.setdefault(
+            estado,
+            {
+                "count": 0,
+                "valor": 0.0,
+                "valor_ratificado": 0.0,
+            },
+        )
         b["count"] += 1
         b["valor"] += float(c.valor_conciliado or 0)
         b["valor_ratificado"] += float(c.valor_ratificado_hus or 0)
 
     items = []
     for estado, b in bucket.items():
-        items.append({
-            "estado_bilateral": estado,
-            "count": b["count"],
-            "valor_conciliado_total": int(b["valor"]),
-            "valor_ratificado_hus_total": int(b["valor_ratificado"]),
-        })
+        items.append(
+            {
+                "estado_bilateral": estado,
+                "count": b["count"],
+                "valor_conciliado_total": int(b["valor"]),
+                "valor_ratificado_hus_total": int(b["valor_ratificado"]),
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -2435,11 +2512,7 @@ def admin_audit_log_stats(
     from app.core.tz import ahora_utc
 
     desde = ahora_utc() - timedelta(days=int(dias))
-    rows = (
-        db.query(AuditLogRecord)
-        .filter(AuditLogRecord.timestamp >= desde)
-        .all()
-    )
+    rows = db.query(AuditLogRecord).filter(AuditLogRecord.timestamp >= desde).all()
 
     total = len(rows)
 
@@ -2450,11 +2523,13 @@ def admin_audit_log_stats(
 
     items = []
     for accion, c in bucket.items():
-        items.append({
-            "accion": accion,
-            "count": c,
-            "pct": round(100 * c / total, 2) if total else 0.0,
-        })
+        items.append(
+            {
+                "accion": accion,
+                "count": c,
+                "pct": round(100 * c / total, 2) if total else 0.0,
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -2487,11 +2562,16 @@ def admin_cierre_mes_anterior(
 
     ahora = ahora_utc()
     inicio_mes_actual = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     if inicio_mes_actual.month == 1:
         inicio_anterior = inicio_mes_actual.replace(
-            year=inicio_mes_actual.year - 1, month=12,
+            year=inicio_mes_actual.year - 1,
+            month=12,
         )
     else:
         inicio_anterior = inicio_mes_actual.replace(
@@ -2502,28 +2582,22 @@ def admin_cierre_mes_anterior(
         db.query(GlosaRecord)
         .filter(GlosaRecord.fecha_decision_eps >= inicio_anterior)
         .filter(GlosaRecord.fecha_decision_eps < inicio_mes_actual)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
-    levantadas = sum(
-        1 for g in glosas
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    ratificadas = sum(
-        1 for g in glosas
-        if (g.estado or "").upper() == "RATIFICADA"
-    )
+    levantadas = sum(1 for g in glosas if (g.estado or "").upper() == "LEVANTADA")
+    ratificadas = sum(1 for g in glosas if (g.estado or "").upper() == "RATIFICADA")
     n = len(glosas)
     obj_total = sum(float(g.valor_objetado or 0) for g in glosas)
     rec_total = sum(float(g.valor_recuperado or 0) for g in glosas)
 
     tasa_lev = round(100 * levantadas / n, 2) if n else 0.0
-    tasa_rec = (
-        round(100 * rec_total / obj_total, 2) if obj_total else 0.0
-    )
+    tasa_rec = round(100 * rec_total / obj_total, 2) if obj_total else 0.0
 
     por_gestor: dict[str, int] = {}
     for g in glosas:
@@ -2531,7 +2605,9 @@ def admin_cierre_mes_anterior(
         if gestor:
             por_gestor[gestor] = por_gestor.get(gestor, 0) + 1
     top_gestores = sorted(
-        por_gestor.items(), key=lambda x: x[1], reverse=True,
+        por_gestor.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
 
     return {
@@ -2543,10 +2619,7 @@ def admin_cierre_mes_anterior(
         "valor_objetado_total": int(obj_total),
         "valor_recuperado_total": int(rec_total),
         "tasa_recuperacion_monetaria_pct": tasa_rec,
-        "top_gestores": [
-            {"gestor": g, "decididas": c}
-            for g, c in top_gestores
-        ],
+        "top_gestores": [{"gestor": g, "decididas": c} for g, c in top_gestores],
     }
 
 
@@ -2573,9 +2646,11 @@ def admin_sugerencias_asignacion(
     glosas = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.eps.ilike(eps))
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.gestor_nombre.isnot(None))
         .all()
     )
@@ -2595,12 +2670,14 @@ def admin_sugerencias_asignacion(
         if b["dec"] < 1:
             continue
         tasa = round(100 * b["lev"] / b["dec"], 2)
-        items.append({
-            "gestor": gestor,
-            "count_decididas": b["dec"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "gestor": gestor,
+                "count_decididas": b["dec"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
     items.sort(
         key=lambda x: (x["tasa_levantamiento_pct"], x["count_decididas"]),
         reverse=True,
@@ -2643,18 +2720,18 @@ def admin_conciliaciones_resultado_distribucion(
 
     items = []
     for res, b in bucket.items():
-        items.append({
-            "resultado": res,
-            "count": b["count"],
-            "valor_conciliado_total": int(b["valor"]),
-        })
+        items.append(
+            {
+                "resultado": res,
+                "count": b["count"],
+                "valor_conciliado_total": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     total = sum(it["count"] for it in items)
     for it in items:
-        it["pct"] = (
-            round(100 * it["count"] / total, 2) if total else 0.0
-        )
+        it["pct"] = round(100 * it["count"] / total, 2) if total else 0.0
 
     return {
         "total_conciliaciones": total,
@@ -2701,10 +2778,15 @@ def admin_usuarios_mas_comentarios(
         email = (c.autor_email or "").strip()
         if not email:
             continue
-        b = bucket.setdefault(email, {
-            "total": 0, "menciones": 0, "resueltos": 0,
-            "glosas": set(),
-        })
+        b = bucket.setdefault(
+            email,
+            {
+                "total": 0,
+                "menciones": 0,
+                "resueltos": 0,
+                "glosas": set(),
+            },
+        )
         b["total"] += 1
         if c.mencion:
             b["menciones"] += 1
@@ -2715,13 +2797,15 @@ def admin_usuarios_mas_comentarios(
 
     items = []
     for email, b in bucket.items():
-        items.append({
-            "autor_email": email,
-            "total_comentarios": b["total"],
-            "menciones_emitidas": b["menciones"],
-            "resueltos_emitidos": b["resueltos"],
-            "glosas_distintas": len(b["glosas"]),
-        })
+        items.append(
+            {
+                "autor_email": email,
+                "total_comentarios": b["total"],
+                "menciones_emitidas": b["menciones"],
+                "resueltos_emitidos": b["resueltos"],
+                "glosas_distintas": len(b["glosas"]),
+            }
+        )
     items.sort(key=lambda x: x["total_comentarios"], reverse=True)
 
     return {
@@ -2749,18 +2833,17 @@ def admin_eps_cartera_detalle(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.eps.ilike(eps))
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.eps.ilike(eps)).all()
 
     if not rows:
         return {
             "eps": eps,
             "resumen": {
-                "total": 0, "abiertas": 0, "cerradas": 0,
-                "valor_objetado_total": 0, "saldo_total": 0,
+                "total": 0,
+                "abiertas": 0,
+                "cerradas": 0,
+                "valor_objetado_total": 0,
+                "saldo_total": 0,
             },
             "top_facturas": [],
             "top_codigos": [],
@@ -2783,18 +2866,20 @@ def admin_eps_cartera_detalle(
             abiertas_count += 1
             f = (g.factura or "").strip()
             if f and f != "N/A":
-                facturas[f] = (
-                    facturas.get(f, 0.0) + float(g.saldo_factura or 0)
-                )
+                facturas[f] = facturas.get(f, 0.0) + float(g.saldo_factura or 0)
             c = (g.codigo_glosa or "").strip()
             if c:
                 codigos[c] = codigos.get(c, 0) + 1
 
     top_facturas = sorted(
-        facturas.items(), key=lambda x: x[1], reverse=True,
+        facturas.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:10]
     top_codigos = sorted(
-        codigos.items(), key=lambda x: x[1], reverse=True,
+        codigos.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:10]
 
     return {
@@ -2806,14 +2891,8 @@ def admin_eps_cartera_detalle(
             "valor_objetado_total": int(valor_total),
             "saldo_total": int(saldo_total),
         },
-        "top_facturas": [
-            {"factura": f, "saldo": int(s)}
-            for f, s in top_facturas
-        ],
-        "top_codigos": [
-            {"codigo_glosa": c, "count": n}
-            for c, n in top_codigos
-        ],
+        "top_facturas": [{"factura": f, "saldo": int(s)} for f, s in top_facturas],
+        "top_codigos": [{"codigo_glosa": c, "count": n} for c, n in top_codigos],
     }
 
 
@@ -2833,7 +2912,10 @@ def admin_glosas_creadas_hoy_detalle(
     from app.core.tz import ahora_utc
 
     inicio = ahora_utc().replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     rows = (
         db.query(GlosaRecord)
@@ -2844,18 +2926,18 @@ def admin_glosas_creadas_hoy_detalle(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "gestor_nombre": g.gestor_nombre,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "gestor_nombre": g.gestor_nombre,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+            }
+        )
 
     valor_total = sum(it["valor_objetado"] for it in items)
 
@@ -2899,17 +2981,15 @@ def admin_consecutivos_duplicados(
 
     items = []
     for cons, count in rows:
-        glosas = (
-            db.query(GlosaRecord)
-            .filter(GlosaRecord.consecutivo_dgh == cons)
-            .all()
+        glosas = db.query(GlosaRecord).filter(GlosaRecord.consecutivo_dgh == cons).all()
+        items.append(
+            {
+                "consecutivo_dgh": cons,
+                "count": int(count),
+                "glosa_ids": [g.id for g in glosas],
+                "estados": list({(g.estado or "?") for g in glosas}),
+            }
         )
-        items.append({
-            "consecutivo_dgh": cons,
-            "count": int(count),
-            "glosa_ids": [g.id for g in glosas],
-            "estados": list({(g.estado or "?") for g in glosas}),
-        })
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -2943,11 +3023,7 @@ def admin_sistema_resumen(
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
 
     total_glosas = db.query(GlosaRecord).count()
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .count()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).count()
     cerradas = total_glosas - abiertas
 
     total_users = db.query(UsuarioRecord).count()
@@ -2996,23 +3072,22 @@ def admin_glosas_sin_codigo_respuesta(
     rows = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
-        .filter(
-            (GlosaRecord.codigo_respuesta.is_(None))
-            | (GlosaRecord.codigo_respuesta == "")
-        )
+        .filter((GlosaRecord.codigo_respuesta.is_(None)) | (GlosaRecord.codigo_respuesta == ""))
         .all()
     )
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+            }
+        )
     items.sort(key=lambda x: x["valor_objetado"], reverse=True)
 
     return {
@@ -3045,11 +3120,7 @@ def admin_audit_actividad_mensual(
     from app.core.tz import ahora_utc
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
-    eventos = (
-        db.query(AuditLogRecord)
-        .filter(AuditLogRecord.timestamp >= desde)
-        .all()
-    )
+    eventos = db.query(AuditLogRecord).filter(AuditLogRecord.timestamp >= desde).all()
 
     por_mes: dict[str, dict] = {}
     for e in eventos:
@@ -3059,9 +3130,14 @@ def admin_audit_actividad_mensual(
         if not ts:
             continue
         k = ts.strftime("%Y-%m")
-        b = por_mes.setdefault(k, {
-            "count": 0, "usuarios": set(), "acciones": {},
-        })
+        b = por_mes.setdefault(
+            k,
+            {
+                "count": 0,
+                "usuarios": set(),
+                "acciones": {},
+            },
+        )
         b["count"] += 1
         if e.usuario_email:
             b["usuarios"].add(e.usuario_email)
@@ -3072,16 +3148,18 @@ def admin_audit_actividad_mensual(
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
         top = sorted(
-            b["acciones"].items(), key=lambda x: x[1], reverse=True,
+            b["acciones"].items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:3]
-        serie.append({
-            "mes": k,
-            "total_eventos": b["count"],
-            "usuarios_distintos": len(b["usuarios"]),
-            "top_acciones": [
-                {"accion": a, "count": c} for a, c in top
-            ],
-        })
+        serie.append(
+            {
+                "mes": k,
+                "total_eventos": b["count"],
+                "usuarios_distintos": len(b["usuarios"]),
+                "top_acciones": [{"accion": a, "count": c} for a, c in top],
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -3111,24 +3189,23 @@ def admin_glosas_sin_gestor(
     abiertas = (
         db.query(GlosaRecord)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .filter(
-            (GlosaRecord.gestor_nombre.is_(None))
-            | (GlosaRecord.gestor_nombre == "")
-        )
+        .filter((GlosaRecord.gestor_nombre.is_(None)) | (GlosaRecord.gestor_nombre == ""))
         .all()
     )
 
     items = []
     for g in abiertas:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dias_restantes": g.dias_restantes,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_restantes": g.dias_restantes,
+            }
+        )
     items.sort(key=lambda x: x["valor_objetado"], reverse=True)
 
     return {
@@ -3163,12 +3240,14 @@ def admin_distribucion_rol(
 
     items = []
     for rol, b in bucket.items():
-        items.append({
-            "rol": rol,
-            "total": b["total"],
-            "activos": b["activos"],
-            "inactivos": b["total"] - b["activos"],
-        })
+        items.append(
+            {
+                "rol": rol,
+                "total": b["total"],
+                "activos": b["activos"],
+                "inactivos": b["total"] - b["activos"],
+            }
+        )
     items.sort(key=lambda x: x["total"], reverse=True)
 
     return {
@@ -3215,12 +3294,14 @@ def admin_eps_conteos(
 
     items = []
     for eps, b in por_eps.items():
-        items.append({
-            "eps": eps,
-            "count_total": b["total"],
-            "count_abiertas": b["abiertas"],
-            "valor_total_objetado": int(b["valor"]),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_total": b["total"],
+                "count_abiertas": b["abiertas"],
+                "valor_total_objetado": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["count_total"], reverse=True)
 
     return {
@@ -3266,10 +3347,12 @@ def admin_usuarios_mas_cargados(
 
     items = []
     for nombre, n in rows:
-        items.append({
-            "gestor": nombre,
-            "glosas_abiertas": int(n),
-        })
+        items.append(
+            {
+                "gestor": nombre,
+                "glosas_abiertas": int(n),
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -3302,9 +3385,7 @@ def admin_conciliaciones_proximas(
     futuro = ahora + timedelta(days=int(dias))
 
     todas = (
-        db.query(ConciliacionRecord)
-        .filter(ConciliacionRecord.fecha_audiencia.isnot(None))
-        .all()
+        db.query(ConciliacionRecord).filter(ConciliacionRecord.fecha_audiencia.isnot(None)).all()
     )
 
     items = []
@@ -3315,14 +3396,16 @@ def admin_conciliaciones_proximas(
         if not fa or fa < ahora or fa > futuro:
             continue
         dias_para = (fa - ahora).days
-        items.append({
-            "id": c.id,
-            "glosa_id": c.glosa_id,
-            "fecha_audiencia": fa.isoformat(),
-            "estado_bilateral": c.estado_bilateral,
-            "dias_para_audiencia": dias_para,
-            "valor_ratificado_hus": float(c.valor_ratificado_hus or 0),
-        })
+        items.append(
+            {
+                "id": c.id,
+                "glosa_id": c.glosa_id,
+                "fecha_audiencia": fa.isoformat(),
+                "estado_bilateral": c.estado_bilateral,
+                "dias_para_audiencia": dias_para,
+                "valor_ratificado_hus": float(c.valor_ratificado_hus or 0),
+            }
+        )
     items.sort(key=lambda x: x["dias_para_audiencia"])
 
     return {
@@ -3356,9 +3439,7 @@ def admin_conciliaciones_vencidas(
     CERRADAS = {"ACTA_FIRMADA", "CERRADA"}
 
     todas = (
-        db.query(ConciliacionRecord)
-        .filter(ConciliacionRecord.fecha_audiencia.isnot(None))
-        .all()
+        db.query(ConciliacionRecord).filter(ConciliacionRecord.fecha_audiencia.isnot(None)).all()
     )
 
     items = []
@@ -3371,14 +3452,16 @@ def admin_conciliaciones_vencidas(
         if (c.estado_bilateral or "") in CERRADAS:
             continue
         dias_atraso = (ahora - fa).days
-        items.append({
-            "id": c.id,
-            "glosa_id": c.glosa_id,
-            "fecha_audiencia": fa.isoformat(),
-            "estado_bilateral": c.estado_bilateral,
-            "dias_atraso": dias_atraso,
-            "valor_ratificado_hus": float(c.valor_ratificado_hus or 0),
-        })
+        items.append(
+            {
+                "id": c.id,
+                "glosa_id": c.glosa_id,
+                "fecha_audiencia": fa.isoformat(),
+                "estado_bilateral": c.estado_bilateral,
+                "dias_atraso": dias_atraso,
+                "valor_ratificado_hus": float(c.valor_ratificado_hus or 0),
+            }
+        )
     items.sort(key=lambda x: x["dias_atraso"], reverse=True)
 
     return {
@@ -3421,9 +3504,7 @@ def admin_dictamenes_versiones_limpieza(
     )
 
     glosas_excedidas = len(rows)
-    filas_excedentes = sum(
-        max(0, n - int(max_versiones_por_glosa)) for _, n in rows
-    )
+    filas_excedentes = sum(max(0, n - int(max_versiones_por_glosa)) for _, n in rows)
 
     BYTES_POR_VERSION = 5000
     bytes_estimados = filas_excedentes * BYTES_POR_VERSION
@@ -3434,7 +3515,8 @@ def admin_dictamenes_versiones_limpieza(
         "filas_excedentes": filas_excedentes,
         "bytes_estimados_recuperables": bytes_estimados,
         "mb_estimados_recuperables": round(
-            bytes_estimados / (1024 * 1024), 2,
+            bytes_estimados / (1024 * 1024),
+            2,
         ),
     }
 
@@ -3472,15 +3554,15 @@ def admin_historial_cambios_rol(
 
     items = []
     for e in eventos:
-        items.append({
-            "timestamp": (
-                e.timestamp.isoformat() if e.timestamp else None
-            ),
-            "usuario_que_cambio": e.usuario_email,
-            "usuario_afectado_id": e.registro_id,
-            "rol_anterior": e.valor_anterior,
-            "rol_nuevo": e.valor_nuevo,
-        })
+        items.append(
+            {
+                "timestamp": (e.timestamp.isoformat() if e.timestamp else None),
+                "usuario_que_cambio": e.usuario_email,
+                "usuario_afectado_id": e.registro_id,
+                "rol_anterior": e.valor_anterior,
+                "rol_nuevo": e.valor_nuevo,
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
@@ -3521,13 +3603,9 @@ def admin_audit_cleanup_recomendado(
     from app.models.db import AuditLogRecord
 
     desde = ahora_utc() - timedelta(days=int(dias_retencion))
-    total = (
-        db.query(_f.count(AuditLogRecord.id)).scalar() or 0
-    )
+    total = db.query(_f.count(AuditLogRecord.id)).scalar() or 0
     a_purgar = (
-        db.query(_f.count(AuditLogRecord.id))
-        .filter(AuditLogRecord.timestamp < desde)
-        .scalar() or 0
+        db.query(_f.count(AuditLogRecord.id)).filter(AuditLogRecord.timestamp < desde).scalar() or 0
     )
 
     BYTES_POR_ROW = 200
@@ -3586,16 +3664,17 @@ def admin_heatmap_usuario(
         key = (ts.weekday(), ts.hour)
         matriz[key] = matriz.get(key, 0) + 1
 
-    DIAS = ["Lunes", "Martes", "Miércoles", "Jueves",
-            "Viernes", "Sábado", "Domingo"]
+    DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     items = []
     for (dia_idx, hora), count in matriz.items():
-        items.append({
-            "dia_semana": dia_idx,
-            "dia_nombre": DIAS[dia_idx],
-            "hora": hora,
-            "count": count,
-        })
+        items.append(
+            {
+                "dia_semana": dia_idx,
+                "dia_nombre": DIAS[dia_idx],
+                "hora": hora,
+                "count": count,
+            }
+        )
     items.sort(key=lambda x: (x["dia_semana"], x["hora"]))
 
     return {
@@ -3629,11 +3708,7 @@ def admin_stats_asignacion(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     con_gestor = 0
     con_auditor = 0
@@ -3654,10 +3729,7 @@ def admin_stats_asignacion(
     if cargas:
         valores = sorted(cargas.values())
         n = len(valores)
-        mediana = (
-            (valores[n // 2 - 1] + valores[n // 2]) / 2
-            if n % 2 == 0 else valores[n // 2]
-        )
+        mediana = (valores[n // 2 - 1] + valores[n // 2]) / 2 if n % 2 == 0 else valores[n // 2]
         carga_min = valores[0]
         carga_max = valores[-1]
     else:
@@ -3700,7 +3772,9 @@ def admin_incidentes_criticos(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        ConciliacionRecord, GlosaRecord, PlantillaGoldRecord,
+        ConciliacionRecord,
+        GlosaRecord,
+        PlantillaGoldRecord,
     )
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
@@ -3715,15 +3789,16 @@ def admin_incidentes_criticos(
         .count()
     )
     if muy_vencidas:
-        incidentes.append({
-            "tipo": "GLOSAS_MUY_VENCIDAS",
-            "severidad": "CRITICAL",
-            "count": muy_vencidas,
-            "descripcion": (
-                f"{muy_vencidas} glosas vencidas hace más de 60 días — "
-                "riesgo regulatorio"
-            ),
-        })
+        incidentes.append(
+            {
+                "tipo": "GLOSAS_MUY_VENCIDAS",
+                "severidad": "CRITICAL",
+                "count": muy_vencidas,
+                "descripcion": (
+                    f"{muy_vencidas} glosas vencidas hace más de 60 días — riesgo regulatorio"
+                ),
+            }
+        )
 
     # 2. Conciliaciones con audiencia atrasada
     audiencias_atrasadas = (
@@ -3735,35 +3810,40 @@ def admin_incidentes_criticos(
         .count()
     )
     if audiencias_atrasadas:
-        incidentes.append({
-            "tipo": "AUDIENCIAS_ATRASADAS",
-            "severidad": "WARNING",
-            "count": audiencias_atrasadas,
-            "descripcion": (
-                f"{audiencias_atrasadas} audiencias bilaterales pasadas "
-                "sin acta firmada"
-            ),
-        })
+        incidentes.append(
+            {
+                "tipo": "AUDIENCIAS_ATRASADAS",
+                "severidad": "WARNING",
+                "count": audiencias_atrasadas,
+                "descripcion": (
+                    f"{audiencias_atrasadas} audiencias bilaterales pasadas sin acta firmada"
+                ),
+            }
+        )
 
     # 3. Plantillas Gold con muchos usos pero valor_recuperado=0
     plantillas_malas = (
         db.query(PlantillaGoldRecord)
         .filter(PlantillaGoldRecord.activa == 1)
         .filter(PlantillaGoldRecord.usos >= 5)
-        .filter((PlantillaGoldRecord.valor_recuperado == 0) |
-                (PlantillaGoldRecord.valor_recuperado.is_(None)))
+        .filter(
+            (PlantillaGoldRecord.valor_recuperado == 0)
+            | (PlantillaGoldRecord.valor_recuperado.is_(None))
+        )
         .count()
     )
     if plantillas_malas:
-        incidentes.append({
-            "tipo": "PLANTILLAS_GOLD_INEFECTIVAS",
-            "severidad": "WARNING",
-            "count": plantillas_malas,
-            "descripcion": (
-                f"{plantillas_malas} plantillas Gold con 5+ usos pero "
-                "$0 recuperado — revisar o desactivar"
-            ),
-        })
+        incidentes.append(
+            {
+                "tipo": "PLANTILLAS_GOLD_INEFECTIVAS",
+                "severidad": "WARNING",
+                "count": plantillas_malas,
+                "descripcion": (
+                    f"{plantillas_malas} plantillas Gold con 5+ usos pero "
+                    "$0 recuperado — revisar o desactivar"
+                ),
+            }
+        )
 
     return {
         "evaluado_en": ahora.isoformat(),
@@ -3810,31 +3890,28 @@ def admin_historial_reasignaciones(
     por_quien_reasigna: dict[str, int] = {}
     for e in eventos:
         if e.usuario_email:
-            por_quien_reasigna[e.usuario_email] = (
-                por_quien_reasigna.get(e.usuario_email, 0) + 1
-            )
-        items.append({
-            "timestamp": (
-                e.timestamp.isoformat() if e.timestamp else None
-            ),
-            "usuario_que_reasigna": e.usuario_email,
-            "glosa_id": e.registro_id,
-            "campo": e.campo,
-            "anterior": e.valor_anterior,
-            "nuevo": e.valor_nuevo,
-        })
+            por_quien_reasigna[e.usuario_email] = por_quien_reasigna.get(e.usuario_email, 0) + 1
+        items.append(
+            {
+                "timestamp": (e.timestamp.isoformat() if e.timestamp else None),
+                "usuario_que_reasigna": e.usuario_email,
+                "glosa_id": e.registro_id,
+                "campo": e.campo,
+                "anterior": e.valor_anterior,
+                "nuevo": e.valor_nuevo,
+            }
+        )
 
     top_reasignadores = sorted(
-        por_quien_reasigna.items(), key=lambda x: x[1], reverse=True,
+        por_quien_reasigna.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
 
     return {
         "ventana_dias": int(dias),
         "total_reasignaciones": len(eventos),
-        "top_5_quien_reasigna": [
-            {"usuario": u, "reasignaciones": n}
-            for u, n in top_reasignadores
-        ],
+        "top_5_quien_reasigna": [{"usuario": u, "reasignaciones": n} for u, n in top_reasignadores],
         "items": items[:100],  # cap a 100 items
     }
 
@@ -3864,7 +3941,8 @@ def admin_usuarios_sin_glosas(
 
     # Set de gestores con glosas abiertas
     gestores_con_carga = {
-        n[0] for n in (
+        n[0]
+        for n in (
             db.query(GlosaRecord.gestor_nombre)
             .filter(GlosaRecord.gestor_nombre.isnot(None))
             .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
@@ -3886,12 +3964,14 @@ def admin_usuarios_sin_glosas(
     for u in usuarios:
         nombre = u.nombre or u.email
         if nombre not in gestores_con_carga:
-            items.append({
-                "id": u.id,
-                "email": u.email,
-                "nombre": u.nombre,
-                "rol": u.rol,
-            })
+            items.append(
+                {
+                    "id": u.id,
+                    "email": u.email,
+                    "nombre": u.nombre,
+                    "rol": u.rol,
+                }
+            )
 
     return {
         "total_usuarios_activos_evaluados": len(usuarios),
@@ -3946,7 +4026,9 @@ def admin_gestor_mensual(
         k = dec.strftime("%Y-%m")
         if k not in por_mes:
             por_mes[k] = {
-                "cerradas": 0, "levantadas": 0, "valor_rec": 0.0,
+                "cerradas": 0,
+                "levantadas": 0,
+                "valor_rec": 0.0,
             }
         b = por_mes[k]
         b["cerradas"] += 1
@@ -3957,17 +4039,16 @@ def admin_gestor_mensual(
     serie = []
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
-        tasa = (
-            round(100 * b["levantadas"] / b["cerradas"], 2)
-            if b["cerradas"] else 0.0
+        tasa = round(100 * b["levantadas"] / b["cerradas"], 2) if b["cerradas"] else 0.0
+        serie.append(
+            {
+                "mes": k,
+                "glosas_cerradas": b["cerradas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+                "valor_recuperado": int(b["valor_rec"]),
+            }
         )
-        serie.append({
-            "mes": k,
-            "glosas_cerradas": b["cerradas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-            "valor_recuperado": int(b["valor_rec"]),
-        })
 
     return {
         "gestor": gestor,
@@ -4047,14 +4128,16 @@ def admin_ranking_gestores(
             rating, badge = 2, "EN_PROGRESO"
         else:
             rating, badge = 1, "EN_PROGRESO"
-        items.append({
-            "gestor": gestor,
-            "glosas_cerradas": b["cerradas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-            "rating": rating,
-            "badge": badge,
-        })
+        items.append(
+            {
+                "gestor": gestor,
+                "glosas_cerradas": b["cerradas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+                "rating": rating,
+                "badge": badge,
+            }
+        )
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
     for idx, it in enumerate(items, start=1):
         it["position"] = idx
@@ -4091,11 +4174,7 @@ def admin_glosas_prioritarias(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     items = []
     for g in abiertas:
@@ -4130,17 +4209,19 @@ def admin_glosas_prioritarias(
         if score == 0:
             continue
 
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "valor_objetado": int(v_obj),
-            "dias_restantes": dr,
-            "estado": g.estado,
-            "gestor_nombre": g.gestor_nombre,
-            "score": round(score, 2),
-            "razones": razones,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": int(v_obj),
+                "dias_restantes": dr,
+                "estado": g.estado,
+                "gestor_nombre": g.gestor_nombre,
+                "score": round(score, 2),
+                "razones": razones,
+            }
+        )
 
     items.sort(key=lambda x: x["score"], reverse=True)
 
@@ -4188,10 +4269,14 @@ def admin_reporte_mensual_csv(
     def _ensure(k):
         if k not in por_mes:
             por_mes[k] = {
-                "creadas": 0, "cerradas": 0,
-                "valor_obj": 0.0, "valor_rec": 0.0,
-                "decididas": 0, "levantadas": 0,
-                "ia_calls": 0, "ia_cost": 0.0,
+                "creadas": 0,
+                "cerradas": 0,
+                "valor_obj": 0.0,
+                "valor_rec": 0.0,
+                "decididas": 0,
+                "levantadas": 0,
+                "ia_calls": 0,
+                "ia_cost": 0.0,
             }
         return por_mes[k]
 
@@ -4228,38 +4313,43 @@ def admin_reporte_mensual_csv(
     def _generar():
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow([
-            "mes", "glosas_creadas", "glosas_cerradas",
-            "valor_objetado", "valor_recuperado",
-            "tasa_levantamiento_pct", "tasa_recuperacion_pct",
-            "ia_calls", "costo_ia_usd",
-        ])
+        w.writerow(
+            [
+                "mes",
+                "glosas_creadas",
+                "glosas_cerradas",
+                "valor_objetado",
+                "valor_recuperado",
+                "tasa_levantamiento_pct",
+                "tasa_recuperacion_pct",
+                "ia_calls",
+                "costo_ia_usd",
+            ]
+        )
         yield buf.getvalue()
-        buf.seek(0); buf.truncate(0)
+        buf.seek(0)
+        buf.truncate(0)
 
         for k in sorted(por_mes.keys()):
             b = por_mes[k]
-            tasa_lev = (
-                round(100 * b["levantadas"] / b["decididas"], 2)
-                if b["decididas"] else 0.0
+            tasa_lev = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
+            tasa_rec = round(100 * b["valor_rec"] / b["valor_obj"], 2) if b["valor_obj"] else 0.0
+            w.writerow(
+                [
+                    k,
+                    b["creadas"],
+                    b["cerradas"],
+                    int(b["valor_obj"]),
+                    int(b["valor_rec"]),
+                    tasa_lev,
+                    tasa_rec,
+                    b["ia_calls"],
+                    round(b["ia_cost"], 4),
+                ]
             )
-            tasa_rec = (
-                round(100 * b["valor_rec"] / b["valor_obj"], 2)
-                if b["valor_obj"] else 0.0
-            )
-            w.writerow([
-                k,
-                b["creadas"],
-                b["cerradas"],
-                int(b["valor_obj"]),
-                int(b["valor_rec"]),
-                tasa_lev,
-                tasa_rec,
-                b["ia_calls"],
-                round(b["ia_cost"], 4),
-            ])
             yield buf.getvalue()
-            buf.seek(0); buf.truncate(0)
+            buf.seek(0)
+            buf.truncate(0)
 
     fname = f"reporte-mensual-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
@@ -4300,9 +4390,8 @@ def admin_conteo_rapido(
 
     glosas_total = db.query(_f.count(GlosaRecord.id)).scalar() or 0
     cerradas = (
-        db.query(_f.count(GlosaRecord.id))
-        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        db.query(_f.count(GlosaRecord.id)).filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS)).scalar()
+        or 0
     )
     abiertas = glosas_total - cerradas
     criticas = (
@@ -4310,25 +4399,24 @@ def admin_conteo_rapido(
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.dias_restantes <= 3)
         .filter(GlosaRecord.dias_restantes >= 0)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     vencidas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.dias_restantes < 0)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     usuarios_activos = (
-        db.query(_f.count(UsuarioRecord.id))
-        .filter(UsuarioRecord.activo == 1)
-        .scalar() or 0
+        db.query(_f.count(UsuarioRecord.id)).filter(UsuarioRecord.activo == 1).scalar() or 0
     )
 
     audit_24h = (
-        db.query(_f.count(AuditLogRecord.id))
-        .filter(AuditLogRecord.timestamp >= desde_24h)
-        .scalar() or 0
+        db.query(_f.count(AuditLogRecord.id)).filter(AuditLogRecord.timestamp >= desde_24h).scalar()
+        or 0
     )
 
     return {
@@ -4389,8 +4477,7 @@ def admin_inconsistencias_datos(
         if g.fecha_decision_eps and estado not in ESTADOS_CERRADOS:
             incons["decision_eps_en_estado_abierto"].append(g.id)
 
-        if (estado in ESTADOS_CERRADOS and
-                (g.dias_restantes or 0) < 0):
+        if estado in ESTADOS_CERRADOS and (g.dias_restantes or 0) < 0:
             incons["dias_negativos_en_cerrada"].append(g.id)
 
         if not g.eps:
@@ -4398,11 +4485,13 @@ def admin_inconsistencias_datos(
 
     items = []
     for regla, ids in incons.items():
-        items.append({
-            "regla": regla,
-            "count": len(ids),
-            "sample_ids": ids[:5],
-        })
+        items.append(
+            {
+                "regla": regla,
+                "count": len(ids),
+                "sample_ids": ids[:5],
+            }
+        )
 
     total = sum(it["count"] for it in items)
 
@@ -4444,11 +4533,7 @@ def admin_timeline_equipo(
     ahora = ahora_utc()
     desde = ahora - timedelta(hours=int(horas))
 
-    eventos = (
-        db.query(AuditLogRecord)
-        .filter(AuditLogRecord.timestamp >= desde)
-        .all()
-    )
+    eventos = db.query(AuditLogRecord).filter(AuditLogRecord.timestamp >= desde).all()
 
     por_hora: dict[str, dict] = {}
     for e in eventos:
@@ -4468,28 +4553,26 @@ def admin_timeline_equipo(
         b = por_hora[key]
         b["total"] += 1
         if e.usuario_email:
-            b["por_usuario"][e.usuario_email] = (
-                b["por_usuario"].get(e.usuario_email, 0) + 1
-            )
+            b["por_usuario"][e.usuario_email] = b["por_usuario"].get(e.usuario_email, 0) + 1
         if e.accion:
-            b["por_accion"][e.accion] = (
-                b["por_accion"].get(e.accion, 0) + 1
-            )
+            b["por_accion"][e.accion] = b["por_accion"].get(e.accion, 0) + 1
 
     serie = []
     for k in sorted(por_hora.keys()):
         b = por_hora[k]
         acciones_top = sorted(
-            b["por_accion"].items(), key=lambda x: x[1], reverse=True,
+            b["por_accion"].items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:3]
-        serie.append({
-            "hora": k,
-            "total_eventos": b["total"],
-            "por_usuario": b["por_usuario"],
-            "acciones_top": [
-                {"accion": a, "n": n} for a, n in acciones_top
-            ],
-        })
+        serie.append(
+            {
+                "hora": k,
+                "total_eventos": b["total"],
+                "por_usuario": b["por_usuario"],
+                "acciones_top": [{"accion": a, "n": n} for a, n in acciones_top],
+            }
+        )
 
     return {
         "ventana_horas": int(horas),
@@ -4520,7 +4603,9 @@ def admin_cierre_del_dia(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        AICallRecord, AuditLogRecord, GlosaRecord,
+        AICallRecord,
+        AuditLogRecord,
+        GlosaRecord,
     )
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
@@ -4528,11 +4613,7 @@ def admin_cierre_del_dia(
     hace_24h = ahora - timedelta(hours=24)
 
     # Glosas creadas últimas 24h
-    creadas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= hace_24h)
-        .all()
-    )
+    creadas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= hace_24h).all()
 
     # Glosas cerradas últimas 24h (basado en fecha_decision_eps)
     cerradas = (
@@ -4542,16 +4623,10 @@ def admin_cierre_del_dia(
         .all()
     )
 
-    valor_recuperado_dia = sum(
-        float(g.valor_recuperado or 0) for g in cerradas
-    )
+    valor_recuperado_dia = sum(float(g.valor_recuperado or 0) for g in cerradas)
 
     # IA calls últimas 24h
-    ia_calls = (
-        db.query(AICallRecord)
-        .filter(AICallRecord.creado_en >= hace_24h)
-        .count()
-    )
+    ia_calls = db.query(AICallRecord).filter(AICallRecord.creado_en >= hace_24h).count()
 
     # Top 3 gestores con más eventos audit
     rows = (
@@ -4564,7 +4639,9 @@ def admin_cierre_del_dia(
     for (email,) in rows:
         por_user[email] = por_user.get(email, 0) + 1
     top_gestores = sorted(
-        por_user.items(), key=lambda x: x[1], reverse=True,
+        por_user.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
 
     # Glosas que vencen mañana (dias_restantes == 1)
@@ -4574,9 +4651,7 @@ def admin_cierre_del_dia(
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .all()
     )
-    valor_que_vence_manana = sum(
-        float(g.valor_objetado or 0) for g in vencen_manana
-    )
+    valor_que_vence_manana = sum(float(g.valor_objetado or 0) for g in vencen_manana)
 
     return {
         "fecha_reporte": ahora.isoformat(),
@@ -4585,9 +4660,7 @@ def admin_cierre_del_dia(
         "glosas_cerradas_24h": len(cerradas),
         "valor_recuperado_24h": int(valor_recuperado_dia),
         "ia_calls_24h": ia_calls,
-        "top_3_gestores": [
-            {"usuario": u, "eventos": n} for u, n in top_gestores
-        ],
+        "top_3_gestores": [{"usuario": u, "eventos": n} for u, n in top_gestores],
         "vencen_manana": {
             "count": len(vencen_manana),
             "valor_total": int(valor_que_vence_manana),
@@ -4625,109 +4698,101 @@ def admin_alertas_inteligentes(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    todas_abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    todas_abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     ahora = ahora_utc()
     alertas = []
 
     # CRITICAL: Vencidas hace mucho (>30d en negativo)
-    muy_vencidas = [
-        g for g in todas_abiertas
-        if (g.dias_restantes or 0) < -30
-    ]
+    muy_vencidas = [g for g in todas_abiertas if (g.dias_restantes or 0) < -30]
     if muy_vencidas:
-        alertas.append({
-            "tipo": "CRITICAL",
-            "categoria": "SLA",
-            "titulo": f"{len(muy_vencidas)} glosas vencidas hace más de 30 días",
-            "descripcion": (
-                "Estas glosas pueden ratificarse automáticamente. "
-                "Acción urgente requerida."
-            ),
-            "accion": "Revisar y atender",
-            "endpoint": "/admin/glosas-prioritarias",
-            "count": len(muy_vencidas),
-        })
+        alertas.append(
+            {
+                "tipo": "CRITICAL",
+                "categoria": "SLA",
+                "titulo": f"{len(muy_vencidas)} glosas vencidas hace más de 30 días",
+                "descripcion": (
+                    "Estas glosas pueden ratificarse automáticamente. Acción urgente requerida."
+                ),
+                "accion": "Revisar y atender",
+                "endpoint": "/admin/glosas-prioritarias",
+                "count": len(muy_vencidas),
+            }
+        )
 
     # WARNING: Muchas críticas
-    criticas = [
-        g for g in todas_abiertas
-        if 0 <= (g.dias_restantes or 0) <= 3
-    ]
+    criticas = [g for g in todas_abiertas if 0 <= (g.dias_restantes or 0) <= 3]
     if len(criticas) >= 5:
-        alertas.append({
-            "tipo": "WARNING",
-            "categoria": "SLA",
-            "titulo": f"{len(criticas)} glosas críticas (≤3 días para vencer)",
-            "descripcion": "Concentración inusual de glosas próximas a vencer.",
-            "accion": "Reasignar y priorizar",
-            "endpoint": "/admin/glosas-prioritarias",
-            "count": len(criticas),
-        })
+        alertas.append(
+            {
+                "tipo": "WARNING",
+                "categoria": "SLA",
+                "titulo": f"{len(criticas)} glosas críticas (≤3 días para vencer)",
+                "descripcion": "Concentración inusual de glosas próximas a vencer.",
+                "accion": "Reasignar y priorizar",
+                "endpoint": "/admin/glosas-prioritarias",
+                "count": len(criticas),
+            }
+        )
 
     # WARNING: Glosas sin gestor
     sin_gestor = [g for g in todas_abiertas if not g.gestor_nombre]
     if len(sin_gestor) >= 10:
-        alertas.append({
-            "tipo": "WARNING",
-            "categoria": "ASIGNACION",
-            "titulo": f"{len(sin_gestor)} glosas sin gestor asignado",
-            "descripcion": "Estas glosas no tienen responsable.",
-            "accion": "Asignar gestores",
-            "endpoint": "/admin/distribucion-cargas",
-            "count": len(sin_gestor),
-        })
+        alertas.append(
+            {
+                "tipo": "WARNING",
+                "categoria": "ASIGNACION",
+                "titulo": f"{len(sin_gestor)} glosas sin gestor asignado",
+                "descripcion": "Estas glosas no tienen responsable.",
+                "accion": "Asignar gestores",
+                "endpoint": "/admin/distribucion-cargas",
+                "count": len(sin_gestor),
+            }
+        )
 
     # BUSINESS: Alto valor sin gestor
     alto_valor_sin_gestor = [
-        g for g in todas_abiertas
+        g
+        for g in todas_abiertas
         if not g.gestor_nombre and float(g.valor_objetado or 0) > 5_000_000
     ]
     if alto_valor_sin_gestor:
-        valor_total = sum(
-            float(g.valor_objetado or 0) for g in alto_valor_sin_gestor
+        valor_total = sum(float(g.valor_objetado or 0) for g in alto_valor_sin_gestor)
+        alertas.append(
+            {
+                "tipo": "BUSINESS",
+                "categoria": "OPORTUNIDAD",
+                "titulo": (f"{len(alto_valor_sin_gestor)} glosas de alto valor (>$5M) sin gestor"),
+                "descripcion": (
+                    f"Valor total no asignado: ${int(valor_total):,} COP. "
+                    "Riesgo de no defenderlas a tiempo."
+                ),
+                "accion": "Asignar a auditor senior",
+                "count": len(alto_valor_sin_gestor),
+            }
         )
-        alertas.append({
-            "tipo": "BUSINESS",
-            "categoria": "OPORTUNIDAD",
-            "titulo": (
-                f"{len(alto_valor_sin_gestor)} glosas de alto valor "
-                "(>$5M) sin gestor"
-            ),
-            "descripcion": (
-                f"Valor total no asignado: ${int(valor_total):,} COP. "
-                "Riesgo de no defenderlas a tiempo."
-            ),
-            "accion": "Asignar a auditor senior",
-            "count": len(alto_valor_sin_gestor),
-        })
 
     # WARNING: Glosas sin dictamen en estados avanzados
     sin_dictamen_avanzadas = [
-        g for g in todas_abiertas
+        g
+        for g in todas_abiertas
         if (g.estado or "").upper() in {"RESPONDIDA", "RATIFICADA"}
         and (not g.dictamen or len(g.dictamen) < 50)
     ]
     if sin_dictamen_avanzadas:
-        alertas.append({
-            "tipo": "WARNING",
-            "categoria": "CALIDAD",
-            "titulo": (
-                f"{len(sin_dictamen_avanzadas)} glosas en estado avanzado "
-                "sin dictamen"
-            ),
-            "descripcion": (
-                "Inconsistencia: el workflow avanzó sin generar el "
-                "dictamen formal."
-            ),
-            "accion": "Generar dictámenes",
-            "endpoint": "/glosas/incompletas",
-            "count": len(sin_dictamen_avanzadas),
-        })
+        alertas.append(
+            {
+                "tipo": "WARNING",
+                "categoria": "CALIDAD",
+                "titulo": (f"{len(sin_dictamen_avanzadas)} glosas en estado avanzado sin dictamen"),
+                "descripcion": (
+                    "Inconsistencia: el workflow avanzó sin generar el dictamen formal."
+                ),
+                "accion": "Generar dictámenes",
+                "endpoint": "/glosas/incompletas",
+                "count": len(sin_dictamen_avanzadas),
+            }
+        )
 
     # INFO: EPS nuevas en últimos 7 días
     desde_7d = ahora - timedelta(days=7)
@@ -4746,18 +4811,20 @@ def admin_alertas_inteligentes(
             eps_historicas.add(eps)
     eps_nuevas = eps_recientes - eps_historicas
     if eps_nuevas:
-        alertas.append({
-            "tipo": "INFO",
-            "categoria": "DATOS",
-            "titulo": f"{len(eps_nuevas)} EPS nuevas detectadas en última semana",
-            "descripcion": (
-                f"EPS sin histórico previo: {', '.join(sorted(eps_nuevas))}. "
-                "Verificar contratos."
-            ),
-            "accion": "Validar contratos",
-            "endpoint": "/glosas/stats/eps-emergentes",
-            "count": len(eps_nuevas),
-        })
+        alertas.append(
+            {
+                "tipo": "INFO",
+                "categoria": "DATOS",
+                "titulo": f"{len(eps_nuevas)} EPS nuevas detectadas en última semana",
+                "descripcion": (
+                    f"EPS sin histórico previo: {', '.join(sorted(eps_nuevas))}. "
+                    "Verificar contratos."
+                ),
+                "accion": "Validar contratos",
+                "endpoint": "/glosas/stats/eps-emergentes",
+                "count": len(eps_nuevas),
+            }
+        )
 
     return {
         "generado_en": ahora.isoformat(),
@@ -4794,43 +4861,38 @@ def admin_actividad_reciente(
     from app.models.db import AICallRecord, AuditLogRecord
 
     audit_eventos = (
-        db.query(AuditLogRecord)
-        .order_by(AuditLogRecord.timestamp.desc())
-        .limit(int(limit))
-        .all()
+        db.query(AuditLogRecord).order_by(AuditLogRecord.timestamp.desc()).limit(int(limit)).all()
     )
     ia_eventos = (
-        db.query(AICallRecord)
-        .order_by(AICallRecord.creado_en.desc())
-        .limit(int(limit))
-        .all()
+        db.query(AICallRecord).order_by(AICallRecord.creado_en.desc()).limit(int(limit)).all()
     )
 
     items = []
     for e in audit_eventos:
-        items.append({
-            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
-            "tipo": "AUDIT",
-            "usuario": e.usuario_email,
-            "descripcion": (
-                f"{e.accion or '?'} en {e.tabla or '?'}"
-                + (f" (id={e.registro_id})" if e.registro_id else "")
-            ),
-            "id_evento": e.id,
-        })
+        items.append(
+            {
+                "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+                "tipo": "AUDIT",
+                "usuario": e.usuario_email,
+                "descripcion": (
+                    f"{e.accion or '?'} en {e.tabla or '?'}"
+                    + (f" (id={e.registro_id})" if e.registro_id else "")
+                ),
+                "id_evento": e.id,
+            }
+        )
     for e in ia_eventos:
-        items.append({
-            "timestamp": (
-                e.creado_en.isoformat() if e.creado_en else None
-            ),
-            "tipo": "AI_CALL",
-            "usuario": getattr(e, "usuario_email", None),
-            "descripcion": (
-                f"{getattr(e, 'modelo', '?')} "
-                f"({getattr(e, 'tipo_operacion', '?')})"
-            ),
-            "id_evento": e.id,
-        })
+        items.append(
+            {
+                "timestamp": (e.creado_en.isoformat() if e.creado_en else None),
+                "tipo": "AI_CALL",
+                "usuario": getattr(e, "usuario_email", None),
+                "descripcion": (
+                    f"{getattr(e, 'modelo', '?')} ({getattr(e, 'tipo_operacion', '?')})"
+                ),
+                "id_evento": e.id,
+            }
+        )
 
     # Mezclar y reordenar DESC por timestamp
     items.sort(
@@ -4891,11 +4953,7 @@ def admin_usuarios_inactivos(
         if prev is None or ts > prev:
             eventos_por_email[email] = ts
 
-    activos = (
-        db.query(UsuarioRecord)
-        .filter(UsuarioRecord.activo == 1)
-        .all()
-    )
+    activos = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all()
 
     inactivos = []
     for u in activos:
@@ -4903,27 +4961,27 @@ def admin_usuarios_inactivos(
         # Normalizar tz si SQLite devuelve naive
         if ult is not None and getattr(ult, "tzinfo", None) is None:
             from datetime import timezone
+
             ult = ult.replace(tzinfo=timezone.utc)
 
         if ult and ult >= corte:
             continue  # tiene actividad reciente
 
-        dias_sin = (
-            (ahora - ult).days if ult else None
+        dias_sin = (ahora - ult).days if ult else None
+        inactivos.append(
+            {
+                "id": u.id,
+                "email": u.email,
+                "nombre": u.nombre,
+                "rol": u.rol,
+                "ultimo_evento_en": ult.isoformat() if ult else None,
+                "dias_sin_actividad": dias_sin,
+            }
         )
-        inactivos.append({
-            "id": u.id,
-            "email": u.email,
-            "nombre": u.nombre,
-            "rol": u.rol,
-            "ultimo_evento_en": ult.isoformat() if ult else None,
-            "dias_sin_actividad": dias_sin,
-        })
 
     # nulls al final, los más antiguos arriba
     inactivos.sort(
-        key=lambda x: (x["dias_sin_actividad"] is None,
-                       -(x["dias_sin_actividad"] or 0)),
+        key=lambda x: (x["dias_sin_actividad"] is None, -(x["dias_sin_actividad"] or 0)),
     )
 
     return {
@@ -4958,18 +5016,16 @@ def admin_distribucion_cargas(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     por_gestor: dict[str, dict] = {}
     for g in abiertas:
         gestor = (g.gestor_nombre or "").strip() or "SIN_ASIGNAR"
         if gestor not in por_gestor:
             por_gestor[gestor] = {
-                "total": 0, "vencidas": 0, "criticas": 0,
+                "total": 0,
+                "vencidas": 0,
+                "criticas": 0,
                 "valor_objetado": 0.0,
             }
         b = por_gestor[gestor]
@@ -4984,18 +5040,17 @@ def admin_distribucion_cargas(
 
     items = []
     for gestor, b in por_gestor.items():
-        tasa = (
-            round(100 * b["vencidas"] / b["total"], 2)
-            if b["total"] else 0.0
+        tasa = round(100 * b["vencidas"] / b["total"], 2) if b["total"] else 0.0
+        items.append(
+            {
+                "gestor": gestor,
+                "total_glosas": b["total"],
+                "vencidas": b["vencidas"],
+                "criticas": b["criticas"],
+                "valor_objetado_total": int(b["valor_objetado"]),
+                "tasa_atraso_pct": tasa,
+            }
         )
-        items.append({
-            "gestor": gestor,
-            "total_glosas": b["total"],
-            "vencidas": b["vencidas"],
-            "criticas": b["criticas"],
-            "valor_objetado_total": int(b["valor_objetado"]),
-            "tasa_atraso_pct": tasa,
-        })
     items.sort(key=lambda x: x["total_glosas"], reverse=True)
 
     return {
@@ -5033,11 +5088,7 @@ def recalcular_dias_restantes(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    activas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.fecha_vencimiento.isnot(None))
-        .all()
-    )
+    activas = db.query(GlosaRecord).filter(GlosaRecord.fecha_vencimiento.isnot(None)).all()
 
     ahora = ahora_utc()
     actualizadas = 0
@@ -5054,6 +5105,7 @@ def recalcular_dias_restantes(
         venc = g.fecha_vencimiento
         if venc.tzinfo is None:
             from datetime import timezone
+
             venc = venc.replace(tzinfo=timezone.utc)
 
         delta_dias = (venc - ahora).days
@@ -5104,9 +5156,14 @@ def admin_system_info(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        AICacheRecord, AICallRecord, AuditLogRecord,
-        ContratoRecord, GlosaEliminadaRecord, GlosaRecord,
-        PlantillaGoldRecord, TarifaContratadaRecord,
+        AICacheRecord,
+        AICallRecord,
+        AuditLogRecord,
+        ContratoRecord,
+        GlosaEliminadaRecord,
+        GlosaRecord,
+        PlantillaGoldRecord,
+        TarifaContratadaRecord,
     )
 
     desde_30 = ahora_utc() - timedelta(days=30)
@@ -5119,40 +5176,44 @@ def admin_system_info(
         "tarifas_contratadas": db.query(_f.count(TarifaContratadaRecord.id)).scalar() or 0,
         "plantillas_gold_activas": (
             db.query(_f.count(PlantillaGoldRecord.id))
-            .filter(PlantillaGoldRecord.activa == 1).scalar() or 0
+            .filter(PlantillaGoldRecord.activa == 1)
+            .scalar()
+            or 0
         ),
         "ai_cache": db.query(_f.count(AICacheRecord.id)).scalar() or 0,
         "ai_calls_30d": (
-            db.query(_f.count(AICallRecord.id))
-            .filter(AICallRecord.creado_en >= desde_30).scalar() or 0
+            db.query(_f.count(AICallRecord.id)).filter(AICallRecord.creado_en >= desde_30).scalar()
+            or 0
         ),
         "audit_log_30d": (
             db.query(_f.count(AuditLogRecord.id))
-            .filter(AuditLogRecord.timestamp >= desde_30).scalar() or 0
+            .filter(AuditLogRecord.timestamp >= desde_30)
+            .scalar()
+            or 0
         ),
         "papelera": db.query(_f.count(GlosaEliminadaRecord.id)).scalar() or 0,
     }
 
     # Última actividad
-    ultima_glosa = (
-        db.query(_f.max(GlosaRecord.creado_en)).scalar()
-    )
+    ultima_glosa = db.query(_f.max(GlosaRecord.creado_en)).scalar()
 
     # Costo IA total (30d)
     cost_30d = (
-        db.query(_f.sum(AICallRecord.cost_usd))
-        .filter(AICallRecord.creado_en >= desde_30).scalar() or 0
+        db.query(_f.sum(AICallRecord.cost_usd)).filter(AICallRecord.creado_en >= desde_30).scalar()
+        or 0
     )
 
     # Estado de schedulers
     scheduler_pre, scheduler_mant = True, True
     try:
         from app.services.ia_auditora_proactiva import _task as _t_pa
+
         scheduler_pre = _t_pa is not None and not _t_pa.done()
     except Exception:
         scheduler_pre = None
     try:
         from app.services.mantenimiento_scheduler import _task as _t_mant
+
         scheduler_mant = _t_mant is not None and not _t_mant.done()
     except Exception:
         scheduler_mant = None
@@ -5170,9 +5231,7 @@ def admin_system_info(
 
     return {
         "counts": counts,
-        "ultima_glosa_creada_en": (
-            ultima_glosa.isoformat() if ultima_glosa else None
-        ),
+        "ultima_glosa_creada_en": (ultima_glosa.isoformat() if ultima_glosa else None),
         "ia_cost_usd_30d": round(float(cost_30d), 4),
         "schedulers": {
             "pre_analisis": scheduler_pre,
@@ -5217,8 +5276,11 @@ def descargar_backup_db(
     from sqlalchemy import inspect
 
     from app.models.db import (
-        ContratoRecord, GlosaRecord, TarifaContratadaRecord,
-        ConciliacionRecord, PlantillaGoldRecord,
+        ContratoRecord,
+        GlosaRecord,
+        TarifaContratadaRecord,
+        ConciliacionRecord,
+        PlantillaGoldRecord,
     )
 
     def _serializar(rec, exclude: tuple = ()) -> dict:
@@ -5238,8 +5300,12 @@ def descargar_backup_db(
             "exportado_por": current_user.email,
             "version_schema": "1.0",
             "incluye_tablas": [
-                "glosas", "contratos", "tarifas_contratadas",
-                "usuarios", "audit_log_90d", "conciliaciones",
+                "glosas",
+                "contratos",
+                "tarifas_contratadas",
+                "usuarios",
+                "audit_log_90d",
+                "conciliaciones",
                 "plantillas_gold",
             ],
         },
@@ -5247,9 +5313,7 @@ def descargar_backup_db(
 
     backup["glosas"] = [_serializar(g) for g in db.query(GlosaRecord).all()]
     backup["contratos"] = [_serializar(c) for c in db.query(ContratoRecord).all()]
-    backup["tarifas_contratadas"] = [
-        _serializar(t) for t in db.query(TarifaContratadaRecord).all()
-    ]
+    backup["tarifas_contratadas"] = [_serializar(t) for t in db.query(TarifaContratadaRecord).all()]
     # Usuarios SIN password_hash (seguridad: el backup no debe servir
     # para login en otra instancia)
     backup["usuarios"] = [
@@ -5259,17 +5323,16 @@ def descargar_backup_db(
     # Audit log: solo últimos 90 días para mantener tamaño manejable
     corte_audit = datetime.now(timezone.utc) - timedelta(days=90)
     backup["audit_log_90d"] = [
-        _serializar(a) for a in db.query(AuditLogRecord)
+        _serializar(a)
+        for a in db.query(AuditLogRecord)
         .filter(AuditLogRecord.timestamp >= corte_audit)
         .order_by(AuditLogRecord.timestamp.desc())
         .all()
     ]
-    backup["conciliaciones"] = [
-        _serializar(c) for c in db.query(ConciliacionRecord).all()
-    ]
+    backup["conciliaciones"] = [_serializar(c) for c in db.query(ConciliacionRecord).all()]
     backup["plantillas_gold"] = [
-        _serializar(p) for p in db.query(PlantillaGoldRecord)
-        .filter(PlantillaGoldRecord.activa == 1).all()
+        _serializar(p)
+        for p in db.query(PlantillaGoldRecord).filter(PlantillaGoldRecord.activa == 1).all()
     ]
 
     fname = f"backup-hus-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.json"

@@ -27,6 +27,7 @@ Output:
     "campos_faltantes": list[str],
   }
 """
+
 from __future__ import annotations
 
 import re
@@ -38,8 +39,8 @@ from typing import Optional
 
 _CODIGOS_GLOSA = re.compile(r"\b(TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX)\d{2,4}\b")
 _FACTURA_RE = re.compile(
-    r"(?:(?:FACTURA|FACT|FV|FE|HUS)[\s:.\-#]*)"   # prefijo variado
-    r"([A-Z0-9\-]{4,30})",                           # el número
+    r"(?:(?:FACTURA|FACT|FV|FE|HUS)[\s:.\-#]*)"  # prefijo variado
+    r"([A-Z0-9\-]{4,30})",  # el número
     re.IGNORECASE,
 )
 _RADICADO_RE = re.compile(
@@ -91,14 +92,30 @@ def _parsear_fecha(raw: str) -> Optional[str]:
 
 
 _EPS_CONOCIDAS = [
-    "FAMISANAR", "NUEVA EPS", "COOSALUD", "COMPENSAR", "POSITIVA", "FOMAG",
-    "SANITAS", "SALUD TOTAL", "SURA", "ECOOPSOS", "POLICIA NACIONAL",
-    "DISPENSARIO MEDICO", "SUMIMEDICAL", "PRECIMED", "AURORA",
-    "SALUD MIA", "PPL", "COMFENALCO", "CAJACOPI",
+    "FAMISANAR",
+    "NUEVA EPS",
+    "COOSALUD",
+    "COMPENSAR",
+    "POSITIVA",
+    "FOMAG",
+    "SANITAS",
+    "SALUD TOTAL",
+    "SURA",
+    "ECOOPSOS",
+    "POLICIA NACIONAL",
+    "DISPENSARIO MEDICO",
+    "SUMIMEDICAL",
+    "PRECIMED",
+    "AURORA",
+    "SALUD MIA",
+    "PPL",
+    "COMFENALCO",
+    "CAJACOPI",
 ]
 
 
 # ─── Extractor principal ────────────────────────────────────────────────────
+
 
 def extraer_de_texto(texto: str) -> dict:
     """Extrae los campos clave de un texto extraído del PDF.
@@ -235,13 +252,11 @@ def extraer_de_texto(texto: str) -> dict:
     # ─── Score de confianza ─────────────────────────────────────────────────
     campos_obligatorios = ["numero_factura", "eps", "cups", "codigos_glosa", "valor_objetado"]
     presentes = sum(
-        1 for k in campos_obligatorios
-        if resultado.get(k) not in ("", 0, 0.0, [], None)
+        1 for k in campos_obligatorios if resultado.get(k) not in ("", 0, 0.0, [], None)
     )
     resultado["confianza"] = round(presentes / len(campos_obligatorios), 2)
     resultado["campos_faltantes"] = [
-        k for k in campos_obligatorios
-        if resultado.get(k) in ("", 0, 0.0, [], None)
+        k for k in campos_obligatorios if resultado.get(k) in ("", 0, 0.0, [], None)
     ]
 
     return resultado

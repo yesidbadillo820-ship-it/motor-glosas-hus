@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/import-history (R149 P1)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -33,7 +34,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -41,6 +45,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -49,11 +54,17 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, fecha):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=fecha,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=fecha,
+        )
+    )
     db.commit()
 
 
@@ -62,8 +73,7 @@ class TestImportHistory:
         r = client.get("/sistema/import-history")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "umbral_cluster",
-                    "total_clusters_detectados", "items"):
+        for key in ("ventana_dias", "umbral_cluster", "total_clusters_detectados", "items"):
             assert key in d
         assert d["umbral_cluster"] == 10
 
@@ -78,6 +88,7 @@ class TestImportHistory:
     def test_cluster_detectado(self, client, db_session):
         # 12 glosas en la misma hora (hace 3 días)
         from datetime import timedelta
+
         ts = ahora_utc() - timedelta(days=3)
         for _ in range(12):
             _seed(db_session, ts)
@@ -87,7 +98,6 @@ class TestImportHistory:
         assert d["items"][0]["glosas_creadas"] == 12
 
     def test_orden_clusters_desc(self, client, db_session):
-        from datetime import timedelta
         ts1 = datetime(2026, 4, 10, 10, 0, tzinfo=timezone.utc)
         ts2 = datetime(2026, 4, 12, 14, 0, tzinfo=timezone.utc)
         # 20 glosas en ts1

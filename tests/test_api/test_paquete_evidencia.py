@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/{id}/paquete-evidencia.json (R85 P2)."""
+
 from __future__ import annotations
 
 import json
@@ -12,7 +13,10 @@ from sqlalchemy.pool import StaticPool
 from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import (
-    AICallRecord, AuditLogRecord, GlosaRecord, UsuarioRecord,
+    AICallRecord,
+    AuditLogRecord,
+    GlosaRecord,
+    UsuarioRecord,
 )
 
 
@@ -40,8 +44,12 @@ def usuario():
 @pytest.fixture
 def glosa(db_session):
     g = GlosaRecord(
-        eps="FAMISANAR", paciente="JUAN", codigo_glosa="TA0201",
-        valor_objetado=168_563, etapa="X", estado="RADICADA",
+        eps="FAMISANAR",
+        paciente="JUAN",
+        codigo_glosa="TA0201",
+        valor_objetado=168_563,
+        etapa="X",
+        estado="RADICADA",
         factura="FE-001",
         dictamen="<p>Dictamen formal del HUS</p>",
         modelo_ia="anthropic/claude-sonnet-4-6",
@@ -57,6 +65,7 @@ def glosa(db_session):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -96,9 +105,14 @@ class TestPaqueteEvidencia:
 
     def test_sin_dictamen_firma_es_none(self, client, db_session):
         g = GlosaRecord(
-            eps="X", paciente="X", codigo_glosa="TA0201",
-            valor_objetado=100, etapa="X", estado="RADICADA",
-            dictamen=None, creado_en=ahora_utc(),
+            eps="X",
+            paciente="X",
+            codigo_glosa="TA0201",
+            valor_objetado=100,
+            etapa="X",
+            estado="RADICADA",
+            dictamen=None,
+            creado_en=ahora_utc(),
         )
         db_session.add(g)
         db_session.commit()
@@ -107,17 +121,26 @@ class TestPaqueteEvidencia:
         assert d["dictamen_actual"] is None
 
     def test_timeline_incluye_audit_y_calls(self, client, glosa, db_session):
-        db_session.add(AuditLogRecord(
-            tabla="glosas", registro_id=glosa.id,
-            accion="ACTUALIZAR_ESTADO", usuario_email="x@hus.com",
-            timestamp=ahora_utc(),
-        ))
-        db_session.add(AICallRecord(
-            glosa_id=glosa.id, proveedor="anthropic",
-            modelo="claude-sonnet-4-6", cost_usd=0.045,
-            input_tokens=8000, output_tokens=500,
-            creado_en=ahora_utc(),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                tabla="glosas",
+                registro_id=glosa.id,
+                accion="ACTUALIZAR_ESTADO",
+                usuario_email="x@hus.com",
+                timestamp=ahora_utc(),
+            )
+        )
+        db_session.add(
+            AICallRecord(
+                glosa_id=glosa.id,
+                proveedor="anthropic",
+                modelo="claude-sonnet-4-6",
+                cost_usd=0.045,
+                input_tokens=8000,
+                output_tokens=500,
+                creado_en=ahora_utc(),
+            )
+        )
         db_session.commit()
         r = client.get(f"/glosas/{glosa.id}/paquete-evidencia.json")
         d = json.loads(r.text)

@@ -53,22 +53,21 @@ def info_usuario_actual(
         "rol": current_user.rol,
         "activo": bool(current_user.activo),
         "totp_activo": bool(getattr(current_user, "totp_activo", 0)),
-        "must_change_password": bool(
-            getattr(current_user, "must_change_password", 0)
-        ),
+        "must_change_password": bool(getattr(current_user, "must_change_password", 0)),
         "creado_en": (
-            current_user.creado_en.isoformat()
-            if getattr(current_user, "creado_en", None) else None
+            current_user.creado_en.isoformat() if getattr(current_user, "creado_en", None) else None
         ),
         "rustdesk_id": getattr(current_user, "rustdesk_id", None),
         "rustdesk_etiqueta": getattr(current_user, "rustdesk_etiqueta", None),
         "vacaciones_desde": (
             current_user.vacaciones_desde.isoformat()
-            if getattr(current_user, "vacaciones_desde", None) else None
+            if getattr(current_user, "vacaciones_desde", None)
+            else None
         ),
         "vacaciones_hasta": (
             current_user.vacaciones_hasta.isoformat()
-            if getattr(current_user, "vacaciones_hasta", None) else None
+            if getattr(current_user, "vacaciones_hasta", None)
+            else None
         ),
         "delega_a_email": getattr(current_user, "delega_a_email", None),
         "vacaciones_motivo": getattr(current_user, "vacaciones_motivo", None),
@@ -96,6 +95,7 @@ def heatmap_actividad(
     from datetime import datetime, timedelta, timezone as _tz
     from sqlalchemy import func as _func
     from app.models.db import GlosaRecord
+
     ahora = datetime.now(_tz.utc)
     desde = (ahora - timedelta(days=max(7, min(int(dias), 730)))).date()
     # Agregar por fecha de decision o creacion - usamos fecha_decision_eps
@@ -107,8 +107,8 @@ def heatmap_actividad(
             _func.coalesce(_func.sum(GlosaRecord.valor_objetado), 0).label("v"),
         )
         .filter(
-            (GlosaRecord.auditor_email == current_user.email) |
-            (GlosaRecord.gestor_nombre == current_user.email)
+            (GlosaRecord.auditor_email == current_user.email)
+            | (GlosaRecord.gestor_nombre == current_user.email)
         )
         .filter(_func.date(GlosaRecord.creado_en) >= desde)
         .group_by(_func.date(GlosaRecord.creado_en))
@@ -120,13 +120,14 @@ def heatmap_actividad(
     max_dia = 0
     for fecha, n, v in rows:
         # fecha puede ser date o str segun el dialecto
-        if hasattr(fecha, 'isoformat'):
+        if hasattr(fecha, "isoformat"):
             key = fecha.isoformat()
         else:
             key = str(fecha)[:10]
         por_dia[key] = {"count": int(n), "valor": float(v or 0)}
         total += int(n)
-        if int(n) > max_dia: max_dia = int(n)
+        if int(n) > max_dia:
+            max_dia = int(n)
     # Fill in zeros for missing days for cleaner heatmap
     cursor = desde
     end = ahora.date()
@@ -162,6 +163,7 @@ def digest_desde_ultima_visita(
     """
     from datetime import datetime, timedelta, timezone as _tz
     from app.models.db import GlosaRecord, AuditLogRecord
+
     if desde:
         try:
             cursor = datetime.fromisoformat(desde.replace("Z", "+00:00"))
@@ -193,8 +195,8 @@ def digest_desde_ultima_visita(
         .filter(GlosaRecord.fecha_decision_eps.isnot(None))
         .filter(GlosaRecord.fecha_decision_eps > cursor)
         .filter(
-            (GlosaRecord.auditor_email == current_user.email) |
-            (GlosaRecord.gestor_nombre == current_user.email)
+            (GlosaRecord.auditor_email == current_user.email)
+            | (GlosaRecord.gestor_nombre == current_user.email)
         )
         .order_by(GlosaRecord.fecha_decision_eps.desc())
         .limit(30)
@@ -209,8 +211,8 @@ def digest_desde_ultima_visita(
         .filter(GlosaRecord.fecha_vencimiento <= en_24h)
         .filter(GlosaRecord.fecha_vencimiento >= ahora)
         .filter(
-            (GlosaRecord.auditor_email == current_user.email) |
-            (GlosaRecord.gestor_nombre == current_user.email)
+            (GlosaRecord.auditor_email == current_user.email)
+            | (GlosaRecord.gestor_nombre == current_user.email)
         )
         .order_by(GlosaRecord.fecha_vencimiento.asc())
         .limit(20)
@@ -224,8 +226,8 @@ def digest_desde_ultima_visita(
         .filter(GlosaRecord.fecha_vencimiento.isnot(None))
         .filter(GlosaRecord.fecha_vencimiento < ahora)
         .filter(
-            (GlosaRecord.auditor_email == current_user.email) |
-            (GlosaRecord.gestor_nombre == current_user.email)
+            (GlosaRecord.auditor_email == current_user.email)
+            | (GlosaRecord.gestor_nombre == current_user.email)
         )
         .order_by(GlosaRecord.fecha_vencimiento.asc())
         .limit(10)
@@ -274,18 +276,26 @@ def digest_desde_ultima_visita(
         ],
         "proximas_a_vencer_24h": [
             {
-                "id": g.id, "factura": g.factura, "eps": g.eps,
+                "id": g.id,
+                "factura": g.factura,
+                "eps": g.eps,
                 "valor_objetado": float(g.valor_objetado or 0),
                 "vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
-                "horas_restantes": int((g.fecha_vencimiento - ahora).total_seconds() // 3600) if g.fecha_vencimiento else None,
+                "horas_restantes": int((g.fecha_vencimiento - ahora).total_seconds() // 3600)
+                if g.fecha_vencimiento
+                else None,
             }
             for g in proximas_a_vencer
         ],
         "mias_vencidas": [
             {
-                "id": g.id, "factura": g.factura, "eps": g.eps,
+                "id": g.id,
+                "factura": g.factura,
+                "eps": g.eps,
                 "valor_objetado": float(g.valor_objetado or 0),
-                "vencida_hace_horas": int((ahora - g.fecha_vencimiento).total_seconds() // 3600) if g.fecha_vencimiento else None,
+                "vencida_hace_horas": int((ahora - g.fecha_vencimiento).total_seconds() // 3600)
+                if g.fecha_vencimiento
+                else None,
             }
             for g in mias_vencidas
         ],
@@ -318,7 +328,11 @@ def configurar_vacaciones_propias(
     from datetime import datetime, timedelta, timezone as _tz
     from app.repositories.audit_repository import AuditRepository
 
-    if not payload or payload.get("clear") is True or (not payload.get("desde") and not payload.get("hasta")):
+    if (
+        not payload
+        or payload.get("clear") is True
+        or (not payload.get("desde") and not payload.get("hasta"))
+    ):
         # Limpiar vacaciones
         user = db.query(UsuarioRecord).filter(UsuarioRecord.id == current_user.id).first()
         if not user:
@@ -330,8 +344,11 @@ def configurar_vacaciones_propias(
         db.commit()
         try:
             AuditRepository(db).registrar(
-                usuario_email=current_user.email, usuario_rol=current_user.rol,
-                accion="VACACIONES_LIMPIAR", tabla="usuarios", registro_id=current_user.id,
+                usuario_email=current_user.email,
+                usuario_rol=current_user.rol,
+                accion="VACACIONES_LIMPIAR",
+                tabla="usuarios",
+                registro_id=current_user.id,
             )
         except Exception:
             pass
@@ -381,8 +398,11 @@ def configurar_vacaciones_propias(
     db.commit()
     try:
         AuditRepository(db).registrar(
-            usuario_email=current_user.email, usuario_rol=current_user.rol,
-            accion="VACACIONES_SET", tabla="usuarios", registro_id=current_user.id,
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="VACACIONES_SET",
+            tabla="usuarios",
+            registro_id=current_user.id,
             valor_nuevo=f"{desde.date()} -> {hasta.date()} (delega: {delega or 'ninguno'})",
         )
     except Exception:
@@ -408,6 +428,7 @@ def listar_en_vacaciones(
     7 dias). Util para el coordinador.
     """
     from datetime import datetime, timedelta, timezone as _tz
+
     ahora = datetime.now(_tz.utc)
     en_7d = ahora + timedelta(days=7)
     rows = (
@@ -429,7 +450,8 @@ def listar_en_vacaciones(
             "delega_a_email": u.delega_a_email,
             "motivo": u.vacaciones_motivo,
             "activa_ahora": (
-                u.vacaciones_desde and u.vacaciones_hasta
+                u.vacaciones_desde
+                and u.vacaciones_hasta
                 and u.vacaciones_desde <= ahora <= u.vacaciones_hasta
             ),
         }
@@ -501,6 +523,7 @@ def obtener_link_rustdesk(
     # Audit log — saber quién intentó conectar a qué PC
     try:
         from app.repositories.audit_repository import AuditRepository
+
         AuditRepository(db).registrar(
             usuario_email=current_user.email,
             usuario_rol=rol,
@@ -552,12 +575,11 @@ def mis_glosas_paginado(
 
     nombre = current_user.nombre or current_user.email
 
-    q = (
-        db.query(GlosaRecord)
-        .filter(or_(
+    q = db.query(GlosaRecord).filter(
+        or_(
             GlosaRecord.gestor_nombre == nombre,
             GlosaRecord.auditor_email == current_user.email,
-        ))
+        )
     )
     if estado:
         q = q.filter(GlosaRecord.estado == estado.upper())
@@ -568,10 +590,7 @@ def mis_glosas_paginado(
     pages = (total + per_page - 1) // per_page
 
     glosas = (
-        q.order_by(GlosaRecord.creado_en.desc())
-        .offset((page - 1) * per_page)
-        .limit(per_page)
-        .all()
+        q.order_by(GlosaRecord.creado_en.desc()).offset((page - 1) * per_page).limit(per_page).all()
     )
 
     return {
@@ -580,9 +599,7 @@ def mis_glosas_paginado(
         "items": [
             {
                 "id": g.id,
-                "creado_en": (
-                    g.creado_en.isoformat() if g.creado_en else None
-                ),
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
                 "eps": g.eps,
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
@@ -645,7 +662,9 @@ def performance_historica(
         k = dec.strftime("%Y-%m")
         if k not in por_mes:
             por_mes[k] = {
-                "cerradas": 0, "levantadas": 0, "valor_rec": 0.0,
+                "cerradas": 0,
+                "levantadas": 0,
+                "valor_rec": 0.0,
             }
         b = por_mes[k]
         b["cerradas"] += 1
@@ -656,17 +675,16 @@ def performance_historica(
     serie = []
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
-        tasa = (
-            round(100 * b["levantadas"] / b["cerradas"], 2)
-            if b["cerradas"] else 0.0
+        tasa = round(100 * b["levantadas"] / b["cerradas"], 2) if b["cerradas"] else 0.0
+        serie.append(
+            {
+                "mes": k,
+                "glosas_cerradas": b["cerradas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+                "valor_recuperado": int(b["valor_rec"]),
+            }
         )
-        serie.append({
-            "mes": k,
-            "glosas_cerradas": b["cerradas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-            "valor_recuperado": int(b["valor_rec"]),
-        })
 
     return {
         "usuario_email": current_user.email,
@@ -709,32 +727,22 @@ def resumen_personal(
     ahora = ahora_utc()
     desde = ahora - timedelta(days=int(dias))
 
-    glosas_asignadas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.gestor_nombre == nombre)
-        .all()
-    )
+    glosas_asignadas = db.query(GlosaRecord).filter(GlosaRecord.gestor_nombre == nombre).all()
 
-    abiertas = sum(
-        1 for g in glosas_asignadas
-        if (g.estado or "").upper() not in ESTADOS_CERRADOS
-    )
+    abiertas = sum(1 for g in glosas_asignadas if (g.estado or "").upper() not in ESTADOS_CERRADOS)
 
     cerradas_periodo = []
     for g in glosas_asignadas:
         dec = g.fecha_decision_eps
         if dec and dec.tzinfo is None:
             dec = dec.replace(tzinfo=timezone.utc)
-        if (dec and dec >= desde and
-                (g.estado or "").upper() in ESTADOS_CERRADOS):
+        if dec and dec >= desde and (g.estado or "").upper() in ESTADOS_CERRADOS:
             cerradas_periodo.append(g)
 
-    levantadas = [
-        g for g in cerradas_periodo
-        if (g.estado or "").upper() == "LEVANTADA"
-    ]
+    levantadas = [g for g in cerradas_periodo if (g.estado or "").upper() == "LEVANTADA"]
     decididas = [
-        g for g in cerradas_periodo
+        g
+        for g in cerradas_periodo
         if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
     ]
 
@@ -761,14 +769,9 @@ def resumen_personal(
     )
     levant_por_gestor: dict[str, int] = {}
     for g in todas_periodo:
-        levant_por_gestor[g.gestor_nombre] = (
-            levant_por_gestor.get(g.gestor_nombre, 0) + 1
-        )
+        levant_por_gestor[g.gestor_nombre] = levant_por_gestor.get(g.gestor_nombre, 0) + 1
     mis_levantamientos = levant_por_gestor.get(nombre, 0)
-    posicion = sum(
-        1 for n in levant_por_gestor.values()
-        if n > mis_levantamientos
-    ) + 1
+    posicion = sum(1 for n in levant_por_gestor.values() if n > mis_levantamientos) + 1
 
     return {
         "usuario_email": current_user.email,
@@ -777,8 +780,7 @@ def resumen_personal(
         "mis_glosas_cerradas_periodo": len(cerradas_periodo),
         "mi_valor_recuperado_periodo": int(valor_rec),
         "mi_tasa_levantamiento_pct": (
-            round(100 * len(levantadas) / len(decididas), 2)
-            if decididas else 0.0
+            round(100 * len(levantadas) / len(decididas), 2) if decididas else 0.0
         ),
         "mi_tiempo_promedio_resolucion_dias": (
             round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
@@ -816,8 +818,8 @@ def worklist_personal(
         db.query(GlosaRecord)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(
-            (GlosaRecord.gestor_nombre == nombre) |
-            (GlosaRecord.auditor_email == current_user.email)
+            (GlosaRecord.gestor_nombre == nombre)
+            | (GlosaRecord.auditor_email == current_user.email)
         )
         .all()
     )
@@ -846,16 +848,18 @@ def worklist_personal(
             score += 25
             razones.append("sin dictamen")
 
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "dias_restantes": dr,
-            "valor_objetado": int(v),
-            "score": score,
-            "razones": razones,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "dias_restantes": dr,
+                "valor_objetado": int(v),
+                "score": score,
+                "razones": razones,
+            }
+        )
 
     items.sort(key=lambda x: x["score"], reverse=True)
 
@@ -897,23 +901,29 @@ def yo_proximas_sugerencias(
     if not abiertas:
         return {
             "usuario_email": current_user.email,
-            "total": 0, "items": [],
+            "total": 0,
+            "items": [],
         }
 
     # Cargar histórico de pares
     pares = {
         ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
-        for g in abiertas if g.eps and g.codigo_glosa
+        for g in abiertas
+        if g.eps and g.codigo_glosa
     }
     eps_set = {p[0] for p in pares}
     cod_set = {p[1] for p in pares}
     historico = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(list(ESTADOS_DECIDIDOS)))
-        .filter(GlosaRecord.eps.in_(eps_set))
-        .filter(GlosaRecord.codigo_glosa.in_(cod_set))
-        .all()
-    ) if pares else []
+        (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.estado.in_(list(ESTADOS_DECIDIDOS)))
+            .filter(GlosaRecord.eps.in_(eps_set))
+            .filter(GlosaRecord.codigo_glosa.in_(cod_set))
+            .all()
+        )
+        if pares
+        else []
+    )
     par_idx: dict[tuple, dict] = {}
     for h in historico:
         k = ((h.eps or "").strip(), (h.codigo_glosa or "").strip())
@@ -937,57 +947,49 @@ def yo_proximas_sugerencias(
 
         # URGENTE
         if dr < 0:
-            urgentes.append({
-                "categoria": "URGENTE",
-                "glosa_id": g.id,
-                "motivo": (
-                    f"Vencida hace {abs(dr)}d · valor "
-                    f"${int(valor):,}"
-                ),
-                "score": 1000 + math.log10(max(valor, 1) + 1) * 10,
-                "action_button": "Cerrar HOY",
-            })
+            urgentes.append(
+                {
+                    "categoria": "URGENTE",
+                    "glosa_id": g.id,
+                    "motivo": (f"Vencida hace {abs(dr)}d · valor ${int(valor):,}"),
+                    "score": 1000 + math.log10(max(valor, 1) + 1) * 10,
+                    "action_button": "Cerrar HOY",
+                }
+            )
             continue
 
         # QUICK_WIN: tasa alta + valor medio-alto + abierta
         if tasa is not None and tasa >= 0.6 and dr >= 0:
             score = 500 + tasa * 200 + math.log10(max(valor, 1) + 1) * 5
-            quick_wins.append({
-                "categoria": "QUICK_WIN",
-                "glosa_id": g.id,
-                "motivo": (
-                    f"{tasa*100:.0f}% probabilidad histórica · "
-                    f"valor ${int(valor):,}"
-                ),
-                "score": score,
-                "action_button": "Cerrar pronto",
-            })
+            quick_wins.append(
+                {
+                    "categoria": "QUICK_WIN",
+                    "glosa_id": g.id,
+                    "motivo": (f"{tasa * 100:.0f}% probabilidad histórica · valor ${int(valor):,}"),
+                    "score": score,
+                    "action_button": "Cerrar pronto",
+                }
+            )
             continue
 
         # SIN_DICTAMEN + alto valor
-        if (
-            (not (g.dictamen or "").strip())
-            and valor >= 5_000_000
-        ):
-            sin_dict_alto.append({
-                "categoria": "SIN_DICTAMEN",
-                "glosa_id": g.id,
-                "motivo": (
-                    f"Alto valor ${int(valor):,} sin "
-                    "dictamen — riesgo de pérdida"
-                ),
-                "score": 300 + math.log10(max(valor, 1) + 1) * 8,
-                "action_button": "Redactar dictamen",
-            })
+        if (not (g.dictamen or "").strip()) and valor >= 5_000_000:
+            sin_dict_alto.append(
+                {
+                    "categoria": "SIN_DICTAMEN",
+                    "glosa_id": g.id,
+                    "motivo": (f"Alto valor ${int(valor):,} sin dictamen — riesgo de pérdida"),
+                    "score": 300 + math.log10(max(valor, 1) + 1) * 8,
+                    "action_button": "Redactar dictamen",
+                }
+            )
 
     # Tomar 3 de cada categoría, ordenados por score
     urgentes.sort(key=lambda x: x["score"], reverse=True)
     quick_wins.sort(key=lambda x: x["score"], reverse=True)
     sin_dict_alto.sort(key=lambda x: x["score"], reverse=True)
 
-    items = (
-        urgentes[:3] + quick_wins[:3] + sin_dict_alto[:3]
-    )
+    items = urgentes[:3] + quick_wins[:3] + sin_dict_alto[:3]
     items.sort(key=lambda x: x["score"], reverse=True)
 
     return {
@@ -1024,7 +1026,8 @@ def yo_super_resumen(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        ComentarioGlosaRecord, GlosaRecord,
+        ComentarioGlosaRecord,
+        GlosaRecord,
     )
 
     nombre = current_user.nombre or current_user.email
@@ -1033,7 +1036,11 @@ def yo_super_resumen(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     abiertas = (
@@ -1043,13 +1050,8 @@ def yo_super_resumen(
         .all()
     )
     n_abiertas = len(abiertas)
-    n_vencidas = sum(
-        1 for g in abiertas if (g.dias_restantes or 0) < 0
-    )
-    n_criticas = sum(
-        1 for g in abiertas
-        if 0 <= (g.dias_restantes or 0) <= 3
-    )
+    n_vencidas = sum(1 for g in abiertas if (g.dias_restantes or 0) < 0)
+    n_criticas = sum(1 for g in abiertas if 0 <= (g.dias_restantes or 0) <= 3)
 
     decididas_mes = (
         db.query(GlosaRecord)
@@ -1059,16 +1061,9 @@ def yo_super_resumen(
         .all()
     )
     n_dec_mes = len(decididas_mes)
-    n_lev_mes = sum(
-        1 for g in decididas_mes
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    rec_mes = sum(
-        float(g.valor_recuperado or 0) for g in decididas_mes
-    )
-    tasa_mes = (
-        round(100 * n_lev_mes / n_dec_mes, 2) if n_dec_mes else 0.0
-    )
+    n_lev_mes = sum(1 for g in decididas_mes if (g.estado or "").upper() == "LEVANTADA")
+    rec_mes = sum(float(g.valor_recuperado or 0) for g in decididas_mes)
+    tasa_mes = round(100 * n_lev_mes / n_dec_mes, 2) if n_dec_mes else 0.0
 
     # Donut
     desde_hist = inicio_mes - timedelta(days=180)
@@ -1113,10 +1108,7 @@ def yo_super_resumen(
     menciones = (
         db.query(ComentarioGlosaRecord)
         .filter(ComentarioGlosaRecord.mencion == current_user.email)
-        .filter(
-            (ComentarioGlosaRecord.resuelto == 0)
-            | (ComentarioGlosaRecord.resuelto.is_(None))
-        )
+        .filter((ComentarioGlosaRecord.resuelto == 0) | (ComentarioGlosaRecord.resuelto.is_(None)))
         .count()
     )
 
@@ -1189,23 +1181,29 @@ def yo_sugerencias_orden(
     if not abiertas:
         return {
             "usuario_email": current_user.email,
-            "total": 0, "items": [],
+            "total": 0,
+            "items": [],
         }
 
     # Cargar histórico de pares relevantes en una sola query
     pares = {
         ((g.eps or "").strip(), (g.codigo_glosa or "").strip())
-        for g in abiertas if g.eps and g.codigo_glosa
+        for g in abiertas
+        if g.eps and g.codigo_glosa
     }
     eps_set = {p[0] for p in pares}
     cod_set = {p[1] for p in pares}
     historico = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(list(ESTADOS_DECIDIDOS)))
-        .filter(GlosaRecord.eps.in_(eps_set))
-        .filter(GlosaRecord.codigo_glosa.in_(cod_set))
-        .all()
-    ) if pares else []
+        (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.estado.in_(list(ESTADOS_DECIDIDOS)))
+            .filter(GlosaRecord.eps.in_(eps_set))
+            .filter(GlosaRecord.codigo_glosa.in_(cod_set))
+            .all()
+        )
+        if pares
+        else []
+    )
     par_idx: dict[tuple, dict] = {}
     for h in historico:
         k = ((h.eps or "").strip(), (h.codigo_glosa or "").strip())
@@ -1233,7 +1231,7 @@ def yo_sugerencias_orden(
         if b and b["dec"] >= 2:
             tasa = b["lev"] / b["dec"]
             prob_w = max(tasa, 0.3)
-            prob_lbl = f"{tasa*100:.0f}% prob ({b['dec']} casos)"
+            prob_lbl = f"{tasa * 100:.0f}% prob ({b['dec']} casos)"
         else:
             prob_w = 0.5
             prob_lbl = "sin histórico"
@@ -1247,16 +1245,18 @@ def yo_sugerencias_orden(
         if valor >= 5_000_000:
             motivo += f" · alto valor (${int(valor):,})"
 
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(valor),
-            "dias_restantes": dr,
-            "score": score,
-            "motivo": motivo,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(valor),
+                "dias_restantes": dr,
+                "score": score,
+                "motivo": motivo,
+            }
+        )
 
     items.sort(key=lambda x: x["score"], reverse=True)
 
@@ -1291,11 +1291,16 @@ def yo_proyeccion_mes(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     if inicio_mes.month == 1:
         inicio_anterior = inicio_mes.replace(
-            year=inicio_mes.year - 1, month=12,
+            year=inicio_mes.year - 1,
+            month=12,
         )
     else:
         inicio_anterior = inicio_mes.replace(
@@ -1332,7 +1337,8 @@ def yo_proyeccion_mes(
     delta_vs_anterior = None
     if anterior > 0:
         delta_vs_anterior = round(
-            100 * (proyectado - anterior) / anterior, 1,
+            100 * (proyectado - anterior) / anterior,
+            1,
         )
 
     if dia_actual <= 3:
@@ -1380,7 +1386,11 @@ def yo_timeline_mes(
 
     ahora = ahora_utc()
     inicio = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     dias_mes = monthrange(ahora.year, ahora.month)[1]
 
@@ -1400,9 +1410,16 @@ def yo_timeline_mes(
         if not f:
             continue
         d = f.day
-        b = por_dia.setdefault(d, {
-            "count": 0, "lev": 0, "rat": 0, "ace": 0, "rec": 0.0,
-        })
+        b = por_dia.setdefault(
+            d,
+            {
+                "count": 0,
+                "lev": 0,
+                "rat": 0,
+                "ace": 0,
+                "rec": 0.0,
+            },
+        )
         b["count"] += 1
         e = (g.estado or "").upper()
         if e == "LEVANTADA":
@@ -1417,38 +1434,50 @@ def yo_timeline_mes(
     for d in range(1, dias_mes + 1):
         b = por_dia.get(d)
         if d > ahora.day:
-            serie.append({
-                "dia": d, "count": 0, "futuro": True,
-                "lev": 0, "rat": 0, "ace": 0,
-                "valor_recuperado": 0,
-                "dominante": None,
-            })
+            serie.append(
+                {
+                    "dia": d,
+                    "count": 0,
+                    "futuro": True,
+                    "lev": 0,
+                    "rat": 0,
+                    "ace": 0,
+                    "valor_recuperado": 0,
+                    "dominante": None,
+                }
+            )
         elif b:
             dominante = max(
                 ("LEVANTADA", "RATIFICADA", "ACEPTADA"),
                 key=lambda k: (
-                    b["lev"] if k == "LEVANTADA"
-                    else b["rat"] if k == "RATIFICADA"
-                    else b["ace"]
+                    b["lev"] if k == "LEVANTADA" else b["rat"] if k == "RATIFICADA" else b["ace"]
                 ),
             )
-            serie.append({
-                "dia": d,
-                "count": b["count"],
-                "lev": b["lev"],
-                "rat": b["rat"],
-                "ace": b["ace"],
-                "valor_recuperado": int(b["rec"]),
-                "dominante": dominante,
-                "futuro": False,
-            })
+            serie.append(
+                {
+                    "dia": d,
+                    "count": b["count"],
+                    "lev": b["lev"],
+                    "rat": b["rat"],
+                    "ace": b["ace"],
+                    "valor_recuperado": int(b["rec"]),
+                    "dominante": dominante,
+                    "futuro": False,
+                }
+            )
         else:
-            serie.append({
-                "dia": d, "count": 0, "futuro": False,
-                "lev": 0, "rat": 0, "ace": 0,
-                "valor_recuperado": 0,
-                "dominante": None,
-            })
+            serie.append(
+                {
+                    "dia": d,
+                    "count": 0,
+                    "futuro": False,
+                    "lev": 0,
+                    "rat": 0,
+                    "ace": 0,
+                    "valor_recuperado": 0,
+                    "dominante": None,
+                }
+            )
 
     total_mes = sum(s["count"] for s in serie)
     max_dia = max(serie, key=lambda s: s["count"]) if serie else None
@@ -1460,7 +1489,8 @@ def yo_timeline_mes(
         "total_decididas_mes": total_mes,
         "mejor_dia": (
             {"dia": max_dia["dia"], "count": max_dia["count"]}
-            if max_dia and max_dia["count"] > 0 else None
+            if max_dia and max_dia["count"] > 0
+            else None
         ),
         "serie": serie,
     }
@@ -1493,7 +1523,11 @@ def yo_progreso_mes(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     # Mes actual count
     decididas_mes = (
@@ -1538,10 +1572,7 @@ def yo_progreso_mes(
 
     ritmo_actual = round(decididas_mes / dia_actual, 2) if dia_actual else 0.0
     faltan = max(meta - decididas_mes, 0)
-    ritmo_necesario = (
-        round(faltan / max(dias_restantes_mes, 1), 2)
-        if dias_restantes_mes else 0.0
-    )
+    ritmo_necesario = round(faltan / max(dias_restantes_mes, 1), 2) if dias_restantes_mes else 0.0
 
     if progreso_pct >= 100:
         mensaje = "🎉 ¡Meta cumplida! Sigue sumando para batir tu récord."
@@ -1600,11 +1631,16 @@ def yo_insights(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     if inicio_mes.month == 1:
         inicio_anterior = inicio_mes.replace(
-            year=inicio_mes.year - 1, month=12,
+            year=inicio_mes.year - 1,
+            month=12,
         )
     else:
         inicio_anterior = inicio_mes.replace(
@@ -1639,12 +1675,8 @@ def yo_insights(
             if (g.estado or "").upper() == "LEVANTADA":
                 prev_lev += 1
 
-    tasa_actual = (
-        100.0 * actual_lev / actual_dec if actual_dec else 0.0
-    )
-    tasa_prev = (
-        100.0 * prev_lev / prev_dec if prev_dec else 0.0
-    )
+    tasa_actual = 100.0 * actual_lev / actual_dec if actual_dec else 0.0
+    tasa_prev = 100.0 * prev_lev / prev_dec if prev_dec else 0.0
 
     # Equipo (para comparativa)
     decididas_eq = (
@@ -1663,14 +1695,8 @@ def yo_insights(
         if (g.estado or "").upper() == "LEVANTADA":
             b["lev"] += 1
     if bucket_eq:
-        tasas_eq = [
-            100.0 * b["lev"] / b["dec"]
-            for b in bucket_eq.values() if b["dec"] >= 3
-        ]
-        tasa_eq_promedio = (
-            round(sum(tasas_eq) / len(tasas_eq), 2)
-            if tasas_eq else 0.0
-        )
+        tasas_eq = [100.0 * b["lev"] / b["dec"] for b in bucket_eq.values() if b["dec"] >= 3]
+        tasa_eq_promedio = round(sum(tasas_eq) / len(tasas_eq), 2) if tasas_eq else 0.0
     else:
         tasa_eq_promedio = 0.0
 
@@ -1682,9 +1708,7 @@ def yo_insights(
         .all()
     )
     n_abiertas = len(abiertas)
-    n_vencidas = sum(
-        1 for g in abiertas if (g.dias_restantes or 0) < 0
-    )
+    n_vencidas = sum(1 for g in abiertas if (g.dias_restantes or 0) < 0)
 
     insights = []
 
@@ -1692,103 +1716,104 @@ def yo_insights(
     if prev_dec >= 3:
         delta = tasa_actual - tasa_prev
         if delta >= 5:
-            insights.append({
-                "titulo": "Subiste tu tasa este mes",
-                "frase": (
-                    f"Pasaste de {tasa_prev:.1f}% a "
-                    f"{tasa_actual:.1f}% — sube {delta:.1f} pts."
-                ),
-                "tipo": "POSITIVO",
-                "accion_sugerida": "Mantén el momentum",
-                "prioridad": 3,
-            })
+            insights.append(
+                {
+                    "titulo": "Subiste tu tasa este mes",
+                    "frase": (
+                        f"Pasaste de {tasa_prev:.1f}% a {tasa_actual:.1f}% — sube {delta:.1f} pts."
+                    ),
+                    "tipo": "POSITIVO",
+                    "accion_sugerida": "Mantén el momentum",
+                    "prioridad": 3,
+                }
+            )
         elif delta <= -5:
-            insights.append({
-                "titulo": "Tu tasa cayó vs mes anterior",
-                "frase": (
-                    f"Bajaste de {tasa_prev:.1f}% a "
-                    f"{tasa_actual:.1f}% ({delta:+.1f} pts)."
-                ),
-                "tipo": "ATENCION",
-                "accion_sugerida": (
-                    "Revisa /yo/eps-mejor-rendimiento para "
-                    "identificar qué cambió"
-                ),
-                "prioridad": 1,
-            })
+            insights.append(
+                {
+                    "titulo": "Tu tasa cayó vs mes anterior",
+                    "frase": (
+                        f"Bajaste de {tasa_prev:.1f}% a {tasa_actual:.1f}% ({delta:+.1f} pts)."
+                    ),
+                    "tipo": "ATENCION",
+                    "accion_sugerida": (
+                        "Revisa /yo/eps-mejor-rendimiento para identificar qué cambió"
+                    ),
+                    "prioridad": 1,
+                }
+            )
 
     # 2) Comparación con equipo
     if actual_dec >= 3 and tasa_eq_promedio > 0:
         diff = tasa_actual - tasa_eq_promedio
         if diff >= 8:
-            insights.append({
-                "titulo": "Por encima del promedio del equipo",
-                "frase": (
-                    f"Tu tasa ({tasa_actual:.1f}%) está "
-                    f"{diff:.1f} pts arriba del promedio "
-                    f"({tasa_eq_promedio:.1f}%)."
-                ),
-                "tipo": "POSITIVO",
-                "accion_sugerida": (
-                    "Comparte buenas prácticas con el equipo"
-                ),
-                "prioridad": 3,
-            })
+            insights.append(
+                {
+                    "titulo": "Por encima del promedio del equipo",
+                    "frase": (
+                        f"Tu tasa ({tasa_actual:.1f}%) está "
+                        f"{diff:.1f} pts arriba del promedio "
+                        f"({tasa_eq_promedio:.1f}%)."
+                    ),
+                    "tipo": "POSITIVO",
+                    "accion_sugerida": ("Comparte buenas prácticas con el equipo"),
+                    "prioridad": 3,
+                }
+            )
         elif diff <= -8:
-            insights.append({
-                "titulo": "Por debajo del promedio del equipo",
-                "frase": (
-                    f"Tu tasa ({tasa_actual:.1f}%) está "
-                    f"{abs(diff):.1f} pts abajo del promedio "
-                    f"({tasa_eq_promedio:.1f}%)."
-                ),
-                "tipo": "ATENCION",
-                "accion_sugerida": (
-                    "Revisa casos similares antes de redactar dictamen"
-                ),
-                "prioridad": 2,
-            })
+            insights.append(
+                {
+                    "titulo": "Por debajo del promedio del equipo",
+                    "frase": (
+                        f"Tu tasa ({tasa_actual:.1f}%) está "
+                        f"{abs(diff):.1f} pts abajo del promedio "
+                        f"({tasa_eq_promedio:.1f}%)."
+                    ),
+                    "tipo": "ATENCION",
+                    "accion_sugerida": ("Revisa casos similares antes de redactar dictamen"),
+                    "prioridad": 2,
+                }
+            )
 
     # 3) Vencidas
     if n_vencidas > 0:
-        insights.append({
-            "titulo": f"{n_vencidas} glosa(s) vencidas",
-            "frase": (
-                "Estas glosas pueden archivarse "
-                "automáticamente si no las cierras hoy."
-            ),
-            "tipo": "ATENCION",
-            "accion_sugerida": "Atender en orden de antigüedad",
-            "prioridad": 1,
-        })
+        insights.append(
+            {
+                "titulo": f"{n_vencidas} glosa(s) vencidas",
+                "frase": ("Estas glosas pueden archivarse automáticamente si no las cierras hoy."),
+                "tipo": "ATENCION",
+                "accion_sugerida": "Atender en orden de antigüedad",
+                "prioridad": 1,
+            }
+        )
 
     # 4) Backlog
     if n_abiertas > 30:
-        insights.append({
-            "titulo": "Backlog alto",
-            "frase": (
-                f"Tienes {n_abiertas} glosas abiertas — "
-                "considera priorizar quick-wins."
-            ),
-            "tipo": "NEUTRAL",
-            "accion_sugerida": "Abre Quick Wins en Mi desempeño",
-            "prioridad": 2,
-        })
+        insights.append(
+            {
+                "titulo": "Backlog alto",
+                "frase": (f"Tienes {n_abiertas} glosas abiertas — considera priorizar quick-wins."),
+                "tipo": "NEUTRAL",
+                "accion_sugerida": "Abre Quick Wins en Mi desempeño",
+                "prioridad": 2,
+            }
+        )
 
     # 5) Recuperado del mes
     if actual_rec > 0:
         if actual_rec > prev_rec * 1.2 and prev_rec > 0:
-            insights.append({
-                "titulo": "Recuperación creciente",
-                "frase": (
-                    f"Recuperaste ${int(actual_rec):,} este mes — "
-                    f"{((actual_rec/prev_rec - 1)*100):.0f}% más "
-                    "que el mes pasado."
-                ),
-                "tipo": "POSITIVO",
-                "accion_sugerida": "Buen ritmo financiero",
-                "prioridad": 3,
-            })
+            insights.append(
+                {
+                    "titulo": "Recuperación creciente",
+                    "frase": (
+                        f"Recuperaste ${int(actual_rec):,} este mes — "
+                        f"{((actual_rec / prev_rec - 1) * 100):.0f}% más "
+                        "que el mes pasado."
+                    ),
+                    "tipo": "POSITIVO",
+                    "accion_sugerida": "Buen ritmo financiero",
+                    "prioridad": 3,
+                }
+            )
 
     insights.sort(key=lambda x: x["prioridad"])
     return {
@@ -1843,34 +1868,13 @@ def yo_checklist_personal(
         .all()
     )
 
-    sin_dict = [
-        g for g in abiertas
-        if not (g.dictamen or "").strip()
-    ]
-    dict_corto = [
-        g for g in abiertas
-        if g.dictamen and 0 < len(g.dictamen.strip()) < 50
-    ]
-    sin_cresp = [
-        g for g in respondidas
-        if not (g.codigo_respuesta or "").strip()
-    ]
-    sin_aceptado = [
-        g for g in ratificadas
-        if not g.valor_aceptado or float(g.valor_aceptado) == 0
-    ]
-    vencidas = [
-        g for g in abiertas
-        if (g.dias_restantes or 0) < 0
-    ]
-    criticas = [
-        g for g in abiertas
-        if 0 <= (g.dias_restantes or 0) <= 3
-    ]
-    alto_valor_sin_dict = [
-        g for g in sin_dict
-        if float(g.valor_objetado or 0) >= 5_000_000
-    ]
+    sin_dict = [g for g in abiertas if not (g.dictamen or "").strip()]
+    dict_corto = [g for g in abiertas if g.dictamen and 0 < len(g.dictamen.strip()) < 50]
+    sin_cresp = [g for g in respondidas if not (g.codigo_respuesta or "").strip()]
+    sin_aceptado = [g for g in ratificadas if not g.valor_aceptado or float(g.valor_aceptado) == 0]
+    vencidas = [g for g in abiertas if (g.dias_restantes or 0) < 0]
+    criticas = [g for g in abiertas if 0 <= (g.dias_restantes or 0) <= 3]
+    alto_valor_sin_dict = [g for g in sin_dict if float(g.valor_objetado or 0) >= 5_000_000]
 
     def _ids(lst, n=5):
         return [g.id for g in lst[:n]]
@@ -1958,7 +1962,8 @@ def yo_inicio(
 
     from app.core.tz import ahora_utc
     from app.models.db import (
-        ComentarioGlosaRecord, GlosaRecord,
+        ComentarioGlosaRecord,
+        GlosaRecord,
     )
 
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
@@ -1967,7 +1972,10 @@ def yo_inicio(
     nombre = current_user.nombre or current_user.email
     ahora = ahora_utc()
     inicio_dia = ahora.replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     # Resumen del día
@@ -1978,21 +1986,17 @@ def yo_inicio(
         .all()
     )
     n_abiertas = len(abiertas_q)
-    n_vencidas = sum(
-        1 for g in abiertas_q
-        if (g.dias_restantes or 0) < 0
-    )
-    n_criticas = sum(
-        1 for g in abiertas_q
-        if 0 <= (g.dias_restantes or 0) <= 3
-    )
+    n_vencidas = sum(1 for g in abiertas_q if (g.dias_restantes or 0) < 0)
+    n_criticas = sum(1 for g in abiertas_q if 0 <= (g.dias_restantes or 0) <= 3)
 
     cerradas_hoy = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.gestor_nombre == nombre)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.fecha_decision_eps >= inicio_dia)
         .count()
     )
@@ -2001,29 +2005,41 @@ def yo_inicio(
     top_acciones = []
     if n_vencidas:
         peor = next(
-            (g for g in sorted(
-                abiertas_q,
-                key=lambda x: x.dias_restantes or 0,
-            )), None,
-        )
-        top_acciones.append({
-            "tipo": "URGENTE",
-            "titulo": f"{n_vencidas} vencida(s)",
-            "glosa_id": peor.id if peor else None,
-        })
-    if n_criticas:
-        peor_c = next(
-            (g for g in sorted(
-                abiertas_q,
-                key=lambda x: x.dias_restantes or 0,
-            ) if 0 <= (g.dias_restantes or 0) <= 3),
+            (
+                g
+                for g in sorted(
+                    abiertas_q,
+                    key=lambda x: x.dias_restantes or 0,
+                )
+            ),
             None,
         )
-        top_acciones.append({
-            "tipo": "IMPORTANTE",
-            "titulo": f"{n_criticas} crítica(s)",
-            "glosa_id": peor_c.id if peor_c else None,
-        })
+        top_acciones.append(
+            {
+                "tipo": "URGENTE",
+                "titulo": f"{n_vencidas} vencida(s)",
+                "glosa_id": peor.id if peor else None,
+            }
+        )
+    if n_criticas:
+        peor_c = next(
+            (
+                g
+                for g in sorted(
+                    abiertas_q,
+                    key=lambda x: x.dias_restantes or 0,
+                )
+                if 0 <= (g.dias_restantes or 0) <= 3
+            ),
+            None,
+        )
+        top_acciones.append(
+            {
+                "tipo": "IMPORTANTE",
+                "titulo": f"{n_criticas} crítica(s)",
+                "glosa_id": peor_c.id if peor_c else None,
+            }
+        )
 
     # Top 3 quick wins
     tasas_cache: dict[tuple, tuple] = {}
@@ -2040,10 +2056,7 @@ def yo_inicio(
             .all()
         )
         n = len(rows)
-        lev = sum(
-            1 for r in rows
-            if (r.estado or "").upper() == "LEVANTADA"
-        )
+        lev = sum(1 for r in rows if (r.estado or "").upper() == "LEVANTADA")
         tasas_cache[k] = (n, lev)
         return n, lev
 
@@ -2058,23 +2071,22 @@ def yo_inicio(
         if tasa < 60:
             continue
         valor = float(g.valor_objetado or 0)
-        qw.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "valor_objetado": int(valor),
-            "tasa_pct": round(tasa, 1),
-            "score": tasa * valor,
-        })
+        qw.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "valor_objetado": int(valor),
+                "tasa_pct": round(tasa, 1),
+                "score": tasa * valor,
+            }
+        )
     qw.sort(key=lambda x: x["score"], reverse=True)
 
     # Menciones pendientes
     menciones_q = (
         db.query(ComentarioGlosaRecord)
         .filter(ComentarioGlosaRecord.mencion == current_user.email)
-        .filter(
-            (ComentarioGlosaRecord.resuelto == 0)
-            | (ComentarioGlosaRecord.resuelto.is_(None))
-        )
+        .filter((ComentarioGlosaRecord.resuelto == 0) | (ComentarioGlosaRecord.resuelto.is_(None)))
         .order_by(ComentarioGlosaRecord.creado_en.desc())
         .all()
     )
@@ -2160,10 +2172,7 @@ def yo_quick_wins(
             .all()
         )
         n = len(rows)
-        lev = sum(
-            1 for r in rows
-            if (r.estado or "").upper() == "LEVANTADA"
-        )
+        lev = sum(1 for r in rows if (r.estado or "").upper() == "LEVANTADA")
         tasas_cache[k] = (n, lev)
         return n, lev
 
@@ -2179,18 +2188,20 @@ def yo_quick_wins(
             continue
         valor = float(g.valor_objetado or 0)
         score = tasa * valor
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(valor),
-            "tasa_par_pct": round(tasa, 2),
-            "n_muestras": n,
-            "score": round(score, 2),
-            "dias_restantes": g.dias_restantes,
-            "tiene_dictamen": bool(g.dictamen and len(g.dictamen) > 50),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(valor),
+                "tasa_par_pct": round(tasa, 2),
+                "n_muestras": n,
+                "score": round(score, 2),
+                "dias_restantes": g.dias_restantes,
+                "tiene_dictamen": bool(g.dictamen and len(g.dictamen) > 50),
+            }
+        )
     items.sort(key=lambda x: x["score"], reverse=True)
 
     return {
@@ -2232,11 +2243,16 @@ def yo_asistente_proactivo(
     nombre = current_user.nombre or current_user.email
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     if inicio_mes.month == 1:
         inicio_anterior = inicio_mes.replace(
-            year=inicio_mes.year - 1, month=12,
+            year=inicio_mes.year - 1,
+            month=12,
         )
     else:
         inicio_anterior = inicio_mes.replace(
@@ -2256,20 +2272,22 @@ def yo_asistente_proactivo(
     )
     if vencidas:
         peor = vencidas[0]
-        acciones.append({
-            "tipo": "URGENTE",
-            "prioridad": 1,
-            "icono": "🚨",
-            "titulo": f"{len(vencidas)} glosa(s) vencidas",
-            "mensaje": (
-                f"La más antigua lleva "
-                f"{abs(int(peor.dias_restantes or 0))} días vencida. "
-                "Cerrá hoy o se archivan automáticamente."
-            ),
-            "count": len(vencidas),
-            "glosa_ids": [g.id for g in vencidas[:5]],
-            "accion_recomendada": "Abre Mis Glosas y filtra por VENCIDA",
-        })
+        acciones.append(
+            {
+                "tipo": "URGENTE",
+                "prioridad": 1,
+                "icono": "🚨",
+                "titulo": f"{len(vencidas)} glosa(s) vencidas",
+                "mensaje": (
+                    f"La más antigua lleva "
+                    f"{abs(int(peor.dias_restantes or 0))} días vencida. "
+                    "Cerrá hoy o se archivan automáticamente."
+                ),
+                "count": len(vencidas),
+                "glosa_ids": [g.id for g in vencidas[:5]],
+                "accion_recomendada": "Abre Mis Glosas y filtra por VENCIDA",
+            }
+        )
 
     # 2. Críticas (IMPORTANTE) — solo abiertas con 0..3 dias
     criticas = (
@@ -2282,21 +2300,20 @@ def yo_asistente_proactivo(
         .all()
     )
     if criticas:
-        acciones.append({
-            "tipo": "IMPORTANTE",
-            "prioridad": 2,
-            "icono": "⏰",
-            "titulo": f"{len(criticas)} glosa(s) críticas",
-            "mensaje": (
-                "Vencen en 3 días o menos. Atendé hoy "
-                "para asegurar el cierre dentro de SLA."
-            ),
-            "count": len(criticas),
-            "glosa_ids": [g.id for g in criticas[:5]],
-            "accion_recomendada": (
-                "Prioriza por valor: las más caras primero"
-            ),
-        })
+        acciones.append(
+            {
+                "tipo": "IMPORTANTE",
+                "prioridad": 2,
+                "icono": "⏰",
+                "titulo": f"{len(criticas)} glosa(s) críticas",
+                "mensaje": (
+                    "Vencen en 3 días o menos. Atendé hoy para asegurar el cierre dentro de SLA."
+                ),
+                "count": len(criticas),
+                "glosa_ids": [g.id for g in criticas[:5]],
+                "accion_recomendada": ("Prioriza por valor: las más caras primero"),
+            }
+        )
 
     # 3. Oportunidad: alta cuantía abierta sin dictamen
     sin_dict = (
@@ -2304,67 +2321,62 @@ def yo_asistente_proactivo(
         .filter(GlosaRecord.gestor_nombre == nombre)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.valor_objetado >= 5_000_000)
-        .filter(
-            (GlosaRecord.dictamen.is_(None))
-            | (GlosaRecord.dictamen == "")
-        )
+        .filter((GlosaRecord.dictamen.is_(None)) | (GlosaRecord.dictamen == ""))
         .all()
     )
     if sin_dict:
         valor_total = sum(float(g.valor_objetado or 0) for g in sin_dict)
-        acciones.append({
-            "tipo": "OPORTUNIDAD",
-            "prioridad": 3,
-            "icono": "💰",
-            "titulo": (
-                f"{len(sin_dict)} glosa(s) de alto valor "
-                "sin dictamen"
-            ),
-            "mensaje": (
-                f"Valor total en juego: ${int(valor_total):,}. "
-                "Un dictamen sólido aquí impacta directamente "
-                "el recuperado del mes."
-            ),
-            "count": len(sin_dict),
-            "glosa_ids": [g.id for g in sin_dict[:5]],
-            "accion_recomendada": (
-                "Pide casos similares con /casos-similares-resueltos"
-            ),
-        })
+        acciones.append(
+            {
+                "tipo": "OPORTUNIDAD",
+                "prioridad": 3,
+                "icono": "💰",
+                "titulo": (f"{len(sin_dict)} glosa(s) de alto valor sin dictamen"),
+                "mensaje": (
+                    f"Valor total en juego: ${int(valor_total):,}. "
+                    "Un dictamen sólido aquí impacta directamente "
+                    "el recuperado del mes."
+                ),
+                "count": len(sin_dict),
+                "glosa_ids": [g.id for g in sin_dict[:5]],
+                "accion_recomendada": ("Pide casos similares con /casos-similares-resueltos"),
+            }
+        )
 
     # 4. Menciones pendientes
     menciones = (
         db.query(ComentarioGlosaRecord)
         .filter(ComentarioGlosaRecord.mencion == current_user.email)
-        .filter(
-            (ComentarioGlosaRecord.resuelto == 0)
-            | (ComentarioGlosaRecord.resuelto.is_(None))
-        )
+        .filter((ComentarioGlosaRecord.resuelto == 0) | (ComentarioGlosaRecord.resuelto.is_(None)))
         .all()
     )
     if menciones:
         glosa_ids = list({m.glosa_id for m in menciones if m.glosa_id})[:5]
-        acciones.append({
-            "tipo": "MENCIONES",
-            "prioridad": 4,
-            "icono": "💬",
-            "titulo": f"{len(menciones)} mención(es) sin resolver",
-            "mensaje": (
-                "Tus colegas te pidieron opinión en estas glosas. "
-                "Responder construye colaboración."
-            ),
-            "count": len(menciones),
-            "glosa_ids": glosa_ids,
-            "accion_recomendada": "Abre cada glosa y responde al hilo",
-        })
+        acciones.append(
+            {
+                "tipo": "MENCIONES",
+                "prioridad": 4,
+                "icono": "💬",
+                "titulo": f"{len(menciones)} mención(es) sin resolver",
+                "mensaje": (
+                    "Tus colegas te pidieron opinión en estas glosas. "
+                    "Responder construye colaboración."
+                ),
+                "count": len(menciones),
+                "glosa_ids": glosa_ids,
+                "accion_recomendada": "Abre cada glosa y responde al hilo",
+            }
+        )
 
     # 5. Mejora: tasa actual vs mes anterior
     decididas_q = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.gestor_nombre == nombre)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.fecha_decision_eps >= inicio_anterior)
         .all()
     )
@@ -2381,47 +2393,44 @@ def yo_asistente_proactivo(
             prev_dec += 1
             if (g.estado or "").upper() == "LEVANTADA":
                 prev_lev += 1
-    tasa_actual = (
-        (100.0 * actual_lev / actual_dec) if actual_dec else 0.0
-    )
-    tasa_prev = (
-        (100.0 * prev_lev / prev_dec) if prev_dec else 0.0
-    )
+    tasa_actual = (100.0 * actual_lev / actual_dec) if actual_dec else 0.0
+    tasa_prev = (100.0 * prev_lev / prev_dec) if prev_dec else 0.0
     if prev_dec >= 3 and tasa_actual + 5 < tasa_prev:
-        acciones.append({
-            "tipo": "MEJORAR",
-            "prioridad": 5,
-            "icono": "📉",
-            "titulo": "Tu tasa cayó vs mes anterior",
-            "mensaje": (
-                f"Pasaste de {tasa_prev:.1f}% a {tasa_actual:.1f}%. "
-                "Revisa qué cambió: ¿más ratificadas?, "
-                "¿códigos nuevos?, ¿EPS distintas?"
-            ),
-            "count": int(prev_lev - actual_lev),
-            "glosa_ids": [],
-            "accion_recomendada": (
-                "Revisa /yo/eps-mejor-rendimiento y "
-                "/yo/comparativa-equipo"
-            ),
-        })
+        acciones.append(
+            {
+                "tipo": "MEJORAR",
+                "prioridad": 5,
+                "icono": "📉",
+                "titulo": "Tu tasa cayó vs mes anterior",
+                "mensaje": (
+                    f"Pasaste de {tasa_prev:.1f}% a {tasa_actual:.1f}%. "
+                    "Revisa qué cambió: ¿más ratificadas?, "
+                    "¿códigos nuevos?, ¿EPS distintas?"
+                ),
+                "count": int(prev_lev - actual_lev),
+                "glosa_ids": [],
+                "accion_recomendada": ("Revisa /yo/eps-mejor-rendimiento y /yo/comparativa-equipo"),
+            }
+        )
 
     # 6. Si no hay nada urgente, dar un mensaje motivador
     if not acciones:
-        acciones.append({
-            "tipo": "OK",
-            "prioridad": 99,
-            "icono": "✨",
-            "titulo": "Todo bajo control",
-            "mensaje": (
-                "No tienes vencidas, ni críticas, ni "
-                "menciones pendientes. Buen momento para "
-                "revisar tu tasa y planear conciliaciones."
-            ),
-            "count": 0,
-            "glosa_ids": [],
-            "accion_recomendada": "Abre Resumen del mes",
-        })
+        acciones.append(
+            {
+                "tipo": "OK",
+                "prioridad": 99,
+                "icono": "✨",
+                "titulo": "Todo bajo control",
+                "mensaje": (
+                    "No tienes vencidas, ni críticas, ni "
+                    "menciones pendientes. Buen momento para "
+                    "revisar tu tasa y planear conciliaciones."
+                ),
+                "count": 0,
+                "glosa_ids": [],
+                "accion_recomendada": "Abre Resumen del mes",
+            }
+        )
 
     return {
         "usuario_email": current_user.email,
@@ -2456,8 +2465,12 @@ def yo_stats_trimestre(
     ahora = ahora_utc()
     trim = (ahora.month - 1) // 3 + 1
     inicio_trim = ahora.replace(
-        month=(trim - 1) * 3 + 1, day=1,
-        hour=0, minute=0, second=0, microsecond=0,
+        month=(trim - 1) * 3 + 1,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     rows = (
@@ -2469,9 +2482,7 @@ def yo_stats_trimestre(
     )
 
     n_dec = len(rows)
-    n_lev = sum(
-        1 for g in rows if (g.estado or "").upper() == "LEVANTADA"
-    )
+    n_lev = sum(1 for g in rows if (g.estado or "").upper() == "LEVANTADA")
     rec = sum(float(g.valor_recuperado or 0) for g in rows)
     dias = set()
     for g in rows:
@@ -2515,11 +2526,16 @@ def yo_tendencia_personal(
 
     ahora = ahora_utc()
     inicio_actual = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     if inicio_actual.month == 1:
         inicio_anterior = inicio_actual.replace(
-            year=inicio_actual.year - 1, month=12,
+            year=inicio_actual.year - 1,
+            month=12,
         )
     else:
         inicio_anterior = inicio_actual.replace(
@@ -2595,11 +2611,7 @@ def yo_dictamenes_stats(
     from app.models.db import GlosaRecord
 
     nombre = current_user.nombre or current_user.email
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.gestor_nombre == nombre)
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.gestor_nombre == nombre).all()
 
     total = len(rows)
     con_dict = 0
@@ -2659,9 +2671,11 @@ def yo_eps_mejor_rendimiento(
     glosas = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.gestor_nombre == nombre)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.eps.isnot(None))
         .all()
     )
@@ -2681,14 +2695,17 @@ def yo_eps_mejor_rendimiento(
         if b["dec"] < min_decididas:
             continue
         tasa = round(100 * b["lev"] / b["dec"], 2)
-        items.append({
-            "eps": eps,
-            "count_decididas": b["dec"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_decididas": b["dec"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
     items.sort(
-        key=lambda x: x["tasa_levantamiento_pct"], reverse=True,
+        key=lambda x: x["tasa_levantamiento_pct"],
+        reverse=True,
     )
 
     return {
@@ -2730,22 +2747,22 @@ def yo_glosas_grandes(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dias_restantes": g.dias_restantes,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_restantes": g.dias_restantes,
+            }
+        )
 
     return {
         "usuario_email": current_user.email,
         "umbral": int(umbral),
         "total_grandes": len(items),
-        "valor_total_pendiente": sum(
-            it["valor_objetado"] for it in items
-        ),
+        "valor_total_pendiente": sum(it["valor_objetado"] for it in items),
         "items": items,
     }
 
@@ -2780,18 +2797,18 @@ def yo_glosas_asignadas_recientes(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "dias_restantes": g.dias_restantes,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "dias_restantes": g.dias_restantes,
+            }
+        )
 
     return {
         "usuario_email": current_user.email,
@@ -2823,7 +2840,11 @@ def yo_glosas_cerradas_mes(
 
     nombre = current_user.nombre or current_user.email
     inicio_mes = ahora_utc().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     rows = (
@@ -2838,32 +2859,29 @@ def yo_glosas_cerradas_mes(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_recuperado": int(float(g.valor_recuperado or 0)),
-            "fecha_decision_eps": (
-                g.fecha_decision_eps.isoformat()
-                if g.fecha_decision_eps else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_recuperado": int(float(g.valor_recuperado or 0)),
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
+                ),
+            }
+        )
 
-    levantadas = sum(
-        1 for g in rows if (g.estado or "").upper() == "LEVANTADA"
-    )
+    levantadas = sum(1 for g in rows if (g.estado or "").upper() == "LEVANTADA")
 
     return {
         "usuario_email": current_user.email,
         "mes": inicio_mes.strftime("%Y-%m"),
         "total_cerradas": len(items),
         "levantadas": levantadas,
-        "valor_recuperado_total": sum(
-            it["valor_recuperado"] for it in items
-        ),
+        "valor_recuperado_total": sum(it["valor_recuperado"] for it in items),
         "items": items,
     }
 
@@ -2903,10 +2921,16 @@ def yo_eps_asignadas(
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        b = bucket.setdefault(eps, {
-            "total": 0, "abiertas": 0, "valor": 0.0,
-            "dec": 0, "lev": 0,
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "total": 0,
+                "abiertas": 0,
+                "valor": 0.0,
+                "dec": 0,
+                "lev": 0,
+            },
+        )
         b["total"] += 1
         b["valor"] += float(g.valor_objetado or 0)
         estado = (g.estado or "").upper()
@@ -2919,16 +2943,16 @@ def yo_eps_asignadas(
 
     items = []
     for eps, b in bucket.items():
-        tasa = (
-            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append(
+            {
+                "eps": eps,
+                "count_total": b["total"],
+                "count_abiertas": b["abiertas"],
+                "valor_objetado_total": int(b["valor"]),
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "eps": eps,
-            "count_total": b["total"],
-            "count_abiertas": b["abiertas"],
-            "valor_objetado_total": int(b["valor"]),
-            "tasa_levantamiento_pct": tasa,
-        })
     items.sort(key=lambda x: x["count_total"], reverse=True)
 
     return {
@@ -2970,16 +2994,18 @@ def yo_glosas_criticas(
     items = []
     for g in glosas:
         dr = g.dias_restantes if g.dias_restantes is not None else 0
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "dias_restantes": dr,
-            "es_vencida": dr < 0,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "dias_restantes": dr,
+                "es_vencida": dr < 0,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+            }
+        )
 
     return {
         "usuario_email": current_user.email,
@@ -3076,9 +3102,14 @@ def yo_comparativa_equipo(
         gestor = (g.gestor_nombre or "").strip()
         if not gestor:
             continue
-        b = bucket.setdefault(gestor, {
-            "dec": 0, "lev": 0, "rec": 0.0,
-        })
+        b = bucket.setdefault(
+            gestor,
+            {
+                "dec": 0,
+                "lev": 0,
+                "rec": 0.0,
+            },
+        )
         b["dec"] += 1
         if (g.estado or "").upper() == "LEVANTADA":
             b["lev"] += 1
@@ -3088,7 +3119,8 @@ def yo_comparativa_equipo(
         return {
             "usuario_email": current_user.email,
             "tu": {
-                "decididas": 0, "levantadas": 0,
+                "decididas": 0,
+                "levantadas": 0,
                 "tasa_levantamiento_pct": 0.0,
                 "valor_recuperado_total": 0,
             },
@@ -3101,9 +3133,7 @@ def yo_comparativa_equipo(
         }
 
     yo = bucket.get(nombre, {"dec": 0, "lev": 0, "rec": 0.0})
-    yo_tasa = (
-        round(100 * yo["lev"] / yo["dec"], 2) if yo["dec"] else 0.0
-    )
+    yo_tasa = round(100 * yo["lev"] / yo["dec"], 2) if yo["dec"] else 0.0
 
     n = len(bucket)
     sum_dec = sum(b["dec"] for b in bucket.values())
@@ -3239,21 +3269,27 @@ def dashboard_personal(
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
     nombre = current_user.nombre or current_user.email
     inicio_mes = ahora_utc().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     abiertas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(GlosaRecord.gestor_nombre == nombre)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     vencidas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(GlosaRecord.gestor_nombre == nombre)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.dias_restantes < 0)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     criticas = (
         db.query(_f.count(GlosaRecord.id))
@@ -3261,23 +3297,23 @@ def dashboard_personal(
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.dias_restantes >= 0)
         .filter(GlosaRecord.dias_restantes <= 3)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     menciones = (
         db.query(_f.count(ComentarioGlosaRecord.id))
         .filter(ComentarioGlosaRecord.mencion == current_user.email)
-        .filter(
-            (ComentarioGlosaRecord.resuelto == 0)
-            | (ComentarioGlosaRecord.resuelto.is_(None))
-        )
-        .scalar() or 0
+        .filter((ComentarioGlosaRecord.resuelto == 0) | (ComentarioGlosaRecord.resuelto.is_(None)))
+        .scalar()
+        or 0
     )
     cerradas_mes = (
         db.query(_f.count(GlosaRecord.id))
         .filter(GlosaRecord.gestor_nombre == nombre)
         .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
         .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     return {
@@ -3309,25 +3345,22 @@ def menciones_pendientes(
     coms = (
         db.query(ComentarioGlosaRecord)
         .filter(ComentarioGlosaRecord.mencion == current_user.email)
-        .filter(
-            (ComentarioGlosaRecord.resuelto == 0)
-            | (ComentarioGlosaRecord.resuelto.is_(None))
-        )
+        .filter((ComentarioGlosaRecord.resuelto == 0) | (ComentarioGlosaRecord.resuelto.is_(None)))
         .order_by(ComentarioGlosaRecord.creado_en.desc())
         .all()
     )
 
     items = []
     for c in coms:
-        items.append({
-            "id": c.id,
-            "glosa_id": c.glosa_id,
-            "autor_email": c.autor_email,
-            "texto": (c.texto or "")[:300],
-            "creado_en": (
-                c.creado_en.isoformat() if c.creado_en else None
-            ),
-        })
+        items.append(
+            {
+                "id": c.id,
+                "glosa_id": c.glosa_id,
+                "autor_email": c.autor_email,
+                "texto": (c.texto or "")[:300],
+                "creado_en": (c.creado_en.isoformat() if c.creado_en else None),
+            }
+        )
 
     return {
         "usuario_email": current_user.email,
@@ -3501,21 +3534,20 @@ def usuarios_sin_2fa(
     usuarios = (
         db.query(UsuarioRecord)
         .filter(UsuarioRecord.activo == 1)
-        .filter(
-            (UsuarioRecord.totp_secret.is_(None))
-            | (UsuarioRecord.totp_secret == "")
-        )
+        .filter((UsuarioRecord.totp_secret.is_(None)) | (UsuarioRecord.totp_secret == ""))
         .all()
     )
 
     items = []
     for u in usuarios:
-        items.append({
-            "id": u.id,
-            "email": u.email,
-            "nombre": u.nombre,
-            "rol": u.rol,
-        })
+        items.append(
+            {
+                "id": u.id,
+                "email": u.email,
+                "nombre": u.nombre,
+                "rol": u.rol,
+            }
+        )
 
     return {
         "total_sin_2fa": len(items),
@@ -3591,7 +3623,7 @@ def _garantizar_al_menos_un_super_admin_activo(db: Session, excluir_id: int = No
         raise HTTPException(
             status_code=400,
             detail="No se puede dejar el sistema sin SUPER_ADMIN activo. "
-                   "Asigna este rol a otro usuario antes de proceder.",
+            "Asigna este rol a otro usuario antes de proceder.",
         )
 
 
@@ -3609,11 +3641,11 @@ def crear_usuario(
         raise HTTPException(status_code=400, detail="La contraseña debe tener mínimo 6 caracteres")
     if not data.nombre.strip():
         raise HTTPException(status_code=400, detail="El nombre es requerido")
-    
+
     existe = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
     if existe:
         raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
-    
+
     usuario = UsuarioRecord(
         nombre=data.nombre.strip(),
         email=email,
@@ -3624,21 +3656,21 @@ def crear_usuario(
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
-    
+
     AuditRepository(db).registrar(
         usuario_email=current_user.email,
         usuario_rol=current_user.rol,
         accion="CREAR",
         tabla="usuarios",
         registro_id=usuario.id,
-        detalle=f"Usuario creado: {email} con rol {ROL_AUDITOR}"
+        detalle=f"Usuario creado: {email} con rol {ROL_AUDITOR}",
     )
-    
+
     return {
         "id": usuario.id,
         "nombre": usuario.nombre,
         "email": usuario.email,
-        "message": "Usuario creado exitosamente"
+        "message": "Usuario creado exitosamente",
     }
 
 
@@ -3672,17 +3704,26 @@ def editar_usuario(
         if not nuevo_email or "@" not in nuevo_email:
             raise HTTPException(status_code=400, detail="Email inválido")
         if nuevo_email != usuario.email:
-            ya_existe = db.query(UsuarioRecord).filter(
-                UsuarioRecord.email == nuevo_email,
-                UsuarioRecord.id != usuario_id,
-            ).first()
+            ya_existe = (
+                db.query(UsuarioRecord)
+                .filter(
+                    UsuarioRecord.email == nuevo_email,
+                    UsuarioRecord.id != usuario_id,
+                )
+                .first()
+            )
             if ya_existe:
                 raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
             cambios.append(("email", usuario.email, nuevo_email))
             usuario.email = nuevo_email
 
     if not cambios:
-        return {"message": "Sin cambios", "id": usuario.id, "nombre": usuario.nombre, "email": usuario.email}
+        return {
+            "message": "Sin cambios",
+            "id": usuario.id,
+            "nombre": usuario.nombre,
+            "email": usuario.email,
+        }
 
     db.commit()
     db.refresh(usuario)
@@ -3720,14 +3761,14 @@ def cambiar_password(
     """Cambia la contraseña de un usuario."""
     if len(data.nueva_password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener mínimo 6 caracteres")
-    
+
     usuario = db.query(UsuarioRecord).filter(UsuarioRecord.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
     usuario.password_hash = get_password_hash(data.nueva_password)
     db.commit()
-    
+
     AuditRepository(db).registrar(
         usuario_email=current_user.email,
         usuario_rol=current_user.rol,
@@ -3735,7 +3776,7 @@ def cambiar_password(
         tabla="usuarios",
         registro_id=usuario_id,
         campo="password",
-        detalle=f"Contraseña cambiada para usuario {usuario.email}"
+        detalle=f"Contraseña cambiada para usuario {usuario.email}",
     )
     return {"message": "Contraseña actualizada exitosamente"}
 
@@ -3750,12 +3791,14 @@ def cambiar_rol(
     """Cambia el rol de un usuario (solo SUPER_ADMIN)."""
     nuevo_rol = data.rol.upper()
     if nuevo_rol not in ROLES_VALIDOS:
-        raise HTTPException(status_code=400, detail=f"Rol inválido. Use: {', '.join(ROLES_VALIDOS)}")
-    
+        raise HTTPException(
+            status_code=400, detail=f"Rol inválido. Use: {', '.join(ROLES_VALIDOS)}"
+        )
+
     usuario = db.query(UsuarioRecord).filter(UsuarioRecord.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
     anterior = usuario.rol
     # Si estamos degradando a un SUPER_ADMIN, validar que quede al menos otro activo
     if anterior == ROL_SUPER_ADMIN and nuevo_rol != ROL_SUPER_ADMIN:
@@ -3773,7 +3816,7 @@ def cambiar_rol(
         campo="rol",
         valor_anterior=anterior,
         valor_nuevo=nuevo_rol,
-        detalle=f"Rol cambiado de {anterior} a {nuevo_rol} para {usuario.email}"
+        detalle=f"Rol cambiado de {anterior} a {nuevo_rol} para {usuario.email}",
     )
     return {"message": "Rol actualizado", "nuevo_rol": nuevo_rol}
 
@@ -3788,7 +3831,7 @@ def activar_desactivar(
     usuario = db.query(UsuarioRecord).filter(UsuarioRecord.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
     anterior = usuario.activo
     # Si se va a desactivar a un SUPER_ADMIN, validar que quede al menos otro activo
     if anterior == 1 and usuario.rol == ROL_SUPER_ADMIN:
@@ -3796,7 +3839,7 @@ def activar_desactivar(
 
     usuario.activo = 0 if anterior == 1 else 1
     db.commit()
-    
+
     AuditRepository(db).registrar(
         usuario_email=current_user.email,
         usuario_rol=current_user.rol,
@@ -3806,9 +3849,12 @@ def activar_desactivar(
         campo="activo",
         valor_anterior=str(anterior),
         valor_nuevo=str(usuario.activo),
-        detalle=f"Usuario {'activado' if usuario.activo else 'desactivado'}: {usuario.email}"
+        detalle=f"Usuario {'activado' if usuario.activo else 'desactivado'}: {usuario.email}",
     )
-    return {"message": f"Usuario {'activado' if usuario.activo else 'desactivado'}", "activo": usuario.activo}
+    return {
+        "message": f"Usuario {'activado' if usuario.activo else 'desactivado'}",
+        "activo": usuario.activo,
+    }
 
 
 @router.delete("/{usuario_id}")
@@ -3819,7 +3865,9 @@ def eliminar_usuario(
 ):
     """Elimina un usuario (solo SUPER_ADMIN)."""
     if usuario_id == current_user.id:
-        raise HTTPException(status_code=400, detail="No puedes eliminar tu propio usuario mientras estás activo")
+        raise HTTPException(
+            status_code=400, detail="No puedes eliminar tu propio usuario mientras estás activo"
+        )
 
     usuario = db.query(UsuarioRecord).filter(UsuarioRecord.id == usuario_id).first()
     if not usuario:
@@ -3832,13 +3880,13 @@ def eliminar_usuario(
     email = usuario.email
     db.delete(usuario)
     db.commit()
-    
+
     AuditRepository(db).registrar(
         usuario_email=current_user.email,
         usuario_rol=current_user.rol,
         accion="ELIMINAR",
         tabla="usuarios",
         registro_id=usuario_id,
-        detalle=f"Usuario eliminado: {email}"
+        detalle=f"Usuario eliminado: {email}",
     )
     return {"message": f"Usuario {usuario_id} eliminado"}

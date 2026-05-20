@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/dictamenes-versiones-limpieza (R205 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -52,10 +57,14 @@ def client(db_session, usuario_super):
 
 
 def _seed(db, glosa_id):
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id, dictamen_html="<p>X</p>",
-        accion="REFINAR", creado_en=ahora_utc(),
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html="<p>X</p>",
+            accion="REFINAR",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -64,11 +73,13 @@ class TestDictamenesVersionesLimpieza:
         r = client.get("/admin/dictamenes-versiones-limpieza")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("max_versiones_por_glosa",
-                    "glosas_que_exceden_max",
-                    "filas_excedentes",
-                    "bytes_estimados_recuperables",
-                    "mb_estimados_recuperables"):
+        for key in (
+            "max_versiones_por_glosa",
+            "glosas_que_exceden_max",
+            "filas_excedentes",
+            "bytes_estimados_recuperables",
+            "mb_estimados_recuperables",
+        ):
             assert key in d
 
     def test_glosa_con_15_versiones_excede(self, client, db_session):
@@ -79,10 +90,7 @@ class TestDictamenesVersionesLimpieza:
         for _ in range(5):
             _seed(db_session, 2)
 
-        r = client.get(
-            "/admin/dictamenes-versiones-limpieza"
-            "?max_versiones_por_glosa=10"
-        )
+        r = client.get("/admin/dictamenes-versiones-limpieza?max_versiones_por_glosa=10")
         d = r.json()
         assert d["glosas_que_exceden_max"] == 1
         assert d["filas_excedentes"] == 5
@@ -90,9 +98,6 @@ class TestDictamenesVersionesLimpieza:
     def test_max_alto_no_excede(self, client, db_session):
         for _ in range(15):
             _seed(db_session, 1)
-        r = client.get(
-            "/admin/dictamenes-versiones-limpieza"
-            "?max_versiones_por_glosa=100"
-        )
+        r = client.get("/admin/dictamenes-versiones-limpieza?max_versiones_por_glosa=100")
         d = r.json()
         assert d["glosas_que_exceden_max"] == 0

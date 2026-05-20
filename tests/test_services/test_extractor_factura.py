@@ -1,4 +1,5 @@
 """Tests del extractor automático de facturas (Ronda 5)."""
+
 from app.services.extractor_factura import extraer_de_texto
 
 

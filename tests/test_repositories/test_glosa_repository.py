@@ -1,7 +1,7 @@
 """Tests del GlosaRepository (R67 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from sqlalchemy import create_engine
@@ -26,9 +26,13 @@ def db():
 
 def _seed(db, **kw):
     base = dict(
-        eps="FAMISANAR", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100_000, valor_aceptado=0,
-        etapa="RESPUESTA", estado="RADICADA",
+        eps="FAMISANAR",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        valor_aceptado=0,
+        etapa="RESPUESTA",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -40,11 +44,15 @@ class TestCrear:
     def test_crear_glosa_basica(self, db):
         repo = GlosaRepository(db)
         g = repo.crear(
-            eps="FAMISANAR", paciente="JUAN PEREZ",
-            codigo_glosa="TA0201", valor_objetado=168_563,
-            valor_aceptado=0, etapa="RESPUESTA",
+            eps="FAMISANAR",
+            paciente="JUAN PEREZ",
+            codigo_glosa="TA0201",
+            valor_objetado=168_563,
+            valor_aceptado=0,
+            etapa="RESPUESTA",
             estado="RADICADA",
-            dictamen="<p>x</p>", dias_restantes=15,
+            dictamen="<p>x</p>",
+            dias_restantes=15,
         )
         assert g.id is not None
         assert g.eps == "FAMISANAR"
@@ -53,14 +61,20 @@ class TestCrear:
     def test_crear_glosa_con_metadata_completa(self, db):
         repo = GlosaRepository(db)
         g = repo.crear(
-            eps="X", paciente="Y", codigo_glosa="SO0101",
-            valor_objetado=50_000, valor_aceptado=0,
-            etapa="X", estado="RADICADA",
-            dictamen="<p>x</p>", dias_restantes=10,
+            eps="X",
+            paciente="Y",
+            codigo_glosa="SO0101",
+            valor_objetado=50_000,
+            valor_aceptado=0,
+            etapa="X",
+            estado="RADICADA",
+            dictamen="<p>x</p>",
+            dias_restantes=10,
             cups_servicio="890101",
             servicio_descripcion="CONSULTA MEDICINA GENERAL",
             concepto_glosa="SOPORTES",
-            factura="FE-001", numero_radicado="RAD-1",
+            factura="FE-001",
+            numero_radicado="RAD-1",
             modelo_ia="anthropic/claude-sonnet-4-6",
             score=92.5,
         )
@@ -128,8 +142,7 @@ class TestSearchFullText:
         assert "A" not in pacientes
 
     def test_search_en_servicio_descripcion(self, db):
-        _seed(db, paciente="X",
-              servicio_descripcion="CONSULTA URGENCIAS GINECOLOGIA")
+        _seed(db, paciente="X", servicio_descripcion="CONSULTA URGENCIAS GINECOLOGIA")
         repo = GlosaRepository(db)
         r = repo.listar_paginado(page=1, per_page=10, search="GINECOLOGIA")
         assert any(g.paciente == "X" for g in r["items"])

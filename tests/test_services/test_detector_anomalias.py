@@ -1,4 +1,5 @@
 """Tests del detector de anomalías (Ronda 16)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -51,6 +52,7 @@ def _crear_glosa(db, **kwargs):
 
 # ─── Duplicados ────────────────────────────────────────────────────────────
 
+
 class TestDuplicados:
     def test_sin_duplicados_retorna_vacio(self, db_session):
         _crear_glosa(db_session, factura="F-1", cups_servicio="890701")
@@ -88,6 +90,7 @@ class TestDuplicados:
 
 # ─── Patrón sospechoso EPS ─────────────────────────────────────────────────
 
+
 class TestPatronEps:
     def test_eps_sin_data_previa_no_marca(self, db_session):
         # Solo 2 glosas en periodo reciente, nada antes
@@ -122,6 +125,7 @@ class TestPatronEps:
 
 # ─── Valor anómalo ─────────────────────────────────────────────────────────
 
+
 class TestValorAnomalo:
     def test_sin_cups_retorna_none(self, db_session):
         g = _crear_glosa(db_session, cups_servicio=None, valor_objetado=100_000)
@@ -155,6 +159,7 @@ class TestValorAnomalo:
 
 
 # ─── Resumen dashboard ─────────────────────────────────────────────────────
+
 
 def test_resumen_anomalias_estructura(db_session):
     _crear_glosa(db_session, factura="F-DUP", cups_servicio="890701")

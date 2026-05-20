@@ -1,4 +1,5 @@
 """Tests del auditor pre-IA de glosas (R-cerebro #9)."""
+
 from __future__ import annotations
 
 from app.services.auditor_glosa import (
@@ -51,7 +52,8 @@ class TestSinTarifa:
     def test_eps_dice_sin_tarifa_pero_si_hay(self):
         a = auditar(
             "NO HAY TARIFA PACTADA NI COTIZACION AVALADA",
-            tiene_contrato=True, valor_pactado=33487,
+            tiene_contrato=True,
+            valor_pactado=33487,
             cups="902210",
         )
         ids = [h["id"] for h in a["hallazgos"]]
@@ -64,7 +66,8 @@ class TestObjetaMasQueExcedente:
         # objetado $168.563 >> $16.107 → flag
         a = auditar(
             "SE GLOSA LA DIFERENCIA",
-            valor_facturado=247663, valor_pactado=231556,
+            valor_facturado=247663,
+            valor_pactado=231556,
             valor_objetado=168563,
         )
         ids = [h["id"] for h in a["hallazgos"]]
@@ -95,7 +98,9 @@ class TestScoreEvidencia:
             "SE GLOSA MVC SIN CONTRATO ENTRE LAS PARTES "
             "SE RECONOCE A SOAT VIGENTE. SE GLOSA LA DIFERENCIA",
             tiene_contrato=True,
-            valor_facturado=41151, valor_pactado=33487, valor_objetado=3151,
+            valor_facturado=41151,
+            valor_pactado=33487,
+            valor_objetado=3151,
             cups="902210",
         )
         assert a["score_evidencia"] >= 60

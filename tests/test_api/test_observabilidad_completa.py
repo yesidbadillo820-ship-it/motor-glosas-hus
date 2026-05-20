@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/observabilidad-completa (R208 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -51,8 +56,7 @@ class TestObservabilidadCompleta:
         r = client.get("/sistema/observabilidad-completa")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("evaluado_en", "actividad_ultima_hora",
-                    "tamanos", "schedulers"):
+        for key in ("evaluado_en", "actividad_ultima_hora", "tamanos", "schedulers"):
             assert key in d
         for k in ("eventos_audit", "ia_calls"):
             assert k in d["actividad_ultima_hora"]
@@ -64,11 +68,17 @@ class TestObservabilidadCompleta:
 
     def test_glosas_count(self, client, db_session):
         for _ in range(7):
-            db_session.add(GlosaRecord(
-                eps="X", paciente="X", codigo_glosa="C",
-                valor_objetado=1000, etapa="X", estado="RADICADA",
-                creado_en=ahora_utc(),
-            ))
+            db_session.add(
+                GlosaRecord(
+                    eps="X",
+                    paciente="X",
+                    codigo_glosa="C",
+                    valor_objetado=1000,
+                    etapa="X",
+                    estado="RADICADA",
+                    creado_en=ahora_utc(),
+                )
+            )
         db_session.commit()
         r = client.get("/sistema/observabilidad-completa")
         d = r.json()

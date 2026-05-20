@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/recomendaciones (R111 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
         factura="F-001",
         dictamen="<p>" + "x" * 100 + "</p>",
@@ -79,8 +85,7 @@ class TestRecomendaciones:
         acciones = [it["accion"] for it in d["items"]]
         assert "ATENDER_VENCIDA" in acciones
         # HIGH priority
-        atender = next(it for it in d["items"]
-                       if it["accion"] == "ATENDER_VENCIDA")
+        atender = next(it for it in d["items"] if it["accion"] == "ATENDER_VENCIDA")
         assert atender["prioridad"] == "HIGH"
 
     def test_critica(self, client, db_session):
@@ -94,8 +99,7 @@ class TestRecomendaciones:
         g = _seed(db_session, dictamen=None)
         r = client.get(f"/glosas/{g.id}/recomendaciones")
         d = r.json()
-        item = next((it for it in d["items"]
-                     if it["accion"] == "GENERAR_DICTAMEN"), None)
+        item = next((it for it in d["items"] if it["accion"] == "GENERAR_DICTAMEN"), None)
         assert item is not None
         assert item["prioridad"] == "HIGH"
         assert "endpoint" in item
@@ -104,15 +108,13 @@ class TestRecomendaciones:
         g = _seed(db_session, gestor_nombre=None)
         r = client.get(f"/glosas/{g.id}/recomendaciones")
         d = r.json()
-        item = next((it for it in d["items"]
-                     if it["accion"] == "ASIGNAR_GESTOR"), None)
+        item = next((it for it in d["items"] if it["accion"] == "ASIGNAR_GESTOR"), None)
         assert item is not None
         assert item["prioridad"] == "MEDIUM"
 
     def test_glosa_buena_monitoreo(self, client, db_session):
         # Glosa con todo OK
-        g = _seed(db_session, dias_restantes=20,
-                  cups_servicio="123456")
+        g = _seed(db_session, dias_restantes=20, cups_servicio="123456")
         r = client.get(f"/glosas/{g.id}/recomendaciones")
         d = r.json()
         # Sin issues → recomendación de monitoreo

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/comentarios-resumen (R161 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -12,7 +13,9 @@ from sqlalchemy.pool import StaticPool
 from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import (
-    ComentarioGlosaRecord, GlosaRecord, UsuarioRecord,
+    ComentarioGlosaRecord,
+    GlosaRecord,
+    UsuarioRecord,
 )
 
 
@@ -41,6 +44,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,20 +53,32 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid):
-    db.add(GlosaRecord(
-        id=gid, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_com(db, gid, autor, mencion=None, resuelto=0, dias_atras=1):
-    db.add(ComentarioGlosaRecord(
-        glosa_id=gid, autor_email=autor,
-        texto="x", mencion=mencion, resuelto=resuelto,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        ComentarioGlosaRecord(
+            glosa_id=gid,
+            autor_email=autor,
+            texto="x",
+            mencion=mencion,
+            resuelto=resuelto,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 

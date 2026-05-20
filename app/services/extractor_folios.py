@@ -11,6 +11,7 @@ Estos datos se inyectan al prompt IA para que la respuesta cite
 referencias documentales específicas del expediente, haciendo la
 respuesta casi imposible de ratificar por la EPS.
 """
+
 from __future__ import annotations
 import re
 from collections import Counter
@@ -20,12 +21,12 @@ _PATRON_FOLIO = re.compile(
     r"(?:folio|fl\.?|hoja|página|pagina|pág\.?|pag\.?)\s*(?:no?\.?|número|num\.?)?\s*(\d{1,4})",
     re.IGNORECASE,
 )
-_PATRON_FECHA = re.compile(
-    r"\b(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})\b"
-)
+_PATRON_FECHA = re.compile(r"\b(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})\b")
 _PATRON_CIE10 = re.compile(r"\b([A-Z]\d{2}(?:\.\d)?)\b")
 _PATRON_CUPS_6D = re.compile(r"\b(\d{6})\b")
-_PATRON_HC = re.compile(r"(?:hist\.?\s*cl[íi]nica|historia\s*cl[íi]nica|HC)[\s#:]*(\d{4,12})", re.IGNORECASE)
+_PATRON_HC = re.compile(
+    r"(?:hist\.?\s*cl[íi]nica|historia\s*cl[íi]nica|HC)[\s#:]*(\d{4,12})", re.IGNORECASE
+)
 _PATRON_FIRMA = re.compile(
     r"(?:firmado|firma|suscrito|expedido)\s+por[\s:]*(Dr\.?\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3})",
     re.IGNORECASE,
@@ -90,7 +91,9 @@ def extraer_referencias_documentales(contexto_pdf: str) -> dict:
     # Resumen citable para el prompt
     lineas = []
     if folios_top:
-        lineas.append(f"  • Folios del expediente referenciables: {', '.join(str(f) for f in folios_top)}")
+        lineas.append(
+            f"  • Folios del expediente referenciables: {', '.join(str(f) for f in folios_top)}"
+        )
     if fechas_unicas:
         lineas.append(f"  • Fechas documentales: {', '.join(fechas_unicas[:5])}")
     if hc:
@@ -102,7 +105,9 @@ def extraer_referencias_documentales(contexto_pdf: str) -> dict:
     if cups:
         lineas.append(f"  • CUPS presentes en soporte: {', '.join(cups[:5])}")
 
-    resumen = "\n".join(lineas) if lineas else "  (sin referencias documentales específicas detectadas)"
+    resumen = (
+        "\n".join(lineas) if lineas else "  (sin referencias documentales específicas detectadas)"
+    )
 
     return {
         "folios_citables": folios_top,

@@ -15,6 +15,7 @@ Resultado esperado: precedentes mejor rankeados → defensa apoyada en
 glosas que realmente comparten el patrón argumental, no solo palabras
 sueltas. Sin dependencias nuevas (~70 líneas de matemática pura).
 """
+
 import re
 import math
 import logging
@@ -41,8 +42,23 @@ def _similitud(a, b):
 
 
 def _palabras_clave(texto):
-    STOPWORDS_LEGACY = {"para", "como", "esta", "este", "pero", "donde", "cuando", "tiene",
-                        "valor", "glosa", "segun", "articulo", "dicho", "dicha", "sobre"}
+    STOPWORDS_LEGACY = {
+        "para",
+        "como",
+        "esta",
+        "este",
+        "pero",
+        "donde",
+        "cuando",
+        "tiene",
+        "valor",
+        "glosa",
+        "segun",
+        "articulo",
+        "dicho",
+        "dicha",
+        "sobre",
+    }
     palabras = re.findall(r"[a-záéíóúñ]{5,}", _normalizar(texto))
     return {p for p in palabras if p not in STOPWORDS_LEGACY}
 
@@ -50,16 +66,74 @@ def _palabras_clave(texto):
 # ─── BM25 nativo (núcleo del nuevo ranker) ───────────────────────────
 
 # Stopwords español + jerga genérica del dominio glosas (no aportan info)
-_STOPWORDS = frozenset({
-    "para", "como", "esta", "este", "pero", "donde", "cuando", "tiene",
-    "valor", "glosa", "segun", "según", "articulo", "artículo", "dicho",
-    "dicha", "sobre", "entre", "porque", "puede", "debe", "deben", "hace",
-    "hacer", "tambien", "también", "muy", "mas", "más", "menos", "ante",
-    "bajo", "con", "contra", "desde", "durante", "hasta", "mediante",
-    "para", "por", "sin", "sobre", "tras", "que", "los", "las", "del",
-    "una", "uno", "unos", "unas", "ese", "esa", "esos", "esas", "ello",
-    "todo", "toda", "todos", "todas", "otro", "otra", "otros", "otras",
-})
+_STOPWORDS = frozenset(
+    {
+        "para",
+        "como",
+        "esta",
+        "este",
+        "pero",
+        "donde",
+        "cuando",
+        "tiene",
+        "valor",
+        "glosa",
+        "segun",
+        "según",
+        "articulo",
+        "artículo",
+        "dicho",
+        "dicha",
+        "sobre",
+        "entre",
+        "porque",
+        "puede",
+        "debe",
+        "deben",
+        "hace",
+        "hacer",
+        "tambien",
+        "también",
+        "muy",
+        "mas",
+        "más",
+        "menos",
+        "ante",
+        "bajo",
+        "con",
+        "contra",
+        "desde",
+        "durante",
+        "hasta",
+        "mediante",
+        "para",
+        "por",
+        "sin",
+        "sobre",
+        "tras",
+        "que",
+        "los",
+        "las",
+        "del",
+        "una",
+        "uno",
+        "unos",
+        "unas",
+        "ese",
+        "esa",
+        "esos",
+        "esas",
+        "ello",
+        "todo",
+        "toda",
+        "todos",
+        "todas",
+        "otro",
+        "otra",
+        "otros",
+        "otras",
+    }
+)
 
 # Parámetros BM25 estándar — funcionan bien out-of-the-box
 BM25_K1 = 1.5
@@ -149,10 +223,7 @@ class RAGService:
         for terms in docs_terms:
             for t in set(terms):
                 df[t] = df.get(t, 0) + 1
-        idf = {
-            t: math.log(1 + (N - n + 0.5) / (n + 0.5))
-            for t, n in df.items()
-        }
+        idf = {t: math.log(1 + (N - n + 0.5) / (n + 0.5)) for t, n in df.items()}
         avg_doc_len = sum(len(d) for d in docs_terms) / max(N, 1)
 
         # Tokenizar query
@@ -180,15 +251,17 @@ class RAGService:
         for score, g in scored[:top_k]:
             extracto = re.sub(r"<[^>]+>", " ", (g.dictamen or "")[:600])
             extracto = re.sub(r"\s+", " ", extracto).strip()
-            resultados.append({
-                "codigo_glosa": g.codigo_glosa,
-                "eps": g.eps,
-                "etapa": g.etapa,
-                "decision_eps": g.decision_eps or "N/A",
-                "score_similitud": round(score, 3),
-                "extracto_dictamen": extracto,
-                "id": g.id,
-            })
+            resultados.append(
+                {
+                    "codigo_glosa": g.codigo_glosa,
+                    "eps": g.eps,
+                    "etapa": g.etapa,
+                    "decision_eps": g.decision_eps or "N/A",
+                    "score_similitud": round(score, 3),
+                    "extracto_dictamen": extracto,
+                    "id": g.id,
+                }
+            )
 
         if resultados:
             logger.debug(
@@ -200,8 +273,10 @@ class RAGService:
     def construir_contexto_rag(self, casos: list[dict]) -> str:
         if not casos:
             return ""
-        lineas = ["=== PRECEDENTES EXITOSOS DEL PROPIO HUS ===",
-                  f"Se encontraron {len(casos)} caso(s) similar(es):\n"]
+        lineas = [
+            "=== PRECEDENTES EXITOSOS DEL PROPIO HUS ===",
+            f"Se encontraron {len(casos)} caso(s) similar(es):\n",
+        ]
         for i, c in enumerate(casos, 1):
             lineas.append(
                 f"PRECEDENTE #{i} — Código: {c['codigo_glosa']} | EPS: {c['eps']}\n"

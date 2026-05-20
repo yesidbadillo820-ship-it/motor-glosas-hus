@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/proyeccion-vencimiento (R178 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, dr, valor=1000, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        dias_restantes=dr,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            dias_restantes=dr,
+        )
+    )
     db.commit()
 
 
@@ -59,8 +67,7 @@ class TestProyeccionVencimiento:
         r = client.get("/glosas/stats/proyeccion-vencimiento")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "total_glosas_proximas",
-                    "valor_total_proximas", "serie"):
+        for key in ("ventana_dias", "total_glosas_proximas", "valor_total_proximas", "serie"):
             assert key in d
 
     def test_excluye_vencidas_y_lejanas(self, client, db_session):

@@ -16,6 +16,7 @@ Uso: el admin entra a /admin/diagnostico (tab del SPA) y ve un panel
 verde-amarillo-rojo con cada componente. Si algo está rojo, tiene
 botones "Reindexar ahora" / "Refrescar noticias" para auto-fix.
 """
+
 from __future__ import annotations
 import os
 import logging
@@ -27,8 +28,12 @@ from sqlalchemy import func, desc
 from app.database import get_db
 from app.api.deps import get_admin
 from app.models.db import (
-    UsuarioRecord, GlosaRecord, NoticiaSaludRecord,
-    LoteImportacionRecord, ContratoRecord, ClausulaContrato,
+    UsuarioRecord,
+    GlosaRecord,
+    NoticiaSaludRecord,
+    LoteImportacionRecord,
+    ContratoRecord,
+    ClausulaContrato,
 )
 
 logger = logging.getLogger("motor_glosas")
@@ -94,6 +99,7 @@ def diagnostico_completo(
     # ─── Indexer de soportes ───────────────────────────────────────
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
+
         indexer = get_indexer()
         stats = indexer.stats()
         if stats.get("facturas_indexadas", 0) == 0:
@@ -129,7 +135,8 @@ def diagnostico_completo(
         n_activas = (
             db.query(func.count(NoticiaSaludRecord.id))
             .filter(NoticiaSaludRecord.activa == 1)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         ultima_noticia = (
             db.query(NoticiaSaludRecord.indexada_en)
@@ -180,9 +187,11 @@ def diagnostico_completo(
             "data": {},
         }
     else:
+
         def _do_ping_anthropic():
             try:
                 import httpx
+
                 timeout = httpx.Timeout(connect=8.0, read=15.0, write=8.0, pool=5.0)
                 with httpx.Client(timeout=timeout) as client:
                     resp = client.post(
@@ -207,7 +216,11 @@ def diagnostico_completo(
                     except Exception:
                         err_msg = resp.text[:120]
                     if "credit" in err_msg.lower():
-                        return "error", f"🚨 Sin créditos — recargar en console.anthropic.com/settings/billing. ({err_msg[:120]})", {}
+                        return (
+                            "error",
+                            f"🚨 Sin créditos — recargar en console.anthropic.com/settings/billing. ({err_msg[:120]})",
+                            {},
+                        )
                     return "warning", f"HTTP 400: {err_msg[:120]}", {}
                 if resp.status_code in (401, 403):
                     return "error", f"API key inválida o revocada (HTTP {resp.status_code})", {}
@@ -265,6 +278,7 @@ def diagnostico_completo(
         def _do_ping_gemini():
             try:
                 import httpx as _httpx_g
+
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent?key={gemini_key}"
                 payload = {
                     "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
@@ -273,11 +287,19 @@ def diagnostico_completo(
                 with _httpx_g.Client(timeout=10.0) as client:
                     rg = client.post(url, json=payload)
                 if rg.status_code == 200:
-                    return "ok", f"API key OK · ping {gemini_modelo} exitoso · {gemini_key[:10]}…", {}
+                    return (
+                        "ok",
+                        f"API key OK · ping {gemini_modelo} exitoso · {gemini_key[:10]}…",
+                        {},
+                    )
                 if rg.status_code in (400, 401, 403):
                     return "error", f"API key INVALIDA o sin permisos (HTTP {rg.status_code})", {}
                 if rg.status_code == 429:
-                    return "warning", "Rate limit del tier gratis hit (HTTP 429). Esperar 60s o usar Anthropic/Groq.", {}
+                    return (
+                        "warning",
+                        "Rate limit del tier gratis hit (HTTP 429). Esperar 60s o usar Anthropic/Groq.",
+                        {},
+                    )
                 return "warning", f"Ping HTTP {rg.status_code}: {rg.text[:120]}", {}
             except Exception as _eg:
                 return "warning", f"No se pudo hacer ping: {str(_eg)[:120]}", {}
@@ -312,6 +334,7 @@ def diagnostico_completo(
         def _do_ping_openrouter():
             try:
                 import httpx as _httpx_or
+
                 with _httpx_or.Client(timeout=10.0) as client:
                     r_or = client.post(
                         "https://openrouter.ai/api/v1/chat/completions",
@@ -329,11 +352,19 @@ def diagnostico_completo(
                         },
                     )
                 if r_or.status_code == 200:
-                    return "ok", f"API key OK · ping {openrouter_modelo} exitoso · {openrouter_key[:10]}…", {}
+                    return (
+                        "ok",
+                        f"API key OK · ping {openrouter_modelo} exitoso · {openrouter_key[:10]}…",
+                        {},
+                    )
                 if r_or.status_code in (401, 403):
                     return "error", f"API key INVALIDA o sin permisos (HTTP {r_or.status_code})", {}
                 if r_or.status_code == 429:
-                    return "warning", "Rate limit hit — esperar 60s o agregar credito en openrouter.ai/credits", {}
+                    return (
+                        "warning",
+                        "Rate limit hit — esperar 60s o agregar credito en openrouter.ai/credits",
+                        {},
+                    )
                 if r_or.status_code == 402:
                     return "error", "Sin credito — agregar fondos en openrouter.ai/credits", {}
                 return "warning", f"Ping HTTP {r_or.status_code}: {r_or.text[:120]}", {}
@@ -371,11 +402,13 @@ def diagnostico_completo(
         cliente_info = ""
         try:
             import sentry_sdk
+
             cliente = sentry_sdk.Hub.current.client
             if cliente and cliente.dsn:
                 sentry_activo = True
                 # Sólo mostramos el host del DSN (sin la key)
                 from urllib.parse import urlparse
+
                 host = urlparse(cliente.dsn).hostname or "?"
                 cliente_info = f"host={host} env={cliente.options.get('environment', '?')}"
         except Exception as _es:
@@ -384,7 +417,8 @@ def diagnostico_completo(
         out["secciones"]["sentry"] = {
             "estado": "ok" if sentry_activo else "warning",
             "mensaje": (
-                f"Sentry activo · {cliente_info}" if sentry_activo
+                f"Sentry activo · {cliente_info}"
+                if sentry_activo
                 else f"SENTRY_DSN configurado pero el cliente no quedó activo ({cliente_info})"
             ),
             "data": {
@@ -411,6 +445,7 @@ def diagnostico_completo(
     else:
         try:
             from app.services.posthog_service import disponible as ph_disponible
+
             activo = ph_disponible()
         except Exception:
             activo = False
@@ -434,12 +469,14 @@ def diagnostico_completo(
         n_lotes = (
             db.query(func.count(LoteImportacionRecord.id))
             .filter(LoteImportacionRecord.iniciado_en >= umbral_lote)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         n_procesando = (
             db.query(func.count(LoteImportacionRecord.id))
             .filter(LoteImportacionRecord.estado == "PROCESANDO")
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         out["secciones"]["lotes_importacion"] = {
             "estado": "warning" if n_procesando > 5 else "ok",
@@ -455,7 +492,8 @@ def diagnostico_completo(
         contratos_con_pdf = (
             db.query(func.count(ContratoRecord.eps))
             .filter(ContratoRecord.pdf_path.isnot(None))
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         out["secciones"]["clausulas_contratos"] = {
             "estado": "ok" if n_clausulas > 0 else "warning",
@@ -473,9 +511,7 @@ def diagnostico_completo(
         soportes_root = os.getenv("SOPORTES_ROOT", "/data/soportes")
         existe = os.path.exists(soportes_root)
         try:
-            disponible_bytes = (
-                __import__("shutil").disk_usage(soportes_root).free if existe else 0
-            )
+            disponible_bytes = __import__("shutil").disk_usage(soportes_root).free if existe else 0
             mb_disponible = round(disponible_bytes / (1024 * 1024), 1) if disponible_bytes else 0
         except Exception:
             mb_disponible = -1

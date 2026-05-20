@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/usuarios/exportar.csv (R105 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,8 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", nombre="Root",
-        rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        nombre="Root",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx_secreto"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -63,17 +68,32 @@ class TestExportarUsuariosCSV:
         r = client.get("/admin/usuarios/exportar.csv")
         primera = r.text.split("\n")[0]
         # Las 10 columnas esperadas
-        for col in ("id", "email", "nombre", "rol", "activo",
-                    "totp_activo", "must_change_password",
-                    "creado_en", "ultimo_login", "fallos_login"):
+        for col in (
+            "id",
+            "email",
+            "nombre",
+            "rol",
+            "activo",
+            "totp_activo",
+            "must_change_password",
+            "creado_en",
+            "ultimo_login",
+            "fallos_login",
+        ):
             assert col in primera
 
     def test_incluye_usuarios(self, client, db_session, usuario_super):
         # Agregar otro usuario
-        db_session.add(UsuarioRecord(
-            id=2, email="alice@x", nombre="Alice", rol="AUDITOR",
-            activo=1, password_hash=get_password_hash("y"),
-        ))
+        db_session.add(
+            UsuarioRecord(
+                id=2,
+                email="alice@x",
+                nombre="Alice",
+                rol="AUDITOR",
+                activo=1,
+                password_hash=get_password_hash("y"),
+            )
+        )
         db_session.commit()
 
         r = client.get("/admin/usuarios/exportar.csv")
@@ -92,12 +112,18 @@ class TestExportarUsuariosCSV:
 
     def test_no_revela_totp_secret(self, client, db_session):
         # Si hubiera totp_secret, no debe filtrarse
-        db_session.add(UsuarioRecord(
-            id=2, email="2fa@x", nombre="2FA", rol="AUDITOR",
-            activo=1, password_hash="x",
-            totp_secret="JBSWY3DPEHPK3PXP",  # secret de prueba
-            totp_activo=1,
-        ))
+        db_session.add(
+            UsuarioRecord(
+                id=2,
+                email="2fa@x",
+                nombre="2FA",
+                rol="AUDITOR",
+                activo=1,
+                password_hash="x",
+                totp_secret="JBSWY3DPEHPK3PXP",  # secret de prueba
+                totp_activo=1,
+            )
+        )
         db_session.commit()
 
         r = client.get("/admin/usuarios/exportar.csv")

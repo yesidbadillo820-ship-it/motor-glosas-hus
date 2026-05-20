@@ -33,6 +33,7 @@ puede invocar cualquier capacidad. El usuario puede hacer:
 
 Y la IA encadena: buscar_glosa → buscar_soportes → auditar_factura.
 """
+
 from __future__ import annotations
 import os
 import json
@@ -75,7 +76,10 @@ TOOLS_ASISTENTE = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "factura": {"type": "string", "description": "Número de factura (HUSXXXXX o solo dígitos)"},
+                "factura": {
+                    "type": "string",
+                    "description": "Número de factura (HUSXXXXX o solo dígitos)",
+                },
             },
             "required": ["factura"],
         },
@@ -99,7 +103,10 @@ TOOLS_ASISTENTE = [
             "type": "object",
             "properties": {
                 "factura": {"type": "string"},
-                "pregunta_especifica": {"type": "string", "description": "Qué busca el gestor — ej: 'verificar si está la baciloscopia' o 'audita esta factura'"},
+                "pregunta_especifica": {
+                    "type": "string",
+                    "description": "Qué busca el gestor — ej: 'verificar si está la baciloscopia' o 'audita esta factura'",
+                },
             },
             "required": ["factura", "pregunta_especifica"],
         },
@@ -113,7 +120,10 @@ TOOLS_ASISTENTE = [
                 "factura": {"type": "string"},
                 "eps": {"type": "string"},
                 "codigo_glosa": {"type": "string"},
-                "estado": {"type": "string", "description": "RADICADA, RESPONDIDA, LEVANTADA, RATIFICADA, ACEPTADA, CONCILIADA"},
+                "estado": {
+                    "type": "string",
+                    "description": "RADICADA, RESPONDIDA, LEVANTADA, RATIFICADA, ACEPTADA, CONCILIADA",
+                },
                 "limite": {"type": "integer", "default": 10},
             },
         },
@@ -182,25 +192,32 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
     try:
         if name == "buscar_soportes_por_factura":
             from app.services.soportes_autodiscovery_service import get_indexer
+
             soportes = get_indexer().lookup(args.get("factura", ""))
-            return json.dumps({"soportes": soportes[:10], "total": len(soportes)}, ensure_ascii=False)
+            return json.dumps(
+                {"soportes": soportes[:10], "total": len(soportes)}, ensure_ascii=False
+            )
 
         if name == "buscar_facturas_por_query":
             from app.services.soportes_autodiscovery_service import get_indexer
+
             grupos = get_indexer().buscar(args.get("query", ""), limite=args.get("limite", 10))
             return json.dumps({"resultados": grupos, "total": len(grupos)}, ensure_ascii=False)
 
         if name == "auditar_factura_forense":
             from app.services.soportes_autodiscovery_service import get_indexer
             from app.services.auditor_forense import auditar_forense
+
             factura = args.get("factura", "").strip().upper()
             pregunta = args.get("pregunta_especifica", "audita esta factura")
             soportes = get_indexer().lookup(factura)
             if not soportes:
-                return json.dumps({
-                    "error": f"No hay soportes indexados para {factura}",
-                    "sugerencia": "Verificar que el jump-box haya subido los archivos",
-                })
+                return json.dumps(
+                    {
+                        "error": f"No hay soportes indexados para {factura}",
+                        "sugerencia": "Verificar que el jump-box haya subido los archivos",
+                    }
+                )
             pdfs_raw = []
             for s in soportes[:5]:
                 ruta = s.get("ruta")
@@ -213,14 +230,18 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
             if not pdfs_raw:
                 return json.dumps({"error": "No se pudieron leer los PDFs"})
             res = await auditar_forense(factura, pregunta, pdfs_raw=pdfs_raw)
-            return json.dumps({
-                "html": res.get("html", "")[:8000],
-                "tokens": res.get("input_tokens", 0) + res.get("output_tokens", 0),
-                "soportes_usados": len(pdfs_raw),
-            }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "html": res.get("html", "")[:8000],
+                    "tokens": res.get("input_tokens", 0) + res.get("output_tokens", 0),
+                    "soportes_usados": len(pdfs_raw),
+                },
+                ensure_ascii=False,
+            )
 
         if name == "buscar_glosa_en_bd":
             from app.models.db import GlosaRecord
+
             q = db.query(GlosaRecord)
             if args.get("factura"):
                 q = q.filter(GlosaRecord.factura.ilike(f"%{args['factura']}%"))
@@ -231,71 +252,110 @@ async def execute_tool_asistente(name: str, args: dict, db, current_user) -> str
             if args.get("estado"):
                 q = q.filter(GlosaRecord.estado == args["estado"].upper())
             rows = q.order_by(GlosaRecord.creado_en.desc()).limit(args.get("limite", 10)).all()
-            return json.dumps({
-                "glosas": [
-                    {
-                        "id": g.id,
-                        "factura": g.factura,
-                        "eps": g.eps,
-                        "codigo_glosa": g.codigo_glosa,
-                        "valor_objetado": float(g.valor_objetado or 0),
-                        "estado": g.estado,
-                        "creado_en": g.creado_en.isoformat() if g.creado_en else None,
-                    }
-                    for g in rows
-                ],
-                "total": len(rows),
-            }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "glosas": [
+                        {
+                            "id": g.id,
+                            "factura": g.factura,
+                            "eps": g.eps,
+                            "codigo_glosa": g.codigo_glosa,
+                            "valor_objetado": float(g.valor_objetado or 0),
+                            "estado": g.estado,
+                            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+                        }
+                        for g in rows
+                    ],
+                    "total": len(rows),
+                },
+                ensure_ascii=False,
+            )
 
         if name == "lookup_norma_legal":
             from app.services.ia_tools import _exec_lookup_norma
-            return _exec_lookup_norma({
-                "tipo": args.get("tipo"),
-                "numero": args.get("numero"),
-                "anio": args.get("anio"),
-            })
+
+            return _exec_lookup_norma(
+                {
+                    "tipo": args.get("tipo"),
+                    "numero": args.get("numero"),
+                    "anio": args.get("anio"),
+                }
+            )
 
         if name == "buscar_clausulas_contrato":
             from app.services.ia_tools import _exec_buscar_clausula_contrato
-            return _exec_buscar_clausula_contrato({
-                "eps": args.get("eps"),
-                "tema": args.get("tema"),
-            })
+
+            return _exec_buscar_clausula_contrato(
+                {
+                    "eps": args.get("eps"),
+                    "tema": args.get("tema"),
+                }
+            )
 
         if name == "lookup_tarifa_pactada":
             from app.services.ia_tools import _exec_lookup_tarifa
-            return _exec_lookup_tarifa({
-                "eps": args.get("eps"),
-                "codigo_cups": args.get("codigo_cups"),
-            })
+
+            return _exec_lookup_tarifa(
+                {
+                    "eps": args.get("eps"),
+                    "codigo_cups": args.get("codigo_cups"),
+                }
+            )
 
         if name == "buscar_glosa_similar_levantada":
             from app.services.ia_tools import _exec_buscar_glosa_similar
-            return _exec_buscar_glosa_similar({
-                "eps": args.get("eps"),
-                "codigo_glosa": args.get("codigo_glosa"),
-                "limite": args.get("limite", 3),
-            })
+
+            return _exec_buscar_glosa_similar(
+                {
+                    "eps": args.get("eps"),
+                    "codigo_glosa": args.get("codigo_glosa"),
+                    "limite": args.get("limite", 3),
+                }
+            )
 
         if name == "estadisticas_sistema":
             from app.models.db import GlosaRecord
             from sqlalchemy import func
             from datetime import datetime, timezone
+
             ahora = datetime.now(timezone.utc)
             inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             n_total = db.query(func.count(GlosaRecord.id)).scalar() or 0
-            n_mes = db.query(func.count(GlosaRecord.id)).filter(GlosaRecord.creado_en >= inicio_mes).scalar() or 0
-            valor_obj_mes = db.query(func.sum(GlosaRecord.valor_objetado)).filter(GlosaRecord.creado_en >= inicio_mes).scalar() or 0
-            valor_rec_mes = db.query(func.sum(GlosaRecord.valor_recuperado)).filter(GlosaRecord.creado_en >= inicio_mes).scalar() or 0
-            n_levantadas = db.query(func.count(GlosaRecord.id)).filter(GlosaRecord.estado == "LEVANTADA").scalar() or 0
-            return json.dumps({
-                "glosas_total": n_total,
-                "glosas_mes": n_mes,
-                "valor_objetado_mes": float(valor_obj_mes),
-                "valor_recuperado_mes": float(valor_rec_mes),
-                "glosas_levantadas_total": n_levantadas,
-                "tasa_levantamiento_pct": round(100.0 * n_levantadas / max(n_total, 1), 2),
-            }, ensure_ascii=False)
+            n_mes = (
+                db.query(func.count(GlosaRecord.id))
+                .filter(GlosaRecord.creado_en >= inicio_mes)
+                .scalar()
+                or 0
+            )
+            valor_obj_mes = (
+                db.query(func.sum(GlosaRecord.valor_objetado))
+                .filter(GlosaRecord.creado_en >= inicio_mes)
+                .scalar()
+                or 0
+            )
+            valor_rec_mes = (
+                db.query(func.sum(GlosaRecord.valor_recuperado))
+                .filter(GlosaRecord.creado_en >= inicio_mes)
+                .scalar()
+                or 0
+            )
+            n_levantadas = (
+                db.query(func.count(GlosaRecord.id))
+                .filter(GlosaRecord.estado == "LEVANTADA")
+                .scalar()
+                or 0
+            )
+            return json.dumps(
+                {
+                    "glosas_total": n_total,
+                    "glosas_mes": n_mes,
+                    "valor_objetado_mes": float(valor_obj_mes),
+                    "valor_recuperado_mes": float(valor_rec_mes),
+                    "glosas_levantadas_total": n_levantadas,
+                    "tasa_levantamiento_pct": round(100.0 * n_levantadas / max(n_total, 1), 2),
+                },
+                ensure_ascii=False,
+            )
 
         return json.dumps({"error": f"Tool desconocida: {name}"})
     except Exception as e:
@@ -485,13 +545,10 @@ async def chat_con_asistente(
             # non-empty".
             contenido_asistente = _sanear_content(contenido)
             if contenido_asistente is not None:
-                msgs_anthropic.append(
-                    {"role": "assistant", "content": contenido_asistente}
-                )
+                msgs_anthropic.append({"role": "assistant", "content": contenido_asistente})
 
             tool_uses = [
-                b for b in contenido
-                if isinstance(b, dict) and b.get("type") == "tool_use"
+                b for b in contenido if isinstance(b, dict) and b.get("type") == "tool_use"
             ]
             if tool_uses and stop_reason == "tool_use":
                 # Ejecutar cada tool
@@ -501,19 +558,25 @@ async def chat_con_asistente(
                     tool_name = tu.get("name")
                     tool_input = tu.get("input", {})
                     logger.info(f"[ASISTENTE] turno={turno} tool={tool_name}")
-                    result_str = await execute_tool_asistente(tool_name, tool_input, db, current_user)
+                    result_str = await execute_tool_asistente(
+                        tool_name, tool_input, db, current_user
+                    )
                     if not (result_str or "").strip():
                         result_str = "(sin resultado)"
-                    tools_usadas.append({
-                        "name": tool_name,
-                        "args": tool_input,
-                        "result_preview": result_str[:200],
-                    })
-                    tool_results_content.append({
-                        "type": "tool_result",
-                        "tool_use_id": tool_id,
-                        "content": result_str,
-                    })
+                    tools_usadas.append(
+                        {
+                            "name": tool_name,
+                            "args": tool_input,
+                            "result_preview": result_str[:200],
+                        }
+                    )
+                    tool_results_content.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": result_str,
+                        }
+                    )
                 msgs_anthropic.append({"role": "user", "content": tool_results_content})
                 continue
 

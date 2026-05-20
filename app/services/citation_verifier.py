@@ -13,6 +13,7 @@ debajo del dictamen y sugiere reformulación.
 NO bloquea el envío — el gestor decide si corrige o ignora. Pero al menos
 no manda el dictamen a ciegas con citas inventadas.
 """
+
 import re
 import logging
 from typing import Optional
@@ -102,6 +103,7 @@ def _corpus_clausulas_contrato(eps: Optional[str] = None) -> str:
     try:
         from app.database import SessionLocal
         from app.models.db import ClausulaContrato
+
         db = SessionLocal()
         try:
             q = db.query(ClausulaContrato)
@@ -165,13 +167,15 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                 tipo_short = tipo_label[:3].lower()
                 clave = _buscar_clave_norma(tipo_short, numero, anio, normas)
                 if not clave:
-                    issues.append({
-                        "tipo": "NORMA_INEXISTENTE",
-                        "severidad": "ALTA",
-                        "cita": f"{tipo_label} {numero} de {anio}",
-                        "detalle": f"No existe en el corpus normativo cargado ({tipo_label} {numero}/{anio}).",
-                        "sugerencia": "Verifica la cita o reemplaza por una norma vigente del corpus.",
-                    })
+                    issues.append(
+                        {
+                            "tipo": "NORMA_INEXISTENTE",
+                            "severidad": "ALTA",
+                            "cita": f"{tipo_label} {numero} de {anio}",
+                            "detalle": f"No existe en el corpus normativo cargado ({tipo_label} {numero}/{anio}).",
+                            "sugerencia": "Verifica la cita o reemplaza por una norma vigente del corpus.",
+                        }
+                    )
 
     # 2. Verificar Sentencias
     for m in PAT_SENTENCIA.finditer(texto):
@@ -181,13 +185,15 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
             anio = "20" + anio if int(anio) < 50 else "19" + anio
         clave = _buscar_clave_norma(sala.lower(), num, anio, normas)
         if not clave:
-            issues.append({
-                "tipo": "NORMA_INEXISTENTE",
-                "severidad": "MEDIA",
-                "cita": f"Sentencia {sala.upper()}-{num}/{anio}",
-                "detalle": "Sentencia no incluida en el corpus jurisprudencial.",
-                "sugerencia": "Verifica que la sentencia exista o reemplaza por una conocida (ej: T-760/2008, T-1025/2002).",
-            })
+            issues.append(
+                {
+                    "tipo": "NORMA_INEXISTENTE",
+                    "severidad": "MEDIA",
+                    "cita": f"Sentencia {sala.upper()}-{num}/{anio}",
+                    "detalle": "Sentencia no incluida en el corpus jurisprudencial.",
+                    "sugerencia": "Verifica que la sentencia exista o reemplaza por una conocida (ej: T-760/2008, T-1025/2002).",
+                }
+            )
 
     # 3. Verificar artículos cuando se citan junto a su norma
     for m in PAT_ARTICULO.finditer(texto):
@@ -205,13 +211,15 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
             # Las claves de articulos pueden ser strings o ints
             keys_art = {str(k) for k in arts.keys()}
             if str(art_num) not in keys_art:
-                issues.append({
-                    "tipo": "ARTICULO_FUERA_DE_NORMA",
-                    "severidad": "MEDIA",
-                    "cita": f"Art. {art_num} {norma_tipo} {norma_num}/{norma_anio}",
-                    "detalle": f"La {norma_tipo} {norma_num}/{norma_anio} no contiene el Art. {art_num} en el corpus cargado.",
-                    "sugerencia": "Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
-                })
+                issues.append(
+                    {
+                        "tipo": "ARTICULO_FUERA_DE_NORMA",
+                        "severidad": "MEDIA",
+                        "cita": f"Art. {art_num} {norma_tipo} {norma_num}/{norma_anio}",
+                        "detalle": f"La {norma_tipo} {norma_num}/{norma_anio} no contiene el Art. {art_num} en el corpus cargado.",
+                        "sugerencia": "Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
+                    }
+                )
 
     # 4. Verificar citas literales entre chevrones
     citas_literales = PAT_CITA_LITERAL.findall(texto)
@@ -224,9 +232,7 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
             + " "
             + _normalizar(n.get("extracto_judicial", ""))
             + " "
-            + " ".join(
-                _normalizar(a.get("texto", "")) for a in (n.get("articulos") or {}).values()
-            )
+            + " ".join(_normalizar(a.get("texto", "")) for a in (n.get("articulos") or {}).values())
             for n in normas.values()
         )
         # Ampliar corpus con clausulas literales extraidas del PDF del contrato
@@ -246,13 +252,15 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                 # Probamos también con los primeros 60 chars
                 inicio = cita_norm[:60]
                 if inicio not in corpus_normalizado:
-                    issues.append({
-                        "tipo": "CITA_LITERAL_FALSA",
-                        "severidad": "ALTA",
-                        "cita": "«" + (cita[:140] + "..." if len(cita) > 140 else cita) + "»",
-                        "detalle": "Este texto entrecomillado no se encuentra literalmente en el corpus normativo cargado. Puede ser una cita inventada por la IA.",
-                        "sugerencia": "Reemplaza el texto entre comillas por una cita literal de una norma real, o quita las comillas si solo querías parafrasear.",
-                    })
+                    issues.append(
+                        {
+                            "tipo": "CITA_LITERAL_FALSA",
+                            "severidad": "ALTA",
+                            "cita": "«" + (cita[:140] + "..." if len(cita) > 140 else cita) + "»",
+                            "detalle": "Este texto entrecomillado no se encuentra literalmente en el corpus normativo cargado. Puede ser una cita inventada por la IA.",
+                            "sugerencia": "Reemplaza el texto entre comillas por una cita literal de una norma real, o quita las comillas si solo querías parafrasear.",
+                        }
+                    )
 
     ok = max(0, total_citas - len(issues))
     tiene_graves = any(i["severidad"] == "ALTA" for i in issues)

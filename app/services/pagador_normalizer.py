@@ -16,6 +16,7 @@ Este módulo expone tres formas canónicas:
   • nombre_corto(): la marca comercial limpia (ej. "DISPENSARIO MÉDICO BUCARAMANGA")
   • nombre_largo(): forma completa "<código> · <nombre_corto>" para encabezados
 """
+
 from __future__ import annotations
 
 import re

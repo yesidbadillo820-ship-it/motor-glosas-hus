@@ -8,6 +8,7 @@ Genera: docs/usuarios_motor_glosas.xlsx con 3 hojas:
   2. Guía de Ingreso y Uso
   3. Recomendaciones para no saturar la IA
 """
+
 import sys
 from pathlib import Path
 
@@ -22,35 +23,35 @@ from openpyxl.utils import get_column_letter
 # Lista canónica de 29 usuarios (actualizada 22/04/2026).
 # Password inicial de cada usuario = prefijo del email (parte antes del @).
 USUARIOS = [
-    ("Auditor Principal",               "admin@hus.gov.co",                     "SUPER_ADMIN"),
-    ("YESID PEREZ",                     "glosashus09@sinacsc.com",              "SUPER_ADMIN"),
-    ("YENFERSON ORTEGA",                "coordinadorglosashus01@sinacsc.com",   "COORDINADOR"),
-    ("DIANEYDA QUINTERO",               "glosashus11@sinacsc.com",              "AUDITOR"),
-    ("RUBY MILENA",                     "carterahus04@sinacsc.com",             "AUDITOR"),
-    ("CAROLINA CIFUENTES",              "glosashus02@sinacsc.com",              "AUDITOR"),
-    ("JHON JAIMES",                     "glosashus04@sinacsc.com",              "AUDITOR"),
-    ("MARICELA ROJAS",                  "glosashus05@sinacsc.com",              "AUDITOR"),
-    ("IRMA RIOS",                       "carterahus01@sinacsc.com",             "AUDITOR"),
-    ("A_A_A_A (EQUIPO ASEGURADORAS)",   "glosashus12@sinacsc.com",              "AUDITOR"),
-    ("A_A_A_A (EQUIPO ASEGURADORAS)",   "devoluciones02@sinacsc.com",           "AUDITOR"),
-    ("A_A_A_A (EQUIPO ASEGURADORAS)",   "glosashus10@sinacsc.com",              "AUDITOR"),
-    ("A_A_A_A (EQUIPO ASEGURADORAS)",   "glosashus16@sinacsc.com",              "AUDITOR"),
-    ("KAREN ORTIZ",                     "radicadevoluciones@sinacsc.com",       "AUDITOR"),
-    ("YUDY AMAYA",                      "coordinacioncartera@hus.gov.co",       "AUDITOR"),
-    ("CLAUDIA SUAREZ",                  "glosashus08@sinacsc.com",              "AUDITOR"),
-    ("SOFIA ORTEGA",                    "glosashus07@sinacsc.com",              "AUDITOR"),
-    ("PATRICIA QUIÑONES",               "carterahus05@sinacsc.com",             "AUDITOR"),
-    ("LAURA DIAZ",                      "auditorhus01@sinacsc.com",             "AUDITOR"),
-    ("LEYDI ZULAY GONZALEZ",            "auditorhus03@sinacsc.com",             "AUDITOR"),
-    ("LEIDY JHOANA SANGUINO",           "auditorhus02@sinacsc.com",             "AUDITOR"),
-    ("JOHANNA MORENO",                  "devoluciones03@sinacsc.com",           "AUDITOR"),
-    ("EDGAR SILVA",                     "devoluciones1@sinacsc.com",            "AUDITOR"),
-    ("OSCAR VILLAMIZAR",                "glosashus03@sinacsc.com",              "AUDITOR"),
-    ("SEBASTIAN SANCHES",               "devoluciones01@sinacsc.com",           "AUDITOR"),
-    ("DANIEL FONCE",                    "glosashus01@sinacsc.com",              "AUDITOR"),
-    ("ELIAS CARVAJAL",                  "glosashus15@sinacsc.com",              "AUDITOR"),
-    ("IVAN ARCINIEGAS",                 "glosashus13@sinacsc.com",              "AUDITOR"),
-    ("CAMILO CASTILLO",                 "glosashus14@sinacsc.com",              "AUDITOR"),
+    ("Auditor Principal", "admin@hus.gov.co", "SUPER_ADMIN"),
+    ("YESID PEREZ", "glosashus09@sinacsc.com", "SUPER_ADMIN"),
+    ("YENFERSON ORTEGA", "coordinadorglosashus01@sinacsc.com", "COORDINADOR"),
+    ("DIANEYDA QUINTERO", "glosashus11@sinacsc.com", "AUDITOR"),
+    ("RUBY MILENA", "carterahus04@sinacsc.com", "AUDITOR"),
+    ("CAROLINA CIFUENTES", "glosashus02@sinacsc.com", "AUDITOR"),
+    ("JHON JAIMES", "glosashus04@sinacsc.com", "AUDITOR"),
+    ("MARICELA ROJAS", "glosashus05@sinacsc.com", "AUDITOR"),
+    ("IRMA RIOS", "carterahus01@sinacsc.com", "AUDITOR"),
+    ("A_A_A_A (EQUIPO ASEGURADORAS)", "glosashus12@sinacsc.com", "AUDITOR"),
+    ("A_A_A_A (EQUIPO ASEGURADORAS)", "devoluciones02@sinacsc.com", "AUDITOR"),
+    ("A_A_A_A (EQUIPO ASEGURADORAS)", "glosashus10@sinacsc.com", "AUDITOR"),
+    ("A_A_A_A (EQUIPO ASEGURADORAS)", "glosashus16@sinacsc.com", "AUDITOR"),
+    ("KAREN ORTIZ", "radicadevoluciones@sinacsc.com", "AUDITOR"),
+    ("YUDY AMAYA", "coordinacioncartera@hus.gov.co", "AUDITOR"),
+    ("CLAUDIA SUAREZ", "glosashus08@sinacsc.com", "AUDITOR"),
+    ("SOFIA ORTEGA", "glosashus07@sinacsc.com", "AUDITOR"),
+    ("PATRICIA QUIÑONES", "carterahus05@sinacsc.com", "AUDITOR"),
+    ("LAURA DIAZ", "auditorhus01@sinacsc.com", "AUDITOR"),
+    ("LEYDI ZULAY GONZALEZ", "auditorhus03@sinacsc.com", "AUDITOR"),
+    ("LEIDY JHOANA SANGUINO", "auditorhus02@sinacsc.com", "AUDITOR"),
+    ("JOHANNA MORENO", "devoluciones03@sinacsc.com", "AUDITOR"),
+    ("EDGAR SILVA", "devoluciones1@sinacsc.com", "AUDITOR"),
+    ("OSCAR VILLAMIZAR", "glosashus03@sinacsc.com", "AUDITOR"),
+    ("SEBASTIAN SANCHES", "devoluciones01@sinacsc.com", "AUDITOR"),
+    ("DANIEL FONCE", "glosashus01@sinacsc.com", "AUDITOR"),
+    ("ELIAS CARVAJAL", "glosashus15@sinacsc.com", "AUDITOR"),
+    ("IVAN ARCINIEGAS", "glosashus13@sinacsc.com", "AUDITOR"),
+    ("CAMILO CASTILLO", "glosashus14@sinacsc.com", "AUDITOR"),
 ]
 
 
@@ -107,7 +108,7 @@ def crear_hoja_credenciales(wb):
         "Credenciales de Acceso · 29 usuarios",
         "La CONTRASEÑA INICIAL es el PREFIJO del correo (parte antes del @). "
         "Ej.: glosashus04@sinacsc.com → contraseña: glosashus04 · "
-        "Cambie su contraseña en el primer ingreso."
+        "Cambie su contraseña en el primer ingreso.",
     )
 
     headers = ["#", "Nombre completo", "Correo institucional", "Contraseña inicial", "Rol"]
@@ -126,7 +127,7 @@ def crear_hoja_credenciales(wb):
     rol_colors = {
         "SUPER_ADMIN": ("FEF3C7", "92400E"),
         "COORDINADOR": ("E0E7FF", "3730A3"),
-        "AUDITOR":     ("DBEAFE", "1E40AF"),
+        "AUDITOR": ("DBEAFE", "1E40AF"),
     }
     fill_alt = PatternFill("solid", fgColor="F8FAFC")
 
@@ -206,57 +207,120 @@ def crear_hoja_guia(wb):
     _hoja_titulo(
         ws,
         "Guía de Ingreso y Uso de la IA",
-        "Lea esta guía antes del primer uso. Tiempo estimado: 5 minutos."
+        "Lea esta guía antes del primer uso. Tiempo estimado: 5 minutos.",
     )
 
     secciones = [
-        ("🔐 1. INGRESAR AL SISTEMA", [
-            ("URL", "https://motor-glosas-hus.onrender.com"),
-            ("Correo", "El que aparece en la hoja 'Credenciales'."),
-            ("Contraseña", "Prefijo del correo (ej. glosashus04@sinacsc.com → glosashus04)."),
-            ("Primer login", "El sistema le pide cambiar la contraseña. Use una segura (8+ caracteres, números, símbolos)."),
-            ("Problemas", "Si ve pantalla en blanco, visite /reset-sw.html y vuelva a entrar."),
-        ]),
-        ("⚖️ 2. ANALIZAR UNA GLOSA INDIVIDUAL", [
-            ("Paso 1", "Panel 'Analizar glosa' (menú lateral izquierdo)."),
-            ("Paso 2", "Seleccionar EPS / Pagador del desplegable. Si no aparece, elija 'OTRA / SIN DEFINIR'."),
-            ("Paso 3", "Pegar el NÚMERO DE FACTURA. El sistema buscará conceptos ya cargados."),
-            ("Paso 4", "Si aparece la caja azul con los conceptos, haga click en el que desea responder. El texto se autocompleta."),
-            ("Paso 5", "Elegir etapa (RESPUESTA A GLOSA / RATIFICADA / ACLARACIÓN)."),
-            ("Paso 6", "Tono: Conciliador para Salud Total/EPS confiables; Firme para cuando hay que exigir pago."),
-            ("Paso 7", "Subir soportes PDF (opcional, hasta 10 archivos de 15MB)."),
-            ("Paso 8", "Click en ANALIZAR. La IA demora 10-30 segundos."),
-        ]),
-        ("📥 3. IMPORTAR RECEPCIÓN (Excel 4 hojas)", [
-            ("Dónde", "Menú lateral → 'Importar recepción'."),
-            ("Formato", "Excel (.xlsx) con 4 hojas: INICIAL, RATIFICADA, I, R."),
-            ("Qué hace", "Crea las glosas automáticamente, las asigna a cada gestor, carga todos los conceptos."),
-            ("Después", "Cada gestor las ve en su bandeja 'Mis glosas'. Los conceptos aparecen al buscar la factura en Analizar."),
-        ]),
-        ("📋 4. IMPORTACIÓN MASIVA (copy-paste Excel)", [
-            ("Dónde", "Menú lateral → 'Importación masiva'."),
-            ("Cuándo usar", "Cuando tiene varias glosas en Excel y quiere procesar de golpe."),
-            ("Separador", "Tab o pipe (|) — auto-detectado. Pegue directo desde Excel."),
-            ("Columnas", "ENTIDAD | FACTURA | VALOR | CÓDIGO | CONCEPTO | CUPS | SERVICIO | MOTIVO."),
-        ]),
-        ("💚 5. SALUD TOTAL (archivo TXT)", [
-            ("Dónde", "Menú lateral → 'Salud Total'."),
-            ("Archivo", "TXT separado por TAB o pipe con 24 columnas."),
-            ("Tipo respuesta", "Extemporánea (fuera de términos) / Ratificada / IA (análisis completo)."),
-            ("Resultado", "Descarga un TXT formateado listo para radicar en el portal de Salud Total EPS."),
-        ]),
-        ("🔍 6. ATAJOS ÚTILES", [
-            ("Cmd + K (Ctrl + K)", "Spotlight: busca glosas, usuarios, EPS, contratos o abre cualquier sección."),
-            ("Mis glosas", "Sus glosas asignadas con semáforo de vencimiento (verde/amarillo/rojo/negro)."),
-            ("Historial", "Todas las glosas procesadas (filtro por EPS, fecha, código)."),
-            ("Alertas", "Glosas próximas a vencer (según días hábiles desde recepción)."),
-            ("Dashboard", "KPIs del mes y tendencias de 6 meses (solo COORDINADOR/SUPER_ADMIN)."),
-        ]),
-        ("📄 7. DESCARGAR PDF DEL DICTAMEN", [
-            ("Después de analizar", "Botón 'Imprimir PDF' en el resultado."),
-            ("Contenido", "Cabecera institucional, tabla de códigos, argumento jurídico, mensaje de tiempo, firmas, pie de página SINAC."),
-            ("Para radicar", "Firme manualmente el PDF impreso y adjunte al radicado en la EPS."),
-        ]),
+        (
+            "🔐 1. INGRESAR AL SISTEMA",
+            [
+                ("URL", "https://motor-glosas-hus.onrender.com"),
+                ("Correo", "El que aparece en la hoja 'Credenciales'."),
+                ("Contraseña", "Prefijo del correo (ej. glosashus04@sinacsc.com → glosashus04)."),
+                (
+                    "Primer login",
+                    "El sistema le pide cambiar la contraseña. Use una segura (8+ caracteres, números, símbolos).",
+                ),
+                ("Problemas", "Si ve pantalla en blanco, visite /reset-sw.html y vuelva a entrar."),
+            ],
+        ),
+        (
+            "⚖️ 2. ANALIZAR UNA GLOSA INDIVIDUAL",
+            [
+                ("Paso 1", "Panel 'Analizar glosa' (menú lateral izquierdo)."),
+                (
+                    "Paso 2",
+                    "Seleccionar EPS / Pagador del desplegable. Si no aparece, elija 'OTRA / SIN DEFINIR'.",
+                ),
+                ("Paso 3", "Pegar el NÚMERO DE FACTURA. El sistema buscará conceptos ya cargados."),
+                (
+                    "Paso 4",
+                    "Si aparece la caja azul con los conceptos, haga click en el que desea responder. El texto se autocompleta.",
+                ),
+                ("Paso 5", "Elegir etapa (RESPUESTA A GLOSA / RATIFICADA / ACLARACIÓN)."),
+                (
+                    "Paso 6",
+                    "Tono: Conciliador para Salud Total/EPS confiables; Firme para cuando hay que exigir pago.",
+                ),
+                ("Paso 7", "Subir soportes PDF (opcional, hasta 10 archivos de 15MB)."),
+                ("Paso 8", "Click en ANALIZAR. La IA demora 10-30 segundos."),
+            ],
+        ),
+        (
+            "📥 3. IMPORTAR RECEPCIÓN (Excel 4 hojas)",
+            [
+                ("Dónde", "Menú lateral → 'Importar recepción'."),
+                ("Formato", "Excel (.xlsx) con 4 hojas: INICIAL, RATIFICADA, I, R."),
+                (
+                    "Qué hace",
+                    "Crea las glosas automáticamente, las asigna a cada gestor, carga todos los conceptos.",
+                ),
+                (
+                    "Después",
+                    "Cada gestor las ve en su bandeja 'Mis glosas'. Los conceptos aparecen al buscar la factura en Analizar.",
+                ),
+            ],
+        ),
+        (
+            "📋 4. IMPORTACIÓN MASIVA (copy-paste Excel)",
+            [
+                ("Dónde", "Menú lateral → 'Importación masiva'."),
+                ("Cuándo usar", "Cuando tiene varias glosas en Excel y quiere procesar de golpe."),
+                ("Separador", "Tab o pipe (|) — auto-detectado. Pegue directo desde Excel."),
+                (
+                    "Columnas",
+                    "ENTIDAD | FACTURA | VALOR | CÓDIGO | CONCEPTO | CUPS | SERVICIO | MOTIVO.",
+                ),
+            ],
+        ),
+        (
+            "💚 5. SALUD TOTAL (archivo TXT)",
+            [
+                ("Dónde", "Menú lateral → 'Salud Total'."),
+                ("Archivo", "TXT separado por TAB o pipe con 24 columnas."),
+                (
+                    "Tipo respuesta",
+                    "Extemporánea (fuera de términos) / Ratificada / IA (análisis completo).",
+                ),
+                (
+                    "Resultado",
+                    "Descarga un TXT formateado listo para radicar en el portal de Salud Total EPS.",
+                ),
+            ],
+        ),
+        (
+            "🔍 6. ATAJOS ÚTILES",
+            [
+                (
+                    "Cmd + K (Ctrl + K)",
+                    "Spotlight: busca glosas, usuarios, EPS, contratos o abre cualquier sección.",
+                ),
+                (
+                    "Mis glosas",
+                    "Sus glosas asignadas con semáforo de vencimiento (verde/amarillo/rojo/negro).",
+                ),
+                ("Historial", "Todas las glosas procesadas (filtro por EPS, fecha, código)."),
+                ("Alertas", "Glosas próximas a vencer (según días hábiles desde recepción)."),
+                (
+                    "Dashboard",
+                    "KPIs del mes y tendencias de 6 meses (solo COORDINADOR/SUPER_ADMIN).",
+                ),
+            ],
+        ),
+        (
+            "📄 7. DESCARGAR PDF DEL DICTAMEN",
+            [
+                ("Después de analizar", "Botón 'Imprimir PDF' en el resultado."),
+                (
+                    "Contenido",
+                    "Cabecera institucional, tabla de códigos, argumento jurídico, mensaje de tiempo, firmas, pie de página SINAC.",
+                ),
+                (
+                    "Para radicar",
+                    "Firme manualmente el PDF impreso y adjunte al radicado en la EPS.",
+                ),
+            ],
+        ),
     ]
 
     r = 5
@@ -294,51 +358,71 @@ def crear_hoja_recomendaciones(wb):
     _hoja_titulo(
         ws,
         "Recomendaciones para el Equipo · Uso eficiente de la IA",
-        "Seguir estas prácticas evita costos altos, respuestas genéricas y spam en el sistema."
+        "Seguir estas prácticas evita costos altos, respuestas genéricas y spam en el sistema.",
     )
 
     bloques = [
-        ("✅ QUÉ SÍ HACER", BRAND_GREEN, [
-            "Usar el autocompletado de factura: al pegar el número, el sistema trae los conceptos ya cargados — evita redigitar.",
-            "Seleccionar el concepto específico antes de analizar (no dejar el texto genérico 'glosa objetada por la entidad pagadora').",
-            "Elegir el tono correcto: Firme solo cuando la EPS ya rechazó una vez; Conciliador en primera vuelta.",
-            "Revisar el dictamen antes de radicar — la IA puede equivocarse en detalles; usted firma.",
-            "Subir TODOS los soportes PDF relevantes (historia clínica, autorización, RIPS) al analizar. La IA los usa como contexto.",
-            "Usar 'Refinar' en el modal cuando quiera ajustar tono o cita de una norma específica — no re-analizar desde cero.",
-            "Guardar argumentos ganadores como 'Plantilla Gold' (⭐): la IA los usa de ejemplo en casos similares futuros.",
-            "Agrupar glosas por factura y usar 'Analizar todos' en vez de ir una por una — más rápido y consistente.",
-        ]),
-        ("❌ QUÉ NO HACER", "DC2626", [
-            "NO analizar la misma glosa múltiples veces seguidas para 'probar' respuestas. Cada clic cuesta tokens y queda en auditoría.",
-            "NO pegar textos inútiles (ej. 'hola', '123', 'test', solo el código glosa TA0801 sin contexto). La IA genera respuesta mala.",
-            "NO subir PDFs de 15MB si solo necesita 2-3 páginas. Comprímalos antes (ILovePDF, Smallpdf).",
-            "NO usar el sistema desde 5 pestañas a la vez — se pisan las sesiones.",
-            "NO spamear el botón Analizar si tarda — la primera petición ya está en curso. Espere la respuesta.",
-            "NO modificar manualmente el dictamen para borrar citas legales. La IA calibra normativa; si quiere otra cita, use 'Refinar'.",
-            "NO compartir credenciales con compañeros. Cada acción queda registrada al dueño del correo.",
-            "NO usar glosas ajenas para 'aprender'. Cada auditor ve las suyas; el COORDINADOR ve todo.",
-        ]),
-        ("📈 PARA RESPUESTAS DE MEJOR CALIDAD", BRAND_TEAL, [
-            "Dé contexto: Número de factura + Código glosa + Servicio + Valor. La IA rinde 3× mejor con datos completos.",
-            "Si la EPS escribió una OBSERVACIÓN específica (ej. 'no concuerda cantidad facturada'), péguela completa. Ahí está la clave.",
-            "Para glosas ratificadas use el tono Firme + cite la Ley 1438 Art. 57 y exija mesa de conciliación.",
-            "Para glosas extemporáneas, la IA detecta automáticamente si superan 20 días hábiles y responde con plantilla RE9502.",
-            "Si el dictamen cita una norma derogada o incorrecta (raro), use 'Validar' ✅ en el modal — el sistema detecta automáticamente.",
-        ]),
-        ("⚡ USO RESPONSABLE DE TOKENS IA", BRAND_AMBER, [
-            "Cada análisis = ~2000-4000 tokens = costo real. Un uso responsable beneficia a todo el equipo.",
-            "Lote grande (50+ conceptos)? Usar 'Analizar todos' con pausa automática entre llamadas (rate-limit interno).",
-            "Antes de analizar, revise si la glosa YA tiene dictamen en Historial. No duplicar trabajo.",
-            "Si necesita re-generar, use 'Regenerar' — mantiene contexto; NO borrar y analizar de nuevo.",
-            "Horarios de menor carga (8–11 am) responden más rápido que horarios punta.",
-        ]),
-        ("🆘 SI ALGO NO FUNCIONA", "3730A3", [
-            "Pantalla en blanco al entrar → visite /reset-sw.html y recargue con Ctrl+Shift+R.",
-            "Mensaje 500 o 'Error interno' → intente de nuevo en 1-2 min; si persiste, reporte al COORDINADOR.",
-            "Import masiva falla → verifique que el archivo Excel tenga las 4 hojas con los encabezados correctos.",
-            "Contraseña olvidada → el SUPER_ADMIN (YESID o Auditor Principal) puede resetearla en el panel Usuarios.",
-            "Sugerencias de mejora → anotarlas y enviarlas al COORDINADOR (YENFERSON ORTEGA).",
-        ]),
+        (
+            "✅ QUÉ SÍ HACER",
+            BRAND_GREEN,
+            [
+                "Usar el autocompletado de factura: al pegar el número, el sistema trae los conceptos ya cargados — evita redigitar.",
+                "Seleccionar el concepto específico antes de analizar (no dejar el texto genérico 'glosa objetada por la entidad pagadora').",
+                "Elegir el tono correcto: Firme solo cuando la EPS ya rechazó una vez; Conciliador en primera vuelta.",
+                "Revisar el dictamen antes de radicar — la IA puede equivocarse en detalles; usted firma.",
+                "Subir TODOS los soportes PDF relevantes (historia clínica, autorización, RIPS) al analizar. La IA los usa como contexto.",
+                "Usar 'Refinar' en el modal cuando quiera ajustar tono o cita de una norma específica — no re-analizar desde cero.",
+                "Guardar argumentos ganadores como 'Plantilla Gold' (⭐): la IA los usa de ejemplo en casos similares futuros.",
+                "Agrupar glosas por factura y usar 'Analizar todos' en vez de ir una por una — más rápido y consistente.",
+            ],
+        ),
+        (
+            "❌ QUÉ NO HACER",
+            "DC2626",
+            [
+                "NO analizar la misma glosa múltiples veces seguidas para 'probar' respuestas. Cada clic cuesta tokens y queda en auditoría.",
+                "NO pegar textos inútiles (ej. 'hola', '123', 'test', solo el código glosa TA0801 sin contexto). La IA genera respuesta mala.",
+                "NO subir PDFs de 15MB si solo necesita 2-3 páginas. Comprímalos antes (ILovePDF, Smallpdf).",
+                "NO usar el sistema desde 5 pestañas a la vez — se pisan las sesiones.",
+                "NO spamear el botón Analizar si tarda — la primera petición ya está en curso. Espere la respuesta.",
+                "NO modificar manualmente el dictamen para borrar citas legales. La IA calibra normativa; si quiere otra cita, use 'Refinar'.",
+                "NO compartir credenciales con compañeros. Cada acción queda registrada al dueño del correo.",
+                "NO usar glosas ajenas para 'aprender'. Cada auditor ve las suyas; el COORDINADOR ve todo.",
+            ],
+        ),
+        (
+            "📈 PARA RESPUESTAS DE MEJOR CALIDAD",
+            BRAND_TEAL,
+            [
+                "Dé contexto: Número de factura + Código glosa + Servicio + Valor. La IA rinde 3× mejor con datos completos.",
+                "Si la EPS escribió una OBSERVACIÓN específica (ej. 'no concuerda cantidad facturada'), péguela completa. Ahí está la clave.",
+                "Para glosas ratificadas use el tono Firme + cite la Ley 1438 Art. 57 y exija mesa de conciliación.",
+                "Para glosas extemporáneas, la IA detecta automáticamente si superan 20 días hábiles y responde con plantilla RE9502.",
+                "Si el dictamen cita una norma derogada o incorrecta (raro), use 'Validar' ✅ en el modal — el sistema detecta automáticamente.",
+            ],
+        ),
+        (
+            "⚡ USO RESPONSABLE DE TOKENS IA",
+            BRAND_AMBER,
+            [
+                "Cada análisis = ~2000-4000 tokens = costo real. Un uso responsable beneficia a todo el equipo.",
+                "Lote grande (50+ conceptos)? Usar 'Analizar todos' con pausa automática entre llamadas (rate-limit interno).",
+                "Antes de analizar, revise si la glosa YA tiene dictamen en Historial. No duplicar trabajo.",
+                "Si necesita re-generar, use 'Regenerar' — mantiene contexto; NO borrar y analizar de nuevo.",
+                "Horarios de menor carga (8–11 am) responden más rápido que horarios punta.",
+            ],
+        ),
+        (
+            "🆘 SI ALGO NO FUNCIONA",
+            "3730A3",
+            [
+                "Pantalla en blanco al entrar → visite /reset-sw.html y recargue con Ctrl+Shift+R.",
+                "Mensaje 500 o 'Error interno' → intente de nuevo en 1-2 min; si persiste, reporte al COORDINADOR.",
+                "Import masiva falla → verifique que el archivo Excel tenga las 4 hojas con los encabezados correctos.",
+                "Contraseña olvidada → el SUPER_ADMIN (YESID o Auditor Principal) puede resetearla en el panel Usuarios.",
+                "Sugerencias de mejora → anotarlas y enviarlas al COORDINADOR (YENFERSON ORTEGA).",
+            ],
+        ),
     ]
 
     r = 5
@@ -381,8 +465,8 @@ def main() -> None:
     wb.save(output)
     print(f"OK Excel generado: {output}")
     print(f"  Hoja 1: Credenciales ({len(USUARIOS)} usuarios)")
-    print(f"  Hoja 2: Guia de Uso")
-    print(f"  Hoja 3: Buenas practicas IA")
+    print("  Hoja 2: Guia de Uso")
+    print("  Hoja 3: Buenas practicas IA")
 
 
 if __name__ == "__main__":

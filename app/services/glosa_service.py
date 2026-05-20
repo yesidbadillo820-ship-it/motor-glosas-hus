@@ -47,7 +47,8 @@ def _calcular_costo_anthropic_usd(usage: dict, modelo: str) -> float:
     if not isinstance(usage, dict):
         return 0.0
     tarifas = _TARIFAS_ANTHROPIC_USD_POR_MTOK.get(
-        modelo, _TARIFAS_ANTHROPIC_USD_POR_MTOK["_default"],
+        modelo,
+        _TARIFAS_ANTHROPIC_USD_POR_MTOK["_default"],
     )
     p_in = tarifas["input"]
     p_out = tarifas["output"]
@@ -91,25 +92,30 @@ def _log_metricas_anthropic(usage: dict, modelo: str, latencia_ms: int) -> None:
         from app.core.logging_utils import glosa_id_var, user_email_var
         from app.database import SessionLocal
         from app.models.db import AICallRecord
+
         db = SessionLocal()
         try:
-            db.add(AICallRecord(
-                proveedor="anthropic",
-                modelo=modelo,
-                latency_ms=int(latencia_ms or 0),
-                input_tokens=inp,
-                cache_creation_input_tokens=cwrite,
-                cache_read_input_tokens=cread,
-                output_tokens=out,
-                cost_usd=costo,
-                user_email=(user_email_var.get() or None),
-                glosa_id=glosa_id_var.get(),
-            ))
+            db.add(
+                AICallRecord(
+                    proveedor="anthropic",
+                    modelo=modelo,
+                    latency_ms=int(latencia_ms or 0),
+                    input_tokens=inp,
+                    cache_creation_input_tokens=cwrite,
+                    cache_read_input_tokens=cread,
+                    output_tokens=out,
+                    cost_usd=costo,
+                    user_email=(user_email_var.get() or None),
+                    glosa_id=glosa_id_var.get(),
+                )
+            )
             db.commit()
         finally:
             db.close()
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[ANTHROPIC-CALL] no se pudo persistir métrica: {e}")
+
+
 _CACHE_TTL = 3600
 # Lock para evitar races cuando N requests concurrentes tocan la misma clave.
 # TTLCache NO es thread-safe por default; con 10 usuarios paralelos escribiendo
@@ -120,32 +126,100 @@ _CACHE_IA_LOCK = asyncio.Lock()
 # tiempo excesivo en networks lentos.
 _CACHE_MAX_RESP_LEN = 500_000
 
-_ERRORES_REINTENTABLES = frozenset([
-    "429", "rate", "limit", "timeout", "stream", "idle",
-    "timed out", "connection", "503", "502", "reset", "eof",
-])
+_ERRORES_REINTENTABLES = frozenset(
+    [
+        "429",
+        "rate",
+        "limit",
+        "timeout",
+        "stream",
+        "idle",
+        "timed out",
+        "connection",
+        "503",
+        "502",
+        "reset",
+        "eof",
+    ]
+)
 
 FERIADOS_CO = [
     # 2025
-    "2025-01-01","2025-01-06","2025-03-24","2025-04-17","2025-04-18",
-    "2025-05-01","2025-06-02","2025-06-23","2025-06-30","2025-07-20",
-    "2025-08-07","2025-08-18","2025-10-13","2025-11-03","2025-11-17",
-    "2025-12-08","2025-12-25",
+    "2025-01-01",
+    "2025-01-06",
+    "2025-03-24",
+    "2025-04-17",
+    "2025-04-18",
+    "2025-05-01",
+    "2025-06-02",
+    "2025-06-23",
+    "2025-06-30",
+    "2025-07-20",
+    "2025-08-07",
+    "2025-08-18",
+    "2025-10-13",
+    "2025-11-03",
+    "2025-11-17",
+    "2025-12-08",
+    "2025-12-25",
     # 2026
-    "2026-01-01","2026-01-12","2026-03-23","2026-04-02","2026-04-03",
-    "2026-05-01","2026-05-18","2026-06-08","2026-06-15","2026-06-29",
-    "2026-07-20","2026-08-07","2026-08-17","2026-10-12","2026-11-02",
-    "2026-11-16","2026-12-08","2026-12-25",
+    "2026-01-01",
+    "2026-01-12",
+    "2026-03-23",
+    "2026-04-02",
+    "2026-04-03",
+    "2026-05-01",
+    "2026-05-18",
+    "2026-06-08",
+    "2026-06-15",
+    "2026-06-29",
+    "2026-07-20",
+    "2026-08-07",
+    "2026-08-17",
+    "2026-10-12",
+    "2026-11-02",
+    "2026-11-16",
+    "2026-12-08",
+    "2026-12-25",
     # 2027 (Ley 1393/2010 - puentes psicológicos automáticos)
-    "2027-01-01","2027-01-11","2027-03-22","2027-04-01","2027-04-02",
-    "2027-05-01","2027-05-17","2027-06-07","2027-06-14","2027-06-28",
-    "2027-07-20","2027-08-07","2027-08-16","2027-10-11","2027-11-01",
-    "2027-11-15","2027-12-08","2027-12-25",
+    "2027-01-01",
+    "2027-01-11",
+    "2027-03-22",
+    "2027-04-01",
+    "2027-04-02",
+    "2027-05-01",
+    "2027-05-17",
+    "2027-06-07",
+    "2027-06-14",
+    "2027-06-28",
+    "2027-07-20",
+    "2027-08-07",
+    "2027-08-16",
+    "2027-10-11",
+    "2027-11-01",
+    "2027-11-15",
+    "2027-12-08",
+    "2027-12-25",
     # 2028 (estimados - verificar publicado)
-    "2028-01-01","2028-01-10","2028-03-20","2028-04-13","2028-04-14",
-    "2028-05-01","2028-05-15","2028-06-05","2028-06-12","2028-06-26",
-    "2028-07-20","2028-08-07","2028-08-14","2028-10-09","2028-10-30",
-    "2028-11-06","2028-11-13","2028-12-08","2028-12-25",
+    "2028-01-01",
+    "2028-01-10",
+    "2028-03-20",
+    "2028-04-13",
+    "2028-04-14",
+    "2028-05-01",
+    "2028-05-15",
+    "2028-06-05",
+    "2028-06-12",
+    "2028-06-26",
+    "2028-07-20",
+    "2028-08-07",
+    "2028-08-14",
+    "2028-10-09",
+    "2028-10-30",
+    "2028-11-06",
+    "2028-11-13",
+    "2028-12-08",
+    "2028-12-25",
 ]
 
 # PLAZO LEGAL: 20 días hábiles para que la EPS formule la glosa (Art. 57 Ley 1438/2011
@@ -194,20 +268,24 @@ ESTRATEGIAS_TIPO = {
     "FA_FACTURACION": "ESTRATEGIA FACTURACIÓN: Error formal no es causal de glosa (Circular 030/2013). Los errores formales son subsanables. La prestación del servicio genera obligación de pago.",
     "IN_INSUMOS": "ESTRATEGIA INSUMOS: Inherentes al acto médico. Se facturan al costo de adquisición más porcentaje administrativo pactado. Factura de compra disponible como soporte.",
     "ME_MEDICAMENTOS": "ESTRATEGIA MEDICAMENTOS: Dispensados bajo fórmula médica. Plan de Beneficios los incluye (Res. 5269/2017). No existe alternativa terapéutica equivalente.",
-    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Glosa improcedente por extemporaneidad. Art. 57 Ley 1438/2011 + Decreto 4747/2007 establecen 20 días hábiles para formular glosas. EPS perdió el derecho a glosar. Estas glosas son abusivas y no pueden disminuir el pago a la IPS."
+    "EXT_EXTEMPORANEA": "ESTRATEGIA EXTEMPORÁNEA: Glosa improcedente por extemporaneidad. Art. 57 Ley 1438/2011 + Decreto 4747/2007 establecen 20 días hábiles para formular glosas. EPS perdió el derecho a glosar. Estas glosas son abusivas y no pueden disminuir el pago a la IPS.",
 }
 
 CODIGOS_GLOSA = {
-    "TA": "OBJECIÓN POR TARIFA", "SO": "OBJECIÓN POR SOPORTES",
-    "AU": "OBJECIÓN POR AUTORIZACIÓN", "CO": "OBJECIÓN POR COBERTURA",
-    "CL": "OBJECIÓN POR PERTINENCIA", "PE": "OBJECIÓN POR PERTINENCIA",
+    "TA": "OBJECIÓN POR TARIFA",
+    "SO": "OBJECIÓN POR SOPORTES",
+    "AU": "OBJECIÓN POR AUTORIZACIÓN",
+    "CO": "OBJECIÓN POR COBERTURA",
+    "CL": "OBJECIÓN POR PERTINENCIA",
+    "PE": "OBJECIÓN POR PERTINENCIA",
     "FA": "OBJECIÓN POR FACTURACIÓN",
-    "IN": "OBJECIÓN POR INSUMOS", "ME": "OBJECIÓN POR MEDICAMENTOS",
-    "SE": "OBJECIÓN SIN ESPECIFICACIÓN", "EX": "OBJECIÓN EXTEMPORÁNEA"
+    "IN": "OBJECIÓN POR INSUMOS",
+    "ME": "OBJECIÓN POR MEDICAMENTOS",
+    "SE": "OBJECIÓN SIN ESPECIFICACIÓN",
+    "EX": "OBJECIÓN EXTEMPORÁNEA",
 }
 
-PLANTILLAS_CODIGO = {
-}
+PLANTILLAS_CODIGO = {}
 
 
 def obtener_plantilla_por_codigo(codigo: str) -> Optional[dict]:
@@ -276,20 +354,22 @@ def _truncar_runaway(texto: str, max_repeticiones: int = 3) -> str:
     for tam_ngrama in (2, 3, 4, 5):
         i = 0
         while i < len(palabras) - tam_ngrama * (max_repeticiones + 1):
-            ngrama = palabras[i:i + tam_ngrama]
+            ngrama = palabras[i : i + tam_ngrama]
             # Contar repeticiones consecutivas
             repes = 1
             j = i + tam_ngrama
-            while j + tam_ngrama <= len(palabras) and palabras[j:j + tam_ngrama] == ngrama:
+            while j + tam_ngrama <= len(palabras) and palabras[j : j + tam_ngrama] == ngrama:
                 repes += 1
                 j += tam_ngrama
                 if repes > max_repeticiones:
                     # ENCONTRAMOS LOOP — truncar en el inicio del bucle
-                    truncado = " ".join(palabras[:i + tam_ngrama])
+                    truncado = " ".join(palabras[: i + tam_ngrama])
                     # Agregar cierre limpio
-                    if not truncado.rstrip().endswith(("."," ")):
+                    if not truncado.rstrip().endswith((".", " ")):
                         truncado += "."
-                    truncado += " [TEXTO TRUNCADO POR SISTEMA: LA IA ENTRÓ EN BUCLE — REVISAR Y RE-GENERAR]"
+                    truncado += (
+                        " [TEXTO TRUNCADO POR SISTEMA: LA IA ENTRÓ EN BUCLE — REVISAR Y RE-GENERAR]"
+                    )
                     return truncado
             i += 1
     return texto
@@ -297,106 +377,111 @@ def _truncar_runaway(texto: str, max_repeticiones: int = 3) -> str:
 
 _SUAVIZAR_PATTERNS = [
     # Apertura obligatoria: nunca "RESPETUOSAMENTE" en la primera frase
-    (r"\bESE\s+HUS\s+RESPETUOSAMENTE\s+NO\s+ACEPTA\b",
-     "ESE HUS NO ACEPTA"),
-
+    (r"\bESE\s+HUS\s+RESPETUOSAMENTE\s+NO\s+ACEPTA\b", "ESE HUS NO ACEPTA"),
     # ═══ REGISTRO COLOQUIAL → TÉCNICO-JURÍDICO ═══
     # (detectados en respuestas reales que debilitan la defensa)
-    (r"\bLAS\s+RAZONES\s+SON\s+CLARAS[:\.,]?",
-     "POR LAS SIGUIENTES RAZONES:"),
-    (r"\bLO\s+CUAL\s+NO\s+ES\s+V[ÁA]LIDO\b",
-     "LO CUAL NO SE AJUSTA AL MARCO CONTRACTUAL"),
-    (r"\bA\s+CONVENIENCIA\b",
-     "DE MANERA UNILATERAL"),
-    (r"\bPAGO\s+COMPLETO\s+DEL\s+VALOR\s+FACTURADO\b",
-     "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO"),
-    (r"\bEL\s+PAGO\s+COMPLETO\b",
-     "EL RECONOCIMIENTO ÍNTEGRO"),
-    (r"\bPAGAR\s+COMPLETO\b",
-     "RECONOCER ÍNTEGRAMENTE"),
-    (r"\bES\s+CLARO\s+QUE\b",
-     "RESULTA EVIDENTE QUE"),
-    (r"\b(?:SIMPLEMENTE|B[ÁA]SICAMENTE|OBVIAMENTE|CLARAMENTE)\s+",
-     ""),
-    (r"\bELLA\s+MISMA\s+FIRM[ÓO]\b",
-     "SUSCRITO POR LA ENTIDAD PAGADORA"),
-    (r"\bQUE\s+LA\s+EPS\s+ELLA\s+MISMA\b",
-     "QUE LA ENTIDAD PAGADORA"),
-    (r"\bNO\s+EST[ÁA]\s+BIEN\b",
-     "NO RESULTA PROCEDENTE"),
-    (r"\bNO\s+ES\s+BUENA\s+IDEA\b",
-     "NO RESULTA PROCEDENTE"),
-    (r"\bEST[ÁA]\s+USANDO\s+UNA\s+TARIFA\s+DIFERENTE\b",
-     "APLICA UNA TARIFA DIFERENTE A LA PACTADA"),
-    (r"\bSIN\s+APLICAR\s+DICHO\s+DESCUENTO\b",
-     "SIN APLICAR EL DESCUENTO CONTRACTUAL CONVENIDO"),
-
+    (r"\bLAS\s+RAZONES\s+SON\s+CLARAS[:\.,]?", "POR LAS SIGUIENTES RAZONES:"),
+    (r"\bLO\s+CUAL\s+NO\s+ES\s+V[ÁA]LIDO\b", "LO CUAL NO SE AJUSTA AL MARCO CONTRACTUAL"),
+    (r"\bA\s+CONVENIENCIA\b", "DE MANERA UNILATERAL"),
+    (
+        r"\bPAGO\s+COMPLETO\s+DEL\s+VALOR\s+FACTURADO\b",
+        "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO",
+    ),
+    (r"\bEL\s+PAGO\s+COMPLETO\b", "EL RECONOCIMIENTO ÍNTEGRO"),
+    (r"\bPAGAR\s+COMPLETO\b", "RECONOCER ÍNTEGRAMENTE"),
+    (r"\bES\s+CLARO\s+QUE\b", "RESULTA EVIDENTE QUE"),
+    (r"\b(?:SIMPLEMENTE|B[ÁA]SICAMENTE|OBVIAMENTE|CLARAMENTE)\s+", ""),
+    (r"\bELLA\s+MISMA\s+FIRM[ÓO]\b", "SUSCRITO POR LA ENTIDAD PAGADORA"),
+    (r"\bQUE\s+LA\s+EPS\s+ELLA\s+MISMA\b", "QUE LA ENTIDAD PAGADORA"),
+    (r"\bNO\s+EST[ÁA]\s+BIEN\b", "NO RESULTA PROCEDENTE"),
+    (r"\bNO\s+ES\s+BUENA\s+IDEA\b", "NO RESULTA PROCEDENTE"),
+    (
+        r"\bEST[ÁA]\s+USANDO\s+UNA\s+TARIFA\s+DIFERENTE\b",
+        "APLICA UNA TARIFA DIFERENTE A LA PACTADA",
+    ),
+    (r"\bSIN\s+APLICAR\s+DICHO\s+DESCUENTO\b", "SIN APLICAR EL DESCUENTO CONTRACTUAL CONVENIDO"),
     # Exigir → Solicitar
-    (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\s+Y\s+DEFINITIVO\b",
-     "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
-    (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\b",
-     "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO"),
-    (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\b",
-     "SE SOLICITA EL LEVANTAMIENTO"),
-    (r"\bSE\s+EXIGE\s+EL\s+PAGO\s+[ÍI]NTEGRO\b",
-     "SE SOLICITA EL RECONOCIMIENTO ÍNTEGRO"),
-    (r"\bSE\s+EXIGE\s+EL\s+RECONOCIMIENTO\b",
-     "SE SOLICITA EL RECONOCIMIENTO"),
-    (r"\bSE\s+EXIGE\b(?!\s+EL)",
-     "SE SOLICITA"),
+    (
+        r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\s+Y\s+DEFINITIVO\b",
+        "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO",
+    ),
+    (
+        r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\s+INMEDIATO\b",
+        "SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO",
+    ),
+    (r"\bSE\s+EXIGE\s+EL\s+LEVANTAMIENTO\b", "SE SOLICITA EL LEVANTAMIENTO"),
+    (r"\bSE\s+EXIGE\s+EL\s+PAGO\s+[ÍI]NTEGRO\b", "SE SOLICITA EL RECONOCIMIENTO ÍNTEGRO"),
+    (r"\bSE\s+EXIGE\s+EL\s+RECONOCIMIENTO\b", "SE SOLICITA EL RECONOCIMIENTO"),
+    (r"\bSE\s+EXIGE\b(?!\s+EL)", "SE SOLICITA"),
     # Obligar → establece el deber
-    (r"\bOBLIGA\s+A\s+LA\s+ENTIDAD\s+PAGADORA\s+A\s+RECONOCER\b",
-     "ESTABLECE EL DEBER DE RECONOCER"),
-    (r"\bOBLIGA\s+A\s+LA\s+EPS\s+A\s+RECONOCER\b",
-     "ESTABLECE EL DEBER DE RECONOCER"),
-    (r"\bOBLIGA\s+A\s+LAS\s+ENTIDADES?\b",
-     "ESTABLECE EL DEBER DE LAS ENTIDADES"),
+    (
+        r"\bOBLIGA\s+A\s+LA\s+ENTIDAD\s+PAGADORA\s+A\s+RECONOCER\b",
+        "ESTABLECE EL DEBER DE RECONOCER",
+    ),
+    (r"\bOBLIGA\s+A\s+LA\s+EPS\s+A\s+RECONOCER\b", "ESTABLECE EL DEBER DE RECONOCER"),
+    (r"\bOBLIGA\s+A\s+LAS\s+ENTIDADES?\b", "ESTABLECE EL DEBER DE LAS ENTIDADES"),
     # Incumplimiento hostil → diferencia susceptible
-    (r"\bCONFIGURA\s+UN\s+INCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
-     "CORRESPONDE A UNA DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
-    (r"\bINCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
-     "DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
-    (r"\bAFECTA\s+DIRECTAMENTE\s+EL\s+FLUJO\s+DE\s+RECURSOS\s+DEL\s+HOSPITAL\b",
-     "AFECTA EL FLUJO DE RECURSOS INSTITUCIONALES"),
+    (
+        r"\bCONFIGURA\s+UN\s+INCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b",
+        "CORRESPONDE A UNA DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN",
+    ),
+    (r"\bINCUMPLIMIENTO\s+CONTRACTUAL\s+INJUSTIFICADO\b", "DIFERENCIA SUSCEPTIBLE DE SUBSANACIÓN"),
+    (
+        r"\bAFECTA\s+DIRECTAMENTE\s+EL\s+FLUJO\s+DE\s+RECURSOS\s+DEL\s+HOSPITAL\b",
+        "AFECTA EL FLUJO DE RECURSOS INSTITUCIONALES",
+    ),
     # Acusaciones
-    (r"\bLO\s+CUAL\s+NO\s+SE\s+HA\s+CUMPLIDO\s+EN\s+ESTE\s+CASO\b\.?",
-     "SE SOLICITA SU APLICACIÓN EN EL PRESENTE CASO."),
-    (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+ENTIDAD\s+PAGADORA\b",
-     "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
-    (r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+EPS\b",
-     "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO"),
-    (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b",
-     "AMERITA SER REVISADA"),
-    (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\b",
-     "AMERITA SER REVISADA"),
-    (r"\bACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b",
-     "OBJECIÓN SUSCEPTIBLE DE CONCILIACIÓN"),
-    (r"\bCARECE\s+DE\s+TODO\s+SUSTENTO\s+LEGAL\b",
-     "REQUIERE MAYOR SUSTENTO"),
-    (r"\bCARECE\s+DE\s+SUSTENTO\s+CONTRACTUAL\s+Y\s+LEGAL\b",
-     "REQUIERE MAYOR SUSTENTO CONTRACTUAL Y LEGAL"),
-    (r"\bCARECE\s+DE\s+SUSTENTO\b",
-     "REQUIERE MAYOR SUSTENTO"),
+    (
+        r"\bLO\s+CUAL\s+NO\s+SE\s+HA\s+CUMPLIDO\s+EN\s+ESTE\s+CASO\b\.?",
+        "SE SOLICITA SU APLICACIÓN EN EL PRESENTE CASO.",
+    ),
+    (
+        r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+ENTIDAD\s+PAGADORA\b",
+        "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO",
+    ),
+    (
+        r"\bNO\s+FUE\s+RESPETADA\s+POR\s+LA\s+EPS\b",
+        "REQUIERE SU APLICACIÓN CONFORME A LO CONVENIDO",
+    ),
+    (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b", "AMERITA SER REVISADA"),
+    (r"\bCONSTITUYE\s+UN\s+ACTO\s+ABUSIVO\b", "AMERITA SER REVISADA"),
+    (r"\bACTO\s+ABUSIVO\s+E\s+IMPROCEDENTE\b", "OBJECIÓN SUSCEPTIBLE DE CONCILIACIÓN"),
+    (r"\bCARECE\s+DE\s+TODO\s+SUSTENTO\s+LEGAL\b", "REQUIERE MAYOR SUSTENTO"),
+    (
+        r"\bCARECE\s+DE\s+SUSTENTO\s+CONTRACTUAL\s+Y\s+LEGAL\b",
+        "REQUIERE MAYOR SUSTENTO CONTRACTUAL Y LEGAL",
+    ),
+    (r"\bCARECE\s+DE\s+SUSTENTO\b", "REQUIERE MAYOR SUSTENTO"),
     # Frases redundantes
-    (r"\bSE\s+REFUERZA\s+LA\s+ARGUMENTACI[ÓO]N\s+DE\s+QUE\b",
-     "SE RATIFICA QUE"),
+    (r"\bSE\s+REFUERZA\s+LA\s+ARGUMENTACI[ÓO]N\s+DE\s+QUE\b", "SE RATIFICA QUE"),
 ]
 
 _FRASES_ROTAS_PATTERNS = [
-    (r"RECONOCIMIENTO\s+[ÍI]NTEGRO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
-     "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO"),
-    (r"RECONOCIMIENTO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
-     "RECONOCIMIENTO DEL VALOR FACTURADO"),
-    (r"VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
-     r"VALOR \1 EN EL EXPEDIENTE"),
-    (r"FACTURAD[OA]\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
-     r"FACTURADO SEGÚN CONSTA EN EL EXPEDIENTE"),
-    (r"Y\s+RECONOCIDO\s+SOLO\s+POR\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
-     "Y RECONOCIDO PARCIALMENTE POR LA ENTIDAD PAGADORA"),
-    (r"RETENCI[ÓO]N\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
-     "LA DIFERENCIA INDICADA EN EL EXPEDIENTE"),
-    (r"\bDE\s+EL\s+VALOR\b",
-     "DEL VALOR"),
+    (
+        r"RECONOCIMIENTO\s+[ÍI]NTEGRO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+        "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO",
+    ),
+    (
+        r"RECONOCIMIENTO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+        "RECONOCIMIENTO DEL VALOR FACTURADO",
+    ),
+    (
+        r"VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
+        r"VALOR \1 EN EL EXPEDIENTE",
+    ),
+    (
+        r"FACTURAD[OA]\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
+        r"FACTURADO SEGÚN CONSTA EN EL EXPEDIENTE",
+    ),
+    (
+        r"Y\s+RECONOCIDO\s+SOLO\s+POR\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+        "Y RECONOCIDO PARCIALMENTE POR LA ENTIDAD PAGADORA",
+    ),
+    (
+        r"RETENCI[ÓO]N\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
+        "LA DIFERENCIA INDICADA EN EL EXPEDIENTE",
+    ),
+    (r"\bDE\s+EL\s+VALOR\b", "DEL VALOR"),
 ]
 
 
@@ -426,7 +511,8 @@ def _suavizar_tono(texto: str) -> str:
     texto = re.sub(
         r"\$\s*\[[A-Z_ ]+\]",
         "EL VALOR INDICADO EN EL EXPEDIENTE",
-        texto, flags=re.IGNORECASE,
+        texto,
+        flags=re.IGNORECASE,
     )
     # Frases rotas (primero, para que el suavizador no sobre-escriba)
     for pat, repl in _FRASES_ROTAS_PATTERNS:
@@ -486,7 +572,9 @@ def generar_texto_tarifa_match(
     )
 
 
-def generar_texto_aceptacion_total(codigo_glosa: str = "", valor: str = "", servicio: str = "") -> str:
+def generar_texto_aceptacion_total(
+    codigo_glosa: str = "", valor: str = "", servicio: str = ""
+) -> str:
     """Plantilla RE9702 — GLOSA ACEPTADA AL 100%.
 
     El auditor decidió aceptar la glosa completa. ESE HUS reconoce la
@@ -494,7 +582,11 @@ def generar_texto_aceptacion_total(codigo_glosa: str = "", valor: str = "", serv
     una declaración formal de aceptación.
     """
     cod = codigo_glosa or "INDICADO EN EL EXPEDIENTE"
-    val = valor if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "") else "EL VALOR INDICADO EN EL EXPEDIENTE"
+    val = (
+        valor
+        if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "")
+        else "EL VALOR INDICADO EN EL EXPEDIENTE"
+    )
     srv_txt = f" RESPECTO DEL SERVICIO {servicio.upper()}" if servicio else ""
     return (
         f"ESE HUS ACEPTA LA GLOSA APLICADA BAJO EL CÓDIGO {cod} POR {val}"
@@ -508,8 +600,10 @@ def generar_texto_aceptacion_total(codigo_glosa: str = "", valor: str = "", serv
 
 
 def generar_texto_aceptacion_parcial(
-    codigo_glosa: str = "", valor_objetado: float = 0.0,
-    valor_aceptado: float = 0.0, servicio: str = "",
+    codigo_glosa: str = "",
+    valor_objetado: float = 0.0,
+    valor_aceptado: float = 0.0,
+    servicio: str = "",
 ) -> str:
     """Plantilla RE9801 — GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE.
 
@@ -569,8 +663,8 @@ TEXTO_DMBUG_TARIFAS = (
     "INEXISTENCIA DE CONTRATO ES INEXACTA. EL ARGUMENTO DE AGOTAMIENTO "
     "PRESUPUESTAL NO CONSTITUYE CAUSAL CONTRACTUAL NI LEGAL PARA SUSTITUIR "
     "UNILATERALMENTE LAS TARIFAS PACTADAS POR SOAT, EN VIRTUD DE LOS "
-    "ARTÍCULOS 1602 Y 1603 DEL CÓDIGO CIVIL (\"TODO CONTRATO LEGALMENTE "
-    "CELEBRADO ES UNA LEY PARA LOS CONTRATANTES\"), 871 DEL CÓDIGO DE "
+    'ARTÍCULOS 1602 Y 1603 DEL CÓDIGO CIVIL ("TODO CONTRATO LEGALMENTE '
+    'CELEBRADO ES UNA LEY PARA LOS CONTRATANTES"), 871 DEL CÓDIGO DE '
     "COMERCIO (BUENA FE CONTRACTUAL), 5 Y 27 DE LA LEY 80 DE 1993 (DERECHO A "
     "LA REMUNERACIÓN PACTADA Y ECUACIÓN CONTRACTUAL), DECRETO-LEY 1795 DE "
     "2000 (RÉGIMEN DEL SUBSISTEMA DE SALUD DE LAS FF.MM.), ACUERDO 002 DE "
@@ -595,12 +689,7 @@ def _es_dispensario_medico(eps: str) -> bool:
     if not eps:
         return False
     e = eps.upper().strip()
-    return (
-        "DISPENSARIO MEDICO" in e
-        or "DMBUG" in e
-        or "DIGSA" in e
-        or "U220311" in e
-    )
+    return "DISPENSARIO MEDICO" in e or "DMBUG" in e or "DIGSA" in e or "U220311" in e
 
 
 def limpiar_cierre_extemporanea_indebido(
@@ -638,6 +727,7 @@ def limpiar_cierre_extemporanea_indebido(
     # ("LA ENTIDAD PAGADORA CUENTA CON 10..." o "DE PERSISTIR..." o
     # "COMUNICACIONES:...") hasta que termine en correo @hus.gov.co.
     import re as _re
+
     patrones_cierre = [
         # Variante completa: "LA ENTIDAD PAGADORA CUENTA CON 10 DÍAS..."
         # hasta GLOSASYDEVOLUCIONES@HUS.GOV.CO.
@@ -704,13 +794,16 @@ def limpiar_palabra_injustificado(texto: str, codigo_respuesta: str = "") -> str
     out = re.sub(
         r"\bLA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\s+APLICADA\b",
         "LA GLOSA APLICADA",
-        out, flags=re.IGNORECASE,
+        out,
+        flags=re.IGNORECASE,
     )
     out = re.sub(
         r"\bACEPTA\s+LA\s+GLOSA\s+(INJUSTIFICADA|INDEBIDA|IMPROCEDENTE|INFUNDADA|INCORRECTA|ERRÓNEA|ERRONEA)\b(?!\s+APLICADA)",
         "ACEPTA LA GLOSA",
-        out, flags=re.IGNORECASE,
+        out,
+        flags=re.IGNORECASE,
     )
+
     # Frases compuestas con "injustificado/a/os/as" — preservando case.
     def _frase(reemplazo_upper: str):
         def _r(m):
@@ -721,19 +814,34 @@ def limpiar_palabra_injustificado(texto: str, codigo_respuesta: str = "") -> str
                 return reemplazo_upper.lower()
             # Mixed: capitalize cada palabra
             return " ".join(w.capitalize() for w in reemplazo_upper.split())
+
         return _r
-    out = re.sub(r"\bDESCUENTOS\s+INJUSTIFICADOS\b",
-                 _frase("DESCUENTOS UNILATERALES"), out, flags=re.IGNORECASE)
-    out = re.sub(r"\bDESCUENTO\s+INJUSTIFICADO\b",
-                 _frase("DESCUENTO UNILATERAL"), out, flags=re.IGNORECASE)
-    out = re.sub(r"\bRETRASO\s+INJUSTIFICADO\b",
-                 _frase("RETRASO INDEBIDO"), out, flags=re.IGNORECASE)
-    out = re.sub(r"\bINCUMPLIMIENTO\s+INJUSTIFICADO\b",
-                 _frase("INCUMPLIMIENTO CONTRACTUAL"), out, flags=re.IGNORECASE)
-    out = re.sub(r"\bGLOSA\s+INJUSTIFICADA\b",
-                 _frase("GLOSA IMPROCEDENTE"), out, flags=re.IGNORECASE)
-    out = re.sub(r"\bGLOSAS\s+INJUSTIFICADAS\b",
-                 _frase("GLOSAS IMPROCEDENTES"), out, flags=re.IGNORECASE)
+
+    out = re.sub(
+        r"\bDESCUENTOS\s+INJUSTIFICADOS\b",
+        _frase("DESCUENTOS UNILATERALES"),
+        out,
+        flags=re.IGNORECASE,
+    )
+    out = re.sub(
+        r"\bDESCUENTO\s+INJUSTIFICADO\b", _frase("DESCUENTO UNILATERAL"), out, flags=re.IGNORECASE
+    )
+    out = re.sub(
+        r"\bRETRASO\s+INJUSTIFICADO\b", _frase("RETRASO INDEBIDO"), out, flags=re.IGNORECASE
+    )
+    out = re.sub(
+        r"\bINCUMPLIMIENTO\s+INJUSTIFICADO\b",
+        _frase("INCUMPLIMIENTO CONTRACTUAL"),
+        out,
+        flags=re.IGNORECASE,
+    )
+    out = re.sub(
+        r"\bGLOSA\s+INJUSTIFICADA\b", _frase("GLOSA IMPROCEDENTE"), out, flags=re.IGNORECASE
+    )
+    out = re.sub(
+        r"\bGLOSAS\s+INJUSTIFICADAS\b", _frase("GLOSAS IMPROCEDENTES"), out, flags=re.IGNORECASE
+    )
+
     # Palabra suelta — preservando case
     def _repl(m):
         terminacion = m.group(1)
@@ -746,6 +854,7 @@ def limpiar_palabra_injustificado(texto: str, codigo_respuesta: str = "") -> str
             return sustituto.lower()
         # Mixed case: capitalizar
         return sustituto.capitalize()
+
     out = re.sub(r"\bINJUSTIFICAD(OS|AS|O|A)\b", _repl, out, flags=re.IGNORECASE)
     return out
 
@@ -776,14 +885,30 @@ def generar_texto_extemporanea(dias: int) -> str:
 # Estas entidades son muy estrictas con tarifas; si no se cita la normativa
 # SOAT exacta, ratifican la glosa.
 _KEYWORDS_ASEGURADORAS_SOAT = (
-    "SEGUROS", "COMPAÑIA DE SEGUROS", "COMPANIA DE SEGUROS",
-    "BOLIVAR", "POSITIVA", "AXA", "MAPFRE", "MUNDIAL", "PREVISORA",
-    "SURAMERICANA S.A.", "COLPATRIA", "ESTADO", "ALLIANZ", "LIBERTY",
-    " SOAT", " ARL", "UVB", "UVT",  # sufijos tipicos en nombres de Excel
-    "DIRECCION DE SANIDAD",         # Sanidad Militar/Policia = SOAT plus
+    "SEGUROS",
+    "COMPAÑIA DE SEGUROS",
+    "COMPANIA DE SEGUROS",
+    "BOLIVAR",
+    "POSITIVA",
+    "AXA",
+    "MAPFRE",
+    "MUNDIAL",
+    "PREVISORA",
+    "SURAMERICANA S.A.",
+    "COLPATRIA",
+    "ESTADO",
+    "ALLIANZ",
+    "LIBERTY",
+    " SOAT",
+    " ARL",
+    "UVB",
+    "UVT",  # sufijos tipicos en nombres de Excel
+    "DIRECCION DE SANIDAD",  # Sanidad Militar/Policia = SOAT plus
     "DISPENSARIO MEDICO",
-    "SANIDAD NAVAL", "SANIDAD AEREA",
+    "SANIDAD NAVAL",
+    "SANIDAD AEREA",
 )
+
 
 def _es_aseguradora_soat(nombre: str) -> bool:
     """True si el nombre parece de aseguradora SOAT/ARL sin contrato pactado."""
@@ -832,7 +957,9 @@ def _nombre_entidad_para_texto(eps: str, texto_contextual: str = "") -> str:
     return f"LA ENTIDAD {e}"
 
 
-def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "", texto_contextual: str = "") -> str:
+def generar_texto_injustificada(
+    eps: str, codigo: str = "", valor: str = "", texto_contextual: str = ""
+) -> str:
     """Argumento fijo para glosas de tarifas SIN contrato pactado.
 
     NOTA (mayo 2026 - directiva Yesid): el nombre de la función se mantiene
@@ -847,13 +974,16 @@ def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "", tex
     """
     entidad = _nombre_entidad_para_texto(eps, texto_contextual=texto_contextual)
     codigo_str = codigo if codigo else "DE TARIFAS"
-    valor_str = valor if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "") else "EL VALOR INDICADO EN EL EXPEDIENTE"
+    valor_str = (
+        valor
+        if valor and valor.strip() not in ("$ 0.00", "$0.00", "$ 0", "")
+        else "EL VALOR INDICADO EN EL EXPEDIENTE"
+    )
 
     return (
         f"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS "
         f"INTERPUESTA POR {entidad} BAJO EL CÓDIGO {codigo_str}, FACTURADA POR "
         f"{valor_str}. "
-
         f"LA OBJECIÓN NO SE AJUSTA AL MARCO CONTRACTUAL NI NORMATIVO POR LAS "
         f"SIGUIENTES RAZONES: EN PRIMER LUGAR, NO EXISTE CONTRATO PACTADO ENTRE "
         f"LAS PARTES QUE CONTEMPLE UNA TARIFA CONVENIDA DISTINTA A LA DEL MANUAL "
@@ -861,7 +991,6 @@ def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "", tex
         f"EN SEGUNDO LUGAR, NO ES ADMISIBLE APLICAR DESCUENTOS UNILATERALES SIN "
         f"SOPORTE CONTRACTUAL. EN TERCER LUGAR, LA GLOSA CARECE DE EVIDENCIA DE "
         f"UNA TARIFA DISTINTA QUE JUSTIFIQUE LA REDUCCIÓN APLICADA. "
-
         f"DE CONFORMIDAD CON LA CIRCULAR EXTERNA 047 DE 2025 DEL MINISTERIO DE "
         f"SALUD (MANUAL TARIFARIO SOAT 2026 INDEXADO A UVB — VALOR UVB 2026: $12.110) Y "
         f"EL DECRETO 780 DE 2016, EL MANUAL TARIFARIO SOAT RIGE SUPLETORIAMENTE A FALTA DE "
@@ -870,7 +999,6 @@ def generar_texto_injustificada(eps: str, codigo: str = "", valor: str = "", tex
         f"LA LEY 100 DE 1993 ESTABLECE EL DEBER DE LA ENTIDAD PAGADORA DE "
         f"RECONOCER LOS VALORES DEBIDAMENTE FACTURADOS POR LOS SERVICIOS "
         f"PRESTADOS. "
-
         f"EN ESE ORDEN DE IDEAS, SE SOLICITA RESPETUOSAMENTE EL LEVANTAMIENTO "
         f"DE LA GLOSA Y EL RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO CONFORME "
         f"AL MANUAL TARIFARIO SOAT. DE PERSISTIR LA OBJECIÓN, SE INVITA A MESA "
@@ -905,15 +1033,18 @@ class GlosaService:
         self.groq_model = groq_model or "llama-3.3-70b-versatile"
         # Tercer proveedor: Google Gemini (tier gratis generoso)
         from app.services.gemini_service import GeminiService
+
         gem_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
-        self.gemini = GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
+        self.gemini = (
+            GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
+        )
         self.gemini_model = gemini_model
         # Cuarto proveedor: OpenRouter (meta-router → DeepSeek/Llama/etc)
         from app.services.openrouter_service import OpenRouterService
+
         or_key = openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
         self.openrouter = (
-            OpenRouterService(api_key=or_key, default_model=openrouter_model)
-            if or_key else None
+            OpenRouterService(api_key=or_key, default_model=openrouter_model) if or_key else None
         )
         self.openrouter_model = openrouter_model
 
@@ -949,7 +1080,9 @@ class GlosaService:
         msg_tiempo, color_tiempo, dias = "Fechas no ingresadas", "bg-slate-500", 0
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
-                dias = self._calcular_dias_habiles(str(data.fecha_radicacion), str(data.fecha_recepcion))
+                dias = self._calcular_dias_habiles(
+                    str(data.fecha_radicacion), str(data.fecha_recepcion)
+                )
                 # PLAZO LEGAL: 20 días hábiles para que la EPS formule glosa (Art. 57 Ley 1438/2011 + Dec. 4747/2007)
                 es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
                 msg_tiempo = (
@@ -998,7 +1131,10 @@ class GlosaService:
             # la funcion extrae el nombre real del Excel (ej. COMPAÑIA MUNDIAL DE
             # SEGUROS S.A. SOAT UVB) y lo usa en el texto.
             argumento_fijo = generar_texto_injustificada(
-                eps_key, codigo_det, valor_raw, texto_contextual=texto_base,
+                eps_key,
+                codigo_det,
+                valor_raw,
+                texto_contextual=texto_base,
             )
             tipo_glosa = "TA_TARIFA"
 
@@ -1017,6 +1153,7 @@ class GlosaService:
             val_ace_num = float(getattr(data, "valor_aceptado_parcial", 0.0) or 0.0)
             try:
                 import re as _rex
+
                 # Remover decimales tipo .00 antes de extraer digitos para
                 # que "$100.00" no se convierta en "10000" (concatenacion de
                 # "100" + "00"). Los valores del Excel son enteros COP.
@@ -1039,17 +1176,20 @@ class GlosaService:
         # generar dictamen determinístico SIN llamar al LLM. Ahorra ~8k
         # tokens por glosa. Solo se activa si no hay ya un argumento_fijo
         # (extemporánea/ratificada/aceptada tienen prioridad).
-        if (argumento_fijo is None and es_tarifa and info_tarifa
-                and info_tarifa.get("encontrada")):
+        if argumento_fijo is None and es_tarifa and info_tarifa and info_tarifa.get("encontrada"):
             rec = info_tarifa.get("recomendacion") or {}
             pact = float(info_tarifa.get("valor_pactado_calc") or 0.0)
             fact = float(info_tarifa.get("valor_facturado") or 0.0)
             # Match perfecto: DEFENDER_TOTAL + valor_pactado real + fact ≈ pact
-            if (rec.get("accion") == "DEFENDER_TOTAL"
-                    and pact > 0 and abs(fact - pact) < max(1.0, pact * 0.005)):
+            if (
+                rec.get("accion") == "DEFENDER_TOTAL"
+                and pact > 0
+                and abs(fact - pact) < max(1.0, pact * 0.005)
+            ):
                 val_obj_mt = 0.0
                 try:
                     import re as _rem
+
                     sin_dec_m = _rem.sub(r"\.\d{1,2}(?=\s|$|[^\d])", "", str(valor_raw))
                     nums_m = _rem.findall(r"\d+", sin_dec_m)
                     if nums_m:
@@ -1063,7 +1203,7 @@ class GlosaService:
                 )
                 tipo_glosa = "TARIFA_MATCH_PERFECTO"
                 logger.info(
-                    f"[AHORRO-IA] Match perfecto detectado: cups={info_tarifa.get('tarifa',{}).get('codigo_cups')} "
+                    f"[AHORRO-IA] Match perfecto detectado: cups={info_tarifa.get('tarifa', {}).get('codigo_cups')} "
                     f"pactado=${pact:,.0f} facturado=${fact:,.0f} — plantilla fija usada (0 tokens)"
                 )
 
@@ -1084,9 +1224,15 @@ class GlosaService:
         elif modo_resp == "aceptar_parcial":
             cod_res, desc_res = "RE9801", "GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE"
         elif es_ratificacion:
-            cod_res, desc_res = "RE9901", "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
+            cod_res, desc_res = (
+                "RE9901",
+                "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN",
+            )
         elif es_extemporanea:
-            cod_res, desc_res = "RE9502", "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 57 Ley 1438/2011)"
+            cod_res, desc_res = (
+                "RE9502",
+                "GLOSA NO PROCEDE - ACEPTACIÓN TÁCITA (Art. 57 Ley 1438/2011)",
+            )
         elif es_tarifa and _es_dispensario_medico(eps_key):
             # Override DMBUG: contrato 440-DIGSA/DMBUG-2025 está vigente,
             # por lo que la respuesta es RE9901 (defensa con contrato),
@@ -1094,7 +1240,10 @@ class GlosaService:
             # porque el eps_key viene con prefijo U220311.
             cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
         elif es_tarifa and not tiene_contrato:
-            cod_res, desc_res = "RE9602", "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN"
+            cod_res, desc_res = (
+                "RE9602",
+                "GLOSA INJUSTIFICADA - APORTA EVIDENCIA DE INJUSTIFICACIÓN",
+            )
         else:
             cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
 
@@ -1123,6 +1272,7 @@ class GlosaService:
             accion_ia = _mapa_accion.get(tipo_glosa, "")
             try:
                 from app.services.auto_pilot_decision import _parse_valor as _pval_vobj
+
                 _vobj = _pval_vobj(valor_raw)
             except Exception:
                 _vobj = 0.0
@@ -1136,8 +1286,10 @@ class GlosaService:
             # TODO SUSTENTO LEGAL" que son intencionales en estos textos.
             # Las ratificadas tampoco deben tocarse (TEXTO_RATIFICADA es fijo).
             _saltar_suavizar = tipo_glosa in (
-                "EXTEMPORANEA", "RATIFICADA",
-                "ACEPTADA_TOTAL", "ACEPTADA_PARCIAL",
+                "EXTEMPORANEA",
+                "RATIFICADA",
+                "ACEPTADA_TOTAL",
+                "ACEPTADA_PARCIAL",
                 "TARIFA_MATCH_PERFECTO",
             )
             arg_ia = argumento_fijo if _saltar_suavizar else _suavizar_tono(argumento_fijo)
@@ -1149,8 +1301,10 @@ class GlosaService:
             # llevan el "...10 días hábiles... mesa de conciliación...
             # CARTERA@HUS.GOV.CO". Cualquier otra defensa lo pierde.
             arg_ia = limpiar_cierre_extemporanea_indebido(
-                arg_ia, es_ratificacion=es_ratificacion,
-                es_extemporanea=es_extemporanea, codigo_respuesta=cod_res,
+                arg_ia,
+                es_ratificacion=es_ratificacion,
+                es_extemporanea=es_extemporanea,
+                codigo_respuesta=cod_res,
             )
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "").replace("\n", " ")
             modelo_usado = "texto_fijo"
@@ -1175,12 +1329,10 @@ class GlosaService:
             # para todos los tipos de glosa.
             if modo_resp == "auditoria_previa":
                 from app.services.glosa_ia_prompts import get_system_prompt_auditoria
+
                 system_prompt = get_system_prompt_auditoria(eps=data.eps)
             else:
-                system_prompt = get_system_prompt(
-                    prefijo=prefijo,
-                    eps=data.eps
-                )
+                system_prompt = get_system_prompt(prefijo=prefijo, eps=data.eps)
             # Fase 3: inyectar contexto de tarifa oficial si es TA con CUPS
             # conocido. Le da a la IA el valor EXACTO publicado (Res. 124/2026
             # HUS o Circular 047/2025 SOAT) para que arme un dictamen con
@@ -1191,9 +1343,8 @@ class GlosaService:
                     from app.services.tarifas_oficiales import (
                         contexto_tarifa_oficial,
                     )
-                    m_cups = _re_ta.search(
-                        r"\b(\d{4,7}[A-Z]?\d*)\b", texto_base
-                    )
+
+                    m_cups = _re_ta.search(r"\b(\d{4,7}[A-Z]?\d*)\b", texto_base)
                     if m_cups:
                         ctx_oficial = contexto_tarifa_oficial(m_cups.group(1))
                         if ctx_oficial:
@@ -1210,9 +1361,8 @@ class GlosaService:
             # para que el prompt IA agregue obligatoriamente la cita al Manual
             # Tarifario SOAT vigente. Revisa eps + texto_base (por si la EPS
             # es "OTRA / SIN DEFINIR" pero el Excel trae aseguradora real).
-            es_asegura_soat = (
-                _es_aseguradora_soat(str(data.eps))
-                or _es_aseguradora_soat(texto_base)
+            es_asegura_soat = _es_aseguradora_soat(str(data.eps)) or _es_aseguradora_soat(
+                texto_base
             )
             if es_asegura_soat:
                 nombre_real = _extraer_nombre_entidad_real(texto_base) or str(data.eps)
@@ -1232,7 +1382,7 @@ class GlosaService:
                     "5. Para régimen especial FF.MM./Policía: Decreto 1795/2000.\n"
                     "   Para FOMAG/PPL: Decreto 1398/2020.\n"
                     "6. Usar el nombre EXACTO de la entidad en la respuesta\n"
-                    f"   (\"{nombre_real}\"), no genéricos como \"LA ENTIDAD PAGADORA\".\n"
+                    f'   ("{nombre_real}"), no genéricos como "LA ENTIDAD PAGADORA".\n'
                     "═══════════════════════════════════════════════════════"
                 )
                 system_prompt = system_prompt + hint_aseguradora
@@ -1254,6 +1404,7 @@ class GlosaService:
             cups_verificado = ""
             try:
                 from app.main import _extraer_cups_servicio as _extcups
+
                 _c, _ = _extcups(texto_base, "")
                 cups_verificado = _c or ""
             except Exception:
@@ -1294,6 +1445,7 @@ class GlosaService:
             _clausulas_contrato = []
             try:
                 from app.services.glosa_ia_prompts import get_clausulas_para_glosa
+
                 _clausulas_contrato = get_clausulas_para_glosa(
                     eps=str(data.eps or ""),
                     codigo_glosa=codigo_det,
@@ -1334,8 +1486,10 @@ class GlosaService:
             # sin él — nunca rompemos el análisis para el usuario.
             try:
                 from app.services.multi_agent import (
-                    multi_agent_habilitado, ejecutar_auditor,
+                    multi_agent_habilitado,
+                    ejecutar_auditor,
                 )
+
                 if multi_agent_habilitado() and self.anthropic_key:
                     _audit_result = await ejecutar_auditor(
                         texto_glosa=texto_base,
@@ -1350,7 +1504,10 @@ class GlosaService:
                     )
                     if _audit_result and _audit_result.get("json"):
                         import json as _json
-                        hallazgos_str = _json.dumps(_audit_result["json"], ensure_ascii=False, indent=2)[:4000]
+
+                        hallazgos_str = _json.dumps(
+                            _audit_result["json"], ensure_ascii=False, indent=2
+                        )[:4000]
                         user_prompt += (
                             "\n\n═══ BLOQUE EXTRA: HALLAZGOS DEL AUDITOR PRE-IA ═══\n"
                             "(JSON estructurado producido por el Auditor Agent — "
@@ -1394,7 +1551,7 @@ class GlosaService:
                     f"  • Contrato         : {contrato_real}\n"
                     f"  • Valor facturado HUS: ${val_fact:,.0f}\n"
                     f"  • Valor reconocido EPS: ${val_rec:,.0f}\n"
-                    f"  • Recomendación sistema: {rec.get('titulo','')}\n\n"
+                    f"  • Recomendación sistema: {rec.get('titulo', '')}\n\n"
                     "REGLAS OBLIGATORIAS:\n"
                     "  1. Cita SIEMPRE el contrato y la modalidad REALES del catálogo,\n"
                     "     NO los genéricos de la ficha EPS global.\n"
@@ -1416,6 +1573,7 @@ class GlosaService:
             # inputs curados por cada especialidad antes de redactar.
             try:
                 from app.services.multi_agente import orquestar_dictamen
+
                 _mod_agente = ""
                 _fac_agente = 0.0
                 _pact_agente = 0.0
@@ -1431,7 +1589,8 @@ class GlosaService:
                     _fact_agente = float(info_tarifa.get("valor_facturado") or 0.0)
                     _rec_agente = float(info_tarifa.get("valor_reconocido") or 0.0)
                 bloque_agentes = orquestar_dictamen(
-                    codigo_glosa=codigo_det, eps=str(data.eps),
+                    codigo_glosa=codigo_det,
+                    eps=str(data.eps),
                     cups=cups_verificado or "",
                     servicio="",
                     etapa=str(data.etapa or "Inicial"),
@@ -1460,10 +1619,13 @@ class GlosaService:
                     bloque_few_shot_para_prompt,
                     obtener_ejemplos_gold,
                 )
+
                 _db_fs = SessionLocal()
                 try:
                     _ejemplos_gold = obtener_ejemplos_gold(
-                        _db_fs, str(data.eps), codigo_det,
+                        _db_fs,
+                        str(data.eps),
+                        codigo_det,
                     )
                 finally:
                     _db_fs.close()
@@ -1483,6 +1645,7 @@ class GlosaService:
                 from app.services.analizador_motivo_eps import (
                     construir_bloque_motivo_eps,
                 )
+
                 bloque_motivo = construir_bloque_motivo_eps(texto_base)
                 if bloque_motivo:
                     user_prompt = user_prompt + bloque_motivo
@@ -1499,10 +1662,13 @@ class GlosaService:
                 from app.services.calibracion_dificultad import (
                     construir_bloque_calibracion,
                 )
+
                 _db_cal = SessionLocal()
                 try:
                     bloque_cal = construir_bloque_calibracion(
-                        _db_cal, str(data.eps), codigo_det,
+                        _db_cal,
+                        str(data.eps),
+                        codigo_det,
                     )
                 finally:
                     _db_cal.close()
@@ -1543,6 +1709,7 @@ class GlosaService:
                     # Bug detectado 12-may-2026: Sonnet se activaba para casos de
                     # $7.700 porque el parser interpretaba mal los puntos de miles.
                     from app.services.auto_pilot_decision import _parse_valor as _pval_route
+
                     _valor_num_route = int(_pval_route(valor_raw)) if valor_raw else 0
                     _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
                     _len_glosa_route = len(str(texto_base or ""))
@@ -1591,22 +1758,21 @@ class GlosaService:
                     puede_emitir_directo,
                     generar_dictamen_directo,
                 )
+
                 _pact_num = 0.0
                 _fact_num = 0.0
                 if info_tarifa and info_tarifa.get("encontrada"):
-                    _pact_num = float(
-                        info_tarifa.get("valor_pactado_calc") or 0.0
-                    )
-                    _fact_num = float(
-                        info_tarifa.get("valor_facturado") or 0.0
-                    )
+                    _pact_num = float(info_tarifa.get("valor_pactado_calc") or 0.0)
+                    _fact_num = float(info_tarifa.get("valor_facturado") or 0.0)
                 _obj_num = 0.0
                 if valor_raw:
                     from app.services.auto_pilot_decision import _parse_valor as _pval_obj
+
                     _obj_num = _pval_obj(valor_raw)
                 _aud = auditar(
                     texto_base or "",
-                    eps=str(data.eps), codigo=codigo_det,
+                    eps=str(data.eps),
+                    codigo=codigo_det,
                     cups=cups_verificado,
                     tiene_contrato=tiene_contrato,
                     valor_facturado=_fact_num,
@@ -1617,21 +1783,17 @@ class GlosaService:
                 _num_contrato_real = ""
                 try:
                     from app.services.glosa_ia_prompts import get_contrato
+
                     _ctr = get_contrato(str(data.eps))
-                    _num_contrato_real = (
-                        _ctr.get("numero", "") if _ctr else ""
-                    )
+                    _num_contrato_real = _ctr.get("numero", "") if _ctr else ""
                 except Exception:
                     pass
                 # Si hay tarifa exacta del catálogo, usar ese contrato.
-                if (
-                    info_tarifa and info_tarifa.get("encontrada")
-                    and info_tarifa.get("tarifa")
-                ):
+                if info_tarifa and info_tarifa.get("encontrada") and info_tarifa.get("tarifa"):
                     _ttar = info_tarifa.get("tarifa")
-                    _ctr_cat = getattr(_ttar, "contrato_numero", None) \
-                        or (_ttar.get("contrato_numero")
-                            if isinstance(_ttar, dict) else None)
+                    _ctr_cat = getattr(_ttar, "contrato_numero", None) or (
+                        _ttar.get("contrato_numero") if isinstance(_ttar, dict) else None
+                    )
                     if _ctr_cat:
                         _num_contrato_real = _ctr_cat
 
@@ -1697,7 +1859,9 @@ class GlosaService:
                     # Intento A: Anthropic Claude con PDF nativo
                     try:
                         res_ia, modelo_usado = await self._llamar_anthropic_multimodal(
-                            system_prompt, user_prompt, pdfs_raw_para_multimodal,
+                            system_prompt,
+                            user_prompt,
+                            pdfs_raw_para_multimodal,
                         )
                         _intento_ok = True
                     except Exception as _e_mm:
@@ -1727,9 +1891,11 @@ class GlosaService:
                     if not _intento_ok and self.gemini:
                         try:
                             from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
+
                             imagenes = pdfs_a_imagenes_combinadas(
                                 pdfs_raw_para_multimodal,
-                                max_imagenes_total=20, dpi=130,
+                                max_imagenes_total=20,
+                                dpi=130,
                             )
                             if imagenes:
                                 res_ia, modelo_usado = await self.gemini.completar_con_retry(
@@ -1754,25 +1920,27 @@ class GlosaService:
                 if not _intento_ok:
                     try:
                         from app.services.ia_tools import tool_use_habilitado
+
                         if tool_use_habilitado():
                             try:
                                 res_ia, modelo_usado = await self._llamar_anthropic_con_tools(
-                                    system_prompt, user_prompt,
+                                    system_prompt,
+                                    user_prompt,
                                     modelo_override=_modelo_override,
                                 )
                                 _intento_ok = True
                             except Exception as _e_tools:
-                                logger.warning(
-                                    f"[TOOL-USE] Falló, fallback a clásico: {_e_tools}"
-                                )
+                                logger.warning(f"[TOOL-USE] Falló, fallback a clásico: {_e_tools}")
                     except Exception:
                         pass
 
                 # Path 3: clásico (con caché + fallback a Groq)
                 if not _intento_ok:
                     res_ia, modelo_usado = await self._llamar_ia(
-                        system_prompt, user_prompt,
-                        eps=str(data.eps), codigo=codigo_det,
+                        system_prompt,
+                        user_prompt,
+                        eps=str(data.eps),
+                        codigo=codigo_det,
                         modelo_override=_modelo_override,
                     )
 
@@ -1793,6 +1961,7 @@ class GlosaService:
                     construir_instruccion_retry,
                     resumen_defectos,
                 )
+
                 _defectos = detectar_defectos_criticos(
                     res_ia,
                     codigo_glosa=codigo_det,
@@ -1811,30 +1980,36 @@ class GlosaService:
                     try:
                         # Extraer solo el contenido de <argumento>
                         import re as _re_arg
+
                         _m_arg = _re_arg.search(
                             r"<argumento>(.*?)</argumento>",
-                            res_ia or "", _re_arg.DOTALL | _re_arg.IGNORECASE,
+                            res_ia or "",
+                            _re_arg.DOTALL | _re_arg.IGNORECASE,
                         )
                         _arg_solo = _m_arg.group(1) if _m_arg else (res_ia or "")
                         _copia = detectar_copia_gold(
-                            _arg_solo, _ejemplos_gold, umbral=0.55,
+                            _arg_solo,
+                            _ejemplos_gold,
+                            umbral=0.55,
                         )
                         if _copia:
-                            _defectos.append({
-                                "regla": "copia_textual_gold",
-                                "mensaje": (
-                                    f"El dictamen es {_copia['similitud']*100:.0f}% "
-                                    "idéntico a un ejemplo Gold."
-                                ),
-                                "sugerencia": (
-                                    "Reformula con vocabulario propio. "
-                                    "Mantén estructura y normas pero "
-                                    "cambia las palabras."
-                                ),
-                            })
+                            _defectos.append(
+                                {
+                                    "regla": "copia_textual_gold",
+                                    "mensaje": (
+                                        f"El dictamen es {_copia['similitud'] * 100:.0f}% "
+                                        "idéntico a un ejemplo Gold."
+                                    ),
+                                    "sugerencia": (
+                                        "Reformula con vocabulario propio. "
+                                        "Mantén estructura y normas pero "
+                                        "cambia las palabras."
+                                    ),
+                                }
+                            )
                             logger.warning(
                                 f"[VALIDACION-IA] Copia textual detectada: "
-                                f"{_copia['similitud']*100:.0f}% similitud con "
+                                f"{_copia['similitud'] * 100:.0f}% similitud con "
                                 f"ejemplo {_copia['fuente']} #{_copia['ejemplo_id']}"
                             )
                     except Exception as _e_c:
@@ -1844,10 +2019,7 @@ class GlosaService:
                 # vuelve a producir longitud similar) y gastamos
                 # ~$0.05 + ~25s en latencia por nada. Tratamos esa
                 # regla como soft warning y NO disparamos retry.
-                _solo_largo = (
-                    len(_defectos) == 1
-                    and _defectos[0].get("regla") == "demasiado_largo"
-                )
+                _solo_largo = len(_defectos) == 1 and _defectos[0].get("regla") == "demasiado_largo"
                 if _solo_largo:
                     logger.info(
                         "[VALIDACION-IA] Solo demasiado_largo — "
@@ -1863,8 +2035,10 @@ class GlosaService:
                     user_retry = user_prompt + instr_retry
                     try:
                         res_retry, _modelo_retry = await self._llamar_ia(
-                            system_prompt, user_retry,
-                            eps=str(data.eps), codigo=codigo_det,
+                            system_prompt,
+                            user_retry,
+                            eps=str(data.eps),
+                            codigo=codigo_det,
                             modelo_override=_modelo_override,
                             bypass_cache=True,
                         )
@@ -1948,42 +2122,49 @@ class GlosaService:
             arg_ia = re.sub(
                 r"\$\s*(EL\s+)?VALOR\s+(FACTURADO|OBJETADO|ACEPTADO|INDICADO)",
                 lambda m: (m.group(1) or "EL ") + f"VALOR {m.group(2)}",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 2) "VALOR DE EL VALOR INDICADO EN EL EXPEDIENTE" (redundancia)
             arg_ia = re.sub(
                 r"VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
                 r"VALOR INDICADO EN EL EXPEDIENTE",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 3) "RETENCIÓN DE EL VALOR" / "RETENCIÓN DE $EL VALOR"
             arg_ia = re.sub(
                 r"RETENCI[ÓO]N\s+DE\s+\$?\s*EL\s+VALOR",
                 r"RETENCIÓN DEL VALOR",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 4) "FACTURADO POR VALOR DE EL VALOR INDICADO..." → "FACTURADO SEGÚN CONSTA..."
             arg_ia = re.sub(
                 r"FACTURAD[OA]\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)\s+EN\s+EL\s+EXPEDIENTE",
                 r"FACTURADO SEGÚN CONSTA EN EL EXPEDIENTE",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 5) "RECONOCIMIENTO ÍNTEGRO DEL VALOR DE EL VALOR INDICADO..."
             arg_ia = re.sub(
                 r"RECONOCIMIENTO\s+(ÍNTEGRO\s+)?DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+(INDICADO|FACTURADO|OBJETADO)",
                 r"RECONOCIMIENTO \1DEL VALOR \2",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 6) Preposición "DE EL" → "DEL"
             arg_ia = re.sub(r"\bDE\s+EL\s+VALOR\b", "DEL VALOR", arg_ia, flags=re.IGNORECASE)
 
             # 7) Terminología Sanidad Militar: "FUERZAS ARMADAS" → "FUERZAS MILITARES"
-            arg_ia = re.sub(r"\bFUERZAS\s+ARMADAS\b", "FUERZAS MILITARES", arg_ia, flags=re.IGNORECASE)
+            arg_ia = re.sub(
+                r"\bFUERZAS\s+ARMADAS\b", "FUERZAS MILITARES", arg_ia, flags=re.IGNORECASE
+            )
             arg_ia = re.sub(r"\bFF\.?\s*AA\b\.?", "FF.MM.", arg_ia)
             arg_ia = re.sub(r"FF\.MM\.\.", "FF.MM.", arg_ia)  # doble punto si aplicó 2 veces
 
@@ -2055,10 +2236,11 @@ class GlosaService:
             # aceptaciones (totales/parciales) y demás casos, este cierre
             # es ruidoso e innecesario — Yesid pidió eliminarlo.
             arg_ia = limpiar_cierre_extemporanea_indebido(
-                arg_ia, es_ratificacion=es_ratificacion,
-                es_extemporanea=es_extemporanea, codigo_respuesta=cod_res,
+                arg_ia,
+                es_ratificacion=es_ratificacion,
+                es_extemporanea=es_extemporanea,
+                codigo_respuesta=cod_res,
             )
-
 
             # 11) Limpieza minima de PHI: solo conectores o formatos rotos,
             # PERO conservamos nombres y numero de HC porque son base argumental
@@ -2070,12 +2252,14 @@ class GlosaService:
             arg_ia = re.sub(
                 r"\b(ADICIONALMENTE|ASIMISMO|IGUALMENTE),\s*(POR\s+SU\s+PARTE|EN\s+IDÉNTICO\s+SENTIDO)",
                 r"\1",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
             arg_ia = re.sub(
                 r"\b(POR\s+SU\s+PARTE),\s*(ADICIONALMENTE|ASIMISMO|IGUALMENTE|EN\s+IDÉNTICO\s+SENTIDO)",
                 r"\1",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 13) Anti-runaway: detectar y truncar bucles de repetición
@@ -2083,7 +2267,9 @@ class GlosaService:
             arg_ia = _truncar_runaway(arg_ia)
 
             # 14) Corregir "DISPOSICIONADO" inventado por IA → DISPENSARIO
-            arg_ia = re.sub(r"\bDISPOSICIONADO\b", "DISPENSARIO MÉDICO", arg_ia, flags=re.IGNORECASE)
+            arg_ia = re.sub(
+                r"\bDISPOSICIONADO\b", "DISPENSARIO MÉDICO", arg_ia, flags=re.IGNORECASE
+            )
 
             # 15) ESTÁNDAR INSTITUCIONAL: respuestas a glosas SIEMPRE en MAYÚSCULAS
             # Si la IA mezcló casing o devolvió en minúsculas, forzamos upper.
@@ -2103,12 +2289,17 @@ class GlosaService:
             arg_ia = re.sub(
                 r"\$\s*\[[A-Z_ ]+\]",
                 "EL VALOR INDICADO EN EL EXPEDIENTE",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 16b) Si el texto original de la glosa NO traía un valor numérico,
             # la IA NO debe inventar cifras. Reemplazamos montos específicos.
-            _no_hay_valor_original = (not valor_raw) or valor_raw.strip() in ("$ 0.00", "$0.00", "$ 0")
+            _no_hay_valor_original = (not valor_raw) or valor_raw.strip() in (
+                "$ 0.00",
+                "$0.00",
+                "$ 0",
+            )
             if _no_hay_valor_original:
                 # Patrón: $ seguido de cifras con separadores (. , ) opcionales
                 _patron_monto = re.compile(
@@ -2121,22 +2312,26 @@ class GlosaService:
             arg_ia = re.sub(
                 r"FACTURADO\s+POR\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
                 "FACTURADO SEGÚN VALOR INDICADO EN EL EXPEDIENTE",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
             arg_ia = re.sub(
                 r"Y\s+RECONOCIDO\s+SOLO\s+POR\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
                 "Y RECONOCIDO PARCIALMENTE POR LA ENTIDAD PAGADORA",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
             arg_ia = re.sub(
                 r"RETENCI[ÓO]N\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
                 "LA DIFERENCIA INDICADA EN EL EXPEDIENTE",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
             arg_ia = re.sub(
                 r"RECONOCIMIENTO\s+ÍNTEGRO\s+DEL\s+VALOR\s+DE\s+EL\s+VALOR\s+INDICADO\s+EN\s+EL\s+EXPEDIENTE",
                 "RECONOCIMIENTO ÍNTEGRO DEL VALOR FACTURADO",
-                arg_ia, flags=re.IGNORECASE,
+                arg_ia,
+                flags=re.IGNORECASE,
             )
 
             # 17) TONO INSTITUCIONAL CONCILIADOR + FRASES ROTAS (safety net
@@ -2156,12 +2351,21 @@ class GlosaService:
             from app.services.dictamen_postprocesor import (
                 truncar_despues_de_levantamiento,
             )
+
             arg_ia = truncar_despues_de_levantamiento(arg_ia)
 
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
-        score = self._calcular_score(tipo_glosa, es_extemporanea, es_ratificacion, tiene_pdf, es_urgencia, es_tarifa, arg_limpio)
+        score = self._calcular_score(
+            tipo_glosa,
+            es_extemporanea,
+            es_ratificacion,
+            tiene_pdf,
+            es_urgencia,
+            es_tarifa,
+            arg_limpio,
+        )
 
         # R59 P3: en modo auditoría usamos wrapper minimal — el LLM ya
         # produjo el HTML estructurado con 6 secciones del informe; añadir
@@ -2169,23 +2373,33 @@ class GlosaService:
         # al lector y rompería la estructura visual del diagnóstico.
         if modo_resp == "auditoria_previa":
             dictamen = self._wrapper_auditoria_html(
-                codigo=codigo_det, eps=data.eps, contenido_html=arg_ia,
+                codigo=codigo_det,
+                eps=data.eps,
+                contenido_html=arg_ia,
                 numero_factura=data.numero_factura,
                 numero_radicado=data.numero_radicado,
             )
         else:
             dictamen = self._generar_dictamen_html(
-                codigo_det, valor_raw, cod_res, desc_res, arg_ia, data.eps, tipo_glosa,
-                numero_factura=data.numero_factura, numero_radicado=data.numero_radicado,
+                codigo_det,
+                valor_raw,
+                cod_res,
+                desc_res,
+                arg_ia,
+                data.eps,
+                tipo_glosa,
+                numero_factura=data.numero_factura,
+                numero_radicado=data.numero_radicado,
                 normas_clave=normas_clave if normas_clave else None,
                 servicio=servicio_ia if servicio_ia else None,
                 contrato=contrato_ia if contrato_ia else None,
-                tarifa=tarifa_ia if tarifa_ia else None
+                tarifa=tarifa_ia if tarifa_ia else None,
             )
 
         # Calcular riesgo de ratificación (heurística 0-100)
         try:
             from app.services.riesgo_ratificacion import calcular_riesgo
+
             riesgo = calcular_riesgo(
                 codigo_glosa=codigo_det,
                 eps=str(data.eps),
@@ -2206,6 +2420,7 @@ class GlosaService:
         verif_citas = None
         try:
             from app.services.citation_verifier import verificar_citas as _vc
+
             verif_citas = _vc(dictamen, eps=str(data.eps or ""))
         except Exception as _e:
             logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")
@@ -2216,6 +2431,7 @@ class GlosaService:
         confianza = None
         try:
             from app.services.confidence_scorer import calcular_confianza
+
             # Cuenta soportes contando el separador que usa
             # app/api/routers/analizar.py:212-216 ("═══ DOCUMENTO: ... ═══").
             # Antes contaba "\n--- ARCHIVO " que no existe → soportes_n=0 siempre.
@@ -2240,10 +2456,15 @@ class GlosaService:
             _auditor_ok = False
             try:
                 from app.services.auditor_glosa import auditar as _auditar
+
                 def _num(s):
-                    if not s: return 0.0
-                    try: return float("".join(c for c in str(s) if c.isdigit() or c == "."))
-                    except (ValueError, TypeError): return 0.0
+                    if not s:
+                        return 0.0
+                    try:
+                        return float("".join(c for c in str(s) if c.isdigit() or c == "."))
+                    except (ValueError, TypeError):
+                        return 0.0
+
                 _audit_res = _auditar(
                     texto_glosa=texto_base,
                     eps=str(data.eps or ""),
@@ -2254,8 +2475,9 @@ class GlosaService:
                     valor_objetado=_num(valor_raw),
                     contexto_pdf=contexto_pdf or "",
                 )
-                hallazgos_altos = [h for h in (_audit_res.get("hallazgos") or [])
-                                    if h.get("severidad") == "ALTA"]
+                hallazgos_altos = [
+                    h for h in (_audit_res.get("hallazgos") or []) if h.get("severidad") == "ALTA"
+                ]
                 # Sin discrepancias = auditor no encontró nada ALTA
                 _auditor_ok = len(hallazgos_altos) == 0
             except Exception as _e_aud:
@@ -2285,6 +2507,7 @@ class GlosaService:
         auto_pilot = None
         try:
             from app.services.auto_pilot_decision import decidir_auto_envio
+
             score_conf = (confianza or {}).get("score") if confianza else None
             auto_pilot = decidir_auto_envio(
                 confianza_score=score_conf,
@@ -2312,12 +2535,8 @@ class GlosaService:
             modelo_ia=modelo_usado,
             riesgo_ratificacion=riesgo,
             accion_ia=(accion_ia or None),
-            valor_aceptar_ia=(
-                valor_aceptar_ia if valor_aceptar_ia > 0 else None
-            ),
-            valor_defender_ia=(
-                valor_defender_ia if valor_defender_ia > 0 else None
-            ),
+            valor_aceptar_ia=(valor_aceptar_ia if valor_aceptar_ia > 0 else None),
+            valor_defender_ia=(valor_defender_ia if valor_defender_ia > 0 else None),
             verificacion_citas=verif_citas,
             confianza=confianza,
             auto_pilot=auto_pilot,
@@ -2329,6 +2548,7 @@ class GlosaService:
         # picos de heap entre 50-80 MB en pruebas locales.
         try:
             import gc as _gc
+
             _gc.collect()
         except Exception:
             pass
@@ -2337,6 +2557,7 @@ class GlosaService:
         # OJO: solo enviamos métricas, NUNCA texto del paciente / dictamen.
         try:
             from app.services.posthog_service import capture
+
             capture(
                 event="glosa_analizada",
                 distinct_id=hint_gestor or "anonimo",
@@ -2351,9 +2572,12 @@ class GlosaService:
                     "es_ratificacion": bool(es_ratificacion),
                     "tiene_pdf": bool(tiene_pdf),
                     "valor_objetado_bucket": (
-                        "<100K" if valor_raw < 100_000
-                        else "<1M" if valor_raw < 1_000_000
-                        else "<10M" if valor_raw < 10_000_000
+                        "<100K"
+                        if valor_raw < 100_000
+                        else "<1M"
+                        if valor_raw < 1_000_000
+                        else "<10M"
+                        if valor_raw < 10_000_000
                         else ">=10M"
                     ),
                     "primary_ai_config": self.primary_ai,
@@ -2365,9 +2589,16 @@ class GlosaService:
 
         return resultado
 
-    def _calcular_score(self, tipo_glosa: str, es_extemporanea: bool, es_ratificacion: bool,
-                        tiene_pdf: bool, es_urgencia: bool, es_tarifa: bool,
-                        argumento_generado: str = "") -> float:
+    def _calcular_score(
+        self,
+        tipo_glosa: str,
+        es_extemporanea: bool,
+        es_ratificacion: bool,
+        tiene_pdf: bool,
+        es_urgencia: bool,
+        es_tarifa: bool,
+        argumento_generado: str = "",
+    ) -> float:
         if es_extemporanea:
             base = 99.0
         elif es_ratificacion:
@@ -2378,28 +2609,32 @@ class GlosaService:
             base = 75.0
         else:
             base = 85.0
-        
+
         if tiene_pdf:
             base = min(100.0, base + 5.0)
-        
+
         if argumento_generado:
-            normas_citadas = len(re.findall(
-                r'(LEY\s*\d+|DECRETO\s*\d+|RESOLUCIÓN|RESOLUCIÓN\s*\d+|ART\.\s*\d+|ARTÍCULO\s*\d+|SENTENCIA)',
-                argumento_generado.upper()
-            ))
+            normas_citadas = len(
+                re.findall(
+                    r"(LEY\s*\d+|DECRETO\s*\d+|RESOLUCIÓN|RESOLUCIÓN\s*\d+|ART\.\s*\d+|ARTÍCULO\s*\d+|SENTENCIA)",
+                    argumento_generado.upper(),
+                )
+            )
             bonus_normas = min(5.0, normas_citadas * 0.5)
-            
+
             bonus_longitud = min(3.0, len(argumento_generado) / 300)
-            
+
             base = min(100.0, base + bonus_normas + bonus_longitud)
-            
+
             if normas_citadas >= 3:
-                logger.info(f"Score bonus: {normas_citadas} normas citadas, {len(argumento_generado)} chars")
-        
+                logger.info(
+                    f"Score bonus: {normas_citadas} normas citadas, {len(argumento_generado)} chars"
+                )
+
         return round(base, 1)
 
     def _xml(self, tag: str, texto: str, default: str) -> str:
-        m = re.search(fr'<{tag}>(.*?)</{tag}>', texto, re.IGNORECASE | re.DOTALL)
+        m = re.search(rf"<{tag}>(.*?)</{tag}>", texto, re.IGNORECASE | re.DOTALL)
         return m.group(1).strip() if m else default
 
     def _determinar_tipo_glosa(self, prefijo: str, texto: str) -> str:
@@ -2408,50 +2643,133 @@ class GlosaService:
         if "extempor" in texto_lower or prefijo == "EX":
             return "EXT_EXTEMPORANEA"
         # 2) Si el prefijo del código es explícito, usarlo
-        if prefijo == "TA": return "TA_TARIFA"
-        elif prefijo == "SO": return "SO_SOPORTES"
-        elif prefijo == "AU": return "AU_AUTORIZACION"
-        elif prefijo == "CO": return "CO_COBERTURA"
-        elif prefijo == "CL": return "CL_PERTINENCIA"
-        elif prefijo == "PE": return "CL_PERTINENCIA"  # retrocompatibilidad: PE → CL
-        elif prefijo == "FA": return "FA_FACTURACION"
-        elif prefijo == "IN": return "IN_INSUMOS"
-        elif prefijo == "ME": return "ME_MEDICAMENTOS"
+        if prefijo == "TA":
+            return "TA_TARIFA"
+        elif prefijo == "SO":
+            return "SO_SOPORTES"
+        elif prefijo == "AU":
+            return "AU_AUTORIZACION"
+        elif prefijo == "CO":
+            return "CO_COBERTURA"
+        elif prefijo == "CL":
+            return "CL_PERTINENCIA"
+        elif prefijo == "PE":
+            return "CL_PERTINENCIA"  # retrocompatibilidad: PE → CL
+        elif prefijo == "FA":
+            return "FA_FACTURACION"
+        elif prefijo == "IN":
+            return "IN_INSUMOS"
+        elif prefijo == "ME":
+            return "ME_MEDICAMENTOS"
         # 3) Sin código reconocido → detectar por keywords del texto
         #    Orden importa: SOPORTES antes que FACTURACIÓN porque "falta de
         #    soporte" contiene "factura" implícito en muchos casos.
-        if any(p in texto_lower for p in [
-            "soporte", "historia clínica", "historia clinica", "rips",
-            "documento", "anexo", "epicrisis", "firma médica", "firma medica",
-            "ordenes médicas", "ordenes medicas", "sin adjuntar", "falta de evidencia",
-        ]):
+        if any(
+            p in texto_lower
+            for p in [
+                "soporte",
+                "historia clínica",
+                "historia clinica",
+                "rips",
+                "documento",
+                "anexo",
+                "epicrisis",
+                "firma médica",
+                "firma medica",
+                "ordenes médicas",
+                "ordenes medicas",
+                "sin adjuntar",
+                "falta de evidencia",
+            ]
+        ):
             return "SO_SOPORTES"
-        if any(p in texto_lower for p in [
-            "tarifa", "liquidación", "liquidacion", "manual tarifario",
-            "soat -", "soat menos", "homologación", "homologacion",
-            "diferencia en valor", "descuento unilateral", "uvb",
-        ]):
+        if any(
+            p in texto_lower
+            for p in [
+                "tarifa",
+                "liquidación",
+                "liquidacion",
+                "manual tarifario",
+                "soat -",
+                "soat menos",
+                "homologación",
+                "homologacion",
+                "diferencia en valor",
+                "descuento unilateral",
+                "uvb",
+            ]
+        ):
             return "TA_TARIFA"
-        if any(p in texto_lower for p in [
-            "autorización", "autorizacion", "orden previa", "orden de servicio",
-            "sin autorización", "sin autorizacion", "urgencia sin autorización",
-            "remisión", "remision",
-        ]):
+        if any(
+            p in texto_lower
+            for p in [
+                "autorización",
+                "autorizacion",
+                "orden previa",
+                "orden de servicio",
+                "sin autorización",
+                "sin autorizacion",
+                "urgencia sin autorización",
+                "remisión",
+                "remision",
+            ]
+        ):
             return "AU_AUTORIZACION"
-        if any(p in texto_lower for p in [
-            "cobertura", "pbs", "plan de beneficios", "no incluido",
-            "exclusión", "exclusion", "no pbs", "adres",
-        ]):
+        if any(
+            p in texto_lower
+            for p in [
+                "cobertura",
+                "pbs",
+                "plan de beneficios",
+                "no incluido",
+                "exclusión",
+                "exclusion",
+                "no pbs",
+                "adres",
+            ]
+        ):
             return "CO_COBERTURA"
-        if any(p in texto_lower for p in [
-            "pertinencia", "no pertinente", "indicación clínica", "indicacion clinica",
-            "criterio médico", "criterio medico", "autonomía médica",
-            "autonomia medica", "no justificado clínicamente",
-        ]):
+        if any(
+            p in texto_lower
+            for p in [
+                "pertinencia",
+                "no pertinente",
+                "indicación clínica",
+                "indicacion clinica",
+                "criterio médico",
+                "criterio medico",
+                "autonomía médica",
+                "autonomia medica",
+                "no justificado clínicamente",
+            ]
+        ):
             return "CL_PERTINENCIA"
-        if any(p in texto_lower for p in ["insumo", "material", "precio", "prótesis", "protesis", "dispositivo médico", "dispositivo medico"]):
+        if any(
+            p in texto_lower
+            for p in [
+                "insumo",
+                "material",
+                "precio",
+                "prótesis",
+                "protesis",
+                "dispositivo médico",
+                "dispositivo medico",
+            ]
+        ):
             return "IN_INSUMOS"
-        if any(p in texto_lower for p in ["medicamento", "fármaco", "farmaco", "fórmula", "formula", "tocilizumab", "dosis", "vial"]):
+        if any(
+            p in texto_lower
+            for p in [
+                "medicamento",
+                "fármaco",
+                "farmaco",
+                "fórmula",
+                "formula",
+                "tocilizumab",
+                "dosis",
+                "vial",
+            ]
+        ):
             return "ME_MEDICAMENTOS"
         # 4) Último recurso: FACTURACIÓN como fallback
         return "FA_FACTURACION"
@@ -2512,7 +2830,10 @@ class GlosaService:
             return 0
 
     def _wrapper_auditoria_html(
-        self, codigo: str, eps: str, contenido_html: str,
+        self,
+        codigo: str,
+        eps: str,
+        contenido_html: str,
         numero_factura: Optional[str] = None,
         numero_radicado: Optional[str] = None,
     ) -> str:
@@ -2526,25 +2847,23 @@ class GlosaService:
           - El contenido del LLM tal cual (ya viene estructurado)
           - Disclaimer: este NO es la respuesta oficial a la EPS
         """
-        meta_factura = (
-            f"<span><b>Factura:</b> {numero_factura}</span>"
-            if numero_factura else ""
-        )
+        meta_factura = f"<span><b>Factura:</b> {numero_factura}</span>" if numero_factura else ""
         meta_radicado = (
-            f"<span><b>Radicado:</b> {numero_radicado}</span>"
-            if numero_radicado else ""
+            f"<span><b>Radicado:</b> {numero_radicado}</span>" if numero_radicado else ""
         )
         meta_sep = " · " if numero_factura and numero_radicado else ""
         meta_html = (
             f"<div style='font-size:11px;color:#64748b;margin-top:6px;'>"
             f"{meta_factura}{meta_sep}{meta_radicado}"
-            f"</div>" if (meta_factura or meta_radicado) else ""
+            f"</div>"
+            if (meta_factura or meta_radicado)
+            else ""
         )
         return f"""
 <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;">
   <div style="background:linear-gradient(135deg,#1e40af 0%,#1e3a8a 100%);color:#fff;padding:14px 20px;">
     <div style="font-size:11px;letter-spacing:1.5px;opacity:.85;text-transform:uppercase;font-weight:600;">📊 Auditoría previa · Diagnóstico neutral</div>
-    <div style="font-size:16px;font-weight:700;margin-top:4px;">Análisis interno de la glosa {codigo or ''} — {eps or ''}</div>
+    <div style="font-size:16px;font-weight:700;margin-top:4px;">Análisis interno de la glosa {codigo or ""} — {eps or ""}</div>
     {meta_html}
   </div>
   <div style="padding:18px 22px;font-size:13px;line-height:1.55;color:#0f172a;">
@@ -2559,20 +2878,35 @@ class GlosaService:
 </div>
 """
 
-    def _generar_dictamen_html(self, codigo: str, valor: str, cod_res: str, desc_res: str,
-                               argumento: str, eps: str, tipo: str,
-                               numero_factura: Optional[str] = None,
-                               numero_radicado: Optional[str] = None,
-                               normas_clave: Optional[str] = None,
-                               servicio: Optional[str] = None,
-                               contrato: Optional[str] = None,
-                               tarifa: Optional[str] = None) -> str:
+    def _generar_dictamen_html(
+        self,
+        codigo: str,
+        valor: str,
+        cod_res: str,
+        desc_res: str,
+        argumento: str,
+        eps: str,
+        tipo: str,
+        numero_factura: Optional[str] = None,
+        numero_radicado: Optional[str] = None,
+        normas_clave: Optional[str] = None,
+        servicio: Optional[str] = None,
+        contrato: Optional[str] = None,
+        tarifa: Optional[str] = None,
+    ) -> str:
         colores = {
-            "TA_TARIFA": "#1e40af", "SO_SOPORTES": "#7c3aed", "AU_AUTORIZACION": "#059669",
-            "CO_COBERTURA": "#dc2626", "CL_PERTINENCIA": "#d97706", "PE_PERTINENCIA": "#d97706",
+            "TA_TARIFA": "#1e40af",
+            "SO_SOPORTES": "#7c3aed",
+            "AU_AUTORIZACION": "#059669",
+            "CO_COBERTURA": "#dc2626",
+            "CL_PERTINENCIA": "#d97706",
+            "PE_PERTINENCIA": "#d97706",
             "FA_FACTURACION": "#0891b2",
-            "IN_INSUMOS": "#e11d48", "ME_MEDICAMENTOS": "#4f46e5", "EXT_EXTEMPORANEA": "#991b1b",
-            "RATIFICADA": "#7c3aed", "EXTEMPORANEA": "#991b1b"
+            "IN_INSUMOS": "#e11d48",
+            "ME_MEDICAMENTOS": "#4f46e5",
+            "EXT_EXTEMPORANEA": "#991b1b",
+            "RATIFICADA": "#7c3aed",
+            "EXTEMPORANEA": "#991b1b",
         }
         color = colores.get(tipo, "#1e3a8a")
 
@@ -2581,9 +2915,9 @@ class GlosaService:
             fila_trazabilidad = f"""
             <tr>
                 <td colspan="3" style="padding:6px 10px;font-size:10px;color:#64748b;border-top:1px dashed #e2e8f0;">
-                    {'N° Factura: <b>' + numero_factura + '</b>' if numero_factura else ''}
-                    {'&nbsp;&nbsp;|&nbsp;&nbsp;' if numero_factura and numero_radicado else ''}
-                    {'N° Radicado: <b>' + numero_radicado + '</b>' if numero_radicado else ''}
+                    {"N° Factura: <b>" + numero_factura + "</b>" if numero_factura else ""}
+                    {"&nbsp;&nbsp;|&nbsp;&nbsp;" if numero_factura and numero_radicado else ""}
+                    {"N° Radicado: <b>" + numero_radicado + "</b>" if numero_radicado else ""}
                 </td>
             </tr>"""
 
@@ -2635,7 +2969,7 @@ class GlosaService:
                         </tr>
                     </thead>
                     <tbody>
-                        {''.join(filas_adj)}
+                        {"".join(filas_adj)}
                     </tbody>
                 </table>
             </div>"""
@@ -2672,7 +3006,7 @@ class GlosaService:
         <div style="background:#f8fafc;border-radius:12px;padding:20px;border-left:4px solid {color};margin-top:15px;">
             <div style="display:flex;gap:10px;margin-bottom:15px;">
                 <span style="background:{color};color:white;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;">{eps}</span>
-                <span style="background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;">{tipo.replace('_', ' ')}</span>
+                <span style="background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;">{tipo.replace("_", " ")}</span>
             </div>
             <h4 style="color:#0f172a;margin:0 0 10px 0;font-size:14px;">ARGUMENTACIÓN JURÍDICA</h4>
             <div style="font-size:12px;line-height:1.9;color:#334155;white-space:pre-wrap;">{argumento}</div>
@@ -2719,22 +3053,45 @@ class GlosaService:
 
         # 1. Checks locales (rápidos, sin IA)
         if len(txt) < 200:
-            hallazgos.append({"nivel": "error", "mensaje": "El argumento es muy corto (menos de 200 caracteres)"})
+            hallazgos.append(
+                {"nivel": "error", "mensaje": "El argumento es muy corto (menos de 200 caracteres)"}
+            )
 
         # Placeholders típicos olvidados
-        placeholders = ["{EPS}", "{NOMBRE}", "{VALOR}", "XXXX", "[INSERTAR", "[COMPLETAR", "TODO:", "N/A NO APLICA"]
+        placeholders = [
+            "{EPS}",
+            "{NOMBRE}",
+            "{VALOR}",
+            "XXXX",
+            "[INSERTAR",
+            "[COMPLETAR",
+            "TODO:",
+            "N/A NO APLICA",
+        ]
         for ph in placeholders:
             if ph in txt.upper():
-                hallazgos.append({"nivel": "error", "mensaje": f"Dictamen contiene placeholder sin rellenar: {ph}"})
+                hallazgos.append(
+                    {
+                        "nivel": "error",
+                        "mensaje": f"Dictamen contiene placeholder sin rellenar: {ph}",
+                    }
+                )
 
         # EPS mencionada
         if eps and eps.upper() not in txt.upper() and "ESE HUS" in txt.upper():
             # No critico pero vale warning
-            hallazgos.append({"nivel": "warn", "mensaje": f"El texto no menciona explícitamente a {eps}"})
+            hallazgos.append(
+                {"nivel": "warn", "mensaje": f"El texto no menciona explícitamente a {eps}"}
+            )
 
         # Número de factura
         if numero_factura and numero_factura not in txt:
-            hallazgos.append({"nivel": "warn", "mensaje": f"No se encuentra el número de factura ({numero_factura}) en el texto"})
+            hallazgos.append(
+                {
+                    "nivel": "warn",
+                    "mensaje": f"No se encuentra el número de factura ({numero_factura}) en el texto",
+                }
+            )
 
         # Normas esperadas para el tipo
         normas_esperadas = []
@@ -2757,10 +3114,12 @@ class GlosaService:
             if n in txt:
                 normas_citadas += 1
         if normas_esperadas and normas_citadas == 0:
-            hallazgos.append({
-                "nivel": "warn",
-                "mensaje": f"No se cita ninguna norma típica para glosas {prefijo} ({', '.join(normas_esperadas)})",
-            })
+            hallazgos.append(
+                {
+                    "nivel": "warn",
+                    "mensaje": f"No se cita ninguna norma típica para glosas {prefijo} ({', '.join(normas_esperadas)})",
+                }
+            )
 
         # Detección de normas derogadas / incorrectas
         derogadas = {
@@ -2773,13 +3132,16 @@ class GlosaService:
 
         # Días hábiles / extemporaneidad
         if dias_habiles > 20 and "EXTEMPOR" not in txt.upper():
-            hallazgos.append({
-                "nivel": "warn",
-                "mensaje": f"La glosa tiene {dias_habiles} días hábiles (extemporánea) pero no se argumenta como tal",
-            })
+            hallazgos.append(
+                {
+                    "nivel": "warn",
+                    "mensaje": f"La glosa tiene {dias_habiles} días hábiles (extemporánea) pero no se argumenta como tal",
+                }
+            )
 
         # 2. Validación normativa contra catálogo
         from app.services.normativa import validar_citas
+
         val_citas = validar_citas(txt)
         for d in val_citas["derogadas"]:
             msg = f"Cita derogada/confusa: {d['cita']}. {d['razon']}"
@@ -2787,10 +3149,12 @@ class GlosaService:
                 msg += f" → usar {d['reemplaza_por']}"
             hallazgos.append({"nivel": "error", "mensaje": msg})
         if val_citas["no_catalogadas"]:
-            hallazgos.append({
-                "nivel": "info",
-                "mensaje": f"Citas no verificadas (pueden ser válidas): {', '.join(val_citas['no_catalogadas'][:5])}",
-            })
+            hallazgos.append(
+                {
+                    "nivel": "info",
+                    "mensaje": f"Citas no verificadas (pueden ser válidas): {', '.join(val_citas['no_catalogadas'][:5])}",
+                }
+            )
 
         # 3. Check con IA (si hay proveedor)
         ia_check = None
@@ -2835,7 +3199,11 @@ class GlosaService:
         resumen = (
             ia_check.get("resumen")
             if ia_check and ia_check.get("resumen")
-            else (f"{errores} error(es), {warnings_} advertencia(s)" if hallazgos else "Sin observaciones")
+            else (
+                f"{errores} error(es), {warnings_} advertencia(s)"
+                if hallazgos
+                else "Sin observaciones"
+            )
         )
 
         return {
@@ -2852,6 +3220,7 @@ class GlosaService:
     def _parsear_validacion_ia(texto: str) -> dict:
         """Parsea la respuesta estructurada de la IA del validador."""
         import re as _re
+
         out = {"hallazgos": []}
         m = _re.search(r"PUEDE_RADICAR:\s*(SI|NO)", texto, _re.IGNORECASE)
         if m:
@@ -2866,10 +3235,12 @@ class GlosaService:
         for linea in texto.split("\n"):
             m = _re.match(r"\s*-\s*NIVEL:\s*(ERROR|WARN|INFO)\s*[-—]\s*(.+)", linea, _re.IGNORECASE)
             if m:
-                out["hallazgos"].append({
-                    "nivel": m.group(1).lower(),
-                    "mensaje": m.group(2).strip()[:300],
-                })
+                out["hallazgos"].append(
+                    {
+                        "nivel": m.group(1).lower(),
+                        "mensaje": m.group(2).strip()[:300],
+                    }
+                )
         return out
 
     async def refinar_dictamen(
@@ -2887,6 +3258,7 @@ class GlosaService:
         # Extraer solo el argumento jurídico del HTML para no marear a la IA
         import re as _re
         from html import unescape
+
         txt = _re.sub(r"<[^>]+>", " ", dictamen_actual_html or "")
         txt = _re.sub(r"\s+", " ", unescape(txt)).strip()
 
@@ -2899,10 +3271,10 @@ class GlosaService:
             "ARGUMENTACION JURIDICA",
             "RESPUESTA A GLOSA",
             "ESE HUS NO ACEPTA LA RATIFICACIÓN",  # ratificadas (nuevo)
-            "ESE HUS NO ACEPTA",                    # tarifas/facturacion/IA normal
-            "ESE HUS RESPETUOSAMENTE",              # ratificadas (legacy, antes del cambio)
-            "ESE HUS RECHAZA",                      # Salud Total
-            "ESE HUS NO COMPARTE",                  # variante ratificada
+            "ESE HUS NO ACEPTA",  # tarifas/facturacion/IA normal
+            "ESE HUS RESPETUOSAMENTE",  # ratificadas (legacy, antes del cambio)
+            "ESE HUS RECHAZA",  # Salud Total
+            "ESE HUS NO COMPARTE",  # variante ratificada
         )
         for marker in markers_inicio:
             if marker in txt:
@@ -2912,8 +3284,12 @@ class GlosaService:
                 if pos < 500:
                     # Para "ARGUMENTACIÓN JURÍDICA" y "RESPUESTA A GLOSA" son labels,
                     # cortamos DESPUES del marker.
-                    if marker in ("ARGUMENTACIÓN JURÍDICA", "ARGUMENTACION JURIDICA", "RESPUESTA A GLOSA"):
-                        txt = txt[pos + len(marker):].strip()
+                    if marker in (
+                        "ARGUMENTACIÓN JURÍDICA",
+                        "ARGUMENTACION JURIDICA",
+                        "RESPUESTA A GLOSA",
+                    ):
+                        txt = txt[pos + len(marker) :].strip()
                     else:
                         # Para "ESE HUS..." el marker ES el inicio del argumento, cortamos DESDE el marker.
                         txt = txt[pos:].strip()
@@ -2934,7 +3310,7 @@ class GlosaService:
             "DOCUMENTO GENERADO ELECTRÓNICAMENTE",
             "DOCUMENTO GENERADO ELECTRONICAMENTE",
             "MARCO LEGAL: RESOLUCIÓN 2284",
-            'PRESTADOR_NIT',        # JSON de metadatos embebido
+            "PRESTADOR_NIT",  # JSON de metadatos embebido
             '"CODIGO_GLOSA"',
             "Nota: Generado con asistencia",
             "Nota: Generado con IA",
@@ -2998,7 +3374,9 @@ class GlosaService:
         out = out.upper()
         return _expandir_abreviaturas_tipo(out)
 
-    async def _llamar_gemini_con_retry(self, system: str, user: str, max_intentos: int = 3) -> tuple[str, str]:
+    async def _llamar_gemini_con_retry(
+        self, system: str, user: str, max_intentos: int = 3
+    ) -> tuple[str, str]:
         """Llama a Gemini con retry. Tier free 15 RPM en Flash 2.0,
         2 RPM en Pro 1.5. El service maneja retry interno con
         exponential backoff cuando hits 429/503/504."""
@@ -3013,7 +3391,9 @@ class GlosaService:
             max_intentos=max_intentos,
         )
 
-    async def _llamar_openrouter_con_retry(self, system: str, user: str, max_intentos: int = 3) -> tuple[str, str]:
+    async def _llamar_openrouter_con_retry(
+        self, system: str, user: str, max_intentos: int = 3
+    ) -> tuple[str, str]:
         """Llama a OpenRouter (default DeepSeek V3) con retry. Si el
         modelo principal del sender falla, OpenRouter cae solo al
         fallback gratis (Llama 3.3 70B) sin que tengamos que reintentar
@@ -3034,7 +3414,9 @@ class GlosaService:
             fallbacks=["meta-llama/llama-3.3-70b-instruct:free"],
         )
 
-    async def _llamar_groq_con_retry(self, system: str, user: str, max_intentos: int = 4) -> tuple[str, str]:
+    async def _llamar_groq_con_retry(
+        self, system: str, user: str, max_intentos: int = 4
+    ) -> tuple[str, str]:
         """Llama a Groq con retry exponencial para manejar rate limits y timeouts."""
         ultimo_error: Exception = Exception("Groq: sin intentos")
 
@@ -3076,7 +3458,7 @@ class GlosaService:
                 resp = await self.groq.chat.completions.create(
                     messages=[
                         {"role": "system", "content": system_reforzado},
-                        {"role": "user", "content": user}
+                        {"role": "user", "content": user},
                     ],
                     # Modelo configurable via env GROQ_MODEL (default: llama-3.3-70b-versatile).
                     # Llama 3.3 es mas estable que gpt-oss-120b (que entraba en loops
@@ -3099,8 +3481,10 @@ class GlosaService:
                 error_msg = str(e).lower()
                 es_reintentable = any(k in error_msg for k in _ERRORES_REINTENTABLES)
                 if es_reintentable and intento < max_intentos - 1:
-                    espera = min(2 ** intento, 16)
-                    logger.warning(f"Groq error reintentarable: {e}, reintento {intento + 2}/{max_intentos} en {espera}s")
+                    espera = min(2**intento, 16)
+                    logger.warning(
+                        f"Groq error reintentarable: {e}, reintento {intento + 2}/{max_intentos} en {espera}s"
+                    )
                     await asyncio.sleep(espera)
                     continue
                 raise
@@ -3176,6 +3560,7 @@ class GlosaService:
         # R54 P3: medir latencia y costo de cada call para observabilidad.
         # Usamos time.monotonic() (no afecta a wall clock changes).
         import time as _time
+
         _t_inicio = _time.monotonic()
 
         ultimo_error = None
@@ -3188,9 +3573,7 @@ class GlosaService:
                     # Mejora #4: temperature 0.10 (era 0.15) — más
                     # consistencia en dictámenes estructurados.
                     _temp_efectiva = (
-                        temperature_override
-                        if temperature_override is not None
-                        else 0.10
+                        temperature_override if temperature_override is not None else 0.10
                     )
                     resp = await client.post(
                         "https://api.anthropic.com/v1/messages",
@@ -3210,7 +3593,9 @@ class GlosaService:
                         usage = data.get("usage", {})
                         latencia_ms = int((_time.monotonic() - _t_inicio) * 1000)
                         _log_metricas_anthropic(
-                            usage, _modelo_efectivo, latencia_ms,
+                            usage,
+                            _modelo_efectivo,
+                            latencia_ms,
                         )
                         return data["content"][0]["text"], f"anthropic/{_modelo_efectivo}"
                     err = data.get("error", {}).get("message", str(data)[:300])
@@ -3219,18 +3604,22 @@ class GlosaService:
                     if status in (429, 529, 500, 502, 503, 504):
                         ultimo_error = RuntimeError(f"Anthropic HTTP {status}: {err[:200]}")
                         import asyncio as _aio
+
                         espera = 2.0 * (intento + 1)
-                        logger.warning(f"[ANTHROPIC] HTTP {status}, reintentando en {espera}s (intento {intento+1}/3)")
+                        logger.warning(
+                            f"[ANTHROPIC] HTTP {status}, reintentando en {espera}s (intento {intento + 1}/3)"
+                        )
                         await _aio.sleep(espera)
                         continue
                     raise RuntimeError(f"Anthropic devolvió sin 'content' (status={status}): {err}")
             except _ERRORES_TRANSITORIOS as e:
                 ultimo_error = e
                 import asyncio as _aio
+
                 espera = 2.0 * (intento + 1)
                 logger.warning(
                     f"[ANTHROPIC] timeout/red {type(e).__name__}, "
-                    f"reintentando en {espera}s (intento {intento+1}/3): {str(e)[:120]}"
+                    f"reintentando en {espera}s (intento {intento + 1}/3): {str(e)[:120]}"
                 )
                 await _aio.sleep(espera)
                 continue
@@ -3318,13 +3707,17 @@ class GlosaService:
                         tool_id = tu.get("id")
                         tool_name = tu.get("name")
                         tool_input = tu.get("input", {})
-                        logger.info(f"[TOOL-USE] turno={turno} tool={tool_name} input={str(tool_input)[:200]}")
+                        logger.info(
+                            f"[TOOL-USE] turno={turno} tool={tool_name} input={str(tool_input)[:200]}"
+                        )
                         result_str = execute_tool(tool_name, tool_input)
-                        tool_results_content.append({
-                            "type": "tool_result",
-                            "tool_use_id": tool_id,
-                            "content": result_str,
-                        })
+                        tool_results_content.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": tool_id,
+                                "content": result_str,
+                            }
+                        )
                     messages.append({"role": "user", "content": tool_results_content})
                     continue
 
@@ -3335,7 +3728,7 @@ class GlosaService:
                         texto_final += b.get("text", "")
                 if not texto_final:
                     raise RuntimeError("Tool use terminó sin texto final")
-                logger.info(f"[TOOL-USE] dictamen final tras {turno+1} turnos")
+                logger.info(f"[TOOL-USE] dictamen final tras {turno + 1} turnos")
                 return texto_final, f"anthropic/{modelo_efectivo}/tools"
 
         # Llegamos a max_turns sin texto final
@@ -3380,14 +3773,16 @@ class GlosaService:
             if len(b) > 32 * 1024 * 1024:
                 logger.warning(f"[MULTIMODAL] {nombre} excede 32MB, omitido")
                 continue
-            content_blocks.append({
-                "type": "document",
-                "source": {
-                    "type": "base64",
-                    "media_type": "application/pdf",
-                    "data": base64.standard_b64encode(b).decode("ascii"),
-                },
-            })
+            content_blocks.append(
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": base64.standard_b64encode(b).decode("ascii"),
+                    },
+                }
+            )
         if not content_blocks:
             raise RuntimeError("multimodal: ningún PDF válido para enviar")
         # El texto del prompt va al final, después de los documentos
@@ -3492,7 +3887,10 @@ class GlosaService:
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
         if not self.groq and not self.anthropic_key and not self.gemini and not self.openrouter:
-            return "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>", "error"
+            return (
+                "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>",
+                "error",
+            )
 
         # Orden de intento segun primary_ai configurado por el usuario.
         # RESPETAMOS la decision del usuario: si dice 'groq', va groq primero
@@ -3555,7 +3953,8 @@ class GlosaService:
                 # Solo Anthropic acepta modelo/temperature override
                 if nombre == "anthropic":
                     content, modelo = await fn(
-                        system, user,
+                        system,
+                        user,
                         modelo_override=modelo_override,
                         temperature_override=temperature_override,
                     )
@@ -3592,17 +3991,21 @@ def _buscar_cache_ia_db(clave: str) -> tuple[str, str] | None:
         from app.core.tz import a_utc, ahora_utc
         from app.database import SessionLocal
         from app.models.db import AICacheRecord
+
         db = SessionLocal()
         try:
             r = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()
             if not r:
                 return None
-            if r.creado_en and (ahora_utc() - a_utc(r.creado_en)) > timedelta(days=_CACHE_IA_TTL_DIAS):
+            if r.creado_en and (ahora_utc() - a_utc(r.creado_en)) > timedelta(
+                days=_CACHE_IA_TTL_DIAS
+            ):
                 db.delete(r)
                 db.commit()
                 return None
             r.hit_count = (r.hit_count or 0) + 1
             from sqlalchemy.sql import func as _func
+
             r.ultimo_hit = _func.now()
             db.commit()
             return (r.respuesta, r.modelo or "db-cache")
@@ -3629,6 +4032,7 @@ def _guardar_cache_ia_db(clave: str, respuesta: str, modelo: str) -> None:
             respuesta = respuesta[:_CACHE_MAX_RESP_LEN]
         from app.database import SessionLocal
         from app.models.db import AICacheRecord
+
         db = SessionLocal()
         try:
             existente = db.query(AICacheRecord).filter(AICacheRecord.clave == clave).first()

@@ -1,4 +1,5 @@
 """Tests del endpoint /sistema/alertas-criticas (R74 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -37,8 +38,12 @@ def usuario_coord():
 
 def _seed_glosa(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -50,6 +55,7 @@ def _seed_glosa(db, **kw):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -96,11 +102,14 @@ class TestAlertasCriticas:
 
     def test_costo_ia_alto_genera_alerta(self, client, db_session):
         # Inserta call IA con costo > $10
-        db_session.add(AICallRecord(
-            proveedor="anthropic", modelo="claude-sonnet-4-6",
-            cost_usd=15.0,
-            creado_en=ahora_utc() - timedelta(hours=1),
-        ))
+        db_session.add(
+            AICallRecord(
+                proveedor="anthropic",
+                modelo="claude-sonnet-4-6",
+                cost_usd=15.0,
+                creado_en=ahora_utc() - timedelta(hours=1),
+            )
+        )
         db_session.commit()
         r = client.get("/sistema/alertas-criticas")
         d = r.json()
@@ -111,7 +120,8 @@ class TestAlertasCriticas:
         _seed_glosa(db_session, dias_restantes=-1, estado="RADICADA")
         _seed_glosa(db_session, dias_restantes=2, estado="RADICADA")
         _seed_glosa(
-            db_session, estado="BORRADOR",
+            db_session,
+            estado="BORRADOR",
             creado_en=ahora_utc() - timedelta(days=10),
         )
         r = client.get("/sistema/alertas-criticas")

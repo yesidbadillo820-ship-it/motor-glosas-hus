@@ -30,20 +30,22 @@ MOTIVOS_SALUD_TOTAL = {
     "FACTURACION": "ESE HUS RECHAZA LA GLOSA POR FACTURACIÓN. LOS ERRORES FORMALES SON SUBSANABLES Y NO CONSTITUYEN CAUSAL DE GLOSA (CIRCULAR 030/2013). LA PRESTACIÓN DEL SERVICIO GENERA LA OBLIGACIÓN DE PAGO. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
 }
 
+
 def _detectar_tipo_motivo(descripcion_motivo: str, motv_glosa: str) -> str:
     """Identifica el tipo de motivo desde la descripción real del archivo TXT."""
-    texto = (descripcion_motivo + ' ' + motv_glosa).upper()
-    if any(k in texto for k in ['TARIFA', 'PRECIO', 'VALOR', 'COSTO']):
-        return 'TARIFA'
-    if any(k in texto for k in ['SOPORTE', 'DOCUMENTO', 'HISTORIA', 'FACTURA', 'FIRMA']):
-        return 'SOPORTE'
-    if any(k in texto for k in ['AUTORIZA', 'ORDEN', 'REMISION']):
-        return 'AUTORIZACION'
-    if any(k in texto for k in ['PERTINEN', 'INDICACION', 'NECESIDAD', 'CLINICO']):
-        return 'PERTINENCIA'
-    if any(k in texto for k in ['COBERTURA', 'PBS', 'PLAN', 'BENEFICIO']):
-        return 'COBERTURA'
-    return 'FACTURACION'
+    texto = (descripcion_motivo + " " + motv_glosa).upper()
+    if any(k in texto for k in ["TARIFA", "PRECIO", "VALOR", "COSTO"]):
+        return "TARIFA"
+    if any(k in texto for k in ["SOPORTE", "DOCUMENTO", "HISTORIA", "FACTURA", "FIRMA"]):
+        return "SOPORTE"
+    if any(k in texto for k in ["AUTORIZA", "ORDEN", "REMISION"]):
+        return "AUTORIZACION"
+    if any(k in texto for k in ["PERTINEN", "INDICACION", "NECESIDAD", "CLINICO"]):
+        return "PERTINENCIA"
+    if any(k in texto for k in ["COBERTURA", "PBS", "PLAN", "BENEFICIO"]):
+        return "COBERTURA"
+    return "FACTURACION"
+
 
 OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RES. 3047/2008, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). CONFORME AL ART. 57 LEY 1438/2011 OPERACIONALIZADO POR EL MANUAL ÚNICO RES. 2284/2023 (20 DÍAS EPS FORMULAR | 15 DÍAS IPS RESPONDER | 10 DÍAS EPS DECIDIR), LA GLOSA ES EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO."
 
@@ -79,8 +81,10 @@ OBS_TA_POR_TIPO = {
     "AP": "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE. LOS INSUMOS Y MATERIALES FUERON NECESARIOS Y ADECUADOS PARA LA ATENCIÓN. SE REQUIERE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
 }
 
+
 def es_dia_habil(fecha: datetime) -> bool:
     return fecha.weekday() < 5
+
 
 def calcular_dias_habiles(fecha_inicio: datetime, fecha_fin: datetime) -> int:
     dias = 0
@@ -90,6 +94,7 @@ def calcular_dias_habiles(fecha_inicio: datetime, fecha_fin: datetime) -> int:
             dias += 1
         actual += timedelta(days=1)
     return dias
+
 
 def parsear_fecha(fecha_str: str) -> datetime:
     fecha_str = fecha_str.strip()
@@ -119,8 +124,14 @@ def parsear_fecha(fecha_str: str) -> datetime:
             continue
     raise ValueError(f"Formato de fecha no reconocido: {fecha_str}")
 
+
 class GlosaSaludTotal:
-    def __init__(self, campos: List[str], tipo_respuesta: str = "extemporanea", fecha_recepcion: Optional[datetime] = None):
+    def __init__(
+        self,
+        campos: List[str],
+        tipo_respuesta: str = "extemporanea",
+        fecha_recepcion: Optional[datetime] = None,
+    ):
         self.campos = campos
         self.tipo_respuesta = tipo_respuesta
         self.fecha_recepcion = fecha_recepcion
@@ -166,19 +177,17 @@ class GlosaSaludTotal:
 
     def obtener_observacion(self) -> str:
         dias = self.dias_transcurridos()
-        
+
         if self.tipo_respuesta == "extemporanea" and dias > DIAS_LIMITE:
             return OBS_EXTEMPORANEA.replace("{DIAS}", str(dias))
-        
+
         if self.tipo_respuesta == "ratificada":
             return OBS_RATIFICADA
-        
+
         # NUEVO: detectar tipo desde el contenido REAL del archivo TXT
-        tipo_detectado = _detectar_tipo_motivo(
-            self.descripcion_motivo, self.motv_glosa_general
-        )
-        obs_base = MOTIVOS_SALUD_TOTAL.get(tipo_detectado, MOTIVOS_SALUD_TOTAL['FACTURACION'])
-        
+        tipo_detectado = _detectar_tipo_motivo(self.descripcion_motivo, self.motv_glosa_general)
+        obs_base = MOTIVOS_SALUD_TOTAL.get(tipo_detectado, MOTIVOS_SALUD_TOTAL["FACTURACION"])
+
         # Personalizar con nombre del servicio
         if self.nombre_servicio:
             return f"{obs_base} SERVICIO: {self.nombre_servicio.upper()}."
@@ -315,11 +324,15 @@ class GlosaSaludTotal:
             if key in plantillas:
                 return plantillas[key]
         # Fallback por tipo detectado desde el texto
-        tipo_detectado = _detectar_tipo_motivo(
-            self.descripcion_motivo, self.motv_glosa_general
-        )
-        mapeo = {"TARIFA":"TA","SOPORTE":"SO","AUTORIZACION":"AU",
-                 "PERTINENCIA":"CL","COBERTURA":"CO","FACTURACION":"FA"}
+        tipo_detectado = _detectar_tipo_motivo(self.descripcion_motivo, self.motv_glosa_general)
+        mapeo = {
+            "TARIFA": "TA",
+            "SOPORTE": "SO",
+            "AUTORIZACION": "AU",
+            "PERTINENCIA": "CL",
+            "COBERTURA": "CO",
+            "FACTURACION": "FA",
+        }
         return plantillas.get(mapeo.get(tipo_detectado, "FA"), plantillas["FA"])
 
     def generar_respuesta(self) -> Dict[str, Any]:
@@ -365,7 +378,7 @@ class GlosaSaludTotal:
             recorte = observacion[:OBS_MAX_CARACTERES]
             ultimo_punto = max(recorte.rfind(". "), recorte.rfind(".\n"))
             if ultimo_punto > OBS_MAX_CARACTERES * 0.7:
-                observacion = recorte[:ultimo_punto + 1]
+                observacion = recorte[: ultimo_punto + 1]
             else:
                 observacion = recorte.rstrip() + "."
 
@@ -386,6 +399,7 @@ class GlosaSaludTotal:
             "DiasTranscurridos": dias,
         }
 
+
 def _detectar_separador(primera_linea: str) -> str:
     """Auto-detecta el separador del archivo TXT.
 
@@ -405,7 +419,11 @@ def _detectar_separador(primera_linea: str) -> str:
     return "\t"
 
 
-def procesar_glosas_salud_total(contenido_txt: str, tipo_respuesta: str = "extemporanea", fecha_recepcion: Optional[datetime] = None) -> List[Dict[str, Any]]:
+def procesar_glosas_salud_total(
+    contenido_txt: str,
+    tipo_respuesta: str = "extemporanea",
+    fecha_recepcion: Optional[datetime] = None,
+) -> List[Dict[str, Any]]:
     lineas = contenido_txt.strip().split("\n")
     if not lineas:
         return []
@@ -422,7 +440,9 @@ def procesar_glosas_salud_total(contenido_txt: str, tipo_respuesta: str = "extem
         # Validación: mínimo 14 columnas para que la glosa tenga datos básicos
         # (fecha + factura + servicio + valor_glosa_final).
         if len(campos) < 14:
-            errores.append(f"Fila {idx}: solo {len(campos)} columnas (esperadas ≥14, separador detectado: {'TAB' if sep == chr(9) else 'PIPE'})")
+            errores.append(
+                f"Fila {idx}: solo {len(campos)} columnas (esperadas ≥14, separador detectado: {'TAB' if sep == chr(9) else 'PIPE'})"
+            )
             continue
         try:
             glosa = GlosaSaludTotal(campos, tipo_respuesta, fecha_recepcion)
@@ -436,39 +456,47 @@ def procesar_glosas_salud_total(contenido_txt: str, tipo_respuesta: str = "extem
     if not respuestas and errores:
         raise ValueError(
             "No se pudo procesar ninguna línea del archivo. "
-            "Separador detectado: " + ("TAB" if sep == "\t" else "PIPE") +
-            ". Primeros errores: " + " | ".join(errores[:3])
+            "Separador detectado: "
+            + ("TAB" if sep == "\t" else "PIPE")
+            + ". Primeros errores: "
+            + " | ".join(errores[:3])
         )
     return respuestas
+
 
 def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
     if not respuestas:
         return ""
-    
+
     header = "NumeroRad|PrefijoFac|NumeroFac|NUMREG|NombreServicio|ValorGlosaTotalxServ|CodMotvGlosaGeneral|CodMotvGlosaEspc|ValorAceptadoIPS|Codigo Respuesta a glosas|ConceptoRespuesta|Observacion IPS"
     lineas = [header]
-    
+
     for r in respuestas:
-        linea = "|".join([
-            str(r.get("NumeroRad", "")),
-            str(r.get("PrefijoFac", "")),
-            str(r.get("NumeroFac", "")),
-            str(r.get("NUMREG", "")),
-            str(r.get("NombreServicio", "")),
-            str(r.get("ValorGlosaTotalxServ", "")),
-            str(r.get("CodMotvGlosaGeneral", "")),
-            str(r.get("CodMotvGlosaEspc", "")),
-            str(r.get("ValorAceptadoIPS", "")),
-            str(r.get("Codigo_Respuesta_a_glosas", "")),
-            str(r.get("ConceptoRespuesta", "")),
-            str(r.get("Observacion_IPS", "")),
-        ])
+        linea = "|".join(
+            [
+                str(r.get("NumeroRad", "")),
+                str(r.get("PrefijoFac", "")),
+                str(r.get("NumeroFac", "")),
+                str(r.get("NUMREG", "")),
+                str(r.get("NombreServicio", "")),
+                str(r.get("ValorGlosaTotalxServ", "")),
+                str(r.get("CodMotvGlosaGeneral", "")),
+                str(r.get("CodMotvGlosaEspc", "")),
+                str(r.get("ValorAceptadoIPS", "")),
+                str(r.get("Codigo_Respuesta_a_glosas", "")),
+                str(r.get("ConceptoRespuesta", "")),
+                str(r.get("Observacion_IPS", "")),
+            ]
+        )
         lineas.append(linea)
-    
+
     return "\n".join(lineas)
+
 
 def generar_nombre_archivo(tipo_respuesta: str = "extemporanea") -> str:
     now = datetime.now()
     fecha_str = now.strftime("%d%m%Y")
-    sufijo = "1" if tipo_respuesta == "extemporanea" else "2" if tipo_respuesta == "ratificada" else "3"
+    sufijo = (
+        "1" if tipo_respuesta == "extemporanea" else "2" if tipo_respuesta == "ratificada" else "3"
+    )
     return f"RTAGLOSA_{NIT_HUS}_{fecha_str}_{sufijo}.txt"

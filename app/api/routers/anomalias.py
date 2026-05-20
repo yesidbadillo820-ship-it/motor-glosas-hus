@@ -9,6 +9,7 @@ del coordinador:
   GET /anomalias/glosa/{id}/valor-anomalo
     → z-score del valor de una glosa vs histórico del CUPS
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query

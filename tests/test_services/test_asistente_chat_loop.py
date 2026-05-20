@@ -5,6 +5,7 @@ a un tool_use (caso que disparaba el 400 al reinyectarlo en el turno 2).
 Verifica que el turno 2 NO reenvía bloques de texto vacíos y que el loop
 termina devolviendo la respuesta final.
 """
+
 import json
 
 import pytest
@@ -39,20 +40,23 @@ class _FakeClient:
         self.requests.append(json)
         self._turno += 1
         if self._turno == 1:
-            return _FakeResp({
-                "content": [
-                    {"type": "text", "text": ""},  # <-- bloque vacío (el bug)
-                    {"type": "tool_use", "id": "tu_1",
-                     "name": "buscar", "input": {"q": "x"}},
-                ],
-                "stop_reason": "tool_use",
-                "usage": {"input_tokens": 10, "output_tokens": 5},
-            })
-        return _FakeResp({
-            "content": [{"type": "text", "text": "Respuesta final OK"}],
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 8, "output_tokens": 4},
-        })
+            return _FakeResp(
+                {
+                    "content": [
+                        {"type": "text", "text": ""},  # <-- bloque vacío (el bug)
+                        {"type": "tool_use", "id": "tu_1", "name": "buscar", "input": {"q": "x"}},
+                    ],
+                    "stop_reason": "tool_use",
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                }
+            )
+        return _FakeResp(
+            {
+                "content": [{"type": "text", "text": "Respuesta final OK"}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 8, "output_tokens": 4},
+            }
+        )
 
 
 @pytest.mark.anyio

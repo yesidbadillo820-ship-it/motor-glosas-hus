@@ -10,6 +10,7 @@ Endpoints:
   GET    /glosas/{id}/nota-credito         — consultar
   DELETE /glosas/{id}/nota-credito         — borrar (corrección)
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -42,10 +43,7 @@ def _to_dict(g: GlosaRecord) -> dict:
         "valor_aceptado": g.valor_aceptado or 0.0,
         "estado": g.estado,
         "numero_nota_credito": g.numero_nota_credito,
-        "fecha_nota_credito": (
-            g.fecha_nota_credito.isoformat()
-            if g.fecha_nota_credito else None
-        ),
+        "fecha_nota_credito": (g.fecha_nota_credito.isoformat() if g.fecha_nota_credito else None),
         "valor_nota_credito": g.valor_nota_credito or 0.0,
         "observacion": g.nota_credito_observacion,
     }

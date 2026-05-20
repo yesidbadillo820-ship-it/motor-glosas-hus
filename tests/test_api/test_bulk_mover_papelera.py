@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/bulk-mover-papelera (R71 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,8 +38,12 @@ def _seed_n(db, n):
     ids = []
     for i in range(n):
         g = GlosaRecord(
-            eps="X", paciente=f"P{i}", codigo_glosa="TA0201",
-            valor_objetado=100, etapa="X", estado="RADICADA",
+            eps="X",
+            paciente=f"P{i}",
+            codigo_glosa="TA0201",
+            valor_objetado=100,
+            etapa="X",
+            estado="RADICADA",
             creado_en=ahora_utc(),
         )
         db.add(g)
@@ -52,6 +57,7 @@ def _seed_n(db, n):
 def client(db_session, usuario_coordinador):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coordinador
     with TestClient(app) as c:
@@ -62,9 +68,13 @@ def client(db_session, usuario_coordinador):
 class TestBulkMoverPapelera:
     def test_dry_run_no_borra(self, client, db_session):
         ids = _seed_n(db_session, 3)
-        r = client.post("/glosas/bulk-mover-papelera", json={
-            "glosa_ids": ids, "dry_run": True,
-        })
+        r = client.post(
+            "/glosas/bulk-mover-papelera",
+            json={
+                "glosa_ids": ids,
+                "dry_run": True,
+            },
+        )
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["dry_run"] is True
@@ -75,10 +85,13 @@ class TestBulkMoverPapelera:
 
     def test_real_mueve_a_papelera(self, client, db_session):
         ids = _seed_n(db_session, 2)
-        r = client.post("/glosas/bulk-mover-papelera", json={
-            "glosa_ids": ids,
-            "motivo": "Importadas por error",
-        })
+        r = client.post(
+            "/glosas/bulk-mover-papelera",
+            json={
+                "glosa_ids": ids,
+                "motivo": "Importadas por error",
+            },
+        )
         d = r.json()
         assert d["movidas_a_papelera"] == 2
         # historial vacío, papelera con 2
@@ -87,21 +100,30 @@ class TestBulkMoverPapelera:
 
     def test_no_encontradas_no_rompen_batch(self, client, db_session):
         ids = _seed_n(db_session, 2)
-        r = client.post("/glosas/bulk-mover-papelera", json={
-            "glosa_ids": ids + [99999],
-        })
+        r = client.post(
+            "/glosas/bulk-mover-papelera",
+            json={
+                "glosa_ids": ids + [99999],
+            },
+        )
         d = r.json()
         assert d["movidas_a_papelera"] == 2
         assert d["no_encontradas"] == [99999]
 
     def test_lista_vacia_falla(self, client):
-        r = client.post("/glosas/bulk-mover-papelera", json={
-            "glosa_ids": [],
-        })
+        r = client.post(
+            "/glosas/bulk-mover-papelera",
+            json={
+                "glosa_ids": [],
+            },
+        )
         assert r.status_code == 422
 
     def test_cap_200(self, client):
-        r = client.post("/glosas/bulk-mover-papelera", json={
-            "glosa_ids": list(range(1, 202)),
-        })
+        r = client.post(
+            "/glosas/bulk-mover-papelera",
+            json={
+                "glosa_ids": list(range(1, 202)),
+            },
+        )
         assert r.status_code == 422

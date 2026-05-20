@@ -17,6 +17,7 @@ Modo ejecución (dry_run=False):
 
 La función es segura de correr múltiples veces.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -56,9 +57,7 @@ def retro_aplicar(
     q = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.creado_en >= desde)
-        .filter(
-            ~GlosaRecord.estado.in_(["RESUELTA", "ARCHIVADA", "CERRADA"])
-        )
+        .filter(~GlosaRecord.estado.in_(["RESUELTA", "ARCHIVADA", "CERRADA"]))
     )
     if limite:
         q = q.limit(int(limite))
@@ -88,20 +87,24 @@ def retro_aplicar(
             if tipo == "RATIFICADA":
                 stats["aplicarian_ratificada"] += 1
                 if len(stats["ejemplos_ratificada"]) < 50:
-                    stats["ejemplos_ratificada"].append({
-                        "glosa_id": g.id,
-                        "eps": g.eps,
-                        "codigo": g.codigo_glosa,
-                    })
+                    stats["ejemplos_ratificada"].append(
+                        {
+                            "glosa_id": g.id,
+                            "eps": g.eps,
+                            "codigo": g.codigo_glosa,
+                        }
+                    )
             elif tipo == "EXTEMPORANEA":
                 stats["aplicarian_extemporanea"] += 1
                 if len(stats["ejemplos_extemporanea"]) < 50:
-                    stats["ejemplos_extemporanea"].append({
-                        "glosa_id": g.id,
-                        "eps": g.eps,
-                        "codigo": g.codigo_glosa,
-                        "dias": clase.get("dias_extemporaneidad"),
-                    })
+                    stats["ejemplos_extemporanea"].append(
+                        {
+                            "glosa_id": g.id,
+                            "eps": g.eps,
+                            "codigo": g.codigo_glosa,
+                            "dias": clase.get("dias_extemporaneidad"),
+                        }
+                    )
 
             if dry_run:
                 continue

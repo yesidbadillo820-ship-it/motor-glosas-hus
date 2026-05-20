@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/por-dia-semana (R141 P2)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, fecha):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=fecha,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=fecha,
+        )
+    )
     db.commit()
 
 
@@ -82,8 +90,7 @@ class TestPorDiaSemana:
     def test_pct_del_total(self, client, db_session):
         # 4 glosas el lunes
         for _ in range(4):
-            _seed(db_session,
-                  datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
+            _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
         # 1 glosa el martes
         _seed(db_session, datetime(2026, 4, 21, 10, 0, tzinfo=timezone.utc))
 
@@ -95,6 +102,7 @@ class TestPorDiaSemana:
 
     def test_excluye_fuera_ventana(self, client, db_session):
         from datetime import timedelta
+
         ahora = ahora_utc()
         # Reciente
         _seed(db_session, ahora - timedelta(days=10))

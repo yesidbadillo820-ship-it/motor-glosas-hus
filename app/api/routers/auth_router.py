@@ -25,7 +25,7 @@ async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     totp: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     cfg = get_settings()
     # IP del cliente para auditoría de seguridad. Se loguea en TODOS los
@@ -58,6 +58,7 @@ async def login_for_access_token(
                 headers={"X-2FA-Required": "true"},
             )
         import pyotp
+
         if not pyotp.TOTP(user.totp_secret).verify(totp.strip(), valid_window=1):
             logger.warning(
                 f"[AUTH-2FA-FAIL] Código 2FA inválido | email={user.email} | ip={ip_cliente}"
@@ -68,12 +69,8 @@ async def login_for_access_token(
             )
 
     access_token_expires = timedelta(minutes=cfg.access_token_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    logger.info(
-        f"[AUTH-OK] Login exitoso | email={user.email} | rol={user.rol} | ip={ip_cliente}"
-    )
+    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    logger.info(f"[AUTH-OK] Login exitoso | email={user.email} | rol={user.rol} | ip={ip_cliente}")
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -84,8 +81,15 @@ async def login_for_access_token(
 
 
 _PASSWORDS_DEBILES = {
-    "admin", "admin123", "password", "123456", "hus2026",
-    "12345678", "qwerty", "abc123", "contraseña",
+    "admin",
+    "admin123",
+    "password",
+    "123456",
+    "hus2026",
+    "12345678",
+    "qwerty",
+    "abc123",
+    "contraseña",
 }
 
 
@@ -172,9 +176,7 @@ def logout(
       - Cumplimiento Habeas Data (Ley 1581/2012)
     """
     ip = get_remote_address(request)
-    logger.info(
-        f"[AUTH-LOGOUT] Cierre de sesión | email={current_user.email} | ip={ip}"
-    )
+    logger.info(f"[AUTH-LOGOUT] Cierre de sesión | email={current_user.email} | ip={ip}")
     return {
         "ok": True,
         "mensaje": "Sesión cerrada. Descarte el token en el cliente.",
@@ -206,11 +208,10 @@ def refresh_token(
     ip = get_remote_address(request)
     expires = timedelta(minutes=cfg.access_token_expire_minutes)
     new_token = create_access_token(
-        data={"sub": current_user.email}, expires_delta=expires,
+        data={"sub": current_user.email},
+        expires_delta=expires,
     )
-    logger.info(
-        f"[AUTH-REFRESH] Token renovado | email={current_user.email} | ip={ip}"
-    )
+    logger.info(f"[AUTH-REFRESH] Token renovado | email={current_user.email} | ip={ip}")
     return {
         "access_token": new_token,
         "token_type": "bearer",

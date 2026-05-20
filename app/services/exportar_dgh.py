@@ -39,6 +39,7 @@ sin emojis, sin headers tipo "📋 Tarifa pactada encontrada" ni
 "RATIFICADA EPS: U240061 - ... | Observación recepción: ...", solo el
 argumento jurídico final.
 """
+
 from __future__ import annotations
 
 import html as _html
@@ -54,6 +55,7 @@ from app.models.db import ConceptoGlosaRecord, GlosaRecord
 try:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
+
     EXCEL_OK = True
 except Exception:
     EXCEL_OK = False
@@ -93,14 +95,14 @@ COLUMNAS_DGH = [
 # Removemos emojis (rango BMP común + suplementario para pictogramas)
 _EMOJI_RE = re.compile(
     "["
-    "\U0001F300-\U0001F6FF"     # pictogramas, transporte, símbolos
-    "\U0001F900-\U0001F9FF"     # símbolos y pictogramas suplementarios
-    "\U0001FA00-\U0001FAFF"
-    "☀-➿"              # símbolos varios
-    "✀-➿"              # dingbats
-    "\U0001F000-\U0001F2FF"
-    "←-⇿"              # flechas
-    "⬀-⯿"              # flechas suplementarias
+    "\U0001f300-\U0001f6ff"  # pictogramas, transporte, símbolos
+    "\U0001f900-\U0001f9ff"  # símbolos y pictogramas suplementarios
+    "\U0001fa00-\U0001faff"
+    "☀-➿"  # símbolos varios
+    "✀-➿"  # dingbats
+    "\U0001f000-\U0001f2ff"
+    "←-⇿"  # flechas
+    "⬀-⯿"  # flechas suplementarias
     "]+",
     flags=re.UNICODE,
 )
@@ -121,8 +123,12 @@ _FIN_ARGUMENTO = re.compile(
 
 # Headers que debemos ELIMINAR del inicio del dictamen (no son argumento)
 _HEADERS_BASURA = (
-    re.compile(r"^\s*RATIFICADA\s+EPS:.*?Observaci[óo]n\s+recepci[óo]n:\s*", re.IGNORECASE | re.DOTALL),
-    re.compile(r"^\s*GLOSA\s+EXTEMPOR[AÁ]NEA\s*[—-]\s*\d+\s+D[IÍ]AS\s+H[AÁ]BILES\s*", re.IGNORECASE),
+    re.compile(
+        r"^\s*RATIFICADA\s+EPS:.*?Observaci[óo]n\s+recepci[óo]n:\s*", re.IGNORECASE | re.DOTALL
+    ),
+    re.compile(
+        r"^\s*GLOSA\s+EXTEMPOR[AÁ]NEA\s*[—-]\s*\d+\s+D[IÍ]AS\s+H[AÁ]BILES\s*", re.IGNORECASE
+    ),
     re.compile(r"^\s*RESPUESTA\s+A\s+GLOSA\s+RATIFICADA\s*", re.IGNORECASE),
     # Banner "Tarifa pactada encontrada..." completo
     re.compile(
@@ -130,13 +136,25 @@ _HEADERS_BASURA = (
         re.IGNORECASE | re.DOTALL,
     ),
     # "EPS: ... | Factura: ... | Observación recepción: ..." (sin prefijo RATIFICADA)
-    re.compile(r"^\s*EPS:\s*.*?\|\s*Factura:\s*.*?\|\s*Observaci[óo]n\s+recepci[óo]n:\s*", re.IGNORECASE | re.DOTALL),
+    re.compile(
+        r"^\s*EPS:\s*.*?\|\s*Factura:\s*.*?\|\s*Observaci[óo]n\s+recepci[óo]n:\s*",
+        re.IGNORECASE | re.DOTALL,
+    ),
     # Línea tipo "CUPS: 890750 EPS: ... Contrato: ..."
-    re.compile(r"CUPS:\s*\S+\s+EPS:\s*[^|]*?\s+Contrato:\s*\S+.*?(?=ESE\s+HUS|DE\s+CONFORMIDAD|$)", re.IGNORECASE | re.DOTALL),
+    re.compile(
+        r"CUPS:\s*\S+\s+EPS:\s*[^|]*?\s+Contrato:\s*\S+.*?(?=ESE\s+HUS|DE\s+CONFORMIDAD|$)",
+        re.IGNORECASE | re.DOTALL,
+    ),
     # Tabla encabezado "CÓDIGO GLOSA VALOR OBJETADO CÓDIGO RESPUESTA TA0201 $ N RE9901"
-    re.compile(r"C[ÓO]DIGO\s+GLOSA\s+VALOR\s+OBJETADO\s+C[ÓO]DIGO\s+RESPUESTA\s+\S+\s+\$\s*[\d\.,]+\s+RE\d+", re.IGNORECASE),
+    re.compile(
+        r"C[ÓO]DIGO\s+GLOSA\s+VALOR\s+OBJETADO\s+C[ÓO]DIGO\s+RESPUESTA\s+\S+\s+\$\s*[\d\.,]+\s+RE\d+",
+        re.IGNORECASE,
+    ),
     # Banner "GLOSA RATIFICADA - SE MANTIENE RESPUESTA INICIAL, SE SOLICITA CONCILIACIÓN"
-    re.compile(r"GLOSA\s+RATIFICADA\s*[-–]\s*SE\s+MANTIENE\s+RESPUESTA\s+INICIAL.*?CONCILIACI[ÓO]N", re.IGNORECASE),
+    re.compile(
+        r"GLOSA\s+RATIFICADA\s*[-–]\s*SE\s+MANTIENE\s+RESPUESTA\s+INICIAL.*?CONCILIACI[ÓO]N",
+        re.IGNORECASE,
+    ),
     # Meta "N° Factura: HUS000... [EPS] RATIFICADA"
     re.compile(r"N[°º]\s*Factura:\s*\S+\s+.*?\s+RATIFICADA", re.IGNORECASE),
     # Nota pie "Generado con asistencia de IA. Verificar antes de radicar..."
@@ -194,12 +212,14 @@ def limpiar_dictamen_para_dgh(dictamen_html: str, glosa: GlosaRecord) -> str:
     if "texto_fijo/ratificada" in modelo:
         try:
             from app.services.glosa_service import TEXTO_RATIFICADA
+
             return TEXTO_RATIFICADA
         except Exception:
             pass
     if "texto_fijo/extemporanea" in modelo:
         try:
             from app.services.glosa_service import generar_texto_extemporanea
+
             dias = int(getattr(glosa, "dias_radicacion_dgh", 0) or 0)
             if dias <= 0:
                 dias = 21
@@ -214,11 +234,11 @@ def limpiar_dictamen_para_dgh(dictamen_html: str, glosa: GlosaRecord) -> str:
     # Estrategia 1: si existe marcador 'ARGUMENTACIÓN JURÍDICA', cortar desde ahí
     m_inicio = _INICIO_ARGUMENTO.search(txt)
     if m_inicio:
-        txt = txt[m_inicio.end():]
+        txt = txt[m_inicio.end() :]
     # Estrategia 2: cortar antes de 'RELACIÓN DE SOPORTES APORTADOS' o 'Nota: Generado...'
     m_fin = _FIN_ARGUMENTO.search(txt)
     if m_fin:
-        txt = txt[:m_fin.start()]
+        txt = txt[: m_fin.start()]
 
     # Remover headers sueltos residuales
     for rx in _HEADERS_BASURA:
@@ -230,6 +250,7 @@ def limpiar_dictamen_para_dgh(dictamen_html: str, glosa: GlosaRecord) -> str:
 
 
 # ─── Resolución del tercero (EPS) ─────────────────────────────────────────
+
 
 def resolver_tercero(glosa: GlosaRecord) -> tuple[str, str, str]:
     """Retorna (NombreCompletoAN, NombreCompletoNA, Documento).
@@ -283,6 +304,7 @@ def resolver_tercero(glosa: GlosaRecord) -> tuple[str, str, str]:
 
 # ─── Clasificadores derivados ─────────────────────────────────────────────
 
+
 def estado_cxc_objecion(glosa: GlosaRecord) -> str:
     """Glosa_Inicial / Glosa_Ratificada / Glosa_Total (usado por DGH)."""
     est = (getattr(glosa, "estado", "") or "").upper()
@@ -311,7 +333,9 @@ def tipo_objecion_tramite(codigo_glosa: str) -> str:
     return "Administrativo"
 
 
-def codigo_respuesta_efectivo(glosa: GlosaRecord, concepto: Optional[ConceptoGlosaRecord] = None) -> str:
+def codigo_respuesta_efectivo(
+    glosa: GlosaRecord, concepto: Optional[ConceptoGlosaRecord] = None
+) -> str:
     """Código RE9XXX de la respuesta. Si no lo tenemos, inferimos del flujo.
 
     Para RATIFICADAS el código canónico es RE9901 (no acepta ratificación).
@@ -332,6 +356,7 @@ def codigo_respuesta_efectivo(glosa: GlosaRecord, concepto: Optional[ConceptoGlo
 
 
 # ─── Formateadores ────────────────────────────────────────────────────────
+
 
 def _fmt_fecha(dt) -> str:
     """Devuelve DD/MM/AAAA en formato español."""
@@ -365,6 +390,7 @@ def _fmt_fecha_hora(dt) -> str:
 
 # ─── Generación del Excel ─────────────────────────────────────────────────
 
+
 def generar_filas_dgh(
     db: Session,
     glosas: list[GlosaRecord],
@@ -379,11 +405,7 @@ def generar_filas_dgh(
     ids = [g.id for g in glosas if g.id]
     conceptos_por_glosa: dict[int, list[ConceptoGlosaRecord]] = {}
     if ids:
-        todos = (
-            db.query(ConceptoGlosaRecord)
-            .filter(ConceptoGlosaRecord.glosa_id.in_(ids))
-            .all()
-        )
+        todos = db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.glosa_id.in_(ids)).all()
         for c in todos:
             conceptos_por_glosa.setdefault(c.glosa_id, []).append(c)
 
@@ -407,7 +429,9 @@ def generar_filas_dgh(
             # Ronda 42: también aplicar extracción de descripción de servicio
             desc_fallback = (g.servicio_descripcion or "").strip()
             if not desc_fallback:
-                desc_fallback = extraer_descripcion_servicio(g.texto_glosa_original or g.observacion_eps or "")
+                desc_fallback = extraer_descripcion_servicio(
+                    g.texto_glosa_original or g.observacion_eps or ""
+                )
             fila = {
                 "EstadoCxCObjecion": estado_cxc,
                 "TipoObjecionTramite": tipo_objecion_tramite(g.codigo_glosa or ""),
@@ -450,7 +474,9 @@ def generar_filas_dgh(
 
             fila = {
                 "EstadoCxCObjecion": estado_cxc,
-                "TipoObjecionTramite": tipo_objecion_tramite(c.codigo_glosa or g.codigo_glosa or ""),
+                "TipoObjecionTramite": tipo_objecion_tramite(
+                    c.codigo_glosa or g.codigo_glosa or ""
+                ),
                 "FacturaCartera.Factura": factura,
                 "FechaDocumento": fecha_doc,
                 "Consecutivo": consec,
@@ -462,13 +488,16 @@ def generar_filas_dgh(
                 "FacturaCartera.Tercero.NombreCompletoAN": nombre_an,
                 "FechaObjecion": fecha_obj,
                 "FacturaCartera.Tercero.NombreCompletoNA": nombre_na,
-                "ListadoConceptos.ConceptoObjecion.Codigo": (getattr(c, "codigo_syscafe", None) or c.codigo_glosa or ""),
+                "ListadoConceptos.ConceptoObjecion.Codigo": (
+                    getattr(c, "codigo_syscafe", None) or c.codigo_glosa or ""
+                ),
                 "ListadoConceptos.Oid": c.oid_dgh or "",
                 "ListadoConceptos.ConceptoObjecion.Nombre": c.nombre_glosa or "",
                 "ListadoConceptos.ServicioProductoFactura.Codigo": c.cups_codigo or "",
                 "ListadoConceptos.ServicioProductoFactura.Descripcion": desc_servicio,
                 "ListadoConceptos.ValorObjecion": float(c.valor_objetado or 0.0),
-                "ListadoConceptos.ServicioProductoFactura.CentroCosto.CodigoNombreCentro": c.centro_costo or "",
+                "ListadoConceptos.ServicioProductoFactura.CentroCosto.CodigoNombreCentro": c.centro_costo
+                or "",
                 "ListadoConceptos.Observaciones": c.observacion_eps or "",
                 "FECHA DE CARGUE": fcargue,
                 "CODIGO RESPUESTA": codigo_resp,

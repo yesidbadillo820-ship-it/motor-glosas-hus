@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/dashboard-coordinador (R396 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def admin():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def admin():
 def client(db_session, admin):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin
     with TestClient(app) as c:
@@ -46,17 +51,24 @@ def client(db_session, admin):
     app.dependency_overrides.clear()
 
 
-def _seed(db, eps="X", gestor=None, dias=10, estado="RADICADA",
-          valor=1000, recuperado=0, decidida=False):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=valor, valor_recuperado=recuperado,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        dias_restantes=dias,
-        fecha_decision_eps=ahora_utc() if decidida else None,
-    ))
+def _seed(
+    db, eps="X", gestor=None, dias=10, estado="RADICADA", valor=1000, recuperado=0, decidida=False
+):
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            valor_recuperado=recuperado,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            dias_restantes=dias,
+            fecha_decision_eps=ahora_utc() if decidida else None,
+        )
+    )
     db.commit()
 
 
@@ -65,8 +77,12 @@ class TestDashboardCoordinador:
         _seed(db_session, eps="SAN", gestor="Alice", dias=-3)
         _seed(db_session, eps="SAN", gestor=None, dias=10)
         _seed(
-            db_session, eps="SAN", gestor="Alice",
-            estado="LEVANTADA", recuperado=5000, decidida=True,
+            db_session,
+            eps="SAN",
+            gestor="Alice",
+            estado="LEVANTADA",
+            recuperado=5000,
+            decidida=True,
         )
         r = client.get("/admin/dashboard-coordinador")
         d = r.json()
@@ -81,12 +97,14 @@ class TestDashboardCoordinador:
     def test_no_admin_403(self, db_session):
         from app.api.deps import get_usuario_actual
         from app.main import app
+
         no_admin = UsuarioRecord(
-            id=99, email="x@x", rol="AUDITOR", activo=1,
+            id=99,
+            email="x@x",
+            rol="AUDITOR",
+            activo=1,
         )
-        app.dependency_overrides[get_db] = (
-            lambda: iter([db_session]).__next__()
-        )
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
         app.dependency_overrides[get_usuario_actual] = lambda: no_admin
         with TestClient(app) as c:
             r = c.get("/admin/dashboard-coordinador")

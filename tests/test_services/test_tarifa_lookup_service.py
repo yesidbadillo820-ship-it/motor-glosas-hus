@@ -1,11 +1,11 @@
 """Tests del servicio de evaluación de tarifas pactadas."""
+
 from __future__ import annotations
 
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
 
 from app.services.tarifa_lookup_service import (
     calcular_valor_pactado,
@@ -71,8 +71,9 @@ class TestEvaluarGlosaTarifa:
 
     def test_no_encontrada(self):
         db = self._db_mock(None)
-        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "999999",
-                                  valor_facturado=100_000, valor_objetado=20_000)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "999999", valor_facturado=100_000, valor_objetado=20_000
+        )
         assert r["encontrada"] is False
         assert r["tarifa"] is None
         assert r["recomendacion"] is None
@@ -85,8 +86,9 @@ class TestEvaluarGlosaTarifa:
     def test_facturado_igual_pactado_defender_total(self):
         t = _tarifa(valor_pactado=83800.0)
         db = self._db_mock(t)
-        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890202",
-                                  valor_facturado=83800, valor_objetado=10_000)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "890202", valor_facturado=83800, valor_objetado=10_000
+        )
         assert r["encontrada"]
         assert r["recomendacion"]["accion"] == "DEFENDER_TOTAL"
         assert r["valor_pactado_calc"] == 83800.0
@@ -96,8 +98,9 @@ class TestEvaluarGlosaTarifa:
         db = self._db_mock(t)
         # Hospital facturó 100_000, pactado es 83_800. Diferencia=16_200.
         # EPS objeta 20_000 → cabe la diferencia → aceptar parcial 16_200, defender 3_800
-        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890202",
-                                  valor_facturado=100_000, valor_objetado=20_000)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "890202", valor_facturado=100_000, valor_objetado=20_000
+        )
         assert r["encontrada"]
         rec = r["recomendacion"]
         assert rec["accion"] == "ACEPTAR_PARCIAL"
@@ -107,8 +110,9 @@ class TestEvaluarGlosaTarifa:
     def test_facturado_menor_al_pactado_defender(self):
         t = _tarifa(valor_pactado=83800.0)
         db = self._db_mock(t)
-        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890202",
-                                  valor_facturado=70_000, valor_objetado=10_000)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "890202", valor_facturado=70_000, valor_objetado=10_000
+        )
         assert r["recomendacion"]["accion"] == "DEFENDER_TOTAL"
         assert r["recomendacion"]["valor_a_defender"] == 70_000.0
 
@@ -117,18 +121,23 @@ class TestEvaluarGlosaTarifa:
         db = self._db_mock(t)
         # Diferencia facturado-pactado = 100_000 - 50_000 = 50_000.
         # EPS solo objeta 20_000 → no cabe → REVISAR
-        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890202",
-                                  valor_facturado=100_000, valor_objetado=20_000)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "890202", valor_facturado=100_000, valor_objetado=20_000
+        )
         assert r["recomendacion"]["accion"] == "REVISAR"
 
     def test_soat_porcentaje_calcula_pactado(self):
-        t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0,
-                     valor_pactado=0)
+        t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0, valor_pactado=0)
         db = self._db_mock(t)
-        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890202",
-                                  valor_facturado=95_000, valor_objetado=10_000,
-                                  valor_soat_base=100_000,
-                                  valor_reconocido=85_000)
+        r = evaluar_glosa_tarifa(
+            db,
+            "FAMISANAR EPS",
+            "890202",
+            valor_facturado=95_000,
+            valor_objetado=10_000,
+            valor_soat_base=100_000,
+            valor_reconocido=85_000,
+        )
         assert r["valor_pactado_calc"] == 95_000.0
         # SOAT_PORCENTAJE con facturado y reconocido → DEFENDER (discrepancia
         # sobre SOAT base, no sobre el descuento pactado).
@@ -213,8 +222,9 @@ class TestSoatPorcentajeSinBase:
     def test_sin_valores_solo_soat_revisar(self):
         t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0, valor_pactado=0)
         db = self._db_mock(t)
-        r = evaluar_glosa_tarifa(db, "FAMISANAR EPS", "890750",
-                                  valor_facturado=0, valor_objetado=24_900)
+        r = evaluar_glosa_tarifa(
+            db, "FAMISANAR EPS", "890750", valor_facturado=0, valor_objetado=24_900
+        )
         rec = r["recomendacion"]
         assert rec["accion"] == "REVISAR"
         assert "SOAT base" in rec["razon"]
@@ -226,7 +236,9 @@ class TestSoatPorcentajeSinBase:
         t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0, valor_pactado=0)
         db = self._db_mock(t)
         r = evaluar_glosa_tarifa(
-            db, "FAMISANAR EPS", "890750",
+            db,
+            "FAMISANAR EPS",
+            "890750",
             valor_facturado=114_900,
             valor_objetado=24_900,
             valor_reconocido=90_000,
@@ -243,7 +255,9 @@ class TestSoatPorcentajeSinBase:
         t = _tarifa(tipo_tarifa="SOAT_PORCENTAJE", factor_ajuste=-5.0, valor_pactado=0)
         db = self._db_mock(t)
         r = evaluar_glosa_tarifa(
-            db, "FAMISANAR EPS", "890750",
+            db,
+            "FAMISANAR EPS",
+            "890750",
             valor_facturado=114_900,
             valor_objetado=24_900,
         )

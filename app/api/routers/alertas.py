@@ -18,12 +18,12 @@ def obtener_alertas_proximas(
 ):
     """
     Obtiene lista de glosas próximas a vencer.
-    
+
     Requiere autenticación JWT.
     """
     repo = GlosaRepository(db)
     alertas = repo.alertas_proximas(dias_limite=dias)
-    
+
     return {
         "total": len(alertas),
         "dias_umbral": dias,
@@ -40,7 +40,7 @@ def obtener_alertas_proximas(
                 "creado_en": a.creado_en.isoformat() if a.creado_en else None,
             }
             for a in alertas
-        ]
+        ],
     }
 
 
@@ -53,7 +53,7 @@ def enviar_alertas_email(
 ):
     """
     Envía alerta por correo electrónico con las glosas próximas a vencer.
-    
+
     Requiere autenticación JWT.
     Configurar SMTP_USER, SMTP_PASSWORD y ALERTAS_EMAIL en variables de entorno.
     """
@@ -63,14 +63,14 @@ def enviar_alertas_email(
         dias_limite=dias,
         forzar=forzar,
     )
-    
+
     return {
         "success": exito,
         "message": mensaje,
         "configuracion": {
-            "smtp_configurado": bool(__import__('os').getenv("SMTP_USER")),
-            "destinatarios_configurados": bool(__import__('os').getenv("ALERTAS_EMAIL")),
-        }
+            "smtp_configurado": bool(__import__("os").getenv("SMTP_USER")),
+            "destinatarios_configurados": bool(__import__("os").getenv("ALERTAS_EMAIL")),
+        },
     }
 
 
@@ -80,11 +80,11 @@ def obtener_config_alertas(
 ):
     """
     Retorna la configuración actual de alertas.
-    
+
     Requiere autenticación JWT.
     """
     import os
-    
+
     return {
         "smtp": {
             "host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
@@ -92,6 +92,8 @@ def obtener_config_alertas(
             "usuario_configurado": bool(os.getenv("SMTP_USER")),
             "desde": os.getenv("SMTP_FROM", "noreply@hus.gov.co"),
         },
-        "destinatarios": os.getenv("ALERTAS_EMAIL", "").split(",") if os.getenv("ALERTAS_EMAIL") else [],
+        "destinatarios": os.getenv("ALERTAS_EMAIL", "").split(",")
+        if os.getenv("ALERTAS_EMAIL")
+        else [],
         "umbral_default": 5,
     }

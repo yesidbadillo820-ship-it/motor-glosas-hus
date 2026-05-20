@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/auditor-emails-distribucion (R327 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.com", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.com",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def coord():
 def client(db_session, coord):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: coord
     with TestClient(app) as c:
@@ -47,12 +52,18 @@ def client(db_session, coord):
 
 
 def _seed(db, email, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        auditor_email=email,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            auditor_email=email,
+        )
+    )
     db.commit()
 
 
@@ -62,9 +73,7 @@ class TestAuditorEmailsDistribucion:
         _seed(db_session, "alice@x", estado="LEVANTADA")
         _seed(db_session, "bob@x", estado="RATIFICADA")
 
-        r = client.get(
-            "/glosas/stats/auditor-emails-distribucion"
-        )
+        r = client.get("/glosas/stats/auditor-emails-distribucion")
         d = r.json()
         b = {it["auditor_email"]: it for it in d["items"]}
         assert b["alice@x"]["total"] == 2

@@ -1,7 +1,7 @@
 """Tests del endpoint POST /glosas/{id}/reanalizar (R60 P2)."""
+
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,8 +34,11 @@ def db_session():
 @pytest.fixture
 def usuario_auditor():
     return UsuarioRecord(
-        id=1, email="auditor@hus.gov.co", nombre="Auditor",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="auditor@hus.gov.co",
+        nombre="Auditor",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -71,6 +74,7 @@ def client(db_session, usuario_auditor):
 
     # Mock del GlosaService instanciado dentro del endpoint
     import app.api.routers.glosas as glosas_mod
+
     original_svc = glosas_mod.GlosaService
 
     class _MockService:
@@ -96,10 +100,12 @@ def client(db_session, usuario_auditor):
 
     # Bypass del rate-limit IA
     from app.services import rate_limit_ia
+
     original_consumir = rate_limit_ia.consumir_cupo_ia
 
     async def _bypass_cupo():
         return None
+
     rate_limit_ia.consumir_cupo_ia = _bypass_cupo
     glosas_mod._consumir_cupo_ia = _bypass_cupo
 
@@ -144,8 +150,12 @@ class TestReanalizarGlosa:
     def test_reanalizar_sin_texto_original_falla(self, client, db_session):
         """Glosas legacy sin texto_glosa_original no se pueden reanalizar."""
         g = GlosaRecord(
-            eps="X", codigo_glosa="Y", valor_objetado=100,
-            etapa="X", estado="RADICADA", creado_en=ahora_utc(),
+            eps="X",
+            codigo_glosa="Y",
+            valor_objetado=100,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
             dictamen="<div>algo</div>",
             # texto_glosa_original = None
         )

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/velocidad-equipo (R115 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,16 +49,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, dias_atras_dec=None, estado="LEVANTADA"):
-    fecha_dec = (
-        ahora_utc() - timedelta(days=dias_atras_dec)
-        if dias_atras_dec is not None else None
+    fecha_dec = ahora_utc() - timedelta(days=dias_atras_dec) if dias_atras_dec is not None else None
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_decision_eps=fecha_dec,
+        )
     )
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_decision_eps=fecha_dec,
-    ))
     db.commit()
 
 
@@ -71,9 +76,9 @@ class TestVelocidadEquipo:
 
     def test_clasifica_por_ventana(self, client, db_session):
         # Cerradas en distintas ventanas
-        _seed(db_session, dias_atras_dec=3)    # ≤7d, ≤30d, ≤90d
-        _seed(db_session, dias_atras_dec=20)   # no7, ≤30d, ≤90d
-        _seed(db_session, dias_atras_dec=60)   # no7, no30, ≤90d
+        _seed(db_session, dias_atras_dec=3)  # ≤7d, ≤30d, ≤90d
+        _seed(db_session, dias_atras_dec=20)  # no7, ≤30d, ≤90d
+        _seed(db_session, dias_atras_dec=60)  # no7, no30, ≤90d
         _seed(db_session, dias_atras_dec=120)  # nada
         r = client.get("/glosas/stats/velocidad-equipo")
         d = r.json()

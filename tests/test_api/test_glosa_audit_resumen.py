@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/audit-resumen (R88 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,20 +50,32 @@ def client(db_session, usuario):
 
 def _seed_glosa(db):
     g = GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
-    db.add(g); db.commit(); db.refresh(g)
+    db.add(g)
+    db.commit()
+    db.refresh(g)
     return g
 
 
 def _seed_audit(db, glosa_id, usuario, accion, campo=None, dias_atras=0):
-    db.add(AuditLogRecord(
-        usuario_email=usuario, usuario_rol="AUDITOR",
-        accion=accion, tabla="glosas", registro_id=glosa_id, campo=campo,
-        timestamp=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=usuario,
+            usuario_rol="AUDITOR",
+            accion=accion,
+            tabla="glosas",
+            registro_id=glosa_id,
+            campo=campo,
+            timestamp=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -114,10 +128,15 @@ class TestGlosaAuditResumen:
     def test_excluye_eventos_de_otra_tabla(self, client, db_session):
         g = _seed_glosa(db_session)
         # Evento sobre otra tabla — no debe contarse
-        db_session.add(AuditLogRecord(
-            usuario_email="u@x", accion="X", tabla="usuarios",
-            registro_id=g.id, timestamp=ahora_utc(),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                usuario_email="u@x",
+                accion="X",
+                tabla="usuarios",
+                registro_id=g.id,
+                timestamp=ahora_utc(),
+            )
+        )
         db_session.commit()
 
         r = client.get(f"/glosas/{g.id}/audit-resumen")

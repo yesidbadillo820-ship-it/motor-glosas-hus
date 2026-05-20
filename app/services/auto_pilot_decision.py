@@ -14,6 +14,7 @@ gestor decide si activa el modo "ejecutar auto-pilot" en la UI cuando
 quiere que el sistema mande automáticamente los casos auto_enviables.
 Por defecto, todo va a revisión humana.
 """
+
 import re
 import logging
 
@@ -106,8 +107,9 @@ def evaluar_caso_dificil(
 
     if valor_cop >= VALOR_CASO_DIFICIL_COP:
         razones.append(
-            f"Valor objetado ${valor_cop:,.0f} supera el umbral de caso difícil (${VALOR_CASO_DIFICIL_COP:,})"
-            .replace(",", ".")
+            f"Valor objetado ${valor_cop:,.0f} supera el umbral de caso difícil (${VALOR_CASO_DIFICIL_COP:,})".replace(
+                ",", "."
+            )
         )
 
     if len(conceptos) >= 3:
@@ -170,12 +172,12 @@ def decidir_auto_envio(
     # Confianza
     if confianza_score is not None and confianza_score >= umbral:
         razones_pro.append(
-            f"Confianza del dictamen {int(confianza_score*100)}% supera umbral {int(umbral*100)}%"
+            f"Confianza del dictamen {int(confianza_score * 100)}% supera umbral {int(umbral * 100)}%"
         )
     else:
-        score_str = f"{int(confianza_score*100)}%" if confianza_score is not None else "—"
+        score_str = f"{int(confianza_score * 100)}%" if confianza_score is not None else "—"
         razones_contra.append(
-            f"Confianza {score_str} es inferior al umbral mínimo {int(umbral*100)}%"
+            f"Confianza {score_str} es inferior al umbral mínimo {int(umbral * 100)}%"
         )
 
     # Caso difícil

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/snapshot.json (R117 P1)."""
+
 from __future__ import annotations
 
 import json
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -55,8 +60,12 @@ def client(db_session, usuario_super):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -75,8 +84,7 @@ class TestAdminSnapshot:
     def test_estructura(self, client):
         r = client.get("/admin/snapshot.json")
         d = json.loads(r.content)
-        for key in ("snapshot_id", "generado_en", "generado_por",
-                    "counts", "glosas"):
+        for key in ("snapshot_id", "generado_en", "generado_por", "counts", "glosas"):
             assert key in d
 
     def test_counts_correctos(self, client, db_session):

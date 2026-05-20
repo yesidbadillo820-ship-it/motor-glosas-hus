@@ -1,4 +1,5 @@
 """Tests del detector REQUIERE_SOPORTES (gating gratis pre-IA)."""
+
 from __future__ import annotations
 
 from app.services.detector_requiere_soportes import evaluar, mensaje_para_dictamen

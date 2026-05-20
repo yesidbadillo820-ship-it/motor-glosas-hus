@@ -7,6 +7,7 @@ Cubre:
   2. auto_responder: con `ids_ia=[]` NO se corre el lote IA pero el
      Excel-respuesta SÍ se envía; el background se programa igual.
 """
+
 from io import BytesIO
 
 import pytest
@@ -44,10 +45,20 @@ def _excel_recepcion() -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "RECEPCION"
-    ws.append(["GESTOR", "ENTIDAD", "FACTURA", "CONSECUTIVO DGH",
-               "VALOR GLOSA", "FECHA RECEPCION", "VENCE"])
-    ws.append(["JUAN PEREZ", "SURA EPS", "FAC-001", "C-001",
-               "1.234.567,89", "01/03/2026", "31/12/2026"])
+    ws.append(
+        [
+            "GESTOR",
+            "ENTIDAD",
+            "FACTURA",
+            "CONSECUTIVO DGH",
+            "VALOR GLOSA",
+            "FECHA RECEPCION",
+            "VENCE",
+        ]
+    )
+    ws.append(
+        ["JUAN PEREZ", "SURA EPS", "FAC-001", "C-001", "1.234.567,89", "01/03/2026", "31/12/2026"]
+    )
     out = BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -65,7 +76,7 @@ def test_reimport_acumula_ids_en_glosas_ids_todas(db_session):
     r2 = RecepcionService(db_session).procesar_excel(contenido)
     assert r2.duplicadas == 1
     assert r2.total == 0
-    assert r2.glosas_ids_para_auto_responder == []   # nada para IA
+    assert r2.glosas_ids_para_auto_responder == []  # nada para IA
     # PERO la glosa duplicada SÍ queda en glosas_ids_todas → el Excel
     # se puede regenerar/enviar igual.
     assert len(r2.glosas_ids_todas) == 1
@@ -73,6 +84,7 @@ def test_reimport_acumula_ids_en_glosas_ids_todas(db_session):
 
     # Y el valor monetario se guardó correctamente (no ×100).
     from app.models.db import GlosaRecord
+
     g = db_session.query(GlosaRecord).first()
     assert abs(float(g.valor_objetado) - 1234567.89) < 0.01
 
@@ -96,8 +108,11 @@ async def test_procesar_lote_y_enviar_excel_sin_ia_no_corre_lote(monkeypatch):
 
     monkeypatch.setattr(ar, "procesar_lote", _fake_procesar_lote)
     import app.services.email_service as es
+
     monkeypatch.setattr(
-        es, "enviar_excel_recepcion_con_respuestas", _fake_enviar,
+        es,
+        "enviar_excel_recepcion_con_respuestas",
+        _fake_enviar,
     )
 
     class _DB:
@@ -106,11 +121,14 @@ async def test_procesar_lote_y_enviar_excel_sin_ia_no_corre_lote(monkeypatch):
 
     monkeypatch.setattr(ar, "SessionLocal", lambda: _DB(), raising=False)
     import app.database as dbmod
+
     monkeypatch.setattr(dbmod, "SessionLocal", lambda: _DB())
 
     res = await ar.procesar_lote_y_enviar_excel(
-        glosa_ids=[10, 11], excel_original=b"xlsxbytes",
-        resumen={"total": 0}, ids_ia=[],
+        glosa_ids=[10, 11],
+        excel_original=b"xlsxbytes",
+        resumen={"total": 0},
+        ids_ia=[],
     )
 
     assert lote_llamado["n"] == 0, "no debe correr la IA si ids_ia vacío"
@@ -137,6 +155,9 @@ def test_lanzar_background_sin_ia_pero_con_excel_programa_task(monkeypatch):
     monkeypatch.setattr(ar, "_registrar_bg_task", lambda t, n: t)
 
     ar.lanzar_lote_y_enviar_excel_background(
-        glosa_ids=[5], excel_original=b"xlsx", resumen={}, ids_ia=[],
+        glosa_ids=[5],
+        excel_original=b"xlsx",
+        resumen={},
+        ids_ia=[],
     )
     assert creado["task"] is True

@@ -21,6 +21,7 @@ Output:
     "acciones_sugeridas": [...],
   }
 """
+
 from __future__ import annotations
 
 import math
@@ -98,24 +99,28 @@ def predecir_ratificacion(db: Session, glosa: GlosaRecord) -> dict:
     # 1) EPS con alta tasa de ratificación (>30% últimos 90 días)
     try:
         hace_90d = ahora_utc() - timedelta(days=90)
-        total = db.query(func.count(GlosaRecord.id)).filter(
-            GlosaRecord.eps.ilike(f"%{eps}%")
-        ).filter(GlosaRecord.decision_eps.isnot(None)).filter(
-            GlosaRecord.creado_en >= hace_90d
-        ).scalar() or 0
-        ratif = db.query(func.count(GlosaRecord.id)).filter(
-            GlosaRecord.eps.ilike(f"%{eps}%")
-        ).filter(GlosaRecord.decision_eps == "RATIFICADA").filter(
-            GlosaRecord.creado_en >= hace_90d
-        ).scalar() or 0
+        total = (
+            db.query(func.count(GlosaRecord.id))
+            .filter(GlosaRecord.eps.ilike(f"%{eps}%"))
+            .filter(GlosaRecord.decision_eps.isnot(None))
+            .filter(GlosaRecord.creado_en >= hace_90d)
+            .scalar()
+            or 0
+        )
+        ratif = (
+            db.query(func.count(GlosaRecord.id))
+            .filter(GlosaRecord.eps.ilike(f"%{eps}%"))
+            .filter(GlosaRecord.decision_eps == "RATIFICADA")
+            .filter(GlosaRecord.creado_en >= hace_90d)
+            .scalar()
+            or 0
+        )
         if total >= 5 and ratif / total > 0.30:
             x += _PESOS["eps_alta_ratif"]
             factores_neg.append(
                 f"EPS {glosa.eps} ratifica {100 * ratif / total:.0f}% en los últimos 90 días ({ratif}/{total})."
             )
-            acciones.append(
-                "Considerá subir tono a FIRME y reforzar con jurisprudencia reciente."
-            )
+            acciones.append("Considerá subir tono a FIRME y reforzar con jurisprudencia reciente.")
     except Exception:
         pass
 
@@ -137,14 +142,19 @@ def predecir_ratificacion(db: Session, glosa: GlosaRecord) -> dict:
     # 4) Citas normativas (conteo de menciones de Ley/Res./Decreto/Art./Sentencia)
     try:
         import re
-        citas = len(re.findall(
-            r"\b(LEY|RESOLUCI[ÓO]N|DECRETO|CIRCULAR|ART\.?|SENTENCIA|ACUERDO)\s+[A-Z0-9]+\b",
-            dictamen.upper(),
-        ))
+
+        citas = len(
+            re.findall(
+                r"\b(LEY|RESOLUCI[ÓO]N|DECRETO|CIRCULAR|ART\.?|SENTENCIA|ACUERDO)\s+[A-Z0-9]+\b",
+                dictamen.upper(),
+            )
+        )
         if citas < 3:
             x += _PESOS["pocas_citas"]
             factores_neg.append(f"Solo {citas} citas normativas detectadas.")
-            acciones.append("Agregá al menos 3 normas: una general (Ley 1438), una específica del tipo y una del marco SOAT.")
+            acciones.append(
+                "Agregá al menos 3 normas: una general (Ley 1438), una específica del tipo y una del marco SOAT."
+            )
         else:
             factores_pos.append(f"{citas} citas normativas sólidas.")
     except Exception:
@@ -162,7 +172,10 @@ def predecir_ratificacion(db: Session, glosa: GlosaRecord) -> dict:
         factores_pos.append("MATCH PERFECTO de tarifa (facturado = pactado en contrato).")
 
     # 6) Aseguradora SOAT sin contrato
-    if any(k in eps for k in ("MUNDIAL", "BOLÍVAR", "LIBERTY", "COMPAÑÍA", "ASEGURADORA", "ARL", "POSITIVA")):
+    if any(
+        k in eps
+        for k in ("MUNDIAL", "BOLÍVAR", "LIBERTY", "COMPAÑÍA", "ASEGURADORA", "ARL", "POSITIVA")
+    ):
         x += _PESOS["aseguradora_soat"]
         factores_pos.append("Aseguradora SOAT — tasa de ratificación históricamente menor.")
 
@@ -173,11 +186,14 @@ def predecir_ratificacion(db: Session, glosa: GlosaRecord) -> dict:
 
     # 8) Ratificación previa del mismo código en la misma EPS
     try:
-        previas = db.query(func.count(GlosaRecord.id)).filter(
-            GlosaRecord.eps.ilike(f"%{eps}%")
-        ).filter(GlosaRecord.codigo_glosa == codigo).filter(
-            GlosaRecord.decision_eps == "RATIFICADA"
-        ).scalar() or 0
+        previas = (
+            db.query(func.count(GlosaRecord.id))
+            .filter(GlosaRecord.eps.ilike(f"%{eps}%"))
+            .filter(GlosaRecord.codigo_glosa == codigo)
+            .filter(GlosaRecord.decision_eps == "RATIFICADA")
+            .scalar()
+            or 0
+        )
         if previas >= 2:
             x += _PESOS["ratif_previa_mismo_codigo"]
             factores_neg.append(
@@ -192,7 +208,9 @@ def predecir_ratificacion(db: Session, glosa: GlosaRecord) -> dict:
     # 9) Valor alto
     if float(glosa.valor_objetado or 0) >= 1_000_000:
         x += _PESOS["valor_alto"]
-        factores_neg.append(f"Valor objetado alto (${int(glosa.valor_objetado):,}) → auditoría más estricta.")
+        factores_neg.append(
+            f"Valor objetado alto (${int(glosa.valor_objetado):,}) → auditoría más estricta."
+        )
 
     # ─── Sigmoid ──────────────────────────────────────────────────────────
     prob = _sigmoide(x)

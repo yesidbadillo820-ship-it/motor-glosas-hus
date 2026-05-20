@@ -26,6 +26,7 @@ ESTADO ACTUAL (foundation): ~30 aristas explícitas para las normas
 más usadas en glosas. Iremos sumando con el tiempo según los
 dictamenes reales y los hallazgos de Yesid.
 """
+
 from __future__ import annotations
 import logging
 from typing import Optional
@@ -51,48 +52,102 @@ TIPOS_RELACION = {
 # se ignora silenciosamente (ver _resolver_clave abajo).
 ARISTAS_GRAFO: list[tuple[str, str, str, str]] = [
     # ─── Decreto 4747 de 2007 (régimen IPS-EPS de glosas) ─────────────
-    ("decreto_4747_2007", "reglamenta_a", "ley_100_1993",
-     "Decreto 4747/2007 reglamenta artículos de la Ley 100 sobre relaciones IPS-EPS"),
-    ("res_3047_2008", "reglamenta_a", "decreto_4747_2007",
-     "Res. 3047/2008 establece formatos de glosas previstos en el Dec. 4747"),
-    ("res_4331_2012", "modifica_a", "res_3047_2008",
-     "Res. 4331/2012 modifica parcialmente la Res. 3047/2008"),
-    ("res_2275_2023", "modifica_a", "res_3047_2008",
-     "Res. 2275/2023 actualiza la Res. 3047/2008 con factura electrónica"),
-    ("res_2284_2023", "modifica_a", "res_3047_2008",
-     "Res. 2284/2023 (Manual Único de Glosas) actualiza el codigo de glosas"),
-
+    (
+        "decreto_4747_2007",
+        "reglamenta_a",
+        "ley_100_1993",
+        "Decreto 4747/2007 reglamenta artículos de la Ley 100 sobre relaciones IPS-EPS",
+    ),
+    (
+        "res_3047_2008",
+        "reglamenta_a",
+        "decreto_4747_2007",
+        "Res. 3047/2008 establece formatos de glosas previstos en el Dec. 4747",
+    ),
+    (
+        "res_4331_2012",
+        "modifica_a",
+        "res_3047_2008",
+        "Res. 4331/2012 modifica parcialmente la Res. 3047/2008",
+    ),
+    (
+        "res_2275_2023",
+        "modifica_a",
+        "res_3047_2008",
+        "Res. 2275/2023 actualiza la Res. 3047/2008 con factura electrónica",
+    ),
+    (
+        "res_2284_2023",
+        "modifica_a",
+        "res_3047_2008",
+        "Res. 2284/2023 (Manual Único de Glosas) actualiza el codigo de glosas",
+    ),
     # ─── Ley 1438 de 2011 (reforma SGSSS — silencio Art. 57) ──────────
-    ("ley_1438_2011", "modifica_a", "ley_100_1993",
-     "Ley 1438/2011 reforma SGSSS, introduce art. 57 (silencio favor IPS)"),
-    ("res_2284_2023", "fundamenta_a", "ley_1438_2011",
-     "El Manual Único de Glosas se apoya en plazos y silencios Art. 57 Ley 1438"),
-
+    (
+        "ley_1438_2011",
+        "modifica_a",
+        "ley_100_1993",
+        "Ley 1438/2011 reforma SGSSS, introduce art. 57 (silencio favor IPS)",
+    ),
+    (
+        "res_2284_2023",
+        "fundamenta_a",
+        "ley_1438_2011",
+        "El Manual Único de Glosas se apoya en plazos y silencios Art. 57 Ley 1438",
+    ),
     # ─── Sentencias C/T como fundamento ─────────────────────────────
-    ("sentencia_t_760_2008", "fundamenta_a", "ley_100_1993",
-     "T-760/2008 desarrolla el derecho fundamental a la salud sobre Ley 100"),
-    ("sentencia_t_1025_2002", "fundamenta_a", "ley_100_1993",
-     "T-1025/2002 sobre urgencias, art. 168 Ley 100"),
-    ("ley_1751_2015", "fundamenta_a", "sentencia_t_760_2008",
-     "Ley Estatutaria de Salud cristaliza la doctrina T-760/2008"),
-
+    (
+        "sentencia_t_760_2008",
+        "fundamenta_a",
+        "ley_100_1993",
+        "T-760/2008 desarrolla el derecho fundamental a la salud sobre Ley 100",
+    ),
+    (
+        "sentencia_t_1025_2002",
+        "fundamenta_a",
+        "ley_100_1993",
+        "T-1025/2002 sobre urgencias, art. 168 Ley 100",
+    ),
+    (
+        "ley_1751_2015",
+        "fundamenta_a",
+        "sentencia_t_760_2008",
+        "Ley Estatutaria de Salud cristaliza la doctrina T-760/2008",
+    ),
     # ─── Decreto 780 de 2016 (compilatorio) ────────────────────────
-    ("decreto_780_2016", "complementa_a", "decreto_4747_2007",
-     "Decreto Único Reglamentario 780/2016 compila todo el sector salud"),
-    ("decreto_780_2016", "complementa_a", "decreto_1011_2006",
-     "Compila el SOGCS"),
-
+    (
+        "decreto_780_2016",
+        "complementa_a",
+        "decreto_4747_2007",
+        "Decreto Único Reglamentario 780/2016 compila todo el sector salud",
+    ),
+    ("decreto_780_2016", "complementa_a", "decreto_1011_2006", "Compila el SOGCS"),
     # ─── Resoluciones de habilitación y soportes ────────────────────
-    ("res_1995_1999", "complementa_a", "ley_100_1993",
-     "Historia clínica como documento médico-legal"),
-    ("res_3100_2019", "modifica_a", "res_2003_2014",
-     "Res. 3100/2019 actualiza condiciones de habilitación"),
-
+    (
+        "res_1995_1999",
+        "complementa_a",
+        "ley_100_1993",
+        "Historia clínica como documento médico-legal",
+    ),
+    (
+        "res_3100_2019",
+        "modifica_a",
+        "res_2003_2014",
+        "Res. 3100/2019 actualiza condiciones de habilitación",
+    ),
     # ─── C. Comercio + C. Civil (cláusulas anti-rebatimiento) ──────
-    ("art_871_codigo_comercio", "complementa_a", "ley_100_1993",
-     "Buena fe contractual aplica a contratos IPS-EPS"),
-    ("art_1602_codigo_civil", "complementa_a", "ley_100_1993",
-     "Fuerza vinculante de los contratos pactados"),
+    (
+        "art_871_codigo_comercio",
+        "complementa_a",
+        "ley_100_1993",
+        "Buena fe contractual aplica a contratos IPS-EPS",
+    ),
+    (
+        "art_1602_codigo_civil",
+        "complementa_a",
+        "ley_100_1993",
+        "Fuerza vinculante de los contratos pactados",
+    ),
 ]
 
 
@@ -228,10 +283,7 @@ def construir_bloque_grafo_para_prompt(clave_principal: str) -> str:
 def listar_aristas() -> list[dict]:
     """Devuelve todas las aristas del grafo en formato JSON-serializable.
     Útil para endpoints /admin/grafo o visualizaciones."""
-    return [
-        {"origen": o, "tipo": t, "destino": d, "nota": n}
-        for o, t, d, n in ARISTAS_GRAFO
-    ]
+    return [{"origen": o, "tipo": t, "destino": d, "nota": n} for o, t, d, n in ARISTAS_GRAFO]
 
 
 def estadisticas_grafo() -> dict:

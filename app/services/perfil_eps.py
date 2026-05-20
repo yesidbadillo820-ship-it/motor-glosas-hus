@@ -10,6 +10,7 @@ Uso:
     from app.services.perfil_eps import perfil_para_eps
     perfil = perfil_para_eps("NUEVA EPS")
 """
+
 from __future__ import annotations
 
 
@@ -35,7 +36,6 @@ PERFILES_EPS: dict[str, dict] = {
         ),
         "cierre_preferido": "invitación a conciliación técnica",
     },
-
     "COOSALUD": {
         "estilo": "administrativo",
         "caracteristicas": (
@@ -50,7 +50,6 @@ PERFILES_EPS: dict[str, dict] = {
         "evitar": "Argumentación muy extensa sin cifras concretas.",
         "cierre_preferido": "solicitud directa de reconocimiento con monto específico",
     },
-
     "COMPENSAR": {
         "estilo": "técnico-clínico",
         "caracteristicas": (
@@ -65,7 +64,6 @@ PERFILES_EPS: dict[str, dict] = {
         "evitar": "Argumentos exclusivamente contractuales sin soporte clínico.",
         "cierre_preferido": "invitación a mesa de auditoría médica conjunta",
     },
-
     "DISPENSARIO MEDICO": {
         "estilo": "institucional-militar",
         "caracteristicas": (
@@ -81,7 +79,6 @@ PERFILES_EPS: dict[str, dict] = {
         "evitar": "Citar jurisprudencia de EPS (T-760/2008) — no aplica.",
         "cierre_preferido": "solicitud de conciliación interadministrativa",
     },
-
     "POLICIA NACIONAL": {
         "estilo": "institucional-militar",
         "caracteristicas": (
@@ -95,7 +92,6 @@ PERFILES_EPS: dict[str, dict] = {
         "evitar": "Confundir con normativa de EPS regulares.",
         "cierre_preferido": "solicitud conciliación interadministrativa",
     },
-
     "PPL": {
         "estilo": "régimen-especial",
         "caracteristicas": (
@@ -110,7 +106,6 @@ PERFILES_EPS: dict[str, dict] = {
         "evitar": "Decir 'EPS' o citar T-760/2008.",
         "cierre_preferido": "invitación a conciliación con el Fondo",
     },
-
     "FOMAG": {
         "estilo": "régimen-especial",
         "caracteristicas": (
@@ -118,13 +113,11 @@ PERFILES_EPS: dict[str, dict] = {
             "administrado por Fiduprevisora. Docentes oficiales."
         ),
         "tactica_recomendada": (
-            "Citar Ley 91/1989 y Dec. 3752/2003. Referir al Patrimonio "
-            "Autónomo FOMAG."
+            "Citar Ley 91/1989 y Dec. 3752/2003. Referir al Patrimonio Autónomo FOMAG."
         ),
         "evitar": "Normativa de EPS regulares, tono confrontativo.",
         "cierre_preferido": "conciliación con el Patrimonio Autónomo",
     },
-
     "SALUD TOTAL": {
         "estilo": "administrativo-automatizado",
         "caracteristicas": (
@@ -138,7 +131,6 @@ PERFILES_EPS: dict[str, dict] = {
         "evitar": "Respuestas extensas, exceden límite y pueden ser rechazadas.",
         "cierre_preferido": "reconocimiento íntegro sin extenderse",
     },
-
     "SANITAS": {
         "estilo": "formal-regulatorio",
         "caracteristicas": (

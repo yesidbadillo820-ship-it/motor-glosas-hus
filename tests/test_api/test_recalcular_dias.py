@@ -1,4 +1,5 @@
 """Tests del endpoint POST /admin/recalcular-dias-restantes (R91 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -54,13 +59,19 @@ def client(db_session, usuario_super):
 
 
 def _seed(db, fecha_venc, dias_restantes, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_vencimiento=fecha_venc,
-        dias_restantes=dias_restantes,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="TA0201",
+            valor_objetado=100,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_vencimiento=fecha_venc,
+            dias_restantes=dias_restantes,
+        )
+    )
     db.commit()
 
 
@@ -69,11 +80,9 @@ class TestRecalcularDiasRestantes:
         ahora = ahora_utc()
         # fecha_venc = +10 días + 1h (buffer para evitar precisión SQLite),
         # dias_restantes desactualizado a 99
-        _seed(db_session, ahora + timedelta(days=10, hours=1),
-              dias_restantes=99)
+        _seed(db_session, ahora + timedelta(days=10, hours=1), dias_restantes=99)
         # Otra: fecha_venc = -5 días + 1h, dias_restantes desactualizado a 0
-        _seed(db_session, ahora + timedelta(days=-5, hours=1),
-              dias_restantes=0)
+        _seed(db_session, ahora + timedelta(days=-5, hours=1), dias_restantes=0)
 
         r = client.post("/admin/recalcular-dias-restantes")
         assert r.status_code == 200, r.text
@@ -89,8 +98,7 @@ class TestRecalcularDiasRestantes:
         assert valores[1] == 10
 
     def test_dry_run_no_modifica(self, client, db_session):
-        _seed(db_session, ahora_utc() + timedelta(days=10),
-              dias_restantes=99)
+        _seed(db_session, ahora_utc() + timedelta(days=10), dias_restantes=99)
         r = client.post("/admin/recalcular-dias-restantes?dry_run=true")
         d = r.json()
         assert d["actualizadas"] == 1
@@ -101,10 +109,8 @@ class TestRecalcularDiasRestantes:
 
     def test_cerradas_se_ignoran(self, client, db_session):
         ahora = ahora_utc()
-        _seed(db_session, ahora + timedelta(days=10),
-              dias_restantes=999, estado="ACEPTADA")
-        _seed(db_session, ahora + timedelta(days=10),
-              dias_restantes=999, estado="LEVANTADA")
+        _seed(db_session, ahora + timedelta(days=10), dias_restantes=999, estado="ACEPTADA")
+        _seed(db_session, ahora + timedelta(days=10), dias_restantes=999, estado="LEVANTADA")
         r = client.post("/admin/recalcular-dias-restantes")
         d = r.json()
         assert d["actualizadas"] == 0
@@ -117,8 +123,7 @@ class TestRecalcularDiasRestantes:
         ahora = ahora_utc()
         # fecha_venc = +10, pero como (vencimiento - ahora).days a veces da 9
         # por la fracción del día, mejor poner +10 días + 1h para garantizar 10
-        _seed(db_session, ahora + timedelta(days=10, hours=1),
-              dias_restantes=10)
+        _seed(db_session, ahora + timedelta(days=10, hours=1), dias_restantes=10)
         r = client.post("/admin/recalcular-dias-restantes")
         d = r.json()
         assert d["actualizadas"] == 0

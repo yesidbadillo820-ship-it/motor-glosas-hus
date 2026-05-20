@@ -1,4 +1,5 @@
 """Tests del endpoint GET /mi-desempeno/proximas-vencer (R66 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,16 +32,24 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="auditor@hus.com", nombre="Juan",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="auditor@hus.com",
+        nombre="Juan",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="P", codigo_glosa="TA0201",
-        valor_objetado=100, etapa="X", estado="RADICADA",
-        dias_restantes=10, creado_en=ahora_utc(),
+        eps="X",
+        paciente="P",
+        codigo_glosa="TA0201",
+        valor_objetado=100,
+        etapa="X",
+        estado="RADICADA",
+        dias_restantes=10,
+        creado_en=ahora_utc(),
         auditor_email="auditor@hus.com",
     )
     base.update(kw)
@@ -52,6 +61,7 @@ def _seed(db, **kw):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -68,10 +78,10 @@ class TestProximasVencer:
         assert d["items"] == []
 
     def test_severidades_correctas(self, client, db_session):
-        _seed(db_session, paciente="V", dias_restantes=-1)   # VENCIDA
-        _seed(db_session, paciente="C", dias_restantes=1)    # CRITICA
-        _seed(db_session, paciente="A", dias_restantes=4)    # ALTA
-        _seed(db_session, paciente="M", dias_restantes=6)    # MEDIA
+        _seed(db_session, paciente="V", dias_restantes=-1)  # VENCIDA
+        _seed(db_session, paciente="C", dias_restantes=1)  # CRITICA
+        _seed(db_session, paciente="A", dias_restantes=4)  # ALTA
+        _seed(db_session, paciente="M", dias_restantes=6)  # MEDIA
         r = client.get("/mi-desempeno/proximas-vencer?dias_limite=10")
         d = r.json()
         sevs = {it["paciente"]: it["severidad"] for it in d["items"]}
@@ -106,10 +116,8 @@ class TestProximasVencer:
 
     def test_solo_glosas_del_usuario(self, client, db_session):
         """Glosas asignadas a OTRO auditor NO aparecen."""
-        _seed(db_session, paciente="MIA",
-              auditor_email="auditor@hus.com", dias_restantes=2)
-        _seed(db_session, paciente="OTRA",
-              auditor_email="otro@hus.com", dias_restantes=2)
+        _seed(db_session, paciente="MIA", auditor_email="auditor@hus.com", dias_restantes=2)
+        _seed(db_session, paciente="OTRA", auditor_email="otro@hus.com", dias_restantes=2)
         r = client.get("/mi-desempeno/proximas-vencer")
         d = r.json()
         pacientes = [it["paciente"] for it in d["items"]]

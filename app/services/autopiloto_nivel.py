@@ -17,6 +17,7 @@ Filosofía: el gestor decide cuánto intervenir; el motor le ahorra el
 60% mecánico. Cada glosa trae su nivel pintado en la lista para que se
 sepa de un vistazo qué hacer.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -45,8 +46,10 @@ def clasificar_nivel(glosa, db) -> dict:
         }
     """
     from app.services.dictamen_stale import (
-        _CANONICA_EXTEMPORANEA, _CANONICA_RATIFICADA,
-        _INDICADORES_RATIFICACION, _texto_dictamen_normalizado,
+        _CANONICA_EXTEMPORANEA,
+        _CANONICA_RATIFICADA,
+        _INDICADORES_RATIFICACION,
+        _texto_dictamen_normalizado,
         _eps_tiene_tarifas,
     )
 
@@ -72,7 +75,11 @@ def clasificar_nivel(glosa, db) -> dict:
             "confianza_pct": 99,
             "accion_sugerida": "marcar_respondida",
         }
-    if any(ind in etapa for ind in _INDICADORES_RATIFICACION) and _CANONICA_RATIFICADA in texto and cod_resp == "RE9901":
+    if (
+        any(ind in etapa for ind in _INDICADORES_RATIFICACION)
+        and _CANONICA_RATIFICADA in texto
+        and cod_resp == "RE9901"
+    ):
         return {
             "nivel": "AUTO_RADICAR",
             "icono": "🤖",

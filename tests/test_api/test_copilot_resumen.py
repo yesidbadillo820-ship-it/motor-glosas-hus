@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/copilot-resumen (R400 P1 — HITO)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -44,17 +46,24 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, eps="X", gestor=None, dias=10, valor=1000,
-          estado="RADICADA", recuperado=0, decidida=False):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=valor, valor_recuperado=recuperado,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        dias_restantes=dias,
-        fecha_decision_eps=ahora_utc() if decidida else None,
-    ))
+def _seed(
+    db, eps="X", gestor=None, dias=10, valor=1000, estado="RADICADA", recuperado=0, decidida=False
+):
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            valor_recuperado=recuperado,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            dias_restantes=dias,
+            fecha_decision_eps=ahora_utc() if decidida else None,
+        )
+    )
     db.commit()
 
 
@@ -63,7 +72,9 @@ class TestCopilotResumen:
         r = client.get("/sistema/copilot-resumen")
         d = r.json()
         for k in (
-            "frase_ejecutiva", "highlights", "kpis_resumen",
+            "frase_ejecutiva",
+            "highlights",
+            "kpis_resumen",
         ):
             assert k in d
 

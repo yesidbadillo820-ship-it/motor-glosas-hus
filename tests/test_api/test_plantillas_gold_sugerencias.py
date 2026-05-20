@@ -1,4 +1,5 @@
 """Tests del endpoint /plantillas-gold/sugerencias (R75 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -35,10 +36,14 @@ def usuario():
 
 def _seed(db, **kw):
     base = dict(
-        eps="FAMISANAR", codigo_glosa="TA0201",
-        tipo="TA", titulo="Argumento ganador",
+        eps="FAMISANAR",
+        codigo_glosa="TA0201",
+        tipo="TA",
+        titulo="Argumento ganador",
         argumento="texto suficientemente largo para no fallar el filtro min_length",
-        usos=5, activa=1, creado_en=ahora_utc(),
+        usos=5,
+        activa=1,
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(PlantillaGoldRecord(**base))
@@ -49,6 +54,7 @@ def _seed(db, **kw):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:

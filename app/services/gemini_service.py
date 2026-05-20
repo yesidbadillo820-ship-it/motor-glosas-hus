@@ -16,6 +16,7 @@ Roles funcionales propuestos:
   filas), coaching IA, predicciones.
 - Groq Llama: respuestas rapidas, dictamenes simples, fallback.
 """
+
 from __future__ import annotations
 import asyncio
 import logging
@@ -32,12 +33,12 @@ logger = logging.getLogger("motor_glosas")
 # El experimental 2.0-flash-exp fue deprecado al pasar 2.0-flash a GA.
 # 2.5 Flash/Pro son los newest. 1.5 sigue activo como fallback.
 GEMINI_MODELS = {
-    "2.0-flash": "gemini-2.0-flash",         # GA, default. 15 RPM/1500 RPD free
+    "2.0-flash": "gemini-2.0-flash",  # GA, default. 15 RPM/1500 RPD free
     "2.0-flash-lite": "gemini-2.0-flash-lite",  # mas barato, mismo tier
-    "2.5-flash": "gemini-2.5-flash",         # newer, 15 RPM/1500 RPD free
-    "2.5-pro": "gemini-2.5-pro",             # mejor calidad, 5 RPM/25 RPD free
-    "1.5-flash": "gemini-1.5-flash",         # legacy estable, 1M ctx
-    "1.5-pro": "gemini-1.5-pro",             # legacy mejor calidad, 2M ctx
+    "2.5-flash": "gemini-2.5-flash",  # newer, 15 RPM/1500 RPD free
+    "2.5-pro": "gemini-2.5-pro",  # mejor calidad, 5 RPM/25 RPD free
+    "1.5-flash": "gemini-1.5-flash",  # legacy estable, 1M ctx
+    "1.5-pro": "gemini-1.5-pro",  # legacy mejor calidad, 2M ctx
 }
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
@@ -59,7 +60,9 @@ class GeminiService:
 
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
-    def __init__(self, api_key: str = "", default_model: str = DEFAULT_GEMINI_MODEL, timeout: float = 90.0):
+    def __init__(
+        self, api_key: str = "", default_model: str = DEFAULT_GEMINI_MODEL, timeout: float = 90.0
+    ):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
         self.default_model = default_model
         self.timeout = httpx.Timeout(connect=10.0, read=timeout, write=30.0, pool=5.0)
@@ -94,6 +97,7 @@ class GeminiService:
                 primero (ver pdf_to_images.py) y pasarlas aqui.
         """
         import base64
+
         if not self.disponible:
             raise RuntimeError("GEMINI_API_KEY no configurada")
         modelo = modelo or self.default_model
@@ -108,12 +112,14 @@ class GeminiService:
                 if len(data) > 30 * 1024 * 1024:
                     logger.warning(f"[GEMINI] PDF {nombre} >30MB, saltado")
                     continue
-                parts.append({
-                    "inline_data": {
-                        "mime_type": "application/pdf",
-                        "data": base64.standard_b64encode(data).decode("ascii"),
-                    },
-                })
+                parts.append(
+                    {
+                        "inline_data": {
+                            "mime_type": "application/pdf",
+                            "data": base64.standard_b64encode(data).decode("ascii"),
+                        },
+                    }
+                )
         if imagenes_raw:
             # Cap a 30 imagenes total (ya hay buen razonamiento con eso)
             for nombre, data in imagenes_raw[:30]:
@@ -124,16 +130,21 @@ class GeminiService:
                 # Detectar mime type por extension; default png
                 ext = (nombre.rsplit(".", 1)[-1] or "").lower()
                 mime = {
-                    "png": "image/png", "jpg": "image/jpeg",
-                    "jpeg": "image/jpeg", "webp": "image/webp",
-                    "heic": "image/heic", "heif": "image/heif",
+                    "png": "image/png",
+                    "jpg": "image/jpeg",
+                    "jpeg": "image/jpeg",
+                    "webp": "image/webp",
+                    "heic": "image/heic",
+                    "heif": "image/heif",
                 }.get(ext, "image/png")
-                parts.append({
-                    "inline_data": {
-                        "mime_type": mime,
-                        "data": base64.standard_b64encode(data).decode("ascii"),
-                    },
-                })
+                parts.append(
+                    {
+                        "inline_data": {
+                            "mime_type": mime,
+                            "data": base64.standard_b64encode(data).decode("ascii"),
+                        },
+                    }
+                )
         parts.append({"text": user})
 
         body = {
@@ -203,7 +214,8 @@ class GeminiService:
         for intento in range(max_intentos):
             try:
                 return await self.completar(
-                    system, user,
+                    system,
+                    user,
                     modelo=modelo,
                     temperature=temperature,
                     max_tokens=max_tokens,
@@ -213,10 +225,14 @@ class GeminiService:
             except Exception as e:
                 ultimo_error = e
                 msg = str(e).lower()
-                retriable = any(c in msg for c in ["429", "503", "504", "rate", "overloaded", "timeout"])
+                retriable = any(
+                    c in msg for c in ["429", "503", "504", "rate", "overloaded", "timeout"]
+                )
                 if retriable and intento < max_intentos - 1:
-                    espera = min(2 ** intento, 8)
-                    logger.warning(f"Gemini retriable: {e}, retry {intento+2}/{max_intentos} en {espera}s")
+                    espera = min(2**intento, 8)
+                    logger.warning(
+                        f"Gemini retriable: {e}, retry {intento + 2}/{max_intentos} en {espera}s"
+                    )
                     await asyncio.sleep(espera)
                     continue
                 raise

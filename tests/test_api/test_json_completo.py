@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/json-completo (R142 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -62,8 +68,7 @@ class TestJsonCompleto:
         assert r.status_code == 404
 
     def test_devuelve_todas_las_columnas(self, client, db_session):
-        g = _seed(db_session, eps="SANITAS", paciente="Pedro",
-                  factura="F-1", valor_objetado=12345)
+        g = _seed(db_session, eps="SANITAS", paciente="Pedro", factura="F-1", valor_objetado=12345)
         r = client.get(f"/glosas/{g.id}/json-completo")
         d = r.json()
         # Algunas columnas obligatorias
@@ -84,7 +89,17 @@ class TestJsonCompleto:
         r = client.get(f"/glosas/{g.id}/json-completo")
         d = r.json()
         # Las 50+ columnas del modelo están presentes
-        for col in ("id", "creado_en", "eps", "paciente", "factura",
-                    "codigo_glosa", "valor_objetado", "etapa",
-                    "estado", "dictamen", "dias_restantes"):
+        for col in (
+            "id",
+            "creado_en",
+            "eps",
+            "paciente",
+            "factura",
+            "codigo_glosa",
+            "valor_objetado",
+            "etapa",
+            "estado",
+            "dictamen",
+            "dias_restantes",
+        ):
             assert col in d

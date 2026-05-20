@@ -1,4 +1,5 @@
 """Tests del detector de duplicados de factura (R58 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -25,9 +26,12 @@ def db():
 
 def _seed(db, **kw):
     base = dict(
-        eps="FAMISANAR", paciente="X",
-        codigo_glosa="TA0201", valor_objetado=10_000,
-        factura="FE-001", creado_en=ahora_utc(),
+        eps="FAMISANAR",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=10_000,
+        factura="FE-001",
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(GlosaRecord(**base))
@@ -72,6 +76,7 @@ class TestBuscarDuplicadosFactura:
 
     def test_orden_por_fecha_desc(self, db):
         from datetime import timedelta
+
         antiguo = ahora_utc() - timedelta(days=10)
         reciente = ahora_utc()
         _seed(db, factura="FE-DUP", creado_en=antiguo)
@@ -92,11 +97,15 @@ class TestEndpointDuplicados:
     def test_endpoint_devuelve_estructura_correcta(self, db):
         from app.api.routers.glosas import listar_duplicados_factura
         from unittest.mock import MagicMock
+
         _seed(db, factura="FE-2026-001", eps="FAMISANAR", valor_objetado=100_000)
         user = MagicMock(email="test@hus.com")
         r = listar_duplicados_factura(
-            factura="FE-2026-001", eps=None, limite=5,
-            db=db, current_user=user,
+            factura="FE-2026-001",
+            eps=None,
+            limite=5,
+            db=db,
+            current_user=user,
         )
         assert r["total"] == 1
         assert r["factura_consultada"] == "FE-2026-001"
@@ -106,10 +115,14 @@ class TestEndpointDuplicados:
     def test_endpoint_sin_duplicados(self, db):
         from app.api.routers.glosas import listar_duplicados_factura
         from unittest.mock import MagicMock
+
         user = MagicMock(email="test@hus.com")
         r = listar_duplicados_factura(
-            factura="FE-INEXISTENTE", eps=None, limite=5,
-            db=db, current_user=user,
+            factura="FE-INEXISTENTE",
+            eps=None,
+            limite=5,
+            db=db,
+            current_user=user,
         )
         assert r["total"] == 0
         assert r["duplicados"] == []
@@ -117,12 +130,16 @@ class TestEndpointDuplicados:
     def test_endpoint_filtro_eps(self, db):
         from app.api.routers.glosas import listar_duplicados_factura
         from unittest.mock import MagicMock
+
         _seed(db, factura="FE-X", eps="FAMISANAR")
         _seed(db, factura="FE-X", eps="SALUD TOTAL")
         user = MagicMock(email="test@hus.com")
         r = listar_duplicados_factura(
-            factura="FE-X", eps="FAMISANAR", limite=5,
-            db=db, current_user=user,
+            factura="FE-X",
+            eps="FAMISANAR",
+            limite=5,
+            db=db,
+            current_user=user,
         )
         assert r["total"] == 1
         assert r["duplicados"][0]["eps"] == "FAMISANAR"

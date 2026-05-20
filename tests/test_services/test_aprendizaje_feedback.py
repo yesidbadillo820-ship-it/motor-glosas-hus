@@ -1,10 +1,10 @@
 """Tests del aprendizaje por retroalimentación (Ronda 3)."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from app.services.aprendizaje_feedback import (
     _extraer_argumento_del_dictamen,
@@ -42,11 +42,14 @@ def test_extraer_argumento_corta_en_soportes():
 def _fake_glosa(**kwargs):
     """Factory para GlosaRecord mock."""
     defaults = dict(
-        id=1, eps="FAMISANAR EPS", codigo_glosa="TA0201",
+        id=1,
+        eps="FAMISANAR EPS",
+        codigo_glosa="TA0201",
         dictamen="<h4>ARGUMENTACIÓN JURÍDICA</h4> ESE HUS NO ACEPTA LA GLOSA "
-                 "TA0201 porque el valor facturado coincide con el contrato "
-                 "vigente. Se solicita levantamiento. " * 2,
-        valor_recuperado=100000.0, modelo_ia="groq/llama-3.3",
+        "TA0201 porque el valor facturado coincide con el contrato "
+        "vigente. Se solicita levantamiento. " * 2,
+        valor_recuperado=100000.0,
+        modelo_ia="groq/llama-3.3",
     )
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)

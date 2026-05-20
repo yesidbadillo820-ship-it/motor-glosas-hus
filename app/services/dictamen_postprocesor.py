@@ -11,6 +11,7 @@ la regla y añaden párrafos de "10 días hábiles", "Art. 57 Ley 1438" o
 emails institucionales. Este módulo es el guard-rail determinístico
 post-IA que garantiza que NINGÚN dictamen salga con esa coda.
 """
+
 from __future__ import annotations
 
 import re
@@ -68,11 +69,11 @@ def truncar_despues_de_levantamiento(texto: str) -> str:
     # Buscar el siguiente punto a partir del fin del match. Permitimos
     # hasta 200 chars de continuación legítima ("Y EL RECONOCIMIENTO
     # ÍNTEGRO DEL VALOR PACTADO EN EL ANEXO N° 1 DEL CONTRATO 440...").
-    cola = texto[m.end():m.end() + 200]
+    cola = texto[m.end() : m.end() + 200]
     rel = cola.find(".")
     if rel == -1:
         # No hay punto cercano: cortamos en el fin del match y añadimos
         # el punto final faltante.
-        return texto[:m.end()].rstrip() + "."
+        return texto[: m.end()].rstrip() + "."
 
-    return texto[:m.end() + rel + 1].rstrip()
+    return texto[: m.end() + rel + 1].rstrip()

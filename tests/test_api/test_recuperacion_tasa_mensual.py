@@ -1,7 +1,7 @@
 """Tests del endpoint GET /glosas/stats/recuperacion-tasa-mensual (R311 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,13 +48,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, valor_obj, valor_rec, estado="LEVANTADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor_obj, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_decision_eps=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor_obj,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_decision_eps=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -63,9 +70,7 @@ class TestRecuperacionTasaMensual:
         _seed(db_session, valor_obj=5000, valor_rec=2000)
         # Total: 15000 obj, 10000 rec → 66.67%
 
-        r = client.get(
-            "/glosas/stats/recuperacion-tasa-mensual?meses=2"
-        )
+        r = client.get("/glosas/stats/recuperacion-tasa-mensual?meses=2")
         d = r.json()
         assert len(d["serie"]) == 1
         mes = d["serie"][0]
@@ -74,8 +79,6 @@ class TestRecuperacionTasaMensual:
         assert mes["tasa_recuperacion_pct"] == 66.67
 
     def test_vacio(self, client):
-        r = client.get(
-            "/glosas/stats/recuperacion-tasa-mensual"
-        )
+        r = client.get("/glosas/stats/recuperacion-tasa-mensual")
         d = r.json()
         assert d["serie"] == []

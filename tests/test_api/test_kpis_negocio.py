@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/kpis-negocio (R151 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -41,6 +45,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -50,8 +55,12 @@ def client(db_session, usuario_coord):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -64,15 +73,17 @@ class TestKpisNegocio:
         r = client.get("/sistema/kpis-negocio")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("tasa_levantamiento_global_pct",
-                    "tasa_recuperacion_global_pct",
-                    "valor_recuperado_acumulado",
-                    "valor_pendiente_actual",
-                    "tiempo_promedio_resolucion_dias",
-                    "glosas_cerradas_30d",
-                    "tasa_cumplimiento_sla_30d_pct",
-                    "eps_top_recuperacion",
-                    "calculado_en"):
+        for key in (
+            "tasa_levantamiento_global_pct",
+            "tasa_recuperacion_global_pct",
+            "valor_recuperado_acumulado",
+            "valor_pendiente_actual",
+            "tiempo_promedio_resolucion_dias",
+            "glosas_cerradas_30d",
+            "tasa_cumplimiento_sla_30d_pct",
+            "eps_top_recuperacion",
+            "calculado_en",
+        ):
             assert key in d
 
     def test_tasa_levantamiento(self, client, db_session):
@@ -95,19 +106,17 @@ class TestKpisNegocio:
         assert d["valor_pendiente_actual"] == 10_000
 
     def test_eps_top_recuperacion(self, client, db_session):
-        _seed(db_session, eps="SANITAS", estado="LEVANTADA",
-              valor_recuperado=10_000)
-        _seed(db_session, eps="OTRA", estado="LEVANTADA",
-              valor_recuperado=1_000)
+        _seed(db_session, eps="SANITAS", estado="LEVANTADA", valor_recuperado=10_000)
+        _seed(db_session, eps="OTRA", estado="LEVANTADA", valor_recuperado=1_000)
         r = client.get("/sistema/kpis-negocio")
         d = r.json()
         assert d["eps_top_recuperacion"] == "SANITAS"
 
     def test_glosas_cerradas_30d(self, client, db_session):
-        _seed(db_session, estado="LEVANTADA",
-              fecha_decision_eps=ahora_utc() - timedelta(days=10))
-        _seed(db_session, estado="LEVANTADA",
-              fecha_decision_eps=ahora_utc() - timedelta(days=60))  # fuera
+        _seed(db_session, estado="LEVANTADA", fecha_decision_eps=ahora_utc() - timedelta(days=10))
+        _seed(
+            db_session, estado="LEVANTADA", fecha_decision_eps=ahora_utc() - timedelta(days=60)
+        )  # fuera
         r = client.get("/sistema/kpis-negocio")
         d = r.json()
         assert d["glosas_cerradas_30d"] == 1

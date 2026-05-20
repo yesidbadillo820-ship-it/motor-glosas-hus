@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/checklist-personal (R381 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,8 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -40,6 +44,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,19 +52,32 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, gestor="Alice", estado="RADICADA", dictamen=None,
-          dias=10, valor=1000, codigo_respuesta=None,
-          valor_aceptado=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, valor_aceptado=valor_aceptado,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        dictamen=dictamen,
-        dias_restantes=dias,
-        codigo_respuesta=codigo_respuesta,
-    ))
+def _seed(
+    db,
+    gestor="Alice",
+    estado="RADICADA",
+    dictamen=None,
+    dias=10,
+    valor=1000,
+    codigo_respuesta=None,
+    valor_aceptado=0,
+):
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            valor_aceptado=valor_aceptado,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            dictamen=dictamen,
+            dias_restantes=dias,
+            codigo_respuesta=codigo_respuesta,
+        )
+    )
     db.commit()
 
 
@@ -72,8 +90,7 @@ class TestChecklistPersonal:
         # Vencida
         _seed(db_session, dias=-5, dictamen="x" * 200)
         # RESPONDIDA sin código respuesta
-        _seed(db_session, estado="RESPONDIDA",
-              dictamen="x" * 200)
+        _seed(db_session, estado="RESPONDIDA", dictamen="x" * 200)
 
         r = client.get("/usuarios/yo/checklist-personal")
         d = r.json()

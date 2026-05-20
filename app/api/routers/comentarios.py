@@ -1,4 +1,5 @@
 """Hilo de comentarios por glosa (colaboración entre el equipo)."""
+
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -63,6 +64,7 @@ def agregar(
 
     # Detectar mención explícita "@email@dominio" en el texto si no se pasó
     import re as _re
+
     mencion = data.mencion
     if not mencion:
         m = _re.search(r"@([\w.+-]+@[\w-]+\.[\w.-]+)", data.texto)
@@ -139,7 +141,10 @@ def eliminar(
     )
     if not c:
         raise HTTPException(404, "Comentario no encontrado")
-    if c.autor_email != current_user.email and current_user.rol not in ("SUPER_ADMIN", "COORDINADOR"):
+    if c.autor_email != current_user.email and current_user.rol not in (
+        "SUPER_ADMIN",
+        "COORDINADOR",
+    ):
         raise HTTPException(403, "No autorizado para eliminar este comentario")
     db.delete(c)
     db.commit()

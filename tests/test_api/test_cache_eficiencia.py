@@ -1,7 +1,7 @@
 """Tests del endpoint GET /sistema/metricas-ia/cache-eficiencia (R143 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -41,6 +44,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -49,12 +53,16 @@ def client(db_session, usuario_coord):
 
 
 def _seed_call(db, input_tok=1000, cache_read=0, cost=0.01):
-    db.add(AICallRecord(
-        proveedor="anthropic", modelo="claude",
-        input_tokens=input_tok,
-        cache_read_input_tokens=cache_read,
-        cost_usd=cost, creado_en=ahora_utc(),
-    ))
+    db.add(
+        AICallRecord(
+            proveedor="anthropic",
+            modelo="claude",
+            input_tokens=input_tok,
+            cache_read_input_tokens=cache_read,
+            cost_usd=cost,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -63,10 +71,16 @@ class TestCacheEficiencia:
         r = client.get("/sistema/metricas-ia/cache-eficiencia")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "total_calls", "total_input_tokens",
-                    "total_cache_read_tokens", "hit_rate_pct",
-                    "cost_total_usd", "ahorro_estimado_usd",
-                    "ai_cache_filas_actuales"):
+        for key in (
+            "ventana_dias",
+            "total_calls",
+            "total_input_tokens",
+            "total_cache_read_tokens",
+            "hit_rate_pct",
+            "cost_total_usd",
+            "ahorro_estimado_usd",
+            "ai_cache_filas_actuales",
+        ):
             assert key in d
 
     def test_sin_calls(self, client):
@@ -95,11 +109,15 @@ class TestCacheEficiencia:
 
     def test_cuenta_cache_filas(self, client, db_session):
         for i in range(5):
-            db_session.add(AICacheRecord(
-                clave=f"x{i}" * 64, modelo="x",
-                respuesta="r", hit_count=0,
-                creado_en=ahora_utc(),
-            ))
+            db_session.add(
+                AICacheRecord(
+                    clave=f"x{i}" * 64,
+                    modelo="x",
+                    respuesta="r",
+                    hit_count=0,
+                    creado_en=ahora_utc(),
+                )
+            )
         db_session.commit()
         r = client.get("/sistema/metricas-ia/cache-eficiencia")
         d = r.json()

@@ -29,6 +29,7 @@ Fuera de los casos obligatorios del SOAT, el tarifario SOAT puede usarse
 como REFERENTE para otros contratos (ej. FAMISANAR pacta "SOAT -5%"; otros
 contratos pactan "TARIFAS PROPIAS" que aluden a la Res. 054/2026 HUS).
 """
+
 from __future__ import annotations
 
 
@@ -105,9 +106,7 @@ def calcular_valor_pesos(tarifa_uvb: float, anio: int = 2026) -> int:
     return _redondear_a_centena(float(tarifa_uvb) * valor_uvb_vigente(anio))
 
 
-def calcular_soat_con_factor(
-    tarifa_uvb: float, factor_pct: float = 0.0, anio: int = 2026
-) -> int:
+def calcular_soat_con_factor(tarifa_uvb: float, factor_pct: float = 0.0, anio: int = 2026) -> int:
     """Contrato 'SOAT ± X%': UVB × valor_UVB × (1+pct/100) → centena."""
     if tarifa_uvb is None or tarifa_uvb <= 0:
         return 0
@@ -149,5 +148,3 @@ def marco_normativo_segun_modalidad(modalidad: str) -> str:
     if "SOAT" in m or "UVB" in m:
         return MARCO_SOAT_2026
     return "Valor pactado en el contrato vigente entre las partes."
-
-

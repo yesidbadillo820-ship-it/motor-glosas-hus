@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/buscar-por-cups (R186 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,7 +11,9 @@ from sqlalchemy.pool import StaticPool
 from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import (
-    ConceptoGlosaRecord, GlosaRecord, UsuarioRecord,
+    ConceptoGlosaRecord,
+    GlosaRecord,
+    UsuarioRecord,
 )
 
 
@@ -39,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,19 +51,30 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid):
-    db.add(GlosaRecord(
-        id=gid, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_concepto(db, gid, cups):
-    db.add(ConceptoGlosaRecord(
-        glosa_id=gid, codigo_glosa="TA",
-        cups_codigo=cups, valor_objetado=500,
-    ))
+    db.add(
+        ConceptoGlosaRecord(
+            glosa_id=gid,
+            codigo_glosa="TA",
+            cups_codigo=cups,
+            valor_objetado=500,
+        )
+    )
     db.commit()
 
 

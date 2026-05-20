@@ -18,6 +18,7 @@ Modalidades soportadas:
   • SOAT_PCT              (UVB × 12.110 × (1 + pct/100))
   • PROPIA_HUS            (FACTOR × SMDLV)
 """
+
 from __future__ import annotations
 
 
@@ -113,34 +114,38 @@ def buscar_codigo(
         for cod, (factor_uvb, valor_pesos, desc, norma) in TARIFAS_SOAT_2026.items():
             if _matchea(q, cod, desc):
                 liquidacion = _liquidar_soat(factor_uvb, pct, anio)
-                matches.append({
-                    "codigo": cod,
-                    "descripcion": desc,
-                    "norma": norma,
-                    "catalogo": "SOAT_2026",
-                    **liquidacion,
-                })
+                matches.append(
+                    {
+                        "codigo": cod,
+                        "descripcion": desc,
+                        "norma": norma,
+                        "catalogo": "SOAT_2026",
+                        **liquidacion,
+                    }
+                )
 
     if mod in ("PROPIA", "PROPIA_HUS", "AMBOS", ""):
         for cod, (factor_smdlv, valor_pesos, desc, norma) in TARIFAS_PROPIAS_HUS.items():
             if _matchea(q, cod, desc):
                 liquidacion = _liquidar_propia(factor_smdlv, anio)
-                matches.append({
-                    "codigo": cod,
-                    "descripcion": desc,
-                    "norma": norma,
-                    "catalogo": "PROPIA_HUS",
-                    **liquidacion,
-                })
+                matches.append(
+                    {
+                        "codigo": cod,
+                        "descripcion": desc,
+                        "norma": norma,
+                        "catalogo": "PROPIA_HUS",
+                        **liquidacion,
+                    }
+                )
 
     # Orden: matches por código exacto primero, luego por descripción
     q_up = q.upper().strip()
-    matches.sort(key=lambda x: (
-        0 if x["codigo"].upper() == q_up else
-        1 if q_up in x["codigo"].upper() else
-        2,
-        x["descripcion"],
-    ))
+    matches.sort(
+        key=lambda x: (
+            0 if x["codigo"].upper() == q_up else 1 if q_up in x["codigo"].upper() else 2,
+            x["descripcion"],
+        )
+    )
 
     # Fallback informativo: si no hay tarifa local pero el código existe
     # en el catálogo CUPS curado, devolverlo como "sin tarifa local". El
@@ -149,24 +154,26 @@ def buscar_codigo(
     if not matches and q:
         for cod, desc in DESCRIPCIONES_CUPS_2025.items():
             if _matchea(q, cod, desc):
-                fallback_cups.append({
-                    "codigo": cod,
-                    "descripcion": desc,
-                    "modalidad": "SIN_TARIFA_LOCAL",
-                    "factor_uvb": None,
-                    "factor_smdlv": None,
-                    "valor_pesos": None,
-                    "uvb_vigente": valor_uvb_vigente(anio),
-                    "smdlv_vigente": valor_smdlv_vigente(anio),
-                    "porcentaje_aplicado": pct,
-                    "catalogo": "CUPS_2025_DESCRIPTIVO",
-                    "norma": "Catálogo CUPS curado (sin factor tarifario local)",
-                    "formula": (
-                        "Sin factor en catálogos locales. Consulta el Manual SOAT "
-                        "2026 oficial (Circular 047/2025) o el contrato vigente "
-                        "para obtener el factor UVB/SMDLV de este código."
-                    ),
-                })
+                fallback_cups.append(
+                    {
+                        "codigo": cod,
+                        "descripcion": desc,
+                        "modalidad": "SIN_TARIFA_LOCAL",
+                        "factor_uvb": None,
+                        "factor_smdlv": None,
+                        "valor_pesos": None,
+                        "uvb_vigente": valor_uvb_vigente(anio),
+                        "smdlv_vigente": valor_smdlv_vigente(anio),
+                        "porcentaje_aplicado": pct,
+                        "catalogo": "CUPS_2025_DESCRIPTIVO",
+                        "norma": "Catálogo CUPS curado (sin factor tarifario local)",
+                        "formula": (
+                            "Sin factor en catálogos locales. Consulta el Manual SOAT "
+                            "2026 oficial (Circular 047/2025) o el contrato vigente "
+                            "para obtener el factor UVB/SMDLV de este código."
+                        ),
+                    }
+                )
         # Limitar fallback a 30 para no saturar
         fallback_cups = fallback_cups[:30]
 

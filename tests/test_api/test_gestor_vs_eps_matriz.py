@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/gestor-vs-eps-matriz (R296 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.com", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.com",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def coord():
 def client(db_session, coord):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: coord
     with TestClient(app) as c:
@@ -47,12 +52,18 @@ def client(db_session, coord):
 
 
 def _seed(db, gestor, eps):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="LEVANTADA",
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+        )
+    )
     db.commit()
 
 
@@ -75,12 +86,14 @@ class TestGestorVsEPSMatriz:
     def test_no_auditor(self, db_session):
         from app.api.deps import get_usuario_actual
         from app.main import app
+
         auditor = UsuarioRecord(
-            id=99, email="x@x.com", rol="AUDITOR", activo=1,
+            id=99,
+            email="x@x.com",
+            rol="AUDITOR",
+            activo=1,
         )
-        app.dependency_overrides[get_db] = (
-            lambda: iter([db_session]).__next__()
-        )
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
         app.dependency_overrides[get_usuario_actual] = lambda: auditor
         with TestClient(app) as c:
             r = c.get("/glosas/stats/gestor-vs-eps-matriz")

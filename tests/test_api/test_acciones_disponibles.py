@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/{id}/acciones-disponibles (R78 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -35,8 +36,12 @@ def usuario():
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -51,6 +56,7 @@ def _seed(db, **kw):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -68,8 +74,13 @@ class TestAccionesDisponibles:
         r = client.get(f"/glosas/{g.id}/acciones-disponibles")
         assert r.status_code == 200
         d = r.json()
-        for k in ("glosa_id", "estado_actual", "transiciones_workflow",
-                  "acciones_operativas", "sugerencia_principal"):
+        for k in (
+            "glosa_id",
+            "estado_actual",
+            "transiciones_workflow",
+            "acciones_operativas",
+            "sugerencia_principal",
+        ):
             assert k in d
 
     def test_sin_dictamen_no_descarga_pdf(self, client, db_session):

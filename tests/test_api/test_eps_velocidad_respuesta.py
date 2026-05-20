@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-velocidad-respuesta (R218 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,12 +51,18 @@ def client(db_session, usuario):
 def _seed(db, eps, dias_creacion_to_decision):
     cre = ahora_utc() - timedelta(days=dias_creacion_to_decision + 30)
     dec = cre + timedelta(days=dias_creacion_to_decision)
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="LEVANTADA",
-        creado_en=cre,
-        fecha_decision_eps=dec,
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=cre,
+            fecha_decision_eps=dec,
+        )
+    )
     db.commit()
 
 
@@ -69,9 +77,7 @@ class TestEPSVelocidadRespuesta:
         _seed(db_session, "NUEVA", 90)
         _seed(db_session, "NUEVA", 90)
 
-        r = client.get(
-            "/glosas/stats/eps-velocidad-respuesta?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/eps-velocidad-respuesta?min_glosas=1")
         d = r.json()
         # SANITAS más rápida → primera
         assert d["items"][0]["eps"] == "SANITAS"
@@ -80,23 +86,25 @@ class TestEPSVelocidadRespuesta:
     def test_filtro_min(self, client, db_session):
         _seed(db_session, "POCAS", 10)
         _seed(db_session, "POCAS", 10)
-        r = client.get(
-            "/glosas/stats/eps-velocidad-respuesta?min_glosas=3"
-        )
+        r = client.get("/glosas/stats/eps-velocidad-respuesta?min_glosas=3")
         d = r.json()
         assert d["items"] == []
 
     def test_excluye_sin_decision(self, client, db_session):
         # Glosa sin fecha_decision → no cuenta
-        db_session.add(GlosaRecord(
-            eps="X", paciente="X", codigo_glosa="C",
-            valor_objetado=1000, etapa="X", estado="RADICADA",
-            creado_en=ahora_utc(),
-            fecha_decision_eps=None,
-        ))
-        db_session.commit()
-        r = client.get(
-            "/glosas/stats/eps-velocidad-respuesta?min_glosas=1"
+        db_session.add(
+            GlosaRecord(
+                eps="X",
+                paciente="X",
+                codigo_glosa="C",
+                valor_objetado=1000,
+                etapa="X",
+                estado="RADICADA",
+                creado_en=ahora_utc(),
+                fecha_decision_eps=None,
+            )
         )
+        db_session.commit()
+        r = client.get("/glosas/stats/eps-velocidad-respuesta?min_glosas=1")
         d = r.json()
         assert d["items"] == []

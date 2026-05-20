@@ -1,7 +1,8 @@
 """Tests del health monitor (Ronda 17)."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -35,6 +36,7 @@ def db_session():
 
 # ─── _peor_estado ──────────────────────────────────────────────────────────
 
+
 class TestPeorEstado:
     def test_todos_ok(self):
         assert _peor_estado(["OK", "OK", "OK"]) == "OK"
@@ -57,6 +59,7 @@ class TestPeorEstado:
 
 # ─── _check_bd ─────────────────────────────────────────────────────────────
 
+
 class TestCheckBd:
     def test_bd_viva_retorna_ok(self, db_session):
         r = _check_bd(db_session)
@@ -67,6 +70,7 @@ class TestCheckBd:
 
 # ─── _check_glosas_hoy ─────────────────────────────────────────────────────
 
+
 class TestCheckGlosasHoy:
     def test_sin_glosas_ok(self, db_session):
         r = _check_glosas_hoy(db_session)
@@ -76,8 +80,11 @@ class TestCheckGlosasHoy:
 
     def test_vencidas_pocas_atencion(self, db_session):
         g = GlosaRecord(
-            eps="X", estado="PENDIENTE", dias_restantes=-2,
-            codigo_glosa="TA0201", valor_objetado=10000,
+            eps="X",
+            estado="PENDIENTE",
+            dias_restantes=-2,
+            codigo_glosa="TA0201",
+            valor_objetado=10000,
             creado_en=datetime.now(timezone.utc),
         )
         db_session.add(g)
@@ -88,17 +95,23 @@ class TestCheckGlosasHoy:
 
     def test_vencidas_muchas_critico(self, db_session):
         for i in range(12):
-            db_session.add(GlosaRecord(
-                eps="X", estado="PENDIENTE", dias_restantes=-1,
-                codigo_glosa="TA0201", valor_objetado=1000,
-                creado_en=datetime.now(timezone.utc),
-            ))
+            db_session.add(
+                GlosaRecord(
+                    eps="X",
+                    estado="PENDIENTE",
+                    dias_restantes=-1,
+                    codigo_glosa="TA0201",
+                    valor_objetado=1000,
+                    creado_en=datetime.now(timezone.utc),
+                )
+            )
         db_session.commit()
         r = _check_glosas_hoy(db_session)
         assert r["estado"] == "CRITICO"
 
 
 # ─── _check_cache_ia ───────────────────────────────────────────────────────
+
 
 class TestCheckCache:
     def test_sin_cache_ratio_cero(self, db_session):
@@ -110,6 +123,7 @@ class TestCheckCache:
 
 # ─── _check_anomalias ──────────────────────────────────────────────────────
 
+
 class TestCheckAnomalias:
     def test_sin_anomalias_ok(self, db_session):
         r = _check_anomalias(db_session)
@@ -119,12 +133,17 @@ class TestCheckAnomalias:
     def test_con_duplicado_alta(self, db_session):
         # 3 glosas duplicadas → ALTA
         for _ in range(3):
-            db_session.add(GlosaRecord(
-                eps="X", factura="DUP-1", cups_servicio="999",
-                estado="PENDIENTE", valor_objetado=1000,
-                codigo_glosa="TA0201",
-                creado_en=datetime.now(timezone.utc),
-            ))
+            db_session.add(
+                GlosaRecord(
+                    eps="X",
+                    factura="DUP-1",
+                    cups_servicio="999",
+                    estado="PENDIENTE",
+                    valor_objetado=1000,
+                    codigo_glosa="TA0201",
+                    creado_en=datetime.now(timezone.utc),
+                )
+            )
         db_session.commit()
         r = _check_anomalias(db_session)
         # Con 1 ALTA pasa a ATENCION (necesita ≥3 para CRITICO)
@@ -133,6 +152,7 @@ class TestCheckAnomalias:
 
 
 # ─── _check_bots ───────────────────────────────────────────────────────────
+
 
 class TestCheckBots:
     def test_sin_credenciales_degrada_a_mock(self, monkeypatch):
@@ -147,6 +167,7 @@ class TestCheckBots:
 
 # ─── _check_actividad_reciente ─────────────────────────────────────────────
 
+
 class TestActividadReciente:
     def test_sin_actividad_ok(self, db_session):
         r = _check_actividad_reciente(db_session, horas=6)
@@ -155,6 +176,7 @@ class TestActividadReciente:
 
 
 # ─── checar_salud consolidado ──────────────────────────────────────────────
+
 
 class TestCheckSaludConsolidado:
     def test_sistema_vacio_retorna_ok(self, db_session):
@@ -173,7 +195,12 @@ class TestCheckSaludConsolidado:
     def test_todos_los_componentes_presentes(self, db_session):
         r = checar_salud(db_session)
         esperados = {
-            "bd", "scheduler_ia_proactiva", "cache_ia",
-            "glosas_hoy", "anomalias", "bots", "actividad_reciente",
+            "bd",
+            "scheduler_ia_proactiva",
+            "cache_ia",
+            "glosas_hoy",
+            "anomalias",
+            "bots",
+            "actividad_reciente",
         }
         assert set(r["componentes"].keys()) == esperados

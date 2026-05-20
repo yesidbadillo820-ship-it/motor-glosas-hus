@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/proyeccion-mes (R391 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,8 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -40,6 +44,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,13 +53,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, gestor="Alice", estado="LEVANTADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        fecha_decision_eps=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            fecha_decision_eps=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -63,9 +74,12 @@ class TestProyeccionMes:
         r = client.get("/usuarios/yo/proyeccion-mes")
         d = r.json()
         for k in (
-            "decididas_actual", "ritmo_diario",
-            "decididas_proyectadas", "intervalo_min",
-            "intervalo_max", "confianza",
+            "decididas_actual",
+            "ritmo_diario",
+            "decididas_proyectadas",
+            "intervalo_min",
+            "intervalo_max",
+            "confianza",
         ):
             assert k in d
 

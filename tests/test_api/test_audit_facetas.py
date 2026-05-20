@@ -1,4 +1,5 @@
 """Tests del endpoint GET /audit/facetas (R87 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -52,10 +57,15 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, usuario, rol, accion, tabla):
-    db.add(AuditLogRecord(
-        usuario_email=usuario, usuario_rol=rol,
-        accion=accion, tabla=tabla, timestamp=ahora_utc(),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=usuario,
+            usuario_rol=rol,
+            accion=accion,
+            tabla=tabla,
+            timestamp=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -83,10 +93,15 @@ class TestAuditFacetas:
     def test_excluye_nulos(self, client, db_session):
         _seed(db_session, "u@x", "AUDITOR", "X", "T")
         # Una entrada con campos nulos
-        db_session.add(AuditLogRecord(
-            usuario_email=None, usuario_rol=None,
-            accion=None, tabla=None, timestamp=ahora_utc(),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                usuario_email=None,
+                usuario_rol=None,
+                accion=None,
+                tabla=None,
+                timestamp=ahora_utc(),
+            )
+        )
         db_session.commit()
 
         r = client.get("/audit/facetas")

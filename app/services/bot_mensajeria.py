@@ -1,4 +1,4 @@
-"""Bots de mensajería (WhatsApp / Telegram) — skeleton pragmático.
+r"""Bots de mensajería (WhatsApp / Telegram) — skeleton pragmático.
 
 Ronda 13 de la visión premium. No conectamos directamente con Meta API o
 Telegram BotAPI (requieren claves y configuración externa), pero
@@ -20,6 +20,7 @@ Escenarios típicos:
   - "EPS Nueva levantó glosa #456 → recuperación de \$500K"
   - "Coordinador: 15 glosas vencidas sin responder"
 """
+
 from __future__ import annotations
 
 import os
@@ -32,15 +33,14 @@ from app.core.logging_utils import logger
 
 # ─── Providers ─────────────────────────────────────────────────────────────
 
+
 class MockProvider:
     """Provider mock que solo logea. Útil para desarrollo/tests."""
 
     nombre = "mock"
 
     def enviar(self, destinatario: str, mensaje: str, meta: Optional[dict] = None) -> dict:
-        logger.info(
-            f"[BOT-MOCK] → {destinatario[:30]}: {mensaje[:80]}…"
-        )
+        logger.info(f"[BOT-MOCK] → {destinatario[:30]}: {mensaje[:80]}…")
         return {"ok": True, "provider": self.nombre, "delivered_at": ahora_utc().isoformat()}
 
 
@@ -53,6 +53,7 @@ class WhatsAppMetaProvider:
 
     Si esas vars no están, degrada a MockProvider.
     """
+
     nombre = "whatsapp-meta"
 
     def __init__(self):
@@ -69,6 +70,7 @@ class WhatsAppMetaProvider:
         #   https://graph.facebook.com/v19.0/{phone_id}/messages
         # con payload {messaging_product, to, type, text}
         import httpx
+
         url = f"https://graph.facebook.com/v19.0/{self.phone_id}/messages"
         headers = {"Authorization": f"Bearer {self.token}"}
         payload = {
@@ -82,7 +84,12 @@ class WhatsAppMetaProvider:
                 r = c.post(url, headers=headers, json=payload)
             if r.status_code // 100 == 2:
                 return {"ok": True, "provider": self.nombre, "response": r.json()}
-            return {"ok": False, "provider": self.nombre, "error": r.text[:200], "status": r.status_code}
+            return {
+                "ok": False,
+                "provider": self.nombre,
+                "error": r.text[:200],
+                "status": r.status_code,
+            }
         except Exception as e:
             return {"ok": False, "provider": self.nombre, "error": str(e)[:200]}
 
@@ -93,6 +100,7 @@ class TelegramProvider:
     Config vía env:
       TELEGRAM_BOT_TOKEN — token del bot (BotFather)
     """
+
     nombre = "telegram"
 
     def __init__(self):
@@ -105,6 +113,7 @@ class TelegramProvider:
         if not self.disponible():
             return MockProvider().enviar(destinatario, mensaje, meta)
         import httpx
+
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         payload = {
             "chat_id": destinatario,
@@ -116,7 +125,12 @@ class TelegramProvider:
                 r = c.post(url, json=payload)
             if r.status_code // 100 == 2:
                 return {"ok": True, "provider": self.nombre, "response": r.json()}
-            return {"ok": False, "provider": self.nombre, "error": r.text[:200], "status": r.status_code}
+            return {
+                "ok": False,
+                "provider": self.nombre,
+                "error": r.text[:200],
+                "status": r.status_code,
+            }
         except Exception as e:
             return {"ok": False, "provider": self.nombre, "error": str(e)[:200]}
 
@@ -162,6 +176,7 @@ def enviar_notificacion(
 
 
 # ─── Plantillas de mensajes ────────────────────────────────────────────────
+
 
 def plantilla_glosa_vencida(glosa_id: int, codigo: str, eps: str, valor: float, dias: int) -> str:
     return (

@@ -18,6 +18,7 @@ Filosofía:
     BAJA = matiz menor.
   • Output: dict con `hallazgos`, `score_evidencia`, `accion_sugerida`.
 """
+
 from __future__ import annotations
 
 import re
@@ -80,6 +81,7 @@ _PAT_GLOSA_DIFERENCIA = re.compile(
 # Auditor principal
 # ──────────────────────────────────────────────────────────────────────
 
+
 def auditar(
     texto_glosa: str,
     *,
@@ -110,148 +112,155 @@ def auditar(
     # ── HALLAZGO 1: La EPS afirma "sin contrato" pero el sistema
     #    tiene contrato vigente.
     if _PAT_SIN_CONTRATO.search(texto) and tiene_contrato:
-        hallazgos.append({
-            "id": "afirmacion_sin_contrato_falsa",
-            "severidad": "ALTA",
-            "afirmacion_eps": (
-                "La EPS afirma que NO existe contrato entre las partes."
-            ),
-            "realidad_sistema": (
-                "El sistema tiene cargado un contrato vigente para esta "
-                "entidad pagadora, con tarifa pactada en el catálogo "
-                "institucional."
-            ),
-            "refutacion_sugerida": (
-                "Refutar PUNTUALMENTE que la afirmación NO se ajusta a "
-                "la realidad documental: el contrato existe, está "
-                "vigente y la tarifa pactada está incorporada al "
-                "acuerdo. Citar número de contrato + Art. 1602 C.C. "
-                "(contrato es ley entre partes)."
-            ),
-        })
+        hallazgos.append(
+            {
+                "id": "afirmacion_sin_contrato_falsa",
+                "severidad": "ALTA",
+                "afirmacion_eps": ("La EPS afirma que NO existe contrato entre las partes."),
+                "realidad_sistema": (
+                    "El sistema tiene cargado un contrato vigente para esta "
+                    "entidad pagadora, con tarifa pactada en el catálogo "
+                    "institucional."
+                ),
+                "refutacion_sugerida": (
+                    "Refutar PUNTUALMENTE que la afirmación NO se ajusta a "
+                    "la realidad documental: el contrato existe, está "
+                    "vigente y la tarifa pactada está incorporada al "
+                    "acuerdo. Citar número de contrato + Art. 1602 C.C. "
+                    "(contrato es ley entre partes)."
+                ),
+            }
+        )
 
     # ── HALLAZGO 2: La EPS afirma "sin tarifa pactada" pero el sistema
     #    sí tiene la tarifa cargada.
     if _PAT_SIN_TARIFA_PACTADA.search(texto) and valor_pactado > 0:
-        hallazgos.append({
-            "id": "afirmacion_sin_tarifa_falsa",
-            "severidad": "ALTA",
-            "afirmacion_eps": (
-                "La EPS afirma que no hay tarifa pactada para el "
-                "servicio facturado."
-            ),
-            "realidad_sistema": (
-                f"El sistema tiene cargada una tarifa pactada de "
-                f"${valor_pactado:,.0f} para el CUPS {cups or ''} en el "
-                "tarifario institucional incorporado al contrato."
-            ),
-            "refutacion_sugerida": (
-                "Citar el monto exacto pactado y la fuente (tarifario "
-                "del contrato). El argumento de \"sin tarifa\" es "
-                "objetivamente desmentible."
-            ),
-        })
+        hallazgos.append(
+            {
+                "id": "afirmacion_sin_tarifa_falsa",
+                "severidad": "ALTA",
+                "afirmacion_eps": (
+                    "La EPS afirma que no hay tarifa pactada para el servicio facturado."
+                ),
+                "realidad_sistema": (
+                    f"El sistema tiene cargada una tarifa pactada de "
+                    f"${valor_pactado:,.0f} para el CUPS {cups or ''} en el "
+                    "tarifario institucional incorporado al contrato."
+                ),
+                "refutacion_sugerida": (
+                    "Citar el monto exacto pactado y la fuente (tarifario "
+                    'del contrato). El argumento de "sin tarifa" es '
+                    "objetivamente desmentible."
+                ),
+            }
+        )
 
     # ── HALLAZGO 3: La EPS aplica SOAT como sustituto cuando hay
     #    contrato vigente. SOAT es supletorio (Decreto 2423/1996 +
     #    Circular 047/2025); cuando hay pacto contractual aplica el
     #    pacto, no el SOAT, por especialidad sobre la regla supletiva.
     if _PAT_APLICA_SOAT.search(texto) and tiene_contrato:
-        hallazgos.append({
-            "id": "soat_sustituto_indebido",
-            "severidad": "ALTA",
-            "afirmacion_eps": (
-                "La EPS aplica tarifa SOAT (vigente o histórica) como "
-                "criterio liquidatorio."
-            ),
-            "realidad_sistema": (
-                "Existe contrato vigente con tarifa propia pactada. "
-                "El SOAT solo aplica cuando NO hay contrato; cuando "
-                "el contrato pactó otra tarifa, esa rige por "
-                "especialidad sobre la regla supletiva."
-            ),
-            "refutacion_sugerida": (
-                "Sostener que la sustitución unilateral de la tarifa "
-                "pactada por SOAT carece de respaldo contractual y "
-                "viola Art. 871 C.Comercio (buena fe en ejecución)."
-            ),
-        })
+        hallazgos.append(
+            {
+                "id": "soat_sustituto_indebido",
+                "severidad": "ALTA",
+                "afirmacion_eps": (
+                    "La EPS aplica tarifa SOAT (vigente o histórica) como criterio liquidatorio."
+                ),
+                "realidad_sistema": (
+                    "Existe contrato vigente con tarifa propia pactada. "
+                    "El SOAT solo aplica cuando NO hay contrato; cuando "
+                    "el contrato pactó otra tarifa, esa rige por "
+                    "especialidad sobre la regla supletiva."
+                ),
+                "refutacion_sugerida": (
+                    "Sostener que la sustitución unilateral de la tarifa "
+                    "pactada por SOAT carece de respaldo contractual y "
+                    "viola Art. 871 C.Comercio (buena fe en ejecución)."
+                ),
+            }
+        )
 
     # ── HALLAZGO 4: Coherencia numérica. Si la EPS objeta más que el
     #    excedente real (facturado − pactado), está reduciendo la
     #    base contractual y eso es indefendible para ella.
     if (
-        valor_facturado > 0 and valor_pactado > 0
-        and valor_objetado > 0 and valor_facturado >= valor_pactado
+        valor_facturado > 0
+        and valor_pactado > 0
+        and valor_objetado > 0
+        and valor_facturado >= valor_pactado
     ):
         excedente = valor_facturado - valor_pactado
         if valor_objetado > excedente + 1:
             # La EPS está objetando MÁS que lo que está fuera del
             # contrato — afecta la base pactada.
-            hallazgos.append({
-                "id": "objeta_mas_que_excedente",
-                "severidad": "ALTA",
-                "afirmacion_eps": (
-                    f"La EPS objeta ${valor_objetado:,.0f} cuando el "
-                    f"excedente sobre lo pactado es solo "
-                    f"${excedente:,.0f}."
-                ),
-                "realidad_sistema": (
-                    f"La diferencia entre lo objetado y el excedente "
-                    f"real es ${valor_objetado - excedente:,.0f}. Ese "
-                    "monto sí está cubierto por la tarifa pactada — "
-                    "objetarlo es desconocer el contrato."
-                ),
-                "refutacion_sugerida": (
-                    f"Aceptar parcialmente ${excedente:,.0f} (el "
-                    f"excedente real); defender los ${valor_objetado - excedente:,.0f} "
-                    "restantes como pactados."
-                ),
-            })
+            hallazgos.append(
+                {
+                    "id": "objeta_mas_que_excedente",
+                    "severidad": "ALTA",
+                    "afirmacion_eps": (
+                        f"La EPS objeta ${valor_objetado:,.0f} cuando el "
+                        f"excedente sobre lo pactado es solo "
+                        f"${excedente:,.0f}."
+                    ),
+                    "realidad_sistema": (
+                        f"La diferencia entre lo objetado y el excedente "
+                        f"real es ${valor_objetado - excedente:,.0f}. Ese "
+                        "monto sí está cubierto por la tarifa pactada — "
+                        "objetarlo es desconocer el contrato."
+                    ),
+                    "refutacion_sugerida": (
+                        f"Aceptar parcialmente ${excedente:,.0f} (el "
+                        f"excedente real); defender los ${valor_objetado - excedente:,.0f} "
+                        "restantes como pactados."
+                    ),
+                }
+            )
 
     # ── HALLAZGO 5: Glosa "la diferencia" sin señalar cifra concreta
     #    ni indicar contra qué tarifa de referencia.
     if _PAT_GLOSA_DIFERENCIA.search(texto):
-        hallazgos.append({
-            "id": "diferencia_sin_referente",
-            "severidad": "MEDIA",
-            "afirmacion_eps": (
-                "La EPS glosa \"la diferencia\" sin precisar el "
-                "referente tarifario aplicado."
-            ),
-            "realidad_sistema": (
-                "Una glosa válida debe identificar (a) el valor "
-                "pactado contractual y (b) la diferencia exacta. "
-                "Glosar abstractamente no acredita el motivo."
-            ),
-            "refutacion_sugerida": (
-                "Pedir que la EPS especifique el referente normativo "
-                "y la diferencia exacta — invocar Resolución 2284/2023 "
-                "que exige motivación detallada en la objeción."
-            ),
-        })
+        hallazgos.append(
+            {
+                "id": "diferencia_sin_referente",
+                "severidad": "MEDIA",
+                "afirmacion_eps": (
+                    'La EPS glosa "la diferencia" sin precisar el referente tarifario aplicado.'
+                ),
+                "realidad_sistema": (
+                    "Una glosa válida debe identificar (a) el valor "
+                    "pactado contractual y (b) la diferencia exacta. "
+                    "Glosar abstractamente no acredita el motivo."
+                ),
+                "refutacion_sugerida": (
+                    "Pedir que la EPS especifique el referente normativo "
+                    "y la diferencia exacta — invocar Resolución 2284/2023 "
+                    "que exige motivación detallada en la objeción."
+                ),
+            }
+        )
 
     # ── HALLAZGO 6: Falta de historia clínica afirmada por EPS pero
     #    el expediente sí adjunta PDFs.
     if _PAT_SIN_HISTORIA.search(texto) and pdf and len(pdf) > 500:
-        hallazgos.append({
-            "id": "historia_aportada_objetada",
-            "severidad": "MEDIA",
-            "afirmacion_eps": (
-                "La EPS afirma que falta la historia clínica."
-            ),
-            "realidad_sistema": (
-                f"El expediente aporta {len(pdf):,} caracteres "
-                "extraídos del PDF — historia clínica/RIPS/factura "
-                "presentes en autos."
-            ),
-            "refutacion_sugerida": (
-                "Citar Resolución 1995/1999: la historia clínica es "
-                "documento médico-legal de plena prueba y obra en "
-                "autos. La afirmación de \"falta\" no se ajusta a la "
-                "realidad documental."
-            ),
-        })
+        hallazgos.append(
+            {
+                "id": "historia_aportada_objetada",
+                "severidad": "MEDIA",
+                "afirmacion_eps": ("La EPS afirma que falta la historia clínica."),
+                "realidad_sistema": (
+                    f"El expediente aporta {len(pdf):,} caracteres "
+                    "extraídos del PDF — historia clínica/RIPS/factura "
+                    "presentes en autos."
+                ),
+                "refutacion_sugerida": (
+                    "Citar Resolución 1995/1999: la historia clínica es "
+                    "documento médico-legal de plena prueba y obra en "
+                    'autos. La afirmación de "falta" no se ajusta a la '
+                    "realidad documental."
+                ),
+            }
+        )
 
     # ── Score de evidencia: 100 = caso unívoco a favor del prestador.
     severidad_pesos = {"ALTA": 30, "MEDIA": 15, "BAJA": 5}
@@ -273,9 +282,7 @@ def auditar(
         "score_evidencia": score,
         "accion_sugerida": accion,
         "puede_responder_solo": puede_solo,
-        "n_hallazgos_alta": sum(
-            1 for h in hallazgos if h["severidad"] == "ALTA"
-        ),
+        "n_hallazgos_alta": sum(1 for h in hallazgos if h["severidad"] == "ALTA"),
     }
 
 
@@ -295,8 +302,8 @@ def bloque_auditoria_para_prompt(auditoria: dict) -> str:
         "El sistema YA comparó las afirmaciones de la EPS contra los",
         "datos verificados. Tu dictamen DEBE refutar UNO POR UNO los",
         "siguientes hallazgos en el párrafo 2 (REFUTACIÓN FÁCTICA),",
-        "citando expresamente que \"la afirmación de la EPS no se",
-        "ajusta a la realidad documental\":",
+        'citando expresamente que "la afirmación de la EPS no se',
+        'ajusta a la realidad documental":',
         "",
     ]
     for i, h in enumerate(auditoria["hallazgos"], 1):
@@ -306,15 +313,9 @@ def bloque_auditoria_para_prompt(auditoria: dict) -> str:
         partes.append(f"     ↳ Realidad: {h['realidad_sistema']}")
         partes.append(f"     ↳ Cómo refutar: {h['refutacion_sugerida']}")
         partes.append("")
-    partes.append(
-        "⚠ NO redactes argumentos genéricos sobre \"buena fe contractual\""
-    )
-    partes.append(
-        "  sin antes ATACAR PUNTUALMENTE los hallazgos de arriba. Esa es la"
-    )
-    partes.append(
-        "  diferencia entre un dictamen de plantilla y uno con auditoría real."
-    )
+    partes.append('⚠ NO redactes argumentos genéricos sobre "buena fe contractual"')
+    partes.append("  sin antes ATACAR PUNTUALMENTE los hallazgos de arriba. Esa es la")
+    partes.append("  diferencia entre un dictamen de plantilla y uno con auditoría real.")
     partes.append("═══════════════════════════════════════════════════════════")
     partes.append("")
     return "\n".join(partes)
@@ -336,7 +337,9 @@ def construir_bloque_auditoria(
     try:
         a = auditar(
             texto_glosa,
-            eps=eps, codigo=codigo, cups=cups,
+            eps=eps,
+            codigo=codigo,
+            cups=cups,
             tiene_contrato=tiene_contrato,
             valor_facturado=valor_facturado,
             valor_pactado=valor_pactado,

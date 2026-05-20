@@ -14,10 +14,12 @@ Contiene:
 Estos helpers son usados por app.main y otros módulos (glosa_service,
 ia_auditora_proactiva) para no duplicar lógica de parsing.
 """
+
 from __future__ import annotations
 
 import re
 from typing import Optional
+
 
 def _detectar_servicio_desde_texto(texto_glosa: str, contexto_pdf: str = "") -> Optional[str]:
     """Intenta extraer el nombre del servicio/procedimiento y el CUPS desde el texto
@@ -59,7 +61,9 @@ def _detectar_servicio_desde_texto(texto_glosa: str, contexto_pdf: str = "") -> 
         if m:
             desc = (m.group(1) if m.groups() else m.group(0)).strip()
             # Cortar en separadores que indican fin natural de la descripción
-            desc = re.split(r"\s+(?:COBRO|DIFERENCIA|VALOR|SIN|CON|POR\s+VALOR|MOTIVO|OBSERVACI)", desc)[0]
+            desc = re.split(
+                r"\s+(?:COBRO|DIFERENCIA|VALOR|SIN|CON|POR\s+VALOR|MOTIVO|OBSERVACI)", desc
+            )[0]
             desc = re.sub(r"\s+", " ", desc).strip().rstrip(",-.")
             if 5 <= len(desc) <= 80:
                 break
@@ -157,6 +161,7 @@ def _concepto_glosa(codigo_glosa: str) -> str:
     # 1) Catálogo oficial completo (nueva fuente de verdad)
     try:
         from app.services.catalogo_glosas import obtener_concepto
+
         oficial = obtener_concepto(codigo_glosa)
         if oficial:
             return oficial
@@ -237,6 +242,7 @@ def _facturado_linea_cups(texto: str, cups: str) -> float:
     montos = re.findall(r"\$\s*([\d][\d\.,]{2,})", chunk)
     if not montos:
         return 0.0
+
     # Filtrar ceros ($0,00) y quedarnos con valores significativos.
     def _tof(s):
         s = re.sub(r"[^\d,\.]", "", s)
@@ -255,6 +261,7 @@ def _facturado_linea_cups(texto: str, cups: str) -> float:
             return float(s)
         except ValueError:
             return 0.0
+
     valores = [_tof(x) for x in montos]
     valores = [v for v in valores if v > 0]
     if not valores:
@@ -411,6 +418,7 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
         pact_txt = f"${val_pact:,.0f}"
 
     import html as _html
+
     esc = _html.escape
 
     # Filas dinámicas de la tabla
@@ -422,10 +430,12 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     if val_rec > 0:
         filas_tabla.append(("Valor reconocido EPS", f"${val_rec:,.0f}"))
     if val_obj > 0:
-        filas_tabla.append((
-            "Valor objetado EPS",
-            f'<b style="color:#b91c1c;">${val_obj:,.0f}</b>',
-        ))
+        filas_tabla.append(
+            (
+                "Valor objetado EPS",
+                f'<b style="color:#b91c1c;">${val_obj:,.0f}</b>',
+            )
+        )
 
     tabla_html = (
         '<table style="width:100%;border-collapse:collapse;font-size:.85rem;'
@@ -453,12 +463,12 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
         if soat_hus > 0 or soat_eps > 0:
             interp_html = (
                 '<div style="padding:10px 12px;background:#eff6ff;border-radius:6px;'
-                'font-size:.82rem;color:#1e3a8a;margin-bottom:.5rem;'
+                "font-size:.82rem;color:#1e3a8a;margin-bottom:.5rem;"
                 'border-left:3px solid #3b82f6;">'
                 "<b>🔍 Interpretación SOAT base del CUPS (calculada):</b><br>"
-                f"• <b>HUS</b>: asumiendo ${val_fact:,.0f} × {1+factor/100:.3f} "
+                f"• <b>HUS</b>: asumiendo ${val_fact:,.0f} × {1 + factor / 100:.3f} "
                 f"→ SOAT base = <b>${soat_hus:,.0f}</b><br>"
-                f"• <b>EPS</b>: asumiendo ${val_rec:,.0f} × {1+factor/100:.3f} "
+                f"• <b>EPS</b>: asumiendo ${val_rec:,.0f} × {1 + factor / 100:.3f} "
                 f"→ SOAT base = <b>${soat_eps:,.0f}</b><br>"
                 "→ Verificar el valor SOAT oficial del CUPS en el <i>Manual "
                 "Tarifario SOAT 2026 — Circular Externa 047 de 2025 MinSalud "
@@ -472,27 +482,27 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
             border-left:5px solid {color_border};border-radius:8px;
             font-family:system-ui,sans-serif;line-height:1.5;">
   <div style="font-size:1rem;font-weight:700;margin-bottom:.5rem;color:#1e293b;">
-    📋 Tarifa pactada encontrada en el contrato · {esc(rec.get('titulo', ''))}
+    📋 Tarifa pactada encontrada en el contrato · {esc(rec.get("titulo", ""))}
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
               gap:.4rem .9rem;font-size:.85rem;margin-bottom:.5rem;">
-    <div><b>CUPS:</b> {esc(str(t.get('codigo_cups') or '—'))}</div>
-    <div><b>EPS:</b> {esc(str(t.get('eps') or '—'))}</div>
-    <div><b>Contrato:</b> {esc(str(t.get('contrato_numero') or '—'))}</div>
-    <div><b>Modalidad:</b> {esc(str(t.get('modalidad') or '—'))}</div>
+    <div><b>CUPS:</b> {esc(str(t.get("codigo_cups") or "—"))}</div>
+    <div><b>EPS:</b> {esc(str(t.get("eps") or "—"))}</div>
+    <div><b>Contrato:</b> {esc(str(t.get("contrato_numero") or "—"))}</div>
+    <div><b>Modalidad:</b> {esc(str(t.get("modalidad") or "—"))}</div>
   </div>
   <div style="font-size:.82rem;color:#334155;margin-bottom:.6rem;">
-    <b>Descripción contrato:</b> {esc(str(t.get('descripcion') or '—'))}
+    <b>Descripción contrato:</b> {esc(str(t.get("descripcion") or "—"))}
   </div>
   {tabla_html}
   {interp_html}
   <div style="padding:10px 12px;background:white;border-radius:6px;
               font-size:.85rem;color:#0f172a;">
-    <b>💡 Recomendación:</b> {esc(rec.get('razon', ''))}
+    <b>💡 Recomendación:</b> {esc(rec.get("razon", ""))}
   </div>
   <div style="font-size:.72rem;color:#64748b;margin-top:.5rem;">
-    Fuente: {esc(str(t.get('fuente_archivo') or 'contrato'))}
-    {("· Vigencia hasta: " + esc(t['vigencia_hasta'][:10])) if t.get('vigencia_hasta') else ""}
+    Fuente: {esc(str(t.get("fuente_archivo") or "contrato"))}
+    {("· Vigencia hasta: " + esc(t["vigencia_hasta"][:10])) if t.get("vigencia_hasta") else ""}
   </div>
 </div>
 """

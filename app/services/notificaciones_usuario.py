@@ -15,6 +15,7 @@ Categorías:
 
 Diseñada para ser barata: cada sub-query está indexada.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -39,7 +40,8 @@ def _glosas_criticas(db: Session, email: str, horas: int = 48) -> int:
         .filter(GlosaRecord.estado == "PENDIENTE")
         .filter(GlosaRecord.dias_restantes > 0)
         .filter(GlosaRecord.dias_restantes <= 2)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
 
@@ -49,7 +51,8 @@ def _glosas_vencidas(db: Session, email: str) -> int:
         .filter(GlosaRecord.auditor_email == email)
         .filter(GlosaRecord.estado == "PENDIENTE")
         .filter(GlosaRecord.dias_restantes < 0)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
 

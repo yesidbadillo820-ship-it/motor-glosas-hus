@@ -32,6 +32,7 @@ El campo `estado_general` se calcula así:
   - ATENCION → scheduler inactivo +24h o ≥1 glosa vencida o ≥1 alerta MEDIA
   - OK       → nada de lo anterior
 """
+
 from __future__ import annotations
 
 import os
@@ -54,6 +55,7 @@ from app.services.detector_anomalias import (
 
 
 # ─── Helpers de componentes individuales ───────────────────────────────────
+
 
 def _check_bd(db: Session) -> dict:
     """Ping a la BD con una query trivial. Mide latencia."""
@@ -78,6 +80,7 @@ def _check_bd(db: Session) -> dict:
 def _check_scheduler() -> dict:
     try:
         from app.services.ia_auditora_proactiva import obtener_estado
+
         est = obtener_estado()
     except Exception as e:
         return {"estado": "DESCONOCIDO", "detalle": str(e)[:120]}
@@ -104,7 +107,8 @@ def _check_cache_ia(db: Session) -> dict:
             "hits_acumulados": int(hits),
             "ratio_ahorro": (
                 round(float(hits) / max(1, float(total) + float(hits)), 3)
-                if (total or hits) else 0.0
+                if (total or hits)
+                else 0.0
             ),
         }
     except Exception as e:
@@ -118,23 +122,25 @@ def _check_glosas_hoy(db: Session) -> dict:
         radicadas_hoy = (
             db.query(func.count(GlosaRecord.id))
             .filter(GlosaRecord.creado_en >= inicio_hoy)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         vencidas = (
             db.query(func.count(GlosaRecord.id))
             .filter(GlosaRecord.estado == "PENDIENTE")
             .filter(GlosaRecord.dias_restantes < 0)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         pendientes = (
-            db.query(func.count(GlosaRecord.id))
-            .filter(GlosaRecord.estado == "PENDIENTE")
-            .scalar() or 0
+            db.query(func.count(GlosaRecord.id)).filter(GlosaRecord.estado == "PENDIENTE").scalar()
+            or 0
         )
         respondidas_hoy = (
             db.query(func.count(GlosaRecord.id))
             .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         if vencidas >= 10:
             estado = "CRITICO"
@@ -182,6 +188,7 @@ def _check_bots() -> dict:
             WhatsAppMetaProvider,
             TelegramProvider,
         )
+
         wa = WhatsAppMetaProvider()
         tg = TelegramProvider()
         configurados = []
@@ -204,12 +211,14 @@ def _check_actividad_reciente(db: Session, horas: int = 6) -> dict:
         total = (
             db.query(func.count(AuditLogRecord.id))
             .filter(AuditLogRecord.timestamp >= desde)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         usuarios_activos = (
             db.query(func.count(func.distinct(AuditLogRecord.usuario_email)))
             .filter(AuditLogRecord.timestamp >= desde)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         return {
             "estado": "OK",
@@ -222,6 +231,7 @@ def _check_actividad_reciente(db: Session, horas: int = 6) -> dict:
 
 
 # ─── Orquestador ───────────────────────────────────────────────────────────
+
 
 def _peor_estado(estados: list[str]) -> str:
     """Regresa el peor estado del conjunto."""
@@ -263,20 +273,26 @@ def checar_salud(db: Session) -> dict[str, Any]:
     if componentes["bd"]["estado"] == "CRITICO":
         alertas.append({"nivel": "CRITICO", "mensaje": "Base de datos sin respuesta."})
     if componentes["glosas_hoy"].get("vencidas", 0) >= 1:
-        alertas.append({
-            "nivel": "ATENCION" if componentes["glosas_hoy"]["vencidas"] < 10 else "CRITICO",
-            "mensaje": f"{componentes['glosas_hoy']['vencidas']} glosas vencidas sin responder.",
-        })
+        alertas.append(
+            {
+                "nivel": "ATENCION" if componentes["glosas_hoy"]["vencidas"] < 10 else "CRITICO",
+                "mensaje": f"{componentes['glosas_hoy']['vencidas']} glosas vencidas sin responder.",
+            }
+        )
     if componentes["anomalias"].get("alta", 0) >= 1:
-        alertas.append({
-            "nivel": "ATENCION",
-            "mensaje": f"{componentes['anomalias']['alta']} anomalías críticas detectadas.",
-        })
+        alertas.append(
+            {
+                "nivel": "ATENCION",
+                "mensaje": f"{componentes['anomalias']['alta']} anomalías críticas detectadas.",
+            }
+        )
     if not componentes["scheduler_ia_proactiva"].get("activo"):
-        alertas.append({
-            "nivel": "ATENCION",
-            "mensaje": "Scheduler de IA proactiva inactivo.",
-        })
+        alertas.append(
+            {
+                "nivel": "ATENCION",
+                "mensaje": "Scheduler de IA proactiva inactivo.",
+            }
+        )
 
     return {
         "estado_general": general,

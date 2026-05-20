@@ -11,6 +11,7 @@ Uso:
     dato_seguro = cifrar("nombre paciente")     # -> bytes base64 si hay key
     plano = descifrar(dato_seguro)               # -> str original
 """
+
 from __future__ import annotations
 import os
 import logging
@@ -29,6 +30,7 @@ def _get_fernet():
         return None
     try:
         from cryptography.fernet import Fernet
+
         _FERNET = Fernet(key.encode() if isinstance(key, str) else key)
         return _FERNET
     except Exception as e:

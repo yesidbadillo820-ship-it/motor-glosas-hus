@@ -1,7 +1,7 @@
 """Tests del endpoint GET /sistema/glosas-con-ia (R157 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -41,6 +44,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -49,20 +53,31 @@ def client(db_session, usuario_coord):
 
 
 def _seed_glosa(db, gid):
-    db.add(GlosaRecord(
-        id=gid, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_call(db, glosa_id, cost=0.01):
-    db.add(AICallRecord(
-        proveedor="anthropic", modelo="claude",
-        glosa_id=glosa_id, cost_usd=cost,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        AICallRecord(
+            proveedor="anthropic",
+            modelo="claude",
+            glosa_id=glosa_id,
+            cost_usd=cost,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -71,10 +86,14 @@ class TestGlosasConIA:
         r = client.get("/sistema/glosas-con-ia")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "total_glosas_periodo",
-                    "glosas_con_ia", "cobertura_pct",
-                    "calls_por_glosa_promedio",
-                    "cost_promedio_usd_por_glosa"):
+        for key in (
+            "ventana_dias",
+            "total_glosas_periodo",
+            "glosas_con_ia",
+            "cobertura_pct",
+            "calls_por_glosa_promedio",
+            "cost_promedio_usd_por_glosa",
+        ):
             assert key in d
 
     def test_sin_glosas(self, client):

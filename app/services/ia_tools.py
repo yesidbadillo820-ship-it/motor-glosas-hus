@@ -17,6 +17,7 @@ producción sin riesgo de romper el flujo principal.
 Spec Anthropic Tool Use:
   https://docs.anthropic.com/en/docs/build-with-claude/tool-use
 """
+
 import os
 import logging
 
@@ -132,6 +133,7 @@ TOOLS_DISPONIBLES = [
 
 # ─── Implementación de cada herramienta ──────────────────────────────
 
+
 def execute_tool(name: str, arguments: dict) -> str:
     """Ejecuta una llamada a herramienta y devuelve el resultado como
     string (JSON o texto). Devuelve un mensaje de error legible si la
@@ -154,12 +156,14 @@ def execute_tool(name: str, arguments: dict) -> str:
 
 def _exec_buscar_clausula_contrato(args: dict) -> str:
     import json
+
     eps = (args.get("eps") or "").strip().upper()
     tema = (args.get("tema") or "").strip().upper()
     if not eps or not tema:
         return json.dumps({"clausulas": [], "error": "Faltan eps o tema"})
     from app.database import SessionLocal
     from app.models.db import ClausulaContrato
+
     db = SessionLocal()
     try:
         rows = (
@@ -170,27 +174,33 @@ def _exec_buscar_clausula_contrato(args: dict) -> str:
             .all()
         )
         if not rows:
-            return json.dumps({
-                "clausulas": [],
-                "info": f"No hay cláusulas extraídas del contrato vigente para EPS={eps} tema={tema}. Si necesitás citar el contrato, indicá al gestor que suba el PDF en Tarifas → Subir PDF del contrato.",
-            })
-        return json.dumps({
-            "clausulas": [
+            return json.dumps(
                 {
-                    "numero": c.numero_clausula,
-                    "tema": c.tema,
-                    "titulo": c.titulo,
-                    "texto_literal": c.texto_literal,
+                    "clausulas": [],
+                    "info": f"No hay cláusulas extraídas del contrato vigente para EPS={eps} tema={tema}. Si necesitás citar el contrato, indicá al gestor que suba el PDF en Tarifas → Subir PDF del contrato.",
                 }
-                for c in rows
-            ]
-        }, ensure_ascii=False)
+            )
+        return json.dumps(
+            {
+                "clausulas": [
+                    {
+                        "numero": c.numero_clausula,
+                        "tema": c.tema,
+                        "titulo": c.titulo,
+                        "texto_literal": c.texto_literal,
+                    }
+                    for c in rows
+                ]
+            },
+            ensure_ascii=False,
+        )
     finally:
         db.close()
 
 
 def _exec_buscar_glosa_similar(args: dict) -> str:
     import json
+
     eps = (args.get("eps") or "").strip().upper()
     codigo = (args.get("codigo_glosa") or "").strip().upper()
     limite = int(args.get("limite") or 3)
@@ -199,6 +209,7 @@ def _exec_buscar_glosa_similar(args: dict) -> str:
     prefijo = codigo[:2]
     from app.database import SessionLocal
     from app.models.db import GlosaRecord
+
     db = SessionLocal()
     try:
         rows = (
@@ -214,32 +225,40 @@ def _exec_buscar_glosa_similar(args: dict) -> str:
             .all()
         )
         if not rows:
-            return json.dumps({
-                "precedentes": [],
-                "info": f"No hay glosas levantadas previas con EPS={eps} prefijo={prefijo}. Construí el dictamen sin precedente interno (solo normativa + cláusulas).",
-            })
-        import re as _re
-        return json.dumps({
-            "precedentes": [
+            return json.dumps(
                 {
-                    "codigo_glosa": g.codigo_glosa,
-                    "valor_recuperado": float(g.valor_recuperado or 0),
-                    "extracto_dictamen": _re.sub(r"<[^>]+>", " ", (g.dictamen or "")[:500]),
+                    "precedentes": [],
+                    "info": f"No hay glosas levantadas previas con EPS={eps} prefijo={prefijo}. Construí el dictamen sin precedente interno (solo normativa + cláusulas).",
                 }
-                for g in rows
-            ]
-        }, ensure_ascii=False)
+            )
+        import re as _re
+
+        return json.dumps(
+            {
+                "precedentes": [
+                    {
+                        "codigo_glosa": g.codigo_glosa,
+                        "valor_recuperado": float(g.valor_recuperado or 0),
+                        "extracto_dictamen": _re.sub(r"<[^>]+>", " ", (g.dictamen or "")[:500]),
+                    }
+                    for g in rows
+                ]
+            },
+            ensure_ascii=False,
+        )
     finally:
         db.close()
 
 
 def _exec_lookup_tarifa(args: dict) -> str:
     import json
+
     eps = (args.get("eps") or "").strip().upper()
     cups = (args.get("codigo_cups") or "").strip()
     if not eps or not cups:
         return json.dumps({"tarifa": None, "error": "Faltan eps o codigo_cups"})
     from app.database import SessionLocal
+
     try:
         from app.models.db import TarifaContratada
     except Exception:
@@ -252,27 +271,33 @@ def _exec_lookup_tarifa(args: dict) -> str:
             .first()
         )
         if not row:
-            return json.dumps({
-                "tarifa": None,
-                "info": f"No hay tarifa pactada cargada para EPS={eps} CUPS={cups}. Verifica el manual tarifario del contrato.",
-            })
-        return json.dumps({
-            "tarifa": {
-                "eps": row.eps,
-                "codigo_cups": row.codigo_cups,
-                "descripcion": getattr(row, "descripcion", None),
-                "valor_pactado": float(getattr(row, "valor_pactado", 0) or 0),
-                "tipo_tarifa": getattr(row, "tipo_tarifa", None),
-                "factor_ajuste": getattr(row, "factor_ajuste", None),
-                "modalidad": getattr(row, "modalidad", None),
-            }
-        }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "tarifa": None,
+                    "info": f"No hay tarifa pactada cargada para EPS={eps} CUPS={cups}. Verifica el manual tarifario del contrato.",
+                }
+            )
+        return json.dumps(
+            {
+                "tarifa": {
+                    "eps": row.eps,
+                    "codigo_cups": row.codigo_cups,
+                    "descripcion": getattr(row, "descripcion", None),
+                    "valor_pactado": float(getattr(row, "valor_pactado", 0) or 0),
+                    "tipo_tarifa": getattr(row, "tipo_tarifa", None),
+                    "factor_ajuste": getattr(row, "factor_ajuste", None),
+                    "modalidad": getattr(row, "modalidad", None),
+                }
+            },
+            ensure_ascii=False,
+        )
     finally:
         db.close()
 
 
 def _exec_lookup_norma(args: dict) -> str:
     import json
+
     tipo = (args.get("tipo") or "").strip().lower()
     numero = (args.get("numero") or "").strip()
     anio = (args.get("anio") or "").strip()
@@ -284,12 +309,15 @@ def _exec_lookup_norma(args: dict) -> str:
         return json.dumps({"norma": None, "error": "Corpus normativo no disponible"})
 
     from app.services.citation_verifier import _buscar_clave_norma
+
     clave = _buscar_clave_norma(tipo[:3], numero, anio, normas)
     if not clave:
-        return json.dumps({
-            "norma": None,
-            "info": f"No se encontró {tipo.title()} {numero} de {anio} en el corpus. NO la cites en el dictamen.",
-        })
+        return json.dumps(
+            {
+                "norma": None,
+                "info": f"No se encontró {tipo.title()} {numero} de {anio} en el corpus. NO la cites en el dictamen.",
+            }
+        )
     n = normas[clave]
 
     # Knowledge graph: incluir relaciones y sustentos heredados
@@ -297,11 +325,15 @@ def _exec_lookup_norma(args: dict) -> str:
     sustentos = []
     try:
         from app.services.normativa_grafo import obtener_relaciones, normas_que_sustentan
+
         # La clave del grafo usa formato "ley_100_1993" / "res_2284_2023";
         # construimos la clave canónica desde tipo + numero + anio
-        tipo_short = {"resolucion": "res", "decreto": "decreto", "ley": "ley", "sentencia": "sentencia"}.get(
-            tipo, tipo[:3]
-        )
+        tipo_short = {
+            "resolucion": "res",
+            "decreto": "decreto",
+            "ley": "ley",
+            "sentencia": "sentencia",
+        }.get(tipo, tipo[:3])
         clave_grafo = f"{tipo_short}_{numero.lstrip('0') or numero}_{anio}"
         relaciones = obtener_relaciones(clave_grafo)
         sustentos = normas_que_sustentan(clave_grafo, max_profundidad=2)

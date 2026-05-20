@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/exportar-paquete-multi.zip (R138 P2)."""
+
 from __future__ import annotations
 
 import io
@@ -41,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -50,8 +52,12 @@ def client(db_session, usuario):
 
 def _seed(db, gid, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -70,8 +76,7 @@ class TestPaqueteMulti:
 
     def test_genera_zip_con_subcarpetas(self, client, db_session):
         _seed(db_session, gid=1, eps="SANITAS")
-        _seed(db_session, gid=2, eps="NUEVA EPS",
-              dictamen="texto largo de dictamen para glosa 2")
+        _seed(db_session, gid=2, eps="NUEVA EPS", dictamen="texto largo de dictamen para glosa 2")
 
         r = client.get("/glosas/exportar-paquete-multi.zip?ids=1,2")
         assert r.status_code == 200, r.text

@@ -1,4 +1,5 @@
 """Tests del skeleton de multi-tenancy (Ronda 14)."""
+
 from types import SimpleNamespace
 
 from app.services.tenancy import (

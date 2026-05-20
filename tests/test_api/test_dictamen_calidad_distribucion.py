@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/dictamen-calidad-distribucion (R222 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, dictamen):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-        dictamen=dictamen,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            dictamen=dictamen,
+        )
+    )
     db.commit()
 
 
@@ -62,11 +70,11 @@ class TestDictamenCalidadDistribucion:
         assert len(d["items"]) == 5
 
     def test_clasificacion(self, client, db_session):
-        _seed(db_session, None)         # SIN_DICTAMEN
-        _seed(db_session, "x" * 50)     # MUY_CORTO
-        _seed(db_session, "x" * 300)    # CORTO
-        _seed(db_session, "x" * 1500)   # MEDIO
-        _seed(db_session, "x" * 3000)   # LARGO
+        _seed(db_session, None)  # SIN_DICTAMEN
+        _seed(db_session, "x" * 50)  # MUY_CORTO
+        _seed(db_session, "x" * 300)  # CORTO
+        _seed(db_session, "x" * 1500)  # MEDIO
+        _seed(db_session, "x" * 3000)  # LARGO
 
         r = client.get("/glosas/stats/dictamen-calidad-distribucion")
         d = r.json()

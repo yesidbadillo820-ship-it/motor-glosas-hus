@@ -2,6 +2,7 @@
 re-ranker. Útil para encontrar precedentes: 'glosas de biopsia' encuentra
 aunque el código sea distinto.
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -42,20 +43,23 @@ async def buscar(
         raise HTTPException(400, "Consulta sin términos útiles")
 
     from sqlalchemy import or_
+
     conds = []
     for t in tokens:
         like = f"%{t}%"
-        conds.append(or_(
-            GlosaRecord.paciente.ilike(like),
-            GlosaRecord.eps.ilike(like),
-            GlosaRecord.codigo_glosa.ilike(like),
-            GlosaRecord.factura.ilike(like),
-            GlosaRecord.cups_servicio.ilike(like),
-            GlosaRecord.servicio_descripcion.ilike(like),
-            GlosaRecord.concepto_glosa.ilike(like),
-            GlosaRecord.texto_glosa_original.ilike(like),
-            GlosaRecord.dictamen.ilike(like),
-        ))
+        conds.append(
+            or_(
+                GlosaRecord.paciente.ilike(like),
+                GlosaRecord.eps.ilike(like),
+                GlosaRecord.codigo_glosa.ilike(like),
+                GlosaRecord.factura.ilike(like),
+                GlosaRecord.cups_servicio.ilike(like),
+                GlosaRecord.servicio_descripcion.ilike(like),
+                GlosaRecord.concepto_glosa.ilike(like),
+                GlosaRecord.texto_glosa_original.ilike(like),
+                GlosaRecord.dictamen.ilike(like),
+            )
+        )
     # OR entre términos (match amplio, la IA filtra después)
     candidatos = (
         db.query(GlosaRecord)
@@ -89,14 +93,19 @@ async def buscar(
     # 2. Re-ranking con IA
     snippets = []
     for g in candidatos:
-        snippet = " · ".join(filter(None, [
-            g.codigo_glosa or "",
-            g.eps or "",
-            g.factura or "",
-            (g.servicio_descripcion or "")[:80],
-            (g.concepto_glosa or "")[:80],
-            (g.texto_glosa_original or "")[:120],
-        ]))
+        snippet = " · ".join(
+            filter(
+                None,
+                [
+                    g.codigo_glosa or "",
+                    g.eps or "",
+                    g.factura or "",
+                    (g.servicio_descripcion or "")[:80],
+                    (g.concepto_glosa or "")[:80],
+                    (g.texto_glosa_original or "")[:120],
+                ],
+            )
+        )
         snippets.append(f"[{g.id}] {snippet}")
 
     system = (
@@ -119,6 +128,7 @@ async def buscar(
         metodo = f"ia/{modelo}"
         # Extraer números de la respuesta
         import re as _re
+
         ids_ordenados = [int(n) for n in _re.findall(r"\b\d+\b", res)][:limite]
     except Exception as e:
         logger.warning(f"Busqueda semantica IA fallo: {e}. Usando SQL ranking.")
@@ -173,8 +183,11 @@ async def buscar_corpus(
         }
     """
     from app.models.db import (
-        ContratoRecord, TarifaContratadaRecord, PlantillaGoldRecord,
+        ContratoRecord,
+        TarifaContratadaRecord,
+        PlantillaGoldRecord,
     )
+
     q = data.query.strip()
     limite = min(data.limite, 20)
     tokens = [t for t in q.lower().split() if len(t) > 2][:6]
@@ -187,66 +200,77 @@ async def buscar_corpus(
     g_conds = []
     for t in tokens:
         like = f"%{t}%"
-        g_conds.append(or_(
-            GlosaRecord.eps.ilike(like),
-            GlosaRecord.codigo_glosa.ilike(like),
-            GlosaRecord.factura.ilike(like),
-            GlosaRecord.cups_servicio.ilike(like),
-            GlosaRecord.servicio_descripcion.ilike(like),
-            GlosaRecord.concepto_glosa.ilike(like),
-            GlosaRecord.texto_glosa_original.ilike(like),
-            GlosaRecord.dictamen.ilike(like),
-        ))
+        g_conds.append(
+            or_(
+                GlosaRecord.eps.ilike(like),
+                GlosaRecord.codigo_glosa.ilike(like),
+                GlosaRecord.factura.ilike(like),
+                GlosaRecord.cups_servicio.ilike(like),
+                GlosaRecord.servicio_descripcion.ilike(like),
+                GlosaRecord.concepto_glosa.ilike(like),
+                GlosaRecord.texto_glosa_original.ilike(like),
+                GlosaRecord.dictamen.ilike(like),
+            )
+        )
     glosas = (
-        db.query(GlosaRecord).filter(or_(*g_conds))
-        .order_by(GlosaRecord.creado_en.desc()).limit(40).all()
+        db.query(GlosaRecord)
+        .filter(or_(*g_conds))
+        .order_by(GlosaRecord.creado_en.desc())
+        .limit(40)
+        .all()
     )
 
     # 2. Contratos
     c_conds = []
     for t in tokens:
         like = f"%{t}%"
-        c_conds.append(or_(
-            ContratoRecord.eps.ilike(like),
-            ContratoRecord.detalles.ilike(like),
-        ))
-    contratos = (
-        db.query(ContratoRecord).filter(or_(*c_conds)).limit(15).all()
-    )
+        c_conds.append(
+            or_(
+                ContratoRecord.eps.ilike(like),
+                ContratoRecord.detalles.ilike(like),
+            )
+        )
+    contratos = db.query(ContratoRecord).filter(or_(*c_conds)).limit(15).all()
 
     # 3. Tarifas contratadas
     t_conds = []
     for t in tokens:
         like = f"%{t}%"
-        t_conds.append(or_(
-            TarifaContratadaRecord.eps.ilike(like),
-            TarifaContratadaRecord.codigo_cups.ilike(like),
-            TarifaContratadaRecord.descripcion.ilike(like),
-            TarifaContratadaRecord.modalidad.ilike(like),
-        ))
+        t_conds.append(
+            or_(
+                TarifaContratadaRecord.eps.ilike(like),
+                TarifaContratadaRecord.codigo_cups.ilike(like),
+                TarifaContratadaRecord.descripcion.ilike(like),
+                TarifaContratadaRecord.modalidad.ilike(like),
+            )
+        )
     tarifas = (
         db.query(TarifaContratadaRecord)
         .filter(or_(*t_conds))
         .filter(TarifaContratadaRecord.activa == 1)
-        .limit(15).all()
+        .limit(15)
+        .all()
     )
 
     # 4. Plantillas Gold
     p_conds = []
     for t in tokens:
         like = f"%{t}%"
-        p_conds.append(or_(
-            PlantillaGoldRecord.titulo.ilike(like),
-            PlantillaGoldRecord.argumento.ilike(like),
-            PlantillaGoldRecord.eps.ilike(like),
-            PlantillaGoldRecord.codigo_glosa.ilike(like),
-        ))
+        p_conds.append(
+            or_(
+                PlantillaGoldRecord.titulo.ilike(like),
+                PlantillaGoldRecord.argumento.ilike(like),
+                PlantillaGoldRecord.eps.ilike(like),
+                PlantillaGoldRecord.codigo_glosa.ilike(like),
+            )
+        )
     plantillas = (
         db.query(PlantillaGoldRecord)
         .filter(or_(*p_conds))
         .filter(PlantillaGoldRecord.activa == 1)
         .order_by(PlantillaGoldRecord.usos.desc())
-        .limit(10).all()
+        .limit(10)
+        .all()
     )
 
     # Serializar
@@ -257,7 +281,8 @@ async def buscar_corpus(
             "eps": c.eps,
             "detalles": (c.detalles or "")[:300],
             "creado_en": c.creado_en.isoformat() if c.creado_en else None,
-        } for c in contratos
+        }
+        for c in contratos
     ]
     res_tarifas = [
         {
@@ -268,7 +293,8 @@ async def buscar_corpus(
             "valor": float(t.valor_pactado or 0),
             "modalidad": t.modalidad,
             "tipo_tarifa": t.tipo_tarifa,
-        } for t in tarifas
+        }
+        for t in tarifas
     ]
     res_plantillas = [
         {
@@ -278,8 +304,11 @@ async def buscar_corpus(
             "codigo_glosa": p.codigo_glosa,
             "tipo": p.tipo,
             "usos": p.usos or 0,
-            "preview": ((p.argumento or "")[:200] + "…") if p.argumento and len(p.argumento) > 200 else (p.argumento or ""),
-        } for p in plantillas
+            "preview": ((p.argumento or "")[:200] + "…")
+            if p.argumento and len(p.argumento) > 200
+            else (p.argumento or ""),
+        }
+        for p in plantillas
     ]
 
     total = len(res_glosas) + len(res_contratos) + len(res_tarifas) + len(res_plantillas)

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/serie-mensual-cantidad (R124 P2)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -9,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +48,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, creado, estado="RADICADA", fecha_dec=None):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=creado, fecha_decision_eps=fecha_dec,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=creado,
+            fecha_decision_eps=fecha_dec,
+        )
+    )
     db.commit()
 
 
@@ -64,10 +72,12 @@ class TestSerieMensualCantidad:
 
     def test_creadas_y_cerradas_separadas(self, client, db_session):
         # Glosa creada en marzo, cerrada en abril
-        _seed(db_session,
-              creado=datetime(2026, 3, 15, tzinfo=timezone.utc),
-              estado="LEVANTADA",
-              fecha_dec=datetime(2026, 4, 5, tzinfo=timezone.utc))
+        _seed(
+            db_session,
+            creado=datetime(2026, 3, 15, tzinfo=timezone.utc),
+            estado="LEVANTADA",
+            fecha_dec=datetime(2026, 4, 5, tzinfo=timezone.utc),
+        )
 
         r = client.get("/glosas/stats/serie-mensual-cantidad?meses=24")
         d = r.json()
@@ -83,10 +93,12 @@ class TestSerieMensualCantidad:
         # Abril: 3 creadas, 1 cerrada → delta = +2
         for _ in range(3):
             _seed(db_session, datetime(2026, 4, 1, tzinfo=timezone.utc))
-        _seed(db_session,
-              creado=datetime(2026, 3, 1, tzinfo=timezone.utc),
-              estado="LEVANTADA",
-              fecha_dec=datetime(2026, 4, 15, tzinfo=timezone.utc))
+        _seed(
+            db_session,
+            creado=datetime(2026, 3, 1, tzinfo=timezone.utc),
+            estado="LEVANTADA",
+            fecha_dec=datetime(2026, 4, 15, tzinfo=timezone.utc),
+        )
 
         r = client.get("/glosas/stats/serie-mensual-cantidad?meses=24")
         d = r.json()
@@ -100,10 +112,12 @@ class TestSerieMensualCantidad:
         for _ in range(4):
             _seed(db_session, datetime(2026, 4, 1, tzinfo=timezone.utc))
         for _ in range(2):
-            _seed(db_session,
-                  creado=datetime(2026, 3, 1, tzinfo=timezone.utc),
-                  estado="LEVANTADA",
-                  fecha_dec=datetime(2026, 4, 15, tzinfo=timezone.utc))
+            _seed(
+                db_session,
+                creado=datetime(2026, 3, 1, tzinfo=timezone.utc),
+                estado="LEVANTADA",
+                fecha_dec=datetime(2026, 4, 15, tzinfo=timezone.utc),
+            )
 
         r = client.get("/glosas/stats/serie-mensual-cantidad?meses=24")
         d = r.json()

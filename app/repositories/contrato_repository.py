@@ -4,7 +4,6 @@ from app.models.schemas import ContratoInput
 
 
 class ContratoRepository:
-
     def __init__(self, db: Session):
         self.db = db
 
@@ -12,9 +11,7 @@ class ContratoRepository:
         return self.db.query(ContratoRecord).order_by(ContratoRecord.eps).all()
 
     def obtener(self, eps: str) -> ContratoRecord | None:
-        return self.db.query(ContratoRecord).filter(
-            ContratoRecord.eps == eps.upper()
-        ).first()
+        return self.db.query(ContratoRecord).filter(ContratoRecord.eps == eps.upper()).first()
 
     def como_dict(self) -> dict[str, str]:
         return {c.eps: c.detalles for c in self.listar()}

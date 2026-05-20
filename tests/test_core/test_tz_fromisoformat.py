@@ -5,6 +5,7 @@ a parar a una columna `DateTime(timezone=True)` (Postgres TIMESTAMPTZ) se
 normalice con `a_utc()` antes — si no, el siguiente `column - ahora_utc()`
 lanza TypeError en producción.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

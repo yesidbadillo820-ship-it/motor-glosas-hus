@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/distribucion-riesgo (R139 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -60,8 +66,7 @@ class TestDistribucionRiesgo:
         r = client.get("/glosas/stats/distribucion-riesgo")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total_glosas_abiertas", "valor_pendiente_total",
-                    "matriz"):
+        for key in ("total_glosas_abiertas", "valor_pendiente_total", "matriz"):
             assert key in d
         # 4 urgencias × 3 montos = 12 celdas
         assert len(d["matriz"]) == 12
@@ -75,12 +80,10 @@ class TestDistribucionRiesgo:
         r = client.get("/glosas/stats/distribucion-riesgo")
         d = r.json()
         venc_alto = next(
-            it for it in d["matriz"]
-            if it["urgencia"] == "VENCIDA" and it["monto"] == "ALTO"
+            it for it in d["matriz"] if it["urgencia"] == "VENCIDA" and it["monto"] == "ALTO"
         )
         crit_bajo = next(
-            it for it in d["matriz"]
-            if it["urgencia"] == "CRITICA" and it["monto"] == "BAJO"
+            it for it in d["matriz"] if it["urgencia"] == "CRITICA" and it["monto"] == "BAJO"
         )
         assert venc_alto["count"] == 1
         assert venc_alto["valor_total"] == 10_000_000
@@ -88,8 +91,7 @@ class TestDistribucionRiesgo:
         assert crit_bajo["valor_total"] == 500_000
 
     def test_excluye_cerradas(self, client, db_session):
-        _seed(db_session, estado="LEVANTADA",
-              dias_restantes=-100, valor_objetado=99_999_999)
+        _seed(db_session, estado="LEVANTADA", dias_restantes=-100, valor_objetado=99_999_999)
         r = client.get("/glosas/stats/distribucion-riesgo")
         d = r.json()
         assert d["total_glosas_abiertas"] == 0

@@ -1,4 +1,5 @@
 """Informes ejecutivos PDF para Gerencia y Junta Directiva."""
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
@@ -46,12 +47,14 @@ def ejecutivo_mensual(
         GlosaRecord.creado_en >= inicio, GlosaRecord.creado_en < fin
     )
     total = base_q.count()
-    valores = db.query(
-        func.sum(GlosaRecord.valor_objetado),
-        func.sum(GlosaRecord.valor_aceptado),
-    ).filter(
-        GlosaRecord.creado_en >= inicio, GlosaRecord.creado_en < fin
-    ).first()
+    valores = (
+        db.query(
+            func.sum(GlosaRecord.valor_objetado),
+            func.sum(GlosaRecord.valor_aceptado),
+        )
+        .filter(GlosaRecord.creado_en >= inicio, GlosaRecord.creado_en < fin)
+        .first()
+    )
     v_obj = float(valores[0] or 0)
     v_ac = float(valores[1] or 0)
     v_rec = v_obj - v_ac
@@ -74,17 +77,18 @@ def ejecutivo_mensual(
 
     # Top 5 causales (prefijo código)
     from sqlalchemy import case
+
     tipo_case = case(
-        (GlosaRecord.codigo_glosa.like('TA%'), 'TARIFAS'),
-        (GlosaRecord.codigo_glosa.like('SO%'), 'SOPORTES'),
-        (GlosaRecord.codigo_glosa.like('AU%'), 'AUTORIZACIÓN'),
-        (GlosaRecord.codigo_glosa.like('CO%'), 'COBERTURA'),
-        (GlosaRecord.codigo_glosa.like('PE%'), 'PERTINENCIA'),
-        (GlosaRecord.codigo_glosa.like('CL%'), 'PERTINENCIA'),
-        (GlosaRecord.codigo_glosa.like('FA%'), 'FACTURACIÓN'),
-        (GlosaRecord.codigo_glosa.like('IN%'), 'INSUMOS'),
-        (GlosaRecord.codigo_glosa.like('ME%'), 'MEDICAMENTOS'),
-        else_='OTROS',
+        (GlosaRecord.codigo_glosa.like("TA%"), "TARIFAS"),
+        (GlosaRecord.codigo_glosa.like("SO%"), "SOPORTES"),
+        (GlosaRecord.codigo_glosa.like("AU%"), "AUTORIZACIÓN"),
+        (GlosaRecord.codigo_glosa.like("CO%"), "COBERTURA"),
+        (GlosaRecord.codigo_glosa.like("PE%"), "PERTINENCIA"),
+        (GlosaRecord.codigo_glosa.like("CL%"), "PERTINENCIA"),
+        (GlosaRecord.codigo_glosa.like("FA%"), "FACTURACIÓN"),
+        (GlosaRecord.codigo_glosa.like("IN%"), "INSUMOS"),
+        (GlosaRecord.codigo_glosa.like("ME%"), "MEDICAMENTOS"),
+        else_="OTROS",
     )
     top_causales = (
         db.query(
@@ -101,29 +105,38 @@ def ejecutivo_mensual(
 
     # Tendencia 6 meses (incluyendo el actual)
     meses_atras = 5
-    inicio_tendencia = datetime(year, month, 1, tzinfo=timezone.utc) - timedelta(days=meses_atras * 32)
+    inicio_tendencia = datetime(year, month, 1, tzinfo=timezone.utc) - timedelta(
+        days=meses_atras * 32
+    )
     tendencia = (
         db.query(
-            func.extract('year', GlosaRecord.creado_en).label('y'),
-            func.extract('month', GlosaRecord.creado_en).label('m'),
+            func.extract("year", GlosaRecord.creado_en).label("y"),
+            func.extract("month", GlosaRecord.creado_en).label("m"),
             func.count(GlosaRecord.id),
             func.sum(GlosaRecord.valor_objetado),
             func.sum(GlosaRecord.valor_aceptado),
         )
         .filter(GlosaRecord.creado_en >= inicio_tendencia, GlosaRecord.creado_en < fin)
-        .group_by('y', 'm')
-        .order_by('y', 'm')
+        .group_by("y", "m")
+        .order_by("y", "m")
         .all()
     )
 
     # Conciliaciones del mes
-    conc_total = db.query(ConciliacionRecord).filter(
-        ConciliacionRecord.creado_en >= inicio, ConciliacionRecord.creado_en < fin
-    ).count()
-    conc_acuerdo = db.query(ConciliacionRecord).filter(
-        ConciliacionRecord.creado_en >= inicio, ConciliacionRecord.creado_en < fin,
-        ConciliacionRecord.resultado == "ACUERDO_TOTAL"
-    ).count()
+    conc_total = (
+        db.query(ConciliacionRecord)
+        .filter(ConciliacionRecord.creado_en >= inicio, ConciliacionRecord.creado_en < fin)
+        .count()
+    )
+    conc_acuerdo = (
+        db.query(ConciliacionRecord)
+        .filter(
+            ConciliacionRecord.creado_en >= inicio,
+            ConciliacionRecord.creado_en < fin,
+            ConciliacionRecord.resultado == "ACUERDO_TOTAL",
+        )
+        .count()
+    )
 
     # Recomendaciones automáticas básicas
     recomendaciones = []
@@ -152,9 +165,21 @@ def ejecutivo_mensual(
     if not recomendaciones:
         recomendaciones.append("Desempeño operativo dentro de parámetros normales.")
 
-    meses_esp = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-                 "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
-    titulo_mes = f"{meses_esp[month-1]} {year}"
+    meses_esp = [
+        "ENERO",
+        "FEBRERO",
+        "MARZO",
+        "ABRIL",
+        "MAYO",
+        "JUNIO",
+        "JULIO",
+        "AGOSTO",
+        "SEPTIEMBRE",
+        "OCTUBRE",
+        "NOVIEMBRE",
+        "DICIEMBRE",
+    ]
+    titulo_mes = f"{meses_esp[month - 1]} {year}"
 
     # Registrar auditoría
     AuditRepository(db).registrar(
@@ -190,7 +215,7 @@ def ejecutivo_mensual(
         ace = float(r[4] or 0)
         rec = obj - ace
         return (
-            f"<tr><td>{meses_esp[m-1][:3]} {y}</td><td class='num'>{int(r[2] or 0)}</td>"
+            f"<tr><td>{meses_esp[m - 1][:3]} {y}</td><td class='num'>{int(r[2] or 0)}</td>"
             f"<td class='num'>{_cop(obj)}</td><td class='num'>{_cop(rec)}</td></tr>"
         )
 
@@ -229,7 +254,7 @@ def ejecutivo_mensual(
   <div class="inst">ESE HOSPITAL UNIVERSITARIO DE SANTANDER — NIT 900.006.037-4</div>
   <h1>Informe Ejecutivo de Glosas</h1>
   <div class="mes">{titulo_mes}</div>
-  <div style="font-size:9pt;color:#64748b;margin-top:4px">Generado {now.strftime('%Y-%m-%d %H:%M UTC')} · {current_user.email}</div>
+  <div style="font-size:9pt;color:#64748b;margin-top:4px">Generado {now.strftime("%Y-%m-%d %H:%M UTC")} · {current_user.email}</div>
 </div>
 
 <h2>1. Resumen del mes</h2>
@@ -243,19 +268,19 @@ def ejecutivo_mensual(
 <h2>2. Top 5 EPS por valor objetado</h2>
 <table>
   <thead><tr><th>EPS / Entidad</th><th class="num">Glosas</th><th class="num">Objetado</th><th class="num">Recuperado</th><th class="num">Tasa éxito</th></tr></thead>
-  <tbody>{''.join(_tr_eps(r) for r in top_eps) or '<tr><td colspan="5">Sin datos</td></tr>'}</tbody>
+  <tbody>{"".join(_tr_eps(r) for r in top_eps) or '<tr><td colspan="5">Sin datos</td></tr>'}</tbody>
 </table>
 
 <h2>3. Top 5 causales</h2>
 <table>
   <thead><tr><th>Causal</th><th class="num">Glosas</th><th class="num">Valor objetado</th></tr></thead>
-  <tbody>{''.join(_tr_causal(r) for r in top_causales) or '<tr><td colspan="3">Sin datos</td></tr>'}</tbody>
+  <tbody>{"".join(_tr_causal(r) for r in top_causales) or '<tr><td colspan="3">Sin datos</td></tr>'}</tbody>
 </table>
 
 <h2>4. Tendencia últimos 6 meses</h2>
 <table>
   <thead><tr><th>Mes</th><th class="num">Glosas</th><th class="num">Objetado</th><th class="num">Recuperado</th></tr></thead>
-  <tbody>{''.join(_tr_mes(r) for r in tendencia) or '<tr><td colspan="4">Sin datos</td></tr>'}</tbody>
+  <tbody>{"".join(_tr_mes(r) for r in tendencia) or '<tr><td colspan="4">Sin datos</td></tr>'}</tbody>
 </table>
 
 <h2>5. Conciliaciones</h2>
@@ -267,7 +292,7 @@ def ejecutivo_mensual(
 <h2>6. Recomendaciones</h2>
 <div class="recos">
   <h3>⚡ Acciones sugeridas</h3>
-  <ul>{''.join('<li>' + r + '</li>' for r in recomendaciones)}</ul>
+  <ul>{"".join("<li>" + r + "</li>" for r in recomendaciones)}</ul>
 </div>
 
 <div class="foot">

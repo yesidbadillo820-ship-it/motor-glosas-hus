@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/comparar-periodos (R118 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,19 +48,21 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, dias_atras_creado, estado="RADICADA",
-          dias_atras_dec=None, valor_rec=0):
-    fecha_dec = (
-        ahora_utc() - timedelta(days=dias_atras_dec)
-        if dias_atras_dec is not None else None
+def _seed(db, dias_atras_creado, estado="RADICADA", dias_atras_dec=None, valor_rec=0):
+    fecha_dec = ahora_utc() - timedelta(days=dias_atras_dec) if dias_atras_dec is not None else None
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras_creado),
+            fecha_decision_eps=fecha_dec,
+        )
     )
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras_creado),
-        fecha_decision_eps=fecha_dec,
-    ))
     db.commit()
 
 
@@ -67,8 +71,7 @@ class TestCompararPeriodos:
         r = client.get("/glosas/stats/comparar-periodos")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "periodo_actual", "periodo_previo",
-                    "deltas"):
+        for key in ("ventana_dias", "periodo_actual", "periodo_previo", "deltas"):
             assert key in d
 
     def test_glosas_creadas_actual_vs_previo(self, client, db_session):
@@ -108,8 +111,9 @@ class TestCompararPeriodos:
 
     def test_valor_recuperado_se_acumula(self, client, db_session):
         # Cerrada en actual con $5k recuperado
-        _seed(db_session, dias_atras_creado=10, estado="LEVANTADA",
-              dias_atras_dec=5, valor_rec=5000)
+        _seed(
+            db_session, dias_atras_creado=10, estado="LEVANTADA", dias_atras_dec=5, valor_rec=5000
+        )
         r = client.get("/glosas/stats/comparar-periodos?dias=30")
         d = r.json()
         assert d["periodo_actual"]["valor_recuperado"] == 5000

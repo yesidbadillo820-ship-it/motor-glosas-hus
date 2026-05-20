@@ -1,9 +1,7 @@
 """Tests de WorkflowService (Ronda 50 Paso 6)."""
+
 from __future__ import annotations
 
-from types import SimpleNamespace
-
-import pytest
 
 from app.services.workflow_service import (
     EstadoGlosa,

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/sin-actividad (R99 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,21 +49,31 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, dias_atras=0, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
     return db.query(GlosaRecord).order_by(GlosaRecord.id.desc()).first()
 
 
 def _seed_audit(db, glosa_id, dias_atras):
-    db.add(AuditLogRecord(
-        usuario_email="u@x", accion="UPDATE", tabla="glosas",
-        registro_id=glosa_id,
-        timestamp=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email="u@x",
+            accion="UPDATE",
+            tabla="glosas",
+            registro_id=glosa_id,
+            timestamp=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 

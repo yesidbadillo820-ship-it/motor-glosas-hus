@@ -1,4 +1,5 @@
 """Tests para app.services.memoria_gestor."""
+
 from __future__ import annotations
 
 import pytest

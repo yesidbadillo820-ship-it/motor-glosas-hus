@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/glosas-sin-comentarios (R284 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -41,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,20 +51,30 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, glosa_id, estado="RADICADA", valor=1000):
-    db.add(GlosaRecord(
-        id=glosa_id,
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_comentario(db, glosa_id):
-    db.add(ComentarioGlosaRecord(
-        glosa_id=glosa_id, autor_email="x", texto="t",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        ComentarioGlosaRecord(
+            glosa_id=glosa_id,
+            autor_email="x",
+            texto="t",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 

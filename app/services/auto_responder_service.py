@@ -13,6 +13,7 @@ del Excel de recepción:
   Concurrencia: hasta 3 glosas en paralelo (semáforo asyncio).
   Resiliente: si una glosa falla, el resto sigue procesando.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -75,12 +76,11 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
         soportes_count = 0
         try:
             from app.services.soportes_autodiscovery_service import get_indexer
+
             if g.factura:
                 soportes_count = len(get_indexer().lookup(g.factura) or [])
         except Exception as e:
-            logger.debug(
-                f"[auto-responder] indexer lookup falló glosa={glosa_id}: {e}"
-            )
+            logger.debug(f"[auto-responder] indexer lookup falló glosa={glosa_id}: {e}")
 
         # Reglas pre-IA (gratis)
         evaluacion = evaluar(
@@ -101,7 +101,8 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
 
         if evaluacion["requiere"]:
             g.dictamen = mensaje_para_dictamen(
-                evaluacion, codigo_glosa=g.codigo_glosa or "—",
+                evaluacion,
+                codigo_glosa=g.codigo_glosa or "—",
             )
             g.estado = "REQUIERE_SOPORTES"
             g.modelo_ia = "detector_pre_ia"
@@ -118,9 +119,7 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
         try:
             return await _ejecutar_ia_y_persistir(db, g)
         except Exception as e:
-            logger.warning(
-                f"[AUTO-RESPONDER] Glosa {glosa_id} falló en IA: {e}"
-            )
+            logger.warning(f"[AUTO-RESPONDER] Glosa {glosa_id} falló en IA: {e}")
             # En caso de error, dejar la glosa pendiente para el gestor
             return {
                 "glosa_id": glosa_id,
@@ -138,12 +137,7 @@ async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
     from app.models.schemas import GlosaInput
 
     eps = (glosa.eps or "").strip() or "OTRA / SIN DEFINIR"
-    texto = (
-        glosa.texto_glosa_original
-        or glosa.dictamen
-        or glosa.concepto_glosa
-        or ""
-    ).strip()
+    texto = (glosa.texto_glosa_original or glosa.dictamen or glosa.concepto_glosa or "").strip()
     if len(texto) < 15:
         return {
             "glosa_id": glosa.id,
@@ -158,6 +152,7 @@ async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
     contexto_soportes = ""
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
+
         if glosa.factura:
             soportes = get_indexer().lookup(glosa.factura)
             if soportes:
@@ -191,6 +186,7 @@ async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
     )
 
     from app.core.config import get_settings
+
     _cfg = get_settings()
     service = GlosaService(
         groq_api_key=_cfg.groq_api_key,
@@ -259,6 +255,7 @@ async def procesar_lote(glosa_ids: list[int]) -> dict:
     # PostHog: medir conversión real del auto-responder.
     try:
         from app.services.posthog_service import capture
+
         capture(
             event="lote_auto_responder_completo",
             distinct_id="auto-responder",
@@ -268,9 +265,7 @@ async def procesar_lote(glosa_ids: list[int]) -> dict:
                 "requieren_soportes": req_soportes,
                 "ya_procesadas": ya_procesadas,
                 "errores": errores,
-                "tasa_respondidas": (
-                    round(respondidas / len(glosa_ids), 3) if glosa_ids else 0
-                ),
+                "tasa_respondidas": (round(respondidas / len(glosa_ids), 3) if glosa_ids else 0),
             },
         )
     except Exception:
@@ -282,12 +277,12 @@ async def procesar_lote(glosa_ids: list[int]) -> dict:
     # task background termine. Compactamos el detalle a solo los IDs
     # antes de devolver, y forzamos GC.
     detalle_compacto = [
-        {"glosa_id": r.get("glosa_id"), "estado": r.get("estado")}
-        for r in resultados
+        {"glosa_id": r.get("glosa_id"), "estado": r.get("estado")} for r in resultados
     ]
     del resultados
     try:
         import gc as _gc
+
         _gc.collect()
     except Exception as e:
         logger.debug(f"[auto-responder] gc.collect post-lote falló: {e}")
@@ -343,8 +338,7 @@ def lanzar_lote_background(glosa_ids: list[int]) -> None:
         task = loop.create_task(procesar_lote(glosa_ids))
         _registrar_bg_task(task, f"procesar_lote({len(glosa_ids)})")
         logger.info(
-            f"[AUTO-RESPONDER] Lote de {len(glosa_ids)} glosas encolado "
-            "para auto-procesamiento"
+            f"[AUTO-RESPONDER] Lote de {len(glosa_ids)} glosas encolado para auto-procesamiento"
         )
     except Exception as e:
         logger.error(f"[AUTO-RESPONDER] No se pudo lanzar lote: {e}")
@@ -389,9 +383,7 @@ def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
         finally:
             s.close()
     except Exception as e:
-        logger.warning(
-            f"[EXCEL-EMAIL] no se pudo actualizar estado rec_id={rec_id}: {e}"
-        )
+        logger.warning(f"[EXCEL-EMAIL] no se pudo actualizar estado rec_id={rec_id}: {e}")
 
 
 async def procesar_lote_y_enviar_excel(
@@ -464,9 +456,7 @@ async def procesar_lote_y_enviar_excel(
             db=db_email,
         )
         resultado_lote["excel_emails"] = envio
-        logger.info(
-            f"[EXCEL-EMAIL] ✅ envío terminó: {envio}"
-        )
+        logger.info(f"[EXCEL-EMAIL] ✅ envío terminó: {envio}")
         _actualizar_estado_recepcion(rec_id, envio)
     except Exception as e:
         logger.error(
@@ -479,6 +469,7 @@ async def procesar_lote_y_enviar_excel(
             try:
                 from app.database import SessionLocal
                 from app.models.db import ImportacionRecepcionRecord
+
                 s = SessionLocal()
                 try:
                     rec = (
@@ -535,11 +526,16 @@ def lanzar_lote_y_enviar_excel_background(
         loop = asyncio.get_event_loop()
         task = loop.create_task(
             procesar_lote_y_enviar_excel(
-                glosa_ids, excel_original, resumen, ids_ia, rec_id,
+                glosa_ids,
+                excel_original,
+                resumen,
+                ids_ia,
+                rec_id,
             )
         )
         _registrar_bg_task(
-            task, f"procesar_lote_y_enviar_excel({len(glosa_ids)})",
+            task,
+            f"procesar_lote_y_enviar_excel({len(glosa_ids)})",
         )
         logger.info(
             f"[AUTO-RESPONDER] {len(glosa_ids)} glosas tocadas "
@@ -548,7 +544,6 @@ def lanzar_lote_y_enviar_excel_background(
         )
     except Exception as e:
         logger.error(
-            f"[AUTO-RESPONDER] No se pudo lanzar lote+excel: "
-            f"{type(e).__name__}: {e}",
+            f"[AUTO-RESPONDER] No se pudo lanzar lote+excel: {type(e).__name__}: {e}",
             exc_info=True,
         )

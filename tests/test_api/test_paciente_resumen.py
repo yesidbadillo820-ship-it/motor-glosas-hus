@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/paciente-resumen (R130 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,9 +48,13 @@ def client(db_session, usuario):
 
 def _seed(db, paciente, **kw):
     base = dict(
-        eps="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        factura="F-001", creado_en=ahora_utc(),
+        eps="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
+        factura="F-001",
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(GlosaRecord(paciente=paciente, **base))
@@ -75,12 +81,24 @@ class TestPacienteResumen:
         assert d["total_glosas"] == 1
 
     def test_resumen_metricas(self, client, db_session):
-        _seed(db_session, "Ana López", factura="F-1", eps="SANITAS",
-              valor_objetado=10000, valor_recuperado=8000,
-              estado="LEVANTADA")
-        _seed(db_session, "Ana López", factura="F-2", eps="NUEVA EPS",
-              valor_objetado=5000, valor_recuperado=0,
-              estado="ACEPTADA")
+        _seed(
+            db_session,
+            "Ana López",
+            factura="F-1",
+            eps="SANITAS",
+            valor_objetado=10000,
+            valor_recuperado=8000,
+            estado="LEVANTADA",
+        )
+        _seed(
+            db_session,
+            "Ana López",
+            factura="F-2",
+            eps="NUEVA EPS",
+            valor_objetado=5000,
+            valor_recuperado=0,
+            estado="ACEPTADA",
+        )
 
         r = client.get("/glosas/paciente-resumen?paciente=Ana")
         d = r.json()

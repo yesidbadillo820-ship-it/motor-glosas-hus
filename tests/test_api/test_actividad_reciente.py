@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/actividad-reciente (R110 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -54,11 +59,15 @@ def client(db_session, usuario_super):
 
 
 def _seed_audit(db, usuario, accion, tabla, segundos_atras=0):
-    db.add(AuditLogRecord(
-        usuario_email=usuario, accion=accion, tabla=tabla,
-        registro_id=1,
-        timestamp=ahora_utc() - timedelta(seconds=segundos_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=usuario,
+            accion=accion,
+            tabla=tabla,
+            registro_id=1,
+            timestamp=ahora_utc() - timedelta(seconds=segundos_atras),
+        )
+    )
     db.commit()
 
 
@@ -89,8 +98,7 @@ class TestActividadReciente:
 
     def test_limit_respetado(self, client, db_session):
         for i in range(20):
-            _seed_audit(db_session, "u@x", f"A{i}", "T",
-                        segundos_atras=i * 5)
+            _seed_audit(db_session, "u@x", f"A{i}", "T", segundos_atras=i * 5)
         r = client.get("/admin/actividad-reciente?limit=5")
         d = r.json()
         assert d["total_devueltos"] == 5
@@ -101,7 +109,6 @@ class TestActividadReciente:
         r = client.get("/admin/actividad-reciente")
         d = r.json()
         for it in d["items"]:
-            for key in ("timestamp", "tipo", "usuario",
-                        "descripcion", "id_evento"):
+            for key in ("timestamp", "tipo", "usuario", "descripcion", "id_evento"):
                 assert key in it
             assert it["tipo"] in ("AUDIT", "AI_CALL")

@@ -12,6 +12,7 @@ Aquí calculamos similitud sobre 5-gramas (jaccard) entre el argumento
 generado y cada ejemplo. Si alguna pasa de un umbral (0.55 = 55%
 solapamiento), forzamos retry con instrucción de adaptar.
 """
+
 from __future__ import annotations
 
 import re
@@ -33,14 +34,13 @@ def _ngramas(texto: str, n: int = 5) -> set:
     palabras = _normalizar(texto).split()
     if len(palabras) < n:
         return set()
-    return {
-        " ".join(palabras[i:i + n])
-        for i in range(len(palabras) - n + 1)
-    }
+    return {" ".join(palabras[i : i + n]) for i in range(len(palabras) - n + 1)}
 
 
 def similitud_jaccard(
-    texto1: str, texto2: str, n: int = 5,
+    texto1: str,
+    texto2: str,
+    n: int = 5,
 ) -> float:
     """Jaccard similarity sobre n-gramas. 0..1."""
     a = _ngramas(texto1, n)
@@ -84,7 +84,7 @@ def instruccion_anti_copia(deteccion: dict) -> str:
         return ""
     return (
         "\n\n═══ DETECCIÓN DE COPIA TEXTUAL ═══\n"
-        f"Tu respuesta anterior es {deteccion['similitud']*100:.0f}% "
+        f"Tu respuesta anterior es {deteccion['similitud'] * 100:.0f}% "
         f"idéntica al EJEMPLO de fuente {deteccion['fuente']} "
         f"(id={deteccion['ejemplo_id']}). Esto es INACEPTABLE: el "
         "ejemplo es solo REFERENCIA, no debe copiarse textualmente.\n"

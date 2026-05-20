@@ -5,6 +5,7 @@ Garantiza:
   - índices correctamente declarados (rendimiento de /sistema/metricas-ia)
   - persistencia + recuperación funciona
 """
+
 from __future__ import annotations
 
 import pytest
@@ -37,10 +38,18 @@ class TestAICallRecordSchema:
         cols = {c.key for c in insp.columns}
         # Todos los campos del helper de logging deben tener columna
         assert {
-            "id", "proveedor", "modelo", "latency_ms",
-            "input_tokens", "cache_creation_input_tokens",
-            "cache_read_input_tokens", "output_tokens",
-            "cost_usd", "glosa_id", "user_email", "creado_en",
+            "id",
+            "proveedor",
+            "modelo",
+            "latency_ms",
+            "input_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+            "output_tokens",
+            "cost_usd",
+            "glosa_id",
+            "user_email",
+            "creado_en",
         }.issubset(cols)
 
     def test_indices_declarados(self):
@@ -66,7 +75,8 @@ class TestAICallRecordPersistencia:
         """Crear con solo campos obligatorios — los nullable y defaults
         no deben fallar."""
         rec = AICallRecord(
-            proveedor="anthropic", modelo="claude-sonnet-4-6",
+            proveedor="anthropic",
+            modelo="claude-sonnet-4-6",
         )
         db.add(rec)
         db.commit()
@@ -85,10 +95,13 @@ class TestAICallRecordPersistencia:
 
     def test_persiste_call_completo(self, db):
         rec = AICallRecord(
-            proveedor="anthropic", modelo="claude-sonnet-4-6",
+            proveedor="anthropic",
+            modelo="claude-sonnet-4-6",
             latency_ms=1234,
-            input_tokens=100, cache_creation_input_tokens=8000,
-            cache_read_input_tokens=0, output_tokens=500,
+            input_tokens=100,
+            cache_creation_input_tokens=8000,
+            cache_read_input_tokens=0,
+            output_tokens=500,
             cost_usd=0.0345,
             glosa_id=42,
             user_email="auditor@hus.com",
@@ -106,13 +119,18 @@ class TestAICallRecordPersistencia:
         """No es benchmark — solo verifica que la query con filtro
         creado_en > X funcione (aprovechando el índice declarado)."""
         for i in range(5):
-            db.add(AICallRecord(
-                proveedor="anthropic", modelo="claude-sonnet-4-6",
-                latency_ms=i * 100, cost_usd=i * 0.001,
-            ))
+            db.add(
+                AICallRecord(
+                    proveedor="anthropic",
+                    modelo="claude-sonnet-4-6",
+                    latency_ms=i * 100,
+                    cost_usd=i * 0.001,
+                )
+            )
         db.commit()
         # Query con filtro
         from datetime import timedelta
+
         desde = ahora_utc() - timedelta(hours=1)
         cnt = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).count()
         assert cnt == 5

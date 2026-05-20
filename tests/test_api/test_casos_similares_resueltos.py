@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/casos-similares-resueltos (R349 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -44,16 +46,21 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, glosa_id, eps, codigo, estado="RADICADA",
-          dictamen=None):
-    db.add(GlosaRecord(
-        id=glosa_id,
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_decision_eps=ahora_utc() if estado != "RADICADA" else None,
-        dictamen=dictamen,
-    ))
+def _seed(db, glosa_id, eps, codigo, estado="RADICADA", dictamen=None):
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_decision_eps=ahora_utc() if estado != "RADICADA" else None,
+            dictamen=dictamen,
+        )
+    )
     db.commit()
 
 
@@ -63,15 +70,27 @@ class TestCasosSimilaresResueltos:
         _seed(db_session, 1, "X", "TA01", estado="RADICADA")
         # Casos similares decididos
         _seed(
-            db_session, 2, "X", "TA01", estado="LEVANTADA",
+            db_session,
+            2,
+            "X",
+            "TA01",
+            estado="LEVANTADA",
             dictamen="argumento ganador",
         )
         _seed(
-            db_session, 3, "X", "TA01", estado="RATIFICADA",
+            db_session,
+            3,
+            "X",
+            "TA01",
+            estado="RATIFICADA",
         )
         # Glosa de otra EPS, no debe aparecer
         _seed(
-            db_session, 4, "OTRA", "TA01", estado="LEVANTADA",
+            db_session,
+            4,
+            "OTRA",
+            "TA01",
+            estado="LEVANTADA",
         )
 
         r = client.get("/glosas/1/casos-similares-resueltos")

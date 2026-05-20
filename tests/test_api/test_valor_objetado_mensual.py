@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/valor-objetado-mensual (R172 P1)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -9,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +48,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, fecha, valor=1000):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado="RADICADA",
-        creado_en=fecha,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=fecha,
+        )
+    )
     db.commit()
 
 
@@ -63,15 +70,9 @@ class TestValorObjetadoMensual:
         assert d["serie"] == []
 
     def test_serie_basica(self, client, db_session):
-        _seed(db_session,
-              datetime(2026, 4, 5, tzinfo=timezone.utc),
-              valor=10_000)
-        _seed(db_session,
-              datetime(2026, 4, 20, tzinfo=timezone.utc),
-              valor=20_000)
-        _seed(db_session,
-              datetime(2026, 3, 1, tzinfo=timezone.utc),
-              valor=5_000)
+        _seed(db_session, datetime(2026, 4, 5, tzinfo=timezone.utc), valor=10_000)
+        _seed(db_session, datetime(2026, 4, 20, tzinfo=timezone.utc), valor=20_000)
+        _seed(db_session, datetime(2026, 3, 1, tzinfo=timezone.utc), valor=5_000)
 
         r = client.get("/glosas/stats/valor-objetado-mensual?meses=24")
         d = r.json()

@@ -1,13 +1,6 @@
 """Tests del endpoint /tarifas-contratadas (Fase 1 — carga CSV + consulta)."""
-from io import BytesIO
-
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from app.api.routers.tarifas_contratadas import _normalizar_valor
-from app.database import Base
 
 
 class TestNormalizarValor:

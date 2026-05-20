@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/buscar-similares-texto (R103 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, texto):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-        texto_glosa_original=texto,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            texto_glosa_original=texto,
+        )
+    )
     db.commit()
 
 
@@ -60,10 +68,7 @@ class TestBuscarSimilaresTexto:
         assert r.status_code == 422  # FastAPI valida min_length
 
     def test_sin_candidatas(self, client):
-        r = client.get(
-            "/glosas/buscar-similares-texto"
-            "?texto=insumos hospitalarios farmaceuticos"
-        )
+        r = client.get("/glosas/buscar-similares-texto?texto=insumos hospitalarios farmaceuticos")
         d = r.json()
         assert d["total_evaluadas"] == 0
         assert d["items"] == []
@@ -71,12 +76,10 @@ class TestBuscarSimilaresTexto:
     def test_encuentra_similares(self, client, db_session):
         _seed(db_session, "insumos farmaceuticos administrados al paciente")
         _seed(db_session, "honorarios medicos por consulta especializada")
-        _seed(db_session,
-              "insumos quirurgicos consumidos durante intervencion")
+        _seed(db_session, "insumos quirurgicos consumidos durante intervencion")
 
         r = client.get(
-            "/glosas/buscar-similares-texto"
-            "?texto=insumos administrados durante hospitalizacion"
+            "/glosas/buscar-similares-texto?texto=insumos administrados durante hospitalizacion"
         )
         d = r.json()
         # Las 2 con "insumos" deben aparecer; los honorarios médicos no
@@ -88,9 +91,7 @@ class TestBuscarSimilaresTexto:
     def test_score_idempotente_glosa_identica(self, client, db_session):
         texto = "valor cobrado supera tarifa contratada"
         _seed(db_session, texto)
-        r = client.get(
-            f"/glosas/buscar-similares-texto?texto={texto}"
-        )
+        r = client.get(f"/glosas/buscar-similares-texto?texto={texto}")
         d = r.json()
         # Match exacto → score 1.0
         assert d["items"][0]["score_similitud"] == 1.0
@@ -98,8 +99,6 @@ class TestBuscarSimilaresTexto:
     def test_top_limita(self, client, db_session):
         for _ in range(15):
             _seed(db_session, "insumos farmaceuticos administrados paciente")
-        r = client.get(
-            "/glosas/buscar-similares-texto?texto=insumos farmaceuticos&top=5"
-        )
+        r = client.get("/glosas/buscar-similares-texto?texto=insumos farmaceuticos&top=5")
         d = r.json()
         assert len(d["items"]) == 5

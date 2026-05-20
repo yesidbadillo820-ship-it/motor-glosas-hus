@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/decision-eps-tiempo-distribucion (R285 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,25 +50,29 @@ def client(db_session, usuario):
 
 def _seed(db, dias_decision):
     creado = ahora_utc() - timedelta(days=dias_decision)
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="LEVANTADA",
-        creado_en=creado,
-        fecha_decision_eps=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=creado,
+            fecha_decision_eps=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 class TestDecisionEPSTiempo:
     def test_buckets(self, client, db_session):
-        _seed(db_session, dias_decision=5)    # 0-15
-        _seed(db_session, dias_decision=20)   # 16-30
-        _seed(db_session, dias_decision=45)   # 31-60
+        _seed(db_session, dias_decision=5)  # 0-15
+        _seed(db_session, dias_decision=20)  # 16-30
+        _seed(db_session, dias_decision=45)  # 31-60
         _seed(db_session, dias_decision=120)  # >90
 
-        r = client.get(
-            "/glosas/stats/decision-eps-tiempo-distribucion"
-        )
+        r = client.get("/glosas/stats/decision-eps-tiempo-distribucion")
         d = r.json()
         bm = {b["rango_dias"]: b["count"] for b in d["buckets"]}
         assert bm["0-15"] == 1
@@ -76,9 +82,7 @@ class TestDecisionEPSTiempo:
         assert d["total_glosas"] == 4
 
     def test_vacio(self, client):
-        r = client.get(
-            "/glosas/stats/decision-eps-tiempo-distribucion"
-        )
+        r = client.get("/glosas/stats/decision-eps-tiempo-distribucion")
         d = r.json()
         assert d["total_glosas"] == 0
         assert d["promedio_dias"] == 0.0

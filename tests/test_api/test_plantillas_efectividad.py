@@ -1,4 +1,5 @@
 """Tests del endpoint GET /plantillas-gold/efectividad (R107 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -52,23 +57,35 @@ def client(db_session, usuario_coord):
 
 
 def _seed_glosa(db, estado="LEVANTADA", valor_rec=10000):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=10000, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=10000,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
     return db.query(GlosaRecord).order_by(GlosaRecord.id.desc()).first()
 
 
 def _seed_plantilla(db, titulo, usos=0, glosa_origen_id=None, activa=1):
-    db.add(PlantillaGoldRecord(
-        eps="X", codigo_glosa="C", tipo="ARG",
-        titulo=titulo, argumento="<p>argumento</p>",
-        usos=usos, glosa_origen_id=glosa_origen_id,
-        activa=activa,
-    ))
+    db.add(
+        PlantillaGoldRecord(
+            eps="X",
+            codigo_glosa="C",
+            tipo="ARG",
+            titulo=titulo,
+            argumento="<p>argumento</p>",
+            usos=usos,
+            glosa_origen_id=glosa_origen_id,
+            activa=activa,
+        )
+    )
     db.commit()
 
 
@@ -104,8 +121,7 @@ class TestPlantillasEfectividad:
         _seed_plantilla(db_session, "Real", usos=5, glosa_origen_id=g.id)
         # Plantilla con muchos usos pero glosa origen ACEPTADA → no es gold
         g2 = _seed_glosa(db_session, "ACEPTADA")
-        _seed_plantilla(db_session, "FalsaGold", usos=10,
-                        glosa_origen_id=g2.id)
+        _seed_plantilla(db_session, "FalsaGold", usos=10, glosa_origen_id=g2.id)
         # Plantilla LEVANTADA pero solo 1 uso → no llega al threshold de 3
         g3 = _seed_glosa(db_session, "LEVANTADA")
         _seed_plantilla(db_session, "Pocos", usos=1, glosa_origen_id=g3.id)

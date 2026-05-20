@@ -47,48 +47,48 @@ class ImportacionMasivaRequest(BaseModel):
 # canónica que usa el resto del sistema (contratos, perfiles, aseguradoras).
 _EPS_ALIASES: list[tuple[str, str]] = [
     # (substring a buscar en el texto upper, clave canónica)
-    ("SANITAS",                      "SANITAS"),
-    ("NUEVA EPS",                    "NUEVA EPS"),
-    ("COOSALUD",                     "COOSALUD"),
-    ("COMPENSAR",                    "COMPENSAR"),
-    ("FAMISANAR",                    "FAMISANAR"),
-    ("SALUD TOTAL",                  "SALUD TOTAL"),
-    ("SURA",                         "SURA"),
-    ("MUTUAL SER",                   "MUTUAL SER"),
-    ("SAVIA SALUD",                  "SAVIA SALUD"),
-    ("CAPITAL SALUD",                "CAPITAL SALUD"),
-    ("ASMET SALUD",                  "ASMET SALUD"),
-    ("EMSSANAR",                     "EMSSANAR"),
-    ("CAJACOPI",                     "CAJACOPI"),
-    ("COMFAMILIAR",                  "COMFAMILIAR"),
-    ("COMFENALCO",                   "COMFENALCO"),
-    ("ECOOPSOS",                     "ECOOPSOS"),
-    ("ALIANSALUD",                   "ALIANSALUD"),
-    ("ANAS WAYUU",                   "ANAS WAYUU"),
-    ("DUSAKAWI",                     "DUSAKAWI"),
-    ("PIJAOS SALUD",                 "PIJAOS SALUD"),
-    ("MALLAMAS",                     "MALLAMAS"),
-    ("CAPRESOCA",                    "CAPRESOCA"),
+    ("SANITAS", "SANITAS"),
+    ("NUEVA EPS", "NUEVA EPS"),
+    ("COOSALUD", "COOSALUD"),
+    ("COMPENSAR", "COMPENSAR"),
+    ("FAMISANAR", "FAMISANAR"),
+    ("SALUD TOTAL", "SALUD TOTAL"),
+    ("SURA", "SURA"),
+    ("MUTUAL SER", "MUTUAL SER"),
+    ("SAVIA SALUD", "SAVIA SALUD"),
+    ("CAPITAL SALUD", "CAPITAL SALUD"),
+    ("ASMET SALUD", "ASMET SALUD"),
+    ("EMSSANAR", "EMSSANAR"),
+    ("CAJACOPI", "CAJACOPI"),
+    ("COMFAMILIAR", "COMFAMILIAR"),
+    ("COMFENALCO", "COMFENALCO"),
+    ("ECOOPSOS", "ECOOPSOS"),
+    ("ALIANSALUD", "ALIANSALUD"),
+    ("ANAS WAYUU", "ANAS WAYUU"),
+    ("DUSAKAWI", "DUSAKAWI"),
+    ("PIJAOS SALUD", "PIJAOS SALUD"),
+    ("MALLAMAS", "MALLAMAS"),
+    ("CAPRESOCA", "CAPRESOCA"),
     ("SERVICIO OCCIDENTAL DE SALUD", "SOS"),
-    ("SOS ",                         "SOS"),
+    ("SOS ", "SOS"),
     # Aseguradoras (SOAT / ARL / pólizas)
-    ("SEGUROS COMERCIALES BOLIVAR",  "SEGUROS BOLIVAR"),
-    ("SEGUROS BOLIVAR",              "SEGUROS BOLIVAR"),
-    ("SEGUROS DEL ESTADO",           "SEGUROS DEL ESTADO"),
+    ("SEGUROS COMERCIALES BOLIVAR", "SEGUROS BOLIVAR"),
+    ("SEGUROS BOLIVAR", "SEGUROS BOLIVAR"),
+    ("SEGUROS DEL ESTADO", "SEGUROS DEL ESTADO"),
     ("SEGUROS GENERALES SURAMERICANA", "SURA"),
-    ("MAPFRE",                       "MAPFRE"),
-    ("AXA COLPATRIA",                "AXA COLPATRIA"),
-    ("LA PREVISORA",                 "FOMAG"),
-    ("FIDEICOMISOS PATRIMONIOS",     "FOMAG"),
-    ("FOMAG",                        "FOMAG"),
+    ("MAPFRE", "MAPFRE"),
+    ("AXA COLPATRIA", "AXA COLPATRIA"),
+    ("LA PREVISORA", "FOMAG"),
+    ("FIDEICOMISOS PATRIMONIOS", "FOMAG"),
+    ("FOMAG", "FOMAG"),
     # Regímenes especiales
-    ("DISPENSARIO MEDICO",           "DISPENSARIO MEDICO"),
-    ("FUERZAS MILITARES",            "DISPENSARIO MEDICO"),
-    ("POLICIA NACIONAL",             "SANIDAD POLICIA"),
-    ("SANIDAD POLICIA",              "SANIDAD POLICIA"),
+    ("DISPENSARIO MEDICO", "DISPENSARIO MEDICO"),
+    ("FUERZAS MILITARES", "DISPENSARIO MEDICO"),
+    ("POLICIA NACIONAL", "SANIDAD POLICIA"),
+    ("SANIDAD POLICIA", "SANIDAD POLICIA"),
     ("UNIDAD DE SERVICIOS PENITENCIARIOS", "USPEC"),
-    ("USPEC",                        "USPEC"),
-    ("MAGISTERIO",                   "FOMAG"),
+    ("USPEC", "USPEC"),
+    ("MAGISTERIO", "FOMAG"),
 ]
 
 
@@ -122,6 +122,7 @@ class ValidarRequest(BaseModel):
 class ReanalizarRequest(BaseModel):
     """R60 P2: petición de re-análisis sobre glosa existente.
     Sin duplicar la fila — actualiza el dictamen de la glosa actual."""
+
     tono: Optional[str] = "conciliador"
     modo_respuesta: Optional[str] = "defender"
 
@@ -130,6 +131,7 @@ class BulkActualizarEstadoRequest(BaseModel):
     """R71 P1: cambio masivo de estado. Útil cuando llega un Excel
     de respuesta de la EPS con N decisiones (LEVANTADAS, RATIFICADAS)
     para procesar de un golpe."""
+
     glosa_ids: list[int] = Field(..., min_length=1, max_length=500)
     nuevo_estado: str = Field(..., min_length=3, max_length=50)
     nota: Optional[str] = Field(default=None, max_length=300)
@@ -138,6 +140,7 @@ class BulkActualizarEstadoRequest(BaseModel):
 class BulkMoverPapeleraRequest(BaseModel):
     """R71 P2: mueve N glosas a la papelera en una sola transacción.
     Soporta dry_run para preview antes de ejecutar."""
+
     glosa_ids: list[int] = Field(..., min_length=1, max_length=200)
     motivo: Optional[str] = Field(default=None, max_length=300)
     dry_run: bool = False
@@ -151,6 +154,7 @@ def _limpiar_observacion(dictamen_html: str) -> str:
         return ""
     from html import unescape
     import re as _re
+
     txt = _re.sub(r"<[^>]+>", " ", dictamen_html)
     txt = _re.sub(r"\s+", " ", unescape(txt)).strip()
 
@@ -181,13 +185,14 @@ def _limpiar_observacion(dictamen_html: str) -> str:
 @router.get("/historial", response_model=list)
 def historial(
     limit: int = 50,
-    eps:   Optional[str] = None,
-    db:    Session        = Depends(get_db),
+    eps: Optional[str] = None,
+    db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Historial detallado con todos los campos relevantes para vista IPS."""
     from app.main import _extraer_motivo_glosa
     from app.services.resolver_entidad import resolver_entidad_mostrar
+
     repo = GlosaRepository(db)
     glosas = repo.listar(limit=limit, eps=eps)
     items = []
@@ -198,30 +203,32 @@ def historial(
             tercero_nombre=getattr(g, "tercero_nombre", None),
             eps_codigo=getattr(g, "eps_codigo", None),
         )
-        items.append({
-            "id": g.id,
-            "fecha": g.creado_en.isoformat() if g.creado_en else None,
-            "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
-            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
-            "entidad": entidad_real,
-            "eps": g.eps,  # alias para compatibilidad (valor raw, sin resolver)
-            "paciente": g.paciente,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "concepto_glosa": g.concepto_glosa,
-            "cups": g.cups_servicio,
-            "servicio": g.servicio_descripcion,
-            "valor_objetado": g.valor_objetado,
-            "valor_aceptado": g.valor_aceptado,
-            "glosa_original": _extraer_motivo_glosa(g.texto_glosa_original or ""),
-            "codigo_respuesta": g.codigo_respuesta,
-            "observacion": obs_texto,
-            "etapa": g.etapa,
-            "estado": g.estado,
-            "dictamen": g.dictamen,
-            "dias_restantes": g.dias_restantes,
-            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "fecha": g.creado_en.isoformat() if g.creado_en else None,
+                "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+                "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
+                "entidad": entidad_real,
+                "eps": g.eps,  # alias para compatibilidad (valor raw, sin resolver)
+                "paciente": g.paciente,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "concepto_glosa": g.concepto_glosa,
+                "cups": g.cups_servicio,
+                "servicio": g.servicio_descripcion,
+                "valor_objetado": g.valor_objetado,
+                "valor_aceptado": g.valor_aceptado,
+                "glosa_original": _extraer_motivo_glosa(g.texto_glosa_original or ""),
+                "codigo_respuesta": g.codigo_respuesta,
+                "observacion": obs_texto,
+                "etapa": g.etapa,
+                "estado": g.estado,
+                "dictamen": g.dictamen,
+                "dias_restantes": g.dias_restantes,
+                "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+            }
+        )
     return items
 
 
@@ -244,16 +251,25 @@ def historial_paginado(
 ):
     """Historial con paginación y filtros avanzados (vista detallada IPS)."""
     from app.main import _extraer_motivo_glosa
+
     repo = GlosaRepository(db)
     resultado = repo.listar_paginado(
-        page=page, per_page=per_page,
-        eps=eps, estado=estado, search=search,
-        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
-        valor_min=valor_min, valor_max=valor_max,
-        tipo=tipo, semaforo=semaforo, workflow=workflow,
+        page=page,
+        per_page=per_page,
+        eps=eps,
+        estado=estado,
+        search=search,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        valor_min=valor_min,
+        valor_max=valor_max,
+        tipo=tipo,
+        semaforo=semaforo,
+        workflow=workflow,
     )
 
     from app.services.resolver_entidad import resolver_entidad_mostrar
+
     items = []
     for g in resultado["items"]:
         obs_texto = _limpiar_observacion(g.dictamen)
@@ -262,28 +278,30 @@ def historial_paginado(
             tercero_nombre=getattr(g, "tercero_nombre", None),
             eps_codigo=getattr(g, "eps_codigo", None),
         )
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "entidad": entidad_real,
-            "paciente": g.paciente,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "concepto_glosa": g.concepto_glosa,
-            "cups": g.cups_servicio,
-            "servicio": g.servicio_descripcion,
-            "valor_objetado": g.valor_objetado,
-            "valor_aceptado": g.valor_aceptado,
-            "glosa_original": _extraer_motivo_glosa(g.texto_glosa_original or ""),
-            "codigo_respuesta": g.codigo_respuesta,
-            "observacion": obs_texto,
-            "etapa": g.etapa,
-            "estado": g.estado,
-            "dias_restantes": g.dias_restantes,
-            "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
-            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
-            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "entidad": entidad_real,
+                "paciente": g.paciente,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "concepto_glosa": g.concepto_glosa,
+                "cups": g.cups_servicio,
+                "servicio": g.servicio_descripcion,
+                "valor_objetado": g.valor_objetado,
+                "valor_aceptado": g.valor_aceptado,
+                "glosa_original": _extraer_motivo_glosa(g.texto_glosa_original or ""),
+                "codigo_respuesta": g.codigo_respuesta,
+                "observacion": obs_texto,
+                "etapa": g.etapa,
+                "estado": g.estado,
+                "dias_restantes": g.dias_restantes,
+                "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+                "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
+                "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+            }
+        )
 
     return {
         "items": items,
@@ -324,9 +342,12 @@ def exportar_json(
 
     repo = GlosaRepository(db)
     glosas = repo.listar_para_export(
-        eps=eps, estado=estado,
-        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
-        valor_min=valor_min, valor_max=valor_max,
+        eps=eps,
+        estado=estado,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        valor_min=valor_min,
+        valor_max=valor_max,
     )
 
     def _generar():
@@ -347,12 +368,10 @@ def exportar_json(
                 "dias_restantes": g.dias_restantes,
                 "gestor_nombre": g.gestor_nombre,
                 "fecha_vencimiento": (
-                    g.fecha_vencimiento.isoformat()
-                    if g.fecha_vencimiento else None
+                    g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None
                 ),
                 "fecha_decision_eps": (
-                    g.fecha_decision_eps.isoformat()
-                    if g.fecha_decision_eps else None
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
                 ),
             }
             yield json.dumps(obj, ensure_ascii=False) + "\n"
@@ -388,10 +407,16 @@ def exportar_xlsx(
 
     repo = GlosaRepository(db)
     glosas_raw = repo.listar_para_export(
-        eps=eps, estado=estado, search=search,
-        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
-        valor_min=valor_min, valor_max=valor_max,
-        tipo=tipo, semaforo=semaforo, workflow=workflow,
+        eps=eps,
+        estado=estado,
+        search=search,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        valor_min=valor_min,
+        valor_max=valor_max,
+        tipo=tipo,
+        semaforo=semaforo,
+        workflow=workflow,
     )
 
     # R-export 27-abr-2026: deduplicar por (factura, código, cups, etapa)
@@ -409,9 +434,7 @@ def exportar_xlsx(
         # Solo conservamos si NO había una entrada para esta clave o
         # si la nueva es más reciente (creado_en mayor).
         prev = visto.get(clave)
-        if prev is None or (
-            g.creado_en and prev.creado_en and g.creado_en > prev.creado_en
-        ):
+        if prev is None or (g.creado_en and prev.creado_en and g.creado_en > prev.creado_en):
             visto[clave] = g
     glosas = sorted(
         visto.values(),
@@ -424,13 +447,28 @@ def exportar_xlsx(
     ws.title = "Historial Glosas HUS"
 
     headers = [
-        "ID", "Fecha Creación", "EPS/Entidad", "Paciente", "Factura",
-        "Código Glosa", "Concepto", "CUPS", "Servicio",
-        "Valor Objetado", "Valor Aceptado", "Valor Recuperado",
-        "Código Respuesta", "Observación EPS", "Dictamen HUS",
-        "Etapa", "Estado",
-        "Workflow", "Semáforo", "Días Restantes",
-        "Fecha Recepción", "Fecha Entrega",
+        "ID",
+        "Fecha Creación",
+        "EPS/Entidad",
+        "Paciente",
+        "Factura",
+        "Código Glosa",
+        "Concepto",
+        "CUPS",
+        "Servicio",
+        "Valor Objetado",
+        "Valor Aceptado",
+        "Valor Recuperado",
+        "Código Respuesta",
+        "Observación EPS",
+        "Dictamen HUS",
+        "Etapa",
+        "Estado",
+        "Workflow",
+        "Semáforo",
+        "Días Restantes",
+        "Fecha Recepción",
+        "Fecha Entrega",
     ]
     ws.append(headers)
 
@@ -455,30 +493,32 @@ def exportar_xlsx(
         # Dictamen: el texto limpio (sin HTML) generado por la defensa.
         dictamen_txt = _limpiar_observacion(g.dictamen) or ""
         recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
-        ws.append([
-            g.id,
-            g.creado_en.strftime("%Y-%m-%d %H:%M") if g.creado_en else "",
-            g.eps or "",
-            g.paciente or "",
-            g.factura or "",
-            g.codigo_glosa or "",
-            g.concepto_glosa or "",
-            g.cups_servicio or "",
-            g.servicio_descripcion or "",
-            float(g.valor_objetado or 0),
-            float(g.valor_aceptado or 0),
-            float(recuperado),
-            g.codigo_respuesta or "",
-            obs_eps_raw[:600] if obs_eps_raw else "",
-            dictamen_txt[:800] if dictamen_txt else "",
-            g.etapa or "",
-            g.estado or "",
-            g.workflow_state or "",
-            g.prioridad or "",
-            g.dias_restantes if g.dias_restantes is not None else "",
-            g.fecha_recepcion.strftime("%Y-%m-%d") if g.fecha_recepcion else "",
-            g.fecha_entrega.strftime("%Y-%m-%d") if g.fecha_entrega else "",
-        ])
+        ws.append(
+            [
+                g.id,
+                g.creado_en.strftime("%Y-%m-%d %H:%M") if g.creado_en else "",
+                g.eps or "",
+                g.paciente or "",
+                g.factura or "",
+                g.codigo_glosa or "",
+                g.concepto_glosa or "",
+                g.cups_servicio or "",
+                g.servicio_descripcion or "",
+                float(g.valor_objetado or 0),
+                float(g.valor_aceptado or 0),
+                float(recuperado),
+                g.codigo_respuesta or "",
+                obs_eps_raw[:600] if obs_eps_raw else "",
+                dictamen_txt[:800] if dictamen_txt else "",
+                g.etapa or "",
+                g.estado or "",
+                g.workflow_state or "",
+                g.prioridad or "",
+                g.dias_restantes if g.dias_restantes is not None else "",
+                g.fecha_recepcion.strftime("%Y-%m-%d") if g.fecha_recepcion else "",
+                g.fecha_entrega.strftime("%Y-%m-%d") if g.fecha_entrega else "",
+            ]
+        )
 
     # Ajuste de anchos (22 columnas: Observación EPS 60, Dictamen HUS 80)
     widths = [6, 18, 22, 28, 14, 12, 26, 10, 32, 14, 14, 14, 12, 60, 80, 14, 14, 14, 10, 10, 14, 14]
@@ -494,6 +534,7 @@ def exportar_xlsx(
     try:
         from openpyxl.styles import PatternFill
         from openpyxl.formatting.rule import CellIsRule, FormulaRule
+
         # Aplicar desde fila 2 hasta el final
         last_row = ws.max_row
         if last_row > 1:
@@ -503,17 +544,34 @@ def exportar_xlsx(
             fill_rojo = PatternFill(start_color="FECACA", end_color="FECACA", fill_type="solid")
             fill_amarillo = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
             fill_verde = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
-            fill_verde_fuerte = PatternFill(start_color="A7F3D0", end_color="A7F3D0", fill_type="solid")
+            fill_verde_fuerte = PatternFill(
+                start_color="A7F3D0", end_color="A7F3D0", fill_type="solid"
+            )
             # Días restantes — semáforo
-            ws.conditional_formatting.add(rango_dias, CellIsRule(operator="lessThanOrEqual", formula=["3"], fill=fill_rojo))
-            ws.conditional_formatting.add(rango_dias, CellIsRule(operator="between", formula=["4", "7"], fill=fill_amarillo))
-            ws.conditional_formatting.add(rango_dias, CellIsRule(operator="greaterThan", formula=["7"], fill=fill_verde))
+            ws.conditional_formatting.add(
+                rango_dias, CellIsRule(operator="lessThanOrEqual", formula=["3"], fill=fill_rojo)
+            )
+            ws.conditional_formatting.add(
+                rango_dias, CellIsRule(operator="between", formula=["4", "7"], fill=fill_amarillo)
+            )
+            ws.conditional_formatting.add(
+                rango_dias, CellIsRule(operator="greaterThan", formula=["7"], fill=fill_verde)
+            )
             # Valor recuperado
-            ws.conditional_formatting.add(rango_recup, CellIsRule(operator="greaterThan", formula=["0"], fill=fill_verde_fuerte))
+            ws.conditional_formatting.add(
+                rango_recup,
+                CellIsRule(operator="greaterThan", formula=["0"], fill=fill_verde_fuerte),
+            )
             # Estado
-            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"CERRADA")'], fill=fill_verde))
-            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"RATIFICADA")'], fill=fill_rojo))
-            ws.conditional_formatting.add(rango_estado, FormulaRule(formula=['EXACT(P2,"EXTEMPORANEA")'], fill=fill_amarillo))
+            ws.conditional_formatting.add(
+                rango_estado, FormulaRule(formula=['EXACT(P2,"CERRADA")'], fill=fill_verde)
+            )
+            ws.conditional_formatting.add(
+                rango_estado, FormulaRule(formula=['EXACT(P2,"RATIFICADA")'], fill=fill_rojo)
+            )
+            ws.conditional_formatting.add(
+                rango_estado, FormulaRule(formula=['EXACT(P2,"EXTEMPORANEA")'], fill=fill_amarillo)
+            )
     except Exception:
         # Sin formato condicional el Excel sigue siendo válido.
         pass
@@ -574,11 +632,13 @@ def codigos_respuesta_catalogo(
             tipo = "EXTEMPORANEA"
         else:
             tipo = "OTRO"
-        items.append({
-            "codigo": codigo,
-            "descripcion": descripcion,
-            "tipo_funcional": tipo,
-        })
+        items.append(
+            {
+                "codigo": codigo,
+                "descripcion": descripcion,
+                "tipo_funcional": tipo,
+            }
+        )
 
     return {
         "regulacion": "Resolución 2284/2023 — Códigos de respuesta IPS",
@@ -609,13 +669,22 @@ def codigos_glosa_catalogo(
       - items: [{codigo, grupo, descripcion}]
     """
     from app.services.catalogo_glosas import (
-        CODIGOS_AU, CODIGOS_CL, CODIGOS_CO, CODIGOS_FA,
-        CODIGOS_SA, CODIGOS_SO, CODIGOS_TA,
+        CODIGOS_AU,
+        CODIGOS_CL,
+        CODIGOS_CO,
+        CODIGOS_FA,
+        CODIGOS_SA,
+        CODIGOS_SO,
+        CODIGOS_TA,
     )
 
     grupos = {
-        "FA": CODIGOS_FA, "TA": CODIGOS_TA, "SO": CODIGOS_SO,
-        "AU": CODIGOS_AU, "CO": CODIGOS_CO, "CL": CODIGOS_CL,
+        "FA": CODIGOS_FA,
+        "TA": CODIGOS_TA,
+        "SO": CODIGOS_SO,
+        "AU": CODIGOS_AU,
+        "CO": CODIGOS_CO,
+        "CL": CODIGOS_CL,
         "SA": CODIGOS_SA,
     }
 
@@ -632,11 +701,13 @@ def codigos_glosa_catalogo(
     por_grupo: dict[str, int] = {}
     for nombre_grupo, dic in grupos.items():
         for codigo, descripcion in dic.items():
-            items.append({
-                "codigo": codigo,
-                "grupo": nombre_grupo,
-                "descripcion": descripcion,
-            })
+            items.append(
+                {
+                    "codigo": codigo,
+                    "grupo": nombre_grupo,
+                    "descripcion": descripcion,
+                }
+            )
             por_grupo[nombre_grupo] = por_grupo.get(nombre_grupo, 0) + 1
 
     items.sort(key=lambda x: x["codigo"])
@@ -677,9 +748,7 @@ def estados_disponibles(
         {
             "clave": "RESPONDIDA",
             "nombre": "Respondida",
-            "descripcion": (
-                "HUS ya respondió la glosa, esperando decisión EPS."
-            ),
+            "descripcion": ("HUS ya respondió la glosa, esperando decisión EPS."),
             "es_cerrado": False,
             "color": "AZUL",
         },
@@ -687,8 +756,7 @@ def estados_disponibles(
             "clave": "RATIFICADA",
             "nombre": "Ratificada por EPS",
             "descripcion": (
-                "EPS sostuvo la glosa tras respuesta HUS. Pasa a "
-                "siguiente etapa o se acepta."
+                "EPS sostuvo la glosa tras respuesta HUS. Pasa a siguiente etapa o se acepta."
             ),
             "es_cerrado": False,
             "color": "ROJO",
@@ -710,27 +778,21 @@ def estados_disponibles(
         {
             "clave": "CONCILIADA",
             "nombre": "Conciliada bilateralmente",
-            "descripcion": (
-                "HUS y EPS llegaron a acuerdo en audiencia bilateral."
-            ),
+            "descripcion": ("HUS y EPS llegaron a acuerdo en audiencia bilateral."),
             "es_cerrado": True,
             "color": "AZUL",
         },
         {
             "clave": "ARCHIVADA",
             "nombre": "Archivada",
-            "descripcion": (
-                "Glosa retirada del flujo activo (sin valor a defender)."
-            ),
+            "descripcion": ("Glosa retirada del flujo activo (sin valor a defender)."),
             "es_cerrado": True,
             "color": "GRIS",
         },
         {
             "clave": "EXTEMPORANEA",
             "nombre": "Extemporánea",
-            "descripcion": (
-                "EPS objetó fuera del término legal. HUS puede rechazar."
-            ),
+            "descripcion": ("EPS objetó fuera del término legal. HUS puede rechazar."),
             "es_cerrado": False,
             "color": "AMARILLO",
         },
@@ -767,10 +829,7 @@ def glosas_sin_codigo_glosa(
     glosas = (
         db.query(GlosaRecord)
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .filter(
-            (GlosaRecord.codigo_glosa.is_(None))
-            | (GlosaRecord.codigo_glosa == "")
-        )
+        .filter((GlosaRecord.codigo_glosa.is_(None)) | (GlosaRecord.codigo_glosa == ""))
         .order_by(GlosaRecord.creado_en.desc())
         .limit(int(limit))
         .all()
@@ -778,16 +837,16 @@ def glosas_sin_codigo_glosa(
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "eps": g.eps,
-            "factura": g.factura,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "estado": g.estado,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "estado": g.estado,
+            }
+        )
 
     return {
         "total_sin_codigo": len(glosas),
@@ -822,17 +881,17 @@ def factura_detalle(
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "eps": g.eps,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "valor_recuperado": float(g.valor_recuperado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "valor_recuperado": float(g.valor_recuperado or 0),
+            }
+        )
 
     return {
         "factura_buscada": factura,
@@ -859,25 +918,21 @@ def buscar_por_radicado(
 
     Param `radicado`: número exacto.
     """
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.numero_radicado == radicado)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.numero_radicado == radicado).all()
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "eps": g.eps,
-            "factura": g.factura,
-            "numero_radicado": g.numero_radicado,
-            "estado": g.estado,
-            "valor_objetado": float(g.valor_objetado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "eps": g.eps,
+                "factura": g.factura,
+                "numero_radicado": g.numero_radicado,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+        )
 
     return {
         "radicado_buscado": radicado,
@@ -916,11 +971,7 @@ def buscar_similares_texto(
     if not tokens_query:
         return {"total_evaluadas": 0, "items": []}
 
-    candidatas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.texto_glosa_original.isnot(None))
-        .all()
-    )
+    candidatas = db.query(GlosaRecord).filter(GlosaRecord.texto_glosa_original.isnot(None)).all()
 
     items = []
     for g in candidatas:
@@ -932,14 +983,16 @@ def buscar_similares_texto(
         score = len(inter) / len(union) if union else 0
         if score < 0.05:  # threshold mínimo
             continue
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "score_similitud": round(score, 4),
-            "preview": (g.texto_glosa_original or "")[:200],
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "score_similitud": round(score, 4),
+                "preview": (g.texto_glosa_original or "")[:200],
+            }
+        )
 
     items.sort(key=lambda x: x["score_similitud"], reverse=True)
 
@@ -1056,6 +1109,7 @@ def buscar_por_id_o_factura(
         raise HTTPException(400, "Término vacío")
 
     from sqlalchemy import or_
+
     q = db.query(GlosaRecord)
 
     # Si es número puro, intentar como ID interno primero
@@ -1185,12 +1239,8 @@ async def generar_lote(
                 # Conceptos vinculados (hojas I/R del DGH)
                 try:
                     from app.models.db import ConceptoGlosaRecord as _CG
-                    conceptos = (
-                        db.query(_CG)
-                        .filter(_CG.glosa_id == g.id)
-                        .limit(5)
-                        .all()
-                    )
+
+                    conceptos = db.query(_CG).filter(_CG.glosa_id == g.id).limit(5).all()
                     for c in conceptos:
                         if c.codigo_glosa and c.codigo_glosa not in partes:
                             partes.append(c.codigo_glosa)
@@ -1201,13 +1251,17 @@ async def generar_lote(
                         if c.observacion_eps:
                             partes.append(c.observacion_eps)
                         if c.valor_objetado and float(c.valor_objetado) > 0:
-                            partes.append(f"Valor objetado: ${int(c.valor_objetado):,}".replace(",", "."))
+                            partes.append(
+                                f"Valor objetado: ${int(c.valor_objetado):,}".replace(",", ".")
+                            )
                 except Exception:
                     pass
                 texto = " — ".join([p for p in partes if p]).strip()
             if not texto:
                 resumen["fallidas"] += 1
-                resumen["detalle_fallidas"].append({"id": gid, "error": "sin texto ni conceptos vinculados"})
+                resumen["detalle_fallidas"].append(
+                    {"id": gid, "error": "sin texto ni conceptos vinculados"}
+                )
                 return
             try:
                 gi = GlosaInput(
@@ -1218,11 +1272,11 @@ async def generar_lote(
                     # así que tomamos solo la fecha con .date().
                     fecha_radicacion=(
                         g.fecha_radicacion_factura.date().isoformat()
-                        if g.fecha_radicacion_factura else None
+                        if g.fecha_radicacion_factura
+                        else None
                     ),
                     fecha_recepcion=(
-                        g.fecha_recepcion.date().isoformat()
-                        if g.fecha_recepcion else None
+                        g.fecha_recepcion.date().isoformat() if g.fecha_recepcion else None
                     ),
                     valor_aceptado=str(int(g.valor_aceptado or 0)),
                     tabla_excel=texto,
@@ -1231,10 +1285,12 @@ async def generar_lote(
                 )
                 # Few-shots según (EPS, código)
                 from app.api.routers.plantillas_gold import obtener_few_shot, marcar_usos
+
                 pg = obtener_few_shot(db, eps=gi.eps, codigo_glosa=g.codigo_glosa or "", limite=2)
                 # Pre-lookup de tarifa pactada — sin esto el LLM defaultea
                 # al argumento "no existe contrato" aunque exista en BD.
                 from app.services.tarifa_lookup_service import pre_lookup_tarifa
+
                 info_tarifa_pre = pre_lookup_tarifa(
                     db=db,
                     cod_pref=g.codigo_glosa or "",
@@ -1247,8 +1303,10 @@ async def generar_lote(
                 hint_gestor = ""
                 try:
                     from app.services.memoria_gestor import patron_gestor
+
                     pat = patron_gestor(
-                        db, autor_email=current_user.email,
+                        db,
+                        autor_email=current_user.email,
                         codigo_glosa=g.codigo_glosa or "",
                         eps=gi.eps or "",
                     )
@@ -1256,7 +1314,9 @@ async def generar_lote(
                 except Exception as e:
                     logger.debug(f"[lote {gid}] memoria_gestor falló: {e}")
                 res = await service.analizar(
-                    gi, contexto_pdf="", contratos_db=contratos,
+                    gi,
+                    contexto_pdf="",
+                    contratos_db=contratos,
                     few_shots=[p.argumento for p in pg],
                     info_tarifa=info_tarifa_pre,
                     hint_gestor=hint_gestor,
@@ -1264,6 +1324,7 @@ async def generar_lote(
                 if pg:
                     marcar_usos(db, [p.id for p in pg])
                 from datetime import datetime, timezone as _tz
+
                 g.dictamen = res.dictamen
                 g.dictamen_generado_en = datetime.now(_tz.utc)
                 g.score = res.score
@@ -1335,6 +1396,7 @@ async def refinar_dictamen_endpoint(
 
     # Reemplazar el bloque de argumento dentro del HTML existente
     import re as _re
+
     nuevo_html = glosa.dictamen
     patron = _re.compile(
         r'(<div style="font-size:12px;line-height:1\.9;[^"]*">)(.*?)(</div>)',
@@ -1356,6 +1418,7 @@ async def refinar_dictamen_endpoint(
 
     if data.guardar:
         from datetime import datetime, timezone as _tz
+
         glosa.dictamen = nuevo_html
         glosa.dictamen_generado_en = datetime.now(_tz.utc)
         db.commit()
@@ -1371,9 +1434,13 @@ async def refinar_dictamen_endpoint(
         # Guardar snapshot en historial de versiones
         try:
             from app.api.routers.versiones import guardar_version
+
             guardar_version(
-                db=db, glosa_id=glosa_id, dictamen_html=nuevo_html,
-                accion="REFINAR", autor_email=current_user.email,
+                db=db,
+                glosa_id=glosa_id,
+                dictamen_html=nuevo_html,
+                accion="REFINAR",
+                autor_email=current_user.email,
                 mensaje_refinar=data.mensaje[:500],
             )
         except Exception:
@@ -1398,6 +1465,7 @@ def validar_normas_texto(
     """Valida citas normativas en un texto libre (sin persistir).
     Útil para que el auditor chequee rápido un borrador."""
     from app.services.normativa import validar_citas
+
     return validar_citas(data.texto)
 
 
@@ -1461,7 +1529,7 @@ async def validar_pre_radicacion(
 @router.get("/alertas")
 def alertas(
     dias: int = 5,
-    db:   Session       = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
@@ -1491,8 +1559,14 @@ def glosas_vencen_24h(
     Pensado para banner alerta + notificación push diaria. Un cron en
     admin invoca este endpoint cada 8h para alimentar las notifs.
     """
-    terminales = ["LEVANTADA", "CONCILIADA", "ACEPTADA", "RATIFICADA",
-                  "ARCHIVADA", "DUPLICADA_OCULTA"]
+    terminales = [
+        "LEVANTADA",
+        "CONCILIADA",
+        "ACEPTADA",
+        "RATIFICADA",
+        "ARCHIVADA",
+        "DUPLICADA_OCULTA",
+    ]
     base_q = db.query(GlosaRecord).filter(
         GlosaRecord.dias_restantes <= 1,
         GlosaRecord.estado.notin_(terminales),
@@ -1504,10 +1578,14 @@ def glosas_vencen_24h(
             | (GlosaRecord.gestor_nombre == current_user.email)
         )
 
-    rows = base_q.order_by(
-        GlosaRecord.dias_restantes.asc(),
-        GlosaRecord.valor_objetado.desc(),
-    ).limit(200).all()
+    rows = (
+        base_q.order_by(
+            GlosaRecord.dias_restantes.asc(),
+            GlosaRecord.valor_objetado.desc(),
+        )
+        .limit(200)
+        .all()
+    )
 
     valor_total_riesgo = sum(float(g.valor_objetado or 0) for g in rows)
 
@@ -1516,8 +1594,10 @@ def glosas_vencen_24h(
         "valor_total_riesgo": valor_total_riesgo,
         "glosas": [
             {
-                "id": g.id, "factura": g.factura,
-                "eps": g.eps, "codigo_glosa": g.codigo_glosa,
+                "id": g.id,
+                "factura": g.factura,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": float(g.valor_objetado or 0),
                 "dias_restantes": int(g.dias_restantes or 0),
                 "estado": g.estado,
@@ -1533,7 +1613,7 @@ def glosas_vencen_24h(
 
 @router.get("/metrics")
 def metrics(
-    db:   Session       = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
@@ -1579,9 +1659,7 @@ def dashboard_plata_recuperada(
     Filtros opcionales: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD.
     """
 
-    base_q = db.query(GlosaRecord).filter(
-        GlosaRecord.estado.notin_(["DUPLICADA_OCULTA"])
-    )
+    base_q = db.query(GlosaRecord).filter(GlosaRecord.estado.notin_(["DUPLICADA_OCULTA"]))
 
     if desde:
         try:
@@ -1606,9 +1684,10 @@ def dashboard_plata_recuperada(
     n_levantadas = sum(1 for g in glosas if (g.estado or "").upper() == "LEVANTADA")
     n_ratificadas = sum(1 for g in glosas if (g.estado or "").upper() == "RATIFICADA")
     n_pendientes = sum(
-        1 for g in glosas
-        if (g.estado or "").upper() not in
-           {"LEVANTADA", "RATIFICADA", "ACEPTADA", "CONCILIADA", "ARCHIVADA"}
+        1
+        for g in glosas
+        if (g.estado or "").upper()
+        not in {"LEVANTADA", "RATIFICADA", "ACEPTADA", "CONCILIADA", "ARCHIVADA"}
     )
 
     tasa_efectividad = (n_levantadas / max(1, n_levantadas + n_ratificadas)) * 100
@@ -1617,14 +1696,17 @@ def dashboard_plata_recuperada(
     por_eps: dict[str, dict] = {}
     for g in glosas:
         eps_k = (g.eps or "—").upper()
-        d = por_eps.setdefault(eps_k, {
-            "eps": eps_k,
-            "n_glosas": 0,
-            "valor_objetado": 0.0,
-            "valor_aceptado": 0.0,
-            "valor_recuperado": 0.0,
-            "n_levantadas": 0,
-        })
+        d = por_eps.setdefault(
+            eps_k,
+            {
+                "eps": eps_k,
+                "n_glosas": 0,
+                "valor_objetado": 0.0,
+                "valor_aceptado": 0.0,
+                "valor_recuperado": 0.0,
+                "n_levantadas": 0,
+            },
+        )
         d["n_glosas"] += 1
         d["valor_objetado"] += float(g.valor_objetado or 0)
         d["valor_aceptado"] += float(g.valor_aceptado or 0)
@@ -1637,12 +1719,15 @@ def dashboard_plata_recuperada(
     por_codigo: dict[str, dict] = {}
     for g in glosas:
         cod = (g.codigo_glosa or "—").upper()
-        d = por_codigo.setdefault(cod, {
-            "codigo_glosa": cod,
-            "n_glosas": 0,
-            "valor_objetado": 0.0,
-            "valor_recuperado": 0.0,
-        })
+        d = por_codigo.setdefault(
+            cod,
+            {
+                "codigo_glosa": cod,
+                "n_glosas": 0,
+                "valor_objetado": 0.0,
+                "valor_recuperado": 0.0,
+            },
+        )
         d["n_glosas"] += 1
         d["valor_objetado"] += float(g.valor_objetado or 0)
         d["valor_recuperado"] += float(g.valor_recuperado or 0)
@@ -1654,12 +1739,15 @@ def dashboard_plata_recuperada(
         if not g.creado_en:
             continue
         ym = g.creado_en.strftime("%Y-%m")
-        d = por_mes.setdefault(ym, {
-            "mes": ym,
-            "n_glosas": 0,
-            "valor_objetado": 0.0,
-            "valor_recuperado": 0.0,
-        })
+        d = por_mes.setdefault(
+            ym,
+            {
+                "mes": ym,
+                "n_glosas": 0,
+                "valor_objetado": 0.0,
+                "valor_recuperado": 0.0,
+            },
+        )
         d["n_glosas"] += 1
         d["valor_objetado"] += float(g.valor_objetado or 0)
         d["valor_recuperado"] += float(g.valor_recuperado or 0)
@@ -1751,9 +1839,7 @@ def paciente_resumen(
         "glosas": [
             {
                 "id": g.id,
-                "creado_en": (
-                    g.creado_en.isoformat() if g.creado_en else None
-                ),
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
                 "factura": g.factura,
                 "eps": g.eps,
                 "codigo_glosa": g.codigo_glosa,
@@ -1795,11 +1881,7 @@ def glosas_sin_actividad(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     # Última actividad por glosa según audit_log
     ultimas: dict[int, "object"] = {}
@@ -1838,16 +1920,18 @@ def glosas_sin_actividad(
             continue
 
         dias_sin = (ahora - ultimo_mov).days
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "dias_restantes": g.dias_restantes,
-            "gestor_nombre": g.gestor_nombre,
-            "ultimo_movimiento_en": ultimo_mov.isoformat(),
-            "dias_sin_movimiento": dias_sin,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "dias_restantes": g.dias_restantes,
+                "gestor_nombre": g.gestor_nombre,
+                "ultimo_movimiento_en": ultimo_mov.isoformat(),
+                "dias_sin_movimiento": dias_sin,
+            }
+        )
 
     items.sort(key=lambda x: x["dias_sin_movimiento"], reverse=True)
 
@@ -1887,11 +1971,7 @@ def glosas_incompletas(
     # Pre-filtramos por estado en SQL; los criterios de huecos los
     # evaluamos en Python para tener semántica consistente (ej.
     # "dictamen corto" requiere len() y SQL LENGTH no es portable).
-    candidatas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    candidatas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     items = []
     for g in candidatas:
@@ -1908,17 +1988,17 @@ def glosas_incompletas(
         if not faltantes:
             continue
 
-        items.append({
-            "id": g.id,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "campos_faltantes": faltantes,
-            "total_huecos": len(faltantes),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "campos_faltantes": faltantes,
+                "total_huecos": len(faltantes),
+            }
+        )
 
     items.sort(key=lambda x: x["total_huecos"], reverse=True)
 
@@ -1944,14 +2024,9 @@ def facetas_glosas(
     Hace un solo round-trip por columna; cada columna tiene índice
     en BD así que es O(distinct) eficiente.
     """
+
     def _distinct(col):
-        rows = (
-            db.query(col)
-            .filter(col.isnot(None))
-            .distinct()
-            .order_by(col.asc())
-            .all()
-        )
+        rows = db.query(col).filter(col.isnot(None)).distinct().order_by(col.asc()).all()
         return [r[0] for r in rows if r[0]]
 
     return {
@@ -1982,6 +2057,7 @@ def glosas_por_factura(
     concepto al auditor sin pegar texto.
     """
     from app.models.db import GlosaRecord as _GR
+
     factura_limpio = numero_factura.strip()
     if not factura_limpio:
         return {"numero_factura": "", "glosas": []}
@@ -1992,17 +2068,14 @@ def glosas_por_factura(
         El normalizador también repara truncamientos como BUCARAMANG → BUCARAMANGA.
         """
         from app.services import pagador_normalizer
+
         t = pagador_normalizer.nombre_corto(tercero)
         if t:
             return t
         return pagador_normalizer.nombre_corto(plan_eps)
 
     glosas_padre = (
-        db.query(_GR)
-        .filter(_GR.factura == factura_limpio)
-        .order_by(_GR.id.asc())
-        .limit(50)
-        .all()
+        db.query(_GR).filter(_GR.factura == factura_limpio).order_by(_GR.id.asc()).limit(50).all()
     )
     items: list[dict] = []
     glosa_ids = [g.id for g in glosas_padre]
@@ -2023,55 +2096,65 @@ def glosas_por_factura(
         # Caso normal: Excel de recepción completo con hojas I/R
         for c in conceptos:
             padre = mapa_padre.get(c.glosa_id)
-            items.append({
-                "id": c.glosa_id,                    # glosa padre (para analizar llamando al endpoint)
-                "concepto_id": c.id,                  # identificador del concepto específico
-                "oid_dgh": c.oid_dgh or "",
-                "codigo_glosa": c.codigo_glosa or "",
-                "nombre_glosa": c.nombre_glosa or "",
-                "cups": c.cups_codigo or "",
-                "servicio": c.cups_descripcion or "",
-                "centro_costo": c.centro_costo or "",
-                "observacion_eps": c.observacion_eps or "",
-                "valor_objetado": c.valor_objetado or 0,
-                "valor_aceptado": 0,
-                "estado": (padre.estado if padre else "") or "",
-                "eps": (padre.eps if padre else "") or "",
-                # Nombre comercial corto (FacturaCartera.Tercero.NombreCompletoNA),
-                # ej: "DISPENSARIO MEDICO BUCARAMANGA". La UI lo prefiere sobre
-                # el plan EPS cuando existe.
-                "tercero_nombre": _nombre_corto_entidad(
-                    padre.eps if padre else "",
-                    getattr(padre, "tercero_nombre", None) if padre else "",
-                ),
-                "concepto_glosa": c.nombre_glosa or "",
-                "texto_glosa_original": (c.observacion_eps or "")[:400],
-                "fecha_radicacion_factura": padre.fecha_radicacion_factura.isoformat() if padre and padre.fecha_radicacion_factura else None,
-                "fecha_recepcion": padre.fecha_recepcion.isoformat() if padre and padre.fecha_recepcion else None,
-                "dictamen_generado": bool(c.dictamen_html),
-            })
+            items.append(
+                {
+                    "id": c.glosa_id,  # glosa padre (para analizar llamando al endpoint)
+                    "concepto_id": c.id,  # identificador del concepto específico
+                    "oid_dgh": c.oid_dgh or "",
+                    "codigo_glosa": c.codigo_glosa or "",
+                    "nombre_glosa": c.nombre_glosa or "",
+                    "cups": c.cups_codigo or "",
+                    "servicio": c.cups_descripcion or "",
+                    "centro_costo": c.centro_costo or "",
+                    "observacion_eps": c.observacion_eps or "",
+                    "valor_objetado": c.valor_objetado or 0,
+                    "valor_aceptado": 0,
+                    "estado": (padre.estado if padre else "") or "",
+                    "eps": (padre.eps if padre else "") or "",
+                    # Nombre comercial corto (FacturaCartera.Tercero.NombreCompletoNA),
+                    # ej: "DISPENSARIO MEDICO BUCARAMANGA". La UI lo prefiere sobre
+                    # el plan EPS cuando existe.
+                    "tercero_nombre": _nombre_corto_entidad(
+                        padre.eps if padre else "",
+                        getattr(padre, "tercero_nombre", None) if padre else "",
+                    ),
+                    "concepto_glosa": c.nombre_glosa or "",
+                    "texto_glosa_original": (c.observacion_eps or "")[:400],
+                    "fecha_radicacion_factura": padre.fecha_radicacion_factura.isoformat()
+                    if padre and padre.fecha_radicacion_factura
+                    else None,
+                    "fecha_recepcion": padre.fecha_recepcion.isoformat()
+                    if padre and padre.fecha_recepcion
+                    else None,
+                    "dictamen_generado": bool(c.dictamen_html),
+                }
+            )
     else:
         # Fallback legacy: 1 GlosaRecord por concepto (flujo importación masiva)
         for g in glosas_padre:
-            items.append({
-                "id": g.id,
-                "concepto_id": None,
-                "codigo_glosa": g.codigo_glosa or "",
-                "nombre_glosa": g.concepto_glosa or "",
-                "concepto_glosa": g.concepto_glosa or "",
-                "cups": g.cups_servicio or "",
-                "servicio": g.servicio_descripcion or "",
-                "centro_costo": "",
-                "observacion_eps": "",
-                "valor_objetado": g.valor_objetado or 0,
-                "valor_aceptado": g.valor_aceptado or 0,
-                "estado": g.estado or "",
-                "eps": g.eps or "",
-                "texto_glosa_original": (g.texto_glosa_original or "")[:400],
-                "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,
-                "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
-                "dictamen_generado": bool(g.dictamen),
-            })
+            items.append(
+                {
+                    "id": g.id,
+                    "concepto_id": None,
+                    "codigo_glosa": g.codigo_glosa or "",
+                    "nombre_glosa": g.concepto_glosa or "",
+                    "concepto_glosa": g.concepto_glosa or "",
+                    "cups": g.cups_servicio or "",
+                    "servicio": g.servicio_descripcion or "",
+                    "centro_costo": "",
+                    "observacion_eps": "",
+                    "valor_objetado": g.valor_objetado or 0,
+                    "valor_aceptado": g.valor_aceptado or 0,
+                    "estado": g.estado or "",
+                    "eps": g.eps or "",
+                    "texto_glosa_original": (g.texto_glosa_original or "")[:400],
+                    "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat()
+                    if g.fecha_radicacion_factura
+                    else None,
+                    "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+                    "dictamen_generado": bool(g.dictamen),
+                }
+            )
 
     eps_unicas = list({g.eps for g in glosas_padre if g.eps})
     # Nombre comercial corto de la entidad (Tercero.NombreCompletoNA). Si todas
@@ -2080,10 +2163,13 @@ def glosas_por_factura(
     # Usar el helper para fallback: si tercero_nombre esta vacio, extrae el
     # nombre corto del plan EPS. Así las glosas importadas antes del campo
     # tercero_nombre también muestran el nombre comercial limpio.
-    terceros_unicos = list({
-        _nombre_corto_entidad(g.eps, getattr(g, "tercero_nombre", None))
-        for g in glosas_padre if g.eps
-    })
+    terceros_unicos = list(
+        {
+            _nombre_corto_entidad(g.eps, getattr(g, "tercero_nombre", None))
+            for g in glosas_padre
+            if g.eps
+        }
+    )
     terceros_unicos = [t for t in terceros_unicos if t]
     total_objetado = sum(i["valor_objetado"] or 0 for i in items)
     return {
@@ -2112,6 +2198,7 @@ def facturas_pendientes_agrupadas(
     """
     from app.models.db import GlosaRecord as _GR
     from sqlalchemy import or_ as _or
+
     repo = GlosaRepository(db)
     # Filtrar por gestor/equipo (igual que mis-asignaciones)
     equipo = getattr(current_user, "equipo", None)
@@ -2145,15 +2232,21 @@ def facturas_pendientes_agrupadas(
         eps_set = {g.eps for g in glosas if g.eps}
         total = sum(g.valor_objetado or 0 for g in glosas)
         codigos = [g.codigo_glosa for g in glosas if g.codigo_glosa]
-        fecha_mas_reciente = max((g.fecha_recepcion for g in glosas if g.fecha_recepcion), default=None)
-        resultado.append({
-            "numero_factura": fact,
-            "eps": list(eps_set)[0] if len(eps_set) == 1 else None,
-            "cantidad_conceptos": len(glosas),
-            "valor_total_objetado": total,
-            "codigos": codigos[:10],
-            "fecha_recepcion_mas_reciente": fecha_mas_reciente.isoformat() if fecha_mas_reciente else None,
-        })
+        fecha_mas_reciente = max(
+            (g.fecha_recepcion for g in glosas if g.fecha_recepcion), default=None
+        )
+        resultado.append(
+            {
+                "numero_factura": fact,
+                "eps": list(eps_set)[0] if len(eps_set) == 1 else None,
+                "cantidad_conceptos": len(glosas),
+                "valor_total_objetado": total,
+                "codigos": codigos[:10],
+                "fecha_recepcion_mas_reciente": fecha_mas_reciente.isoformat()
+                if fecha_mas_reciente
+                else None,
+            }
+        )
     # Orden: mas conceptos primero, luego mayor valor
     resultado.sort(key=lambda x: (-x["cantidad_conceptos"], -x["valor_total_objetado"]))
     return {"total_facturas": len(resultado), "facturas": resultado[:limite]}
@@ -2182,6 +2275,7 @@ def mis_asignaciones(
     repo = GlosaRepository(db)
     if todas and current_user.rol in ("SUPER_ADMIN", "COORDINADOR"):
         from app.models.db import GlosaRecord as _GR
+
         glosas = (
             db.query(_GR)
             .filter(_GR.estado.notin_(["LEVANTADA", "CONCILIADA"]))
@@ -2195,7 +2289,8 @@ def mis_asignaciones(
         equipo = getattr(current_user, "equipo", None)
         emails_equipo = repo.emails_del_mismo_equipo(equipo) if equipo else None
         glosas = repo.listar_por_gestor(
-            current_user.email, current_user.nombre,
+            current_user.email,
+            current_user.nombre,
             emails_equipo=emails_equipo,
         )
 
@@ -2284,8 +2379,14 @@ def mis_asignaciones(
     if vista:
         vista_norm = vista.lower().strip()
         contratos_db = ContratoRepository(db).como_dict() or {}
-        terminales = {"RESPONDIDA", "CONCILIADA", "LEVANTADA", "ACEPTADA",
-                      "RATIFICADA", "ARCHIVADA"}
+        terminales = {
+            "RESPONDIDA",
+            "CONCILIADA",
+            "LEVANTADA",
+            "ACEPTADA",
+            "RATIFICADA",
+            "ARCHIVADA",
+        }
 
         # Vista "dictamen_obsoleto" — recorre el módulo dedicado. Cargamos
         # los IDs antes del filtro para no llamar dictamen_stale.es_stale
@@ -2293,6 +2394,7 @@ def mis_asignaciones(
         ids_obsoletos: set[int] = set()
         if vista_norm == "dictamen_obsoleto":
             from app.services.dictamen_stale import es_stale as _es_stale
+
             for g in glosas:
                 try:
                     if _es_stale(g, db):
@@ -2330,6 +2432,7 @@ def mis_asignaciones(
         glosas = [g for g in glosas if _matches(g)]
 
     from app.services.resolver_entidad import resolver_entidad_mostrar
+
     # Soportes auto-detectados: cuántos PDFs hay en el servidor por
     # factura + tipos detectados. Un lookup por factura única (no por
     # glosa) para no penalizar listas largas. Silencioso si el
@@ -2338,6 +2441,7 @@ def mis_asignaciones(
     _soportes_tipos_por_factura: dict[str, str] = {}
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
+
         _indexer = get_indexer()
         if _indexer.stats().get("raiz_existe"):
             _facturas_unicas = {(g.factura or "").strip() for g in glosas if g.factura}
@@ -2357,55 +2461,59 @@ def mis_asignaciones(
     items = []
     for g in glosas:
         score, motivo = score_por_id.get(g.id, (0, ""))
-        items.append({
-            "id": g.id,
-            "eps": resolver_entidad_mostrar(
-                eps=g.eps,
-                tercero_nombre=getattr(g, "tercero_nombre", None),
-                eps_codigo=getattr(g, "eps_codigo", None),
-            ),
-            "eps_raw": g.eps,
-            "factura": g.factura,
-            "numero_radicado": g.numero_radicado,
-            "consecutivo_dgh": g.consecutivo_dgh,
-            "gestor_nombre": g.gestor_nombre,
-            "valor_objetado": g.valor_objetado,
-            "estado": g.estado,
-            "prioridad": g.prioridad,
-            "dias_restantes": g.dias_restantes,
-            "dias_radicacion_dgh": getattr(g, "dias_radicacion_dgh", None),
-            "fecha_vencimiento": g.fecha_vencimiento.isoformat() if g.fecha_vencimiento else None,
-            "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
-            "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat() if g.fecha_radicacion_factura else None,
-            "fecha_documento_dgh": g.fecha_documento_dgh.isoformat() if g.fecha_documento_dgh else None,
-            "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
-            "radicado_info": g.radicado_info,
-            "referencia": g.referencia,
-            # Flag para que el front muestre el boton "Marcar Respondida" solo
-            # si ya hay un dictamen generado (sino no hay nada que cerrar).
-            "dictamen_generado": bool(g.dictamen),
-            "observacion_tecnico": g.observacion_tecnico,
-            "tipo_glosa_excel": g.tipo_glosa_excel,
-            "profesional_medico": g.profesional_medico,
-            "dictamen": g.dictamen,
-            "workflow_state": g.workflow_state or "BORRADOR",
-            "nota_workflow": g.nota_workflow,
-            "valor_aceptado": float(g.valor_aceptado or 0.0),
-            "numero_nota_credito": getattr(g, "numero_nota_credito", None),
-            # Priorización automática (R-UI 27-abr-2026)
-            "score_urgencia": int(score),
-            "motivo_prioridad": motivo,
-            # Campos para Sprint #3 (similares en bloque) y filtros UI
-            "codigo_glosa": g.codigo_glosa,
-            "cups_servicio": getattr(g, "cups_servicio", None),
-            # Soportes auto-detectados en el servidor de archivos
-            "soportes_disponibles": _soportes_por_factura.get(
-                (g.factura or "").strip(), 0
-            ),
-            "soportes_tipos": _soportes_tipos_por_factura.get(
-                (g.factura or "").strip(), ""
-            ),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": resolver_entidad_mostrar(
+                    eps=g.eps,
+                    tercero_nombre=getattr(g, "tercero_nombre", None),
+                    eps_codigo=getattr(g, "eps_codigo", None),
+                ),
+                "eps_raw": g.eps,
+                "factura": g.factura,
+                "numero_radicado": g.numero_radicado,
+                "consecutivo_dgh": g.consecutivo_dgh,
+                "gestor_nombre": g.gestor_nombre,
+                "valor_objetado": g.valor_objetado,
+                "estado": g.estado,
+                "prioridad": g.prioridad,
+                "dias_restantes": g.dias_restantes,
+                "dias_radicacion_dgh": getattr(g, "dias_radicacion_dgh", None),
+                "fecha_vencimiento": g.fecha_vencimiento.isoformat()
+                if g.fecha_vencimiento
+                else None,
+                "fecha_entrega": g.fecha_entrega.isoformat() if g.fecha_entrega else None,
+                "fecha_radicacion_factura": g.fecha_radicacion_factura.isoformat()
+                if g.fecha_radicacion_factura
+                else None,
+                "fecha_documento_dgh": g.fecha_documento_dgh.isoformat()
+                if g.fecha_documento_dgh
+                else None,
+                "fecha_recepcion": g.fecha_recepcion.isoformat() if g.fecha_recepcion else None,
+                "radicado_info": g.radicado_info,
+                "referencia": g.referencia,
+                # Flag para que el front muestre el boton "Marcar Respondida" solo
+                # si ya hay un dictamen generado (sino no hay nada que cerrar).
+                "dictamen_generado": bool(g.dictamen),
+                "observacion_tecnico": g.observacion_tecnico,
+                "tipo_glosa_excel": g.tipo_glosa_excel,
+                "profesional_medico": g.profesional_medico,
+                "dictamen": g.dictamen,
+                "workflow_state": g.workflow_state or "BORRADOR",
+                "nota_workflow": g.nota_workflow,
+                "valor_aceptado": float(g.valor_aceptado or 0.0),
+                "numero_nota_credito": getattr(g, "numero_nota_credito", None),
+                # Priorización automática (R-UI 27-abr-2026)
+                "score_urgencia": int(score),
+                "motivo_prioridad": motivo,
+                # Campos para Sprint #3 (similares en bloque) y filtros UI
+                "codigo_glosa": g.codigo_glosa,
+                "cups_servicio": getattr(g, "cups_servicio", None),
+                # Soportes auto-detectados en el servidor de archivos
+                "soportes_disponibles": _soportes_por_factura.get((g.factura or "").strip(), 0),
+                "soportes_tipos": _soportes_tipos_por_factura.get((g.factura or "").strip(), ""),
+            }
+        )
     return items
 
 
@@ -2413,7 +2521,7 @@ def mis_asignaciones(
 def actualizar_estado(
     glosa_id: int,
     nuevo_estado: str,
-    db:    Session        = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
@@ -2456,9 +2564,13 @@ def exportar_resumen_eps_csv(
             continue
         if eps not in por_eps:
             por_eps[eps] = {
-                "total": 0, "abiertas": 0, "cerradas": 0,
-                "decididas": 0, "levantadas": 0,
-                "obj": 0.0, "rec": 0.0,
+                "total": 0,
+                "abiertas": 0,
+                "cerradas": 0,
+                "decididas": 0,
+                "levantadas": 0,
+                "obj": 0.0,
+                "rec": 0.0,
             }
         b = por_eps[eps]
         b["total"] += 1
@@ -2477,30 +2589,41 @@ def exportar_resumen_eps_csv(
     def _generar():
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow([
-            "eps", "total_glosas", "abiertas", "cerradas",
-            "levantadas", "valor_objetado", "valor_recuperado",
-            "tasa_levantamiento_pct",
-        ])
+        w.writerow(
+            [
+                "eps",
+                "total_glosas",
+                "abiertas",
+                "cerradas",
+                "levantadas",
+                "valor_objetado",
+                "valor_recuperado",
+                "tasa_levantamiento_pct",
+            ]
+        )
         yield buf.getvalue()
-        buf.seek(0); buf.truncate(0)
+        buf.seek(0)
+        buf.truncate(0)
 
         for eps, b in sorted(por_eps.items()):
-            tasa = (
-                round(100 * b["levantadas"] / b["decididas"], 2)
-                if b["decididas"] else 0.0
+            tasa = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
+            w.writerow(
+                [
+                    eps,
+                    b["total"],
+                    b["abiertas"],
+                    b["cerradas"],
+                    b["levantadas"],
+                    int(b["obj"]),
+                    int(b["rec"]),
+                    tasa,
+                ]
             )
-            w.writerow([
-                eps, b["total"], b["abiertas"], b["cerradas"],
-                b["levantadas"], int(b["obj"]), int(b["rec"]),
-                tasa,
-            ])
             yield buf.getvalue()
-            buf.seek(0); buf.truncate(0)
+            buf.seek(0)
+            buf.truncate(0)
 
-    fname = (
-        f"resumen-eps-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
-    )
+    fname = f"resumen-eps-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
         _generar(),
         media_type="text/csv",
@@ -2550,11 +2673,7 @@ def exportar_paquete_multi_zip(
     if len(ids_list) > 100:
         raise HTTPException(400, "máximo 100 glosas por paquete")
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.id.in_(ids_list))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids_list)).all()
     if not glosas:
         raise HTTPException(404, "Ninguna glosa encontrada")
 
@@ -2577,9 +2696,7 @@ def exportar_paquete_multi_zip(
             subdir = f"glosa-{g.id}/"
             datos = {
                 "id": g.id,
-                "creado_en": (
-                    g.creado_en.isoformat() if g.creado_en else None
-                ),
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
                 "eps": g.eps,
                 "factura": g.factura,
                 "codigo_glosa": g.codigo_glosa,
@@ -2641,15 +2758,17 @@ def top_glosas_antiguas(
         if cre and cre.tzinfo is None:
             cre = cre.replace(tzinfo=timezone.utc)
         antig = (ahora - cre).days if cre else None
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "creado_en": cre.isoformat() if cre else None,
-            "antiguedad_dias": antig,
-            "valor_objetado": float(g.valor_objetado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "creado_en": cre.isoformat() if cre else None,
+                "antiguedad_dias": antig,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -2689,14 +2808,16 @@ def top_glosas_urgentes(
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "dias_restantes": g.dias_restantes,
-            "valor_objetado": float(g.valor_objetado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "dias_restantes": g.dias_restantes,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -2731,15 +2852,17 @@ def top_glosas_recuperadas(
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "valor_recuperado": float(g.valor_recuperado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "valor_recuperado": float(g.valor_recuperado or 0),
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -2769,23 +2892,21 @@ def top_glosas_por_valor(
     if abiertas_only:
         q = q.filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
 
-    glosas = (
-        q.order_by(GlosaRecord.valor_objetado.desc())
-        .limit(int(top))
-        .all()
-    )
+    glosas = q.order_by(GlosaRecord.valor_objetado.desc()).limit(int(top)).all()
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "dias_restantes": g.dias_restantes,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "dias_restantes": g.dias_restantes,
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -2817,7 +2938,8 @@ def buscar_por_cups(
     from app.models.db import ConceptoGlosaRecord
 
     glosa_ids = {
-        row[0] for row in (
+        row[0]
+        for row in (
             db.query(ConceptoGlosaRecord.glosa_id)
             .filter(ConceptoGlosaRecord.cups_codigo == cups)
             .filter(ConceptoGlosaRecord.glosa_id.isnot(None))
@@ -2843,16 +2965,16 @@ def buscar_por_cups(
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": float(g.valor_objetado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+        )
 
     return {
         "cups_buscado": cups,
@@ -2884,11 +3006,7 @@ def cups_perfil(
     Declarado ANTES de /{glosa_id} para evitar collision con path
     resolver de FastAPI.
     """
-    conceptos = (
-        db.query(ConceptoGlosaRecord)
-        .filter(ConceptoGlosaRecord.cups_codigo == cups)
-        .all()
-    )
+    conceptos = db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.cups_codigo == cups).all()
 
     if not conceptos:
         return {
@@ -2905,11 +3023,7 @@ def cups_perfil(
     glosa_ids = {c.glosa_id for c in conceptos if c.glosa_id is not None}
     epss: dict[str, int] = {}
     if glosa_ids:
-        for g in (
-            db.query(GlosaRecord)
-            .filter(GlosaRecord.id.in_(glosa_ids))
-            .all()
-        ):
+        for g in db.query(GlosaRecord).filter(GlosaRecord.id.in_(glosa_ids)).all():
             if g.eps:
                 epss[g.eps] = epss.get(g.eps, 0) + 1
 
@@ -2917,9 +3031,7 @@ def cups_perfil(
     centros: set[str] = set()
     for c in conceptos:
         if c.codigo_glosa:
-            por_codigo[c.codigo_glosa] = (
-                por_codigo.get(c.codigo_glosa, 0) + 1
-            )
+            por_codigo[c.codigo_glosa] = por_codigo.get(c.codigo_glosa, 0) + 1
         if c.centro_costo:
             centros.add(c.centro_costo)
 
@@ -2930,12 +3042,8 @@ def cups_perfil(
         "frecuencia_total": len(conceptos),
         "valor_objetado_total": int(sum(valores)),
         "valor_promedio": round(sum(valores) / len(valores), 2),
-        "por_eps": dict(
-            sorted(epss.items(), key=lambda x: x[1], reverse=True)
-        ),
-        "por_codigo_glosa": dict(
-            sorted(por_codigo.items(), key=lambda x: x[1], reverse=True)
-        ),
+        "por_eps": dict(sorted(epss.items(), key=lambda x: x[1], reverse=True)),
+        "por_codigo_glosa": dict(sorted(por_codigo.items(), key=lambda x: x[1], reverse=True)),
         "centros_costo": sorted(centros),
     }
 
@@ -2958,9 +3066,9 @@ def detectar_glosas_similares_en_bloque(
     devuelve solo los grupos que coinciden.
     """
     base_q = db.query(GlosaRecord).filter(
-        GlosaRecord.estado.notin_(["LEVANTADA", "CONCILIADA", "ACEPTADA",
-                                   "RATIFICADA", "ARCHIVADA",
-                                   "DUPLICADA_OCULTA"]),
+        GlosaRecord.estado.notin_(
+            ["LEVANTADA", "CONCILIADA", "ACEPTADA", "RATIFICADA", "ARCHIVADA", "DUPLICADA_OCULTA"]
+        ),
     )
     if current_user.rol == "AUDITOR":
         base_q = base_q.filter(
@@ -2994,29 +3102,35 @@ def detectar_glosas_similares_en_bloque(
         valor_total = sum(float(g.valor_objetado or 0.0) for g in glosas)
         respondidas = [g for g in glosas if g.dictamen and len(g.dictamen) > 200]
         dictamen_modelo = (
-            max(respondidas, key=lambda g: len(g.dictamen or "")).dictamen
-            if respondidas else None
+            max(respondidas, key=lambda g: len(g.dictamen or "")).dictamen if respondidas else None
         )
-        resultado.append({
-            "eps": eps_g, "codigo_glosa": cod_g, "cups": cups_g,
-            "n_glosas": len(glosas),
-            "valor_total": valor_total,
-            "dictamen_modelo_glosa_id": (
-                max(respondidas, key=lambda g: len(g.dictamen or "")).id
-                if respondidas else None
-            ),
-            "tiene_dictamen_modelo": dictamen_modelo is not None,
-            "glosas": [
-                {
-                    "id": g.id, "factura": g.factura,
-                    "valor_objetado": float(g.valor_objetado or 0.0),
-                    "estado": g.estado, "workflow_state": g.workflow_state,
-                    "dias_restantes": g.dias_restantes,
-                    "tiene_dictamen": bool(g.dictamen and len(g.dictamen) > 200),
-                }
-                for g in glosas
-            ],
-        })
+        resultado.append(
+            {
+                "eps": eps_g,
+                "codigo_glosa": cod_g,
+                "cups": cups_g,
+                "n_glosas": len(glosas),
+                "valor_total": valor_total,
+                "dictamen_modelo_glosa_id": (
+                    max(respondidas, key=lambda g: len(g.dictamen or "")).id
+                    if respondidas
+                    else None
+                ),
+                "tiene_dictamen_modelo": dictamen_modelo is not None,
+                "glosas": [
+                    {
+                        "id": g.id,
+                        "factura": g.factura,
+                        "valor_objetado": float(g.valor_objetado or 0.0),
+                        "estado": g.estado,
+                        "workflow_state": g.workflow_state,
+                        "dias_restantes": g.dias_restantes,
+                        "tiene_dictamen": bool(g.dictamen and len(g.dictamen) > 200),
+                    }
+                    for g in glosas
+                ],
+            }
+        )
 
     resultado.sort(key=lambda x: -x["valor_total"])
     return {
@@ -3029,7 +3143,7 @@ def detectar_glosas_similares_en_bloque(
 @router.get("/{glosa_id}")
 def obtener_glosa(
     glosa_id: int,
-    db:    Session       = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     repo = GlosaRepository(db)
@@ -3037,6 +3151,7 @@ def obtener_glosa(
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
     from app.services.dictamen_stale import motivo_stale
+
     aviso_stale = motivo_stale(glosa, db)
     return {
         "id": glosa.id,
@@ -3048,7 +3163,9 @@ def obtener_glosa(
         "etapa": glosa.etapa,
         "estado": glosa.estado,
         "dictamen": glosa.dictamen,
-        "dictamen_generado_en": glosa.dictamen_generado_en.isoformat() if getattr(glosa, "dictamen_generado_en", None) else None,
+        "dictamen_generado_en": glosa.dictamen_generado_en.isoformat()
+        if getattr(glosa, "dictamen_generado_en", None)
+        else None,
         "dictamen_stale": bool(aviso_stale),
         "dictamen_stale_motivo": aviso_stale,
         "dias_restantes": glosa.dias_restantes,
@@ -3056,11 +3173,17 @@ def obtener_glosa(
         "numero_radicado": glosa.numero_radicado,
         "consecutivo_dgh": glosa.consecutivo_dgh,
         "gestor_nombre": glosa.gestor_nombre,
-        "fecha_radicacion_factura": glosa.fecha_radicacion_factura.isoformat() if glosa.fecha_radicacion_factura else None,
-        "fecha_documento_dgh": glosa.fecha_documento_dgh.isoformat() if glosa.fecha_documento_dgh else None,
+        "fecha_radicacion_factura": glosa.fecha_radicacion_factura.isoformat()
+        if glosa.fecha_radicacion_factura
+        else None,
+        "fecha_documento_dgh": glosa.fecha_documento_dgh.isoformat()
+        if glosa.fecha_documento_dgh
+        else None,
         "fecha_recepcion": glosa.fecha_recepcion.isoformat() if glosa.fecha_recepcion else None,
         "fecha_entrega": glosa.fecha_entrega.isoformat() if glosa.fecha_entrega else None,
-        "fecha_vencimiento": glosa.fecha_vencimiento.isoformat() if glosa.fecha_vencimiento else None,
+        "fecha_vencimiento": glosa.fecha_vencimiento.isoformat()
+        if glosa.fecha_vencimiento
+        else None,
         "radicado_info": glosa.radicado_info,
         "referencia": glosa.referencia,
         "observacion_tecnico": glosa.observacion_tecnico,
@@ -3082,6 +3205,7 @@ def preparar_conciliacion(
     táctica basada en el histórico de esa EPS contra ese tipo de glosa.
     """
     from app.services.conciliador_ia import preparar_audiencia
+
     return preparar_audiencia(db, glosa_id)
 
 
@@ -3099,6 +3223,7 @@ def autopiloto_niveles_batch(
     (1 click), revisable rápido o requiere editor manual.
     """
     from app.services.autopiloto_nivel import clasificar_nivel
+
     ids = payload.get("glosa_ids") or []
     if not isinstance(ids, list) or not ids:
         return {"items": []}
@@ -3129,6 +3254,7 @@ def mi_estilo_gestor(
     agregar T-760 + tono conciliador en TA0201 contra FAMISANAR.'
     """
     from app.services.memoria_gestor import patron_gestor
+
     return patron_gestor(
         db,
         autor_email=current_user.email,
@@ -3154,6 +3280,7 @@ def auditar_glosa(
     if not glosa:
         raise HTTPException(404, "Glosa no encontrada")
     from app.services.auditor_dictamen import auditar_dictamen
+
     return auditar_dictamen(glosa, db)
 
 
@@ -3173,6 +3300,7 @@ def eliminar_glosa(
     # Mover a papelera (soft-delete con snapshot)
     try:
         from app.api.routers.papelera import mover_a_papelera
+
         pap_id = mover_a_papelera(db, glosa, eliminado_por=current_user.email, motivo=motivo or "")
     except Exception as e:
         logger.warning(f"No se pudo mover a papelera: {e}")
@@ -3265,7 +3393,7 @@ def cambiar_workflow(
 
     glosa.workflow_state = nuevo
     if data.comentario:
-        nota = (glosa.nota_workflow or "")
+        nota = glosa.nota_workflow or ""
         nueva_nota = f"[{ahora_utc().strftime('%Y-%m-%d %H:%M')} {current_user.email} {actual}->{nuevo}] {data.comentario}"
         glosa.nota_workflow = (nota + " | " + nueva_nota)[-500:] if nota else nueva_nota[:500]
 
@@ -3293,9 +3421,12 @@ def cambiar_workflow(
 
 
 @router.patch("/{glosa_id}/decision-eps")
-def registrar_decision_eps(glosa_id: int, data: DecisionEPSInput,
-                           db: Session = Depends(get_db),
-                           current_user: UsuarioRecord = Depends(get_auditor_o_superior)):
+def registrar_decision_eps(
+    glosa_id: int,
+    data: DecisionEPSInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
     DECISIONES = {"LEVANTADA", "ACEPTADA", "RATIFICADA", "PENDIENTE"}
     decision = data.decision_eps.upper()
     if decision not in DECISIONES:
@@ -3319,19 +3450,29 @@ def registrar_decision_eps(glosa_id: int, data: DecisionEPSInput,
     # que la IA no la sugiera más.
     try:
         from app.services.aprendizaje_feedback import aprender_de_decision_eps
+
         aprender_de_decision_eps(
-            db=db, glosa=glosa, decision=decision, creado_por=current_user.email,
+            db=db,
+            glosa=glosa,
+            decision=decision,
+            creado_por=current_user.email,
         )
     except Exception as _e:
         # El aprendizaje nunca debe bloquear la decisión; solo logear.
         import logging as _l
+
         _l.getLogger("motor_glosas").warning(f"Aprendizaje feedback falló: {_e}")
 
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="DECISION_EPS", tabla="glosas", registro_id=glosa_id,
-        campo="decision_eps", valor_nuevo=decision,
-        detalle=f"Decisión: {decision} | recuperado: ${data.valor_recuperado:,.0f}")
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="DECISION_EPS",
+        tabla="glosas",
+        registro_id=glosa_id,
+        campo="decision_eps",
+        valor_nuevo=decision,
+        detalle=f"Decisión: {decision} | recuperado: ${data.valor_recuperado:,.0f}",
+    )
     return {"message": "Decisión registrada", "glosa_id": glosa_id, "decision_eps": decision}
 
 
@@ -3375,8 +3516,11 @@ def registrar_decision_eps_lote(
             continue
         # Para LEVANTADA, valor recuperado por defecto = valor_objetado
         if decision == "LEVANTADA":
-            recuperado = data.valor_recuperado if data.valor_recuperado is not None \
+            recuperado = (
+                data.valor_recuperado
+                if data.valor_recuperado is not None
                 else float(glosa.valor_objetado or 0.0)
+            )
         else:
             recuperado = data.valor_recuperado or 0.0
 
@@ -3391,11 +3535,16 @@ def registrar_decision_eps_lote(
         # Aprendizaje feedback: promover argumento exitoso a Plantilla Gold
         try:
             from app.services.aprendizaje_feedback import aprender_de_decision_eps
+
             aprender_de_decision_eps(
-                db=db, glosa=glosa, decision=decision, creado_por=current_user.email,
+                db=db,
+                glosa=glosa,
+                decision=decision,
+                creado_por=current_user.email,
             )
         except Exception as _e:
             import logging as _l
+
             _l.getLogger("motor_glosas").warning(f"Aprendizaje feedback (lote) falló: {_e}")
 
         recuperado_total += recuperado
@@ -3404,11 +3553,17 @@ def registrar_decision_eps_lote(
     db.commit()
 
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="DECISION_EPS_LOTE", tabla="glosas", registro_id=0,
-        campo="decision_eps", valor_nuevo=decision,
-        detalle=(f"Lote {decision}: {procesadas}/{len(data.glosa_ids)} procesadas | "
-                 f"recuperado total: ${recuperado_total:,.0f}"),
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="DECISION_EPS_LOTE",
+        tabla="glosas",
+        registro_id=0,
+        campo="decision_eps",
+        valor_nuevo=decision,
+        detalle=(
+            f"Lote {decision}: {procesadas}/{len(data.glosa_ids)} procesadas | "
+            f"recuperado total: ${recuperado_total:,.0f}"
+        ),
     )
 
     return {
@@ -3421,9 +3576,12 @@ def registrar_decision_eps_lote(
 
 
 @router.patch("/{glosa_id}/asignar")
-def asignar_auditor(glosa_id: int, data: AsignarAuditorInput,
-                    db: Session = Depends(get_db),
-                    current_user: UsuarioRecord = Depends(get_coordinador_o_admin)):
+def asignar_auditor(
+    glosa_id: int,
+    data: AsignarAuditorInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
     glosa = GlosaRepository(db).obtener_por_id(glosa_id)
     if not glosa:
         raise HTTPException(404, "Glosa no encontrada")
@@ -3431,9 +3589,13 @@ def asignar_auditor(glosa_id: int, data: AsignarAuditorInput,
     glosa.auditor_email = data.auditor_email
     db.commit()
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="ASIGNAR", tabla="glosas", registro_id=glosa_id,
-        valor_anterior=anterior, valor_nuevo=data.auditor_email,
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="ASIGNAR",
+        tabla="glosas",
+        registro_id=glosa_id,
+        valor_anterior=anterior,
+        valor_nuevo=data.auditor_email,
     )
     return {"ok": True, "id": glosa_id, "auditor_email": data.auditor_email}
 
@@ -3451,12 +3613,15 @@ def _resolver_destino_con_vacaciones(db: Session, email: str) -> tuple[str, bool
     if not email:
         return email, False
     from datetime import datetime, timezone as _tz
+
     ahora = datetime.now(_tz.utc)
     u = db.query(UsuarioRecord).filter(UsuarioRecord.email.ilike(email)).first()
     if not u:
         return email, False
     if (
-        u.vacaciones_desde and u.vacaciones_hasta and u.delega_a_email
+        u.vacaciones_desde
+        and u.vacaciones_hasta
+        and u.delega_a_email
         and u.vacaciones_desde <= ahora <= u.vacaciones_hasta
     ):
         return u.delega_a_email, True
@@ -3498,9 +3663,13 @@ def bulk_asignar(
         actualizadas += 1
         try:
             AuditRepository(db).registrar(
-                usuario_email=current_user.email, usuario_rol=current_user.rol,
-                accion="BULK_ASIGNAR", tabla="glosas", registro_id=gid,
-                valor_anterior=anterior, valor_nuevo=destino_real,
+                usuario_email=current_user.email,
+                usuario_rol=current_user.rol,
+                accion="BULK_ASIGNAR",
+                tabla="glosas",
+                registro_id=gid,
+                valor_anterior=anterior,
+                valor_nuevo=destino_real,
                 detalle=("redirigido_vacaciones" if redirigido else None),
             )
         except Exception:
@@ -3557,8 +3726,8 @@ def bulk_reasignar_de_gestor(
     limite = max(1, min(int(data.limite or 100), 500))
 
     q = db.query(GlosaRecord).filter(
-        (GlosaRecord.auditor_email == data.gestor_origen) |
-        (GlosaRecord.gestor_nombre == data.gestor_origen)
+        (GlosaRecord.auditor_email == data.gestor_origen)
+        | (GlosaRecord.gestor_nombre == data.gestor_origen)
     )
     if data.solo_pendientes:
         q = q.filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
@@ -3573,9 +3742,13 @@ def bulk_reasignar_de_gestor(
         actualizadas += 1
         try:
             AuditRepository(db).registrar(
-                usuario_email=current_user.email, usuario_rol=current_user.rol,
-                accion="REASIGNAR_DE_GESTOR", tabla="glosas", registro_id=g.id,
-                valor_anterior=data.gestor_origen, valor_nuevo=data.gestor_destino,
+                usuario_email=current_user.email,
+                usuario_rol=current_user.rol,
+                accion="REASIGNAR_DE_GESTOR",
+                tabla="glosas",
+                registro_id=g.id,
+                valor_anterior=data.gestor_origen,
+                valor_nuevo=data.gestor_destino,
                 detalle=("solo_pendientes" if data.solo_pendientes else "todas"),
             )
         except Exception:
@@ -3594,7 +3767,7 @@ def bulk_reasignar_de_gestor(
 
 class AutoAsignarInput(BaseModel):
     glosa_ids: list[int]
-    candidatos: list[str] = []   # opcional: lista de emails candidatos
+    candidatos: list[str] = []  # opcional: lista de emails candidatos
     incluir_carga_actual: bool = True
 
 
@@ -3621,6 +3794,7 @@ def bulk_auto_asignar(
     Solo COORDINADOR/SUPER_ADMIN.
     """
     from sqlalchemy import func as _func
+
     if not data.glosa_ids:
         raise HTTPException(400, "Lista vacia")
     if len(data.glosa_ids) > 500:
@@ -3628,6 +3802,7 @@ def bulk_auto_asignar(
 
     # Determinar candidatos: explicitos o todos los AUDITOR/COORDINADOR activos
     from datetime import datetime, timezone as _tz
+
     ahora_dt = datetime.now(_tz.utc)
     if data.candidatos:
         candidatos = [c.strip() for c in data.candidatos if c and "@" in c]
@@ -3643,7 +3818,8 @@ def bulk_auto_asignar(
         candidatos = []
         for u in users:
             en_vacaciones = (
-                u.vacaciones_desde and u.vacaciones_hasta
+                u.vacaciones_desde
+                and u.vacaciones_hasta
                 and u.vacaciones_desde <= ahora_dt <= u.vacaciones_hasta
             )
             if en_vacaciones:
@@ -3682,6 +3858,7 @@ def bulk_auto_asignar(
 
     # Asignar usando heap de menor carga
     import heapq
+
     heap = [(carga[c], c) for c in candidatos]
     heapq.heapify(heap)
 
@@ -3703,9 +3880,13 @@ def bulk_auto_asignar(
         heapq.heappush(heap, (carga_actual + 1, email_destino))
         try:
             AuditRepository(db).registrar(
-                usuario_email=current_user.email, usuario_rol=current_user.rol,
-                accion="AUTO_ASIGNAR", tabla="glosas", registro_id=gid,
-                valor_anterior=anterior, valor_nuevo=email_destino,
+                usuario_email=current_user.email,
+                usuario_rol=current_user.rol,
+                accion="AUTO_ASIGNAR",
+                tabla="glosas",
+                registro_id=gid,
+                valor_anterior=anterior,
+                valor_nuevo=email_destino,
                 detalle="round-robin balanceado",
             )
         except Exception:
@@ -3713,8 +3894,7 @@ def bulk_auto_asignar(
     db.commit()
 
     distribucion = [
-        {"email": k, "asignadas": len(v), "ids_sample": v[:5]}
-        for k, v in asignaciones.items() if v
+        {"email": k, "asignadas": len(v), "ids_sample": v[:5]} for k, v in asignaciones.items() if v
     ]
     distribucion.sort(key=lambda x: -x["asignadas"])
 
@@ -3757,27 +3937,51 @@ def bulk_exportar_csv(
     def _gen():
         buf = _io.StringIO()
         w = _csv.writer(buf)
-        w.writerow([
-            "id", "factura", "eps", "codigo_glosa", "valor_objetado",
-            "valor_aceptado", "valor_recuperado", "estado", "etapa",
-            "auditor_email", "gestor_nombre", "fecha_recepcion",
-            "fecha_entrega", "decision_eps", "creado_en",
-        ])
+        w.writerow(
+            [
+                "id",
+                "factura",
+                "eps",
+                "codigo_glosa",
+                "valor_objetado",
+                "valor_aceptado",
+                "valor_recuperado",
+                "estado",
+                "etapa",
+                "auditor_email",
+                "gestor_nombre",
+                "fecha_recepcion",
+                "fecha_entrega",
+                "decision_eps",
+                "creado_en",
+            ]
+        )
         yield buf.getvalue()
-        buf.seek(0); buf.truncate(0)
+        buf.seek(0)
+        buf.truncate(0)
         for g in glosas:
-            w.writerow([
-                g.id, g.factura or "", g.eps or "", g.codigo_glosa or "",
-                float(g.valor_objetado or 0), float(g.valor_aceptado or 0),
-                float(g.valor_recuperado or 0), g.estado or "", g.etapa or "",
-                g.auditor_email or "", g.gestor_nombre or "",
-                g.fecha_recepcion.isoformat() if g.fecha_recepcion else "",
-                g.fecha_entrega.isoformat() if g.fecha_entrega else "",
-                g.decision_eps or "",
-                g.creado_en.isoformat() if g.creado_en else "",
-            ])
+            w.writerow(
+                [
+                    g.id,
+                    g.factura or "",
+                    g.eps or "",
+                    g.codigo_glosa or "",
+                    float(g.valor_objetado or 0),
+                    float(g.valor_aceptado or 0),
+                    float(g.valor_recuperado or 0),
+                    g.estado or "",
+                    g.etapa or "",
+                    g.auditor_email or "",
+                    g.gestor_nombre or "",
+                    g.fecha_recepcion.isoformat() if g.fecha_recepcion else "",
+                    g.fecha_entrega.isoformat() if g.fecha_entrega else "",
+                    g.decision_eps or "",
+                    g.creado_en.isoformat() if g.creado_en else "",
+                ]
+            )
             yield buf.getvalue()
-            buf.seek(0); buf.truncate(0)
+            buf.seek(0)
+            buf.truncate(0)
 
     fname = f"glosas-seleccion-{_dt.now().strftime('%Y%m%d-%H%M%S')}.csv"
     return StreamingResponse(
@@ -3788,15 +3992,24 @@ def bulk_exportar_csv(
 
 
 @router.get("/casos-similares/{glosa_id}")
-def casos_similares(glosa_id: int, db: Session = Depends(get_db),
-                    current_user: UsuarioRecord = Depends(get_usuario_actual)):
+def casos_similares(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
     from app.services.rag_service import RAGService
+
     glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
     if not glosa:
         raise HTTPException(404, "Glosa no encontrada")
     casos = RAGService().buscar_casos_similares(
-        texto_glosa=glosa.dictamen or "", eps=glosa.eps,
-        codigo_glosa=glosa.codigo_glosa or "", db=db, top_k=5, solo_exitosos=False)
+        texto_glosa=glosa.dictamen or "",
+        eps=glosa.eps,
+        codigo_glosa=glosa.codigo_glosa or "",
+        db=db,
+        top_k=5,
+        solo_exitosos=False,
+    )
     return {"glosa_id": glosa_id, "casos_similares": casos}
 
 
@@ -3841,12 +4054,20 @@ def listar_conceptos_glosa(
             "valor_factura": glosa.valor_factura,
             "saldo_factura": glosa.saldo_factura,
             "tercero_nit": glosa.tercero_nit,
-            "fecha_radicacion_factura": glosa.fecha_radicacion_factura.isoformat() if glosa.fecha_radicacion_factura else None,
-            "fecha_documento_dgh": glosa.fecha_documento_dgh.isoformat() if glosa.fecha_documento_dgh else None,
+            "fecha_radicacion_factura": glosa.fecha_radicacion_factura.isoformat()
+            if glosa.fecha_radicacion_factura
+            else None,
+            "fecha_documento_dgh": glosa.fecha_documento_dgh.isoformat()
+            if glosa.fecha_documento_dgh
+            else None,
             "fecha_recepcion": glosa.fecha_recepcion.isoformat() if glosa.fecha_recepcion else None,
             "fecha_entrega": glosa.fecha_entrega.isoformat() if glosa.fecha_entrega else None,
-            "fecha_vencimiento": glosa.fecha_vencimiento.isoformat() if glosa.fecha_vencimiento else None,
-            "fecha_objecion_eps": glosa.fecha_objecion_eps.isoformat() if glosa.fecha_objecion_eps else None,
+            "fecha_vencimiento": glosa.fecha_vencimiento.isoformat()
+            if glosa.fecha_vencimiento
+            else None,
+            "fecha_objecion_eps": glosa.fecha_objecion_eps.isoformat()
+            if glosa.fecha_objecion_eps
+            else None,
             "dias_restantes": glosa.dias_restantes,
             "prioridad": glosa.prioridad,
         },
@@ -3891,8 +4112,8 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
     if not texto:
         return filas
 
-    lineas = texto.strip().split('\n')
-    CAMPOS = ['eps', 'factura', 'valor', 'codigo', 'descripcion', 'cups', 'servicio', 'motivo']
+    lineas = texto.strip().split("\n")
+    CAMPOS = ["eps", "factura", "valor", "codigo", "descripcion", "cups", "servicio", "motivo"]
 
     for i, linea in enumerate(lineas):
         linea = linea.strip()
@@ -3900,10 +4121,10 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
             continue
 
         # Auto-detectar separador: Tab si existe, sino pipe.
-        if '\t' in linea:
-            partes = [p.strip() for p in linea.split('\t')]
-        elif '|' in linea:
-            partes = [p.strip() for p in linea.split('|')]
+        if "\t" in linea:
+            partes = [p.strip() for p in linea.split("\t")]
+        elif "|" in linea:
+            partes = [p.strip() for p in linea.split("|")]
         else:
             # Sin separador válido → saltar
             continue
@@ -3913,30 +4134,32 @@ def _parsear_filas_excel(texto: str) -> list[dict]:
 
         # Si hay más de 8 columnas, re-unir el excedente al motivo (último campo)
         if len(partes) > len(CAMPOS):
-            motivo_extendido = ' '.join(partes[len(CAMPOS) - 1:]).strip()
-            partes = partes[:len(CAMPOS) - 1] + [motivo_extendido]
+            motivo_extendido = " ".join(partes[len(CAMPOS) - 1 :]).strip()
+            partes = partes[: len(CAMPOS) - 1] + [motivo_extendido]
 
-        fila_data: dict = {'fila': i + 1}
+        fila_data: dict = {"fila": i + 1}
         # Campo legacy 'servicio' (col 7) no existe en downstream — se mapea
         # al 'descripcion' adicional cuando hay 8 columnas.
         for idx, campo in enumerate(CAMPOS):
-            fila_data[campo] = partes[idx] if idx < len(partes) else ''
+            fila_data[campo] = partes[idx] if idx < len(partes) else ""
 
         # Si hay columna 'servicio' (col 7) y la 'descripcion' está vacía,
         # promover servicio a descripcion. Si ambas tienen valor, concatenar.
-        if fila_data.get('servicio'):
-            if fila_data.get('descripcion') and fila_data['descripcion'] != fila_data['servicio']:
-                fila_data['descripcion'] = f"{fila_data['descripcion']} — {fila_data['servicio']}"
+        if fila_data.get("servicio"):
+            if fila_data.get("descripcion") and fila_data["descripcion"] != fila_data["servicio"]:
+                fila_data["descripcion"] = f"{fila_data['descripcion']} — {fila_data['servicio']}"
             else:
-                fila_data['descripcion'] = fila_data['servicio']
+                fila_data["descripcion"] = fila_data["servicio"]
 
-        if fila_data['codigo'] and len(fila_data['codigo']) >= 2:
+        if fila_data["codigo"] and len(fila_data["codigo"]) >= 2:
             filas.append(fila_data)
 
     return filas
 
 
-async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id: str, eps_formulario: str, lote_id=None):
+async def _procesar_fila_en_background(
+    fila_data: dict, servicio_id: str, req_id: str, eps_formulario: str, lote_id=None
+):
     """Procesa una fila individual en segundo plano.
 
     Si `eps_formulario` viene vacío o "AUTO", se usa la EPS detectada de la
@@ -3972,7 +4195,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         eps_formulario_limpio = (eps_formulario or "").strip().upper()
         usa_auto = (not eps_formulario_limpio) or eps_formulario_limpio == "AUTO"
         if usa_auto:
-            eps_final = _normalizar_eps(fila_data.get('eps', '')) or "SIN EPS"
+            eps_final = _normalizar_eps(fila_data.get("eps", "")) or "SIN EPS"
         else:
             eps_final = eps_formulario
 
@@ -3982,30 +4205,33 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
             eps=eps_final,
             etapa="RESPUESTA A GLOSA",
             tabla_excel=texto_glosa,
-            numero_factura=fila_data.get('factura'),
+            numero_factura=fila_data.get("factura"),
             numero_radicado=servicio_id,
         )
 
         from app.services.tarifa_lookup_service import pre_lookup_tarifa
+
         info_tarifa_pre = pre_lookup_tarifa(
-            db=db, cod_pref=fila_data.get('codigo', ''),
-            eps=eps_final, tabla_excel=texto_glosa,
+            db=db,
+            cod_pref=fila_data.get("codigo", ""),
+            eps=eps_final,
+            tabla_excel=texto_glosa,
         )
         resultado = await service.analizar(data, "", contratos, info_tarifa=info_tarifa_pre)
 
         repo = GlosaRepository(db)
         # Campos adicionales para que el flujo "responder por factura"
         # los pueda listar con contexto (servicio, CUPS, concepto).
-        concepto_excel = fila_data.get('motivo') or fila_data.get('descripcion') or ''
+        concepto_excel = fila_data.get("motivo") or fila_data.get("descripcion") or ""
         kwargs_extra = {}
-        if fila_data.get('descripcion'):
-            kwargs_extra['servicio_descripcion'] = fila_data['descripcion'][:400]
+        if fila_data.get("descripcion"):
+            kwargs_extra["servicio_descripcion"] = fila_data["descripcion"][:400]
         if concepto_excel:
-            kwargs_extra['concepto_glosa'] = concepto_excel[:500]
-        if fila_data.get('cups'):
-            kwargs_extra['cups_servicio'] = fila_data['cups'][:20]
+            kwargs_extra["concepto_glosa"] = concepto_excel[:500]
+        if fila_data.get("cups"):
+            kwargs_extra["cups_servicio"] = fila_data["cups"][:20]
         # Texto glosa original para que el auditor pueda revisar
-        kwargs_extra['texto_glosa_original'] = texto_glosa[:2000]
+        kwargs_extra["texto_glosa_original"] = texto_glosa[:2000]
 
         # IM F2: si el lote tiene gestor_asignado_id, resolvemos el
         # email del usuario y lo pasamos como asignado_a_email para
@@ -4014,12 +4240,21 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
         if lote_id is not None:
             try:
                 from app.models.db import LoteImportacionRecord, UsuarioRecord
-                lote = db.query(LoteImportacionRecord).filter(LoteImportacionRecord.id == lote_id).first()
+
+                lote = (
+                    db.query(LoteImportacionRecord)
+                    .filter(LoteImportacionRecord.id == lote_id)
+                    .first()
+                )
                 if lote and lote.gestor_asignado_id:
-                    user = db.query(UsuarioRecord).filter(UsuarioRecord.id == lote.gestor_asignado_id).first()
+                    user = (
+                        db.query(UsuarioRecord)
+                        .filter(UsuarioRecord.id == lote.gestor_asignado_id)
+                        .first()
+                    )
                     if user and user.email:
                         asignado_email = user.email
-                        kwargs_extra['asignado_a_email'] = asignado_email
+                        kwargs_extra["asignado_a_email"] = asignado_email
             except Exception as _e_asg:
                 logger.debug(f"[{req_id}] No se pudo resolver gestor del lote {lote_id}: {_e_asg}")
 
@@ -4028,7 +4263,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
+                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",
@@ -4037,7 +4272,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
                 modelo_ia=resultado.modelo_ia,
                 score=resultado.score,
                 numero_radicado=servicio_id,
-                factura=fila_data.get('factura'),
+                factura=fila_data.get("factura"),
                 **kwargs_extra,
             )
         except TypeError:
@@ -4046,7 +4281,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r'[^\d]', '', fila_data.get('valor', '0')) or 0),
+                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",
@@ -4055,9 +4290,9 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
                 modelo_ia=resultado.modelo_ia,
                 score=resultado.score,
                 numero_radicado=servicio_id,
-                factura=fila_data.get('factura'),
+                factura=fila_data.get("factura"),
             )
-        
+
         logger.info(f"[{req_id}] Fila {fila_data['fila']} procesada: {resultado.codigo_glosa}")
         fila_ok = True
     except Exception as e:
@@ -4072,6 +4307,7 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
                 from app.models.db import LoteImportacionRecord as _LIR
                 from datetime import datetime as _dt, timezone as _tz
                 import json as _json
+
                 db_lote = SessionLocal()
                 try:
                     lote = db_lote.query(_LIR).filter(_LIR.id == lote_id).first()
@@ -4090,15 +4326,17 @@ async def _procesar_fila_en_background(fila_data: dict, servicio_id: str, req_id
                                 # F2: guardamos tambien la fila_data completa
                                 # para soportar retry desde la UI sin que el
                                 # usuario tenga que volver a pegar el Excel.
-                                actuales.append({
-                                    "fila": fila_data.get("fila"),
-                                    "error": error_msg or "Error desconocido",
-                                    "fila_data": {
-                                        k: (str(v)[:500] if v else "")
-                                        for k, v in fila_data.items()
-                                        if k != "fila"
-                                    },
-                                })
+                                actuales.append(
+                                    {
+                                        "fila": fila_data.get("fila"),
+                                        "error": error_msg or "Error desconocido",
+                                        "fila_data": {
+                                            k: (str(v)[:500] if v else "")
+                                            for k, v in fila_data.items()
+                                            if k != "fila"
+                                        },
+                                    }
+                                )
                                 lote.errores = _json.dumps(actuales, ensure_ascii=False)
                         # Si se procesaron todas, marcar COMPLETO
                         if (lote.procesadas or 0) >= (lote.total_filas or 0):
@@ -4157,26 +4395,32 @@ async def preview_importar_masiva(
         elif "|" in linea_clean:
             partes = linea_clean.split("|")
         else:
-            filas_invalidas.append({
-                "fila": i + 1,
-                "razon": "Sin separador (TAB o pipe)",
-                "preview": linea_clean[:80],
-            })
+            filas_invalidas.append(
+                {
+                    "fila": i + 1,
+                    "razon": "Sin separador (TAB o pipe)",
+                    "preview": linea_clean[:80],
+                }
+            )
             continue
         if len(partes) < 4:
-            filas_invalidas.append({
-                "fila": i + 1,
-                "razon": f"Solo {len(partes)} columnas (minimo 4)",
-                "preview": linea_clean[:80],
-            })
+            filas_invalidas.append(
+                {
+                    "fila": i + 1,
+                    "razon": f"Solo {len(partes)} columnas (minimo 4)",
+                    "preview": linea_clean[:80],
+                }
+            )
             continue
         codigo_field = (partes[3] if len(partes) > 3 else "").strip()
         if not codigo_field or len(codigo_field) < 2:
-            filas_invalidas.append({
-                "fila": i + 1,
-                "razon": "Codigo de glosa vacio o muy corto",
-                "preview": linea_clean[:80],
-            })
+            filas_invalidas.append(
+                {
+                    "fila": i + 1,
+                    "razon": "Codigo de glosa vacio o muy corto",
+                    "preview": linea_clean[:80],
+                }
+            )
 
     # EPS detectadas
     eps_detectadas: dict[str, int] = {}
@@ -4200,11 +4444,13 @@ async def preview_importar_masiva(
         for f in filas_validas:
             par = (f.get("factura") or "", f.get("codigo") or "")
             if par in existentes_set:
-                posibles_duplicados.append({
-                    "factura": par[0],
-                    "codigo": par[1],
-                    "razon": "Ya existe en BD",
-                })
+                posibles_duplicados.append(
+                    {
+                        "factura": par[0],
+                        "codigo": par[1],
+                        "razon": "Ya existe en BD",
+                    }
+                )
 
     # Estimacion de costo (USD) basada en flags activos
     n_validas = len(filas_validas)
@@ -4263,8 +4509,7 @@ async def importar_glosas_masiva(
     eps_formulario = (request.eps or "").strip()
     modo_auto = not eps_formulario or eps_formulario.upper() == "AUTO"
     logger.info(
-        f"[{req_id}] Importación masiva iniciada | "
-        f"modo={'AUTO' if modo_auto else eps_formulario}"
+        f"[{req_id}] Importación masiva iniciada | modo={'AUTO' if modo_auto else eps_formulario}"
     )
 
     filas = _parsear_filas_excel(request.texto_excel)
@@ -4276,10 +4521,10 @@ async def importar_glosas_masiva(
     eps_detectadas: dict[str, int] = {}
     facturas_detectadas: set[str] = set()
     for f in filas:
-        clave = _normalizar_eps(f.get('eps', '')) if modo_auto else eps_formulario
+        clave = _normalizar_eps(f.get("eps", "")) if modo_auto else eps_formulario
         eps_detectadas[clave or "SIN EPS"] = eps_detectadas.get(clave or "SIN EPS", 0) + 1
-        if f.get('factura'):
-            facturas_detectadas.add(f['factura'])
+        if f.get("factura"):
+            facturas_detectadas.add(f["factura"])
 
     servicio_id = f"BATCH-{req_id}"
 
@@ -4287,6 +4532,7 @@ async def importar_glosas_masiva(
     import json as _json
     import hashlib as _hashlib
     from app.models.db import LoteImportacionRecord
+
     texto_hash = _hashlib.sha256((request.texto_excel or "").encode("utf-8")).hexdigest()
     gestor_id = getattr(request, "gestor_asignado_id", None)
     try:
@@ -4366,6 +4612,7 @@ def listar_lotes_importacion(
     items = q.offset((page - 1) * per_page).limit(per_page).all()
 
     import json as _json
+
     return {
         "total": total,
         "page": page,
@@ -4383,9 +4630,7 @@ def listar_lotes_importacion(
                 "estado": l.estado,
                 "iniciado_en": l.iniciado_en.isoformat() if l.iniciado_en else None,
                 "terminado_en": l.terminado_en.isoformat() if l.terminado_en else None,
-                "eps_detectadas": (
-                    _json.loads(l.eps_detectadas) if l.eps_detectadas else {}
-                ),
+                "eps_detectadas": (_json.loads(l.eps_detectadas) if l.eps_detectadas else {}),
                 "costo_estimado_usd": l.costo_estimado_usd or 0,
                 "costo_real_usd": l.costo_real_usd or 0,
                 "gestor_asignado_id": l.gestor_asignado_id,
@@ -4427,9 +4672,7 @@ def status_lote(
         "iniciado_en": l.iniciado_en.isoformat() if l.iniciado_en else None,
         "terminado_en": l.terminado_en.isoformat() if l.terminado_en else None,
         "errores": _json.loads(l.errores) if l.errores else [],
-        "glosas_creadas_ids": (
-            _json.loads(l.glosas_creadas_ids) if l.glosas_creadas_ids else []
-        ),
+        "glosas_creadas_ids": (_json.loads(l.glosas_creadas_ids) if l.glosas_creadas_ids else []),
         "costo_real_usd": l.costo_real_usd or 0,
     }
 
@@ -4529,8 +4772,9 @@ def exportar_lote_csv(
             w.writerow(["GLOSAS CREADAS"])
             w.writerow(["ID", "EPS", "Factura", "Codigo", "Valor objetado", "Estado"])
             for g in glosas:
-                w.writerow([g.id, g.eps, g.factura, g.codigo_glosa,
-                           g.valor_objetado or 0, g.estado or ""])
+                w.writerow(
+                    [g.id, g.eps, g.factura, g.codigo_glosa, g.valor_objetado or 0, g.estado or ""]
+                )
         yield buf.getvalue()
 
     fname = f"lote-{l.batch_id}-{lote_id}.csv"
@@ -4555,30 +4799,57 @@ def descargar_plantilla_masiva(
 
     def _generar():
         buf = io.StringIO()
-        w = csv.writer(buf, delimiter='\t')  # TAB para compat con paste-from-Excel
+        w = csv.writer(buf, delimiter="\t")  # TAB para compat con paste-from-Excel
         # Header
-        w.writerow([
-            "ENTIDAD", "FACTURA", "VALOR", "CODIGO", "CONCEPTO",
-            "CUPS", "SERVICIO", "MOTIVO",
-        ])
+        w.writerow(
+            [
+                "ENTIDAD",
+                "FACTURA",
+                "VALOR",
+                "CODIGO",
+                "CONCEPTO",
+                "CUPS",
+                "SERVICIO",
+                "MOTIVO",
+            ]
+        )
         # 3 filas ejemplo cubriendo casos comunes
-        w.writerow([
-            "FAMISANAR EPS", "HUS0000123456", "$ 150.000", "TA0801",
-            "Tarifa diferente a la pactada en contrato",
-            "890301", "Consulta de control",
-            "El valor facturado no corresponde a la tarifa SOAT pactada",
-        ])
-        w.writerow([
-            "NUEVA EPS", "HUS0000123457", "$ 75.000", "SO0101",
-            "Soporte ilegible",
-            "", "", "Historia clínica con tinta corrida en página 3",
-        ])
-        w.writerow([
-            "COMPENSAR", "HUS0000123458", "$ 200.000", "FA0601",
-            "Cargos no facturables",
-            "FMQ0114", "Catéter intravenoso",
-            "Cantidad facturada no coincide con registros de uso",
-        ])
+        w.writerow(
+            [
+                "FAMISANAR EPS",
+                "HUS0000123456",
+                "$ 150.000",
+                "TA0801",
+                "Tarifa diferente a la pactada en contrato",
+                "890301",
+                "Consulta de control",
+                "El valor facturado no corresponde a la tarifa SOAT pactada",
+            ]
+        )
+        w.writerow(
+            [
+                "NUEVA EPS",
+                "HUS0000123457",
+                "$ 75.000",
+                "SO0101",
+                "Soporte ilegible",
+                "",
+                "",
+                "Historia clínica con tinta corrida en página 3",
+            ]
+        )
+        w.writerow(
+            [
+                "COMPENSAR",
+                "HUS0000123458",
+                "$ 200.000",
+                "FA0601",
+                "Cargos no facturables",
+                "FMQ0114",
+                "Catéter intravenoso",
+                "Cantidad facturada no coincide con registros de uso",
+            ]
+        )
         yield buf.getvalue()
 
     return StreamingResponse(
@@ -4696,6 +4967,7 @@ def check_lote_duplicado(
 
 def _recepcion_base_dir() -> str:
     import os as _os
+
     d = _os.path.join(_os.getenv("SOPORTES_ROOT", "/data"), "recepcion")
     _os.makedirs(d, exist_ok=True)
     return d
@@ -4707,6 +4979,7 @@ def _guardar_resumen_json(rec_id: int, data: dict) -> None:
     procesamiento en background."""
     import os as _os
     import json as _json
+
     try:
         ruta = _os.path.join(_recepcion_base_dir(), f"{rec_id}.resumen.json")
         with open(ruta, "w", encoding="utf-8") as fh:
@@ -4772,9 +5045,7 @@ async def _procesar_recepcion_bg(
         except Exception as e:
             logger.warning(f"[{req_id}] audit recepción falló: {e}")
 
-        glosas_para_auto = list(
-            getattr(resumen, "glosas_ids_para_auto_responder", []) or []
-        )
+        glosas_para_auto = list(getattr(resumen, "glosas_ids_para_auto_responder", []) or [])
         glosas_todas = list(getattr(resumen, "glosas_ids_todas", []) or [])
 
         resumen_dict = resumen.to_dict()
@@ -4808,9 +5079,13 @@ async def _procesar_recepcion_bg(
                 from app.services.auto_responder_service import (
                     procesar_lote_y_enviar_excel,
                 )
+
                 await procesar_lote_y_enviar_excel(
-                    glosas_todas, contenido, resumen_dict,
-                    ids_ia=glosas_para_auto, rec_id=rec_id,
+                    glosas_todas,
+                    contenido,
+                    resumen_dict,
+                    ids_ia=glosas_para_auto,
+                    rec_id=rec_id,
                 )
             except Exception as e:
                 logger.error(
@@ -4821,7 +5096,8 @@ async def _procesar_recepcion_bg(
         # Broadcast resumen (best-effort).
         try:
             enviados = await enviar_resumen_importacion_recepcion(
-                resumen_dict, db=db,
+                resumen_dict,
+                db=db,
             )
             resumen_dict["correos_enviados"] = enviados
         except Exception as e:
@@ -4832,6 +5108,7 @@ async def _procesar_recepcion_bg(
 
         try:
             from app.services.posthog_service import capture
+
             capture(
                 event="recepcion_importada",
                 distinct_id=str(usuario_id if usuario_id is not None else "anonimo"),
@@ -4845,17 +5122,14 @@ async def _procesar_recepcion_bg(
                     "gestores_afectados": len(resumen_dict.get("por_gestor", {})),
                     "rojo": resumen_dict.get("semaforo", {}).get("ROJO", 0),
                     "negro": resumen_dict.get("semaforo", {}).get("NEGRO", 0),
-                    "auto_respuesta_lanzada": resumen_dict.get(
-                        "auto_respuesta_lanzada", False
-                    ),
+                    "auto_respuesta_lanzada": resumen_dict.get("auto_respuesta_lanzada", False),
                 },
             )
         except Exception:
             pass
     except Exception as e:
         logger.error(
-            f"[{req_id}] Importación recepción (bg) falló: "
-            f"{type(e).__name__}: {e}",
+            f"[{req_id}] Importación recepción (bg) falló: {type(e).__name__}: {e}",
             exc_info=True,
         )
         try:
@@ -4870,7 +5144,8 @@ async def _procesar_recepcion_bg(
         except Exception:
             pass
         _guardar_resumen_json(
-            rec_id, {"estado": "ERROR", "error": str(e)[:300], "total": 0},
+            rec_id,
+            {"estado": "ERROR", "error": str(e)[:300], "total": 0},
         )
     finally:
         db.close()
@@ -4932,7 +5207,8 @@ async def importar_recepcion(
                 try:
                     _os.remove(v.ruta_original)
                     rj = _os.path.join(
-                        _recepcion_base_dir(), f"{v.id}.resumen.json",
+                        _recepcion_base_dir(),
+                        f"{v.id}.resumen.json",
                     )
                     if _os.path.exists(rj):
                         _os.remove(rj)
@@ -5014,17 +5290,19 @@ def historial_importaciones_recepcion(
                 .count()
             )
         pendientes = max(0, len(ids) - listos)
-        out.append({
-            "id": r.id,
-            "creado_en": r.creado_en.isoformat() if r.creado_en else None,
-            "usuario_email": r.usuario_email,
-            "archivo_nombre": r.archivo_nombre,
-            "total_glosas": r.total_glosas,
-            "estado": r.estado,
-            "descargable": bool(r.ruta_original),
-            "dictamenes_listos": listos,
-            "dictamenes_pendientes": pendientes,
-        })
+        out.append(
+            {
+                "id": r.id,
+                "creado_en": r.creado_en.isoformat() if r.creado_en else None,
+                "usuario_email": r.usuario_email,
+                "archivo_nombre": r.archivo_nombre,
+                "total_glosas": r.total_glosas,
+                "estado": r.estado,
+                "descargable": bool(r.ruta_original),
+                "dictamenes_listos": listos,
+                "dictamenes_pendientes": pendientes,
+            }
+        )
     return {"importaciones": out}
 
 
@@ -5044,9 +5322,7 @@ def estado_importacion_recepcion(
     from app.models.db import ImportacionRecepcionRecord
 
     rec = (
-        db.query(ImportacionRecepcionRecord)
-        .filter(ImportacionRecepcionRecord.id == rec_id)
-        .first()
+        db.query(ImportacionRecepcionRecord).filter(ImportacionRecepcionRecord.id == rec_id).first()
     )
     if not rec:
         raise HTTPException(404, "Importación no encontrada")
@@ -5098,9 +5374,7 @@ def descargar_excel_respuesta_recepcion(
     )
 
     rec = (
-        db.query(ImportacionRecepcionRecord)
-        .filter(ImportacionRecepcionRecord.id == rec_id)
-        .first()
+        db.query(ImportacionRecepcionRecord).filter(ImportacionRecepcionRecord.id == rec_id).first()
     )
     if not rec:
         raise HTTPException(404, "Importación no encontrada")
@@ -5124,17 +5398,16 @@ def descargar_excel_respuesta_recepcion(
 
     respuestas = construir_respuestas_por_clave(db, ids)
     xlsx = generar_excel_con_respuestas(
-        contenido_original, respuestas, gestor_destacar=None,
+        contenido_original,
+        respuestas,
+        gestor_destacar=None,
     )
 
     fecha = (rec.creado_en or datetime.now()).strftime("%Y-%m-%d")
     nombre = f"glosas_recepcion_{fecha}_respuesta.xlsx"
     return StreamingResponse(
         iter([xlsx]),
-        media_type=(
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        ),
+        media_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
 
@@ -5146,10 +5419,8 @@ def obtener_estado_batch(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     """Obtiene el estado de un lote de importación."""
-    glosas_batch = db.query(GlosaRecord).filter(
-        GlosaRecord.numero_radicado == batch_id
-    ).all()
-    
+    glosas_batch = db.query(GlosaRecord).filter(GlosaRecord.numero_radicado == batch_id).all()
+
     return {
         "batch_id": batch_id,
         "total": len(glosas_batch),
@@ -5162,7 +5433,7 @@ def obtener_estado_batch(
                 "creado_en": g.creado_en.isoformat() if g.creado_en else None,
             }
             for g in glosas_batch
-        ]
+        ],
     }
 
 
@@ -5198,7 +5469,10 @@ def listar_duplicados_factura(
     from app.repositories.glosa_repository import buscar_duplicados_factura
 
     duplicados = buscar_duplicados_factura(
-        db, numero_factura=factura, eps=eps, limite=limite,
+        db,
+        numero_factura=factura,
+        eps=eps,
+        limite=limite,
     )
     return {
         "factura_consultada": factura,
@@ -5246,10 +5520,7 @@ async def reanalizar_glosa(
     # R-UI 27-abr-2026: si falta texto_glosa_original (glosa importada
     # masivamente), construirlo on-the-fly con los datos disponibles.
     # Excepción: glosas legacy con EPS/etapa inválidas no se pueden reanalizar.
-    if (
-        not (glosa.texto_glosa_original or "").strip()
-        and len(glosa.eps or "") < 2
-    ):
+    if not (glosa.texto_glosa_original or "").strip() and len(glosa.eps or "") < 2:
         raise HTTPException(
             400,
             "Glosa legacy sin texto_glosa_original ni datos mínimos para reanalizar.",
@@ -5266,14 +5537,13 @@ async def reanalizar_glosa(
         if glosa.servicio_descripcion:
             partes.append(glosa.servicio_descripcion)
         if glosa.valor_objetado and float(glosa.valor_objetado) > 0:
-            partes.append(
-                f"Valor objetado: ${int(glosa.valor_objetado):,}".replace(",", ".")
-            )
+            partes.append(f"Valor objetado: ${int(glosa.valor_objetado):,}".replace(",", "."))
         if glosa.observacion_eps:
             partes.append(glosa.observacion_eps)
         # Conceptos vinculados (importación masiva nueva con hojas I/R)
         try:
             from app.models.db import ConceptoGlosaRecord
+
             conceptos = (
                 db.query(ConceptoGlosaRecord)
                 .filter(ConceptoGlosaRecord.glosa_id == glosa.id)
@@ -5290,9 +5560,7 @@ async def reanalizar_glosa(
                 if c.observacion_eps:
                     partes.append(c.observacion_eps)
                 if c.valor_objetado and float(c.valor_objetado) > 0:
-                    partes.append(
-                        f"Valor objetado: ${int(c.valor_objetado):,}".replace(",", ".")
-                    )
+                    partes.append(f"Valor objetado: ${int(c.valor_objetado):,}".replace(",", "."))
         except Exception:
             pass
         texto_para_ia = " - ".join(p for p in partes if p and str(p).strip())
@@ -5301,12 +5569,13 @@ async def reanalizar_glosa(
             texto_para_ia = (
                 f"{glosa.codigo_glosa or 'GLOSA'} - "
                 f"Glosa interpuesta por {glosa.eps or 'la entidad pagadora'}, "
-                f"valor objetado ${int(glosa.valor_objetado or 0):,}".replace(",", ".") +
-                ". Defender con argumentos generales aplicables al código."
+                f"valor objetado ${int(glosa.valor_objetado or 0):,}".replace(",", ".")
+                + ". Defender con argumentos generales aplicables al código."
             )
 
     # Construir GlosaInput a partir de los campos persistidos
     from app.models.schemas import GlosaInput
+
     try:
         glosa_input = GlosaInput(
             eps=glosa.eps or "",
@@ -5325,6 +5594,7 @@ async def reanalizar_glosa(
 
     # Trazabilidad request-scoped (R56 P1)
     from app.core.logging_utils import glosa_id_var, user_email_var
+
     user_email_var.set(current_user.email or "")
     glosa_id_var.set(glosa.id)
 
@@ -5348,6 +5618,7 @@ async def reanalizar_glosa(
     # motor produce el argumento genérico "no existe contrato" aunque sí
     # exista en BD — bug crítico que afectaba a #2513 y otras TA-DMBUG.
     from app.services.tarifa_lookup_service import pre_lookup_tarifa
+
     info_tarifa_pre = pre_lookup_tarifa(
         db=db,
         cod_pref=glosa.codigo_glosa or "",
@@ -5362,8 +5633,10 @@ async def reanalizar_glosa(
     hint_gestor = ""
     try:
         from app.services.memoria_gestor import patron_gestor
+
         patron = patron_gestor(
-            db, autor_email=current_user.email,
+            db,
+            autor_email=current_user.email,
             codigo_glosa=glosa.codigo_glosa or "",
             eps=glosa.eps or "",
         )
@@ -5371,13 +5644,16 @@ async def reanalizar_glosa(
     except Exception:
         pass
     resultado = await service.analizar(
-        glosa_input, "", contratos,
+        glosa_input,
+        "",
+        contratos,
         info_tarifa=info_tarifa_pre,
         hint_gestor=hint_gestor,
     )
 
     # Sobreescribir dictamen + metadata. NO crear nueva fila.
     from datetime import datetime, timezone as _tz
+
     glosa.dictamen = resultado.dictamen
     glosa.dictamen_generado_en = datetime.now(_tz.utc)
     glosa.tipo_analisis = resultado.tipo if hasattr(glosa, "tipo_analisis") else None
@@ -5391,16 +5667,23 @@ async def reanalizar_glosa(
     # Snapshot del dictamen como nueva versión
     try:
         from app.api.routers.versiones import guardar_version
+
         guardar_version(
-            db=db, glosa_id=glosa.id, dictamen_html=resultado.dictamen,
-            accion="REANALIZAR", autor_email=current_user.email,
+            db=db,
+            glosa_id=glosa.id,
+            dictamen_html=resultado.dictamen,
+            accion="REANALIZAR",
+            autor_email=current_user.email,
         )
     except Exception as _e:
         logger.warning(f"No se pudo guardar version: {_e}")
 
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="REANALIZAR_GLOSA", tabla="glosas", registro_id=glosa.id,
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="REANALIZAR_GLOSA",
+        tabla="glosas",
+        registro_id=glosa.id,
         detalle=f"tono={data.tono} modo={data.modo_respuesta}",
     )
 
@@ -5466,8 +5749,11 @@ def clonar_glosa(
     )
 
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="CLONAR_GLOSA", tabla="glosas", registro_id=nueva.id,
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="CLONAR_GLOSA",
+        tabla="glosas",
+        registro_id=nueva.id,
         detalle=f"Clonada desde glosa #{glosa_id}",
     )
 
@@ -5529,6 +5815,7 @@ def descargar_paquete_evidencia(
     firma_info = None
     if glosa.dictamen:
         from app.services.firma_digital import firmar_dictamen
+
         firma_info = firmar_dictamen(
             texto_dictamen=glosa.dictamen,
             firmante_email=current_user.email,
@@ -5538,50 +5825,61 @@ def descargar_paquete_evidencia(
 
     # 3. Timeline reusable: invocamos la función directamente
     from app.models.db import (
-        AICallRecord, AuditLogRecord, ComentarioGlosaRecord,
+        AICallRecord,
+        AuditLogRecord,
+        ComentarioGlosaRecord,
         DictamenVersionRecord,
     )
+
     eventos = []
     for v in db.query(DictamenVersionRecord).filter_by(glosa_id=glosa_id).all():
-        eventos.append({
-            "tipo": f"VERSION_{v.accion or 'CREAR'}",
-            "actor": v.autor_email,
-            "timestamp": v.creado_en.isoformat() if v.creado_en else None,
-        })
+        eventos.append(
+            {
+                "tipo": f"VERSION_{v.accion or 'CREAR'}",
+                "actor": v.autor_email,
+                "timestamp": v.creado_en.isoformat() if v.creado_en else None,
+            }
+        )
     for a in (
         db.query(AuditLogRecord)
         .filter(AuditLogRecord.tabla.in_(("glosas", "historial")))
         .filter(AuditLogRecord.registro_id == glosa_id)
         .all()
     ):
-        eventos.append({
-            "tipo": f"AUDIT_{a.accion or 'ACCION'}",
-            "actor": a.usuario_email,
-            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
-            "detalle": (a.detalle or "")[:200],
-        })
+        eventos.append(
+            {
+                "tipo": f"AUDIT_{a.accion or 'ACCION'}",
+                "actor": a.usuario_email,
+                "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+                "detalle": (a.detalle or "")[:200],
+            }
+        )
     for c in db.query(ComentarioGlosaRecord).filter_by(glosa_id=glosa_id).all():
-        eventos.append({
-            "tipo": "COMENTARIO",
-            "actor": c.autor_email,
-            "timestamp": c.creado_en.isoformat() if c.creado_en else None,
-            "texto": (c.texto or "")[:200],
-        })
+        eventos.append(
+            {
+                "tipo": "COMENTARIO",
+                "actor": c.autor_email,
+                "timestamp": c.creado_en.isoformat() if c.creado_en else None,
+                "texto": (c.texto or "")[:200],
+            }
+        )
     eventos.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
 
     # 4. Calls IA atribuidos
     ia_calls = []
     for c in db.query(AICallRecord).filter_by(glosa_id=glosa_id).all():
-        ia_calls.append({
-            "modelo": c.modelo,
-            "tokens_total": (c.input_tokens or 0)
-                            + (c.cache_creation_input_tokens or 0)
-                            + (c.cache_read_input_tokens or 0)
-                            + (c.output_tokens or 0),
-            "cost_usd": c.cost_usd,
-            "latency_ms": c.latency_ms,
-            "creado_en": c.creado_en.isoformat() if c.creado_en else None,
-        })
+        ia_calls.append(
+            {
+                "modelo": c.modelo,
+                "tokens_total": (c.input_tokens or 0)
+                + (c.cache_creation_input_tokens or 0)
+                + (c.cache_read_input_tokens or 0)
+                + (c.output_tokens or 0),
+                "cost_usd": c.cost_usd,
+                "latency_ms": c.latency_ms,
+                "creado_en": c.creado_en.isoformat() if c.creado_en else None,
+            }
+        )
 
     payload = {
         "metadata": {
@@ -5636,6 +5934,7 @@ def obtener_firma_dictamen(
         raise HTTPException(400, "La glosa no tiene dictamen generado")
 
     from app.services.firma_digital import firmar_dictamen
+
     info = firmar_dictamen(
         texto_dictamen=glosa.dictamen,
         firmante_email=current_user.email,
@@ -5681,9 +5980,14 @@ def descargar_dictamen_txt(
     # Quitar todos los tags
     txt = re.sub(r"<[^>]+>", "", txt)
     # Decode entidades
-    txt = (txt.replace("&nbsp;", " ").replace("&amp;", "&")
-              .replace("&lt;", "<").replace("&gt;", ">")
-              .replace("&quot;", '"').replace("&#39;", "'"))
+    txt = (
+        txt.replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+    )
     # Normalizar líneas en blanco
     txt = re.sub(r"\n{3,}", "\n\n", txt)
     txt = re.sub(r"[ \t]+", " ", txt)
@@ -5762,13 +6066,15 @@ def stats_por_codigo_respuesta(
     por_codigo = []
     for codigo, count, valor in rows:
         porcentaje = (count / total * 100) if total else 0
-        por_codigo.append({
-            "codigo": codigo or "—",
-            "descripcion": descripciones.get(codigo, "Otro"),
-            "count": count,
-            "valor_total": float(valor or 0),
-            "porcentaje": round(porcentaje, 1),
-        })
+        por_codigo.append(
+            {
+                "codigo": codigo or "—",
+                "descripcion": descripciones.get(codigo, "Otro"),
+                "count": count,
+                "valor_total": float(valor or 0),
+                "porcentaje": round(porcentaje, 1),
+            }
+        )
     por_codigo.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -5825,14 +6131,16 @@ def stats_por_eps(
         v_ac = float(v_ac or 0)
         v_rec = v_obj - v_ac
         tasa = (v_rec / v_obj * 100) if v_obj > 0 else 0
-        items.append({
-            "eps": eps,
-            "count": count,
-            "valor_objetado": v_obj,
-            "valor_aceptado": v_ac,
-            "valor_recuperado": v_rec,
-            "tasa_exito_pct": round(tasa, 1),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count": count,
+                "valor_objetado": v_obj,
+                "valor_aceptado": v_ac,
+                "valor_recuperado": v_rec,
+                "tasa_exito_pct": round(tasa, 1),
+            }
+        )
     items.sort(key=lambda x: x["valor_objetado"], reverse=True)
 
     return {
@@ -5890,9 +6198,14 @@ def descargar_dictamen_markdown(
     # 5) tags restantes
     md = re.sub(r"<[^>]+>", "", md)
     # 6) entidades comunes
-    md = (md.replace("&nbsp;", " ").replace("&amp;", "&")
-            .replace("&lt;", "<").replace("&gt;", ">")
-            .replace("&quot;", '"').replace("&#39;", "'"))
+    md = (
+        md.replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+    )
     # 7) normalizar líneas en blanco múltiples
     md = re.sub(r"\n{3,}", "\n\n", md)
     md = re.sub(r"[ \t]+", " ", md)
@@ -5946,9 +6259,17 @@ def bulk_actualizar_estado(
     Audit log: 1 entry por glosa con accion=BULK_UPDATE_ESTADO.
     """
     estados_validos = {
-        "RADICADA", "BORRADOR", "EN_REVISION", "RESPONDIDA",
-        "LEVANTADA", "RATIFICADA", "ACEPTADA", "PARCIALMENTE_ACEPTADA",
-        "RESUELTA", "CONCILIADA", "ARCHIVADA",
+        "RADICADA",
+        "BORRADOR",
+        "EN_REVISION",
+        "RESPONDIDA",
+        "LEVANTADA",
+        "RATIFICADA",
+        "ACEPTADA",
+        "PARCIALMENTE_ACEPTADA",
+        "RESUELTA",
+        "CONCILIADA",
+        "ARCHIVADA",
     }
     nuevo_estado_norm = data.nuevo_estado.strip().upper()
     if nuevo_estado_norm not in estados_validos:
@@ -5972,9 +6293,13 @@ def bulk_actualizar_estado(
         g.estado = nuevo_estado_norm
         actualizadas += 1
         audit_repo.registrar(
-            usuario_email=current_user.email, usuario_rol=current_user.rol,
-            accion="BULK_UPDATE_ESTADO", tabla="glosas", registro_id=gid,
-            campo="estado", valor_anterior=estado_anterior,
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="BULK_UPDATE_ESTADO",
+            tabla="glosas",
+            registro_id=gid,
+            campo="estado",
+            valor_anterior=estado_anterior,
             valor_nuevo=nuevo_estado_norm,
             detalle=(data.nota or "Bulk update de estado")[:300],
         )
@@ -6022,8 +6347,10 @@ def bulk_mover_papelera(
             continue
         try:
             from app.api.routers.papelera import mover_a_papelera
+
             mover_a_papelera(
-                db, g,
+                db,
+                g,
                 eliminado_por=current_user.email,
                 motivo=(data.motivo or "Bulk delete")[:300],
             )
@@ -6068,6 +6395,7 @@ def acciones_disponibles_glosa(
         raise HTTPException(404, "Glosa no encontrada")
 
     from app.services.workflow_service import WorkflowService
+
     transiciones = WorkflowService.obtener_transiciones_validas(
         glosa.estado or "RADICADA",
     )
@@ -6105,7 +6433,7 @@ def _sugerir_accion_principal(glosa) -> Optional[str]:
     tiene_dict = bool(glosa.dictamen and len(glosa.dictamen) > 50)
     dias = glosa.dias_restantes or 0
     if not tiene_dict:
-        if (glosa.texto_glosa_original or ""):
+        if glosa.texto_glosa_original or "":
             return "Generar dictamen con IA"
         return "Pegar texto de la glosa para empezar"
     if estado == "BORRADOR":
@@ -6152,6 +6480,7 @@ def validar_rapido_glosa(
         raise HTTPException(400, "La glosa aún no tiene dictamen generado")
 
     from app.services.validador_dictamen import evaluar_dictamen
+
     resultado = evaluar_dictamen(
         glosa.dictamen or "",
         codigo_glosa=glosa.codigo_glosa or "",
@@ -6214,14 +6543,16 @@ def stats_por_gestor(
         v_ac = float(v_ac or 0)
         v_rec = v_obj - v_ac
         tasa = (v_rec / v_obj * 100) if v_obj > 0 else 0
-        items.append({
-            "auditor_email": email,
-            "count_glosas": int(count),
-            "valor_objetado": v_obj,
-            "valor_aceptado": v_ac,
-            "valor_recuperado": v_rec,
-            "tasa_exito_pct": round(tasa, 1),
-        })
+        items.append(
+            {
+                "auditor_email": email,
+                "count_glosas": int(count),
+                "valor_objetado": v_obj,
+                "valor_aceptado": v_ac,
+                "valor_recuperado": v_rec,
+                "tasa_exito_pct": round(tasa, 1),
+            }
+        )
     items.sort(key=lambda x: x["count_glosas"], reverse=True)
 
     return {
@@ -6262,8 +6593,7 @@ def stats_anomalias(
     if len(valores) < 4:
         return {
             "total_glosas_evaluadas": len(valores),
-            "razon": "Necesitas al menos 4 glosas con valor>0 para "
-                    "calcular cuartiles.",
+            "razon": "Necesitas al menos 4 glosas con valor>0 para calcular cuartiles.",
             "outliers_altos": [],
             "outliers_bajos": [],
         }
@@ -6280,20 +6610,24 @@ def stats_anomalias(
     outliers_bajos = []
     for g, v in valores:
         if v > upper:
-            outliers_altos.append({
-                "glosa_id": g.id,
-                "eps": g.eps,
-                "factura": g.factura,
-                "valor_objetado": int(v),
-                "veces_sobre_q3": round(v / q3, 2) if q3 else 0,
-            })
+            outliers_altos.append(
+                {
+                    "glosa_id": g.id,
+                    "eps": g.eps,
+                    "factura": g.factura,
+                    "valor_objetado": int(v),
+                    "veces_sobre_q3": round(v / q3, 2) if q3 else 0,
+                }
+            )
         elif v < lower:
-            outliers_bajos.append({
-                "glosa_id": g.id,
-                "eps": g.eps,
-                "factura": g.factura,
-                "valor_objetado": int(v),
-            })
+            outliers_bajos.append(
+                {
+                    "glosa_id": g.id,
+                    "eps": g.eps,
+                    "factura": g.factura,
+                    "valor_objetado": int(v),
+                }
+            )
 
     outliers_altos.sort(key=lambda x: x["valor_objetado"], reverse=True)
     outliers_bajos.sort(key=lambda x: x["valor_objetado"])
@@ -6334,11 +6668,7 @@ def stats_distribucion_riesgo(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     matriz = {
         "VENCIDA": {"ALTO": [], "MEDIO": [], "BAJO": []},
@@ -6377,24 +6707,20 @@ def stats_distribucion_riesgo(
             count = len(valores)
             v_sum = sum(valores)
             total_valor += v_sum
-            items.append({
-                "urgencia": urg,
-                "monto": monto,
-                "count": count,
-                "valor_total": int(v_sum),
-            })
+            items.append(
+                {
+                    "urgencia": urg,
+                    "monto": monto,
+                    "count": count,
+                    "valor_total": int(v_sum),
+                }
+            )
 
     # Calcular pct relativos
     total_count = sum(it["count"] for it in items)
     for it in items:
-        it["pct_count"] = (
-            round(100 * it["count"] / total_count, 2)
-            if total_count else 0.0
-        )
-        it["pct_valor"] = (
-            round(100 * it["valor_total"] / total_valor, 2)
-            if total_valor else 0.0
-        )
+        it["pct_count"] = round(100 * it["count"] / total_count, 2) if total_count else 0.0
+        it["pct_valor"] = round(100 * it["valor_total"] / total_valor, 2) if total_valor else 0.0
 
     # Ordenar por valor DESC para resaltar el riesgo concentrado
     items.sort(key=lambda x: x["valor_total"], reverse=True)
@@ -6469,12 +6795,14 @@ def stats_concentracion_pareto(
     top_concentracion = []
     for eps, v in items_eps[:20]:  # Top 20
         cum += v
-        top_concentracion.append({
-            "eps": eps,
-            "valor": int(v),
-            "pct_individual": round(100 * v / total, 2),
-            "pct_acumulado": round(100 * cum / total, 2),
-        })
+        top_concentracion.append(
+            {
+                "eps": eps,
+                "valor": int(v),
+                "pct_individual": round(100 * v / total, 2),
+                "pct_acumulado": round(100 * cum / total, 2),
+            }
+        )
 
     return {
         "total_eps": len(por_eps),
@@ -6513,9 +6841,7 @@ def stats_refinaciones(
 
     desde = ahora_utc() - timedelta(days=int(dias))
     versiones = (
-        db.query(DictamenVersionRecord)
-        .filter(DictamenVersionRecord.creado_en >= desde)
-        .all()
+        db.query(DictamenVersionRecord).filter(DictamenVersionRecord.creado_en >= desde).all()
     )
 
     if not versiones:
@@ -6541,7 +6867,9 @@ def stats_refinaciones(
             glosas_set.add(v.glosa_id)
 
     top_5 = sorted(
-        por_autor.items(), key=lambda x: x[1], reverse=True,
+        por_autor.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
 
     refinar = por_accion.get("REFINAR", 0)
@@ -6551,13 +6879,10 @@ def stats_refinaciones(
         "ventana_dias": int(dias),
         "total_acciones": len(versiones),
         "por_accion": por_accion,
-        "top_5_autores": [
-            {"autor": u, "acciones": n} for u, n in top_5
-        ],
+        "top_5_autores": [{"autor": u, "acciones": n} for u, n in top_5],
         "glosas_con_refinaciones": len(glosas_set),
         "promedio_versiones_por_glosa": (
-            round(len(versiones) / len(glosas_set), 2)
-            if glosas_set else 0.0
+            round(len(versiones) / len(glosas_set), 2) if glosas_set else 0.0
         ),
         "tasa_refinacion_pct": tasa,
     }
@@ -6616,9 +6941,7 @@ def stats_conciliaciones(
 
     for c in todas:
         if c.resultado:
-            por_resultado[c.resultado] = (
-                por_resultado.get(c.resultado, 0) + 1
-            )
+            por_resultado[c.resultado] = por_resultado.get(c.resultado, 0) + 1
         eb = c.estado_bilateral or "?"
         por_estado[eb] = por_estado.get(eb, 0) + 1
         valor_conc += float(c.valor_conciliado or 0)
@@ -6630,10 +6953,7 @@ def stats_conciliaciones(
         if fa and ahora <= fa <= en_30d:
             audiencias_proximas += 1
 
-    tasa = (
-        round(100 * valor_conc / valor_def, 2)
-        if valor_def else 0.0
-    )
+    tasa = round(100 * valor_conc / valor_def, 2) if valor_def else 0.0
 
     return {
         "total_conciliaciones": len(todas),
@@ -6687,25 +7007,27 @@ def stats_serie_mensual_cantidad(
         dec = g.fecha_decision_eps
         if dec and dec.tzinfo is None:
             dec = dec.replace(tzinfo=timezone.utc)
-        if (dec and (g.estado or "").upper() in ESTADOS_CERRADOS):
+        if dec and (g.estado or "").upper() in ESTADOS_CERRADOS:
             k = dec.strftime("%Y-%m")
             cerradas_mes[k] = cerradas_mes.get(k, 0) + 1
 
     todos_meses = sorted(set(creadas_mes.keys()) | set(cerradas_mes.keys()))
-    meses_recientes = todos_meses[-int(meses):]
+    meses_recientes = todos_meses[-int(meses) :]
 
     serie = []
     for k in meses_recientes:
         c = creadas_mes.get(k, 0)
         cer = cerradas_mes.get(k, 0)
         ratio = round(cer / c, 2) if c else None
-        serie.append({
-            "mes": k,
-            "creadas": c,
-            "cerradas": cer,
-            "delta_neto": c - cer,
-            "ratio_cierre": ratio,
-        })
+        serie.append(
+            {
+                "mes": k,
+                "creadas": c,
+                "cerradas": cer,
+                "delta_neto": c - cer,
+                "ratio_cierre": ratio,
+            }
+        )
 
     return {
         "meses_solicitados": int(meses),
@@ -6765,14 +7087,16 @@ def stats_facturas_hot(
     for f, b in por_factura.items():
         if b["count"] < min_glosas:
             continue
-        items.append({
-            "factura": f,
-            "eps": b["eps"],
-            "count_glosas": b["count"],
-            "valor_objetado_total": int(b["valor_objetado"]),
-            "estados": b["estados"],
-            "codigos_distintos": sorted(b["codigos"]),
-        })
+        items.append(
+            {
+                "factura": f,
+                "eps": b["eps"],
+                "count_glosas": b["count"],
+                "valor_objetado_total": int(b["valor_objetado"]),
+                "estados": b["estados"],
+                "codigos_distintos": sorted(b["codigos"]),
+            }
+        )
     items.sort(key=lambda x: x["count_glosas"], reverse=True)
 
     return {
@@ -6815,9 +7139,11 @@ def stats_cobranza_por_eps(
             continue
         if eps not in por_eps:
             por_eps[eps] = {
-                "pendiente_count": 0, "pendiente_valor": 0.0,
+                "pendiente_count": 0,
+                "pendiente_valor": 0.0,
                 "antiguedades": [],
-                "cerradas_obj": 0.0, "cerradas_rec": 0.0,
+                "cerradas_obj": 0.0,
+                "cerradas_rec": 0.0,
             }
         b = por_eps[eps]
         v = float(g.valor_objetado or 0)
@@ -6839,22 +7165,22 @@ def stats_cobranza_por_eps(
         if b["pendiente_count"] == 0:
             continue
         tasa_hist = (
-            round(100 * b["cerradas_rec"] / b["cerradas_obj"], 2)
-            if b["cerradas_obj"] else 0.0
+            round(100 * b["cerradas_rec"] / b["cerradas_obj"], 2) if b["cerradas_obj"] else 0.0
         )
         recuperable = b["pendiente_valor"] * (tasa_hist / 100)
         antig_prom = (
-            round(sum(b["antiguedades"]) / len(b["antiguedades"]), 1)
-            if b["antiguedades"] else 0.0
+            round(sum(b["antiguedades"]) / len(b["antiguedades"]), 1) if b["antiguedades"] else 0.0
         )
-        items.append({
-            "eps": eps,
-            "count_pendientes": b["pendiente_count"],
-            "valor_pendiente": int(b["pendiente_valor"]),
-            "tasa_historica_recuperacion_pct": tasa_hist,
-            "valor_recuperable_estimado": int(recuperable),
-            "antiguedad_promedio_dias": antig_prom,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_pendientes": b["pendiente_count"],
+                "valor_pendiente": int(b["pendiente_valor"]),
+                "tasa_historica_recuperacion_pct": tasa_hist,
+                "valor_recuperable_estimado": int(recuperable),
+                "antiguedad_promedio_dias": antig_prom,
+            }
+        )
     items.sort(key=lambda x: x["valor_pendiente"], reverse=True)
 
     return {
@@ -6893,10 +7219,10 @@ def stats_cobranza_pendiente(
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
     BUCKETS = [
-        ("<30d",   0,    30),
-        ("30-60d", 30,   60),
-        ("60-90d", 60,   90),
-        (">90d",   90,   None),
+        ("<30d", 0, 30),
+        ("30-60d", 30, 60),
+        ("60-90d", 60, 90),
+        (">90d", 90, None),
     ]
 
     ahora = ahora_utc()
@@ -6921,33 +7247,29 @@ def stats_cobranza_pendiente(
             antig = (ahora - creado).days if creado else 0
             pendientes.append((antig, v))
 
-    tasa_historica = (
-        round(100 * cerradas_rec / cerradas_obj, 2)
-        if cerradas_obj else 0.0
-    )
+    tasa_historica = round(100 * cerradas_rec / cerradas_obj, 2) if cerradas_obj else 0.0
 
     total_count = len(pendientes)
     total_valor = sum(v for _, v in pendientes)
 
     items = []
     for nombre, lo, hi in BUCKETS:
-        en_bucket = [
-            (a, v) for a, v in pendientes
-            if a >= lo and (hi is None or a < hi)
-        ]
+        en_bucket = [(a, v) for a, v in pendientes if a >= lo and (hi is None or a < hi)]
         n = len(en_bucket)
         v_sum = sum(v for _, v in en_bucket)
         recuperable = v_sum * (tasa_historica / 100)
-        items.append({
-            "rango_antiguedad": nombre,
-            "antiguedad_min_dias": lo,
-            "antiguedad_max_dias": hi,
-            "count": n,
-            "valor_pendiente": int(v_sum),
-            "pct_count": round(100 * n / total_count, 2) if total_count else 0.0,
-            "pct_valor": round(100 * v_sum / total_valor, 2) if total_valor else 0.0,
-            "valor_recuperable_estimado": int(recuperable),
-        })
+        items.append(
+            {
+                "rango_antiguedad": nombre,
+                "antiguedad_min_dias": lo,
+                "antiguedad_max_dias": hi,
+                "count": n,
+                "valor_pendiente": int(v_sum),
+                "pct_count": round(100 * n / total_count, 2) if total_count else 0.0,
+                "pct_valor": round(100 * v_sum / total_valor, 2) if total_valor else 0.0,
+                "valor_recuperable_estimado": int(recuperable),
+            }
+        )
 
     return {
         "tasa_historica_recuperacion_pct": tasa_historica,
@@ -6998,7 +7320,8 @@ def stats_eps_emergentes(
         if creado and creado >= corte:
             if eps not in eps_recientes:
                 eps_recientes[eps] = {
-                    "count": 0, "valor_objetado": 0.0,
+                    "count": 0,
+                    "valor_objetado": 0.0,
                     "primer_visto": None,
                 }
             b = eps_recientes[eps]
@@ -7015,14 +7338,14 @@ def stats_eps_emergentes(
         if eps in eps_historicas:
             continuas += 1
             continue
-        nuevas.append({
-            "eps": eps,
-            "glosas_recientes": b["count"],
-            "valor_objetado_total": int(b["valor_objetado"]),
-            "primer_glosa_en": (
-                b["primer_visto"].isoformat() if b["primer_visto"] else None
-            ),
-        })
+        nuevas.append(
+            {
+                "eps": eps,
+                "glosas_recientes": b["count"],
+                "valor_objetado_total": int(b["valor_objetado"]),
+                "primer_glosa_en": (b["primer_visto"].isoformat() if b["primer_visto"] else None),
+            }
+        )
 
     nuevas.sort(key=lambda x: x["glosas_recientes"], reverse=True)
 
@@ -7064,8 +7387,11 @@ def stats_estatus_eps(
             continue
         if eps not in por_eps:
             por_eps[eps] = {
-                "total": 0, "decididas": 0, "levantadas": 0,
-                "vencidas": 0, "criticas": 0,
+                "total": 0,
+                "decididas": 0,
+                "levantadas": 0,
+                "vencidas": 0,
+                "criticas": 0,
             }
         b = por_eps[eps]
         b["total"] += 1
@@ -7084,10 +7410,7 @@ def stats_estatus_eps(
 
     items = []
     for eps, b in por_eps.items():
-        tasa = (
-            round(100 * b["levantadas"] / b["decididas"], 2)
-            if b["decididas"] else 0.0
-        )
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
         razones = []
         if b["vencidas"] > 15:
             status = "ROJO"
@@ -7100,24 +7423,24 @@ def stats_estatus_eps(
             if b["vencidas"] > 5:
                 razones.append(f"{b['vencidas']} vencidas")
             if tasa < 60 and b["decididas"] >= 5:
-                razones.append(
-                    f"tasa_levantamiento_pct={tasa} bajo target"
-                )
+                razones.append(f"tasa_levantamiento_pct={tasa} bajo target")
         else:
             status = "VERDE"
             razones.append("operación saludable")
 
-        items.append({
-            "eps": eps,
-            "status": status,
-            "razones": razones,
-            "total_glosas": b["total"],
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "vencidas": b["vencidas"],
-            "criticas": b["criticas"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "status": status,
+                "razones": razones,
+                "total_glosas": b["total"],
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "vencidas": b["vencidas"],
+                "criticas": b["criticas"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
 
     orden_status = {"ROJO": 0, "AMARILLO": 1, "VERDE": 2}
     items.sort(key=lambda x: (orden_status[x["status"]], x["eps"]))
@@ -7135,8 +7458,7 @@ def stats_estatus_eps(
 
 @router.get("/stats/comparativa-eps")
 def stats_comparativa_eps(
-    min_glosas: int = Query(5, ge=1, le=100,
-                            description="Mínimo de glosas para incluir EPS"),
+    min_glosas: int = Query(5, ge=1, le=100, description="Mínimo de glosas para incluir EPS"),
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
@@ -7168,9 +7490,13 @@ def stats_comparativa_eps(
         eps = (g.eps or "SIN_EPS").strip()
         if eps not in por_eps:
             por_eps[eps] = {
-                "total": 0, "levantadas": 0, "aceptadas": 0,
-                "ratificadas": 0, "pendientes": 0,
-                "valor_objetado": 0.0, "valor_recuperado": 0.0,
+                "total": 0,
+                "levantadas": 0,
+                "aceptadas": 0,
+                "ratificadas": 0,
+                "pendientes": 0,
+                "valor_objetado": 0.0,
+                "valor_recuperado": 0.0,
                 "tiempos": [],
             }
         b = por_eps[eps]
@@ -7197,26 +7523,22 @@ def stats_comparativa_eps(
         if b["total"] < min_glosas:
             continue
         decididas = b["levantadas"] + b["aceptadas"] + b["ratificadas"]
-        tasa = (
-            round(100 * b["levantadas"] / decididas, 2)
-            if decididas else 0.0
+        tasa = round(100 * b["levantadas"] / decididas, 2) if decididas else 0.0
+        tiempo_prom = round(sum(b["tiempos"]) / len(b["tiempos"]), 2) if b["tiempos"] else 0.0
+        items.append(
+            {
+                "eps": eps,
+                "total_glosas": b["total"],
+                "levantadas": b["levantadas"],
+                "aceptadas": b["aceptadas"],
+                "ratificadas": b["ratificadas"],
+                "pendientes": b["pendientes"],
+                "tasa_levantamiento_pct": tasa,
+                "valor_objetado_total": int(b["valor_objetado"]),
+                "valor_recuperado_total": int(b["valor_recuperado"]),
+                "tiempo_promedio_decision_dias": tiempo_prom,
+            }
         )
-        tiempo_prom = (
-            round(sum(b["tiempos"]) / len(b["tiempos"]), 2)
-            if b["tiempos"] else 0.0
-        )
-        items.append({
-            "eps": eps,
-            "total_glosas": b["total"],
-            "levantadas": b["levantadas"],
-            "aceptadas": b["aceptadas"],
-            "ratificadas": b["ratificadas"],
-            "pendientes": b["pendientes"],
-            "tasa_levantamiento_pct": tasa,
-            "valor_objetado_total": int(b["valor_objetado"]),
-            "valor_recuperado_total": int(b["valor_recuperado"]),
-            "tiempo_promedio_decision_dias": tiempo_prom,
-        })
 
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
 
@@ -7286,13 +7608,9 @@ def stats_cumplimiento_sla(
         else:
             en_tiempo += 1
 
-    tasa = (
-        round(100 * cerradas_a_tiempo / cerradas, 2)
-        if cerradas else 0.0
-    )
+    tasa = round(100 * cerradas_a_tiempo / cerradas, 2) if cerradas else 0.0
     tiempo_promedio = (
-        round(sum(tiempos_resolucion) / len(tiempos_resolucion), 2)
-        if tiempos_resolucion else 0.0
+        round(sum(tiempos_resolucion) / len(tiempos_resolucion), 2) if tiempos_resolucion else 0.0
     )
 
     return {
@@ -7339,13 +7657,13 @@ def stats_distribucion_valores(
     from datetime import timedelta
 
     BUCKETS = [
-        ("<100k",    0,         100_000),
-        ("100k-500k", 100_000,   500_000),
-        ("500k-1M",  500_000,   1_000_000),
-        ("1M-5M",    1_000_000, 5_000_000),
-        ("5M-10M",   5_000_000, 10_000_000),
-        ("10M-50M",  10_000_000, 50_000_000),
-        ("50M+",     50_000_000, None),
+        ("<100k", 0, 100_000),
+        ("100k-500k", 100_000, 500_000),
+        ("500k-1M", 500_000, 1_000_000),
+        ("1M-5M", 1_000_000, 5_000_000),
+        ("5M-10M", 5_000_000, 10_000_000),
+        ("10M-50M", 10_000_000, 50_000_000),
+        ("50M+", 50_000_000, None),
     ]
 
     corte = ahora_utc() - timedelta(days=int(dias))
@@ -7374,21 +7692,20 @@ def stats_distribucion_valores(
     # Distribución por bucket
     buckets_out = []
     for nombre, lo, hi in BUCKETS:
-        en_bucket = [
-            v for v in valores
-            if v >= lo and (hi is None or v < hi)
-        ]
+        en_bucket = [v for v in valores if v >= lo and (hi is None or v < hi)]
         n = len(en_bucket)
         v_sum = sum(en_bucket)
-        buckets_out.append({
-            "rango": nombre,
-            "min": lo,
-            "max": hi,
-            "count": n,
-            "valor": int(v_sum),
-            "pct_count": round(100 * n / total_glosas, 2) if total_glosas else 0.0,
-            "pct_valor": round(100 * v_sum / valor_total, 2) if valor_total else 0.0,
-        })
+        buckets_out.append(
+            {
+                "rango": nombre,
+                "min": lo,
+                "max": hi,
+                "count": n,
+                "valor": int(v_sum),
+                "pct_count": round(100 * n / total_glosas, 2) if total_glosas else 0.0,
+                "pct_valor": round(100 * v_sum / valor_total, 2) if valor_total else 0.0,
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
@@ -7448,8 +7765,7 @@ def stats_comparar_periodos(
             if creado and desde <= creado < hasta:
                 creadas += 1
 
-            if (dec and desde <= dec < hasta and
-                    (g.estado or "").upper() in ESTADOS_CERRADOS):
+            if dec and desde <= dec < hasta and (g.estado or "").upper() in ESTADOS_CERRADOS:
                 cerradas += 1
                 valor_rec += float(g.valor_recuperado or 0)
                 if creado:
@@ -7460,8 +7776,7 @@ def stats_comparar_periodos(
             "glosas_cerradas": cerradas,
             "valor_recuperado": int(valor_rec),
             "tiempo_promedio_resolucion_dias": (
-                round(sum(tiempos) / len(tiempos), 2)
-                if tiempos else 0.0
+                round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
             ),
         }
 
@@ -7473,10 +7788,7 @@ def stats_comparar_periodos(
         pct = round(100 * diff / p, 2) if p else None
         return {"absoluto": diff, "pct": pct}
 
-    deltas = {
-        k: _delta(actual[k], previo[k])
-        for k in actual.keys()
-    }
+    deltas = {k: _delta(actual[k], previo[k]) for k in actual.keys()}
 
     return {
         "ventana_dias": int(dias),
@@ -7531,9 +7843,7 @@ def stats_forecast_cierres(
     velocidad_semanal = velocidad_diaria * 7
 
     pendientes_actuales = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .count()
+        db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).count()
     )
 
     serie = []
@@ -7542,11 +7852,13 @@ def stats_forecast_cierres(
         cierres = min(int(velocidad_semanal), pendientes)
         pendientes -= cierres
         fecha = ahora + timedelta(weeks=w)
-        serie.append({
-            "semana": f"{fecha.year}-W{fecha.isocalendar()[1]:02d}",
-            "cierres_estimados": cierres,
-            "pendientes_restantes_estimados": max(0, pendientes),
-        })
+        serie.append(
+            {
+                "semana": f"{fecha.year}-W{fecha.isocalendar()[1]:02d}",
+                "cierres_estimados": cierres,
+                "pendientes_restantes_estimados": max(0, pendientes),
+            }
+        )
         if pendientes <= 0:
             break
 
@@ -7604,16 +7916,11 @@ def stats_velocidad_equipo(
         if delta <= 90:
             cerradas_90d += 1
 
-    pendientes = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .count()
-    )
+    pendientes = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).count()
 
     velocidad_diaria_30d = round(cerradas_30d / 30, 2)
     dias_para_cerrar = (
-        round(pendientes / velocidad_diaria_30d, 1)
-        if velocidad_diaria_30d > 0 else None
+        round(pendientes / velocidad_diaria_30d, 1) if velocidad_diaria_30d > 0 else None
     )
 
     return {
@@ -7648,8 +7955,7 @@ def stats_desempeno_trimestral(
     """
     from datetime import timezone
 
-    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA",
-                        "ARCHIVADA", "CONCILIADA"}
+    ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA", "ARCHIVADA", "CONCILIADA"}
 
     glosas = db.query(GlosaRecord).all()
 
@@ -7666,8 +7972,11 @@ def stats_desempeno_trimestral(
 
         if key not in por_trim:
             por_trim[key] = {
-                "total": 0, "decididas": 0, "levantadas": 0,
-                "valor_obj": 0.0, "valor_rec": 0.0,
+                "total": 0,
+                "decididas": 0,
+                "levantadas": 0,
+                "valor_obj": 0.0,
+                "valor_rec": 0.0,
             }
         b = por_trim[key]
         b["total"] += 1
@@ -7682,30 +7991,26 @@ def stats_desempeno_trimestral(
 
     # Ordenar por trimestre y limitar a últimos N
     keys_ordenados = sorted(por_trim.keys())
-    keys_recientes = keys_ordenados[-int(trimestres):]
+    keys_recientes = keys_ordenados[-int(trimestres) :]
 
     serie = []
     for key in keys_recientes:
         b = por_trim[key]
-        tasa_lev = (
-            round(100 * b["levantadas"] / b["decididas"], 2)
-            if b["decididas"] else 0.0
+        tasa_lev = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
+        tasa_rec = round(100 * b["valor_rec"] / b["valor_obj"], 2) if b["valor_obj"] else 0.0
+        serie.append(
+            {
+                "trimestre": key,
+                "total_glosas": b["total"],
+                "decididas": b["decididas"],
+                "pendientes": b["total"] - b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa_lev,
+                "valor_objetado_total": int(b["valor_obj"]),
+                "valor_recuperado_total": int(b["valor_rec"]),
+                "tasa_recuperacion_pct": tasa_rec,
+            }
         )
-        tasa_rec = (
-            round(100 * b["valor_rec"] / b["valor_obj"], 2)
-            if b["valor_obj"] else 0.0
-        )
-        serie.append({
-            "trimestre": key,
-            "total_glosas": b["total"],
-            "decididas": b["decididas"],
-            "pendientes": b["total"] - b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa_lev,
-            "valor_objetado_total": int(b["valor_obj"]),
-            "valor_recuperado_total": int(b["valor_rec"]),
-            "tasa_recuperacion_pct": tasa_rec,
-        })
 
     return {
         "trimestres_solicitados": int(trimestres),
@@ -7770,7 +8075,7 @@ def stats_valor_eficiencia_anual(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """R210 P1: serie anual de valor objetado vs recuperado.
+    r"""R210 P1: serie anual de valor objetado vs recuperado.
 
     Vista comparativa para reportes anuales:
       "En 2025 se objetaron \$10B y recuperamos \$5B (50%
@@ -7801,16 +8106,15 @@ def stats_valor_eficiencia_anual(
     serie = []
     for k in sorted(por_anio.keys()):
         b = por_anio[k]
-        eff = (
-            round(100 * b["rec"] / b["obj"], 2)
-            if b["obj"] else 0.0
+        eff = round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        serie.append(
+            {
+                "anio": k,
+                "valor_objetado": int(b["obj"]),
+                "valor_recuperado": int(b["rec"]),
+                "eficiencia_pct": eff,
+            }
         )
-        serie.append({
-            "anio": k,
-            "valor_objetado": int(b["obj"]),
-            "valor_recuperado": int(b["rec"]),
-            "eficiencia_pct": eff,
-        })
 
     return {"serie": serie}
 
@@ -7834,11 +8138,7 @@ def stats_criticas_economicas(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     items = []
     for g in abiertas:
@@ -7847,21 +8147,24 @@ def stats_criticas_economicas(
             continue
         dr = g.dias_restantes if g.dias_restantes is not None else 0
         score = valor / max(1, dr + 30)
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "valor_objetado": valor,
-            "dias_restantes": dr,
-            "score_urgencia_economica": round(score, 2),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "valor_objetado": valor,
+                "dias_restantes": dr,
+                "score_urgencia_economica": round(score, 2),
+            }
+        )
     items.sort(
-        key=lambda x: x["score_urgencia_economica"], reverse=True,
+        key=lambda x: x["score_urgencia_economica"],
+        reverse=True,
     )
 
     return {
         "top_solicitado": int(top),
-        "items": items[:int(top)],
+        "items": items[: int(top)],
     }
 
 
@@ -7883,13 +8186,16 @@ def stats_proceso_bilateral(
     glosas = db.query(GlosaRecord).all()
 
     ESTADOS_PIPELINE = [
-        "RADICADA", "RESPONDIDA", "RATIFICADA",
-        "CONCILIADA", "LEVANTADA", "ACEPTADA",
-        "ARCHIVADA", "EXTEMPORANEA",
+        "RADICADA",
+        "RESPONDIDA",
+        "RATIFICADA",
+        "CONCILIADA",
+        "LEVANTADA",
+        "ACEPTADA",
+        "ARCHIVADA",
+        "EXTEMPORANEA",
     ]
-    por_estado: dict[str, dict] = {
-        e: {"count": 0, "valor": 0.0} for e in ESTADOS_PIPELINE
-    }
+    por_estado: dict[str, dict] = {e: {"count": 0, "valor": 0.0} for e in ESTADOS_PIPELINE}
 
     for g in glosas:
         e = (g.estado or "").upper().strip() or "(SIN_ESTADO)"
@@ -7900,11 +8206,13 @@ def stats_proceso_bilateral(
     items = []
     for e in ESTADOS_PIPELINE:
         b = por_estado[e]
-        items.append({
-            "estado": e,
-            "count": b["count"],
-            "valor": int(b["valor"]),
-        })
+        items.append(
+            {
+                "estado": e,
+                "count": b["count"],
+                "valor": int(b["valor"]),
+            }
+        )
 
     total = sum(it["count"] for it in items)
 
@@ -7951,18 +8259,24 @@ def stats_mas_comentadas(
 
     items = []
     for glosa_id, n in rows:
-        g = db.query(GlosaRecord).filter(
-            GlosaRecord.id == glosa_id,
-        ).first()
+        g = (
+            db.query(GlosaRecord)
+            .filter(
+                GlosaRecord.id == glosa_id,
+            )
+            .first()
+        )
         if not g:
             continue
-        items.append({
-            "glosa_id": glosa_id,
-            "n_comentarios": int(n),
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-        })
+        items.append(
+            {
+                "glosa_id": glosa_id,
+                "n_comentarios": int(n),
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -8012,11 +8326,13 @@ def stats_eps_no_responde(
 
     items = []
     for eps, b in por_eps.items():
-        items.append({
-            "eps": eps,
-            "count_sin_respuesta": b["count"],
-            "valor_pendiente": int(b["valor"]),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_sin_respuesta": b["count"],
+                "valor_pendiente": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["count_sin_respuesta"], reverse=True)
 
     return {
@@ -8059,21 +8375,20 @@ def stats_listas_para_cerrar(
             continue
         if not g.codigo_respuesta or not g.codigo_respuesta.strip():
             continue
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "codigo_respuesta": g.codigo_respuesta,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "dias_restantes": g.dias_restantes,
-            "gestor": g.gestor_nombre,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "codigo_respuesta": g.codigo_respuesta,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "dias_restantes": g.dias_restantes,
+                "gestor": g.gestor_nombre,
+            }
+        )
     items.sort(
-        key=lambda x: (
-            x["dias_restantes"]
-            if x["dias_restantes"] is not None else 9999
-        ),
+        key=lambda x: x["dias_restantes"] if x["dias_restantes"] is not None else 9999,
     )
 
     return {
@@ -8102,9 +8417,7 @@ def stats_refinaciones_por_dia(
 
     desde = ahora_utc() - timedelta(days=int(dias))
     versiones = (
-        db.query(DictamenVersionRecord)
-        .filter(DictamenVersionRecord.creado_en >= desde)
-        .all()
+        db.query(DictamenVersionRecord).filter(DictamenVersionRecord.creado_en >= desde).all()
     )
 
     por_dia: dict[str, dict] = {}
@@ -8127,12 +8440,14 @@ def stats_refinaciones_por_dia(
     serie = []
     for k in sorted(por_dia.keys()):
         b = por_dia[k]
-        serie.append({
-            "fecha": k,
-            "total": b["total"],
-            "refinar": b["refinar"],
-            "regenerar": b["regenerar"],
-        })
+        serie.append(
+            {
+                "fecha": k,
+                "total": b["total"],
+                "refinar": b["refinar"],
+                "regenerar": b["regenerar"],
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
@@ -8186,11 +8501,7 @@ def stats_tiempo_primer_dictamen(
 
     glosa_ids = [r[0] for r in rows]
     glosas_dict = {
-        g.id: g for g in (
-            db.query(GlosaRecord)
-            .filter(GlosaRecord.id.in_(glosa_ids))
-            .all()
-        )
+        g.id: g for g in (db.query(GlosaRecord).filter(GlosaRecord.id.in_(glosa_ids)).all())
     }
 
     horas: list[float] = []
@@ -8267,10 +8578,16 @@ def stats_tercero_nit_resumen(
         nit = (g.tercero_nit or "").strip()
         if not nit:
             continue
-        b = bucket.setdefault(nit, {
-            "nombre": g.tercero_nombre or g.eps or nit,
-            "count": 0, "eps": set(), "obj": 0.0, "rec": 0.0,
-        })
+        b = bucket.setdefault(
+            nit,
+            {
+                "nombre": g.tercero_nombre or g.eps or nit,
+                "count": 0,
+                "eps": set(),
+                "obj": 0.0,
+                "rec": 0.0,
+            },
+        )
         b["count"] += 1
         if g.eps:
             b["eps"].add(g.eps.strip())
@@ -8279,14 +8596,16 @@ def stats_tercero_nit_resumen(
 
     items = []
     for nit, b in bucket.items():
-        items.append({
-            "tercero_nit": nit,
-            "tercero_nombre": b["nombre"],
-            "count_glosas": b["count"],
-            "eps_distintas": len(b["eps"]),
-            "valor_objetado_total": int(b["obj"]),
-            "valor_recuperado_total": int(b["rec"]),
-        })
+        items.append(
+            {
+                "tercero_nit": nit,
+                "tercero_nombre": b["nombre"],
+                "count_glosas": b["count"],
+                "eps_distintas": len(b["eps"]),
+                "valor_objetado_total": int(b["obj"]),
+                "valor_recuperado_total": int(b["rec"]),
+            }
+        )
     items.sort(key=lambda x: x["valor_objetado_total"], reverse=True)
 
     return {
@@ -8313,11 +8632,7 @@ def stats_dgh_radicacion_tiempo(
 
     También retorna promedio y mediana globales.
     """
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.dias_radicacion_dgh.isnot(None))
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.dias_radicacion_dgh.isnot(None)).all()
 
     buckets = {"0-7": 0, "8-30": 0, "31-60": 0, "61-90": 0, "91+": 0}
     valores: list[int] = []
@@ -8353,9 +8668,7 @@ def stats_dgh_radicacion_tiempo(
         "promedio_dias": promedio,
         "mediana_dias": mediana,
         "max_dias": maximo,
-        "buckets": [
-            {"rango": k, "count": v} for k, v in buckets.items()
-        ],
+        "buckets": [{"rango": k, "count": v} for k, v in buckets.items()],
     }
 
 
@@ -8392,9 +8705,15 @@ def stats_tecnico_recepcion_actividad(
         tec = (g.tecnico_recepcion or "").strip()
         if not tec:
             continue
-        b = bucket.setdefault(tec, {
-            "total": 0, "eps": set(), "valor": 0.0, "dev": 0,
-        })
+        b = bucket.setdefault(
+            tec,
+            {
+                "total": 0,
+                "eps": set(),
+                "valor": 0.0,
+                "dev": 0,
+            },
+        )
         b["total"] += 1
         if g.eps:
             b["eps"].add(g.eps.strip())
@@ -8404,13 +8723,15 @@ def stats_tecnico_recepcion_actividad(
 
     items = []
     for tec, b in bucket.items():
-        items.append({
-            "tecnico_recepcion": tec,
-            "total_glosas": b["total"],
-            "eps_distintas": len(b["eps"]),
-            "valor_objetado_total": int(b["valor"]),
-            "count_devoluciones": b["dev"],
-        })
+        items.append(
+            {
+                "tecnico_recepcion": tec,
+                "total_glosas": b["total"],
+                "eps_distintas": len(b["eps"]),
+                "valor_objetado_total": int(b["valor"]),
+                "count_devoluciones": b["dev"],
+            }
+        )
     items.sort(key=lambda x: x["total_glosas"], reverse=True)
 
     return {
@@ -8441,20 +8762,22 @@ def stats_dashboard_mensual_completo(
     from app.core.tz import ahora_utc
 
     inicio = ahora_utc().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
-    creadas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= inicio)
-        .all()
-    )
+    creadas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= inicio).all()
     decididas = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.fecha_decision_eps >= inicio)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -8462,20 +8785,10 @@ def stats_dashboard_mensual_completo(
     obj_creadas = sum(float(g.valor_objetado or 0) for g in creadas)
 
     n_dec = len(decididas)
-    n_lev = sum(
-        1 for g in decididas
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    n_rat = sum(
-        1 for g in decididas
-        if (g.estado or "").upper() == "RATIFICADA"
-    )
-    rec_total = sum(
-        float(g.valor_recuperado or 0) for g in decididas
-    )
-    obj_dec_total = sum(
-        float(g.valor_objetado or 0) for g in decididas
-    )
+    n_lev = sum(1 for g in decididas if (g.estado or "").upper() == "LEVANTADA")
+    n_rat = sum(1 for g in decididas if (g.estado or "").upper() == "RATIFICADA")
+    rec_total = sum(float(g.valor_recuperado or 0) for g in decididas)
+    obj_dec_total = sum(float(g.valor_objetado or 0) for g in decididas)
 
     a_tiempo = 0
     for g in decididas:
@@ -8485,10 +8798,7 @@ def stats_dashboard_mensual_completo(
             a_tiempo += 1
 
     tasa_lev = round(100 * n_lev / n_dec, 2) if n_dec else 0.0
-    tasa_rec = (
-        round(100 * rec_total / obj_dec_total, 2)
-        if obj_dec_total else 0.0
-    )
+    tasa_rec = round(100 * rec_total / obj_dec_total, 2) if obj_dec_total else 0.0
     pct_sla = round(100 * a_tiempo / n_dec, 2) if n_dec else 0.0
 
     eps_vol: dict[str, int] = {}
@@ -8502,10 +8812,14 @@ def stats_dashboard_mensual_completo(
             gestor_vol[gest] = gestor_vol.get(gest, 0) + 1
 
     top3_eps = sorted(
-        eps_vol.items(), key=lambda x: x[1], reverse=True,
+        eps_vol.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
     top3_gestor = sorted(
-        gestor_vol.items(), key=lambda x: x[1], reverse=True,
+        gestor_vol.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
 
     return {
@@ -8526,12 +8840,8 @@ def stats_dashboard_mensual_completo(
         },
         "tasa_levantamiento_pct": tasa_lev,
         "tasa_recuperacion_monetaria_pct": tasa_rec,
-        "top_3_eps_volumen": [
-            {"eps": e, "count": c} for e, c in top3_eps
-        ],
-        "top_3_gestores_volumen": [
-            {"gestor": g, "count": c} for g, c in top3_gestor
-        ],
+        "top_3_eps_volumen": [{"eps": e, "count": c} for e, c in top3_eps],
+        "top_3_gestores_volumen": [{"gestor": g, "count": c} for g, c in top3_gestor],
     }
 
 
@@ -8564,26 +8874,25 @@ def stats_ratificadas_recientes(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_aceptado": int(float(g.valor_aceptado or 0)),
-            "gestor_nombre": g.gestor_nombre,
-            "fecha_decision_eps": (
-                g.fecha_decision_eps.isoformat()
-                if g.fecha_decision_eps else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_aceptado": int(float(g.valor_aceptado or 0)),
+                "gestor_nombre": g.gestor_nombre,
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
+                ),
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
         "total": len(items),
-        "valor_aceptado_total": sum(
-            it["valor_aceptado"] for it in items
-        ),
+        "valor_aceptado_total": sum(it["valor_aceptado"] for it in items),
         "items": items,
     }
 
@@ -8617,19 +8926,19 @@ def stats_conciliaciones_acta_firmadas(
 
     items = []
     for c in rows:
-        items.append({
-            "conciliacion_id": c.id,
-            "glosa_id": c.glosa_id,
-            "acta_numero": c.acta_numero,
-            "fecha_acta": (
-                c.fecha_acta.isoformat() if c.fecha_acta else None
-            ),
-            "valor_conciliado": int(float(c.valor_conciliado or 0)),
-            "valor_ratificado_hus": int(
-                float(c.valor_ratificado_hus or 0),
-            ),
-            "estado_bilateral": c.estado_bilateral,
-        })
+        items.append(
+            {
+                "conciliacion_id": c.id,
+                "glosa_id": c.glosa_id,
+                "acta_numero": c.acta_numero,
+                "fecha_acta": (c.fecha_acta.isoformat() if c.fecha_acta else None),
+                "valor_conciliado": int(float(c.valor_conciliado or 0)),
+                "valor_ratificado_hus": int(
+                    float(c.valor_ratificado_hus or 0),
+                ),
+                "estado_bilateral": c.estado_bilateral,
+            }
+        )
 
     return {
         "total_actas": len(items),
@@ -8663,10 +8972,15 @@ def stats_cobranza_eps_vencidas(
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        b = bucket.setdefault(eps, {
-            "count": 0, "suma_dias": 0,
-            "obj": 0.0, "saldo": 0.0,
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "count": 0,
+                "suma_dias": 0,
+                "obj": 0.0,
+                "saldo": 0.0,
+            },
+        )
         b["count"] += 1
         b["suma_dias"] += abs(int(g.dias_restantes or 0))
         b["obj"] += float(g.valor_objetado or 0)
@@ -8674,16 +8988,16 @@ def stats_cobranza_eps_vencidas(
 
     items = []
     for eps, b in bucket.items():
-        prom = (
-            round(b["suma_dias"] / b["count"], 1) if b["count"] else 0.0
+        prom = round(b["suma_dias"] / b["count"], 1) if b["count"] else 0.0
+        items.append(
+            {
+                "eps": eps,
+                "count_vencidas": b["count"],
+                "dias_promedio_vencido": prom,
+                "valor_objetado_total": int(b["obj"]),
+                "saldo_total": int(b["saldo"]),
+            }
         )
-        items.append({
-            "eps": eps,
-            "count_vencidas": b["count"],
-            "dias_promedio_vencido": prom,
-            "valor_objetado_total": int(b["obj"]),
-            "saldo_total": int(b["saldo"]),
-        })
     items.sort(key=lambda x: x["valor_objetado_total"], reverse=True)
 
     return {
@@ -8708,7 +9022,9 @@ def stats_conciliaciones_pendientes(
     from app.models.db import ConciliacionRecord
 
     PENDIENTES = [
-        "PROGRAMADA", "EPS_RESPONDIO", "AUDIENCIA_REALIZADA",
+        "PROGRAMADA",
+        "EPS_RESPONDIO",
+        "AUDIENCIA_REALIZADA",
     ]
 
     rows = (
@@ -8726,11 +9042,13 @@ def stats_conciliaciones_pendientes(
 
     items = []
     for e, b in bucket.items():
-        items.append({
-            "estado_bilateral": e,
-            "count": b["count"],
-            "valor_conciliado_total": int(b["valor"]),
-        })
+        items.append(
+            {
+                "estado_bilateral": e,
+                "count": b["count"],
+                "valor_conciliado_total": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -8768,13 +9086,16 @@ def stats_factura_grandes_pendientes(
         f = (g.factura or "").strip()
         if not f:
             continue
-        b = bucket.setdefault(f, {
-            "eps": g.eps,
-            "valor_factura": float(g.valor_factura or 0),
-            "saldo": float(g.saldo_factura or 0),
-            "abiertas": 0,
-            "obj_abierto": 0.0,
-        })
+        b = bucket.setdefault(
+            f,
+            {
+                "eps": g.eps,
+                "valor_factura": float(g.valor_factura or 0),
+                "saldo": float(g.saldo_factura or 0),
+                "abiertas": 0,
+                "obj_abierto": 0.0,
+            },
+        )
         if (g.estado or "").upper() not in ESTADOS_CERRADOS:
             b["abiertas"] += 1
             b["obj_abierto"] += float(g.valor_objetado or 0)
@@ -8783,14 +9104,16 @@ def stats_factura_grandes_pendientes(
     for f, b in bucket.items():
         if b["abiertas"] == 0:
             continue
-        items.append({
-            "factura": f,
-            "eps": b["eps"],
-            "valor_factura": int(b["valor_factura"]),
-            "saldo_factura": int(b["saldo"]),
-            "count_glosas_abiertas": b["abiertas"],
-            "valor_objetado_pendiente": int(b["obj_abierto"]),
-        })
+        items.append(
+            {
+                "factura": f,
+                "eps": b["eps"],
+                "valor_factura": int(b["valor_factura"]),
+                "saldo_factura": int(b["saldo"]),
+                "count_glosas_abiertas": b["abiertas"],
+                "valor_objetado_pendiente": int(b["obj_abierto"]),
+            }
+        )
     items.sort(key=lambda x: x["valor_factura"], reverse=True)
 
     return {
@@ -8824,9 +9147,11 @@ def stats_dictamen_tasa_vs_largo(
 
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -8843,15 +9168,15 @@ def stats_dictamen_tasa_vs_largo(
     items = []
     for n, _, _ in BUCKETS:
         b = bandas[n]
-        tasa = (
-            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append(
+            {
+                "rango_caracteres": n,
+                "decididas": b["dec"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "rango_caracteres": n,
-            "decididas": b["dec"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-        })
 
     return {
         "items": items,
@@ -8871,7 +9196,11 @@ def stats_codigo_respuesta_mes_actual(
     from app.core.tz import ahora_utc
 
     inicio = ahora_utc().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     rows = (
@@ -8887,9 +9216,14 @@ def stats_codigo_respuesta_mes_actual(
         c = (g.codigo_respuesta or "").strip()
         if not c:
             continue
-        b = bucket.setdefault(c, {
-            "count": 0, "lev": 0, "dec": 0,
-        })
+        b = bucket.setdefault(
+            c,
+            {
+                "count": 0,
+                "lev": 0,
+                "dec": 0,
+            },
+        )
         b["count"] += 1
         estado = (g.estado or "").upper()
         if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA"):
@@ -8899,16 +9233,16 @@ def stats_codigo_respuesta_mes_actual(
 
     items = []
     for c, b in bucket.items():
-        tasa = (
-            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append(
+            {
+                "codigo_respuesta": c,
+                "count_total": b["count"],
+                "decididas": b["dec"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "codigo_respuesta": c,
-            "count_total": b["count"],
-            "decididas": b["dec"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-        })
     items.sort(key=lambda x: x["count_total"], reverse=True)
 
     return {
@@ -8951,9 +9285,13 @@ def stats_eps_radica_promedio_dia(
             cre = cre.replace(tzinfo=timezone.utc)
         if not cre:
             continue
-        b = bucket.setdefault(eps, {
-            "total": 0, "por_dia": {},
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "total": 0,
+                "por_dia": {},
+            },
+        )
         b["total"] += 1
         k = cre.date().isoformat()
         b["por_dia"][k] = b["por_dia"].get(k, 0) + 1
@@ -8965,13 +9303,15 @@ def stats_eps_radica_promedio_dia(
         n_dias = len(b["por_dia"])
         max_dia = max(b["por_dia"].values()) if b["por_dia"] else 0
         prom = round(b["total"] / int(dias), 2)
-        items.append({
-            "eps": eps,
-            "count_total": b["total"],
-            "dias_con_glosa": n_dias,
-            "promedio_diario": prom,
-            "max_dia": max_dia,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_total": b["total"],
+                "dias_con_glosa": n_dias,
+                "promedio_diario": prom,
+                "max_dia": max_dia,
+            }
+        )
     items.sort(key=lambda x: x["promedio_diario"], reverse=True)
 
     return {
@@ -9009,9 +9349,14 @@ def stats_factura_tasa_cierre(
         f = (g.factura or "").strip()
         if not f:
             continue
-        b = bucket.setdefault(f, {
-            "total": 0, "cerradas": 0, "eps": g.eps,
-        })
+        b = bucket.setdefault(
+            f,
+            {
+                "total": 0,
+                "cerradas": 0,
+                "eps": g.eps,
+            },
+        )
         b["total"] += 1
         if (g.estado or "").upper() in ESTADOS_CERRADOS:
             b["cerradas"] += 1
@@ -9020,17 +9365,16 @@ def stats_factura_tasa_cierre(
     for f, b in bucket.items():
         if b["total"] < min_glosas:
             continue
-        pct = (
-            round(100 * b["cerradas"] / b["total"], 2)
-            if b["total"] else 0.0
+        pct = round(100 * b["cerradas"] / b["total"], 2) if b["total"] else 0.0
+        items.append(
+            {
+                "factura": f,
+                "eps": b["eps"],
+                "total": b["total"],
+                "cerradas": b["cerradas"],
+                "pct_cerradas": pct,
+            }
         )
-        items.append({
-            "factura": f,
-            "eps": b["eps"],
-            "total": b["total"],
-            "cerradas": b["cerradas"],
-            "pct_cerradas": pct,
-        })
     items.sort(key=lambda x: x["pct_cerradas"])
 
     return {
@@ -9059,9 +9403,11 @@ def stats_eps_codigo_rentabilidad(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.eps.isnot(None))
         .filter(GlosaRecord.codigo_glosa.isnot(None))
         .all()
@@ -9073,9 +9419,13 @@ def stats_eps_codigo_rentabilidad(
         codigo = (g.codigo_glosa or "").strip()
         if not eps or not codigo:
             continue
-        b = bucket.setdefault((eps, codigo), {
-            "count": 0, "rec": 0.0,
-        })
+        b = bucket.setdefault(
+            (eps, codigo),
+            {
+                "count": 0,
+                "rec": 0.0,
+            },
+        )
         b["count"] += 1
         b["rec"] += float(g.valor_recuperado or 0)
 
@@ -9084,13 +9434,15 @@ def stats_eps_codigo_rentabilidad(
         if b["count"] < min_decididas:
             continue
         prom = int(b["rec"] / b["count"]) if b["count"] else 0
-        items.append({
-            "eps": eps,
-            "codigo_glosa": codigo,
-            "count_decididas": b["count"],
-            "valor_recuperado_total": int(b["rec"]),
-            "valor_recuperado_promedio": prom,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "codigo_glosa": codigo,
+                "count_decididas": b["count"],
+                "valor_recuperado_total": int(b["rec"]),
+                "valor_recuperado_promedio": prom,
+            }
+        )
     items.sort(key=lambda x: x["valor_recuperado_total"], reverse=True)
 
     return {
@@ -9113,23 +9465,18 @@ def stats_conciliaciones_por_eps(
     """
     from app.models.db import ConciliacionRecord
 
-    rows = (
-        db.query(
-            ConciliacionRecord.glosa_id,
-            ConciliacionRecord.valor_conciliado,
-            ConciliacionRecord.valor_ratificado_hus,
-        )
-        .all()
-    )
+    rows = db.query(
+        ConciliacionRecord.glosa_id,
+        ConciliacionRecord.valor_conciliado,
+        ConciliacionRecord.valor_ratificado_hus,
+    ).all()
 
     if not rows:
         return {"total_eps": 0, "items": []}
 
     glosa_ids = {r[0] for r in rows if r[0]}
     glosas_eps = dict(
-        db.query(GlosaRecord.id, GlosaRecord.eps)
-        .filter(GlosaRecord.id.in_(glosa_ids))
-        .all()
+        db.query(GlosaRecord.id, GlosaRecord.eps).filter(GlosaRecord.id.in_(glosa_ids)).all()
     )
 
     bucket: dict[str, dict] = {}
@@ -9137,23 +9484,31 @@ def stats_conciliaciones_por_eps(
         eps = (glosas_eps.get(g_id) or "").strip() if g_id else ""
         if not eps:
             continue
-        b = bucket.setdefault(eps, {
-            "count": 0, "valor": 0.0, "ratificado": 0.0,
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "count": 0,
+                "valor": 0.0,
+                "ratificado": 0.0,
+            },
+        )
         b["count"] += 1
         b["valor"] += float(val_c or 0)
         b["ratificado"] += float(val_r or 0)
 
     items = []
     for eps, b in bucket.items():
-        items.append({
-            "eps": eps,
-            "count_conciliaciones": b["count"],
-            "valor_conciliado_total": int(b["valor"]),
-            "valor_ratificado_hus_total": int(b["ratificado"]),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_conciliaciones": b["count"],
+                "valor_conciliado_total": int(b["valor"]),
+                "valor_ratificado_hus_total": int(b["ratificado"]),
+            }
+        )
     items.sort(
-        key=lambda x: x["count_conciliaciones"], reverse=True,
+        key=lambda x: x["count_conciliaciones"],
+        reverse=True,
     )
 
     return {
@@ -9195,11 +9550,7 @@ def stats_glosas_conciliadas_detalle(
             "items": [],
         }
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.id.in_(glosa_ids))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(glosa_ids)).all()
 
     # Aggregate valor per glosa
     valores_concil = {}
@@ -9211,31 +9562,29 @@ def stats_glosas_conciliadas_detalle(
     ).all():
         if not g_id:
             continue
-        valores_concil[g_id] = (
-            valores_concil.get(g_id, 0.0) + float(valor or 0)
-        )
-        valores_ratificado[g_id] = (
-            valores_ratificado.get(g_id, 0.0)
-            + float(valor_rat or 0)
-        )
+        valores_concil[g_id] = valores_concil.get(g_id, 0.0) + float(valor or 0)
+        valores_ratificado[g_id] = valores_ratificado.get(g_id, 0.0) + float(valor_rat or 0)
 
     items = []
     for g in glosas:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_conciliado_total": int(
-                valores_concil.get(g.id, 0.0),
-            ),
-            "valor_ratificado_hus_total": int(
-                valores_ratificado.get(g.id, 0.0),
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_conciliado_total": int(
+                    valores_concil.get(g.id, 0.0),
+                ),
+                "valor_ratificado_hus_total": int(
+                    valores_ratificado.get(g.id, 0.0),
+                ),
+            }
+        )
     items.sort(
-        key=lambda x: x["valor_conciliado_total"], reverse=True,
+        key=lambda x: x["valor_conciliado_total"],
+        reverse=True,
     )
 
     return {
@@ -9272,16 +9621,18 @@ def stats_vencen_en_dias(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dias_restantes": g.dias_restantes,
-            "gestor_nombre": g.gestor_nombre,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_restantes": g.dias_restantes,
+                "gestor_nombre": g.gestor_nombre,
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
@@ -9318,20 +9669,19 @@ def stats_conciliaciones_top_monto(
 
     items = []
     for c in rows:
-        items.append({
-            "conciliacion_id": c.id,
-            "glosa_id": c.glosa_id,
-            "valor_conciliado": int(float(c.valor_conciliado or 0)),
-            "valor_ratificado_hus": int(
-                float(c.valor_ratificado_hus or 0),
-            ),
-            "resultado": c.resultado,
-            "estado_bilateral": c.estado_bilateral,
-            "fecha_audiencia": (
-                c.fecha_audiencia.isoformat()
-                if c.fecha_audiencia else None
-            ),
-        })
+        items.append(
+            {
+                "conciliacion_id": c.id,
+                "glosa_id": c.glosa_id,
+                "valor_conciliado": int(float(c.valor_conciliado or 0)),
+                "valor_ratificado_hus": int(
+                    float(c.valor_ratificado_hus or 0),
+                ),
+                "resultado": c.resultado,
+                "estado_bilateral": c.estado_bilateral,
+                "fecha_audiencia": (c.fecha_audiencia.isoformat() if c.fecha_audiencia else None),
+            }
+        )
 
     return {
         "limit": int(limit),
@@ -9359,9 +9709,11 @@ def stats_codigos_recuperacion_monetaria(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.codigo_glosa.isnot(None))
         .all()
     )
@@ -9371,9 +9723,14 @@ def stats_codigos_recuperacion_monetaria(
         codigo = (g.codigo_glosa or "").strip()
         if not codigo:
             continue
-        b = bucket.setdefault(codigo, {
-            "count": 0, "obj": 0.0, "rec": 0.0,
-        })
+        b = bucket.setdefault(
+            codigo,
+            {
+                "count": 0,
+                "obj": 0.0,
+                "rec": 0.0,
+            },
+        )
         b["count"] += 1
         b["obj"] += float(g.valor_objetado or 0)
         b["rec"] += float(g.valor_recuperado or 0)
@@ -9382,16 +9739,16 @@ def stats_codigos_recuperacion_monetaria(
     for codigo, b in bucket.items():
         if b["count"] < min_glosas:
             continue
-        tasa = (
-            round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        tasa = round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        items.append(
+            {
+                "codigo_glosa": codigo,
+                "count_decididas": b["count"],
+                "valor_objetado_total": int(b["obj"]),
+                "valor_recuperado_total": int(b["rec"]),
+                "tasa_recuperacion_monetaria_pct": tasa,
+            }
         )
-        items.append({
-            "codigo_glosa": codigo,
-            "count_decididas": b["count"],
-            "valor_objetado_total": int(b["obj"]),
-            "valor_recuperado_total": int(b["rec"]),
-            "tasa_recuperacion_monetaria_pct": tasa,
-        })
     items.sort(
         key=lambda x: x["tasa_recuperacion_monetaria_pct"],
         reverse=True,
@@ -9423,11 +9780,16 @@ def stats_eps_volumen_mes_anterior(
 
     ahora = ahora_utc()
     inicio_mes_actual = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     if inicio_mes_actual.month == 1:
         inicio_anterior = inicio_mes_actual.replace(
-            year=inicio_mes_actual.year - 1, month=12,
+            year=inicio_mes_actual.year - 1,
+            month=12,
         )
     else:
         inicio_anterior = inicio_mes_actual.replace(
@@ -9453,11 +9815,13 @@ def stats_eps_volumen_mes_anterior(
 
     items = []
     for eps, b in bucket.items():
-        items.append({
-            "eps": eps,
-            "count_glosas": b["count"],
-            "valor_objetado_total": int(b["valor"]),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_glosas": b["count"],
+                "valor_objetado_total": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["count_glosas"], reverse=True)
 
     return {
@@ -9503,17 +9867,18 @@ def stats_codigo_respuesta_monetaria(
 
     items = []
     for c, b in bucket.items():
-        prom = (
-            int(b["rec"] / b["count"]) if b["count"] else 0
+        prom = int(b["rec"] / b["count"]) if b["count"] else 0
+        items.append(
+            {
+                "codigo_respuesta": c,
+                "count_levantadas": b["count"],
+                "valor_recuperado_total": int(b["rec"]),
+                "valor_recuperado_promedio": prom,
+            }
         )
-        items.append({
-            "codigo_respuesta": c,
-            "count_levantadas": b["count"],
-            "valor_recuperado_total": int(b["rec"]),
-            "valor_recuperado_promedio": prom,
-        })
     items.sort(
-        key=lambda x: x["valor_recuperado_total"], reverse=True,
+        key=lambda x: x["valor_recuperado_total"],
+        reverse=True,
     )
 
     return {
@@ -9542,9 +9907,11 @@ def stats_cumplimiento_sla_mensual(
     glosas = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.fecha_decision_eps >= desde)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -9567,16 +9934,15 @@ def stats_cumplimiento_sla_mensual(
     serie = []
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
-        pct = (
-            round(100 * b["a_tiempo"] / b["total"], 2)
-            if b["total"] else 0.0
+        pct = round(100 * b["a_tiempo"] / b["total"], 2) if b["total"] else 0.0
+        serie.append(
+            {
+                "mes": k,
+                "total_cerradas": b["total"],
+                "cerradas_a_tiempo": b["a_tiempo"],
+                "cumplimiento_sla_pct": pct,
+            }
         )
-        serie.append({
-            "mes": k,
-            "total_cerradas": b["total"],
-            "cerradas_a_tiempo": b["a_tiempo"],
-            "cumplimiento_sla_pct": pct,
-        })
 
     return {
         "ventana_meses": int(meses),
@@ -9636,12 +10002,14 @@ def stats_eps_tiempo_radicacion_objecion(
         if len(vals) < min_glosas:
             continue
         prom = round(sum(vals) / len(vals), 2)
-        items.append({
-            "eps": eps,
-            "count": len(vals),
-            "tiempo_promedio_dias": prom,
-            "tiempo_max_dias": max(vals),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count": len(vals),
+                "tiempo_promedio_dias": prom,
+                "tiempo_max_dias": max(vals),
+            }
+        )
     items.sort(key=lambda x: x["tiempo_promedio_dias"])
 
     return {
@@ -9681,9 +10049,13 @@ def stats_codigo_eps_cobertura(
         eps = (g.eps or "").strip()
         if not codigo or not eps:
             continue
-        b = bucket.setdefault(codigo, {
-            "count": 0, "eps": {},
-        })
+        b = bucket.setdefault(
+            codigo,
+            {
+                "count": 0,
+                "eps": {},
+            },
+        )
         b["count"] += 1
         b["eps"][eps] = b["eps"].get(eps, 0) + 1
 
@@ -9692,16 +10064,18 @@ def stats_codigo_eps_cobertura(
         if b["count"] < min_glosas:
             continue
         top3 = sorted(
-            b["eps"].items(), key=lambda x: x[1], reverse=True,
+            b["eps"].items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:3]
-        items.append({
-            "codigo_glosa": codigo,
-            "count_glosas": b["count"],
-            "eps_distintas": len(b["eps"]),
-            "top_3_eps": [
-                {"eps": e, "count": c} for e, c in top3
-            ],
-        })
+        items.append(
+            {
+                "codigo_glosa": codigo,
+                "count_glosas": b["count"],
+                "eps_distintas": len(b["eps"]),
+                "top_3_eps": [{"eps": e, "count": c} for e, c in top3],
+            }
+        )
     items.sort(key=lambda x: x["eps_distintas"], reverse=True)
 
     return {
@@ -9737,9 +10111,11 @@ def stats_codigos_respuesta_mejor_tasa_eps(
         .filter(GlosaRecord.eps.ilike(eps_q))
         .filter(GlosaRecord.codigo_respuesta.isnot(None))
         .filter(GlosaRecord.codigo_respuesta != "")
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -9759,16 +10135,16 @@ def stats_codigos_respuesta_mejor_tasa_eps(
         if b["dec"] < int(min_muestras):
             continue
         tasa = round(100 * b["lev"] / b["dec"], 2)
-        prom_rec = (
-            int(b["rec"] / b["dec"]) if b["dec"] else 0
+        prom_rec = int(b["rec"] / b["dec"]) if b["dec"] else 0
+        items.append(
+            {
+                "codigo_respuesta": cr,
+                "decididas": b["dec"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+                "valor_recuperado_promedio": prom_rec,
+            }
         )
-        items.append({
-            "codigo_respuesta": cr,
-            "decididas": b["dec"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-            "valor_recuperado_promedio": prom_rec,
-        })
     items.sort(
         key=lambda x: (
             x["tasa_levantamiento_pct"],
@@ -9827,9 +10203,14 @@ def stats_eps_volumen_tasa_mes(
         k = cre.strftime("%Y-%m")
         meses_set.add(k)
         total_eps[eps] = total_eps.get(eps, 0) + 1
-        b = matriz.setdefault(eps, {}).setdefault(k, {
-            "count": 0, "dec": 0, "lev": 0,
-        })
+        b = matriz.setdefault(eps, {}).setdefault(
+            k,
+            {
+                "count": 0,
+                "dec": 0,
+                "lev": 0,
+            },
+        )
         b["count"] += 1
         estado = (g.estado or "").upper()
         if estado in ESTADOS_DECIDIDOS:
@@ -9838,8 +10219,11 @@ def stats_eps_volumen_tasa_mes(
             b["lev"] += 1
 
     eps_top = [
-        e for e, _ in sorted(
-            total_eps.items(), key=lambda x: x[1], reverse=True,
+        e
+        for e, _ in sorted(
+            total_eps.items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[: int(top_eps)]
     ]
     meses_ord = sorted(meses_set)
@@ -9849,19 +10233,21 @@ def stats_eps_volumen_tasa_mes(
         celdas = []
         for m in meses_ord:
             b = matriz.get(eps, {}).get(m, {"count": 0, "dec": 0, "lev": 0})
-            tasa = (
-                round(100 * b["lev"] / b["dec"], 1) if b["dec"] else None
+            tasa = round(100 * b["lev"] / b["dec"], 1) if b["dec"] else None
+            celdas.append(
+                {
+                    "mes": m,
+                    "count": b["count"],
+                    "tasa_levantamiento_pct": tasa,
+                }
             )
-            celdas.append({
-                "mes": m,
-                "count": b["count"],
-                "tasa_levantamiento_pct": tasa,
-            })
-        items.append({
-            "eps": eps,
-            "total": total_eps.get(eps, 0),
-            "celdas": celdas,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "total": total_eps.get(eps, 0),
+                "celdas": celdas,
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -9917,9 +10303,7 @@ def stats_anomalias_recientes(
         if cre >= inicio_actual:
             eps_actual[eps] = eps_actual.get(eps, 0) + 1
             if eps and cod:
-                codigos_actual[(eps, cod)] = (
-                    codigos_actual.get((eps, cod), 0) + 1
-                )
+                codigos_actual[(eps, cod)] = codigos_actual.get((eps, cod), 0) + 1
         else:
             # bucket por semana
             semana_idx = int((ahora - cre).days // 7)
@@ -9946,29 +10330,29 @@ def stats_anomalias_recientes(
             continue
         ratio = count / promedio
         if ratio >= 2.0 and count >= 5:
-            items.append({
-                "tipo": "PICO",
-                "eps": eps,
-                "actual_semana": count,
-                "promedio_semanal_hist": round(promedio, 1),
-                "ratio": round(ratio, 2),
-                "mensaje": (
-                    f"{eps} pasó de ~{promedio:.0f}/sem a "
-                    f"{count} esta semana ({ratio:.1f}x)"
-                ),
-            })
+            items.append(
+                {
+                    "tipo": "PICO",
+                    "eps": eps,
+                    "actual_semana": count,
+                    "promedio_semanal_hist": round(promedio, 1),
+                    "ratio": round(ratio, 2),
+                    "mensaje": (
+                        f"{eps} pasó de ~{promedio:.0f}/sem a {count} esta semana ({ratio:.1f}x)"
+                    ),
+                }
+            )
         elif ratio <= 0.3 and promedio >= 5:
-            items.append({
-                "tipo": "CAIDA",
-                "eps": eps,
-                "actual_semana": count,
-                "promedio_semanal_hist": round(promedio, 1),
-                "ratio": round(ratio, 2),
-                "mensaje": (
-                    f"{eps} cayó de ~{promedio:.0f}/sem a "
-                    f"{count} esta semana"
-                ),
-            })
+            items.append(
+                {
+                    "tipo": "CAIDA",
+                    "eps": eps,
+                    "actual_semana": count,
+                    "promedio_semanal_hist": round(promedio, 1),
+                    "ratio": round(ratio, 2),
+                    "mensaje": (f"{eps} cayó de ~{promedio:.0f}/sem a {count} esta semana"),
+                }
+            )
 
     # CODIGO NUEVO por par (eps, codigo) que no estaba en histórico
     for (eps, cod), count in codigos_actual.items():
@@ -9976,23 +10360,26 @@ def stats_anomalias_recientes(
             continue
         if count < 2:
             continue  # filtra ruido — al menos 2 casos
-        items.append({
-            "tipo": "NUEVO_CODIGO",
-            "eps": eps,
-            "codigo_glosa": cod,
-            "actual_semana": count,
-            "mensaje": (
-                f"Código {cod} aparece en {eps} "
-                f"({count} casos esta semana, antes nunca)"
-            ),
-        })
+        items.append(
+            {
+                "tipo": "NUEVO_CODIGO",
+                "eps": eps,
+                "codigo_glosa": cod,
+                "actual_semana": count,
+                "mensaje": (
+                    f"Código {cod} aparece en {eps} ({count} casos esta semana, antes nunca)"
+                ),
+            }
+        )
 
     # Orden: PICO primero, luego CAÍDA, luego NUEVO_CODIGO
     orden_tipo = {"PICO": 1, "CAIDA": 2, "NUEVO_CODIGO": 3}
-    items.sort(key=lambda x: (
-        orden_tipo.get(x["tipo"], 9),
-        -(x.get("actual_semana") or 0),
-    ))
+    items.sort(
+        key=lambda x: (
+            orden_tipo.get(x["tipo"], 9),
+            -(x.get("actual_semana") or 0),
+        )
+    )
 
     return {
         "ventana_dias": 7,
@@ -10018,11 +10405,7 @@ def stats_comparativa_anio(
     year_actual = ahora.year
     year_anterior = year_actual - 1
 
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en.isnot(None))
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.creado_en.isnot(None)).all()
 
     actual: dict[int, dict] = {m: {"count": 0, "valor": 0.0} for m in range(1, 13)}
     anterior: dict[int, dict] = {m: {"count": 0, "valor": 0.0} for m in range(1, 13)}
@@ -10050,14 +10433,16 @@ def stats_comparativa_anio(
             delta_pct = round(100 * (a["count"] - p["count"]) / p["count"], 2)
         elif a["count"] > 0:
             delta_pct = 100.0
-        serie.append({
-            "mes": m,
-            "actual_count": a["count"],
-            "actual_valor": int(a["valor"]),
-            "anterior_count": p["count"],
-            "anterior_valor": int(p["valor"]),
-            "delta_count_pct": delta_pct,
-        })
+        serie.append(
+            {
+                "mes": m,
+                "actual_count": a["count"],
+                "actual_valor": int(a["valor"]),
+                "anterior_count": p["count"],
+                "anterior_valor": int(p["valor"]),
+                "delta_count_pct": delta_pct,
+            }
+        )
 
     return {
         "year_actual": year_actual,
@@ -10092,11 +10477,7 @@ def stats_tasas_pares_batch(
         return {"items": []}
     ids = [int(x) for x in ids if isinstance(x, (int, float, str))][:200]
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.id.in_(ids))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids)).all()
     if not glosas:
         return {"items": []}
 
@@ -10111,12 +10492,16 @@ def stats_tasas_pares_batch(
     eps_set = {p[0] for p in pares_unicos}
     cod_set = {p[1] for p in pares_unicos}
     historico = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
-        .filter(GlosaRecord.eps.in_(eps_set))
-        .filter(GlosaRecord.codigo_glosa.in_(cod_set))
-        .all()
-    ) if pares_unicos else []
+        (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.estado.in_(ESTADOS_DECIDIDOS))
+            .filter(GlosaRecord.eps.in_(eps_set))
+            .filter(GlosaRecord.codigo_glosa.in_(cod_set))
+            .all()
+        )
+        if pares_unicos
+        else []
+    )
 
     par_idx: dict[tuple, dict] = {}
     for h in historico:
@@ -10138,13 +10523,15 @@ def stats_tasas_pares_batch(
         else:
             tasa = round(100 * b["lev"] / b["dec"], 2)
             n = b["dec"]
-        items.append({
-            "glosa_id": g.id,
-            "eps": k[0],
-            "codigo_glosa": k[1],
-            "tasa_par_pct": tasa,
-            "n_par": n,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": k[0],
+                "codigo_glosa": k[1],
+                "tasa_par_pct": tasa,
+                "n_par": n,
+            }
+        )
 
     return {"total": len(items), "items": items}
 
@@ -10168,6 +10555,7 @@ def stats_eps_perfil(
       - codigos_top: top 5 códigos glosa más frecuentes con tasa par
     """
     from app.services import pagador_normalizer
+
     q = db.query(GlosaRecord).filter(
         GlosaRecord.estado.in_(["LEVANTADA", "ACEPTADA", "RATIFICADA"])
     )
@@ -10178,15 +10566,18 @@ def stats_eps_perfil(
     perfiles: dict[str, dict] = {}
     for g in glosas:
         clave = pagador_normalizer.nombre_corto(g.eps or "") or (g.eps or "—")
-        p = perfiles.setdefault(clave, {
-            "n_decididas": 0,
-            "n_levantadas": 0,
-            "n_aceptadas": 0,
-            "n_ratificadas": 0,
-            "valor_total": 0.0,
-            "valor_recuperado": 0.0,
-            "codigos": {},
-        })
+        p = perfiles.setdefault(
+            clave,
+            {
+                "n_decididas": 0,
+                "n_levantadas": 0,
+                "n_aceptadas": 0,
+                "n_ratificadas": 0,
+                "valor_total": 0.0,
+                "valor_recuperado": 0.0,
+                "codigos": {},
+            },
+        )
         p["n_decididas"] += 1
         e = (g.estado or "").upper()
         if e == "LEVANTADA":
@@ -10237,28 +10628,28 @@ def stats_eps_perfil(
         if n == 0:
             continue
         tasa = round(100 * p["n_levantadas"] / n, 1)
-        codigos_top = sorted(
-            p["codigos"].items(), key=lambda kv: kv[1]["n"], reverse=True
-        )[:5]
-        items.append({
-            "eps": clave,
-            "n_decididas": n,
-            "n_levantadas": p["n_levantadas"],
-            "n_ratificadas": p["n_ratificadas"],
-            "n_aceptadas": p["n_aceptadas"],
-            "tasa_pct": tasa,
-            "valor_total": int(p["valor_total"]),
-            "valor_recuperado": int(p["valor_recuperado"]),
-            "tono_recomendado": _tono_recomendado(p),
-            "codigos_top": [
-                {
-                    "codigo": k,
-                    "n": v["n"],
-                    "tasa_par_pct": round(100 * v["lev"] / v["n"], 1) if v["n"] >= 2 else None,
-                }
-                for k, v in codigos_top
-            ],
-        })
+        codigos_top = sorted(p["codigos"].items(), key=lambda kv: kv[1]["n"], reverse=True)[:5]
+        items.append(
+            {
+                "eps": clave,
+                "n_decididas": n,
+                "n_levantadas": p["n_levantadas"],
+                "n_ratificadas": p["n_ratificadas"],
+                "n_aceptadas": p["n_aceptadas"],
+                "tasa_pct": tasa,
+                "valor_total": int(p["valor_total"]),
+                "valor_recuperado": int(p["valor_recuperado"]),
+                "tono_recomendado": _tono_recomendado(p),
+                "codigos_top": [
+                    {
+                        "codigo": k,
+                        "n": v["n"],
+                        "tasa_par_pct": round(100 * v["lev"] / v["n"], 1) if v["n"] >= 2 else None,
+                    }
+                    for k, v in codigos_top
+                ],
+            }
+        )
 
     items.sort(key=lambda x: x["n_decididas"], reverse=True)
     return {"total": len(items), "items": items[:30]}
@@ -10282,11 +10673,7 @@ def stats_eps_totales_snapshot(
     Útil para grilla de referencia en dashboards
     operacionales.
     """
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.eps.isnot(None))
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.eps.isnot(None)).all()
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
     ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
@@ -10296,10 +10683,18 @@ def stats_eps_totales_snapshot(
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        b = bucket.setdefault(eps, {
-            "total": 0, "abiertas": 0, "lev": 0, "dec": 0,
-            "obj": 0.0, "rec": 0.0, "saldo": 0.0,
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "total": 0,
+                "abiertas": 0,
+                "lev": 0,
+                "dec": 0,
+                "obj": 0.0,
+                "rec": 0.0,
+                "saldo": 0.0,
+            },
+        )
         b["total"] += 1
         b["obj"] += float(g.valor_objetado or 0)
         b["rec"] += float(g.valor_recuperado or 0)
@@ -10314,19 +10709,19 @@ def stats_eps_totales_snapshot(
 
     items = []
     for eps, b in bucket.items():
-        tasa = (
-            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append(
+            {
+                "eps": eps,
+                "count_total": b["total"],
+                "count_abiertas": b["abiertas"],
+                "count_cerradas": b["total"] - b["abiertas"],
+                "valor_objetado_total": int(b["obj"]),
+                "valor_recuperado_total": int(b["rec"]),
+                "saldo_total": int(b["saldo"]),
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "eps": eps,
-            "count_total": b["total"],
-            "count_abiertas": b["abiertas"],
-            "count_cerradas": b["total"] - b["abiertas"],
-            "valor_objetado_total": int(b["obj"]),
-            "valor_recuperado_total": int(b["rec"]),
-            "saldo_total": int(b["saldo"]),
-            "tasa_levantamiento_pct": tasa,
-        })
     items.sort(key=lambda x: x["count_total"], reverse=True)
 
     return {
@@ -10362,27 +10757,26 @@ def stats_glosas_grandes_perdidas(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_aceptado": int(float(g.valor_aceptado or 0)),
-            "gestor_nombre": g.gestor_nombre,
-            "fecha_decision_eps": (
-                g.fecha_decision_eps.isoformat()
-                if g.fecha_decision_eps else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_aceptado": int(float(g.valor_aceptado or 0)),
+                "gestor_nombre": g.gestor_nombre,
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
+                ),
+            }
+        )
 
     return {
         "umbral": int(umbral),
         "total_grandes_perdidas": len(items),
-        "valor_total_perdido": sum(
-            it["valor_aceptado"] for it in items
-        ),
+        "valor_total_perdido": sum(it["valor_aceptado"] for it in items),
         "items": items,
     }
 
@@ -10418,9 +10812,15 @@ def stats_auditor_emails_distribucion(
         email = (g.auditor_email or "").strip()
         if not email:
             continue
-        b = bucket.setdefault(email, {
-            "total": 0, "abiertas": 0, "decididas": 0, "valor": 0.0,
-        })
+        b = bucket.setdefault(
+            email,
+            {
+                "total": 0,
+                "abiertas": 0,
+                "decididas": 0,
+                "valor": 0.0,
+            },
+        )
         b["total"] += 1
         b["valor"] += float(g.valor_objetado or 0)
         estado = (g.estado or "").upper()
@@ -10431,13 +10831,15 @@ def stats_auditor_emails_distribucion(
 
     items = []
     for email, b in bucket.items():
-        items.append({
-            "auditor_email": email,
-            "total": b["total"],
-            "abiertas": b["abiertas"],
-            "decididas": b["decididas"],
-            "valor_objetado_total": int(b["valor"]),
-        })
+        items.append(
+            {
+                "auditor_email": email,
+                "total": b["total"],
+                "abiertas": b["abiertas"],
+                "decididas": b["decididas"],
+                "valor_objetado_total": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["total"], reverse=True)
 
     return {
@@ -10473,27 +10875,24 @@ def stats_factura_resumen(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = sum(
-        1 for g in rows
-        if (g.estado or "").upper() not in ESTADOS_CERRADOS
-    )
+    abiertas = sum(1 for g in rows if (g.estado or "").upper() not in ESTADOS_CERRADOS)
     obj_total = sum(float(g.valor_objetado or 0) for g in rows)
     rec_total = sum(float(g.valor_recuperado or 0) for g in rows)
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_recuperado": int(float(g.valor_recuperado or 0)),
-            "gestor_nombre": g.gestor_nombre,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_recuperado": int(float(g.valor_recuperado or 0)),
+                "gestor_nombre": g.gestor_nombre,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+            }
+        )
 
     return {
         "factura": factura_q,
@@ -10540,13 +10939,15 @@ def stats_edad_promedio_por_estado(
         prom = round(sum(ages) / n, 1) if n else 0.0
         ord_a = sorted(ages)
         med = ord_a[n // 2]
-        items.append({
-            "estado": estado,
-            "count": n,
-            "edad_promedio_dias": prom,
-            "edad_mediana_dias": med,
-            "edad_max_dias": max(ages),
-        })
+        items.append(
+            {
+                "estado": estado,
+                "count": n,
+                "edad_promedio_dias": prom,
+                "edad_mediana_dias": med,
+                "edad_max_dias": max(ages),
+            }
+        )
     items.sort(key=lambda x: x["edad_promedio_dias"], reverse=True)
 
     return {
@@ -10582,9 +10983,14 @@ def stats_gestor_vencidas_distribucion(
         gestor = (g.gestor_nombre or "").strip()
         if not gestor:
             continue
-        b = bucket.setdefault(gestor, {
-            "total": 0, "vencidas": 0, "criticas": 0,
-        })
+        b = bucket.setdefault(
+            gestor,
+            {
+                "total": 0,
+                "vencidas": 0,
+                "criticas": 0,
+            },
+        )
         b["total"] += 1
         dr = g.dias_restantes if g.dias_restantes is not None else 0
         if dr < 0:
@@ -10594,17 +11000,16 @@ def stats_gestor_vencidas_distribucion(
 
     items = []
     for gestor, b in bucket.items():
-        pct = (
-            round(100 * b["vencidas"] / b["total"], 2)
-            if b["total"] else 0.0
+        pct = round(100 * b["vencidas"] / b["total"], 2) if b["total"] else 0.0
+        items.append(
+            {
+                "gestor": gestor,
+                "total_abiertas": b["total"],
+                "vencidas": b["vencidas"],
+                "criticas": b["criticas"],
+                "pct_vencidas": pct,
+            }
         )
-        items.append({
-            "gestor": gestor,
-            "total_abiertas": b["total"],
-            "vencidas": b["vencidas"],
-            "criticas": b["criticas"],
-            "pct_vencidas": pct,
-        })
     items.sort(key=lambda x: x["vencidas"], reverse=True)
 
     return {
@@ -10631,25 +11036,27 @@ def stats_glosas_sin_fecha_decision(
     """
     rows = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.fecha_decision_eps.is_(None))
         .all()
     )
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+            }
+        )
     items.sort(key=lambda x: x["valor_objetado"], reverse=True)
 
     return {
@@ -10698,12 +11105,14 @@ def stats_eps_pacientes_distintos(
             continue
         n_pac = len(b["pacientes"])
         ratio = round(b["count"] / n_pac, 2) if n_pac else 0.0
-        items.append({
-            "eps": eps,
-            "count_glosas": b["count"],
-            "pacientes_distintos": n_pac,
-            "ratio_glosas_paciente": ratio,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_glosas": b["count"],
+                "pacientes_distintos": n_pac,
+                "ratio_glosas_paciente": ratio,
+            }
+        )
     items.sort(key=lambda x: x["pacientes_distintos"], reverse=True)
 
     return {
@@ -10733,40 +11142,33 @@ def stats_progreso_equipo_mes(
     from app.core.tz import ahora_utc
 
     inicio_mes = ahora_utc().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
-    creadas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= inicio_mes)
-        .all()
-    )
+    creadas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= inicio_mes).all()
     cerradas = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.fecha_decision_eps >= inicio_mes)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
     n_creadas = len(creadas)
     n_cerradas = len(cerradas)
-    n_levantadas = sum(
-        1 for g in cerradas
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    rec_total = sum(
-        float(g.valor_recuperado or 0) for g in cerradas
-    )
-    obj_creadas = sum(
-        float(g.valor_objetado or 0) for g in creadas
-    )
+    n_levantadas = sum(1 for g in cerradas if (g.estado or "").upper() == "LEVANTADA")
+    rec_total = sum(float(g.valor_recuperado or 0) for g in cerradas)
+    obj_creadas = sum(float(g.valor_objetado or 0) for g in creadas)
 
     balance = n_cerradas - n_creadas
-    tasa_cierre = (
-        round(100 * n_cerradas / n_creadas, 2) if n_creadas else 0.0
-    )
+    tasa_cierre = round(100 * n_cerradas / n_creadas, 2) if n_creadas else 0.0
 
     return {
         "mes": inicio_mes.strftime("%Y-%m"),
@@ -10797,9 +11199,11 @@ def stats_recientes_decididas(
     rows = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.fecha_decision_eps.isnot(None))
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .order_by(GlosaRecord.fecha_decision_eps.desc())
         .limit(int(limit))
         .all()
@@ -10807,20 +11211,21 @@ def stats_recientes_decididas(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_recuperado": int(float(g.valor_recuperado or 0)),
-            "gestor_nombre": g.gestor_nombre,
-            "fecha_decision_eps": (
-                g.fecha_decision_eps.isoformat()
-                if g.fecha_decision_eps else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_recuperado": int(float(g.valor_recuperado or 0)),
+                "gestor_nombre": g.gestor_nombre,
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
+                ),
+            }
+        )
 
     return {
         "limit": int(limit),
@@ -10848,19 +11253,12 @@ def stats_devoluciones_resumen(
 
     Útil para identificar EPS que abusan de la devolución.
     """
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.es_devolucion.in_(["1", "S", "Y"]))
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.es_devolucion.in_(["1", "S", "Y"])).all()
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
     total = len(rows)
-    abiertas = sum(
-        1 for g in rows
-        if (g.estado or "").upper() not in ESTADOS_CERRADOS
-    )
+    abiertas = sum(1 for g in rows if (g.estado or "").upper() not in ESTADOS_CERRADOS)
     valor = sum(float(g.valor_objetado or 0) for g in rows)
 
     por_eps: dict[str, int] = {}
@@ -10870,7 +11268,9 @@ def stats_devoluciones_resumen(
             por_eps[eps] = por_eps.get(eps, 0) + 1
 
     top_eps = sorted(
-        por_eps.items(), key=lambda x: x[1], reverse=True,
+        por_eps.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:10]
 
     return {
@@ -10878,9 +11278,7 @@ def stats_devoluciones_resumen(
         "count_abiertas": abiertas,
         "count_cerradas": total - abiertas,
         "valor_objetado_total": int(valor),
-        "top_eps": [
-            {"eps": e, "count": c} for e, c in top_eps
-        ],
+        "top_eps": [{"eps": e, "count": c} for e, c in top_eps],
     }
 
 
@@ -10901,26 +11299,24 @@ def stats_dictamenes_largos_top(
       - dictamen_len
       - estado y resultado (si decidida)
     """
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.dictamen.isnot(None))
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.dictamen.isnot(None)).all()
 
     items = []
     for g in rows:
         dlen = len(g.dictamen or "")
         if dlen < 50:
             continue
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dictamen_len": dlen,
-            "estado": g.estado,
-            "gestor_nombre": g.gestor_nombre,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dictamen_len": dlen,
+                "estado": g.estado,
+                "gestor_nombre": g.gestor_nombre,
+            }
+        )
     items.sort(key=lambda x: x["dictamen_len"], reverse=True)
 
     return {
@@ -10982,12 +11378,14 @@ def stats_cobertura_asignacion(
 
     items = []
     for campo, c in counts.items():
-        items.append({
-            "campo": campo,
-            "count": c,
-            "pct_cobertura": round(100 * c / n, 2),
-            "faltantes": n - c,
-        })
+        items.append(
+            {
+                "campo": campo,
+                "count": c,
+                "pct_cobertura": round(100 * c / n, 2),
+                "faltantes": n - c,
+            }
+        )
 
     return {
         "total_glosas": n,
@@ -11017,9 +11415,11 @@ def stats_recuperacion_tasa_mensual(
     glosas = (
         db.query(GlosaRecord)
         .filter(GlosaRecord.fecha_decision_eps >= desde)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -11038,15 +11438,15 @@ def stats_recuperacion_tasa_mensual(
     serie = []
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
-        tasa = (
-            round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        tasa = round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        serie.append(
+            {
+                "mes": k,
+                "valor_objetado": int(b["obj"]),
+                "valor_recuperado": int(b["rec"]),
+                "tasa_recuperacion_pct": tasa,
+            }
         )
-        serie.append({
-            "mes": k,
-            "valor_objetado": int(b["obj"]),
-            "valor_recuperado": int(b["rec"]),
-            "tasa_recuperacion_pct": tasa,
-        })
 
     return {
         "ventana_meses": int(meses),
@@ -11074,11 +11474,7 @@ def stats_fecha_objecion_mensual(
     from datetime import timedelta, timezone
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.fecha_objecion_eps >= desde)
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.fecha_objecion_eps >= desde).all()
 
     por_mes: dict[str, dict] = {}
     for g in rows:
@@ -11095,11 +11491,13 @@ def stats_fecha_objecion_mensual(
     serie = []
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
-        serie.append({
-            "mes": k,
-            "count_objetadas": b["count"],
-            "valor_objetado_total": int(b["valor"]),
-        })
+        serie.append(
+            {
+                "mes": k,
+                "count_objetadas": b["count"],
+                "valor_objetado_total": int(b["valor"]),
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -11120,14 +11518,15 @@ def stats_tipo_glosa_tasa(
     levantamiento. Útil para identificar tipos donde HUS
     pierde sistemáticamente.
     """
-    PREFIJOS = ["TA", "SO", "AU", "CO", "CL", "PE",
-                "FA", "SE", "IN", "ME", "EX"]
+    PREFIJOS = ["TA", "SO", "AU", "CO", "CL", "PE", "FA", "SE", "IN", "ME", "EX"]
 
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.codigo_glosa.isnot(None))
         .all()
     )
@@ -11138,9 +11537,13 @@ def stats_tipo_glosa_tasa(
         if len(codigo) < 2:
             continue
         prefijo = codigo[:2]
-        b = bucket.setdefault(prefijo, {
-            "dec": 0, "lev": 0,
-        })
+        b = bucket.setdefault(
+            prefijo,
+            {
+                "dec": 0,
+                "lev": 0,
+            },
+        )
         b["dec"] += 1
         if (g.estado or "").upper() == "LEVANTADA":
             b["lev"] += 1
@@ -11148,15 +11551,15 @@ def stats_tipo_glosa_tasa(
     items = []
     for p in PREFIJOS:
         b = bucket.get(p, {"dec": 0, "lev": 0})
-        tasa = (
-            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append(
+            {
+                "tipo": p,
+                "decididas": b["dec"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "tipo": p,
-            "decididas": b["dec"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-        })
 
     return {
         "total_decididas": sum(it["decididas"] for it in items),
@@ -11196,20 +11599,26 @@ def stats_saldo_evolucion_mensual(
         if cre < desde:
             continue
         k = cre.strftime("%Y-%m")
-        b = serie.setdefault(k, {
-            "creadas": 0, "saldo": 0.0,
-        })
+        b = serie.setdefault(
+            k,
+            {
+                "creadas": 0,
+                "saldo": 0.0,
+            },
+        )
         b["creadas"] += 1
         b["saldo"] += float(g.saldo_factura or 0)
 
     items = []
     for k in sorted(serie.keys()):
         b = serie[k]
-        items.append({
-            "mes": k,
-            "glosas_creadas": b["creadas"],
-            "saldo_creado": int(b["saldo"]),
-        })
+        items.append(
+            {
+                "mes": k,
+                "glosas_creadas": b["creadas"],
+                "saldo_creado": int(b["saldo"]),
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -11247,8 +11656,13 @@ def stats_factura_distribucion_glosas(
         counts[f] = counts.get(f, 0) + 1
 
     buckets = {
-        "1": 0, "2": 0, "3": 0, "4": 0, "5": 0,
-        "6-10": 0, "10+": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6-10": 0,
+        "10+": 0,
     }
     for n in counts.values():
         if n == 1:
@@ -11266,17 +11680,11 @@ def stats_factura_distribucion_glosas(
         else:
             buckets["10+"] += 1
 
-    items = [
-        {"glosas_por_factura": k, "count_facturas": v}
-        for k, v in buckets.items()
-    ]
+    items = [{"glosas_por_factura": k, "count_facturas": v} for k, v in buckets.items()]
 
     total_facturas = len(counts)
     total_glosas = sum(counts.values())
-    promedio = (
-        round(total_glosas / total_facturas, 2)
-        if total_facturas else 0.0
-    )
+    promedio = round(total_glosas / total_facturas, 2) if total_facturas else 0.0
 
     return {
         "total_facturas": total_facturas,
@@ -11304,20 +11712,22 @@ def stats_codigo_glosa_eps_cruzado(
     if not codigo_q:
         return {"codigo_glosa": "", "items": []}
 
-    rows = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.codigo_glosa.ilike(codigo_q))
-        .all()
-    )
+    rows = db.query(GlosaRecord).filter(GlosaRecord.codigo_glosa.ilike(codigo_q)).all()
 
     bucket: dict[str, dict] = {}
     for g in rows:
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        b = bucket.setdefault(eps, {
-            "count": 0, "lev": 0, "dec": 0, "valor": 0.0,
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "count": 0,
+                "lev": 0,
+                "dec": 0,
+                "valor": 0.0,
+            },
+        )
         b["count"] += 1
         b["valor"] += float(g.valor_objetado or 0)
         estado = (g.estado or "").upper()
@@ -11328,17 +11738,17 @@ def stats_codigo_glosa_eps_cruzado(
 
     items = []
     for eps, b in bucket.items():
-        tasa = (
-            round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
+        items.append(
+            {
+                "eps": eps,
+                "count": b["count"],
+                "decididas": b["dec"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+                "valor_objetado_total": int(b["valor"]),
+            }
         )
-        items.append({
-            "eps": eps,
-            "count": b["count"],
-            "decididas": b["dec"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-            "valor_objetado_total": int(b["valor"]),
-        })
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -11392,9 +11802,15 @@ def stats_eps_tiempo_en_pipeline(
         if not cre:
             continue
         antig = (ahora - cre).days
-        b = bucket.setdefault(eps, {
-            "count": 0, "suma": 0, "max": 0, "saldo": 0.0,
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "count": 0,
+                "suma": 0,
+                "max": 0,
+                "saldo": 0.0,
+            },
+        )
         b["count"] += 1
         b["suma"] += antig
         b["max"] = max(b["max"], antig)
@@ -11405,13 +11821,15 @@ def stats_eps_tiempo_en_pipeline(
         if b["count"] < min_glosas:
             continue
         prom = round(b["suma"] / b["count"], 1)
-        items.append({
-            "eps": eps,
-            "count_abiertas": b["count"],
-            "antiguedad_promedio_dias": prom,
-            "antiguedad_max_dias": b["max"],
-            "saldo_pendiente_total": int(b["saldo"]),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_abiertas": b["count"],
+                "antiguedad_promedio_dias": prom,
+                "antiguedad_max_dias": b["max"],
+                "saldo_pendiente_total": int(b["saldo"]),
+            }
+        )
     items.sort(key=lambda x: x["antiguedad_promedio_dias"], reverse=True)
 
     return {
@@ -11441,9 +11859,14 @@ def stats_prioridad_distribucion(
     bucket: dict[str, dict] = {}
     for g in rows:
         p = (g.prioridad or "NORMAL").upper()
-        b = bucket.setdefault(p, {
-            "count": 0, "valor": 0.0, "abiertas": 0,
-        })
+        b = bucket.setdefault(
+            p,
+            {
+                "count": 0,
+                "valor": 0.0,
+                "abiertas": 0,
+            },
+        )
         b["count"] += 1
         b["valor"] += float(g.valor_objetado or 0)
         if (g.estado or "").upper() not in ESTADOS_CERRADOS:
@@ -11453,15 +11876,15 @@ def stats_prioridad_distribucion(
 
     items = []
     for p, b in bucket.items():
-        items.append({
-            "prioridad": p,
-            "count": b["count"],
-            "abiertas": b["abiertas"],
-            "valor_objetado_total": int(b["valor"]),
-            "pct": (
-                round(100 * b["count"] / total, 2) if total else 0.0
-            ),
-        })
+        items.append(
+            {
+                "prioridad": p,
+                "count": b["count"],
+                "abiertas": b["abiertas"],
+                "valor_objetado_total": int(b["valor"]),
+                "pct": (round(100 * b["count"] / total, 2) if total else 0.0),
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -11498,18 +11921,18 @@ def stats_workflow_state_distribucion(
 
     items = []
     for state, count, valor in rows:
-        items.append({
-            "workflow_state": state or "SIN_ESTADO",
-            "count": int(count),
-            "valor_objetado_total": int(float(valor or 0)),
-        })
+        items.append(
+            {
+                "workflow_state": state or "SIN_ESTADO",
+                "count": int(count),
+                "valor_objetado_total": int(float(valor or 0)),
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     total = sum(it["count"] for it in items)
     for it in items:
-        it["pct"] = (
-            round(100 * it["count"] / total, 2) if total else 0.0
-        )
+        it["pct"] = round(100 * it["count"] / total, 2) if total else 0.0
 
     return {
         "total_glosas": total,
@@ -11538,11 +11961,7 @@ def stats_dashboard_cobranza(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     BUCKETS = [
         ("0-30", 0, 30),
@@ -11571,9 +11990,13 @@ def stats_dashboard_cobranza(
 
         factura = (g.factura or "").strip()
         if factura and factura != "N/A":
-            f = por_factura.setdefault(factura, {
-                "saldo": 0.0, "eps": eps,
-            })
+            f = por_factura.setdefault(
+                factura,
+                {
+                    "saldo": 0.0,
+                    "eps": eps,
+                },
+            )
             f["saldo"] += saldo
 
         cre = g.creado_en
@@ -11588,11 +12011,14 @@ def stats_dashboard_cobranza(
                     break
 
     top_eps = sorted(
-        por_eps.items(), key=lambda x: x[1], reverse=True,
+        por_eps.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
     top_facturas = sorted(
         por_factura.items(),
-        key=lambda x: x[1]["saldo"], reverse=True,
+        key=lambda x: x[1]["saldo"],
+        reverse=True,
     )[:5]
 
     return {
@@ -11602,17 +12028,12 @@ def stats_dashboard_cobranza(
             "valor_factura_total": int(valor_total),
         },
         "aging": [
-            {"rango_dias": n, "count": b["count"],
-             "saldo": int(b["saldo"])}
+            {"rango_dias": n, "count": b["count"], "saldo": int(b["saldo"])}
             for n, b in bandas.items()
         ],
-        "top_eps": [
-            {"eps": e, "saldo": int(s)}
-            for e, s in top_eps
-        ],
+        "top_eps": [{"eps": e, "saldo": int(s)} for e, s in top_eps],
         "top_facturas": [
-            {"factura": f, "eps": d["eps"], "saldo": int(d["saldo"])}
-            for f, d in top_facturas
+            {"factura": f, "eps": d["eps"], "saldo": int(d["saldo"])} for f, d in top_facturas
         ],
     }
 
@@ -11649,25 +12070,23 @@ def stats_sin_actividad_reciente(
         if row[0]
     }
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     items = []
     for g in abiertas:
         if g.id in glosas_con_actividad:
             continue
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dias_restantes": g.dias_restantes,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_restantes": g.dias_restantes,
+            }
+        )
     items.sort(key=lambda x: x["valor_objetado"], reverse=True)
 
     return {
@@ -11695,11 +12114,7 @@ def stats_decisiones_por_dia(
     from datetime import timedelta, timezone
 
     desde = ahora_utc() - timedelta(days=int(dias))
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.fecha_decision_eps >= desde)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.fecha_decision_eps >= desde).all()
 
     por_dia: dict[str, dict] = {}
     for g in glosas:
@@ -11709,9 +12124,15 @@ def stats_decisiones_por_dia(
         if not dec:
             continue
         k = dec.strftime("%Y-%m-%d")
-        b = por_dia.setdefault(k, {
-            "total": 0, "lev": 0, "rat": 0, "ace": 0,
-        })
+        b = por_dia.setdefault(
+            k,
+            {
+                "total": 0,
+                "lev": 0,
+                "rat": 0,
+                "ace": 0,
+            },
+        )
         b["total"] += 1
         estado = (g.estado or "").upper()
         if estado == "LEVANTADA":
@@ -11724,13 +12145,15 @@ def stats_decisiones_por_dia(
     serie = []
     for k in sorted(por_dia.keys()):
         b = por_dia[k]
-        serie.append({
-            "fecha": k,
-            "total": b["total"],
-            "levantadas": b["lev"],
-            "ratificadas": b["rat"],
-            "aceptadas": b["ace"],
-        })
+        serie.append(
+            {
+                "fecha": k,
+                "total": b["total"],
+                "levantadas": b["lev"],
+                "ratificadas": b["rat"],
+                "aceptadas": b["ace"],
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
@@ -11761,9 +12184,11 @@ def stats_gestor_vs_eps_matriz(
     """
     decididas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.gestor_nombre.isnot(None))
         .filter(GlosaRecord.eps.isnot(None))
         .all()
@@ -11784,21 +12209,25 @@ def stats_gestor_vs_eps_matriz(
         matriz[gestor][eps] = matriz[gestor].get(eps, 0) + 1
 
     g_top = [
-        g for g, _ in sorted(
-            total_g.items(), key=lambda x: x[1], reverse=True,
+        g
+        for g, _ in sorted(
+            total_g.items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[: int(top_gestores)]
     ]
     e_top = [
-        e for e, _ in sorted(
-            total_e.items(), key=lambda x: x[1], reverse=True,
+        e
+        for e, _ in sorted(
+            total_e.items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[: int(top_eps)]
     ]
 
     matriz_filt = {}
     for gestor in g_top:
-        matriz_filt[gestor] = {
-            eps: matriz.get(gestor, {}).get(eps, 0) for eps in e_top
-        }
+        matriz_filt[gestor] = {eps: matriz.get(gestor, {}).get(eps, 0) for eps in e_top}
 
     return {
         "gestores": g_top,
@@ -11826,11 +12255,7 @@ def stats_dias_decision_promedio_mes(
     from datetime import timedelta, timezone
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.fecha_decision_eps >= desde)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.fecha_decision_eps >= desde).all()
 
     por_mes: dict[str, list[int]] = {}
     for g in glosas:
@@ -11854,13 +12279,15 @@ def stats_dias_decision_promedio_mes(
         prom = round(sum(vals) / len(vals), 2)
         ord_v = sorted(vals)
         med = ord_v[len(vals) // 2]
-        serie.append({
-            "mes": k,
-            "count": len(vals),
-            "promedio_dias": prom,
-            "mediana_dias": med,
-            "max_dias": max(vals),
-        })
+        serie.append(
+            {
+                "mes": k,
+                "count": len(vals),
+                "promedio_dias": prom,
+                "mediana_dias": med,
+                "max_dias": max(vals),
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -11904,9 +12331,13 @@ def stats_eps_diversidad_codigos(
         codigo = (g.codigo_glosa or "").strip()
         if not eps or not codigo:
             continue
-        b = bucket.setdefault(eps, {
-            "count": 0, "codigos": {},
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "count": 0,
+                "codigos": {},
+            },
+        )
         b["count"] += 1
         b["codigos"][codigo] = b["codigos"].get(codigo, 0) + 1
 
@@ -11917,17 +12348,19 @@ def stats_eps_diversidad_codigos(
         diversos = len(b["codigos"])
         ratio = round(diversos / b["count"], 3) if b["count"] else 0.0
         top3 = sorted(
-            b["codigos"].items(), key=lambda x: x[1], reverse=True,
+            b["codigos"].items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:3]
-        items.append({
-            "eps": eps,
-            "count_glosas": b["count"],
-            "codigos_distintos": diversos,
-            "ratio_diversidad": ratio,
-            "top_3_codigos": [
-                {"codigo_glosa": c, "count": n} for c, n in top3
-            ],
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_glosas": b["count"],
+                "codigos_distintos": diversos,
+                "ratio_diversidad": ratio,
+                "top_3_codigos": [{"codigo_glosa": c, "count": n} for c, n in top3],
+            }
+        )
     items.sort(key=lambda x: x["codigos_distintos"], reverse=True)
 
     return {
@@ -11955,8 +12388,7 @@ def stats_tipo_glosa_mensual(
     """
     from datetime import timedelta, timezone
 
-    PREFIJOS = ["TA", "SO", "AU", "CO", "CL", "PE",
-                "FA", "SE", "IN", "ME", "EX"]
+    PREFIJOS = ["TA", "SO", "AU", "CO", "CL", "PE", "FA", "SE", "IN", "ME", "EX"]
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
     rows = (
@@ -12020,17 +12452,17 @@ def stats_glosas_recientes_eps(
 
     items = []
     for g in rows:
-        items.append({
-            "glosa_id": g.id,
-            "factura": g.factura,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "gestor_nombre": g.gestor_nombre,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "factura": g.factura,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "gestor_nombre": g.gestor_nombre,
+            }
+        )
 
     return {
         "eps": eps_q,
@@ -12100,13 +12532,15 @@ def stats_codigo_respuesta_tendencia(
             delta_pct = 100.0 if a > 0 else 0.0
         else:
             delta_pct = round(100 * (a - p) / p, 2)
-        items.append({
-            "codigo_respuesta": codigo,
-            "count_actual": a,
-            "count_previo": p,
-            "delta_abs": a - p,
-            "delta_pct": delta_pct,
-        })
+        items.append(
+            {
+                "codigo_respuesta": codigo,
+                "count_actual": a,
+                "count_previo": p,
+                "delta_abs": a - p,
+                "delta_pct": delta_pct,
+            }
+        )
     items.sort(key=lambda x: x["delta_pct"], reverse=True)
 
     return {
@@ -12136,18 +12570,14 @@ def stats_decision_eps_tiempo_distribucion(
     """
     from datetime import timezone
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.fecha_decision_eps.isnot(None)).all()
 
     BUCKETS = [
-        ("0-15",  0,    15),
-        ("16-30", 16,   30),
-        ("31-60", 31,   60),
-        ("61-90", 61,   90),
-        (">90",   91,   None),
+        ("0-15", 0, 15),
+        ("16-30", 16, 30),
+        ("31-60", 31, 60),
+        ("61-90", 61, 90),
+        (">90", 91, None),
     ]
 
     bandas = {nombre: 0 for nombre, _, _ in BUCKETS}
@@ -12177,10 +12607,7 @@ def stats_decision_eps_tiempo_distribucion(
     promedio = round(suma / total, 2) if total else 0.0
     mediana = sorted(valores)[len(valores) // 2] if valores else 0
 
-    items = [
-        {"rango_dias": k, "count": bandas[k]}
-        for k, _, _ in BUCKETS
-    ]
+    items = [{"rango_dias": k, "count": bandas[k]} for k, _, _ in BUCKETS]
 
     return {
         "total_glosas": total,
@@ -12209,33 +12636,26 @@ def stats_glosas_sin_comentarios(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     # IDs con al menos 1 comentario
-    ids_con_com = {
-        row[0]
-        for row in db.query(ComentarioGlosaRecord.glosa_id)
-        .distinct()
-        .all()
-    }
+    ids_con_com = {row[0] for row in db.query(ComentarioGlosaRecord.glosa_id).distinct().all()}
 
     items = []
     for g in abiertas:
         if g.id in ids_con_com:
             continue
-        items.append({
-            "glosa_id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "codigo_glosa": g.codigo_glosa,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "dias_restantes": g.dias_restantes,
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "dias_restantes": g.dias_restantes,
+            }
+        )
     items.sort(key=lambda x: x["valor_objetado"], reverse=True)
 
     return {
@@ -12267,9 +12687,11 @@ def stats_eps_volumen_vs_tasa(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.eps.isnot(None))
         .all()
     )
@@ -12289,11 +12711,13 @@ def stats_eps_volumen_vs_tasa(
         if b["dec"] < min_decididas:
             continue
         tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
-        raw.append({
-            "eps": eps,
-            "decididas": b["dec"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        raw.append(
+            {
+                "eps": eps,
+                "decididas": b["dec"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
 
     if not raw:
         return {
@@ -12353,9 +12777,11 @@ def stats_eps_ganancia_perdida(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.eps.isnot(None))
         .all()
     )
@@ -12365,9 +12791,14 @@ def stats_eps_ganancia_perdida(
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        b = bucket.setdefault(eps, {
-            "count": 0, "ganancia": 0.0, "perdida": 0.0,
-        })
+        b = bucket.setdefault(
+            eps,
+            {
+                "count": 0,
+                "ganancia": 0.0,
+                "perdida": 0.0,
+            },
+        )
         b["count"] += 1
         estado = (g.estado or "").upper()
         if estado == "LEVANTADA":
@@ -12381,14 +12812,16 @@ def stats_eps_ganancia_perdida(
             continue
         denom = b["ganancia"] + b["perdida"]
         ratio = round(100 * b["ganancia"] / denom, 2) if denom else 0.0
-        items.append({
-            "eps": eps,
-            "count_decididas": b["count"],
-            "ganancia": int(b["ganancia"]),
-            "perdida": int(b["perdida"]),
-            "balance": int(b["ganancia"] - b["perdida"]),
-            "ratio_ganancia_pct": ratio,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_decididas": b["count"],
+                "ganancia": int(b["ganancia"]),
+                "perdida": int(b["perdida"]),
+                "balance": int(b["ganancia"] - b["perdida"]),
+                "ratio_ganancia_pct": ratio,
+            }
+        )
     items.sort(key=lambda x: x["balance"], reverse=True)
 
     return {
@@ -12417,11 +12850,7 @@ def stats_conciliaciones_mensual(
     from app.models.db import ConciliacionRecord
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
-    rows = (
-        db.query(ConciliacionRecord)
-        .filter(ConciliacionRecord.creado_en >= desde)
-        .all()
-    )
+    rows = db.query(ConciliacionRecord).filter(ConciliacionRecord.creado_en >= desde).all()
 
     por_mes: dict[str, dict] = {}
     for c in rows:
@@ -12431,9 +12860,14 @@ def stats_conciliaciones_mensual(
         if not cre:
             continue
         k = cre.strftime("%Y-%m")
-        b = por_mes.setdefault(k, {
-            "count": 0, "valor": 0.0, "resultados": {},
-        })
+        b = por_mes.setdefault(
+            k,
+            {
+                "count": 0,
+                "valor": 0.0,
+                "resultados": {},
+            },
+        )
         b["count"] += 1
         b["valor"] += float(c.valor_conciliado or 0)
         res = c.resultado or "SIN_RESULTADO"
@@ -12443,12 +12877,14 @@ def stats_conciliaciones_mensual(
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
         top_res = max(b["resultados"].items(), key=lambda x: x[1])[0]
-        serie.append({
-            "mes": k,
-            "count_conciliaciones": b["count"],
-            "valor_conciliado_total": int(b["valor"]),
-            "resultado_dominante": top_res,
-        })
+        serie.append(
+            {
+                "mes": k,
+                "count_conciliaciones": b["count"],
+                "valor_conciliado_total": int(b["valor"]),
+                "resultado_dominante": top_res,
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -12482,11 +12918,7 @@ def stats_comentarios_actividad_mensual(
     from app.models.db import ComentarioGlosaRecord
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
-    rows = (
-        db.query(ComentarioGlosaRecord)
-        .filter(ComentarioGlosaRecord.creado_en >= desde)
-        .all()
-    )
+    rows = db.query(ComentarioGlosaRecord).filter(ComentarioGlosaRecord.creado_en >= desde).all()
 
     por_mes: dict[str, dict] = {}
     for c in rows:
@@ -12496,10 +12928,15 @@ def stats_comentarios_actividad_mensual(
         if not cre:
             continue
         k = cre.strftime("%Y-%m")
-        b = por_mes.setdefault(k, {
-            "count": 0, "autores": set(),
-            "menciones": 0, "resueltos": 0,
-        })
+        b = por_mes.setdefault(
+            k,
+            {
+                "count": 0,
+                "autores": set(),
+                "menciones": 0,
+                "resueltos": 0,
+            },
+        )
         b["count"] += 1
         if c.autor_email:
             b["autores"].add(c.autor_email)
@@ -12512,14 +12949,16 @@ def stats_comentarios_actividad_mensual(
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
         pct = round(100 * b["resueltos"] / b["count"], 2) if b["count"] else 0.0
-        serie.append({
-            "mes": k,
-            "count_comentarios": b["count"],
-            "autores_distintos": len(b["autores"]),
-            "menciones": b["menciones"],
-            "resueltos": b["resueltos"],
-            "pct_resueltos": pct,
-        })
+        serie.append(
+            {
+                "mes": k,
+                "count_comentarios": b["count"],
+                "autores_distintos": len(b["autores"]),
+                "menciones": b["menciones"],
+                "resueltos": b["resueltos"],
+                "pct_resueltos": pct,
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -12582,9 +13021,7 @@ def stats_heatmap_mes_eps(
 
     matriz_filt = {}
     for eps in eps_top:
-        matriz_filt[eps] = {
-            m: matriz.get(eps, {}).get(m, 0) for m in meses_ord
-        }
+        matriz_filt[eps] = {m: matriz.get(eps, {}).get(m, 0) for m in meses_ord}
 
     return {
         "ventana_meses": int(meses),
@@ -12631,9 +13068,15 @@ def stats_eps_respuestas_codigos(
         c = (g.codigo_respuesta or "").strip()
         if not c:
             continue
-        b = bucket.setdefault(c, {
-            "count": 0, "lev": 0, "rat": 0, "dec": 0,
-        })
+        b = bucket.setdefault(
+            c,
+            {
+                "count": 0,
+                "lev": 0,
+                "rat": 0,
+                "dec": 0,
+            },
+        )
         b["count"] += 1
         estado = (g.estado or "").upper()
         if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA"):
@@ -12646,14 +13089,16 @@ def stats_eps_respuestas_codigos(
     items = []
     for c, b in bucket.items():
         tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
-        items.append({
-            "codigo_respuesta": c,
-            "count_total": b["count"],
-            "decididas": b["dec"],
-            "levantadas": b["lev"],
-            "ratificadas": b["rat"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "codigo_respuesta": c,
+                "count_total": b["count"],
+                "decididas": b["dec"],
+                "levantadas": b["lev"],
+                "ratificadas": b["rat"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
     items.sort(key=lambda x: x["count_total"], reverse=True)
 
     return {
@@ -12704,10 +13149,16 @@ def stats_eps_tendencia_mensual(
         if not cre:
             continue
         k = cre.strftime("%Y-%m")
-        b = por_mes.setdefault(k, {
-            "creadas": 0, "decididas": 0, "levantadas": 0,
-            "obj": 0.0, "rec": 0.0,
-        })
+        b = por_mes.setdefault(
+            k,
+            {
+                "creadas": 0,
+                "decididas": 0,
+                "levantadas": 0,
+                "obj": 0.0,
+                "rec": 0.0,
+            },
+        )
         b["creadas"] += 1
         b["obj"] += float(g.valor_objetado or 0)
         estado = (g.estado or "").upper()
@@ -12720,19 +13171,18 @@ def stats_eps_tendencia_mensual(
     serie = []
     for k in sorted(por_mes.keys()):
         b = por_mes[k]
-        tasa = (
-            round(100 * b["levantadas"] / b["decididas"], 2)
-            if b["decididas"] else 0.0
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
+        serie.append(
+            {
+                "mes": k,
+                "creadas": b["creadas"],
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "valor_objetado": int(b["obj"]),
+                "valor_recuperado": int(b["rec"]),
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        serie.append({
-            "mes": k,
-            "creadas": b["creadas"],
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "valor_objetado": int(b["obj"]),
-            "valor_recuperado": int(b["rec"]),
-            "tasa_levantamiento_pct": tasa,
-        })
 
     return {
         "eps": eps_q,
@@ -12775,13 +13225,17 @@ def stats_facturas_saldos_pendientes(
         f = (g.factura or "").strip()
         if not f:
             continue
-        b = bucket.setdefault(f, {
-            "eps": g.eps,
-            "count": 0, "abiertas": 0,
-            "saldo": float(g.saldo_factura or 0),
-            "valor_factura": float(g.valor_factura or 0),
-            "obj": 0.0,
-        })
+        b = bucket.setdefault(
+            f,
+            {
+                "eps": g.eps,
+                "count": 0,
+                "abiertas": 0,
+                "saldo": float(g.saldo_factura or 0),
+                "valor_factura": float(g.valor_factura or 0),
+                "obj": 0.0,
+            },
+        )
         b["count"] += 1
         if (g.estado or "").upper() not in ESTADOS_CERRADOS:
             b["abiertas"] += 1
@@ -12791,15 +13245,17 @@ def stats_facturas_saldos_pendientes(
     for factura, b in bucket.items():
         if b["abiertas"] == 0:
             continue
-        items.append({
-            "factura": factura,
-            "eps": b["eps"],
-            "count_glosas": b["count"],
-            "count_abiertas": b["abiertas"],
-            "saldo_factura": int(b["saldo"]),
-            "valor_factura": int(b["valor_factura"]),
-            "valor_objetado_total": int(b["obj"]),
-        })
+        items.append(
+            {
+                "factura": factura,
+                "eps": b["eps"],
+                "count_glosas": b["count"],
+                "count_abiertas": b["abiertas"],
+                "saldo_factura": int(b["saldo"]),
+                "valor_factura": int(b["valor_factura"]),
+                "valor_objetado_total": int(b["obj"]),
+            }
+        )
     items.sort(key=lambda x: x["saldo_factura"], reverse=True)
 
     return {
@@ -12855,12 +13311,14 @@ def stats_eps_codigo_pareto(
     acumulado = 0.0
     top80 = []
     for (eps, codigo), valor in ord_p:
-        top80.append({
-            "eps": eps,
-            "codigo_glosa": codigo,
-            "valor_objetado": int(valor),
-            "pct_individual": round(100 * valor / valor_total, 2),
-        })
+        top80.append(
+            {
+                "eps": eps,
+                "codigo_glosa": codigo,
+                "valor_objetado": int(valor),
+                "pct_individual": round(100 * valor / valor_total, 2),
+            }
+        )
         acumulado += valor
         if acumulado >= 0.8 * valor_total:
             break
@@ -12897,25 +13355,18 @@ def stats_aging_cartera_saldo(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     BUCKETS = [
-        ("0-30",   0,    30),
-        ("31-60",  31,   60),
-        ("61-90",  61,   90),
-        ("91-180", 91,   180),
-        (">180",   181,  None),
+        ("0-30", 0, 30),
+        ("31-60", 31, 60),
+        ("61-90", 61, 90),
+        ("91-180", 91, 180),
+        (">180", 181, None),
     ]
 
     ahora = ahora_utc()
-    bandas: dict[str, dict] = {
-        nombre: {"count": 0, "saldo": 0.0}
-        for nombre, _, _ in BUCKETS
-    }
+    bandas: dict[str, dict] = {nombre: {"count": 0, "saldo": 0.0} for nombre, _, _ in BUCKETS}
 
     for g in abiertas:
         cre = g.creado_en
@@ -12934,11 +13385,13 @@ def stats_aging_cartera_saldo(
     items = []
     for nombre, _, _ in BUCKETS:
         b = bandas[nombre]
-        items.append({
-            "rango_dias": nombre,
-            "count": b["count"],
-            "saldo": int(b["saldo"]),
-        })
+        items.append(
+            {
+                "rango_dias": nombre,
+                "count": b["count"],
+                "saldo": int(b["saldo"]),
+            }
+        )
 
     return {
         "total_count": sum(it["count"] for it in items),
@@ -12983,9 +13436,14 @@ def stats_cartera_por_eps(
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        b = por_eps.setdefault(eps, {
-            "count": 0, "saldo": 0.0, "valor": 0.0,
-        })
+        b = por_eps.setdefault(
+            eps,
+            {
+                "count": 0,
+                "saldo": 0.0,
+                "valor": 0.0,
+            },
+        )
         b["count"] += 1
         b["saldo"] += float(g.saldo_factura or 0)
         b["valor"] += float(g.valor_factura or 0)
@@ -12993,20 +13451,20 @@ def stats_cartera_por_eps(
     items = []
     for eps, b in por_eps.items():
         pct = round(100 * b["saldo"] / b["valor"], 2) if b["valor"] else 0.0
-        items.append({
-            "eps": eps,
-            "count_glosas": b["count"],
-            "saldo_total": int(b["saldo"]),
-            "valor_factura_total": int(b["valor"]),
-            "pct_saldo": pct,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_glosas": b["count"],
+                "saldo_total": int(b["saldo"]),
+                "valor_factura_total": int(b["valor"]),
+                "pct_saldo": pct,
+            }
+        )
     items.sort(key=lambda x: x["saldo_total"], reverse=True)
 
     saldo_global = sum(it["saldo_total"] for it in items)
     valor_global = sum(it["valor_factura_total"] for it in items)
-    pct_global = (
-        round(100 * saldo_global / valor_global, 2) if valor_global else 0.0
-    )
+    pct_global = round(100 * saldo_global / valor_global, 2) if valor_global else 0.0
 
     return {
         "solo_abiertas": bool(solo_abiertas),
@@ -13049,9 +13507,16 @@ def stats_calidad_dictamen_por_gestor(
         gestor = (g.gestor_nombre or "").strip()
         if not gestor:
             continue
-        b = bucket.setdefault(gestor, {
-            "total": 0, "suma": 0, "cortos": 0, "largos": 0, "completos": 0,
-        })
+        b = bucket.setdefault(
+            gestor,
+            {
+                "total": 0,
+                "suma": 0,
+                "cortos": 0,
+                "largos": 0,
+                "completos": 0,
+            },
+        )
         dlen = len(g.dictamen or "")
         b["total"] += 1
         b["suma"] += dlen
@@ -13068,14 +13533,16 @@ def stats_calidad_dictamen_por_gestor(
             continue
         prom = round(b["suma"] / b["total"], 1)
         pct_c = round(100 * b["completos"] / b["total"], 2)
-        items.append({
-            "gestor": gestor,
-            "total_glosas": b["total"],
-            "len_promedio": prom,
-            "count_cortos": b["cortos"],
-            "count_largos": b["largos"],
-            "pct_completos": pct_c,
-        })
+        items.append(
+            {
+                "gestor": gestor,
+                "total_glosas": b["total"],
+                "len_promedio": prom,
+                "count_cortos": b["cortos"],
+                "count_largos": b["largos"],
+                "pct_completos": pct_c,
+            }
+        )
     items.sort(key=lambda x: x["len_promedio"], reverse=True)
 
     return {
@@ -13141,13 +13608,15 @@ def stats_codigo_glosa_tendencia(
             delta_pct = 100.0 if a > 0 else 0.0
         else:
             delta_pct = round(100 * (a - p) / p, 2)
-        items.append({
-            "codigo_glosa": codigo,
-            "count_actual": a,
-            "count_previo": p,
-            "delta_abs": delta_abs,
-            "delta_pct": delta_pct,
-        })
+        items.append(
+            {
+                "codigo_glosa": codigo,
+                "count_actual": a,
+                "count_previo": p,
+                "delta_abs": delta_abs,
+                "delta_pct": delta_pct,
+            }
+        )
 
     items.sort(key=lambda x: x["delta_pct"], reverse=True)
 
@@ -13177,9 +13646,11 @@ def stats_gestores_pareto(
     """
     decididas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.gestor_nombre.isnot(None))
         .all()
     )
@@ -13205,11 +13676,13 @@ def stats_gestores_pareto(
     acumulado = 0
     top80 = []
     for gestor, count in ord_g:
-        top80.append({
-            "gestor": gestor,
-            "decididas": count,
-            "pct_individual": round(100 * count / total, 2),
-        })
+        top80.append(
+            {
+                "gestor": gestor,
+                "decididas": count,
+                "pct_individual": round(100 * count / total, 2),
+            }
+        )
         acumulado += count
         if acumulado >= 0.8 * total:
             break
@@ -13258,9 +13731,16 @@ def stats_profesional_top(
         prof = (g.profesional_medico or "").strip()
         if not prof:
             continue
-        b = bucket.setdefault(prof, {
-            "total": 0, "lev": 0, "rat": 0, "dec": 0, "val": 0.0,
-        })
+        b = bucket.setdefault(
+            prof,
+            {
+                "total": 0,
+                "lev": 0,
+                "rat": 0,
+                "dec": 0,
+                "val": 0.0,
+            },
+        )
         b["total"] += 1
         estado = (g.estado or "").upper()
         if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA"):
@@ -13274,15 +13754,17 @@ def stats_profesional_top(
     items = []
     for prof, b in bucket.items():
         tasa = round(100 * b["lev"] / b["dec"], 2) if b["dec"] else 0.0
-        items.append({
-            "profesional_medico": prof,
-            "total_glosas": b["total"],
-            "decididas": b["dec"],
-            "levantadas": b["lev"],
-            "ratificadas": b["rat"],
-            "tasa_levantamiento_pct": tasa,
-            "valor_objetado_total": int(b["val"]),
-        })
+        items.append(
+            {
+                "profesional_medico": prof,
+                "total_glosas": b["total"],
+                "decididas": b["dec"],
+                "levantadas": b["lev"],
+                "ratificadas": b["rat"],
+                "tasa_levantamiento_pct": tasa,
+                "valor_objetado_total": int(b["val"]),
+            }
+        )
     items.sort(key=lambda x: x["total_glosas"], reverse=True)
 
     return {
@@ -13314,9 +13796,11 @@ def stats_exito_por_gestor(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.gestor_nombre.isnot(None))
         .all()
     )
@@ -13328,7 +13812,9 @@ def stats_exito_por_gestor(
             continue
         if gestor not in por_gestor:
             por_gestor[gestor] = {
-                "decididas": 0, "levantadas": 0, "rec": 0.0,
+                "decididas": 0,
+                "levantadas": 0,
+                "rec": 0.0,
             }
         por_gestor[gestor]["decididas"] += 1
         if (g.estado or "").upper() == "LEVANTADA":
@@ -13340,13 +13826,15 @@ def stats_exito_por_gestor(
         if b["decididas"] < min_glosas:
             continue
         tasa = round(100 * b["levantadas"] / b["decididas"], 2)
-        items.append({
-            "gestor": gestor,
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-            "valor_recuperado_total": int(b["rec"]),
-        })
+        items.append(
+            {
+                "gestor": gestor,
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+                "valor_recuperado_total": int(b["rec"]),
+            }
+        )
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
 
     return {
@@ -13373,20 +13861,14 @@ def stats_cobranza_pareto_eps(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     por_eps: dict[str, float] = {}
     for g in abiertas:
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        por_eps[eps] = (
-            por_eps.get(eps, 0.0) + float(g.valor_objetado or 0)
-        )
+        por_eps[eps] = por_eps.get(eps, 0.0) + float(g.valor_objetado or 0)
 
     valor_total = sum(por_eps.values())
     if valor_total == 0:
@@ -13402,11 +13884,13 @@ def stats_cobranza_pareto_eps(
     acumulado = 0.0
     eps_top80 = []
     for eps, valor in eps_ord:
-        eps_top80.append({
-            "eps": eps,
-            "valor_pendiente": int(valor),
-            "pct_individual": round(100 * valor / valor_total, 2),
-        })
+        eps_top80.append(
+            {
+                "eps": eps,
+                "valor_pendiente": int(valor),
+                "pct_individual": round(100 * valor / valor_total, 2),
+            }
+        )
         acumulado += valor
         if acumulado >= 0.8 * valor_total:
             break
@@ -13427,7 +13911,7 @@ def stats_glosas_altas_cuantia(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """R253 P1: glosas con valor objetado superior al umbral.
+    r"""R253 P1: glosas con valor objetado superior al umbral.
 
     Útil para identificar casos de alta cuantía que requieren
     seguimiento ejecutivo:
@@ -13448,14 +13932,16 @@ def stats_glosas_altas_cuantia(
 
     items = []
     for g in glosas:
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "dias_restantes": g.dias_restantes,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "dias_restantes": g.dias_restantes,
+            }
+        )
 
     return {
         "umbral": int(umbral),
@@ -13484,29 +13970,19 @@ def stats_eps_codigo_pareja(
         db.query(GlosaRecord)
         .filter(GlosaRecord.eps == eps)
         .filter(GlosaRecord.codigo_glosa == codigo_glosa)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
-    levantadas = sum(
-        1 for g in glosas
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
-    ratificadas = sum(
-        1 for g in glosas
-        if (g.estado or "").upper() == "RATIFICADA"
-    )
-    aceptadas = sum(
-        1 for g in glosas
-        if (g.estado or "").upper() == "ACEPTADA"
-    )
+    levantadas = sum(1 for g in glosas if (g.estado or "").upper() == "LEVANTADA")
+    ratificadas = sum(1 for g in glosas if (g.estado or "").upper() == "RATIFICADA")
+    aceptadas = sum(1 for g in glosas if (g.estado or "").upper() == "ACEPTADA")
 
-    tasa = (
-        round(100 * levantadas / len(glosas), 2)
-        if glosas else 0.0
-    )
+    tasa = round(100 * levantadas / len(glosas), 2) if glosas else 0.0
 
     return {
         "eps": eps,
@@ -13542,13 +14018,15 @@ def stats_mes_actual(
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     creadas = (
-        db.query(_f.count(GlosaRecord.id))
-        .filter(GlosaRecord.creado_en >= inicio_mes)
-        .scalar() or 0
+        db.query(_f.count(GlosaRecord.id)).filter(GlosaRecord.creado_en >= inicio_mes).scalar() or 0
     )
     cerradas_list = (
         db.query(GlosaRecord)
@@ -13556,28 +14034,21 @@ def stats_mes_actual(
         .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .all()
     )
-    levantadas = sum(
-        1 for g in cerradas_list
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
+    levantadas = sum(1 for g in cerradas_list if (g.estado or "").upper() == "LEVANTADA")
     valor_obj_mes = (
         db.query(_f.coalesce(_f.sum(GlosaRecord.valor_objetado), 0))
         .filter(GlosaRecord.creado_en >= inicio_mes)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
-    valor_rec_mes = sum(
-        float(g.valor_recuperado or 0) for g in cerradas_list
-    )
+    valor_rec_mes = sum(float(g.valor_recuperado or 0) for g in cerradas_list)
 
     decididas = sum(
-        1 for g in cerradas_list
-        if (g.estado or "").upper() in
-        {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+        1
+        for g in cerradas_list
+        if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
     )
-    tasa = (
-        round(100 * levantadas / decididas, 2)
-        if decididas else 0.0
-    )
+    tasa = round(100 * levantadas / decididas, 2) if decididas else 0.0
 
     return {
         "mes": inicio_mes.strftime("%Y-%m"),
@@ -13625,16 +14096,18 @@ def stats_eps_pacientes_top(
 
     items = []
     for pac, b in por_pac.items():
-        items.append({
-            "paciente": pac,
-            "count": b["count"],
-            "valor_objetado_total": int(b["valor"]),
-        })
+        items.append(
+            {
+                "paciente": pac,
+                "count": b["count"],
+                "valor_objetado_total": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
         "eps": eps,
-        "items": items[:int(top)],
+        "items": items[: int(top)],
     }
 
 
@@ -13712,7 +14185,7 @@ def stats_codigos_mas_recuperados(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """R244 P1: códigos de glosa con más valor TOTAL recuperado.
+    r"""R244 P1: códigos de glosa con más valor TOTAL recuperado.
 
     Útil para identificar dónde se recauda más:
       "TA0201 nos ha generado \$50M en defensas exitosas"
@@ -13741,15 +14214,17 @@ def stats_codigos_mas_recuperados(
 
     items = []
     for cod, b in por_cod.items():
-        items.append({
-            "codigo_glosa": cod,
-            "count_levantadas": b["count"],
-            "valor_recuperado_total": int(b["valor"]),
-        })
+        items.append(
+            {
+                "codigo_glosa": cod,
+                "count_levantadas": b["count"],
+                "valor_recuperado_total": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["valor_recuperado_total"], reverse=True)
 
     return {
-        "items": items[:int(top)],
+        "items": items[: int(top)],
     }
 
 
@@ -13768,11 +14243,7 @@ def stats_eps_pendientes_detalle(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     por_eps: dict[str, dict] = {}
     for g in abiertas:
@@ -13789,12 +14260,14 @@ def stats_eps_pendientes_detalle(
 
     items = []
     for eps, b in por_eps.items():
-        items.append({
-            "eps": eps,
-            "count_pendientes": b["count"],
-            "valor_pendiente": int(b["valor"]),
-            "vencidas": b["vencidas"],
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count_pendientes": b["count"],
+                "valor_pendiente": int(b["valor"]),
+                "vencidas": b["vencidas"],
+            }
+        )
     items.sort(key=lambda x: x["count_pendientes"], reverse=True)
 
     return {
@@ -13819,11 +14292,7 @@ def stats_codigos_respuesta_distribucion(
 
     Solo glosas con codigo_respuesta no-NULL.
     """
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.codigo_respuesta.isnot(None))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.codigo_respuesta.isnot(None)).all()
 
     por_codigo: dict[str, int] = {}
     for g in glosas:
@@ -13836,11 +14305,13 @@ def stats_codigos_respuesta_distribucion(
     items = []
     for cod, count in por_codigo.items():
         pct = round(100 * count / total, 2) if total else 0.0
-        items.append({
-            "codigo_respuesta": cod,
-            "count": count,
-            "pct": pct,
-        })
+        items.append(
+            {
+                "codigo_respuesta": cod,
+                "count": count,
+                "pct": pct,
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -13868,25 +14339,18 @@ def stats_aging_glosas(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     BUCKETS = [
-        ("0-30",   0,    30),
-        ("31-60",  31,   60),
-        ("61-90",  61,   90),
-        ("91-180", 91,   180),
-        (">180",   181,  None),
+        ("0-30", 0, 30),
+        ("31-60", 31, 60),
+        ("61-90", 61, 90),
+        ("91-180", 91, 180),
+        (">180", 181, None),
     ]
 
     ahora = ahora_utc()
-    bandas: dict[str, dict] = {
-        nombre: {"count": 0, "valor": 0.0}
-        for nombre, _, _ in BUCKETS
-    }
+    bandas: dict[str, dict] = {nombre: {"count": 0, "valor": 0.0} for nombre, _, _ in BUCKETS}
 
     for g in abiertas:
         cre = g.creado_en
@@ -13904,11 +14368,13 @@ def stats_aging_glosas(
     items = []
     for nombre, _, _ in BUCKETS:
         b = bandas[nombre]
-        items.append({
-            "rango_dias": nombre,
-            "count": b["count"],
-            "valor": int(b["valor"]),
-        })
+        items.append(
+            {
+                "rango_dias": nombre,
+                "count": b["count"],
+                "valor": int(b["valor"]),
+            }
+        )
 
     return {
         "total_abiertas": len(abiertas),
@@ -13957,20 +14423,22 @@ def stats_anomalias_valor(
         valores = [v for _, v in glosas_cohorte]
         mean = sum(valores) / len(valores)
         var = sum((v - mean) ** 2 for v in valores) / len(valores)
-        std = var ** 0.5
+        std = var**0.5
         if std == 0:
             continue
         for g, v in glosas_cohorte:
             z = (v - mean) / std
             if abs(z) >= factor_z:
-                items.append({
-                    "glosa_id": g.id,
-                    "eps": g.eps,
-                    "codigo_glosa": g.codigo_glosa,
-                    "valor_objetado": v,
-                    "z_score": round(z, 2),
-                    "promedio_cohorte": round(mean, 2),
-                })
+                items.append(
+                    {
+                        "glosa_id": g.id,
+                        "eps": g.eps,
+                        "codigo_glosa": g.codigo_glosa,
+                        "valor_objetado": v,
+                        "z_score": round(z, 2),
+                        "promedio_cohorte": round(mean, 2),
+                    }
+                )
     items.sort(key=lambda x: abs(x["z_score"]), reverse=True)
 
     return {
@@ -14000,9 +14468,11 @@ def stats_tasa_levantamiento_mensual(
 
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.fecha_decision_eps.isnot(None))
         .all()
     )
@@ -14022,20 +14492,19 @@ def stats_tasa_levantamiento_mensual(
             por_mes[k]["levantadas"] += 1
 
     todos = sorted(por_mes.keys())
-    recientes = todos[-int(meses):]
+    recientes = todos[-int(meses) :]
     serie = []
     for k in recientes:
         b = por_mes[k]
-        tasa = (
-            round(100 * b["levantadas"] / b["decididas"], 2)
-            if b["decididas"] else 0.0
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
+        serie.append(
+            {
+                "mes": k,
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        serie.append({
-            "mes": k,
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-        })
 
     return {
         "meses_solicitados": int(meses),
@@ -14061,9 +14530,11 @@ def stats_codigos_mejor_tasa(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.codigo_glosa.isnot(None))
         .all()
     )
@@ -14084,17 +14555,19 @@ def stats_codigos_mejor_tasa(
         if b["decididas"] < min_decididas:
             continue
         tasa = round(100 * b["levantadas"] / b["decididas"], 2)
-        items.append({
-            "codigo_glosa": cod,
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "codigo_glosa": cod,
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
 
     return {
         "min_decididas_filtro": int(min_decididas),
-        "items": items[:int(top)],
+        "items": items[: int(top)],
     }
 
 
@@ -14115,9 +14588,11 @@ def stats_codigos_peor_tasa(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .filter(GlosaRecord.codigo_glosa.isnot(None))
         .all()
     )
@@ -14138,17 +14613,19 @@ def stats_codigos_peor_tasa(
         if b["decididas"] < min_decididas:
             continue
         tasa = round(100 * b["levantadas"] / b["decididas"], 2)
-        items.append({
-            "codigo_glosa": cod,
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "codigo_glosa": cod,
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
     items.sort(key=lambda x: x["tasa_levantamiento_pct"])
 
     return {
         "min_decididas_filtro": int(min_decididas),
-        "items": items[:int(top)],
+        "items": items[: int(top)],
     }
 
 
@@ -14170,9 +14647,11 @@ def stats_eps_peor_tasa(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -14192,17 +14671,19 @@ def stats_eps_peor_tasa(
         if b["decididas"] < min_decididas:
             continue
         tasa = round(100 * b["levantadas"] / b["decididas"], 2)
-        items.append({
-            "eps": eps,
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
     items.sort(key=lambda x: x["tasa_levantamiento_pct"])
 
     return {
         "min_decididas_filtro": int(min_decididas),
-        "items": items[:int(top)],
+        "items": items[: int(top)],
     }
 
 
@@ -14226,9 +14707,11 @@ def stats_eps_mejor_tasa(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -14248,17 +14731,19 @@ def stats_eps_mejor_tasa(
         if b["decididas"] < min_decididas:
             continue
         tasa = round(100 * b["levantadas"] / b["decididas"], 2)
-        items.append({
-            "eps": eps,
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+            }
+        )
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
 
     return {
         "min_decididas_filtro": int(min_decididas),
-        "items": items[:int(top)],
+        "items": items[: int(top)],
     }
 
 
@@ -14284,32 +14769,35 @@ def stats_dashboard_completo(
 
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
     inicio_hoy = ahora_utc().replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
     abiertas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     valor_pendiente = (
         db.query(_f.coalesce(_f.sum(GlosaRecord.valor_objetado), 0))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     valor_recuperado_total = (
-        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0))
-        .scalar() or 0
+        db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0)).scalar() or 0
     )
 
-    abiertas_glosas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas_glosas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
     urgencia = {
-        "VENCIDA": 0, "CRITICA": 0, "PROXIMA": 0, "LEJANA": 0,
+        "VENCIDA": 0,
+        "CRITICA": 0,
+        "PROXIMA": 0,
+        "LEJANA": 0,
     }
     for g in abiertas_glosas:
         dr = g.dias_restantes if g.dias_restantes is not None else 0
@@ -14325,24 +14813,22 @@ def stats_dashboard_completo(
     por_eps_valor: dict[str, float] = {}
     for g in abiertas_glosas:
         if g.eps:
-            por_eps_valor[g.eps] = (
-                por_eps_valor.get(g.eps, 0.0)
-                + float(g.valor_objetado or 0)
-            )
+            por_eps_valor[g.eps] = por_eps_valor.get(g.eps, 0.0) + float(g.valor_objetado or 0)
     top_3 = sorted(
-        por_eps_valor.items(), key=lambda x: x[1], reverse=True,
+        por_eps_valor.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
 
     creadas_hoy = (
-        db.query(_f.count(GlosaRecord.id))
-        .filter(GlosaRecord.creado_en >= inicio_hoy)
-        .scalar() or 0
+        db.query(_f.count(GlosaRecord.id)).filter(GlosaRecord.creado_en >= inicio_hoy).scalar() or 0
     )
     cerradas_hoy = (
         db.query(_f.count(GlosaRecord.id))
         .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
         .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     return {
@@ -14353,9 +14839,7 @@ def stats_dashboard_completo(
             "valor_recuperado_acumulado": int(valor_recuperado_total),
         },
         "urgencia": urgencia,
-        "top_3_eps_pendientes": [
-            {"eps": e, "valor_pendiente": int(v)} for e, v in top_3
-        ],
+        "top_3_eps_pendientes": [{"eps": e, "valor_pendiente": int(v)} for e, v in top_3],
         "actividad_hoy": {
             "creadas": int(creadas_hoy),
             "cerradas": int(cerradas_hoy),
@@ -14379,9 +14863,11 @@ def stats_dictamen_vs_tasa_exito(
     """
     glosas = (
         db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .all()
     )
 
@@ -14409,16 +14895,15 @@ def stats_dictamen_vs_tasa_exito(
 
     items = []
     for nombre, b in bandas.items():
-        tasa = (
-            round(100 * b["lev"] / b["count"], 2)
-            if b["count"] else 0.0
+        tasa = round(100 * b["lev"] / b["count"], 2) if b["count"] else 0.0
+        items.append(
+            {
+                "banda": nombre,
+                "count": b["count"],
+                "levantadas": b["lev"],
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "banda": nombre,
-            "count": b["count"],
-            "levantadas": b["lev"],
-            "tasa_levantamiento_pct": tasa,
-        })
 
     return {"items": items}
 
@@ -14522,11 +15007,13 @@ def stats_dictamen_calidad_distribucion(
     items = []
     for nombre, count in bandas.items():
         pct = round(100 * count / total, 2) if total else 0.0
-        items.append({
-            "banda": nombre,
-            "count": count,
-            "pct": pct,
-        })
+        items.append(
+            {
+                "banda": nombre,
+                "count": count,
+                "pct": pct,
+            }
+        )
 
     return {
         "total_glosas": total,
@@ -14568,11 +15055,13 @@ def stats_decisiones_eps_detalle(
     items = []
     for estado, count in sorted(por_estado.items()):
         pct = round(100 * count / total, 2) if total else 0.0
-        items.append({
-            "estado": estado,
-            "count": count,
-            "pct": pct,
-        })
+        items.append(
+            {
+                "estado": estado,
+                "count": count,
+                "pct": pct,
+            }
+        )
 
     return {
         "eps": eps,
@@ -14598,11 +15087,7 @@ def stats_distribucion_urgencia(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     bandas = {
         "VENCIDA": {"count": 0, "valor": 0.0},
@@ -14627,12 +15112,14 @@ def stats_distribucion_urgencia(
     items = []
     for nombre, b in bandas.items():
         pct = round(100 * b["count"] / total, 2) if total else 0.0
-        items.append({
-            "banda": nombre,
-            "count": b["count"],
-            "valor_total": int(b["valor"]),
-            "pct": pct,
-        })
+        items.append(
+            {
+                "banda": nombre,
+                "count": b["count"],
+                "valor_total": int(b["valor"]),
+                "pct": pct,
+            }
+        )
 
     return {
         "total_abiertas": total,
@@ -14664,11 +15151,7 @@ def stats_eps_velocidad_respuesta(
     """
     from datetime import timezone
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.fecha_decision_eps.isnot(None))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.fecha_decision_eps.isnot(None)).all()
 
     por_eps: dict[str, list[int]] = {}
     for g in glosas:
@@ -14693,12 +15176,14 @@ def stats_eps_velocidad_respuesta(
         if len(tiempos) < min_glosas:
             continue
         promedio = sum(tiempos) / len(tiempos)
-        items.append({
-            "eps": eps,
-            "count": len(tiempos),
-            "tiempo_promedio_dias": round(promedio, 2),
-            "tiempo_max_dias": max(tiempos),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count": len(tiempos),
+                "tiempo_promedio_dias": round(promedio, 2),
+                "tiempo_max_dias": max(tiempos),
+            }
+        )
     items.sort(key=lambda x: x["tiempo_promedio_dias"])
 
     return {
@@ -14730,11 +15215,7 @@ def stats_antiguedad_promedio_eps(
 
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     ahora = ahora_utc()
     por_eps: dict[str, list[int]] = {}
@@ -14753,14 +15234,17 @@ def stats_antiguedad_promedio_eps(
     items = []
     for eps, antiguedades in por_eps.items():
         promedio = sum(antiguedades) / len(antiguedades)
-        items.append({
-            "eps": eps,
-            "count": len(antiguedades),
-            "antiguedad_promedio_dias": round(promedio, 2),
-            "antiguedad_max_dias": max(antiguedades),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count": len(antiguedades),
+                "antiguedad_promedio_dias": round(promedio, 2),
+                "antiguedad_max_dias": max(antiguedades),
+            }
+        )
     items.sort(
-        key=lambda x: x["antiguedad_promedio_dias"], reverse=True,
+        key=lambda x: x["antiguedad_promedio_dias"],
+        reverse=True,
     )
 
     return {
@@ -14804,9 +15288,7 @@ def stats_multi_concepto_ratio(
 
     glosas_con_conceptos = len(rows)
     glosas_multi = sum(1 for _, n in rows if n > 1)
-    promedio_conceptos = (
-        sum(n for _, n in rows) / len(rows) if rows else 0
-    )
+    promedio_conceptos = sum(n for _, n in rows) / len(rows) if rows else 0
 
     return {
         "total_glosas": int(total_glosas),
@@ -14814,8 +15296,7 @@ def stats_multi_concepto_ratio(
         "glosas_multi_concepto": glosas_multi,
         "glosas_simples": glosas_con_conceptos - glosas_multi,
         "ratio_multi_pct": (
-            round(100 * glosas_multi / glosas_con_conceptos, 2)
-            if glosas_con_conceptos else 0.0
+            round(100 * glosas_multi / glosas_con_conceptos, 2) if glosas_con_conceptos else 0.0
         ),
         "promedio_conceptos_por_glosa": round(promedio_conceptos, 2),
     }
@@ -14857,18 +15338,24 @@ def stats_audit_mas_cambiada(
 
     items = []
     for glosa_id, n in rows:
-        g = db.query(GlosaRecord).filter(
-            GlosaRecord.id == glosa_id,
-        ).first()
+        g = (
+            db.query(GlosaRecord)
+            .filter(
+                GlosaRecord.id == glosa_id,
+            )
+            .first()
+        )
         if not g:
             continue
-        items.append({
-            "glosa_id": glosa_id,
-            "n_eventos_audit": int(n),
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-        })
+        items.append(
+            {
+                "glosa_id": glosa_id,
+                "n_eventos_audit": int(n),
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -14910,18 +15397,24 @@ def stats_glosas_mas_refinadas(
     for glosa_id, n in rows:
         if glosa_id is None:
             continue
-        g = db.query(GlosaRecord).filter(
-            GlosaRecord.id == glosa_id,
-        ).first()
+        g = (
+            db.query(GlosaRecord)
+            .filter(
+                GlosaRecord.id == glosa_id,
+            )
+            .first()
+        )
         if not g:
             continue
-        items.append({
-            "glosa_id": glosa_id,
-            "n_versiones": int(n),
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-        })
+        items.append(
+            {
+                "glosa_id": glosa_id,
+                "n_versiones": int(n),
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+            }
+        )
 
     return {
         "top_solicitado": int(top),
@@ -14948,20 +15441,14 @@ def stats_concentracion_eps(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     por_eps: dict[str, float] = {}
     for g in abiertas:
         eps = (g.eps or "").strip()
         if not eps:
             continue
-        por_eps[eps] = (
-            por_eps.get(eps, 0.0) + float(g.valor_objetado or 0)
-        )
+        por_eps[eps] = por_eps.get(eps, 0.0) + float(g.valor_objetado or 0)
 
     if not por_eps:
         return {
@@ -15017,11 +15504,7 @@ def stats_recuperacion_promedio_por_eps(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     por_eps: dict[str, dict] = {}
     for g in glosas:
@@ -15040,18 +15523,19 @@ def stats_recuperacion_promedio_por_eps(
         if b["count"] < min_glosas:
             continue
         promedio = b["rec"] / b["count"] if b["count"] else 0
-        tasa = (
-            round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        tasa = round(100 * b["rec"] / b["obj"], 2) if b["obj"] else 0.0
+        items.append(
+            {
+                "eps": eps,
+                "glosas_cerradas": b["count"],
+                "valor_recuperado_total": int(b["rec"]),
+                "valor_recuperado_promedio": round(promedio, 2),
+                "tasa_recuperacion_pct": tasa,
+            }
         )
-        items.append({
-            "eps": eps,
-            "glosas_cerradas": b["count"],
-            "valor_recuperado_total": int(b["rec"]),
-            "valor_recuperado_promedio": round(promedio, 2),
-            "tasa_recuperacion_pct": tasa,
-        })
     items.sort(
-        key=lambda x: x["valor_recuperado_promedio"], reverse=True,
+        key=lambda x: x["valor_recuperado_promedio"],
+        reverse=True,
     )
 
     return {
@@ -15083,11 +15567,7 @@ def stats_eps_actividad_mensual(
     """
     from datetime import timezone
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.eps == eps)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.eps == eps).all()
 
     por_mes: dict[str, dict] = {}
     for g in glosas:
@@ -15099,7 +15579,9 @@ def stats_eps_actividad_mensual(
         k = cre.strftime("%Y-%m")
         if k not in por_mes:
             por_mes[k] = {
-                "count": 0, "valor_obj": 0.0, "valor_rec": 0.0,
+                "count": 0,
+                "valor_obj": 0.0,
+                "valor_rec": 0.0,
             }
         b = por_mes[k]
         b["count"] += 1
@@ -15107,16 +15589,18 @@ def stats_eps_actividad_mensual(
         b["valor_rec"] += float(g.valor_recuperado or 0)
 
     todos_meses = sorted(por_mes.keys())
-    meses_recientes = todos_meses[-int(meses):]
+    meses_recientes = todos_meses[-int(meses) :]
     serie = []
     for k in meses_recientes:
         b = por_mes[k]
-        serie.append({
-            "mes": k,
-            "glosas_iniciadas": b["count"],
-            "valor_objetado": int(b["valor_obj"]),
-            "valor_recuperado": int(b["valor_rec"]),
-        })
+        serie.append(
+            {
+                "mes": k,
+                "glosas_iniciadas": b["count"],
+                "valor_objetado": int(b["valor_obj"]),
+                "valor_recuperado": int(b["valor_rec"]),
+            }
+        )
 
     return {
         "eps": eps,
@@ -15150,43 +15634,52 @@ def stats_dashboard_light(
 
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
     inicio_hoy = ahora_utc().replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
     abiertas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     criticas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.dias_restantes >= 0)
         .filter(GlosaRecord.dias_restantes <= 3)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     vencidas = (
         db.query(_f.count(GlosaRecord.id))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
         .filter(GlosaRecord.dias_restantes < 0)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     valor_pendiente = (
         db.query(_f.coalesce(_f.sum(GlosaRecord.valor_objetado), 0))
         .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     cerradas_hoy = (
         db.query(_f.count(GlosaRecord.id))
         .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
         .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     valor_rec_hoy = (
         db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0))
         .filter(GlosaRecord.fecha_decision_eps >= inicio_hoy)
         .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     return {
@@ -15236,18 +15729,18 @@ def stats_proyeccion_vencimiento(
     serie = []
     for dr in sorted(por_dia.keys()):
         b = por_dia[dr]
-        serie.append({
-            "dias_restantes": dr,
-            "count": b["count"],
-            "valor_objetado_total": int(b["valor"]),
-        })
+        serie.append(
+            {
+                "dias_restantes": dr,
+                "count": b["count"],
+                "valor_objetado_total": int(b["valor"]),
+            }
+        )
 
     return {
         "ventana_dias": int(dias),
         "total_glosas_proximas": sum(s["count"] for s in serie),
-        "valor_total_proximas": sum(
-            s["valor_objetado_total"] for s in serie
-        ),
+        "valor_total_proximas": sum(s["valor_objetado_total"] for s in serie),
         "serie": serie,
     }
 
@@ -15290,11 +15783,13 @@ def stats_transiciones_recientes(
     items = []
     for k, count in por_transicion.items():
         anterior, nuevo = k.split("|", 1)
-        items.append({
-            "anterior": anterior,
-            "nuevo": nuevo,
-            "count": count,
-        })
+        items.append(
+            {
+                "anterior": anterior,
+                "nuevo": nuevo,
+                "count": count,
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -15321,7 +15816,10 @@ def stats_cerradas_hoy(
       - tasa_levantamiento_pct
     """
     inicio_hoy = ahora_utc().replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
@@ -15344,9 +15842,7 @@ def stats_cerradas_hoy(
         valor_rec += float(g.valor_recuperado or 0)
 
     decididas = levantadas + aceptadas
-    tasa = (
-        round(100 * levantadas / decididas, 2) if decididas else 0.0
-    )
+    tasa = round(100 * levantadas / decididas, 2) if decididas else 0.0
 
     return {
         "fecha": inicio_hoy.date().isoformat(),
@@ -15375,14 +15871,13 @@ def stats_creadas_hoy(
     """
 
     inicio_hoy = ahora_utc().replace(
-        hour=0, minute=0, second=0, microsecond=0,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
     )
 
-    glosas_hoy = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= inicio_hoy)
-        .all()
-    )
+    glosas_hoy = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= inicio_hoy).all()
 
     eps_set: set[str] = set()
     fac_set: set[str] = set()
@@ -15427,9 +15922,7 @@ def stats_analizadas_hoy(
     inicio_hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
 
     versiones = (
-        db.query(DictamenVersionRecord)
-        .filter(DictamenVersionRecord.creado_en >= inicio_hoy)
-        .all()
+        db.query(DictamenVersionRecord).filter(DictamenVersionRecord.creado_en >= inicio_hoy).all()
     )
 
     glosas_set: set[int] = set()
@@ -15444,7 +15937,9 @@ def stats_analizadas_hoy(
             por_autor[v.autor_email] = por_autor.get(v.autor_email, 0) + 1
 
     top_5 = sorted(
-        por_autor.items(), key=lambda x: x[1], reverse=True,
+        por_autor.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
 
     return {
@@ -15452,9 +15947,7 @@ def stats_analizadas_hoy(
         "dictamenes_hoy": len(versiones),
         "glosas_distintas_hoy": len(glosas_set),
         "por_accion": por_accion,
-        "top_5_autores": [
-            {"autor": u, "acciones": n} for u, n in top_5
-        ],
+        "top_5_autores": [{"autor": u, "acciones": n} for u, n in top_5],
     }
 
 
@@ -15479,18 +15972,16 @@ def stats_cerradas_por_etapa(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     por_etapa: dict[str, dict] = {}
     for g in glosas:
         etapa = (g.etapa or "(SIN_ETAPA)").strip() or "(SIN_ETAPA)"
         if etapa not in por_etapa:
             por_etapa[etapa] = {
-                "count": 0, "levantadas": 0, "valor_rec": 0.0,
+                "count": 0,
+                "levantadas": 0,
+                "valor_rec": 0.0,
             }
         b = por_etapa[etapa]
         b["count"] += 1
@@ -15500,16 +15991,15 @@ def stats_cerradas_por_etapa(
 
     items = []
     for etapa, b in por_etapa.items():
-        tasa = (
-            round(100 * b["levantadas"] / b["count"], 2)
-            if b["count"] else 0.0
+        tasa = round(100 * b["levantadas"] / b["count"], 2) if b["count"] else 0.0
+        items.append(
+            {
+                "etapa": etapa,
+                "count": b["count"],
+                "valor_recuperado_total": int(b["valor_rec"]),
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "etapa": etapa,
-            "count": b["count"],
-            "valor_recuperado_total": int(b["valor_rec"]),
-            "tasa_levantamiento_pct": tasa,
-        })
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -15524,7 +16014,7 @@ def stats_valor_objetado_mensual(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """R172 P1: serie mensual del valor objetado (no recuperado).
+    r"""R172 P1: serie mensual del valor objetado (no recuperado).
 
     Diferente a /stats/recuperacion-mensual (valor RECUPERADO):
     aquí valor OBJETADO en el mes que se creó la glosa, útil
@@ -15556,18 +16046,20 @@ def stats_valor_objetado_mensual(
         por_mes[k]["valor"] += float(g.valor_objetado or 0)
 
     todos_meses = sorted(por_mes.keys())
-    meses_recientes = todos_meses[-int(meses):]
+    meses_recientes = todos_meses[-int(meses) :]
 
     serie = []
     for k in meses_recientes:
         b = por_mes[k]
         promedio = b["valor"] / b["count"] if b["count"] else 0
-        serie.append({
-            "mes": k,
-            "count_glosas": b["count"],
-            "valor_objetado_total": int(b["valor"]),
-            "valor_promedio": round(promedio, 2),
-        })
+        serie.append(
+            {
+                "mes": k,
+                "count_glosas": b["count"],
+                "valor_objetado_total": int(b["valor"]),
+                "valor_promedio": round(promedio, 2),
+            }
+        )
 
     return {
         "meses_solicitados": int(meses),
@@ -15596,12 +16088,15 @@ def stats_cups_sin_tarifa(
     Param `eps`: nombre exacto de la EPS.
     """
     from app.models.db import (
-        ConceptoGlosaRecord, GlosaRecord, TarifaContratadaRecord,
+        ConceptoGlosaRecord,
+        GlosaRecord,
+        TarifaContratadaRecord,
     )
 
     # CUPS con tarifa cargada para esta EPS
     cups_con_tarifa = {
-        t.codigo_cups for t in (
+        t.codigo_cups
+        for t in (
             db.query(TarifaContratadaRecord)
             .filter(TarifaContratadaRecord.eps == eps)
             .filter(TarifaContratadaRecord.codigo_cups.isnot(None))
@@ -15610,11 +16105,7 @@ def stats_cups_sin_tarifa(
     }
 
     # Conceptos TA* de glosas de esta EPS
-    glosas_eps = (
-        db.query(GlosaRecord.id)
-        .filter(GlosaRecord.eps == eps)
-        .all()
-    )
+    glosas_eps = db.query(GlosaRecord.id).filter(GlosaRecord.eps == eps).all()
     glosa_ids = {g[0] for g in glosas_eps}
 
     if not glosa_ids:
@@ -15648,12 +16139,14 @@ def stats_cups_sin_tarifa(
 
     items = []
     for cups, b in por_cups.items():
-        items.append({
-            "cups_codigo": cups,
-            "cups_descripcion": (b["descripcion"] or "")[:200],
-            "frecuencia": b["frecuencia"],
-            "valor_total_objetado": int(b["valor"]),
-        })
+        items.append(
+            {
+                "cups_codigo": cups,
+                "cups_descripcion": (b["descripcion"] or "")[:200],
+                "frecuencia": b["frecuencia"],
+                "valor_total_objetado": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["frecuencia"], reverse=True)
 
     return {
@@ -15682,7 +16175,9 @@ def stats_tarifa_coincidente(
     sólida.
     """
     from app.models.db import (
-        ConceptoGlosaRecord, GlosaRecord, TarifaContratadaRecord,
+        ConceptoGlosaRecord,
+        GlosaRecord,
+        TarifaContratadaRecord,
     )
 
     # Glosas TA* abiertas o cerradas, con CUPS
@@ -15711,11 +16206,7 @@ def stats_tarifa_coincidente(
     glosa_ids = {c.glosa_id for c in conceptos_ta if c.glosa_id}
     eps_por_glosa = {}
     if glosa_ids:
-        for g in (
-            db.query(GlosaRecord)
-            .filter(GlosaRecord.id.in_(glosa_ids))
-            .all()
-        ):
+        for g in db.query(GlosaRecord).filter(GlosaRecord.id.in_(glosa_ids)).all():
             eps_por_glosa[g.id] = g.eps
 
     con_tarifa = 0
@@ -15731,9 +16222,7 @@ def stats_tarifa_coincidente(
             sin_tarifa += 1
 
     total = con_tarifa + sin_tarifa
-    cobertura = (
-        round(100 * con_tarifa / total, 2) if total else 0.0
-    )
+    cobertura = round(100 * con_tarifa / total, 2) if total else 0.0
 
     return {
         "total_conceptos_ta": total,
@@ -15761,26 +16250,23 @@ def stats_sin_dictamen(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     items = []
     for g in glosas:
         if not g.dictamen or not g.dictamen.strip():
-            items.append({
-                "id": g.id,
-                "eps": g.eps,
-                "factura": g.factura,
-                "estado": g.estado,
-                "dias_restantes": g.dias_restantes,
-                "valor_objetado": float(g.valor_objetado or 0),
-            })
+            items.append(
+                {
+                    "id": g.id,
+                    "eps": g.eps,
+                    "factura": g.factura,
+                    "estado": g.estado,
+                    "dias_restantes": g.dias_restantes,
+                    "valor_objetado": float(g.valor_objetado or 0),
+                }
+            )
     items.sort(
-        key=lambda x: (x["dias_restantes"]
-                       if x["dias_restantes"] is not None else 9999),
+        key=lambda x: x["dias_restantes"] if x["dias_restantes"] is not None else 9999,
     )
 
     return {
@@ -15823,14 +16309,16 @@ def stats_dictamenes_cortos(
     for g in glosas:
         dlen = len(g.dictamen or "")
         if dlen < umbral_chars:
-            items.append({
-                "id": g.id,
-                "eps": g.eps,
-                "factura": g.factura,
-                "estado": g.estado,
-                "dictamen_chars": dlen,
-                "valor_objetado": float(g.valor_objetado or 0),
-            })
+            items.append(
+                {
+                    "id": g.id,
+                    "eps": g.eps,
+                    "factura": g.factura,
+                    "estado": g.estado,
+                    "dictamen_chars": dlen,
+                    "valor_objetado": float(g.valor_objetado or 0),
+                }
+            )
     items.sort(key=lambda x: x["dictamen_chars"])
 
     return {
@@ -15865,11 +16353,7 @@ def stats_comentarios_globales(
     from app.models.db import ComentarioGlosaRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
-    coms = (
-        db.query(ComentarioGlosaRecord)
-        .filter(ComentarioGlosaRecord.creado_en >= desde)
-        .all()
-    )
+    coms = db.query(ComentarioGlosaRecord).filter(ComentarioGlosaRecord.creado_en >= desde).all()
 
     por_autor: dict[str, int] = {}
     glosas_set: set[int] = set()
@@ -15886,7 +16370,9 @@ def stats_comentarios_globales(
                 menciones_resueltas += 1
 
     top_5 = sorted(
-        por_autor.items(), key=lambda x: x[1], reverse=True,
+        por_autor.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
 
     return {
@@ -15896,9 +16382,7 @@ def stats_comentarios_globales(
         "menciones_totales": menciones_total,
         "menciones_resueltas": menciones_resueltas,
         "menciones_pendientes": menciones_total - menciones_resueltas,
-        "top_5_comentaristas": [
-            {"autor": u, "comentarios": n} for u, n in top_5
-        ],
+        "top_5_comentaristas": [{"autor": u, "comentarios": n} for u, n in top_5],
     }
 
 
@@ -15929,7 +16413,9 @@ def stats_por_anio(
     def _ensure(k):
         if k not in por_anio:
             por_anio[k] = {
-                "creadas": 0, "cerradas": 0, "valor_rec": 0.0,
+                "creadas": 0,
+                "cerradas": 0,
+                "valor_rec": 0.0,
             }
         return por_anio[k]
 
@@ -15954,12 +16440,14 @@ def stats_por_anio(
     serie = []
     for k in sorted(por_anio.keys()):
         b = por_anio[k]
-        serie.append({
-            "anio": k,
-            "creadas": b["creadas"],
-            "cerradas": b["cerradas"],
-            "valor_recuperado": int(b["valor_rec"]),
-        })
+        serie.append(
+            {
+                "anio": k,
+                "creadas": b["creadas"],
+                "cerradas": b["cerradas"],
+                "valor_recuperado": int(b["valor_rec"]),
+            }
+        )
 
     return {
         "total_anios_con_actividad": len(serie),
@@ -15989,20 +16477,12 @@ def stats_por_dia_semana(
     """
     from datetime import timedelta, timezone
 
-    DIAS_NOMBRE = ["Lunes", "Martes", "Miércoles", "Jueves",
-                   "Viernes", "Sábado", "Domingo"]
+    DIAS_NOMBRE = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
     desde = ahora_utc() - timedelta(days=int(dias))
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= desde)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= desde).all()
 
-    por_dia = [
-        {"dia": DIAS_NOMBRE[i], "count": 0, "valor_total": 0.0}
-        for i in range(7)
-    ]
+    por_dia = [{"dia": DIAS_NOMBRE[i], "count": 0, "valor_total": 0.0} for i in range(7)]
 
     for g in glosas:
         creado = g.creado_en
@@ -16016,10 +16496,7 @@ def stats_por_dia_semana(
 
     total_count = sum(d["count"] for d in por_dia)
     for d in por_dia:
-        d["pct_del_total"] = (
-            round(100 * d["count"] / total_count, 2)
-            if total_count else 0.0
-        )
+        d["pct_del_total"] = round(100 * d["count"] / total_count, 2) if total_count else 0.0
         d["valor_total"] = int(d["valor_total"])
 
     return {
@@ -16050,11 +16527,7 @@ def stats_pacientes_frecuentes(
       - eps_distintas
       - valor_objetado_total
     """
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.paciente.isnot(None))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.paciente.isnot(None)).all()
 
     por_paciente: dict[str, dict] = {}
     for g in glosas:
@@ -16080,13 +16553,15 @@ def stats_pacientes_frecuentes(
     for paciente, b in por_paciente.items():
         if b["count"] < min_glosas:
             continue
-        items.append({
-            "paciente": paciente,
-            "count_glosas": b["count"],
-            "facturas_distintas": len(b["facturas"]),
-            "eps_distintas": len(b["epss"]),
-            "valor_objetado_total": int(b["valor"]),
-        })
+        items.append(
+            {
+                "paciente": paciente,
+                "count_glosas": b["count"],
+                "facturas_distintas": len(b["facturas"]),
+                "eps_distintas": len(b["epss"]),
+                "valor_objetado_total": int(b["valor"]),
+            }
+        )
     items.sort(key=lambda x: x["count_glosas"], reverse=True)
 
     return {
@@ -16120,9 +16595,7 @@ def stats_cups_mas_objetados(
       - facturas_distintas
     """
     conceptos = (
-        db.query(ConceptoGlosaRecord)
-        .filter(ConceptoGlosaRecord.cups_codigo.isnot(None))
-        .all()
+        db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.cups_codigo.isnot(None)).all()
     )
 
     por_cups: dict[str, dict] = {}
@@ -16145,13 +16618,15 @@ def stats_cups_mas_objetados(
 
     items = []
     for cups, b in por_cups.items():
-        items.append({
-            "cups_codigo": cups,
-            "cups_descripcion": (b["descripcion"] or "")[:200],
-            "frecuencia": b["frecuencia"],
-            "valor_objetado_total": int(b["valor"]),
-            "facturas_distintas": len(b["facturas"]),
-        })
+        items.append(
+            {
+                "cups_codigo": cups,
+                "cups_descripcion": (b["descripcion"] or "")[:200],
+                "frecuencia": b["frecuencia"],
+                "valor_objetado_total": int(b["valor"]),
+                "facturas_distintas": len(b["facturas"]),
+            }
+        )
     items.sort(key=lambda x: x["frecuencia"], reverse=True)
 
     return {
@@ -16251,11 +16726,7 @@ def stats_cohorte_mensual(
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
     corte = ahora_utc() - timedelta(days=int(meses) * 31)
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.creado_en >= corte)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= corte).all()
 
     cohortes: dict[str, list] = {}
     for g in glosas:
@@ -16294,13 +16765,15 @@ def stats_cohorte_mensual(
             if dias <= 90:
                 cerradas_90 += 1
 
-        serie.append({
-            "cohorte": key,
-            "total_glosas": total,
-            "cierre_30d_pct": round(100 * cerradas_30 / total, 2),
-            "cierre_60d_pct": round(100 * cerradas_60 / total, 2),
-            "cierre_90d_pct": round(100 * cerradas_90 / total, 2),
-        })
+        serie.append(
+            {
+                "cohorte": key,
+                "total_glosas": total,
+                "cierre_30d_pct": round(100 * cerradas_30 / total, 2),
+                "cierre_60d_pct": round(100 * cerradas_60 / total, 2),
+                "cierre_90d_pct": round(100 * cerradas_90 / total, 2),
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -16353,10 +16826,7 @@ def stats_proyeccion_recuperacion(
             pendientes_obj += v_obj
             pendientes_count += 1
 
-    tasa = (
-        round(100 * cerradas_rec / cerradas_obj, 2)
-        if cerradas_obj else 0.0
-    )
+    tasa = round(100 * cerradas_rec / cerradas_obj, 2) if cerradas_obj else 0.0
 
     proyeccion = pendientes_obj * (tasa / 100)
 
@@ -16450,26 +16920,21 @@ def stats_dashboard_snapshot(
             "valor_objetado_total": int(valor_obj_total),
             "valor_recuperado_total": int(valor_rec_total),
             "tasa_recuperacion_pct": (
-                round(100 * valor_rec_total / valor_obj_total, 2)
-                if valor_obj_total else 0.0
+                round(100 * valor_rec_total / valor_obj_total, 2) if valor_obj_total else 0.0
             ),
         },
         "resoluciones": {
             "decididas": decididas,
             "levantadas": levantadas,
             "tasa_levantamiento_pct": (
-                round(100 * levantadas / decididas, 2)
-                if decididas else 0.0
+                round(100 * levantadas / decididas, 2) if decididas else 0.0
             ),
         },
         "sla": {
             "vencidas": vencidas,
             "criticas": criticas,
             "en_tiempo": en_tiempo,
-            "pct_en_tiempo": (
-                round(100 * en_tiempo / abiertas, 2)
-                if abiertas else 0.0
-            ),
+            "pct_en_tiempo": (round(100 * en_tiempo / abiertas, 2) if abiertas else 0.0),
         },
         "generado_en": ahora_utc().isoformat(),
     }
@@ -16524,9 +16989,7 @@ def stats_cuellos_botella(
         ts = e.timestamp
         if ts and ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
-        por_glosa.setdefault(e.registro_id, []).append(
-            (ts, e.valor_nuevo)
-        )
+        por_glosa.setdefault(e.registro_id, []).append((ts, e.valor_nuevo))
 
     # Para cada glosa, tiempo entre transiciones consecutivas
     por_estado: dict[str, list[float]] = {}
@@ -16551,14 +17014,17 @@ def stats_cuellos_botella(
             mediano = (tiempos[n // 2 - 1] + tiempos[n // 2]) / 2
         else:
             mediano = tiempos[n // 2]
-        items.append({
-            "estado": estado,
-            "count_glosas_con_transicion": n,
-            "tiempo_promedio_dias": round(promedio, 2),
-            "tiempo_mediano_dias": round(mediano, 2),
-        })
+        items.append(
+            {
+                "estado": estado,
+                "count_glosas_con_transicion": n,
+                "tiempo_promedio_dias": round(promedio, 2),
+                "tiempo_mediano_dias": round(mediano, 2),
+            }
+        )
     items.sort(
-        key=lambda x: x["tiempo_promedio_dias"], reverse=True,
+        key=lambda x: x["tiempo_promedio_dias"],
+        reverse=True,
     )
 
     return {
@@ -16599,7 +17065,9 @@ def stats_abandono_por_etapa(
         etapa = (g.etapa or "SIN_ETAPA").strip() or "SIN_ETAPA"
         if etapa not in por_etapa:
             por_etapa[etapa] = {
-                "total": 0, "abiertas": 0, "tiempos": [],
+                "total": 0,
+                "abiertas": 0,
+                "tiempos": [],
             }
         b = por_etapa[etapa]
         b["total"] += 1
@@ -16615,21 +17083,17 @@ def stats_abandono_por_etapa(
 
     items = []
     for etapa, b in por_etapa.items():
-        tiempo_prom = (
-            round(sum(b["tiempos"]) / len(b["tiempos"]), 2)
-            if b["tiempos"] else 0.0
+        tiempo_prom = round(sum(b["tiempos"]) / len(b["tiempos"]), 2) if b["tiempos"] else 0.0
+        tasa = round(100 * b["abiertas"] / b["total"], 2) if b["total"] else 0.0
+        items.append(
+            {
+                "etapa": etapa,
+                "total_glosas": b["total"],
+                "abiertas": b["abiertas"],
+                "tasa_abandono_pct": tasa,
+                "tiempo_promedio_dias_abiertas": tiempo_prom,
+            }
         )
-        tasa = (
-            round(100 * b["abiertas"] / b["total"], 2)
-            if b["total"] else 0.0
-        )
-        items.append({
-            "etapa": etapa,
-            "total_glosas": b["total"],
-            "abiertas": b["abiertas"],
-            "tasa_abandono_pct": tasa,
-            "tiempo_promedio_dias_abiertas": tiempo_prom,
-        })
 
     items.sort(key=lambda x: x["tasa_abandono_pct"], reverse=True)
 
@@ -16669,7 +17133,9 @@ def stats_codigos_respuesta_por_eps(
         cod = g.codigo_respuesta
         if cod not in por_codigo:
             por_codigo[cod] = {
-                "total": 0, "decididas": 0, "levantadas": 0,
+                "total": 0,
+                "decididas": 0,
+                "levantadas": 0,
             }
         b = por_codigo[cod]
         b["total"] += 1
@@ -16681,17 +17147,16 @@ def stats_codigos_respuesta_por_eps(
 
     items = []
     for cod, b in por_codigo.items():
-        tasa = (
-            round(100 * b["levantadas"] / b["decididas"], 2)
-            if b["decididas"] else 0.0
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
+        items.append(
+            {
+                "codigo_respuesta": cod,
+                "usado": b["total"],
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "codigo_respuesta": cod,
-            "usado": b["total"],
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-        })
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
 
     return {
@@ -16732,7 +17197,9 @@ def stats_exito_por_codigo_respuesta(
             continue
         if cod not in por_codigo:
             por_codigo[cod] = {
-                "total": 0, "levantadas": 0, "decididas": 0,
+                "total": 0,
+                "levantadas": 0,
+                "decididas": 0,
             }
         b = por_codigo[cod]
         b["total"] += 1
@@ -16744,17 +17211,16 @@ def stats_exito_por_codigo_respuesta(
 
     items = []
     for cod, b in por_codigo.items():
-        tasa = (
-            round(100 * b["levantadas"] / b["decididas"], 2)
-            if b["decididas"] else 0.0
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
+        items.append(
+            {
+                "codigo_respuesta": cod,
+                "total_usado": b["total"],
+                "decididas": b["decididas"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa,
+            }
         )
-        items.append({
-            "codigo_respuesta": cod,
-            "total_usado": b["total"],
-            "decididas": b["decididas"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa,
-        })
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
 
     return {
@@ -16769,7 +17235,7 @@ def stats_promedio_por_eps(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """R152 P1: valor promedio de glosa por EPS.
+    r"""R152 P1: valor promedio de glosa por EPS.
 
     Detecta el "perfil económico" de cada EPS:
       - SANITAS: promedio \$5M (glosas grandes, casos complejos)
@@ -16806,13 +17272,15 @@ def stats_promedio_por_eps(
             mediano = (valores_ord[n // 2 - 1] + valores_ord[n // 2]) / 2
         else:
             mediano = valores_ord[n // 2]
-        items.append({
-            "eps": eps,
-            "count": n,
-            "valor_promedio": round(promedio, 2),
-            "valor_mediano": round(mediano, 2),
-            "valor_max": int(max(valores)),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "count": n,
+                "valor_promedio": round(promedio, 2),
+                "valor_mediano": round(mediano, 2),
+                "valor_max": int(max(valores)),
+            }
+        )
     items.sort(key=lambda x: x["valor_promedio"], reverse=True)
 
     return {
@@ -16853,16 +17321,15 @@ def stats_por_etapa_actual(
     total_count = sum(b["count"] for b in por_etapa.values())
     items = []
     for etapa, b in por_etapa.items():
-        pct = (
-            round(100 * b["count"] / total_count, 2)
-            if total_count else 0.0
+        pct = round(100 * b["count"] / total_count, 2) if total_count else 0.0
+        items.append(
+            {
+                "etapa": etapa,
+                "count": b["count"],
+                "valor_pendiente_total": int(b["valor"]),
+                "pct_del_total": pct,
+            }
         )
-        items.append({
-            "etapa": etapa,
-            "count": b["count"],
-            "valor_pendiente_total": int(b["valor"]),
-            "pct_del_total": pct,
-        })
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -16892,11 +17359,7 @@ def stats_concentracion_codigo(
     """
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
-    abiertas = (
-        db.query(GlosaRecord)
-        .filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS))
-        .all()
-    )
+    abiertas = db.query(GlosaRecord).filter(~GlosaRecord.estado.in_(ESTADOS_CERRADOS)).all()
 
     por_codigo: dict[str, dict] = {}
     for g in abiertas:
@@ -16909,16 +17372,15 @@ def stats_concentracion_codigo(
     valor_total = sum(b["valor"] for b in por_codigo.values())
     items = []
     for cod, b in por_codigo.items():
-        pct = (
-            round(100 * b["valor"] / valor_total, 2)
-            if valor_total else 0.0
+        pct = round(100 * b["valor"] / valor_total, 2) if valor_total else 0.0
+        items.append(
+            {
+                "codigo_glosa": cod,
+                "count": b["count"],
+                "valor_pendiente": int(b["valor"]),
+                "pct_del_total": pct,
+            }
         )
-        items.append({
-            "codigo_glosa": cod,
-            "count": b["count"],
-            "valor_pendiente": int(b["valor"]),
-            "pct_del_total": pct,
-        })
     items.sort(key=lambda x: x["valor_pendiente"], reverse=True)
 
     return {
@@ -16958,8 +17420,10 @@ def stats_codigos_mas_objetados(
             continue
         if cod not in por_codigo:
             por_codigo[cod] = {
-                "freq": 0, "valor": 0.0,
-                "decididas": 0, "levantadas": 0,
+                "freq": 0,
+                "valor": 0.0,
+                "decididas": 0,
+                "levantadas": 0,
                 "por_eps": {},
             }
         b = por_codigo[cod]
@@ -16977,22 +17441,21 @@ def stats_codigos_mas_objetados(
 
     items = []
     for cod, b in por_codigo.items():
-        tasa = (
-            round(100 * b["levantadas"] / b["decididas"], 2)
-            if b["decididas"] else 0.0
-        )
+        tasa = round(100 * b["levantadas"] / b["decididas"], 2) if b["decididas"] else 0.0
         eps_top3 = sorted(
-            b["por_eps"].items(), key=lambda x: x[1], reverse=True,
+            b["por_eps"].items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:3]
-        items.append({
-            "codigo": cod,
-            "frecuencia": b["freq"],
-            "valor_objetado_total": int(b["valor"]),
-            "tasa_levantamiento_pct": tasa,
-            "eps_principales": [
-                {"eps": e, "veces": n} for e, n in eps_top3
-            ],
-        })
+        items.append(
+            {
+                "codigo": cod,
+                "frecuencia": b["freq"],
+                "valor_objetado_total": int(b["valor"]),
+                "tasa_levantamiento_pct": tasa,
+                "eps_principales": [{"eps": e, "veces": n} for e, n in eps_top3],
+            }
+        )
     items.sort(key=lambda x: x["frecuencia"], reverse=True)
 
     return {
@@ -17041,8 +17504,10 @@ def stats_eficiencia_gestor(
             continue
         if gestor not in por_gestor:
             por_gestor[gestor] = {
-                "total": 0, "levantadas": 0,
-                "valor_recuperado": 0.0, "valor_objetado": 0.0,
+                "total": 0,
+                "levantadas": 0,
+                "valor_recuperado": 0.0,
+                "valor_objetado": 0.0,
                 "tiempos": [],
             }
         b = por_gestor[gestor]
@@ -17063,22 +17528,22 @@ def stats_eficiencia_gestor(
         tasa_lev = round(100 * b["levantadas"] / b["total"], 2)
         tasa_rec = (
             round(100 * b["valor_recuperado"] / b["valor_objetado"], 2)
-            if b["valor_objetado"] else 0.0
+            if b["valor_objetado"]
+            else 0.0
         )
-        tiempo_prom = (
-            round(sum(b["tiempos"]) / len(b["tiempos"]), 2)
-            if b["tiempos"] else 0.0
+        tiempo_prom = round(sum(b["tiempos"]) / len(b["tiempos"]), 2) if b["tiempos"] else 0.0
+        items.append(
+            {
+                "gestor": gestor,
+                "total_cerradas": b["total"],
+                "levantadas": b["levantadas"],
+                "tasa_levantamiento_pct": tasa_lev,
+                "valor_recuperado_total": int(b["valor_recuperado"]),
+                "valor_objetado_total": int(b["valor_objetado"]),
+                "tasa_recuperacion_pct": tasa_rec,
+                "tiempo_promedio_resolucion_dias": tiempo_prom,
+            }
         )
-        items.append({
-            "gestor": gestor,
-            "total_cerradas": b["total"],
-            "levantadas": b["levantadas"],
-            "tasa_levantamiento_pct": tasa_lev,
-            "valor_recuperado_total": int(b["valor_recuperado"]),
-            "valor_objetado_total": int(b["valor_objetado"]),
-            "tasa_recuperacion_pct": tasa_rec,
-            "tiempo_promedio_resolucion_dias": tiempo_prom,
-        })
     items.sort(key=lambda x: x["tasa_levantamiento_pct"], reverse=True)
 
     return {
@@ -17143,15 +17608,18 @@ def stats_recuperacion_mensual(
         b = por_mes[key]
         tasa = (
             round(100 * b["recuperado"] / b["valor_objetado_total"], 2)
-            if b["valor_objetado_total"] else 0.0
+            if b["valor_objetado_total"]
+            else 0.0
         )
-        serie.append({
-            "mes": key,
-            "recuperado": int(b["recuperado"]),
-            "glosas_cerradas": b["glosas_cerradas"],
-            "valor_objetado_total": int(b["valor_objetado_total"]),
-            "tasa_recuperacion_pct": tasa,
-        })
+        serie.append(
+            {
+                "mes": key,
+                "recuperado": int(b["recuperado"]),
+                "glosas_cerradas": b["glosas_cerradas"],
+                "valor_objetado_total": int(b["valor_objetado_total"]),
+                "tasa_recuperacion_pct": tasa,
+            }
+        )
 
     return {
         "ventana_meses": int(meses),
@@ -17189,11 +17657,7 @@ def stats_heatmap_actividad(
     from datetime import timedelta
 
     corte = ahora_utc() - timedelta(days=int(dias))
-    rows = (
-        db.query(GlosaRecord.creado_en)
-        .filter(GlosaRecord.creado_en >= corte)
-        .all()
-    )
+    rows = db.query(GlosaRecord.creado_en).filter(GlosaRecord.creado_en >= corte).all()
 
     matriz = [[0 for _ in range(24)] for _ in range(7)]
     total = 0
@@ -17210,8 +17674,13 @@ def stats_heatmap_actividad(
         "total": total,
         "matriz": matriz,
         "dias_semana": [
-            "Lunes", "Martes", "Miércoles", "Jueves",
-            "Viernes", "Sábado", "Domingo",
+            "Lunes",
+            "Martes",
+            "Miércoles",
+            "Jueves",
+            "Viernes",
+            "Sábado",
+            "Domingo",
         ],
         "horas": list(range(24)),
     }
@@ -17268,6 +17737,7 @@ def stats_tendencia_diaria(
         # SQLAlchemy puede devolver date o str según el motor
         if isinstance(fecha, str):
             from datetime import datetime
+
             try:
                 fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
             except Exception:
@@ -17284,11 +17754,13 @@ def stats_tendencia_diaria(
     while cursor <= hoy:
         clave = cursor.isoformat()
         info = por_fecha.get(clave, {"count": 0, "valor_objetado": 0.0})
-        serie.append({
-            "fecha": clave,
-            "count": info["count"],
-            "valor_objetado": info["valor_objetado"],
-        })
+        serie.append(
+            {
+                "fecha": clave,
+                "count": info["count"],
+                "valor_objetado": info["valor_objetado"],
+            }
+        )
         cursor += timedelta(days=1)
 
     return {
@@ -17375,14 +17847,16 @@ def stats_por_tipo_glosa(
     items = []
     total_count = sum(d["count"] for d in por_prefijo.values()) or 0
     for prefijo, d in por_prefijo.items():
-        items.append({
-            "prefijo": prefijo,
-            "tipo": descripciones.get(prefijo, "Otro"),
-            "count": d["count"],
-            "valor_objetado": d["valor_objetado"],
-            "codigos_distintos": len(d["codigos_unicos"]),
-            "porcentaje": round(d["count"] / total_count * 100, 1) if total_count else 0,
-        })
+        items.append(
+            {
+                "prefijo": prefijo,
+                "tipo": descripciones.get(prefijo, "Otro"),
+                "count": d["count"],
+                "valor_objetado": d["valor_objetado"],
+                "codigos_distintos": len(d["codigos_unicos"]),
+                "porcentaje": round(d["count"] / total_count * 100, 1) if total_count else 0,
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -17485,10 +17959,7 @@ def checklist_glosa(
     obligatorios = [it for it in items if not it["opcional"]]
     obl_completados = sum(1 for it in obligatorios if it["completado"])
     obl_pendientes = len(obligatorios) - obl_completados
-    pct = (
-        round(100 * obl_completados / len(obligatorios), 2)
-        if obligatorios else 0.0
-    )
+    pct = round(100 * obl_completados / len(obligatorios), 2) if obligatorios else 0.0
 
     return {
         "glosa_id": glosa_id,
@@ -17596,9 +18067,7 @@ def contexto_completo_glosa(
     return {
         "glosa": {
             "id": glosa.id,
-            "creado_en": (
-                glosa.creado_en.isoformat() if glosa.creado_en else None
-            ),
+            "creado_en": (glosa.creado_en.isoformat() if glosa.creado_en else None),
             "eps": glosa.eps,
             "paciente": glosa.paciente,
             "factura": glosa.factura,
@@ -17618,9 +18087,7 @@ def contexto_completo_glosa(
         },
         "audit_resumen": {
             "total_cambios": len(eventos),
-            "ultimo_cambio_en": (
-                max(timestamps).isoformat() if timestamps else None
-            ),
+            "ultimo_cambio_en": (max(timestamps).isoformat() if timestamps else None),
             "usuarios_que_intervinieron": usuarios,
         },
         "relacionadas_count": {
@@ -17672,36 +18139,39 @@ def score_prioridad_glosa(
 
     dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
     if dr < 0:
-        desglose.append({"componente": "vencimiento", "peso": 100,
-                         "razon": f"vencida hace {abs(dr)}d"})
+        desglose.append(
+            {"componente": "vencimiento", "peso": 100, "razon": f"vencida hace {abs(dr)}d"}
+        )
         score += 100
     elif dr <= 3:
-        desglose.append({"componente": "vencimiento", "peso": 50,
-                         "razon": f"crítica ({dr}d restantes)"})
+        desglose.append(
+            {"componente": "vencimiento", "peso": 50, "razon": f"crítica ({dr}d restantes)"}
+        )
         score += 50
     elif dr <= 7:
-        desglose.append({"componente": "vencimiento", "peso": 20,
-                         "razon": f"próxima ({dr}d restantes)"})
+        desglose.append(
+            {"componente": "vencimiento", "peso": 20, "razon": f"próxima ({dr}d restantes)"}
+        )
         score += 20
 
     v_obj = float(glosa.valor_objetado or 0)
     if v_obj > 10_000_000:
-        desglose.append({"componente": "valor", "peso": 30,
-                         "razon": f"alto valor ({int(v_obj):,} COP)"})
+        desglose.append(
+            {"componente": "valor", "peso": 30, "razon": f"alto valor ({int(v_obj):,} COP)"}
+        )
         score += 30
     elif v_obj > 1_000_000:
-        desglose.append({"componente": "valor", "peso": 15,
-                         "razon": f"valor medio ({int(v_obj):,} COP)"})
+        desglose.append(
+            {"componente": "valor", "peso": 15, "razon": f"valor medio ({int(v_obj):,} COP)"}
+        )
         score += 15
 
     if not glosa.dictamen or len(glosa.dictamen) < 50:
-        desglose.append({"componente": "dictamen", "peso": 25,
-                         "razon": "sin dictamen generado"})
+        desglose.append({"componente": "dictamen", "peso": 25, "razon": "sin dictamen generado"})
         score += 25
 
     if not glosa.gestor_nombre:
-        desglose.append({"componente": "asignacion", "peso": 15,
-                         "razon": "sin gestor asignado"})
+        desglose.append({"componente": "asignacion", "peso": 15, "razon": "sin gestor asignado"})
         score += 15
 
     if score >= 100:
@@ -17836,28 +18306,31 @@ def dialogo_bilateral(
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
         valor = float(glosa.valor_objetado or 0)
-        pasos.append({
-            "actor": "EPS",
-            "fecha": ts.isoformat(),
-            "mensaje": (
-                f"Objeta con código {glosa.codigo_glosa or '?'} por "
-                f"${int(valor):,} COP"
-            ),
-            "estado_resultante": "RADICADA",
-        })
+        pasos.append(
+            {
+                "actor": "EPS",
+                "fecha": ts.isoformat(),
+                "mensaje": (
+                    f"Objeta con código {glosa.codigo_glosa or '?'} por ${int(valor):,} COP"
+                ),
+                "estado_resultante": "RADICADA",
+            }
+        )
 
     # 2) HUS responde
     if glosa.dictamen and len(glosa.dictamen) > 50:
-        pasos.append({
-            "actor": "HUS",
-            "fecha": None,
-            "mensaje": (
-                f"Responde con código {glosa.codigo_respuesta or '?'} "
-                f"y dictamen técnico-jurídico "
-                f"({len(glosa.dictamen)} chars)"
-            ),
-            "estado_resultante": glosa.estado or "RESPONDIDA",
-        })
+        pasos.append(
+            {
+                "actor": "HUS",
+                "fecha": None,
+                "mensaje": (
+                    f"Responde con código {glosa.codigo_respuesta or '?'} "
+                    f"y dictamen técnico-jurídico "
+                    f"({len(glosa.dictamen)} chars)"
+                ),
+                "estado_resultante": glosa.estado or "RESPONDIDA",
+            }
+        )
 
     # 3) EPS decide
     if glosa.decision_eps:
@@ -17865,15 +18338,14 @@ def dialogo_bilateral(
         if ts and ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
         v_rec = float(glosa.valor_recuperado or 0)
-        pasos.append({
-            "actor": "EPS",
-            "fecha": ts.isoformat() if ts else None,
-            "mensaje": (
-                f"Decisión: {glosa.decision_eps}. "
-                f"Recuperado: ${int(v_rec):,} COP"
-            ),
-            "estado_resultante": glosa.estado or "?",
-        })
+        pasos.append(
+            {
+                "actor": "EPS",
+                "fecha": ts.isoformat() if ts else None,
+                "mensaje": (f"Decisión: {glosa.decision_eps}. Recuperado: ${int(v_rec):,} COP"),
+                "estado_resultante": glosa.estado or "?",
+            }
+        )
 
     # 4) Conciliación si existe
     conciliaciones = (
@@ -17887,15 +18359,17 @@ def dialogo_bilateral(
         if ts and ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
         v_conc = float(c.valor_conciliado or 0)
-        pasos.append({
-            "actor": "BILATERAL",
-            "fecha": ts.isoformat() if ts else None,
-            "mensaje": (
-                f"Conciliación: {c.resultado or 'pendiente'}. "
-                f"Valor conciliado: ${int(v_conc):,} COP"
-            ),
-            "estado_resultante": c.estado_bilateral or "?",
-        })
+        pasos.append(
+            {
+                "actor": "BILATERAL",
+                "fecha": ts.isoformat() if ts else None,
+                "mensaje": (
+                    f"Conciliación: {c.resultado or 'pendiente'}. "
+                    f"Valor conciliado: ${int(v_conc):,} COP"
+                ),
+                "estado_resultante": c.estado_bilateral or "?",
+            }
+        )
 
     return {
         "glosa_id": glosa_id,
@@ -18005,16 +18479,16 @@ def glosas_mismo_paciente(
 
     items = []
     for g in otras:
-        items.append({
-            "id": g.id,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "eps": g.eps,
-            "factura": g.factura,
-            "estado": g.estado,
-            "valor_objetado": float(g.valor_objetado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "eps": g.eps,
+                "factura": g.factura,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+        )
 
     return {
         "paciente": glosa.paciente,
@@ -18058,16 +18532,16 @@ def glosas_misma_factura(
 
     items = []
     for g in hermanas:
-        items.append({
-            "id": g.id,
-            "creado_en": (
-                g.creado_en.isoformat() if g.creado_en else None
-            ),
-            "eps": g.eps,
-            "codigo_glosa": g.codigo_glosa,
-            "estado": g.estado,
-            "valor_objetado": float(g.valor_objetado or 0),
-        })
+        items.append(
+            {
+                "id": g.id,
+                "creado_en": (g.creado_en.isoformat() if g.creado_en else None),
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "estado": g.estado,
+                "valor_objetado": float(g.valor_objetado or 0),
+            }
+        )
 
     return {
         "factura": glosa.factura,
@@ -18122,10 +18596,7 @@ def dictamen_similar_anterior(
             "glosa_id_origen": None,
             "dictamen": None,
             "sin_match": True,
-            "razon": (
-                f"No hay glosas LEVANTADAS de eps={glosa.eps} "
-                f"codigo={glosa.codigo_glosa}"
-            ),
+            "razon": (f"No hay glosas LEVANTADAS de eps={glosa.eps} codigo={glosa.codigo_glosa}"),
         }
 
     return {
@@ -18133,8 +18604,7 @@ def dictamen_similar_anterior(
         "dictamen": similar.dictamen,
         "valor_recuperado_origen": float(similar.valor_recuperado or 0),
         "fecha_decision_origen": (
-            similar.fecha_decision_eps.isoformat()
-            if similar.fecha_decision_eps else None
+            similar.fecha_decision_eps.isoformat() if similar.fecha_decision_eps else None
         ),
         "sin_match": False,
     }
@@ -18162,8 +18632,10 @@ def dashboard_glosa(
     from sqlalchemy import func as _f
 
     from app.models.db import (
-        AuditLogRecord, ComentarioGlosaRecord,
-        ConceptoGlosaRecord, ConciliacionRecord,
+        AuditLogRecord,
+        ComentarioGlosaRecord,
+        ConceptoGlosaRecord,
+        ConciliacionRecord,
         DictamenVersionRecord,
     )
 
@@ -18174,38 +18646,41 @@ def dashboard_glosa(
     n_conceptos = (
         db.query(_f.count(ConceptoGlosaRecord.id))
         .filter(ConceptoGlosaRecord.glosa_id == glosa_id)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     n_versiones = (
         db.query(_f.count(DictamenVersionRecord.id))
         .filter(DictamenVersionRecord.glosa_id == glosa_id)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     n_comentarios = (
         db.query(_f.count(ComentarioGlosaRecord.id))
         .filter(ComentarioGlosaRecord.glosa_id == glosa_id)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     menciones_pend = (
         db.query(_f.count(ComentarioGlosaRecord.id))
         .filter(ComentarioGlosaRecord.glosa_id == glosa_id)
         .filter(ComentarioGlosaRecord.mencion.isnot(None))
-        .filter(
-            (ComentarioGlosaRecord.resuelto == 0)
-            | (ComentarioGlosaRecord.resuelto.is_(None))
-        )
-        .scalar() or 0
+        .filter((ComentarioGlosaRecord.resuelto == 0) | (ComentarioGlosaRecord.resuelto.is_(None)))
+        .scalar()
+        or 0
     )
     n_conciliaciones = (
         db.query(_f.count(ConciliacionRecord.id))
         .filter(ConciliacionRecord.glosa_id == glosa_id)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     n_audit = (
         db.query(_f.count(AuditLogRecord.id))
         .filter(AuditLogRecord.tabla == "glosas")
         .filter(AuditLogRecord.registro_id == glosa_id)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     return {
@@ -18255,38 +18730,50 @@ def checklist_pre_envio(
 
     items = []
 
-    items.append({
-        "item": "EPS configurada",
-        "ok": bool(glosa.eps and glosa.eps.strip()),
-    })
-    items.append({
-        "item": "Factura válida (no N/A)",
-        "ok": bool(glosa.factura and glosa.factura != "N/A"),
-    })
-    items.append({
-        "item": "Código glosa configurado",
-        "ok": bool(glosa.codigo_glosa and glosa.codigo_glosa.strip()),
-    })
-    items.append({
-        "item": "Dictamen sólido (>=200 chars)",
-        "ok": bool(glosa.dictamen and len(glosa.dictamen) >= 200),
-    })
-    items.append({
-        "item": "Código respuesta configurado",
-        "ok": bool(
-            glosa.codigo_respuesta and glosa.codigo_respuesta.strip()
-        ),
-    })
-    items.append({
-        "item": "Gestor asignado",
-        "ok": bool(glosa.gestor_nombre),
-    })
+    items.append(
+        {
+            "item": "EPS configurada",
+            "ok": bool(glosa.eps and glosa.eps.strip()),
+        }
+    )
+    items.append(
+        {
+            "item": "Factura válida (no N/A)",
+            "ok": bool(glosa.factura and glosa.factura != "N/A"),
+        }
+    )
+    items.append(
+        {
+            "item": "Código glosa configurado",
+            "ok": bool(glosa.codigo_glosa and glosa.codigo_glosa.strip()),
+        }
+    )
+    items.append(
+        {
+            "item": "Dictamen sólido (>=200 chars)",
+            "ok": bool(glosa.dictamen and len(glosa.dictamen) >= 200),
+        }
+    )
+    items.append(
+        {
+            "item": "Código respuesta configurado",
+            "ok": bool(glosa.codigo_respuesta and glosa.codigo_respuesta.strip()),
+        }
+    )
+    items.append(
+        {
+            "item": "Gestor asignado",
+            "ok": bool(glosa.gestor_nombre),
+        }
+    )
     dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
-    items.append({
-        "item": "No vencida",
-        "ok": dr >= 0,
-        "detalle": f"dias_restantes={dr}",
-    })
+    items.append(
+        {
+            "item": "No vencida",
+            "ok": dr >= 0,
+            "detalle": f"dias_restantes={dr}",
+        }
+    )
 
     todos_ok = all(it["ok"] for it in items)
     faltantes = [it["item"] for it in items if not it["ok"]]
@@ -18336,27 +18823,24 @@ def conciliaciones_resumen(
     )
 
     CERRADAS = {"ACTA_FIRMADA", "CERRADA"}
-    en_curso = sum(
-        1 for c in conciliaciones
-        if (c.estado_bilateral or "") not in CERRADAS
-    )
-    valor_total = sum(
-        float(c.valor_conciliado or 0) for c in conciliaciones
-    )
+    en_curso = sum(1 for c in conciliaciones if (c.estado_bilateral or "") not in CERRADAS)
+    valor_total = sum(float(c.valor_conciliado or 0) for c in conciliaciones)
 
     items = []
     for c in conciliaciones[:20]:
         cre = c.creado_en
         if cre and cre.tzinfo is None:
             cre = cre.replace(tzinfo=timezone.utc)
-        items.append({
-            "id": c.id,
-            "creado_en": cre.isoformat() if cre else None,
-            "estado_bilateral": c.estado_bilateral,
-            "resultado": c.resultado,
-            "valor_conciliado": float(c.valor_conciliado or 0),
-            "acta_numero": c.acta_numero,
-        })
+        items.append(
+            {
+                "id": c.id,
+                "creado_en": cre.isoformat() if cre else None,
+                "estado_bilateral": c.estado_bilateral,
+                "resultado": c.resultado,
+                "valor_conciliado": float(c.valor_conciliado or 0),
+                "acta_numero": c.acta_numero,
+            }
+        )
 
     return {
         "glosa_id": glosa_id,
@@ -18454,21 +18938,16 @@ def score_defensa(
             .all()
         )
         decididas = [
-            g for g in misma_eps
-            if (g.estado or "").upper() in
-            {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+            g
+            for g in misma_eps
+            if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
         ]
-        levantadas = [
-            g for g in decididas
-            if (g.estado or "").upper() == "LEVANTADA"
-        ]
+        levantadas = [g for g in decididas if (g.estado or "").upper() == "LEVANTADA"]
         if decididas:
             tasa = 100 * len(levantadas) / len(decididas)
             if tasa > 60:
                 score += 1
-                razones.append(
-                    f"EPS con buena tasa histórica ({tasa:.0f}%)"
-                )
+                razones.append(f"EPS con buena tasa histórica ({tasa:.0f}%)")
 
     if glosa.codigo_glosa:
         mismo_cod = (
@@ -18479,35 +18958,27 @@ def score_defensa(
             .all()
         )
         decididas = [
-            g for g in mismo_cod
-            if (g.estado or "").upper() in
-            {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+            g
+            for g in mismo_cod
+            if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
         ]
-        levantadas = [
-            g for g in decididas
-            if (g.estado or "").upper() == "LEVANTADA"
-        ]
+        levantadas = [g for g in decididas if (g.estado or "").upper() == "LEVANTADA"]
         if decididas:
             tasa = 100 * len(levantadas) / len(decididas)
             if tasa > 60:
                 score += 1
                 razones.append(
-                    f"Código {glosa.codigo_glosa} con buena tasa "
-                    f"histórica ({tasa:.0f}%)"
+                    f"Código {glosa.codigo_glosa} con buena tasa histórica ({tasa:.0f}%)"
                 )
 
     if glosa.dictamen and len(glosa.dictamen) > 200:
         score += 1
-        razones.append(
-            f"Dictamen sólido ({len(glosa.dictamen)} chars)"
-        )
+        razones.append(f"Dictamen sólido ({len(glosa.dictamen)} chars)")
 
     EFECTIVOS = {"RE9501", "RE9502", "RE9602", "RE9901", "RE9601"}
     if glosa.codigo_respuesta in EFECTIVOS:
         score += 1
-        razones.append(
-            f"Código respuesta {glosa.codigo_respuesta} es de defensa"
-        )
+        razones.append(f"Código respuesta {glosa.codigo_respuesta} es de defensa")
 
     dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
     if dr < 0:
@@ -18618,11 +19089,7 @@ def conceptos_resumen(
     if not glosa:
         raise HTTPException(404, "Glosa no encontrada")
 
-    conceptos = (
-        db.query(ConceptoGlosaRecord)
-        .filter(ConceptoGlosaRecord.glosa_id == glosa_id)
-        .all()
-    )
+    conceptos = db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.glosa_id == glosa_id).all()
 
     if not conceptos:
         return {
@@ -18636,18 +19103,13 @@ def conceptos_resumen(
         }
 
     valor_total = sum(float(c.valor_objetado or 0) for c in conceptos)
-    respondidos = sum(
-        1 for c in conceptos
-        if c.dictamen_html and len(c.dictamen_html) > 50
-    )
+    respondidos = sum(1 for c in conceptos if c.dictamen_html and len(c.dictamen_html) > 50)
 
     por_codigo: dict[str, int] = {}
     centros: set[str] = set()
     for c in conceptos:
         if c.codigo_glosa:
-            por_codigo[c.codigo_glosa] = (
-                por_codigo.get(c.codigo_glosa, 0) + 1
-            )
+            por_codigo[c.codigo_glosa] = por_codigo.get(c.codigo_glosa, 0) + 1
         if c.centro_costo:
             centros.add(c.centro_costo)
 
@@ -18697,9 +19159,7 @@ def historial_workflow(
 
     items = [
         {
-            "timestamp": (
-                e.timestamp.isoformat() if e.timestamp else None
-            ),
+            "timestamp": (e.timestamp.isoformat() if e.timestamp else None),
             "usuario": e.usuario_email,
             "campo": e.campo,
             "valor_anterior": e.valor_anterior,
@@ -18764,8 +19224,7 @@ def comparar_con_promedio(
         return {
             "glosa_id": glosa_id,
             "razon_no_evaluable": (
-                f"No hay otras glosas con eps={glosa.eps} y "
-                f"codigo={glosa.codigo_glosa}"
+                f"No hay otras glosas con eps={glosa.eps} y codigo={glosa.codigo_glosa}"
             ),
         }
 
@@ -18780,27 +19239,20 @@ def comparar_con_promedio(
         valor_mediano = valores[n // 2]
 
     decididas = [
-        g for g in cohorte
-        if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA",
-                                         "RATIFICADA"}
+        g for g in cohorte if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
     ]
-    levantadas = [
-        g for g in decididas
-        if (g.estado or "").upper() == "LEVANTADA"
-    ]
-    tasa = (
-        round(100 * len(levantadas) / len(decididas), 2)
-        if decididas else 0.0
-    )
+    levantadas = [g for g in decididas if (g.estado or "").upper() == "LEVANTADA"]
+    tasa = round(100 * len(levantadas) / len(decididas), 2) if decididas else 0.0
 
     # Percentil aproximado
     menores = sum(1 for v in valores if v < valor_glosa)
     percentil = round(100 * menores / n, 1)
 
     valor_atipico = (
-        valor_glosa > 3 * valor_promedio
-        or valor_glosa < valor_promedio / 5
-    ) if valor_promedio > 0 else False
+        (valor_glosa > 3 * valor_promedio or valor_glosa < valor_promedio / 5)
+        if valor_promedio > 0
+        else False
+    )
 
     return {
         "glosa_id": glosa_id,
@@ -18819,8 +19271,11 @@ def comparar_con_promedio(
         "posicion": {
             "percentil_valor": percentil,
             "ratio_vs_promedio": round(
-                valor_glosa / valor_promedio, 2,
-            ) if valor_promedio else None,
+                valor_glosa / valor_promedio,
+                2,
+            )
+            if valor_promedio
+            else None,
         },
         "flags": {
             "valor_atipico": valor_atipico,
@@ -18858,11 +19313,13 @@ def recomendaciones_glosa(
     recomendaciones = []
 
     if cerrada:
-        recomendaciones.append({
-            "prioridad": "INFO",
-            "accion": "ARCHIVAR",
-            "descripcion": "Glosa cerrada — sin acciones pendientes.",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "INFO",
+                "accion": "ARCHIVAR",
+                "descripcion": "Glosa cerrada — sin acciones pendientes.",
+            }
+        )
         return {
             "glosa_id": glosa_id,
             "total": len(recomendaciones),
@@ -18872,66 +19329,82 @@ def recomendaciones_glosa(
     # ── Reglas críticas ───────────────────────────────────────
     dr = glosa.dias_restantes if glosa.dias_restantes is not None else 0
     if dr < 0:
-        recomendaciones.append({
-            "prioridad": "HIGH",
-            "accion": "ATENDER_VENCIDA",
-            "descripcion": (
-                f"Glosa vencida hace {abs(dr)} días. Responder "
-                "urgentemente para evitar ratificación automática."
-            ),
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "HIGH",
+                "accion": "ATENDER_VENCIDA",
+                "descripcion": (
+                    f"Glosa vencida hace {abs(dr)} días. Responder "
+                    "urgentemente para evitar ratificación automática."
+                ),
+            }
+        )
     elif dr <= 3:
-        recomendaciones.append({
-            "prioridad": "HIGH",
-            "accion": "ATENDER_CRITICA",
-            "descripcion": f"Faltan {dr} días para vencimiento.",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "HIGH",
+                "accion": "ATENDER_CRITICA",
+                "descripcion": f"Faltan {dr} días para vencimiento.",
+            }
+        )
 
     if not glosa.dictamen or len(glosa.dictamen) < 50:
-        recomendaciones.append({
-            "prioridad": "HIGH",
-            "accion": "GENERAR_DICTAMEN",
-            "descripcion": "No hay dictamen generado. Usar IA para crear uno.",
-            "endpoint": f"POST /glosas/{glosa_id}/refinar",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "HIGH",
+                "accion": "GENERAR_DICTAMEN",
+                "descripcion": "No hay dictamen generado. Usar IA para crear uno.",
+                "endpoint": f"POST /glosas/{glosa_id}/refinar",
+            }
+        )
 
     # ── Reglas medias ─────────────────────────────────────────
     if not glosa.gestor_nombre:
-        recomendaciones.append({
-            "prioridad": "MEDIUM",
-            "accion": "ASIGNAR_GESTOR",
-            "descripcion": "Glosa sin gestor asignado.",
-            "endpoint": f"PATCH /glosas/{glosa_id}/asignar",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "MEDIUM",
+                "accion": "ASIGNAR_GESTOR",
+                "descripcion": "Glosa sin gestor asignado.",
+                "endpoint": f"PATCH /glosas/{glosa_id}/asignar",
+            }
+        )
 
     if not glosa.factura or glosa.factura == "N/A":
-        recomendaciones.append({
-            "prioridad": "MEDIUM",
-            "accion": "COMPLETAR_FACTURA",
-            "descripcion": "Falta número de factura.",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "MEDIUM",
+                "accion": "COMPLETAR_FACTURA",
+                "descripcion": "Falta número de factura.",
+            }
+        )
 
     if not glosa.texto_glosa_original:
-        recomendaciones.append({
-            "prioridad": "MEDIUM",
-            "accion": "CAPTURAR_TEXTO_ORIGINAL",
-            "descripcion": "Sin texto original — el contexto IA será débil.",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "MEDIUM",
+                "accion": "CAPTURAR_TEXTO_ORIGINAL",
+                "descripcion": "Sin texto original — el contexto IA será débil.",
+            }
+        )
 
     # ── Reglas bajas ──────────────────────────────────────────
     if not glosa.cups_servicio:
-        recomendaciones.append({
-            "prioridad": "LOW",
-            "accion": "AGREGAR_CUPS",
-            "descripcion": "Sin código CUPS — útil para validación normativa.",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "LOW",
+                "accion": "AGREGAR_CUPS",
+                "descripcion": "Sin código CUPS — útil para validación normativa.",
+            }
+        )
 
     if not recomendaciones:
-        recomendaciones.append({
-            "prioridad": "INFO",
-            "accion": "MONITOREAR",
-            "descripcion": "Glosa en buen estado — esperar respuesta EPS.",
-        })
+        recomendaciones.append(
+            {
+                "prioridad": "INFO",
+                "accion": "MONITOREAR",
+                "descripcion": "Glosa en buen estado — esperar respuesta EPS.",
+            }
+        )
 
     return {
         "glosa_id": glosa_id,
@@ -18967,7 +19440,11 @@ def resumen_pdf_glosa(
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import (
-        Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
     )
     from reportlab.lib import colors
     from reportlab.lib.units import inch
@@ -18978,18 +19455,23 @@ def resumen_pdf_glosa(
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
-        buf, pagesize=letter,
-        leftMargin=0.5 * inch, rightMargin=0.5 * inch,
-        topMargin=0.5 * inch, bottomMargin=0.5 * inch,
+        buf,
+        pagesize=letter,
+        leftMargin=0.5 * inch,
+        rightMargin=0.5 * inch,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
     )
     styles = getSampleStyleSheet()
     story = []
 
     # Header
-    story.append(Paragraph(
-        f"<b>RESUMEN GLOSA #{glosa_id} — HUS</b>",
-        styles["Title"],
-    ))
+    story.append(
+        Paragraph(
+            f"<b>RESUMEN GLOSA #{glosa_id} — HUS</b>",
+            styles["Title"],
+        )
+    )
     story.append(Spacer(1, 0.2 * inch))
 
     # Datos clave (tabla)
@@ -19008,16 +19490,20 @@ def resumen_pdf_glosa(
         ["Decisión EPS", glosa.decision_eps or "Pendiente"],
     ]
     tabla = Table(datos, colWidths=[2.2 * inch, 4.5 * inch])
-    tabla.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#0B5D8A")),
-        ("TEXTCOLOR", (0, 0), (0, -1), colors.white),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("PADDING", (0, 0), (-1, -1), 6),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-    ]))
+    tabla.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#0B5D8A")),
+                ("TEXTCOLOR", (0, 0), (0, -1), colors.white),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("PADDING", (0, 0), (-1, -1), 6),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ]
+        )
+    )
     story.append(tabla)
     story.append(Spacer(1, 0.3 * inch))
 
@@ -19026,6 +19512,7 @@ def resumen_pdf_glosa(
         story.append(Paragraph("<b>Dictamen HUS:</b>", styles["Heading3"]))
         # Limpiar HTML básico
         import re
+
         texto_dict = re.sub(r"<[^>]+>", " ", glosa.dictamen)
         texto_dict = re.sub(r"\s+", " ", texto_dict).strip()
         story.append(Paragraph(texto_dict[:1500], styles["BodyText"]))
@@ -19033,10 +19520,12 @@ def resumen_pdf_glosa(
 
     # Footer
     story.append(Spacer(1, 0.3 * inch))
-    story.append(Paragraph(
-        f"<i>Generado por {current_user.email} el {ahora_utc().strftime('%Y-%m-%d %H:%M UTC')}</i>",
-        styles["BodyText"],
-    ))
+    story.append(
+        Paragraph(
+            f"<i>Generado por {current_user.email} el {ahora_utc().strftime('%Y-%m-%d %H:%M UTC')}</i>",
+            styles["BodyText"],
+        )
+    )
 
     doc.build(story)
     buf.seek(0)
@@ -19096,8 +19585,7 @@ def exportar_evidencia_zip(
         "gestor_nombre": glosa.gestor_nombre,
         "auditor_email": glosa.auditor_email,
         "fecha_vencimiento": (
-            glosa.fecha_vencimiento.isoformat()
-            if glosa.fecha_vencimiento else None
+            glosa.fecha_vencimiento.isoformat() if glosa.fecha_vencimiento else None
         ),
     }
 
@@ -19135,10 +19623,8 @@ def exportar_evidencia_zip(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("README.txt", readme)
-        zf.writestr("glosa.json",
-                    json.dumps(glosa_dict, ensure_ascii=False, indent=2))
-        zf.writestr("audit_log.json",
-                    json.dumps(audit_list, ensure_ascii=False, indent=2))
+        zf.writestr("glosa.json", json.dumps(glosa_dict, ensure_ascii=False, indent=2))
+        zf.writestr("audit_log.json", json.dumps(audit_list, ensure_ascii=False, indent=2))
         if glosa.dictamen:
             zf.writestr("dictamen.txt", glosa.dictamen)
 
@@ -19207,15 +19693,15 @@ def duplicados_potenciales_glosa(
             diff_pct = abs(v - valor_origen) / max(v, valor_origen) * 100
             score = round(max(0, 100 - diff_pct), 2)
 
-        items.append({
-            "id": c.id,
-            "creado_en": (
-                c.creado_en.isoformat() if c.creado_en else None
-            ),
-            "valor_objetado": v,
-            "estado": c.estado,
-            "score_similitud": score,
-        })
+        items.append(
+            {
+                "id": c.id,
+                "creado_en": (c.creado_en.isoformat() if c.creado_en else None),
+                "valor_objetado": v,
+                "estado": c.estado,
+                "score_similitud": score,
+            }
+        )
 
     items.sort(key=lambda x: x["score_similitud"], reverse=True)
 
@@ -19335,19 +19821,25 @@ def diff_entre_glosas(
         raise HTTPException(404, f"Glosa {otra_id} no encontrada")
 
     CAMPOS = [
-        "eps", "paciente", "factura", "codigo_glosa",
-        "valor_objetado", "valor_aceptado", "valor_recuperado",
-        "etapa", "estado", "decision_eps",
-        "gestor_nombre", "cups_servicio", "codigo_respuesta",
+        "eps",
+        "paciente",
+        "factura",
+        "codigo_glosa",
+        "valor_objetado",
+        "valor_aceptado",
+        "valor_recuperado",
+        "etapa",
+        "estado",
+        "decision_eps",
+        "gestor_nombre",
+        "cups_servicio",
+        "codigo_respuesta",
     ]
 
     snapshot1 = {c: getattr(g1, c, None) for c in CAMPOS}
     snapshot2 = {c: getattr(g2, c, None) for c in CAMPOS}
 
-    diferentes = sorted(
-        c for c in CAMPOS
-        if snapshot1.get(c) != snapshot2.get(c)
-    )
+    diferentes = sorted(c for c in CAMPOS if snapshot1.get(c) != snapshot2.get(c))
 
     # Casteamos floats para serialización JSON consistente
     def _normalizar(d: dict) -> dict:
@@ -19410,9 +19902,7 @@ def sla_glosa(
     if dec and dec.tzinfo is None:
         dec = dec.replace(tzinfo=timezone.utc)
 
-    dias_transcurridos = (
-        (ahora - creado).days if creado else None
-    )
+    dias_transcurridos = (ahora - creado).days if creado else None
 
     tiempo_total = None
     if cerrada and dec and creado:
@@ -19515,8 +20005,7 @@ def borrador_respuesta(
         "borrador_disponible": True,
         "fuente_caso_id": candidato.id,
         "fuente_fecha_decision": (
-            candidato.fecha_decision_eps.isoformat()
-            if candidato.fecha_decision_eps else None
+            candidato.fecha_decision_eps.isoformat() if candidato.fecha_decision_eps else None
         ),
         "fuente_resultado": "LEVANTADA",
         "borrador": texto,
@@ -19556,9 +20045,7 @@ def playbook_glosa(
         .all()
     )
     n_par = len(pares)
-    lev_par = sum(
-        1 for g in pares if (g.estado or "").upper() == "LEVANTADA"
-    )
+    lev_par = sum(1 for g in pares if (g.estado or "").upper() == "LEVANTADA")
     tasa_par = (100.0 * lev_par / n_par) if n_par else None
 
     eps_q = (
@@ -19569,62 +20056,37 @@ def playbook_glosa(
         .all()
     )
     n_eps = len(eps_q)
-    lev_eps = sum(
-        1 for g in eps_q if (g.estado or "").upper() == "LEVANTADA"
-    )
+    lev_eps = sum(1 for g in eps_q if (g.estado or "").upper() == "LEVANTADA")
     tasa_eps_global = (100.0 * lev_eps / n_eps) if n_eps else None
 
     # Tono
     if tasa_par is not None and tasa_par >= 70:
         tono = "conciliador"
         tono_motivo = (
-            "Históricamente esta EPS levanta este código — "
-            "tono profesional y directo basta."
+            "Históricamente esta EPS levanta este código — tono profesional y directo basta."
         )
     elif tasa_par is not None and tasa_par <= 30:
         tono = "firme"
-        tono_motivo = (
-            "Histórico desfavorable — argumenta con técnica "
-            "fuerte y respaldo normativo."
-        )
+        tono_motivo = "Histórico desfavorable — argumenta con técnica fuerte y respaldo normativo."
     else:
         tono = "neutral"
-        tono_motivo = (
-            "Sin patrón claro — defensa técnico-jurídica "
-            "estándar."
-        )
+        tono_motivo = "Sin patrón claro — defensa técnico-jurídica estándar."
 
     # Próximo paso
     dr = glosa.dias_restantes if glosa.dias_restantes is not None else None
     estado_actual = (glosa.estado or "").upper()
-    if estado_actual in ("LEVANTADA", "ACEPTADA", "RATIFICADA",
-                         "ARCHIVADA", "CONCILIADA"):
+    if estado_actual in ("LEVANTADA", "ACEPTADA", "RATIFICADA", "ARCHIVADA", "CONCILIADA"):
         proximo = "Glosa cerrada — solo lectura"
     elif estado_actual == "RESPONDIDA":
-        proximo = (
-            "Esperando decisión de EPS — monitorear "
-            "fecha_decision_eps"
-        )
+        proximo = "Esperando decisión de EPS — monitorear fecha_decision_eps"
     elif dr is not None and dr < 0:
-        proximo = (
-            "URGENTE: glosa vencida. Ejecutar respuesta "
-            "definitiva HOY o se archiva."
-        )
+        proximo = "URGENTE: glosa vencida. Ejecutar respuesta definitiva HOY o se archiva."
     elif dr is not None and dr <= 3:
-        proximo = (
-            "Crítico (≤3 días): redactar dictamen y enviar "
-            "respuesta antes de cierre."
-        )
+        proximo = "Crítico (≤3 días): redactar dictamen y enviar respuesta antes de cierre."
     elif not (glosa.dictamen or "").strip():
-        proximo = (
-            "Redactar dictamen técnico-jurídico — comienza "
-            "revisando casos similares."
-        )
+        proximo = "Redactar dictamen técnico-jurídico — comienza revisando casos similares."
     elif len(glosa.dictamen or "") < 200:
-        proximo = (
-            "Reforzar dictamen actual con normativa "
-            "específica antes de enviar."
-        )
+        proximo = "Reforzar dictamen actual con normativa específica antes de enviar."
     else:
         proximo = "Revisar dictamen y enviar respuesta a EPS."
 
@@ -19657,31 +20119,23 @@ def playbook_glosa(
 
     # Recomendaciones
     recomendaciones = []
-    if (
-        tasa_par is not None and tasa_par >= 60
-        and not (glosa.dictamen or "").strip()
-    ):
+    if tasa_par is not None and tasa_par >= 60 and not (glosa.dictamen or "").strip():
         recomendaciones.append(
-            "🎯 Caso favorable según histórico: redactar "
-            "dictamen y cerrar pronto."
+            "🎯 Caso favorable según histórico: redactar dictamen y cerrar pronto."
         )
     if valor >= 10_000_000 and not (glosa.dictamen or "").strip():
         recomendaciones.append(
-            "💰 Alto valor sin dictamen — enfoque cuidadoso "
-            "en respaldo normativo."
+            "💰 Alto valor sin dictamen — enfoque cuidadoso en respaldo normativo."
         )
     if dr is not None and dr < 0:
-        recomendaciones.append(
-            "🚨 Vencida — riesgo de archivo automático."
-        )
+        recomendaciones.append("🚨 Vencida — riesgo de archivo automático.")
     if (
-        tasa_par is not None and tasa_par < 30
-        and tasa_eps_global is not None and tasa_eps_global < 30
+        tasa_par is not None
+        and tasa_par < 30
+        and tasa_eps_global is not None
+        and tasa_eps_global < 30
     ):
-        recomendaciones.append(
-            "🤝 Considera conciliación bilateral antes de "
-            "ratificación."
-        )
+        recomendaciones.append("🤝 Considera conciliación bilateral antes de ratificación.")
 
     return {
         "glosa_id": glosa.id,
@@ -19696,13 +20150,8 @@ def playbook_glosa(
             "score": riesgo_score,
             "razones": razones_riesgo,
         },
-        "tasa_par_pct": (
-            round(tasa_par, 2) if tasa_par is not None else None
-        ),
-        "tasa_eps_global_pct": (
-            round(tasa_eps_global, 2)
-            if tasa_eps_global is not None else None
-        ),
+        "tasa_par_pct": (round(tasa_par, 2) if tasa_par is not None else None),
+        "tasa_eps_global_pct": (round(tasa_eps_global, 2) if tasa_eps_global is not None else None),
         "n_par": n_par,
         "n_eps_global": n_eps,
         "recomendaciones": recomendaciones,
@@ -19756,10 +20205,7 @@ def eps_comportamiento(
 
     decididas = [g for g in rows if (g.estado or "").upper() in ESTADOS_DECIDIDOS]
     n_dec = len(decididas)
-    n_lev = sum(
-        1 for g in decididas
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
+    n_lev = sum(1 for g in decididas if (g.estado or "").upper() == "LEVANTADA")
     tasa_lev = round(100 * n_lev / n_dec, 2) if n_dec else 0.0
 
     # Tiempo promedio de decisión
@@ -19784,7 +20230,9 @@ def eps_comportamiento(
         if c:
             codigos[c] = codigos.get(c, 0) + 1
     top_codigos = sorted(
-        codigos.items(), key=lambda x: x[1], reverse=True,
+        codigos.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
 
     # Top códigos respuesta cuando HUS responde
@@ -19794,7 +20242,9 @@ def eps_comportamiento(
         if cr:
             cresp[cr] = cresp.get(cr, 0) + 1
     top_cresp = sorted(
-        cresp.items(), key=lambda x: x[1], reverse=True,
+        cresp.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:3]
 
     # Estilo: combina tasa + tiempo
@@ -19824,12 +20274,8 @@ def eps_comportamiento(
         "n_decididas": n_dec,
         "tasa_levantamiento_global_pct": tasa_lev,
         "tiempo_promedio_decision_dias": tiempo_prom,
-        "codigos_top_3": [
-            {"codigo_glosa": c, "count": n} for c, n in top_codigos
-        ],
-        "codigos_respuesta_top_3": [
-            {"codigo_respuesta": c, "count": n} for c, n in top_cresp
-        ],
+        "codigos_top_3": [{"codigo_glosa": c, "count": n} for c, n in top_codigos],
+        "codigos_respuesta_top_3": [{"codigo_respuesta": c, "count": n} for c, n in top_cresp],
         "estilo_resumen": estilo,
     }
 
@@ -19872,9 +20318,7 @@ def asistente_ficha(
         .all()
     )
     n_par = len(pares)
-    lev_par = sum(
-        1 for g in pares if (g.estado or "").upper() == "LEVANTADA"
-    )
+    lev_par = sum(1 for g in pares if (g.estado or "").upper() == "LEVANTADA")
     tasa_par = round(100 * lev_par / n_par, 2) if n_par else None
 
     tasa_gestor = None
@@ -19888,12 +20332,8 @@ def asistente_ficha(
             .all()
         )
         n_gestor = len(gpQ)
-        lev_g = sum(
-            1 for g in gpQ if (g.estado or "").upper() == "LEVANTADA"
-        )
-        tasa_gestor = (
-            round(100 * lev_g / n_gestor, 2) if n_gestor else None
-        )
+        lev_g = sum(1 for g in gpQ if (g.estado or "").upper() == "LEVANTADA")
+        tasa_gestor = round(100 * lev_g / n_gestor, 2) if n_gestor else None
 
     if tasa_par is not None and tasa_gestor is not None:
         prob = round(tasa_par * 0.6 + tasa_gestor * 0.4, 2)
@@ -19918,15 +20358,15 @@ def asistente_ficha(
     )
     for c in casos_q:
         d = c.dictamen or ""
-        casos.append({
-            "glosa_id": c.id,
-            "estado": c.estado,
-            "valor_objetado": int(float(c.valor_objetado or 0)),
-            "valor_recuperado": int(float(c.valor_recuperado or 0)),
-            "dictamen_extracto": (
-                d[:160] + ("…" if len(d) > 160 else "")
-            ),
-        })
+        casos.append(
+            {
+                "glosa_id": c.id,
+                "estado": c.estado,
+                "valor_objetado": int(float(c.valor_objetado or 0)),
+                "valor_recuperado": int(float(c.valor_recuperado or 0)),
+                "dictamen_extracto": (d[:160] + ("…" if len(d) > 160 else "")),
+            }
+        )
 
     # ─── codigo_respuesta sugerido (mejor tasa en el par) ─────
     cr_bucket: dict[str, dict] = {}
@@ -19958,8 +20398,7 @@ def asistente_ficha(
     alerta_dictamen = None
     if dlen == 0:
         alerta_dictamen = (
-            "No has escrito dictamen. "
-            "Considera mirar los casos similares antes de redactar."
+            "No has escrito dictamen. Considera mirar los casos similares antes de redactar."
         )
     elif dlen < 50:
         alerta_dictamen = (
@@ -19971,22 +20410,13 @@ def asistente_ficha(
     factura_ctx = None
     f = (glosa.factura or "").strip()
     if f and f != "N/A":
-        hermanas = (
-            db.query(GlosaRecord)
-            .filter(GlosaRecord.factura == f)
-            .all()
-        )
-        abiertas_h = sum(
-            1 for g in hermanas
-            if (g.estado or "").upper() not in ESTADOS_CERRADOS
-        )
+        hermanas = db.query(GlosaRecord).filter(GlosaRecord.factura == f).all()
+        abiertas_h = sum(1 for g in hermanas if (g.estado or "").upper() not in ESTADOS_CERRADOS)
         factura_ctx = {
             "factura": f,
             "total_glosas_factura": len(hermanas),
             "glosas_abiertas": abiertas_h,
-            "valor_objetado_total": int(sum(
-                float(g.valor_objetado or 0) for g in hermanas
-            )),
+            "valor_objetado_total": int(sum(float(g.valor_objetado or 0) for g in hermanas)),
         }
 
     # ─── Urgencia ─────
@@ -20002,69 +20432,84 @@ def asistente_ficha(
         urgencia = {"nivel": "HOY", "mensaje": "Vence hoy"}
     elif dr <= 3:
         urgencia = {
-            "nivel": "CRITICA", "mensaje": f"Vence en {dr} días",
+            "nivel": "CRITICA",
+            "mensaje": f"Vence en {dr} días",
         }
     elif dr <= 7:
         urgencia = {
-            "nivel": "PROXIMA", "mensaje": f"Vence en {dr} días",
+            "nivel": "PROXIMA",
+            "mensaje": f"Vence en {dr} días",
         }
     else:
         urgencia = {
-            "nivel": "NORMAL", "mensaje": f"Vence en {dr} días",
+            "nivel": "NORMAL",
+            "mensaje": f"Vence en {dr} días",
         }
 
     # ─── Acciones sugeridas (priorizadas) ─────
     acciones = []
     if (glosa.estado or "").upper() in ESTADOS_CERRADOS:
-        acciones.append({
-            "prioridad": 1,
-            "tipo": "INFO",
-            "mensaje": "Esta glosa ya está cerrada — solo lectura",
-        })
+        acciones.append(
+            {
+                "prioridad": 1,
+                "tipo": "INFO",
+                "mensaje": "Esta glosa ya está cerrada — solo lectura",
+            }
+        )
     else:
         if dr is not None and dr < 0:
-            acciones.append({
-                "prioridad": 1, "tipo": "URGENTE",
-                "mensaje": (
-                    f"Glosa vencida hace {abs(dr)}d. Cierra hoy."
-                ),
-            })
+            acciones.append(
+                {
+                    "prioridad": 1,
+                    "tipo": "URGENTE",
+                    "mensaje": (f"Glosa vencida hace {abs(dr)}d. Cierra hoy."),
+                }
+            )
         elif dr is not None and dr <= 3:
-            acciones.append({
-                "prioridad": 1, "tipo": "IMPORTANTE",
-                "mensaje": f"Vence en {dr}d — atender hoy",
-            })
+            acciones.append(
+                {
+                    "prioridad": 1,
+                    "tipo": "IMPORTANTE",
+                    "mensaje": f"Vence en {dr}d — atender hoy",
+                }
+            )
         if alerta_dictamen:
-            acciones.append({
-                "prioridad": 2, "tipo": "DICTAMEN",
-                "mensaje": alerta_dictamen,
-            })
+            acciones.append(
+                {
+                    "prioridad": 2,
+                    "tipo": "DICTAMEN",
+                    "mensaje": alerta_dictamen,
+                }
+            )
         if cr_sugerido:
-            acciones.append({
-                "prioridad": 3, "tipo": "SUGERENCIA",
-                "mensaje": (
-                    f"Considera responder con "
-                    f"{cr_sugerido['codigo_respuesta']} — "
-                    f"{cr_sugerido['tasa_levantamiento_pct']}% de "
-                    "éxito en casos iguales"
-                ),
-            })
+            acciones.append(
+                {
+                    "prioridad": 3,
+                    "tipo": "SUGERENCIA",
+                    "mensaje": (
+                        f"Considera responder con "
+                        f"{cr_sugerido['codigo_respuesta']} — "
+                        f"{cr_sugerido['tasa_levantamiento_pct']}% de "
+                        "éxito en casos iguales"
+                    ),
+                }
+            )
         if prob is not None and prob >= 70:
-            acciones.append({
-                "prioridad": 4, "tipo": "POSITIVA",
-                "mensaje": (
-                    f"Alta probabilidad de levantamiento ({prob}%) — "
-                    "vale el esfuerzo"
-                ),
-            })
+            acciones.append(
+                {
+                    "prioridad": 4,
+                    "tipo": "POSITIVA",
+                    "mensaje": (f"Alta probabilidad de levantamiento ({prob}%) — vale el esfuerzo"),
+                }
+            )
         elif prob is not None and prob < 30:
-            acciones.append({
-                "prioridad": 4, "tipo": "PRECAUCION",
-                "mensaje": (
-                    f"Baja probabilidad histórica ({prob}%) — "
-                    "considera conciliar"
-                ),
-            })
+            acciones.append(
+                {
+                    "prioridad": 4,
+                    "tipo": "PRECAUCION",
+                    "mensaje": (f"Baja probabilidad histórica ({prob}%) — considera conciliar"),
+                }
+            )
 
     return {
         "glosa_id": glosa.id,
@@ -20113,9 +20558,11 @@ def casos_similares_resueltos(
         .filter(GlosaRecord.eps == glosa.eps)
         .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
         .filter(GlosaRecord.id != glosa.id)
-        .filter(GlosaRecord.estado.in_(
-            ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-        ))
+        .filter(
+            GlosaRecord.estado.in_(
+                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+            )
+        )
         .order_by(GlosaRecord.fecha_decision_eps.desc())
         .limit(int(limit))
         .all()
@@ -20125,17 +20572,18 @@ def casos_similares_resueltos(
     for g in rows:
         d = g.dictamen or ""
         extracto = d[:200] + ("..." if len(d) > 200 else "")
-        items.append({
-            "glosa_id": g.id,
-            "estado": g.estado,
-            "valor_objetado": int(float(g.valor_objetado or 0)),
-            "valor_recuperado": int(float(g.valor_recuperado or 0)),
-            "dictamen_extracto": extracto,
-            "fecha_decision_eps": (
-                g.fecha_decision_eps.isoformat()
-                if g.fecha_decision_eps else None
-            ),
-        })
+        items.append(
+            {
+                "glosa_id": g.id,
+                "estado": g.estado,
+                "valor_objetado": int(float(g.valor_objetado or 0)),
+                "valor_recuperado": int(float(g.valor_recuperado or 0)),
+                "dictamen_extracto": extracto,
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
+                ),
+            }
+        )
 
     return {
         "glosa_id": glosa.id,
@@ -20182,10 +20630,7 @@ def probabilidad_levantamiento(
         .all()
     )
     n_par = len(par_query)
-    lev_par = sum(
-        1 for g in par_query
-        if (g.estado or "").upper() == "LEVANTADA"
-    )
+    lev_par = sum(1 for g in par_query if (g.estado or "").upper() == "LEVANTADA")
     tasa_par = round(100 * lev_par / n_par, 2) if n_par else None
 
     # tasa gestor
@@ -20200,13 +20645,8 @@ def probabilidad_levantamiento(
             .all()
         )
         n_gestor = len(gest_query)
-        lev_gestor = sum(
-            1 for g in gest_query
-            if (g.estado or "").upper() == "LEVANTADA"
-        )
-        tasa_gestor = (
-            round(100 * lev_gestor / n_gestor, 2) if n_gestor else None
-        )
+        lev_gestor = sum(1 for g in gest_query if (g.estado or "").upper() == "LEVANTADA")
+        tasa_gestor = round(100 * lev_gestor / n_gestor, 2) if n_gestor else None
 
     if tasa_par is not None and tasa_gestor is not None:
         prob = round(tasa_par * 0.6 + tasa_gestor * 0.4, 2)
@@ -20255,11 +20695,7 @@ def contexto_cartera_glosa(
 
     factura = (glosa.factura or "").strip()
     if factura and factura != "N/A":
-        otras = (
-            db.query(GlosaRecord)
-            .filter(GlosaRecord.factura == factura)
-            .all()
-        )
+        otras = db.query(GlosaRecord).filter(GlosaRecord.factura == factura).all()
         count_factura = len(otras)
         obj_factura = sum(float(g.valor_objetado or 0) for g in otras)
         obj_abierto = sum(
@@ -20270,11 +20706,7 @@ def contexto_cartera_glosa(
     else:
         count_factura = 1
         obj_factura = float(glosa.valor_objetado or 0)
-        obj_abierto = (
-            obj_factura
-            if (glosa.estado or "").upper() not in ESTADOS_CERRADOS
-            else 0.0
-        )
+        obj_abierto = obj_factura if (glosa.estado or "").upper() not in ESTADOS_CERRADOS else 0.0
 
     return {
         "glosa_id": glosa.id,
@@ -20353,12 +20785,8 @@ def audit_resumen_glosa(
     return {
         "glosa_id": glosa_id,
         "total_cambios": total,
-        "primer_cambio_en": (
-            min(timestamps).isoformat() if timestamps else None
-        ),
-        "ultimo_cambio_en": (
-            max(timestamps).isoformat() if timestamps else None
-        ),
+        "primer_cambio_en": (min(timestamps).isoformat() if timestamps else None),
+        "ultimo_cambio_en": (max(timestamps).isoformat() if timestamps else None),
         "usuarios_que_intervinieron": usuarios,
         "eventos_por_accion": por_accion,
         "eventos_por_campo": por_campo,
@@ -20391,7 +20819,9 @@ def timeline_glosa(
     ordenada DESC (más reciente primero).
     """
     from app.models.db import (
-        AICallRecord, AuditLogRecord, ComentarioGlosaRecord,
+        AICallRecord,
+        AuditLogRecord,
+        ComentarioGlosaRecord,
         DictamenVersionRecord,
     )
 
@@ -20403,31 +20833,33 @@ def timeline_glosa(
 
     # 1. Creación de la glosa
     if glosa.creado_en:
-        eventos.append({
-            "timestamp": glosa.creado_en.isoformat(),
-            "tipo": "CREAR_GLOSA",
-            "actor": glosa.auditor_email or "—",
-            "detalle": f"Glosa creada · {glosa.eps} · {glosa.codigo_glosa}",
-            "metadata": {
-                "valor_objetado": float(glosa.valor_objetado or 0),
-                "estado": glosa.estado,
-            },
-        })
+        eventos.append(
+            {
+                "timestamp": glosa.creado_en.isoformat(),
+                "tipo": "CREAR_GLOSA",
+                "actor": glosa.auditor_email or "—",
+                "detalle": f"Glosa creada · {glosa.eps} · {glosa.codigo_glosa}",
+                "metadata": {
+                    "valor_objetado": float(glosa.valor_objetado or 0),
+                    "estado": glosa.estado,
+                },
+            }
+        )
 
     # 2. Versiones del dictamen
     versiones = (
-        db.query(DictamenVersionRecord)
-        .filter(DictamenVersionRecord.glosa_id == glosa_id)
-        .all()
+        db.query(DictamenVersionRecord).filter(DictamenVersionRecord.glosa_id == glosa_id).all()
     )
     for v in versiones:
-        eventos.append({
-            "timestamp": v.creado_en.isoformat() if v.creado_en else None,
-            "tipo": f"VERSION_{v.accion or 'CREAR'}",
-            "actor": v.autor_email or "—",
-            "detalle": v.mensaje_refinar or f"Snapshot del dictamen ({v.accion})",
-            "metadata": {"version_id": v.id},
-        })
+        eventos.append(
+            {
+                "timestamp": v.creado_en.isoformat() if v.creado_en else None,
+                "tipo": f"VERSION_{v.accion or 'CREAR'}",
+                "actor": v.autor_email or "—",
+                "detalle": v.mensaje_refinar or f"Snapshot del dictamen ({v.accion})",
+                "metadata": {"version_id": v.id},
+            }
+        )
 
     # 3. Audit log para esta glosa
     auditorias = (
@@ -20439,64 +20871,66 @@ def timeline_glosa(
         .all()
     )
     for a in auditorias:
-        eventos.append({
-            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
-            "tipo": f"AUDIT_{a.accion or 'ACCION'}",
-            "actor": a.usuario_email or "—",
-            "detalle": (a.detalle or "")[:300],
-            "metadata": {
-                "campo": a.campo,
-                "valor_anterior": (a.valor_anterior or "")[:80],
-                "valor_nuevo": (a.valor_nuevo or "")[:80],
-                "ip": a.ip,
-            },
-        })
+        eventos.append(
+            {
+                "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+                "tipo": f"AUDIT_{a.accion or 'ACCION'}",
+                "actor": a.usuario_email or "—",
+                "detalle": (a.detalle or "")[:300],
+                "metadata": {
+                    "campo": a.campo,
+                    "valor_anterior": (a.valor_anterior or "")[:80],
+                    "valor_nuevo": (a.valor_nuevo or "")[:80],
+                    "ip": a.ip,
+                },
+            }
+        )
 
     # 4. Comentarios resueltos
     comentarios = (
-        db.query(ComentarioGlosaRecord)
-        .filter(ComentarioGlosaRecord.glosa_id == glosa_id)
-        .all()
+        db.query(ComentarioGlosaRecord).filter(ComentarioGlosaRecord.glosa_id == glosa_id).all()
     )
     for c in comentarios:
         if c.creado_en:
-            eventos.append({
-                "timestamp": c.creado_en.isoformat(),
-                "tipo": "COMENTARIO",
-                "actor": c.autor_email or "—",
-                "detalle": (c.texto or "")[:300],
-                "metadata": {"resuelto": bool(c.resuelto_en)},
-            })
+            eventos.append(
+                {
+                    "timestamp": c.creado_en.isoformat(),
+                    "tipo": "COMENTARIO",
+                    "actor": c.autor_email or "—",
+                    "detalle": (c.texto or "")[:300],
+                    "metadata": {"resuelto": bool(c.resuelto_en)},
+                }
+            )
         if c.resuelto_en:
-            eventos.append({
-                "timestamp": c.resuelto_en.isoformat(),
-                "tipo": "COMENTARIO_RESUELTO",
-                "actor": c.resuelto_por or "—",
-                "detalle": "Comentario marcado como resuelto",
-                "metadata": {"comentario_id": c.id},
-            })
+            eventos.append(
+                {
+                    "timestamp": c.resuelto_en.isoformat(),
+                    "tipo": "COMENTARIO_RESUELTO",
+                    "actor": c.resuelto_por or "—",
+                    "detalle": "Comentario marcado como resuelto",
+                    "metadata": {"comentario_id": c.id},
+                }
+            )
 
     # 5. Calls IA con costo
-    calls = (
-        db.query(AICallRecord)
-        .filter(AICallRecord.glosa_id == glosa_id)
-        .all()
-    )
+    calls = db.query(AICallRecord).filter(AICallRecord.glosa_id == glosa_id).all()
     for c in calls:
         if c.creado_en:
-            eventos.append({
-                "timestamp": c.creado_en.isoformat(),
-                "tipo": "AI_CALL",
-                "actor": c.user_email or "—",
-                "detalle": f"{c.proveedor}/{c.modelo} · {c.latency_ms}ms · ${c.cost_usd:.5f}",
-                "metadata": {
-                    "tokens_in": (c.input_tokens or 0)
-                                 + (c.cache_creation_input_tokens or 0)
-                                 + (c.cache_read_input_tokens or 0),
-                    "tokens_out": c.output_tokens,
-                    "cost_usd": c.cost_usd,
-                },
-            })
+            eventos.append(
+                {
+                    "timestamp": c.creado_en.isoformat(),
+                    "tipo": "AI_CALL",
+                    "actor": c.user_email or "—",
+                    "detalle": f"{c.proveedor}/{c.modelo} · {c.latency_ms}ms · ${c.cost_usd:.5f}",
+                    "metadata": {
+                        "tokens_in": (c.input_tokens or 0)
+                        + (c.cache_creation_input_tokens or 0)
+                        + (c.cache_read_input_tokens or 0),
+                        "tokens_out": c.output_tokens,
+                        "cost_usd": c.cost_usd,
+                    },
+                }
+            )
 
     # Ordenar DESC (más reciente primero)
     eventos.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
@@ -20528,9 +20962,7 @@ def preview_auditoria(
     tiene_contrato = False
     if eps:
         tiene_contrato = bool(
-            db.query(ContratoRecord).filter(
-                ContratoRecord.eps.ilike(f"%{eps[:15]}%")
-            ).first()
+            db.query(ContratoRecord).filter(ContratoRecord.eps.ilike(f"%{eps[:15]}%")).first()
         )
 
     hallazgos: list[dict] = []
@@ -20538,43 +20970,53 @@ def preview_auditoria(
 
     # Patrón: "sin contrato entre las partes" cuando SÍ existe contrato
     if tiene_contrato and re.search(r"SIN\s+CONTRATO", texto):
-        hallazgos.append({
-            "id": "afirmacion_sin_contrato_falsa",
-            "severidad": "ALTA",
-            "descripcion": "La EPS afirma ausencia de contrato pero HUS tiene contrato activo.",
-            "argumento": "Refuta directamente citando número y vigencia del contrato.",
-        })
+        hallazgos.append(
+            {
+                "id": "afirmacion_sin_contrato_falsa",
+                "severidad": "ALTA",
+                "descripcion": "La EPS afirma ausencia de contrato pero HUS tiene contrato activo.",
+                "argumento": "Refuta directamente citando número y vigencia del contrato.",
+            }
+        )
         score += 25
 
     # Patrón: SOAT como sustituto unilateral
-    if re.search(r"SE\s+RECONOCE\s+(A\s+)?SOAT", texto) or re.search(r"RECONOCE.*SOAT.*VIGENTE", texto):
-        hallazgos.append({
-            "id": "soat_sustituto_indebido",
-            "severidad": "ALTA",
-            "descripcion": "La EPS propone SOAT como tarifa sustituta sin soporte contractual.",
-            "argumento": "PACTA SUNT SERVANDA: solo aplica la tarifa pactada, no la impuesta.",
-        })
+    if re.search(r"SE\s+RECONOCE\s+(A\s+)?SOAT", texto) or re.search(
+        r"RECONOCE.*SOAT.*VIGENTE", texto
+    ):
+        hallazgos.append(
+            {
+                "id": "soat_sustituto_indebido",
+                "severidad": "ALTA",
+                "descripcion": "La EPS propone SOAT como tarifa sustituta sin soporte contractual.",
+                "argumento": "PACTA SUNT SERVANDA: solo aplica la tarifa pactada, no la impuesta.",
+            }
+        )
         score += 20
 
     # Patrón: "diferencia sin referente" — la EPS dice "se glosa la diferencia"
     # sin especificar la base de cálculo contractual (siempre es vicio inmotivación)
     if re.search(r"SE\s+GLOSA\s+LA\s+DIFERENCIA", texto):
-        hallazgos.append({
-            "id": "diferencia_sin_referente",
-            "severidad": "MEDIA",
-            "descripcion": "La EPS glosa una diferencia sin indicar el valor de referencia.",
-            "argumento": "Inmotivación: Decreto 4747/2007 Art. 21 exige sustentación precisa.",
-        })
+        hallazgos.append(
+            {
+                "id": "diferencia_sin_referente",
+                "severidad": "MEDIA",
+                "descripcion": "La EPS glosa una diferencia sin indicar el valor de referencia.",
+                "argumento": "Inmotivación: Decreto 4747/2007 Art. 21 exige sustentación precisa.",
+            }
+        )
         score += 15
 
     # Patrón: MVC (manejo vía contrato) sin especificación
     if re.search(r"\bMVC\b", texto):
-        hallazgos.append({
-            "id": "mvc_sin_especificacion",
-            "severidad": "MEDIA",
-            "descripcion": "Uso de código MVC sin especificar el contrato de referencia.",
-            "argumento": "Solicitar especificación del contrato y cláusula aplicable.",
-        })
+        hallazgos.append(
+            {
+                "id": "mvc_sin_especificacion",
+                "severidad": "MEDIA",
+                "descripcion": "Uso de código MVC sin especificar el contrato de referencia.",
+                "argumento": "Solicitar especificación del contrato y cláusula aplicable.",
+            }
+        )
         score += 10
 
     # Determinar acción sugerida

@@ -1,4 +1,5 @@
 """Papelera con soft-delete y restauración dentro de 30 días."""
+
 import json
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
@@ -69,9 +70,7 @@ def buscar_papelera(
     """
     q = db.query(GlosaEliminadaRecord)
     if glosa_id_original is not None:
-        q = q.filter(
-            GlosaEliminadaRecord.glosa_id_original == int(glosa_id_original)
-        )
+        q = q.filter(GlosaEliminadaRecord.glosa_id_original == int(glosa_id_original))
     if eliminado_por:
         q = q.filter(GlosaEliminadaRecord.eliminado_por == eliminado_por)
 
@@ -86,9 +85,7 @@ def buscar_papelera(
                 "id": g.id,
                 "glosa_id_original": g.glosa_id_original,
                 "eliminado_por": g.eliminado_por,
-                "eliminado_en": (
-                    g.eliminado_en.isoformat() if g.eliminado_en else None
-                ),
+                "eliminado_en": (g.eliminado_en.isoformat() if g.eliminado_en else None),
                 "motivo": g.motivo,
             }
             for g in items
@@ -148,12 +145,12 @@ def stats_papelera(
             proximas += 1
 
         if g.eliminado_por:
-            por_usuario[g.eliminado_por] = (
-                por_usuario.get(g.eliminado_por, 0) + 1
-            )
+            por_usuario[g.eliminado_por] = por_usuario.get(g.eliminado_por, 0) + 1
 
     top_5 = sorted(
-        por_usuario.items(), key=lambda x: x[1], reverse=True,
+        por_usuario.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
 
     return {
@@ -162,9 +159,7 @@ def stats_papelera(
         "eliminadas_ultimos_7d": cnt_7d,
         "eliminadas_ultimos_30d": cnt_30d,
         "proximas_a_expirar": proximas,
-        "top_5_eliminadores": [
-            {"usuario": u, "eliminadas": n} for u, n in top_5
-        ],
+        "top_5_eliminadores": [{"usuario": u, "eliminadas": n} for u, n in top_5],
     }
 
 
@@ -192,19 +187,21 @@ def listar(
             dias_restantes = 30 - (ahora - eliminado_en).days
         else:
             dias_restantes = 30
-        items.append({
-            "id": r.id,
-            "glosa_id_original": r.glosa_id_original,
-            "eliminado_por": r.eliminado_por,
-            "eliminado_en": eliminado_en.isoformat() if eliminado_en else None,
-            "motivo": r.motivo,
-            "dias_restantes_restaurar": max(0, dias_restantes),
-            "eps": snap.get("eps"),
-            "factura": snap.get("factura"),
-            "codigo_glosa": snap.get("codigo_glosa"),
-            "valor_objetado": snap.get("valor_objetado"),
-            "paciente": snap.get("paciente"),
-        })
+        items.append(
+            {
+                "id": r.id,
+                "glosa_id_original": r.glosa_id_original,
+                "eliminado_por": r.eliminado_por,
+                "eliminado_en": eliminado_en.isoformat() if eliminado_en else None,
+                "motivo": r.motivo,
+                "dias_restantes_restaurar": max(0, dias_restantes),
+                "eps": snap.get("eps"),
+                "factura": snap.get("factura"),
+                "codigo_glosa": snap.get("codigo_glosa"),
+                "valor_objetado": snap.get("valor_objetado"),
+                "paciente": snap.get("paciente"),
+            }
+        )
     return items
 
 
@@ -225,9 +222,15 @@ def restaurar(
     # Convertir ISO strings de vuelta a datetime — TZ-aware UTC para que
     # SQLAlchemy las acepte en columnas DateTime(timezone=True) sin lanzar
     # 'TypeError: can't subtract offset-naive and offset-aware'.
-    for campo in ("creado_en", "fecha_recepcion", "fecha_entrega",
-                  "fecha_vencimiento", "fecha_radicacion_factura",
-                  "fecha_documento_dgh", "fecha_decision_eps"):
+    for campo in (
+        "creado_en",
+        "fecha_recepcion",
+        "fecha_entrega",
+        "fecha_vencimiento",
+        "fecha_radicacion_factura",
+        "fecha_documento_dgh",
+        "fecha_decision_eps",
+    ):
         if isinstance(snap.get(campo), str):
             try:
                 snap[campo] = _normalizar_tz(datetime.fromisoformat(snap[campo]))
@@ -246,8 +249,10 @@ def restaurar(
         raise HTTPException(500, f"Error restaurando: {e}")
 
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="RESTAURAR_GLOSA", tabla="historial",
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="RESTAURAR_GLOSA",
+        tabla="historial",
         registro_id=nueva.id,
         detalle=f"Restaurada desde papelera #{papelera_id}",
     )
@@ -267,8 +272,10 @@ def purgar(
     db.delete(r)
     db.commit()
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="PURGAR_PAPELERA", tabla="glosas_eliminadas",
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="PURGAR_PAPELERA",
+        tabla="glosas_eliminadas",
         registro_id=papelera_id,
     )
     return {"message": "Purgado definitivamente"}

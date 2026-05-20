@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/eps-cartera-detalle (R292 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -46,14 +51,20 @@ def client(db_session, admin_user):
     app.dependency_overrides.clear()
 
 
-def _seed(db, eps, factura, codigo, estado="RADICADA",
-          saldo=1000):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo, factura=factura,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        saldo_factura=saldo,
-    ))
+def _seed(db, eps, factura, codigo, estado="RADICADA", saldo=1000):
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            factura=factura,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            saldo_factura=saldo,
+        )
+    )
     db.commit()
 
 
@@ -62,7 +73,10 @@ class TestEPSCarteraDetalle:
         _seed(db_session, "SANITAS", "F100", "TA0801", saldo=5000)
         _seed(db_session, "SANITAS", "F200", "TA0801", saldo=10000)
         _seed(
-            db_session, "SANITAS", "F300", "FA0603",
+            db_session,
+            "SANITAS",
+            "F300",
+            "FA0603",
             estado="LEVANTADA",
         )
         # Otra EPS, no debe aparecer

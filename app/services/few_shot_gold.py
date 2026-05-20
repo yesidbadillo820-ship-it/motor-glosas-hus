@@ -16,6 +16,7 @@ Filosofía:
   • Truncamos cada ejemplo a 1500 chars para no inflar el prompt
   • Marcamos claramente "EJEMPLO" para que el LLM no copie textual
 """
+
 from __future__ import annotations
 
 import logging
@@ -50,6 +51,7 @@ def obtener_ejemplos_gold(
     # 1) PlantillaGoldRecord (curadas por el equipo jurídico)
     try:
         from app.models.db import PlantillaGoldRecord
+
         gold = (
             db.query(PlantillaGoldRecord)
             .filter(PlantillaGoldRecord.eps.ilike(eps_norm))
@@ -63,11 +65,13 @@ def obtener_ejemplos_gold(
             arg = (g.argumento or "").strip()
             if len(arg) < 200:
                 continue
-            ejemplos.append({
-                "argumento": arg[:_MAX_CHARS_EJEMPLO],
-                "fuente": "GOLD",
-                "id": g.id,
-            })
+            ejemplos.append(
+                {
+                    "argumento": arg[:_MAX_CHARS_EJEMPLO],
+                    "fuente": "GOLD",
+                    "id": g.id,
+                }
+            )
             if len(ejemplos) >= max_ejemplos:
                 return ejemplos
         # Si encontramos AL MENOS un gold, NO mezclamos con histórico:
@@ -80,6 +84,7 @@ def obtener_ejemplos_gold(
     # 2) Fallback: GlosaRecord LEVANTADA con dictamen útil
     try:
         from app.models.db import GlosaRecord
+
         rows = (
             db.query(GlosaRecord)
             .filter(GlosaRecord.eps.ilike(eps_norm))
@@ -97,11 +102,13 @@ def obtener_ejemplos_gold(
             # Evitar duplicados: ya tenemos uno con este texto
             if any(arg[:200] == e["argumento"][:200] for e in ejemplos):
                 continue
-            ejemplos.append({
-                "argumento": arg[:_MAX_CHARS_EJEMPLO],
-                "fuente": "HISTORICO",
-                "id": r.id,
-            })
+            ejemplos.append(
+                {
+                    "argumento": arg[:_MAX_CHARS_EJEMPLO],
+                    "fuente": "HISTORICO",
+                    "id": r.id,
+                }
+            )
             if len(ejemplos) >= max_ejemplos:
                 break
     except Exception as e:
@@ -142,7 +149,10 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
 
 
 def construir_bloque_gold(
-    db, eps: str, codigo: str, max_ejemplos: int = _MAX_EJEMPLOS,
+    db,
+    eps: str,
+    codigo: str,
+    max_ejemplos: int = _MAX_EJEMPLOS,
 ) -> str:
     """Helper de un solo paso: busca y formatea."""
     try:

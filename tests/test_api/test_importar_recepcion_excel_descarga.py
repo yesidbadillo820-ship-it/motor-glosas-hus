@@ -1,5 +1,6 @@
 """Tests de la descarga del Excel-respuesta de una importación de
 recepción (que quede descargable desde la app, no solo por correo)."""
+
 from __future__ import annotations
 
 from io import BytesIO
@@ -40,7 +41,11 @@ def _client(db_session):
     from app.main import app
 
     u = UsuarioRecord(
-        id=1, email="x@hus.com", nombre="Test", rol="AUDITOR", activo=1,
+        id=1,
+        email="x@hus.com",
+        nombre="Test",
+        rol="AUDITOR",
+        activo=1,
         password_hash="x",
     )
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
@@ -64,15 +69,23 @@ def test_descarga_regenera_excel_con_columnas_ia(db_session, tmp_path):
     ruta.write_bytes(_excel_recepcion_bytes())
 
     g = GlosaRecord(
-        id=10, eps="SURA EPS", paciente="N/A",
-        factura="FAC-001", consecutivo_dgh="C-001",
-        estado="RESPONDIDA", dictamen="Dictamen IA de prueba",
+        id=10,
+        eps="SURA EPS",
+        paciente="N/A",
+        factura="FAC-001",
+        consecutivo_dgh="C-001",
+        estado="RESPONDIDA",
+        dictamen="Dictamen IA de prueba",
         modelo_ia="test",
     )
     db_session.add(g)
     rec = ImportacionRecepcionRecord(
-        id=1, usuario_email="x@hus.com", archivo_nombre="recepcion.xlsx",
-        total_glosas=1, glosa_ids="[10]", estado="LISTO",
+        id=1,
+        usuario_email="x@hus.com",
+        archivo_nombre="recepcion.xlsx",
+        total_glosas=1,
+        glosa_ids="[10]",
+        estado="LISTO",
         ruta_original=str(ruta),
     )
     db_session.add(rec)
@@ -97,11 +110,17 @@ def test_descarga_regenera_excel_con_columnas_ia(db_session, tmp_path):
 
 
 def test_historial_lista_la_importacion(db_session):
-    db_session.add(ImportacionRecepcionRecord(
-        id=1, usuario_email="x@hus.com", archivo_nombre="recepcion.xlsx",
-        total_glosas=3, glosa_ids="[1,2,3]", estado="LISTO",
-        ruta_original="/data/recepcion/1.xlsx",
-    ))
+    db_session.add(
+        ImportacionRecepcionRecord(
+            id=1,
+            usuario_email="x@hus.com",
+            archivo_nombre="recepcion.xlsx",
+            total_glosas=3,
+            glosa_ids="[1,2,3]",
+            estado="LISTO",
+            ruta_original="/data/recepcion/1.xlsx",
+        )
+    )
     db_session.commit()
 
     c, app = _client(db_session)
@@ -127,11 +146,17 @@ def test_descarga_inexistente_404(db_session):
 
 
 def test_descarga_sin_archivo_410(db_session):
-    db_session.add(ImportacionRecepcionRecord(
-        id=2, usuario_email="x@hus.com", archivo_nombre="r.xlsx",
-        total_glosas=1, glosa_ids="[1]", estado="SIN_ARCHIVO",
-        ruta_original=None,
-    ))
+    db_session.add(
+        ImportacionRecepcionRecord(
+            id=2,
+            usuario_email="x@hus.com",
+            archivo_nombre="r.xlsx",
+            total_glosas=1,
+            glosa_ids="[1]",
+            estado="SIN_ARCHIVO",
+            ruta_original=None,
+        )
+    )
     db_session.commit()
     c, app = _client(db_session)
     try:

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/dialogo-bilateral (R138 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed_glosa(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -88,13 +94,15 @@ class TestDialogoBilateral:
 
     def test_incluye_conciliacion(self, client, db_session):
         g = _seed_glosa(db_session)
-        db_session.add(ConciliacionRecord(
-            glosa_id=g.id,
-            creado_en=ahora_utc(),
-            resultado="ACUERDO",
-            valor_conciliado=2500,
-            estado_bilateral="ACTA_FIRMADA",
-        ))
+        db_session.add(
+            ConciliacionRecord(
+                glosa_id=g.id,
+                creado_en=ahora_utc(),
+                resultado="ACUERDO",
+                valor_conciliado=2500,
+                estado_bilateral="ACTA_FIRMADA",
+            )
+        )
         db_session.commit()
 
         r = client.get(f"/glosas/{g.id}/dialogo-bilateral")
@@ -105,9 +113,7 @@ class TestDialogoBilateral:
         assert "ACUERDO" in bilateral["mensaje"]
 
     def test_mensaje_objecion_incluye_codigo_y_valor(self, client, db_session):
-        g = _seed_glosa(db_session,
-                        codigo_glosa="TA0201",
-                        valor_objetado=15000)
+        g = _seed_glosa(db_session, codigo_glosa="TA0201", valor_objetado=15000)
         r = client.get(f"/glosas/{g.id}/dialogo-bilateral")
         d = r.json()
         msg = d["dialogo"][0]["mensaje"]

@@ -89,9 +89,7 @@ def verificar_firma(hash_hex: str, firma_b64: str, texto_dictamen: str = "") -> 
                 return False
 
         # Verificar la firma HMAC sobre el hash hex
-        firma_esperada_bytes = hmac.new(
-            secret, hash_hex.encode("utf-8"), hashlib.sha256
-        ).digest()
+        firma_esperada_bytes = hmac.new(secret, hash_hex.encode("utf-8"), hashlib.sha256).digest()
         try:
             firma_recibida_bytes = base64.b64decode(firma_b64)
         except Exception:

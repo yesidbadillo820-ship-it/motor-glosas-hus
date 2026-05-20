@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/codigo-respuesta-cobertura (R343 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -47,12 +52,18 @@ def client(db_session, admin_user):
 
 
 def _seed(db, eps, codigo_glosa, codigo_respuesta):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo_glosa,
-        valor_objetado=1000, etapa="X", estado="LEVANTADA",
-        creado_en=ahora_utc(),
-        codigo_respuesta=codigo_respuesta,
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo_glosa,
+            valor_objetado=1000,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=ahora_utc(),
+            codigo_respuesta=codigo_respuesta,
+        )
+    )
     db.commit()
 
 

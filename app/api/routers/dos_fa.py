@@ -6,6 +6,7 @@ Flujo:
   3. Llama POST /2fa/activar con el código de 6 dígitos → se activa
   4. En el login (si totp_activo=1) debe mandar el código junto con password
 """
+
 import io
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -31,6 +32,7 @@ def setup_2fa(
 ):
     """Genera secreto TOTP (si no existe) + URI para QR. No activa aún."""
     import pyotp
+
     if current_user.totp_activo:
         raise HTTPException(400, "2FA ya está activo. Desactiva primero si quieres regenerar.")
 
@@ -65,6 +67,7 @@ def qr_2fa(
     """Devuelve la imagen PNG del QR para el secret actual del usuario."""
     import pyotp
     import qrcode
+
     if not current_user.totp_secret:
         raise HTTPException(400, "Primero llama a /2fa/setup para generar secret")
     uri = pyotp.TOTP(current_user.totp_secret).provisioning_uri(
@@ -89,6 +92,7 @@ def activar_2fa(
 ):
     """Activa 2FA validando el primer código de la app de autenticación."""
     import pyotp
+
     if not current_user.totp_secret:
         raise HTTPException(400, "Primero llama a /2fa/setup")
     if current_user.totp_activo:
@@ -116,6 +120,7 @@ def desactivar_2fa(
 ):
     """Desactiva 2FA (requiere código actual para evitar uso malicioso)."""
     import pyotp
+
     if not current_user.totp_activo:
         raise HTTPException(400, "2FA no está activo")
     totp = pyotp.TOTP(current_user.totp_secret or "")

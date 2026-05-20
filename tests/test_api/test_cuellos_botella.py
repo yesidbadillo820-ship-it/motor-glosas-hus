@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cuellos-botella (R135 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,12 +49,18 @@ def client(db_session, usuario):
 
 
 def _seed_audit(db, gid, anterior, nuevo, dias_atras):
-    db.add(AuditLogRecord(
-        usuario_email="u@x", accion="UPDATE",
-        tabla="glosas", registro_id=gid,
-        campo="estado", valor_anterior=anterior, valor_nuevo=nuevo,
-        timestamp=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email="u@x",
+            accion="UPDATE",
+            tabla="glosas",
+            registro_id=gid,
+            campo="estado",
+            valor_anterior=anterior,
+            valor_nuevo=nuevo,
+            timestamp=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -66,17 +74,14 @@ class TestCuellosBotella:
     def test_calcula_tiempo_entre_transiciones(self, client, db_session):
         # Glosa 1: RADICADA por 10 días, luego pasa a RESPONDIDA
         _seed_audit(db_session, 1, None, "RADICADA", dias_atras=20)
-        _seed_audit(db_session, 1, "RADICADA", "RESPONDIDA",
-                    dias_atras=10)
+        _seed_audit(db_session, 1, "RADICADA", "RESPONDIDA", dias_atras=10)
         # Glosa 2: RADICADA por 5 días
         _seed_audit(db_session, 2, None, "RADICADA", dias_atras=15)
-        _seed_audit(db_session, 2, "RADICADA", "RESPONDIDA",
-                    dias_atras=10)
+        _seed_audit(db_session, 2, "RADICADA", "RESPONDIDA", dias_atras=10)
 
         r = client.get("/glosas/stats/cuellos-botella")
         d = r.json()
-        radicada = next(it for it in d["items"]
-                        if it["estado"] == "RADICADA")
+        radicada = next(it for it in d["items"] if it["estado"] == "RADICADA")
         # Tiempos: 10d y 5d → promedio 7.5d
         assert radicada["count_glosas_con_transicion"] == 2
         assert 7 <= radicada["tiempo_promedio_dias"] <= 8
@@ -98,10 +103,15 @@ class TestCuellosBotella:
         _seed_audit(db_session, 1, None, "X", dias_atras=10)
         _seed_audit(db_session, 1, "X", "Y", dias_atras=5)
         # Audit en otra tabla
-        db_session.add(AuditLogRecord(
-            tabla="usuarios", registro_id=1, campo="estado",
-            valor_anterior="X", timestamp=ahora_utc(),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                tabla="usuarios",
+                registro_id=1,
+                campo="estado",
+                valor_anterior="X",
+                timestamp=ahora_utc(),
+            )
+        )
         db_session.commit()
 
         r = client.get("/glosas/stats/cuellos-botella")

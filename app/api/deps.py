@@ -35,10 +35,14 @@ def get_usuario_actual(
     except JWTError:
         raise credentials_exception
 
-    usuario = db.query(UsuarioRecord).filter(
-        UsuarioRecord.email == email,
-        UsuarioRecord.activo == 1,
-    ).first()
+    usuario = (
+        db.query(UsuarioRecord)
+        .filter(
+            UsuarioRecord.email == email,
+            UsuarioRecord.activo == 1,
+        )
+        .first()
+    )
     if not usuario:
         raise credentials_exception
     return usuario
@@ -52,6 +56,7 @@ def require_rol(*roles: str) -> Callable:
                 detail=f"Acción no permitida. Se requiere uno de los roles: {', '.join(roles)}",
             )
         return current_user
+
     return checker
 
 
@@ -61,13 +66,17 @@ def get_admin(current_user: UsuarioRecord = Depends(get_usuario_actual)) -> Usua
     return current_user
 
 
-def get_coordinador_o_admin(current_user: UsuarioRecord = Depends(get_usuario_actual)) -> UsuarioRecord:
+def get_coordinador_o_admin(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+) -> UsuarioRecord:
     if current_user.rol not in (ROL_SUPER_ADMIN, ROL_COORDINADOR):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Se requiere rol COORDINADOR o superior")
     return current_user
 
 
-def get_auditor_o_superior(current_user: UsuarioRecord = Depends(get_usuario_actual)) -> UsuarioRecord:
+def get_auditor_o_superior(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+) -> UsuarioRecord:
     if current_user.rol not in (ROL_SUPER_ADMIN, ROL_COORDINADOR, ROL_AUDITOR):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Se requiere rol AUDITOR o superior")
     return current_user

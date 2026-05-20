@@ -1,4 +1,5 @@
 """Tests del endpoint GET /tarifas-contratadas/cobertura-eps (R168 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -36,6 +37,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -44,10 +46,14 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, codigo="C", contrato="CT-1"):
-    db.add(TarifaContratadaRecord(
-        eps=eps, codigo_cups=codigo,
-        contrato_numero=contrato, valor_pactado=1000,
-    ))
+    db.add(
+        TarifaContratadaRecord(
+            eps=eps,
+            codigo_cups=codigo,
+            contrato_numero=contrato,
+            valor_pactado=1000,
+        )
+    )
     db.commit()
 
 
@@ -56,8 +62,7 @@ class TestCoberturaEPS:
         r = client.get("/tarifas-contratadas/cobertura-eps")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total_eps_con_tarifas",
-                    "total_tarifas_cargadas", "items"):
+        for key in ("total_eps_con_tarifas", "total_tarifas_cargadas", "items"):
             assert key in d
 
     def test_orden_count_desc(self, client, db_session):

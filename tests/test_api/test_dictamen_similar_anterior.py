@@ -1,7 +1,7 @@
 """Tests del endpoint GET /glosas/{id}/dictamen-similar-anterior (R231 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,16 +47,22 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, gid, eps="SANITAS", codigo="TA0201",
-          estado="RADICADA", dictamen=None, valor_rec=0):
-    db.add(GlosaRecord(
-        id=gid, eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_decision_eps=ahora_utc(),
-        dictamen=dictamen,
-    ))
+def _seed(db, gid, eps="SANITAS", codigo="TA0201", estado="RADICADA", dictamen=None, valor_rec=0):
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_decision_eps=ahora_utc(),
+            dictamen=dictamen,
+        )
+    )
     db.commit()
 
 
@@ -72,10 +79,7 @@ class TestDictamenSimilarAnterior:
 
     def test_match_levantada(self, client, db_session):
         _seed(db_session, 1)  # target
-        _seed(db_session, 2,
-              estado="LEVANTADA",
-              dictamen="dictamen ganador",
-              valor_rec=10000)
+        _seed(db_session, 2, estado="LEVANTADA", dictamen="dictamen ganador", valor_rec=10000)
 
         r = client.get("/glosas/1/dictamen-similar-anterior")
         d = r.json()
@@ -87,11 +91,9 @@ class TestDictamenSimilarAnterior:
     def test_aislamiento_eps_codigo(self, client, db_session):
         _seed(db_session, 1, eps="SANITAS", codigo="TA0201")
         # Otra EPS, mismo código
-        _seed(db_session, 2, eps="OTRA", codigo="TA0201",
-              estado="LEVANTADA", dictamen="x")
+        _seed(db_session, 2, eps="OTRA", codigo="TA0201", estado="LEVANTADA", dictamen="x")
         # Misma EPS, otro código
-        _seed(db_session, 3, eps="SANITAS", codigo="FA0603",
-              estado="LEVANTADA", dictamen="y")
+        _seed(db_session, 3, eps="SANITAS", codigo="FA0603", estado="LEVANTADA", dictamen="y")
 
         r = client.get("/glosas/1/dictamen-similar-anterior")
         d = r.json()

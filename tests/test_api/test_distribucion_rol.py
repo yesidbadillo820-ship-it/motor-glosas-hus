@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/distribucion-rol (R266 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,7 +31,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -38,6 +42,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -47,15 +52,30 @@ def client(db_session, admin_user):
 
 class TestDistribucionRol:
     def test_basico(self, client, db_session):
-        db_session.add(UsuarioRecord(
-            id=10, email="a@x.com", rol="AUDITOR", activo=1,
-        ))
-        db_session.add(UsuarioRecord(
-            id=11, email="b@x.com", rol="AUDITOR", activo=0,
-        ))
-        db_session.add(UsuarioRecord(
-            id=12, email="c@x.com", rol="COORDINADOR", activo=1,
-        ))
+        db_session.add(
+            UsuarioRecord(
+                id=10,
+                email="a@x.com",
+                rol="AUDITOR",
+                activo=1,
+            )
+        )
+        db_session.add(
+            UsuarioRecord(
+                id=11,
+                email="b@x.com",
+                rol="AUDITOR",
+                activo=0,
+            )
+        )
+        db_session.add(
+            UsuarioRecord(
+                id=12,
+                email="c@x.com",
+                rol="COORDINADOR",
+                activo=1,
+            )
+        )
         db_session.commit()
 
         r = client.get("/admin/distribucion-rol")
@@ -72,12 +92,14 @@ class TestDistribucionRol:
     def test_no_admin_403(self, db_session):
         from app.api.deps import get_usuario_actual
         from app.main import app
+
         no_admin = UsuarioRecord(
-            id=99, email="x@x.com", rol="AUDITOR", activo=1,
+            id=99,
+            email="x@x.com",
+            rol="AUDITOR",
+            activo=1,
         )
-        app.dependency_overrides[get_db] = (
-            lambda: iter([db_session]).__next__()
-        )
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
         app.dependency_overrides[get_usuario_actual] = lambda: no_admin
         with TestClient(app) as c:
             r = c.get("/admin/distribucion-rol")

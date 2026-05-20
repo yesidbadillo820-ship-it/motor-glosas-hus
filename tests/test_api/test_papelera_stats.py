@@ -1,4 +1,5 @@
 """Tests del endpoint GET /papelera/stats (R128 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -54,11 +59,14 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, usuario, dias_atras=1):
-    db.add(GlosaEliminadaRecord(
-        glosa_id_original=1, snapshot_json="{}",
-        eliminado_por=usuario,
-        eliminado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaEliminadaRecord(
+            glosa_id_original=1,
+            snapshot_json="{}",
+            eliminado_por=usuario,
+            eliminado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -67,14 +75,19 @@ class TestPapeleraStats:
         r = client.get("/papelera/stats")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total_papelera", "eliminadas_ultimas_24h",
-                    "eliminadas_ultimos_7d", "eliminadas_ultimos_30d",
-                    "proximas_a_expirar", "top_5_eliminadores"):
+        for key in (
+            "total_papelera",
+            "eliminadas_ultimas_24h",
+            "eliminadas_ultimos_7d",
+            "eliminadas_ultimos_30d",
+            "proximas_a_expirar",
+            "top_5_eliminadores",
+        ):
             assert key in d
 
     def test_clasifica_por_ventana(self, client, db_session):
-        _seed(db_session, "alice@x", dias_atras=0)   # 24h
-        _seed(db_session, "alice@x", dias_atras=5)   # 7d
+        _seed(db_session, "alice@x", dias_atras=0)  # 24h
+        _seed(db_session, "alice@x", dias_atras=5)  # 7d
         _seed(db_session, "alice@x", dias_atras=20)  # 30d
         _seed(db_session, "alice@x", dias_atras=40)  # fuera
 

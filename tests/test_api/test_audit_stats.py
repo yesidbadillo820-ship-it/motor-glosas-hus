@@ -1,4 +1,5 @@
 """Tests del endpoint GET /audit/stats (R87 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -54,11 +59,15 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, usuario, accion, tabla, dias_atras=0):
-    db.add(AuditLogRecord(
-        usuario_email=usuario, usuario_rol="AUDITOR",
-        accion=accion, tabla=tabla,
-        timestamp=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=usuario,
+            usuario_rol="AUDITOR",
+            accion=accion,
+            tabla=tabla,
+            timestamp=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -99,7 +108,7 @@ class TestAuditStats:
         assert tablas == {"glosas": 3, "usuarios": 1}
 
     def test_ventana_filtra_fuera_de_rango(self, client, db_session):
-        _seed(db_session, "u1@x", "X", "T", dias_atras=5)   # dentro (default 30)
+        _seed(db_session, "u1@x", "X", "T", dias_atras=5)  # dentro (default 30)
         _seed(db_session, "u2@x", "X", "T", dias_atras=60)  # fuera
         r = client.get("/audit/stats")
         d = r.json()

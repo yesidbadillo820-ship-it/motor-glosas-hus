@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/feature-flags (R144 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,7 +31,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -38,6 +42,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -59,10 +64,17 @@ class TestFeatureFlags:
         r = client.get("/sistema/feature-flags")
         d = r.json()
         nombres = {f["nombre"] for f in d["items"]}
-        for f in ("ia_anthropic", "ia_groq", "firma_digital_rsa",
-                  "cifrado_simetrico", "smtp_alertas", "sentry",
-                  "push_notifications", "whatsapp_business",
-                  "telegram_bot"):
+        for f in (
+            "ia_anthropic",
+            "ia_groq",
+            "firma_digital_rsa",
+            "cifrado_simetrico",
+            "smtp_alertas",
+            "sentry",
+            "push_notifications",
+            "whatsapp_business",
+            "telegram_bot",
+        ):
             assert f in nombres
 
     def test_cada_flag_tiene_metadata(self, client):

@@ -1,7 +1,6 @@
 """Tests for GlosaService."""
-import pytest
+
 from app.services.glosa_service import (
-    GlosaService,
     generar_texto_extemporanea,
     generar_texto_injustificada,
     obtener_plantilla_por_codigo,
@@ -46,10 +45,8 @@ class TestSanitizerInjustificado:
             ("la glosa es injustificada", "la glosa es improcedente"),
             ("LA GLOSA ES INJUSTIFICADA", "LA GLOSA ES IMPROCEDENTE"),
             ("esta glosa es injustificado", "esta glosa es improcedente"),
-            ("tarifas injustificadas en el contrato",
-             "tarifas improcedentes en el contrato"),
-            ("TARIFAS INJUSTIFICADAS EN EL CONTRATO",
-             "TARIFAS IMPROCEDENTES EN EL CONTRATO"),
+            ("tarifas injustificadas en el contrato", "tarifas improcedentes en el contrato"),
+            ("TARIFAS INJUSTIFICADAS EN EL CONTRATO", "TARIFAS IMPROCEDENTES EN EL CONTRATO"),
         ]
         for src, expected in cases:
             assert limpiar_palabra_injustificado(src) == expected, (
@@ -303,7 +300,7 @@ class TestScoreCalculo:
             es_ratificacion=False,
             tiene_pdf=False,
             es_urgencia=False,
-            es_tarifa=False
+            es_tarifa=False,
         )
         assert score == 99.0
 
@@ -315,7 +312,7 @@ class TestScoreCalculo:
             es_ratificacion=True,
             tiene_pdf=False,
             es_urgencia=False,
-            es_tarifa=False
+            es_tarifa=False,
         )
         assert score == 92.0
 
@@ -327,7 +324,7 @@ class TestScoreCalculo:
             es_ratificacion=False,
             tiene_pdf=False,
             es_urgencia=True,
-            es_tarifa=False
+            es_tarifa=False,
         )
         assert score == 90.0
 
@@ -339,7 +336,7 @@ class TestScoreCalculo:
             es_ratificacion=False,
             tiene_pdf=True,
             es_urgencia=False,
-            es_tarifa=False
+            es_tarifa=False,
         )
         assert score == 100.0
 
@@ -351,6 +348,6 @@ class TestScoreCalculo:
             es_ratificacion=False,
             tiene_pdf=False,
             es_urgencia=False,
-            es_tarifa=True
+            es_tarifa=True,
         )
         assert score == 75.0

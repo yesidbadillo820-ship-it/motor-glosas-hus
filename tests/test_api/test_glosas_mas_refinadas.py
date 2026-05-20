@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/glosas-mas-refinadas (R192 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,19 +47,30 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid, eps="X"):
-    db.add(GlosaRecord(
-        id=gid, eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_version(db, glosa_id):
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id, dictamen_html="<p>X</p>",
-        accion="REFINAR", creado_en=ahora_utc(),
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html="<p>X</p>",
+            accion="REFINAR",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/dias-decision-promedio-mes (R295 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,12 +50,18 @@ def client(db_session, usuario):
 
 def _seed(db, dias_decision):
     creado = ahora_utc() - timedelta(days=dias_decision)
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="LEVANTADA",
-        creado_en=creado,
-        fecha_decision_eps=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=creado,
+            fecha_decision_eps=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -64,9 +72,7 @@ class TestDiasDecisionPromedioMes:
         _seed(db_session, dias_decision=30)
         # Promedio: 20
 
-        r = client.get(
-            "/glosas/stats/dias-decision-promedio-mes?meses=2"
-        )
+        r = client.get("/glosas/stats/dias-decision-promedio-mes?meses=2")
         d = r.json()
         assert len(d["serie"]) == 1
         mes = d["serie"][0]

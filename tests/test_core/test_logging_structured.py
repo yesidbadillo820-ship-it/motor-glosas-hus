@@ -1,4 +1,5 @@
 """Tests del StructuredFormatter (R80 P1)."""
+
 from __future__ import annotations
 
 import json
@@ -13,8 +14,13 @@ from app.core.logging_utils import (
 
 def _crear_record(msg="test"):
     return logging.LogRecord(
-        name="test", level=logging.INFO, pathname="x", lineno=1,
-        msg=msg, args=(), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="x",
+        lineno=1,
+        msg=msg,
+        args=(),
+        exc_info=None,
     )
 
 

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/usuarios-mas-comentarios (R294 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -35,7 +36,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -43,6 +47,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -51,21 +56,32 @@ def client(db_session, admin_user):
 
 
 def _seed_glosa(db, glosa_id):
-    db.add(GlosaRecord(
-        id=glosa_id,
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_com(db, glosa_id, autor, mencion=None, resuelto=0):
-    db.add(ComentarioGlosaRecord(
-        glosa_id=glosa_id, autor_email=autor, texto="t",
-        mencion=mencion, resuelto=resuelto,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        ComentarioGlosaRecord(
+            glosa_id=glosa_id,
+            autor_email=autor,
+            texto="t",
+            mencion=mencion,
+            resuelto=resuelto,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -89,12 +105,14 @@ class TestUsuariosMasComentarios:
     def test_no_admin_403(self, db_session):
         from app.api.deps import get_usuario_actual
         from app.main import app
+
         no_admin = UsuarioRecord(
-            id=99, email="x@x.com", rol="AUDITOR", activo=1,
+            id=99,
+            email="x@x.com",
+            rol="AUDITOR",
+            activo=1,
         )
-        app.dependency_overrides[get_db] = (
-            lambda: iter([db_session]).__next__()
-        )
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
         app.dependency_overrides[get_usuario_actual] = lambda: no_admin
         with TestClient(app) as c:
             r = c.get("/admin/usuarios-mas-comentarios")

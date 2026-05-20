@@ -21,20 +21,31 @@ def listar_audit_log(
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     repo = AuditRepository(db)
-    resultado = repo.listar(page=page, per_page=per_page,
-                            usuario_email=usuario_email, accion=accion, tabla=tabla)
+    resultado = repo.listar(
+        page=page, per_page=per_page, usuario_email=usuario_email, accion=accion, tabla=tabla
+    )
     return {
         "items": [
-            {"id": r.id,
-             "timestamp": r.timestamp.isoformat() if r.timestamp else None,
-             "usuario_email": r.usuario_email, "usuario_rol": r.usuario_rol,
-             "accion": r.accion, "tabla": r.tabla, "registro_id": r.registro_id,
-             "campo": r.campo, "valor_anterior": r.valor_anterior,
-             "valor_nuevo": r.valor_nuevo, "detalle": r.detalle, "ip": r.ip}
+            {
+                "id": r.id,
+                "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+                "usuario_email": r.usuario_email,
+                "usuario_rol": r.usuario_rol,
+                "accion": r.accion,
+                "tabla": r.tabla,
+                "registro_id": r.registro_id,
+                "campo": r.campo,
+                "valor_anterior": r.valor_anterior,
+                "valor_nuevo": r.valor_nuevo,
+                "detalle": r.detalle,
+                "ip": r.ip,
+            }
             for r in resultado["items"]
         ],
-        "total": resultado["total"], "page": resultado["page"],
-        "per_page": resultado["per_page"], "pages": resultado["pages"],
+        "total": resultado["total"],
+        "page": resultado["page"],
+        "per_page": resultado["per_page"],
+        "pages": resultado["pages"],
     }
 
 
@@ -46,11 +57,16 @@ def historial_cambios_glosa(
 ):
     logs = AuditRepository(db).por_registro("glosas", glosa_id)
     return [
-        {"id": r.id,
-         "timestamp": r.timestamp.isoformat() if r.timestamp else None,
-         "usuario_email": r.usuario_email, "accion": r.accion,
-         "campo": r.campo, "valor_anterior": r.valor_anterior,
-         "valor_nuevo": r.valor_nuevo, "detalle": r.detalle}
+        {
+            "id": r.id,
+            "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+            "usuario_email": r.usuario_email,
+            "accion": r.accion,
+            "campo": r.campo,
+            "valor_anterior": r.valor_anterior,
+            "valor_nuevo": r.valor_nuevo,
+            "detalle": r.detalle,
+        }
         for r in logs
     ]
 
@@ -73,13 +89,7 @@ def facetas_audit_log(
     from app.models.db import AuditLogRecord
 
     def _distinct(col):
-        rows = (
-            db.query(col)
-            .filter(col.isnot(None))
-            .distinct()
-            .order_by(col.asc())
-            .all()
-        )
+        rows = db.query(col).filter(col.isnot(None)).distinct().order_by(col.asc()).all()
         return [r[0] for r in rows if r[0]]
 
     return {
@@ -119,11 +129,7 @@ def audit_heatmap_actividad(
     from app.models.db import AuditLogRecord
 
     desde = ahora_utc() - timedelta(days=int(dias))
-    eventos = (
-        db.query(AuditLogRecord)
-        .filter(AuditLogRecord.timestamp >= desde)
-        .all()
-    )
+    eventos = db.query(AuditLogRecord).filter(AuditLogRecord.timestamp >= desde).all()
 
     matriz: dict[tuple[int, int], int] = {}
     for e in eventos:
@@ -135,16 +141,17 @@ def audit_heatmap_actividad(
         key = (ts.weekday(), ts.hour)
         matriz[key] = matriz.get(key, 0) + 1
 
-    DIAS = ["Lunes", "Martes", "Miércoles", "Jueves",
-            "Viernes", "Sábado", "Domingo"]
+    DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     items = []
     for (dia_idx, hora), count in matriz.items():
-        items.append({
-            "dia_semana": dia_idx,
-            "dia_nombre": DIAS[dia_idx],
-            "hora": hora,
-            "count": count,
-        })
+        items.append(
+            {
+                "dia_semana": dia_idx,
+                "dia_nombre": DIAS[dia_idx],
+                "hora": hora,
+                "count": count,
+            }
+        )
     items.sort(key=lambda x: (x["dia_semana"], x["hora"]))
 
     return {
@@ -192,11 +199,13 @@ def audit_distribucion_tablas(
     items = []
     for tabla, count in por_tabla.items():
         pct = round(100 * count / total, 2) if total else 0.0
-        items.append({
-            "tabla": tabla,
-            "count": count,
-            "pct": pct,
-        })
+        items.append(
+            {
+                "tabla": tabla,
+                "count": count,
+                "pct": pct,
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -248,11 +257,13 @@ def audit_distribucion_acciones(
     items = []
     for accion, count in por_accion.items():
         pct = round(100 * count / total, 2) if total else 0.0
-        items.append({
-            "accion": accion,
-            "count": count,
-            "pct": pct,
-        })
+        items.append(
+            {
+                "accion": accion,
+                "count": count,
+                "pct": pct,
+            }
+        )
     items.sort(key=lambda x: x["count"], reverse=True)
 
     return {
@@ -346,10 +357,7 @@ def stats_audit_log(
         "top_10_usuarios": [{"usuario": u, "eventos": n} for u, n in top_usuarios],
         "top_10_acciones": [{"accion": a, "eventos": n} for a, n in top_acciones],
         "top_10_tablas": [{"tabla": t, "eventos": n} for t, n in top_tablas],
-        "eventos_por_dia": [
-            {"fecha": k, "eventos": v}
-            for k, v in sorted(eventos_por_dia.items())
-        ],
+        "eventos_por_dia": [{"fecha": k, "eventos": v} for k, v in sorted(eventos_por_dia.items())],
     }
 
 
@@ -405,30 +413,45 @@ def exportar_audit_csv(
     def _generar_csv():
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        writer.writerow([
-            "id", "timestamp", "usuario_email", "usuario_rol",
-            "accion", "tabla", "registro_id", "campo",
-            "valor_anterior", "valor_nuevo", "detalle", "ip",
-        ])
+        writer.writerow(
+            [
+                "id",
+                "timestamp",
+                "usuario_email",
+                "usuario_rol",
+                "accion",
+                "tabla",
+                "registro_id",
+                "campo",
+                "valor_anterior",
+                "valor_nuevo",
+                "detalle",
+                "ip",
+            ]
+        )
         yield buffer.getvalue()
-        buffer.seek(0); buffer.truncate(0)
+        buffer.seek(0)
+        buffer.truncate(0)
         for r in q.all():
-            writer.writerow([
-                r.id,
-                r.timestamp.isoformat() if r.timestamp else "",
-                r.usuario_email or "",
-                r.usuario_rol or "",
-                r.accion or "",
-                r.tabla or "",
-                r.registro_id if r.registro_id is not None else "",
-                r.campo or "",
-                (r.valor_anterior or "")[:1000],
-                (r.valor_nuevo or "")[:1000],
-                (r.detalle or "")[:1000],
-                r.ip or "",
-            ])
+            writer.writerow(
+                [
+                    r.id,
+                    r.timestamp.isoformat() if r.timestamp else "",
+                    r.usuario_email or "",
+                    r.usuario_rol or "",
+                    r.accion or "",
+                    r.tabla or "",
+                    r.registro_id if r.registro_id is not None else "",
+                    r.campo or "",
+                    (r.valor_anterior or "")[:1000],
+                    (r.valor_nuevo or "")[:1000],
+                    (r.detalle or "")[:1000],
+                    r.ip or "",
+                ]
+            )
             yield buffer.getvalue()
-            buffer.seek(0); buffer.truncate(0)
+            buffer.seek(0)
+            buffer.truncate(0)
 
     fname = f"audit-log-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(

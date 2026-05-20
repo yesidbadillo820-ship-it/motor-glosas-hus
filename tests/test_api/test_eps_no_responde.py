@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-no-responde (R195 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,12 +49,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, estado="RESPONDIDA", dias_atras=20, fecha_dec=None):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-        fecha_decision_eps=fecha_dec,
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+            fecha_decision_eps=fecha_dec,
+        )
+    )
     db.commit()
 
 
@@ -81,8 +89,7 @@ class TestEPSNoResponde:
         assert d["items"] == []
 
     def test_excluye_si_eps_decidio(self, client, db_session):
-        _seed(db_session, "X", dias_atras=30,
-              fecha_dec=ahora_utc())
+        _seed(db_session, "X", dias_atras=30, fecha_dec=ahora_utc())
         r = client.get("/glosas/stats/eps-no-responde?dias_minimos=15")
         d = r.json()
         assert d["items"] == []

@@ -3,6 +3,7 @@
 Garantizan: cálculo correcto del delay hasta las 6 AM, idempotencia
 de iniciar/detener, no romper en absence de event loop.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

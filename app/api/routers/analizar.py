@@ -74,6 +74,7 @@ async def _extraer_soportes_del_servidor(
         return ""
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
+
         soportes = get_indexer().lookup(numero_factura) or []
     except Exception as e:
         logger.warning(f"[{req_id}] Indexador soportes no disponible: {e}")
@@ -87,11 +88,13 @@ async def _extraer_soportes_del_servidor(
             return PRIORIDAD_TIPOS_SOPORTE.index(s.get("tipo_codigo") or "")
         except ValueError:
             return len(PRIORIDAD_TIPOS_SOPORTE)
+
     soportes_ordenados = sorted(soportes, key=_prioridad)
 
     contexto = ""
     leidos = 0
     from app.services.pdf_service import PdfService
+
     pdf_svc = PdfService()
     for s in soportes_ordenados:
         if leidos >= MAX_SOPORTES_AUTO:
@@ -105,21 +108,24 @@ async def _extraer_soportes_del_servidor(
             # Para JSON/XML/TXT (RIPS, etc.), inyectamos directo como texto plano
             try:
                 from pathlib import Path as _P
+
                 p = _P(ruta)
                 if p.exists() and p.stat().st_size < 500_000:
-                    contenido_txt = p.read_text(encoding="utf-8", errors="ignore")[:MAX_CHARS_POR_SOPORTE]
-                    contexto += (
-                        f"\n\n═══ SOPORTE AUTO ({tipo}): {nombre} ═══\n\n"
-                        + contenido_txt
-                    )
+                    contenido_txt = p.read_text(encoding="utf-8", errors="ignore")[
+                        :MAX_CHARS_POR_SOPORTE
+                    ]
+                    contexto += f"\n\n═══ SOPORTE AUTO ({tipo}): {nombre} ═══\n\n" + contenido_txt
                     leidos += 1
-                    logger.info(f"[{req_id}] Soporte texto auto: {nombre} ({len(contenido_txt)} chars)")
+                    logger.info(
+                        f"[{req_id}] Soporte texto auto: {nombre} ({len(contenido_txt)} chars)"
+                    )
             except Exception as e:
                 logger.warning(f"[{req_id}] No pude leer soporte {nombre}: {e}")
             continue
         # PDF — extraer texto
         try:
             from pathlib import Path as _P
+
             p = _P(ruta)
             if not p.exists():
                 continue
@@ -139,10 +145,7 @@ async def _extraer_soportes_del_servidor(
             texto_recortado = (texto or "")[:MAX_CHARS_POR_SOPORTE]
             if not texto_recortado.strip():
                 continue
-            contexto += (
-                f"\n\n═══ SOPORTE AUTO ({tipo}): {nombre} ═══\n\n"
-                + texto_recortado
-            )
+            contexto += f"\n\n═══ SOPORTE AUTO ({tipo}): {nombre} ═══\n\n" + texto_recortado
             leidos += 1
             logger.info(
                 f"[{req_id}] Soporte auto inyectado: {nombre} "
@@ -178,6 +181,7 @@ async def _extraer_pdfs(
         return "", 0, None
 
     from app.services.pdf_service import PdfService
+
     pdf_svc = PdfService()
     contexto_pdf = ""
     procesados = 0
@@ -186,8 +190,7 @@ async def _extraer_pdfs(
     for archivo in archivos:
         if procesados >= MAX_ARCHIVOS:
             logger.warning(
-                f"[{req_id}] Máximo {MAX_ARCHIVOS} archivos alcanzado, "
-                "ignorando restantes"
+                f"[{req_id}] Máximo {MAX_ARCHIVOS} archivos alcanzado, ignorando restantes"
             )
             break
         if not archivo.filename:
@@ -231,7 +234,9 @@ async def _extraer_pdfs(
 
 
 def _obtener_few_shots(
-    db: Session, eps: str, tabla_excel: str,
+    db: Session,
+    eps: str,
+    tabla_excel: str,
 ) -> tuple[list[str], list, str]:
     """Pre-fetch de Plantillas Gold para inyectar como few-shot al LLM.
 
@@ -239,36 +244,51 @@ def _obtener_few_shots(
     se usa también para el pre-lookup de tarifa.
     """
     from app.api.routers.plantillas_gold import obtener_few_shot
+
     codigo_match = re.search(
         r"\b(TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b",
         tabla_excel.upper(),
     )
     cod_pref = codigo_match.group(0) if codigo_match else ""
     plantillas_gold = (
-        obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2)
-        if cod_pref else []
+        obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2) if cod_pref else []
     )
     few_shots = [p.argumento for p in plantillas_gold]
     return few_shots, plantillas_gold, cod_pref
 
 
 def _pre_lookup_tarifa(
-    db: Session, cod_pref: str, eps: str,
-    tabla_excel: str, contexto_pdf: str, req_id: str,
+    db: Session,
+    cod_pref: str,
+    eps: str,
+    tabla_excel: str,
+    contexto_pdf: str,
+    req_id: str,
 ) -> Optional[dict]:
     """Wrapper local sobre tarifa_lookup_service.pre_lookup_tarifa.
     Mantenido para no romper el call site original (línea 573 de este módulo).
     """
     from app.services.tarifa_lookup_service import pre_lookup_tarifa
+
     return pre_lookup_tarifa(
-        db=db, cod_pref=cod_pref, eps=eps,
-        tabla_excel=tabla_excel, contexto_pdf=contexto_pdf, req_id=req_id,
+        db=db,
+        cod_pref=cod_pref,
+        eps=eps,
+        tabla_excel=tabla_excel,
+        contexto_pdf=contexto_pdf,
+        req_id=req_id,
     )
 
 
 def _agregar_banner_tarifa_post(
-    db: Session, resultado, eps: str, tabla_excel: str,
-    contexto_pdf: str, val_obj: float, val_ac: float, req_id: str,
+    db: Session,
+    resultado,
+    eps: str,
+    tabla_excel: str,
+    contexto_pdf: str,
+    val_obj: float,
+    val_ac: float,
+    req_id: str,
 ) -> None:
     """Si es glosa TA con CUPS extraíble, busca la tarifa y prefija el
     banner HTML al dictamen para que el auditor vea los datos duros."""
@@ -280,6 +300,7 @@ def _agregar_banner_tarifa_post(
         return
     try:
         from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
+
         # Buscar valores en la glosa Y en el PDF (la factura electrónica
         # HUS trae "VALOR TOTAL ORDEN DE SERVICIO $X" — fuente confiable
         # del facturado real, distinto del valor objetado por la EPS).
@@ -291,21 +312,29 @@ def _agregar_banner_tarifa_post(
             if vals_pdf["facturado"] > 0:
                 val_fact = vals_pdf["facturado"]
         info_tarifa = evaluar_glosa_tarifa(
-            db, eps=eps, cups=cups_ext,
-            valor_facturado=val_fact, valor_objetado=val_obj,
+            db,
+            eps=eps,
+            cups=cups_ext,
+            valor_facturado=val_fact,
+            valor_objetado=val_obj,
             valor_reconocido=val_rec,
         )
         if not info_tarifa.get("encontrada"):
             from app.services.tarifas_oficiales import tarifa_a_banner_dict
+
             oficial = tarifa_a_banner_dict(cups_ext)
             if oficial:
                 info_tarifa = {
-                    "encontrada": True, "tarifa": oficial,
-                    "valor_facturado": val_fact, "valor_objetado": val_obj,
+                    "encontrada": True,
+                    "tarifa": oficial,
+                    "valor_facturado": val_fact,
+                    "valor_objetado": val_obj,
                     "valor_reconocido": val_rec,
                     "valor_pactado_calc": oficial["valor_pactado"],
                     "recomendacion": {
-                        "accion": "DEFENDER_TOTAL" if val_fact <= oficial["valor_pactado"] + 1 else "REVISAR",
+                        "accion": "DEFENDER_TOTAL"
+                        if val_fact <= oficial["valor_pactado"] + 1
+                        else "REVISAR",
                         "titulo": "✅ Valor oficial HUS/SOAT conocido — defender",
                         "razon": (
                             f"El valor oficial publicado para este CUPS es "
@@ -331,7 +360,9 @@ def _agregar_banner_tarifa_post(
         logger.warning(f"[{req_id}] No se pudo agregar banner de tarifa: {e}")
 
 
-def _decidir_estado_y_codigo(val_obj: float, val_ac: float) -> tuple[float, str, Optional[str], Optional[str]]:
+def _decidir_estado_y_codigo(
+    val_obj: float, val_ac: float
+) -> tuple[float, str, Optional[str], Optional[str]]:
     """Determina (val_obj_corregido, estado, cod_respuesta, descripcion).
 
     BUG fix preservado: si val_obj=0 y hay aceptación, val_ac es la base
@@ -347,9 +378,15 @@ def _decidir_estado_y_codigo(val_obj: float, val_ac: float) -> tuple[float, str,
 
 
 def _construir_dictamen_aceptacion(
-    eps: str, codigo_glosa: str, val_obj: float, val_ac: float,
-    estado: str, cod_resp: str, desc_resp: str,
-    tabla_excel: str, contexto_pdf: str,
+    eps: str,
+    codigo_glosa: str,
+    val_obj: float,
+    val_ac: float,
+    estado: str,
+    cod_resp: str,
+    desc_resp: str,
+    tabla_excel: str,
+    contexto_pdf: str,
 ) -> str:
     """Genera el HTML completo cuando hay aceptación (total/parcial).
 
@@ -360,7 +397,9 @@ def _construir_dictamen_aceptacion(
     contrato_info = get_contrato(eps)
     num_contrato = contrato_info.get("numero") or "CONTRATO VIGENTE ENTRE LAS PARTES"
     servicio_descr = _descripcion_servicio(
-        codigo_glosa, texto_glosa=tabla_excel, contexto_pdf=contexto_pdf,
+        codigo_glosa,
+        texto_glosa=tabla_excel,
+        contexto_pdf=contexto_pdf,
     )
 
     if estado == "ACEPTADA":
@@ -439,10 +478,18 @@ def _construir_dictamen_aceptacion(
 
 
 async def _persistir_y_responder(
-    db: Session, resultado, eps: str, etapa: str,
-    valor_aceptado: str, tabla_excel: str, contexto_pdf: str,
-    numero_factura: Optional[str], numero_radicado: Optional[str],
-    data, current_user, req_id: str,
+    db: Session,
+    resultado,
+    eps: str,
+    etapa: str,
+    valor_aceptado: str,
+    tabla_excel: str,
+    contexto_pdf: str,
+    numero_factura: Optional[str],
+    numero_radicado: Optional[str],
+    data,
+    current_user,
+    req_id: str,
 ):
     """Cierra el flujo: aplica banner de tarifa, decide estado, construye
     dictamen final, persiste GlosaRecord, guarda snapshot de versión."""
@@ -451,26 +498,36 @@ async def _persistir_y_responder(
     val_ac = float(re.sub(r"[^\d]", "", valor_aceptado) or 0)
 
     _agregar_banner_tarifa_post(
-        db, resultado, eps, tabla_excel, contexto_pdf, val_obj, val_ac, req_id,
+        db,
+        resultado,
+        eps,
+        tabla_excel,
+        contexto_pdf,
+        val_obj,
+        val_ac,
+        req_id,
     )
 
     val_obj, estado, cod_resp_acept, desc_resp_acept = _decidir_estado_y_codigo(
-        val_obj, val_ac,
+        val_obj,
+        val_ac,
     )
 
     dictamen_final = resultado.dictamen
     if estado in ("ACEPTADA", "PARCIALMENTE_ACEPTADA"):
         dictamen_final = _construir_dictamen_aceptacion(
-            eps=eps, codigo_glosa=resultado.codigo_glosa,
-            val_obj=val_obj, val_ac=val_ac,
-            estado=estado, cod_resp=cod_resp_acept,
+            eps=eps,
+            codigo_glosa=resultado.codigo_glosa,
+            val_obj=val_obj,
+            val_ac=val_ac,
+            estado=estado,
+            cod_resp=cod_resp_acept,
             desc_resp=desc_resp_acept,
-            tabla_excel=tabla_excel, contexto_pdf=contexto_pdf,
+            tabla_excel=tabla_excel,
+            contexto_pdf=contexto_pdf,
         )
 
-    tipo_final = (
-        f"RESPUESTA {cod_resp_acept}" if cod_resp_acept else resultado.tipo
-    )
+    tipo_final = f"RESPUESTA {cod_resp_acept}" if cod_resp_acept else resultado.tipo
     cup_ext, servicio_ext = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
     cod_resp_m = re.search(r"\bRE\d{4}\b", tipo_final or "")
     cod_resp = cod_resp_m.group(0) if cod_resp_m else (cod_resp_acept or "")
@@ -486,6 +543,7 @@ async def _persistir_y_responder(
     try:
         if numero_factura and resultado.codigo_glosa:
             from app.models.db import GlosaRecord as _GR
+
             q = (
                 db.query(_GR)
                 .filter(_GR.factura == numero_factura)
@@ -501,6 +559,7 @@ async def _persistir_y_responder(
     if existente:
         # UPDATE de la fila existente — sobreescribe dictamen y campos.
         from datetime import datetime, timezone as _tz
+
         existente.valor_objetado = val_obj
         existente.valor_aceptado = val_ac
         existente.estado = estado
@@ -509,19 +568,11 @@ async def _persistir_y_responder(
         existente.dias_restantes = resultado.dias_restantes
         existente.modelo_ia = resultado.modelo_ia
         existente.score = resultado.score
-        existente.numero_radicado = (
-            numero_radicado or existente.numero_radicado
-        )
-        existente.texto_glosa_original = (
-            tabla_excel or existente.texto_glosa_original
-        )
+        existente.numero_radicado = numero_radicado or existente.numero_radicado
+        existente.texto_glosa_original = tabla_excel or existente.texto_glosa_original
         existente.codigo_respuesta = cod_resp or existente.codigo_respuesta
-        existente.cups_servicio = (
-            cup_ext or existente.cups_servicio
-        )
-        existente.servicio_descripcion = (
-            servicio_ext or existente.servicio_descripcion
-        )
+        existente.cups_servicio = cup_ext or existente.cups_servicio
+        existente.servicio_descripcion = servicio_ext or existente.servicio_descripcion
         existente.paciente = resultado.paciente or existente.paciente
         if data and getattr(data, "fecha_recepcion", None):
             existente.fecha_recepcion = data.fecha_recepcion
@@ -558,7 +609,9 @@ async def _persistir_y_responder(
 
     if estado == "RADICADA":
         glosa_repo.actualizar_estado(
-            glosa.id, "RESPONDIDA", responsable=current_user.email,
+            glosa.id,
+            "RESPONDIDA",
+            responsable=current_user.email,
         )
 
     logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")
@@ -566,6 +619,7 @@ async def _persistir_y_responder(
     # de este request quedan trazados a su id (caso de glosas que disparen
     # un análisis adicional, ej. evaluación de riesgo).
     from app.core.logging_utils import glosa_id_var
+
     glosa_id_var.set(glosa.id)
 
     resultado.tipo = tipo_final
@@ -573,9 +627,13 @@ async def _persistir_y_responder(
     resultado.glosa_id = glosa.id
     try:
         from app.api.routers.versiones import guardar_version
+
         guardar_version(
-            db=db, glosa_id=glosa.id, dictamen_html=dictamen_final,
-            accion="CREAR", autor_email=current_user.email,
+            db=db,
+            glosa_id=glosa.id,
+            dictamen_html=dictamen_final,
+            accion="CREAR",
+            autor_email=current_user.email,
         )
     except Exception as e:
         logger.warning(f"No se pudo guardar version: {e}")
@@ -628,6 +686,7 @@ async def analizar(
     # glosa_id se setea más tarde, en _persistir_y_responder cuando ya
     # existe la fila en BD.
     from app.core.logging_utils import user_email_var
+
     user_email_var.set(current_user.email or "")
     logger.info(
         f"[{req_id}] Análisis solicitado por: {current_user.email} | "
@@ -636,7 +695,8 @@ async def analizar(
 
     try:
         data = GlosaInput(
-            eps=eps, etapa=etapa,
+            eps=eps,
+            etapa=etapa,
             fecha_radicacion=fecha_radicacion,
             fecha_recepcion=fecha_recepcion,
             valor_aceptado=valor_aceptado,
@@ -653,7 +713,9 @@ async def analizar(
         raise HTTPException(status_code=422, detail=str(e))
 
     contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
-        archivos, req_id, capturar_raw=bool(usar_pdf_nativo_soportes),
+        archivos,
+        req_id,
+        capturar_raw=bool(usar_pdf_nativo_soportes),
     )
 
     # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
@@ -668,7 +730,11 @@ async def analizar(
         req_id=req_id,
     )
     if contexto_soportes_auto:
-        contexto_pdf = (contexto_pdf + "\n\n" + contexto_soportes_auto) if contexto_pdf else contexto_soportes_auto
+        contexto_pdf = (
+            (contexto_pdf + "\n\n" + contexto_soportes_auto)
+            if contexto_pdf
+            else contexto_soportes_auto
+        )
         # Contar como "archivos procesados" para que el motor IA detecte
         # que hay soportes disponibles y referencie en el dictamen.
         archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
@@ -678,17 +744,19 @@ async def analizar(
 
     few_shots, plantillas_gold, cod_pref = _obtener_few_shots(db, eps, tabla_excel)
 
-    info_tarifa_pre = _pre_lookup_tarifa(
-        db, cod_pref, eps, tabla_excel, contexto_pdf, req_id
-    )
+    info_tarifa_pre = _pre_lookup_tarifa(db, cod_pref, eps, tabla_excel, contexto_pdf, req_id)
 
     resultado = await service.analizar(
-        data, contexto_pdf, contratos,
-        few_shots=few_shots, info_tarifa=info_tarifa_pre,
+        data,
+        contexto_pdf,
+        contratos,
+        few_shots=few_shots,
+        info_tarifa=info_tarifa_pre,
         pdfs_raw_para_multimodal=pdfs_raw,
     )
     if plantillas_gold:
         from app.api.routers.plantillas_gold import marcar_usos
+
         marcar_usos(db, [p.id for p in plantillas_gold])
     logger.info(
         f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} "
@@ -696,14 +764,25 @@ async def analizar(
     )
 
     return await _persistir_y_responder(
-        db, resultado, eps, etapa, valor_aceptado, tabla_excel, contexto_pdf,
-        numero_factura, numero_radicado, data, current_user, req_id,
+        db,
+        resultado,
+        eps,
+        etapa,
+        valor_aceptado,
+        tabla_excel,
+        contexto_pdf,
+        numero_factura,
+        numero_radicado,
+        data,
+        current_user,
+        req_id,
     )
 
 
 # ════════════════════════════════════════════════════════════════════
 # Endpoints de soporte para el rediseno del panel "Analizar glosa"
 # ════════════════════════════════════════════════════════════════════
+
 
 @router.post("/analizar/preview")
 async def preview_glosa(
@@ -756,10 +835,23 @@ async def preview_glosa(
     eps_detectada = ""
     if not eps_form or eps_form.upper() in ("OTRA / SIN DEFINIR", "OTRA/SIN DEFINIR", ""):
         eps_lista = [
-            "NUEVA EPS", "COMPENSAR", "COOSALUD", "POSITIVA", "FOMAG",
-            "POLICIA NACIONAL", "AURORA", "SUMIMEDICAL", "PRECIMED",
-            "SALUD MIA", "SANITAS", "SURA", "MEDIMAS", "FAMISANAR",
-            "MUTUAL SER", "EPS SURA", "SAVIA SALUD",
+            "NUEVA EPS",
+            "COMPENSAR",
+            "COOSALUD",
+            "POSITIVA",
+            "FOMAG",
+            "POLICIA NACIONAL",
+            "AURORA",
+            "SUMIMEDICAL",
+            "PRECIMED",
+            "SALUD MIA",
+            "SANITAS",
+            "SURA",
+            "MEDIMAS",
+            "FAMISANAR",
+            "MUTUAL SER",
+            "EPS SURA",
+            "SAVIA SALUD",
         ]
         for eps_nombre in eps_lista:
             if eps_nombre in texto_upper:
@@ -824,15 +916,28 @@ async def extraer_de_correo(
 
     texto_upper = raw.upper()
 
-    factura_match = re.search(r"(?:FACTURA|FACT|FV[-\s]?)\s*[:\-]?\s*([A-Z0-9\-]{4,20})", texto_upper)
+    factura_match = re.search(
+        r"(?:FACTURA|FACT|FV[-\s]?)\s*[:\-]?\s*([A-Z0-9\-]{4,20})", texto_upper
+    )
     radicado_match = re.search(r"(?:RADIC|GLS[-\s]?)\s*[:\-]?\s*([A-Z0-9\-]{4,20})", texto_upper)
     fecha_match = re.search(r"\b(\d{1,2}[\-/]\d{1,2}[\-/]\d{2,4})\b", raw)
 
     eps_detectada = ""
     eps_lista = [
-        "NUEVA EPS", "COMPENSAR", "COOSALUD", "POSITIVA", "FOMAG",
-        "POLICIA NACIONAL", "AURORA", "SUMIMEDICAL", "PRECIMED",
-        "SALUD MIA", "SANITAS", "SURA", "MEDIMAS", "FAMISANAR",
+        "NUEVA EPS",
+        "COMPENSAR",
+        "COOSALUD",
+        "POSITIVA",
+        "FOMAG",
+        "POLICIA NACIONAL",
+        "AURORA",
+        "SUMIMEDICAL",
+        "PRECIMED",
+        "SALUD MIA",
+        "SANITAS",
+        "SURA",
+        "MEDIMAS",
+        "FAMISANAR",
     ]
     for eps_nombre in eps_lista:
         if eps_nombre in texto_upper:
@@ -901,6 +1006,7 @@ async def score_breakdown(
       - auditor_ok:           el agente auditor no encontro discrepancias
     """
     from app.models.db import GlosaRecord
+
     g = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
     if not g:
         raise HTTPException(status_code=404, detail="glosa no encontrada")
@@ -908,84 +1014,112 @@ async def score_breakdown(
     factores = []
 
     datos_completos = bool(g.eps and g.codigo_glosa and (g.valor_objetado or 0) > 0)
-    factores.append({
-        "id": "datos_completos",
-        "etiqueta": "Datos del caso completos",
-        "peso": 15,
-        "score": 100 if datos_completos else 40,
-        "ok": datos_completos,
-        "sugerencia": "" if datos_completos else "Faltan datos basicos (EPS, codigo o valor)",
-    })
+    factores.append(
+        {
+            "id": "datos_completos",
+            "etiqueta": "Datos del caso completos",
+            "peso": 15,
+            "score": 100 if datos_completos else 40,
+            "ok": datos_completos,
+            "sugerencia": "" if datos_completos else "Faltan datos basicos (EPS, codigo o valor)",
+        }
+    )
 
     tarifa_ok = bool(
         getattr(g, "tarifa_pactada", None)
         or getattr(g, "tarifa_match", None)
         or (g.dictamen and "tarifa" in (g.dictamen or "").lower())
     )
-    factores.append({
-        "id": "tarifa_pactada",
-        "etiqueta": "Tarifa pactada conocida",
-        "peso": 20,
-        "score": 100 if tarifa_ok else 30,
-        "ok": tarifa_ok,
-        "sugerencia": "" if tarifa_ok else "Subir el contrato firmado al modulo de Contratos",
-    })
+    factores.append(
+        {
+            "id": "tarifa_pactada",
+            "etiqueta": "Tarifa pactada conocida",
+            "peso": 20,
+            "score": 100 if tarifa_ok else 30,
+            "ok": tarifa_ok,
+            "sugerencia": "" if tarifa_ok else "Subir el contrato firmado al modulo de Contratos",
+        }
+    )
 
     soportes_ok = bool(
         getattr(g, "tiene_soportes", False)
         or (g.dictamen and "soporte" in (g.dictamen or "").lower())
     )
-    factores.append({
-        "id": "soportes_adjuntos",
-        "etiqueta": "Soportes documentales",
-        "peso": 25,
-        "score": 100 if soportes_ok else 0,
-        "ok": soportes_ok,
-        "sugerencia": "" if soportes_ok else "Adjuntar historia clinica, RIPS o evolutivas",
-    })
+    factores.append(
+        {
+            "id": "soportes_adjuntos",
+            "etiqueta": "Soportes documentales",
+            "peso": 25,
+            "score": 100 if soportes_ok else 0,
+            "ok": soportes_ok,
+            "sugerencia": "" if soportes_ok else "Adjuntar historia clinica, RIPS o evolutivas",
+        }
+    )
 
     precedente_ok = False
     try:
         from sqlalchemy import and_
-        prev = db.query(GlosaRecord).filter(
-            and_(
-                GlosaRecord.codigo_glosa == g.codigo_glosa,
-                GlosaRecord.eps == g.eps,
-                GlosaRecord.estado == "GANADA",
-                GlosaRecord.id != glosa_id,
+
+        prev = (
+            db.query(GlosaRecord)
+            .filter(
+                and_(
+                    GlosaRecord.codigo_glosa == g.codigo_glosa,
+                    GlosaRecord.eps == g.eps,
+                    GlosaRecord.estado == "GANADA",
+                    GlosaRecord.id != glosa_id,
+                )
             )
-        ).limit(1).first()
+            .limit(1)
+            .first()
+        )
         precedente_ok = prev is not None
     except Exception:
         pass
-    factores.append({
-        "id": "precedente_interno",
-        "etiqueta": "Precedente interno (glosa ganada similar)",
-        "peso": 15,
-        "score": 100 if precedente_ok else 0,
-        "ok": precedente_ok,
-        "sugerencia": "" if precedente_ok else "Sin precedente interno; el dictamen igual procede via normativa",
-    })
+    factores.append(
+        {
+            "id": "precedente_interno",
+            "etiqueta": "Precedente interno (glosa ganada similar)",
+            "peso": 15,
+            "score": 100 if precedente_ok else 0,
+            "ok": precedente_ok,
+            "sugerencia": ""
+            if precedente_ok
+            else "Sin precedente interno; el dictamen igual procede via normativa",
+        }
+    )
 
-    normativa_ok = bool(g.dictamen and any(k in (g.dictamen or "").upper() for k in ["ART.", "ARTICULO", "RES.", "LEY", "DECRETO", "SENT."]))
-    factores.append({
-        "id": "normativa_relevante",
-        "etiqueta": "Normativa citada en el dictamen",
-        "peso": 15,
-        "score": 100 if normativa_ok else 50,
-        "ok": normativa_ok,
-        "sugerencia": "" if normativa_ok else "El dictamen no cita normativa explicita",
-    })
+    normativa_ok = bool(
+        g.dictamen
+        and any(
+            k in (g.dictamen or "").upper()
+            for k in ["ART.", "ARTICULO", "RES.", "LEY", "DECRETO", "SENT."]
+        )
+    )
+    factores.append(
+        {
+            "id": "normativa_relevante",
+            "etiqueta": "Normativa citada en el dictamen",
+            "peso": 15,
+            "score": 100 if normativa_ok else 50,
+            "ok": normativa_ok,
+            "sugerencia": "" if normativa_ok else "El dictamen no cita normativa explicita",
+        }
+    )
 
     auditor_ok = bool(getattr(g, "auditor_ok", True))
-    factores.append({
-        "id": "auditor_ok",
-        "etiqueta": "Auditor forense sin discrepancias",
-        "peso": 10,
-        "score": 100 if auditor_ok else 40,
-        "ok": auditor_ok,
-        "sugerencia": "" if auditor_ok else "El agente auditor detecto inconsistencias en el caso",
-    })
+    factores.append(
+        {
+            "id": "auditor_ok",
+            "etiqueta": "Auditor forense sin discrepancias",
+            "peso": 10,
+            "score": 100 if auditor_ok else 40,
+            "ok": auditor_ok,
+            "sugerencia": ""
+            if auditor_ok
+            else "El agente auditor detecto inconsistencias en el caso",
+        }
+    )
 
     total_peso = sum(f["peso"] for f in factores)
     total_score = sum(f["score"] * f["peso"] for f in factores) / total_peso
@@ -995,7 +1129,6 @@ async def score_breakdown(
         "score_total": round(total_score, 1),
         "factores": factores,
         "sugerencias_priorizadas": [
-            f["sugerencia"] for f in sorted(factores, key=lambda x: -x["peso"])
-            if f["sugerencia"]
+            f["sugerencia"] for f in sorted(factores, key=lambda x: -x["peso"]) if f["sugerencia"]
         ][:3],
     }

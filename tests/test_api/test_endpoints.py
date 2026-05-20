@@ -3,7 +3,7 @@
 Most endpoints require authentication. These tests verify that the routes
 exist (not 404) and correctly enforce authentication (401 without token).
 """
-import pytest
+
 from fastapi.testclient import TestClient
 
 

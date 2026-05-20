@@ -1,7 +1,7 @@
 """Tests del endpoint GET /glosas/buscar-avanzado (R94 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,9 +49,14 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        factura="F-001", valor_objetado=1000, etapa="X",
-        estado="RADICADA", creado_en=ahora_utc(),
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        factura="F-001",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(GlosaRecord(**base))
@@ -80,15 +86,10 @@ class TestBuscarAvanzado:
         assert r.json()["total_coincidencias"] == 1
 
     def test_combinacion_AND(self, client, db_session):
-        _seed(db_session, eps="SANITAS", estado="LEVANTADA",
-              valor_objetado=5000)
-        _seed(db_session, eps="SANITAS", estado="ACEPTADA",
-              valor_objetado=5000)
-        _seed(db_session, eps="NUEVA EPS", estado="LEVANTADA",
-              valor_objetado=5000)
-        r = client.get(
-            "/glosas/buscar-avanzado?eps=SANITAS&estado=LEVANTADA"
-        )
+        _seed(db_session, eps="SANITAS", estado="LEVANTADA", valor_objetado=5000)
+        _seed(db_session, eps="SANITAS", estado="ACEPTADA", valor_objetado=5000)
+        _seed(db_session, eps="NUEVA EPS", estado="LEVANTADA", valor_objetado=5000)
+        r = client.get("/glosas/buscar-avanzado?eps=SANITAS&estado=LEVANTADA")
         d = r.json()
         assert d["total_coincidencias"] == 1
 
@@ -96,9 +97,7 @@ class TestBuscarAvanzado:
         _seed(db_session, valor_objetado=500)
         _seed(db_session, valor_objetado=5000)
         _seed(db_session, valor_objetado=50000)
-        r = client.get(
-            "/glosas/buscar-avanzado?valor_min=1000&valor_max=10000"
-        )
+        r = client.get("/glosas/buscar-avanzado?valor_min=1000&valor_max=10000")
         d = r.json()
         assert d["total_coincidencias"] == 1
         assert d["items"][0]["valor_objetado"] == 5000.0
@@ -113,4 +112,4 @@ class TestBuscarAvanzado:
         r = client.get("/glosas/buscar-avanzado?limit=5")
         d = r.json()
         assert d["total_coincidencias"] == 15  # total real
-        assert len(d["items"]) == 5             # limitado
+        assert len(d["items"]) == 5  # limitado

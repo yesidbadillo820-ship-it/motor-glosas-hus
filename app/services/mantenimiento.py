@@ -7,6 +7,7 @@ Funciones idempotentes que se pueden invocar:
 Diseño: cada función retorna un dict con stats para que el caller
 loguee/registre cuántas filas se afectaron y cuánto espacio se liberó.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -46,11 +47,7 @@ def purgar_ai_cache_viejo(
     corte = ahora_utc() - timedelta(days=max(1, int(dias)))
     total_antes = db.query(AICacheRecord).count()
 
-    obsoletas = (
-        db.query(AICacheRecord)
-        .filter(AICacheRecord.creado_en < corte)
-        .all()
-    )
+    obsoletas = db.query(AICacheRecord).filter(AICacheRecord.creado_en < corte).all()
     espacio_chars = sum(len(r.respuesta or "") for r in obsoletas)
 
     purgadas = 0

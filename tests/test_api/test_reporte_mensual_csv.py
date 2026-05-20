@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/reporte-mensual.csv (R126 P2)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -55,8 +60,12 @@ def client(db_session, usuario_super):
 
 def _seed_glosa(db, creado, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
     )
     base.update(kw)
     db.add(GlosaRecord(creado_en=creado, **base))
@@ -64,10 +73,14 @@ def _seed_glosa(db, creado, **kw):
 
 
 def _seed_ia(db, creado, cost=0.01):
-    db.add(AICallRecord(
-        proveedor="anthropic", modelo="claude",
-        cost_usd=cost, creado_en=creado,
-    ))
+    db.add(
+        AICallRecord(
+            proveedor="anthropic",
+            modelo="claude",
+            cost_usd=cost,
+            creado_en=creado,
+        )
+    )
     db.commit()
 
 
@@ -82,19 +95,23 @@ class TestReporteMensualCSV:
     def test_header_row(self, client):
         r = client.get("/admin/reporte-mensual.csv")
         primera = r.text.split("\n")[0]
-        for col in ("mes", "glosas_creadas", "glosas_cerradas",
-                    "valor_objetado", "valor_recuperado",
-                    "tasa_levantamiento_pct", "tasa_recuperacion_pct",
-                    "ia_calls", "costo_ia_usd"):
+        for col in (
+            "mes",
+            "glosas_creadas",
+            "glosas_cerradas",
+            "valor_objetado",
+            "valor_recuperado",
+            "tasa_levantamiento_pct",
+            "tasa_recuperacion_pct",
+            "ia_calls",
+            "costo_ia_usd",
+        ):
             assert col in primera
 
     def test_serie_por_mes(self, client, db_session):
-        _seed_glosa(db_session,
-                    datetime(2026, 3, 15, tzinfo=timezone.utc))
-        _seed_glosa(db_session,
-                    datetime(2026, 4, 1, tzinfo=timezone.utc))
-        _seed_glosa(db_session,
-                    datetime(2026, 4, 20, tzinfo=timezone.utc))
+        _seed_glosa(db_session, datetime(2026, 3, 15, tzinfo=timezone.utc))
+        _seed_glosa(db_session, datetime(2026, 4, 1, tzinfo=timezone.utc))
+        _seed_glosa(db_session, datetime(2026, 4, 20, tzinfo=timezone.utc))
 
         r = client.get("/admin/reporte-mensual.csv")
         # 1 header + 2 meses = 3 líneas no vacías
@@ -106,8 +123,6 @@ class TestReporteMensualCSV:
         assert any("2026-04,2" in l for l in lineas)
 
     def test_incluye_costos_ia(self, client, db_session):
-        _seed_ia(db_session,
-                 datetime(2026, 4, 5, tzinfo=timezone.utc),
-                 cost=2.5)
+        _seed_ia(db_session, datetime(2026, 4, 5, tzinfo=timezone.utc), cost=2.5)
         r = client.get("/admin/reporte-mensual.csv")
         assert "2.5" in r.text

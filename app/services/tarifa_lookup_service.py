@@ -16,6 +16,7 @@ Uso típico desde `glosa_service.analizar()`:
         # Inyectar al prompt / mostrar banner
         ...
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -127,6 +128,7 @@ def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord
     # traducimos al CUPS oficial y reintentamos.
     try:
         from app.services.homologador_cups import homologar_cups
+
         homo = homologar_cups(cups, db=db, eps=eps)
         if homo and homo.get("cups_oficial") and homo["cups_oficial"] != cups:
             cups_oficial = homo["cups_oficial"]
@@ -208,6 +210,7 @@ def _motivo_cuestiona_contrato(motivo_glosa: str) -> bool:
         return False
     import re
     import unicodedata
+
     nfkd = unicodedata.normalize("NFKD", motivo_glosa)
     sin_dia = "".join(c for c in nfkd if not unicodedata.combining(c))
     txt = re.sub(r"\s+", " ", sin_dia).upper()
@@ -249,8 +252,16 @@ def _recomendacion(
     # desde los valores facturado/reconocido, y explicar la discrepancia.
     if es_soat_pct:
         multiplicador = 1 + factor_pct / 100.0
-        soat_base_hus = (valor_facturado / multiplicador) if (valor_facturado > 0 and multiplicador > 0) else 0.0
-        soat_base_eps = (valor_reconocido / multiplicador) if (valor_reconocido > 0 and multiplicador > 0) else 0.0
+        soat_base_hus = (
+            (valor_facturado / multiplicador)
+            if (valor_facturado > 0 and multiplicador > 0)
+            else 0.0
+        )
+        soat_base_eps = (
+            (valor_reconocido / multiplicador)
+            if (valor_reconocido > 0 and multiplicador > 0)
+            else 0.0
+        )
         signo = "+" if factor_pct > 0 else ""
         if valor_facturado > 0 and valor_reconocido > 0:
             return {
@@ -321,7 +332,9 @@ def _recomendacion(
         }
 
     if valor_pactado > 0 and diferencia_abs > tolerancia:
-        valor_a_aceptar = min(diferencia_abs, valor_objetado) if valor_objetado > 0 else diferencia_abs
+        valor_a_aceptar = (
+            min(diferencia_abs, valor_objetado) if valor_objetado > 0 else diferencia_abs
+        )
         valor_a_defender = max(0.0, valor_objetado - valor_a_aceptar) if valor_objetado > 0 else 0.0
         cabe_en_objetado = valor_objetado > 0 and diferencia_abs <= valor_objetado + tolerancia
         if cabe_en_objetado:
@@ -489,7 +502,9 @@ def evaluar_glosa_tarifa(
             "codigo_ips_contrato": cod_ips_encontrado,
             "cups_oficial": cups_encontrado,
             "norma": "Res. 2641/2025 MinSalud — CUPS 2025",
-        } if homologado else None,
+        }
+        if homologado
+        else None,
     }
 
 
@@ -518,6 +533,7 @@ def pre_lookup_tarifa(
         return None
     try:
         from app.utils.parsers_glosa import _extraer_cups_servicio, _extraer_valores_glosa
+
         cups_pre, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
         if not cups_pre:
             return None
@@ -530,7 +546,9 @@ def pre_lookup_tarifa(
             if _vp_pdf.get("facturado", 0.0) > 0:
                 _vp_fact = _vp_pdf["facturado"]
         info = evaluar_glosa_tarifa(
-            db, eps=eps, cups=cups_pre,
+            db,
+            eps=eps,
+            cups=cups_pre,
             valor_facturado=_vp_fact,
             valor_objetado=0.0,
             valor_reconocido=vals_pre.get("reconocido", 0.0),
@@ -540,14 +558,12 @@ def pre_lookup_tarifa(
             return info
         # Fallback al catálogo oficial HUS/SOAT
         from app.services.tarifas_oficiales import tarifa_a_banner_dict
+
         ofic = tarifa_a_banner_dict(cups_pre)
         if not ofic:
             return None
         diff = abs(vals_pre.get("facturado", 0.0) - ofic["valor_pactado"])
-        accion = (
-            "DEFENDER_TOTAL" if diff < max(1.0, ofic["valor_pactado"] * 0.005)
-            else "REVISAR"
-        )
+        accion = "DEFENDER_TOTAL" if diff < max(1.0, ofic["valor_pactado"] * 0.005) else "REVISAR"
         return {
             "encontrada": True,
             "tarifa": ofic,
@@ -563,9 +579,8 @@ def pre_lookup_tarifa(
         }
     except Exception as e:
         import logging
-        logging.getLogger(__name__).warning(
-            f"[{req_id}] pre_lookup_tarifa falló: {e}"
-        )
+
+        logging.getLogger(__name__).warning(f"[{req_id}] pre_lookup_tarifa falló: {e}")
         return None
 
 

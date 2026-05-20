@@ -1,4 +1,5 @@
 """Tests del endpoint /usuarios/yo (R81 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,8 +33,11 @@ def db_session():
 @pytest.fixture
 def usuario(db_session):
     u = UsuarioRecord(
-        id=1, email="auditor@hus.com", nombre="Juan Pérez",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="auditor@hus.com",
+        nombre="Juan Pérez",
+        rol="AUDITOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
         creado_en=ahora_utc(),
     )
@@ -46,6 +50,7 @@ def usuario(db_session):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -79,6 +84,14 @@ class TestUsuariosYo:
     def test_estructura_completa(self, client):
         r = client.get("/usuarios/yo")
         d = r.json()
-        for k in ("id", "email", "nombre", "rol", "activo",
-                  "totp_activo", "must_change_password", "creado_en"):
+        for k in (
+            "id",
+            "email",
+            "nombre",
+            "rol",
+            "activo",
+            "totp_activo",
+            "must_change_password",
+            "creado_en",
+        ):
             assert k in d

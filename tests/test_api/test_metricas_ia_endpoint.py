@@ -1,4 +1,5 @@
 """Tests del endpoint /sistema/metricas-ia (R55 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -27,9 +28,14 @@ def db():
 
 def _seed_call(db, **kw):
     base = dict(
-        proveedor="anthropic", modelo="claude-sonnet-4-6",
-        latency_ms=1000, input_tokens=100, cache_creation_input_tokens=0,
-        cache_read_input_tokens=0, output_tokens=50, cost_usd=0.001,
+        proveedor="anthropic",
+        modelo="claude-sonnet-4-6",
+        latency_ms=1000,
+        input_tokens=100,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=0,
+        output_tokens=50,
+        cost_usd=0.001,
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -40,6 +46,7 @@ def _seed_call(db, **kw):
 class TestMetricasIaEndpoint:
     def test_sin_calls_retorna_ceros(self, db):
         from app.api.routers.sistema import metricas_ia
+
         user = MagicMock(rol="ADMIN")
         r = metricas_ia(dias=1, db=db, current_user=user)
         assert r["total_calls"] == 0
@@ -48,6 +55,7 @@ class TestMetricasIaEndpoint:
 
     def test_agregaciones_basicas(self, db):
         from app.api.routers.sistema import metricas_ia
+
         # 3 calls: 2 sonnet, 1 haiku
         _seed_call(db, modelo="claude-sonnet-4-6", cost_usd=0.05, latency_ms=1000)
         _seed_call(db, modelo="claude-sonnet-4-6", cost_usd=0.03, latency_ms=2000)
@@ -64,6 +72,7 @@ class TestMetricasIaEndpoint:
 
     def test_latencia_percentiles(self, db):
         from app.api.routers.sistema import metricas_ia
+
         for ms in [100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 9999]:
             _seed_call(db, latency_ms=ms)
         user = MagicMock(rol="ADMIN")
@@ -76,6 +85,7 @@ class TestMetricasIaEndpoint:
 
     def test_cache_hit_rate(self, db):
         from app.api.routers.sistema import metricas_ia
+
         # 2 calls: una sin cache, una con 90% cache_read
         _seed_call(db, input_tokens=1000, cache_read_input_tokens=0)
         _seed_call(db, input_tokens=100, cache_read_input_tokens=900)
@@ -87,6 +97,7 @@ class TestMetricasIaEndpoint:
     def test_filtro_por_ventana(self, db):
         """Calls de hace 5 días no deben contar si dias=1."""
         from app.api.routers.sistema import metricas_ia
+
         _seed_call(db, creado_en=ahora_utc() - timedelta(days=5))
         _seed_call(db, creado_en=ahora_utc())
         user = MagicMock(rol="ADMIN")
@@ -100,6 +111,7 @@ class TestMetricasIaEndpoint:
 class TestMetricasIaPorGlosa:
     def test_glosa_sin_calls(self, db):
         from app.api.routers.sistema import metricas_ia_por_glosa
+
         user = MagicMock(rol="ADMIN")
         r = metricas_ia_por_glosa(glosa_id=999, db=db, current_user=user)
         assert r["total_calls"] == 0
@@ -107,6 +119,7 @@ class TestMetricasIaPorGlosa:
 
     def test_glosa_con_un_call(self, db):
         from app.api.routers.sistema import metricas_ia_por_glosa
+
         _seed_call(db, glosa_id=42, cost_usd=0.025, latency_ms=2000)
         # Otra glosa para confirmar aislamiento
         _seed_call(db, glosa_id=43, cost_usd=0.999)
@@ -119,6 +132,7 @@ class TestMetricasIaPorGlosa:
     def test_glosa_con_multiples_calls_orden_cronologico(self, db):
         """Debe ordenar por creado_en ASC (call inicial primero)."""
         from app.api.routers.sistema import metricas_ia_por_glosa
+
         _seed_call(db, glosa_id=7, cost_usd=0.05, creado_en=ahora_utc() - timedelta(seconds=20))
         _seed_call(db, glosa_id=7, cost_usd=0.03, creado_en=ahora_utc() - timedelta(seconds=10))
         _seed_call(db, glosa_id=7, cost_usd=0.001, creado_en=ahora_utc())
@@ -134,6 +148,7 @@ class TestMetricasIaPorGlosa:
 class TestMetricasIaPorUsuario:
     def test_ranking_por_costo_descendente(self, db):
         from app.api.routers.sistema import metricas_ia_por_usuario
+
         # Usuario A gasta más
         _seed_call(db, user_email="A@hus.com", cost_usd=0.10)
         _seed_call(db, user_email="A@hus.com", cost_usd=0.05)
@@ -152,6 +167,7 @@ class TestMetricasIaPorUsuario:
 
     def test_promedio_latencia_por_usuario(self, db):
         from app.api.routers.sistema import metricas_ia_por_usuario
+
         _seed_call(db, user_email="C@hus.com", latency_ms=1000, cost_usd=0.01)
         _seed_call(db, user_email="C@hus.com", latency_ms=3000, cost_usd=0.01)
         user = MagicMock(rol="ADMIN")
@@ -161,8 +177,11 @@ class TestMetricasIaPorUsuario:
 
     def test_filtro_ventana_dias(self, db):
         from app.api.routers.sistema import metricas_ia_por_usuario
+
         _seed_call(
-            db, user_email="X@hus.com", cost_usd=0.10,
+            db,
+            user_email="X@hus.com",
+            cost_usd=0.10,
             creado_en=ahora_utc() - timedelta(days=10),
         )
         _seed_call(db, user_email="X@hus.com", cost_usd=0.01)

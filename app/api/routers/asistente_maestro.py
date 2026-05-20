@@ -4,6 +4,7 @@ El frontend hace POST /asistente/chat con {mensajes: [{role, content}]}
 y espera {respuesta, tools_llamadas}. Delega en el servicio
 chat_con_asistente que corre el loop de tools contra Anthropic.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -32,8 +33,7 @@ async def asistente_chat(
     _cupo_ia: None = Depends(_consumir_cupo_ia),
 ):
     mensajes = [
-        m for m in data.mensajes
-        if isinstance(m, dict) and m.get("role") in ("user", "assistant")
+        m for m in data.mensajes if isinstance(m, dict) and m.get("role") in ("user", "assistant")
     ]
     if not mensajes:
         raise HTTPException(400, "Sin mensajes válidos")

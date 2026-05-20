@@ -3,6 +3,7 @@
 Cubre: paginación, filtros (eps, estado, búsqueda, rango de valor,
 fecha) y respuesta estructurada. Usa TestClient con dependency_overrides.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -41,9 +42,13 @@ def usuario_admin():
 
 def _seed(db, **kw):
     base = dict(
-        eps="FAMISANAR", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100_000, valor_aceptado=0,
-        etapa="RESPUESTA", estado="RADICADA",
+        eps="FAMISANAR",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        valor_aceptado=0,
+        etapa="RESPUESTA",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -55,6 +60,7 @@ def _seed(db, **kw):
 def client(db_session, usuario_admin):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario_admin
     with TestClient(app) as c:
@@ -123,8 +129,10 @@ class TestHistorialPaginado:
         d = r.json()
         # Solo debe traer las que matchean AAA
         for it in d["items"]:
-            assert "AAA" in (it.get("factura") or "").upper() or \
-                   "AAA" in (it.get("paciente") or "").upper()
+            assert (
+                "AAA" in (it.get("factura") or "").upper()
+                or "AAA" in (it.get("paciente") or "").upper()
+            )
 
     def test_filtro_fecha_desde(self, client, db_session):
         viejo = ahora_utc() - timedelta(days=60)
@@ -144,10 +152,8 @@ class TestHistorialPaginado:
     def test_search_full_text_en_dictamen(self, client, db_session):
         """R66 P1: el filtro search ahora busca también dentro del
         campo 'dictamen' — útil para encontrar argumentos previos."""
-        _seed(db_session, paciente="A",
-              dictamen="<p>se invoca Art. 57 Ley 1438</p>")
-        _seed(db_session, paciente="B",
-              dictamen="<p>fundamento en Sentencia T-760</p>")
+        _seed(db_session, paciente="A", dictamen="<p>se invoca Art. 57 Ley 1438</p>")
+        _seed(db_session, paciente="B", dictamen="<p>fundamento en Sentencia T-760</p>")
         r = client.get("/glosas/historial-paginado?search=T-760")
         d = r.json()
         pacientes = [it["paciente"] for it in d["items"]]
@@ -157,16 +163,16 @@ class TestHistorialPaginado:
     def test_search_en_texto_glosa_original(self, client, db_session):
         """search también matchea en texto_glosa_original (texto bruto
         que pegó el gestor del Excel de la EPS)."""
-        _seed(db_session, paciente="X",
-              texto_glosa_original="TA0201 hemograma valor 168563")
+        _seed(db_session, paciente="X", texto_glosa_original="TA0201 hemograma valor 168563")
         r = client.get("/glosas/historial-paginado?search=hemograma")
         d = r.json()
         assert any(it["paciente"] == "X" for it in d["items"])
 
     def test_search_en_servicio_descripcion(self, client, db_session):
         """servicio_descripcion también parte del full-text."""
-        _seed(db_session, paciente="X",
-              servicio_descripcion="CONSULTA DE URGENCIAS POR GINECOLOGIA")
+        _seed(
+            db_session, paciente="X", servicio_descripcion="CONSULTA DE URGENCIAS POR GINECOLOGIA"
+        )
         r = client.get("/glosas/historial-paginado?search=GINECOLOGIA")
         d = r.json()
         assert any(it["paciente"] == "X" for it in d["items"])

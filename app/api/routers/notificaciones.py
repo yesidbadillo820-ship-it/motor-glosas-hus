@@ -11,6 +11,7 @@ GET /notificaciones/badge
   Versión ultra-liviana que solo devuelve el número total —
   ideal para llamar cada 30s sin saturar la BD.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -49,18 +50,12 @@ def contadores_notificaciones(
     for g in grupos:
         if isinstance(g, dict):
             tipo = g.get("tipo") or g.get("nombre") or "(sin_tipo)"
-            count = (
-                g.get("count")
-                or g.get("total")
-                or len(g.get("items", []))
-            )
+            count = g.get("count") or g.get("total") or len(g.get("items", []))
             desglose[tipo] = count
     return {
         "total": r.get("total", 0) if isinstance(r, dict) else 0,
         "por_tipo": desglose,
-        "generado_en": (
-            r.get("generado_en") if isinstance(r, dict) else None
-        ),
+        "generado_en": (r.get("generado_en") if isinstance(r, dict) else None),
     }
 
 

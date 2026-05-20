@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/score-prioridad (R112 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=100, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=100,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
         dictamen="<p>" + "x" * 100 + "</p>",
         gestor_nombre="Alice",
@@ -96,8 +102,13 @@ class TestScorePrioridad:
         assert d["banner_recomendado"] == "MEDIA"
 
     def test_glosa_buena_info(self, client, db_session):
-        g = _seed(db_session, dias_restantes=20, valor_objetado=100,
-                  dictamen="x" * 100, gestor_nombre="Alice")
+        g = _seed(
+            db_session,
+            dias_restantes=20,
+            valor_objetado=100,
+            dictamen="x" * 100,
+            gestor_nombre="Alice",
+        )
         r = client.get(f"/glosas/{g.id}/score-prioridad")
         d = r.json()
         # Sin componentes activos → score 0 → INFO
@@ -105,8 +116,7 @@ class TestScorePrioridad:
         assert d["banner_recomendado"] == "INFO"
 
     def test_desglose_estructura(self, client, db_session):
-        g = _seed(db_session, dias_restantes=-5,
-                  valor_objetado=20_000_000)
+        g = _seed(db_session, dias_restantes=-5, valor_objetado=20_000_000)
         r = client.get(f"/glosas/{g.id}/score-prioridad")
         d = r.json()
         for item in d["desglose"]:

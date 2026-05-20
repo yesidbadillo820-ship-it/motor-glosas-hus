@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cargabilidad-equipo (R223 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,12 +48,18 @@ def client(db_session, usuario):
 
 def _seed_n(db, gestor, n):
     for _ in range(n):
-        db.add(GlosaRecord(
-            eps="X", paciente="X", codigo_glosa="C",
-            valor_objetado=1000, etapa="X", estado="RADICADA",
-            creado_en=ahora_utc(),
-            gestor_nombre=gestor,
-        ))
+        db.add(
+            GlosaRecord(
+                eps="X",
+                paciente="X",
+                codigo_glosa="C",
+                valor_objetado=1000,
+                etapa="X",
+                estado="RADICADA",
+                creado_en=ahora_utc(),
+                gestor_nombre=gestor,
+            )
+        )
     db.commit()
 
 
@@ -61,15 +69,14 @@ class TestCargabilidadEquipo:
         d = r.json()
         for key in ("total_gestores_con_carga", "bandas"):
             assert key in d
-        for k in ("ligera_1a5", "media_6a15",
-                  "alta_16a30", "sobrecarga_mas_30"):
+        for k in ("ligera_1a5", "media_6a15", "alta_16a30", "sobrecarga_mas_30"):
             assert k in d["bandas"]
 
     def test_clasificacion(self, client, db_session):
-        _seed_n(db_session, "Light", 3)         # ligera
-        _seed_n(db_session, "Medium", 10)       # media
-        _seed_n(db_session, "High", 25)         # alta
-        _seed_n(db_session, "Overload", 40)     # sobrecarga
+        _seed_n(db_session, "Light", 3)  # ligera
+        _seed_n(db_session, "Medium", 10)  # media
+        _seed_n(db_session, "High", 25)  # alta
+        _seed_n(db_session, "Overload", 40)  # sobrecarga
 
         r = client.get("/glosas/stats/cargabilidad-equipo")
         d = r.json()

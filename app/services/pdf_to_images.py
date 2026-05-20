@@ -7,6 +7,7 @@ Usa pdfplumber (ya en requirements.txt) que internamente usa
 Pillow para renderizar paginas a PNG. No requiere poppler ni
 otros binarios externos como pdf2image.
 """
+
 from __future__ import annotations
 import io
 import logging
@@ -93,7 +94,7 @@ def pdfs_a_imagenes_combinadas(
             if len(out) >= max_imagenes_total:
                 break
             base = nombre.rsplit(".", 1)[0]
-            out.append((f"{base}-pag-{i+1}.png", img))
+            out.append((f"{base}-pag-{i + 1}.png", img))
         if len(out) >= max_imagenes_total:
             break
     return out

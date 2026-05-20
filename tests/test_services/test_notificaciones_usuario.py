@@ -1,7 +1,8 @@
 """Tests del consolidador de notificaciones por usuario (Ronda 25)."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -41,10 +42,15 @@ EMAIL = "ana@hus.com"
 
 def _g(db, **kw):
     defaults = dict(
-        eps="FAMISANAR", paciente="X", factura="F",
-        codigo_glosa="TA0201", valor_objetado=100_000,
-        estado="PENDIENTE", dias_restantes=10,
-        auditor_email=EMAIL, creado_en=datetime.now(timezone.utc),
+        eps="FAMISANAR",
+        paciente="X",
+        factura="F",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        estado="PENDIENTE",
+        dias_restantes=10,
+        auditor_email=EMAIL,
+        creado_en=datetime.now(timezone.utc),
     )
     defaults.update(kw)
     g = GlosaRecord(**defaults)
@@ -93,9 +99,13 @@ class TestMenciones:
     def test_menciones_pendientes(self, db_session):
         g = _g(db_session)
         c = ComentarioGlosaRecord(
-            glosa_id=g.id, autor_email="x@hus.com",
-            autor_nombre="X", texto="hola @ana", mencion=EMAIL,
-            resuelto=0, creado_en=datetime.now(timezone.utc),
+            glosa_id=g.id,
+            autor_email="x@hus.com",
+            autor_nombre="X",
+            texto="hola @ana",
+            mencion=EMAIL,
+            resuelto=0,
+            creado_en=datetime.now(timezone.utc),
         )
         db_session.add(c)
         db_session.commit()
@@ -104,8 +114,12 @@ class TestMenciones:
     def test_mencion_resuelta_no_cuenta(self, db_session):
         g = _g(db_session)
         c = ComentarioGlosaRecord(
-            glosa_id=g.id, autor_email="x@hus.com", autor_nombre="X",
-            texto="hola @ana", mencion=EMAIL, resuelto=1,
+            glosa_id=g.id,
+            autor_email="x@hus.com",
+            autor_nombre="X",
+            texto="hola @ana",
+            mencion=EMAIL,
+            resuelto=1,
             creado_en=datetime.now(timezone.utc),
         )
         db_session.add(c)
@@ -117,8 +131,11 @@ class TestGold:
     def test_gold_de_mis_eps(self, db_session):
         _g(db_session)  # crea trabajo histórico con FAMISANAR
         p = PlantillaGoldRecord(
-            eps="FAMISANAR", codigo_glosa="TA0201", activa=1,
-            argumento="X", creado_en=datetime.now(timezone.utc),
+            eps="FAMISANAR",
+            codigo_glosa="TA0201",
+            activa=1,
+            argumento="X",
+            creado_en=datetime.now(timezone.utc),
         )
         db_session.add(p)
         db_session.commit()
@@ -127,8 +144,11 @@ class TestGold:
     def test_gold_de_otra_eps_no_cuenta(self, db_session):
         _g(db_session, eps="FAMISANAR")
         p = PlantillaGoldRecord(
-            eps="SANITAS", codigo_glosa="TA0201", activa=1,
-            argumento="X", creado_en=datetime.now(timezone.utc),
+            eps="SANITAS",
+            codigo_glosa="TA0201",
+            activa=1,
+            argumento="X",
+            creado_en=datetime.now(timezone.utc),
         )
         db_session.add(p)
         db_session.commit()
@@ -137,8 +157,8 @@ class TestGold:
 
 class TestConsolidado:
     def test_suma_total_correcta(self, db_session):
-        _g(db_session, dias_restantes=2)            # critica
-        _g(db_session, dias_restantes=-1, factura="F2")   # vencida
+        _g(db_session, dias_restantes=2)  # critica
+        _g(db_session, dias_restantes=-1, factura="F2")  # vencida
         _g(db_session, modelo_ia="pre-analisis/texto_fijo/RATIFICADA", factura="F3")
         usuario = SimpleNamespace(email=EMAIL)
         r = notificaciones_de(db_session, usuario)

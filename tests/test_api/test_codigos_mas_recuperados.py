@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/codigos-mas-recuperados (R244 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, codigo, valor_rec):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa=codigo,
-        valor_objetado=10000, valor_recuperado=valor_rec,
-        etapa="X", estado="LEVANTADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=10000,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 

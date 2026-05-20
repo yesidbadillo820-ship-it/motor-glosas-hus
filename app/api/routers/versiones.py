@@ -3,6 +3,7 @@
 Cada vez que se genera, refina o regenera un dictamen, se guarda snapshot.
 El auditor puede revisar cómo cambió y restaurar una versión anterior.
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -76,10 +77,14 @@ def diff_versiones(
         raise HTTPException(400, "v1 y v2 deben ser diferentes")
 
     def _cargar(vid: int):
-        v = db.query(DictamenVersionRecord).filter(
-            DictamenVersionRecord.id == vid,
-            DictamenVersionRecord.glosa_id == glosa_id,
-        ).first()
+        v = (
+            db.query(DictamenVersionRecord)
+            .filter(
+                DictamenVersionRecord.id == vid,
+                DictamenVersionRecord.glosa_id == glosa_id,
+            )
+            .first()
+        )
         if not v:
             raise HTTPException(404, f"Versión {vid} no encontrada")
         return v
@@ -110,12 +115,15 @@ def diff_versiones(
     txt2 = _to_text(rec2.dictamen_html or "")
 
     # difflib produce el diff con marcadores +/- y headers @@.
-    diff = list(difflib.unified_diff(
-        txt1, txt2,
-        fromfile=f"v{rec1.id} ({rec1.accion or '—'})",
-        tofile=f"v{rec2.id} ({rec2.accion or '—'})",
-        lineterm="",
-    ))
+    diff = list(
+        difflib.unified_diff(
+            txt1,
+            txt2,
+            fromfile=f"v{rec1.id} ({rec1.accion or '—'})",
+            tofile=f"v{rec2.id} ({rec2.accion or '—'})",
+            lineterm="",
+        )
+    )
 
     agregadas = sum(1 for ln in diff if ln.startswith("+") and not ln.startswith("+++"))
     removidas = sum(1 for ln in diff if ln.startswith("-") and not ln.startswith("---"))
@@ -123,12 +131,14 @@ def diff_versiones(
     return {
         "glosa_id": glosa_id,
         "v1": {
-            "id": rec1.id, "accion": rec1.accion,
+            "id": rec1.id,
+            "accion": rec1.accion,
             "creado_en": rec1.creado_en.isoformat() if rec1.creado_en else None,
             "autor_email": rec1.autor_email,
         },
         "v2": {
-            "id": rec2.id, "accion": rec2.accion,
+            "id": rec2.id,
+            "accion": rec2.accion,
             "creado_en": rec2.creado_en.isoformat() if rec2.creado_en else None,
             "autor_email": rec2.autor_email,
         },
@@ -146,10 +156,14 @@ def obtener(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    v = db.query(DictamenVersionRecord).filter(
-        DictamenVersionRecord.id == version_id,
-        DictamenVersionRecord.glosa_id == glosa_id,
-    ).first()
+    v = (
+        db.query(DictamenVersionRecord)
+        .filter(
+            DictamenVersionRecord.id == version_id,
+            DictamenVersionRecord.glosa_id == glosa_id,
+        )
+        .first()
+    )
     if not v:
         raise HTTPException(404, "Versión no encontrada")
     return {
@@ -174,32 +188,42 @@ def restaurar(
     glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
     if not glosa:
         raise HTTPException(404, "Glosa no encontrada")
-    v = db.query(DictamenVersionRecord).filter(
-        DictamenVersionRecord.id == version_id,
-        DictamenVersionRecord.glosa_id == glosa_id,
-    ).first()
+    v = (
+        db.query(DictamenVersionRecord)
+        .filter(
+            DictamenVersionRecord.id == version_id,
+            DictamenVersionRecord.glosa_id == glosa_id,
+        )
+        .first()
+    )
     if not v:
         raise HTTPException(404, "Versión no encontrada")
 
     # Snapshot del dictamen actual antes de sobrescribir
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id,
-        dictamen_html=glosa.dictamen or "",
-        accion="SNAPSHOT_PRE_RESTAURAR",
-        autor_email=current_user.email,
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html=glosa.dictamen or "",
+            accion="SNAPSHOT_PRE_RESTAURAR",
+            autor_email=current_user.email,
+        )
+    )
     glosa.dictamen = v.dictamen_html
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id,
-        dictamen_html=v.dictamen_html,
-        accion="RESTAURAR",
-        mensaje_refinar=f"Restaurada desde versión #{version_id}",
-        autor_email=current_user.email,
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html=v.dictamen_html,
+            accion="RESTAURAR",
+            mensaje_refinar=f"Restaurada desde versión #{version_id}",
+            autor_email=current_user.email,
+        )
+    )
     db.commit()
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="RESTAURAR_DICTAMEN", tabla="historial",
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="RESTAURAR_DICTAMEN",
+        tabla="historial",
         registro_id=glosa_id,
         detalle=f"Restauró versión #{version_id}",
     )
@@ -217,11 +241,13 @@ def guardar_version(
     """Helper para que otros endpoints guarden snapshot."""
     if not dictamen_html:
         return
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id,
-        dictamen_html=dictamen_html,
-        accion=accion,
-        mensaje_refinar=mensaje_refinar,
-        autor_email=autor_email,
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html=dictamen_html,
+            accion=accion,
+            mensaje_refinar=mensaje_refinar,
+            autor_email=autor_email,
+        )
+    )
     db.commit()

@@ -7,15 +7,14 @@ Casos reales que antes fallaban (reportados por el usuario):
   - Códigos propios HUS (letras+dígitos): FMQ6296, QX0106
   - NO confundir el código de glosa (TA0801, SO0101) con el CUPS
 """
+
 from app.main import _extraer_cups_servicio
 
 
 class TestExtraerCups:
     def test_cups_con_sufijo_h(self):
         """CUPS institucional HUS con sufijo H (Res. 124/2026)."""
-        cups, _ = _extraer_cups_servicio(
-            "CUPS 372301H - ESTUDIO ELECTROFISIOLOGICO CARDIACO"
-        )
+        cups, _ = _extraer_cups_servicio("CUPS 372301H - ESTUDIO ELECTROFISIOLOGICO CARDIACO")
         assert cups == "372301H"
 
     def test_cups_con_sufijo_h_numero(self):
@@ -25,9 +24,7 @@ class TestExtraerCups:
 
     def test_cups_con_sufijo_letra_guion_digitos(self):
         """CUPS tipo 39147B-18 (consulta genética médica Dispensario)."""
-        cups, _ = _extraer_cups_servicio(
-            "CUPS 39147B-18 - CONSULTA GENETICA MEDICA"
-        )
+        cups, _ = _extraer_cups_servicio("CUPS 39147B-18 - CONSULTA GENETICA MEDICA")
         assert cups == "39147B-18"
 
     def test_medicamento_cum(self):
@@ -47,23 +44,17 @@ class TestExtraerCups:
     def test_no_confunde_codigo_glosa_con_cups(self):
         """BUG REAL: cuando el texto empieza con 'TA0801 - CUPS 873306',
         no debe tomar TA0801 como CUPS."""
-        cups, _ = _extraer_cups_servicio(
-            "TA0801 - CUPS 873306 - RADIOGRAFIA - $83.800"
-        )
+        cups, _ = _extraer_cups_servicio("TA0801 - CUPS 873306 - RADIOGRAFIA - $83.800")
         assert cups == "873306"
         assert cups != "TA0801"
 
     def test_texto_minusculas(self):
         """Caso real con mojibake y minúsculas."""
-        cups, _ = _extraer_cups_servicio(
-            "ta0801 - cups 873306 - valor facturado $83.800"
-        )
+        cups, _ = _extraer_cups_servicio("ta0801 - cups 873306 - valor facturado $83.800")
         assert cups == "873306"
 
     def test_so_glosa_con_cups_real(self):
-        cups, _ = _extraer_cups_servicio(
-            "SO0101 - No se aporta historia clínica - CUPS 890201"
-        )
+        cups, _ = _extraer_cups_servicio("SO0101 - No se aporta historia clínica - CUPS 890201")
         assert cups == "890201"
 
     def test_sin_cups_retorna_vacio(self):

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/stats (R164 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,8 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co",
-        nombre="Coordinador", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        nombre="Coordinador",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -52,11 +57,16 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, email, rol="AUDITOR", activo=1, totp=None, nombre="X"):
-    db.add(UsuarioRecord(
-        email=email, rol=rol, activo=activo,
-        nombre=nombre, totp_secret=totp,
-        password_hash=get_password_hash("y"),
-    ))
+    db.add(
+        UsuarioRecord(
+            email=email,
+            rol=rol,
+            activo=activo,
+            nombre=nombre,
+            totp_secret=totp,
+            password_hash=get_password_hash("y"),
+        )
+    )
     db.commit()
 
 
@@ -65,8 +75,14 @@ class TestUsuariosStats:
         r = client.get("/usuarios/stats")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total", "activos", "inactivas" if False else
-                    "inactivos", "con_2fa", "sin_nombre", "por_rol"):
+        for key in (
+            "total",
+            "activos",
+            "inactivas" if False else "inactivos",
+            "con_2fa",
+            "sin_nombre",
+            "por_rol",
+        ):
             assert key in d
 
     def test_counts(self, client, db_session):

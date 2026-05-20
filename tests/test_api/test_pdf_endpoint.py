@@ -1,4 +1,5 @@
 """Tests del endpoint POST /pdf/ocr (R83 P2)."""
+
 from __future__ import annotations
 
 from io import BytesIO
@@ -51,6 +52,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -60,24 +62,33 @@ def client(db_session, usuario):
 
 class TestPdfOcr:
     def test_archivo_no_pdf_400(self, client):
-        r = client.post("/pdf/ocr", files={
-            "archivo": ("test.txt", b"contenido texto", "text/plain"),
-        })
+        r = client.post(
+            "/pdf/ocr",
+            files={
+                "archivo": ("test.txt", b"contenido texto", "text/plain"),
+            },
+        )
         assert r.status_code == 400
 
     def test_pdf_muy_grande_400(self, client):
         # PDF de 31 MB (excede límite 30MB)
         big = b"%PDF-1.7\n" + b"x" * (31_000_000)
-        r = client.post("/pdf/ocr", files={
-            "archivo": ("big.pdf", big, "application/pdf"),
-        })
+        r = client.post(
+            "/pdf/ocr",
+            files={
+                "archivo": ("big.pdf", big, "application/pdf"),
+            },
+        )
         assert r.status_code == 400
 
     def test_pdf_valido_devuelve_texto(self, client):
         pdf = _pdf_minimal("Texto del PDF de prueba")
-        r = client.post("/pdf/ocr", files={
-            "archivo": ("test.pdf", pdf, "application/pdf"),
-        })
+        r = client.post(
+            "/pdf/ocr",
+            files={
+                "archivo": ("test.pdf", pdf, "application/pdf"),
+            },
+        )
         assert r.status_code == 200
         d = r.json()
         assert "texto" in d

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/comentarios-globales (R160 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,13 +48,17 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, glosa_id=1, autor="u@x", mencion=None, resuelto=0,
-          dias_atras=1):
-    db.add(ComentarioGlosaRecord(
-        glosa_id=glosa_id, autor_email=autor,
-        texto="x", mencion=mencion, resuelto=resuelto,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+def _seed(db, glosa_id=1, autor="u@x", mencion=None, resuelto=0, dias_atras=1):
+    db.add(
+        ComentarioGlosaRecord(
+            glosa_id=glosa_id,
+            autor_email=autor,
+            texto="x",
+            mencion=mencion,
+            resuelto=resuelto,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -61,10 +67,15 @@ class TestComentariosGlobales:
         r = client.get("/glosas/stats/comentarios-globales")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("ventana_dias", "total_comentarios",
-                    "glosas_con_comentarios", "menciones_totales",
-                    "menciones_resueltas", "menciones_pendientes",
-                    "top_5_comentaristas"):
+        for key in (
+            "ventana_dias",
+            "total_comentarios",
+            "glosas_con_comentarios",
+            "menciones_totales",
+            "menciones_resueltas",
+            "menciones_pendientes",
+            "top_5_comentaristas",
+        ):
             assert key in d
 
     def test_top_5_y_glosas_distintas(self, client, db_session):

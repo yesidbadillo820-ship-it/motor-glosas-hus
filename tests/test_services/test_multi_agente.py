@@ -1,4 +1,5 @@
 """Tests del orquestador multi-agente (Ronda 6)."""
+
 from app.services.multi_agente import (
     agente_clinico,
     agente_conciliador,
@@ -63,9 +64,11 @@ class TestAgenteClinico:
 class TestAgenteTarifario:
     def test_soat_porcentaje_calcula_interp(self):
         r = agente_tarifario(
-            modalidad="SOAT UVB VIGENTE", factor_ajuste=-5.0,
+            modalidad="SOAT UVB VIGENTE",
+            factor_ajuste=-5.0,
             tipo_tarifa="SOAT_PORCENTAJE",
-            valor_facturado=114_900, valor_reconocido=90_000,
+            valor_facturado=114_900,
+            valor_reconocido=90_000,
         )
         assert r["interpretacion_hus"] > r["interpretacion_eps"]
         assert r["diferencia_pesos"] == 24_900.0
@@ -73,8 +76,10 @@ class TestAgenteTarifario:
 
     def test_propias_valor_fijo_match_perfecto_defender(self):
         r = agente_tarifario(
-            modalidad="PROPIAS", tipo_tarifa="VALOR_FIJO",
-            valor_pactado=83_800, valor_facturado=83_800,
+            modalidad="PROPIAS",
+            tipo_tarifa="VALOR_FIJO",
+            valor_pactado=83_800,
+            valor_facturado=83_800,
         )
         assert r["recomendacion"] == "DEFENDER"
 
@@ -94,11 +99,16 @@ class TestAgenteConciliador:
 class TestOrquestador:
     def test_orquestar_incluye_4_agentes(self):
         bloque = orquestar_dictamen(
-            codigo_glosa="TA0201", eps="FAMISANAR EPS",
-            cups="890750", servicio="CONSULTA URGENCIAS", etapa="INICIAL",
-            modalidad="SOAT UVB", factor_ajuste=-5.0,
+            codigo_glosa="TA0201",
+            eps="FAMISANAR EPS",
+            cups="890750",
+            servicio="CONSULTA URGENCIAS",
+            etapa="INICIAL",
+            modalidad="SOAT UVB",
+            factor_ajuste=-5.0,
             tipo_tarifa="SOAT_PORCENTAJE",
-            valor_facturado=114_900, valor_reconocido=90_000,
+            valor_facturado=114_900,
+            valor_reconocido=90_000,
         )
         assert "AGENTE JURÍDICO" in bloque
         assert "AGENTE CLÍNICO" in bloque
@@ -113,8 +123,10 @@ class TestOrquestador:
         """T-760 debe aparecer solo en la sección NO CITES (evitar), no
         en normas primarias ni jurisprudencia sugerida."""
         bloque = orquestar_dictamen(
-            codigo_glosa="TA0201", eps="FOMAG",
-            cups="890202", etapa="Inicial",
+            codigo_glosa="TA0201",
+            eps="FOMAG",
+            cups="890202",
+            etapa="Inicial",
         )
         # Debe estar presente en evitar (prefijo ✗)
         assert "T-760" in bloque

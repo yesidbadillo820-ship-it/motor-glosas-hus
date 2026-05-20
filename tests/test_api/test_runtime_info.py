@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/runtime-info (R107 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,7 +31,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -38,6 +42,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -51,9 +56,16 @@ class TestRuntimeInfo:
         assert r.status_code == 200, r.text
         d = r.json()
         # Estos campos siempre deben estar (sin depender de psutil)
-        for key in ("python_version", "python_implementation", "platform",
-                    "machine", "pid", "cwd", "threads_activos",
-                    "psutil_disponible"):
+        for key in (
+            "python_version",
+            "python_implementation",
+            "platform",
+            "machine",
+            "pid",
+            "cwd",
+            "threads_activos",
+            "psutil_disponible",
+        ):
             assert key in d
 
     def test_python_version_formato(self, client):

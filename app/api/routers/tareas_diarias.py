@@ -1,10 +1,11 @@
 """Checklist de tareas diarias del gestor."""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_actual
@@ -33,12 +34,12 @@ class TareaPatch(BaseModel):
 
 def _validar_tarea_in(body: TareaIn) -> None:
     if body.prioridad.upper() not in _PRIORIDADES_VALIDAS:
-        raise HTTPException(status_code=400, detail=f"prioridad debe ser ALTA, MEDIA o BAJA")
+        raise HTTPException(status_code=400, detail="prioridad debe ser ALTA, MEDIA o BAJA")
     if body.fecha_para is not None:
         try:
             date.fromisoformat(body.fecha_para)
         except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail=f"fecha_para no es una fecha ISO válida")
+            raise HTTPException(status_code=400, detail="fecha_para no es una fecha ISO válida")
 
 
 def _serialize(t: TareaDiariaRecord) -> dict:
@@ -118,10 +119,14 @@ def actualizar_tarea(
     db: Session = Depends(get_db),
     usuario: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    tarea = db.query(TareaDiariaRecord).filter(
-        TareaDiariaRecord.id == tarea_id,
-        TareaDiariaRecord.usuario_email == usuario.email,
-    ).first()
+    tarea = (
+        db.query(TareaDiariaRecord)
+        .filter(
+            TareaDiariaRecord.id == tarea_id,
+            TareaDiariaRecord.usuario_email == usuario.email,
+        )
+        .first()
+    )
     if not tarea:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
     if body.titulo is not None:
@@ -149,10 +154,14 @@ def eliminar_tarea(
     db: Session = Depends(get_db),
     usuario: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    tarea = db.query(TareaDiariaRecord).filter(
-        TareaDiariaRecord.id == tarea_id,
-        TareaDiariaRecord.usuario_email == usuario.email,
-    ).first()
+    tarea = (
+        db.query(TareaDiariaRecord)
+        .filter(
+            TareaDiariaRecord.id == tarea_id,
+            TareaDiariaRecord.usuario_email == usuario.email,
+        )
+        .first()
+    )
     if not tarea:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
     db.delete(tarea)

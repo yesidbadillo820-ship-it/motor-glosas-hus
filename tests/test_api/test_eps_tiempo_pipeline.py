@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-tiempo-en-pipeline (R304 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, dias_atras, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -62,9 +70,7 @@ class TestEPSTiempoEnPipeline:
         _seed(db_session, "X", dias_atras=30)
         # Promedio: 20
 
-        r = client.get(
-            "/glosas/stats/eps-tiempo-en-pipeline?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/eps-tiempo-en-pipeline?min_glosas=1")
         d = r.json()
         item = next(x for x in d["items"] if x["eps"] == "X")
         assert item["count_abiertas"] == 3
@@ -73,8 +79,6 @@ class TestEPSTiempoEnPipeline:
 
     def test_excluye_cerradas(self, client, db_session):
         _seed(db_session, "X", dias_atras=10, estado="LEVANTADA")
-        r = client.get(
-            "/glosas/stats/eps-tiempo-en-pipeline?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/eps-tiempo-en-pipeline?min_glosas=1")
         d = r.json()
         assert d["items"] == []

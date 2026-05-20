@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/dictamenes-stats (R348 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice", rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -39,6 +44,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,21 +53,27 @@ def client(db_session, usuario):
 
 
 def _seed(db, gestor, dictamen):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        dictamen=dictamen,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            dictamen=dictamen,
+        )
+    )
     db.commit()
 
 
 class TestYoDictamenesStats:
     def test_metricas(self, client, db_session):
         _seed(db_session, "Alice", "x" * 250)  # largo
-        _seed(db_session, "Alice", "corto")    # corto (5 chars < 50)
-        _seed(db_session, "Alice", "")         # sin dictamen
+        _seed(db_session, "Alice", "corto")  # corto (5 chars < 50)
+        _seed(db_session, "Alice", "")  # sin dictamen
         _seed(db_session, "Bob", "no propia")  # otro
 
         r = client.get("/usuarios/yo/dictamenes-stats")

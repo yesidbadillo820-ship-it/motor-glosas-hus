@@ -37,6 +37,7 @@ Uso:
 Para EPS que glosan con el CUPS oficial directamente, esta función no
 interviene — el lookup tradicional por cups funciona.
 """
+
 from __future__ import annotations
 
 import re
@@ -64,15 +65,22 @@ HOMOLOGACIONES_EXPLICITAS: dict[str, tuple[str, str]] = {
     # La EPS DMBUG a veces glosa 39147B-18 (código interno viejo HUS) para
     # consulta de control por especialista en genética. Su CUPS oficial es
     # 890348 en la Res. 2641/2025 (numeración nueva CUPS 2025).
-    "39147B-18": ("890348", "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA"),
-    "39147B18":  ("890348", "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA"),
-    "39147B":    ("890348", "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA"),
-
+    "39147B-18": (
+        "890348",
+        "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
+    ),
+    "39147B18": (
+        "890348",
+        "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
+    ),
+    "39147B": (
+        "890348",
+        "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
+    ),
     # CONSULTA DE PRIMERA VEZ por especialista en genética
     "39143A-18": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN GENÉTICA MÉDICA"),
     "39143A-16": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ANESTESIOLOGÍA"),
     "39143A-19": ("890248", "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN DERMATOLOGÍA"),
-
     # ─── Consulta otras especialidades ──────────────────────────────────────
     # Códigos IPS con sufijo H1/H2 (variantes de especialidad HUS)
     # Estos están ya en tarifas_oficiales.py; se listan también acá para
@@ -80,29 +88,26 @@ HOMOLOGACIONES_EXPLICITAS: dict[str, tuple[str, str]] = {
     "890202H1": ("890202", "CONSULTA PRIMERA VEZ POR ELECTROFISIOLOGÍA"),
     "890302H1": ("890302", "CONSULTA CONTROL POR ELECTROFISIOLOGÍA"),
     "890402H1": ("890402", "INTERCONSULTA HOSPITALARIA POR ELECTROFISIOLOGÍA"),
-    "890405H":  ("890405", "INTERCONSULTA POR ENFERMERÍA"),
+    "890405H": ("890405", "INTERCONSULTA POR ENFERMERÍA"),
     "890405H1": ("890405", "INTERCONSULTA ENFERMERÍA — CLÍNICA DE HERIDAS"),
     "890405H2": ("890405", "INTERCONSULTA ENFERMERÍA — TERAPIA DE INFUSIÓN"),
-    "890410H":  ("890410", "INTERCONSULTA POR AUDIOLOGÍA"),
-    "890253H":  ("890253", "CONSULTA PRIMERA VEZ POR HEPATOLOGÍA"),
-    "890453":   ("890453", "CONSULTA POR HEPATOLOGÍA"),
-
+    "890410H": ("890410", "INTERCONSULTA POR AUDIOLOGÍA"),
+    "890253H": ("890253", "CONSULTA PRIMERA VEZ POR HEPATOLOGÍA"),
+    "890453": ("890453", "CONSULTA POR HEPATOLOGÍA"),
     # ─── Radiología con sufijos de versión (H, H1) ─────────────────────────
-    "871040H":  ("871040", "RADIOGRAFÍA DE COLUMNA LUMBOSACRA"),
-    "873205H":  ("873205", "RADIOGRAFÍA DE CODO"),
-    "881434H":  ("881434", "PERFIL BIOFÍSICO"),
-    "873306H":  ("873306", "ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA"),
-    "898101H":  ("898101", "ESTUDIO ANATOMOPATOLÓGICO EN BIOPSIA"),
-    "897011H":  ("897011", "MONITORIA FETAL ANTEPARTO"),
-
+    "871040H": ("871040", "RADIOGRAFÍA DE COLUMNA LUMBOSACRA"),
+    "873205H": ("873205", "RADIOGRAFÍA DE CODO"),
+    "881434H": ("881434", "PERFIL BIOFÍSICO"),
+    "873306H": ("873306", "ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA"),
+    "898101H": ("898101", "ESTUDIO ANATOMOPATOLÓGICO EN BIOPSIA"),
+    "897011H": ("897011", "MONITORIA FETAL ANTEPARTO"),
     # ─── Consulta urgencias ginecología/obstetricia ────────────────────────
-    "890750H":  ("890750", "CONSULTA DE URGENCIAS POR ESPECIALISTA EN GINECOLOGÍA"),
-    "890793H":  ("890793", "CONSULTA DE URGENCIAS POR ESPECIALISTA EN URGENCIAS"),
-
+    "890750H": ("890750", "CONSULTA DE URGENCIAS POR ESPECIALISTA EN GINECOLOGÍA"),
+    "890793H": ("890793", "CONSULTA DE URGENCIAS POR ESPECIALISTA EN URGENCIAS"),
     # ─── Misceláneos con sufijo institucional H ────────────────────────────
-    "010101H":  ("010101", "PUNCIÓN CISTERNAL VÍA LATERAL"),
-    "010102H":  ("010102", "PUNCIÓN CISTERNAL VÍA MEDIAL"),
-    "010103H":  ("010103", "PUNCIÓN CISTERNAL"),
+    "010101H": ("010101", "PUNCIÓN CISTERNAL VÍA LATERAL"),
+    "010102H": ("010102", "PUNCIÓN CISTERNAL VÍA MEDIAL"),
+    "010103H": ("010103", "PUNCIÓN CISTERNAL"),
 }
 
 
@@ -126,7 +131,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "890109": "CONSULTA DE PRIMERA VEZ POR TERAPIA OCUPACIONAL",
     "890110": "CONSULTA DE PRIMERA VEZ POR OPTOMETRÍA",
     "890111": "CONSULTA DE PRIMERA VEZ POR ODONTOLOGÍA GENERAL",
-
     # ── Consulta de control medicina general (8903xx) ───────────────────────
     "890301": "CONSULTA DE CONTROL POR MEDICINA GENERAL",
     "890303": "CONSULTA DE CONTROL POR ENFERMERÍA",
@@ -134,7 +138,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "890305": "CONSULTA DE CONTROL POR PSICOLOGÍA",
     "890306": "CONSULTA DE CONTROL POR FISIOTERAPIA",
     "890307": "CONSULTA DE CONTROL POR FONOAUDIOLOGÍA",
-
     # ── Consultas primera vez por especialista (8902xx) ─────────────────────
     "890201": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA INTERNA",
     "890202": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN ELECTROFISIOLOGÍA",
@@ -160,7 +163,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "890255": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN DERMATOLOGÍA",
     "890260": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN PSIQUIATRÍA",
     "890265": "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FÍSICA Y REHABILITACIÓN",
-
     # ── Consultas de control por especialista (89035x..89036x) ──────────────
     # Nota: 890301 = control medicina general (arriba). El control de
     # especialista usa 8903xx con desplazamiento similar a 8902xx primera vez.
@@ -170,18 +172,15 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "890335": "CONSULTA DE CONTROL POR ESPECIALISTA EN ORTOPEDIA Y TRAUMATOLOGÍA",
     "890348": "CONSULTA DE CONTROL O DE SEGUIMIENTO POR ESPECIALISTA EN GENÉTICA MÉDICA",
     "890351": "CONSULTA DE CONTROL POR ESPECIALISTA EN MEDICINA INTERNA",
-
     # ── Interconsultas hospitalarias (8904xx) ───────────────────────────────
     "890402": "INTERCONSULTA HOSPITALARIA POR ELECTROFISIOLOGÍA",
     "890405": "INTERCONSULTA HOSPITALARIA POR ENFERMERÍA",
     "890410": "INTERCONSULTA HOSPITALARIA POR AUDIOLOGÍA",
     "890453": "INTERCONSULTA HOSPITALARIA POR HEPATOLOGÍA",
-
     # ── Urgencias (8907xx) ──────────────────────────────────────────────────
     "890701": "CONSULTA DE URGENCIAS POR MEDICINA GENERAL",
     "890750": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN GINECOLOGÍA Y OBSTETRICIA",
     "890793": "CONSULTA DE URGENCIAS POR ESPECIALISTA EN MEDICINA DE EMERGENCIAS",
-
     # ── Laboratorio clínico — química e inmunología ─────────────────────────
     "901040": "GLICEMIA PRE Y POST CARGA DE GLUCOSA",
     "901225": "GLUCOSA EN SUERO U OTROS FLUIDOS DIFERENTES A ORINA",
@@ -197,7 +196,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "906225": "PROTEÍNA C REACTIVA (PCR) CUANTITATIVA",
     "906039": "PARCIAL DE ORINA",
     "907106": "UROANÁLISIS CON MICROSCOPIO DE CAMPO, SEDIMENTO Y DENSIDAD URINARIA",
-
     # ── Hematología ─────────────────────────────────────────────────────────
     "902207": "HEMOGRAMA IV (HEMATOCRITO, HEMOGLOBINA, RECUENTO ERITROCITOS, ÍNDICES, LEUCOGRAMA)",
     "902210": "HEMOGRAMA III (HEMATOCRITO, HEMOGLOBINA, RECUENTO ERITROCITOS, LEUCOGRAMA)",
@@ -205,13 +203,11 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "902049": "TIEMPO DE PROTROMBINA (TP-INR)",
     "902045": "TIEMPO DE TROMBOPLASTINA PARCIAL ACTIVADA (TTPA)",
     "906915": "VELOCIDAD DE SEDIMENTACIÓN GLOBULAR (VSG)",
-
     # ── Microbiología y serología ───────────────────────────────────────────
     "907111": "UROCULTIVO Y RECUENTO DE COLONIAS",
     "908436": "PRUEBA RÁPIDA PARA VIH (TAMIZAJE)",
     "906320": "PRUEBA TREPONÉMICA SIFILIS (FTA-ABS)",
     "906916": "TAMIZAJE PARA HEPATITIS B (HBsAg)",
-
     # ── Imagenología — Rayos X ──────────────────────────────────────────────
     "870101": "RADIOGRAFÍA DE CRÁNEO PA O AP Y LATERAL",
     "871040": "RADIOGRAFÍA DE COLUMNA LUMBOSACRA",
@@ -230,7 +226,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "874601": "RADIOGRAFÍA DE TIBIA Y PERONÉ",
     "874701": "RADIOGRAFÍA DE TOBILLO",
     "874801": "RADIOGRAFÍA DE PIE",
-
     # ── Imagenología — Ecografía ────────────────────────────────────────────
     "881201": "ECOGRAFÍA DE TIROIDES",
     "881330": "ECOGRAFÍA DE ABDOMEN TOTAL",
@@ -247,7 +242,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "881702": "ECOCARDIOGRAFÍA TRANSESOFÁGICA",
     "881901": "ECOGRAFÍA DOPPLER VENOSA DE MIEMBROS INFERIORES",
     "881902": "ECOGRAFÍA DOPPLER ARTERIAL DE MIEMBROS INFERIORES",
-
     # ── Imagenología — TAC (tomografía) ─────────────────────────────────────
     "883101": "TAC DE CRÁNEO SIMPLE",
     "883102": "TAC DE CRÁNEO CON CONTRASTE",
@@ -258,7 +252,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "883303": "TAC DE PELVIS",
     "883401": "TAC DE COLUMNA CERVICAL",
     "883402": "TAC DE COLUMNA LUMBOSACRA",
-
     # ── Imagenología — Resonancia magnética ─────────────────────────────────
     "884003": "RESONANCIA MAGNÉTICA DE CEREBRO SIMPLE",
     "884004": "RESONANCIA MAGNÉTICA DE CEREBRO CON CONTRASTE",
@@ -267,21 +260,18 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "884201": "RESONANCIA MAGNÉTICA DE ABDOMEN",
     "884301": "RESONANCIA MAGNÉTICA DE RODILLA",
     "884302": "RESONANCIA MAGNÉTICA DE HOMBRO",
-
     # ── Otros estudios diagnósticos ─────────────────────────────────────────
     "891101": "ELECTROCARDIOGRAMA DE REPOSO",
     "891201": "ELECTROENCEFALOGRAMA",
     "892101": "ESPIROMETRÍA",
     "893101": "AUDIOMETRÍA TONAL",
     "897011": "MONITORIA FETAL ANTEPARTO",
-
     # ── Patología y biopsia ─────────────────────────────────────────────────
     "873306": "ESTUDIO DE COLORACIÓN BÁSICA EN BIOPSIA",
     "898101": "ESTUDIO ANATOMOPATOLÓGICO EN BIOPSIA",
     "898102": "ESTUDIO ANATOMOPATOLÓGICO EN ESPECIMEN QUIRÚRGICO",
     "898104": "INMUNOHISTOQUÍMICA",
     "898201": "CITOLOGÍA CÉRVICO-UTERINA CONVENCIONAL",
-
     # ── Procedimientos quirúrgicos comunes ──────────────────────────────────
     "470301": "APENDICECTOMÍA POR LAPAROTOMÍA",
     "470302": "APENDICECTOMÍA LAPAROSCÓPICA",
@@ -292,7 +282,6 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "861101": "SUTURA DE PIEL",
     "861201": "DESBRIDAMIENTO DE TEJIDO BLANDO",
     "865101": "CURACIÓN MAYOR",
-
     # ── Estancias hospitalarias y servicios ────────────────────────────────
     "S11101": "ESTANCIA EN HABITACIÓN COMPARTIDA",
     "S11201": "ESTANCIA EN UCI ADULTOS",
@@ -301,11 +290,9 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
     "S11301": "ESTANCIA EN UCE (UNIDAD DE CUIDADOS ESPECIALES)",
     "S12101": "ESTANCIA EN PEDIATRÍA",
     "S13101": "ESTANCIA EN GINECOOBSTETRICIA",
-
     # ── Materiales / suministros frecuentes ─────────────────────────────────
     "M01101": "OXÍGENO MEDICINAL POR HORA",
     "M02101": "TRANSFUSIÓN DE GLÓBULOS ROJOS EMPACADOS",
-
     # ── Procedimientos menores comunes ──────────────────────────────────────
     "391001": "CURACIÓN MENOR DE HERIDA",
     "390402": "NEBULIZACIÓN CON BRONCODILATADOR",
@@ -319,9 +306,9 @@ DESCRIPCIONES_CUPS_2025: dict[str, str] = {
 # reconocer el código base cuando la versión específica no está en la tabla.
 _SUFIJOS_INSTITUCIONALES = re.compile(
     r"(?:"
-    r"-\d{2}"            # ej. '-16', '-18', '-19' (versión interna)
-    r"|H\d*"             # ej. 'H', 'H1', 'H2' (variantes HUS)
-    r"|[A-Z]\d*$"        # ej. 'A1', 'B', 'C' al final
+    r"-\d{2}"  # ej. '-16', '-18', '-19' (versión interna)
+    r"|H\d*"  # ej. 'H', 'H1', 'H2' (variantes HUS)
+    r"|[A-Z]\d*$"  # ej. 'A1', 'B', 'C' al final
     r")+$"
 )
 
@@ -331,6 +318,7 @@ def _normalizar_descripcion(s: str) -> str:
     if not s:
         return ""
     import unicodedata
+
     t = unicodedata.normalize("NFKD", str(s))
     return "".join(c for c in t if not unicodedata.combining(c)).upper()
 
@@ -362,9 +350,27 @@ def buscar_cups_por_descripcion(
         return []
 
     STOP = {
-        "CUAL", "QUE", "CUPS", "CODIGO", "PARA", "DEL", "LAS", "LOS",
-        "POR", "ESTA", "ESTE", "CON", "SIN", "NUMERO", "ES", "EL", "LA",
-        "DE", "EN", "UN", "UNA",
+        "CUAL",
+        "QUE",
+        "CUPS",
+        "CODIGO",
+        "PARA",
+        "DEL",
+        "LAS",
+        "LOS",
+        "POR",
+        "ESTA",
+        "ESTE",
+        "CON",
+        "SIN",
+        "NUMERO",
+        "ES",
+        "EL",
+        "LA",
+        "DE",
+        "EN",
+        "UN",
+        "UNA",
     }
     tokens = [t for t in tokens if t not in STOP]
     if not tokens:
@@ -391,10 +397,16 @@ def buscar_cups_por_descripcion(
     for cups, desc in DESCRIPCIONES_CUPS_2025.items():
         s = _score(desc)
         if s > 0:
-            resultados.append((s, {
-                "cups_oficial": cups, "descripcion": desc,
-                "fuente": "DESCRIPCIONES_CUPS_2025 (catálogo curado)",
-            }))
+            resultados.append(
+                (
+                    s,
+                    {
+                        "cups_oficial": cups,
+                        "descripcion": desc,
+                        "fuente": "DESCRIPCIONES_CUPS_2025 (catálogo curado)",
+                    },
+                )
+            )
             vistos.add(cups)
 
     # 2) Tabla de homologaciones explícitas (variantes con sufijo HUS)
@@ -403,10 +415,16 @@ def buscar_cups_por_descripcion(
             continue
         s = _score(desc)
         if s > 0:
-            resultados.append((s, {
-                "cups_oficial": cups, "descripcion": desc,
-                "fuente": f"Res. 2641/2025 (vía '{cod_viejo}')",
-            }))
+            resultados.append(
+                (
+                    s,
+                    {
+                        "cups_oficial": cups,
+                        "descripcion": desc,
+                        "fuente": f"Res. 2641/2025 (vía '{cod_viejo}')",
+                    },
+                )
+            )
             vistos.add(cups)
 
     # 3) BD: TarifaContratadaRecord (contratos cargados por el coordinador)
@@ -414,12 +432,10 @@ def buscar_cups_por_descripcion(
         try:
             # Intento de prefijo con ilike sobre cualquier token >= 4 chars
             from sqlalchemy import or_
+
             largos = [t for t in tokens if len(t) >= 4]
             if largos:
-                clausulas = [
-                    TarifaContratadaRecord.descripcion.ilike(f"%{t}%")
-                    for t in largos
-                ]
+                clausulas = [TarifaContratadaRecord.descripcion.ilike(f"%{t}%") for t in largos]
                 filas = (
                     db.query(TarifaContratadaRecord)
                     .filter(TarifaContratadaRecord.activa == 1)
@@ -432,20 +448,22 @@ def buscar_cups_por_descripcion(
                         continue
                     s = _score(fila.descripcion or "")
                     if s > 0:
-                        resultados.append((s, {
-                            "cups_oficial": fila.codigo_cups,
-                            "descripcion": fila.descripcion or "",
-                            "fuente": f"contrato {fila.eps or '—'}",
-                        }))
+                        resultados.append(
+                            (
+                                s,
+                                {
+                                    "cups_oficial": fila.codigo_cups,
+                                    "descripcion": fila.descripcion or "",
+                                    "fuente": f"contrato {fila.eps or '—'}",
+                                },
+                            )
+                        )
                         vistos.add(fila.codigo_cups)
         except Exception:
             pass
 
     resultados.sort(key=lambda x: x[0], reverse=True)
-    return [
-        {**d, "score": round(s, 3)}
-        for s, d in resultados[:top_k]
-    ]
+    return [{**d, "score": round(s, 3)} for s, d in resultados[:top_k]]
 
 
 def _normalizar_codigo(codigo: str) -> str:
