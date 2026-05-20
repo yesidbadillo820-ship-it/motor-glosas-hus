@@ -27,6 +27,20 @@ SIN CONTRATO               —                           SOAT pleno
 import re
 from typing import Optional
 
+
+def _parsear_valor_cop(s: str) -> float:
+    """Convierte '$247.663' o '$3.411.840' → float (puntos = separadores de miles)."""
+    if not s:
+        return 0.0
+    limpio = re.sub(r"[^\d]", "", str(s))
+    return float(limpio) if limpio else 0.0
+
+
+def _fmt_cop(n: float) -> str:
+    """Formatea 16107 → '$16,107' (miles con coma, sin decimales)."""
+    return f"${int(n):,}"
+
+
 # ══════════════════════════════════════════════════════════════════
 #  1.  BASE DE CONOCIMIENTO CONTRACTUAL
 # ══════════════════════════════════════════════════════════════════
@@ -458,6 +472,23 @@ Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO 
 • GLOSA ATÍPICA — el porcentaje o concepto NO existe en el Catálogo Único de Glosas (Res. 3047/2008 Anexo Técnico No. 6).
 • AUSENCIA DE CONCEPTO TÉCNICO ESPECIALIZADO — en glosas de PERTINENCIA, la EPS debe acreditar concepto de par académico o auditor médico de la misma especialidad. Sin ese soporte, la glosa es inválida.
 
+═══════════════ DECISIÓN AUTÓNOMA — MATRIZ DE ACCIÓN ═══════════════
+Cuando el user prompt incluya "⚠ EXCEDENTE FACTURADO DETECTADO", DEBES emitir
+la decisión que corresponde a los datos. Las cuatro acciones posibles son:
+
+  DEFENDER_TOTAL    → No hay excedente; la glosa es improcedente en su totalidad.
+  ACEPTAR_PARCIAL   → Excedente real < monto objetado; acepta solo el excedente.
+  ACEPTAR_TOTAL     → Excedente real ≥ monto objetado; acepta el objetado completo.
+  REVISAR           → Datos insuficientes o contradictorios; escala a auditor sénior.
+
+Incluye en la respuesta XML los tres tags de decisión:
+  <accion>DEFENDER_TOTAL | ACEPTAR_PARCIAL | ACEPTAR_TOTAL | REVISAR</accion>
+  <valor_aceptar>$0 si DEFENDER_TOTAL, monto aceptado si ACEPTAR_*</valor_aceptar>
+  <valor_defender>monto que HUS defiende</valor_defender>
+
+Si el user prompt no incluye el bloque de excedente, usa DEFENDER_TOTAL por
+defecto y emite <accion>DEFENDER_TOTAL</accion> <valor_aceptar>$0</valor_aceptar>.
+
 ═══════════════ CONTRATO DE SALIDA (XML) ═══════════════
 Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 
@@ -466,6 +497,9 @@ Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
 <tarifa>Tarifa pactada (ej: "SOAT -20%") o "SOAT PLENO"</tarifa>
 <normas_clave>3 normas más relevantes separadas por "|"</normas_clave>
+<accion>DEFENDER_TOTAL</accion>
+<valor_aceptar>$0</valor_aceptar>
+<valor_defender>valor objetado completo</valor_defender>
 <argumento>EL ARGUMENTO COMPLETO, EN MAYÚSCULAS. LONGITUD ADAPTATIVA según BLOQUE COMPLEJIDAD del user prompt:
   • COMPLEJIDAD BAJA (glosa simple, sin PDF, valor <500k): 2 PÁRRAFOS, 130-180 palabras. NO enumerar (I)/(II). Ve directo.
   • COMPLEJIDAD ALTA (glosa con PDFs, valor alto, texto extenso, casos con vicios identificables): 5-8 PUNTOS enumerados en NÚMEROS ROMANOS (I), (II), (III)... + petición final. 280-450 palabras.
@@ -1562,6 +1596,50 @@ def build_user_prompt(
         )
     # conciliador es el default — no añade bloque extra
 
+    # ── Detección de excedente facturado (TA* y similares) ──────────
+    # Si valor_facturado > valor_pactado, HUS facturó por encima de lo pactado
+    # y debe aceptar la diferencia. La IA necesita saberlo para producir la
+    # acción correcta (ACEPTAR_PARCIAL / ACEPTAR_TOTAL) en lugar de defender
+    # íntegramente cuando hay un excedente legítimo.
+    bloque_excedente_str = ""
+    _vf = _parsear_valor_cop(valor_facturado)
+    _vp = _parsear_valor_cop(valor_pactado)
+    _vo = _parsear_valor_cop(valor_objetado)
+    if _vf > 0 and _vp > 0:
+        _excedente = _vf - _vp
+        # Sanity check: si facturado/objetado > 100× es dato absurdo (error OCR)
+        _ratio = (_vf / _vo) if _vo > 0 else 0.0
+        if _excedente > 0 and _ratio <= 100:
+            if _vo > 0 and _excedente >= _vo:
+                # Excedente real ≥ lo objetado → la EPS tenía razón en todo
+                bloque_excedente_str = (
+                    f"\n⚠ EXCEDENTE FACTURADO DETECTADO\n"
+                    f"  Facturado  : {_fmt_cop(_vf)}\n"
+                    f"  Pactado    : {_fmt_cop(_vp)}\n"
+                    f"  Excedente  : {_fmt_cop(_excedente)}  (> objetado {_fmt_cop(_vo)})\n"
+                    f"  DECISIÓN: ACEPTAR_TOTAL — el excedente real supera el monto objetado.\n"
+                    f"  Acepta íntegramente {_fmt_cop(_vo)} (ACEPTACIÓN TOTAL).\n"
+                    f"  <accion>ACEPTAR_TOTAL</accion>\n"
+                    f"  <valor_aceptar>{_fmt_cop(_vo)}</valor_aceptar>\n"
+                    f"  <valor_defender>{_fmt_cop(0)}</valor_defender>\n"
+                    f"  Código respuesta sugerido: RE9905.\n"
+                )
+            elif _vo > 0:
+                _defendible = _vo - _excedente
+                bloque_excedente_str = (
+                    f"\n⚠ EXCEDENTE FACTURADO DETECTADO\n"
+                    f"  Facturado  : {_fmt_cop(_vf)}\n"
+                    f"  Pactado    : {_fmt_cop(_vp)}\n"
+                    f"  Excedente  : {_fmt_cop(_excedente)}  (< objetado {_fmt_cop(_vo)})\n"
+                    f"  DECISIÓN: ACEPTAR_PARCIAL\n"
+                    f"  Acepta      : {_fmt_cop(_excedente)}  (solo el excedente real)\n"
+                    f"  A defender  : {_fmt_cop(_defendible)}\n"
+                    f"  <accion>ACEPTAR_PARCIAL</accion>\n"
+                    f"  <valor_aceptar>{_fmt_cop(_excedente)}</valor_aceptar>\n"
+                    f"  <valor_defender>{_fmt_cop(_defendible)}</valor_defender>\n"
+                    f"  Código respuesta sugerido: RE9905.\n"
+                )
+
     # Regla de oro para la IA: los datos del BLOQUE 1 son AUTORITATIVOS.
     # La EPS a veces menciona CUPS o valores alternativos en el texto de
     # la glosa ("se reconoce tarifa SOAT UVB vigente código 39143") — eso
@@ -1615,7 +1693,7 @@ DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos 
 
 SOPORTES ADJUNTOS (extracto de PDF, si los hay):
 {pdf_texto}
-
+{bloque_excedente_str}
 ═══ BLOQUE 4: INSTRUCCIÓN ═══
 Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 <paciente>...</paciente>

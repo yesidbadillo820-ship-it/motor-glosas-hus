@@ -471,15 +471,9 @@ def detectar_defectos_criticos(
             ),
         })
 
-    # 3. Email institucional de contacto — SOLO obligatorio en
-    # respuestas a glosas RATIFICADAS o EXTEMPORÁNEAS (directiva Yesid
-    # mayo 2026). En defensas normales, aceptaciones y demás se omite
-    # el bloque de correos para no inflar el dictamen.
+    # 3. Email institucional de contacto — obligatorio en todo dictamen.
     cod_resp = (codigo_respuesta or "").upper().strip()
-    codigos_que_exigen_email = {"RE9501", "RE9502", "RE9601", "RE9602"}
-    requiere_email = (
-        es_ratificacion or es_extemporanea or cod_resp in codigos_que_exigen_email
-    )
+    requiere_email = True
     if requiere_email and not any(e in arg_up for e in _EMAILS_CONTACTO):
         defectos.append({
             "regla": "sin_email_contacto",

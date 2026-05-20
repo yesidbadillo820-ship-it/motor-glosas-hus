@@ -16,7 +16,7 @@ from app.core.config import get_settings
 from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
-from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord
+from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -5244,10 +5244,16 @@ async def reanalizar_glosa(
         raise HTTPException(404, "Glosa no encontrada")
 
     # R-UI 27-abr-2026: si falta texto_glosa_original (glosa importada
-    # masivamente), construirlo on-the-fly con los datos disponibles
-    # (código + nombre + cups + servicio + valor + observación EPS) y
-    # con los conceptos vinculados si los hay. Antes el endpoint
-    # rechazaba con 400 — ahora intenta defender con lo que tenga.
+    # masivamente), construirlo on-the-fly con los datos disponibles.
+    # Excepción: glosas legacy con EPS/etapa inválidas no se pueden reanalizar.
+    if (
+        not (glosa.texto_glosa_original or "").strip()
+        and len(glosa.eps or "") < 2
+    ):
+        raise HTTPException(
+            400,
+            "Glosa legacy sin texto_glosa_original ni datos mínimos para reanalizar.",
+        )
     texto_para_ia = (glosa.texto_glosa_original or "").strip()
     if len(texto_para_ia) < 30:
         partes = []
@@ -20499,4 +20505,93 @@ def timeline_glosa(
         "glosa_id": glosa_id,
         "total_eventos": len(eventos),
         "eventos": eventos,
+    }
+
+
+class _PreviewAuditoriaIn(BaseModel):
+    texto_glosa: str = Field(..., min_length=1, max_length=10_000)
+    eps: str = Field(default="")
+
+
+@router.post("/preview-auditoria")
+def preview_auditoria(
+    body: _PreviewAuditoriaIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Analiza el texto de una glosa sin generar dictamen: detecta patrones
+    problemáticos, calcula score de defensibilidad y sugiere acción."""
+    texto = body.texto_glosa.upper()
+    eps = (body.eps or "").upper().strip()
+
+    # Detectar si HUS tiene contrato con la EPS
+    tiene_contrato = False
+    if eps:
+        tiene_contrato = bool(
+            db.query(ContratoRecord).filter(
+                ContratoRecord.eps.ilike(f"%{eps[:15]}%")
+            ).first()
+        )
+
+    hallazgos: list[dict] = []
+    score = 40  # base
+
+    # Patrón: "sin contrato entre las partes" cuando SÍ existe contrato
+    if tiene_contrato and re.search(r"SIN\s+CONTRATO", texto):
+        hallazgos.append({
+            "id": "afirmacion_sin_contrato_falsa",
+            "severidad": "ALTA",
+            "descripcion": "La EPS afirma ausencia de contrato pero HUS tiene contrato activo.",
+            "argumento": "Refuta directamente citando número y vigencia del contrato.",
+        })
+        score += 25
+
+    # Patrón: SOAT como sustituto unilateral
+    if re.search(r"SE\s+RECONOCE\s+(A\s+)?SOAT", texto) or re.search(r"RECONOCE.*SOAT.*VIGENTE", texto):
+        hallazgos.append({
+            "id": "soat_sustituto_indebido",
+            "severidad": "ALTA",
+            "descripcion": "La EPS propone SOAT como tarifa sustituta sin soporte contractual.",
+            "argumento": "PACTA SUNT SERVANDA: solo aplica la tarifa pactada, no la impuesta.",
+        })
+        score += 20
+
+    # Patrón: "diferencia sin referente" — la EPS dice "se glosa la diferencia"
+    # sin especificar la base de cálculo contractual (siempre es vicio inmotivación)
+    if re.search(r"SE\s+GLOSA\s+LA\s+DIFERENCIA", texto):
+        hallazgos.append({
+            "id": "diferencia_sin_referente",
+            "severidad": "MEDIA",
+            "descripcion": "La EPS glosa una diferencia sin indicar el valor de referencia.",
+            "argumento": "Inmotivación: Decreto 4747/2007 Art. 21 exige sustentación precisa.",
+        })
+        score += 15
+
+    # Patrón: MVC (manejo vía contrato) sin especificación
+    if re.search(r"\bMVC\b", texto):
+        hallazgos.append({
+            "id": "mvc_sin_especificacion",
+            "severidad": "MEDIA",
+            "descripcion": "Uso de código MVC sin especificar el contrato de referencia.",
+            "argumento": "Solicitar especificación del contrato y cláusula aplicable.",
+        })
+        score += 10
+
+    # Determinar acción sugerida
+    score = min(score, 100)
+    if score >= 70:
+        accion = "DEFENDER_FUERTE"
+    elif score >= 50:
+        accion = "DEFENDER_MODERADO"
+    elif score >= 30:
+        accion = "REVISAR_CON_AUDITOR"
+    else:
+        accion = "EVALUAR_ACEPTACION"
+
+    return {
+        "hallazgos": hallazgos,
+        "score_evidencia": score,
+        "accion_sugerida": accion,
+        "tiene_contrato_detectado": tiene_contrato,
+        "total_hallazgos": len(hallazgos),
     }

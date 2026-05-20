@@ -149,14 +149,14 @@ class TestExtraerPdfs:
     @pytest.mark.asyncio
     async def test_archivos_none_retorna_vacio(self):
         from app.api.routers.analizar import _extraer_pdfs
-        contexto, n = await _extraer_pdfs(None, req_id="test")
+        contexto, n, _ = await _extraer_pdfs(None, req_id="test")
         assert contexto == ""
         assert n == 0
 
     @pytest.mark.asyncio
     async def test_archivos_lista_vacia_retorna_vacio(self):
         from app.api.routers.analizar import _extraer_pdfs
-        contexto, n = await _extraer_pdfs([], req_id="test")
+        contexto, n, _ = await _extraer_pdfs([], req_id="test")
         assert contexto == ""
         assert n == 0
 
@@ -168,7 +168,7 @@ class TestExtraerPdfs:
         f = MagicMock()
         f.filename = "no-es-pdf.txt"
         f.read = AsyncMock(return_value=b"hola mundo no soy pdf")
-        contexto, n = await _extraer_pdfs([f], req_id="test")
+        contexto, n, _ = await _extraer_pdfs([f], req_id="test")
         assert contexto == ""
         assert n == 0
 
@@ -178,7 +178,7 @@ class TestExtraerPdfs:
         from unittest.mock import AsyncMock, MagicMock
         f = MagicMock()
         f.filename = ""
-        contexto, n = await _extraer_pdfs([f], req_id="test")
+        contexto, n, _ = await _extraer_pdfs([f], req_id="test")
         assert n == 0
         # f.read no debió llamarse
         f.read.assert_not_called() if hasattr(f.read, "assert_not_called") else None
@@ -191,7 +191,7 @@ class TestExtraerPdfs:
         f = MagicMock()
         f.filename = "huge.pdf"
         f.read = AsyncMock(return_value=b"%PDF-1.7" + b"x" * (MAX_BYTES_PDF + 1))
-        contexto, n = await _extraer_pdfs([f], req_id="test")
+        contexto, n, _ = await _extraer_pdfs([f], req_id="test")
         assert n == 0  # ignorado por tamaño
 
     @pytest.mark.asyncio
@@ -209,5 +209,5 @@ class TestExtraerPdfs:
         with patch("app.services.pdf_service.PdfService.extraer_con_ocr",
                    new_callable=AsyncMock,
                    return_value=("contenido extraído", "nativo")):
-            contexto, n = await _extraer_pdfs(archivos, req_id="test")
+            contexto, n, _ = await _extraer_pdfs(archivos, req_id="test")
         assert n == MAX_ARCHIVOS  # se cortó en 10
