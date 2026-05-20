@@ -1,9 +1,9 @@
 name: Deploy a Fly.io
 
 on:
-  # Despliega automáticamente al hacer push a main (típicamente tras merge de un PR)
+  # Despliega automáticamente al hacer push a motor-glosas (branch principal del repo)
   push:
-    branches: ["main"]
+    branches: ["motor-glosas"]
   # Permite disparar manualmente desde la pestaña Actions de GitHub
   workflow_dispatch:
 
