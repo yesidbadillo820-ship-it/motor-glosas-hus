@@ -739,6 +739,60 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Seed Gold canónicas falló (no crítico): {_e}")
             db.rollback()
 
+        # Seed del banco HUS: 50 plantillas jurídicas genéricas (TA/SO/CO/FA/CL)
+        # Idempotente — sólo crea las que no existen aún (match por eps+codigo+titulo).
+        try:
+            import json as _json
+            from pathlib import Path as _Path
+
+            archivo_hus = (
+                _Path(__file__).resolve().parent.parent / "data" / "plantillas_hus_base.json"
+            )
+            if archivo_hus.exists():
+                with archivo_hus.open(encoding="utf-8") as _fh:
+                    _data_hus = _json.load(_fh)
+                _filas_hus = _data_hus.get("plantillas", [])
+                hus_creadas = 0
+                for fila in _filas_hus:
+                    eps = (fila.get("eps") or "").upper().strip()
+                    cod = (fila.get("codigo_glosa") or "").upper().strip()
+                    tit = (fila.get("titulo") or "").strip()[:200]
+                    arg = (fila.get("argumento") or "").strip()
+                    if not eps or not cod or not arg:
+                        continue
+                    existe = (
+                        db.query(_PGR)
+                        .filter(
+                            _PGR.eps == eps,
+                            _PGR.codigo_glosa == cod,
+                            _PGR.titulo == tit,
+                        )
+                        .first()
+                    )
+                    if existe:
+                        continue
+                    db.add(
+                        _PGR(
+                            eps=eps,
+                            codigo_glosa=cod,
+                            tipo=fila.get("tipo") or "PLANTILLA_HUS_BASE",
+                            titulo=tit,
+                            argumento=arg,
+                            valor_recuperado=0.0,
+                            usos=0,
+                            creado_por="auto_seed_lifespan",
+                            notas=fila.get("notas") or None,
+                            activa=1,
+                        )
+                    )
+                    hus_creadas += 1
+                if hus_creadas:
+                    db.commit()
+                    logger.info(f"Seed banco HUS: {hus_creadas} plantillas creadas.")
+        except Exception as _e:
+            logger.warning(f"Seed banco HUS falló (no crítico): {_e}")
+            db.rollback()
+
         db.commit()
         logger.info("Base de datos inicializada correctamente")
     except Exception as e:
