@@ -236,10 +236,29 @@ def patron_gestor(
             "con el caso (no fuerces si no aplica):\n" + "\n".join(hint_lista) + "\n"
         )
 
+    # Combinar con patrones aprendidos por DIFF (adiciones manuales del gestor).
+    # Best-effort: si falla, seguimos con el hint del mensaje_refinar.
+    hint_diff = ""
+    diff_info: dict = {}
+    try:
+        from app.services.aprendizaje_diff import patron_diff_gestor
+
+        diff_info = patron_diff_gestor(
+            db=db,
+            autor_email=autor_email,
+            codigo_glosa=codigo_glosa,
+            eps=eps,
+            limite_meses=limite_meses,
+        )
+        hint_diff = diff_info.get("hint_para_prompt", "") or ""
+    except Exception:
+        pass
+
     return {
         "autor": autor_email,
         "n_refinamientos": n_total,
         "patrones_globales": glob,
         "patrones_contexto": ctx,
-        "hint_para_prompt": hint_prompt,
+        "normas_agregadas_por_diff": diff_info.get("normas_recurrentes", []),
+        "hint_para_prompt": hint_prompt + hint_diff,
     }

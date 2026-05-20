@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.models.db import UsuarioRecord
+from app.models.db import AICallRecord, UsuarioRecord
 
 
 @pytest.fixture
@@ -136,6 +136,79 @@ class TestMiDiaDashboard:
     def test_saludo_no_vacio(self, client):
         r = client.get("/mi-dia")
         assert len(r.json()["saludo"]) > 0
+
+
+class TestDiagnosticoIA:
+    def test_sin_llamadas_devuelve_estado_sin_datos(self, client):
+        r = client.get("/sistema/diagnostico-ia")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total_calls"] == 0
+        assert body["estado"] == "SIN_DATOS"
+        assert body["proveedores"] == {}
+
+    def test_con_llamadas_agrega_por_proveedor(self, client, db_session):
+        from datetime import datetime, timezone
+
+        ahora = datetime.now(timezone.utc)
+        # 3 calls de Groq con distintas latencias y éxito
+        db_session.add_all(
+            [
+                AICallRecord(
+                    proveedor="groq",
+                    modelo="llama-3.3-70b",
+                    latency_ms=1200,
+                    output_tokens=500,
+                    creado_en=ahora,
+                ),
+                AICallRecord(
+                    proveedor="groq",
+                    modelo="llama-3.3-70b",
+                    latency_ms=800,
+                    output_tokens=300,
+                    creado_en=ahora,
+                ),
+                AICallRecord(
+                    proveedor="groq",
+                    modelo="llama-3.3-70b",
+                    latency_ms=3500,
+                    output_tokens=0,  # fallo
+                    creado_en=ahora,
+                ),
+                AICallRecord(
+                    proveedor="anthropic",
+                    modelo="claude-sonnet-4-6",
+                    latency_ms=5000,
+                    output_tokens=900,
+                    cost_usd=0.045,
+                    creado_en=ahora,
+                ),
+            ]
+        )
+        db_session.commit()
+
+        r = client.get("/sistema/diagnostico-ia?horas=24")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total_calls"] == 4
+        assert "groq" in body["proveedores"]
+        assert "anthropic" in body["proveedores"]
+        groq = body["proveedores"]["groq"]
+        assert groq["total_calls"] == 3
+        assert groq["tasa_exito_pct"] == round(100 * 2 / 3, 1)
+        assert groq["latency_ms"]["p50"] >= 800
+        anth = body["proveedores"]["anthropic"]
+        assert anth["total_calls"] == 1
+        assert anth["costo_usd"] == 0.045
+
+    def test_clampa_horas_a_rango_valido(self, client):
+        # 0 → mínimo 1, 999 → máximo 168
+        r1 = client.get("/sistema/diagnostico-ia?horas=0")
+        assert r1.status_code == 200
+        assert r1.json()["ventana_horas"] == 1
+        r2 = client.get("/sistema/diagnostico-ia?horas=999")
+        assert r2.status_code == 200
+        assert r2.json()["ventana_horas"] == 168
 
 
 class TestCorrelationIdMiddleware:
