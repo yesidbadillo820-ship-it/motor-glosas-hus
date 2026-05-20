@@ -5,8 +5,13 @@ few-shot examples al generar respuestas para nuevas glosas del mismo
 (EPS, código). Efecto compuesto: cada victoria mejora las próximas.
 """
 
+import csv
+import hashlib
+import io
+import json
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.tz import ahora_utc
@@ -467,6 +472,299 @@ def plantillas_efectividad(
         "total_evaluadas": len(items),
         "gold_reales": sum(1 for it in items if it["es_gold_real"]),
         "items": items,
+    }
+
+
+def _hash_plantilla(eps: str, codigo: str, argumento: str) -> str:
+    """Hash determinístico para detectar duplicados en importación masiva.
+    Normaliza eps + código + argumento (sin espacios redundantes ni case)."""
+    import re as _re
+
+    norm = " ".join((eps or "").upper().split())
+    norm += "|" + " ".join((codigo or "").upper().split())
+    arg_norm = _re.sub(r"\s+", " ", (argumento or "").strip())[:5000]
+    norm += "|" + arg_norm
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
+
+
+class PlantillaImportRow(BaseModel):
+    """Una fila del payload de importación masiva."""
+
+    eps: str
+    codigo_glosa: str
+    titulo: str = Field(..., max_length=200)
+    argumento: str
+    tipo: Optional[str] = None
+    valor_recuperado: Optional[float] = 0.0
+    notas: Optional[str] = None
+
+
+class PlantillaImportPayload(BaseModel):
+    """Payload JSON para POST /plantillas-gold/importar-masivo (modo JSON)."""
+
+    plantillas: list[PlantillaImportRow]
+
+
+def _procesar_filas_importacion(
+    db: Session,
+    filas: list[dict],
+    autor: str,
+) -> dict:
+    """Inserta plantillas en lote con detección de duplicados.
+
+    Cada fila debe tener: eps, codigo_glosa, titulo, argumento.
+    Opcional: tipo, valor_recuperado, notas.
+
+    Devuelve resumen estructurado:
+      {creadas: N, omitidas_duplicado: N, omitidas_error: N,
+       errores: [{fila: i, razon: "..."}], ids_creadas: [...]}
+    """
+    creadas = 0
+    duplicadas = 0
+    errores: list[dict] = []
+    ids: list[int] = []
+
+    # Pre-cargar hashes existentes para detectar duplicados sin N queries
+    hashes_existentes: set[str] = set()
+    for p in db.query(PlantillaGoldRecord).all():
+        hashes_existentes.add(_hash_plantilla(p.eps, p.codigo_glosa, p.argumento))
+
+    for i, fila in enumerate(filas, start=1):
+        try:
+            eps = (fila.get("eps") or "").upper().strip()
+            cod = (fila.get("codigo_glosa") or "").upper().strip()
+            tit = (fila.get("titulo") or "").strip()
+            arg = (fila.get("argumento") or "").strip()
+            if not eps or not cod or not arg:
+                errores.append({"fila": i, "razon": "eps/codigo_glosa/argumento requeridos"})
+                continue
+            if len(arg) < 50:
+                errores.append({"fila": i, "razon": "argumento < 50 chars"})
+                continue
+
+            h = _hash_plantilla(eps, cod, arg)
+            if h in hashes_existentes:
+                duplicadas += 1
+                continue
+
+            try:
+                valor = float(fila.get("valor_recuperado") or 0)
+            except (TypeError, ValueError):
+                valor = 0.0
+
+            rec = PlantillaGoldRecord(
+                eps=eps,
+                codigo_glosa=cod,
+                tipo=fila.get("tipo") or None,
+                titulo=(tit or f"{cod} · {eps}")[:200],
+                argumento=arg,
+                valor_recuperado=valor,
+                notas=fila.get("notas") or None,
+                creado_por=autor,
+                activa=1,
+            )
+            db.add(rec)
+            db.flush()
+            hashes_existentes.add(h)
+            ids.append(rec.id)
+            creadas += 1
+        except Exception as e:
+            errores.append({"fila": i, "razon": f"excepcion: {e!s}"[:200]})
+
+    db.commit()
+    return {
+        "total_recibidas": len(filas),
+        "creadas": creadas,
+        "omitidas_duplicado": duplicadas,
+        "omitidas_error": len(errores),
+        "errores": errores[:50],
+        "ids_creadas": ids,
+    }
+
+
+def _validar_y_procesar_lote(
+    db: Session, filas: list[dict], autor: str, current_user: UsuarioRecord
+) -> dict:
+    """Helper compartido entre los 2 endpoints de import (JSON y multipart)."""
+    if not filas:
+        raise HTTPException(400, "El archivo/payload no contiene filas")
+    if len(filas) > 5000:
+        raise HTTPException(413, f"Máximo 5000 plantillas por lote (recibidas {len(filas)})")
+
+    resumen = _procesar_filas_importacion(db, filas, autor)
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="PLANTILLA_GOLD_IMPORT",
+        tabla="plantillas_gold",
+        registro_id=None,
+        detalle=(
+            f"importadas={resumen['creadas']} "
+            f"dup={resumen['omitidas_duplicado']} "
+            f"err={resumen['omitidas_error']}"
+        ),
+    )
+    return resumen
+
+
+@router.post("/importar-masivo", status_code=201)
+def importar_masivo_json(
+    payload: PlantillaImportPayload,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Importa plantillas en lote desde JSON body.
+
+    Body: `{"plantillas": [{"eps": "...", "codigo_glosa": "...",
+            "titulo": "...", "argumento": "...", ...}, ...]}`
+
+    Detecta duplicados por hash SHA-256(eps|codigo|argumento_normalizado).
+    Reporta errores por fila sin abortar el batch — útil para archivos
+    masivos donde algunas filas pueden estar mal formateadas.
+
+    Solo coordinador/admin (las plantillas son IP del equipo legal).
+
+    Para subir CSV/archivo, ver POST /plantillas-gold/importar-masivo/archivo.
+    """
+    filas = [p.model_dump() for p in payload.plantillas]
+    return _validar_y_procesar_lote(db, filas, current_user.email, current_user)
+
+
+@router.post("/importar-masivo/archivo", status_code=201)
+async def importar_masivo_archivo(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Importa plantillas en lote desde un archivo CSV o JSON.
+
+    Acepta:
+      - CSV con columnas: eps, codigo_glosa, titulo, argumento
+        (opcionales: tipo, valor_recuperado, notas). Encoding UTF-8 con
+        BOM o Latin-1 detectado automáticamente.
+      - JSON: lista directa `[{...}, {...}]` o `{"plantillas": [...]}`.
+
+    Detecta el formato por extensión del archivo (.json vs .csv).
+    Mismo procesamiento que /importar-masivo (dedupe + reporte de errores).
+    """
+    contenido = await archivo.read()
+    nombre = (archivo.filename or "").lower()
+    filas: list[dict] = []
+
+    if nombre.endswith(".json"):
+        try:
+            data = json.loads(contenido.decode("utf-8"))
+            if isinstance(data, dict) and "plantillas" in data:
+                filas = list(data["plantillas"])
+            elif isinstance(data, list):
+                filas = data
+            else:
+                raise HTTPException(400, "JSON debe ser lista o {plantillas: [...]}")
+        except json.JSONDecodeError as e:
+            raise HTTPException(400, f"JSON inválido: {e}")
+    else:
+        try:
+            texto = contenido.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            texto = contenido.decode("latin-1")
+        reader = csv.DictReader(io.StringIO(texto))
+        filas = list(reader)
+
+    return _validar_y_procesar_lote(db, filas, current_user.email, current_user)
+
+
+@router.get("/cobertura")
+def cobertura_plantillas(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Mapa de cobertura: qué (EPS × código_glosa) tienen plantillas y cuáles no.
+
+    Cruza PlantillaGoldRecord con GlosaRecord para identificar:
+      - combinaciones (EPS, código) frecuentes en glosas reales SIN plantilla
+      - combinaciones con plantilla pero pocos usos
+      - top-10 huecos por valor objetado (qué falta cargar primero)
+
+    Devuelve:
+      {
+        eps_codigo_sin_plantilla: [{eps, codigo, n_glosas, valor_total}, ...],
+        eps_codigo_con_plantilla: [{eps, codigo, n_plantillas, usos}, ...],
+        resumen: {total_combinaciones, con_plantilla, sin_plantilla}
+      }
+    """
+    from sqlalchemy import func
+
+    # Plantillas activas por (eps, codigo)
+    plantillas = (
+        db.query(
+            PlantillaGoldRecord.eps,
+            PlantillaGoldRecord.codigo_glosa,
+            func.count(PlantillaGoldRecord.id).label("n_plantillas"),
+            func.coalesce(func.sum(PlantillaGoldRecord.usos), 0).label("usos_total"),
+        )
+        .filter(PlantillaGoldRecord.activa == 1)
+        .group_by(PlantillaGoldRecord.eps, PlantillaGoldRecord.codigo_glosa)
+        .all()
+    )
+    set_con_plantilla: set[tuple[str, str]] = {
+        ((p.eps or "").upper(), (p.codigo_glosa or "").upper()) for p in plantillas
+    }
+
+    # Glosas reales por (eps, codigo) — últimos 365 días
+    from datetime import datetime, timedelta, timezone
+
+    desde = datetime.now(timezone.utc) - timedelta(days=365)
+    glosas = (
+        db.query(
+            GlosaRecord.eps,
+            GlosaRecord.codigo_glosa,
+            func.count(GlosaRecord.id).label("n_glosas"),
+            func.coalesce(func.sum(GlosaRecord.valor_objetado), 0).label("valor_total"),
+        )
+        .filter(GlosaRecord.creado_en >= desde)
+        .filter(GlosaRecord.codigo_glosa.isnot(None))
+        .group_by(GlosaRecord.eps, GlosaRecord.codigo_glosa)
+        .all()
+    )
+
+    sin_plantilla = []
+    for g in glosas:
+        clave = ((g.eps or "").upper(), (g.codigo_glosa or "").upper())
+        if not clave[0] or not clave[1]:
+            continue
+        if clave in set_con_plantilla:
+            continue
+        sin_plantilla.append(
+            {
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "n_glosas": int(g.n_glosas),
+                "valor_total": float(g.valor_total or 0),
+            }
+        )
+    # Top huecos por valor (los más urgentes de cargar)
+    sin_plantilla.sort(key=lambda x: x["valor_total"], reverse=True)
+
+    con_plantilla = [
+        {
+            "eps": p.eps,
+            "codigo_glosa": p.codigo_glosa,
+            "n_plantillas": int(p.n_plantillas),
+            "usos_total": int(p.usos_total or 0),
+        }
+        for p in plantillas
+    ]
+    con_plantilla.sort(key=lambda x: x["usos_total"], reverse=True)
+
+    return {
+        "resumen": {
+            "combinaciones_con_plantilla": len(con_plantilla),
+            "combinaciones_sin_plantilla": len(sin_plantilla),
+            "top_huecos_por_valor": sin_plantilla[:10],
+        },
+        "eps_codigo_sin_plantilla": sin_plantilla,
+        "eps_codigo_con_plantilla": con_plantilla,
     }
 
 
