@@ -51,7 +51,9 @@ def main():
 
     if args.dry_run:
         for i, fila in enumerate(filas, 1):
-            print(f"  [{i:02d}] {fila['eps']:10s} | {fila['codigo_glosa']:10s} | {fila['titulo'][:60]}")
+            print(
+                f"  [{i:02d}] {fila['eps']:10s} | {fila['codigo_glosa']:10s} | {fila['titulo'][:60]}"
+            )
         print("[DRY-RUN] No se modificó la base de datos.")
         return
 
@@ -62,7 +64,9 @@ def main():
     from app.models.db import PlantillaGoldRecord
 
     db_url = os.environ.get("DATABASE_URL", "sqlite:///./motor_glosas.db")
-    engine = create_engine(db_url, connect_args={"check_same_thread": False} if "sqlite" in db_url else {})
+    engine = create_engine(
+        db_url, connect_args={"check_same_thread": False} if "sqlite" in db_url else {}
+    )
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     db = Session()
@@ -77,8 +81,7 @@ def main():
         return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
     hashes_existentes = {
-        _hash(p.eps, p.codigo_glosa, p.argumento)
-        for p in db.query(PlantillaGoldRecord).all()
+        _hash(p.eps, p.codigo_glosa, p.argumento) for p in db.query(PlantillaGoldRecord).all()
     }
 
     creadas = 0

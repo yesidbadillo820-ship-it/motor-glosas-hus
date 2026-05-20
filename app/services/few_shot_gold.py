@@ -114,14 +114,92 @@ def obtener_ejemplos_gold(
     except Exception as e:
         logger.debug(f"few_shot_gold: error consultando GlosaRecord: {e}")
 
+    # 3) Último recurso: banco HUS de 50 plantillas jurídicas por familia
+    #    (eps=GENERICO, código TA-G01..CL-G10). Sólo si no hay ejemplos del
+    #    par exacto ni histórico — son fallback genérico de "último recurso".
+    if not ejemplos:
+        try:
+            from app.models.db import PlantillaGoldRecord
+
+            prefijo = cod_norm[:2]  # "TA" de "TA0201", "SO" de "SO0501", etc.
+            hus = (
+                db.query(PlantillaGoldRecord)
+                .filter(PlantillaGoldRecord.eps == "GENERICO")
+                .filter(PlantillaGoldRecord.codigo_glosa.like(f"{prefijo}-G%"))
+                .filter(PlantillaGoldRecord.activa == 1)
+                .order_by(PlantillaGoldRecord.usos.desc())
+                .limit(int(max_ejemplos))
+                .all()
+            )
+            for h in hus:
+                arg = (h.argumento or "").strip()
+                if len(arg) < 200:
+                    continue
+                ejemplos.append(
+                    {
+                        "argumento": arg[:_MAX_CHARS_EJEMPLO],
+                        "fuente": "BANCO_HUS",
+                        "id": h.id,
+                    }
+                )
+        except Exception as e:
+            logger.debug(f"few_shot_gold: error consultando banco HUS: {e}")
+
     return ejemplos
 
 
 def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
-    """Construye el bloque de texto a anexar al user_prompt."""
+    """Construye el bloque de texto a anexar al user_prompt.
+
+    Si TODOS los ejemplos vienen del banco HUS (fuente=BANCO_HUS), usa
+    instrucciones de "PLANTILLA BASE" — el LLM debe usar el texto verbatim
+    como esqueleto y SÓLO personalizar: nombre del servicio, valores, nombre
+    del paciente, fechas (estos últimos sólo si vienen en los soportes PDF).
+
+    Si hay ejemplos de GOLD/HISTORICO, usa instrucciones tradicionales de
+    "inspírate, no copies".
+    """
     if not ejemplos:
         return ""
 
+    solo_hus = all(e.get("fuente") == "BANCO_HUS" for e in ejemplos)
+
+    if solo_hus:
+        partes = [
+            "",
+            "═══ PLANTILLA(S) JURÍDICA(S) BASE — BANCO HUS ═══",
+            (
+                "Las siguientes plantillas son argumentos jurídicos APROBADOS "
+                "por el equipo legal del HUS. Úsalas como ESQUELETO BASE del "
+                "dictamen — NO reescribas los argumentos legales (citas, normas, "
+                "sentencias, decretos): ya están redactados con rigor jurídico."
+            ),
+            ("TU ÚNICA TAREA es PERSONALIZAR la plantilla con los datos del caso actual:"),
+            "  1. NOMBRE DEL SERVICIO (CUPS/procedimiento del BLOQUE 1)",
+            "  2. VALORES MONETARIOS (objetado/facturado del BLOQUE 1)",
+            (
+                "  3. NOMBRE DEL PACIENTE Y NÚMERO DE DOCUMENTO (si vienen en "
+                "soportes PDF; si NO hay soportes, OMITIR — no inventar)"
+            ),
+            ("  4. FECHAS DE ATENCIÓN (si vienen en soportes PDF; si NO, OMITIR — no inventar)"),
+            ('  5. Reemplazar "LA ENTIDAD PAGADORA" por el nombre real del pagador (del BLOQUE 1)'),
+            "",
+        ]
+        for i, ej in enumerate(ejemplos, 1):
+            partes.append(f"--- PLANTILLA BASE #{i} (fuente: BANCO_HUS) ---")
+            partes.append(ej["argumento"])
+            partes.append("--- FIN PLANTILLA ---")
+            partes.append("")
+        partes.append(
+            "⚠ PROHIBIDO inventar nombres de pacientes, números de documento o "
+            "fechas que NO estén explícitos en los soportes PDF o en el texto "
+            "de la glosa. Si el dato no existe, omitir la mención."
+        )
+        partes.append("═══════════════════════════════════════════════════════════════════")
+        partes.append("")
+        return "\n".join(partes)
+
+    # Comportamiento original: ejemplos GOLD o HISTORICO
     partes = [
         "",
         "═══ EJEMPLOS DE DICTÁMENES GANADORES PREVIOS (mismo eps + código) ═══",
