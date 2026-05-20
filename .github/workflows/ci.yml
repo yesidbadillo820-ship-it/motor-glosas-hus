@@ -33,6 +33,9 @@ jobs:
       SECRET_KEY: ci-test-secret-do-not-use-in-production
       DATABASE_URL: sqlite:///./test_ci.db
       PYTHONPATH: ${{ github.workspace }}
+      # Salta schedulers en background — sin esto, los TestClient acumulan
+      # asyncio tasks hasta agotar memoria del runner.
+      DISABLE_SCHEDULERS: "1"
     steps:
       - uses: actions/checkout@v4
 
