@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/eps-comportamiento (R374 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,10 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="auditor@hus.com", rol="AUDITOR", activo=1,
+        id=1,
+        email="auditor@hus.com",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -41,6 +45,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,21 +53,26 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, gid, eps="SAN", codigo="C", estado="RADICADA",
-          dias_decision=None, codigo_respuesta=None):
+def _seed(
+    db, gid, eps="SAN", codigo="C", estado="RADICADA", dias_decision=None, codigo_respuesta=None
+):
     creado = ahora_utc()
     if dias_decision is not None:
         creado = creado - timedelta(days=dias_decision)
-    db.add(GlosaRecord(
-        id=gid,
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=creado,
-        fecha_decision_eps=(
-            ahora_utc() if dias_decision is not None else None
-        ),
-        codigo_respuesta=codigo_respuesta,
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=creado,
+            fecha_decision_eps=(ahora_utc() if dias_decision is not None else None),
+            codigo_respuesta=codigo_respuesta,
+        )
+    )
     db.commit()
 
 
@@ -73,7 +83,10 @@ class TestEPSComportamiento:
         # Histórico SAN: 5 LEV / 5 dec → 100% (conciliadora)
         for i in range(5):
             _seed(
-                db_session, 100 + i, eps="SAN", estado="LEVANTADA",
+                db_session,
+                100 + i,
+                eps="SAN",
+                estado="LEVANTADA",
                 dias_decision=10,
             )
 

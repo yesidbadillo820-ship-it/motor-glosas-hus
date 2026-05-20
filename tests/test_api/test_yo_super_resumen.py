@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/super-resumen (R397 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,8 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -40,6 +44,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,17 +52,22 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, gestor="Alice", dias=10, estado="RADICADA",
-          recuperado=0, decidida=False):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, valor_recuperado=recuperado,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        dias_restantes=dias,
-        fecha_decision_eps=ahora_utc() if decidida else None,
-    ))
+def _seed(db, gestor="Alice", dias=10, estado="RADICADA", recuperado=0, decidida=False):
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            valor_recuperado=recuperado,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            dias_restantes=dias,
+            fecha_decision_eps=ahora_utc() if decidida else None,
+        )
+    )
     db.commit()
 
 
@@ -66,14 +76,21 @@ class TestSuperResumen:
         r = client.get("/usuarios/yo/super-resumen")
         d = r.json()
         for k in (
-            "kpis", "donut", "alertas_count",
-            "menciones_pendientes", "streak_actual",
+            "kpis",
+            "donut",
+            "alertas_count",
+            "menciones_pendientes",
+            "streak_actual",
         ):
             assert k in d
         for k in (
-            "abiertas", "vencidas", "criticas",
-            "decididas_mes", "levantadas_mes",
-            "recuperado_mes", "tasa_levantamiento_mes_pct",
+            "abiertas",
+            "vencidas",
+            "criticas",
+            "decididas_mes",
+            "levantadas_mes",
+            "recuperado_mes",
+            "tasa_levantamiento_mes_pct",
         ):
             assert k in d["kpis"]
 
@@ -82,8 +99,10 @@ class TestSuperResumen:
         _seed(db_session, dias=2)
         _seed(db_session, dias=10)
         _seed(
-            db_session, estado="LEVANTADA",
-            recuperado=500, decidida=True,
+            db_session,
+            estado="LEVANTADA",
+            recuperado=500,
+            decidida=True,
         )
         r = client.get("/usuarios/yo/super-resumen")
         d = r.json()

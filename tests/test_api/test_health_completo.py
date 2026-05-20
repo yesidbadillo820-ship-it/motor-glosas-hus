@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/health-completo (R190 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -51,11 +56,9 @@ class TestHealthCompleto:
         r = client.get("/sistema/health-completo")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("evaluado_en", "estado_global",
-                    "componentes", "operacion"):
+        for key in ("evaluado_en", "estado_global", "componentes", "operacion"):
             assert key in d
-        for c in ("bd_responsiva", "ia_configurada",
-                  "schedulers_activos"):
+        for c in ("bd_responsiva", "ia_configurada", "schedulers_activos"):
             assert c in d["componentes"]
         for o in ("total_glosas", "abiertas", "vencidas_graves"):
             assert o in d["operacion"]
@@ -67,12 +70,18 @@ class TestHealthCompleto:
 
     def test_degraded_si_muchas_vencidas(self, client, db_session):
         for _ in range(25):
-            db_session.add(GlosaRecord(
-                eps="X", paciente="X", codigo_glosa="C",
-                valor_objetado=1000, etapa="X", estado="RADICADA",
-                creado_en=ahora_utc(),
-                dias_restantes=-100,
-            ))
+            db_session.add(
+                GlosaRecord(
+                    eps="X",
+                    paciente="X",
+                    codigo_glosa="C",
+                    valor_objetado=1000,
+                    etapa="X",
+                    estado="RADICADA",
+                    creado_en=ahora_utc(),
+                    dias_restantes=-100,
+                )
+            )
         db_session.commit()
         r = client.get("/sistema/health-completo")
         d = r.json()

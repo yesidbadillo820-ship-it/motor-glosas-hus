@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/comparativa-eps (R90 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,8 +50,12 @@ def client(db_session, usuario):
 
 def _seed(db, eps, estado, valor=1000, **kw):
     base = dict(
-        eps=eps, paciente="X", codigo_glosa="TA0201",
-        valor_objetado=valor, etapa="X", estado=estado,
+        eps=eps,
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=valor,
+        etapa="X",
+        estado=estado,
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -111,10 +117,8 @@ class TestComparativaEPS:
         assert item["tasa_levantamiento_pct"] == 100.0
 
     def test_valores_acumulados(self, client, db_session):
-        _seed(db_session, "X", "LEVANTADA",
-              valor=10_000, valor_recuperado=10_000)
-        _seed(db_session, "X", "ACEPTADA",
-              valor=5_000, valor_recuperado=0)
+        _seed(db_session, "X", "LEVANTADA", valor=10_000, valor_recuperado=10_000)
+        _seed(db_session, "X", "ACEPTADA", valor=5_000, valor_recuperado=0)
         r = client.get("/glosas/stats/comparativa-eps?min_glosas=1")
         d = r.json()
         item = next(it for it in d["items"] if it["eps"] == "X")
@@ -123,12 +127,20 @@ class TestComparativaEPS:
 
     def test_tiempo_promedio_decision(self, client, db_session):
         ahora = ahora_utc()
-        _seed(db_session, "X", "LEVANTADA",
-              creado_en=ahora - timedelta(days=10),
-              fecha_decision_eps=ahora)
-        _seed(db_session, "X", "LEVANTADA",
-              creado_en=ahora - timedelta(days=20),
-              fecha_decision_eps=ahora)
+        _seed(
+            db_session,
+            "X",
+            "LEVANTADA",
+            creado_en=ahora - timedelta(days=10),
+            fecha_decision_eps=ahora,
+        )
+        _seed(
+            db_session,
+            "X",
+            "LEVANTADA",
+            creado_en=ahora - timedelta(days=20),
+            fecha_decision_eps=ahora,
+        )
         r = client.get("/glosas/stats/comparativa-eps?min_glosas=1")
         d = r.json()
         item = next(it for it in d["items"] if it["eps"] == "X")

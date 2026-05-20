@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/cups-perfil (R140 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,7 +11,9 @@ from sqlalchemy.pool import StaticPool
 from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import (
-    ConceptoGlosaRecord, GlosaRecord, UsuarioRecord,
+    ConceptoGlosaRecord,
+    GlosaRecord,
+    UsuarioRecord,
 )
 
 
@@ -39,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,18 +51,27 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid, eps="X"):
-    db.add(GlosaRecord(
-        id=gid, eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_concepto(db, gid, cups, **kw):
     base = dict(
-        glosa_id=gid, codigo_glosa="TA0201",
-        cups_codigo=cups, valor_objetado=1000,
+        glosa_id=gid,
+        codigo_glosa="TA0201",
+        cups_codigo=cups,
+        valor_objetado=1000,
     )
     base.update(kw)
     db.add(ConceptoGlosaRecord(**base))
@@ -75,11 +88,15 @@ class TestCupsPerfil:
     def test_estructura_completa(self, client, db_session):
         _seed_glosa(db_session, 1, eps="SANITAS")
         _seed_glosa(db_session, 2, eps="NUEVA EPS")
-        _seed_concepto(db_session, 1, "906625",
-                       cups_descripcion="Gonadotropina",
-                       centro_costo="LAB", valor_objetado=10_000)
-        _seed_concepto(db_session, 2, "906625",
-                       centro_costo="LAB", valor_objetado=20_000)
+        _seed_concepto(
+            db_session,
+            1,
+            "906625",
+            cups_descripcion="Gonadotropina",
+            centro_costo="LAB",
+            valor_objetado=10_000,
+        )
+        _seed_concepto(db_session, 2, "906625", centro_costo="LAB", valor_objetado=20_000)
 
         r = client.get("/glosas/cups-perfil?cups=906625")
         d = r.json()

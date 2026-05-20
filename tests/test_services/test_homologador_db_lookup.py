@@ -6,6 +6,7 @@ de tabla explícita y normalización heurística, pero el branch BD
 (que se activa con cada Excel cargado por el coordinador) tenía
 cobertura limitada.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -31,9 +32,13 @@ def db():
 
 def _seed(db, **kw):
     base = dict(
-        eps="FAMISANAR", codigo_cups="890750", codigo_ips=None,
-        descripcion="X", valor_pactado=100_000,
-        modalidad="TARIFA PROPIA", activa=1,
+        eps="FAMISANAR",
+        codigo_cups="890750",
+        codigo_ips=None,
+        descripcion="X",
+        valor_pactado=100_000,
+        modalidad="TARIFA PROPIA",
+        activa=1,
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -45,8 +50,7 @@ class TestLookupBd:
     def test_codigo_ips_match_devuelve_cups_oficial(self, db):
         """Si el coordinador cargó el Excel con codigo_ips='39999X-99' y
         codigo_cups='890999', el homologador debe traducir."""
-        _seed(db, codigo_ips="39999X-99", codigo_cups="890999",
-              descripcion="PROCEDIMIENTO X")
+        _seed(db, codigo_ips="39999X-99", codigo_cups="890999", descripcion="PROCEDIMIENTO X")
         r = homologar_cups("39999X-99", db=db)
         assert r is not None
         assert r["cups_oficial"] == "890999"

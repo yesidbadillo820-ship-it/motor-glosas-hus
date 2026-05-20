@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/glosas-saldo-cero-detalle (R360 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -47,13 +52,19 @@ def client(db_session, admin_user):
 
 
 def _seed(db, saldo, valor_factura=10000, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        saldo_factura=saldo,
-        valor_factura=valor_factura,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            saldo_factura=saldo,
+            valor_factura=valor_factura,
+        )
+    )
     db.commit()
 
 
@@ -62,8 +73,7 @@ class TestGlosasSaldoCero:
         _seed(db_session, saldo=0, valor_factura=10000)
         _seed(db_session, saldo=None, valor_factura=10000)
         _seed(db_session, saldo=5000, valor_factura=10000)  # OK
-        _seed(db_session, saldo=0, valor_factura=10000,
-              estado="LEVANTADA")  # cerrada
+        _seed(db_session, saldo=0, valor_factura=10000, estado="LEVANTADA")  # cerrada
 
         r = client.get("/admin/glosas-saldo-cero-detalle")
         d = r.json()

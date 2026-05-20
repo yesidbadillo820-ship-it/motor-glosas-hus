@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/stats/por-gestor (R73 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -35,9 +36,13 @@ def usuario_coord():
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100_000, valor_aceptado=0,
-        etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        valor_aceptado=0,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -49,6 +54,7 @@ def _seed(db, **kw):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:

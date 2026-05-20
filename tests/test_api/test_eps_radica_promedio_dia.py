@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-radica-promedio-dia (R357 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, dias_atras=0):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -61,10 +69,7 @@ class TestEPSRadicaPromedioDia:
         for i in range(5):
             _seed(db_session, "X", dias_atras=i)
 
-        r = client.get(
-            "/glosas/stats/eps-radica-promedio-dia"
-            "?dias=10&min_glosas=1"
-        )
+        r = client.get("/glosas/stats/eps-radica-promedio-dia?dias=10&min_glosas=1")
         d = r.json()
         item = d["items"][0]
         assert item["eps"] == "X"

@@ -4,6 +4,7 @@ Genera PDF con membrete institucional HUS, tipografia premium, tabla
 de identificacion, secciones formateadas y hash SHA-256 de
 integridad. Listo para firmar/enviar a la EPS sin pasar por Word.
 """
+
 from __future__ import annotations
 import hashlib
 import io
@@ -70,15 +71,22 @@ def descargar_pdf_dictamen(
     from reportlab.lib.units import cm
     from reportlab.lib.colors import HexColor
     from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer,
+        Table,
+        TableStyle,
     )
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
-        buf, pagesize=letter,
-        leftMargin=2.2 * cm, rightMargin=2.2 * cm,
-        topMargin=2.5 * cm, bottomMargin=2.0 * cm,
-        title=f"Dictamen {g.factura or '#'+str(g.id)}",
+        buf,
+        pagesize=letter,
+        leftMargin=2.2 * cm,
+        rightMargin=2.2 * cm,
+        topMargin=2.5 * cm,
+        bottomMargin=2.0 * cm,
+        title=f"Dictamen {g.factura or '#' + str(g.id)}",
         author="ESE HUS",
     )
 
@@ -90,58 +98,81 @@ def descargar_pdf_dictamen(
     BG_TABLE = HexColor("#f5f7fa")
 
     h1 = ParagraphStyle(
-        "H1", parent=styles["Title"],
-        fontName="Helvetica-Bold", fontSize=14, leading=18,
-        textColor=NAVY_DARK, alignment=TA_CENTER, spaceAfter=4,
+        "H1",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=14,
+        leading=18,
+        textColor=NAVY_DARK,
+        alignment=TA_CENTER,
+        spaceAfter=4,
     )
     h2 = ParagraphStyle(
-        "H2", parent=styles["Heading2"],
-        fontName="Helvetica-Bold", fontSize=10.5, leading=14,
-        textColor=NAVY, spaceBefore=10, spaceAfter=4,
+        "H2",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=10.5,
+        leading=14,
+        textColor=NAVY,
+        spaceBefore=10,
+        spaceAfter=4,
     )
     body = ParagraphStyle(
-        "Body", parent=styles["BodyText"],
-        fontName="Helvetica", fontSize=9.5, leading=14,
-        textColor=GRAY_TEXT, alignment=TA_JUSTIFY, spaceAfter=6,
+        "Body",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=9.5,
+        leading=14,
+        textColor=GRAY_TEXT,
+        alignment=TA_JUSTIFY,
+        spaceAfter=6,
     )
     small = ParagraphStyle(
-        "Small", parent=styles["BodyText"],
-        fontName="Helvetica", fontSize=7.5, leading=10,
-        textColor=GRAY_LIGHT, alignment=TA_CENTER,
+        "Small",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=7.5,
+        leading=10,
+        textColor=GRAY_LIGHT,
+        alignment=TA_CENTER,
     )
     foot = ParagraphStyle(
-        "Foot", parent=styles["BodyText"],
-        fontName="Helvetica-Oblique", fontSize=7, leading=9.5,
-        textColor=GRAY_LIGHT, alignment=TA_CENTER,
+        "Foot",
+        parent=styles["BodyText"],
+        fontName="Helvetica-Oblique",
+        fontSize=7,
+        leading=9.5,
+        textColor=GRAY_LIGHT,
+        alignment=TA_CENTER,
     )
 
     story: list = []
 
     # Cabecera institucional
-    story.append(Paragraph(
-        "<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>",
-        h1
-    ))
-    story.append(Paragraph(
-        "NIT 900.006.037-4 · Bucaramanga, Santander · Colombia",
-        small
-    ))
+    story.append(Paragraph("<b>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</b>", h1))
+    story.append(Paragraph("NIT 900.006.037-4 · Bucaramanga, Santander · Colombia", small))
     story.append(Spacer(1, 8))
     # Linea separadora
     line_t = Table([[" "]], colWidths=[doc.width])
-    line_t.setStyle(TableStyle([
-        ("LINEABOVE", (0, 0), (-1, 0), 1.5, NAVY),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
+    line_t.setStyle(
+        TableStyle(
+            [
+                ("LINEABOVE", (0, 0), (-1, 0), 1.5, NAVY),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
     story.append(line_t)
     story.append(Spacer(1, 12))
 
     # Titulo principal
-    story.append(Paragraph(
-        f"<b>DICTAMEN DE GLOSA</b> &nbsp; · &nbsp; Factura {g.factura or '#'+str(g.id)}",
-        h1,
-    ))
+    story.append(
+        Paragraph(
+            f"<b>DICTAMEN DE GLOSA</b> &nbsp; · &nbsp; Factura {g.factura or '#' + str(g.id)}",
+            h1,
+        )
+    )
     story.append(Spacer(1, 14))
 
     # Tabla de identificacion
@@ -155,31 +186,37 @@ def descargar_pdf_dictamen(
         ["Etapa", g.etapa or "—", "Estado", g.estado or "—"],
     ]
     info_t = Table(info_data, colWidths=[3.0 * cm, 5.5 * cm, 3.0 * cm, 5.5 * cm])
-    info_t.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
-        ("TEXTCOLOR", (0, 0), (-1, -1), GRAY_TEXT),
-        ("BACKGROUND", (0, 0), (0, -1), BG_TABLE),
-        ("BACKGROUND", (2, 0), (2, -1), BG_TABLE),
-        ("LINEBELOW", (0, 0), (-1, -2), 0.4, GRAY_LIGHT),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-    ]))
+    info_t.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+                ("TEXTCOLOR", (0, 0), (-1, -1), GRAY_TEXT),
+                ("BACKGROUND", (0, 0), (0, -1), BG_TABLE),
+                ("BACKGROUND", (2, 0), (2, -1), BG_TABLE),
+                ("LINEBELOW", (0, 0), (-1, -2), 0.4, GRAY_LIGHT),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     story.append(info_t)
     story.append(Spacer(1, 14))
 
     # Glosa original (texto del pagador)
     if g.texto_glosa_original:
         story.append(Paragraph("1. GLOSA OBJETADA POR EL PAGADOR", h2))
-        story.append(Paragraph(
-            _strip_html(g.texto_glosa_original).replace("\n", "<br/>"),
-            body,
-        ))
+        story.append(
+            Paragraph(
+                _strip_html(g.texto_glosa_original).replace("\n", "<br/>"),
+                body,
+            )
+        )
 
     # Concepto / motivo
     if g.concepto_glosa:
@@ -192,10 +229,12 @@ def descargar_pdf_dictamen(
     # Dividir por parrafos dobles
     for parrafo in dictamen_clean.split("\n\n"):
         if parrafo.strip():
-            story.append(Paragraph(
-                parrafo.replace("\n", "<br/>"),
-                body,
-            ))
+            story.append(
+                Paragraph(
+                    parrafo.replace("\n", "<br/>"),
+                    body,
+                )
+            )
 
     # Decision EPS si ya hubo
     if g.decision_eps:
@@ -216,20 +255,26 @@ def descargar_pdf_dictamen(
     story.append(Spacer(1, 20))
     story.append(line_t)
     story.append(Spacer(1, 6))
-    story.append(Paragraph(
-        f"<b>Documento generado:</b> {ahora_utc().strftime('%d/%m/%Y %H:%M')} UTC · "
-        f"<b>Gestor responsable:</b> {current_user.nombre or current_user.email}",
-        foot,
-    ))
-    story.append(Paragraph(
-        f"<b>Hash de integridad:</b> <font face='Courier'>{sha[:32]}...{sha[-8:]}</font>",
-        foot,
-    ))
-    story.append(Paragraph(
-        "Este documento es generado automáticamente por el Motor de Glosas HUS. "
-        "El hash SHA-256 garantiza la integridad del dictamen al momento de generación.",
-        foot,
-    ))
+    story.append(
+        Paragraph(
+            f"<b>Documento generado:</b> {ahora_utc().strftime('%d/%m/%Y %H:%M')} UTC · "
+            f"<b>Gestor responsable:</b> {current_user.nombre or current_user.email}",
+            foot,
+        )
+    )
+    story.append(
+        Paragraph(
+            f"<b>Hash de integridad:</b> <font face='Courier'>{sha[:32]}...{sha[-8:]}</font>",
+            foot,
+        )
+    )
+    story.append(
+        Paragraph(
+            "Este documento es generado automáticamente por el Motor de Glosas HUS. "
+            "El hash SHA-256 garantiza la integridad del dictamen al momento de generación.",
+            foot,
+        )
+    )
 
     # Construir
     doc.build(story)

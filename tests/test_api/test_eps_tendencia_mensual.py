@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-tendencia-mensual (R273 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, estado="LEVANTADA", valor=1000, recuperado=0):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=valor, valor_recuperado=recuperado,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            valor_recuperado=recuperado,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -58,9 +66,7 @@ class TestEPSTendenciaMensual:
     def test_filtra_por_eps(self, client, db_session):
         _seed(db_session, "SANITAS")
         _seed(db_session, "OTRA")
-        r = client.get(
-            "/glosas/stats/eps-tendencia-mensual?eps=SANITAS"
-        )
+        r = client.get("/glosas/stats/eps-tendencia-mensual?eps=SANITAS")
         d = r.json()
         assert d["eps"] == "SANITAS"
         # Una sola entrada de mes
@@ -78,8 +84,6 @@ class TestEPSTendenciaMensual:
         assert d["serie"][0]["tasa_levantamiento_pct"] == 50.0
 
     def test_sin_match(self, client):
-        r = client.get(
-            "/glosas/stats/eps-tendencia-mensual?eps=NOEXISTE"
-        )
+        r = client.get("/glosas/stats/eps-tendencia-mensual?eps=NOEXISTE")
         d = r.json()
         assert d["serie"] == []

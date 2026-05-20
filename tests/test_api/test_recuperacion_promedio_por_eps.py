@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/recuperacion-promedio-por-eps (R182 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,21 +47,25 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, valor_obj=1000, valor_rec=500, estado="LEVANTADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=valor_obj, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor_obj,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 class TestRecuperacionPromedioPorEPS:
     def test_excluye_abiertas(self, client, db_session):
         _seed(db_session, "X", estado="RADICADA")
-        r = client.get(
-            "/glosas/stats/recuperacion-promedio-por-eps?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/recuperacion-promedio-por-eps?min_glosas=1")
         d = r.json()
         assert d["items"] == []
 
@@ -67,11 +73,8 @@ class TestRecuperacionPromedioPorEPS:
         # SANITAS: 2 glosas con $5k y $3k recuperado → promedio $4k
         _seed(db_session, "SANITAS", valor_rec=5000)
         _seed(db_session, "SANITAS", valor_rec=3000)
-        _seed(db_session, "SANITAS", valor_rec=0,
-              estado="ACEPTADA")  # no recuperó
-        r = client.get(
-            "/glosas/stats/recuperacion-promedio-por-eps?min_glosas=1"
-        )
+        _seed(db_session, "SANITAS", valor_rec=0, estado="ACEPTADA")  # no recuperó
+        r = client.get("/glosas/stats/recuperacion-promedio-por-eps?min_glosas=1")
         d = r.json()
         item = d["items"][0]
         # 8000 / 3 = 2666.67
@@ -80,9 +83,7 @@ class TestRecuperacionPromedioPorEPS:
     def test_filtro_min_glosas(self, client, db_session):
         _seed(db_session, "POCAS", valor_rec=1000)
         _seed(db_session, "POCAS", valor_rec=1000)
-        r = client.get(
-            "/glosas/stats/recuperacion-promedio-por-eps?min_glosas=3"
-        )
+        r = client.get("/glosas/stats/recuperacion-promedio-por-eps?min_glosas=3")
         d = r.json()
         assert d["items"] == []
 
@@ -94,9 +95,7 @@ class TestRecuperacionPromedioPorEPS:
         _seed(db_session, "BAJA", valor_rec=1000)
         _seed(db_session, "BAJA", valor_rec=1000)
 
-        r = client.get(
-            "/glosas/stats/recuperacion-promedio-por-eps?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/recuperacion-promedio-por-eps?min_glosas=1")
         d = r.json()
         assert d["items"][0]["eps"] == "ALTA"
         assert d["items"][1]["eps"] == "BAJA"

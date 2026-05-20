@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/usuarios-sin-glosas (R156 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -52,20 +57,31 @@ def client(db_session, usuario_super):
 
 
 def _seed_user(db, email, nombre, rol="AUDITOR", activo=1):
-    db.add(UsuarioRecord(
-        email=email, nombre=nombre, rol=rol, activo=activo,
-        password_hash=get_password_hash("y"),
-    ))
+    db.add(
+        UsuarioRecord(
+            email=email,
+            nombre=nombre,
+            rol=rol,
+            activo=activo,
+            password_hash=get_password_hash("y"),
+        )
+    )
     db.commit()
 
 
 def _seed_glosa(db, gestor, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+        )
+    )
     db.commit()
 
 
@@ -74,8 +90,7 @@ class TestUsuariosSinGlosas:
         r = client.get("/admin/usuarios-sin-glosas")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total_usuarios_activos_evaluados",
-                    "total_sin_glosas_asignadas", "items"):
+        for key in ("total_usuarios_activos_evaluados", "total_sin_glosas_asignadas", "items"):
             assert key in d
 
     def test_detecta_usuario_sin_carga(self, client, db_session):

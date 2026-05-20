@@ -31,11 +31,7 @@ def buscar_duplicados_factura(
     )
     if eps:
         q = q.filter(GlosaRecord.eps == eps.strip().upper())
-    return (
-        q.order_by(GlosaRecord.creado_en.desc())
-        .limit(max(1, int(limite)))
-        .all()
-    )
+    return q.order_by(GlosaRecord.creado_en.desc()).limit(max(1, int(limite))).all()
 
 
 class GlosaRepository:
@@ -73,6 +69,7 @@ class GlosaRepository:
         asignado_a_email: Optional[str] = None,
     ) -> GlosaRecord:
         from datetime import datetime, timezone as _tz
+
         record = GlosaRecord(
             eps=eps,
             paciente=paciente,
@@ -138,10 +135,16 @@ class GlosaRepository:
             per_page, page = 20, 1
 
         q = self._query_con_filtros(
-            eps=eps, estado=estado, search=search,
-            fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
-            valor_min=valor_min, valor_max=valor_max,
-            tipo=tipo, semaforo=semaforo, workflow=workflow,
+            eps=eps,
+            estado=estado,
+            search=search,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            valor_min=valor_min,
+            valor_max=valor_max,
+            tipo=tipo,
+            semaforo=semaforo,
+            workflow=workflow,
         )
 
         total = q.count()
@@ -153,7 +156,7 @@ class GlosaRepository:
             "total": total,
             "page": page,
             "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page
+            "pages": (total + per_page - 1) // per_page,
         }
 
     def _query_con_filtros(
@@ -170,6 +173,7 @@ class GlosaRepository:
         workflow: Optional[str] = None,
     ):
         from datetime import datetime as _dt
+
         q = self.db.query(GlosaRecord).order_by(GlosaRecord.creado_en.desc())
 
         if eps:
@@ -211,17 +215,17 @@ class GlosaRepository:
             # y dictamen. Cubre el 95% de búsquedas que un gestor hace
             # ("¿dónde quedó esa glosa de hemograma?", "buscar 168563",
             # "ese argumento sobre Art. 57 que escribimos…").
-            patron = f'%{search}%'
+            patron = f"%{search}%"
             q = q.filter(
-                (GlosaRecord.paciente.ilike(patron)) |
-                (GlosaRecord.eps.ilike(patron)) |
-                (GlosaRecord.codigo_glosa.ilike(patron)) |
-                (GlosaRecord.numero_radicado.ilike(patron)) |
-                (GlosaRecord.factura.ilike(patron)) |
-                (GlosaRecord.cups_servicio.ilike(patron)) |
-                (GlosaRecord.servicio_descripcion.ilike(patron)) |
-                (GlosaRecord.texto_glosa_original.ilike(patron)) |
-                (GlosaRecord.dictamen.ilike(patron))
+                (GlosaRecord.paciente.ilike(patron))
+                | (GlosaRecord.eps.ilike(patron))
+                | (GlosaRecord.codigo_glosa.ilike(patron))
+                | (GlosaRecord.numero_radicado.ilike(patron))
+                | (GlosaRecord.factura.ilike(patron))
+                | (GlosaRecord.cups_servicio.ilike(patron))
+                | (GlosaRecord.servicio_descripcion.ilike(patron))
+                | (GlosaRecord.texto_glosa_original.ilike(patron))
+                | (GlosaRecord.dictamen.ilike(patron))
             )
         return q
 
@@ -239,6 +243,7 @@ class GlosaRepository:
         """
         from datetime import datetime, timedelta
         from sqlalchemy import case
+
         desde = datetime.now() - timedelta(days=ventana_dias)
 
         # Top EPS glosadoras
@@ -261,14 +266,16 @@ class GlosaRepository:
             ace = float(r.acept or 0)
             recuperado = obj - ace
             exito = (recuperado / obj * 100) if obj > 0 else 0
-            top_eps_data.append({
-                "eps": r.eps or "—",
-                "glosas": int(r.cnt or 0),
-                "objetado": obj,
-                "aceptado": ace,
-                "recuperado": recuperado,
-                "tasa_exito": round(exito, 1),
-            })
+            top_eps_data.append(
+                {
+                    "eps": r.eps or "—",
+                    "glosas": int(r.cnt or 0),
+                    "objetado": obj,
+                    "aceptado": ace,
+                    "recuperado": recuperado,
+                    "tasa_exito": round(exito, 1),
+                }
+            )
 
         # Tasa de éxito por código de glosa (top 15 por volumen)
         por_codigo = (
@@ -291,26 +298,28 @@ class GlosaRepository:
             ace = float(r.acept or 0)
             rec = obj - ace
             exito = (rec / obj * 100) if obj > 0 else 0
-            codigos_data.append({
-                "codigo": r.codigo_glosa,
-                "glosas": int(r.cnt or 0),
-                "objetado": obj,
-                "recuperado": rec,
-                "tasa_exito": round(exito, 1),
-            })
+            codigos_data.append(
+                {
+                    "codigo": r.codigo_glosa,
+                    "glosas": int(r.cnt or 0),
+                    "objetado": obj,
+                    "recuperado": rec,
+                    "tasa_exito": round(exito, 1),
+                }
+            )
 
         # Éxito por tipo (prefijo 2 letras)
         tipo_case = case(
-            (GlosaRecord.codigo_glosa.like('TA%'), 'TARIFAS'),
-            (GlosaRecord.codigo_glosa.like('SO%'), 'SOPORTES'),
-            (GlosaRecord.codigo_glosa.like('AU%'), 'AUTORIZACIÓN'),
-            (GlosaRecord.codigo_glosa.like('CO%'), 'COBERTURA'),
-            (GlosaRecord.codigo_glosa.like('PE%'), 'PERTINENCIA'),
-            (GlosaRecord.codigo_glosa.like('FA%'), 'FACTURACIÓN'),
-            (GlosaRecord.codigo_glosa.like('IN%'), 'INSUMOS'),
-            (GlosaRecord.codigo_glosa.like('ME%'), 'MEDICAMENTOS'),
-            (GlosaRecord.codigo_glosa.like('CL%'), 'CLÍNICO'),
-            else_='OTROS'
+            (GlosaRecord.codigo_glosa.like("TA%"), "TARIFAS"),
+            (GlosaRecord.codigo_glosa.like("SO%"), "SOPORTES"),
+            (GlosaRecord.codigo_glosa.like("AU%"), "AUTORIZACIÓN"),
+            (GlosaRecord.codigo_glosa.like("CO%"), "COBERTURA"),
+            (GlosaRecord.codigo_glosa.like("PE%"), "PERTINENCIA"),
+            (GlosaRecord.codigo_glosa.like("FA%"), "FACTURACIÓN"),
+            (GlosaRecord.codigo_glosa.like("IN%"), "INSUMOS"),
+            (GlosaRecord.codigo_glosa.like("ME%"), "MEDICAMENTOS"),
+            (GlosaRecord.codigo_glosa.like("CL%"), "CLÍNICO"),
+            else_="OTROS",
         )
         por_tipo = (
             self.db.query(
@@ -329,21 +338,27 @@ class GlosaRepository:
             ace = float(r.acept or 0)
             rec = obj - ace
             exito = (rec / obj * 100) if obj > 0 else 0
-            tipos_data.append({
-                "tipo": r.tipo,
-                "glosas": int(r.cnt or 0),
-                "objetado": obj,
-                "recuperado": rec,
-                "tasa_exito": round(exito, 1),
-            })
+            tipos_data.append(
+                {
+                    "tipo": r.tipo,
+                    "glosas": int(r.cnt or 0),
+                    "objetado": obj,
+                    "recuperado": rec,
+                    "tasa_exito": round(exito, 1),
+                }
+            )
         tipos_data.sort(key=lambda x: x["objetado"], reverse=True)
 
         # Totales de la ventana
-        totales_q = self.db.query(
-            func.count(GlosaRecord.id),
-            func.sum(GlosaRecord.valor_objetado),
-            func.sum(GlosaRecord.valor_aceptado),
-        ).filter(GlosaRecord.creado_en >= desde).first()
+        totales_q = (
+            self.db.query(
+                func.count(GlosaRecord.id),
+                func.sum(GlosaRecord.valor_objetado),
+                func.sum(GlosaRecord.valor_aceptado),
+            )
+            .filter(GlosaRecord.creado_en >= desde)
+            .first()
+        )
         total_cnt = int(totales_q[0] or 0)
         total_obj = float(totales_q[1] or 0)
         total_ace = float(totales_q[2] or 0)
@@ -367,7 +382,7 @@ class GlosaRepository:
         if codigos_data:
             codigo_critico = min(
                 [c for c in codigos_data if c["glosas"] >= 3] or codigos_data,
-                key=lambda x: x["tasa_exito"]
+                key=lambda x: x["tasa_exito"],
             )
             if codigo_critico["tasa_exito"] < 50:
                 recomendaciones.append(
@@ -393,9 +408,7 @@ class GlosaRepository:
         dias_counts = [0] * 7
         try:
             fechas = (
-                self.db.query(GlosaRecord.creado_en)
-                .filter(GlosaRecord.creado_en >= desde)
-                .all()
+                self.db.query(GlosaRecord.creado_en).filter(GlosaRecord.creado_en >= desde).all()
             )
             for (f,) in fechas:
                 if f:
@@ -438,16 +451,21 @@ class GlosaRepository:
     def analytics(self) -> AnalyticsResult:
         from datetime import datetime
         from sqlalchemy import extract
+
         now = datetime.now()
-        
-        stats = self.db.query(
-            func.count(GlosaRecord.id),
-            func.sum(GlosaRecord.valor_objetado),
-            func.sum(GlosaRecord.valor_aceptado),
-        ).filter(
-            extract('year', GlosaRecord.creado_en) == now.year,
-            extract('month', GlosaRecord.creado_en) == now.month,
-        ).first()
+
+        stats = (
+            self.db.query(
+                func.count(GlosaRecord.id),
+                func.sum(GlosaRecord.valor_objetado),
+                func.sum(GlosaRecord.valor_aceptado),
+            )
+            .filter(
+                extract("year", GlosaRecord.creado_en) == now.year,
+                extract("month", GlosaRecord.creado_en) == now.month,
+            )
+            .first()
+        )
 
         total = stats[0] or 0
         v_objetado = float(stats[1] or 0)
@@ -462,40 +480,56 @@ class GlosaRepository:
         )
 
     def metrics(self) -> dict:
-        by_eps = self.db.query(
-            GlosaRecord.eps,
-            func.count(GlosaRecord.id),
-            func.sum(GlosaRecord.valor_objetado),
-            func.sum(GlosaRecord.valor_aceptado),
-        ).group_by(GlosaRecord.eps).all()
+        by_eps = (
+            self.db.query(
+                GlosaRecord.eps,
+                func.count(GlosaRecord.id),
+                func.sum(GlosaRecord.valor_objetado),
+                func.sum(GlosaRecord.valor_aceptado),
+            )
+            .group_by(GlosaRecord.eps)
+            .all()
+        )
 
-        by_estado = self.db.query(
-            GlosaRecord.estado,
-            func.count(GlosaRecord.id),
-        ).group_by(GlosaRecord.estado).all()
+        by_estado = (
+            self.db.query(
+                GlosaRecord.estado,
+                func.count(GlosaRecord.id),
+            )
+            .group_by(GlosaRecord.estado)
+            .all()
+        )
 
         # Métricas por tipo de glosa (basado en prefijo del código)
         from sqlalchemy import case
+
         tipo_cases = case(
-            (GlosaRecord.codigo_glosa.like('TA%'), 'TARIFA'),
-            (GlosaRecord.codigo_glosa.like('SO%'), 'SOPORTES'),
-            (GlosaRecord.codigo_glosa.like('AU%'), 'AUTORIZACION'),
-            (GlosaRecord.codigo_glosa.like('CO%'), 'COBERTURA'),
-            (GlosaRecord.codigo_glosa.like('PE%'), 'PERTINENCIA'),
-            (GlosaRecord.codigo_glosa.like('FA%'), 'FACTURACION'),
-            (GlosaRecord.codigo_glosa.like('IN%'), 'INSUMOS'),
-            (GlosaRecord.codigo_glosa.like('ME%'), 'MEDICAMENTOS'),
-            else_='OTROS'
+            (GlosaRecord.codigo_glosa.like("TA%"), "TARIFA"),
+            (GlosaRecord.codigo_glosa.like("SO%"), "SOPORTES"),
+            (GlosaRecord.codigo_glosa.like("AU%"), "AUTORIZACION"),
+            (GlosaRecord.codigo_glosa.like("CO%"), "COBERTURA"),
+            (GlosaRecord.codigo_glosa.like("PE%"), "PERTINENCIA"),
+            (GlosaRecord.codigo_glosa.like("FA%"), "FACTURACION"),
+            (GlosaRecord.codigo_glosa.like("IN%"), "INSUMOS"),
+            (GlosaRecord.codigo_glosa.like("ME%"), "MEDICAMENTOS"),
+            else_="OTROS",
         )
-        
-        by_tipo = self.db.query(
-            tipo_cases.label('tipo'),
-            func.count(GlosaRecord.id),
-            func.sum(GlosaRecord.valor_objetado),
-        ).group_by(tipo_cases).all()
+
+        by_tipo = (
+            self.db.query(
+                tipo_cases.label("tipo"),
+                func.count(GlosaRecord.id),
+                func.sum(GlosaRecord.valor_objetado),
+            )
+            .group_by(tipo_cases)
+            .all()
+        )
 
         return {
-            "by_eps": [{"eps": r[0], "count": r[1], "obj": float(r[2] or 0), "acept": float(r[3] or 0)} for r in by_eps],
+            "by_eps": [
+                {"eps": r[0], "count": r[1], "obj": float(r[2] or 0), "acept": float(r[3] or 0)}
+                for r in by_eps
+            ],
             "by_estado": [{"estado": r[0], "count": r[1]} for r in by_estado],
             "by_tipo": [{"tipo": r[0], "count": r[1], "obj": float(r[2] or 0)} for r in by_tipo],
         }
@@ -503,38 +537,46 @@ class GlosaRepository:
     def tendencias_mensuales(self, meses: int = 6) -> list:
         """Obtiene tendencias de los últimos N meses"""
         from datetime import datetime, timedelta
+
         desde = datetime.now() - timedelta(days=meses * 30)
-        
-        resultados = self.db.query(
-            func.extract('year', GlosaRecord.creado_en).label('year'),
-            func.extract('month', GlosaRecord.creado_en).label('month'),
-            func.count(GlosaRecord.id).label('count'),
-            func.sum(GlosaRecord.valor_objetado).label('obj'),
-            func.sum(GlosaRecord.valor_aceptado).label('acept'),
-        ).filter(
-            GlosaRecord.creado_en >= desde
-        ).group_by(
-            func.extract('year', GlosaRecord.creado_en),
-            func.extract('month', GlosaRecord.creado_en)
-        ).order_by('year', 'month').all()
-        
+
+        resultados = (
+            self.db.query(
+                func.extract("year", GlosaRecord.creado_en).label("year"),
+                func.extract("month", GlosaRecord.creado_en).label("month"),
+                func.count(GlosaRecord.id).label("count"),
+                func.sum(GlosaRecord.valor_objetado).label("obj"),
+                func.sum(GlosaRecord.valor_aceptado).label("acept"),
+            )
+            .filter(GlosaRecord.creado_en >= desde)
+            .group_by(
+                func.extract("year", GlosaRecord.creado_en),
+                func.extract("month", GlosaRecord.creado_en),
+            )
+            .order_by("year", "month")
+            .all()
+        )
+
         return [
             {
                 "mes": f"{int(r.year)}-{int(r.month):02d}",
                 "count": r.count,
                 "objetado": float(r.obj or 0),
                 "aceptado": float(r.acept or 0),
-                "recuperado": float((r.obj or 0) - (r.acept or 0))
+                "recuperado": float((r.obj or 0) - (r.acept or 0)),
             }
             for r in resultados
         ]
 
     def top_glosas(self, limit: int = 10) -> list:
         """Top glosas por valor objetado"""
-        resultados = self.db.query(GlosaRecord).order_by(
-            GlosaRecord.valor_objetado.desc()
-        ).limit(limit).all()
-        
+        resultados = (
+            self.db.query(GlosaRecord)
+            .order_by(GlosaRecord.valor_objetado.desc())
+            .limit(limit)
+            .all()
+        )
+
         return [
             {
                 "id": r.id,
@@ -543,12 +585,14 @@ class GlosaRepository:
                 "codigo": r.codigo_glosa,
                 "valor": r.valor_objetado,
                 "estado": r.estado,
-                "creado": r.creado_en.isoformat() if r.creado_en else None
+                "creado": r.creado_en.isoformat() if r.creado_en else None,
             }
             for r in resultados
         ]
 
-    def actualizar_estado(self, glosa_id: int, nuevo_estado: str, responsable: str = None) -> Optional[GlosaRecord]:
+    def actualizar_estado(
+        self, glosa_id: int, nuevo_estado: str, responsable: str = None
+    ) -> Optional[GlosaRecord]:
         glosa = self.obtener_por_id(glosa_id)
         if glosa:
             glosa.estado = nuevo_estado
@@ -563,12 +607,15 @@ class GlosaRepository:
 
     def semaforo_counts(self) -> dict:
         """Cuenta glosas agrupadas por color de semáforo (columna prioridad)."""
-        resultados = self.db.query(
-            GlosaRecord.prioridad,
-            func.count(GlosaRecord.id),
-        ).filter(
-            GlosaRecord.estado.notin_(["LEVANTADA", "CONCILIADA", "ACEPTADA"])
-        ).group_by(GlosaRecord.prioridad).all()
+        resultados = (
+            self.db.query(
+                GlosaRecord.prioridad,
+                func.count(GlosaRecord.id),
+            )
+            .filter(GlosaRecord.estado.notin_(["LEVANTADA", "CONCILIADA", "ACEPTADA"]))
+            .group_by(GlosaRecord.prioridad)
+            .all()
+        )
         base = {"VERDE": 0, "AMARILLO": 0, "ROJO": 0, "NEGRO": 0}
         for color, cnt in resultados:
             if color in base:
@@ -594,6 +641,7 @@ class GlosaRepository:
         sola vista compartida.
         """
         from sqlalchemy import or_
+
         condiciones = []
         # Incluir el email del usuario + todos los emails del equipo
         emails_a_incluir = [gestor_email]
@@ -622,5 +670,6 @@ class GlosaRepository:
         if not equipo:
             return []
         from app.models.db import UsuarioRecord as _UR
+
         usuarios = self.db.query(_UR).filter(_UR.equipo == equipo).all()
         return [u.email for u in usuarios if u.email]

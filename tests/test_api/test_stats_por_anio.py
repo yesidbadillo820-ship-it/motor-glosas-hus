@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/por-anio (R157 P2)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -9,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,8 +49,12 @@ def client(db_session, usuario):
 
 def _seed(db, creado, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
     )
     base.update(kw)
     db.add(GlosaRecord(creado_en=creado, **base))
@@ -68,12 +73,13 @@ class TestStatsPorAnio:
         _seed(db_session, datetime(2025, 6, 5, tzinfo=timezone.utc))
         # 2026: 2 creadas
         _seed(db_session, datetime(2026, 1, 1, tzinfo=timezone.utc))
-        _seed(db_session,
-              datetime(2026, 4, 1, tzinfo=timezone.utc),
-              estado="LEVANTADA",
-              valor_recuperado=5000,
-              fecha_decision_eps=datetime(
-                  2026, 4, 15, tzinfo=timezone.utc))
+        _seed(
+            db_session,
+            datetime(2026, 4, 1, tzinfo=timezone.utc),
+            estado="LEVANTADA",
+            valor_recuperado=5000,
+            fecha_decision_eps=datetime(2026, 4, 15, tzinfo=timezone.utc),
+        )
 
         r = client.get("/glosas/stats/por-anio")
         d = r.json()

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/abandono-por-etapa (R106 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, etapa, estado, dias_atras=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa=etapa, estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa=etapa,
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -79,8 +87,7 @@ class TestAbandonoEtapa:
         _seed(db_session, "RESPUESTA_PRIMERA", "LEVANTADA")
         r = client.get("/glosas/stats/abandono-por-etapa")
         d = r.json()
-        item = next(it for it in d["items"]
-                    if it["etapa"] == "RESPUESTA_PRIMERA")
+        item = next(it for it in d["items"] if it["etapa"] == "RESPUESTA_PRIMERA")
         assert item["abiertas"] == 3
         assert item["total_glosas"] == 4
         assert item["tasa_abandono_pct"] == 75.0

@@ -1,4 +1,5 @@
 """Tests del servicio de cifrado Fernet (Ronda 50 Paso 6)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ class TestConKey:
     def key_valida(self, monkeypatch):
         # Generar key Fernet válida para el test
         from cryptography.fernet import Fernet
+
         k = Fernet.generate_key().decode()
         monkeypatch.setenv("GLOSAS_ENCRYPTION_KEY", k)
         cifrado._FERNET = None  # forzar recarga
@@ -78,6 +80,7 @@ class TestCasosEdge:
     def test_descifrar_valor_no_cifrado_pasa(self, monkeypatch):
         # Tiene una key pero el dato no está cifrado (no tiene prefijo fenc:)
         from cryptography.fernet import Fernet
+
         monkeypatch.setenv("GLOSAS_ENCRYPTION_KEY", Fernet.generate_key().decode())
         cifrado._FERNET = None
         assert cifrado.descifrar("valor antiguo plano") == "valor antiguo plano"

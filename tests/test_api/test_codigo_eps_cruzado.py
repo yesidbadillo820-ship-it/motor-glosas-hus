@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/codigo-glosa-eps-cruzado (R305 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, codigo, estado="LEVANTADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -60,9 +68,7 @@ class TestCodigoEPSCruzado:
         _seed(db_session, "EPS001", "TA0801", estado="RATIFICADA")
         _seed(db_session, "OTRA", "FA0603")
 
-        r = client.get(
-            "/glosas/stats/codigo-glosa-eps-cruzado?codigo=TA0801"
-        )
+        r = client.get("/glosas/stats/codigo-glosa-eps-cruzado?codigo=TA0801")
         d = r.json()
         assert d["total_eps"] == 2
         sanitas = next(x for x in d["items"] if x["eps"] == "SANITAS")
@@ -73,8 +79,6 @@ class TestCodigoEPSCruzado:
         assert eps001["tasa_levantamiento_pct"] == 0.0
 
     def test_codigo_inexistente(self, client):
-        r = client.get(
-            "/glosas/stats/codigo-glosa-eps-cruzado?codigo=ZZ"
-        )
+        r = client.get("/glosas/stats/codigo-glosa-eps-cruzado?codigo=ZZ")
         d = r.json()
         assert d["items"] == []

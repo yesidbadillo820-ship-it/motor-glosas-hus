@@ -25,6 +25,7 @@ Roles funcionales sugeridos en este proyecto:
   - Groq Llama: FALLBACK #3 (ultimo recurso). Velocidad bestial pero
     calidad inferior a los demas para argumentacion juridica densa.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,13 +41,13 @@ logger = logging.getLogger("motor_glosas")
 # Modelos validos en mayo 2026. Lista completa: openrouter.ai/models
 # Precio referenciado por 1M tokens (input / output).
 OPENROUTER_MODELS = {
-    "deepseek/deepseek-chat":               "$0.27 / $1.10",   # V3, default
-    "deepseek/deepseek-r1":                 "$0.55 / $2.19",   # reasoning
-    "meta-llama/llama-3.3-70b-instruct":    "$0.07 / $0.25",   # barato
+    "deepseek/deepseek-chat": "$0.27 / $1.10",  # V3, default
+    "deepseek/deepseek-r1": "$0.55 / $2.19",  # reasoning
+    "meta-llama/llama-3.3-70b-instruct": "$0.07 / $0.25",  # barato
     "meta-llama/llama-3.3-70b-instruct:free": "FREE (50 RPD)",  # gratis
-    "qwen/qwen-2.5-72b-instruct":           "$0.13 / $0.39",
-    "google/gemma-2-27b-it":                "$0.27 / $0.27",
-    "mistralai/mistral-large-2411":         "$2.00 / $6.00",
+    "qwen/qwen-2.5-72b-instruct": "$0.13 / $0.39",
+    "google/gemma-2-27b-it": "$0.27 / $0.27",
+    "mistralai/mistral-large-2411": "$2.00 / $6.00",
 }
 
 DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-chat"
@@ -89,7 +90,10 @@ class OpenRouterService:
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY", "")
         self.default_model = default_model
         self.timeout = httpx.Timeout(
-            connect=10.0, read=timeout, write=30.0, pool=5.0,
+            connect=10.0,
+            read=timeout,
+            write=30.0,
+            pool=5.0,
         )
         # Headers de identificacion que OpenRouter recomienda incluir
         # — ayudan a que el dashboard del proyecto muestre nuestra app.
@@ -188,7 +192,8 @@ class OpenRouterService:
         for intento in range(max_intentos):
             try:
                 return await self.completar(
-                    system, user,
+                    system,
+                    user,
                     modelo=modelo,
                     temperature=temperature,
                     max_tokens=max_tokens,
@@ -198,14 +203,14 @@ class OpenRouterService:
                 ultimo_error = e
                 msg = str(e).lower()
                 retriable = any(
-                    c in msg for c in
-                    ["429", "503", "504", "rate", "overloaded", "timeout", "connection"]
+                    c in msg
+                    for c in ["429", "503", "504", "rate", "overloaded", "timeout", "connection"]
                 )
                 if retriable and intento < max_intentos - 1:
-                    espera = min(2 ** intento, 8)
+                    espera = min(2**intento, 8)
                     logger.warning(
                         f"OpenRouter retriable: {e}, "
-                        f"retry {intento+2}/{max_intentos} en {espera}s"
+                        f"retry {intento + 2}/{max_intentos} en {espera}s"
                     )
                     await asyncio.sleep(espera)
                     continue

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/calidad-dictamen-por-gestor (R261 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,13 +47,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, gestor, dictamen):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        dictamen=dictamen,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            dictamen=dictamen,
+        )
+    )
     db.commit()
 
 
@@ -62,9 +70,7 @@ class TestCalidadDictamen:
         # Bob: 1 largo
         _seed(db_session, "Bob", "x" * 250)
 
-        r = client.get(
-            "/glosas/stats/calidad-dictamen-por-gestor?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/calidad-dictamen-por-gestor?min_glosas=1")
         d = r.json()
         bob = next(x for x in d["items"] if x["gestor"] == "Bob")
         alice = next(x for x in d["items"] if x["gestor"] == "Alice")
@@ -78,8 +84,6 @@ class TestCalidadDictamen:
 
     def test_min_glosas_filter(self, client, db_session):
         _seed(db_session, "Solo", "x" * 100)
-        r = client.get(
-            "/glosas/stats/calidad-dictamen-por-gestor?min_glosas=5"
-        )
+        r = client.get("/glosas/stats/calidad-dictamen-por-gestor?min_glosas=5")
         d = r.json()
         assert d["items"] == []

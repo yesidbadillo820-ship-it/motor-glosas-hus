@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/alertas-inteligentes (R121 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -55,8 +60,12 @@ def client(db_session, usuario_super):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
         gestor_nombre="Alice",
         dictamen="<p>" + "x" * 100 + "</p>",
@@ -78,8 +87,7 @@ class TestAlertasInteligentes:
 
     def test_sin_problemas_sin_alertas_criticas(self, client, db_session):
         # Glosa antigua (>7d) para evitar alerta INFO de "EPS nueva"
-        _seed(db_session, dias_restantes=20,
-              creado_en=ahora_utc() - timedelta(days=30))
+        _seed(db_session, dias_restantes=20, creado_en=ahora_utc() - timedelta(days=30))
         r = client.get("/admin/alertas-inteligentes")
         d = r.json()
         # No debe haber CRITICAL ni WARNING — solo posible INFO/BUSINESS
@@ -101,8 +109,7 @@ class TestAlertasInteligentes:
             _seed(db_session, dias_restantes=2)
         r = client.get("/admin/alertas-inteligentes")
         d = r.json()
-        warnings = [a for a in d["items"]
-                    if a["tipo"] == "WARNING" and a["categoria"] == "SLA"]
+        warnings = [a for a in d["items"] if a["tipo"] == "WARNING" and a["categoria"] == "SLA"]
         assert len(warnings) == 1
 
     def test_warning_sin_gestor_threshold(self, client, db_session):
@@ -111,8 +118,7 @@ class TestAlertasInteligentes:
             _seed(db_session, dias_restantes=20, gestor_nombre=None)
         r1 = client.get("/admin/alertas-inteligentes")
         d1 = r1.json()
-        sin_gestor = [a for a in d1["items"]
-                      if a["categoria"] == "ASIGNACION"]
+        sin_gestor = [a for a in d1["items"] if a["categoria"] == "ASIGNACION"]
         assert sin_gestor == []
 
         # Ahora 10 → SÍ dispara
@@ -120,14 +126,12 @@ class TestAlertasInteligentes:
             _seed(db_session, dias_restantes=20, gestor_nombre=None)
         r2 = client.get("/admin/alertas-inteligentes")
         d2 = r2.json()
-        sin_gestor = [a for a in d2["items"]
-                      if a["categoria"] == "ASIGNACION"]
+        sin_gestor = [a for a in d2["items"] if a["categoria"] == "ASIGNACION"]
         assert len(sin_gestor) == 1
         assert sin_gestor[0]["count"] == 10
 
     def test_business_alto_valor_sin_gestor(self, client, db_session):
-        _seed(db_session, dias_restantes=20, gestor_nombre=None,
-              valor_objetado=10_000_000)
+        _seed(db_session, dias_restantes=20, gestor_nombre=None, valor_objetado=10_000_000)
         r = client.get("/admin/alertas-inteligentes")
         d = r.json()
         biz = [a for a in d["items"] if a["tipo"] == "BUSINESS"]

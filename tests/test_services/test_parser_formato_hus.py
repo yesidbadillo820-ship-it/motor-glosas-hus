@@ -8,11 +8,11 @@ Excel con estructura:
 El bug era que "TARIFA 2025" y "VALOR 2025" no matchean con
 match exacto contra "VALOR"/"TARIFA".
 """
+
 from __future__ import annotations
 
 from io import BytesIO
 
-import pytest
 from openpyxl import Workbook
 
 from app.services.tarifas_excel_parser import (
@@ -47,24 +47,44 @@ class TestIndiceColumnaPrefijos:
 class TestTipoHojaHUSFormats:
     def test_hoja_servicios_ips(self):
         """Estructura de hoja SERVICIOS IPS del TARIFARIO HUS."""
-        headers = ["CODIGO IPS", "DESCRIPCIÓN CUPS", "CUPS 2641/25",
-                   "DESCRIPCIÓN CUPS", "FACTOR", "VALOR 2025"]
+        headers = [
+            "CODIGO IPS",
+            "DESCRIPCIÓN CUPS",
+            "CUPS 2641/25",
+            "DESCRIPCIÓN CUPS",
+            "FACTOR",
+            "VALOR 2025",
+        ]
         headers_norm = [h.upper().strip() for h in headers]
         tipo = _tipo_hoja(headers_norm)
         assert tipo == "SIMPLE_FIJO"
 
     def test_hoja_ambulatorio(self):
         """Estructura de hoja AMBULATORIO."""
-        headers = ["CODIGO IPS", "DESCRIPCIÓN IPS", "CUPS 2341/24",
-                   "DESCRIPCION CUPS", "FACTOR", "TARIFA 2025", "SERVICIO"]
+        headers = [
+            "CODIGO IPS",
+            "DESCRIPCIÓN IPS",
+            "CUPS 2341/24",
+            "DESCRIPCION CUPS",
+            "FACTOR",
+            "TARIFA 2025",
+            "SERVICIO",
+        ]
         headers_norm = [h.upper().strip() for h in headers]
         tipo = _tipo_hoja(headers_norm)
         assert tipo == "SIMPLE_FIJO"
 
     def test_hoja_paquetes(self):
         """Estructura de hoja PAQUETES (con año truncado)."""
-        headers = ["CODIGO IPS", "DESCRIPCIÓN CUPS", "CUPS 2341/",
-                   "DESCRIPCIÓN CUPS", "FACTOR", "VALOR 2025", "ESPECIALIDAD"]
+        headers = [
+            "CODIGO IPS",
+            "DESCRIPCIÓN CUPS",
+            "CUPS 2341/",
+            "DESCRIPCIÓN CUPS",
+            "FACTOR",
+            "VALOR 2025",
+            "ESPECIALIDAD",
+        ]
         headers_norm = [h.upper().strip() for h in headers]
         tipo = _tipo_hoja(headers_norm)
         assert tipo == "SIMPLE_FIJO"
@@ -89,14 +109,30 @@ class TestIntegracionExcelHUS:
         excel_bytes = _crear_excel_hus(
             "SERVICIOS IPS",
             headers=[
-                "CODIGO IPS", "DESCRIPCIÓN CUPS", "CUPS 2641/25",
-                "DESCRIPCIÓN CUPS", "FACTOR", "VALOR 2025",
+                "CODIGO IPS",
+                "DESCRIPCIÓN CUPS",
+                "CUPS 2641/25",
+                "DESCRIPCIÓN CUPS",
+                "FACTOR",
+                "VALOR 2025",
             ],
             filas=[
-                ["010101H", "PUNCION CISTERNAL - VIA LATERAL", "010101",
-                 "PUNCION CISTERNAL, VIA LATERAL", "SOAT (SMLMV)", 777793],
-                ["890348H", "CONSULTA DE CONTROL GENETICA", "890348",
-                 "CONSULTA DE CONTROL O DE SEGUIMIENTO POR GENETICA", "SOAT (SMLMV)", 231556],
+                [
+                    "010101H",
+                    "PUNCION CISTERNAL - VIA LATERAL",
+                    "010101",
+                    "PUNCION CISTERNAL, VIA LATERAL",
+                    "SOAT (SMLMV)",
+                    777793,
+                ],
+                [
+                    "890348H",
+                    "CONSULTA DE CONTROL GENETICA",
+                    "890348",
+                    "CONSULTA DE CONTROL O DE SEGUIMIENTO POR GENETICA",
+                    "SOAT (SMLMV)",
+                    231556,
+                ],
             ],
         )
         resultado = parsear_excel_tarifas(excel_bytes, filename="TARIFARIO_HUS.xlsx")
@@ -115,14 +151,25 @@ class TestIntegracionExcelHUS:
         excel_bytes = _crear_excel_hus(
             "AMBULATORIO",
             headers=[
-                "CODIGO IPS", "DESCRIPCIÓN IPS", "CUPS 2341/24",
-                "DESCRIPCION CUPS", "FACTOR", "TARIFA 2025", "SERVICIO",
+                "CODIGO IPS",
+                "DESCRIPCIÓN IPS",
+                "CUPS 2341/24",
+                "DESCRIPCION CUPS",
+                "FACTOR",
+                "TARIFA 2025",
+                "SERVICIO",
             ],
             filas=[
-                ["902210AMB", "HEMOGRAMA IV", "902210",
-                 "HEMOGRAMA IV", 0.37, 17600, "LABORATORIO"],
-                ["903895AMB", "CREATININA", "903895",
-                 "CREATININA EN SUERO", 0.31, 15200, "LABORATORIO"],
+                ["902210AMB", "HEMOGRAMA IV", "902210", "HEMOGRAMA IV", 0.37, 17600, "LABORATORIO"],
+                [
+                    "903895AMB",
+                    "CREATININA",
+                    "903895",
+                    "CREATININA EN SUERO",
+                    0.31,
+                    15200,
+                    "LABORATORIO",
+                ],
             ],
         )
         resultado = parsear_excel_tarifas(excel_bytes, filename="AMBULATORIO.xlsx")
@@ -149,13 +196,23 @@ class TestIntegracionExcelHUS:
         excel_bytes = _crear_excel_hus(
             "SERVICIOS IPS",
             headers=[
-                "CODIGO IPS", "DESCRIPCIÓN CUPS", "CUPS 2641/25",
-                "DESCRIPCIÓN CUPS", "FACTOR", "VALOR 2025",
+                "CODIGO IPS",
+                "DESCRIPCIÓN CUPS",
+                "CUPS 2641/25",
+                "DESCRIPCIÓN CUPS",
+                "FACTOR",
+                "VALOR 2025",
             ],
             filas=[
                 # Caso típico: código IPS con sufijo 'H', CUPS limpio
-                ["39147B-18", "CONSULTA GENETICA MEDICA", "890348",
-                 "CONSULTA GENETICA", "SOAT (SMLMV)", 231556],
+                [
+                    "39147B-18",
+                    "CONSULTA GENETICA MEDICA",
+                    "890348",
+                    "CONSULTA GENETICA",
+                    "SOAT (SMLMV)",
+                    231556,
+                ],
             ],
         )
         resultado = parsear_excel_tarifas(excel_bytes, filename="HUS.xlsx")

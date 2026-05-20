@@ -1,7 +1,7 @@
 """Tests del endpoint GET /sistema/auth-stats (R240 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -41,6 +44,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -49,10 +53,14 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, accion):
-    db.add(AuditLogRecord(
-        usuario_email="u@x", accion=accion, tabla="auth",
-        timestamp=ahora_utc(),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email="u@x",
+            accion=accion,
+            tabla="auth",
+            timestamp=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -62,8 +70,7 @@ class TestAuthStats:
         d = r.json()
         for key in ("ventana_dias", "contadores"):
             assert key in d
-        for k in ("login_ok", "login_fail", "logout",
-                  "twofa", "refresh"):
+        for k in ("login_ok", "login_fail", "logout", "twofa", "refresh"):
             assert k in d["contadores"]
 
     def test_clasifica_acciones(self, client, db_session):

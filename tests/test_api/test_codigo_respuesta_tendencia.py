@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/codigo-respuesta-tendencia (R286 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,12 +49,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, codigo, dias_atras=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="LEVANTADA",
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-        codigo_respuesta=codigo,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+            codigo_respuesta=codigo,
+        )
+    )
     db.commit()
 
 
@@ -61,10 +69,7 @@ class TestCodigoRespuestaTendencia:
         for _ in range(5):
             _seed(db_session, "RE9501", dias_atras=5)
 
-        r = client.get(
-            "/glosas/stats/codigo-respuesta-tendencia"
-            "?dias=30&min_glosas_actual=3"
-        )
+        r = client.get("/glosas/stats/codigo-respuesta-tendencia?dias=30&min_glosas_actual=3")
         d = r.json()
         assert len(d["items"]) == 1
         assert d["items"][0]["codigo_respuesta"] == "RE9501"
@@ -73,9 +78,6 @@ class TestCodigoRespuestaTendencia:
 
     def test_min_glosas_filtra(self, client, db_session):
         _seed(db_session, "RE9701", dias_atras=5)
-        r = client.get(
-            "/glosas/stats/codigo-respuesta-tendencia"
-            "?min_glosas_actual=5"
-        )
+        r = client.get("/glosas/stats/codigo-respuesta-tendencia?min_glosas_actual=5")
         d = r.json()
         assert d["items"] == []

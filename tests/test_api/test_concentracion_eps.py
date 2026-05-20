@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/concentracion-eps (R187 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, valor):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -58,9 +66,14 @@ class TestConcentracionEPS:
         r = client.get("/glosas/stats/concentracion-eps")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total_eps", "valor_pendiente_total", "hhi",
-                    "top_eps_pct", "top_3_eps_pct",
-                    "interpretacion"):
+        for key in (
+            "total_eps",
+            "valor_pendiente_total",
+            "hhi",
+            "top_eps_pct",
+            "top_3_eps_pct",
+            "interpretacion",
+        ):
             assert key in d
 
     def test_alto_riesgo_monopolio(self, client, db_session):

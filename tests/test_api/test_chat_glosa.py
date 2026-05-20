@@ -1,4 +1,5 @@
 """Tests del chat conversacional de glosa (Ronda 8)."""
+
 from types import SimpleNamespace
 
 from app.api.routers.chat_glosa import (
@@ -30,8 +31,7 @@ class TestEsModificacion:
 class TestRespuestaRapida:
     def _glosa_fake(self):
         return SimpleNamespace(
-            id=1, codigo_glosa="TA0201", eps="FAMISANAR EPS",
-            dictamen="<p>...</p>"
+            id=1, codigo_glosa="TA0201", eps="FAMISANAR EPS", dictamen="<p>...</p>"
         )
 
     def test_por_que_871(self):
@@ -65,4 +65,5 @@ class TestRagNormativaIntegration:
     def test_rag_normativa_modulo_existe(self):
         """Sanity: garantizar que el módulo está disponible para el chat."""
         from app.services import rag_normativa
+
         assert callable(getattr(rag_normativa, "buscar_normas", None))

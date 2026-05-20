@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/aging-glosas (R237 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, dias_atras, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -63,9 +71,9 @@ class TestAgingGlosas:
         assert len(d["items"]) == 5
 
     def test_clasificacion(self, client, db_session):
-        _seed(db_session, 10)   # 0-30
-        _seed(db_session, 45)   # 31-60
-        _seed(db_session, 75)   # 61-90
+        _seed(db_session, 10)  # 0-30
+        _seed(db_session, 45)  # 31-60
+        _seed(db_session, 75)  # 61-90
         _seed(db_session, 120)  # 91-180
         _seed(db_session, 250)  # >180
 

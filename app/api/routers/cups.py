@@ -16,6 +16,7 @@ Endpoints:
     Detalle de un CUPS específico: contratos que lo tienen, valor pactado,
     descripción oficial, homologación si aplica.
 """
+
 from __future__ import annotations
 
 import re
@@ -49,7 +50,9 @@ def _is_codigo(q: str) -> bool:
 
 @router.get("/buscar")
 def buscar_cups(
-    q: str = Query(..., min_length=2, description="Código CUPS, código IPS o parte de la descripción"),
+    q: str = Query(
+        ..., min_length=2, description="Código CUPS, código IPS o parte de la descripción"
+    ),
     limite: int = Query(10, ge=1, le=50),
     eps: Optional[str] = Query(None, description="Filtrar por EPS"),
     db: Session = Depends(get_db),
@@ -73,16 +76,18 @@ def buscar_cups(
         if clave in vistos_cups:
             return
         vistos_cups.add(clave)
-        resultados.append({
-            "codigo_cups": fila.codigo_cups,
-            "codigo_ips": fila.codigo_ips,
-            "descripcion": fila.descripcion,
-            "eps": fila.eps,
-            "contrato_numero": fila.contrato_numero,
-            "valor_pactado": float(fila.valor_pactado or 0),
-            "modalidad": fila.modalidad,
-            "tipo_match": tipo_match,
-        })
+        resultados.append(
+            {
+                "codigo_cups": fila.codigo_cups,
+                "codigo_ips": fila.codigo_ips,
+                "descripcion": fila.descripcion,
+                "eps": fila.eps,
+                "contrato_numero": fila.contrato_numero,
+                "valor_pactado": float(fila.valor_pactado or 0),
+                "modalidad": fila.modalidad,
+                "tipo_match": tipo_match,
+            }
+        )
 
     # Prioridad 1: match exacto por CUPS
     if _is_codigo(q_clean):
@@ -91,12 +96,20 @@ def buscar_cups(
 
         # Prioridad 2: match exacto por CODIGO IPS (homologación)
         if len(resultados) < limite:
-            for fila in base.filter(TarifaContratadaRecord.codigo_ips == q_clean).limit(limite - len(resultados)).all():
+            for fila in (
+                base.filter(TarifaContratadaRecord.codigo_ips == q_clean)
+                .limit(limite - len(resultados))
+                .all()
+            ):
                 _agregar(fila, "codigo_ips_exacto")
 
         # Prioridad 3: prefix match en código
         if len(resultados) < limite:
-            for fila in base.filter(TarifaContratadaRecord.codigo_cups.ilike(f"{q_clean}%")).limit(limite - len(resultados)).all():
+            for fila in (
+                base.filter(TarifaContratadaRecord.codigo_cups.ilike(f"{q_clean}%"))
+                .limit(limite - len(resultados))
+                .all()
+            ):
                 _agregar(fila, "codigo_prefix")
 
     # Prioridad 4a: match literal en descripción (case-insensitive)
@@ -120,9 +133,7 @@ def buscar_cups(
         # con tilde falla) pero cubre el 95% de casos.
         prefijo = q_norm[0] if q_norm else q_clean[0]
         candidatos = (
-            base.filter(TarifaContratadaRecord.descripcion.ilike(f"%{prefijo}%"))
-            .limit(500)
-            .all()
+            base.filter(TarifaContratadaRecord.descripcion.ilike(f"%{prefijo}%")).limit(500).all()
         )
         agregados_norm = 0
         for fila in candidatos:
@@ -136,22 +147,25 @@ def buscar_cups(
     if _is_codigo(q_clean) and len(resultados) < limite:
         try:
             from app.services.homologador_cups import homologar_cups
+
             homo = homologar_cups(q_clean, db=db, eps=eps)
             if homo and homo.get("cups_oficial"):
                 # Buscar tarifa del cups_oficial si no lo agregamos ya
                 cups_of = homo["cups_oficial"]
                 ya = any(r["codigo_cups"] == cups_of for r in resultados)
                 if not ya:
-                    resultados.append({
-                        "codigo_cups": cups_of,
-                        "codigo_ips": q_clean if q_clean != cups_of else None,
-                        "descripcion": homo.get("descripcion", ""),
-                        "eps": "—",
-                        "contrato_numero": None,
-                        "valor_pactado": 0.0,
-                        "modalidad": "—",
-                        "tipo_match": "homologacion_2641",
-                    })
+                    resultados.append(
+                        {
+                            "codigo_cups": cups_of,
+                            "codigo_ips": q_clean if q_clean != cups_of else None,
+                            "descripcion": homo.get("descripcion", ""),
+                            "eps": "—",
+                            "contrato_numero": None,
+                            "valor_pactado": 0.0,
+                            "modalidad": "—",
+                            "tipo_match": "homologacion_2641",
+                        }
+                    )
         except Exception:
             pass
 
@@ -164,7 +178,9 @@ def buscar_cups(
 
 @router.get("/sugerencias/por-descripcion")
 def sugerencias_cups_por_descripcion(
-    q: str = Query(..., min_length=2, description="Texto del procedimiento (ej: 'hemograma', 'TAC craneo')"),
+    q: str = Query(
+        ..., min_length=2, description="Texto del procedimiento (ej: 'hemograma', 'TAC craneo')"
+    ),
     limite: int = Query(8, ge=1, le=20),
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
@@ -184,6 +200,7 @@ def sugerencias_cups_por_descripcion(
         ('hemograma completo'), busca en catálogo curado + BD.
     """
     from app.services.homologador_cups import buscar_cups_por_descripcion
+
     coincidencias = buscar_cups_por_descripcion(q, top_k=limite, db=db)
     return {
         "query": q,
@@ -221,6 +238,7 @@ def detalle_cups(
     homo = None
     try:
         from app.services.homologador_cups import homologar_cups
+
         homo = homologar_cups(codigo_clean, db=db)
     except Exception:
         pass

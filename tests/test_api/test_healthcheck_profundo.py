@@ -1,4 +1,5 @@
 """Tests del endpoint /sistema/healthcheck-profundo (R70 P2)."""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
@@ -7,6 +8,7 @@ from fastapi.testclient import TestClient
 def test_healthcheck_profundo_publico_sin_auth():
     """Endpoint público para monitores externos."""
     from app.main import app
+
     with TestClient(app) as c:
         r = c.get("/sistema/healthcheck-profundo")
         assert r.status_code in (200, 503)
@@ -14,6 +16,7 @@ def test_healthcheck_profundo_publico_sin_auth():
 
 def test_estructura_respuesta():
     from app.main import app
+
     with TestClient(app) as c:
         r = c.get("/sistema/healthcheck-profundo")
         d = r.json()
@@ -25,6 +28,7 @@ def test_estructura_respuesta():
 
 def test_componentes_incluyen_bd():
     from app.main import app
+
     with TestClient(app) as c:
         r = c.get("/sistema/healthcheck-profundo")
         d = r.json()
@@ -36,6 +40,7 @@ def test_componentes_incluyen_bd():
 
 def test_componentes_incluyen_schedulers():
     from app.main import app
+
     with TestClient(app) as c:
         r = c.get("/sistema/healthcheck-profundo")
         d = r.json()
@@ -48,6 +53,7 @@ def test_status_code_503_si_degradado():
     # Hard test — depende del estado del módulo. En vez de mockear,
     # verificamos solo que la lógica de status code funciona via OK.
     from app.main import app
+
     with TestClient(app) as c:
         r = c.get("/sistema/healthcheck-profundo")
         d = r.json()

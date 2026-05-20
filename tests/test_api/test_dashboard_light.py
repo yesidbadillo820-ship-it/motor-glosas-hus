@@ -1,7 +1,7 @@
 """Tests del endpoint GET /glosas/stats/dashboard-light (R180 P1)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,8 +49,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -62,9 +67,14 @@ class TestDashboardLight:
         r = client.get("/glosas/stats/dashboard-light")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total_abiertas", "total_criticas",
-                    "total_vencidas", "valor_pendiente",
-                    "cerradas_hoy", "valor_recuperado_hoy"):
+        for key in (
+            "total_abiertas",
+            "total_criticas",
+            "total_vencidas",
+            "valor_pendiente",
+            "cerradas_hoy",
+            "valor_recuperado_hoy",
+        ):
             assert key in d
             assert isinstance(d[key], int)
 
@@ -72,9 +82,9 @@ class TestDashboardLight:
         _seed(db_session, dias_restantes=10, valor_objetado=10_000)
         _seed(db_session, dias_restantes=2, valor_objetado=5_000)
         _seed(db_session, dias_restantes=-5, valor_objetado=3_000)
-        _seed(db_session, estado="LEVANTADA",
-              valor_recuperado=8_000,
-              fecha_decision_eps=ahora_utc())
+        _seed(
+            db_session, estado="LEVANTADA", valor_recuperado=8_000, fecha_decision_eps=ahora_utc()
+        )
 
         r = client.get("/glosas/stats/dashboard-light")
         d = r.json()

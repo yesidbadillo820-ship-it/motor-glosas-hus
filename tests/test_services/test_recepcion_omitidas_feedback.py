@@ -1,6 +1,7 @@
 """Regresión: las filas/hojas que antes se descartaban en SILENCIO
 ahora se reportan (resumen.filas_omitidas, hojas_descartadas, errores)
 para que el usuario entienda por qué total=0."""
+
 from io import BytesIO
 
 import pytest
@@ -33,12 +34,19 @@ def _excel():
     wb = Workbook()
     ws = wb.active
     ws.title = "RECEPCION"
-    ws.append(["GESTOR", "ENTIDAD", "FACTURA", "CONSECUTIVO DGH",
-               "VALOR GLOSA", "FECHA RECEPCION", "VENCE"])
-    ws.append(["JUAN", "SURA", "FAC-1", "C1",
-               "1.000,00", "01/03/2026", "31/12/2026"])      # OK
-    ws.append(["PEDRO", "", "FAC-2", "C2",
-               "2.000,00", "01/03/2026", "31/12/2026"])       # sin ENTIDAD
+    ws.append(
+        [
+            "GESTOR",
+            "ENTIDAD",
+            "FACTURA",
+            "CONSECUTIVO DGH",
+            "VALOR GLOSA",
+            "FECHA RECEPCION",
+            "VENCE",
+        ]
+    )
+    ws.append(["JUAN", "SURA", "FAC-1", "C1", "1.000,00", "01/03/2026", "31/12/2026"])  # OK
+    ws.append(["PEDRO", "", "FAC-2", "C2", "2.000,00", "01/03/2026", "31/12/2026"])  # sin ENTIDAD
     basura = wb.create_sheet("BASURA")
     basura.append(["col_a", "col_b"])
     basura.append([1, 2])

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/conciliaciones (R128 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,17 +49,25 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, glosa_id):
-    db.add(GlosaRecord(
-        id=glosa_id, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_conc(db, glosa_id, **kw):
     base = dict(
-        glosa_id=glosa_id, creado_en=ahora_utc(),
+        glosa_id=glosa_id,
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(ConciliacionRecord(**base))
@@ -75,11 +85,14 @@ class TestStatsConciliaciones:
 
     def test_estructura(self, client, db_session):
         _seed_glosa(db_session, 1)
-        _seed_conc(db_session, 1,
-                   resultado="ACEPTADA",
-                   estado_bilateral="ACTA_FIRMADA",
-                   valor_conciliado=5000,
-                   valor_ratificado_hus=10000)
+        _seed_conc(
+            db_session,
+            1,
+            resultado="ACEPTADA",
+            estado_bilateral="ACTA_FIRMADA",
+            valor_conciliado=5000,
+            valor_ratificado_hus=10000,
+        )
         r = client.get("/glosas/stats/conciliaciones")
         d = r.json()
         assert d["total_conciliaciones"] == 1
@@ -95,14 +108,11 @@ class TestStatsConciliaciones:
         _seed_glosa(db_session, 2)
         _seed_glosa(db_session, 3)
         # En 10 días
-        _seed_conc(db_session, 1,
-                   fecha_audiencia=ahora_utc() + timedelta(days=10))
+        _seed_conc(db_session, 1, fecha_audiencia=ahora_utc() + timedelta(days=10))
         # En 50 días (fuera)
-        _seed_conc(db_session, 2,
-                   fecha_audiencia=ahora_utc() + timedelta(days=50))
+        _seed_conc(db_session, 2, fecha_audiencia=ahora_utc() + timedelta(days=50))
         # Pasada
-        _seed_conc(db_session, 3,
-                   fecha_audiencia=ahora_utc() - timedelta(days=5))
+        _seed_conc(db_session, 3, fecha_audiencia=ahora_utc() - timedelta(days=5))
 
         r = client.get("/glosas/stats/conciliaciones")
         d = r.json()

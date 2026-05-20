@@ -20,6 +20,7 @@ Diseño:
     parcialmente) se escribe "—" en RESPUESTA IA para que el gestor
     sepa que esa fila quedó sin procesar.
 """
+
 from __future__ import annotations
 
 from io import BytesIO
@@ -107,7 +108,10 @@ def generar_excel_con_respuestas(
         ws = wb[nombre_hoja]
         # Localizar encabezados RECEPCION en esta hoja.
         fila_h, idx = _buscar_fila_encabezado(
-            ws, max_filas=5, mapa=COLUMN_ALIASES, min_aciertos=3,
+            ws,
+            max_filas=5,
+            mapa=COLUMN_ALIASES,
+            min_aciertos=3,
         )
         if not idx or "factura" not in idx:
             # No es hoja de recepción — saltar (conceptos, vacías, etc.)
@@ -180,14 +184,17 @@ def generar_excel_con_respuestas(
 
             celda_resp = ws.cell(row=num_fila, column=col_resp, value=dictamen)
             celda_resp.alignment = Alignment(
-                wrap_text=True, vertical="top", horizontal="left",
+                wrap_text=True,
+                vertical="top",
+                horizontal="left",
             )
             celda_resp.border = _BORDE_FINO
             celda_resp.font = Font(size=9)
 
             celda_estado = ws.cell(row=num_fila, column=col_estado, value=estado)
             celda_estado.alignment = Alignment(
-                horizontal="center", vertical="center",
+                horizontal="center",
+                vertical="center",
             )
             celda_estado.border = _BORDE_FINO
             celda_estado.font = Font(bold=True, size=9)
@@ -201,13 +208,13 @@ def generar_excel_con_respuestas(
             celda_id.font = Font(size=9, color="6B7280")
 
             # Resaltar columna gestor si coincide con el destinatario
-            if (
-                gestor_norm
-                and col_gestor_idx is not None
-                and col_gestor_idx < len(fila)
-            ):
+            if gestor_norm and col_gestor_idx is not None and col_gestor_idx < len(fila):
                 gestor_val = _normalizar_clave(fila[col_gestor_idx].value)
-                if gestor_val and (gestor_val == gestor_norm or gestor_norm in gestor_val or gestor_val in gestor_norm):
+                if gestor_val and (
+                    gestor_val == gestor_norm
+                    or gestor_norm in gestor_val
+                    or gestor_val in gestor_norm
+                ):
                     fila[col_gestor_idx].fill = _RESALTO_GESTOR_FILL
                     fila[col_gestor_idx].font = _RESALTO_GESTOR_FONT
 
@@ -234,11 +241,7 @@ def construir_respuestas_por_clave(db, glosa_ids: list[int]) -> dict[tuple[str, 
         return {}
     from app.models.db import GlosaRecord
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.id.in_(glosa_ids))
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(glosa_ids)).all()
     fuera: dict[tuple[str, str], dict] = {}
     for g in glosas:
         clave = (

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/contexto-cartera (R280 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -44,23 +46,28 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, glosa_id, factura, estado="RADICADA", valor=1000,
-          saldo=0, valor_factura=0):
-    db.add(GlosaRecord(
-        id=glosa_id,
-        eps="X", paciente="X", codigo_glosa="C", factura=factura,
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        saldo_factura=saldo,
-        valor_factura=valor_factura,
-    ))
+def _seed(db, glosa_id, factura, estado="RADICADA", valor=1000, saldo=0, valor_factura=0):
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            factura=factura,
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            saldo_factura=saldo,
+            valor_factura=valor_factura,
+        )
+    )
     db.commit()
 
 
 class TestContextoCartera:
     def test_factura_con_varias_glosas(self, client, db_session):
-        _seed(db_session, 1, "F100", valor=1000, saldo=5000,
-              valor_factura=20000)
+        _seed(db_session, 1, "F100", valor=1000, saldo=5000, valor_factura=20000)
         _seed(db_session, 2, "F100", valor=2000, estado="LEVANTADA")
         _seed(db_session, 3, "F100", valor=3000, estado="RADICADA")
 

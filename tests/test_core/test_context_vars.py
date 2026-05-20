@@ -4,9 +4,9 @@ Garantizan:
   - defaults sensatos sin contaminación entre tests
   - propagación a tareas asyncio (importante para FastAPI)
 """
+
 from __future__ import annotations
 
-import asyncio
 
 import pytest
 
@@ -61,8 +61,10 @@ class TestContextVars:
         FastAPI/asyncio crean tareas para cada request)."""
         tok = user_email_var.set("X@hus.com")
         try:
+
             async def _leer():
                 return user_email_var.get()
+
             resultado = await _leer()
             assert resultado == "X@hus.com"
         finally:

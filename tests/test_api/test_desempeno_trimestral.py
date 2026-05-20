@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/desempeno-trimestral (R109 P1)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -9,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +48,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, fecha, estado="RADICADA", valor_obj=1000, valor_rec=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor_obj, valor_recuperado=valor_rec,
-        etapa="X", estado=estado, creado_en=fecha,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor_obj,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=fecha,
+        )
+    )
     db.commit()
 
 
@@ -78,10 +86,8 @@ class TestDesempenoTrimestral:
 
     def test_metricas_trimestre(self, client, db_session):
         fecha = datetime(2026, 4, 5, tzinfo=timezone.utc)
-        _seed(db_session, fecha, "LEVANTADA",
-              valor_obj=10000, valor_rec=10000)
-        _seed(db_session, fecha, "ACEPTADA",
-              valor_obj=5000, valor_rec=0)
+        _seed(db_session, fecha, "LEVANTADA", valor_obj=10000, valor_rec=10000)
+        _seed(db_session, fecha, "ACEPTADA", valor_obj=5000, valor_rec=0)
         _seed(db_session, fecha, "RADICADA")
 
         r = client.get("/glosas/stats/desempeno-trimestral")

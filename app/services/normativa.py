@@ -3,6 +3,7 @@
 Se usa para validar que los argumentos citen normas existentes y vigentes,
 y señalar cuando alguien cita una derogada o inexistente.
 """
+
 from __future__ import annotations
 
 # Normas vigentes (2026). El formato de key es "LEY|DECRETO|RES|CIRC|ART|SENT + número"
@@ -12,12 +13,14 @@ NORMAS_VIGENTES: dict[str, dict] = {
     "LEY 100/1993": {
         "nombre": "Ley 100 de 1993",
         "resumen": "Sistema General de Seguridad Social en Salud. Art. 168 sobre atención de urgencias; Art. 177 obligaciones EPS de reconocer valores facturados.",
-        "tipo": "LEY", "vigente": True,
+        "tipo": "LEY",
+        "vigente": True,
     },
     "LEY 1122/2007": {
         "nombre": "Ley 1122 de 2007",
         "resumen": "Flujo de recursos entre EPS e IPS. Art. 13 sobre pagos.",
-        "tipo": "LEY", "vigente": True,
+        "tipo": "LEY",
+        "vigente": True,
     },
     "LEY 1438/2011": {
         "nombre": "Ley 1438 de 2011",
@@ -28,18 +31,21 @@ NORMAS_VIGENTES: dict[str, dict] = {
             "glosas, 15 días hábiles para que la IPS responda. "
             "Art. 126: conflictos ante SuperSalud."
         ),
-        "tipo": "LEY", "vigente": True,
+        "tipo": "LEY",
+        "vigente": True,
     },
     "LEY 1751/2015": {
         "nombre": "Ley 1751 de 2015 (Estatutaria)",
         "resumen": "Ley Estatutaria de Salud. Art. 15 exclusiones excepcionales. Art. 17 autonomía profesional del médico.",
-        "tipo": "LEY", "vigente": True,
+        "tipo": "LEY",
+        "vigente": True,
     },
     # Decretos
     "DECRETO 4747/2007": {
         "nombre": "Decreto 4747 de 2007",
         "resumen": "Regulaciones sobre glosas y devoluciones. Art. 11 documentos de cobro. Art. 20: conciliación.",
-        "tipo": "DECRETO", "vigente": True,
+        "tipo": "DECRETO",
+        "vigente": True,
     },
     "DECRETO 780/2016": {
         "nombre": "Decreto 780 de 2016 (Decreto Único Reglamentario del Sector Salud)",
@@ -48,7 +54,8 @@ NORMAS_VIGENTES: dict[str, dict] = {
             "recursos, plazos de pago y auditoría. PROHÍBE la 'auditoría previa' "
             "como barrera de radicación."
         ),
-        "tipo": "DECRETO", "vigente": True,
+        "tipo": "DECRETO",
+        "vigente": True,
     },
     "DECRETO 441/2022": {
         "nombre": "Decreto 441 de 2022",
@@ -58,58 +65,69 @@ NORMAS_VIGENTES: dict[str, dict] = {
             "reducir glosas al final del proceso. Seguimiento a la ejecución del "
             "acuerdo de voluntades."
         ),
-        "tipo": "DECRETO", "vigente": True,
+        "tipo": "DECRETO",
+        "vigente": True,
     },
     "DECRETO 2423/1996": {
         "nombre": "Decreto 2423 de 1996",
         "resumen": "Manual de Tarifas SOAT. Base tarifaria histórica. Actualizado con Circular 025/2024 → UVB 2025.",
-        "tipo": "DECRETO", "vigente": True,
+        "tipo": "DECRETO",
+        "vigente": True,
     },
     "DECRETO 1795/2000": {
         "nombre": "Decreto 1795 de 2000",
         "resumen": "Sistema de Salud de las Fuerzas Militares y de Policía. Rige contratos Dispensario/Sanidad Militar.",
-        "tipo": "DECRETO", "vigente": True,
+        "tipo": "DECRETO",
+        "vigente": True,
     },
     "DECRETO 3752/2003": {
         "nombre": "Decreto 3752 de 2003",
         "resumen": "Régimen de salud docentes oficiales — FOMAG.",
-        "tipo": "DECRETO", "vigente": True,
+        "tipo": "DECRETO",
+        "vigente": True,
     },
     # Resoluciones
     "RESOLUCION 1995/1999": {
         "nombre": "Resolución 1995 de 1999",
         "resumen": "Historia clínica. Documento médico-legal de plena prueba del acto médico.",
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 3047/2008": {
         "nombre": "Resolución 3047 de 2008",
         "resumen": "Anexo Técnico 5: procedimiento histórico de glosas. Derogada en lo relevante por Res. 2284/2023.",
-        "tipo": "RESOLUCION", "vigente": True,  # aún citable como antecedente
+        "tipo": "RESOLUCION",
+        "vigente": True,  # aún citable como antecedente
     },
     "RESOLUCION 5269/2017": {
         "nombre": "Resolución 5269 de 2017",
         "resumen": "Plan de Beneficios en Salud (PBS). Listado de servicios cubiertos.",
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 2175/2015": {
         "nombre": "Resolución 2175 de 2015",
         "resumen": "Procedimiento de conciliación de glosas médicas.",
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "CIRCULAR 047/2025": {
         "nombre": "Circular Externa 047 de 2025 (MinSalud)",
         "resumen": "Manual Tarifario SOAT 2026 indexado a UVB. Fórmula: valor_pesos = Tarifa_UVB × UVB_vigente (UVB 2026 = $12.110, Res. MinHacienda 31/12/2025), ajustado a centena más próxima. Aplica a accidentes de tránsito SOAT, desastres, atentados, eventos catastróficos y atención inicial de urgencias sin acuerdo tarifario.",
-        "tipo": "CIRCULAR", "vigente": True,
+        "tipo": "CIRCULAR",
+        "vigente": True,
     },
     "RESOLUCION 054/2026 HUS": {
         "nombre": "Resolución 054 de enero 30 de 2026 (ESE HUS)",
         "resumen": "Listado unificado de tarifas institucionales propias del Hospital Universitario de Santander. Expresadas en FACTOR SMDLV. Aplica cuando el contrato dice 'TIPO TARIFA = PROPIAS' o 'MANUAL HUS'. Fundamento: Decreto 780/2016 Anexo Técnico 1, Decreto 2423/1996 Art. 87 y 89, Acuerdo Junta Directiva HUS No. 002 y 003 de 2018.",
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 124/2026 HUS": {
         "nombre": "Resolución 124 de marzo 25 de 2026 (ESE HUS)",
         "resumen": "Crea códigos y tarifas institucionales complementarias a la Res. 054/2026 (lab clínico, procedimientos quirúrgicos, electrofisiología, gineco-oncológicos, patología, hematología, etc.) y modifica algunas tarifas existentes. Fórmula: valor_pesos = FACTOR_SMDLV × SMDLV_vigente (SMDLV 2026 ≈ $58.375) → centena más próxima.",
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 2284/2023": {
         "nombre": "Resolución 2284 de 2023 (MINSALUD)",
@@ -120,7 +138,8 @@ NORMAS_VIGENTES: dict[str, dict] = {
             "de 6 dígitos: concepto general + específico + aplicación. Define "
             "soportes de cobro obligatorios."
         ),
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 1885/2024": {
         "nombre": "Resolución 1885 de 2024 (MINSALUD)",
@@ -129,7 +148,8 @@ NORMAS_VIGENTES: dict[str, dict] = {
             "obligatoria por nivel: ALTA COMPLEJIDAD desde 1-feb-2025, MEDIANA "
             "desde 1-abr-2025, BAJA desde 1-jun-2025."
         ),
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 2275/2023": {
         "nombre": "Resolución 2275 de 2023 (MINSALUD)",
@@ -138,50 +158,59 @@ NORMAS_VIGENTES: dict[str, dict] = {
             "de Prestación de Servicios (RIPS). Validación previa ante MinSalud. "
             "Notas crédito/débito electrónicas para ajuste de glosas aceptadas."
         ),
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 866/2021": {
         "nombre": "Resolución 866 de 2021",
         "resumen": "Registros Individuales de Prestación de Servicios de Salud (RIPS). Campos obligatorios.",
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     "RESOLUCION 5159/2015": {
         "nombre": "Resolución 5159 de 2015",
         "resumen": "Cobertura en salud para población privada de la libertad (PPL). Complemento con Ley 1709/2014.",
-        "tipo": "RESOLUCION", "vigente": True,
+        "tipo": "RESOLUCION",
+        "vigente": True,
     },
     # Códigos
     "ART 871 C.COMERCIO": {
         "nombre": "Artículo 871 Código de Comercio",
         "resumen": "Principio de buena fe contractual.",
-        "tipo": "ART", "vigente": True,
+        "tipo": "ART",
+        "vigente": True,
     },
     "ART 1602 C.CIVIL": {
         "nombre": "Artículo 1602 Código Civil",
         "resumen": "Todo contrato legalmente celebrado es ley para las partes.",
-        "tipo": "ART", "vigente": True,
+        "tipo": "ART",
+        "vigente": True,
     },
     # Sentencias
     "SENTENCIA T-760/2008": {
         "nombre": "Sentencia T-760 de 2008",
         "resumen": "Corte Constitucional — Obligaciones de las EPS en prestación de servicios. NO APLICA a Sanidad Militar ni PPL.",
-        "tipo": "SENTENCIA", "vigente": True,
+        "tipo": "SENTENCIA",
+        "vigente": True,
     },
     "SENTENCIA T-1025/2002": {
         "nombre": "Sentencia T-1025 de 2002",
         "resumen": "Urgencias no requieren autorización previa. Aplica transversalmente.",
-        "tipo": "SENTENCIA", "vigente": True,
+        "tipo": "SENTENCIA",
+        "vigente": True,
     },
     "SENTENCIA T-478/1995": {
         "nombre": "Sentencia T-478 de 1995",
         "resumen": "Autonomía médica como derecho fundamental protegido.",
-        "tipo": "SENTENCIA", "vigente": True,
+        "tipo": "SENTENCIA",
+        "vigente": True,
     },
     # Circulares
     "CIRCULAR 030/2013": {
         "nombre": "Circular 030 de 2013 (MINSALUD)",
         "resumen": "Subsanación de errores formales en facturación. Aplica SOLO a errores formales (no a disputas de naturaleza del servicio).",
-        "tipo": "CIRCULAR", "vigente": True,
+        "tipo": "CIRCULAR",
+        "vigente": True,
     },
     "CIRCULAR 025/2024": {
         "nombre": "Circular 025 de 31 de diciembre 2024 (MINSALUD)",
@@ -190,17 +219,20 @@ NORMAS_VIGENTES: dict[str, dict] = {
             "desde 01/01/2025. Los valores 2023-2024 estaban en UVT, ahora 2025 "
             "en UVB."
         ),
-        "tipo": "CIRCULAR", "vigente": True,
+        "tipo": "CIRCULAR",
+        "vigente": True,
     },
     "CIRCULAR 007/2025": {
         "nombre": "Circular Externa 007 de 2025 (MINSALUD)",
         "resumen": "Cronograma gradual de implementación del Manual Único (Res. 2284/2023) por nivel de complejidad.",
-        "tipo": "CIRCULAR", "vigente": True,
+        "tipo": "CIRCULAR",
+        "vigente": True,
     },
     "ACUERDO 002/2001": {
         "nombre": "Acuerdo 002 de 2001 del Consejo Superior de Salud de las Fuerzas Militares",
         "resumen": "Régimen tarifario y cobertura para afiliados del Subsistema de Salud de las FF.MM. Base de contratos con Dispensario Médico.",
-        "tipo": "ACUERDO", "vigente": True,
+        "tipo": "ACUERDO",
+        "vigente": True,
     },
 }
 
@@ -209,7 +241,7 @@ NORMAS_VIGENTES: dict[str, dict] = {
 NORMAS_DEROGADAS: dict[str, dict] = {
     "ART 1601 C.CIVIL": {
         "razon": "Posible confusión con Art. 1602 C.Civil (este último es 'ley para las partes'). "
-                 "El 1601 trata de otra materia civil no aplicable a glosas.",
+        "El 1601 trata de otra materia civil no aplicable a glosas.",
         "reemplaza_por": "ART 1602 C.CIVIL",
     },
     "RESOLUCION 5926/2014": {
@@ -238,7 +270,10 @@ _PATRONES = [
     (_re.compile(r"\bDECRETO\s+(\d{2,5})\s+DE\s+(\d{4})", _re.IGNORECASE), "DECRETO"),
     (_re.compile(r"\bRESOLUCI[ÓO]N\s+(\d{2,5})\s+DE\s+(\d{4})", _re.IGNORECASE), "RESOLUCION"),
     (_re.compile(r"\bCIRCULAR\s+(\d{2,5})\s+DE\s+(\d{4})", _re.IGNORECASE), "CIRCULAR"),
-    (_re.compile(r"\bSENTENCIA\s+(T|C|SU)[\s-]?(\d{1,4})\s+DE\s+(\d{4})", _re.IGNORECASE), "SENTENCIA"),
+    (
+        _re.compile(r"\bSENTENCIA\s+(T|C|SU)[\s-]?(\d{1,4})\s+DE\s+(\d{4})", _re.IGNORECASE),
+        "SENTENCIA",
+    ),
 ]
 
 
@@ -280,11 +315,13 @@ def validar_citas(texto: str) -> dict:
             validas.append(c)
         elif c in NORMAS_DEROGADAS:
             info = NORMAS_DEROGADAS[c]
-            derogadas.append({
-                "cita": c,
-                "razon": info["razon"],
-                "reemplaza_por": info.get("reemplaza_por"),
-            })
+            derogadas.append(
+                {
+                    "cita": c,
+                    "razon": info["razon"],
+                    "reemplaza_por": info.get("reemplaza_por"),
+                }
+            )
         else:
             no_catalogadas.append(c)
 

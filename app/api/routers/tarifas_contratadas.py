@@ -7,6 +7,7 @@ Flujo típico:
   3. Al analizar una glosa TA, el motor consulta buscar_tarifa(eps, cups)
      y decide si el valor facturado coincide con el pactado.
 """
+
 from __future__ import annotations
 
 import csv
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/tarifas-contratadas", tags=["Tarifas Contratadas"])
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
+
 def _normalizar_valor(v: str) -> float:
     """Parsea un string con formato COP (puntos/comas/signo peso) a float."""
     if not v:
@@ -48,6 +50,7 @@ def _normalizar_valor(v: str) -> float:
         # Si hay UN solo punto/coma seguido de 1-2 digitos al final → decimal.
         # Caso contrario (múltiples o más de 2 dígitos tras) → miles.
         import re as _rex
+
         match_dec = _rex.match(r"^(\d+)[\.,](\d{1,2})$", s)
         if match_dec:
             s = f"{match_dec.group(1)}.{match_dec.group(2)}"
@@ -72,6 +75,7 @@ def _parsear_fecha_opcional(v: str) -> Optional[datetime]:
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
+
 @router.get("")
 def listar_tarifas(
     eps: Optional[str] = Query(None, description="Filtrar por EPS (contains, case-insensitive)"),
@@ -89,7 +93,11 @@ def listar_tarifas(
         q = q.filter(TarifaContratadaRecord.eps.ilike(f"%{eps.strip()}%"))
     if cups:
         q = q.filter(TarifaContratadaRecord.codigo_cups == cups.strip())
-    registros = q.order_by(TarifaContratadaRecord.eps, TarifaContratadaRecord.codigo_cups).limit(limite).all()
+    registros = (
+        q.order_by(TarifaContratadaRecord.eps, TarifaContratadaRecord.codigo_cups)
+        .limit(limite)
+        .all()
+    )
     return [
         {
             "id": r.id,
@@ -134,7 +142,9 @@ def buscar_tarifa(
     )
     r = q.first()
     if not r:
-        raise HTTPException(status_code=404, detail="Sin tarifa pactada para esa combinación EPS + CUPS")
+        raise HTTPException(
+            status_code=404, detail="Sin tarifa pactada para esa combinación EPS + CUPS"
+        )
     return {
         "id": r.id,
         "eps": r.eps,
@@ -152,7 +162,9 @@ def buscar_tarifa(
 @router.post("/import-csv")
 async def importar_csv(
     archivo: UploadFile = File(...),
-    eps_default: Optional[str] = Query(None, description="EPS a asignar si la columna EPS no viene en el CSV"),
+    eps_default: Optional[str] = Query(
+        None, description="EPS a asignar si la columna EPS no viene en el CSV"
+    ),
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
@@ -216,12 +228,11 @@ async def importar_csv(
         raise HTTPException(
             400,
             f"El CSV debe tener al menos las columnas 'cups' y 'valor'. "
-            f"Encabezados detectados: {list(headers_norm.keys())}"
+            f"Encabezados detectados: {list(headers_norm.keys())}",
         )
     if "eps" not in col_map and not eps_default:
         raise HTTPException(
-            400,
-            "El CSV no trae columna 'eps'. Pase eps_default=NOMBRE como query param."
+            400, "El CSV no trae columna 'eps'. Pase eps_default=NOMBRE como query param."
         )
 
     fuente = archivo.filename[:300]
@@ -239,16 +250,38 @@ async def importar_csv(
                 errores.append(f"Fila {idx}: valor inválido '{valor_raw}' para CUPS {cups_val}")
                 continue
 
-            eps_val = ((fila.get(col_map["eps"]) if "eps" in col_map else "") or eps_default or "").strip()
+            eps_val = (
+                (fila.get(col_map["eps"]) if "eps" in col_map else "") or eps_default or ""
+            ).strip()
             if not eps_val:
                 errores.append(f"Fila {idx}: EPS vacía y sin eps_default")
                 continue
 
-            contrato_val = (fila.get(col_map.get("contrato", "")) or "").strip() if "contrato" in col_map else ""
-            descripcion = (fila.get(col_map.get("descripcion", "")) or "").strip() if "descripcion" in col_map else ""
-            modalidad = (fila.get(col_map.get("modalidad", "")) or "").strip() if "modalidad" in col_map else ""
-            vig_desde = _parsear_fecha_opcional(fila.get(col_map.get("vigencia_desde", "")) or "") if "vigencia_desde" in col_map else None
-            vig_hasta = _parsear_fecha_opcional(fila.get(col_map.get("vigencia_hasta", "")) or "") if "vigencia_hasta" in col_map else None
+            contrato_val = (
+                (fila.get(col_map.get("contrato", "")) or "").strip()
+                if "contrato" in col_map
+                else ""
+            )
+            descripcion = (
+                (fila.get(col_map.get("descripcion", "")) or "").strip()
+                if "descripcion" in col_map
+                else ""
+            )
+            modalidad = (
+                (fila.get(col_map.get("modalidad", "")) or "").strip()
+                if "modalidad" in col_map
+                else ""
+            )
+            vig_desde = (
+                _parsear_fecha_opcional(fila.get(col_map.get("vigencia_desde", "")) or "")
+                if "vigencia_desde" in col_map
+                else None
+            )
+            vig_hasta = (
+                _parsear_fecha_opcional(fila.get(col_map.get("vigencia_hasta", "")) or "")
+                if "vigencia_hasta" in col_map
+                else None
+            )
 
             # Upsert: buscar tarifa existente con (eps, cups, contrato)
             existente = (
@@ -365,7 +398,7 @@ async def importar_excel(
             400,
             f"No se detectaron tarifas en el Excel. Hojas reconocidas: {hojas_info}. "
             f"Verifica que las columnas incluyan CUPS y un campo de valor "
-            f"(PRECIO DE REFERENCIA, TARIFA UNITARIA, CODIGO DEL PRESTADOR, etc.).{err_info}"
+            f"(PRECIO DE REFERENCIA, TARIFA UNITARIA, CODIGO DEL PRESTADOR, etc.).{err_info}",
         )
 
     eps_val = eps_override or resultado.get("eps") or ""
@@ -373,7 +406,7 @@ async def importar_excel(
     if not eps_val:
         raise HTTPException(
             400,
-            "No se pudo identificar la EPS en el Excel. Pase eps_override=NOMBRE como query param."
+            "No se pudo identificar la EPS en el Excel. Pase eps_override=NOMBRE como query param.",
         )
 
     contrato_val = resultado.get("contrato") or None
@@ -545,11 +578,13 @@ def cobertura_eps(
 
     items = []
     for eps, b in por_eps.items():
-        items.append({
-            "eps": eps,
-            "tarifas_count": b["count"],
-            "contratos_distintos": len(b["contratos"]),
-        })
+        items.append(
+            {
+                "eps": eps,
+                "tarifas_count": b["count"],
+                "contratos_distintos": len(b["contratos"]),
+            }
+        )
     items.sort(key=lambda x: x["tarifas_count"], reverse=True)
 
     return {
@@ -566,6 +601,7 @@ def stats_tarifas(
 ):
     """Resumen: total activas, por EPS."""
     from sqlalchemy import func as _func
+
     total = db.query(TarifaContratadaRecord).filter(TarifaContratadaRecord.activa == 1).count()
     por_eps = (
         db.query(TarifaContratadaRecord.eps, _func.count(TarifaContratadaRecord.id).label("n"))

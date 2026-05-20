@@ -1,4 +1,5 @@
 """Tests de las funciones de optimización de tokens del motor de glosas."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -9,8 +10,10 @@ import pytest
 
 # ─── #7: generar_texto_tarifa_match (plantilla determinística) ──────────────
 
+
 def test_generar_texto_tarifa_match_contiene_valores_clave():
     from app.services.glosa_service import generar_texto_tarifa_match
+
     info = {
         "tarifa": {
             "codigo_cups": "890202",
@@ -36,6 +39,7 @@ def test_generar_texto_tarifa_match_contiene_valores_clave():
 
 def test_generar_texto_tarifa_match_sin_descripcion_usa_fallback():
     from app.services.glosa_service import generar_texto_tarifa_match
+
     info = {
         "tarifa": {
             "codigo_cups": "890202",
@@ -55,9 +59,11 @@ def test_generar_texto_tarifa_match_sin_descripcion_usa_fallback():
 
 # ─── #1: Caché persistente en BD (funciones helper) ─────────────────────────
 
+
 def test_buscar_cache_ia_db_sin_bd_no_rompe():
     """Si no hay sesión disponible o falla BD, debe devolver None sin crashear."""
     from app.services.glosa_service import _buscar_cache_ia_db
+
     with patch("app.database.SessionLocal", side_effect=RuntimeError("no db")):
         assert _buscar_cache_ia_db("clave-inexistente-xxxxxxxxx") is None
 
@@ -65,12 +71,14 @@ def test_buscar_cache_ia_db_sin_bd_no_rompe():
 def test_guardar_cache_ia_db_sin_bd_no_rompe():
     """Si falla al guardar en BD, no debe propagar la excepción."""
     from app.services.glosa_service import _guardar_cache_ia_db
+
     with patch("app.database.SessionLocal", side_effect=RuntimeError("no db")):
         # No debe lanzar excepción
         _guardar_cache_ia_db("k", "respuesta", "modelo/x")
 
 
 # ─── #3: Prompt caching de Anthropic ────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_llamar_anthropic_usa_cache_control_con_system_largo():
@@ -94,8 +102,10 @@ async def test_llamar_anthropic_usa_cache_control_con_system_largo():
     class _FakeClient:
         async def __aenter__(_self):
             return _self
+
         async def __aexit__(_self, *a):
             pass
+
         async def post(_self, url, headers=None, json=None):
             captured["json"] = json
             captured["headers"] = headers
@@ -130,8 +140,12 @@ async def test_llamar_anthropic_sin_cache_control_con_system_corto():
             return {"content": [{"text": "respuesta"}], "usage": {}}
 
     class _FakeClient:
-        async def __aenter__(_self): return _self
-        async def __aexit__(_self, *a): pass
+        async def __aenter__(_self):
+            return _self
+
+        async def __aexit__(_self, *a):
+            pass
+
         async def post(_self, url, headers=None, json=None):
             captured["json"] = json
             return _FakeResp()
@@ -145,31 +159,40 @@ async def test_llamar_anthropic_sin_cache_control_con_system_corto():
 
 # ─── #8: Umbral de OCR más alto ─────────────────────────────────────────────
 
+
 def test_umbral_texto_minimo_es_300():
     from app.services import pdf_service
+
     assert pdf_service.UMBRAL_TEXTO_MINIMO == 300
 
 
 # ─── #6: Rate limit key por usuario ─────────────────────────────────────────
+
 
 def test_limit_key_con_token_valido_devuelve_email():
     """Si viene un JWT válido en el header, la key es 'user:<email>'."""
     from jose import jwt as _jwt
     from app.core.config import get_settings
     from app.core.rate_limit import _limit_key_user_or_ip
+
     cfg = get_settings()
     token = _jwt.encode({"sub": "test@hus.gov.co"}, cfg.secret_key, algorithm=cfg.algorithm)
-    req = SimpleNamespace(headers={"authorization": f"Bearer {token}"},
-                           client=SimpleNamespace(host="1.2.3.4"))
+    req = SimpleNamespace(
+        headers={"authorization": f"Bearer {token}"}, client=SimpleNamespace(host="1.2.3.4")
+    )
     assert _limit_key_user_or_ip(req) == "user:test@hus.gov.co"
 
 
 def test_limit_key_sin_token_usa_ip():
     """Sin JWT, cae a get_remote_address (IP)."""
     from app.core.rate_limit import _limit_key_user_or_ip
+
     # get_remote_address espera un request tipo Starlette; mockeamos lo mínimo
-    req = SimpleNamespace(headers={}, client=SimpleNamespace(host="9.9.9.9"),
-                           scope={"client": ("9.9.9.9", 0), "headers": [], "type": "http"})
+    req = SimpleNamespace(
+        headers={},
+        client=SimpleNamespace(host="9.9.9.9"),
+        scope={"client": ("9.9.9.9", 0), "headers": [], "type": "http"},
+    )
     result = _limit_key_user_or_ip(req)
     # Debe devolver algo que no sea "user:..."
     assert not str(result).startswith("user:")
@@ -178,14 +201,18 @@ def test_limit_key_sin_token_usa_ip():
 def test_limit_key_con_token_invalido_usa_ip():
     """JWT basura → no debe crashear, cae a IP."""
     from app.core.rate_limit import _limit_key_user_or_ip
-    req = SimpleNamespace(headers={"authorization": "Bearer tokenbasura"},
-                           client=SimpleNamespace(host="8.8.8.8"),
-                           scope={"client": ("8.8.8.8", 0), "headers": [], "type": "http"})
+
+    req = SimpleNamespace(
+        headers={"authorization": "Bearer tokenbasura"},
+        client=SimpleNamespace(host="8.8.8.8"),
+        scope={"client": ("8.8.8.8", 0), "headers": [], "type": "http"},
+    )
     result = _limit_key_user_or_ip(req)
     assert not str(result).startswith("user:")
 
 
 # ─── Integración análisis con info_tarifa → skip LLM ────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_cache_ia_lock_impide_race_condition():
@@ -193,6 +220,7 @@ async def test_cache_ia_lock_impide_race_condition():
     que la respuesta cacheada es consistente (misma tupla, no None, no corrupta)."""
     import asyncio as _aio
     from app.services.glosa_service import _CACHE_IA, _CACHE_IA_LOCK
+
     # Setear entrada inicial con lock
     async with _CACHE_IA_LOCK:
         _CACHE_IA["clave_test_race"] = ("respuesta_test", "modelo_test")
@@ -209,7 +237,7 @@ async def test_cache_ia_lock_impide_race_condition():
 def test_clamp_per_page_repositorio():
     """per_page > 1000 debe clampearse a 1000 para evitar full table scans."""
     from app.repositories.glosa_repository import GlosaRepository
-    from unittest.mock import MagicMock
+
     # Mock de DB: listar_paginado internamente hace query.count() + offset + limit
     db = MagicMock()
     query_mock = MagicMock()

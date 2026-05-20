@@ -16,6 +16,7 @@ Exporta:
     - hojas_detectadas: list[str]
     - errores: list[str]
 """
+
 from __future__ import annotations
 
 import re
@@ -28,6 +29,7 @@ from openpyxl import load_workbook
 
 
 # ─── Normalización ──────────────────────────────────────────────────────────
+
 
 def _normalizar_texto(s: Any) -> str:
     """Quita tildes, pasa a mayúsculas, colapsa espacios."""
@@ -104,6 +106,7 @@ def _parsear_porcentaje(v: Any) -> float:
 
 # ─── Helpers que operan sobre rows (lista de tuplas) ────────────────────────
 
+
 def _celda(fila: tuple, idx: int | None) -> Any:
     if idx is None or idx < 0 or idx >= len(fila):
         return None
@@ -153,6 +156,7 @@ def _indice_columna(headers: list[str], *candidatos: str) -> int | None:
 
 # ─── Detección de hojas ─────────────────────────────────────────────────────
 
+
 def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
     """Devuelve 'ANEXO3' | 'ANEXO31' | 'ANEXO32' | 'FOMAG_TARIFARIO' |
     'FOMAG_PAQUETES' | 'SIMPLE_FIJO'.
@@ -187,8 +191,11 @@ def _tipo_hoja(headers_normalizados: list[str]) -> str | None:
     # Cubre Dispensario (PRECIO DE REFERENCIA), Nueva EPS, Sanitas simple,
     # Compensar, y cualquier catálogo plano genérico.
     value_keywords = (
-        "PRECIO DE REFERENCIA", "TARIFA UNITARIA", "VALOR PACTADO",
-        "VALOR UNITARIO", "PRECIO UNITARIO",
+        "PRECIO DE REFERENCIA",
+        "TARIFA UNITARIA",
+        "VALOR PACTADO",
+        "VALOR UNITARIO",
+        "PRECIO UNITARIO",
     )
     has_value = any(k in hunion for k in value_keywords)
     if not has_value:
@@ -214,12 +221,19 @@ def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[
     tablas auxiliares como AGRUPADORES (que tiene COD + DESCRIPCION).
     """
     keywords_fuertes = [
-        "CUPS", "MAPIISS", "TIPO TARIFA",
-        "CODIGO DEL PRESTADOR", "CODIGO DCI", "CUM/IUM",
-        "DESCRIPCION DEL PRESTADOR", "PRECIO DE REFERENCIA",
-        "TARIFA UNITARIA", "TARIFA FINAL",
+        "CUPS",
+        "MAPIISS",
+        "TIPO TARIFA",
+        "CODIGO DEL PRESTADOR",
+        "CODIGO DCI",
+        "CUM/IUM",
+        "DESCRIPCION DEL PRESTADOR",
+        "PRECIO DE REFERENCIA",
+        "TARIFA UNITARIA",
+        "TARIFA FINAL",
         # FOMAG: cabecera de ANEXO TARIFARIO / EXCLUIDOS / *_AMBULATORIOS
-        "PROPUESTA IPS", "OBSERVACION FOMAG",
+        "PROPUESTA IPS",
+        "OBSERVACION FOMAG",
         # FOMAG paquetes
         "VALOR PROPUESTO",
     ]
@@ -229,10 +243,7 @@ def _buscar_fila_encabezado(rows: list[tuple]) -> tuple[int, list[str]] | tuple[
         if len(no_vacios) < 4:
             continue
         fila_norm = [_normalizar_texto(c) for c in fila]
-        matches = sum(
-            1 for celda in fila_norm
-            if any(kw in celda for kw in keywords_fuertes)
-        )
+        matches = sum(1 for celda in fila_norm if any(kw in celda for kw in keywords_fuertes))
         if matches >= 2:
             return idx, fila_norm
     return None, None
@@ -242,8 +253,14 @@ def _extraer_metadata(rows: list[tuple]) -> dict:
     """Extrae eps, contrato, vigencia desde las primeras 50 filas."""
     meta = {"eps": None, "contrato": None, "vigencia_desde": None, "vigencia_hasta": None}
     labels_ruido = {
-        "CORREO:", "CEDULA:", "CEDULA", "TELEFONO:", "TELEFONO",
-        "CORREO", "HORARIO DE ATENCION", "CORREO ELECTRONICO",
+        "CORREO:",
+        "CEDULA:",
+        "CEDULA",
+        "TELEFONO:",
+        "TELEFONO",
+        "CORREO",
+        "HORARIO DE ATENCION",
+        "CORREO ELECTRONICO",
     }
     for fila in rows[:50]:
         for col_idx, celda in enumerate(fila):
@@ -255,7 +272,11 @@ def _extraer_metadata(rows: list[tuple]) -> dict:
                 fin = min(len(fila), col_idx + offset_min + 14)
                 for c in range(col_idx + offset_min, fin):
                     v = fila[c]
-                    if v is not None and str(v).strip() and _normalizar_texto(v) not in labels_ruido:
+                    if (
+                        v is not None
+                        and str(v).strip()
+                        and _normalizar_texto(v) not in labels_ruido
+                    ):
                         return v
                 return None
 
@@ -269,7 +290,9 @@ def _extraer_metadata(rows: list[tuple]) -> dict:
                 v = valor_derecha()
                 if v and _normalizar_texto(v) not in ("N/A", "NA", "-"):
                     meta["contrato"] = str(v).strip()
-            elif "INICIO DE CONTRATO" in etiqueta or ("VIGENCIA" in etiqueta and "INICIO" in etiqueta):
+            elif "INICIO DE CONTRATO" in etiqueta or (
+                "VIGENCIA" in etiqueta and "INICIO" in etiqueta
+            ):
                 v = valor_derecha()
                 f = _parsear_fecha(v)
                 if f and not meta["vigencia_desde"]:
@@ -283,6 +306,7 @@ def _extraer_metadata(rows: list[tuple]) -> dict:
 
 
 # ─── Parsers por tipo de hoja ───────────────────────────────────────────────
+
 
 def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
     """Anexo 3 — Servicios CUPS con fórmula SOAT ± %."""
@@ -301,7 +325,7 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
         return []
 
     filas: list[dict] = []
-    for fila in rows[hdr_idx + 1:]:
+    for fila in rows[hdr_idx + 1 :]:
         cups_raw = _celda(fila, idx_cups)
         if not cups_raw:
             continue
@@ -310,9 +334,7 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
         # Filas de cierre como "SE SUSCRIBE EL PRESENTE ANEXO..." caen acá.
         if not _es_codigo_cups_valido(cups):
             continue
-        desc = _primera_desc_no_vacia(
-            fila, idx_desc_cups, idx_desc_propio, idx_desc_reps, idx_desc
-        )
+        desc = _primera_desc_no_vacia(fila, idx_desc_cups, idx_desc_propio, idx_desc_reps, idx_desc)
         tipo = _limpiar_descripcion(str(_celda(fila, idx_tipo) or ""))
         tipo_norm = _normalizar_texto(tipo)
         # Distinguir contrato SOAT (porcentajes) vs PROPIAS (valores absolutos).
@@ -348,16 +370,18 @@ def _parsear_anexo3(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list
             valor_pactado = round(valor, 2)
             factor_ajuste = 0.0
         obs = _limpiar_descripcion(str(_celda(fila, idx_obs) or ""))
-        filas.append({
-            "codigo_cups": cups[:30],
-            "codigo_ips": None,  # formato Famisanar no trae codigo_ips propio
-            "descripcion": desc[:500] if desc else None,
-            "valor_pactado": valor_pactado,
-            "modalidad": (tipo or "SOAT UVB VIGENTE")[:80],
-            "tipo_tarifa": tipo_tarifa,
-            "factor_ajuste": factor_ajuste,
-            "observacion": obs[:300] if obs else None,
-        })
+        filas.append(
+            {
+                "codigo_cups": cups[:30],
+                "codigo_ips": None,  # formato Famisanar no trae codigo_ips propio
+                "descripcion": desc[:500] if desc else None,
+                "valor_pactado": valor_pactado,
+                "modalidad": (tipo or "SOAT UVB VIGENTE")[:80],
+                "tipo_tarifa": tipo_tarifa,
+                "factor_ajuste": factor_ajuste,
+                "observacion": obs[:300] if obs else None,
+            }
+        )
     return filas
 
 
@@ -414,14 +438,16 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
     idx_tarifa = _indice_columna(headers, "TARIFA UNITARIA")
     idx_iva = _indice_columna(headers, "APLICA IVA")
 
-    idx_codigo = idx_cod_prest if idx_cod_prest is not None else (
-        idx_cum if idx_cum is not None else idx_mapiiss
+    idx_codigo = (
+        idx_cod_prest
+        if idx_cod_prest is not None
+        else (idx_cum if idx_cum is not None else idx_mapiiss)
     )
     if idx_codigo is None or idx_tarifa is None:
         return []
 
     filas: list[dict] = []
-    for fila in rows[hdr_idx + 1:]:
+    for fila in rows[hdr_idx + 1 :]:
         cod_raw = _celda(fila, idx_codigo)
         if not cod_raw:
             continue
@@ -439,16 +465,18 @@ def _parsear_anexo31(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
             iva_si = iva_val in ("SI", "SÍ", "S", "YES", "Y", "1")
         valor_final = tarifa * 1.19 if iva_si else tarifa
         agrup = _limpiar_descripcion(str(_celda(fila, idx_agrup) or ""))
-        filas.append({
-            "codigo_cups": codigo[:30],
-            "codigo_ips": None,
-            "descripcion": desc[:500] if desc else None,
-            "valor_pactado": round(valor_final, 2),
-            "modalidad": (agrup or "MEDICAMENTOS")[:80],
-            "tipo_tarifa": "VALOR_FIJO",
-            "factor_ajuste": 0.0,
-            "observacion": None,
-        })
+        filas.append(
+            {
+                "codigo_cups": codigo[:30],
+                "codigo_ips": None,
+                "descripcion": desc[:500] if desc else None,
+                "valor_pactado": round(valor_final, 2),
+                "modalidad": (agrup or "MEDICAMENTOS")[:80],
+                "tipo_tarifa": "VALOR_FIJO",
+                "factor_ajuste": 0.0,
+                "observacion": None,
+            }
+        )
     return filas
 
 
@@ -469,7 +497,7 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
         return []
 
     filas: list[dict] = []
-    for fila in rows[hdr_idx + 1:]:
+    for fila in rows[hdr_idx + 1 :]:
         cod_raw = _celda(fila, idx_codigo)
         if not cod_raw:
             continue
@@ -492,16 +520,18 @@ def _parsear_anexo32(rows: list[tuple], hdr_idx: int, headers: list[str]) -> lis
             continue
 
         agrup = _limpiar_descripcion(str(_celda(fila, idx_agrup) or ""))
-        filas.append({
-            "codigo_cups": codigo[:30],
-            "codigo_ips": None,
-            "descripcion": desc[:500] if desc else None,
-            "valor_pactado": round(valor, 2),
-            "modalidad": (agrup or "SUMINISTROS")[:80],
-            "tipo_tarifa": "VALOR_FIJO",
-            "factor_ajuste": 0.0,
-            "observacion": None,
-        })
+        filas.append(
+            {
+                "codigo_cups": codigo[:30],
+                "codigo_ips": None,
+                "descripcion": desc[:500] if desc else None,
+                "valor_pactado": round(valor, 2),
+                "modalidad": (agrup or "SUMINISTROS")[:80],
+                "tipo_tarifa": "VALOR_FIJO",
+                "factor_ajuste": 0.0,
+                "observacion": None,
+            }
+        )
     return filas
 
 
@@ -513,21 +543,34 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
     """
     idx_cups = _indice_columna(headers, "CUPS")
     idx_desc = _indice_columna(
-        headers, "DESCRIPCION CUPS", "DESCRIPCION IPS", "DESCRIPCION",
-        "DESCRIPCIÓN", "NOMBRE"
+        headers, "DESCRIPCION CUPS", "DESCRIPCION IPS", "DESCRIPCION", "DESCRIPCIÓN", "NOMBRE"
     )
     idx_valor = _indice_columna(
-        headers, "PRECIO DE REFERENCIA", "TARIFA UNITARIA", "VALOR PACTADO",
-        "VALOR UNITARIO", "PRECIO UNITARIO",
+        headers,
+        "PRECIO DE REFERENCIA",
+        "TARIFA UNITARIA",
+        "VALOR PACTADO",
+        "VALOR UNITARIO",
+        "PRECIO UNITARIO",
         # Ronda 46: soporte para tarifarios con año en el header (DMBUG, HUS)
-        "TARIFA 2025", "TARIFA 2026", "VALOR 2025", "VALOR 2026",
-        "TARIFA 2024", "VALOR 2024",
-        "VALOR", "PRECIO", "TARIFA",
+        "TARIFA 2025",
+        "TARIFA 2026",
+        "VALOR 2025",
+        "VALOR 2026",
+        "TARIFA 2024",
+        "VALOR 2024",
+        "VALOR",
+        "PRECIO",
+        "TARIFA",
     )
     idx_modalidad = _indice_columna(
-        headers, "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
-        "TARIFA A LA QUE CORRESPONDE", "MODALIDAD", "TIPO TARIFA",
-        "SERVICIO", "ESPECIALIDAD",  # Ronda 46: hojas AMBULATORIO/PAQUETES del HUS
+        headers,
+        "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
+        "TARIFA A LA QUE CORRESPONDE",
+        "MODALIDAD",
+        "TIPO TARIFA",
+        "SERVICIO",
+        "ESPECIALIDAD",  # Ronda 46: hojas AMBULATORIO/PAQUETES del HUS
     )
     idx_cod_ips = _indice_columna(headers, "CODIGO IPS", "CODIGO PROPIO")
 
@@ -535,7 +578,7 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
         return []
 
     filas: list[dict] = []
-    for fila in rows[hdr_idx + 1:]:
+    for fila in rows[hdr_idx + 1 :]:
         cups_raw = _celda(fila, idx_cups)
         if not cups_raw:
             continue
@@ -545,25 +588,29 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
         valor = _normalizar_valor(_celda(fila, idx_valor))
         if valor <= 0:
             continue
-        desc = _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
+        desc = (
+            _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
+        )
         modalidad = _limpiar_descripcion(str(_celda(fila, idx_modalidad) or ""))
         # Si hay código IPS propio, guardarlo en observación (útil para trazabilidad)
         cod_ips = str(_celda(fila, idx_cod_ips) or "").strip() if idx_cod_ips is not None else ""
         obs = f"Código IPS: {cod_ips}" if cod_ips and cod_ips != cups else None
 
-        filas.append({
-            "codigo_cups": cups[:30],
-            # Ronda 45: guardar el código IPS propio en campo indexado para
-            # que el lookup pueda encontrar la tarifa cuando la EPS glose con
-            # el código viejo (ej. '39147B-18' en vez de '890348').
-            "codigo_ips": cod_ips[:30] if cod_ips and cod_ips != cups else None,
-            "descripcion": desc[:500] if desc else None,
-            "valor_pactado": round(valor, 2),
-            "modalidad": (modalidad or "TARIFA PROPIA")[:80],
-            "tipo_tarifa": "VALOR_FIJO",
-            "factor_ajuste": 0.0,
-            "observacion": obs[:300] if obs else None,
-        })
+        filas.append(
+            {
+                "codigo_cups": cups[:30],
+                # Ronda 45: guardar el código IPS propio en campo indexado para
+                # que el lookup pueda encontrar la tarifa cuando la EPS glose con
+                # el código viejo (ej. '39147B-18' en vez de '890348').
+                "codigo_ips": cod_ips[:30] if cod_ips and cod_ips != cups else None,
+                "descripcion": desc[:500] if desc else None,
+                "valor_pactado": round(valor, 2),
+                "modalidad": (modalidad or "TARIFA PROPIA")[:80],
+                "tipo_tarifa": "VALOR_FIJO",
+                "factor_ajuste": 0.0,
+                "observacion": obs[:300] if obs else None,
+            }
+        )
     return filas
 
 
@@ -591,6 +638,7 @@ def _parsear_simple_fijo(rows: list[tuple], hdr_idx: int, headers: list[str]) ->
 #   - PAQUETES → tipo_tarifa=VALOR_FIJO, modalidad="PAQUETE FOMAG",
 #     codigo_ips = CODIGO institucional (ej. "423301H").
 
+
 def _parsear_fomag_tarifario(rows: list[tuple], hdr_idx: int, headers: list[str]) -> list[dict]:
     """Parser para hojas ANEXO TARIFARIO / EXCLUIDOS / *_AMBULATORIOS de FOMAG.
 
@@ -612,7 +660,7 @@ def _parsear_fomag_tarifario(rows: list[tuple], hdr_idx: int, headers: list[str]
         return []
 
     filas: list[dict] = []
-    for fila in rows[hdr_idx + 1:]:
+    for fila in rows[hdr_idx + 1 :]:
         cups_raw = _celda(fila, idx_cups)
         if not cups_raw:
             continue
@@ -621,7 +669,9 @@ def _parsear_fomag_tarifario(rows: list[tuple], hdr_idx: int, headers: list[str]
             continue
         propuesta = _normalizar_valor(_celda(fila, idx_propuesta))
         techo = _normalizar_valor(_celda(fila, idx_techo)) if idx_techo is not None else 0.0
-        obs_fomag = _normalizar_texto(_celda(fila, idx_obs_fomag)) if idx_obs_fomag is not None else ""
+        obs_fomag = (
+            _normalizar_texto(_celda(fila, idx_obs_fomag)) if idx_obs_fomag is not None else ""
+        )
         es_excluida = "POR ENCIMA DEL TECHO" in obs_fomag or "ENCIMA DEL TECHO" in obs_fomag
 
         if es_excluida:
@@ -629,7 +679,11 @@ def _parsear_fomag_tarifario(rows: list[tuple], hdr_idx: int, headers: list[str]
             modalidad = "EXCLUIDO POR TECHO FOMAG"
         else:
             valor = propuesta
-            tipo_compa = _normalizar_texto(_celda(fila, idx_comparacion)) if idx_comparacion is not None else ""
+            tipo_compa = (
+                _normalizar_texto(_celda(fila, idx_comparacion))
+                if idx_comparacion is not None
+                else ""
+            )
             if "PROPIA" in tipo_compa or "TARIFA PROPIA" in tipo_compa:
                 modalidad = "TARIFA PROPIA FOMAG"
             else:
@@ -637,7 +691,9 @@ def _parsear_fomag_tarifario(rows: list[tuple], hdr_idx: int, headers: list[str]
         if valor <= 0:
             continue
 
-        desc = _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
+        desc = (
+            _limpiar_descripcion(str(_celda(fila, idx_desc) or "")) if idx_desc is not None else ""
+        )
         cod_inst = ""
         if idx_cod_inst is not None:
             cod_inst = str(_celda(fila, idx_cod_inst) or "").strip()
@@ -656,21 +712,21 @@ def _parsear_fomag_tarifario(rows: list[tuple], hdr_idx: int, headers: list[str]
         if servicio:
             partes_obs.append(f"Servicio: {servicio}")
         if es_excluida and propuesta > 0 and techo > 0:
-            partes_obs.append(
-                f"Propuesta IPS ${propuesta:,.0f} excede techo FOMAG ${techo:,.0f}"
-            )
+            partes_obs.append(f"Propuesta IPS ${propuesta:,.0f} excede techo FOMAG ${techo:,.0f}")
         observacion = " · ".join(partes_obs)[:500] or None
 
-        filas.append({
-            "codigo_cups": cups[:30],
-            "codigo_ips": cod_inst[:30] if cod_inst and cod_inst != cups else None,
-            "descripcion": desc[:500] if desc else None,
-            "valor_pactado": round(valor, 2),
-            "modalidad": modalidad[:80],
-            "tipo_tarifa": "VALOR_FIJO",
-            "factor_ajuste": 0.0,
-            "observacion": observacion,
-        })
+        filas.append(
+            {
+                "codigo_cups": cups[:30],
+                "codigo_ips": cod_inst[:30] if cod_inst and cod_inst != cups else None,
+                "descripcion": desc[:500] if desc else None,
+                "valor_pactado": round(valor, 2),
+                "modalidad": modalidad[:80],
+                "tipo_tarifa": "VALOR_FIJO",
+                "factor_ajuste": 0.0,
+                "observacion": observacion,
+            }
+        )
     return filas
 
 
@@ -697,7 +753,7 @@ def _parsear_fomag_paquetes(rows: list[tuple], hdr_idx: int, headers: list[str])
     # Asumimos que esa celda está entre las primeras 8 columnas.
     categoria_actual = "PAQUETE FOMAG"
     filas: list[dict] = []
-    for fila in rows[hdr_idx + 1:]:
+    for fila in rows[hdr_idx + 1 :]:
         cups_raw = _celda(fila, idx_cups)
         cups = str(cups_raw or "").strip()
         # Filas de subtítulo: tienen un texto largo en alguna celda pero ni
@@ -708,11 +764,21 @@ def _parsear_fomag_paquetes(rows: list[tuple], hdr_idx: int, headers: list[str])
                     continue
                 t = str(c).strip()
                 if len(t) > 6 and t.upper() == t and not t.replace(" ", "").isdigit():
-                    if any(k in t.upper() for k in (
-                        "GASTRO", "COLUMNA", "IVE", "EMBARAZO",
-                        "REHABILITACION", "REHABILITACIÓN",
-                        "DOMICILIARIA", "UROLOG", "PAQUETE", "ENDOSCOP",
-                    )):
+                    if any(
+                        k in t.upper()
+                        for k in (
+                            "GASTRO",
+                            "COLUMNA",
+                            "IVE",
+                            "EMBARAZO",
+                            "REHABILITACION",
+                            "REHABILITACIÓN",
+                            "DOMICILIARIA",
+                            "UROLOG",
+                            "PAQUETE",
+                            "ENDOSCOP",
+                        )
+                    ):
                         categoria_actual = ("PAQUETE FOMAG · " + t)[:80]
                         break
             continue
@@ -730,20 +796,23 @@ def _parsear_fomag_paquetes(rows: list[tuple], hdr_idx: int, headers: list[str])
         if idx_obs is not None:
             obs = _limpiar_descripcion(str(_celda(fila, idx_obs) or ""))
 
-        filas.append({
-            "codigo_cups": cups[:30],
-            "codigo_ips": codigo_inst[:30] if codigo_inst and codigo_inst != cups else None,
-            "descripcion": desc[:500] if desc else None,
-            "valor_pactado": round(valor, 2),
-            "modalidad": categoria_actual[:80],
-            "tipo_tarifa": "VALOR_FIJO",
-            "factor_ajuste": 0.0,
-            "observacion": obs[:500] if obs else None,
-        })
+        filas.append(
+            {
+                "codigo_cups": cups[:30],
+                "codigo_ips": codigo_inst[:30] if codigo_inst and codigo_inst != cups else None,
+                "descripcion": desc[:500] if desc else None,
+                "valor_pactado": round(valor, 2),
+                "modalidad": categoria_actual[:80],
+                "tipo_tarifa": "VALOR_FIJO",
+                "factor_ajuste": 0.0,
+                "observacion": obs[:500] if obs else None,
+            }
+        )
     return filas
 
 
 # ─── API pública ────────────────────────────────────────────────────────────
+
 
 def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
     """Parsea un Excel de tarifas contratadas.
@@ -757,15 +826,20 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
         wb = load_workbook(BytesIO(contenido), data_only=True, read_only=True)
     except Exception as e:
         return {
-            "eps": None, "contrato": None,
-            "vigencia_desde": None, "vigencia_hasta": None,
-            "filas": [], "hojas_detectadas": [],
+            "eps": None,
+            "contrato": None,
+            "vigencia_desde": None,
+            "vigencia_hasta": None,
+            "filas": [],
+            "hojas_detectadas": [],
             "errores": [f"No se pudo abrir el archivo: {type(e).__name__}: {e}"],
         }
 
     meta_global = {
-        "eps": None, "contrato": None,
-        "vigencia_desde": None, "vigencia_hasta": None,
+        "eps": None,
+        "contrato": None,
+        "vigencia_desde": None,
+        "vigencia_hasta": None,
     }
     filas_total: list[dict] = []
     hojas_detectadas: list[str] = []

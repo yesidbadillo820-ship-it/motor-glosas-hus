@@ -10,6 +10,7 @@ from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/plantillas", tags=["plantillas"])
 
+
 class PlantillaCreate(BaseModel):
     nombre: str
     codigo: Optional[str] = None
@@ -17,10 +18,12 @@ class PlantillaCreate(BaseModel):
     eps: Optional[str] = None
     plantilla: str
 
+
 class PlantillaUpdate(BaseModel):
     nombre: Optional[str] = None
     plantilla: Optional[str] = None
     activa: Optional[int] = None
+
 
 @router.get("/stats")
 def stats_plantillas(
@@ -53,7 +56,9 @@ def stats_plantillas(
             por_eps[p.eps] = por_eps.get(p.eps, 0) + 1
 
     top_eps = sorted(
-        por_eps.items(), key=lambda x: x[1], reverse=True,
+        por_eps.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:10]
 
     return {
@@ -61,9 +66,7 @@ def stats_plantillas(
         "activas": activas,
         "inactivas": len(todas) - activas,
         "por_tipo": por_tipo,
-        "top_10_eps": [
-            {"eps": e, "plantillas": n} for e, n in top_eps
-        ],
+        "top_10_eps": [{"eps": e, "plantillas": n} for e, n in top_eps],
     }
 
 
@@ -90,6 +93,7 @@ def listar_plantillas(
         for p in plantillas
     ]
 
+
 @router.post("/")
 def crear_plantilla(
     data: PlantillaCreate,
@@ -106,6 +110,7 @@ def crear_plantilla(
         plantilla=data.plantilla,
     )
     return {"id": plantilla.id, "message": "Plantilla creada"}
+
 
 @router.get("/{plantilla_id}")
 def obtener_plantilla(
@@ -128,6 +133,7 @@ def obtener_plantilla(
         "activa": plantilla.activa,
     }
 
+
 @router.patch("/{plantilla_id}")
 def actualizar_plantilla(
     plantilla_id: int,
@@ -146,6 +152,7 @@ def actualizar_plantilla(
     if not plantilla:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
     return {"message": "Plantilla actualizada"}
+
 
 @router.delete("/{plantilla_id}")
 def eliminar_plantilla(

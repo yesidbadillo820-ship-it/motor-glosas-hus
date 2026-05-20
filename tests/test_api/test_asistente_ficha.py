@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/asistente-ficha (R370 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="auditor@hus.com", rol="AUDITOR", activo=1,
+        id=1,
+        email="auditor@hus.com",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,21 +51,36 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, gid, eps="X", codigo="C", estado="RADICADA",
-          dictamen=None, dias=10, codigo_respuesta=None,
-          factura="F1"):
-    db.add(GlosaRecord(
-        id=gid,
-        eps=eps, paciente="X", codigo_glosa=codigo, factura=factura,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        dictamen=dictamen,
-        dias_restantes=dias,
-        codigo_respuesta=codigo_respuesta,
-        fecha_decision_eps=(
-            ahora_utc() if estado in ("LEVANTADA","RATIFICADA","ACEPTADA") else None
-        ),
-    ))
+def _seed(
+    db,
+    gid,
+    eps="X",
+    codigo="C",
+    estado="RADICADA",
+    dictamen=None,
+    dias=10,
+    codigo_respuesta=None,
+    factura="F1",
+):
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            factura=factura,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            dictamen=dictamen,
+            dias_restantes=dias,
+            codigo_respuesta=codigo_respuesta,
+            fecha_decision_eps=(
+                ahora_utc() if estado in ("LEVANTADA", "RATIFICADA", "ACEPTADA") else None
+            ),
+        )
+    )
     db.commit()
 
 
@@ -70,15 +90,21 @@ class TestAsistenteFicha:
         _seed(db_session, 1, dictamen=None, dias=2)
         # Histórico: 2 LEV con RE9501, 1 RAT con RE9701
         _seed(
-            db_session, 2, estado="LEVANTADA",
+            db_session,
+            2,
+            estado="LEVANTADA",
             codigo_respuesta="RE9501",
         )
         _seed(
-            db_session, 3, estado="LEVANTADA",
+            db_session,
+            3,
+            estado="LEVANTADA",
             codigo_respuesta="RE9501",
         )
         _seed(
-            db_session, 4, estado="RATIFICADA",
+            db_session,
+            4,
+            estado="RATIFICADA",
             codigo_respuesta="RE9701",
         )
 

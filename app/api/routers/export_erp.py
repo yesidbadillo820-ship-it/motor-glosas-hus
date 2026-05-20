@@ -1,4 +1,5 @@
 """Export a ERP contable (CSV con encabezados estándar SIIGO/Hélisa)."""
+
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from typing import Optional
@@ -52,7 +53,7 @@ def export_recuperaciones(
         if recuperado <= 0:
             continue
         # Asiento: DEBE a la EPS (138505-CARTERA-EPS), HABER a recuperación (419500)
-        eps_clean = (g.eps or "SIN_DEFINIR").replace(",", " ").replace("\"", "")
+        eps_clean = (g.eps or "SIN_DEFINIR").replace(",", " ").replace('"', "")
         fac = (g.factura or "N/A").replace(",", " ")
         desc = f"Recuperacion glosa {g.codigo_glosa or ''} {eps_clean}".replace(",", " ")[:120]
         # Línea 1: DEBE (reverso de cartera)
@@ -61,13 +62,17 @@ def export_recuperaciones(
         buf.write(f"{fecha},419500,{eps_clean},{fac},{desc},0,{recuperado:.0f},CARTERA-GLOSAS\n")
 
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="EXPORT_ERP", tabla="historial",
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="EXPORT_ERP",
+        tabla="historial",
         detalle=f"Periodo {f_desde.date()} a {f_hasta.date()} · {len(glosas)} glosas",
     )
 
     buf.seek(0)
-    filename = f"recuperaciones_glosas_{f_desde.strftime('%Y%m%d')}_{f_hasta.strftime('%Y%m%d')}.csv"
+    filename = (
+        f"recuperaciones_glosas_{f_desde.strftime('%Y%m%d')}_{f_hasta.strftime('%Y%m%d')}.csv"
+    )
     return StreamingResponse(
         iter([buf.getvalue()]),
         media_type="text/csv; charset=utf-8",

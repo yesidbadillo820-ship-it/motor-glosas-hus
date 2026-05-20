@@ -1,4 +1,5 @@
 """Tests del servicio UVB (Manual SOAT 2026) y tarifas propias HUS (SMDLV)."""
+
 from app.services.uvb import (
     SMDLV_2026,
     UVB_2026,

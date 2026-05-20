@@ -1,4 +1,5 @@
 """Adjuntos (screenshots, documentos) en conciliaciones."""
+
 import base64
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
@@ -21,9 +22,11 @@ def listar(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    rows = db.query(AdjuntoConciliacionRecord).filter(
-        AdjuntoConciliacionRecord.conciliacion_id == conciliacion_id
-    ).all()
+    rows = (
+        db.query(AdjuntoConciliacionRecord)
+        .filter(AdjuntoConciliacionRecord.conciliacion_id == conciliacion_id)
+        .all()
+    )
     return [
         {
             "id": r.id,
@@ -66,8 +69,10 @@ async def subir(
     db.commit()
     db.refresh(reg)
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="ADJUNTO_CONCILIACION", tabla="conciliaciones",
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="ADJUNTO_CONCILIACION",
+        tabla="conciliaciones",
         registro_id=conciliacion_id,
         detalle=f"Subido: {archivo.filename} ({len(contenido)} bytes)",
     )
@@ -81,10 +86,14 @@ def descargar(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    r = db.query(AdjuntoConciliacionRecord).filter(
-        AdjuntoConciliacionRecord.id == adjunto_id,
-        AdjuntoConciliacionRecord.conciliacion_id == conciliacion_id,
-    ).first()
+    r = (
+        db.query(AdjuntoConciliacionRecord)
+        .filter(
+            AdjuntoConciliacionRecord.id == adjunto_id,
+            AdjuntoConciliacionRecord.conciliacion_id == conciliacion_id,
+        )
+        .first()
+    )
     if not r:
         raise HTTPException(404, "Adjunto no encontrado")
     try:
@@ -105,10 +114,14 @@ def eliminar(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
-    r = db.query(AdjuntoConciliacionRecord).filter(
-        AdjuntoConciliacionRecord.id == adjunto_id,
-        AdjuntoConciliacionRecord.conciliacion_id == conciliacion_id,
-    ).first()
+    r = (
+        db.query(AdjuntoConciliacionRecord)
+        .filter(
+            AdjuntoConciliacionRecord.id == adjunto_id,
+            AdjuntoConciliacionRecord.conciliacion_id == conciliacion_id,
+        )
+        .first()
+    )
     if not r:
         raise HTTPException(404, "Adjunto no encontrado")
     db.delete(r)

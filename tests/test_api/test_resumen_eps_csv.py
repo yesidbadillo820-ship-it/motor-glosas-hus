@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/exportar-resumen-eps.csv (R236 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, estado="RADICADA", obj=1000, rec=0):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=obj, valor_recuperado=rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=obj,
+            valor_recuperado=rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -64,8 +72,7 @@ class TestResumenEPSCSV:
     def test_header(self, client):
         r = client.get("/glosas/exportar-resumen-eps.csv")
         primera = r.text.split("\n")[0]
-        for col in ("eps", "total_glosas", "abiertas",
-                    "tasa_levantamiento_pct"):
+        for col in ("eps", "total_glosas", "abiertas", "tasa_levantamiento_pct"):
             assert col in primera
 
     def test_filas_correctas(self, client, db_session):

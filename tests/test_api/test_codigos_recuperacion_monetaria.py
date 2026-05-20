@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/codigos-recuperacion-monetaria (R339 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, codigo, obj, rec, estado="LEVANTADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa=codigo,
-        valor_objetado=obj, valor_recuperado=rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=obj,
+            valor_recuperado=rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -60,9 +68,7 @@ class TestCodigosRecuperacionMonetaria:
         _seed(db_session, "TA0801", 2000, 1200)
         # Ratio: 2000/3000 = 66.67%
 
-        r = client.get(
-            "/glosas/stats/codigos-recuperacion-monetaria?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/codigos-recuperacion-monetaria?min_glosas=1")
         d = r.json()
         item = d["items"][0]
         assert item["codigo_glosa"] == "TA0801"

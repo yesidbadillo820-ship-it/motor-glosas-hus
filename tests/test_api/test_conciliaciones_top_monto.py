@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/conciliaciones-top-monto (R340 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -41,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,20 +51,29 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, glosa_id):
-    db.add(GlosaRecord(
-        id=glosa_id,
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_concil(db, glosa_id, valor):
-    db.add(ConciliacionRecord(
-        glosa_id=glosa_id, valor_conciliado=valor,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        ConciliacionRecord(
+            glosa_id=glosa_id,
+            valor_conciliado=valor,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -83,8 +94,6 @@ class TestConciliacionesTopMonto:
         _seed_glosa(db_session, 1)
         for v in [100, 200, 300, 400, 500]:
             _seed_concil(db_session, 1, v)
-        r = client.get(
-            "/glosas/stats/conciliaciones-top-monto?limit=2"
-        )
+        r = client.get("/glosas/stats/conciliaciones-top-monto?limit=2")
         d = r.json()
         assert len(d["items"]) == 2

@@ -27,6 +27,7 @@ El indexador se construye on-demand y cachea en memoria. La salida del
 lookup es una lista de soportes con metadata (tipo, ruta absoluta, EPS,
 ENV, mes, tamaño) lista para inyectar en el flujo de análisis.
 """
+
 from __future__ import annotations
 
 import logging
@@ -61,8 +62,18 @@ TIPOS_SOPORTE = {
 _RE_FACTURA = re.compile(r"(HUS\d{4,12})", re.IGNORECASE)
 # Mes inicial de la carpeta raíz: "ABRIL 2026 - SOPORTES RADICACION"
 _MESES = (
-    "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+    "ENERO",
+    "FEBRERO",
+    "MARZO",
+    "ABRIL",
+    "MAYO",
+    "JUNIO",
+    "JULIO",
+    "AGOSTO",
+    "SEPTIEMBRE",
+    "OCTUBRE",
+    "NOVIEMBRE",
+    "DICIEMBRE",
 )
 _RE_MES_RAIZ = re.compile(
     r"^\s*(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
@@ -72,19 +83,19 @@ _RE_MES_RAIZ = re.compile(
 
 @dataclass
 class SoporteEntry:
-    factura: str            # `HUS487523` (raw, como aparece en el filename)
-    factura_norm: str       # solo dígitos sin ceros a la izquierda
-    tipo: str               # `factura_electronica`, `historia_clinica`, etc.
-    tipo_codigo: str        # `FEV`, `HEV`, etc.
-    ruta: str               # path absoluto
+    factura: str  # `HUS487523` (raw, como aparece en el filename)
+    factura_norm: str  # solo dígitos sin ceros a la izquierda
+    tipo: str  # `factura_electronica`, `historia_clinica`, etc.
+    tipo_codigo: str  # `FEV`, `HEV`, etc.
+    ruta: str  # path absoluto
     nombre_archivo: str
     extension: str
-    eps: Optional[str]      # carpeta EPS
-    env: Optional[str]      # carpeta ENV-NNN
-    mes: Optional[str]      # ABRIL
-    anio: Optional[int]     # 2026
-    tamano_kb: int          # sin ñ para compat JSON con front-end
-    fecha_mod: float        # epoch
+    eps: Optional[str]  # carpeta EPS
+    env: Optional[str]  # carpeta ENV-NNN
+    mes: Optional[str]  # ABRIL
+    anio: Optional[int]  # 2026
+    tamano_kb: int  # sin ñ para compat JSON con front-end
+    fecha_mod: float  # epoch
 
 
 def normalizar_factura(factura: str) -> str:
@@ -158,10 +169,12 @@ def _extraer_metadata_path(p: Path, raiz: Path) -> dict:
             # estructurales que no representan EPS).
             for j in range(i + 1, len(partes)):
                 pj_up = upper_parts[j]
-                if (pj_up not in {"1. DD FACTURACION", "ESCANEO", "RIPS",
-                                  "SOPORTES", "CORRESPONDENCIA"}
-                        and "SOPORTES RADICACION" not in pj_up
-                        and not pj_up.startswith("ENV-")):
+                if (
+                    pj_up
+                    not in {"1. DD FACTURACION", "ESCANEO", "RIPS", "SOPORTES", "CORRESPONDENCIA"}
+                    and "SOPORTES RADICACION" not in pj_up
+                    and not pj_up.startswith("ENV-")
+                ):
                     meta["eps"] = partes[j]
                     break
             break
@@ -226,7 +239,7 @@ class SoportesIndexer:
     ) -> SoporteEntry:
         nombre = archivo.name
         clas = _clasificar_archivo(nombre)
-        tipo_cod, tipo_desc = (clas if clas else ("OTRO", "otro"))
+        tipo_cod, tipo_desc = clas if clas else ("OTRO", "otro")
         meta = _extraer_metadata_path(archivo, self.raiz)
         try:
             st = archivo.stat()
@@ -363,8 +376,7 @@ class SoportesIndexer:
             "archivos_indexados": self._archivos_indexados,
             "construido_en_epoch": self._construido_en,
             "construido_hace_seg": (
-                round(time.time() - self._construido_en, 1)
-                if self._construido_en else None
+                round(time.time() - self._construido_en, 1) if self._construido_en else None
             ),
             "ttl_segundos": self.ttl_segundos,
             "ultimo_error": self._ultimo_error,
@@ -427,13 +439,15 @@ class SoportesIndexer:
         for entries in self._indice.values():
             for e in entries:
                 # Texto buscable: ruta + nombre archivo + eps + env + factura
-                blob = " ".join([
-                    (e.ruta or "").lower(),
-                    (e.nombre_archivo or "").lower(),
-                    (e.eps or "").lower(),
-                    (e.env or "").lower(),
-                    (e.factura or "").lower(),
-                ])
+                blob = " ".join(
+                    [
+                        (e.ruta or "").lower(),
+                        (e.nombre_archivo or "").lower(),
+                        (e.eps or "").lower(),
+                        (e.env or "").lower(),
+                        (e.factura or "").lower(),
+                    ]
+                )
                 if all(tok in blob for tok in tokens):
                     coincidencias_por_factura.setdefault(e.factura, []).append(e)
 
@@ -471,6 +485,7 @@ class SoportesIndexer:
                 ruta_carpeta = e.ruta
                 try:
                     import os as _os
+
                     ruta_carpeta = _os.path.dirname(e.ruta)
                 except Exception:
                     pass
@@ -485,22 +500,22 @@ class SoportesIndexer:
                     "archivos": [],
                     "tipos_detectados": set(),
                 }
-            out[fac]["archivos"].append({
-                "tipo": e.tipo,
-                "tipo_codigo": e.tipo_codigo,
-                "nombre_archivo": e.nombre_archivo,
-                "ruta": e.ruta,
-                "extension": e.extension,
-                "tamano_kb": e.tamano_kb,
-            })
+            out[fac]["archivos"].append(
+                {
+                    "tipo": e.tipo,
+                    "tipo_codigo": e.tipo_codigo,
+                    "nombre_archivo": e.nombre_archivo,
+                    "ruta": e.ruta,
+                    "extension": e.extension,
+                    "tamano_kb": e.tamano_kb,
+                }
+            )
             if e.tipo_codigo:
                 out[fac]["tipos_detectados"].add(e.tipo_codigo)
 
         # Ordenar archivos dentro de cada grupo + convertir set a list
         for fac, g in out.items():
-            g["archivos"].sort(
-                key=lambda a: (prioridad.get(a["tipo"], 99), a["nombre_archivo"])
-            )
+            g["archivos"].sort(key=lambda a: (prioridad.get(a["tipo"], 99), a["nombre_archivo"]))
             g["archivos_count"] = len(g["archivos"])
             g["tipos_detectados"] = sorted(g["tipos_detectados"])
         return out

@@ -1,4 +1,5 @@
 """Tests del few-shot dinámico Gold (R-cerebro #2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -33,21 +34,32 @@ def db():
 
 
 def _seed_glosa(db, eps, codigo, estado="LEVANTADA", dictamen=None):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        dictamen=dictamen,
-        fecha_decision_eps=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            dictamen=dictamen,
+            fecha_decision_eps=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_gold(db, eps, codigo, argumento, usos=10):
-    db.add(PlantillaGoldRecord(
-        eps=eps, codigo_glosa=codigo, argumento=argumento,
-        activa=1, usos=usos,
-    ))
+    db.add(
+        PlantillaGoldRecord(
+            eps=eps,
+            codigo_glosa=codigo,
+            argumento=argumento,
+            activa=1,
+            usos=usos,
+        )
+    )
     db.commit()
 
 

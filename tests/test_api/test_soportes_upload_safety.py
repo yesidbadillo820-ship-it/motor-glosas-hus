@@ -4,6 +4,7 @@ Path traversal en este endpoint es crítico: un agente comprometido o
 un usuario auditor malintencionado podría escribir archivos arbitrarios
 en disco si la validación falla. Cubre los vectores conocidos.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

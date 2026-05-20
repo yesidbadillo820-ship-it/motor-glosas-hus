@@ -1,4 +1,5 @@
 """Tests del exportador formato DGH (Ronda 35)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -38,17 +39,24 @@ def db():
 
 def _mk(db, **kw):
     d = dict(
-        eps="FAMISANAR EPS", paciente="X", factura="HUS0000999",
-        codigo_glosa="TA0201", valor_objetado=100_000,
-        estado="PENDIENTE", creado_en=datetime.now(timezone.utc),
+        eps="FAMISANAR EPS",
+        paciente="X",
+        factura="HUS0000999",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        estado="PENDIENTE",
+        creado_en=datetime.now(timezone.utc),
     )
     d.update(kw)
     g = GlosaRecord(**d)
-    db.add(g); db.commit(); db.refresh(g)
+    db.add(g)
+    db.commit()
+    db.refresh(g)
     return g
 
 
 # ─── Limpieza del dictamen ─────────────────────────────────────────────────
+
 
 class TestLimpiarDictamen:
     def test_vacio_retorna_vacio(self):
@@ -58,8 +66,11 @@ class TestLimpiarDictamen:
 
     def test_texto_fijo_ratificada_usa_canonico(self):
         from app.services.glosa_service import TEXTO_RATIFICADA
-        g = GlosaRecord(modelo_ia="pre-analisis/texto_fijo/RATIFICADA",
-                        dictamen="<div>RATIFICADA EPS: X | Factura: Y | Observación recepción: basura</div>")
+
+        g = GlosaRecord(
+            modelo_ia="pre-analisis/texto_fijo/RATIFICADA",
+            dictamen="<div>RATIFICADA EPS: X | Factura: Y | Observación recepción: basura</div>",
+        )
         r = limpiar_dictamen_para_dgh(g.dictamen, g)
         assert r == TEXTO_RATIFICADA
 
@@ -83,9 +94,11 @@ class TestLimpiarDictamen:
 
     def test_remueve_header_ratificada_debug(self):
         g = GlosaRecord(modelo_ia="anthropic/claude")
-        html = ("RATIFICADA EPS: U240061 - FIDEICOMISOS | Factura: HUS001 | "
-                "Observación recepción: ESE HUS DIJO XYZ "
-                "ESE HUS NO ACEPTA LA RATIFICACIÓN")
+        html = (
+            "RATIFICADA EPS: U240061 - FIDEICOMISOS | Factura: HUS001 | "
+            "Observación recepción: ESE HUS DIJO XYZ "
+            "ESE HUS NO ACEPTA LA RATIFICACIÓN"
+        )
         r = limpiar_dictamen_para_dgh(html, g)
         assert "RATIFICADA EPS:" not in r
         assert "Observación recepción:" not in r
@@ -93,9 +106,11 @@ class TestLimpiarDictamen:
 
     def test_remueve_banner_tarifa_pactada(self):
         g = GlosaRecord(modelo_ia="anthropic/claude")
-        html = ("Tarifa pactada encontrada en el contrato · Defender "
-                "CUPS: 890750 EPS: FAMISANAR Contrato: ABC "
-                "ESE HUS NO ACEPTA la glosa por tarifa")
+        html = (
+            "Tarifa pactada encontrada en el contrato · Defender "
+            "CUPS: 890750 EPS: FAMISANAR Contrato: ABC "
+            "ESE HUS NO ACEPTA la glosa por tarifa"
+        )
         r = limpiar_dictamen_para_dgh(html, g)
         assert "Tarifa pactada encontrada" not in r
         assert "ESE HUS NO ACEPTA" in r
@@ -147,12 +162,15 @@ class TestLimpiarDictamen:
 
 # ─── extraer_descripcion_servicio ──────────────────────────────────────────
 
+
 class TestExtraerDescripcionServicio:
     def test_extrae_de_observacion_con_cups_nombre_valor(self):
         """Caso real reportado: 'CUPS 881434H - PERFIL BIOFISICO - Valor objetado: $26.591'"""
-        obs = ("TA0801 - Los cargos por apoyo diagnóstico... "
-               "- CUPS 881434H - PERFIL BIOFISICO - Valor objetado: $26.591 "
-               "- SE GLOSA LA DIFERENCIA")
+        obs = (
+            "TA0801 - Los cargos por apoyo diagnóstico... "
+            "- CUPS 881434H - PERFIL BIOFISICO - Valor objetado: $26.591 "
+            "- SE GLOSA LA DIFERENCIA"
+        )
         assert extraer_descripcion_servicio(obs) == "PERFIL BIOFISICO"
 
     def test_extrae_monitoria_fetal(self):
@@ -173,6 +191,7 @@ class TestExtraerDescripcionServicio:
 
 
 # ─── resolver_tercero ──────────────────────────────────────────────────────
+
 
 class TestResolverTercero:
     def test_con_eps_codigo_y_tercero_nombre(self):
@@ -216,6 +235,7 @@ class TestResolverTercero:
 
 # ─── Clasificadores ────────────────────────────────────────────────────────
 
+
 class TestClasificadores:
     def test_ratificada_por_estado(self):
         g = GlosaRecord(estado="RATIFICADA")
@@ -245,14 +265,21 @@ class TestClasificadores:
 
 # ─── generar_filas_dgh ─────────────────────────────────────────────────────
 
+
 class TestFilas:
     def test_glosa_sin_conceptos_fallback_una_fila(self, db):
-        g = _mk(db, tercero_nombre="FAMISANAR SUBSIDIADO", tercero_nit="900226715",
-                eps_codigo="U220181", cups_servicio="890701",
-                servicio_descripcion="CONSULTA URGENCIAS",
-                valor_objetado=50_000, valor_aceptado=0,
-                dictamen="ESE HUS NO ACEPTA glosa por tarifa",
-                codigo_respuesta="RE9901")
+        g = _mk(
+            db,
+            tercero_nombre="FAMISANAR SUBSIDIADO",
+            tercero_nit="900226715",
+            eps_codigo="U220181",
+            cups_servicio="890701",
+            servicio_descripcion="CONSULTA URGENCIAS",
+            valor_objetado=50_000,
+            valor_aceptado=0,
+            dictamen="ESE HUS NO ACEPTA glosa por tarifa",
+            codigo_respuesta="RE9901",
+        )
         filas = generar_filas_dgh(db, [g])
         assert len(filas) == 1
         f = filas[0]
@@ -271,17 +298,26 @@ class TestFilas:
     def test_glosa_con_conceptos_emite_una_fila_por_concepto(self, db):
         g = _mk(db, tercero_nombre="FOMAG", tercero_nit="900500000")
         # Agregar 3 conceptos
-        for i, (cups, desc, valor) in enumerate([
-            ("890701", "CONSULTA URGENCIAS", 30000),
-            ("873205", "RX CODO", 10000),
-            ("890793", "CONSULTA ESP", 15000),
-        ]):
-            db.add(ConceptoGlosaRecord(
-                glosa_id=g.id, factura=g.factura, codigo_glosa="TA0201",
-                nombre_glosa="Tarifas", cups_codigo=cups, cups_descripcion=desc,
-                valor_objetado=valor, observacion_eps="Mayor valor cobrado",
-                oid_dgh=str(997490 + i),
-            ))
+        for i, (cups, desc, valor) in enumerate(
+            [
+                ("890701", "CONSULTA URGENCIAS", 30000),
+                ("873205", "RX CODO", 10000),
+                ("890793", "CONSULTA ESP", 15000),
+            ]
+        ):
+            db.add(
+                ConceptoGlosaRecord(
+                    glosa_id=g.id,
+                    factura=g.factura,
+                    codigo_glosa="TA0201",
+                    nombre_glosa="Tarifas",
+                    cups_codigo=cups,
+                    cups_descripcion=desc,
+                    valor_objetado=valor,
+                    observacion_eps="Mayor valor cobrado",
+                    oid_dgh=str(997490 + i),
+                )
+            )
         db.commit()
         filas = generar_filas_dgh(db, [g])
         assert len(filas) == 3
@@ -289,19 +325,24 @@ class TestFilas:
         assert cups_codes == ["873205", "890701", "890793"]
 
     def test_ratificada_emite_codigo_respuesta_9901(self, db):
-        g = _mk(db, estado="RATIFICADA",
-                modelo_ia="pre-analisis/texto_fijo/RATIFICADA",
-                dictamen="<div>RATIFICADA EPS: X | Factura: Y | Observación recepción: basura ESE HUS NO ACEPTA</div>")
+        g = _mk(
+            db,
+            estado="RATIFICADA",
+            modelo_ia="pre-analisis/texto_fijo/RATIFICADA",
+            dictamen="<div>RATIFICADA EPS: X | Factura: Y | Observación recepción: basura ESE HUS NO ACEPTA</div>",
+        )
         filas = generar_filas_dgh(db, [g])
         f = filas[0]
         assert f["EstadoCxCObjecion"] == "Glosa_Ratificada"
         assert f["CODIGO RESPUESTA"] == "RE9901"
         # Observación limpia (texto canónico)
         from app.services.glosa_service import TEXTO_RATIFICADA
+
         assert f["OBSERVACION"] == TEXTO_RATIFICADA
 
 
 # ─── Excel completo ────────────────────────────────────────────────────────
+
 
 class TestExcel:
     def test_genera_excel_valido_con_26_columnas(self, db):

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/whatsapp-mensaje (R179 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,9 +48,15 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        id=1, eps="SANITAS", paciente="X", codigo_glosa="TA0201",
-        factura="F-123", valor_objetado=15000,
-        etapa="X", estado="RADICADA", dias_restantes=5,
+        id=1,
+        eps="SANITAS",
+        paciente="X",
+        codigo_glosa="TA0201",
+        factura="F-123",
+        valor_objetado=15000,
+        etapa="X",
+        estado="RADICADA",
+        dias_restantes=5,
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -70,8 +78,7 @@ class TestWhatsappMensaje:
             assert key in d
 
     def test_mensaje_incluye_datos(self, client, db_session):
-        _seed(db_session, eps="SANITAS", codigo_glosa="TA0201",
-              valor_objetado=15000)
+        _seed(db_session, eps="SANITAS", codigo_glosa="TA0201", valor_objetado=15000)
         r = client.get("/glosas/1/whatsapp-mensaje")
         msg = r.json()["mensaje_whatsapp"]
         assert "SANITAS" in msg

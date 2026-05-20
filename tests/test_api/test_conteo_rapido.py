@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/conteo-rapido (R135 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -53,8 +58,12 @@ def client(db_session, usuario_super):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -67,19 +76,25 @@ class TestConteoRapido:
         r = client.get("/admin/conteo-rapido")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("glosas_total", "glosas_abiertas", "glosas_cerradas",
-                    "glosas_criticas", "glosas_vencidas",
-                    "usuarios_activos", "audit_log_24h",
-                    "consultado_en"):
+        for key in (
+            "glosas_total",
+            "glosas_abiertas",
+            "glosas_cerradas",
+            "glosas_criticas",
+            "glosas_vencidas",
+            "usuarios_activos",
+            "audit_log_24h",
+            "consultado_en",
+        ):
             assert key in d
         assert d["usuarios_activos"] == 1  # el SUPER_ADMIN seed
 
     def test_conteos(self, client, db_session):
-        _seed(db_session, dias_restantes=10)        # abierta en tiempo
-        _seed(db_session, dias_restantes=2)         # crítica
-        _seed(db_session, dias_restantes=-5)        # vencida
-        _seed(db_session, estado="LEVANTADA")       # cerrada
-        _seed(db_session, estado="ACEPTADA")        # cerrada
+        _seed(db_session, dias_restantes=10)  # abierta en tiempo
+        _seed(db_session, dias_restantes=2)  # crítica
+        _seed(db_session, dias_restantes=-5)  # vencida
+        _seed(db_session, estado="LEVANTADA")  # cerrada
+        _seed(db_session, estado="ACEPTADA")  # cerrada
 
         r = client.get("/admin/conteo-rapido")
         d = r.json()
@@ -91,10 +106,15 @@ class TestConteoRapido:
 
     def test_solo_cuenta_usuarios_activos(self, client, db_session):
         # Agregar uno inactivo
-        db_session.add(UsuarioRecord(
-            id=2, email="off@x", rol="AUDITOR", activo=0,
-            password_hash=get_password_hash("y"),
-        ))
+        db_session.add(
+            UsuarioRecord(
+                id=2,
+                email="off@x",
+                rol="AUDITOR",
+                activo=0,
+                password_hash=get_password_hash("y"),
+            )
+        )
         db_session.commit()
         r = client.get("/admin/conteo-rapido")
         d = r.json()

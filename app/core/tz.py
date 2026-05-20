@@ -30,6 +30,7 @@ Y para defenderse de datos legacy que quedaron naive:
     eliminado_en = a_utc(r.eliminado_en)      # convierte naive→UTC, deja
                                               # TZ-aware igual.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

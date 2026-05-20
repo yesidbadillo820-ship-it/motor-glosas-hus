@@ -1,4 +1,5 @@
 """Tests del endpoint GET /plantillas-gold/no-usadas (R127 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -54,15 +59,19 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, titulo, usos=0, dias_atras_uso=None, activa=1):
-    ult = (
-        ahora_utc() - timedelta(days=dias_atras_uso)
-        if dias_atras_uso is not None else None
+    ult = ahora_utc() - timedelta(days=dias_atras_uso) if dias_atras_uso is not None else None
+    db.add(
+        PlantillaGoldRecord(
+            eps="X",
+            codigo_glosa="C",
+            tipo="ARG",
+            titulo=titulo,
+            argumento="<p>X</p>",
+            usos=usos,
+            ultima_uso_en=ult,
+            activa=activa,
+        )
     )
-    db.add(PlantillaGoldRecord(
-        eps="X", codigo_glosa="C", tipo="ARG",
-        titulo=titulo, argumento="<p>X</p>",
-        usos=usos, ultima_uso_en=ult, activa=activa,
-    ))
     db.commit()
 
 

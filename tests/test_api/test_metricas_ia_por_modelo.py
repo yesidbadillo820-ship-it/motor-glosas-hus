@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/metricas-ia/por-modelo (R125 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -41,6 +45,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -48,15 +53,29 @@ def client(db_session, usuario_coord):
     app.dependency_overrides.clear()
 
 
-def _seed(db, proveedor, modelo, cost=0.01, latency=500,
-          input_tok=1000, output_tok=500, cache_read=0, dias_atras=5):
-    db.add(AICallRecord(
-        proveedor=proveedor, modelo=modelo,
-        latency_ms=latency, cost_usd=cost,
-        input_tokens=input_tok, output_tokens=output_tok,
-        cache_read_input_tokens=cache_read,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+def _seed(
+    db,
+    proveedor,
+    modelo,
+    cost=0.01,
+    latency=500,
+    input_tok=1000,
+    output_tok=500,
+    cache_read=0,
+    dias_atras=5,
+):
+    db.add(
+        AICallRecord(
+            proveedor=proveedor,
+            modelo=modelo,
+            latency_ms=latency,
+            cost_usd=cost,
+            input_tokens=input_tok,
+            output_tokens=output_tok,
+            cache_read_input_tokens=cache_read,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -80,10 +99,8 @@ class TestMetricasIaPorModelo:
         assert modelos["llama-3.3-70b"]["calls"] == 1
 
     def test_acumula_costo_y_tokens(self, client, db_session):
-        _seed(db_session, "anthropic", "X", cost=0.05,
-              input_tok=1000, output_tok=500)
-        _seed(db_session, "anthropic", "X", cost=0.03,
-              input_tok=2000, output_tok=200)
+        _seed(db_session, "anthropic", "X", cost=0.05, input_tok=1000, output_tok=500)
+        _seed(db_session, "anthropic", "X", cost=0.03, input_tok=2000, output_tok=200)
         r = client.get("/sistema/metricas-ia/por-modelo")
         d = r.json()
         item = d["items"][0]
@@ -101,8 +118,7 @@ class TestMetricasIaPorModelo:
 
     def test_cache_hit_rate(self, client, db_session):
         # 1000 input + 500 cache_read → cache_hit = 50%
-        _seed(db_session, "anthropic", "X",
-              input_tok=1000, cache_read=500)
+        _seed(db_session, "anthropic", "X", input_tok=1000, cache_read=500)
         r = client.get("/sistema/metricas-ia/por-modelo")
         d = r.json()
         assert d["items"][0]["cache_hit_rate_pct"] == 50.0
@@ -116,7 +132,7 @@ class TestMetricasIaPorModelo:
         assert d["items"][1]["modelo"] == "BARATO"
 
     def test_excluye_fuera_de_ventana(self, client, db_session):
-        _seed(db_session, "anthropic", "X", dias_atras=5)   # dentro
+        _seed(db_session, "anthropic", "X", dias_atras=5)  # dentro
         _seed(db_session, "anthropic", "X", dias_atras=60)  # fuera (default 30)
         r = client.get("/sistema/metricas-ia/por-modelo")
         d = r.json()

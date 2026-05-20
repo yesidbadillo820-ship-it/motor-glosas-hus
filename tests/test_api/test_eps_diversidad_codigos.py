@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-diversidad-codigos (R293 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, codigo):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -64,9 +72,7 @@ class TestEPSDiversidadCodigos:
         _seed(db_session, "OTRA", "TA0801")
         _seed(db_session, "OTRA", "TA0801")
 
-        r = client.get(
-            "/glosas/stats/eps-diversidad-codigos?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/eps-diversidad-codigos?min_glosas=1")
         d = r.json()
         sanitas = next(x for x in d["items"] if x["eps"] == "SANITAS")
         otra = next(x for x in d["items"] if x["eps"] == "OTRA")
@@ -77,8 +83,6 @@ class TestEPSDiversidadCodigos:
 
     def test_min_glosas_filtra(self, client, db_session):
         _seed(db_session, "POCAS", "X")
-        r = client.get(
-            "/glosas/stats/eps-diversidad-codigos?min_glosas=5"
-        )
+        r = client.get("/glosas/stats/eps-diversidad-codigos?min_glosas=5")
         d = r.json()
         assert d["items"] == []

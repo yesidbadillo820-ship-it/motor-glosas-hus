@@ -17,16 +17,17 @@ logger = logging.getLogger("motor_glosas")
 # de soportes (historias clínicas, RIPS, facturas) traen >>300 chars.
 UMBRAL_TEXTO_MINIMO = 300
 
+
 class PdfService:
     """
     Servicio dedicado exclusivamente a la extracción y procesamiento
     de texto desde archivos PDF.
     """
-    
+
     async def extraer(self, file_content: bytes) -> str:
         """
-        Ejecuta la extracción de forma asíncrona. 
-        Al usar run_in_executor evitamos bloquear el event loop de FastAPI 
+        Ejecuta la extracción de forma asíncrona.
+        Al usar run_in_executor evitamos bloquear el event loop de FastAPI
         mientras el servidor lee PDFs pesados (evita que el servidor se "congele" para otros usuarios).
         """
         loop = asyncio.get_running_loop()
@@ -45,11 +46,12 @@ class PdfService:
                     # Extraer tablas si las hay
                     for table in page.extract_tables() or []:
                         for row in table:
-                            txt += " | ".join(
-                                [str(c).replace("\n", " ") if c else "" for c in row]
-                            ) + "\n"
-                    paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
-                    
+                            txt += (
+                                " | ".join([str(c).replace("\n", " ") if c else "" for c in row])
+                                + "\n"
+                            )
+                    paginas.append(f"\n--- PÁG {i + 1} ---\n{txt}")
+
         except Exception as e:
             logger.warning(f"Fallo pdfplumber, usando PyPDF2 como respaldo: {e}")
             # Fallback con PyPDF2 (más rápido, útil si el PDF está corrupto para pdfplumber)
@@ -57,7 +59,7 @@ class PdfService:
                 reader = PyPDF2.PdfReader(io.BytesIO(file_content))
                 for i in range(len(reader.pages)):
                     txt = reader.pages[i].extract_text() or ""
-                    paginas.append(f"\n--- PÁG {i+1} ---\n{txt}")
+                    paginas.append(f"\n--- PÁG {i + 1} ---\n{txt}")
             except Exception as e2:
                 # Si ambos fallan (archivo corrupto o no-PDF) devolvemos texto
                 # vacío en vez de propagar. El caller decide si pedir OCR.
@@ -69,23 +71,23 @@ class PdfService:
 
         # ---------------------------------------------------------
         # Estrategia inteligente para no saturar el prompt de la IA:
-        # Se priorizan las primeras 2 páginas (encabezados/paciente) 
+        # Se priorizan las primeras 2 páginas (encabezados/paciente)
         # y las últimas 2 (firmas/totales).
         # ---------------------------------------------------------
         if len(paginas) <= 4:
             return "".join(paginas)
 
         inicio = "".join(paginas[:2])
-        fin    = "".join(paginas[-2:])
-        medio  = "".join(paginas[2:-2])
+        fin = "".join(paginas[-2:])
+        medio = "".join(paginas[2:-2])
 
         # Presupuesto: 3000 caracteres al inicio + 2000 del medio + 2000 al final
         resultado = (
-            inicio[:3000] +
-            "\n...[PÁGINAS INTERMEDIAS OMITIDAS PARA AHORRAR MEMORIA DE IA]...\n" +
-            medio[:2000] +
-            "\n...\n" +
-            fin[:2000]
+            inicio[:3000]
+            + "\n...[PÁGINAS INTERMEDIAS OMITIDAS PARA AHORRAR MEMORIA DE IA]...\n"
+            + medio[:2000]
+            + "\n...\n"
+            + fin[:2000]
         )
         return resultado
 
@@ -128,9 +130,7 @@ class PdfService:
 
         if gemini_api_key:
             try:
-                texto_ocr = await self._ocr_gemini(
-                    file_content, gemini_api_key, gemini_model
-                )
+                texto_ocr = await self._ocr_gemini(file_content, gemini_api_key, gemini_model)
                 if texto_ocr and len(texto_ocr.strip()) > len(texto_real):
                     return texto_ocr, "gemini-pdf"
             except Exception as e:
@@ -143,11 +143,10 @@ class PdfService:
             )
         return texto, "vacio"
 
-    async def _ocr_gemini(
-        self, pdf_bytes: bytes, api_key: str, model: str
-    ) -> str:
+    async def _ocr_gemini(self, pdf_bytes: bytes, api_key: str, model: str) -> str:
         """OCR vía Gemini PDF nativo (gratis en tier free)."""
         from app.services.gemini_service import GeminiService
+
         prompt = (
             "Transcribe fielmente todo el contenido textual de este documento PDF. "
             "Mantén la estructura (tablas, encabezados, filas). No resumas. No interpretes. "
@@ -163,9 +162,7 @@ class PdfService:
         )
         return texto or ""
 
-    async def _ocr_anthropic(
-        self, pdf_bytes: bytes, api_key: str, model: str
-    ) -> str:
+    async def _ocr_anthropic(self, pdf_bytes: bytes, api_key: str, model: str) -> str:
         """Envía el PDF a Claude como document base64 y pide la transcripción."""
         if len(pdf_bytes) > 32 * 1024 * 1024:  # 32 MB limit Anthropic PDFs
             raise RuntimeError("PDF excede 32 MB, no se puede enviar a Anthropic")

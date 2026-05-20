@@ -18,6 +18,7 @@ Tres detectores complementarios que corren sobre GlosaRecord:
 
 Todo es puro SQL + numpy-free; no dependemos de librerías pesadas.
 """
+
 from __future__ import annotations
 
 import math
@@ -33,13 +34,14 @@ from app.models.db import GlosaRecord
 
 @dataclass
 class Anomalia:
-    tipo: str            # "duplicado" | "patron_eps" | "valor_anomalo"
-    severidad: str       # "ALTA" | "MEDIA" | "BAJA"
+    tipo: str  # "duplicado" | "patron_eps" | "valor_anomalo"
+    severidad: str  # "ALTA" | "MEDIA" | "BAJA"
     descripcion: str
-    entidad: dict        # datos relacionados (glosa_ids, eps, etc.)
+    entidad: dict  # datos relacionados (glosa_ids, eps, etc.)
 
 
 # ─── 1) Duplicados ─────────────────────────────────────────────────────────
+
 
 def detectar_duplicados(db: Session, ventana_dias: int = 90) -> list[Anomalia]:
     """Detecta glosas con misma (factura, cups_servicio, eps) dentro de
@@ -89,6 +91,7 @@ def detectar_duplicados(db: Session, ventana_dias: int = 90) -> list[Anomalia]:
 
 # ─── 2) Patrón sospechoso por EPS ──────────────────────────────────────────
 
+
 def detectar_patron_sospechoso_eps(
     db: Session, ventana_dias: int = 30, umbral_salto: float = 0.30
 ) -> list[Anomalia]:
@@ -104,9 +107,7 @@ def detectar_patron_sospechoso_eps(
             db.query(
                 GlosaRecord.eps,
                 func.count(GlosaRecord.id).label("total"),
-                func.sum(
-                    func.coalesce(GlosaRecord.valor_objetado, 0.0)
-                ).label("valor"),
+                func.sum(func.coalesce(GlosaRecord.valor_objetado, 0.0)).label("valor"),
             )
             .filter(GlosaRecord.creado_en >= desde, GlosaRecord.creado_en < hasta)
             .group_by(GlosaRecord.eps)
@@ -174,6 +175,7 @@ def detectar_patron_sospechoso_eps(
 
 # ─── 3) Valor anómalo (z-score por CUPS) ───────────────────────────────────
 
+
 def detectar_valor_anomalo(
     db: Session, glosa: GlosaRecord, umbral_sigma: float = 3.0
 ) -> Optional[Anomalia]:
@@ -228,6 +230,7 @@ def detectar_valor_anomalo(
 
 
 # ─── Dashboard agregado ────────────────────────────────────────────────────
+
 
 def resumen_anomalias(db: Session, ventana_dias: int = 30) -> dict:
     """Combina los detectores y arma un dashboard unificado."""

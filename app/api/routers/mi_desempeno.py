@@ -1,4 +1,5 @@
 """Dashboard individual del gestor con KPIs personales, ranking y logros."""
+
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
@@ -64,18 +65,34 @@ def mi_desempeno(
     # Logros (calculados en caliente)
     logros = []
     if total >= 10:
-        logros.append({"nombre": "Operador activo", "icono": "🏃", "desc": f"{total} glosas procesadas"})
+        logros.append(
+            {"nombre": "Operador activo", "icono": "🏃", "desc": f"{total} glosas procesadas"}
+        )
     if tasa >= 80 and total >= 5:
         logros.append({"nombre": "Francotirador", "icono": "🎯", "desc": f"Tasa de éxito {tasa}%"})
     if v_rec >= 5_000_000:
-        logros.append({"nombre": "Recuperador", "icono": "💰", "desc": f"{v_rec/1_000_000:.1f}M recuperados"})
+        logros.append(
+            {
+                "nombre": "Recuperador",
+                "icono": "💰",
+                "desc": f"{v_rec / 1_000_000:.1f}M recuperados",
+            }
+        )
 
     # Racha: días consecutivos con al menos 1 glosa respondida
     racha = _calcular_racha(glosas)
     if racha >= 3:
-        logros.append({"nombre": f"Racha {racha} días", "icono": "🔥", "desc": "Días consecutivos activo"})
+        logros.append(
+            {"nombre": f"Racha {racha} días", "icono": "🔥", "desc": "Días consecutivos activo"}
+        )
     if por_workflow.get("APROBADA", 0) + por_workflow.get("RADICADA", 0) >= 20:
-        logros.append({"nombre": "Cierre consistente", "icono": "✅", "desc": "20+ glosas aprobadas/radicadas"})
+        logros.append(
+            {
+                "nombre": "Cierre consistente",
+                "icono": "✅",
+                "desc": "20+ glosas aprobadas/radicadas",
+            }
+        )
 
     # Ranking vs equipo (por tasa de éxito)
     ranking = _ranking_equipo(db, desde)
@@ -88,11 +105,23 @@ def mi_desempeno(
     # Alertas personales
     alertas = []
     if semaforo["NEGRO"] > 0:
-        alertas.append({"nivel": "critico", "msg": f"Tienes {semaforo['NEGRO']} glosa(s) VENCIDA(S). Atender ya."})
+        alertas.append(
+            {
+                "nivel": "critico",
+                "msg": f"Tienes {semaforo['NEGRO']} glosa(s) VENCIDA(S). Atender ya.",
+            }
+        )
     if semaforo["ROJO"] > 0:
-        alertas.append({"nivel": "alto", "msg": f"{semaforo['ROJO']} glosa(s) en rojo (menos de 5 días)."})
+        alertas.append(
+            {"nivel": "alto", "msg": f"{semaforo['ROJO']} glosa(s) en rojo (menos de 5 días)."}
+        )
     if por_workflow.get("BORRADOR", 0) >= 5:
-        alertas.append({"nivel": "info", "msg": f"{por_workflow['BORRADOR']} borradores sin enviar a revisión."})
+        alertas.append(
+            {
+                "nivel": "info",
+                "msg": f"{por_workflow['BORRADOR']} borradores sin enviar a revisión.",
+            }
+        )
 
     return {
         "ventana_dias": ventana_dias,
@@ -145,22 +174,24 @@ def _ranking_equipo(db: Session, desde: datetime) -> list[dict]:
         condiciones = [GlosaRecord.auditor_email == u.email]
         if u.nombre:
             condiciones.append(GlosaRecord.gestor_nombre.ilike(f"%{u.nombre.strip()}%"))
-        glosas = db.query(GlosaRecord).filter(
-            or_(*condiciones), GlosaRecord.creado_en >= desde
-        ).all()
+        glosas = (
+            db.query(GlosaRecord).filter(or_(*condiciones), GlosaRecord.creado_en >= desde).all()
+        )
         if not glosas:
             continue
         obj = sum(float(g.valor_objetado or 0) for g in glosas)
         ace = sum(float(g.valor_aceptado or 0) for g in glosas)
         tasa = ((obj - ace) / obj * 100) if obj > 0 else 0
-        ranking.append({
-            "email": u.email,
-            "nombre": u.nombre or u.email.split("@")[0],
-            "rol": u.rol,
-            "glosas": len(glosas),
-            "recuperado": obj - ace,
-            "tasa_exito": round(tasa, 1),
-        })
+        ranking.append(
+            {
+                "email": u.email,
+                "nombre": u.nombre or u.email.split("@")[0],
+                "rol": u.rol,
+                "glosas": len(glosas),
+                "recuperado": obj - ace,
+                "tasa_exito": round(tasa, 1),
+            }
+        )
     # Ordena por tasa, luego por volumen
     ranking.sort(key=lambda x: (-x["tasa_exito"], -x["glosas"]))
     return ranking
@@ -198,9 +229,9 @@ def proximas_vencer_del_usuario(
     """
     q = _glosas_del_gestor(db, current_user)
     # Solo las que NO están resueltas/levantadas/aceptadas finalmente
-    q = q.filter(~GlosaRecord.estado.in_(
-        ["LEVANTADA", "RATIFICADA", "ACEPTADA", "RESUELTA", "CONCILIADA"]
-    ))
+    q = q.filter(
+        ~GlosaRecord.estado.in_(["LEVANTADA", "RATIFICADA", "ACEPTADA", "RESUELTA", "CONCILIADA"])
+    )
     # Filtro por dias_restantes
     q = q.filter(GlosaRecord.dias_restantes != None)  # noqa: E711
     q = q.filter(GlosaRecord.dias_restantes <= dias_limite)
@@ -218,18 +249,20 @@ def proximas_vencer_del_usuario(
             sev = "ALTA"
         else:
             sev = "MEDIA"
-        items.append({
-            "id": g.id,
-            "eps": g.eps,
-            "paciente": g.paciente,
-            "codigo_glosa": g.codigo_glosa,
-            "factura": g.factura,
-            "valor_objetado": float(g.valor_objetado or 0),
-            "estado": g.estado,
-            "dias_restantes": d,
-            "severidad": sev,
-            "creado_en": g.creado_en.isoformat() if g.creado_en else None,
-        })
+        items.append(
+            {
+                "id": g.id,
+                "eps": g.eps,
+                "paciente": g.paciente,
+                "codigo_glosa": g.codigo_glosa,
+                "factura": g.factura,
+                "valor_objetado": float(g.valor_objetado or 0),
+                "estado": g.estado,
+                "dias_restantes": d,
+                "severidad": sev,
+                "creado_en": g.creado_en.isoformat() if g.creado_en else None,
+            }
+        )
     return {
         "usuario_email": current_user.email,
         "dias_limite": dias_limite,

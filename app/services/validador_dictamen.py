@@ -10,6 +10,7 @@ Umbrales:
   • 50-69:  REQUIERE REFINAR — corregir antes de radicar
   • 0-49:   RECHAZADO — reescribir
 """
+
 from __future__ import annotations
 import re
 from html import unescape
@@ -48,8 +49,11 @@ def check_apertura(texto: str) -> dict:
     else:
         msg = "Apertura correcta"
     return {
-        "id": "apertura", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "apertura",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Verifica el inicio del argumento",
     }
 
@@ -62,19 +66,24 @@ def check_cups_real(texto: str, cups_esperado: Optional[str]) -> dict:
         aprobado = cups_esperado in t
         msg = (
             f"CUPS {cups_esperado} citado correctamente"
-            if aprobado else f"No se encontró el CUPS {cups_esperado} en el texto"
+            if aprobado
+            else f"No se encontró el CUPS {cups_esperado} en el texto"
         )
     else:
         # No hay CUPS específico; verificar que no haya CUPS inventado
         inventados = re.findall(r"\bCUPS\s+\d{6}\b", t)
         aprobado = len(inventados) == 0 or "CUPS INDICADO EN EL EXPEDIENTE" in t
         msg = (
-            "No se detectaron CUPS inventados" if aprobado
+            "No se detectaron CUPS inventados"
+            if aprobado
             else f"Posible CUPS inventado: {', '.join(set(inventados[:3]))}"
         )
     return {
-        "id": "cups", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "cups",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Cita SOLO el CUPS que aparece en el texto de la glosa",
     }
 
@@ -97,8 +106,11 @@ def check_sin_cifras_inventadas(texto: str, valor_original: Optional[str]) -> di
         aprobado = False
         msg = f"Posibles cifras inventadas: {', '.join(cifras[:3])}"
     return {
-        "id": "cifras", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "cifras",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else 'Usa "EL VALOR INDICADO EN EL EXPEDIENTE"',
     }
 
@@ -123,8 +135,11 @@ def check_normas_citadas(texto: str, codigo_glosa: str) -> dict:
     aprobado = total >= 3
     msg = f"{total} referencia(s) normativa(s) detectada(s)"
     return {
-        "id": "normas", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "normas",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Cita al menos 3 normas: artículos, leyes o sentencias",
     }
 
@@ -133,14 +148,14 @@ def check_enumeracion(texto: str) -> dict:
     nombre = "Refutación enumerada (EN PRIMER/SEGUNDO/TERCER LUGAR)"
     peso = 10
     t = texto.upper()
-    tiene = (
-        "EN PRIMER LUGAR" in t
-        and "EN SEGUNDO LUGAR" in t
-    )
+    tiene = "EN PRIMER LUGAR" in t and "EN SEGUNDO LUGAR" in t
     msg = "Enumeración presente" if tiene else "Falta enumeración técnica en P2"
     return {
-        "id": "enumeracion", "nombre": nombre, "peso": peso,
-        "aprobado": tiene, "mensaje": msg,
+        "id": "enumeracion",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": tiene,
+        "mensaje": msg,
         "sugerencia": "" if tiene else "Usa 'EN PRIMER LUGAR... EN SEGUNDO LUGAR...'",
     }
 
@@ -155,11 +170,18 @@ def check_invitacion_conciliacion(texto: str) -> dict:
         or "ART\u00cdCULO 20 DEL DECRETO 4747" in t
         or "ARTÍCULO 20 DEL DECRETO 4747" in t
     )
-    msg = "Invitación a conciliación presente" if tiene else "Falta invitación a mesa de conciliación"
+    msg = (
+        "Invitación a conciliación presente" if tiene else "Falta invitación a mesa de conciliación"
+    )
     return {
-        "id": "conciliacion", "nombre": nombre, "peso": peso,
-        "aprobado": tiene, "mensaje": msg,
-        "sugerencia": "" if tiene else "Incluye invitación a mesa de conciliación (Art. 20 Dec. 4747/2007)",
+        "id": "conciliacion",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": tiene,
+        "mensaje": msg,
+        "sugerencia": ""
+        if tiene
+        else "Incluye invitación a mesa de conciliación (Art. 20 Dec. 4747/2007)",
     }
 
 
@@ -175,8 +197,11 @@ def check_extension(texto: str) -> dict:
     else:
         msg = f"{palabras} palabras — dentro del rango"
     return {
-        "id": "extension", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "extension",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Ajustar a 230-310 palabras",
     }
 
@@ -187,8 +212,11 @@ def check_codigo_respuesta_coherente(texto: str, codigo_respuesta: Optional[str]
     t = texto.upper()
     if not codigo_respuesta:
         return {
-            "id": "codigo_re", "nombre": nombre, "peso": peso,
-            "aprobado": True, "mensaje": "Sin código RE asignado",
+            "id": "codigo_re",
+            "nombre": nombre,
+            "peso": peso,
+            "aprobado": True,
+            "mensaje": "Sin código RE asignado",
             "sugerencia": "",
         }
     reglas = {
@@ -204,8 +232,11 @@ def check_codigo_respuesta_coherente(texto: str, codigo_respuesta: Optional[str]
         aprobado = patron in t
         msg = "Coherente" if aprobado else sugerencia
     return {
-        "id": "codigo_re", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "codigo_re",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else sugerencia,
     }
 
@@ -217,6 +248,7 @@ def check_contrato_mencionado(texto: str, eps: str) -> dict:
     # Solo aplica si la EPS tiene contrato conocido
     try:
         from app.services.glosa_ia_prompts import get_contrato
+
         contrato = get_contrato(eps)
         numero = contrato.get("numero", "")
     except Exception:
@@ -230,8 +262,11 @@ def check_contrato_mencionado(texto: str, eps: str) -> dict:
         aprobado = True
         msg = "Sin contrato aplicable (SOAT pleno)"
     return {
-        "id": "contrato", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "contrato",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Menciona el número de contrato en el P3",
     }
 
@@ -245,12 +280,14 @@ def check_placeholders(texto: str) -> dict:
     todos = placeholders + dollar_ph
     aprobado = len(todos) == 0
     msg = (
-        "Sin placeholders" if aprobado
-        else f"Placeholders detectados: {', '.join(set(todos[:3]))}"
+        "Sin placeholders" if aprobado else f"Placeholders detectados: {', '.join(set(todos[:3]))}"
     )
     return {
-        "id": "placeholders", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "placeholders",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Elimina [CORCHETES] y $[PLACEHOLDERS]",
     }
 
@@ -267,11 +304,15 @@ def check_cita_literal_normativa(texto: str) -> dict:
     aprobado = tiene_cita_literal
     msg = (
         "Al menos 1 cita literal de normativa entre comillas ✓"
-        if aprobado else "Ninguna cita textual detectada"
+        if aprobado
+        else "Ninguna cita textual detectada"
     )
     return {
-        "id": "cita_literal", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "cita_literal",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Cita 1 fragmento textual entre « » de la norma clave",
     }
 
@@ -290,13 +331,13 @@ def check_anti_rebatimiento(texto: str) -> dict:
         "SIN PERJUICIO DE LO ANTERIOR",
     ]
     aprobado = any(p in t for p in patrones)
-    msg = (
-        "Cláusula anti-rebatimiento presente ✓"
-        if aprobado else "Sin cláusula preventiva"
-    )
+    msg = "Cláusula anti-rebatimiento presente ✓" if aprobado else "Sin cláusula preventiva"
     return {
-        "id": "anti_rebatimiento", "nombre": nombre, "peso": peso,
-        "aprobado": aprobado, "mensaje": msg,
+        "id": "anti_rebatimiento",
+        "nombre": nombre,
+        "peso": peso,
+        "aprobado": aprobado,
+        "mensaje": msg,
         "sugerencia": "" if aprobado else "Añade una cláusula anti-rebatimiento preventiva",
     }
 
@@ -394,7 +435,9 @@ def _extraer_argumento_xml(xml: str) -> Optional[str]:
     if not xml:
         return None
     m = re.search(
-        r"<argumento>(.*?)</argumento>", xml, re.IGNORECASE | re.DOTALL,
+        r"<argumento>(.*?)</argumento>",
+        xml,
+        re.IGNORECASE | re.DOTALL,
     )
     if not m:
         return None
@@ -429,31 +472,37 @@ def detectar_defectos_criticos(
     """
     defectos: list[dict] = []
     if not dictamen_xml or not dictamen_xml.strip():
-        return [{
-            "regla": "vacio",
-            "mensaje": "La respuesta de la IA está vacía.",
-            "sugerencia": "Genera el dictamen completo en el formato XML del contrato.",
-        }]
+        return [
+            {
+                "regla": "vacio",
+                "mensaje": "La respuesta de la IA está vacía.",
+                "sugerencia": "Genera el dictamen completo en el formato XML del contrato.",
+            }
+        ]
 
     # 1. Tag <argumento> obligatorio
     arg = _extraer_argumento_xml(dictamen_xml)
     if arg is None:
-        defectos.append({
-            "regla": "sin_argumento",
-            "mensaje": "Falta el tag <argumento>...</argumento>.",
-            "sugerencia": (
-                "Incluye obligatoriamente <argumento>...</argumento> "
-                "con el dictamen completo en MAYÚSCULAS."
-            ),
-        })
+        defectos.append(
+            {
+                "regla": "sin_argumento",
+                "mensaje": "Falta el tag <argumento>...</argumento>.",
+                "sugerencia": (
+                    "Incluye obligatoriamente <argumento>...</argumento> "
+                    "con el dictamen completo en MAYÚSCULAS."
+                ),
+            }
+        )
         return defectos  # sin argumento, los demás checks no aplican
 
     if len(arg) < 80:
-        defectos.append({
-            "regla": "argumento_vacio",
-            "mensaje": "El tag <argumento> tiene menos de 80 caracteres.",
-            "sugerencia": "Redacta el dictamen completo según las reglas del system prompt.",
-        })
+        defectos.append(
+            {
+                "regla": "argumento_vacio",
+                "mensaje": "El tag <argumento> tiene menos de 80 caracteres.",
+                "sugerencia": "Redacta el dictamen completo según las reglas del system prompt.",
+            }
+        )
         return defectos
 
     arg_up = arg.upper()
@@ -462,85 +511,86 @@ def detectar_defectos_criticos(
     # como PRIMERAS palabras, sin antefijos como "RESPETUOSAMENTE".
     primeras = arg.strip()[:50].upper()
     if not primeras.startswith("ESE HUS NO ACEPTA"):
-        defectos.append({
-            "regla": "inicio_invalido",
-            "mensaje": 'El dictamen no inicia con "ESE HUS NO ACEPTA".',
-            "sugerencia": (
-                'Comienza el primer párrafo: '
-                '"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE..."'
-            ),
-        })
+        defectos.append(
+            {
+                "regla": "inicio_invalido",
+                "mensaje": 'El dictamen no inicia con "ESE HUS NO ACEPTA".',
+                "sugerencia": (
+                    "Comienza el primer párrafo: "
+                    '"ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE..."'
+                ),
+            }
+        )
 
-    # 3. Email institucional de contacto — SOLO obligatorio en
-    # respuestas a glosas RATIFICADAS o EXTEMPORÁNEAS (directiva Yesid
-    # mayo 2026). En defensas normales, aceptaciones y demás se omite
-    # el bloque de correos para no inflar el dictamen.
-    cod_resp = (codigo_respuesta or "").upper().strip()
-    codigos_que_exigen_email = {"RE9501", "RE9502", "RE9601", "RE9602"}
-    requiere_email = (
-        es_ratificacion or es_extemporanea or cod_resp in codigos_que_exigen_email
-    )
+    # 3. Email institucional de contacto — obligatorio en todo dictamen.
+    requiere_email = True
     if requiere_email and not any(e in arg_up for e in _EMAILS_CONTACTO):
-        defectos.append({
-            "regla": "sin_email_contacto",
-            "mensaje": "El dictamen no incluye el email institucional de contacto.",
-            "sugerencia": (
-                "Cierra el último párrafo con: "
-                "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
-                "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
-            ),
-        })
+        defectos.append(
+            {
+                "regla": "sin_email_contacto",
+                "mensaje": "El dictamen no incluye el email institucional de contacto.",
+                "sugerencia": (
+                    "Cierra el último párrafo con: "
+                    "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+                    "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
+                ),
+            }
+        )
 
     # 4. Frases prohibidas (registro hostil)
     for frase in _FRASES_PROHIBIDAS_CRITICAS:
         if frase in arg_up:
-            defectos.append({
-                "regla": f"frase_prohibida_{frase.lower().replace(' ', '_')[:30]}",
-                "mensaje": f'Detectada frase prohibida: "{frase}".',
-                "sugerencia": (
-                    f'Reemplaza "{frase}" por una expresión institucional '
-                    "conciliadora (ver system prompt §USA SIEMPRE)."
-                ),
-            })
+            defectos.append(
+                {
+                    "regla": f"frase_prohibida_{frase.lower().replace(' ', '_')[:30]}",
+                    "mensaje": f'Detectada frase prohibida: "{frase}".',
+                    "sugerencia": (
+                        f'Reemplaza "{frase}" por una expresión institucional '
+                        "conciliadora (ver system prompt §USA SIEMPRE)."
+                    ),
+                }
+            )
 
     # 5. Citas legales con sintaxis incorrecta
     for incorrecto, correcto in _CITAS_INCORRECTAS:
         if incorrecto.upper() in arg_up:
-            defectos.append({
-                "regla": "cita_incorrecta",
-                "mensaje": f'Cita normativa incorrecta: "{incorrecto.strip()}".',
-                "sugerencia": f'Usa "{correcto.strip()}".',
-            })
+            defectos.append(
+                {
+                    "regla": "cita_incorrecta",
+                    "mensaje": f'Cita normativa incorrecta: "{incorrecto.strip()}".',
+                    "sugerencia": f'Usa "{correcto.strip()}".',
+                }
+            )
 
     # 6. Placeholders con corchetes
     if re.search(r"\$\s*\[[^\]]+\]", arg) or re.search(
         r"\[(VALOR|CIFRA|MONTO|PACIENTE|PACINTE|MEDICO|CUPS|CODIGO|FECHA|NOMBRE)\]",
         arg.upper(),
     ):
-        defectos.append({
-            "regla": "placeholder_corchete",
-            "mensaje": "Hay placeholders sin reemplazar (corchetes [VALOR], $[X], etc.).",
-            "sugerencia": (
-                'Si no tienes el dato exacto, usa frases neutras: '
-                '"EL VALOR INDICADO EN EL EXPEDIENTE", '
-                '"PACIENTE IDENTIFICADO EN EXPEDIENTE", "MÉDICO TRATANTE".'
-            ),
-        })
+        defectos.append(
+            {
+                "regla": "placeholder_corchete",
+                "mensaje": "Hay placeholders sin reemplazar (corchetes [VALOR], $[X], etc.).",
+                "sugerencia": (
+                    "Si no tienes el dato exacto, usa frases neutras: "
+                    '"EL VALOR INDICADO EN EL EXPEDIENTE", '
+                    '"PACIENTE IDENTIFICADO EN EXPEDIENTE", "MÉDICO TRATANTE".'
+                ),
+            }
+        )
 
     # 7. Código de glosa correcto debe aparecer
     if codigo_glosa and codigo_glosa not in ("", "N/A"):
         if codigo_glosa.upper() not in arg_up:
-            defectos.append({
-                "regla": "codigo_glosa_no_mencionado",
-                "mensaje": (
-                    f'El dictamen no menciona el código solicitado '
-                    f'"{codigo_glosa}".'
-                ),
-                "sugerencia": (
-                    f'Cita explícitamente "GLOSA {codigo_glosa}" '
-                    "en el primer y último párrafo."
-                ),
-            })
+            defectos.append(
+                {
+                    "regla": "codigo_glosa_no_mencionado",
+                    "mensaje": (f'El dictamen no menciona el código solicitado "{codigo_glosa}".'),
+                    "sugerencia": (
+                        f'Cita explícitamente "GLOSA {codigo_glosa}" en el primer y último párrafo.'
+                    ),
+                }
+            )
 
     # 8. Si hay valor numérico exacto pedido, debe aparecer
     if valor_objetado and not str(valor_objetado).upper().startswith("EL VALOR"):
@@ -548,17 +598,18 @@ def detectar_defectos_criticos(
         if len(digitos) >= 4:
             arg_digitos = re.sub(r"[^\d]", "", arg)
             if digitos not in arg_digitos:
-                defectos.append({
-                    "regla": "valor_no_textual",
-                    "mensaje": (
-                        f'El valor objetado exacto "{valor_objetado}" '
-                        "no aparece en el dictamen."
-                    ),
-                    "sugerencia": (
-                        f"Incluye textualmente {valor_objetado} en el "
-                        "primer párrafo."
-                    ),
-                })
+                defectos.append(
+                    {
+                        "regla": "valor_no_textual",
+                        "mensaje": (
+                            f'El valor objetado exacto "{valor_objetado}" '
+                            "no aparece en el dictamen."
+                        ),
+                        "sugerencia": (
+                            f"Incluye textualmente {valor_objetado} en el primer párrafo."
+                        ),
+                    }
+                )
 
     # 9. Anti-contradicción: "tarifa propia" + "contrato" cuando hay contrato.
     #    Si el caso tiene contrato vigente, decir "tarifa propia
@@ -566,7 +617,8 @@ def detectar_defectos_criticos(
     #    contrato, no es unilateral. (Feedback del usuario 27-abr-2026.)
     if tiene_contrato:
         menciona_propia = re.search(
-            r"TARIFA\s+PROPIA(?:\s+INSTITUCIONAL)?", arg_up,
+            r"TARIFA\s+PROPIA(?:\s+INSTITUCIONAL)?",
+            arg_up,
         )
         # 9a. Auto-contradicción dentro de la misma frase:
         #     "TARIFA PROPIA INSTITUCIONAL PACTADA" — "propia" implica
@@ -574,7 +626,8 @@ def detectar_defectos_criticos(
         #     Esto NO requiere mencionar contrato a parte; ya es
         #     contradictorio en sí mismo.
         propia_pactada = re.search(
-            r"TARIFA\s+PROPIA(?:\s+INSTITUCIONAL)?\s+PACTADA", arg_up,
+            r"TARIFA\s+PROPIA(?:\s+INSTITUCIONAL)?\s+PACTADA",
+            arg_up,
         )
         # 9b. Mención de contrato en cualquier forma habitual.
         menciona_contrato = re.search(
@@ -585,25 +638,27 @@ def detectar_defectos_criticos(
             arg_up,
         )
         if propia_pactada or (menciona_propia and menciona_contrato):
-            defectos.append({
-                "regla": "tarifa_propia_con_contrato",
-                "mensaje": (
-                    'El dictamen menciona "TARIFA PROPIA" '
-                    "junto al contrato, lo cual es CONTRADICTORIO: "
-                    "si hay contrato, la tarifa es PACTADA, no propia."
-                ),
-                "sugerencia": (
-                    'Reescribe usando exclusivamente "TARIFA PACTADA EN '
-                    "EL CONTRATO No. [X]\". NUNCA escribas "
-                    '"TARIFA PROPIA INSTITUCIONAL" cuando hay contrato; '
-                    "tampoco lo combines con la palabra PACTADA: "
-                    '"propia" implica fijación unilateral y "pactada" '
-                    "implica acuerdo, no pueden coexistir. Si necesitas "
-                    "referenciar la Resolución 054/2026, dilo como "
-                    '"tarifas incorporadas al contrato a través de la '
-                    'Resolución 054/2026".'
-                ),
-            })
+            defectos.append(
+                {
+                    "regla": "tarifa_propia_con_contrato",
+                    "mensaje": (
+                        'El dictamen menciona "TARIFA PROPIA" '
+                        "junto al contrato, lo cual es CONTRADICTORIO: "
+                        "si hay contrato, la tarifa es PACTADA, no propia."
+                    ),
+                    "sugerencia": (
+                        'Reescribe usando exclusivamente "TARIFA PACTADA EN '
+                        'EL CONTRATO No. [X]". NUNCA escribas '
+                        '"TARIFA PROPIA INSTITUCIONAL" cuando hay contrato; '
+                        "tampoco lo combines con la palabra PACTADA: "
+                        '"propia" implica fijación unilateral y "pactada" '
+                        "implica acuerdo, no pueden coexistir. Si necesitas "
+                        "referenciar la Resolución 054/2026, dilo como "
+                        '"tarifas incorporadas al contrato a través de la '
+                        'Resolución 054/2026".'
+                    ),
+                }
+            )
 
     # 9c. Confusión "FACTURADO POR $X" donde $X = valor objetado.
     #     Es un error conceptual GRAVE: el valor facturado es lo que HUS
@@ -617,10 +672,7 @@ def detectar_defectos_criticos(
     #     número exacto del objetado aparece como "facturado por".
     if valor_objetado and not str(valor_objetado).upper().startswith("EL VALOR"):
         digitos_obj = re.sub(r"[^\d]", "", str(valor_objetado))
-        digitos_fact = (
-            re.sub(r"[^\d]", "", str(valor_facturado))
-            if valor_facturado else ""
-        )
+        digitos_fact = re.sub(r"[^\d]", "", str(valor_facturado)) if valor_facturado else ""
         # Solo activamos la regla si:
         #   - hay un número claro de valor_objetado (≥4 dígitos),
         #   - NO conocemos un valor_facturado distinto, o lo conocemos y
@@ -628,29 +680,28 @@ def detectar_defectos_criticos(
         if len(digitos_obj) >= 4 and digitos_obj != digitos_fact:
             # Patrón laxo: detecta "FACTURADO POR ... $<digitos_obj>"
             # permitiendo puntos como separadores de miles entre dígitos.
-            laxo = (
-                r"FACTURAD[OA]S?\s+POR\b[^.\n]{0,40}?\$\s*"
-                + r"[\.,]?".join(list(digitos_obj))
-            )
+            laxo = r"FACTURAD[OA]S?\s+POR\b[^.\n]{0,40}?\$\s*" + r"[\.,]?".join(list(digitos_obj))
             if re.search(laxo, arg_up):
                 obj_clean = str(valor_objetado).lstrip("$").strip()
-                defectos.append({
-                    "regla": "facturado_es_objetado",
-                    "mensaje": (
-                        f'El dictamen dice "FACTURADO POR ${obj_clean}" '
-                        f'pero ${obj_clean} es el VALOR OBJETADO '
-                        "(lo que la EPS rechaza pagar), NO el valor que "
-                        "HUS facturó. Son conceptos distintos."
-                    ),
-                    "sugerencia": (
-                        'Reescribe el párrafo 1 usando: "RESPECTO DEL '
-                        f'CUAL LA ENTIDAD PAGADORA OBJETA ${obj_clean}" '
-                        "(sin la palabra FACTURADO antes del valor "
-                        "objetado). Si conoces el valor facturado real, "
-                        'úsalo así: "FACTURADO POR $[REAL], RESPECTO '
-                        f'DEL CUAL OBJETA ${obj_clean}".'
-                    ),
-                })
+                defectos.append(
+                    {
+                        "regla": "facturado_es_objetado",
+                        "mensaje": (
+                            f'El dictamen dice "FACTURADO POR ${obj_clean}" '
+                            f"pero ${obj_clean} es el VALOR OBJETADO "
+                            "(lo que la EPS rechaza pagar), NO el valor que "
+                            "HUS facturó. Son conceptos distintos."
+                        ),
+                        "sugerencia": (
+                            'Reescribe el párrafo 1 usando: "RESPECTO DEL '
+                            f'CUAL LA ENTIDAD PAGADORA OBJETA ${obj_clean}" '
+                            "(sin la palabra FACTURADO antes del valor "
+                            "objetado). Si conoces el valor facturado real, "
+                            'úsalo así: "FACTURADO POR $[REAL], RESPECTO '
+                            f'DEL CUAL OBJETA ${obj_clean}".'
+                        ),
+                    }
+                )
 
     # 10. Anti-divagación: la respuesta excesivamente larga oculta el
     #     argumento central. Más de 340 palabras = retry. Subido de
@@ -658,19 +709,21 @@ def detectar_defectos_criticos(
     #     casi nunca mejoraban y desperdiciaban ~$0.05 por llamada.
     n_palabras = _contar_palabras(arg)
     if n_palabras > 340:
-        defectos.append({
-            "regla": "demasiado_largo",
-            "mensaje": (
-                f"El argumento tiene {n_palabras} palabras: divaga "
-                "y diluye el alegato. Máximo 320."
-            ),
-            "sugerencia": (
-                "Compacta: una idea por oración, sin repetir código/EPS/"
-                "servicio. Elimina conectores redundantes y suprime la "
-                "segunda cita literal si hay dos. Objetivo: 190-240 "
-                "palabras (caso complejo) o 130-180 (caso simple)."
-            ),
-        })
+        defectos.append(
+            {
+                "regla": "demasiado_largo",
+                "mensaje": (
+                    f"El argumento tiene {n_palabras} palabras: divaga "
+                    "y diluye el alegato. Máximo 320."
+                ),
+                "sugerencia": (
+                    "Compacta: una idea por oración, sin repetir código/EPS/"
+                    "servicio. Elimina conectores redundantes y suprime la "
+                    "segunda cita literal si hay dos. Objetivo: 190-240 "
+                    "palabras (caso complejo) o 130-180 (caso simple)."
+                ),
+            }
+        )
 
     return defectos
 

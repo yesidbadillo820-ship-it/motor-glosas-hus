@@ -1,11 +1,13 @@
 """Tests del rate_limit (R78 P2)."""
+
 from __future__ import annotations
 
-from app.core.rate_limit import _limit_key_user_or_ip, limiter
+from app.core.rate_limit import _limit_key_user_or_ip
 
 
 class _FakeReq:
     """Mock minimal de Request para el key-func."""
+
     def __init__(self, headers=None, ip="1.2.3.4"):
         self.headers = headers or {}
         self.client = type("C", (), {"host": ip})()
@@ -16,6 +18,7 @@ def test_limiter_es_singleton():
     """Múltiples imports deben devolver el mismo objeto."""
     from app.core.rate_limit import limiter as l1
     from app.core.rate_limit import limiter as l2
+
     assert l1 is l2
 
 
@@ -48,6 +51,7 @@ def test_limit_key_con_token_valido_devuelve_email():
     from jose import jwt as _jwt
 
     from app.core.config import get_settings
+
     cfg = get_settings()
     payload = {
         "sub": "auditor@hus.com",

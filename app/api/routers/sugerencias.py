@@ -5,6 +5,7 @@ GET  /sugerencias/yo             — listar las propias
 GET  /admin/sugerencias          — listar todas (admin) con filtros
 PUT  /admin/sugerencias/{id}     — triagear (cambiar estado, nota)
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -122,18 +123,10 @@ def admin_listar_sugerencias(
         t = tipo.upper()
         if t in TIPOS_VALIDOS:
             q = q.filter(SugerenciaRecord.tipo == t)
-    rows = (
-        q.order_by(SugerenciaRecord.creado_en.desc())
-        .limit(int(limit))
-        .all()
-    )
+    rows = q.order_by(SugerenciaRecord.creado_en.desc()).limit(int(limit)).all()
 
     # Resumen agregado para badges del UI
-    total_abiertas = (
-        db.query(SugerenciaRecord)
-        .filter(SugerenciaRecord.estado == "ABIERTA")
-        .count()
-    )
+    total_abiertas = db.query(SugerenciaRecord).filter(SugerenciaRecord.estado == "ABIERTA").count()
     total_bugs = (
         db.query(SugerenciaRecord)
         .filter(SugerenciaRecord.tipo == "BUG")
@@ -178,14 +171,13 @@ def admin_sugerencias_resumen(
         por_autor[a] = por_autor.get(a, 0) + 1
 
     top_autores = sorted(
-        por_autor.items(), key=lambda x: x[1], reverse=True,
+        por_autor.items(),
+        key=lambda x: x[1],
+        reverse=True,
     )[:5]
 
     recientes = (
-        db.query(SugerenciaRecord)
-        .order_by(SugerenciaRecord.creado_en.desc())
-        .limit(5)
-        .all()
+        db.query(SugerenciaRecord).order_by(SugerenciaRecord.creado_en.desc()).limit(5).all()
     )
 
     return {
@@ -194,13 +186,12 @@ def admin_sugerencias_resumen(
         "por_tipo": por_tipo,
         "abiertas": por_estado.get("ABIERTA", 0),
         "bugs_pendientes": sum(
-            1 for s in rows
+            1
+            for s in rows
             if (s.tipo or "").upper() == "BUG"
             and (s.estado or "").upper() in ("ABIERTA", "EN_REVISION")
         ),
-        "top_autores": [
-            {"email": e, "count": n} for e, n in top_autores
-        ],
+        "top_autores": [{"email": e, "count": n} for e, n in top_autores],
         "recientes": [_to_dict(s) for s in recientes],
     }
 
@@ -213,18 +204,15 @@ def admin_triagear_sugerencia(
     current_user: UsuarioRecord = Depends(get_admin),
 ):
     """Cambia estado y/o agrega nota administrativa. Solo SUPER_ADMIN."""
-    s = (
-        db.query(SugerenciaRecord)
-        .filter(SugerenciaRecord.id == sugerencia_id)
-        .first()
-    )
+    s = db.query(SugerenciaRecord).filter(SugerenciaRecord.id == sugerencia_id).first()
     if not s:
         raise HTTPException(404, "Sugerencia no encontrada")
 
     estado_nuevo = (body.estado or "").upper()
     if estado_nuevo not in ESTADOS_VALIDOS:
         raise HTTPException(
-            400, f"estado debe ser uno de {sorted(ESTADOS_VALIDOS)}",
+            400,
+            f"estado debe ser uno de {sorted(ESTADOS_VALIDOS)}",
         )
 
     s.estado = estado_nuevo

@@ -13,6 +13,7 @@ Endpoints:
     DELETE /rutas-facturas/{factura}            - borrar
     GET    /rutas-facturas/stats                - cuantas rutas hay
 """
+
 from __future__ import annotations
 import csv
 import io
@@ -58,10 +59,7 @@ def stats(
 ):
     total = db.query(RutaFacturaRecord).count()
     sample = (
-        db.query(RutaFacturaRecord)
-        .order_by(RutaFacturaRecord.actualizado_en.desc())
-        .limit(3)
-        .all()
+        db.query(RutaFacturaRecord).order_by(RutaFacturaRecord.actualizado_en.desc()).limit(3).all()
     )
     return {
         "total_rutas": total,
@@ -84,9 +82,7 @@ def lookup_ruta(
 ):
     """Devuelve la ruta de carpeta para la factura. 404 si no existe."""
     fac_norm = _normalizar_factura(factura)
-    r = db.query(RutaFacturaRecord).filter(
-        RutaFacturaRecord.factura_hus == fac_norm
-    ).first()
+    r = db.query(RutaFacturaRecord).filter(RutaFacturaRecord.factura_hus == fac_norm).first()
     if not r:
         raise HTTPException(404, f"Sin ruta registrada para {fac_norm}")
     meta = {}
@@ -124,9 +120,7 @@ def alta_manual(
     if not ruta:
         raise HTTPException(400, "ruta_carpeta vacia")
 
-    r = db.query(RutaFacturaRecord).filter(
-        RutaFacturaRecord.factura_hus == fac_norm
-    ).first()
+    r = db.query(RutaFacturaRecord).filter(RutaFacturaRecord.factura_hus == fac_norm).first()
     if r:
         r.ruta_carpeta = ruta[:800]
         r.actualizado_en = ahora_utc()
@@ -210,7 +204,9 @@ async def import_csv(
                     return reader.fieldnames[i]
         return None
 
-    h_fac = _find_header(col_factura_low, ["factura", "factura_hus", "numero_factura", "factura hus", "fac"])
+    h_fac = _find_header(
+        col_factura_low, ["factura", "factura_hus", "numero_factura", "factura hus", "fac"]
+    )
     h_ruta = _find_header(col_ruta_low, ["ruta", "ruta_carpeta", "path", "directorio", "carpeta"])
     if not h_fac:
         raise HTTPException(400, f"No se encontro columna de factura. Headers: {reader.fieldnames}")
@@ -243,9 +239,11 @@ async def import_csv(
                 if v and str(v).strip():
                     meta_extra[k.strip()] = str(v).strip()[:200]
 
-            r = db.query(RutaFacturaRecord).filter(
-                RutaFacturaRecord.factura_hus == fac_norm
-            ).first()
+            r = (
+                db.query(RutaFacturaRecord)
+                .filter(RutaFacturaRecord.factura_hus == fac_norm)
+                .first()
+            )
             if r:
                 r.ruta_carpeta = ruta_raw[:800]
                 r.actualizado_en = ahora_utc()
@@ -254,12 +252,14 @@ async def import_csv(
                     r.meta = json.dumps(meta_extra, ensure_ascii=False)
                 actualizadas += 1
             else:
-                db.add(RutaFacturaRecord(
-                    factura_hus=fac_norm,
-                    ruta_carpeta=ruta_raw[:800],
-                    importado_por=current_user.email,
-                    meta=json.dumps(meta_extra, ensure_ascii=False) if meta_extra else None,
-                ))
+                db.add(
+                    RutaFacturaRecord(
+                        factura_hus=fac_norm,
+                        ruta_carpeta=ruta_raw[:800],
+                        importado_por=current_user.email,
+                        meta=json.dumps(meta_extra, ensure_ascii=False) if meta_extra else None,
+                    )
+                )
                 insertadas += 1
         except Exception as e:
             invalidas += 1
@@ -298,9 +298,7 @@ def borrar_ruta(
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     fac_norm = _normalizar_factura(factura)
-    r = db.query(RutaFacturaRecord).filter(
-        RutaFacturaRecord.factura_hus == fac_norm
-    ).first()
+    r = db.query(RutaFacturaRecord).filter(RutaFacturaRecord.factura_hus == fac_norm).first()
     if not r:
         raise HTTPException(404, "Sin ruta para borrar")
     db.delete(r)

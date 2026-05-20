@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/milestones (R150 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -47,12 +52,18 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, valor_rec=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, valor_recuperado=valor_rec,
-        etapa="X", estado="LEVANTADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -63,8 +74,7 @@ class TestMilestones:
         d = r.json()
         for key in ("actual", "proximos_hitos"):
             assert key in d
-        for key in ("total_glosas", "valor_recuperado_total",
-                    "dias_en_operacion"):
+        for key in ("total_glosas", "valor_recuperado_total", "dias_en_operacion"):
             assert key in d["actual"]
 
     def test_sin_data(self, client):

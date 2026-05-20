@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/{id}/dictamen.md (R69 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -35,8 +36,12 @@ def usuario():
 
 def _seed_glosa(db, dictamen):
     g = GlosaRecord(
-        eps="FAMISANAR", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=168_563, etapa="X", estado="RADICADA",
+        eps="FAMISANAR",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=168_563,
+        etapa="X",
+        estado="RADICADA",
         factura="FE-001",
         modelo_ia="anthropic/claude-sonnet-4-6",
         dictamen=dictamen,
@@ -52,6 +57,7 @@ def _seed_glosa(db, dictamen):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:

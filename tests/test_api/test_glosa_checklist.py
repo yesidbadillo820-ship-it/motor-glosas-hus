@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/checklist (R96 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -77,16 +83,18 @@ class TestGlosaChecklist:
         assert d["porcentaje_avance"] < 50.0
 
     def test_glosa_completa(self, client, db_session):
-        g = _seed(db_session,
-                  factura="F-001",
-                  texto_glosa_original="texto largo de la glosa original",
-                  valor_objetado=5000,
-                  dictamen="<p>" + ("dictamen detallado " * 10) + "</p>",
-                  gestor_nombre="Alice",
-                  auditor_email="auditor@hus.com",
-                  fecha_recepcion=ahora_utc(),
-                  decision_eps="ACEPTA",
-                  estado="LEVANTADA")
+        g = _seed(
+            db_session,
+            factura="F-001",
+            texto_glosa_original="texto largo de la glosa original",
+            valor_objetado=5000,
+            dictamen="<p>" + ("dictamen detallado " * 10) + "</p>",
+            gestor_nombre="Alice",
+            auditor_email="auditor@hus.com",
+            fecha_recepcion=ahora_utc(),
+            decision_eps="ACEPTA",
+            estado="LEVANTADA",
+        )
         r = client.get(f"/glosas/{g.id}/checklist")
         d = r.json()
         # Todos los items obligatorios completados
@@ -108,13 +116,16 @@ class TestGlosaChecklist:
 
     def test_porcentaje_solo_obligatorios(self, client, db_session):
         # Glosa con TODOS los opcionales completos pero ningún obligatorio
-        g = _seed(db_session, valor_objetado=0,
-                  factura="N/A",
-                  texto_glosa_original=None,
-                  dictamen=None,
-                  gestor_nombre="Alice",
-                  auditor_email="auditor@hus.com",
-                  fecha_recepcion=ahora_utc())
+        g = _seed(
+            db_session,
+            valor_objetado=0,
+            factura="N/A",
+            texto_glosa_original=None,
+            dictamen=None,
+            gestor_nombre="Alice",
+            auditor_email="auditor@hus.com",
+            fecha_recepcion=ahora_utc(),
+        )
         r = client.get(f"/glosas/{g.id}/checklist")
         d = r.json()
         # Los opcionales no inflan el %

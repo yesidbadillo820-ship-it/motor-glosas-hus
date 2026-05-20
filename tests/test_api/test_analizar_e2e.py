@@ -8,9 +8,9 @@ Estrategia: usar app.dependency_overrides para sustituir
 Así se valida la cadena completa endpoint → repository → response sin
 tocar Anthropic ni hacer JWT real.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -32,6 +32,7 @@ def db_session():
     lanza 'objects created in a thread can only be used in that same'.
     """
     from sqlalchemy.pool import StaticPool
+
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -50,8 +51,11 @@ def db_session():
 @pytest.fixture
 def usuario_fake():
     return UsuarioRecord(
-        id=1, email="auditor@hus.gov.co", nombre="Auditor Test",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="auditor@hus.gov.co",
+        nombre="Auditor Test",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -59,19 +63,21 @@ def usuario_fake():
 def service_mock():
     """Mock del GlosaService.analizar — devuelve un GlosaResult plausible."""
     svc = MagicMock()
-    svc.analizar = AsyncMock(return_value=GlosaResult(
-        tipo="RESPUESTA RE9901",
-        resumen="Defensa técnica generada",
-        dictamen="<div>Dictamen mock</div>",
-        codigo_glosa="TA0201",
-        valor_objetado="$ 168,563",
-        paciente="N/A",
-        mensaje_tiempo="EN TÉRMINOS",
-        color_tiempo="green",
-        score=85.0,
-        dias_restantes=10,
-        modelo_ia="mock/test",
-    ))
+    svc.analizar = AsyncMock(
+        return_value=GlosaResult(
+            tipo="RESPUESTA RE9901",
+            resumen="Defensa técnica generada",
+            dictamen="<div>Dictamen mock</div>",
+            codigo_glosa="TA0201",
+            valor_objetado="$ 168,563",
+            paciente="N/A",
+            mensaje_tiempo="EN TÉRMINOS",
+            color_tiempo="green",
+            score=85.0,
+            dias_restantes=10,
+            modelo_ia="mock/test",
+        )
+    )
     return svc
 
 
@@ -132,9 +138,7 @@ class TestAnalizarFlowE2E:
                 "eps": "FAMISANAR",
                 "etapa": "RESPUESTA",
                 "valor_aceptado": "168563",  # = valor objetado mock
-                "tabla_excel": (
-                    "TA0201 — Diferencia tarifa CUPS 890750 valor objetado $168.563"
-                ),
+                "tabla_excel": ("TA0201 — Diferencia tarifa CUPS 890750 valor objetado $168.563"),
             },
         )
         assert resp.status_code == 200, resp.text
@@ -181,7 +185,8 @@ class TestAnalizarFlowE2E:
         resp = client_con_overrides.post(
             "/analizar",
             data={
-                "eps": "FAMISANAR", "etapa": "RESPUESTA",
+                "eps": "FAMISANAR",
+                "etapa": "RESPUESTA",
                 "tabla_excel": "TA0201 texto suficiente",
             },
         )

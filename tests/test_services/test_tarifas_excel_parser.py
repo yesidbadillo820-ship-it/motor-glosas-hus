@@ -1,4 +1,5 @@
 """Tests del parser de Excel de tarifas (tipo Famisanar 3 hojas)."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -83,6 +84,7 @@ class TestParsearFecha:
 
 # ─── Tests integración con Excel sintético ────────────────────────────────
 
+
 def _crear_excel_famisanar_3_hojas() -> bytes:
     """Construye un xlsx en memoria con la estructura real Famisanar:
     hoja 1 (Anexo 3), hoja 2 (Anexo 3.1), hoja 3 (Anexo 3.2).
@@ -104,10 +106,20 @@ def _crear_excel_famisanar_3_hojas() -> bytes:
     ws1["F5"] = "14/04/2027"
     # Fila encabezado de tabla (fila 10)
     headers1 = [
-        "CUPS / CUMS / MIPRES", "DESCRIPCIÓN", "COD. REPS", "DESCRIPCIÓN REPS",
-        "CÓDIGO PROPIO", "DESCRIPCIÓN CÓDIGO PROPIO", "INTERDEPENDENCIA",
-        "TIPO TARIFA", "HOSPITALARIO", "AMBULATORIO", "URGENCIA",
-        "CÓDIGO SEDE", "MARCA POR LISTADO", "OBSERVACIÓN",
+        "CUPS / CUMS / MIPRES",
+        "DESCRIPCIÓN",
+        "COD. REPS",
+        "DESCRIPCIÓN REPS",
+        "CÓDIGO PROPIO",
+        "DESCRIPCIÓN CÓDIGO PROPIO",
+        "INTERDEPENDENCIA",
+        "TIPO TARIFA",
+        "HOSPITALARIO",
+        "AMBULATORIO",
+        "URGENCIA",
+        "CÓDIGO SEDE",
+        "MARCA POR LISTADO",
+        "OBSERVACIÓN",
     ]
     for i, h in enumerate(headers1, start=1):
         ws1.cell(row=10, column=i, value=h)
@@ -134,9 +146,19 @@ def _crear_excel_famisanar_3_hojas() -> bytes:
     ws2["A4"] = "NUMERO DE CONTRATO"
     ws2["F4"] = "S-13-1-03-1-04958"
     headers2 = [
-        "CONSECUTIVO", "CÓDIGO DCI", "DESCRIPCIÓN DCI", "CÓDIGO DEL PRESTADOR",
-        "COD. REPS", "DESCRIPCIÓN REPS", "MAPIISS", "CUM/IUM", "DESCRIPCIÓN",
-        "AGRUPADOR", "TARIFA UNITARIA", "APLICA IVA (SI-NO)", "TIPO PLAN",
+        "CONSECUTIVO",
+        "CÓDIGO DCI",
+        "DESCRIPCIÓN DCI",
+        "CÓDIGO DEL PRESTADOR",
+        "COD. REPS",
+        "DESCRIPCIÓN REPS",
+        "MAPIISS",
+        "CUM/IUM",
+        "DESCRIPCIÓN",
+        "AGRUPADOR",
+        "TARIFA UNITARIA",
+        "APLICA IVA (SI-NO)",
+        "TIPO PLAN",
         "OBSERVACIONES",
     ]
     for i, h in enumerate(headers2, start=1):
@@ -164,9 +186,15 @@ def _crear_excel_famisanar_3_hojas() -> bytes:
     ws3["A3"] = "NOMBRE DE LA EPS"
     ws3["E3"] = "FAMISANAR EPS"
     headers3 = [
-        "CONSECUTIVO", "MAPIISS", "CÓDIGO DEL PRESTADOR", "DESCRIPCIÓN DEL PRESTADOR",
-        "AGRUPADOR", "TARIFA UNITARIA", "APLICA IVA (SI-NO)",
-        "TARIFA FINAL (IVA INCLUIDO)", "OBSERVACIONES",
+        "CONSECUTIVO",
+        "MAPIISS",
+        "CÓDIGO DEL PRESTADOR",
+        "DESCRIPCIÓN DEL PRESTADOR",
+        "AGRUPADOR",
+        "TARIFA UNITARIA",
+        "APLICA IVA (SI-NO)",
+        "TARIFA FINAL (IVA INCLUIDO)",
+        "OBSERVACIONES",
     ]
     for i, h in enumerate(headers3, start=1):
         ws3.cell(row=10, column=i, value=h)
@@ -267,6 +295,7 @@ class TestParsearExcelTarifas:
 
 # ─── Formato Dispensario (hoja plana: CUPS + PRECIO DE REFERENCIA) ─────────
 
+
 def _crear_excel_dispensario() -> bytes:
     """Layout plano tal como lo envía DISPENSARIO MEDICO BUCARAMANGA."""
     wb = Workbook()
@@ -274,22 +303,55 @@ def _crear_excel_dispensario() -> bytes:
     ws.title = "Tarifas"
     # Sin metadata de encabezado: la tabla arranca en la fila 1 directamente
     headers = [
-        "ITEM", "CUPS", "DESCRIPCION CUPS", "CODIGO IPS", "DESCRIPCION IPS",
-        "PRECIO DE REFERENCIA", "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
+        "ITEM",
+        "CUPS",
+        "DESCRIPCION CUPS",
+        "CODIGO IPS",
+        "DESCRIPCION IPS",
+        "PRECIO DE REFERENCIA",
+        "TARIFA A LA QUE CORRESPONDE EL PRECIO DE REFERENCIA",
     ]
     for i, h in enumerate(headers, start=1):
         ws.cell(row=1, column=i, value=h)
 
     # Filas de ejemplo reales del user
     datos = [
-        (5081, "039001", "INSERCION DE CATETER EPIDURAL EN CANAL ESPINAL", "039001H",
-         "INSERCION DE CATETER EPIDURAL EN CANAL ESPINAL", 1689585, "PROPIA"),
-        (5082, "039002", "INSERCION DE CATETER EPIDURAL CON PUERTO IMPLANTABLE", "039002H",
-         "INSERCION DE CATETER EPIDURAL CON PUERTO IMPLANTABLE", 1580085, "PROPIA"),
-        (5086, "039204", "NEUROLISIS DE NERVIOS PERIFERICOS POR RADIOFRECUENCIA",
-         "039204H", "NEUROLISIS DE NERVIOS PERIFERICOS", 5081895, "PROPIA"),
-        (5087, "039306", "IMPLANTACION DE ELECTRODOS DE NEUROESTIMULACION ESPINAL",
-         "039306H1", "IMPLANTACION DE ELECTRODOS", 8103986, "PROPIA"),
+        (
+            5081,
+            "039001",
+            "INSERCION DE CATETER EPIDURAL EN CANAL ESPINAL",
+            "039001H",
+            "INSERCION DE CATETER EPIDURAL EN CANAL ESPINAL",
+            1689585,
+            "PROPIA",
+        ),
+        (
+            5082,
+            "039002",
+            "INSERCION DE CATETER EPIDURAL CON PUERTO IMPLANTABLE",
+            "039002H",
+            "INSERCION DE CATETER EPIDURAL CON PUERTO IMPLANTABLE",
+            1580085,
+            "PROPIA",
+        ),
+        (
+            5086,
+            "039204",
+            "NEUROLISIS DE NERVIOS PERIFERICOS POR RADIOFRECUENCIA",
+            "039204H",
+            "NEUROLISIS DE NERVIOS PERIFERICOS",
+            5081895,
+            "PROPIA",
+        ),
+        (
+            5087,
+            "039306",
+            "IMPLANTACION DE ELECTRODOS DE NEUROESTIMULACION ESPINAL",
+            "039306H1",
+            "IMPLANTACION DE ELECTRODOS",
+            8103986,
+            "PROPIA",
+        ),
     ]
     for row_idx, tup in enumerate(datos, start=2):
         for col_idx, val in enumerate(tup, start=1):
@@ -346,6 +408,7 @@ class TestParsearExcelDispensario:
 
 # ─── Casos reales de Famisanar: preamble largo + descripción fallback ──────
 
+
 def _crear_excel_anexo3_con_preamble_largo() -> bytes:
     """Simula el Anexo 3 real donde hay ~55 filas de metadata antes del header."""
     wb = Workbook()
@@ -365,18 +428,26 @@ def _crear_excel_anexo3_con_preamble_largo() -> bytes:
     ws["C36"] = "MARCA"
     for i in range(12):
         ws.cell(row=37 + i, column=1, value=i + 1)
-        ws.cell(row=37 + i, column=2, value=f"AGRUPADOR RIAS {i+1}")
+        ws.cell(row=37 + i, column=2, value=f"AGRUPADOR RIAS {i + 1}")
     ws["A50"] = "AGRUPADORES OBJETO R. 2335/2023 - SERVICIOS"
     ws["A53"] = "DETALLE DE SERVICIOS CONTRATADOS (Servicios y Paquetes)"
 
     # Header real en fila 54 (más allá del viejo límite de 50)
     headers = [
-        "CUPS / CUMS / MIPRES", "DESCRIPCIÓN CUPS / CUMS / MIPRES",
-        "COD. REPS", "DESCRIPCIÓN REPS",
-        "CÓDIGO PROPIO", "DESCRIPCIÓN CÓDIGO PROPIO",
-        "INTERDEPENDENCIA", "TIPO TARIFA",
-        "HOSPITALARIO", "AMBULATORIO", "URGENCIA",
-        "CÓDIGO DE LA SEDE", "MARCA POR LISTADO SI/NO", "OBSERVACIÓN",
+        "CUPS / CUMS / MIPRES",
+        "DESCRIPCIÓN CUPS / CUMS / MIPRES",
+        "COD. REPS",
+        "DESCRIPCIÓN REPS",
+        "CÓDIGO PROPIO",
+        "DESCRIPCIÓN CÓDIGO PROPIO",
+        "INTERDEPENDENCIA",
+        "TIPO TARIFA",
+        "HOSPITALARIO",
+        "AMBULATORIO",
+        "URGENCIA",
+        "CÓDIGO DE LA SEDE",
+        "MARCA POR LISTADO SI/NO",
+        "OBSERVACIÓN",
     ]
     for i, h in enumerate(headers, start=1):
         ws.cell(row=54, column=i, value=h)
@@ -421,11 +492,20 @@ def _crear_excel_medicamento_sin_desc_dci() -> bytes:
     ws["A3"] = "NOMBRE DE LA EPS"
     ws["F3"] = "FAMISANAR EPS"
     headers = [
-        "CONSECUTIVO", "CÓDIGO DCI", "DESCRIPCIÓN DCI",
-        "CÓDIGO DEL PRESTADOR", "COD. REPS", "DESCRIPCIÓN REPS",
-        "MAPIISS", "CUM/IUM", "DESCRIPCIÓN",
-        "AGRUPADOR", "TARIFA UNITARIA", "APLICA IVA (SI-NO)",
-        "TIPO PLAN", "OBSERVACIONES",
+        "CONSECUTIVO",
+        "CÓDIGO DCI",
+        "DESCRIPCIÓN DCI",
+        "CÓDIGO DEL PRESTADOR",
+        "COD. REPS",
+        "DESCRIPCIÓN REPS",
+        "MAPIISS",
+        "CUM/IUM",
+        "DESCRIPCIÓN",
+        "AGRUPADOR",
+        "TARIFA UNITARIA",
+        "APLICA IVA (SI-NO)",
+        "TIPO PLAN",
+        "OBSERVACIONES",
     ]
     for i, h in enumerate(headers, start=1):
         ws.cell(row=10, column=i, value=h)
@@ -470,6 +550,7 @@ class TestDescripcionFallback:
 
 # ─── Bug real Famisanar: PROPIAS con valor absoluto + fila fantasma ────────
 
+
 def _crear_excel_anexo3_propias_y_fantasma() -> bytes:
     """Anexo 3 real con filas TIPO TARIFA=PROPIAS (valor absoluto) y una
     fila final tipo 'SE SUSCRIBE EL PRESENTE ANEXO...' que debe ignorarse.
@@ -481,12 +562,20 @@ def _crear_excel_anexo3_propias_y_fantasma() -> bytes:
     ws["A2"] = "NOMBRE DE LA EPS"
     ws["F2"] = "FAMISANAR EPS"
     headers = [
-        "CUPS / CUMS / MIPRES", "DESCRIPCIÓN CUPS",
-        "COD. REPS", "DESCRIPCIÓN REPS",
-        "CÓDIGO PROPIO", "DESCRIPCIÓN CÓDIGO PROPIO",
-        "INTERDEPENDENCIA", "TIPO TARIFA",
-        "HOSPITALARIO", "AMBULATORIO", "URGENCIA",
-        "SEDE", "MARCA", "OBSERVACIÓN",
+        "CUPS / CUMS / MIPRES",
+        "DESCRIPCIÓN CUPS",
+        "COD. REPS",
+        "DESCRIPCIÓN REPS",
+        "CÓDIGO PROPIO",
+        "DESCRIPCIÓN CÓDIGO PROPIO",
+        "INTERDEPENDENCIA",
+        "TIPO TARIFA",
+        "HOSPITALARIO",
+        "AMBULATORIO",
+        "URGENCIA",
+        "SEDE",
+        "MARCA",
+        "OBSERVACIÓN",
     ]
     for i, h in enumerate(headers, start=1):
         ws.cell(row=10, column=i, value=h)
@@ -513,7 +602,8 @@ def _crear_excel_anexo3_propias_y_fantasma() -> bytes:
 
     # Fila fantasma: texto de cierre en la columna CUPS
     ws.cell(
-        row=14, column=1,
+        row=14,
+        column=1,
         value="SE SUSCRIBE EL PRESENTE ANEXO EN SEÑAL DE APROBACIÓN DE LAS TARIFAS Y SERVICIOS INCLUIDOS",
     )
     ws.cell(row=14, column=8, value="SOAT UVB VIGENTE")
@@ -561,8 +651,12 @@ class TestAnexo3PropiasYFantasma:
         ws = wb.active
         ws.title = "A"
         headers = [
-            "CUPS", "DESCRIPCION", "TIPO TARIFA",
-            "HOSPITALARIO", "AMBULATORIO", "URGENCIA",
+            "CUPS",
+            "DESCRIPCION",
+            "TIPO TARIFA",
+            "HOSPITALARIO",
+            "AMBULATORIO",
+            "URGENCIA",
         ]
         for i, h in enumerate(headers, start=1):
             ws.cell(row=1, column=i, value=h)

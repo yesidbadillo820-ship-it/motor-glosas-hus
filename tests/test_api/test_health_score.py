@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/health-score (R127 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -79,16 +84,21 @@ class TestHealthScore:
     def test_alertas_criticas_baja_score(self, client, db_session):
         # Crear muchas glosas muy vencidas (>10 con dias_restantes<-30)
         for _ in range(15):
-            db_session.add(GlosaRecord(
-                eps="X", paciente="X", codigo_glosa="C",
-                valor_objetado=1000, etapa="X", estado="RADICADA",
-                creado_en=ahora_utc(),
-                dias_restantes=-50,
-            ))
+            db_session.add(
+                GlosaRecord(
+                    eps="X",
+                    paciente="X",
+                    codigo_glosa="C",
+                    valor_objetado=1000,
+                    etapa="X",
+                    estado="RADICADA",
+                    creado_en=ahora_utc(),
+                    dias_restantes=-50,
+                )
+            )
         db_session.commit()
 
         r = client.get("/sistema/health-score")
         d = r.json()
-        alertas = next(c for c in d["desglose"]
-                       if c["componente"] == "sin_alertas_criticas")
+        alertas = next(c for c in d["desglose"] if c["componente"] == "sin_alertas_criticas")
         assert alertas["score"] == 0

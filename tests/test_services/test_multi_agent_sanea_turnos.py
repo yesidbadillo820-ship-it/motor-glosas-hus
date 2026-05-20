@@ -2,6 +2,7 @@
 loop multi-turn de multi_agent: NO debe reinyectar bloques text vacíos
 junto al tool_use, ni enviar tool_result con contenido vacío.
 """
+
 import json
 
 import pytest
@@ -48,8 +49,13 @@ def _agente():
     return Agent(
         name="t",
         system_prompt="sys",
-        tools=[{"name": "buscar", "description": "d",
-                "input_schema": {"type": "object", "properties": {}}}],
+        tools=[
+            {
+                "name": "buscar",
+                "description": "d",
+                "input_schema": {"type": "object", "properties": {}},
+            }
+        ],
     )
 
 
@@ -58,8 +64,7 @@ async def test_no_reinyecta_text_vacio_junto_a_tool_use(monkeypatch):
     primer = {
         "content": [
             {"type": "text", "text": "   "},  # whitespace → inválido
-            {"type": "tool_use", "id": "tu_1", "name": "buscar",
-             "input": {"q": "x"}},
+            {"type": "tool_use", "id": "tu_1", "name": "buscar", "input": {"q": "x"}},
         ],
         "stop_reason": "tool_use",
         "usage": {"input_tokens": 5, "output_tokens": 3},
@@ -90,8 +95,7 @@ async def test_no_reinyecta_text_vacio_junto_a_tool_use(monkeypatch):
                 if b.get("type") == "text":
                     assert b["text"].strip(), f"text vacío reinyectado: {b!r}"
     tiene_tool_use = any(
-        isinstance(m["content"], list)
-        and any(b.get("type") == "tool_use" for b in m["content"])
+        isinstance(m["content"], list) and any(b.get("type") == "tool_use" for b in m["content"])
         for m in msgs_turno2
         if m["role"] == "assistant"
     )
@@ -102,8 +106,7 @@ async def test_no_reinyecta_text_vacio_junto_a_tool_use(monkeypatch):
 async def test_tool_result_vacio_se_reemplaza(monkeypatch):
     primer = {
         "content": [
-            {"type": "tool_use", "id": "tu_1", "name": "buscar",
-             "input": {}},
+            {"type": "tool_use", "id": "tu_1", "name": "buscar", "input": {}},
         ],
         "stop_reason": "tool_use",
         "usage": {"input_tokens": 1, "output_tokens": 1},
@@ -116,7 +119,8 @@ async def test_tool_result_vacio_se_reemplaza(monkeypatch):
     fake = _FakeClient(segundo, primer)
     monkeypatch.setattr(ma.httpx, "AsyncClient", lambda *a, **k: fake)
     monkeypatch.setattr(
-        "app.services.ia_tools.execute_tool", lambda *a, **k: "",
+        "app.services.ia_tools.execute_tool",
+        lambda *a, **k: "",
     )
 
     out = await _agente().run("hola", api_key="sk-test", modelo="claude-x", max_turns=4)

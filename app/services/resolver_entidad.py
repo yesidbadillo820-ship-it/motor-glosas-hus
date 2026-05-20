@@ -17,6 +17,7 @@ Considera 'OTRA / SIN DEFINIR', 'DISPENSARIO MEDICO', 'DIRECCION DE SANIDAD'
 etc. como genéricos truncados → los reemplaza con el tercero_nombre si
 existe.
 """
+
 from __future__ import annotations
 
 import re

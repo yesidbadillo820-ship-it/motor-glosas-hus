@@ -3,6 +3,7 @@
 Cuando el Excel DGH trae código interno Syscafe numérico ('423') y no
 el canónico ('TA0201'), lo derivamos del nombre del concepto.
 """
+
 from __future__ import annotations
 
 from app.services.recepcion_service import _inferir_codigo_canonico

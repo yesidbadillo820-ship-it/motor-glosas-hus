@@ -1,4 +1,5 @@
 """Tests del autopilot de recomendación (Ronda 18)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -52,14 +53,19 @@ def _glosa_base(db, **kw):
 
 def _crear_gold(db, eps, codigo):
     p = PlantillaGoldRecord(
-        eps=eps, codigo_glosa=codigo, tipo="TA", titulo="Gold",
-        argumento="Argumento que ganó antes.", activa=1,
+        eps=eps,
+        codigo_glosa=codigo,
+        tipo="TA",
+        titulo="Gold",
+        argumento="Argumento que ganó antes.",
+        activa=1,
     )
     db.add(p)
     db.commit()
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────
+
 
 class TestHelpers:
     def test_tiene_plantilla_gold_count(self, db_session):
@@ -86,6 +92,7 @@ class TestHelpers:
 
 
 # ─── evaluar_glosa_autopilot ───────────────────────────────────────────────
+
 
 class TestEvaluarGlosa:
     def test_detecta_gold_y_dictamen_en_razones(self, db_session):
@@ -128,6 +135,7 @@ class TestEvaluarGlosa:
 
 
 # ─── evaluar_bandeja ───────────────────────────────────────────────────────
+
 
 class TestEvaluarBandeja:
     def test_bandeja_vacia(self, db_session):

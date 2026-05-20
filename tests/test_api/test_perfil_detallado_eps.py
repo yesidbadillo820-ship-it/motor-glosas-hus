@@ -1,7 +1,7 @@
 """Tests del endpoint GET /contratos/{eps}/perfil-detallado (R121 P2)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,8 +49,11 @@ def client(db_session, usuario):
 
 def _seed(db, eps, **kw):
     base = dict(
-        paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -66,15 +70,18 @@ class TestPerfilDetalladoEPS:
         assert d["total_glosas"] == 0
 
     def test_estructura_completa(self, client, db_session):
-        _seed(db_session, "SANITAS", estado="LEVANTADA",
-              valor_objetado=5000, valor_recuperado=5000)
+        _seed(db_session, "SANITAS", estado="LEVANTADA", valor_objetado=5000, valor_recuperado=5000)
         r = client.get("/contratos/SANITAS/perfil-detallado")
         d = r.json()
         assert d["sin_historial"] is False
-        for sec in ("volumen", "economico", "resoluciones",
-                    "top_5_codigos_objetados",
-                    "codigos_respuesta_efectivos",
-                    "ultima_actividad"):
+        for sec in (
+            "volumen",
+            "economico",
+            "resoluciones",
+            "top_5_codigos_objetados",
+            "codigos_respuesta_efectivos",
+            "ultima_actividad",
+        ):
             assert sec in d
 
     def test_volumen_correcto(self, client, db_session):

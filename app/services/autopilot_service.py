@@ -21,6 +21,7 @@ El objetivo del usuario fue: «la IA haga absolutamente todo y el gestor
 solo tenga que revisar que todo se fue y está funcionando okay». Este
 servicio cierra el ciclo.
 """
+
 from __future__ import annotations
 
 import re
@@ -41,7 +42,7 @@ ESTADOS = ("LISTA_ENVIAR", "CASI_LISTA", "REVISAR", "INTERVENIR")
 @dataclass
 class AutopilotResult:
     estado: str
-    confianza: float                # 0-1
+    confianza: float  # 0-1
     razones_a_favor: list[str] = field(default_factory=list)
     razones_en_contra: list[str] = field(default_factory=list)
     acciones_sugeridas: list[str] = field(default_factory=list)
@@ -146,7 +147,9 @@ def evaluar_glosa_autopilot(db: Session, glosa: GlosaRecord) -> AutopilotResult:
         razones_contra.append("Dictamen corto o vacío (< 400 caracteres).")
         acciones.append("Regenerá el dictamen con la IA antes de enviar.")
     else:
-        razones_pro.append(f"Dictamen con {q['longitud']} caracteres y {q['citas']} citas normativas.")
+        razones_pro.append(
+            f"Dictamen con {q['longitud']} caracteres y {q['citas']} citas normativas."
+        )
 
     # 4) Anomalía de valor
     anom = None
@@ -225,18 +228,20 @@ def evaluar_bandeja(
     for g in glosas:
         res = evaluar_glosa_autopilot(db, g)
         conteo[res.estado] = conteo.get(res.estado, 0) + 1
-        resultados.append({
-            "glosa_id": g.id,
-            "codigo": g.codigo_glosa,
-            "eps": g.eps,
-            "valor": g.valor_objetado,
-            "dias_restantes": g.dias_restantes,
-            "estado_autopilot": res.estado,
-            "confianza": res.confianza,
-            "razones_a_favor": res.razones_a_favor,
-            "razones_en_contra": res.razones_en_contra,
-            "acciones_sugeridas": res.acciones_sugeridas,
-        })
+        resultados.append(
+            {
+                "glosa_id": g.id,
+                "codigo": g.codigo_glosa,
+                "eps": g.eps,
+                "valor": g.valor_objetado,
+                "dias_restantes": g.dias_restantes,
+                "estado_autopilot": res.estado,
+                "confianza": res.confianza,
+                "razones_a_favor": res.razones_a_favor,
+                "razones_en_contra": res.razones_en_contra,
+                "acciones_sugeridas": res.acciones_sugeridas,
+            }
+        )
     return {
         "auditor_email": auditor_email,
         "total_evaluadas": len(glosas),

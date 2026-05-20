@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/devoluciones-resumen (R317 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, devolucion=None, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        es_devolucion=devolucion,
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            es_devolucion=devolucion,
+        )
+    )
     db.commit()
 
 
@@ -77,7 +85,10 @@ class TestDevolucionesResumen:
     def test_abiertas_vs_cerradas(self, client, db_session):
         _seed(db_session, "X", devolucion="1", estado="RADICADA")
         _seed(
-            db_session, "X", devolucion="1", estado="LEVANTADA",
+            db_session,
+            "X",
+            devolucion="1",
+            estado="LEVANTADA",
         )
         r = client.get("/glosas/stats/devoluciones-resumen")
         d = r.json()

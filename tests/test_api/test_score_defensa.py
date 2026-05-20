@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/score-defensa (R185 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, gid=None, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -70,20 +76,25 @@ class TestScoreDefensa:
             assert key in d
         assert 0 <= d["score"] <= 5
         assert d["veredicto"] in (
-            "PROBABLE_DEFENSA", "INCIERTA", "PROBABLE_RATIFICACION",
+            "PROBABLE_DEFENSA",
+            "INCIERTA",
+            "PROBABLE_RATIFICACION",
         )
 
     def test_score_alto_probable_defensa(self, client, db_session):
         # Glosa target con dictamen + código respuesta + tiempo
-        _seed(db_session, gid=1,
-              eps="SANITAS", codigo_glosa="TA0201",
-              dias_restantes=10,
-              codigo_respuesta="RE9901",
-              dictamen="x" * 500)
+        _seed(
+            db_session,
+            gid=1,
+            eps="SANITAS",
+            codigo_glosa="TA0201",
+            dias_restantes=10,
+            codigo_respuesta="RE9901",
+            dictamen="x" * 500,
+        )
         # Histórico SANITAS+TA0201: alta tasa
         for _ in range(5):
-            _seed(db_session, eps="SANITAS", codigo_glosa="TA0201",
-                  estado="LEVANTADA")
+            _seed(db_session, eps="SANITAS", codigo_glosa="TA0201", estado="LEVANTADA")
 
         r = client.get("/glosas/1/score-defensa")
         d = r.json()
@@ -96,5 +107,6 @@ class TestScoreDefensa:
         d = r.json()
         # Vencida sin dictamen → score bajo
         assert d["veredicto"] in (
-            "INCIERTA", "PROBABLE_RATIFICACION",
+            "INCIERTA",
+            "PROBABLE_RATIFICACION",
         )

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/aging-cartera-saldo (R267 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,21 +49,27 @@ def client(db_session, usuario):
 
 
 def _seed(db, dias_atras, saldo, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-        saldo_factura=saldo,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+            saldo_factura=saldo,
+        )
+    )
     db.commit()
 
 
 class TestAgingCarteraSaldo:
     def test_buckets(self, client, db_session):
-        _seed(db_session, dias_atras=5, saldo=1000)     # 0-30
-        _seed(db_session, dias_atras=45, saldo=2000)    # 31-60
-        _seed(db_session, dias_atras=120, saldo=3000)   # 91-180
-        _seed(db_session, dias_atras=300, saldo=5000)   # >180
+        _seed(db_session, dias_atras=5, saldo=1000)  # 0-30
+        _seed(db_session, dias_atras=45, saldo=2000)  # 31-60
+        _seed(db_session, dias_atras=120, saldo=3000)  # 91-180
+        _seed(db_session, dias_atras=300, saldo=5000)  # >180
 
         r = client.get("/glosas/stats/aging-cartera-saldo")
         d = r.json()

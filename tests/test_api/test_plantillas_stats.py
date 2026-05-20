@@ -1,4 +1,5 @@
 """Tests del endpoint GET /plantillas/stats (R159 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -36,6 +37,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -44,10 +46,15 @@ def client(db_session, usuario):
 
 
 def _seed(db, nombre="P", tipo="ARGUMENTO", eps="X", activa=1):
-    db.add(PlantillaRecord(
-        nombre=nombre, plantilla="<p>X</p>",
-        tipo=tipo, eps=eps, activa=activa,
-    ))
+    db.add(
+        PlantillaRecord(
+            nombre=nombre,
+            plantilla="<p>X</p>",
+            tipo=tipo,
+            eps=eps,
+            activa=activa,
+        )
+    )
     db.commit()
 
 
@@ -56,8 +63,7 @@ class TestPlantillasStats:
         r = client.get("/plantillas/stats")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total", "activas", "inactivas",
-                    "por_tipo", "top_10_eps"):
+        for key in ("total", "activas", "inactivas", "por_tipo", "top_10_eps"):
             assert key in d
 
     def test_counts_correctos(self, client, db_session):
@@ -85,5 +91,6 @@ class TestPlantillasStats:
         r = client.get("/plantillas/stats")
         d = r.json()
         assert d["top_10_eps"][0] == {
-            "eps": "SANITAS", "plantillas": 3,
+            "eps": "SANITAS",
+            "plantillas": 3,
         }

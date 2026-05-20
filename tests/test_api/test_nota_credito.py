@@ -1,4 +1,5 @@
 """Tests del endpoint de nota crédito (glosas aceptadas)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,14 +32,18 @@ def db_session():
 @pytest.fixture
 def auditor():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
 def _client(db_session, user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: user
     return TestClient(app)
@@ -46,15 +51,20 @@ def _client(db_session, user):
 
 def _clear():
     from app.main import app
+
     app.dependency_overrides.clear()
 
 
 def _seed(db, *, valor_objetado=200000, valor_aceptado=0.0):
     g = GlosaRecord(
-        eps="DISPENSARIO MEDICO", paciente="X",
-        codigo_glosa="TA0201", valor_objetado=valor_objetado,
-        valor_aceptado=valor_aceptado, etapa="INICIAL",
-        estado="RESPONDIDA", creado_en=ahora_utc(),
+        eps="DISPENSARIO MEDICO",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=valor_objetado,
+        valor_aceptado=valor_aceptado,
+        etapa="INICIAL",
+        estado="RESPONDIDA",
+        creado_en=ahora_utc(),
         factura="HUS493179",
     )
     db.add(g)

@@ -4,20 +4,32 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 MESES_ES = {
-    "January": "ENERO", "February": "FEBRERO", "March": "MARZO",
-    "April": "ABRIL", "May": "MAYO", "June": "JUNIO",
-    "July": "JULIO", "August": "AGOSTO", "September": "SEPTIEMBRE",
-    "October": "OCTUBRE", "November": "NOVIEMBRE", "December": "DICIEMBRE"
+    "January": "ENERO",
+    "February": "FEBRERO",
+    "March": "MARZO",
+    "April": "ABRIL",
+    "May": "MAYO",
+    "June": "JUNIO",
+    "July": "JULIO",
+    "August": "AGOSTO",
+    "September": "SEPTIEMBRE",
+    "October": "OCTUBRE",
+    "November": "NOVIEMBRE",
+    "December": "DICIEMBRE",
 }
+
 
 def fecha_hoy_espanol() -> str:
     now = datetime.now()
     mes_en = now.strftime("%B")
     return f"{now.day} DE {MESES_ES.get(mes_en, mes_en.upper())} DE {now.year}"
 
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+
+from app.core.correlation import CorrelationIdMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -96,6 +108,7 @@ async def lifespan(app: FastAPI):
     # veces con backoff exponencial (2s, 4s, 8s, 16s, 32s = ~1 min total).
     import time as _time
     from sqlalchemy.exc import OperationalError, DBAPIError
+
     _max_intentos_db = 5
     for _intento in range(1, _max_intentos_db + 1):
         try:
@@ -110,7 +123,7 @@ async def lifespan(app: FastAPI):
                     "DB van a devolver 503 hasta que se resuelva."
                 )
                 break
-            espera = 2 ** _intento
+            espera = 2**_intento
             logger.warning(
                 f"DB no disponible (intento {_intento}/{_max_intentos_db}): "
                 f"{type(e).__name__}. Reintento en {espera}s."
@@ -124,6 +137,7 @@ async def lifespan(app: FastAPI):
     # Helper dialect-agnostic para verificar si una columna existe.
     # Funciona tanto en SQLite (dev) como en PostgreSQL (prod).
     inspector = inspect(engine)
+
     def _tiene_columna(tabla: str, columna: str) -> bool:
         try:
             cols = [c["name"] for c in inspector.get_columns(tabla)]
@@ -139,6 +153,7 @@ async def lifespan(app: FastAPI):
 
     # Tipo de timestamp compatible con ambos motores
     from app.core.config import get_settings as _gs
+
     _cfg_local = _gs()
     _is_sqlite = _cfg_local.database_url.startswith("sqlite")
     _TS_TIPO = "TIMESTAMP" if _is_sqlite else "TIMESTAMP WITH TIME ZONE"
@@ -147,7 +162,9 @@ async def lifespan(app: FastAPI):
     try:
         if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "creado_en"):
             logger.warning("MIGRACIÓN: Agregando columna 'creado_en' a tabla usuarios")
-            db.execute(text(f"ALTER TABLE usuarios ADD COLUMN creado_en {_TS_TIPO} DEFAULT {_TS_DEFAULT}"))
+            db.execute(
+                text(f"ALTER TABLE usuarios ADD COLUMN creado_en {_TS_TIPO} DEFAULT {_TS_DEFAULT}")
+            )
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN creado_en: {e}")
@@ -188,7 +205,11 @@ async def lifespan(app: FastAPI):
     try:
         if _tiene_tabla("usuarios") and not _tiene_columna("usuarios", "must_change_password"):
             logger.warning("MIGRACIÓN: Agregando columna 'must_change_password' a tabla usuarios")
-            db.execute(text("ALTER TABLE usuarios ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"))
+            db.execute(
+                text(
+                    "ALTER TABLE usuarios ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"
+                )
+            )
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN must_change_password: {e}")
@@ -224,7 +245,9 @@ async def lifespan(app: FastAPI):
             logger.warning("MIGRACIÓN: Agregando columnas a historial")
             db.execute(text("ALTER TABLE historial ADD COLUMN request_id VARCHAR(50)"))
             db.execute(text("ALTER TABLE historial ADD COLUMN nota_workflow VARCHAR(500)"))
-            db.execute(text("ALTER TABLE historial ADD COLUMN prioridad VARCHAR(50) DEFAULT 'NORMAL'"))
+            db.execute(
+                text("ALTER TABLE historial ADD COLUMN prioridad VARCHAR(50) DEFAULT 'NORMAL'")
+            )
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN historial: {e}")
@@ -276,8 +299,16 @@ async def lifespan(app: FastAPI):
             if _tiene_tabla("historial") and not _tiene_columna("historial", col_name):
                 logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a historial")
                 # Reemplazar TIMESTAMP WITH TIME ZONE por TIMESTAMP en SQLite
-                col_ddl_adapted = col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP") if _is_sqlite else col_ddl
-                col_ddl_adapted = col_ddl_adapted.replace("DOUBLE PRECISION", "REAL") if _is_sqlite else col_ddl_adapted
+                col_ddl_adapted = (
+                    col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP")
+                    if _is_sqlite
+                    else col_ddl
+                )
+                col_ddl_adapted = (
+                    col_ddl_adapted.replace("DOUBLE PRECISION", "REAL")
+                    if _is_sqlite
+                    else col_ddl_adapted
+                )
                 db.execute(text(f"ALTER TABLE historial ADD COLUMN {col_name} {col_ddl_adapted}"))
                 db.commit()
         except Exception as e:
@@ -287,10 +318,12 @@ async def lifespan(app: FastAPI):
     # el modelo). create_all() no lo agrega para tablas pre-existentes.
     try:
         if _tiene_tabla("historial") and _tiene_columna("historial", "numero_nota_credito"):
-            db.execute(text(
-                "CREATE INDEX IF NOT EXISTS ix_historial_numero_nota_credito "
-                "ON historial (numero_nota_credito)"
-            ))
+            db.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_historial_numero_nota_credito "
+                    "ON historial (numero_nota_credito)"
+                )
+            )
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
@@ -312,14 +345,10 @@ async def lifespan(app: FastAPI):
         ]
         for col_name, col_ddl in _HISTORIAL_RESIZE:
             try:
-                if (
-                    _tiene_tabla("historial")
-                    and _tiene_columna("historial", col_name)
-                ):
-                    db.execute(text(
-                        f"ALTER TABLE historial "
-                        f"ALTER COLUMN {col_name} TYPE {col_ddl}"
-                    ))
+                if _tiene_tabla("historial") and _tiene_columna("historial", col_name):
+                    db.execute(
+                        text(f"ALTER TABLE historial ALTER COLUMN {col_name} TYPE {col_ddl}")
+                    )
                     db.commit()
             except Exception as e:
                 logger.warning(f"MIGRACIÓN resize {col_name}: {e}")
@@ -351,8 +380,14 @@ async def lifespan(app: FastAPI):
         try:
             if _tiene_tabla("conciliaciones") and not _tiene_columna("conciliaciones", col_name):
                 logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a conciliaciones")
-                col_ddl_adapted = col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP") if _is_sqlite else col_ddl
-                db.execute(text(f"ALTER TABLE conciliaciones ADD COLUMN {col_name} {col_ddl_adapted}"))
+                col_ddl_adapted = (
+                    col_ddl.replace("TIMESTAMP WITH TIME ZONE", "TIMESTAMP")
+                    if _is_sqlite
+                    else col_ddl
+                )
+                db.execute(
+                    text(f"ALTER TABLE conciliaciones ADD COLUMN {col_name} {col_ddl_adapted}")
+                )
                 db.commit()
         except Exception as e:
             logger.warning(f"MIGRACIÓN conciliaciones {col_name}: {e}")
@@ -366,10 +401,16 @@ async def lifespan(app: FastAPI):
     ]
     for col_name, col_ddl in _TARIFAS_MISSING:
         try:
-            if _tiene_tabla("tarifas_contratadas") and not _tiene_columna("tarifas_contratadas", col_name):
+            if _tiene_tabla("tarifas_contratadas") and not _tiene_columna(
+                "tarifas_contratadas", col_name
+            ):
                 logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a tarifas_contratadas")
-                col_ddl_adapted = col_ddl.replace("DOUBLE PRECISION", "REAL") if _is_sqlite else col_ddl
-                db.execute(text(f"ALTER TABLE tarifas_contratadas ADD COLUMN {col_name} {col_ddl_adapted}"))
+                col_ddl_adapted = (
+                    col_ddl.replace("DOUBLE PRECISION", "REAL") if _is_sqlite else col_ddl
+                )
+                db.execute(
+                    text(f"ALTER TABLE tarifas_contratadas ADD COLUMN {col_name} {col_ddl_adapted}")
+                )
                 db.commit()
         except Exception as e:
             logger.warning(f"MIGRACIÓN tarifas_contratadas {col_name}: {e}")
@@ -471,6 +512,7 @@ async def lifespan(app: FastAPI):
         if db.query(UsuarioRecord).count() == 0:
             from app.core.config import _UNCONFIGURED_ADMIN_PASSWORD
             import secrets as _secrets
+
             admin_pass = cfg.admin_password
             if admin_pass == _UNCONFIGURED_ADMIN_PASSWORD:
                 # Genera password aleatorio imposible de adivinar —
@@ -482,14 +524,16 @@ async def lifespan(app: FastAPI):
                     "Environment y usa FORCE_RESET_ADMIN_PASSWORD=1 para setear "
                     "tu password conocido."
                 )
-            db.add(UsuarioRecord(
-                nombre="Auditor Principal",
-                email="admin@hus.gov.co",
-                password_hash=get_password_hash(admin_pass),
-                rol="SUPER_ADMIN",
-                activo=1,
-                must_change_password=1,  # forzar cambio en primer login
-            ))
+            db.add(
+                UsuarioRecord(
+                    nombre="Auditor Principal",
+                    email="admin@hus.gov.co",
+                    password_hash=get_password_hash(admin_pass),
+                    rol="SUPER_ADMIN",
+                    activo=1,
+                    must_change_password=1,  # forzar cambio en primer login
+                )
+            )
             logger.warning(
                 "Usuario admin creado. Cambiar contraseña inmediatamente "
                 "usando la variable de entorno ADMIN_PASSWORD + "
@@ -543,31 +587,31 @@ async def lifespan(app: FastAPI):
         # El 'nombre' debe coincidir con la columna GESTOR del Excel de recepción
         # para que cada gestor vea sus asignaciones (matching ILIKE).
         USUARIOS_CORPORATIVOS = [
-            ("glosashus09@sinacsc.com",      "SUPER_ADMIN", "YESID PEREZ"),
-            ("glosashus11@sinacsc.com",      "AUDITOR",     "DIANEYDA QUINTERO"),
-            ("glosashus02@sinacsc.com",      "AUDITOR",     "CAROLINA CIFUENTES"),
-            ("glosashus04@sinacsc.com",      "AUDITOR",     "JHON JAIMES"),
-            ("glosashus05@sinacsc.com",      "AUDITOR",     "MARICELA ROJAS"),
-            ("carterahus01@sinacsc.com",     "AUDITOR",     "IRMA RIOS"),
-            ("carterahus04@sinacsc.com",     "AUDITOR",     "RUBY MILENA"),
-            ("carterahus05@sinacsc.com",     "AUDITOR",     "PATRICIA QUIÑONES"),
-            ("radicadevoluciones@sinacsc.com","AUDITOR",    "KAREN ORTIZ"),
-            ("devoluciones01@sinacsc.com",   "AUDITOR",     "SEBASTIAN SANCHES"),
-            ("coordinacioncartera@hus.gov.co","AUDITOR",    "YUDY AMAYA"),
-            ("glosashus08@sinacsc.com",      "AUDITOR",     "CLAUDIA SUAREZ"),
-            ("glosashus07@sinacsc.com",      "AUDITOR",     "YENFERSON ORTEGA"),
-            ("glosashus12@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
-            ("devoluciones02@sinacsc.com",   "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
-            ("glosashus10@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
-            ("glosashus16@sinacsc.com",      "AUDITOR",     "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            ("glosashus09@sinacsc.com", "SUPER_ADMIN", "YESID PEREZ"),
+            ("glosashus11@sinacsc.com", "AUDITOR", "DIANEYDA QUINTERO"),
+            ("glosashus02@sinacsc.com", "AUDITOR", "CAROLINA CIFUENTES"),
+            ("glosashus04@sinacsc.com", "AUDITOR", "JHON JAIMES"),
+            ("glosashus05@sinacsc.com", "AUDITOR", "MARICELA ROJAS"),
+            ("carterahus01@sinacsc.com", "AUDITOR", "IRMA RIOS"),
+            ("carterahus04@sinacsc.com", "AUDITOR", "RUBY MILENA"),
+            ("carterahus05@sinacsc.com", "AUDITOR", "PATRICIA QUIÑONES"),
+            ("radicadevoluciones@sinacsc.com", "AUDITOR", "KAREN ORTIZ"),
+            ("devoluciones01@sinacsc.com", "AUDITOR", "SEBASTIAN SANCHES"),
+            ("coordinacioncartera@hus.gov.co", "AUDITOR", "YUDY AMAYA"),
+            ("glosashus08@sinacsc.com", "AUDITOR", "CLAUDIA SUAREZ"),
+            ("glosashus07@sinacsc.com", "AUDITOR", "YENFERSON ORTEGA"),
+            ("glosashus12@sinacsc.com", "AUDITOR", "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            ("devoluciones02@sinacsc.com", "AUDITOR", "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            ("glosashus10@sinacsc.com", "AUDITOR", "A_A_A_A (EQUIPO ASEGURADORAS)"),
+            ("glosashus16@sinacsc.com", "AUDITOR", "A_A_A_A (EQUIPO ASEGURADORAS)"),
             # Usuarios adicionales creados desde la UI (añadidos al seed
             # para que reaparezcan si alguna vez la DB se recrea desde cero):
-            ("auditorhus01@sinacsc.com",     "AUDITOR",     "LAURA DIAZ"),
-            ("auditorhus02@sinacsc.com",     "AUDITOR",     "LEIDY JHOANA SANGUINO"),
-            ("auditorhus03@sinacsc.com",     "AUDITOR",     "LEYDI ZULAY GONZALEZ"),
-            ("devoluciones03@sinacsc.com",   "AUDITOR",     "JOHANNA MORENO"),
-            ("devoluciones1@sinacsc.com",    "AUDITOR",     "EDGAR SILVA"),
-            ("glosashus03@sinacsc.com",      "AUDITOR",     "OSCAR VILLAMIZAR"),
+            ("auditorhus01@sinacsc.com", "AUDITOR", "LAURA DIAZ"),
+            ("auditorhus02@sinacsc.com", "AUDITOR", "LEIDY JHOANA SANGUINO"),
+            ("auditorhus03@sinacsc.com", "AUDITOR", "LEYDI ZULAY GONZALEZ"),
+            ("devoluciones03@sinacsc.com", "AUDITOR", "JOHANNA MORENO"),
+            ("devoluciones1@sinacsc.com", "AUDITOR", "EDGAR SILVA"),
+            ("glosashus03@sinacsc.com", "AUDITOR", "OSCAR VILLAMIZAR"),
         ]
         # POLÍTICA DE PASSWORD INICIAL: cada usuario corporativo recibe como
         # contraseña el prefijo de su correo (ej. glosashus04@sinacsc.com →
@@ -578,15 +622,19 @@ async def lifespan(app: FastAPI):
             password_inicial = email.split("@")[0]  # prefijo
             existente = db.query(UsuarioRecord).filter(UsuarioRecord.email == email).first()
             if not existente:
-                db.add(UsuarioRecord(
-                    nombre=nombre,
-                    email=email,
-                    password_hash=get_password_hash(password_inicial),
-                    rol=rol,
-                    activo=1,
-                    must_change_password=1,  # obligado a cambiar en primer login
-                ))
-                logger.warning(f"Usuario sembrado: {email} ({rol}) nombre={nombre} password=<prefijo>")
+                db.add(
+                    UsuarioRecord(
+                        nombre=nombre,
+                        email=email,
+                        password_hash=get_password_hash(password_inicial),
+                        rol=rol,
+                        activo=1,
+                        must_change_password=1,  # obligado a cambiar en primer login
+                    )
+                )
+                logger.warning(
+                    f"Usuario sembrado: {email} ({rol}) nombre={nombre} password=<prefijo>"
+                )
             # Si el usuario YA existe, la base de datos es la fuente de verdad:
             # NO sobrescribimos nombre/rol/password. Los cambios hechos por un
             # SUPER_ADMIN desde la UI deben persistir a través de redeploys.
@@ -636,16 +684,19 @@ async def lifespan(app: FastAPI):
                 TEXTO_RATIFICADA as _TXT_RAT,
                 TEXTO_DMBUG_TARIFAS as _TXT_DMBUG,
             )
+
             _GOLD_CANONICAS = [
                 {
-                    "eps": "TODAS", "codigo_glosa": "RATIFICADA",
+                    "eps": "TODAS",
+                    "codigo_glosa": "RATIFICADA",
                     "tipo": "RATIFICADA",
                     "titulo": "Glosa ratificada — texto canónico HUS",
                     "argumento": _TXT_RAT,
                     "notas": "Plantilla institucional para ratificadas.",
                 },
                 {
-                    "eps": "DISPENSARIO MEDICO", "codigo_glosa": "TA",
+                    "eps": "DISPENSARIO MEDICO",
+                    "codigo_glosa": "TA",
                     "tipo": "TARIFAS_DMBUG",
                     "titulo": "DMBUG — Tarifas con contrato 440-DIGSA/DMBUG-2025",
                     "argumento": _TXT_DMBUG,
@@ -654,21 +705,32 @@ async def lifespan(app: FastAPI):
             ]
             gold_creadas = 0
             for p in _GOLD_CANONICAS:
-                existe = db.query(_PGR).filter(
-                    _PGR.eps == p["eps"],
-                    _PGR.codigo_glosa == p["codigo_glosa"],
-                    _PGR.titulo == p["titulo"],
-                ).first()
+                existe = (
+                    db.query(_PGR)
+                    .filter(
+                        _PGR.eps == p["eps"],
+                        _PGR.codigo_glosa == p["codigo_glosa"],
+                        _PGR.titulo == p["titulo"],
+                    )
+                    .first()
+                )
                 if existe:
                     continue
-                db.add(_PGR(
-                    eps=p["eps"], codigo_glosa=p["codigo_glosa"],
-                    tipo=p["tipo"], titulo=p["titulo"],
-                    argumento=p["argumento"], glosa_origen_id=0,
-                    valor_recuperado=0.0, usos=0,
-                    creado_por="auto_seed_lifespan",
-                    notas=p["notas"], activa=1,
-                ))
+                db.add(
+                    _PGR(
+                        eps=p["eps"],
+                        codigo_glosa=p["codigo_glosa"],
+                        tipo=p["tipo"],
+                        titulo=p["titulo"],
+                        argumento=p["argumento"],
+                        glosa_origen_id=0,
+                        valor_recuperado=0.0,
+                        usos=0,
+                        creado_por="auto_seed_lifespan",
+                        notas=p["notas"],
+                        activa=1,
+                    )
+                )
                 gold_creadas += 1
             if gold_creadas:
                 db.commit()
@@ -703,6 +765,7 @@ async def lifespan(app: FastAPI):
     # No bloquea el startup si falla; sólo deja logs.
     try:
         from app.services.ia_auditora_proactiva import iniciar_scheduler
+
         iniciar_scheduler()
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de pre-análisis: {_e}")
@@ -711,6 +774,7 @@ async def lifespan(app: FastAPI):
     # está configurado). No bloquea startup si falla.
     try:
         from app.services.digest_scheduler import iniciar_scheduler as iniciar_digest_scheduler
+
         iniciar_digest_scheduler()
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler del digest: {_e}")
@@ -720,6 +784,7 @@ async def lifespan(app: FastAPI):
     # startup ni rompe si falla — el mantenimiento es secundario.
     try:
         from app.services.mantenimiento_scheduler import iniciar_scheduler as iniciar_mant_scheduler
+
         iniciar_mant_scheduler()
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de mantenimiento: {_e}")
@@ -729,7 +794,10 @@ async def lifespan(app: FastAPI):
     # caliente. No bloquea startup si el mount aún no está disponible
     # — el healthz lo refleja y el reintento ocurre al día siguiente.
     try:
-        from app.services.soportes_reindex_scheduler import iniciar_scheduler as iniciar_soportes_scheduler
+        from app.services.soportes_reindex_scheduler import (
+            iniciar_scheduler as iniciar_soportes_scheduler,
+        )
+
         iniciar_soportes_scheduler()
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
@@ -737,6 +805,7 @@ async def lifespan(app: FastAPI):
     # Scheduler noticias salud Colombia (cada 4h fetch RSS + scraping)
     try:
         from app.services.noticias_scheduler import iniciar_scheduler as iniciar_noticias_scheduler
+
         iniciar_noticias_scheduler()
     except Exception as _e:
         logger.warning(f"No se pudo iniciar scheduler de noticias: {_e}")
@@ -746,26 +815,31 @@ async def lifespan(app: FastAPI):
     # Shutdown: detener schedulers limpiamente
     try:
         from app.services.ia_auditora_proactiva import detener_scheduler
+
         detener_scheduler()
     except Exception:
         pass
     try:
         from app.services.digest_scheduler import detener_scheduler as detener_digest_scheduler
+
         detener_digest_scheduler()
     except Exception:
         pass
     try:
         from app.services.mantenimiento_scheduler import detener_scheduler as detener_mant
+
         detener_mant()
     except Exception:
         pass
     try:
         from app.services.soportes_reindex_scheduler import detener_scheduler as detener_soportes
+
         detener_soportes()
     except Exception:
         pass
     try:
         from app.services.noticias_scheduler import detener_scheduler as detener_noticias
+
         detener_noticias()
     except Exception:
         pass
@@ -827,6 +901,7 @@ app.add_middleware(
 # El umbral 1024 evita comprimir respuestas pequeñas donde el overhead
 # de CPU supera el ahorro de bytes.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(CorrelationIdMiddleware)
 
 
 # Ronda 50 Paso 10: middleware de tenant.
@@ -841,6 +916,7 @@ async def _tenant_middleware(request, call_next):
             resolver_tenant_desde_request,
             set_tenant_id,
         )
+
         tenant = resolver_tenant_desde_request(request)
         set_tenant_id(tenant)
     except Exception:
@@ -863,7 +939,8 @@ from app.api.routers.alertas import router as alertas_router
 from app.api.routers.usuarios import router as usuarios_router
 from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
-from app.api.routers.salud_total import router as salud_total_router
+
+# salud_total: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.tarifas_contratadas import router as tarifas_contratadas_router
 from app.api.routers.tarifa_liquidador import router as tarifa_liquidador_router
 from app.api.routers.admin import router as admin_router
@@ -889,20 +966,25 @@ from app.api.routers.dashboard_ejecutivo import router as dashboard_ejecutivo_ro
 from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
-from app.api.routers.autopilot import router as autopilot_router
+
+# autopilot: stub removido — lógica real en app/services/autopilot_service.py
 from app.api.routers.digest import router as digest_router
-from app.api.routers.control_center import router as control_center_router
+
+# control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
 from app.api.routers.eventos_live import router as eventos_live_router
-from app.api.routers.preset_filtros import router as preset_filtros_router
-from app.api.routers.notas_privadas import router as notas_privadas_router
+
+# preset_filtros: stub removido — prefijo /_removed/ (mayo 2026)
+# notas_privadas: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.rutas_factura import router as rutas_factura_router
 from app.api.routers.snippets import router as snippets_router
 from app.api.routers.prediccion_ia import router as prediccion_ia_router
-from app.api.routers.chat_history import router as chat_history_router
+
+# chat_history: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
-from app.api.routers.comentarios_thread import router as comentarios_thread_router
-from app.api.routers.webhooks import router as webhooks_router
+
+# comentarios_thread: stub removido — prefijo /_removed/ (mayo 2026)
+# webhooks: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.ia_status import router as ia_status_router
 
 app.include_router(auth_router)
@@ -916,7 +998,7 @@ app.include_router(alertas_router)
 app.include_router(usuarios_router)
 app.include_router(conciliacion_router)
 app.include_router(audit_router)
-app.include_router(salud_total_router)
+# salud_total_router: stub removido
 app.include_router(tarifas_contratadas_router)
 app.include_router(tarifa_liquidador_router)
 app.include_router(admin_router)
@@ -942,54 +1024,59 @@ app.include_router(dashboard_ejecutivo_router)
 app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
 app.include_router(sistema_router)
-app.include_router(autopilot_router)
+# autopilot_router: stub removido
 app.include_router(digest_router)
-app.include_router(control_center_router)
+# control_center_router: stub removido
 app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)
-app.include_router(preset_filtros_router)
-app.include_router(notas_privadas_router)
+# preset_filtros_router: stub removido
+# notas_privadas_router: stub removido
 app.include_router(rutas_factura_router)
 app.include_router(snippets_router)
 app.include_router(prediccion_ia_router)
-app.include_router(chat_history_router)
+# chat_history_router: stub removido
 app.include_router(dictamen_pdf_router)
-app.include_router(comentarios_thread_router)
-app.include_router(webhooks_router)
+# comentarios_thread_router: stub removido
+# webhooks_router: stub removido
 app.include_router(ia_status_router)
 from app.api.routers.cups import router as cups_router
+
 app.include_router(cups_router)
 from app.api.routers.pwa import router as pwa_router
+
 app.include_router(pwa_router)
 from app.api.routers.pdf import router as pdf_router
+
 app.include_router(pdf_router)
 from app.api.routers.health import router as health_router
+
 app.include_router(health_router)
 from app.api.routers.analizar import router as analizar_router
+
 app.include_router(analizar_router)
 from app.api.routers.firma import router as firma_router
+
 app.include_router(firma_router)
 from app.api.routers.sugerencias import router as sugerencias_router
+
 app.include_router(sugerencias_router)
 from app.api.routers.tareas_diarias import router as tareas_diarias_router
+
 app.include_router(tareas_diarias_router)
 from app.api.routers.nota_credito import router as nota_credito_router
+
 app.include_router(nota_credito_router)
-from app.api.routers.auditor_preview import router as auditor_preview_router
-app.include_router(auditor_preview_router)
+# auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
+
 app.include_router(soportes_auto_router)
 from app.api.routers.noticias import router as noticias_router
+
 app.include_router(noticias_router)
 from app.api.routers.diagnostico import router as diagnostico_router
+
 app.include_router(diagnostico_router)
-from app.api.routers.auditor_forense import router as auditor_forense_router
-app.include_router(auditor_forense_router)
+# auditor_forense: stub removido — real: auditoria_forense.py (ya incluido arriba)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
+
 app.include_router(asistente_maestro_router)
-
-
-
-
-
-

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-volumen-tasa-mes (R393 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, estado="LEVANTADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -57,9 +65,7 @@ class TestEPSVolumenTasaMes:
     def test_celdas(self, client, db_session):
         _seed(db_session, "X", "LEVANTADA")
         _seed(db_session, "X", "RATIFICADA")
-        r = client.get(
-            "/glosas/stats/eps-volumen-tasa-mes?meses=1&top_eps=2"
-        )
+        r = client.get("/glosas/stats/eps-volumen-tasa-mes?meses=1&top_eps=2")
         d = r.json()
         item = d["items"][0]
         assert item["eps"] == "X"

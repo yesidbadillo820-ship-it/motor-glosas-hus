@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/comentarios-emitidos (R291 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -35,7 +36,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice", rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -43,6 +48,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -51,24 +57,34 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, glosa_id):
-    db.add(GlosaRecord(
-        id=glosa_id,
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
-def _seed_com(db, glosa_id, autor, mencion=None, resuelto=0,
-              resuelto_por=None):
-    db.add(ComentarioGlosaRecord(
-        glosa_id=glosa_id, autor_email=autor, texto="t",
-        mencion=mencion, resuelto=resuelto,
-        resuelto_por=resuelto_por,
-        resuelto_en=ahora_utc() if resuelto_por else None,
-        creado_en=ahora_utc(),
-    ))
+def _seed_com(db, glosa_id, autor, mencion=None, resuelto=0, resuelto_por=None):
+    db.add(
+        ComentarioGlosaRecord(
+            glosa_id=glosa_id,
+            autor_email=autor,
+            texto="t",
+            mencion=mencion,
+            resuelto=resuelto,
+            resuelto_por=resuelto_por,
+            resuelto_en=ahora_utc() if resuelto_por else None,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -77,14 +93,20 @@ class TestYoComentariosEmitidos:
         _seed_glosa(db_session, 1)
         _seed_glosa(db_session, 2)
         _seed_com(
-            db_session, 1, "alice@hus.com", mencion="bob@x",
+            db_session,
+            1,
+            "alice@hus.com",
+            mencion="bob@x",
         )
         _seed_com(db_session, 2, "alice@hus.com", resuelto=1)
         _seed_com(db_session, 1, "bob@hus.com")  # otro autor
 
         # Bob resuelve un comentario de Alice
         _seed_com(
-            db_session, 2, "carl@x", resuelto=1,
+            db_session,
+            2,
+            "carl@x",
+            resuelto=1,
             resuelto_por="alice@hus.com",
         )
 

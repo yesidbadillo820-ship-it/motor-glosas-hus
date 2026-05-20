@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/snapshot-general (R158 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -53,10 +58,19 @@ class TestSnapshotGeneral:
         d = r.json()
         for key in ("evaluado_en", "counts"):
             assert key in d
-        for tabla in ("glosas", "usuarios", "audit_log", "ai_calls",
-                      "ai_cache", "dictamen_versiones",
-                      "conciliaciones", "contratos", "plantillas",
-                      "plantillas_gold", "papelera"):
+        for tabla in (
+            "glosas",
+            "usuarios",
+            "audit_log",
+            "ai_calls",
+            "ai_cache",
+            "dictamen_versiones",
+            "conciliaciones",
+            "contratos",
+            "plantillas",
+            "plantillas_gold",
+            "papelera",
+        ):
             assert tabla in d["counts"]
 
     def test_counts_son_int(self, client):
@@ -67,11 +81,17 @@ class TestSnapshotGeneral:
 
     def test_counts_actualizados(self, client, db_session):
         for _ in range(5):
-            db_session.add(GlosaRecord(
-                eps="X", paciente="X", codigo_glosa="C",
-                valor_objetado=1000, etapa="X", estado="RADICADA",
-                creado_en=ahora_utc(),
-            ))
+            db_session.add(
+                GlosaRecord(
+                    eps="X",
+                    paciente="X",
+                    codigo_glosa="C",
+                    valor_objetado=1000,
+                    etapa="X",
+                    estado="RADICADA",
+                    creado_en=ahora_utc(),
+                )
+            )
         db_session.commit()
         r = client.get("/sistema/snapshot-general")
         d = r.json()

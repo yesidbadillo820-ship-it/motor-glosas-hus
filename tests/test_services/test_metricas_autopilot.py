@@ -1,4 +1,5 @@
 """Tests de métricas de autopilot (Ronda 32)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -18,18 +19,27 @@ def db():
     Base.metadata.create_all(engine)
     S = sessionmaker(bind=engine)
     s = S()
-    try: yield s
-    finally: s.close()
+    try:
+        yield s
+    finally:
+        s.close()
 
 
 def _g(db, **kw):
     d = dict(
-        eps="FAMISANAR", paciente="X", factura="F",
-        codigo_glosa="TA0201", valor_objetado=100_000,
-        estado="PENDIENTE", creado_en=datetime.now(timezone.utc),
+        eps="FAMISANAR",
+        paciente="X",
+        factura="F",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        estado="PENDIENTE",
+        creado_en=datetime.now(timezone.utc),
     )
     d.update(kw)
-    g = GlosaRecord(**d); db.add(g); db.commit(); db.refresh(g)
+    g = GlosaRecord(**d)
+    db.add(g)
+    db.commit()
+    db.refresh(g)
     return g
 
 
@@ -61,7 +71,7 @@ def test_cuenta_tarifa_match(db):
 
 def test_suma_ahorro_estimado(db):
     for _ in range(5):
-        _g(db, modelo_ia="pre-analisis/texto_fijo/RATIFICADA", factura="F"+str(_))
+        _g(db, modelo_ia="pre-analisis/texto_fijo/RATIFICADA", factura="F" + str(_))
     r = metricas_autopilot(db, periodo="hoy")
     # 5 * 8000 tokens = 40k tokens, ~0.06 USD
     assert r["ahorro"]["tokens_estimados"] == 40_000

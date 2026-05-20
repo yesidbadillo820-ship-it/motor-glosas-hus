@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/zonas-horarias (R101 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,7 +31,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -38,6 +42,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -50,16 +55,20 @@ class TestZonasHorarias:
         r = client.get("/sistema/zonas-horarias")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("now_utc", "now_local", "now_local_tz_aware",
-                    "server_tz_env", "python_tz_module",
-                    "bogota_offset_utc"):
+        for key in (
+            "now_utc",
+            "now_local",
+            "now_local_tz_aware",
+            "server_tz_env",
+            "python_tz_module",
+            "bogota_offset_utc",
+        ):
             assert key in d
 
     def test_now_utc_iso(self, client):
         r = client.get("/sistema/zonas-horarias")
         d = r.json()
         # Debe ser ISO string parseable
-        from datetime import datetime
         # Espera formato ISO con offset
         assert "T" in d["now_utc"]
         # +00:00 indica UTC

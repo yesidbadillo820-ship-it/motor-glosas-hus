@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/versiones-resumen (R129 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,23 +49,32 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid=1):
-    db.add(GlosaRecord(
-        id=gid, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
     return gid
 
 
 def _seed_version(db, glosa_id, accion, autor, dias_atras=0):
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id,
-        dictamen_html="<p>x</p>",
-        accion=accion,
-        autor_email=autor,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html="<p>x</p>",
+            accion=accion,
+            autor_email=autor,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -91,7 +102,9 @@ class TestVersionesResumen:
         d = r.json()
         assert d["total_versiones"] == 4
         assert d["por_accion"] == {
-            "CREAR": 1, "REFINAR": 2, "REGENERAR": 1,
+            "CREAR": 1,
+            "REFINAR": 2,
+            "REGENERAR": 1,
         }
         assert d["autores_distintos"] == ["alice@x", "bob@x"]
         assert d["ultima_accion"] == "REGENERAR"

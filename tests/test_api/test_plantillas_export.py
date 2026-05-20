@@ -1,4 +1,5 @@
 """Tests del endpoint /plantillas-gold/export.json (R77 P1)."""
+
 from __future__ import annotations
 
 import json
@@ -37,10 +38,14 @@ def usuario_coord():
 
 def _seed(db, **kw):
     base = dict(
-        eps="FAMISANAR", codigo_glosa="TA0201",
-        tipo="TA", titulo="X",
+        eps="FAMISANAR",
+        codigo_glosa="TA0201",
+        tipo="TA",
+        titulo="X",
         argumento="texto suficientemente largo del argumento ganador con normas",
-        usos=5, activa=1, creado_en=ahora_utc(),
+        usos=5,
+        activa=1,
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(PlantillaGoldRecord(**base))
@@ -51,6 +56,7 @@ def _seed(db, **kw):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:

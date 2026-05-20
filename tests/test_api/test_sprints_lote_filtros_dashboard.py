@@ -7,6 +7,7 @@ Cubre los nuevos endpoints:
   • GET   /glosas/vencen-24h          (Sprint #6)
   • GET   /glosas/dashboard-plata-recuperada  (Sprint #7)
 """
+
 from __future__ import annotations
 
 import pytest
@@ -39,7 +40,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
         nombre="ADMIN",
     )
 
@@ -48,6 +52,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual, get_auditor_o_superior
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     app.dependency_overrides[get_auditor_o_superior] = lambda: admin_user
@@ -58,9 +63,15 @@ def client(db_session, admin_user):
 
 def _seed_glosa(db, **kw):
     defaults = dict(
-        eps="SALUD TOTAL", paciente="JUAN", factura="F1",
-        codigo_glosa="TA0201", valor_objetado=100000.0, etapa="INICIAL",
-        estado="RADICADA", creado_en=ahora_utc(), dias_restantes=10,
+        eps="SALUD TOTAL",
+        paciente="JUAN",
+        factura="F1",
+        codigo_glosa="TA0201",
+        valor_objetado=100000.0,
+        etapa="INICIAL",
+        estado="RADICADA",
+        creado_en=ahora_utc(),
+        dias_restantes=10,
         cups_servicio="890301",
     )
     defaults.update(kw)
@@ -126,7 +137,9 @@ class TestSimilaresBloque:
             _seed_glosa(db_session, factura=f"F{i}", valor_objetado=100000)
         # 1 glosa de otra combinación — NO agrupable (queda sola)
         _seed_glosa(
-            db_session, factura="OTRA", codigo_glosa="SO0101",
+            db_session,
+            factura="OTRA",
+            codigo_glosa="SO0101",
             cups_servicio="999999",
         )
         r = client.get("/glosas/similares-bloque")
@@ -170,17 +183,26 @@ class TestVistasGuardadas:
     def test_vista_ta_sin_contrato(self, client, db_session):
         # SALUD TOTAL sin contrato + TA0201 → entra
         _seed_glosa(
-            db_session, factura="F1", eps="SALUD TOTAL", codigo_glosa="TA0201",
+            db_session,
+            factura="F1",
+            eps="SALUD TOTAL",
+            codigo_glosa="TA0201",
         )
         # SANITAS con contrato + TA0201 → NO entra
         db_session.add(ContratoRecord(eps="SANITAS", detalles="contrato vigente"))
         db_session.commit()
         _seed_glosa(
-            db_session, factura="F2", eps="SANITAS", codigo_glosa="TA0201",
+            db_session,
+            factura="F2",
+            eps="SANITAS",
+            codigo_glosa="TA0201",
         )
         # SALUD TOTAL sin contrato + SO0101 → NO entra (no es TA)
         _seed_glosa(
-            db_session, factura="F3", eps="SALUD TOTAL", codigo_glosa="SO0101",
+            db_session,
+            factura="F3",
+            eps="SALUD TOTAL",
+            codigo_glosa="SO0101",
         )
         r = client.get("/glosas/mis-asignaciones?vista=ta_sin_contrato&todas=true")
         rows = r.json()
@@ -191,12 +213,9 @@ class TestVistasGuardadas:
 # ─── Sprint #6 — Vencen 24h ──────────────────────────────────────────
 class TestVencen24h:
     def test_solo_dias_menor_igual_1(self, client, db_session):
-        _seed_glosa(db_session, factura="F1", dias_restantes=0,
-                    valor_objetado=1000)
-        _seed_glosa(db_session, factura="F2", dias_restantes=1,
-                    valor_objetado=2000)
-        _seed_glosa(db_session, factura="F3", dias_restantes=5,
-                    valor_objetado=3000)  # no
+        _seed_glosa(db_session, factura="F1", dias_restantes=0, valor_objetado=1000)
+        _seed_glosa(db_session, factura="F2", dias_restantes=1, valor_objetado=2000)
+        _seed_glosa(db_session, factura="F3", dias_restantes=5, valor_objetado=3000)  # no
         r = client.get("/glosas/vencen-24h")
         d = r.json()
         assert d["total"] == 2
@@ -212,12 +231,20 @@ class TestVencen24h:
 class TestDashboardPlataRecuperada:
     def test_totales_y_agregados(self, client, db_session):
         _seed_glosa(
-            db_session, factura="F1", valor_objetado=1000, valor_aceptado=200,
-            valor_recuperado=800, estado="LEVANTADA",
+            db_session,
+            factura="F1",
+            valor_objetado=1000,
+            valor_aceptado=200,
+            valor_recuperado=800,
+            estado="LEVANTADA",
         )
         _seed_glosa(
-            db_session, factura="F2", valor_objetado=500, valor_aceptado=500,
-            valor_recuperado=0, estado="RATIFICADA",
+            db_session,
+            factura="F2",
+            valor_objetado=500,
+            valor_aceptado=500,
+            valor_recuperado=0,
+            estado="RATIFICADA",
         )
         r = client.get("/glosas/dashboard-plata-recuperada")
         assert r.status_code == 200

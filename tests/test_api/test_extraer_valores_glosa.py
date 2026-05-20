@@ -1,4 +1,5 @@
 """Tests del extractor de valores desde texto de glosa (_extraer_valores_glosa)."""
+
 from app.main import _extraer_valores_glosa
 
 

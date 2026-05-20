@@ -1,4 +1,5 @@
 """Tests del módulo normativa_completa (R80 P2)."""
+
 from __future__ import annotations
 
 from app.services.normativa_completa import (

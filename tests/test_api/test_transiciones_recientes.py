@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/transiciones-recientes (R177 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,12 +49,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, ant, nuev, horas_atras=1):
-    db.add(AuditLogRecord(
-        usuario_email="u@x", accion="UPDATE",
-        tabla="glosas", registro_id=1,
-        campo="estado", valor_anterior=ant, valor_nuevo=nuev,
-        timestamp=ahora_utc() - timedelta(hours=horas_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email="u@x",
+            accion="UPDATE",
+            tabla="glosas",
+            registro_id=1,
+            campo="estado",
+            valor_anterior=ant,
+            valor_nuevo=nuev,
+            timestamp=ahora_utc() - timedelta(hours=horas_atras),
+        )
+    )
     db.commit()
 
 
@@ -88,11 +96,16 @@ class TestTransicionesRecientes:
     def test_excluye_otra_tabla(self, client, db_session):
         _seed(db_session, "X", "Y")  # tabla glosas
         # Audit en otra tabla
-        db_session.add(AuditLogRecord(
-            tabla="usuarios", registro_id=1, campo="estado",
-            valor_anterior="A", valor_nuevo="B",
-            timestamp=ahora_utc(),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                tabla="usuarios",
+                registro_id=1,
+                campo="estado",
+                valor_anterior="A",
+                valor_nuevo="B",
+                timestamp=ahora_utc(),
+            )
+        )
         db_session.commit()
         r = client.get("/glosas/stats/transiciones-recientes")
         d = r.json()

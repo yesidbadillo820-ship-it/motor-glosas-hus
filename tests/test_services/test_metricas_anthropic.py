@@ -1,4 +1,5 @@
 """Tests de las métricas de costo/latencia Anthropic (R54 P3)."""
+
 from __future__ import annotations
 
 import logging

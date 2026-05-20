@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/analizadas-hoy (R174 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,15 @@ def client(db_session, usuario):
 
 
 def _seed(db, glosa_id, accion, autor, dias_atras=0):
-    db.add(DictamenVersionRecord(
-        glosa_id=glosa_id, dictamen_html="<p>X</p>",
-        accion=accion, autor_email=autor,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        DictamenVersionRecord(
+            glosa_id=glosa_id,
+            dictamen_html="<p>X</p>",
+            accion=accion,
+            autor_email=autor,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -60,9 +66,13 @@ class TestAnalizadasHoy:
         r = client.get("/glosas/stats/analizadas-hoy")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("fecha", "dictamenes_hoy",
-                    "glosas_distintas_hoy",
-                    "por_accion", "top_5_autores"):
+        for key in (
+            "fecha",
+            "dictamenes_hoy",
+            "glosas_distintas_hoy",
+            "por_accion",
+            "top_5_autores",
+        ):
             assert key in d
 
     def test_solo_cuenta_hoy(self, client, db_session):
@@ -88,5 +98,6 @@ class TestAnalizadasHoy:
         assert d["glosas_distintas_hoy"] == 2
         # Alice tiene 2 acciones
         assert d["top_5_autores"][0] == {
-            "autor": "alice@x", "acciones": 2,
+            "autor": "alice@x",
+            "acciones": 2,
         }

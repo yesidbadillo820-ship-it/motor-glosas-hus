@@ -60,19 +60,19 @@ class GlosaRecord(Base):
     profesional_medico = Column(String(200))
 
     # Campos para historial detallado (vista IPS estilo Excel)
-    texto_glosa_original = Column(Text)   # tabla_excel o input original del formulario
-    codigo_respuesta = Column(String(20)) # RE9901, RE9502, RE9801, RE9702, RE9602
-    cups_servicio = Column(String(50))    # CUPS extraído del servicio glosado
+    texto_glosa_original = Column(Text)  # tabla_excel o input original del formulario
+    codigo_respuesta = Column(String(20))  # RE9901, RE9502, RE9801, RE9702, RE9602
+    cups_servicio = Column(String(50))  # CUPS extraído del servicio glosado
     servicio_descripcion = Column(String(400))  # Descripción del servicio/procedimiento
-    concepto_glosa = Column(Text)         # Descripción oficial del código de glosa
+    concepto_glosa = Column(Text)  # Descripción oficial del código de glosa
 
     # Metadatos adicionales del Excel de recepción (hojas INICIAL/RATIFICADA/I/R)
-    eps_codigo = Column(String(20), index=True)   # "U220181", "C230051", ...
-    tecnico_recepcion = Column(String(200))        # TECNICO QUE RECEPCIONO
+    eps_codigo = Column(String(20), index=True)  # "U220181", "C230051", ...
+    tecnico_recepcion = Column(String(200))  # TECNICO QUE RECEPCIONO
     fecha_objecion_eps = Column(DateTime(timezone=True))  # FechaObjecion (hoja I/R)
-    saldo_factura = Column(Float, default=0.0)     # FacturaCartera.Saldo (hoja I/R)
-    valor_factura = Column(Float, default=0.0)     # FacturaCartera.Valor (hoja I/R)
-    tercero_nit = Column(String(30))               # FacturaCartera.Tercero.Documento (hoja I/R)
+    saldo_factura = Column(Float, default=0.0)  # FacturaCartera.Saldo (hoja I/R)
+    valor_factura = Column(Float, default=0.0)  # FacturaCartera.Valor (hoja I/R)
+    tercero_nit = Column(String(30))  # FacturaCartera.Tercero.Documento (hoja I/R)
     # Nombre comercial corto de la entidad pagadora (FacturaCartera.Tercero.
     # NombreCompletoNA). Mas corto y limpio que el plan EPS, ej.
     # "DISPENSARIO MEDICO BUCARAMANGA" vs el plan
@@ -105,15 +105,20 @@ class ConceptoGlosaRecord(Base):
     glosados). Los importadores del Excel de recepción cargan esta tabla
     desde las hojas 'I' (Glosa_Inicial) y 'R' (Glosa_Ratificada) del DGH.
     """
+
     __tablename__ = "conceptos_glosa"
 
     id = Column(Integer, primary_key=True, index=True)
-    glosa_id = Column(Integer, ForeignKey("historial.id", ondelete="CASCADE"), index=True, nullable=False)
+    glosa_id = Column(
+        Integer, ForeignKey("historial.id", ondelete="CASCADE"), index=True, nullable=False
+    )
 
     # Identificadores del DGH (idempotencia)
-    oid_dgh = Column(String(50), index=True)       # ListadoConceptos.Oid (único por concepto)
-    consecutivo_dgh = Column(String(50), index=True)  # mismo CONSECUTIVO DGH que la glosa (denormalizado)
-    factura = Column(String(50), index=True)       # denormalizado para joins rápidos
+    oid_dgh = Column(String(50), index=True)  # ListadoConceptos.Oid (único por concepto)
+    consecutivo_dgh = Column(
+        String(50), index=True
+    )  # mismo CONSECUTIVO DGH que la glosa (denormalizado)
+    factura = Column(String(50), index=True)  # denormalizado para joins rápidos
 
     # Código de glosa + motivo canónico
     codigo_glosa = Column(String(20), index=True)  # TA0801, FA0603, TA0201, ...
@@ -122,16 +127,16 @@ class ConceptoGlosaRecord(Base):
     # al importar si viene y se usa al exportar en el campo
     # 'ListadoConceptos.ConceptoObjecion.Codigo' del formato DGH.
     codigo_syscafe = Column(String(20), index=True)
-    nombre_glosa = Column(Text)                     # ConceptoObjecion.Nombre ("Los cargos por apoyo diagnóstico...")
+    nombre_glosa = Column(Text)  # ConceptoObjecion.Nombre ("Los cargos por apoyo diagnóstico...")
 
     # Servicio/CUPS glosado
-    cups_codigo = Column(String(50))               # 906625, FMQ0163-1, 39143A-10
-    cups_descripcion = Column(Text)                 # "GONADOTROPINA CORIONICA SUBUNIDAD BETA..."
-    centro_costo = Column(String(200))              # "734005 - LABORATORIO - INMUNOLOGIA"
+    cups_codigo = Column(String(50))  # 906625, FMQ0163-1, 39143A-10
+    cups_descripcion = Column(Text)  # "GONADOTROPINA CORIONICA SUBUNIDAD BETA..."
+    centro_costo = Column(String(200))  # "734005 - LABORATORIO - INMUNOLOGIA"
 
     # Valor y observaciones de la EPS para ESTE concepto específico
-    valor_objetado = Column(Float, default=0.0)    # ListadoConceptos.ValorObjecion
-    observacion_eps = Column(Text)                  # ListadoConceptos.Observaciones (motivo fino de la EPS)
+    valor_objetado = Column(Float, default=0.0)  # ListadoConceptos.ValorObjecion
+    observacion_eps = Column(Text)  # ListadoConceptos.Observaciones (motivo fino de la EPS)
 
     # Respuesta del auditor (se llena cuando analiza el concepto)
     dictamen_html = Column(Text)
@@ -164,6 +169,7 @@ class PlantillaRecord(Base):
 class DictamenVersionRecord(Base):
     """Snapshot del dictamen cada vez que se refina/regenera.
     Permite ver el historial y restaurar una versión anterior."""
+
     __tablename__ = "dictamen_versiones"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -174,14 +180,13 @@ class DictamenVersionRecord(Base):
     autor_email = Column(String(200))
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_dictamen_ver_glosa", "glosa_id", "creado_en"),
-    )
+    __table_args__ = (Index("ix_dictamen_ver_glosa", "glosa_id", "creado_en"),)
 
 
 class GlosaEliminadaRecord(Base):
     """Papelera: glosas eliminadas con soft-delete. Se pueden restaurar
     dentro de 30 días. Después se purgan permanentemente."""
+
     __tablename__ = "glosas_eliminadas"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -194,6 +199,7 @@ class GlosaEliminadaRecord(Base):
 
 class PushSubscriptionRecord(Base):
     """Suscripciones Web Push por usuario (para notificaciones al navegador)."""
+
     __tablename__ = "push_subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -208,10 +214,13 @@ class PushSubscriptionRecord(Base):
 
 class AdjuntoConciliacionRecord(Base):
     """Screenshots/evidencia adjunta a una conciliación."""
+
     __tablename__ = "adjuntos_conciliacion"
 
     id = Column(Integer, primary_key=True, index=True)
-    conciliacion_id = Column(Integer, ForeignKey("conciliaciones.id", ondelete="CASCADE"), index=True)
+    conciliacion_id = Column(
+        Integer, ForeignKey("conciliaciones.id", ondelete="CASCADE"), index=True
+    )
     nombre = Column(String(300))
     mime_type = Column(String(100))
     tamano_bytes = Column(Integer)
@@ -222,6 +231,7 @@ class AdjuntoConciliacionRecord(Base):
 
 class ComentarioGlosaRecord(Base):
     """Hilo de comentarios por glosa para discusión interna del equipo."""
+
     __tablename__ = "comentarios_glosa"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -230,15 +240,13 @@ class ComentarioGlosaRecord(Base):
     autor_nombre = Column(String(200))
     autor_rol = Column(String(50))
     texto = Column(Text, nullable=False)
-    mencion = Column(String(200))   # email de quien se menciona con @
+    mencion = Column(String(200))  # email de quien se menciona con @
     resuelto = Column(Integer, default=0)
     resuelto_por = Column(String(200))
     resuelto_en = Column(DateTime(timezone=True))
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_comentarios_glosa", "glosa_id", "creado_en"),
-    )
+    __table_args__ = (Index("ix_comentarios_glosa", "glosa_id", "creado_en"),)
 
 
 class PlantillaGoldRecord(Base):
@@ -247,6 +255,7 @@ class PlantillaGoldRecord(Base):
     Se usan como few-shot examples al llamar a la IA para nuevas glosas
     del mismo (EPS, código) — mejoran calidad con el tiempo.
     """
+
     __tablename__ = "plantillas_gold"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -264,9 +273,7 @@ class PlantillaGoldRecord(Base):
     notas = Column(Text)
     activa = Column(Integer, default=1)
 
-    __table_args__ = (
-        Index("ix_plantilla_gold_lookup", "eps", "codigo_glosa", "activa"),
-    )
+    __table_args__ = (Index("ix_plantilla_gold_lookup", "eps", "codigo_glosa", "activa"),)
 
 
 class ContratoRecord(Base):
@@ -290,10 +297,13 @@ class ClausulaContrato(Base):
     El campo `tema` matchea con `codigo_glosa[:2]` (ej: TA, SO, AU, CO,
     NN, FA) para filtrar solo cláusulas relevantes al tipo de objeción.
     """
+
     __tablename__ = "clausulas_contrato"
 
     id = Column(Integer, primary_key=True, index=True)
-    eps = Column(String, ForeignKey("contratos.eps", ondelete="CASCADE"), index=True, nullable=False)
+    eps = Column(
+        String, ForeignKey("contratos.eps", ondelete="CASCADE"), index=True, nullable=False
+    )
     numero_clausula = Column(String(80))
     tema = Column(String(20), index=True)
     titulo = Column(String(300))
@@ -356,9 +366,7 @@ class AuditLogRecord(Base):
     detalle = Column(Text, nullable=True)
     ip = Column(String(50), nullable=True)
 
-    __table_args__ = (
-        Index("ix_audit_usuario_fecha", "usuario_email", "timestamp"),
-    )
+    __table_args__ = (Index("ix_audit_usuario_fecha", "usuario_email", "timestamp"),)
 
 
 class ConciliacionRecord(Base):
@@ -379,17 +387,15 @@ class ConciliacionRecord(Base):
     acta_numero = Column(String(100))
 
     # Trazabilidad bilateral (ciclo completo con EPS)
-    contra_respuesta_eps = Column(Text)            # Texto de la respuesta de la EPS antes de conciliar
+    contra_respuesta_eps = Column(Text)  # Texto de la respuesta de la EPS antes de conciliar
     fecha_contra_respuesta_eps = Column(DateTime(timezone=True))
-    postura_hus = Column(Text)                      # Posición final de HUS para la audiencia
-    fecha_acta = Column(DateTime(timezone=True))    # Fecha en que se firmó el acta
+    postura_hus = Column(Text)  # Posición final de HUS para la audiencia
+    fecha_acta = Column(DateTime(timezone=True))  # Fecha en que se firmó el acta
     valor_ratificado_hus = Column(Float, default=0.0)  # Valor que HUS defendió
     estado_bilateral = Column(String(40), default="PROGRAMADA")
     # Estados: PROGRAMADA → EPS_RESPONDIO → AUDIENCIA_REALIZADA → ACTA_FIRMADA → CERRADA
 
-    __table_args__ = (
-        Index("ix_conciliacion_glosa", "glosa_id"),
-    )
+    __table_args__ = (Index("ix_conciliacion_glosa", "glosa_id"),)
 
 
 class TarifaContratadaRecord(Base):
@@ -403,35 +409,36 @@ class TarifaContratadaRecord(Base):
     No aplica a aseguradoras SOAT (Mundial, Bolívar, etc) ni a EPS sin
     contrato (Sanitas, etc); esas siguen con lógica actual.
     """
+
     __tablename__ = "tarifas_contratadas"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    eps = Column(String(200), nullable=False, index=True)    # Ej: "FAMISANAR EPS"
-    contrato_numero = Column(String(100))                     # Ej: "S-13-1-03-1-04958"
+    eps = Column(String(200), nullable=False, index=True)  # Ej: "FAMISANAR EPS"
+    contrato_numero = Column(String(100))  # Ej: "S-13-1-03-1-04958"
     codigo_cups = Column(String(30), nullable=False, index=True)  # Ej: "890202" / "FMQ6296"
     # Ronda 45: código interno IPS (ej. '39147B-18' del HUS) para que cuando
     # la EPS glose con el código viejo podamos homologarlo al CUPS oficial
     # (Res. 2641/2025). El parser Excel llena este campo cuando hay columna
     # 'CODIGO IPS'/'CODIGO PROPIO'.
     codigo_ips = Column(String(30), index=True)
-    descripcion = Column(Text)                                # "CONSULTA DE PRIMERA VEZ..."
-    valor_pactado = Column(Float, nullable=False, default=0.0)    # COP (solo tipo VALOR_FIJO)
-    modalidad = Column(String(80))                            # "SOAT UVB VIGENTE" / "MEDICAMENTOS" / "SUMINISTROS CARDIOVASCULAR"
+    descripcion = Column(Text)  # "CONSULTA DE PRIMERA VEZ..."
+    valor_pactado = Column(Float, nullable=False, default=0.0)  # COP (solo tipo VALOR_FIJO)
+    modalidad = Column(
+        String(80)
+    )  # "SOAT UVB VIGENTE" / "MEDICAMENTOS" / "SUMINISTROS CARDIOVASCULAR"
     # Tipo de tarifa: VALOR_FIJO (medicamentos/suministros) | SOAT_PORCENTAJE (servicios CUPS pactados como % sobre SOAT)
     tipo_tarifa = Column(String(30), nullable=False, default="VALOR_FIJO", index=True)
     # Factor de ajuste sobre SOAT vigente. Solo aplica si tipo_tarifa=SOAT_PORCENTAJE.
     # Ej: -5 → SOAT × 0.95; 0 → SOAT plano; +10 → SOAT × 1.10
     factor_ajuste = Column(Float, default=0.0)
-    fuente_archivo = Column(String(300))                      # "famisanar_2026.xlsx"
+    fuente_archivo = Column(String(300))  # "famisanar_2026.xlsx"
     vigencia_desde = Column(DateTime(timezone=True))
     vigencia_hasta = Column(DateTime(timezone=True))
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
-    creado_por = Column(String(200))                          # email del COORDINADOR/SUPER_ADMIN
-    activa = Column(Integer, default=1, nullable=False)       # 1=activa, 0=archivada
+    creado_por = Column(String(200))  # email del COORDINADOR/SUPER_ADMIN
+    activa = Column(Integer, default=1, nullable=False)  # 1=activa, 0=archivada
 
-    __table_args__ = (
-        Index("ix_tarifa_eps_cups", "eps", "codigo_cups", "activa"),
-    )
+    __table_args__ = (Index("ix_tarifa_eps_cups", "eps", "codigo_cups", "activa"),)
 
 
 class AICacheRecord(Base):
@@ -445,19 +452,18 @@ class AICacheRecord(Base):
       - TTL por defecto 30 días (se purga al acceder si creado_en + 30d < now)
       - hit_count: cuántas veces se reutilizó esta respuesta (métrica ahorro)
     """
+
     __tablename__ = "ai_cache"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     clave = Column(String(64), unique=True, nullable=False, index=True)  # SHA256 hex
-    modelo = Column(String(80))                                           # "groq/llama-3.3..." | "anthropic/..."
+    modelo = Column(String(80))  # "groq/llama-3.3..." | "anthropic/..."
     respuesta = Column(Text, nullable=False)
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
     ultimo_hit = Column(DateTime(timezone=True), server_default=func.now())
     hit_count = Column(Integer, default=0, nullable=False)
 
-    __table_args__ = (
-        Index("ix_aicache_clave_creado", "clave", "creado_en"),
-    )
+    __table_args__ = (Index("ix_aicache_clave_creado", "clave", "creado_en"),)
 
 
 class AICallRecord(Base):
@@ -471,11 +477,12 @@ class AICallRecord(Base):
     múltiples filas (LLM principal + retry + check riesgo). El campo
     glosa_id (nullable) permite trazar de vuelta cuando aplica.
     """
+
     __tablename__ = "ai_calls"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    proveedor = Column(String(20), nullable=False)        # 'anthropic' | 'groq'
-    modelo = Column(String(80), nullable=False)           # 'claude-sonnet-4-6' | 'llama-3.3-70b'
+    proveedor = Column(String(20), nullable=False)  # 'anthropic' | 'groq'
+    modelo = Column(String(80), nullable=False)  # 'claude-sonnet-4-6' | 'llama-3.3-70b'
     latency_ms = Column(Integer, default=0, nullable=False)
     input_tokens = Column(Integer, default=0, nullable=False)
     cache_creation_input_tokens = Column(Integer, default=0, nullable=False)
@@ -489,9 +496,7 @@ class AICallRecord(Base):
     user_email = Column(String(200), nullable=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
-    __table_args__ = (
-        Index("ix_aicalls_proveedor_creado", "proveedor", "creado_en"),
-    )
+    __table_args__ = (Index("ix_aicalls_proveedor_creado", "proveedor", "creado_en"),)
 
 
 class TareaDiariaRecord(Base):
@@ -502,6 +507,7 @@ class TareaDiariaRecord(Base):
     reunión, etc.). El día al que pertenece la tarea se guarda
     en `fecha_para` para poder filtrar "lo de hoy".
     """
+
     __tablename__ = "tareas_diarias"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -527,6 +533,7 @@ class SugerenciaRecord(Base):
     sugerencias sin salir del sistema. Admin puede triagear
     desde /admin/sugerencias.
     """
+
     __tablename__ = "sugerencias"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -559,6 +566,7 @@ class LoteImportacionRecord(Base):
       - Forensia ("¿quién subió este lote, cuántas glosas creó?")
       - Auditoría SuperSalud (compliance Habeas Data)
     """
+
     __tablename__ = "lotes_importacion"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -596,6 +604,7 @@ class ImportacionRecepcionRecord(Base):
     solo cuando llega por correo. Sirve además de respaldo si el envío
     SMTP falla.
     """
+
     __tablename__ = "importaciones_recepcion"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -622,6 +631,7 @@ class NoticiaSaludRecord(Base):
     (mismo titulo+url pueden venir múltiples veces si el feed se
     actualiza).
     """
+
     __tablename__ = "noticias_salud"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -649,6 +659,7 @@ class NotaPrivadaRecord(Base):
     auditores ven). El indice unico (glosa_id + autor_email)
     asegura una sola nota por par.
     """
+
     __tablename__ = "notas_privadas"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -658,9 +669,7 @@ class NotaPrivadaRecord(Base):
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
     actualizado_en = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_nota_privada_unico", "glosa_id", "autor_email", unique=True),
-    )
+    __table_args__ = (Index("ix_nota_privada_unico", "glosa_id", "autor_email", unique=True),)
 
 
 class PresetFiltroRecord(Base):
@@ -670,6 +679,7 @@ class PresetFiltroRecord(Base):
     con un click. Tambien soporta presets compartidos (visibilidad
     EQUIPO o GLOBAL) cuando un coordinador comparte un filtro util.
     """
+
     __tablename__ = "preset_filtros"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -687,9 +697,7 @@ class PresetFiltroRecord(Base):
     ultimo_uso = Column(DateTime(timezone=True), nullable=True)
     uso_count = Column(Integer, default=0, nullable=False)
 
-    __table_args__ = (
-        Index("ix_preset_usuario", "usuario_email", "creado_en"),
-    )
+    __table_args__ = (Index("ix_preset_usuario", "usuario_email", "creado_en"),)
 
 
 class ComentarioThreadRecord(Base):
@@ -700,6 +708,7 @@ class ComentarioThreadRecord(Base):
     un anchor de un parrafo especifico ("p:5"). parent_id permite
     respuestas anidadas estilo Linear/GitHub.
     """
+
     __tablename__ = "comentarios_thread"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -721,6 +730,7 @@ class WebhookRecord(Base):
 
     Solo COORDINADOR/SUPER_ADMIN puede crear/borrar.
     """
+
     __tablename__ = "webhooks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -743,6 +753,7 @@ class ChatConversacionRecord(Base):
     Cada usuario tiene N conversaciones, cada una con M mensajes.
     Sirve para volver a una sesion anterior y continuar el contexto.
     """
+
     __tablename__ = "chat_conversaciones"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -755,6 +766,7 @@ class ChatConversacionRecord(Base):
 
 class ChatMensajeRecord(Base):
     """Mensaje individual de una conversacion. Rol = user|assistant."""
+
     __tablename__ = "chat_mensajes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -776,6 +788,7 @@ class SnippetRecord(Base):
     Los GLOBAL los crea el coordinador y todos los usan (plantillas
     institucionales).
     """
+
     __tablename__ = "snippets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -803,6 +816,7 @@ class RutaFacturaRecord(Base):
     El motor en cloud no necesita acceso al share — solo necesita el
     string de la ruta para que el frontend pueda construir la URL.
     """
+
     __tablename__ = "rutas_factura"
 
     factura_hus = Column(String(50), primary_key=True)

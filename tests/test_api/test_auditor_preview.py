@@ -1,4 +1,5 @@
 """Tests del endpoint preview-auditoria (R-cerebro #9)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,14 +31,18 @@ def db_session():
 @pytest.fixture
 def auditor():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
 def _client(db_session, user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: user
     return TestClient(app)
@@ -45,26 +50,29 @@ def _client(db_session, user):
 
 def _clear():
     from app.main import app
+
     app.dependency_overrides.clear()
 
 
 class TestPreview:
     def test_caso_real_TA0801(self, db_session, auditor):
         # Cargar contrato para que el detector "sin contrato" se dispare
-        db_session.add(ContratoRecord(
-            eps="DISPENSARIO MEDICO BUCARAMANGA",
-            detalles="Contrato 440-DIGSA-2025"
-        ))
+        db_session.add(
+            ContratoRecord(eps="DISPENSARIO MEDICO BUCARAMANGA", detalles="Contrato 440-DIGSA-2025")
+        )
         db_session.commit()
         with _client(db_session, auditor) as c:
-            r = c.post("/glosas/preview-auditoria", json={
-                "texto_glosa": (
-                    "TA0801 - CUPS 902210 - HEMOGRAMA - Valor objetado: $3.151 "
-                    "- SE GLOSA MVC SIN CONTRATO ENTRE LAS PARTES "
-                    "SE RECONOCE A SOAT VIGENTE. SE GLOSA LA DIFERENCIA"
-                ),
-                "eps": "DISPENSARIO MEDICO BUCARAMANGA",
-            })
+            r = c.post(
+                "/glosas/preview-auditoria",
+                json={
+                    "texto_glosa": (
+                        "TA0801 - CUPS 902210 - HEMOGRAMA - Valor objetado: $3.151 "
+                        "- SE GLOSA MVC SIN CONTRATO ENTRE LAS PARTES "
+                        "SE RECONOCE A SOAT VIGENTE. SE GLOSA LA DIFERENCIA"
+                    ),
+                    "eps": "DISPENSARIO MEDICO BUCARAMANGA",
+                },
+            )
             assert r.status_code == 200
             d = r.json()
             ids = [h["id"] for h in d["hallazgos"]]
@@ -79,10 +87,13 @@ class TestPreview:
     def test_sin_eps_sin_contrato_detectable(self, db_session, auditor):
         # Sin contrato cargado → "sin contrato" no es mentira → no flag
         with _client(db_session, auditor) as c:
-            r = c.post("/glosas/preview-auditoria", json={
-                "texto_glosa": "SE GLOSA MVC SIN CONTRATO ENTRE LAS PARTES",
-                "eps": "EPS_X_NO_REGISTRADA",
-            })
+            r = c.post(
+                "/glosas/preview-auditoria",
+                json={
+                    "texto_glosa": "SE GLOSA MVC SIN CONTRATO ENTRE LAS PARTES",
+                    "eps": "EPS_X_NO_REGISTRADA",
+                },
+            )
             assert r.status_code == 200
             d = r.json()
             ids = [h["id"] for h in d["hallazgos"]]

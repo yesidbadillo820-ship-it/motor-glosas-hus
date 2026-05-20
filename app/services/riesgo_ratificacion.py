@@ -9,6 +9,7 @@ Score 0-100 donde:
   • 31-60: MEDIO (ámbar) — requiere refuerzo
   • 61-100: ALTO (rojo) — alta probabilidad de ratificación
 """
+
 from __future__ import annotations
 from typing import Optional
 
@@ -16,7 +17,8 @@ from typing import Optional
 # Factores de riesgo por código de glosa (según histórico nacional)
 RIESGO_BASE_POR_CODIGO: dict[str, int] = {
     # Pertinencia clínica — altamente subjetivas, EPS suele ratificar
-    "CL": 55, "PE": 55,
+    "CL": 55,
+    "PE": 55,
     # Autorización — si hay urgencia, casi siempre levantan; si no, riesgo medio
     "AU": 40,
     # Tarifas — depende del contrato
@@ -28,13 +30,18 @@ RIESGO_BASE_POR_CODIGO: dict[str, int] = {
     # Facturación — formales subsanables
     "FA": 25,
     # Insumos / Medicamentos — variable
-    "IN": 40, "ME": 40,
+    "IN": 40,
+    "ME": 40,
     # Extemporánea — casi siempre levantan si pasa el plazo
     "EX": 10,
 }
 
 EPS_HISTORICAMENTE_DIFICILES = {
-    "NUEVA EPS", "SALUD TOTAL", "MEDIMAS", "SURA", "SANITAS",
+    "NUEVA EPS",
+    "SALUD TOTAL",
+    "MEDIMAS",
+    "SURA",
+    "SANITAS",
 }
 
 

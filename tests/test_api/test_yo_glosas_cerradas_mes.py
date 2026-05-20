@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/glosas-cerradas-mes (R318 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice", rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -41,6 +46,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,16 +54,21 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, gestor, fecha_decision, estado="LEVANTADA",
-          recuperado=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, valor_recuperado=recuperado,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        fecha_decision_eps=fecha_decision,
-    ))
+def _seed(db, gestor, fecha_decision, estado="LEVANTADA", recuperado=0):
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            valor_recuperado=recuperado,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            fecha_decision_eps=fecha_decision,
+        )
+    )
     db.commit()
 
 
@@ -65,13 +76,16 @@ class TestYoGlosasCerradasMes:
     def test_solo_mes_actual(self, client, db_session):
         # Mes actual
         _seed(
-            db_session, "Alice",
-            fecha_decision=ahora_utc(), estado="LEVANTADA",
+            db_session,
+            "Alice",
+            fecha_decision=ahora_utc(),
+            estado="LEVANTADA",
             recuperado=500,
         )
         # Mes pasado (40 dias)
         _seed(
-            db_session, "Alice",
+            db_session,
+            "Alice",
             fecha_decision=ahora_utc() - timedelta(days=40),
             estado="LEVANTADA",
         )
@@ -85,8 +99,10 @@ class TestYoGlosasCerradasMes:
 
     def test_excluye_otros_gestores(self, client, db_session):
         _seed(
-            db_session, "Bob",
-            fecha_decision=ahora_utc(), estado="LEVANTADA",
+            db_session,
+            "Bob",
+            fecha_decision=ahora_utc(),
+            estado="LEVANTADA",
         )
         r = client.get("/usuarios/yo/glosas-cerradas-mes")
         d = r.json()

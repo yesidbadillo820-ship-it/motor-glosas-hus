@@ -1,4 +1,5 @@
 """Tests del endpoint /admin/ai-cache/stats (R86 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -55,8 +60,11 @@ def client(db_session, usuario_super):
 
 def _seed(db, **kw):
     base = dict(
-        clave="x" * 64, modelo="x", respuesta="r" * 100,
-        hit_count=0, creado_en=ahora_utc(),
+        clave="x" * 64,
+        modelo="x",
+        respuesta="r" * 100,
+        hit_count=0,
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(AICacheRecord(**base))
@@ -85,9 +93,7 @@ class TestAiCacheStats:
 
     def test_top_5_ordenado_por_hits(self, client, db_session):
         for hits in [1, 5, 100, 50, 10, 200, 3]:
-            _seed(db_session,
-                  clave=("0" * 60 + str(hits))[:64],
-                  hit_count=hits)
+            _seed(db_session, clave=("0" * 60 + str(hits))[:64], hit_count=hits)
         r = client.get("/admin/ai-cache/stats")
         d = r.json()
         # Top 5 ordenado DESC: 200, 100, 50, 10, 5
@@ -95,8 +101,7 @@ class TestAiCacheStats:
         assert hits_top == [200, 100, 50, 10, 5]
 
     def test_viejas_30d(self, client, db_session):
-        _seed(db_session, clave="a" * 64,
-              creado_en=ahora_utc() - timedelta(days=60))
+        _seed(db_session, clave="a" * 64, creado_en=ahora_utc() - timedelta(days=60))
         _seed(db_session, clave="b" * 64, creado_en=ahora_utc())
         r = client.get("/admin/ai-cache/stats")
         d = r.json()

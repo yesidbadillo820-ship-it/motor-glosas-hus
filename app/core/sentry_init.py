@@ -14,6 +14,7 @@ Variables de entorno:
     SENTRY_TRACES_SAMPLE_RATE  — 0.0-1.0 para performance (default: 0.1 = 10%)
     SENTRY_RELEASE          — identificador de versión (default: commit SHA si existe)
 """
+
 from __future__ import annotations
 import os
 import logging
@@ -88,7 +89,9 @@ def init_sentry() -> bool:
     # Validación del DSN antes de llamar init — evita BadDsn exception
     valido, err_msg = _dsn_es_valido(dsn)
     if not valido:
-        logger.warning(f"SENTRY_DSN inválido ({err_msg}). Sentry desactivado. Valor actual: '{dsn[:30]}...'")
+        logger.warning(
+            f"SENTRY_DSN inválido ({err_msg}). Sentry desactivado. Valor actual: '{dsn[:30]}...'"
+        )
         return False
 
     try:
@@ -110,7 +113,7 @@ def init_sentry() -> bool:
 
     # Configuración de logging integrado: captura WARN+ como breadcrumbs, ERROR+ como eventos
     logging_integration = LoggingIntegration(
-        level=logging.INFO,      # nivel mínimo para breadcrumbs
+        level=logging.INFO,  # nivel mínimo para breadcrumbs
         event_level=logging.ERROR,  # nivel mínimo para crear event en Sentry
     )
 
@@ -170,7 +173,7 @@ def init_sentry() -> bool:
             # cuando ambos están — nos permite excluir endpoints ruidosos.
             traces_sampler=traces_sampler,
             profiles_sample_rate=0.0,  # desactivado por defecto (overhead)
-            send_default_pii=False,    # no enviar PII por defecto
+            send_default_pii=False,  # no enviar PII por defecto
             integrations=[
                 FastApiIntegration(transaction_style="endpoint"),
                 StarletteIntegration(transaction_style="endpoint"),
@@ -184,9 +187,7 @@ def init_sentry() -> bool:
             ],
         )
     except Exception as e:
-        logger.error(
-            f"Error inicializando Sentry (la app sigue funcionando sin tracking): {e}"
-        )
+        logger.error(f"Error inicializando Sentry (la app sigue funcionando sin tracking): {e}")
         return False
     logger.info(
         f"Sentry activado | env={environment} | traces={traces_sample_rate} "

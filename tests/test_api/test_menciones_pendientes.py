@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/menciones-pendientes (R216 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +52,16 @@ def client(db_session, usuario):
 
 
 def _seed(db, mencion, resuelto=0, autor="bob@x"):
-    db.add(ComentarioGlosaRecord(
-        glosa_id=1, autor_email=autor,
-        texto="x", mencion=mencion, resuelto=resuelto,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        ComentarioGlosaRecord(
+            glosa_id=1,
+            autor_email=autor,
+            texto="x",
+            mencion=mencion,
+            resuelto=resuelto,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 

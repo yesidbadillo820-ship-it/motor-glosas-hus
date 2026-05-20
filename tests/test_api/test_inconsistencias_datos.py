@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/inconsistencias-datos (R133 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -44,6 +48,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -53,8 +58,12 @@ def client(db_session, usuario_super):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -76,26 +85,21 @@ class TestInconsistenciasDatos:
         _seed(db_session, estado="LEVANTADA", valor_recuperado=0)
         r = client.get("/admin/inconsistencias-datos")
         d = r.json()
-        regla = next(it for it in d["items"]
-                     if it["regla"] == "levantadas_sin_recupero")
+        regla = next(it for it in d["items"] if it["regla"] == "levantadas_sin_recupero")
         assert regla["count"] == 1
 
     def test_aceptada_con_recupero(self, client, db_session):
         _seed(db_session, estado="ACEPTADA", valor_recuperado=5000)
         r = client.get("/admin/inconsistencias-datos")
         d = r.json()
-        regla = next(it for it in d["items"]
-                     if it["regla"] == "aceptadas_con_recupero")
+        regla = next(it for it in d["items"] if it["regla"] == "aceptadas_con_recupero")
         assert regla["count"] == 1
 
     def test_decision_en_abierto(self, client, db_session):
-        _seed(db_session,
-              estado="RADICADA",
-              fecha_decision_eps=ahora_utc())
+        _seed(db_session, estado="RADICADA", fecha_decision_eps=ahora_utc())
         r = client.get("/admin/inconsistencias-datos")
         d = r.json()
-        regla = next(it for it in d["items"]
-                     if it["regla"] == "decision_eps_en_estado_abierto")
+        regla = next(it for it in d["items"] if it["regla"] == "decision_eps_en_estado_abierto")
         assert regla["count"] == 1
 
     def test_glosa_correcta_no_aparece(self, client, db_session):
@@ -111,7 +115,6 @@ class TestInconsistenciasDatos:
             _seed(db_session, estado="LEVANTADA", valor_recuperado=0)
         r = client.get("/admin/inconsistencias-datos")
         d = r.json()
-        regla = next(it for it in d["items"]
-                     if it["regla"] == "levantadas_sin_recupero")
+        regla = next(it for it in d["items"] if it["regla"] == "levantadas_sin_recupero")
         assert regla["count"] == 10
         assert len(regla["sample_ids"]) == 5

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/historial-workflow (R134 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,22 +49,35 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid=1, estado="RADICADA"):
-    db.add(GlosaRecord(
-        id=gid, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
     return gid
 
 
 def _seed_audit(db, gid, campo, anterior, nuevo, hr_atras=1):
-    db.add(AuditLogRecord(
-        usuario_email="u@x", accion="UPDATE",
-        tabla="glosas", registro_id=gid,
-        campo=campo, valor_anterior=anterior, valor_nuevo=nuevo,
-        timestamp=ahora_utc() - timedelta(hours=hr_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email="u@x",
+            accion="UPDATE",
+            tabla="glosas",
+            registro_id=gid,
+            campo=campo,
+            valor_anterior=anterior,
+            valor_nuevo=nuevo,
+            timestamp=ahora_utc() - timedelta(hours=hr_atras),
+        )
+    )
     db.commit()
 
 
@@ -83,15 +98,19 @@ class TestHistorialWorkflow:
         # Cambio de estado → debe aparecer
         _seed_audit(db_session, gid, "estado", "RADICADA", "RESPONDIDA")
         # Cambio de workflow_state → debe aparecer
-        _seed_audit(db_session, gid, "workflow_state",
-                    "RADICADA", "RESPONDIDA")
+        _seed_audit(db_session, gid, "workflow_state", "RADICADA", "RESPONDIDA")
         # Cambio de otro campo → NO debe aparecer
         _seed_audit(db_session, gid, "valor_objetado", "1000", "2000")
         # Audit en otra tabla → NO debe aparecer
-        db_session.add(AuditLogRecord(
-            usuario_email="u@x", tabla="usuarios", registro_id=gid,
-            campo="estado", timestamp=ahora_utc(),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                usuario_email="u@x",
+                tabla="usuarios",
+                registro_id=gid,
+                campo="estado",
+                timestamp=ahora_utc(),
+            )
+        )
         db_session.commit()
 
         r = client.get(f"/glosas/{gid}/historial-workflow")

@@ -1,4 +1,5 @@
 """Tests del endpoint /sistema/observabilidad (Ronda 50 Paso 12)."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -6,6 +7,7 @@ from unittest.mock import MagicMock
 
 def test_observabilidad_estructura(monkeypatch):
     from app.api.routers.sistema import observabilidad
+
     monkeypatch.delenv("SENTRY_DSN", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("FIRMA_DIGITAL_PRIVATE_KEY", raising=False)
@@ -21,9 +23,17 @@ def test_observabilidad_estructura(monkeypatch):
 def test_observabilidad_recomendaciones_sin_config(monkeypatch):
     """Si nada está configurado, hay recomendaciones para todo."""
     from app.api.routers.sistema import observabilidad
-    for k in ("SENTRY_DSN", "ANTHROPIC_API_KEY", "GROQ_API_KEY",
-              "FIRMA_DIGITAL_PRIVATE_KEY", "GLOSAS_ENCRYPTION_KEY",
-              "DIGEST_DESTINATARIOS", "WHATSAPP_META_TOKEN", "TELEGRAM_BOT_TOKEN"):
+
+    for k in (
+        "SENTRY_DSN",
+        "ANTHROPIC_API_KEY",
+        "GROQ_API_KEY",
+        "FIRMA_DIGITAL_PRIVATE_KEY",
+        "GLOSAS_ENCRYPTION_KEY",
+        "DIGEST_DESTINATARIOS",
+        "WHATSAPP_META_TOKEN",
+        "TELEGRAM_BOT_TOKEN",
+    ):
         monkeypatch.delenv(k, raising=False)
     user = MagicMock(email="admin@hus.com", rol="SUPER_ADMIN")
     r = observabilidad(current_user=user)
@@ -35,6 +45,7 @@ def test_observabilidad_recomendaciones_sin_config(monkeypatch):
 
 def test_observabilidad_con_anthropic(monkeypatch):
     from app.api.routers.sistema import observabilidad
+
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake")
     user = MagicMock(email="admin@hus.com", rol="SUPER_ADMIN")
     r = observabilidad(current_user=user)
@@ -45,6 +56,7 @@ def test_observabilidad_con_anthropic(monkeypatch):
 
 def test_metricas_codigo_presentes():
     from app.api.routers.sistema import observabilidad
+
     user = MagicMock(email="admin@hus.com", rol="SUPER_ADMIN")
     r = observabilidad(current_user=user)
     m = r["metricas_codigo"]

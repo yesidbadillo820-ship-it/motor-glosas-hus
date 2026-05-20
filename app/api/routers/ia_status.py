@@ -8,6 +8,7 @@ GET /ia-status/health-check
     Ping ligero a cada proveedor (1 token c/u) para verificar que
     realmente responden, no solo que la key existe.
 """
+
 from __future__ import annotations
 import asyncio
 
@@ -133,10 +134,14 @@ def _calcular_fallback_chain(cfg, primary: str) -> list[str]:
     """
     chain = []
     disponibles = []
-    if cfg.openrouter_api_key: disponibles.append("openrouter")
-    if cfg.anthropic_api_key: disponibles.append("anthropic")
-    if cfg.gemini_api_key: disponibles.append("gemini")
-    if cfg.groq_api_key: disponibles.append("groq")
+    if cfg.openrouter_api_key:
+        disponibles.append("openrouter")
+    if cfg.anthropic_api_key:
+        disponibles.append("anthropic")
+    if cfg.gemini_api_key:
+        disponibles.append("gemini")
+    if cfg.groq_api_key:
+        disponibles.append("groq")
 
     if primary in disponibles:
         chain.append(primary)
@@ -161,6 +166,7 @@ async def health_check(
         if not cfg.anthropic_api_key:
             return {"ok": False, "error": "sin API key"}
         import time
+
         t0 = time.time()
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
@@ -188,8 +194,10 @@ async def health_check(
         if not cfg.gemini_api_key:
             return {"ok": False, "error": "sin API key"}
         from app.services.gemini_service import GeminiService
+
         gs = GeminiService(api_key=cfg.gemini_api_key, default_model=cfg.gemini_model)
         import time
+
         t0 = time.time()
         try:
             res = await gs.health_check()
@@ -203,9 +211,11 @@ async def health_check(
         if not cfg.groq_api_key:
             return {"ok": False, "error": "sin API key"}
         import time
+
         t0 = time.time()
         try:
             from groq import AsyncGroq
+
             g = AsyncGroq(api_key=cfg.groq_api_key, timeout=10.0)
             r = await g.chat.completions.create(
                 model=cfg.groq_model,
@@ -227,11 +237,13 @@ async def health_check(
         if not cfg.openrouter_api_key:
             return {"ok": False, "error": "sin API key"}
         from app.services.openrouter_service import OpenRouterService
+
         ors = OpenRouterService(
             api_key=cfg.openrouter_api_key,
             default_model=cfg.openrouter_model,
         )
         import time
+
         t0 = time.time()
         try:
             res = await ors.health_check()
@@ -242,13 +254,24 @@ async def health_check(
             return {"ok": False, "error": str(e)[:150]}
 
     pings = await asyncio.gather(
-        _ping_anthropic(), _ping_openrouter(), _ping_gemini(), _ping_groq(),
+        _ping_anthropic(),
+        _ping_openrouter(),
+        _ping_gemini(),
+        _ping_groq(),
         return_exceptions=True,
     )
-    resultados["anthropic"] = pings[0] if not isinstance(pings[0], Exception) else {"ok": False, "error": str(pings[0])}
-    resultados["openrouter"] = pings[1] if not isinstance(pings[1], Exception) else {"ok": False, "error": str(pings[1])}
-    resultados["gemini"] = pings[2] if not isinstance(pings[2], Exception) else {"ok": False, "error": str(pings[2])}
-    resultados["groq"] = pings[3] if not isinstance(pings[3], Exception) else {"ok": False, "error": str(pings[3])}
+    resultados["anthropic"] = (
+        pings[0] if not isinstance(pings[0], Exception) else {"ok": False, "error": str(pings[0])}
+    )
+    resultados["openrouter"] = (
+        pings[1] if not isinstance(pings[1], Exception) else {"ok": False, "error": str(pings[1])}
+    )
+    resultados["gemini"] = (
+        pings[2] if not isinstance(pings[2], Exception) else {"ok": False, "error": str(pings[2])}
+    )
+    resultados["groq"] = (
+        pings[3] if not isinstance(pings[3], Exception) else {"ok": False, "error": str(pings[3])}
+    )
 
     todos_ok = all(r.get("ok") for r in resultados.values())
     alguno_ok = any(r.get("ok") for r in resultados.values())

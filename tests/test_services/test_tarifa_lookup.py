@@ -1,4 +1,5 @@
 """Tests del tarifa_lookup_service (R72 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -28,10 +29,12 @@ def db():
 
 def _seed_tarifa(db, **kw):
     base = dict(
-        eps="FAMISANAR", codigo_cups="890750",
+        eps="FAMISANAR",
+        codigo_cups="890750",
         descripcion="CONSULTA URGENCIAS",
         valor_pactado=114_900,
-        modalidad="TARIFA PROPIA", activa=1,
+        modalidad="TARIFA PROPIA",
+        activa=1,
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -42,8 +45,11 @@ def _seed_tarifa(db, **kw):
 class TestEvaluarGlosaTarifa:
     def test_sin_tarifa_retorna_no_encontrada(self, db):
         r = evaluar_glosa_tarifa(
-            db, eps="FAMISANAR", cups="999999",
-            valor_facturado=100_000, valor_objetado=50_000,
+            db,
+            eps="FAMISANAR",
+            cups="999999",
+            valor_facturado=100_000,
+            valor_objetado=50_000,
         )
         assert r["encontrada"] is False
 
@@ -51,8 +57,11 @@ class TestEvaluarGlosaTarifa:
         """Cuando facturado == pactado, defender total."""
         _seed_tarifa(db, valor_pactado=114_900)
         r = evaluar_glosa_tarifa(
-            db, eps="FAMISANAR", cups="890750",
-            valor_facturado=114_900, valor_objetado=14_900,
+            db,
+            eps="FAMISANAR",
+            cups="890750",
+            valor_facturado=114_900,
+            valor_objetado=14_900,
             valor_reconocido=100_000,
         )
         assert r["encontrada"] is True

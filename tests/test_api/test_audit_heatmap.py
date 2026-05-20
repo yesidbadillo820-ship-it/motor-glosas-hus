@@ -1,4 +1,5 @@
 """Tests del endpoint GET /audit/heatmap-actividad (R159 P1)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -10,7 +11,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth import get_password_hash
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import AuditLogRecord, UsuarioRecord
 
@@ -34,7 +34,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord(db_session):
     u = UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +49,7 @@ def usuario_coord(db_session):
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -54,10 +58,14 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, ts):
-    db.add(AuditLogRecord(
-        usuario_email="u@x", accion="X", tabla="T",
-        timestamp=ts,
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email="u@x",
+            accion="X",
+            tabla="T",
+            timestamp=ts,
+        )
+    )
     db.commit()
 
 
@@ -71,13 +79,10 @@ class TestAuditHeatmap:
 
     def test_clasifica_dia_hora(self, client, db_session):
         # 2026-04-20 fue Lunes (weekday=0), 10am
-        _seed(db_session, datetime(2026, 4, 20, 10, 0,
-                                   tzinfo=timezone.utc))
-        _seed(db_session, datetime(2026, 4, 20, 10, 30,
-                                   tzinfo=timezone.utc))
+        _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
+        _seed(db_session, datetime(2026, 4, 20, 10, 30, tzinfo=timezone.utc))
         # 2026-04-22 fue Miércoles (weekday=2), 14h
-        _seed(db_session, datetime(2026, 4, 22, 14, 5,
-                                   tzinfo=timezone.utc))
+        _seed(db_session, datetime(2026, 4, 22, 14, 5, tzinfo=timezone.utc))
 
         r = client.get("/audit/heatmap-actividad?dias=120")
         d = r.json()
@@ -87,10 +92,8 @@ class TestAuditHeatmap:
         assert items[(2, 14)]["count"] == 1
 
     def test_orden_dia_hora(self, client, db_session):
-        _seed(db_session, datetime(2026, 4, 20, 10, 0,
-                                   tzinfo=timezone.utc))
-        _seed(db_session, datetime(2026, 4, 22, 14, 0,
-                                   tzinfo=timezone.utc))
+        _seed(db_session, datetime(2026, 4, 20, 10, 0, tzinfo=timezone.utc))
+        _seed(db_session, datetime(2026, 4, 22, 14, 0, tzinfo=timezone.utc))
         r = client.get("/audit/heatmap-actividad?dias=120")
         d = r.json()
         keys = [(it["dia_semana"], it["hora"]) for it in d["items"]]

@@ -8,6 +8,7 @@ caliente y no paga el costo del walk sobre CIFS.
 Patrón idéntico a mantenimiento_scheduler: loop asyncio cancelado
 limpiamente en shutdown del lifespan de FastAPI.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -32,6 +33,7 @@ def _segundos_hasta_proxima_ejecucion() -> float:
 async def _ejecutar_safe() -> None:
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
+
         stats = get_indexer().rebuild()
         logger.info(
             f"[SOPORTES-REINDEX] OK: {stats['archivos_indexados']} archivos / "
@@ -51,7 +53,7 @@ async def _loop() -> None:
     while True:
         try:
             espera_s = _segundos_hasta_proxima_ejecucion()
-            logger.info(f"[SOPORTES-REINDEX] Próxima ejecución en {espera_s/3600:.1f}h")
+            logger.info(f"[SOPORTES-REINDEX] Próxima ejecución en {espera_s / 3600:.1f}h")
             await asyncio.sleep(espera_s)
             await _ejecutar_safe()
         except asyncio.CancelledError:
@@ -84,6 +86,7 @@ def iniciar_scheduler() -> None:
     try:
         from pathlib import Path
         import os as _os
+
         raiz_explicita = _os.getenv("SOPORTES_ROOT")
         if raiz_explicita and not Path(raiz_explicita).exists():
             logger.info(

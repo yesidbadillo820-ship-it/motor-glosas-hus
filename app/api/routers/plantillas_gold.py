@@ -4,6 +4,7 @@ Se guardan respuestas exitosas (glosa levantada por la EPS) y se usan como
 few-shot examples al generar respuestas para nuevas glosas del mismo
 (EPS, código). Efecto compuesto: cada victoria mejora las próximas.
 """
+
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -125,6 +126,7 @@ def crear_desde_glosa(
     # Extraer argumento limpio del HTML
     import re as _re
     from html import unescape
+
     txt = _re.sub(r"<[^>]+>", " ", g.dictamen)
     txt = _re.sub(r"\s+", " ", unescape(txt)).strip()
     for marker in ("ARGUMENTACIÓN JURÍDICA", "RESPUESTA A GLOSA"):
@@ -219,7 +221,9 @@ def eliminar(
     return {"message": "Plantilla eliminada"}
 
 
-def obtener_few_shot(db: Session, eps: str, codigo_glosa: str, limite: int = 2) -> list[PlantillaGoldRecord]:
+def obtener_few_shot(
+    db: Session, eps: str, codigo_glosa: str, limite: int = 2
+) -> list[PlantillaGoldRecord]:
     """Obtiene las mejores plantillas gold para inyectar como ejemplo en el
     prompt. Prioriza: match exacto de EPS y código, luego mismo código para
     cualquier EPS, ordenando por número de usos."""
@@ -357,11 +361,7 @@ def plantillas_no_usadas(
     """
     from datetime import timedelta, timezone
 
-    plantillas = (
-        db.query(PlantillaGoldRecord)
-        .filter(PlantillaGoldRecord.activa == 1)
-        .all()
-    )
+    plantillas = db.query(PlantillaGoldRecord).filter(PlantillaGoldRecord.activa == 1).all()
 
     ahora = ahora_utc()
     corte = ahora - timedelta(days=int(dias))
@@ -374,26 +374,23 @@ def plantillas_no_usadas(
 
         # Nunca usada O sin actividad en >N días
         if ult is None or ult < corte:
-            dias_sin = (
-                (ahora - ult).days if ult else None
+            dias_sin = (ahora - ult).days if ult else None
+            items.append(
+                {
+                    "id": p.id,
+                    "titulo": p.titulo,
+                    "eps": p.eps,
+                    "codigo_glosa": p.codigo_glosa,
+                    "usos": p.usos or 0,
+                    "ultima_uso_en": ult.isoformat() if ult else None,
+                    "dias_sin_uso": dias_sin,
+                    "creado_en": (p.creado_en.isoformat() if p.creado_en else None),
+                }
             )
-            items.append({
-                "id": p.id,
-                "titulo": p.titulo,
-                "eps": p.eps,
-                "codigo_glosa": p.codigo_glosa,
-                "usos": p.usos or 0,
-                "ultima_uso_en": ult.isoformat() if ult else None,
-                "dias_sin_uso": dias_sin,
-                "creado_en": (
-                    p.creado_en.isoformat() if p.creado_en else None
-                ),
-            })
 
     # nulls al final, los más antiguos arriba
     items.sort(
-        key=lambda x: (x["dias_sin_uso"] is None,
-                       -(x["dias_sin_uso"] or 0)),
+        key=lambda x: (x["dias_sin_uso"] is None, -(x["dias_sin_uso"] or 0)),
     )
 
     return {
@@ -431,11 +428,7 @@ def plantillas_efectividad(
 
     Ordenado DESC por usos.
     """
-    plantillas = (
-        db.query(PlantillaGoldRecord)
-        .filter(PlantillaGoldRecord.activa == 1)
-        .all()
-    )
+    plantillas = db.query(PlantillaGoldRecord).filter(PlantillaGoldRecord.activa == 1).all()
 
     items = []
     for p in plantillas:
@@ -446,34 +439,27 @@ def plantillas_efectividad(
         origen_estado = None
         valor_orig = 0.0
         if p.glosa_origen_id:
-            origen = (
-                db.query(GlosaRecord)
-                .filter(GlosaRecord.id == p.glosa_origen_id)
-                .first()
-            )
+            origen = db.query(GlosaRecord).filter(GlosaRecord.id == p.glosa_origen_id).first()
             if origen:
                 origen_estado = origen.estado
                 valor_orig = float(origen.valor_recuperado or 0)
 
-        es_gold_real = (
-            (p.usos or 0) >= 3 and
-            (origen_estado or "").upper() == "LEVANTADA"
-        )
+        es_gold_real = (p.usos or 0) >= 3 and (origen_estado or "").upper() == "LEVANTADA"
 
-        items.append({
-            "id": p.id,
-            "titulo": p.titulo,
-            "eps": p.eps,
-            "codigo_glosa": p.codigo_glosa,
-            "usos": p.usos or 0,
-            "glosa_origen_id": p.glosa_origen_id,
-            "glosa_origen_estado": origen_estado,
-            "valor_recuperado_origen": int(valor_orig),
-            "ultima_uso_en": (
-                p.ultima_uso_en.isoformat() if p.ultima_uso_en else None
-            ),
-            "es_gold_real": es_gold_real,
-        })
+        items.append(
+            {
+                "id": p.id,
+                "titulo": p.titulo,
+                "eps": p.eps,
+                "codigo_glosa": p.codigo_glosa,
+                "usos": p.usos or 0,
+                "glosa_origen_id": p.glosa_origen_id,
+                "glosa_origen_estado": origen_estado,
+                "valor_recuperado_origen": int(valor_orig),
+                "ultima_uso_en": (p.ultima_uso_en.isoformat() if p.ultima_uso_en else None),
+                "es_gold_real": es_gold_real,
+            }
+        )
 
     items.sort(key=lambda x: x["usos"], reverse=True)
 

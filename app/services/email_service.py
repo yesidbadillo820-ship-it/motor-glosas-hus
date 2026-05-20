@@ -74,7 +74,9 @@ def _enviar_sync(
                 else:
                     parte = MIMEApplication(contenido)
                 parte.add_header(
-                    "Content-Disposition", "attachment", filename=nombre,
+                    "Content-Disposition",
+                    "attachment",
+                    filename=nombre,
                 )
                 msg.attach(parte)
         else:
@@ -108,15 +110,22 @@ async def enviar_email(
 ) -> bool:
     loop = __import__("asyncio").get_event_loop()
     return await loop.run_in_executor(
-        _executor, _enviar_sync, destinatario, asunto, html, adjuntos,
+        _executor,
+        _enviar_sync,
+        destinatario,
+        asunto,
+        html,
+        adjuntos,
     )
 
 
-async def notificar_alerta_vencimiento(eps: str, dias_restantes: int, valor: float, destinatario: str):
+async def notificar_alerta_vencimiento(
+    eps: str, dias_restantes: int, valor: float, destinatario: str
+):
     cfg = get_settings()
     if not cfg.alertas_email:
         return
-    
+
     asunto = f"🔔 Alerta: Glosa próximo a vencer - {eps}"
     contenido = f"""
     <p style="color:#374151;font-size:14px;line-height:1.6">
@@ -140,7 +149,7 @@ async def notificar_batch_completado(batch_id: str, total: int, exitosas: int, d
     cfg = get_settings()
     if not cfg.alertas_email:
         return
-    
+
     asunto = f"✅ Importación masiva completada - {batch_id}"
     contenido = f"""
     <p style="color:#374151;font-size:14px;line-height:1.6">
@@ -170,6 +179,7 @@ def _buscar_emails_por_gestor(gestores_nombres: list, db=None) -> list:
         return []
     try:
         from app.models.db import UsuarioRecord
+
         usuarios = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all()
         emails = set()
         gestores_norm = [g.strip().upper() for g in gestores_nombres if g and g.strip()]
@@ -232,19 +242,19 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     sem_html = f"""
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0">
         <div style="background:#16a34a;color:white;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:22px;font-weight:bold">{semaforo.get('VERDE', 0)}</div>
+            <div style="font-size:22px;font-weight:bold">{semaforo.get("VERDE", 0)}</div>
             <div style="font-size:11px">🟢 VERDE (>10d)</div>
         </div>
         <div style="background:#eab308;color:white;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:22px;font-weight:bold">{semaforo.get('AMARILLO', 0)}</div>
+            <div style="font-size:22px;font-weight:bold">{semaforo.get("AMARILLO", 0)}</div>
             <div style="font-size:11px">🟡 AMARILLO (5-10d)</div>
         </div>
         <div style="background:#dc2626;color:white;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:22px;font-weight:bold">{semaforo.get('ROJO', 0)}</div>
+            <div style="font-size:22px;font-weight:bold">{semaforo.get("ROJO", 0)}</div>
             <div style="font-size:11px">🔴 ROJO (&lt;5d)</div>
         </div>
         <div style="background:#111827;color:white;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:22px;font-weight:bold">{semaforo.get('NEGRO', 0)}</div>
+            <div style="font-size:22px;font-weight:bold">{semaforo.get("NEGRO", 0)}</div>
             <div style="font-size:11px">⚫ VENCIDAS</div>
         </div>
     </div>
@@ -262,7 +272,7 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
         filas_gestor.append(f"""
         <div style="margin:15px 0;padding:12px;background:#f9fafb;border-radius:8px;border-left:3px solid #3b82f6">
             <div style="font-weight:bold;color:#1e40af;margin-bottom:8px">
-                👤 {gestor} <span style="color:#6b7280;font-weight:normal">({len(glosas)} glosa{'s' if len(glosas) != 1 else ''})</span>
+                👤 {gestor} <span style="color:#6b7280;font-weight:normal">({len(glosas)} glosa{"s" if len(glosas) != 1 else ""})</span>
             </div>
             <ul style="margin:0;padding-left:20px;font-size:12px;color:#374151">
                 {lista_facturas}{extra}
@@ -304,7 +314,7 @@ async def enviar_resumen_importacion_recepcion(resumen: dict, db=None) -> int:
     {sem_html}
 
     <h3 style="color:#111827;font-size:16px;margin:25px 0 10px">Asignaciones por gestor</h3>
-    {''.join(filas_gestor) or '<p style="color:#6b7280">No hay asignaciones.</p>'}
+    {"".join(filas_gestor) or '<p style="color:#6b7280">No hay asignaciones.</p>'}
 
     <p style="margin-top:30px;padding:15px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e">
         <b>Acción requerida:</b> ingresa al sistema para revisar las glosas asignadas y responderlas antes de su vencimiento.<br>
@@ -342,24 +352,43 @@ async def enviar_alertas_vencimiento_masivo(db) -> dict:
     """
     cfg = get_settings()
     if not cfg.alertas_email:
-        return {"destinatarios": 0, "correos_enviados": 0, "glosas_alertadas": 0, "error": "ALERTAS_EMAIL vacío"}
+        return {
+            "destinatarios": 0,
+            "correos_enviados": 0,
+            "glosas_alertadas": 0,
+            "error": "ALERTAS_EMAIL vacío",
+        }
 
     destinatarios = [e.strip() for e in cfg.alertas_email.split(",") if e.strip()]
     if not destinatarios:
         return {"destinatarios": 0, "correos_enviados": 0, "glosas_alertadas": 0}
 
     from app.models.db import GlosaRecord
-    rojas = db.query(GlosaRecord).filter(
-        GlosaRecord.prioridad == "ROJO",
-        GlosaRecord.estado.notin_(["LEVANTADA", "ACEPTADA", "CONCILIADA"]),
-    ).all()
-    negras = db.query(GlosaRecord).filter(
-        GlosaRecord.prioridad == "NEGRO",
-        GlosaRecord.estado.notin_(["LEVANTADA", "ACEPTADA", "CONCILIADA"]),
-    ).all()
+
+    rojas = (
+        db.query(GlosaRecord)
+        .filter(
+            GlosaRecord.prioridad == "ROJO",
+            GlosaRecord.estado.notin_(["LEVANTADA", "ACEPTADA", "CONCILIADA"]),
+        )
+        .all()
+    )
+    negras = (
+        db.query(GlosaRecord)
+        .filter(
+            GlosaRecord.prioridad == "NEGRO",
+            GlosaRecord.estado.notin_(["LEVANTADA", "ACEPTADA", "CONCILIADA"]),
+        )
+        .all()
+    )
 
     if not rojas and not negras:
-        return {"destinatarios": len(destinatarios), "correos_enviados": 0, "glosas_alertadas": 0, "mensaje": "Sin glosas críticas"}
+        return {
+            "destinatarios": len(destinatarios),
+            "correos_enviados": 0,
+            "glosas_alertadas": 0,
+            "mensaje": "Sin glosas críticas",
+        }
 
     def _filas(lista, color_hex):
         if not lista:
@@ -375,14 +404,18 @@ async def enviar_alertas_vencimiento_masivo(db) -> dict:
                 f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:{color_hex};font-weight:bold">{dias} días</td></tr>'
             )
         if len(lista) > 40:
-            filas.append(f'<tr><td colspan="5" style="padding:6px 10px;color:#6b7280;font-style:italic">...y {len(lista) - 40} glosas más</td></tr>')
+            filas.append(
+                f'<tr><td colspan="5" style="padding:6px 10px;color:#6b7280;font-style:italic">...y {len(lista) - 40} glosas más</td></tr>'
+            )
         return "".join(filas)
 
     rojas_html = _filas(rojas, "#b91c1c")
     negras_html = _filas(negras, "#0f172a")
 
     total = len(rojas) + len(negras)
-    asunto = f"⚠ Motor Glosas HUS — {total} glosas críticas ({len(rojas)} rojas, {len(negras)} vencidas)"
+    asunto = (
+        f"⚠ Motor Glosas HUS — {total} glosas críticas ({len(rojas)} rojas, {len(negras)} vencidas)"
+    )
 
     contenido = f"""
     <p style="color:#374151;font-size:14px;line-height:1.6">
@@ -435,7 +468,9 @@ async def enviar_alertas_vencimiento_masivo(db) -> dict:
         if await enviar_email(d, asunto, html):
             enviados += 1
 
-    logger.info(f"Alertas de vencimiento enviadas: {enviados}/{len(destinatarios)} | {total} glosas críticas")
+    logger.info(
+        f"Alertas de vencimiento enviadas: {enviados}/{len(destinatarios)} | {total} glosas críticas"
+    )
     return {
         "destinatarios": len(destinatarios),
         "correos_enviados": enviados,
@@ -449,28 +484,28 @@ async def enviar_resumen_semanal(destinatario: str, metricas: dict):
     cfg = get_settings()
     if not cfg.alertas_email:
         return
-    
+
     asunto = "📊 Resumen semanal - Sistema de Glosas HUS"
     ahora = datetime.now()
     contenido = f"""
     <p style="color:#374151;font-size:14px;line-height:1.6">
-        Resumen de la semana del {ahora.strftime('%d de %B de %Y')}
+        Resumen de la semana del {ahora.strftime("%d de %B de %Y")}
     </p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin:20px 0">
         <div style="background:#eff6ff;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:24px;font-weight:bold;color:#1e40af">{metricas.get('total_glosas', 0)}</div>
+            <div style="font-size:24px;font-weight:bold;color:#1e40af">{metricas.get("total_glosas", 0)}</div>
             <div style="font-size:12px;color:#6b7280">Glosas procesadas</div>
         </div>
         <div style="background:#f0fdf4;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:24px;font-weight:bold;color:#15803d">${metricas.get('valor_recuperado', 0):,.0f}</div>
+            <div style="font-size:24px;font-weight:bold;color:#15803d">${metricas.get("valor_recuperado", 0):,.0f}</div>
             <div style="font-size:12px;color:#6b7280">Valor recuperado</div>
         </div>
         <div style="background:#fef3c7;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:24px;font-weight:bold;color:#b45309">{metricas.get('tasa_exito', 0)}%</div>
+            <div style="font-size:24px;font-weight:bold;color:#b45309">{metricas.get("tasa_exito", 0)}%</div>
             <div style="font-size:12px;color:#6b7280">Tasa de éxito</div>
         </div>
         <div style="background:#fce7f3;border-radius:8px;padding:15px;text-align:center">
-            <div style="font-size:24px;font-weight:bold;color:#9d174d">{metricas.get('glosas_pendientes', 0)}</div>
+            <div style="font-size:24px;font-weight:bold;color:#9d174d">{metricas.get("glosas_pendientes", 0)}</div>
             <div style="font-size:12px;color:#6b7280">Pendientes</div>
         </div>
     </div>
@@ -478,9 +513,7 @@ async def enviar_resumen_semanal(destinatario: str, metricas: dict):
     await enviar_email(destinatario, asunto, _build_html_base(asunto, contenido))
 
 
-_XLSX_MIME_SUBTYPE = (
-    "vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+_XLSX_MIME_SUBTYPE = "vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _mapear_gestor_a_emails(db) -> dict[str, list[str]]:
@@ -491,6 +524,7 @@ def _mapear_gestor_a_emails(db) -> dict[str, list[str]]:
         return {}
     try:
         from app.models.db import UsuarioRecord
+
         usuarios = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all()
         out: dict[str, list[str]] = {}
         for u in usuarios:
@@ -504,9 +538,7 @@ def _mapear_gestor_a_emails(db) -> dict[str, list[str]]:
         return {}
 
 
-def _emails_para_gestor(
-    nombre_gestor: str, mapa_gestor_emails: dict[str, list[str]]
-) -> list[str]:
+def _emails_para_gestor(nombre_gestor: str, mapa_gestor_emails: dict[str, list[str]]) -> list[str]:
     """Match flexible: igualdad, contains en ambos sentidos."""
     g = (nombre_gestor or "").strip().upper()
     if not g:
@@ -536,9 +568,7 @@ async def enviar_excel_recepcion_con_respuestas(
     """
     cfg = get_settings()
     if not cfg.smtp_user or not cfg.smtp_password:
-        logger.warning(
-            "[EXCEL-EMAIL] no enviado: SMTP_USER/SMTP_PASSWORD vacíos"
-        )
+        logger.warning("[EXCEL-EMAIL] no enviado: SMTP_USER/SMTP_PASSWORD vacíos")
         return {"destinatarios": 0, "enviados": 0, "gestores_atendidos": 0}
 
     if not excel_original:
@@ -587,11 +617,11 @@ async def enviar_excel_recepcion_con_respuestas(
         try:
             logger.info("[EXCEL-EMAIL] generando broadcast sin resaltado...")
             xlsx_broadcast = generar_excel_con_respuestas(
-                excel_original, respuestas_por_clave, gestor_destacar=None,
+                excel_original,
+                respuestas_por_clave,
+                gestor_destacar=None,
             )
-            logger.info(
-                f"[EXCEL-EMAIL] broadcast generado: {len(xlsx_broadcast)} bytes"
-            )
+            logger.info(f"[EXCEL-EMAIL] broadcast generado: {len(xlsx_broadcast)} bytes")
             asunto_bc = (
                 f"📋 Recepción HUS — {total} glosas procesadas por la IA (copia coordinación)"
             )
@@ -615,29 +645,29 @@ async def enviar_excel_recepcion_con_respuestas(
                 if await enviar_email(d, asunto_bc, html_bc, adjuntos=[adj_bc]):
                     enviados += 1
                     broadcast_ok = True
-            logger.info(
-                f"[EXCEL-EMAIL] broadcast: enviados={enviados}, ok={broadcast_ok}"
-            )
+            logger.info(f"[EXCEL-EMAIL] broadcast: enviados={enviados}, ok={broadcast_ok}")
         except Exception as e:
             logger.error(
-                f"[EXCEL-EMAIL] broadcast coordinación falló: "
-                f"{type(e).__name__}: {e}",
+                f"[EXCEL-EMAIL] broadcast coordinación falló: {type(e).__name__}: {e}",
                 exc_info=True,
             )
     else:
-        logger.warning(
-            "[EXCEL-EMAIL] ALERTAS_EMAIL vacío — no hay broadcast de respaldo"
-        )
+        logger.warning("[EXCEL-EMAIL] ALERTAS_EMAIL vacío — no hay broadcast de respaldo")
 
     # ── 2. Loop por gestor ──────────────────────────────────────────
     for nombre_gestor, filas in sorted(por_gestor.items()):
         emails = _emails_para_gestor(nombre_gestor, mapa)
         if not emails:
             gestores_sin_email.append(nombre_gestor)
-            gestores_detalle.append({
-                "gestor": nombre_gestor, "glosas": len(filas),
-                "emails": 0, "enviado": False, "motivo": "sin email en UsuarioRecord",
-            })
+            gestores_detalle.append(
+                {
+                    "gestor": nombre_gestor,
+                    "glosas": len(filas),
+                    "emails": 0,
+                    "enviado": False,
+                    "motivo": "sin email en UsuarioRecord",
+                }
+            )
             logger.info(
                 f"[EXCEL-EMAIL] Gestor '{nombre_gestor}' ({len(filas)} glosas) "
                 f"sin email asociado en UsuarioRecord — su Excel queda solo "
@@ -645,9 +675,7 @@ async def enviar_excel_recepcion_con_respuestas(
             )
             continue
         gestores_atendidos += 1
-        logger.info(
-            f"[EXCEL-EMAIL] Gestor '{nombre_gestor}' → emails={emails}"
-        )
+        logger.info(f"[EXCEL-EMAIL] Gestor '{nombre_gestor}' → emails={emails}")
 
         try:
             xlsx_bytes = generar_excel_con_respuestas(
@@ -665,18 +693,32 @@ async def enviar_excel_recepcion_con_respuestas(
 
         n_filas = len(filas)
         n_respondidas = sum(
-            1 for f in filas
-            if respuestas_por_clave.get((
-                (f.get("factura") or "").strip().upper(),
-                (f.get("consecutivo_dgh") or "").strip().upper(),
-            ), {}).get("estado", "").upper() == "RESPONDIDA"
+            1
+            for f in filas
+            if respuestas_por_clave.get(
+                (
+                    (f.get("factura") or "").strip().upper(),
+                    (f.get("consecutivo_dgh") or "").strip().upper(),
+                ),
+                {},
+            )
+            .get("estado", "")
+            .upper()
+            == "RESPONDIDA"
         )
         n_requieren = sum(
-            1 for f in filas
-            if respuestas_por_clave.get((
-                (f.get("factura") or "").strip().upper(),
-                (f.get("consecutivo_dgh") or "").strip().upper(),
-            ), {}).get("estado", "").upper() == "REQUIERE_SOPORTES"
+            1
+            for f in filas
+            if respuestas_por_clave.get(
+                (
+                    (f.get("factura") or "").strip().upper(),
+                    (f.get("consecutivo_dgh") or "").strip().upper(),
+                ),
+                {},
+            )
+            .get("estado", "")
+            .upper()
+            == "REQUIERE_SOPORTES"
         )
 
         asunto = (
@@ -717,11 +759,15 @@ async def enviar_excel_recepcion_con_respuestas(
             if await enviar_email(email, asunto, html, adjuntos=[adjunto]):
                 enviados += 1
                 enviado_gestor = True
-        gestores_detalle.append({
-            "gestor": nombre_gestor, "glosas": len(filas),
-            "emails": len(emails), "enviado": enviado_gestor,
-            "motivo": "" if enviado_gestor else "fallo SMTP",
-        })
+        gestores_detalle.append(
+            {
+                "gestor": nombre_gestor,
+                "glosas": len(filas),
+                "emails": len(emails),
+                "enviado": enviado_gestor,
+                "motivo": "" if enviado_gestor else "fallo SMTP",
+            }
+        )
 
     logger.info(
         f"[EXCEL-EMAIL] ✅ flujo terminó: enviados={enviados}, "

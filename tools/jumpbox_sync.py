@@ -30,6 +30,7 @@ CAVEATS
     - Es Plan B. Reemplazalo por mount CIFS apenas Infra te dé la
        cuenta de servicio.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -156,8 +157,14 @@ def fetch_facturas_objetivo() -> set[str]:
             f = (g.get("factura") or "").upper().strip()
             estado = (g.get("estado") or "").upper()
             wf = (g.get("workflow_state") or "").upper()
-            terminales_estado = {"LEVANTADA", "CONCILIADA", "ACEPTADA",
-                                 "RATIFICADA", "ARCHIVADA", "DUPLICADA_OCULTA"}
+            terminales_estado = {
+                "LEVANTADA",
+                "CONCILIADA",
+                "ACEPTADA",
+                "RATIFICADA",
+                "ARCHIVADA",
+                "DUPLICADA_OCULTA",
+            }
             terminales_wf = {"RESPONDIDA", "CONCILIADA", "LEVANTADA"}
             if estado in terminales_estado or wf in terminales_wf:
                 continue  # ya respondida — no necesita PDFs nuevos
@@ -212,9 +219,7 @@ def post_batch(archivos_batch: list[tuple[Path, str]]) -> dict:
                 return r.json()
             except requests.RequestException as e:
                 ultimo_error = e
-                logger.warning(
-                    f"Batch falló intento {intento}/{REINTENTOS}: {e}"
-                )
+                logger.warning(f"Batch falló intento {intento}/{REINTENTOS}: {e}")
                 if intento < REINTENTOS:
                     time.sleep(PAUSA_REINTENTO_S * intento)
         raise RuntimeError(f"Batch falló tras {REINTENTOS} reintentos: {ultimo_error}")
@@ -248,6 +253,7 @@ def post_reindex() -> dict:
 # minúsculas). Con eso bajás de 300k archivos a ~50k.
 import re
 import os as _os
+
 _RE_CARPETA_MES = re.compile(
     r"^(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|"
     r"SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s+\d{4}\s*-\s*SOPORTES",
@@ -298,10 +304,7 @@ def iter_archivos(raiz: Path) -> Iterator[Path]:
     if _FILTRO_MESES_ON:
         # Iterar solo dentro de las carpetas de primer nivel que
         # matchean "{MES} {AÑO} - SOPORTES RADICACION".
-        carpetas_validas = [
-            d for d in raiz.iterdir()
-            if d.is_dir() and _carpeta_mes_valida(d.name)
-        ]
+        carpetas_validas = [d for d in raiz.iterdir() if d.is_dir() and _carpeta_mes_valida(d.name)]
         if not carpetas_validas:
             logger.warning(
                 f"No encontré carpetas que matcheen '{{MES}} {{AÑO}} - SOPORTES "
@@ -359,9 +362,7 @@ def cargar_estado() -> dict:
 def guardar_estado(estado: dict) -> None:
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
-        STATE_FILE.write_text(
-            json.dumps(estado, indent=2, default=str), encoding="utf-8"
-        )
+        STATE_FILE.write_text(json.dumps(estado, indent=2, default=str), encoding="utf-8")
     except Exception as e:
         logger.warning(f"No pude guardar estado: {e}")
 
@@ -533,7 +534,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--once", action="store_true", help="Una sola pasada y salir")
     parser.add_argument("--loop", action="store_true", help="Pasada cada --interval-min minutos")
-    parser.add_argument("--interval-min", type=int, default=30, help="Intervalo entre pasadas en modo loop")
+    parser.add_argument(
+        "--interval-min", type=int, default=30, help="Intervalo entre pasadas en modo loop"
+    )
     parser.add_argument(
         "--solo-pendientes",
         action="store_true",

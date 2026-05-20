@@ -1,8 +1,8 @@
 """Tests del RAG service (precedentes internos del HUS) — R51 P4."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import create_engine
@@ -57,24 +57,39 @@ def db():
     S = sessionmaker(bind=engine)
     s = S()
     # Seed precedentes exitosos del HUS
-    s.add(GlosaRecord(
-        eps="FAMISANAR", codigo_glosa="TA0201",
-        dictamen="Dictamen sobre tarifa contrato consulta urgencias...",
-        decision_eps="LEVANTADA", etapa="respuesta",
-        valor_objetado=100000, creado_en=datetime.now(timezone.utc),
-    ))
-    s.add(GlosaRecord(
-        eps="FAMISANAR", codigo_glosa="TA0202",
-        dictamen="Otra tarifa pactada contrato consulta especialista...",
-        decision_eps="LEVANTADA", etapa="respuesta",
-        valor_objetado=200000, creado_en=datetime.now(timezone.utc),
-    ))
-    s.add(GlosaRecord(
-        eps="SALUD TOTAL", codigo_glosa="SO0101",
-        dictamen="Soporte historia clínica completa institucional...",
-        decision_eps="RATIFICADA", etapa="respuesta",
-        valor_objetado=50000, creado_en=datetime.now(timezone.utc),
-    ))
+    s.add(
+        GlosaRecord(
+            eps="FAMISANAR",
+            codigo_glosa="TA0201",
+            dictamen="Dictamen sobre tarifa contrato consulta urgencias...",
+            decision_eps="LEVANTADA",
+            etapa="respuesta",
+            valor_objetado=100000,
+            creado_en=datetime.now(timezone.utc),
+        )
+    )
+    s.add(
+        GlosaRecord(
+            eps="FAMISANAR",
+            codigo_glosa="TA0202",
+            dictamen="Otra tarifa pactada contrato consulta especialista...",
+            decision_eps="LEVANTADA",
+            etapa="respuesta",
+            valor_objetado=200000,
+            creado_en=datetime.now(timezone.utc),
+        )
+    )
+    s.add(
+        GlosaRecord(
+            eps="SALUD TOTAL",
+            codigo_glosa="SO0101",
+            dictamen="Soporte historia clínica completa institucional...",
+            decision_eps="RATIFICADA",
+            etapa="respuesta",
+            valor_objetado=50000,
+            creado_en=datetime.now(timezone.utc),
+        )
+    )
     s.commit()
     try:
         yield s
@@ -86,8 +101,12 @@ class TestBuscarCasosSimilares:
     def test_filtra_por_solo_exitosos(self, db):
         """Por defecto solo trae LEVANTADAS."""
         r = RAGService().buscar_casos_similares(
-            "tarifa contrato consulta", "FAMISANAR", "TA0201", db,
-            top_k=5, solo_exitosos=True,
+            "tarifa contrato consulta",
+            "FAMISANAR",
+            "TA0201",
+            db,
+            top_k=5,
+            solo_exitosos=True,
         )
         # Los dos TA (levantados) pueden aparecer; el SO (ratificado) no
         for c in r:
@@ -96,8 +115,12 @@ class TestBuscarCasosSimilares:
     def test_bonus_eps_y_codigo_mejora_ranking(self, db):
         """Un caso con la misma EPS y prefijo de código debe rankear alto."""
         r = RAGService().buscar_casos_similares(
-            "tarifa contrato pactada", "FAMISANAR", "TA0299", db,
-            top_k=3, solo_exitosos=True,
+            "tarifa contrato pactada",
+            "FAMISANAR",
+            "TA0299",
+            db,
+            top_k=3,
+            solo_exitosos=True,
         )
         assert len(r) > 0
         # Los códigos TA* de FAMISANAR deben aparecer
@@ -111,7 +134,11 @@ class TestBuscarCasosSimilares:
         empty = S()
         try:
             r = RAGService().buscar_casos_similares(
-                "cualquier texto", "FAMISANAR", "TA0201", empty, top_k=3,
+                "cualquier texto",
+                "FAMISANAR",
+                "TA0201",
+                empty,
+                top_k=3,
             )
             assert r == []
         finally:
@@ -123,13 +150,17 @@ class TestConstruirContextoRag:
         assert RAGService().construir_contexto_rag([]) == ""
 
     def test_con_casos_construye_bloque_precedentes(self):
-        casos = [{
-            "codigo_glosa": "TA0201", "eps": "FAMISANAR",
-            "etapa": "respuesta", "decision_eps": "LEVANTADA",
-            "score_similitud": 0.75,
-            "extracto_dictamen": "Extracto del precedente...",
-            "id": 1,
-        }]
+        casos = [
+            {
+                "codigo_glosa": "TA0201",
+                "eps": "FAMISANAR",
+                "etapa": "respuesta",
+                "decision_eps": "LEVANTADA",
+                "score_similitud": 0.75,
+                "extracto_dictamen": "Extracto del precedente...",
+                "id": 1,
+            }
+        ]
         ctx = RAGService().construir_contexto_rag(casos)
         assert "PRECEDENTES EXITOSOS" in ctx
         assert "TA0201" in ctx

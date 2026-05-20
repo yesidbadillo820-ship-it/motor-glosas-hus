@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/facetas (R88 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100, etapa="RESPUESTA_PRIMERA", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100,
+        etapa="RESPUESTA_PRIMERA",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -61,17 +67,38 @@ class TestGlosasFacetas:
         assert r.status_code == 200, r.text
         d = r.json()
         assert d == {
-            "eps": [], "etapas": [], "estados": [],
-            "codigos_glosa": [], "gestores": [],
+            "eps": [],
+            "etapas": [],
+            "estados": [],
+            "codigos_glosa": [],
+            "gestores": [],
         }
 
     def test_distinct_y_ordenado(self, client, db_session):
-        _seed(db_session, eps="SANITAS", codigo_glosa="TA0201",
-              etapa="A", estado="RADICADA", gestor_nombre="Ana")
-        _seed(db_session, eps="SANITAS", codigo_glosa="TA0201",
-              etapa="A", estado="RADICADA", gestor_nombre="Ana")  # duplicado
-        _seed(db_session, eps="NUEVA EPS", codigo_glosa="FA0603",
-              etapa="B", estado="ACEPTADA", gestor_nombre="Bruno")
+        _seed(
+            db_session,
+            eps="SANITAS",
+            codigo_glosa="TA0201",
+            etapa="A",
+            estado="RADICADA",
+            gestor_nombre="Ana",
+        )
+        _seed(
+            db_session,
+            eps="SANITAS",
+            codigo_glosa="TA0201",
+            etapa="A",
+            estado="RADICADA",
+            gestor_nombre="Ana",
+        )  # duplicado
+        _seed(
+            db_session,
+            eps="NUEVA EPS",
+            codigo_glosa="FA0603",
+            etapa="B",
+            estado="ACEPTADA",
+            gestor_nombre="Bruno",
+        )
 
         r = client.get("/glosas/facetas")
         d = r.json()

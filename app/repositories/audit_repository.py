@@ -52,11 +52,18 @@ class AuditRepository:
             q = q.filter(AuditLogRecord.tabla == tabla.lower())
         total = q.count()
         items = q.offset((page - 1) * per_page).limit(per_page).all()
-        return {"items": items, "total": total, "page": page,
-                "per_page": per_page, "pages": (total + per_page - 1) // per_page}
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page,
+        }
 
     def por_registro(self, tabla: str, registro_id: int) -> list:
-        return (self.db.query(AuditLogRecord)
-                .filter(AuditLogRecord.tabla == tabla,
-                        AuditLogRecord.registro_id == registro_id)
-                .order_by(desc(AuditLogRecord.timestamp)).all())
+        return (
+            self.db.query(AuditLogRecord)
+            .filter(AuditLogRecord.tabla == tabla, AuditLogRecord.registro_id == registro_id)
+            .order_by(desc(AuditLogRecord.timestamp))
+            .all()
+        )

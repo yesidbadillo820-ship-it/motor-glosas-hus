@@ -26,6 +26,7 @@ Para cada fila:
 - Se calcula el semáforo por días hábiles restantes hasta VENCE.
 - Upsert por CONSECUTIVO DGH (o por factura si no viene consecutivo).
 """
+
 from __future__ import annotations
 
 import re
@@ -47,7 +48,7 @@ from app.services.glosa_service import (
 
 
 # ─── Parámetros de semáforo (días hábiles restantes) ─────────────────────────
-SEMAFORO_VERDE_MIN = 11   # >10 días
+SEMAFORO_VERDE_MIN = 11  # >10 días
 SEMAFORO_AMARILLO_MIN = 5  # 5-10 días
 # <5 días → ROJO; <=0 → NEGRO
 
@@ -64,13 +65,17 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "fecha_entrega": ["fecha de entrega", "fecha entrega"],
     "fecha_radicacion": ["fecha radicacion", "fecha de radicacion"],
     "fecha_documento_dgh": [
-        "fecha documento dgh", "fecha dgh",
-        "fecha de documento (dgh)", "fecha de documento dgh",
+        "fecha documento dgh",
+        "fecha dgh",
+        "fecha de documento (dgh)",
+        "fecha de documento dgh",
         "fecha documento (dgh)",
     ],
     "fecha_recepcion": [
-        "fecha recepcion", "fecha de recepcion",
-        "fecha notificacion objecion", "fecha de notificacion objecion",
+        "fecha recepcion",
+        "fecha de recepcion",
+        "fecha notificacion objecion",
+        "fecha de notificacion objecion",
     ],
     "entidad": ["entidad", "eps", "empresa"],
     "factura": ["factura", "numero de factura", "numero factura"],
@@ -82,15 +87,26 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "radicado": ["radicado"],
     "referencia": ["referencia"],
     "observacion_tecnico": [
-        "observacion tecnico", "observacion", "obs tecnico",
-        "observacion recepcion", "observacion de recepcion",
+        "observacion tecnico",
+        "observacion",
+        "obs tecnico",
+        "observacion recepcion",
+        "observacion de recepcion",
     ],
     "tecnico_recepcion": [
-        "tecnico que recepciono", "tecnico recepcion",
-        "tecnico recepciono", "tecnico que recepciona",
+        "tecnico que recepciono",
+        "tecnico recepcion",
+        "tecnico recepciono",
+        "tecnico que recepciona",
     ],
     "tipo_glosa": ["tipo glosa", "tipo de glosa"],
-    "profesional_medico": ["profesional(medico)", "profesional (medico)", "profesional medico", "profesional", "medico auditor"],
+    "profesional_medico": [
+        "profesional(medico)",
+        "profesional (medico)",
+        "profesional medico",
+        "profesional",
+        "medico auditor",
+    ],
 }
 
 # ─── Columnas de las hojas DETALLE (I / R) del DGH ───────────────────────────
@@ -130,6 +146,7 @@ CONCEPTO_COLS: dict[str, list[str]] = {
 
 def _normalizar(texto: str) -> str:
     import unicodedata
+
     t = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
     return re.sub(r"\s+", " ", t).strip().lower()
 
@@ -187,7 +204,9 @@ def _split_entidad(entidad: str) -> tuple[str, str]:
     return "", entidad.strip()
 
 
-def _mapear_cabeceras(fila_encabezado: tuple, mapa: dict[str, list[str]] | None = None) -> dict[str, int]:
+def _mapear_cabeceras(
+    fila_encabezado: tuple, mapa: dict[str, list[str]] | None = None
+) -> dict[str, int]:
     """Devuelve {nombre_interno: índice_columna}.
 
     Por defecto usa COLUMN_ALIASES (hojas INICIAL/RATIFICADA). Pasa
@@ -247,10 +266,17 @@ def _a_fecha(valor) -> Optional[datetime]:
         return None
     s_norm = re.sub(r"[.\s-]+", "/", s)
     for fmt in (
-        "%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S",
-        "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
-        "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y", "%m/%d/%Y",
-        "%Y/%m/%d", "%d-%m-%y",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%d/%m/%Y",
+        "%Y-%m-%d",
+        "%d-%m-%Y",
+        "%d/%m/%y",
+        "%m/%d/%Y",
+        "%Y/%m/%d",
+        "%d-%m-%y",
     ):
         try:
             return datetime.strptime(s, fmt)
@@ -307,7 +333,7 @@ def _a_float(valor) -> float:
         if s.rfind(",") > s.rfind("."):
             s = s.replace(".", "").replace(",", ".")  # 1.234.567,89
         else:
-            s = s.replace(",", "")                     # 1,234,567.89
+            s = s.replace(",", "")  # 1,234,567.89
     elif tiene_coma:
         # Una sola coma con 1-2 decimales → decimal; si no, miles.
         if s.count(",") == 1 and len(s.split(",")[1]) in (1, 2):
@@ -541,8 +567,12 @@ class RecepcionService:
             # la hoja se descartaba entera → las glosas INICIAL (las
             # nuevas) NO se importaban. Las filas de datos no matchean ≥3
             # alias de encabezado, así que ampliar es seguro.
-            fila_h_rec, idx_rec = _buscar_fila_encabezado(ws, max_filas=20, mapa=COLUMN_ALIASES, min_aciertos=3)
-            fila_h_con, idx_con = _buscar_fila_encabezado(ws, max_filas=20, mapa=CONCEPTO_COLS, min_aciertos=4)
+            fila_h_rec, idx_rec = _buscar_fila_encabezado(
+                ws, max_filas=20, mapa=COLUMN_ALIASES, min_aciertos=3
+            )
+            fila_h_con, idx_con = _buscar_fila_encabezado(
+                ws, max_filas=20, mapa=CONCEPTO_COLS, min_aciertos=4
+            )
 
             if idx_con and "concepto_codigo" in idx_con and "factura" in idx_con:
                 plan.append(("CONCEPTOS", nombre_hoja, fila_h_con, idx_con))
@@ -551,11 +581,13 @@ class RecepcionService:
             else:
                 detectadas = sorted(set((idx_rec or {}).keys()))
                 faltan = sorted({"factura", "vence"} - set(detectadas))
-                resumen.hojas_descartadas.append({
-                    "hoja": nombre_hoja,
-                    "columnas_detectadas": detectadas,
-                    "columnas_faltantes": faltan,
-                })
+                resumen.hojas_descartadas.append(
+                    {
+                        "hoja": nombre_hoja,
+                        "columnas_detectadas": detectadas,
+                        "columnas_faltantes": faltan,
+                    }
+                )
                 resumen.errores.append(
                     f"Hoja '{nombre_hoja}' descartada: no se reconocieron "
                     f"las columnas mínimas (faltan: "
@@ -563,8 +595,7 @@ class RecepcionService:
                     f"Detectadas: {', '.join(detectadas) or 'ninguna'}."
                 )
                 logger.warning(
-                    f"Hoja '{nombre_hoja}' sin columnas reconocibles — "
-                    f"saltando (faltan: {faltan})"
+                    f"Hoja '{nombre_hoja}' sin columnas reconocibles — saltando (faltan: {faltan})"
                 )
 
         # Procesar RECEPCION primero, CONCEPTOS después
@@ -582,8 +613,7 @@ class RecepcionService:
                     break
 
             hoja_es_ratificada = (
-                "RATIFIC" in (nombre_hoja or "").upper()
-                or nombre_hoja.strip().upper() == "R"
+                "RATIFIC" in (nombre_hoja or "").upper() or nombre_hoja.strip().upper() == "R"
             )
 
             if tipo == "RECEPCION":
@@ -651,7 +681,8 @@ class RecepcionService:
                     if not factura:
                         falta.append("FACTURA")
                     resumen.registrar_omitida(
-                        num_fila, f"sin {' y '.join(falta)}",
+                        num_fila,
+                        f"sin {' y '.join(falta)}",
                     )
                     continue
 
@@ -728,15 +759,19 @@ class RecepcionService:
                     estado = "RADICADA"
                     requiere_ia = True
                     nota_obs = (
-                        f'<div style="margin-top:10px;padding:10px;background:#fef3c7;border-left:3px solid #eab308;border-radius:6px;font-size:12px">'
-                        f'<b>⚠ Observación técnico:</b> {observacion_tecnico}</div>'
-                    ) if observacion_tecnico else ""
+                        (
+                            f'<div style="margin-top:10px;padding:10px;background:#fef3c7;border-left:3px solid #eab308;border-radius:6px;font-size:12px">'
+                            f"<b>⚠ Observación técnico:</b> {observacion_tecnico}</div>"
+                        )
+                        if observacion_tecnico
+                        else ""
+                    )
                     dictamen = (
                         f'<div style="padding:15px;background:#f8fafc;border-radius:8px;">'
-                        f'<b>Glosa importada desde recepción.</b><br>'
-                        f'Pendiente de análisis y respuesta por el gestor asignado.'
-                        f'{nota_obs}'
-                        f'</div>'
+                        f"<b>Glosa importada desde recepción.</b><br>"
+                        f"Pendiente de análisis y respuesta por el gestor asignado."
+                        f"{nota_obs}"
+                        f"</div>"
                     )
 
                 # Upsert por (factura + consecutivo_dgh) o solo factura si no hay consecutivo
@@ -789,14 +824,16 @@ class RecepcionService:
                     )
                     if es_duplicado_exacto:
                         resumen.duplicadas += 1
-                        resumen.duplicadas_detalle.append({
-                            "fila": num_fila,
-                            "factura": factura,
-                            "consecutivo_dgh": consecutivo,
-                            "valor": valor,
-                            "glosa_existente_id": existente.id,
-                            "motivo": "Misma factura + consecutivo + valor + fecha recepción",
-                        })
+                        resumen.duplicadas_detalle.append(
+                            {
+                                "fila": num_fila,
+                                "factura": factura,
+                                "consecutivo_dgh": consecutivo,
+                                "valor": valor,
+                                "glosa_existente_id": existente.id,
+                                "motivo": "Misma factura + consecutivo + valor + fecha recepción",
+                            }
+                        )
                         if existente.id is not None:
                             resumen.glosas_ids_todas.append(existente.id)
                         continue
@@ -820,18 +857,22 @@ class RecepcionService:
 
                 resumen.total += 1
                 resumen.semaforo[semaforo] = resumen.semaforo.get(semaforo, 0) + 1
-                resumen.por_gestor.setdefault(gestor, []).append({
-                    "factura": factura,
-                    "consecutivo_dgh": consecutivo,
-                    "eps": entidad,
-                    "valor": valor,
-                    "vence": fecha_vence.strftime("%d/%m/%Y"),
-                    "fecha_entrega": fecha_entrega.strftime("%d/%m/%Y") if fecha_entrega else "N/A",
-                    "semaforo": semaforo,
-                    "estado": estado,
-                    "tipo_glosa": tipo_glosa_excel or "-",
-                    "radicado": numero_radicado_real or "-",
-                })
+                resumen.por_gestor.setdefault(gestor, []).append(
+                    {
+                        "factura": factura,
+                        "consecutivo_dgh": consecutivo,
+                        "eps": entidad,
+                        "valor": valor,
+                        "vence": fecha_vence.strftime("%d/%m/%Y"),
+                        "fecha_entrega": fecha_entrega.strftime("%d/%m/%Y")
+                        if fecha_entrega
+                        else "N/A",
+                        "semaforo": semaforo,
+                        "estado": estado,
+                        "tipo_glosa": tipo_glosa_excel or "-",
+                        "radicado": numero_radicado_real or "-",
+                    }
+                )
 
             except Exception as e:
                 resumen.errores.append(f"Fila {num_fila}: {e}")
@@ -978,16 +1019,18 @@ class RecepcionService:
                             pass
                     _padre_cache[_ck] = glosa_padre
                 if not glosa_padre:
-                    resumen.conceptos_huerfanos.append({
-                        "fila": num_fila,
-                        "hoja": nombre_hoja,
-                        "factura": factura,
-                        "consecutivo_dgh": consecutivo,
-                        "codigo_glosa": codigo_glosa,
-                        "cups": cups_codigo,
-                        "valor": valor_obj,
-                        "motivo": "No existe glosa con esa FACTURA (carga primero INICIAL/RATIFICADA)",
-                    })
+                    resumen.conceptos_huerfanos.append(
+                        {
+                            "fila": num_fila,
+                            "hoja": nombre_hoja,
+                            "factura": factura,
+                            "consecutivo_dgh": consecutivo,
+                            "codigo_glosa": codigo_glosa,
+                            "cups": cups_codigo,
+                            "valor": valor_obj,
+                            "motivo": "No existe glosa con esa FACTURA (carga primero INICIAL/RATIFICADA)",
+                        }
+                    )
                     continue
 
                 # Extra: completar metadatos de la glosa padre desde la hoja I/R

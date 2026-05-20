@@ -12,6 +12,7 @@ introducir el campo `dictamen_generado_en` no tienen timestamp, y el campo
 queda NULL hasta que se re-analicen. Sin la detección por texto esos
 dictámenes se quedarían silenciosamente obsoletos.
 """
+
 from __future__ import annotations
 
 import re
@@ -46,7 +47,7 @@ _CANONICA_RATIFICADA = "NO ACEPTA GLOSA RATIFICADA"
 
 # Indicadores en el texto de la glosa o etapa que delatan ratificación.
 _INDICADORES_RATIFICACION = (
-    "RATIFIC",   # RATIFICACION / RATIFICADA / RATIFICACIÓN
+    "RATIFIC",  # RATIFICACION / RATIFICADA / RATIFICACIÓN
     "RESPUESTA A RATIFICACION",
     "RESPUESTA RATIFICACION",
 )
@@ -59,9 +60,26 @@ def es_stale(glosa, db) -> bool:
 
 
 _STOPWORDS_EPS = {
-    "DE", "DEL", "LA", "EL", "Y", "EPS", "ERP", "ARS", "CAJA",
-    "ENTIDAD", "PROMOTORA", "SALUD", "SAS", "S.A.S", "S.A", "LTDA",
-    "DIRECCION", "DIRECCIÓN", "SANIDAD", "SUBSISTEMA",
+    "DE",
+    "DEL",
+    "LA",
+    "EL",
+    "Y",
+    "EPS",
+    "ERP",
+    "ARS",
+    "CAJA",
+    "ENTIDAD",
+    "PROMOTORA",
+    "SALUD",
+    "SAS",
+    "S.A.S",
+    "S.A",
+    "LTDA",
+    "DIRECCION",
+    "DIRECCIÓN",
+    "SANIDAD",
+    "SUBSISTEMA",
 }
 
 
@@ -89,6 +107,7 @@ def _matchea_eps(eps_glosa: str, eps_tarifa: str) -> bool:
     if not eps_glosa or not eps_tarifa:
         return False
     from app.services import pagador_normalizer
+
     if pagador_normalizer.son_equivalentes(eps_glosa, eps_tarifa):
         return True
     a = _tokens_significativos(pagador_normalizer.nombre_corto(eps_glosa))
@@ -117,11 +136,9 @@ def _eps_tiene_tarifas(db, eps: str, tercero_nombre: str = ""):
     if not nombres_a_probar:
         return None
     from app.models.db import TarifaContratadaRecord
+
     candidatos = (
-        db.query(TarifaContratadaRecord)
-        .filter(TarifaContratadaRecord.activa == 1)
-        .limit(200)
-        .all()
+        db.query(TarifaContratadaRecord).filter(TarifaContratadaRecord.activa == 1).limit(200).all()
     )
     for t in candidatos:
         t_eps = (t.eps or "").strip()
@@ -209,6 +226,7 @@ def motivo_stale(glosa, db) -> Optional[str]:
     # 3) Timestamp-based: tarifas para la EPS cargadas después del dictamen.
     if generado:
         from app.models.db import TarifaContratadaRecord
+
         candidatos = (
             db.query(TarifaContratadaRecord)
             .filter(TarifaContratadaRecord.activa == 1)

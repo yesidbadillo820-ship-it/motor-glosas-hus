@@ -1,4 +1,5 @@
 """Tests del detector de copia textual Gold (R-cerebro #7)."""
+
 from __future__ import annotations
 
 from app.services.detector_copia import (
@@ -84,9 +85,7 @@ class TestDetectarCopia:
 
     def test_dictamen_distinto(self):
         d = "uno dos tres cuatro cinco seis siete ocho nueve"
-        ej = self._ejemplo(
-            "perro gato pajaro raton vaca caballo cerdo oveja gallina"
-        )
+        ej = self._ejemplo("perro gato pajaro raton vaca caballo cerdo oveja gallina")
         assert detectar_copia_gold(d, [ej], umbral=0.55) is None
 
     def test_dictamen_copiado_supera_umbral(self):
@@ -117,7 +116,9 @@ class TestDetectarCopia:
             fuente="HISTORICO",
         )
         det = detectar_copia_gold(
-            comun, [ej_bajo, ej_alto], umbral=0.55,
+            comun,
+            [ej_bajo, ej_alto],
+            umbral=0.55,
         )
         assert det is not None
         assert det["ejemplo_id"] == 1

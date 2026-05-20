@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/glosas-asignadas-recientes (R329 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice", rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -41,6 +46,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,12 +55,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, gestor, dias_atras):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-        gestor_nombre=gestor,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+            gestor_nombre=gestor,
+        )
+    )
     db.commit()
 
 
@@ -64,8 +76,6 @@ class TestYoGlosasAsignadasRecientes:
         _seed(db_session, "Alice", dias_atras=20)  # fuera ventana
         _seed(db_session, "Bob", dias_atras=2)  # otro gestor
 
-        r = client.get(
-            "/usuarios/yo/glosas-asignadas-recientes?dias=7"
-        )
+        r = client.get("/usuarios/yo/glosas-asignadas-recientes?dias=7")
         d = r.json()
         assert d["total_recientes"] == 1

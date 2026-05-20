@@ -1,4 +1,5 @@
 """Tests del rate limiter unificado IA (Ronda 50 Paso 3)."""
+
 from __future__ import annotations
 
 import pytest

@@ -1,7 +1,8 @@
 """Tests del endpoint GET /glosas/stats/recuperacion-mensual (R97 P2)."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,13 +49,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, fecha_dec, valor_objetado, valor_rec):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor_objetado, valor_recuperado=valor_rec,
-        etapa="X", estado="LEVANTADA",
-        creado_en=ahora_utc(),
-        fecha_decision_eps=fecha_dec,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor_objetado,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=ahora_utc(),
+            fecha_decision_eps=fecha_dec,
+        )
+    )
     db.commit()
 
 
@@ -97,13 +105,19 @@ class TestRecuperacionMensual:
 
     def test_excluye_sin_fecha_decision(self, client, db_session):
         # Glosa SIN fecha_decision_eps → no entra en el cómputo
-        db_session.add(GlosaRecord(
-            eps="X", paciente="X", codigo_glosa="C",
-            valor_objetado=1000, valor_recuperado=500,
-            etapa="X", estado="LEVANTADA",
-            creado_en=ahora_utc(),
-            fecha_decision_eps=None,
-        ))
+        db_session.add(
+            GlosaRecord(
+                eps="X",
+                paciente="X",
+                codigo_glosa="C",
+                valor_objetado=1000,
+                valor_recuperado=500,
+                etapa="X",
+                estado="LEVANTADA",
+                creado_en=ahora_utc(),
+                fecha_decision_eps=None,
+            )
+        )
         db_session.commit()
 
         r = client.get("/glosas/stats/recuperacion-mensual")

@@ -1,4 +1,5 @@
 """Tests del homologador Res. 2641/2025 (Ronda 45)."""
+
 from __future__ import annotations
 
 import pytest
@@ -76,10 +77,15 @@ class TestBDLookup:
         """Si se cargó una tarifa con codigo_ips='39999X-99' y
         codigo_cups='890999', homologar_cups('39999X-99', db) debe
         encontrarla en BD aunque no esté en la tabla explícita."""
-        db.add(TarifaContratadaRecord(
-            eps="TEST EPS", codigo_cups="890999", codigo_ips="39999X-99",
-            valor_pactado=100_000, activa=1,
-        ))
+        db.add(
+            TarifaContratadaRecord(
+                eps="TEST EPS",
+                codigo_cups="890999",
+                codigo_ips="39999X-99",
+                valor_pactado=100_000,
+                activa=1,
+            )
+        )
         db.commit()
         r = homologar_cups("39999X-99", db=db)
         assert r is not None
@@ -87,14 +93,24 @@ class TestBDLookup:
         assert "contrato" in r["fuente"].lower() or "excel" in r["fuente"].lower()
 
     def test_respeta_eps_si_se_pasa(self, db):
-        db.add(TarifaContratadaRecord(
-            eps="EPS A", codigo_cups="890111", codigo_ips="CODIGO-X",
-            valor_pactado=10_000, activa=1,
-        ))
-        db.add(TarifaContratadaRecord(
-            eps="EPS B", codigo_cups="890222", codigo_ips="CODIGO-X",
-            valor_pactado=20_000, activa=1,
-        ))
+        db.add(
+            TarifaContratadaRecord(
+                eps="EPS A",
+                codigo_cups="890111",
+                codigo_ips="CODIGO-X",
+                valor_pactado=10_000,
+                activa=1,
+            )
+        )
+        db.add(
+            TarifaContratadaRecord(
+                eps="EPS B",
+                codigo_cups="890222",
+                codigo_ips="CODIGO-X",
+                valor_pactado=20_000,
+                activa=1,
+            )
+        )
         db.commit()
         rA = homologar_cups("CODIGO-X", db=db, eps="EPS A")
         rB = homologar_cups("CODIGO-X", db=db, eps="EPS B")
@@ -145,10 +161,12 @@ class TestIntegridad:
 
 # ─── Ronda 51 Paso 5: DESCRIPCIONES_CUPS_2025 ──────────────────────────────
 
+
 class TestDescripcionesCups2025:
     def test_descripciones_al_menos_50_codigos(self):
         """Garantiza la cobertura mínima del catálogo."""
         from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
+
         assert len(DESCRIPCIONES_CUPS_2025) >= 50
 
     def test_cups_oficial_6_digitos_retorna_descripcion(self):
@@ -174,9 +192,11 @@ class TestDescripcionesCups2025:
 
 # ─── Ronda 52: búsqueda por descripción ─────────────────────────────────────
 
+
 class TestBuscarCupsPorDescripcion:
     def test_consulta_medico_general(self):
         from app.services.homologador_cups import buscar_cups_por_descripcion
+
         r = buscar_cups_por_descripcion("consulta medico general", top_k=5)
         assert len(r) > 0
         codigos = {x["cups_oficial"] for x in r}
@@ -185,6 +205,7 @@ class TestBuscarCupsPorDescripcion:
 
     def test_radiografia_torax(self):
         from app.services.homologador_cups import buscar_cups_por_descripcion
+
         r = buscar_cups_por_descripcion("radiografia de torax", top_k=3)
         assert len(r) > 0
         # Top result debe ser 87112x (Rx tórax)
@@ -192,6 +213,7 @@ class TestBuscarCupsPorDescripcion:
 
     def test_hemograma(self):
         from app.services.homologador_cups import buscar_cups_por_descripcion
+
         r = buscar_cups_por_descripcion("hemograma", top_k=3)
         assert len(r) > 0
         codigos = {x["cups_oficial"] for x in r}
@@ -199,18 +221,21 @@ class TestBuscarCupsPorDescripcion:
 
     def test_query_vacia_retorna_vacio(self):
         from app.services.homologador_cups import buscar_cups_por_descripcion
+
         assert buscar_cups_por_descripcion("") == []
         assert buscar_cups_por_descripcion("   ") == []
 
     def test_query_solo_stopwords(self):
         """'cuál es el código' debe retornar vacío (todo stopwords)."""
         from app.services.homologador_cups import buscar_cups_por_descripcion
+
         r = buscar_cups_por_descripcion("cual es el codigo")
         assert r == []
 
     def test_acent_insensitive(self):
         """'tomografia' (sin tilde) debe matchear 'TAC' (búsqueda flexible)."""
         from app.services.homologador_cups import buscar_cups_por_descripcion
+
         r = buscar_cups_por_descripcion("TAC craneo", top_k=3)
         assert len(r) > 0
         assert r[0]["cups_oficial"].startswith("8831")  # TAC craneal
@@ -218,4 +243,5 @@ class TestBuscarCupsPorDescripcion:
     def test_catalogo_amplio(self):
         """Garantiza que el catálogo crezca a >100 códigos."""
         from app.services.homologador_cups import DESCRIPCIONES_CUPS_2025
+
         assert len(DESCRIPCIONES_CUPS_2025) >= 100

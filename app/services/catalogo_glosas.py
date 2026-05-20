@@ -4,76 +4,61 @@
 Este archivo contiene TODOS los códigos oficiales con su definición exacta,
 de modo que la IA no tenga que adivinar qué significa cada código.
 """
+
 from __future__ import annotations
 
 # ─── CATÁLOGO DE GLOSAS POR FACTURACIÓN (FA) ─────────────────────────────
 CODIGOS_FA = {
     "FA": "FACTURACIÓN — Diferencias en cantidad al comparar servicios prestados con facturados; recaudo de copagos no descontados; o errores administrativos en facturación.",
-
     "FA0101": "Estancia u observación de urgencias: el cargo relacionado/justificado en soportes presenta diferencia con las cantidades facturadas.",
     "FA0102": "Consultas, interconsultas o atenciones domiciliarias facturadas que están INCLUIDAS en la estancia u observación de urgencias de acuerdo con lo pactado.",
     "FA0103": "Estancia u observación de urgencias cobrada que ya está INCLUIDA en una atención agrupada (paquete), de acuerdo con lo pactado.",
     "FA0105": "Servicios o tecnologías facturados que están INCLUIDOS en la estancia u observación de urgencias de acuerdo con lo pactado.",
-
     "FA0201": "Consulta/interconsulta/atención domiciliaria: el cargo relacionado/justificado en soportes presenta diferencias con las cantidades facturadas.",
     "FA0202": "Consultas o atenciones (visitas) domiciliarias cobradas que se encuentran INCLUIDAS en los honorarios profesionales POST QUIRÚRGICOS. Defensa central: demostrar que el servicio facturado (CUPS específico) NO es visita domiciliaria ni parte del seguimiento del cirujano tratante, sino un servicio intrahospitalario independiente prestado por otra especialidad.",
     "FA0203": "Consultas/atenciones domiciliarias cobradas que ya están INCLUIDAS en una atención agrupada (paquete).",
     "FA0205": "Consultas cobradas que están INCLUIDAS en los honorarios profesionales del procedimiento, de acuerdo con lo pactado.",
     "FA0206": "Interconsulta registrada en la factura que originó la práctica de un procedimiento quirúrgico/intervencionista realizado por el mismo prestador.",
-
     "FA0301": "Honorarios profesionales en procedimientos quirúrgicos/intervencionistas: el cargo presenta diferencias con las cantidades facturadas.",
     "FA0302": "Honorarios de anestesia: el cargo presenta diferencias con las cantidades facturadas.",
     "FA0303": "Honorarios profesionales cobrados que ya están INCLUIDOS en una atención agrupada.",
-
     "FA0501": "Derechos de sala: el cargo presenta diferencias con las cantidades facturadas.",
     "FA0502": "Tecnologías en salud cobradas que ya están INCLUIDAS en el ítem derechos de sala o materiales quirúrgicos.",
     "FA0503": "Derechos de sala cobrados que ya están INCLUIDOS en una atención agrupada.",
-
     "FA0601": "Dispositivos médicos: el cargo presenta diferencias con las cantidades facturadas.",
     "FA0602": "Dispositivos médicos cobrados que ya están INCLUIDOS en el ítem materiales por grupo quirúrgico.",
     "FA0603": "Dispositivos médicos cobrados que ya están INCLUIDOS en una atención agrupada.",
-
     "FA0701": "Medicamentos o APME: el cargo presenta diferencias con las cantidades facturadas.",
     "FA0702": "Principios activos facturados separadamente cuando fueron dispensados en una presentación combinada.",
     "FA0703": "Medicamentos o APME cobrados que ya están INCLUIDOS en una atención agrupada.",
     "FA0705": "Medicamentos cobrados que ya están INCLUIDOS en el procedimiento quirúrgico.",
-
     "FA0801": "Apoyo diagnóstico: el cargo presenta diferencias con las cantidades facturadas.",
     "FA0802": "Apoyos diagnósticos facturados separadamente cuando están INCLUIDOS uno en el otro. Defensa central: demostrar que el apoyo diagnóstico (ej. TP, laboratorios, imágenes) es un ESTUDIO INDEPENDIENTE solicitado por criterio médico, NO es un estudio derivado o incluido dentro de otro. Citar Manual Tarifario SOAT (Decreto 2423/1996) como referente.",
     "FA0803": "Apoyos diagnósticos cobrados que ya están INCLUIDOS en una atención agrupada.",
     "FA0805": "Apoyos diagnósticos cobrados que ya están INCLUIDOS en el procedimiento quirúrgico o intervencionista.",
-
     "FA1305": "Factura incluye servicios/tecnologías con cobertura diferente (multiusuario); se glosa lo correspondiente a cobertura distinta.",
     "FA1605": "Factura relaciona una o varias personas que en el momento de la prestación correspondían a otro responsable de pago.",
     "FA1606": "Factura relaciona uno o varios servicios/tecnologías que corresponden a otro responsable de pago.",
     "FA1905": "Descuentos otorgados que fueron aplicados de manera diferente a lo pactado o no fueron aplicados.",
     "FA2006": "Recaudos efectivos de copagos/cuotas moderadoras no corresponden a lo informado por la entidad responsable de pago.",
-
     "FA2301": "Otros procedimientos no quirúrgicos: el cargo presenta diferencias con las cantidades facturadas.",
     "FA2302": "Otros procedimientos no quirúrgicos facturados separadamente incluidos en otro.",
     "FA2303": "Otros procedimientos no quirúrgicos cobrados que ya están INCLUIDOS en una atención agrupada.",
-
     "FA2702": "Servicios o tecnologías ya cobrados dentro de la misma u otra factura (doble facturación).",
     "FA2805": "Servicio o tecnología ya pagado por la entidad responsable de pago.",
-
     "FA3801": "Traslado asistencial: el cargo presenta diferencias con las cantidades facturadas.",
     "FA3803": "Traslado asistencial cobrado que ya está INCLUIDO en una atención agrupada.",
-
     "FA5103": "Servicio o tecnología incluido en atención agrupada, prestado por otro prestador en caso de urgencias o por proceso de referencia (descuento del paquete).",
     "FA5105": "Servicio o tecnología incluido en atención agrupada que hace parte de RIAS, prestado por otro prestador.",
     "FA5106": "Servicio o tecnología incluido en atención agrupada prestado por otro prestador, con la finalidad de determinar control o complicaciones.",
-
     "FA5205": "Número de personas incluidas en modalidad de pago prospectiva disminuido por novedades en base de datos.",
     "FA5206": "Persona incluida en modalidad prospectiva fallece, aplica deducción proporcional.",
-
     "FA5701": "Apoyo terapéutico: el cargo presenta diferencias con las cantidades facturadas.",
     "FA5702": "Apoyos terapéuticos facturados separadamente cuando están incluidos en otro.",
     "FA5703": "Apoyos terapéuticos cobrados que ya están INCLUIDOS en una atención agrupada.",
-
     "FA5801": "Procedimientos quirúrgicos o intervencionistas: el cargo presenta diferencias con las cantidades facturadas.",
     "FA5802": "Procedimientos quirúrgicos/intervencionistas facturados separadamente cuando están incluidos en otro.",
     "FA5803": "Procedimientos quirúrgicos cobrados que ya están INCLUIDOS en una atención agrupada.",
-
     "FA5901": "Transporte no asistencial ambulatorio: el cargo presenta diferencias con las cantidades facturadas.",
     "FA5903": "Transporte no asistencial ambulatorio cobrado que ya está INCLUIDO en una atención agrupada.",
 }
@@ -81,7 +66,6 @@ CODIGOS_FA = {
 # ─── CATÁLOGO DE GLOSAS POR TARIFAS (TA) ─────────────────────────────────
 CODIGOS_TA = {
     "TA": "TARIFAS — Diferencias al comparar valores facturados con los pactados en el contrato o los definidos por la normatividad.",
-
     "TA0101": "Estancia u observación de urgencias: el cargo presenta diferencia con los valores pactados o establecidos por la norma.",
     "TA0201": "Consulta, interconsulta o atención domiciliaria: el cargo presenta diferencias con los valores pactados o establecidos por la norma.",
     "TA0301": "Honorarios profesionales en procedimientos quirúrgicos/intervencionistas: diferencias con valores pactados.",
@@ -103,7 +87,6 @@ CODIGOS_TA = {
 # ─── CATÁLOGO DE GLOSAS POR SOPORTES (SO) ────────────────────────────────
 CODIGOS_SO = {
     "SO": "SOPORTES — Ausencia total/parcial o inconsistencia en los soportes, o porque no corresponden a la persona atendida.",
-
     "SO0101": "Ausencia/inconsistencia en la epicrisis que soporta la estancia u observación de urgencias.",
     "SO0102": "Soportes de estancia u observación de urgencias no corresponden a la persona atendida.",
     "SO0201": "Ausencia/inconsistencia en soportes que evidencian la realización de la consulta/interconsulta/atención domiciliaria.",
@@ -123,15 +106,12 @@ CODIGOS_SO = {
     "SO0801": "Ausencia/inconsistencia en soportes que evidencian la práctica del apoyo diagnóstico.",
     "SO0802": "Soportes del apoyo diagnóstico no corresponden a la persona atendida.",
     "SO0803": "Ausencia en soportes de lectura/interpretación del apoyo diagnóstico.",
-
     "SO2101": "Número de autorización no está incluido en el RIPS.",
     "SO2102": "Número de autorización en RIPS no corresponde al prestador.",
     "SO2103": "Número de autorización en RIPS no corresponde al servicio o tecnología prestada.",
     "SO2104": "Número de autorización en RIPS no corresponde a la persona atendida.",
-
     "SO2301": "Ausencia/inconsistencia en soportes de otros procedimientos no quirúrgicos.",
     "SO2302": "Soportes de otros procedimientos no quirúrgicos no corresponden a la persona atendida.",
-
     "SO3401": "Ausencia/inconsistencia en la epicrisis.",
     "SO3402": "Epicrisis no corresponde a la persona atendida.",
     "SO3403": "Ausencia/inconsistencia en la hoja de atención de urgencias.",
@@ -140,7 +120,6 @@ CODIGOS_SO = {
     "SO3406": "Resumen de atención no corresponde a la persona atendida.",
     "SO3407": "Ausencia/inconsistencia en la hoja de atención odontológica.",
     "SO3408": "Hoja de atención odontológica no corresponde a la persona atendida.",
-
     "SO3601": "Ausencia/inconsistencia en copias de factura enviada a SOAT/ADRES.",
     "SO3602": "Copias de factura enviada a SOAT/ADRES no corresponden a la persona atendida.",
     "SO3701": "Ausencia/inconsistencia en la orden o prescripción facultativa.",
@@ -157,7 +136,6 @@ CODIGOS_SO = {
     "SO4701": "No se incluyen soportes de servicios/tecnologías para recobros ADRES/ARL.",
     "SO4801": "Ausencia/inconsistencia en la evidencia del envío del trámite respectivo.",
     "SO4802": "Informe de atención de urgencias no corresponde a la persona atendida.",
-
     "SO5701": "Ausencia/inconsistencia en soportes que evidencian apoyo terapéutico.",
     "SO5702": "Soportes de apoyo terapéutico no corresponden a la persona atendida.",
     "SO5801": "Ausencia/inconsistencia en soportes de procedimientos quirúrgicos/intervencionistas.",
@@ -171,7 +149,6 @@ CODIGOS_SO = {
 # ─── CATÁLOGO DE GLOSAS POR AUTORIZACIÓN (AU) ────────────────────────────
 CODIGOS_AU = {
     "AU": "AUTORIZACIÓN — Servicios/tecnologías no autorizados, difieren de la autorización, o documentos/firmas adulteradas. Las urgencias NO requieren autorización previa (Art. 168 Ley 100/1993).",
-
     "AU0101": "Número de días en habitación difiere de los días autorizados.",
     "AU0102": "Servicio de internación no corresponde al autorizado.",
     "AU0201": "Número de consultas/interconsultas/atenciones domiciliarias difiere de las autorizadas.",
@@ -202,7 +179,6 @@ CODIGOS_AU = {
 # ─── CATÁLOGO DE GLOSAS POR COBERTURA (CO) ───────────────────────────────
 CODIGOS_CO = {
     "CO": "COBERTURA — Cobro de servicios/tecnologías no incluidos en el plan de beneficios, o servicios a cargo de otro responsable.",
-
     "CO0101": "Días en observación/habitación no están incluidos en la cobertura.",
     "CO0201": "Consulta/interconsulta/atención domiciliaria no incluida en la cobertura.",
     "CO0301": "Honorarios profesionales no incluidos en la cobertura.",
@@ -221,7 +197,6 @@ CODIGOS_CO = {
 # ─── CATÁLOGO DE GLOSAS POR CALIDAD / PERTINENCIA (CL) ───────────────────
 CODIGOS_CL = {
     "CL": "CALIDAD / PERTINENCIA — Ausencia de coherencia entre evento/condición de salud y los servicios prestados. Se defiende con autonomía médica (Art. 17 Ley 1751/2015) y criterio del médico tratante.",
-
     "CL0101": "Estancia (observación urgencias u habitación) no es pertinente.",
     "CL0201": "Consulta/interconsulta/atención domiciliaria no es pertinente.",
     "CL0301": "Honorarios profesionales en procedimientos quirúrgicos/hemodinamia/radiología/otros no son pertinentes.",
@@ -241,7 +216,6 @@ CODIGOS_CL = {
 # ─── CATÁLOGO DE GLOSAS POR SEGUIMIENTO A LOS ACUERDOS (SA) ──────────────
 CODIGOS_SA = {
     "SA": "SEGUIMIENTO A LOS ACUERDOS — Glosas por incumplimiento de indicadores pactados en el acuerdo de voluntades (intervenciones obligatorias RIAS, modalidades prospectivas, indicadores de calidad/gestión/resultados).",
-
     "SA5401": "Incumplimiento de indicadores de intervenciones para promoción y mantenimiento de salud (Res. 3280/2018).",
     "SA5402": "Incumplimiento de indicadores de intervenciones para población materno perinatal.",
     "SA5403": "Incumplimiento de indicadores para atención de condiciones crónicas y de alto costo.",
@@ -309,11 +283,14 @@ def pertenece_a_tipo(codigo: str) -> str:
     return ""
 
 
-def sugerir_codigo_respuesta(tipo_glosa: str, es_extemporanea: bool = False,
-                              aceptada_parcial: bool = False,
-                              aceptada_total: bool = False,
-                              ratificada: bool = False,
-                              sin_contrato: bool = False) -> str:
+def sugerir_codigo_respuesta(
+    tipo_glosa: str,
+    es_extemporanea: bool = False,
+    aceptada_parcial: bool = False,
+    aceptada_total: bool = False,
+    ratificada: bool = False,
+    sin_contrato: bool = False,
+) -> str:
     """Sugiere el código de respuesta correcto según la situación.
 
     Default: RE9901 (defensa estándar — IPS subsana aportando referencia

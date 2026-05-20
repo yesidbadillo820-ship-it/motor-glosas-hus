@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/concentracion-codigo (R146 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, codigo, valor=1000, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa=codigo,
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -91,11 +99,17 @@ class TestConcentracionCodigo:
 
     def test_codigo_null_se_clasifica_como_sin_codigo(self, client, db_session):
         # Glosa sin codigo_glosa
-        db_session.add(GlosaRecord(
-            eps="X", paciente="X", codigo_glosa=None,
-            valor_objetado=500, etapa="X", estado="RADICADA",
-            creado_en=ahora_utc(),
-        ))
+        db_session.add(
+            GlosaRecord(
+                eps="X",
+                paciente="X",
+                codigo_glosa=None,
+                valor_objetado=500,
+                etapa="X",
+                estado="RADICADA",
+                creado_en=ahora_utc(),
+            )
+        )
         db_session.commit()
 
         r = client.get("/glosas/stats/concentracion-codigo")

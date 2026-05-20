@@ -12,6 +12,7 @@ el gestor llega a la audiencia con:
 No reemplaza al abogado — le da contexto + munición lista para que la
 audiencia sea más eficiente.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -129,6 +130,7 @@ def preparar_audiencia(
       }
     """
     from app.models.db import GlosaRecord
+
     g = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
     if not g:
         return {"error": "Glosa no encontrada"}
@@ -165,9 +167,7 @@ def preparar_audiencia(
     # Marcar frecuencia estimada según patrón
     for c in contras:
         c["frecuencia_estimada"] = (
-            "alta" if patron == "agresiva" else
-            "media" if patron == "indecisa" else
-            "baja"
+            "alta" if patron == "agresiva" else "media" if patron == "indecisa" else "baja"
         )
 
     # Recomendación táctica
@@ -242,9 +242,12 @@ def preparar_audiencia(
         "contraargumentos": contras,
         "valor_minimo_aceptable": valor_min,
         "recomendacion_tactica": recomendacion,
-        "normas_clave": normas_por_tipo.get(tipo, [
-            "Art. 57 Ley 1438/2011",
-            "Art. 20 Decreto 4747/2007",
-            "Res. 2284/2023 (Manual Único)",
-        ]),
+        "normas_clave": normas_por_tipo.get(
+            tipo,
+            [
+                "Art. 57 Ley 1438/2011",
+                "Art. 20 Decreto 4747/2007",
+                "Res. 2284/2023 (Manual Único)",
+            ],
+        ),
     }

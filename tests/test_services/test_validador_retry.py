@@ -1,4 +1,5 @@
 """Tests del validador post-gen + retry (R-cerebro #1)."""
+
 from __future__ import annotations
 
 from app.services.validador_dictamen import (
@@ -46,7 +47,8 @@ class TestDetectarDefectos:
 
     def test_falta_tag_argumento(self):
         d = detectar_defectos_criticos(
-            "<paciente>X</paciente>", codigo_glosa="FA01",
+            "<paciente>X</paciente>",
+            codigo_glosa="FA01",
         )
         assert any(x["regla"] == "sin_argumento" for x in d)
 
@@ -66,9 +68,7 @@ class TestDetectarDefectos:
     def test_frase_prohibida(self):
         arg = _BUEN_ARGUMENTO + " SE EXIGE EL LEVANTAMIENTO INMEDIATO."
         d = detectar_defectos_criticos(_xml_ok(arg), codigo_glosa="FA0401")
-        assert any(
-            x["regla"].startswith("frase_prohibida") for x in d
-        )
+        assert any(x["regla"].startswith("frase_prohibida") for x in d)
 
     def test_placeholder_corchete(self):
         arg = _BUEN_ARGUMENTO + " VALOR $[VALOR] PARA [PACIENTE]."
@@ -78,7 +78,8 @@ class TestDetectarDefectos:
     def test_codigo_no_mencionado(self):
         # arg con FA0401 pero pedimos TA0801
         d = detectar_defectos_criticos(
-            _xml_ok(_BUEN_ARGUMENTO), codigo_glosa="TA0801",
+            _xml_ok(_BUEN_ARGUMENTO),
+            codigo_glosa="TA0801",
         )
         assert any(x["regla"] == "codigo_glosa_no_mencionado" for x in d)
 
@@ -177,9 +178,7 @@ class TestDetectarDefectos:
             valor_objetado="$168.563",
             tiene_contrato=False,
         )
-        assert not any(
-            x["regla"] == "tarifa_propia_con_contrato" for x in d
-        )
+        assert not any(x["regla"] == "tarifa_propia_con_contrato" for x in d)
 
     def test_facturado_es_objetado_se_marca(self):
         # Caso real 27-abr-2026: el LLM escribió "FACTURADA POR $168.563"
@@ -226,12 +225,12 @@ class TestDetectarDefectos:
         bloque = (
             "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN "
             "SOBRE EL CÓDIGO FA0401, INTERPUESTA POR COOSALUD, RESPECTO DEL "
-            "SERVICIO FACTURADO. " + ("PALABRA " * 350) +
-            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "SERVICIO FACTURADO. " + ("PALABRA " * 350) + "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
             "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
         )
         d = detectar_defectos_criticos(
-            _xml_ok(bloque), codigo_glosa="FA0401",
+            _xml_ok(bloque),
+            codigo_glosa="FA0401",
         )
         assert any(x["regla"] == "demasiado_largo" for x in d)
 
@@ -240,12 +239,12 @@ class TestDetectarDefectos:
         bloque = (
             "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE FACTURACIÓN "
             "SOBRE EL CÓDIGO FA0401, INTERPUESTA POR COOSALUD, RESPECTO DEL "
-            "SERVICIO FACTURADO. " + ("PALABRA " * 280) +
-            "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
+            "SERVICIO FACTURADO. " + ("PALABRA " * 280) + "COMUNICACIONES: CARTERA@HUS.GOV.CO, "
             "GLOSASYDEVOLUCIONES@HUS.GOV.CO."
         )
         d = detectar_defectos_criticos(
-            _xml_ok(bloque), codigo_glosa="FA0401",
+            _xml_ok(bloque),
+            codigo_glosa="FA0401",
         )
         assert not any(x["regla"] == "demasiado_largo" for x in d)
 
@@ -253,8 +252,11 @@ class TestDetectarDefectos:
 class TestInstruccionRetry:
     def test_construir_retry_no_vacio_si_hay_defectos(self):
         defectos = [
-            {"regla": "frase_prohibida_se_exige",
-             "mensaje": "Detectada SE EXIGE", "sugerencia": "Quítalo"},
+            {
+                "regla": "frase_prohibida_se_exige",
+                "mensaje": "Detectada SE EXIGE",
+                "sugerencia": "Quítalo",
+            },
         ]
         instr = construir_instruccion_retry(defectos)
         assert "DEFECTOS CRÍTICOS" in instr

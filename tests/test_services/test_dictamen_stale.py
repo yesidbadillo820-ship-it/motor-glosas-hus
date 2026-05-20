@@ -4,6 +4,7 @@ La detección por texto del dictamen es la pieza clave: dictámenes generados
 antes de cargar contratos/tarifarios no tienen `dictamen_generado_en` y se
 quedarían silenciosamente obsoletos sin esta detección.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -25,6 +26,7 @@ from app.services.dictamen_stale import (  # noqa: E402
 
 class _StubQuery:
     """Stub mínimo para emular .filter().limit().all() y .filter().filter().limit().all()."""
+
     def __init__(self, resultado):
         self._res = resultado
 
@@ -46,22 +48,31 @@ class _StubDB:
         return _StubQuery(self._tarifas)
 
 
-def _glosa(dictamen: str, eps: str = "DISPENSARIO MEDICO BUCARAMANGA",
-           generado: datetime | None = None,
-           codigo_respuesta: str = "",
-           codigo_glosa: str = "",
-           etapa: str = "",
-           dias_radicacion_dgh: int = 0) -> SimpleNamespace:
+def _glosa(
+    dictamen: str,
+    eps: str = "DISPENSARIO MEDICO BUCARAMANGA",
+    generado: datetime | None = None,
+    codigo_respuesta: str = "",
+    codigo_glosa: str = "",
+    etapa: str = "",
+    dias_radicacion_dgh: int = 0,
+) -> SimpleNamespace:
     return SimpleNamespace(
-        id=1, eps=eps, dictamen=dictamen, dictamen_generado_en=generado,
-        codigo_respuesta=codigo_respuesta, codigo_glosa=codigo_glosa,
-        etapa=etapa, dias_radicacion_dgh=dias_radicacion_dgh,
+        id=1,
+        eps=eps,
+        dictamen=dictamen,
+        dictamen_generado_en=generado,
+        codigo_respuesta=codigo_respuesta,
+        codigo_glosa=codigo_glosa,
+        etapa=etapa,
+        dias_radicacion_dgh=dias_radicacion_dgh,
     )
 
 
 def _tarifa(eps: str, creado_en: datetime | None = None):
     return SimpleNamespace(
-        eps=eps, activa=1,
+        eps=eps,
+        activa=1,
         creado_en=creado_en or datetime(2026, 4, 28, tzinfo=timezone.utc),
     )
 
@@ -95,9 +106,7 @@ class TestDetectaPorTexto:
         assert motivo_stale(glosa, db) is None
 
     def test_dictamen_correcto_no_es_stale(self):
-        glosa = _glosa(
-            "ESE HUS DEFIENDE CONFORME A LA TARIFA PACTADA EN EL CONTRATO."
-        )
+        glosa = _glosa("ESE HUS DEFIENDE CONFORME A LA TARIFA PACTADA EN EL CONTRATO.")
         db = _StubDB([_tarifa("DISPENSARIO MEDICO")])
         assert motivo_stale(glosa, db) is None
 
@@ -108,7 +117,8 @@ class TestDetectaPorTexto:
 
     def test_eps_distinta_no_dispara_stale(self):
         glosa = _glosa(
-            "NO EXISTE CONTRATO PACTADO.", eps="FAMISANAR EPS",
+            "NO EXISTE CONTRATO PACTADO.",
+            eps="FAMISANAR EPS",
         )
         # Hay tarifa pero para otra EPS
         db = _StubDB([_tarifa("DISPENSARIO MEDICO")])
@@ -127,9 +137,7 @@ class TestMatcheaEps:
 
     def test_fomag_matchea_fondo_magisterio(self):
         assert _matchea_eps("FOMAG", "FOMAG")
-        assert _matchea_eps(
-            "FONDO PRESTACIONES MAGISTERIO FOMAG", "FOMAG MAGISTERIO"
-        )
+        assert _matchea_eps("FONDO PRESTACIONES MAGISTERIO FOMAG", "FOMAG MAGISTERIO")
 
     def test_eps_completamente_distintas_no_matchean(self):
         assert not _matchea_eps("FAMISANAR EPS", "SANITAS EPS")
@@ -142,9 +150,7 @@ class TestMatcheaEps:
     def test_sigla_unica_matchea_si_aparece_en_el_otro(self):
         # Tarifa cargada con un solo token significativo (sigla DMBUG)
         # matchea contra eps que contenga esa sigla en cualquier parte
-        assert _matchea_eps(
-            "DISPENSARIO MEDICO DMBUG BUCARAMANGA", "DMBUG"
-        )
+        assert _matchea_eps("DISPENSARIO MEDICO DMBUG BUCARAMANGA", "DMBUG")
         assert _matchea_eps("FOMAG MAGISTERIO", "FOMAG")
 
     def test_tokens_significativos_filtra_stopwords(self):
@@ -234,7 +240,9 @@ class TestReIncorrecto:
     def test_RE9602_sin_contrato_no_es_stale(self):
         # Sin contrato pactado, RE9602 es correcto.
         glosa = _glosa(
-            "ESE HUS DEFIENDE.", codigo_respuesta="RE9602", codigo_glosa="TA0201",
+            "ESE HUS DEFIENDE.",
+            codigo_respuesta="RE9602",
+            codigo_glosa="TA0201",
         )
         db = _StubDB([])
         assert motivo_stale(glosa, db) is None
@@ -243,7 +251,9 @@ class TestReIncorrecto:
         # El check de RE9602 incorrecto solo aplica para TA*. Otros tipos
         # pueden usar RE9602 legítimamente.
         glosa = _glosa(
-            "ESE HUS DEFIENDE.", codigo_respuesta="RE9602", codigo_glosa="FA0203",
+            "ESE HUS DEFIENDE.",
+            codigo_respuesta="RE9602",
+            codigo_glosa="FA0203",
         )
         db = _StubDB([_tarifa("DISPENSARIO MEDICO")])
         assert motivo_stale(glosa, db) is None
@@ -252,7 +262,8 @@ class TestReIncorrecto:
         # RE9901 es correcto cuando hay contrato, no debe marcarse stale.
         glosa = _glosa(
             "ESE HUS DEFIENDE CON CONTRATO PACTADO.",
-            codigo_respuesta="RE9901", codigo_glosa="TA0201",
+            codigo_respuesta="RE9901",
+            codigo_glosa="TA0201",
         )
         db = _StubDB([_tarifa("DISPENSARIO MEDICO")])
         assert motivo_stale(glosa, db) is None

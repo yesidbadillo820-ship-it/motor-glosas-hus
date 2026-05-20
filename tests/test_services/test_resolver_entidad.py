@@ -1,4 +1,5 @@
 """Tests del resolver de entidad/EPS (Ronda 36)."""
+
 from __future__ import annotations
 
 from app.services.resolver_entidad import (

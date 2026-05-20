@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-pacientes-top (R246 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, paciente):
-    db.add(GlosaRecord(
-        eps=eps, paciente=paciente, codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente=paciente,
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -63,7 +71,8 @@ class TestEPSPacientesTop:
         r = client.get("/glosas/stats/eps-pacientes-top?eps=SANITAS")
         d = r.json()
         assert d["items"][0] == {
-            "paciente": "Pedro", "count": 3,
+            "paciente": "Pedro",
+            "count": 3,
             "valor_objetado_total": 3000,
         }
         assert d["items"][1]["paciente"] == "Ana"

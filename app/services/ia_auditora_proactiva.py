@@ -17,6 +17,7 @@ Beneficios:
   - Aprovecha caché persistente para glosas idénticas
   - Cero interacción humana requerida para análisis "obvios" (match perfecto)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -106,14 +107,9 @@ async def _procesar_glosas_pendientes(limite: int = 20) -> dict:
         hace_30d = datetime.now() - timedelta(days=30)
         candidatas = (
             db.query(GlosaRecord)
-            .filter(
-                GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"])
-            )
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
             .filter(GlosaRecord.creado_en >= hace_30d)
-            .filter(
-                (GlosaRecord.dictamen.is_(None))
-                | (GlosaRecord.dictamen == "")
-            )
+            .filter((GlosaRecord.dictamen.is_(None)) | (GlosaRecord.dictamen == ""))
             .order_by(
                 GlosaRecord.fecha_vencimiento.asc().nullslast(),
                 GlosaRecord.creado_en.desc(),
@@ -134,6 +130,7 @@ async def _procesar_glosas_pendientes(limite: int = 20) -> dict:
                     from app.services.texto_fijo_detector import (
                         aplicar_texto_fijo_si_corresponde,
                     )
+
                     clase = aplicar_texto_fijo_si_corresponde(g)
                     if clase is not None:
                         db.commit()
@@ -159,7 +156,9 @@ async def _procesar_glosas_pendientes(limite: int = 20) -> dict:
                 if cups and (g.codigo_glosa or "").upper().startswith("TA"):
                     vals = _extraer_valores_glosa(g.texto_glosa_original)
                     info = evaluar_glosa_tarifa(
-                        db, eps=g.eps or "", cups=cups,
+                        db,
+                        eps=g.eps or "",
+                        cups=cups,
                         valor_facturado=vals.get("facturado", 0.0),
                         valor_objetado=float(g.valor_objetado or 0.0),
                         valor_reconocido=vals.get("reconocido", 0.0),
@@ -169,10 +168,13 @@ async def _procesar_glosas_pendientes(limite: int = 20) -> dict:
                         pact = info.get("valor_pactado_calc") or 0.0
                         fact = vals.get("facturado", 0.0)
                         # Match perfecto → plantilla determinística (0 tokens IA)
-                        if (rec.get("accion") == "DEFENDER_TOTAL"
-                                and pact > 0
-                                and abs(fact - pact) < max(1.0, pact * 0.005)):
+                        if (
+                            rec.get("accion") == "DEFENDER_TOTAL"
+                            and pact > 0
+                            and abs(fact - pact) < max(1.0, pact * 0.005)
+                        ):
                             from app.services.glosa_service import generar_texto_tarifa_match
+
                             dictamen = generar_texto_tarifa_match(
                                 codigo_glosa=g.codigo_glosa or "",
                                 valor_objetado=float(g.valor_objetado or 0.0),

@@ -19,6 +19,7 @@ Agrupa en un único endpoint las métricas clave para el Comité de Cartera:
 Incluye alertas automáticas: glosas a punto de vencer, EPS con spike de
 ratificación, tokens IA consumidos hoy vs promedio, etc.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -55,37 +56,51 @@ def dashboard_vivo(
         total_obj_mes = (
             db.query(func.coalesce(func.sum(GlosaRecord.valor_objetado), 0))
             .filter(GlosaRecord.creado_en >= inicio_mes)
-            .scalar() or 0.0
+            .scalar()
+            or 0.0
         )
         total_rec_mes = (
             db.query(func.coalesce(func.sum(GlosaRecord.valor_recuperado), 0))
             .filter(GlosaRecord.creado_en >= inicio_mes)
-            .scalar() or 0.0
+            .scalar()
+            or 0.0
         )
     except Exception:
         total_obj_mes, total_rec_mes = 0.0, 0.0
 
     tasa_recuperacion = (
-        round(100 * float(total_rec_mes) / float(total_obj_mes), 2)
-        if total_obj_mes else 0.0
+        round(100 * float(total_rec_mes) / float(total_obj_mes), 2) if total_obj_mes else 0.0
     )
 
     # ─── Hoy: glosas analizadas, pendientes, críticas, vencidas ────────────
     try:
-        glosas_hoy = db.query(func.count(GlosaRecord.id)).filter(
-            GlosaRecord.creado_en >= inicio_hoy
-        ).scalar() or 0
-        pendientes = db.query(func.count(GlosaRecord.id)).filter(
-            GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"])
-        ).scalar() or 0
-        criticas_48h = db.query(func.count(GlosaRecord.id)).filter(
-            GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"])
-        ).filter(GlosaRecord.fecha_vencimiento <= en_48h).filter(
-            GlosaRecord.fecha_vencimiento >= ahora
-        ).scalar() or 0
-        vencidas = db.query(func.count(GlosaRecord.id)).filter(
-            GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"])
-        ).filter(GlosaRecord.fecha_vencimiento < ahora).scalar() or 0
+        glosas_hoy = (
+            db.query(func.count(GlosaRecord.id))
+            .filter(GlosaRecord.creado_en >= inicio_hoy)
+            .scalar()
+            or 0
+        )
+        pendientes = (
+            db.query(func.count(GlosaRecord.id))
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+            .scalar()
+            or 0
+        )
+        criticas_48h = (
+            db.query(func.count(GlosaRecord.id))
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+            .filter(GlosaRecord.fecha_vencimiento <= en_48h)
+            .filter(GlosaRecord.fecha_vencimiento >= ahora)
+            .scalar()
+            or 0
+        )
+        vencidas = (
+            db.query(func.count(GlosaRecord.id))
+            .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
+            .filter(GlosaRecord.fecha_vencimiento < ahora)
+            .scalar()
+            or 0
+        )
     except Exception:
         glosas_hoy, pendientes, criticas_48h, vencidas = 0, 0, 0, 0
 
@@ -140,9 +155,13 @@ def dashboard_vivo(
             .filter(GlosaRecord.creado_en >= inicio_mes)
             .group_by(GlosaRecord.eps)
             .having(func.count(GlosaRecord.id) >= 5)  # mín 5 decisiones
-            .order_by((func.sum(
-                case((GlosaRecord.decision_eps == "RATIFICADA", 1), else_=0)
-            ) * 1.0 / func.count(GlosaRecord.id)).desc())
+            .order_by(
+                (
+                    func.sum(case((GlosaRecord.decision_eps == "RATIFICADA", 1), else_=0))
+                    * 1.0
+                    / func.count(GlosaRecord.id)
+                ).desc()
+            )
             .limit(5)
             .all()
         )
@@ -161,33 +180,41 @@ def dashboard_vivo(
     # ─── Alertas proactivas ────────────────────────────────────────────────
     alertas = []
     if vencidas > 0:
-        alertas.append({
-            "titulo": f"⚠️ {vencidas} glosas VENCIDAS sin respuesta",
-            "cuerpo": "Estas glosas pasaron del plazo del Art. 57 Ley 1438/2011. "
-                     "Revisa y escalalas ya para evitar pérdida de recursos.",
-            "severidad": "critica",
-        })
+        alertas.append(
+            {
+                "titulo": f"⚠️ {vencidas} glosas VENCIDAS sin respuesta",
+                "cuerpo": "Estas glosas pasaron del plazo del Art. 57 Ley 1438/2011. "
+                "Revisa y escalalas ya para evitar pérdida de recursos.",
+                "severidad": "critica",
+            }
+        )
     if criticas_48h >= 5:
-        alertas.append({
-            "titulo": f"🔴 {criticas_48h} glosas vencen en las próximas 48h",
-            "cuerpo": "Priorizá estas glosas en la bandeja del auditor asignado.",
-            "severidad": "alta",
-        })
+        alertas.append(
+            {
+                "titulo": f"🔴 {criticas_48h} glosas vencen en las próximas 48h",
+                "cuerpo": "Priorizá estas glosas en la bandeja del auditor asignado.",
+                "severidad": "alta",
+            }
+        )
     for eps_info in ranking_eps[:2]:
         if eps_info["ratif_pct"] >= 30:
-            alertas.append({
-                "titulo": f"📊 {eps_info['eps']} ratifica {eps_info['ratif_pct']}%",
-                "cuerpo": f"Alto índice de ratificación en {eps_info['cantidad']} glosas. "
-                         "Considera pasar a tono FIRME y reforzar jurisprudencia en "
-                         "próximas respuestas.",
-                "severidad": "media",
-            })
+            alertas.append(
+                {
+                    "titulo": f"📊 {eps_info['eps']} ratifica {eps_info['ratif_pct']}%",
+                    "cuerpo": f"Alto índice de ratificación en {eps_info['cantidad']} glosas. "
+                    "Considera pasar a tono FIRME y reforzar jurisprudencia en "
+                    "próximas respuestas.",
+                    "severidad": "media",
+                }
+            )
     if glosas_hoy >= 30:
-        alertas.append({
-            "titulo": f"📈 Volumen alto hoy: {glosas_hoy} glosas analizadas",
-            "cuerpo": "Considerá distribuir la carga entre más auditores.",
-            "severidad": "info",
-        })
+        alertas.append(
+            {
+                "titulo": f"📈 Volumen alto hoy: {glosas_hoy} glosas analizadas",
+                "cuerpo": "Considerá distribuir la carga entre más auditores.",
+                "severidad": "info",
+            }
+        )
 
     return {
         "timestamp": ahora.isoformat(),
@@ -228,6 +255,7 @@ def detector_actividad(
       vencidas o criticas se priorizan en la lista.
     """
     from app.models.db import AuditLogRecord
+
     ahora = ahora_utc()
     corte_inactividad = ahora - timedelta(days=dias_inactividad)
     corte_estancada = ahora - timedelta(days=dias_estancada)
@@ -265,19 +293,23 @@ def detector_actividad(
             ultima = None
         if ultima is None or ultima < corte_inactividad:
             dias_sin_act = (ahora - ultima).days if ultima else 999
-            gestores_inactivos.append({
+            gestores_inactivos.append(
+                {
+                    "email": (email or "").split("@")[0],
+                    "email_full": email,
+                    "pendientes": int(pend),
+                    "valor_en_juego": float(valor or 0),
+                    "dias_sin_actividad": dias_sin_act,
+                    "ultima_actividad": ultima.isoformat() if ultima else None,
+                }
+            )
+        carga_concentrada.append(
+            {
                 "email": (email or "").split("@")[0],
-                "email_full": email,
                 "pendientes": int(pend),
                 "valor_en_juego": float(valor or 0),
-                "dias_sin_actividad": dias_sin_act,
-                "ultima_actividad": ultima.isoformat() if ultima else None,
-            })
-        carga_concentrada.append({
-            "email": (email or "").split("@")[0],
-            "pendientes": int(pend),
-            "valor_en_juego": float(valor or 0),
-        })
+            }
+        )
 
     gestores_inactivos.sort(key=lambda x: -x["dias_sin_actividad"])
     gestores_inactivos = gestores_inactivos[:10]
@@ -288,10 +320,15 @@ def detector_actividad(
     try:
         estancadas_rows = (
             db.query(
-                GlosaRecord.id, GlosaRecord.eps, GlosaRecord.factura,
-                GlosaRecord.codigo_glosa, GlosaRecord.estado,
-                GlosaRecord.valor_objetado, GlosaRecord.creado_en,
-                GlosaRecord.auditor_email, GlosaRecord.fecha_vencimiento,
+                GlosaRecord.id,
+                GlosaRecord.eps,
+                GlosaRecord.factura,
+                GlosaRecord.codigo_glosa,
+                GlosaRecord.estado,
+                GlosaRecord.valor_objetado,
+                GlosaRecord.creado_en,
+                GlosaRecord.auditor_email,
+                GlosaRecord.fecha_vencimiento,
             )
             .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
             .filter(GlosaRecord.creado_en <= corte_estancada)
@@ -301,8 +338,11 @@ def detector_actividad(
         )
         glosas_estancadas = [
             {
-                "id": gid, "eps": eps, "factura": factura,
-                "codigo": cod, "estado": estado,
+                "id": gid,
+                "eps": eps,
+                "factura": factura,
+                "codigo": cod,
+                "estado": estado,
                 "valor": float(valor or 0),
                 "auditor": (email or "").split("@")[0] if email else None,
                 "dias_sin_progreso": (ahora - creado).days if creado else None,
@@ -317,9 +357,13 @@ def detector_actividad(
     try:
         riesgo_rows = (
             db.query(
-                GlosaRecord.id, GlosaRecord.eps, GlosaRecord.factura,
-                GlosaRecord.codigo_glosa, GlosaRecord.valor_objetado,
-                GlosaRecord.fecha_vencimiento, GlosaRecord.auditor_email,
+                GlosaRecord.id,
+                GlosaRecord.eps,
+                GlosaRecord.factura,
+                GlosaRecord.codigo_glosa,
+                GlosaRecord.valor_objetado,
+                GlosaRecord.fecha_vencimiento,
+                GlosaRecord.auditor_email,
                 GlosaRecord.estado,
             )
             .filter(GlosaRecord.estado.in_(["RADICADA", "EN_REVISION", "BORRADOR"]))
@@ -331,8 +375,11 @@ def detector_actividad(
         )
         alto_valor_riesgo = [
             {
-                "id": gid, "eps": eps, "factura": factura,
-                "codigo": cod, "valor": float(valor or 0),
+                "id": gid,
+                "eps": eps,
+                "factura": factura,
+                "codigo": cod,
+                "valor": float(valor or 0),
                 "vencimiento": fv.isoformat() if fv else None,
                 "auditor": (email or "").split("@")[0] if email else "sin asignar",
                 "estado": estado,

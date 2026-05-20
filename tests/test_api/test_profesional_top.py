@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/profesional-top (R258 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, profesional, estado="RADICADA", valor=1000):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        profesional_medico=profesional,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            profesional_medico=profesional,
+        )
+    )
     db.commit()
 
 

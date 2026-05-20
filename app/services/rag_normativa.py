@@ -12,6 +12,7 @@ Implementación SIN dependencias pesadas: TF-IDF sobre las claves de
 _TODAS_LAS_NORMAS (~40 entradas). Suficiente para nuestro dominio y
 ejecuta en <10 ms sin cargar modelos de embedding.
 """
+
 from __future__ import annotations
 
 import math
@@ -32,8 +33,27 @@ def _normalizar(texto: str) -> str:
 def _tokenizar(texto: str) -> list[str]:
     norm = _normalizar(texto)
     STOP = {
-        "de", "la", "el", "los", "las", "en", "un", "una", "que", "por", "para",
-        "con", "sin", "del", "al", "se", "es", "como", "este", "esta", "estos",
+        "de",
+        "la",
+        "el",
+        "los",
+        "las",
+        "en",
+        "un",
+        "una",
+        "que",
+        "por",
+        "para",
+        "con",
+        "sin",
+        "del",
+        "al",
+        "se",
+        "es",
+        "como",
+        "este",
+        "esta",
+        "estos",
     }
     return [t for t in norm.split() if t not in STOP and len(t) >= 3]
 
@@ -268,9 +288,7 @@ def validar_citas_en_dictamen(dictamen: str) -> dict:
     idx = _get_indice()
     # Validar: si alguna parte del número aparece en los nombres/claves del
     # índice, se considera verificada.
-    claves_texto = " ".join([
-        d["texto"] for d in idx.get("docs", {}).values()
-    ]).upper()
+    claves_texto = " ".join([d["texto"] for d in idx.get("docs", {}).values()]).upper()
     no_verificadas = []
     verificadas = []
     for c in citas:
@@ -290,7 +308,5 @@ def validar_citas_en_dictamen(dictamen: str) -> dict:
         "verificadas": verificadas,
         "no_verificadas": no_verificadas,
         "total": len(citas),
-        "tasa_verificacion": round(
-            len(verificadas) / len(citas), 2
-        ) if citas else 1.0,
+        "tasa_verificacion": round(len(verificadas) / len(citas), 2) if citas else 1.0,
     }

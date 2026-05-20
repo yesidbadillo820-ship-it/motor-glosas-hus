@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/audit-actividad-mensual (R272 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -41,6 +45,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -49,12 +54,14 @@ def client(db_session, admin_user):
 
 
 def _seed(db, accion, usuario, dias_atras=0):
-    db.add(AuditLogRecord(
-        timestamp=ahora_utc() - timedelta(days=dias_atras),
-        usuario_email=usuario,
-        accion=accion,
-        tabla="historial",
-    ))
+    db.add(
+        AuditLogRecord(
+            timestamp=ahora_utc() - timedelta(days=dias_atras),
+            usuario_email=usuario,
+            accion=accion,
+            tabla="historial",
+        )
+    )
     db.commit()
 
 
@@ -76,12 +83,14 @@ class TestAuditActividadMensual:
     def test_no_admin_403(self, db_session):
         from app.api.deps import get_usuario_actual
         from app.main import app
+
         no_admin = UsuarioRecord(
-            id=99, email="x@x.com", rol="AUDITOR", activo=1,
+            id=99,
+            email="x@x.com",
+            rol="AUDITOR",
+            activo=1,
         )
-        app.dependency_overrides[get_db] = (
-            lambda: iter([db_session]).__next__()
-        )
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
         app.dependency_overrides[get_usuario_actual] = lambda: no_admin
         with TestClient(app) as c:
             r = c.get("/admin/audit-actividad-mensual")

@@ -1,4 +1,5 @@
 """Tests del system prompt de auditoría previa (R59 P2)."""
+
 from __future__ import annotations
 
 from app.services.glosa_ia_prompts import (
@@ -20,19 +21,23 @@ class TestPromptAuditoriaPrevia:
     def test_estructura_seis_secciones_html(self):
         """Estructura definida: 6 sections con data-block atributo."""
         for block in (
-            "resumen", "hallazgos", "riesgos",
-            "probabilidad", "recomendacion", "normativa",
+            "resumen",
+            "hallazgos",
+            "riesgos",
+            "probabilidad",
+            "recomendacion",
+            "normativa",
         ):
-            assert f'data-block="{block}"' in _PROMPT_AUDITORIA_PREVIA, (
-                f"falta sección {block}"
-            )
+            assert f'data-block="{block}"' in _PROMPT_AUDITORIA_PREVIA, f"falta sección {block}"
 
     def test_recomendaciones_neutrales(self):
         """Las 4 acciones esperadas como recomendación deben estar
         listadas como opciones (no como decisión final tomada)."""
         for accion in (
-            "DEFENDER TOTAL", "DEFENDER PARCIAL",
-            "ACEPTAR TOTAL", "PEDIR MÁS INFORMACIÓN",
+            "DEFENDER TOTAL",
+            "DEFENDER PARCIAL",
+            "ACEPTAR TOTAL",
+            "PEDIR MÁS INFORMACIÓN",
         ):
             assert accion in _PROMPT_AUDITORIA_PREVIA
 

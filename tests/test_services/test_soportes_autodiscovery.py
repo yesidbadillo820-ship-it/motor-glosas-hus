@@ -1,10 +1,9 @@
 """Tests para app.services.soportes_autodiscovery_service."""
+
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-import pytest
 
 from app.services.soportes_autodiscovery_service import (
     SoportesIndexer,
@@ -54,10 +53,7 @@ class TestClasificarArchivo:
         assert _clasificar_archivo("ad09000060370002600484921.xml")[0] == "AD"
 
     def test_resultados_msps(self):
-        assert (
-            _clasificar_archivo("ResultadosMSPS_HUS487523_ID39685.json")[0]
-            == "RESULTADOSMSPS"
-        )
+        assert _clasificar_archivo("ResultadosMSPS_HUS487523_ID39685.json")[0] == "RESULTADOSMSPS"
 
     def test_archivo_no_clasificado(self):
         assert _clasificar_archivo("notas_random.pdf") is None
@@ -67,8 +63,12 @@ class TestSoportesIndexer:
     def _construir_arbol(self, raiz: Path):
         """Crea un mini-share fake con la estructura real."""
         env1 = (
-            raiz / "ABRIL 2026 - SOPORTES RADICACION" / "1. DD FACTURACION"
-            / "ESCANEO" / "ASEGURADORA SOLIDARIA" / "ENV-225060-OK"
+            raiz
+            / "ABRIL 2026 - SOPORTES RADICACION"
+            / "1. DD FACTURACION"
+            / "ESCANEO"
+            / "ASEGURADORA SOLIDARIA"
+            / "ENV-225060-OK"
         )
         env1.mkdir(parents=True)
         for f in [
@@ -83,8 +83,12 @@ class TestSoportesIndexer:
             (env1 / f).write_text("dummy")
 
         env2 = (
-            raiz / "FEBRERO 2026 - SOPORTES RADICACION CARPETA 2" / "1. DD FACTURACION"
-            / "ESCANEO" / "FAMISANAR" / "ENV-200001"
+            raiz
+            / "FEBRERO 2026 - SOPORTES RADICACION CARPETA 2"
+            / "1. DD FACTURACION"
+            / "ESCANEO"
+            / "FAMISANAR"
+            / "ENV-200001"
         )
         env2.mkdir(parents=True)
         (env2 / "FEV_900006037_HUS0000495050.pdf").write_text("x")

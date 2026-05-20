@@ -1,7 +1,7 @@
 """Tests del endpoint GET /sistema/metricas-ia/budget (R125 P2)."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +33,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -41,6 +44,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -49,11 +53,14 @@ def client(db_session, usuario_coord):
 
 
 def _seed(db, cost):
-    db.add(AICallRecord(
-        proveedor="anthropic", modelo="claude",
-        cost_usd=cost,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        AICallRecord(
+            proveedor="anthropic",
+            modelo="claude",
+            cost_usd=cost,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -62,14 +69,18 @@ class TestMetricasIaBudget:
         r = client.get("/sistema/metricas-ia/budget")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("presupuesto_mensual_usd",
-                    "gastado_usd_acumulado_mes",
-                    "calls_acumuladas_mes",
-                    "dias_transcurridos_mes",
-                    "dias_totales_mes",
-                    "proyeccion_fin_de_mes_usd",
-                    "pct_consumido", "pct_proyectado",
-                    "alerta", "mes_actual"):
+        for key in (
+            "presupuesto_mensual_usd",
+            "gastado_usd_acumulado_mes",
+            "calls_acumuladas_mes",
+            "dias_transcurridos_mes",
+            "dias_totales_mes",
+            "proyeccion_fin_de_mes_usd",
+            "pct_consumido",
+            "pct_proyectado",
+            "alerta",
+            "mes_actual",
+        ):
             assert key in d
         assert d["alerta"] in ("GREEN", "YELLOW", "RED")
 

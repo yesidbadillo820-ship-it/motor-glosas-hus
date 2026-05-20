@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cerradas-hoy (R176 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,13 +49,19 @@ def client(db_session, usuario):
 
 
 def _seed(db, estado="LEVANTADA", valor_rec=1000, dias_dec=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_decision_eps=ahora_utc() - timedelta(days=dias_dec),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_decision_eps=ahora_utc() - timedelta(days=dias_dec),
+        )
+    )
     db.commit()
 
 
@@ -62,9 +70,14 @@ class TestCerradasHoy:
         r = client.get("/glosas/stats/cerradas-hoy")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("fecha", "count", "levantadas", "aceptadas",
-                    "valor_recuperado_total",
-                    "tasa_levantamiento_pct"):
+        for key in (
+            "fecha",
+            "count",
+            "levantadas",
+            "aceptadas",
+            "valor_recuperado_total",
+            "tasa_levantamiento_pct",
+        ):
             assert key in d
 
     def test_solo_cuenta_hoy(self, client, db_session):

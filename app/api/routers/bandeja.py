@@ -11,6 +11,7 @@ Excel/PDF y los encola para importación. La automatización completa
 (worker periódico) se puede programar con cron externo llamando este
 endpoint cada N minutos.
 """
+
 import os
 import email
 import imaplib
@@ -54,7 +55,9 @@ def poll_ahora(
     user = os.getenv("IMAP_USER")
     pwd = os.getenv("IMAP_PASSWORD")
     if not (host and user and pwd):
-        raise HTTPException(503, "Bandeja IMAP no configurada. Setea IMAP_HOST, IMAP_USER, IMAP_PASSWORD.")
+        raise HTTPException(
+            503, "Bandeja IMAP no configurada. Setea IMAP_HOST, IMAP_USER, IMAP_PASSWORD."
+        )
 
     folder = os.getenv("IMAP_FOLDER", "INBOX")
     resultados = []
@@ -82,19 +85,23 @@ def poll_ahora(
                 if ext not in ("xlsx", "xls", "pdf"):
                     continue
                 content = part.get_payload(decode=True) or b""
-                adj.append({
-                    "filename": filename,
-                    "tamano_bytes": len(content),
-                    "mime": part.get_content_type(),
-                    "base64_preview": base64.b64encode(content[:200]).decode("ascii"),
-                })
-            resultados.append({
-                "id": raw_id.decode(),
-                "asunto": msg.get("Subject", ""),
-                "de": msg.get("From", ""),
-                "fecha": msg.get("Date", ""),
-                "adjuntos": adj,
-            })
+                adj.append(
+                    {
+                        "filename": filename,
+                        "tamano_bytes": len(content),
+                        "mime": part.get_content_type(),
+                        "base64_preview": base64.b64encode(content[:200]).decode("ascii"),
+                    }
+                )
+            resultados.append(
+                {
+                    "id": raw_id.decode(),
+                    "asunto": msg.get("Subject", ""),
+                    "de": msg.get("From", ""),
+                    "fecha": msg.get("Date", ""),
+                    "adjuntos": adj,
+                }
+            )
             if marcar_leidos:
                 M.store(raw_id, "+FLAGS", "\\Seen")
         M.logout()
@@ -103,8 +110,10 @@ def poll_ahora(
         raise HTTPException(500, f"Error IMAP: {e}")
 
     AuditRepository(db).registrar(
-        usuario_email=current_user.email, usuario_rol=current_user.rol,
-        accion="BANDEJA_POLL", tabla="historial",
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="BANDEJA_POLL",
+        tabla="historial",
         detalle=f"Mensajes procesados: {len(resultados)}",
     )
     return {

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/exportar-evidencia.zip (R108 P1)."""
+
 from __future__ import annotations
 
 import io
@@ -41,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -50,8 +52,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -79,8 +85,7 @@ class TestEvidenciaZip:
         assert "dictamen.txt" in nombres
 
     def test_glosa_json_correcto(self, client, db_session):
-        g = _seed(db_session, eps="NUEVA EPS", paciente="Pedro",
-                  valor_objetado=12345)
+        g = _seed(db_session, eps="NUEVA EPS", paciente="Pedro", valor_objetado=12345)
         r = client.get(f"/glosas/{g.id}/exportar-evidencia.zip")
         zf = zipfile.ZipFile(io.BytesIO(r.content))
         with zf.open("glosa.json") as f:
@@ -98,10 +103,15 @@ class TestEvidenciaZip:
 
     def test_audit_log_incluido(self, client, db_session):
         g = _seed(db_session)
-        db_session.add(AuditLogRecord(
-            usuario_email="a@x", accion="UPDATE", tabla="glosas",
-            registro_id=g.id, timestamp=ahora_utc(),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                usuario_email="a@x",
+                accion="UPDATE",
+                tabla="glosas",
+                registro_id=g.id,
+                timestamp=ahora_utc(),
+            )
+        )
         db_session.commit()
 
         r = client.get(f"/glosas/{g.id}/exportar-evidencia.zip")

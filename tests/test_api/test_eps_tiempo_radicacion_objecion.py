@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eps-tiempo-radicacion-objecion (R333 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -51,13 +53,19 @@ def _seed(db, eps, dias_objecion_despues_radicacion):
         days=dias_objecion_despues_radicacion + 30,
     )
     obj = rad + timedelta(days=dias_objecion_despues_radicacion)
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-        fecha_radicacion_factura=rad,
-        fecha_objecion_eps=obj,
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            fecha_radicacion_factura=rad,
+            fecha_objecion_eps=obj,
+        )
+    )
     db.commit()
 
 
@@ -67,9 +75,7 @@ class TestEPSTiempoRadObj:
         _seed(db_session, "X", 20)
         _seed(db_session, "X", 30)
 
-        r = client.get(
-            "/glosas/stats/eps-tiempo-radicacion-objecion?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/eps-tiempo-radicacion-objecion?min_glosas=1")
         d = r.json()
         item = d["items"][0]
         assert item["eps"] == "X"

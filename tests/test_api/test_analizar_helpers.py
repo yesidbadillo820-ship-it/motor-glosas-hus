@@ -1,6 +1,7 @@
 """Tests de los helpers privados extraídos a app/api/routers/analizar.py
 (R55 P3 — cobertura defensiva del split R53 P1).
 """
+
 from __future__ import annotations
 
 from app.api.routers.analizar import (
@@ -57,11 +58,15 @@ class TestDecidirEstadoYCodigo:
 class TestConstruirDictamenAceptacion:
     def test_aceptada_total_html_completo(self):
         html = _construir_dictamen_aceptacion(
-            eps="FAMISANAR", codigo_glosa="TA0201",
-            val_obj=168_563, val_ac=168_563,
-            estado="ACEPTADA", cod_resp="RE9702",
+            eps="FAMISANAR",
+            codigo_glosa="TA0201",
+            val_obj=168_563,
+            val_ac=168_563,
+            estado="ACEPTADA",
+            cod_resp="RE9702",
             desc_resp="GLOSA ACEPTADA AL 100%",
-            tabla_excel="TA0201 consulta urgencias", contexto_pdf="",
+            tabla_excel="TA0201 consulta urgencias",
+            contexto_pdf="",
         )
         # Debe traer la tabla de códigos
         assert "TA0201" in html
@@ -77,11 +82,15 @@ class TestConstruirDictamenAceptacion:
 
     def test_parcialmente_aceptada_muestra_disputa(self):
         html = _construir_dictamen_aceptacion(
-            eps="FAMISANAR", codigo_glosa="SO0101",
-            val_obj=200_000, val_ac=80_000,
-            estado="PARCIALMENTE_ACEPTADA", cod_resp="RE9801",
+            eps="FAMISANAR",
+            codigo_glosa="SO0101",
+            val_obj=200_000,
+            val_ac=80_000,
+            estado="PARCIALMENTE_ACEPTADA",
+            cod_resp="RE9801",
             desc_resp="GLOSA ACEPTADA Y SUBSANADA PARCIALMENTE",
-            tabla_excel="texto glosa", contexto_pdf="",
+            tabla_excel="texto glosa",
+            contexto_pdf="",
         )
         # Bloque ámbar de aceptación parcial
         assert "ACEPTA GLOSA PARCIAL" in html
@@ -94,19 +103,30 @@ class TestConstruirDictamenAceptacion:
         """Si por error val_ac > val_obj, val_rechazado podría ser
         negativo. abs() debe garantizar valor positivo en disputa."""
         html = _construir_dictamen_aceptacion(
-            eps="X", codigo_glosa="Y", val_obj=100, val_ac=150,
-            estado="PARCIALMENTE_ACEPTADA", cod_resp="RE9801",
-            desc_resp="d", tabla_excel="t", contexto_pdf="",
+            eps="X",
+            codigo_glosa="Y",
+            val_obj=100,
+            val_ac=150,
+            estado="PARCIALMENTE_ACEPTADA",
+            cod_resp="RE9801",
+            desc_resp="d",
+            tabla_excel="t",
+            contexto_pdf="",
         )
         # No debe haber un "$-50" en el HTML
         assert "$-" not in html
 
     def test_eps_y_codigo_aparecen(self):
         html = _construir_dictamen_aceptacion(
-            eps="SALUD TOTAL EPS", codigo_glosa="FA0401",
-            val_obj=10_000, val_ac=10_000,
-            estado="ACEPTADA", cod_resp="RE9702",
-            desc_resp="d", tabla_excel="", contexto_pdf="",
+            eps="SALUD TOTAL EPS",
+            codigo_glosa="FA0401",
+            val_obj=10_000,
+            val_ac=10_000,
+            estado="ACEPTADA",
+            cod_resp="RE9702",
+            desc_resp="d",
+            tabla_excel="",
+            contexto_pdf="",
         )
         assert "FA0401" in html
 
@@ -117,6 +137,7 @@ class TestObtenerFewShots:
         de plantillas y se devuelve lista vacía."""
         from app.api.routers.analizar import _obtener_few_shots
         from unittest.mock import MagicMock
+
         db = MagicMock()
         few, plant, cod = _obtener_few_shots(db, eps="X", tabla_excel="texto plano sin código")
         assert few == []
@@ -129,13 +150,17 @@ class TestObtenerFewShots:
         """Con TA0201 en el texto, debe llamarse a obtener_few_shot."""
         from app.api.routers import analizar as mod
         from unittest.mock import MagicMock, patch
+
         db = MagicMock()
         with patch.object(mod, "_obtener_few_shots", wraps=mod._obtener_few_shots):
             # Patch indirecto: monkey-patch el import lazy
             from app.api.routers import plantillas_gold as pg
+
             with patch.object(pg, "obtener_few_shot", return_value=[]) as mock_few:
                 few, plant, cod = mod._obtener_few_shots(
-                    db, eps="FAMISANAR", tabla_excel="…código TA0201 valor X…",
+                    db,
+                    eps="FAMISANAR",
+                    tabla_excel="…código TA0201 valor X…",
                 )
                 assert cod == "TA0201"
                 # Sí se invocó la búsqueda en BD
@@ -149,14 +174,16 @@ class TestExtraerPdfs:
     @pytest.mark.asyncio
     async def test_archivos_none_retorna_vacio(self):
         from app.api.routers.analizar import _extraer_pdfs
-        contexto, n = await _extraer_pdfs(None, req_id="test")
+
+        contexto, n, _ = await _extraer_pdfs(None, req_id="test")
         assert contexto == ""
         assert n == 0
 
     @pytest.mark.asyncio
     async def test_archivos_lista_vacia_retorna_vacio(self):
         from app.api.routers.analizar import _extraer_pdfs
-        contexto, n = await _extraer_pdfs([], req_id="test")
+
+        contexto, n, _ = await _extraer_pdfs([], req_id="test")
         assert contexto == ""
         assert n == 0
 
@@ -165,20 +192,22 @@ class TestExtraerPdfs:
         """Si el primer header no es %PDF, se loggea warning y se ignora."""
         from app.api.routers.analizar import _extraer_pdfs
         from unittest.mock import AsyncMock, MagicMock
+
         f = MagicMock()
         f.filename = "no-es-pdf.txt"
         f.read = AsyncMock(return_value=b"hola mundo no soy pdf")
-        contexto, n = await _extraer_pdfs([f], req_id="test")
+        contexto, n, _ = await _extraer_pdfs([f], req_id="test")
         assert contexto == ""
         assert n == 0
 
     @pytest.mark.asyncio
     async def test_archivo_sin_filename_se_ignora(self):
         from app.api.routers.analizar import _extraer_pdfs
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import MagicMock
+
         f = MagicMock()
         f.filename = ""
-        contexto, n = await _extraer_pdfs([f], req_id="test")
+        contexto, n, _ = await _extraer_pdfs([f], req_id="test")
         assert n == 0
         # f.read no debió llamarse
         f.read.assert_not_called() if hasattr(f.read, "assert_not_called") else None
@@ -188,10 +217,11 @@ class TestExtraerPdfs:
         """PDFs >15MB se omiten para no saturar el LLM."""
         from app.api.routers.analizar import _extraer_pdfs, MAX_BYTES_PDF
         from unittest.mock import AsyncMock, MagicMock
+
         f = MagicMock()
         f.filename = "huge.pdf"
         f.read = AsyncMock(return_value=b"%PDF-1.7" + b"x" * (MAX_BYTES_PDF + 1))
-        contexto, n = await _extraer_pdfs([f], req_id="test")
+        contexto, n, _ = await _extraer_pdfs([f], req_id="test")
         assert n == 0  # ignorado por tamaño
 
     @pytest.mark.asyncio
@@ -199,6 +229,7 @@ class TestExtraerPdfs:
         """Si llegan >10 PDFs, solo se procesan 10."""
         from app.api.routers.analizar import _extraer_pdfs, MAX_ARCHIVOS
         from unittest.mock import AsyncMock, MagicMock, patch
+
         archivos = []
         for i in range(MAX_ARCHIVOS + 5):
             f = MagicMock()
@@ -206,8 +237,10 @@ class TestExtraerPdfs:
             f.read = AsyncMock(return_value=b"%PDF-1.7\n... fake")
             archivos.append(f)
         # Mockear PdfService.extraer_con_ocr para no parsear de verdad
-        with patch("app.services.pdf_service.PdfService.extraer_con_ocr",
-                   new_callable=AsyncMock,
-                   return_value=("contenido extraído", "nativo")):
-            contexto, n = await _extraer_pdfs(archivos, req_id="test")
+        with patch(
+            "app.services.pdf_service.PdfService.extraer_con_ocr",
+            new_callable=AsyncMock,
+            return_value=("contenido extraído", "nativo"),
+        ):
+            contexto, n, _ = await _extraer_pdfs(archivos, req_id="test")
         assert n == MAX_ARCHIVOS  # se cortó en 10

@@ -1,4 +1,5 @@
 """Tests del liquidador de tarifas SOAT/Propias HUS."""
+
 from __future__ import annotations
 
 import pytest
@@ -11,13 +12,18 @@ from app.models.db import UsuarioRecord
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1, nombre="ADMIN",
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
+        nombre="ADMIN",
     )
 
 
 @pytest.fixture
 def client(admin_user):
     from app.main import app
+
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
         yield c
@@ -81,31 +87,37 @@ class TestBuscar:
 
 class TestLiquidarManual:
     def test_soat_pleno(self, client):
-        r = client.post("/tarifa-liquidador/liquidar-manual",
-                        json={"factor": 5.93, "modalidad": "SOAT", "pct": 0, "anio": 2026})
+        r = client.post(
+            "/tarifa-liquidador/liquidar-manual",
+            json={"factor": 5.93, "modalidad": "SOAT", "pct": 0, "anio": 2026},
+        )
         assert r.status_code == 200
         d = r.json()
         assert d["valor_pesos"] == 71_800
         assert d["uvb_vigente"] == 12_110
 
     def test_soat_menos_5(self, client):
-        r = client.post("/tarifa-liquidador/liquidar-manual",
-                        json={"factor": 5.93, "modalidad": "SOAT", "pct": -5})
+        r = client.post(
+            "/tarifa-liquidador/liquidar-manual",
+            json={"factor": 5.93, "modalidad": "SOAT", "pct": -5},
+        )
         d = r.json()
         # 5.93 × 12110 × 0.95 ≈ 68221.685 → centena = 68200
         assert d["valor_pesos"] == 68_200
 
     def test_propia_hus(self, client):
         # 3.94 SMDLV × 58375 = 229997.5 → centena = 230000
-        r = client.post("/tarifa-liquidador/liquidar-manual",
-                        json={"factor": 3.94, "modalidad": "PROPIA"})
+        r = client.post(
+            "/tarifa-liquidador/liquidar-manual", json={"factor": 3.94, "modalidad": "PROPIA"}
+        )
         d = r.json()
         assert d["valor_pesos"] == 230_000
         assert d["smdlv_vigente"] == 58_375
 
     def test_factor_invalido(self, client):
-        r = client.post("/tarifa-liquidador/liquidar-manual",
-                        json={"factor": 0, "modalidad": "SOAT"})
+        r = client.post(
+            "/tarifa-liquidador/liquidar-manual", json={"factor": 0, "modalidad": "SOAT"}
+        )
         assert r.status_code == 422
 
 

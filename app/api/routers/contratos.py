@@ -24,6 +24,7 @@ CONTRATOS_PDF_ROOT = os.getenv("CONTRATOS_PDF_ROOT") or os.path.join(
     os.getenv("SOPORTES_ROOT", "/data"), "contratos"
 )
 
+
 @router.get("/", response_model=List[dict])
 def listar_contratos(
     db: Session = Depends(get_db),
@@ -34,6 +35,7 @@ def listar_contratos(
     contratos = repo.listar()
     return [{"eps": c.eps, "detalles": c.detalles} for c in contratos]
 
+
 @router.post("/upsert")
 def crear_o_actualizar_contrato(
     data: ContratoInput,
@@ -43,6 +45,7 @@ def crear_o_actualizar_contrato(
     """Crea un nuevo contrato o actualiza uno existente si la EPS ya existe."""
     repo = ContratoRepository(db)
     return repo.upsert(data)
+
 
 @router.get("/eps-sin-contrato")
 def eps_sin_contrato(
@@ -63,9 +66,7 @@ def eps_sin_contrato(
     """
     from app.models.db import ContratoRecord, GlosaRecord
 
-    eps_contratadas = {
-        c.eps for c in db.query(ContratoRecord).all() if c.eps
-    }
+    eps_contratadas = {c.eps for c in db.query(ContratoRecord).all() if c.eps}
 
     # Agrupar glosas por EPS
     por_eps: dict[str, dict] = {}
@@ -118,27 +119,23 @@ def exportar_contratos_csv(
 
     from app.models.db import ContratoRecord
 
-    contratos = (
-        db.query(ContratoRecord)
-        .order_by(ContratoRecord.eps.asc())
-        .all()
-    )
+    contratos = db.query(ContratoRecord).order_by(ContratoRecord.eps.asc()).all()
 
     def _generar():
         buf = io.StringIO()
         w = csv.writer(buf)
         w.writerow(["eps", "detalles"])
         yield buf.getvalue()
-        buf.seek(0); buf.truncate(0)
+        buf.seek(0)
+        buf.truncate(0)
 
         for c in contratos:
             w.writerow([c.eps or "", (c.detalles or "")[:500]])
             yield buf.getvalue()
-            buf.seek(0); buf.truncate(0)
+            buf.seek(0)
+            buf.truncate(0)
 
-    fname = (
-        f"contratos-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
-    )
+    fname = f"contratos-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
         _generar(),
         media_type="text/csv",
@@ -167,18 +164,17 @@ def contratos_sin_glosas(
     from app.models.db import ContratoRecord, GlosaRecord
 
     contratos = db.query(ContratoRecord).all()
-    eps_con_glosas = {
-        e[0] for e in db.query(GlosaRecord.eps).distinct().all()
-        if e[0]
-    }
+    eps_con_glosas = {e[0] for e in db.query(GlosaRecord.eps).distinct().all() if e[0]}
 
     sin_glosas = []
     for c in contratos:
         if c.eps not in eps_con_glosas:
-            sin_glosas.append({
-                "eps": c.eps,
-                "detalles": c.detalles,
-            })
+            sin_glosas.append(
+                {
+                    "eps": c.eps,
+                    "detalles": c.detalles,
+                }
+            )
 
     sin_glosas.sort(key=lambda x: x["eps"])
 
@@ -239,15 +235,18 @@ def ranking_contratos(
             continue
         tasa = (
             round(100 * b["valor_recuperado"] / b["valor_objetado"], 2)
-            if b["valor_objetado"] else 0.0
+            if b["valor_objetado"]
+            else 0.0
         )
-        items.append({
-            "eps": eps,
-            "total_glosas": b["total"],
-            "valor_objetado_total": int(b["valor_objetado"]),
-            "valor_recuperado_total": int(b["valor_recuperado"]),
-            "tasa_recuperacion_pct": tasa,
-        })
+        items.append(
+            {
+                "eps": eps,
+                "total_glosas": b["total"],
+                "valor_objetado_total": int(b["valor_objetado"]),
+                "valor_recuperado_total": int(b["valor_recuperado"]),
+                "tasa_recuperacion_pct": tasa,
+            }
+        )
 
     items.sort(
         key=lambda x: x["valor_recuperado_total"],
@@ -286,11 +285,7 @@ def perfil_detallado_eps(
 
     from app.models.db import GlosaRecord
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.eps == eps)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.eps == eps).all()
 
     if not glosas:
         return {
@@ -304,8 +299,7 @@ def perfil_detallado_eps(
     cerradas = [g for g in glosas if (g.estado or "").upper() in ESTADOS_CERRADOS]
     levantadas = [g for g in cerradas if (g.estado or "").upper() == "LEVANTADA"]
     decididas = [
-        g for g in cerradas
-        if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+        g for g in cerradas if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
     ]
 
     valor_obj = sum(float(g.valor_objetado or 0) for g in glosas)
@@ -333,11 +327,13 @@ def perfil_detallado_eps(
     resp_efectivos = []
     for cr, b in por_resp.items():
         tasa = round(100 * b["levantadas"] / b["total"], 2) if b["total"] else 0
-        resp_efectivos.append({
-            "codigo_respuesta": cr,
-            "usado": b["total"],
-            "tasa_exito_pct": tasa,
-        })
+        resp_efectivos.append(
+            {
+                "codigo_respuesta": cr,
+                "usado": b["total"],
+                "tasa_exito_pct": tasa,
+            }
+        )
     resp_efectivos.sort(key=lambda x: x["tasa_exito_pct"], reverse=True)
 
     # Tiempo promedio decisión
@@ -372,22 +368,17 @@ def perfil_detallado_eps(
             "valor_objetado_total": int(valor_obj),
             "valor_recuperado_total": int(valor_rec),
             "valor_pendiente": int(valor_pendiente),
-            "tasa_recuperacion_pct": (
-                round(100 * valor_rec / valor_obj, 2) if valor_obj else 0.0
-            ),
+            "tasa_recuperacion_pct": (round(100 * valor_rec / valor_obj, 2) if valor_obj else 0.0),
         },
         "resoluciones": {
             "tasa_levantamiento_pct": (
-                round(100 * len(levantadas) / len(decididas), 2)
-                if decididas else 0.0
+                round(100 * len(levantadas) / len(decididas), 2) if decididas else 0.0
             ),
             "tiempo_promedio_decision_dias": (
                 round(sum(tiempos) / len(tiempos), 2) if tiempos else 0.0
             ),
         },
-        "top_5_codigos_objetados": [
-            {"codigo": c, "veces": n} for c, n in top_codigos
-        ],
+        "top_5_codigos_objetados": [{"codigo": c, "veces": n} for c, n in top_codigos],
         "codigos_respuesta_efectivos": resp_efectivos[:5],
         "ultima_actividad": ultima.isoformat() if ultima else None,
     }
@@ -411,11 +402,7 @@ def historial_contrato(
     """
     from app.models.db import GlosaRecord
 
-    glosas = (
-        db.query(GlosaRecord)
-        .filter(GlosaRecord.eps == eps)
-        .all()
-    )
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.eps == eps).all()
 
     total = len(glosas)
     if total == 0:
@@ -432,10 +419,10 @@ def historial_contrato(
     valor_obj = sum(float(g.valor_objetado or 0) for g in glosas)
     valor_rec = sum(float(g.valor_recuperado or 0) for g in glosas)
 
-    decididas = [g for g in glosas if (g.estado or "").upper()
-                 in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}]
-    levantadas = sum(1 for g in decididas
-                     if (g.estado or "").upper() == "LEVANTADA")
+    decididas = [
+        g for g in glosas if (g.estado or "").upper() in {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
+    ]
+    levantadas = sum(1 for g in decididas if (g.estado or "").upper() == "LEVANTADA")
 
     # Top 5 códigos
     por_codigo: dict[str, int] = {}
@@ -449,19 +436,13 @@ def historial_contrato(
         "total_glosas": total,
         "valor_objetado_total": int(valor_obj),
         "valor_recuperado_total": int(valor_rec),
-        "tasa_recuperacion_pct": (
-            round(100 * valor_rec / valor_obj, 2)
-            if valor_obj else 0.0
-        ),
+        "tasa_recuperacion_pct": (round(100 * valor_rec / valor_obj, 2) if valor_obj else 0.0),
         "tasa_levantamiento_pct": (
-            round(100 * levantadas / len(decididas), 2)
-            if decididas else 0.0
+            round(100 * levantadas / len(decididas), 2) if decididas else 0.0
         ),
         "decididas": len(decididas),
         "pendientes": total - len(decididas),
-        "top_5_codigos": [
-            {"codigo": c, "veces": n} for c, n in top_5
-        ],
+        "top_5_codigos": [{"codigo": c, "veces": n} for c, n in top_5],
     }
 
 
@@ -483,6 +464,7 @@ def eliminar_contrato(
 # Permite subir el PDF del contrato firmado con cada EPS para que el
 # motor cite cláusulas reales al objetar glosas. Sólo se guarda el
 # vigente: subir uno nuevo reemplaza el anterior y sus cláusulas.
+
 
 @router.post("/{eps}/pdf")
 @limiter.limit("5/minute")
@@ -540,6 +522,7 @@ async def subir_pdf_contrato(
     from app.services.extractor_clausulas_contrato import (
         extraer_clausulas_desde_pdf_bytes,
     )
+
     try:
         clausulas, diagnostico = await extraer_clausulas_desde_pdf_bytes(contenido, eps)
     except Exception as e:
@@ -555,20 +538,20 @@ async def subir_pdf_contrato(
     # Antes el código hacía DELETE incondicional → si la IA fallaba (0 cláusulas)
     # se perdían las cláusulas previamente cargadas. Bug reportado por el
     # gestor: "subí SALUD MIA con éxito ayer, hoy no aparecen".
-    clausulas_previas = (
-        db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).count()
-    )
+    clausulas_previas = db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).count()
     if clausulas:
         db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).delete()
         for c in clausulas:
-            db.add(ClausulaContrato(
-                eps=eps_norm,
-                numero_clausula=c["numero"],
-                tema=c["tema"],
-                titulo=c["titulo"],
-                texto_literal=c["texto_literal"],
-                pagina=c["pagina"],
-            ))
+            db.add(
+                ClausulaContrato(
+                    eps=eps_norm,
+                    numero_clausula=c["numero"],
+                    tema=c["tema"],
+                    titulo=c["titulo"],
+                    texto_literal=c["texto_literal"],
+                    pagina=c["pagina"],
+                )
+            )
         logger.info(
             f"[CONTRATO-PDF] eps={eps_norm} reemplazadas {clausulas_previas} → "
             f"{len(clausulas)} cláusulas"
@@ -595,14 +578,14 @@ async def subir_pdf_contrato(
             registro_id=None,
             campo="pdf_path",
             valor_nuevo=pdf_path,
-            detalle=f"EPS={eps}, {len(contenido)//1024}KB, {len(clausulas)} cláusulas extraídas",
+            detalle=f"EPS={eps}, {len(contenido) // 1024}KB, {len(clausulas)} cláusulas extraídas",
             ip=ip_origen,
         )
     except Exception as _e_audit:
         logger.debug(f"[AUDIT] no se pudo registrar UPLOAD_CONTRATO_PDF: {_e_audit}")
 
     logger.info(
-        f"[CONTRATO-PDF] eps={eps} pdf={len(contenido)//1024}KB "
+        f"[CONTRATO-PDF] eps={eps} pdf={len(contenido) // 1024}KB "
         f"clausulas={len(clausulas)} usuario={current_user.email}"
     )
 
@@ -680,16 +663,17 @@ def borrar_clausulas_contrato(
 # directamente, en lugar de subir el PDF y pagar a Claude por extraerlo.
 # El gestor copia/pega cada cláusula desde el contrato firmado.
 
+
 class ClausulaManualInput(BaseModel):
     numero: str
-    tema: str       # TA / SO / AU / CO / FA / NN
+    tema: str  # TA / SO / AU / CO / FA / NN
     titulo: str = ""
     texto_literal: str
     pagina: Optional[int] = None
 
 
 class ClausulasManualBatch(BaseModel):
-    reemplazar: bool = True   # si True, borra las existentes antes de insertar
+    reemplazar: bool = True  # si True, borra las existentes antes de insertar
     clausulas: list[ClausulaManualInput]
 
 
@@ -717,9 +701,9 @@ def cargar_clausulas_manual(
     TEMAS_VALIDOS = {"TA", "SO", "AU", "CO", "FA", "NN"}
 
     if batch.reemplazar:
-        db.query(ClausulaContrato).filter(
-            ClausulaContrato.eps.in_([eps, eps_norm])
-        ).delete(synchronize_session=False)
+        db.query(ClausulaContrato).filter(ClausulaContrato.eps.in_([eps, eps_norm])).delete(
+            synchronize_session=False
+        )
 
     insertadas = 0
     for c in batch.clausulas:
@@ -729,23 +713,21 @@ def cargar_clausulas_manual(
         tema = (c.tema or "NN").upper().strip()
         if tema not in TEMAS_VALIDOS:
             tema = "NN"
-        db.add(ClausulaContrato(
-            eps=eps_norm,
-            numero_clausula=(c.numero or "").strip()[:80],
-            tema=tema,
-            titulo=(c.titulo or "").strip()[:300],
-            texto_literal=texto[:5000],
-            pagina=c.pagina,
-        ))
+        db.add(
+            ClausulaContrato(
+                eps=eps_norm,
+                numero_clausula=(c.numero or "").strip()[:80],
+                tema=tema,
+                titulo=(c.titulo or "").strip()[:300],
+                texto_literal=texto[:5000],
+                pagina=c.pagina,
+            )
+        )
         insertadas += 1
 
     db.commit()
 
-    total = (
-        db.query(ClausulaContrato)
-        .filter(ClausulaContrato.eps == eps_norm)
-        .count()
-    )
+    total = db.query(ClausulaContrato).filter(ClausulaContrato.eps == eps_norm).count()
     logger.info(
         f"[CONTRATO-MANUAL] eps={eps_norm} insertadas={insertadas} "
         f"reemplazar={batch.reemplazar} total_actual={total}"

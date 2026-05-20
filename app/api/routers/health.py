@@ -2,21 +2,33 @@
 
 Extraídos de app/main.py. Agrupa:
   - GET /health            → healthcheck público (status + version + banner)
+  - GET /health/detail     → métricas detalladas del sistema (requiere auth)
+  - GET /mi-dia            → dashboard personal del gestor (tareas + alertas + métricas)
   - GET /debug/sentry-test → test intencional de integración Sentry
 """
+
 from __future__ import annotations
 
-from datetime import datetime
+import os
+import platform
+import sys
+import time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_usuario_actual
 from app.core.config import get_settings
-from app.models.db import UsuarioRecord
+from app.database import SessionLocal, get_db
+from app.models.db import GlosaRecord, TareaDiariaRecord, UsuarioRecord
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["sistema"])
 
 cfg = get_settings()
+
+# Momento en que arrancó el proceso (aproximado).
+_STARTUP_TIME = time.time()
 
 
 @router.get("/health")
@@ -25,6 +37,173 @@ def health():
         "status": "ok",
         "version": cfg.app_version,
         "banner": (cfg.banner_capacitacion or "").strip(),
+    }
+
+
+@router.get("/health/detail")
+def health_detail(
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Métricas detalladas del sistema. Requiere autenticación."""
+    uptime_seconds = int(time.time() - _STARTUP_TIME)
+    uptime_h = uptime_seconds // 3600
+    uptime_m = (uptime_seconds % 3600) // 60
+
+    # Estadísticas de la base de datos
+    db_stats: dict = {}
+    try:
+        with SessionLocal() as db:
+            total_glosas = db.query(GlosaRecord).count()
+            total_usuarios = db.query(UsuarioRecord).count()
+            db_stats = {
+                "total_glosas": total_glosas,
+                "total_usuarios": total_usuarios,
+                "engine": "SQLite" if "sqlite" in cfg.database_url else "PostgreSQL",
+            }
+    except Exception as exc:
+        db_stats = {"error": str(exc)}
+
+    # Métricas de sistema (psutil opcional)
+    sys_stats: dict = {}
+    try:
+        import psutil  # type: ignore[import]
+
+        proc = psutil.Process(os.getpid())
+        sys_stats = {
+            "rss_mb": round(proc.memory_info().rss / 1_048_576, 1),
+            "cpu_percent": proc.cpu_percent(interval=0.1),
+            "open_files": len(proc.open_files()),
+            "threads": proc.num_threads(),
+            "system_cpu_percent": psutil.cpu_percent(interval=0.1),
+            "system_mem_percent": psutil.virtual_memory().percent,
+        }
+    except ImportError:
+        sys_stats = {"available": False}
+    except Exception as exc:
+        sys_stats = {"error": str(exc)}
+
+    return {
+        "status": "ok",
+        "version": cfg.app_version,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "uptime": f"{uptime_h}h {uptime_m}m",
+        "uptime_seconds": uptime_seconds,
+        "python": sys.version.split()[0],
+        "platform": platform.system(),
+        "database": db_stats,
+        "system": sys_stats,
+        "ai": {
+            "primary": cfg.primary_ai,
+            "anthropic_configured": bool(cfg.anthropic_api_key),
+            "groq_configured": bool(cfg.groq_api_key),
+            "gemini_configured": bool(cfg.gemini_api_key),
+        },
+    }
+
+
+@router.get("/mi-dia")
+def mi_dia(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Dashboard personal del gestor: un solo request para arrancar el día.
+
+    Retorna:
+      - tareas: pendientes de hoy + totales del checklist diario
+      - glosas: asignadas al gestor, vencen próximas 48h, recientes sin dictamen
+      - alertas: número de glosas próximas a vencer
+      - saludo: mensaje motivacional con el nombre del gestor
+    """
+    from datetime import date, timedelta
+
+    from sqlalchemy import func
+
+    hoy = date.today().isoformat()
+
+    # Tareas del gestor para hoy
+    tareas_hoy = (
+        db.query(TareaDiariaRecord)
+        .filter(
+            TareaDiariaRecord.usuario_email == current_user.email,
+            TareaDiariaRecord.fecha_para == hoy,
+        )
+        .all()
+    )
+    tareas_pendientes = sum(1 for t in tareas_hoy if not t.completada)
+    tareas_completadas = sum(1 for t in tareas_hoy if t.completada)
+
+    # Glosas del gestor
+    email = current_user.email
+    glosas_asignadas = (
+        db.query(func.count(GlosaRecord.id))
+        .filter(
+            GlosaRecord.auditor_email == email,
+            GlosaRecord.estado.notin_(["CERRADA", "PAPELERA", "ACEPTADA"]),
+        )
+        .scalar()
+        or 0
+    )
+    glosas_vencen_48h = (
+        db.query(func.count(GlosaRecord.id))
+        .filter(
+            GlosaRecord.auditor_email == email,
+            GlosaRecord.fecha_vencimiento.isnot(None),
+            GlosaRecord.fecha_vencimiento.between(
+                datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc),
+                datetime.combine(date.today() + timedelta(days=2), datetime.min.time()).replace(
+                    tzinfo=timezone.utc
+                ),
+            ),
+            GlosaRecord.estado.notin_(["CERRADA", "PAPELERA"]),
+        )
+        .scalar()
+        or 0
+    )
+    glosas_sin_dictamen = (
+        db.query(func.count(GlosaRecord.id))
+        .filter(
+            GlosaRecord.auditor_email == email,
+            GlosaRecord.dictamen.is_(None),
+            GlosaRecord.estado.notin_(["CERRADA", "PAPELERA"]),
+        )
+        .scalar()
+        or 0
+    )
+
+    # Saludo según la hora
+    hora = datetime.now(timezone.utc).hour
+    if hora < 12:
+        saludo_base = "Buenos días"
+    elif hora < 18:
+        saludo_base = "Buenas tardes"
+    else:
+        saludo_base = "Buenas noches"
+    nombre = (current_user.nombre or "").split()[0] if current_user.nombre else "gestor"
+    saludo = f"{saludo_base}, {nombre}."
+    if tareas_pendientes > 0:
+        saludo += f" Tienes {tareas_pendientes} tarea(s) pendiente(s) hoy."
+    if glosas_vencen_48h > 0:
+        saludo += f" ⚠ {glosas_vencen_48h} glosa(s) vencen en las próximas 48h."
+
+    return {
+        "fecha": hoy,
+        "saludo": saludo,
+        "tareas": {
+            "pendientes": tareas_pendientes,
+            "completadas": tareas_completadas,
+            "total": len(tareas_hoy),
+        },
+        "glosas": {
+            "asignadas_activas": glosas_asignadas,
+            "vencen_48h": glosas_vencen_48h,
+            "sin_dictamen": glosas_sin_dictamen,
+        },
+        "alertas": {
+            "nivel": "ALTA"
+            if glosas_vencen_48h > 5
+            else ("MEDIA" if glosas_vencen_48h > 0 else "OK"),
+            "vencen_48h": glosas_vencen_48h,
+        },
     }
 
 

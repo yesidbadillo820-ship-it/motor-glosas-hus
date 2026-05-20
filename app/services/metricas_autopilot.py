@@ -14,6 +14,7 @@ El endpoint devuelve:
   - ahorro_estimado_tokens: N * 8000 (tokens ahorrados)
   - ahorro_estimado_usd: N * 0.012 ($12 por millón con Anthropic Sonnet)
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -47,13 +48,10 @@ def metricas_autopilot(db: Session, periodo: Periodo = "hoy") -> dict:
     desde = _desde(periodo)
 
     def _contar(q_filter):
-        q = (
-            db.query(
-                func.count(GlosaRecord.id).label("n"),
-                func.coalesce(func.sum(GlosaRecord.valor_objetado), 0).label("v"),
-            )
-            .filter(GlosaRecord.creado_en >= desde)
-        )
+        q = db.query(
+            func.count(GlosaRecord.id).label("n"),
+            func.coalesce(func.sum(GlosaRecord.valor_objetado), 0).label("v"),
+        ).filter(GlosaRecord.creado_en >= desde)
         q = q_filter(q)
         row = q.first()
         return (int(row.n or 0), float(row.v or 0.0)) if row else (0, 0.0)
@@ -73,9 +71,7 @@ def metricas_autopilot(db: Session, periodo: Periodo = "hoy") -> dict:
 
     # Glosas totales creadas en el periodo (para el %)
     total_periodo = (
-        db.query(func.count(GlosaRecord.id))
-        .filter(GlosaRecord.creado_en >= desde)
-        .scalar() or 0
+        db.query(func.count(GlosaRecord.id)).filter(GlosaRecord.creado_en >= desde).scalar() or 0
     )
     pct = round(float(total_n) / float(total_periodo), 3) if total_periodo else 0.0
 

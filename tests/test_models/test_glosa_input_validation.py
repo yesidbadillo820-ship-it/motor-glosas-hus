@@ -1,4 +1,5 @@
 """Tests de validación de GlosaInput (R55 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -48,7 +49,10 @@ class TestModoRespuestaValidator:
 
     def test_modo_auditoria_previa_case_insensitive(self):
         assert _input_minimo(modo_respuesta="AUDITORIA_PREVIA").modo_respuesta == "auditoria_previa"
-        assert _input_minimo(modo_respuesta="  Auditoria_Previa  ").modo_respuesta == "auditoria_previa"
+        assert (
+            _input_minimo(modo_respuesta="  Auditoria_Previa  ").modo_respuesta
+            == "auditoria_previa"
+        )
 
     def test_modo_invalido_fallback_defender(self):
         assert _input_minimo(modo_respuesta="rebelde").modo_respuesta == "defender"

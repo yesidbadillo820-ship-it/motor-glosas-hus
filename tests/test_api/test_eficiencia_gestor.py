@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/eficiencia-gestor (R98 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -48,8 +50,12 @@ def client(db_session, usuario):
 
 def _seed(db, gestor, estado, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado=estado,
         creado_en=ahora_utc(),
         gestor_nombre=gestor,
     )
@@ -107,10 +113,8 @@ class TestEficienciaGestor:
         assert "Pequeña" not in gestores
 
     def test_tasa_recuperacion(self, client, db_session):
-        _seed(db_session, "Alice", "LEVANTADA",
-              valor_objetado=10000, valor_recuperado=8000)
-        _seed(db_session, "Alice", "LEVANTADA",
-              valor_objetado=5000, valor_recuperado=2000)
+        _seed(db_session, "Alice", "LEVANTADA", valor_objetado=10000, valor_recuperado=8000)
+        _seed(db_session, "Alice", "LEVANTADA", valor_objetado=5000, valor_recuperado=2000)
         r = client.get("/glosas/stats/eficiencia-gestor?min_glosas=1")
         d = r.json()
         item = next(it for it in d["items"] if it["gestor"] == "Alice")
@@ -119,12 +123,20 @@ class TestEficienciaGestor:
 
     def test_tiempo_promedio(self, client, db_session):
         ahora = ahora_utc()
-        _seed(db_session, "Alice", "LEVANTADA",
-              creado_en=ahora - timedelta(days=10),
-              fecha_decision_eps=ahora)
-        _seed(db_session, "Alice", "LEVANTADA",
-              creado_en=ahora - timedelta(days=20),
-              fecha_decision_eps=ahora)
+        _seed(
+            db_session,
+            "Alice",
+            "LEVANTADA",
+            creado_en=ahora - timedelta(days=10),
+            fecha_decision_eps=ahora,
+        )
+        _seed(
+            db_session,
+            "Alice",
+            "LEVANTADA",
+            creado_en=ahora - timedelta(days=20),
+            fecha_decision_eps=ahora,
+        )
         r = client.get("/glosas/stats/eficiencia-gestor?min_glosas=1")
         d = r.json()
         item = next(it for it in d["items"] if it["gestor"] == "Alice")

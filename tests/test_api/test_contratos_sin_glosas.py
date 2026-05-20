@@ -1,4 +1,5 @@
 """Tests del endpoint GET /contratos/sin-glosas (R132 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -50,11 +52,17 @@ def _seed_contrato(db, eps, detalles="X"):
 
 
 def _seed_glosa(db, eps):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -63,8 +71,7 @@ class TestContratosSinGlosas:
         r = client.get("/contratos/sin-glosas")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("total_contratos", "contratos_con_glosas",
-                    "contratos_sin_glosas", "items"):
+        for key in ("total_contratos", "contratos_con_glosas", "contratos_sin_glosas", "items"):
             assert key in d
 
     def test_sin_contratos(self, client):

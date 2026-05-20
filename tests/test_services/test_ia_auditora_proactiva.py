@@ -1,7 +1,7 @@
 """Tests de la IA auditora proactiva (scheduler + pre-análisis)."""
+
 from __future__ import annotations
 
-from datetime import datetime, time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,12 +9,14 @@ import pytest
 
 def test_segundos_hasta_6am_dentro_de_24h():
     from app.services.ia_auditora_proactiva import _segundos_hasta_proximas_6am
+
     s = _segundos_hasta_proximas_6am()
     assert 0 < s <= 86400, "debe ser positivo y menor o igual a 24h"
 
 
 def test_obtener_estado_initial():
     from app.services.ia_auditora_proactiva import obtener_estado
+
     est = obtener_estado()
     assert "scheduler_activo" in est
     assert "ejecucion_en_curso" in est
@@ -25,6 +27,7 @@ def test_obtener_estado_initial():
 async def test_ejecutar_pre_analisis_sin_glosas_pendientes():
     """Si no hay glosas pendientes, retorna procesadas=0 sin error."""
     from app.services import ia_auditora_proactiva as iap
+
     # Forzar flag off
     iap._EJECUCION_EN_CURSO = False
 
@@ -47,6 +50,7 @@ async def test_ejecutar_pre_analisis_sin_glosas_pendientes():
 async def test_ejecucion_concurrente_se_bloquea():
     """Si ya hay una ejecución corriendo, la segunda retorna skip."""
     from app.services import ia_auditora_proactiva as iap
+
     iap._EJECUCION_EN_CURSO = True
     try:
         r = await iap.ejecutar_pre_analisis_background(limite=5)

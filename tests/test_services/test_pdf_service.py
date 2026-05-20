@@ -1,4 +1,5 @@
 """Tests del servicio de extracción PDF — R51 P4."""
+
 from __future__ import annotations
 
 import asyncio
@@ -66,18 +67,15 @@ class TestUmbralYOcr:
     def test_ocr_sin_api_key_usa_nativo(self):
         """Si el PDF tiene poco texto pero no hay API key, retorna método 'vacio'."""
         pdf_bytes = _pdf_con_texto("solo cinco palabras aqui hoy")
-        texto, metodo = asyncio.run(
-            PdfService().extraer_con_ocr(pdf_bytes, anthropic_api_key="")
-        )
+        texto, metodo = asyncio.run(PdfService().extraer_con_ocr(pdf_bytes, anthropic_api_key=""))
         assert metodo in ("vacio", "nativo")
 
     def test_ocr_con_texto_abundante_usa_nativo(self):
         """Si el PDF ya trae texto abundante, no se llama a OCR."""
         # 1500 chars de texto real (> UMBRAL 300)
-        contenido = "\n".join([
-            f"linea abundante numero {i} con mucho texto repetido y relleno"
-            for i in range(50)
-        ])
+        contenido = "\n".join(
+            [f"linea abundante numero {i} con mucho texto repetido y relleno" for i in range(50)]
+        )
         pdf_bytes = _pdf_con_texto(contenido)
         texto, metodo = asyncio.run(
             PdfService().extraer_con_ocr(pdf_bytes, anthropic_api_key="fake")

@@ -4,6 +4,7 @@ Verifica que los intentos de login (exitoso y fallido) y los intentos
 2FA fallidos se registren en el logger estructurado para auditoría
 de seguridad y detección de brute-force.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,13 +24,15 @@ def db():
     Base.metadata.create_all(engine)
     S = sessionmaker(bind=engine)
     s = S()
-    s.add(UsuarioRecord(
-        email="auditor@hus.com",
-        nombre="Auditor Test",
-        rol="AUDITOR",
-        password_hash=get_password_hash("Pass1234!"),
-        activo=1,
-    ))
+    s.add(
+        UsuarioRecord(
+            email="auditor@hus.com",
+            nombre="Auditor Test",
+            rol="AUDITOR",
+            password_hash=get_password_hash("Pass1234!"),
+            activo=1,
+        )
+    )
     s.commit()
     try:
         yield s
@@ -40,6 +43,7 @@ def db():
 def _request_real(ip="127.0.0.1"):
     """slowapi exige starlette.Request real, no mock."""
     from starlette.requests import Request
+
     scope = {
         "type": "http",
         "method": "POST",
@@ -63,6 +67,7 @@ async def test_login_fallido_se_logea_warning(db, caplog):
     en el log con [AUTH-FAIL] para auditoría."""
     from app.api.routers.auth_router import login_for_access_token
     from fastapi import HTTPException
+
     caplog.set_level(logging.WARNING, logger="motor_glosas")
     with pytest.raises(HTTPException) as exc:
         await login_for_access_token(
@@ -81,6 +86,7 @@ async def test_login_fallido_se_logea_warning(db, caplog):
 @pytest.mark.asyncio
 async def test_login_exitoso_se_logea_info(db, caplog):
     from app.api.routers.auth_router import login_for_access_token
+
     caplog.set_level(logging.INFO, logger="motor_glosas")
     resp = await login_for_access_token(
         request=_request_real(),

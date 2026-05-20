@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/insight-financiero (R386 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def admin():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def admin():
 def client(db_session, admin):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin
     with TestClient(app) as c:
@@ -47,12 +52,18 @@ def client(db_session, admin):
 
 
 def _seed(db, eps, obj, rec, estado="LEVANTADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=obj, valor_recuperado=rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=obj,
+            valor_recuperado=rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -76,12 +87,14 @@ class TestInsightFinanciero:
     def test_no_admin_403(self, db_session):
         from app.api.deps import get_usuario_actual
         from app.main import app
+
         no_admin = UsuarioRecord(
-            id=99, email="x@x", rol="AUDITOR", activo=1,
+            id=99,
+            email="x@x",
+            rol="AUDITOR",
+            activo=1,
         )
-        app.dependency_overrides[get_db] = (
-            lambda: iter([db_session]).__next__()
-        )
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
         app.dependency_overrides[get_usuario_actual] = lambda: no_admin
         with TestClient(app) as c:
             r = c.get("/admin/insight-financiero")

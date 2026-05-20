@@ -1,4 +1,5 @@
 """Tests de calibración por dificultad histórica (R-cerebro #3)."""
+
 from __future__ import annotations
 
 import pytest
@@ -33,11 +34,17 @@ def db():
 
 
 def _seed(db, eps, codigo, estado):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -84,17 +91,25 @@ class TestBloque:
         assert bloque_calibracion_para_prompt(None) == ""
 
     def test_favorable_dice_favorable(self):
-        b = bloque_calibracion_para_prompt({
-            "nivel": "FAVORABLE", "tasa_pct": 80, "n_muestras": 5,
-            "n_levantadas": 4,
-        })
+        b = bloque_calibracion_para_prompt(
+            {
+                "nivel": "FAVORABLE",
+                "tasa_pct": 80,
+                "n_muestras": 5,
+                "n_levantadas": 4,
+            }
+        )
         assert "FAVORABLE" in b
 
     def test_dificil_pide_blindaje(self):
-        b = bloque_calibracion_para_prompt({
-            "nivel": "DIFICIL", "tasa_pct": 20, "n_muestras": 5,
-            "n_levantadas": 1,
-        })
+        b = bloque_calibracion_para_prompt(
+            {
+                "nivel": "DIFICIL",
+                "tasa_pct": 20,
+                "n_muestras": 5,
+                "n_levantadas": 1,
+            }
+        )
         assert "BLINDAJE" in b
         assert "anti-rebatimiento" in b
 

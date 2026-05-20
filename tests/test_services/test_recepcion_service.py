@@ -1,4 +1,5 @@
 """Tests for RecepcionService (import Excel de recepción + conceptos DGH)."""
+
 from io import BytesIO
 from datetime import datetime
 
@@ -45,10 +46,12 @@ class TestMojibake:
 class TestSplitEntidad:
     def test_formato_codigo_plus_nombre(self):
         assert _split_entidad("U220181 - FAMISANAR EPS SUBSIDIADO") == (
-            "U220181", "FAMISANAR EPS SUBSIDIADO"
+            "U220181",
+            "FAMISANAR EPS SUBSIDIADO",
         )
         assert _split_entidad("C230051 - SANITAS S.A.S. EPS CONTRIBUTIVO") == (
-            "C230051", "SANITAS S.A.S. EPS CONTRIBUTIVO"
+            "C230051",
+            "SANITAS S.A.S. EPS CONTRIBUTIVO",
         )
 
     def test_sin_codigo(self):
@@ -80,56 +83,97 @@ class TestFechaParser:
 
 # ─── Helpers para construir workbooks in-memory ──────────────────────────────
 
+
 def _hoja_inicial(ws, filas_datos):
     """Poblar hoja INICIAL: fila 1 título, fila 2 headers, fila 3+ datos."""
     ws.append(["ENTREGA GLOSA INICIAL"] + [""] * 17)
-    ws.append([
-        "GESTOR", "FECHA DE ENTREGA", "FECHA RADICACION", "FECHA DOCUMENTO DGH",
-        "FECHA RECEPCION", "ENTIDAD", "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA",
-        "VENCE", "DEVOLUCION S/N", "DIAS RADICACION VS RECEPCION", "RADICADO",
-        "REFERENCIA", "OBSERVACION TECNICO", "TECNICO QUE RECEPCIONO",
-        "TIPO GLOSA", "PROFESIONAL(MEDICO)",
-    ])
+    ws.append(
+        [
+            "GESTOR",
+            "FECHA DE ENTREGA",
+            "FECHA RADICACION",
+            "FECHA DOCUMENTO DGH",
+            "FECHA RECEPCION",
+            "ENTIDAD",
+            "FACTURA",
+            "CONSECUTIVO DGH",
+            "VALOR GLOSA",
+            "VENCE",
+            "DEVOLUCION S/N",
+            "DIAS RADICACION VS RECEPCION",
+            "RADICADO",
+            "REFERENCIA",
+            "OBSERVACION TECNICO",
+            "TECNICO QUE RECEPCIONO",
+            "TIPO GLOSA",
+            "PROFESIONAL(MEDICO)",
+        ]
+    )
     for f in filas_datos:
         ws.append(f)
 
 
 def _hoja_ratificada(ws, filas_datos):
     ws.append(["ENTREGA GLOSA RATIFICADA"] + [""] * 10)
-    ws.append([
-        "RESPONSABLE", "FECHA ENTREGA", "FECHA DE DOCUMENTO (DGH)",
-        "FECHA NOTIFICACION OBJECIÓN", "EMPRESA", "NUMERO DE FACTURA",
-        "CONSECUTIVO DGH", "VALOR GLOSA", "FECHA VENCIMIENTO",
-        "OBSERVACION RECEPCION", "TECNICO QUE RECEPCIONO",
-    ])
+    ws.append(
+        [
+            "RESPONSABLE",
+            "FECHA ENTREGA",
+            "FECHA DE DOCUMENTO (DGH)",
+            "FECHA NOTIFICACION OBJECIÓN",
+            "EMPRESA",
+            "NUMERO DE FACTURA",
+            "CONSECUTIVO DGH",
+            "VALOR GLOSA",
+            "FECHA VENCIMIENTO",
+            "OBSERVACION RECEPCION",
+            "TECNICO QUE RECEPCIONO",
+        ]
+    )
     for f in filas_datos:
         ws.append(f)
 
 
 def _hoja_conceptos(ws, filas_datos):
     """Estructura de hojas I/R del DGH."""
-    ws.append([
-        "EstadoCxCObjecion", "TipoObjecionTramite", "Referencia",
-        "FacturaCartera.PlanBeneficio.Contrato.Entidad.NombreEntidad",
-        "FacturaCartera.Saldo", "UsuarioConfirmacion.Descripcion",
-        "UsuarioConfirmacion.Nombre", "UsuarioCreacion.Descripcion",
-        "UsuarioCreacion.Nombre",
-        "FacturaCartera.PlanBeneficio.CodigoNombrePlanBeneficios",
-        "FacturaCartera.PlanBeneficio.Contrato.Entidad.CodigoEntidad",
-        "FacturaCartera.Factura", "FechaDocumento", "Consecutivo",
-        "Observaciones", "EstadoActual", "FacturaCartera.Valor",
-        "FacturaCartera.Fecha", "FacturaCartera.Tercero.Documento",
-        "FacturaCartera.Tercero.NombreCompletoAN", "FechaObjecion",
-        "ConceptoObjecion.Codigo", "Oid", "ConceptoObjecion.Nombre",
-        "ValorObjecion", "FacturaCartera.Tercero.NombreCompletoNA",
-        "ListadoConceptos.ConceptoObjecion.Codigo", "ListadoConceptos.Oid",
-        "ListadoConceptos.ConceptoObjecion.Nombre",
-        "ListadoConceptos.ServicioProductoFactura.Codigo",
-        "ListadoConceptos.ServicioProductoFactura.Descripcion",
-        "ListadoConceptos.ValorObjecion",
-        "ListadoConceptos.ServicioProductoFactura.CentroCosto.CodigoNombreCentro",
-        "ListadoConceptos.Observaciones",
-    ])
+    ws.append(
+        [
+            "EstadoCxCObjecion",
+            "TipoObjecionTramite",
+            "Referencia",
+            "FacturaCartera.PlanBeneficio.Contrato.Entidad.NombreEntidad",
+            "FacturaCartera.Saldo",
+            "UsuarioConfirmacion.Descripcion",
+            "UsuarioConfirmacion.Nombre",
+            "UsuarioCreacion.Descripcion",
+            "UsuarioCreacion.Nombre",
+            "FacturaCartera.PlanBeneficio.CodigoNombrePlanBeneficios",
+            "FacturaCartera.PlanBeneficio.Contrato.Entidad.CodigoEntidad",
+            "FacturaCartera.Factura",
+            "FechaDocumento",
+            "Consecutivo",
+            "Observaciones",
+            "EstadoActual",
+            "FacturaCartera.Valor",
+            "FacturaCartera.Fecha",
+            "FacturaCartera.Tercero.Documento",
+            "FacturaCartera.Tercero.NombreCompletoAN",
+            "FechaObjecion",
+            "ConceptoObjecion.Codigo",
+            "Oid",
+            "ConceptoObjecion.Nombre",
+            "ValorObjecion",
+            "FacturaCartera.Tercero.NombreCompletoNA",
+            "ListadoConceptos.ConceptoObjecion.Codigo",
+            "ListadoConceptos.Oid",
+            "ListadoConceptos.ConceptoObjecion.Nombre",
+            "ListadoConceptos.ServicioProductoFactura.Codigo",
+            "ListadoConceptos.ServicioProductoFactura.Descripcion",
+            "ListadoConceptos.ValorObjecion",
+            "ListadoConceptos.ServicioProductoFactura.CentroCosto.CodigoNombreCentro",
+            "ListadoConceptos.Observaciones",
+        ]
+    )
     for f in filas_datos:
         ws.append(f)
 
@@ -142,13 +186,13 @@ def _bytes_wb(wb) -> bytes:
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def db():
     """DB SQLite en memoria con todas las tablas creadas."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.database import Base
-    import app.models.db  # registra todas las tablas
 
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
@@ -161,6 +205,7 @@ def db():
 
 
 # ─── Tests de detección de tipo de hoja ──────────────────────────────────────
+
 
 class TestDeteccionTipoHoja:
     def test_hoja_inicial_con_titulo_detecta_header_en_fila_2(self):
@@ -207,25 +252,43 @@ class TestDeteccionTipoHoja:
 
 # ─── Tests end-to-end con workbook real ──────────────────────────────────────
 
+
 class TestImportacionCompleta:
     def test_import_inicial_crea_glosa(self, db):
         wb = Workbook()
         ws = wb.active
         ws.title = "INICIAL"
-        _hoja_inicial(ws, [
+        _hoja_inicial(
+            ws,
             [
-                "EQUIPO ASEGURADORAS", "21/04/2026", "01/04/2026", "15/04/2026",
-                "15/04/2026", "U220181 - FAMISANAR EPS SUBSIDIADO",
-                "HUS0000487351", "168185", 758300, "05/05/2026",
-                "N", 8, "", "", "", "ELIAS ALFONSO CARVAJAL NAVARRO",
-                "Administrativo", "",
-            ]
-        ])
+                [
+                    "EQUIPO ASEGURADORAS",
+                    "21/04/2026",
+                    "01/04/2026",
+                    "15/04/2026",
+                    "15/04/2026",
+                    "U220181 - FAMISANAR EPS SUBSIDIADO",
+                    "HUS0000487351",
+                    "168185",
+                    758300,
+                    "05/05/2026",
+                    "N",
+                    8,
+                    "",
+                    "",
+                    "",
+                    "ELIAS ALFONSO CARVAJAL NAVARRO",
+                    "Administrativo",
+                    "",
+                ]
+            ],
+        )
         r = RecepcionService(db).procesar_excel(_bytes_wb(wb))
         assert r.creadas == 1
         assert r.errores == []
 
         from app.models.db import GlosaRecord
+
         g = db.query(GlosaRecord).filter(GlosaRecord.factura == "HUS0000487351").first()
         assert g is not None
         assert g.consecutivo_dgh == "168185"
@@ -238,18 +301,30 @@ class TestImportacionCompleta:
         wb = Workbook()
         ws = wb.active
         ws.title = "RATIFICADA"
-        _hoja_ratificada(ws, [
+        _hoja_ratificada(
+            ws,
             [
-                "KAREN ORTIZ", "21/04/2026", "16/04/2026", "16/04/2026",
-                "U220641 - FUNDACION SALUD MIA EPS SUBSIDIADO", "HUS0000473035",
-                "168313", 24437, "27/04/2026", "", "ELIAS ALFONSO CARVAJAL NAVARRO",
-            ]
-        ])
+                [
+                    "KAREN ORTIZ",
+                    "21/04/2026",
+                    "16/04/2026",
+                    "16/04/2026",
+                    "U220641 - FUNDACION SALUD MIA EPS SUBSIDIADO",
+                    "HUS0000473035",
+                    "168313",
+                    24437,
+                    "27/04/2026",
+                    "",
+                    "ELIAS ALFONSO CARVAJAL NAVARRO",
+                ]
+            ],
+        )
         r = RecepcionService(db).procesar_excel(_bytes_wb(wb))
         assert r.creadas == 1
         assert r.ratificadas == 1
 
         from app.models.db import GlosaRecord
+
         g = db.query(GlosaRecord).filter(GlosaRecord.factura == "HUS0000473035").first()
         assert g.estado == "RATIFICADA"
 
@@ -259,76 +334,173 @@ class TestImportacionCompleta:
         wb.remove(wb.active)
 
         ws1 = wb.create_sheet("INICIAL")
-        _hoja_inicial(ws1, [
+        _hoja_inicial(
+            ws1,
             [
-                "EQUIPO ASEGURADORAS", "21/04/2026", "01/04/2026", "15/04/2026",
-                "15/04/2026", "U220181 - FAMISANAR EPS SUBSIDIADO",
-                "HUS0000487351", "168185", 758300, "05/05/2026",
-                "N", 8, "", "", "", "ELIAS ALFONSO CARVAJAL NAVARRO",
-                "Administrativo", "",
-            ]
-        ])
+                [
+                    "EQUIPO ASEGURADORAS",
+                    "21/04/2026",
+                    "01/04/2026",
+                    "15/04/2026",
+                    "15/04/2026",
+                    "U220181 - FAMISANAR EPS SUBSIDIADO",
+                    "HUS0000487351",
+                    "168185",
+                    758300,
+                    "05/05/2026",
+                    "N",
+                    8,
+                    "",
+                    "",
+                    "",
+                    "ELIAS ALFONSO CARVAJAL NAVARRO",
+                    "Administrativo",
+                    "",
+                ]
+            ],
+        )
 
         ws2 = wb.create_sheet("RATIFICADA")
-        _hoja_ratificada(ws2, [
+        _hoja_ratificada(
+            ws2,
             [
-                "KAREN ORTIZ", "21/04/2026", "16/04/2026", "16/04/2026",
-                "U220641 - FUNDACION SALUD MIA EPS SUBSIDIADO", "HUS0000473035",
-                "168313", 24437, "27/04/2026", "", "ELIAS ALFONSO CARVAJAL NAVARRO",
-            ]
-        ])
+                [
+                    "KAREN ORTIZ",
+                    "21/04/2026",
+                    "16/04/2026",
+                    "16/04/2026",
+                    "U220641 - FUNDACION SALUD MIA EPS SUBSIDIADO",
+                    "HUS0000473035",
+                    "168313",
+                    24437,
+                    "27/04/2026",
+                    "",
+                    "ELIAS ALFONSO CARVAJAL NAVARRO",
+                ]
+            ],
+        )
 
         ws3 = wb.create_sheet("I")
-        _hoja_conceptos(ws3, [
+        _hoja_conceptos(
+            ws3,
             [
-                "Glosa_Inicial", "Administrativo", "", "FAMISANAR EPS", 758300,
-                "ELIAS", "NCA", "ELIAS", "NCA",
-                "U220181 - FAMISANAR EPS SUBSIDIADO", "EPS017",
-                "HUS0000487351", "14/04/2026 15:27", "168185", "", "Confirmado",
-                758300, "13/03/2026 16:44", "830003564",
-                "ENTIDAD PROMOTORA DE SALUD FAMISANAR S A S", "14/04/2026",
-                "", 564068, "", 0, "ENTIDAD PROMOTORA",
-                "TA0801", "1038599",
-                "Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados",
-                "906625",
-                "GONADOTROPINA CORIONICA SUBUNIDAD BETA",
-                22900, "734005 - LABORATORIO - INMUNOLOGIA",
-                "SE REALIZA OBJECIÃ³N POR MAYOR VALOR",
+                [
+                    "Glosa_Inicial",
+                    "Administrativo",
+                    "",
+                    "FAMISANAR EPS",
+                    758300,
+                    "ELIAS",
+                    "NCA",
+                    "ELIAS",
+                    "NCA",
+                    "U220181 - FAMISANAR EPS SUBSIDIADO",
+                    "EPS017",
+                    "HUS0000487351",
+                    "14/04/2026 15:27",
+                    "168185",
+                    "",
+                    "Confirmado",
+                    758300,
+                    "13/03/2026 16:44",
+                    "830003564",
+                    "ENTIDAD PROMOTORA DE SALUD FAMISANAR S A S",
+                    "14/04/2026",
+                    "",
+                    564068,
+                    "",
+                    0,
+                    "ENTIDAD PROMOTORA",
+                    "TA0801",
+                    "1038599",
+                    "Los cargos por apoyo diagnóstico presentan diferencias con los valores pactados",
+                    "906625",
+                    "GONADOTROPINA CORIONICA SUBUNIDAD BETA",
+                    22900,
+                    "734005 - LABORATORIO - INMUNOLOGIA",
+                    "SE REALIZA OBJECIÃ³N POR MAYOR VALOR",
+                ],
+                [
+                    "Glosa_Inicial",
+                    "Administrativo",
+                    "",
+                    "FAMISANAR EPS",
+                    758300,
+                    "ELIAS",
+                    "NCA",
+                    "ELIAS",
+                    "NCA",
+                    "U220181 - FAMISANAR EPS SUBSIDIADO",
+                    "EPS017",
+                    "HUS0000487351",
+                    "14/04/2026 15:27",
+                    "168185",
+                    "",
+                    "Confirmado",
+                    758300,
+                    "13/03/2026 16:44",
+                    "830003564",
+                    "ENTIDAD PROMOTORA DE SALUD FAMISANAR S A S",
+                    "14/04/2026",
+                    "",
+                    564068,
+                    "",
+                    0,
+                    "ENTIDAD PROMOTORA",
+                    "TA0801",
+                    "1038598",
+                    "Los cargos por apoyo diagnóstico presentan diferencias",
+                    "902045",
+                    "TIEMPO DE PROTROMBINA [TP]",
+                    15400,
+                    "734009 - LABORATORIO - COAGULACION",
+                    "SE REALIZA OBJECION TP",
+                ],
             ],
-            [
-                "Glosa_Inicial", "Administrativo", "", "FAMISANAR EPS", 758300,
-                "ELIAS", "NCA", "ELIAS", "NCA",
-                "U220181 - FAMISANAR EPS SUBSIDIADO", "EPS017",
-                "HUS0000487351", "14/04/2026 15:27", "168185", "", "Confirmado",
-                758300, "13/03/2026 16:44", "830003564",
-                "ENTIDAD PROMOTORA DE SALUD FAMISANAR S A S", "14/04/2026",
-                "", 564068, "", 0, "ENTIDAD PROMOTORA",
-                "TA0801", "1038598",
-                "Los cargos por apoyo diagnóstico presentan diferencias",
-                "902045", "TIEMPO DE PROTROMBINA [TP]",
-                15400, "734009 - LABORATORIO - COAGULACION",
-                "SE REALIZA OBJECION TP",
-            ],
-        ])
+        )
 
         ws4 = wb.create_sheet("R")
-        _hoja_conceptos(ws4, [
+        _hoja_conceptos(
+            ws4,
             [
-                "Glosa_Ratificada", "Administrativo", "",
-                "FUNDACION SALUD MIA EPS SUBSIDIADO", 24437, "ELIAS", "NCA",
-                "ELIAS", "NCA", "U220641 - FUNDACION SALUD MIA EPS SUBSIDIADO",
-                "EPSC49", "HUS0000473035", "16/04/2026", "168313", "",
-                "Confirmado", 131200, "06/02/2026 9:08", "900914254",
-                "FUNDACION SALUD MIA EPS", "16/04/2026", "", 564356, "", 0,
-                "FUNDACION SALUD MIA EPS",
-                "TA0201", "1041754",
-                "El cargo por consulta presenta diferencias con los valores pactados",
-                "39143A-10",
-                "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA",
-                24437, "731101 - CONSULTA EXTERNA ESPECIALIZADA",
-                "SE RATIFICA - Se realiza glosa por mayor valor cobrado",
-            ]
-        ])
+                [
+                    "Glosa_Ratificada",
+                    "Administrativo",
+                    "",
+                    "FUNDACION SALUD MIA EPS SUBSIDIADO",
+                    24437,
+                    "ELIAS",
+                    "NCA",
+                    "ELIAS",
+                    "NCA",
+                    "U220641 - FUNDACION SALUD MIA EPS SUBSIDIADO",
+                    "EPSC49",
+                    "HUS0000473035",
+                    "16/04/2026",
+                    "168313",
+                    "",
+                    "Confirmado",
+                    131200,
+                    "06/02/2026 9:08",
+                    "900914254",
+                    "FUNDACION SALUD MIA EPS",
+                    "16/04/2026",
+                    "",
+                    564356,
+                    "",
+                    0,
+                    "FUNDACION SALUD MIA EPS",
+                    "TA0201",
+                    "1041754",
+                    "El cargo por consulta presenta diferencias con los valores pactados",
+                    "39143A-10",
+                    "CONSULTA DE PRIMERA VEZ POR ESPECIALISTA",
+                    24437,
+                    "731101 - CONSULTA EXTERNA ESPECIALIZADA",
+                    "SE RATIFICA - Se realiza glosa por mayor valor cobrado",
+                ]
+            ],
+        )
 
         r = RecepcionService(db).procesar_excel(_bytes_wb(wb))
         assert r.creadas == 2, f"Esperaba 2 glosas, obtuve {r.creadas}. Errores: {r.errores}"
@@ -338,17 +510,20 @@ class TestImportacionCompleta:
 
         # Verificar que la glosa inicial tiene sus 2 conceptos
         from app.models.db import GlosaRecord, ConceptoGlosaRecord
+
         g_inicial = db.query(GlosaRecord).filter(GlosaRecord.factura == "HUS0000487351").first()
-        conceptos = db.query(ConceptoGlosaRecord).filter(
-            ConceptoGlosaRecord.glosa_id == g_inicial.id
-        ).all()
+        conceptos = (
+            db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.glosa_id == g_inicial.id).all()
+        )
         assert len(conceptos) == 2
         codigos = sorted([c.codigo_glosa for c in conceptos])
         assert codigos == ["TA0801", "TA0801"]
         cups = sorted([c.cups_codigo for c in conceptos])
         assert cups == ["902045", "906625"]
         # Mojibake corregido: "OBJECIÃ³N" debe volverse "OBJECIóN"
-        observaciones_con_objecion = [c.observacion_eps for c in conceptos if "OBJECIóN" in (c.observacion_eps or "")]
+        observaciones_con_objecion = [
+            c.observacion_eps for c in conceptos if "OBJECIóN" in (c.observacion_eps or "")
+        ]
         assert len(observaciones_con_objecion) == 1
 
     def test_concepto_huerfano_se_reporta(self, db):
@@ -356,19 +531,47 @@ class TestImportacionCompleta:
         wb = Workbook()
         wb.remove(wb.active)
         ws = wb.create_sheet("I")
-        _hoja_conceptos(ws, [
+        _hoja_conceptos(
+            ws,
             [
-                "Glosa_Inicial", "Administrativo", "", "FAMISANAR EPS", 0,
-                "ELIAS", "NCA", "ELIAS", "NCA",
-                "U220181 - FAMISANAR EPS SUBSIDIADO", "EPS017",
-                "HUS9999999999", "14/04/2026", "999999", "", "Confirmado",
-                0, "14/04/2026", "830003564", "FAMISANAR", "14/04/2026",
-                "", 1, "", 0, "FAMISANAR",
-                "TA0801", "9001", "Concepto huérfano",
-                "906625", "GONADOTROPINA", 22900,
-                "734005 - LABORATORIO", "Observación",
-            ]
-        ])
+                [
+                    "Glosa_Inicial",
+                    "Administrativo",
+                    "",
+                    "FAMISANAR EPS",
+                    0,
+                    "ELIAS",
+                    "NCA",
+                    "ELIAS",
+                    "NCA",
+                    "U220181 - FAMISANAR EPS SUBSIDIADO",
+                    "EPS017",
+                    "HUS9999999999",
+                    "14/04/2026",
+                    "999999",
+                    "",
+                    "Confirmado",
+                    0,
+                    "14/04/2026",
+                    "830003564",
+                    "FAMISANAR",
+                    "14/04/2026",
+                    "",
+                    1,
+                    "",
+                    0,
+                    "FAMISANAR",
+                    "TA0801",
+                    "9001",
+                    "Concepto huérfano",
+                    "906625",
+                    "GONADOTROPINA",
+                    22900,
+                    "734005 - LABORATORIO",
+                    "Observación",
+                ]
+            ],
+        )
         r = RecepcionService(db).procesar_excel(_bytes_wb(wb))
         assert r.conceptos_creados == 0
         assert len(r.conceptos_huerfanos) == 1
@@ -383,8 +586,10 @@ class TestImportacionCompleta:
         factura, tercero) se quedan vacíos. Fix: matchear por factura y
         completar el consecutivo del padre."""
         from app.models.db import GlosaRecord
+
         # Pre-crear glosa padre con consecutivo VACÍO (caso real).
         from app.core.tz import ahora_utc
+
         padre = GlosaRecord(
             eps="DISPENSARIO MEDICO",
             paciente="N/A",
@@ -404,19 +609,47 @@ class TestImportacionCompleta:
         wb = Workbook()
         wb.remove(wb.active)
         ws = wb.create_sheet("I")
-        _hoja_conceptos(ws, [
+        _hoja_conceptos(
+            ws,
             [
-                "Glosa_Inicial", "Administrativo", "", "DISPENSARIO MEDICO", 0,
-                "U", "U", "U", "U",
-                "U220311 - DISPENSARIO MEDICO BUCARAMANG", "EPS001",
-                "HUS0000491522", "20/04/2026", "170979", "", "Confirmado",
-                1022622, "13/04/2026", "901541137", "DISPENSARIO MEDICO BUCARAMANGA", "20/04/2026",
-                "", 1, "", 0, "U",
-                "FA0301", "1066549", "Honorarios profesionales",
-                "890602", "CUIDADO INTRAHOSPITALARIO", 32208,
-                "734303 - CARDIOLOGIA", "Obs orig",
-            ]
-        ])
+                [
+                    "Glosa_Inicial",
+                    "Administrativo",
+                    "",
+                    "DISPENSARIO MEDICO",
+                    0,
+                    "U",
+                    "U",
+                    "U",
+                    "U",
+                    "U220311 - DISPENSARIO MEDICO BUCARAMANG",
+                    "EPS001",
+                    "HUS0000491522",
+                    "20/04/2026",
+                    "170979",
+                    "",
+                    "Confirmado",
+                    1022622,
+                    "13/04/2026",
+                    "901541137",
+                    "DISPENSARIO MEDICO BUCARAMANGA",
+                    "20/04/2026",
+                    "",
+                    1,
+                    "",
+                    0,
+                    "U",
+                    "FA0301",
+                    "1066549",
+                    "Honorarios profesionales",
+                    "890602",
+                    "CUIDADO INTRAHOSPITALARIO",
+                    32208,
+                    "734303 - CARDIOLOGIA",
+                    "Obs orig",
+                ]
+            ],
+        )
         r = RecepcionService(db).procesar_excel(_bytes_wb(wb))
 
         # El concepto NO debería ser huérfano — el fallback lo vincula

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/anomalias-recientes (R388 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, dias_atras, codigo="C"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -75,9 +83,7 @@ class TestAnomaliasRecientes:
         r = client.get("/glosas/stats/anomalias-recientes")
         d = r.json()
         nuevos = [x for x in d["items"] if x["tipo"] == "NUEVO_CODIGO"]
-        assert any(
-            n.get("codigo_glosa") == "NUEVO123" for n in nuevos
-        )
+        assert any(n.get("codigo_glosa") == "NUEVO123" for n in nuevos)
 
     def test_estructura(self, client):
         r = client.get("/glosas/stats/anomalias-recientes")

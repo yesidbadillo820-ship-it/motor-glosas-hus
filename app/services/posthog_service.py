@@ -20,6 +20,7 @@ Setup:
   fly secrets set POSTHOG_API_KEY=phc_xxx -a motor-glosas-hus
   fly secrets set POSTHOG_HOST=https://us.posthog.com  # o eu.posthog.com
 """
+
 from __future__ import annotations
 
 import logging
@@ -107,10 +108,17 @@ def capture(
         if properties:
             for k, v in properties.items():
                 k_low = k.lower()
-                if any(p in k_low for p in (
-                    "paciente", "patient", "documento", "cedula",
-                    "historia_clinica", "diagnostico_texto",
-                )):
+                if any(
+                    p in k_low
+                    for p in (
+                        "paciente",
+                        "patient",
+                        "documento",
+                        "cedula",
+                        "historia_clinica",
+                        "diagnostico_texto",
+                    )
+                ):
                     continue  # skip
                 props_filtradas[k] = v
         _cliente_posthog.capture(

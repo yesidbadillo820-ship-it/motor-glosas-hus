@@ -11,6 +11,7 @@ Lógica:
     completa, blindaje anti-ratificación reforzado
   - sin histórico (N<3) → no inyecta hint
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,7 +27,9 @@ _UMBRAL_DIFICIL = 30.0
 
 
 def calcular_dificultad(
-    db, eps: str, codigo: str,
+    db,
+    eps: str,
+    codigo: str,
 ) -> Optional[dict]:
     """Calcula la dificultad histórica del par.
 
@@ -42,13 +45,16 @@ def calcular_dificultad(
 
     try:
         from app.models.db import GlosaRecord
+
         rows = (
             db.query(GlosaRecord)
             .filter(GlosaRecord.eps.ilike(eps_norm))
             .filter(GlosaRecord.codigo_glosa == cod_norm)
-            .filter(GlosaRecord.estado.in_(
-                ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
-            ))
+            .filter(
+                GlosaRecord.estado.in_(
+                    ["LEVANTADA", "ACEPTADA", "RATIFICADA"],
+                )
+            )
             .all()
         )
     except Exception as e:
@@ -59,10 +65,7 @@ def calcular_dificultad(
     if n < _MIN_MUESTRAS:
         return None
 
-    n_lev = sum(
-        1 for r in rows
-        if (r.estado or "").upper() == "LEVANTADA"
-    )
+    n_lev = sum(1 for r in rows if (r.estado or "").upper() == "LEVANTADA")
     tasa = 100.0 * n_lev / n
 
     if tasa >= _UMBRAL_FAVORABLE:

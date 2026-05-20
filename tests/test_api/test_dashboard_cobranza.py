@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/dashboard-cobranza (R300 P1 — hito)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,15 +48,21 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, eps, factura, saldo, dias_atras=5,
-          estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C", factura=factura,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-        saldo_factura=saldo,
-        valor_factura=10000,
-    ))
+def _seed(db, eps, factura, saldo, dias_atras=5, estado="RADICADA"):
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            factura=factura,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+            saldo_factura=saldo,
+            valor_factura=10000,
+        )
+    )
     db.commit()
 
 
@@ -65,7 +73,10 @@ class TestDashboardCobranza:
         _seed(db_session, "EPS001", "F300", 3000, dias_atras=120)
         # Cerrada no debe contar
         _seed(
-            db_session, "MALA", "F999", 99999,
+            db_session,
+            "MALA",
+            "F999",
+            99999,
             estado="LEVANTADA",
         )
 

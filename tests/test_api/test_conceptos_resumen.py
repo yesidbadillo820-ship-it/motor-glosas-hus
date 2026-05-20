@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/conceptos-resumen (R139 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,7 +11,9 @@ from sqlalchemy.pool import StaticPool
 from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import (
-    ConceptoGlosaRecord, GlosaRecord, UsuarioRecord,
+    ConceptoGlosaRecord,
+    GlosaRecord,
+    UsuarioRecord,
 )
 
 
@@ -39,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,18 +51,27 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid):
-    db.add(GlosaRecord(
-        id=gid, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_concepto(db, gid, **kw):
     base = dict(
-        glosa_id=gid, codigo_glosa="TA0201",
-        valor_objetado=500, factura="F-1",
+        glosa_id=gid,
+        codigo_glosa="TA0201",
+        valor_objetado=500,
+        factura="F-1",
     )
     base.update(kw)
     db.add(ConceptoGlosaRecord(**base))
@@ -79,13 +92,15 @@ class TestConceptosResumen:
 
     def test_resumen_basico(self, client, db_session):
         _seed_glosa(db_session, 1)
-        _seed_concepto(db_session, 1, valor_objetado=1000,
-                       codigo_glosa="TA0201")
-        _seed_concepto(db_session, 1, valor_objetado=500,
-                       codigo_glosa="TA0201")
-        _seed_concepto(db_session, 1, valor_objetado=2000,
-                       codigo_glosa="FA0603",
-                       dictamen_html="<p>" + "x" * 100 + "</p>")
+        _seed_concepto(db_session, 1, valor_objetado=1000, codigo_glosa="TA0201")
+        _seed_concepto(db_session, 1, valor_objetado=500, codigo_glosa="TA0201")
+        _seed_concepto(
+            db_session,
+            1,
+            valor_objetado=2000,
+            codigo_glosa="FA0603",
+            dictamen_html="<p>" + "x" * 100 + "</p>",
+        )
 
         r = client.get("/glosas/1/conceptos-resumen")
         d = r.json()

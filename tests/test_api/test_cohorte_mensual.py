@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cohorte-mensual (R103 P1)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -9,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -39,6 +39,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,15 +50,24 @@ def client(db_session, usuario):
 def _seed(db, creado, estado="RADICADA", dias_resolucion=None):
     fecha_dec = None
     if dias_resolucion is not None and estado in {
-        "ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA",
+        "ACEPTADA",
+        "LEVANTADA",
+        "ARCHIVADA",
+        "CONCILIADA",
     }:
         fecha_dec = creado + timedelta(days=dias_resolucion)
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=creado,
-        fecha_decision_eps=fecha_dec,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=creado,
+            fecha_decision_eps=fecha_dec,
+        )
+    )
     db.commit()
 
 

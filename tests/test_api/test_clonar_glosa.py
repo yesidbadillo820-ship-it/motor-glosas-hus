@@ -1,4 +1,5 @@
 """Tests del endpoint POST /glosas/{id}/clonar (R65 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -36,14 +37,21 @@ def usuario_auditor():
 @pytest.fixture
 def glosa_origen(db_session):
     g = GlosaRecord(
-        eps="FAMISANAR", paciente="JUAN PEREZ",
-        codigo_glosa="TA0201", valor_objetado=168_563, valor_aceptado=50_000,
-        etapa="RESPUESTA", estado="RESPONDIDA",
+        eps="FAMISANAR",
+        paciente="JUAN PEREZ",
+        codigo_glosa="TA0201",
+        valor_objetado=168_563,
+        valor_aceptado=50_000,
+        etapa="RESPUESTA",
+        estado="RESPONDIDA",
         dictamen="<div>dictamen completo</div>",
-        modelo_ia="anthropic/claude-sonnet-4-6", score=85.0,
-        numero_radicado="RAD-9", factura="FE-001",
+        modelo_ia="anthropic/claude-sonnet-4-6",
+        score=85.0,
+        numero_radicado="RAD-9",
+        factura="FE-001",
         texto_glosa_original="TA0201 — diferencia tarifa CUPS 890750",
-        cups_servicio="890750", servicio_descripcion="CONSULTA URGENCIAS",
+        cups_servicio="890750",
+        servicio_descripcion="CONSULTA URGENCIAS",
         concepto_glosa="TARIFAS",
         creado_en=ahora_utc(),
     )
@@ -57,6 +65,7 @@ def glosa_origen(db_session):
 def client(db_session, usuario_auditor):
     from app.api.deps import get_auditor_o_superior, get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario_auditor
     app.dependency_overrides[get_auditor_o_superior] = lambda: usuario_auditor
@@ -113,12 +122,14 @@ class TestClonarGlosa:
 
     def test_clonar_genera_audit_entry(self, client, glosa_origen, db_session):
         from app.models.db import AuditLogRecord
+
         r = client.post(f"/glosas/{glosa_origen.id}/clonar")
         nueva_id = r.json()["id_nueva"]
         # Debe existir entry CLONAR_GLOSA en audit_log
         log = (
             db_session.query(AuditLogRecord)
-            .filter_by(accion="CLONAR_GLOSA", registro_id=nueva_id).first()
+            .filter_by(accion="CLONAR_GLOSA", registro_id=nueva_id)
+            .first()
         )
         assert log is not None
         assert "Clonada desde" in (log.detalle or "")

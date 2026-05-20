@@ -4,6 +4,7 @@ Vive en su propio módulo para que tanto app/main.py como los routers que
 necesitan @limiter.limit(...) lo puedan importar sin disparar imports
 circulares (main importa los routers, los routers importan el limiter).
 """
+
 from __future__ import annotations
 
 from slowapi import Limiter
@@ -23,6 +24,7 @@ def _limit_key_user_or_ip(request) -> str:
         auth = (request.headers.get("authorization") or "").strip()
         if auth.lower().startswith("bearer ") and len(auth) > 16:
             from jose import jwt as _jwt
+
             payload = _jwt.decode(
                 auth.split(" ", 1)[1].strip(),
                 cfg.secret_key,

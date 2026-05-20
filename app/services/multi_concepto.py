@@ -4,6 +4,7 @@ multi_concepto.py — Detección y manejo de glosas con múltiples códigos
 Cuando una glosa tiene varios códigos (ej. TA0801 + SO0101 + FA0202),
 este módulo los detecta y permite generar respuestas separadas coherentes.
 """
+
 from __future__ import annotations
 import re
 
@@ -53,10 +54,16 @@ def detectar_caso_multi_concepto(texto_glosa: str) -> dict:
 
     if es_multi:
         conceptos_nombres = {
-            "TA": "TARIFAS", "SO": "SOPORTES", "AU": "AUTORIZACIÓN",
-            "CO": "COBERTURA", "CL": "PERTINENCIA CLÍNICA",
-            "PE": "PERTINENCIA CLÍNICA", "FA": "FACTURACIÓN",
-            "IN": "INSUMOS", "ME": "MEDICAMENTOS", "EX": "EXTEMPORÁNEA",
+            "TA": "TARIFAS",
+            "SO": "SOPORTES",
+            "AU": "AUTORIZACIÓN",
+            "CO": "COBERTURA",
+            "CL": "PERTINENCIA CLÍNICA",
+            "PE": "PERTINENCIA CLÍNICA",
+            "FA": "FACTURACIÓN",
+            "IN": "INSUMOS",
+            "ME": "MEDICAMENTOS",
+            "EX": "EXTEMPORÁNEA",
         }
         lista = ", ".join(conceptos_nombres.get(p, p) for p in grupos.keys())
         recomendacion = (
@@ -79,6 +86,7 @@ def detectar_caso_multi_concepto(texto_glosa: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────
 # DETECTOR DE GLOSAS EN MASA (item #16)
 # ─────────────────────────────────────────────────────────────────────
+
 
 def _normalizar_motivo(texto: str) -> str:
     """Normaliza el motivo de la glosa eliminando detalles específicos."""
@@ -120,15 +128,17 @@ def detectar_glosas_en_masa(glosas: list[dict]) -> list[dict]:
     for firma, items in grupos.items():
         if len(items) >= 2:  # solo grupos con 2+ glosas
             primera = items[0]
-            resultado.append({
-                "firma": firma,
-                "count": len(items),
-                "ids": [g.get("id") for g in items],
-                "codigo_ejemplo": primera.get("codigo"),
-                "eps": primera.get("eps"),
-                "texto_ejemplo": primera.get("texto_glosa", "")[:200],
-                "ahorro_estimado": f"Responder 1 vez en vez de {len(items)}",
-            })
+            resultado.append(
+                {
+                    "firma": firma,
+                    "count": len(items),
+                    "ids": [g.get("id") for g in items],
+                    "codigo_ejemplo": primera.get("codigo"),
+                    "eps": primera.get("eps"),
+                    "texto_ejemplo": primera.get("texto_glosa", "")[:200],
+                    "ahorro_estimado": f"Responder 1 vez en vez de {len(items)}",
+                }
+            )
 
     resultado.sort(key=lambda x: x["count"], reverse=True)
     return resultado

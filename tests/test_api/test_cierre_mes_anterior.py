@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/cierre-mes-anterior (R316 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,7 +34,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -41,6 +45,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -48,16 +53,21 @@ def client(db_session, admin_user):
     app.dependency_overrides.clear()
 
 
-def _seed(db, fecha_decision, estado, valor_obj=1000, valor_rec=0,
-          gestor=None):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor_obj, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        fecha_decision_eps=fecha_decision,
-        gestor_nombre=gestor,
-    ))
+def _seed(db, fecha_decision, estado, valor_obj=1000, valor_rec=0, gestor=None):
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor_obj,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            fecha_decision_eps=fecha_decision,
+            gestor_nombre=gestor,
+        )
+    )
     db.commit()
 
 
@@ -68,8 +78,11 @@ class TestCierreMesAnterior:
         ahora = ahora_utc()
         fecha_pasada = ahora.replace(day=1) - timedelta(days=5)
         _seed(
-            db_session, fecha_decision=fecha_pasada,
-            estado="LEVANTADA", valor_obj=10000, valor_rec=8000,
+            db_session,
+            fecha_decision=fecha_pasada,
+            estado="LEVANTADA",
+            valor_obj=10000,
+            valor_rec=8000,
             gestor="Alice",
         )
 
@@ -81,12 +94,14 @@ class TestCierreMesAnterior:
     def test_no_admin_403(self, db_session):
         from app.api.deps import get_usuario_actual
         from app.main import app
+
         no_admin = UsuarioRecord(
-            id=99, email="x@x.com", rol="AUDITOR", activo=1,
+            id=99,
+            email="x@x.com",
+            rol="AUDITOR",
+            activo=1,
         )
-        app.dependency_overrides[get_db] = (
-            lambda: iter([db_session]).__next__()
-        )
+        app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
         app.dependency_overrides[get_usuario_actual] = lambda: no_admin
         with TestClient(app) as c:
             r = c.get("/admin/cierre-mes-anterior")

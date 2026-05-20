@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/audit-mas-cambiada (R211 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,20 +47,31 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, gid):
-    db.add(GlosaRecord(
-        id=gid, eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=gid,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_audit(db, glosa_id, tabla="glosas"):
-    db.add(AuditLogRecord(
-        usuario_email="u@x", accion="UPDATE",
-        tabla=tabla, registro_id=glosa_id,
-        timestamp=ahora_utc(),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email="u@x",
+            accion="UPDATE",
+            tabla=tabla,
+            registro_id=glosa_id,
+            timestamp=ahora_utc(),
+        )
+    )
     db.commit()
 
 

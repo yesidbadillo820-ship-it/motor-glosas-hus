@@ -1,4 +1,5 @@
 """Tests del endpoint GET /usuarios/yo/proximas-sugerencias (R399 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,8 +32,11 @@ def db_session():
 @pytest.fixture
 def usuario():
     return UsuarioRecord(
-        id=1, email="alice@hus.com", nombre="Alice",
-        rol="AUDITOR", activo=1,
+        id=1,
+        email="alice@hus.com",
+        nombre="Alice",
+        rol="AUDITOR",
+        activo=1,
     )
 
 
@@ -40,6 +44,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,16 +52,21 @@ def client(db_session, usuario):
     app.dependency_overrides.clear()
 
 
-def _seed(db, gestor="Alice", dias=10, valor=1000,
-          estado="RADICADA", dictamen=None):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        gestor_nombre=gestor,
-        dias_restantes=dias,
-        dictamen=dictamen,
-    ))
+def _seed(db, gestor="Alice", dias=10, valor=1000, estado="RADICADA", dictamen=None):
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            gestor_nombre=gestor,
+            dias_restantes=dias,
+            dictamen=dictamen,
+        )
+    )
     db.commit()
 
 
@@ -71,7 +81,9 @@ class TestProximasSugerencias:
 
     def test_sin_dictamen_alto(self, client, db_session):
         _seed(
-            db_session, dias=10, valor=10_000_000,
+            db_session,
+            dias=10,
+            valor=10_000_000,
             dictamen=None,
         )
         r = client.get("/usuarios/yo/proximas-sugerencias")

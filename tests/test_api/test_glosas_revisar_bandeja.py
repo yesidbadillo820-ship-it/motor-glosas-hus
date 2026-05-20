@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/glosas-revisar-bandeja (R256 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -55,8 +60,12 @@ def client(db_session, usuario_super):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -68,17 +77,14 @@ class TestGlosasRevisarBandeja:
     def test_estructura(self, client):
         r = client.get("/admin/glosas-revisar-bandeja")
         d = r.json()
-        for key in ("total_pendiente_eps", "total_listas_envio",
-                    "pendiente_eps", "listas_envio"):
+        for key in ("total_pendiente_eps", "total_listas_envio", "pendiente_eps", "listas_envio"):
             assert key in d
 
     def test_pendiente_eps(self, client, db_session):
         # RESPONDIDA hace 10 días sin decision → pendiente
-        _seed(db_session, estado="RESPONDIDA",
-              creado_en=ahora_utc() - timedelta(days=10))
+        _seed(db_session, estado="RESPONDIDA", creado_en=ahora_utc() - timedelta(days=10))
         # RESPONDIDA hace 3 días → no
-        _seed(db_session, estado="RESPONDIDA",
-              creado_en=ahora_utc() - timedelta(days=3))
+        _seed(db_session, estado="RESPONDIDA", creado_en=ahora_utc() - timedelta(days=3))
 
         r = client.get("/admin/glosas-revisar-bandeja")
         d = r.json()

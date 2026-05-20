@@ -1,4 +1,5 @@
 """Tests del endpoint /usuarios/yo/permisos (R76 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,6 +31,7 @@ def db_session():
 def _client(db_session, rol):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     user = UsuarioRecord(id=1, email=f"{rol.lower()}@hus.com", rol=rol, activo=1)
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: user

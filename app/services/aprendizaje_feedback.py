@@ -18,6 +18,7 @@ Reglas operativas:
   - Limitar a 5 plantillas Gold por (eps, código) para no inflar la BD:
     si hay 5+, rotar la más antigua.
 """
+
 from __future__ import annotations
 
 import re
@@ -31,7 +32,11 @@ from app.models.db import GlosaRecord, PlantillaGoldRecord
 
 # Modelos "plantilla" que NO necesitan aprender (ya están curados)
 _MODELOS_SKIP = (
-    "texto_fijo", "plantilla", "error", "cache", "db-cache",
+    "texto_fijo",
+    "plantilla",
+    "error",
+    "cache",
+    "db-cache",
     "pre-analisis/texto_fijo",
 )
 
@@ -54,7 +59,7 @@ def _extraer_argumento_del_dictamen(dictamen_html: str) -> str:
     # Buscar marker
     m = re.search(r"ARGUMENTACI[ÓO]N\s+JUR[ÍI]DICA", txt, re.IGNORECASE)
     if m:
-        txt = txt[m.end():].strip()
+        txt = txt[m.end() :].strip()
     # Cortar en cierres conocidos
     for cierre in [
         "Nota: Generado con asistencia",
@@ -187,8 +192,7 @@ def _desactivar_gold(
         if g.argumento and g.argumento[:200].strip() == firma:
             g.activa = 0
             g.notas = (
-                (g.notas or "") +
-                f"\n[DESACTIVADA auto {ahora_utc().isoformat()}] "
+                (g.notas or "") + f"\n[DESACTIVADA auto {ahora_utc().isoformat()}] "
                 f"El mismo argumento fue ratificado por la EPS en glosa #{glosa.id}."
             )
             desactivadas += 1

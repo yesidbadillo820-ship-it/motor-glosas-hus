@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/distribucion-valores (R89 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, valor, dias_atras=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=valor, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="TA0201",
+            valor_objetado=valor,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -69,13 +77,13 @@ class TestDistribucionValores:
         assert all(b["count"] == 0 for b in d["buckets"])
 
     def test_buckets_correctos(self, client, db_session):
-        _seed(db_session, 50_000)        # <100k
-        _seed(db_session, 250_000)       # 100k-500k
-        _seed(db_session, 750_000)       # 500k-1M
-        _seed(db_session, 3_000_000)     # 1M-5M
-        _seed(db_session, 7_000_000)     # 5M-10M
-        _seed(db_session, 25_000_000)    # 10M-50M
-        _seed(db_session, 100_000_000)   # 50M+
+        _seed(db_session, 50_000)  # <100k
+        _seed(db_session, 250_000)  # 100k-500k
+        _seed(db_session, 750_000)  # 500k-1M
+        _seed(db_session, 3_000_000)  # 1M-5M
+        _seed(db_session, 7_000_000)  # 5M-10M
+        _seed(db_session, 25_000_000)  # 10M-50M
+        _seed(db_session, 100_000_000)  # 50M+
 
         r = client.get("/glosas/stats/distribucion-valores")
         d = r.json()
@@ -83,8 +91,13 @@ class TestDistribucionValores:
         # Cada bucket debe tener exactamente 1
         counts = {b["rango"]: b["count"] for b in d["buckets"]}
         assert counts == {
-            "<100k": 1, "100k-500k": 1, "500k-1M": 1,
-            "1M-5M": 1, "5M-10M": 1, "10M-50M": 1, "50M+": 1,
+            "<100k": 1,
+            "100k-500k": 1,
+            "500k-1M": 1,
+            "1M-5M": 1,
+            "5M-10M": 1,
+            "10M-50M": 1,
+            "50M+": 1,
         }
 
     def test_estadisticas_basicas(self, client, db_session):
@@ -128,8 +141,8 @@ class TestDistribucionValores:
         assert bucket_50m["pct_valor"] > 99.0
 
     def test_excluye_fuera_de_ventana(self, client, db_session):
-        _seed(db_session, 100, dias_atras=10)    # dentro
-        _seed(db_session, 200, dias_atras=400)   # fuera (default 180d)
+        _seed(db_session, 100, dias_atras=10)  # dentro
+        _seed(db_session, 200, dias_atras=400)  # fuera (default 180d)
         r = client.get("/glosas/stats/distribucion-valores")
         d = r.json()
         assert d["total_glosas"] == 1

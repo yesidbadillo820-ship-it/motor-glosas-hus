@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/heatmap-actividad (R89 P1)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,11 +51,17 @@ def client(db_session, usuario):
 def _seed(db, fecha_iso):
     """fecha_iso: '2026-04-20 09:00' (UTC)."""
     creado = datetime.fromisoformat(fecha_iso).replace(tzinfo=timezone.utc)
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100, etapa="X", estado="RADICADA",
-        creado_en=creado,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="TA0201",
+            valor_objetado=100,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=creado,
+        )
+    )
     db.commit()
 
 
@@ -92,17 +100,29 @@ class TestHeatmapActividad:
     def test_excluye_fuera_de_ventana(self, client, db_session):
         # Hoy: dentro
         ahora = ahora_utc()
-        db_session.add(GlosaRecord(
-            eps="X", paciente="X", codigo_glosa="X",
-            valor_objetado=100, etapa="X", estado="RADICADA",
-            creado_en=ahora,
-        ))
+        db_session.add(
+            GlosaRecord(
+                eps="X",
+                paciente="X",
+                codigo_glosa="X",
+                valor_objetado=100,
+                etapa="X",
+                estado="RADICADA",
+                creado_en=ahora,
+            )
+        )
         # 200 días atrás: fuera con default (90)
-        db_session.add(GlosaRecord(
-            eps="X", paciente="X", codigo_glosa="X",
-            valor_objetado=100, etapa="X", estado="RADICADA",
-            creado_en=ahora - timedelta(days=200),
-        ))
+        db_session.add(
+            GlosaRecord(
+                eps="X",
+                paciente="X",
+                codigo_glosa="X",
+                valor_objetado=100,
+                etapa="X",
+                estado="RADICADA",
+                creado_en=ahora - timedelta(days=200),
+            )
+        )
         db_session.commit()
 
         r = client.get("/glosas/stats/heatmap-actividad")

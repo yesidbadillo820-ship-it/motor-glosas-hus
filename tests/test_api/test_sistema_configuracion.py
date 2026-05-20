@@ -1,4 +1,5 @@
 """Tests del endpoint GET /sistema/configuracion (R97 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -30,7 +31,10 @@ def db_session():
 @pytest.fixture
 def usuario_coord():
     return UsuarioRecord(
-        id=1, email="coord@hus.gov.co", rol="COORDINADOR", activo=1,
+        id=1,
+        email="coord@hus.gov.co",
+        rol="COORDINADOR",
+        activo=1,
     )
 
 
@@ -38,6 +42,7 @@ def usuario_coord():
 def client(db_session, usuario_coord):
     from app.api.deps import get_coordinador_o_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
     with TestClient(app) as c:
@@ -78,8 +83,9 @@ class TestSistemaConfiguracion:
         assert isinstance(d["auth"]["admin_password_configurado"], bool)
         assert isinstance(d["smtp"]["password_configurado"], bool)
         # No campo "password" o "admin_password" con valor real
-        assert "admin_password" not in d["auth"] or \
-            isinstance(d["auth"].get("admin_password_configurado"), bool)
+        assert "admin_password" not in d["auth"] or isinstance(
+            d["auth"].get("admin_password_configurado"), bool
+        )
 
     def test_cors_es_lista(self, client):
         r = client.get("/sistema/configuracion")

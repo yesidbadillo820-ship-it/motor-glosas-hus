@@ -16,6 +16,7 @@ Detecta:
   - exige_devolucion: si pide reversar/devolver
   - normas_citadas_eps: leyes/decretos que cita la EPS
 """
+
 from __future__ import annotations
 
 import re
@@ -94,6 +95,7 @@ _PAT_PERTINENCIA = re.compile(
 # API pública
 # ──────────────────────────────────────────────────────────────────────
 
+
 def extraer_puntos_eps(texto_glosa: str) -> dict:
     """Extrae los puntos clave del motivo de la EPS.
 
@@ -107,9 +109,7 @@ def extraer_puntos_eps(texto_glosa: str) -> dict:
         return _vacio()
 
     # Tomamos las primeras 800 chars como "motivo principal"
-    motivo_principal = (
-        re.sub(r"\s+", " ", texto[:800]).strip() if texto else None
-    )
+    motivo_principal = re.sub(r"\s+", " ", texto[:800]).strip() if texto else None
 
     # Valor reconocido
     valor_reconocido = None
@@ -188,14 +188,16 @@ def bloque_puntos_a_refutar(puntos: dict) -> str:
     """
     if not puntos:
         return ""
-    tiene_algo = any([
-        puntos.get("valor_reconocido"),
-        puntos.get("descuento_aplicado"),
-        puntos.get("cups_alternativo"),
-        puntos.get("soportes_faltantes"),
-        puntos.get("exige_devolucion"),
-        puntos.get("cuestiona_pertinencia"),
-    ])
+    tiene_algo = any(
+        [
+            puntos.get("valor_reconocido"),
+            puntos.get("descuento_aplicado"),
+            puntos.get("cups_alternativo"),
+            puntos.get("soportes_faltantes"),
+            puntos.get("exige_devolucion"),
+            puntos.get("cuestiona_pertinencia"),
+        ]
+    )
     if not tiene_algo:
         return ""
 
@@ -216,7 +218,7 @@ def bloque_puntos_a_refutar(puntos: dict) -> str:
     if puntos.get("descuento_aplicado"):
         partes.append(
             f"  {n}. La EPS aplica un descuento unilateral "
-            f"(\"{puntos['descuento_aplicado']}\") — invoca Art. 871 "
+            f'("{puntos["descuento_aplicado"]}") — invoca Art. 871 '
             "C.Comercio (buena fe) y Art. 1602 C.Civil (contrato es ley "
             "entre partes) para sostener que NO es admisible modificar "
             "tarifa pactada en vía de glosa."

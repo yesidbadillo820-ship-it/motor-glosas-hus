@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/comparar-con-promedio (R133 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps="SANITAS", codigo="TA0201", valor=10000, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa=codigo,
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
     return db.query(GlosaRecord).order_by(GlosaRecord.id.desc()).first()
 
@@ -95,16 +103,13 @@ class TestCompararConPromedio:
 
     def test_aislamiento_por_cohorte(self, client, db_session):
         # Glosa target: SANITAS+TA0201
-        g = _seed(db_session, eps="SANITAS", codigo="TA0201",
-                  valor=10000)
+        g = _seed(db_session, eps="SANITAS", codigo="TA0201", valor=10000)
         # Cohorte directo (mismo eps+codigo)
         _seed(db_session, eps="SANITAS", codigo="TA0201", valor=5000)
         # Otro EPS — NO debe entrar en cohorte
-        _seed(db_session, eps="NUEVA EPS", codigo="TA0201",
-              valor=999_999)
+        _seed(db_session, eps="NUEVA EPS", codigo="TA0201", valor=999_999)
         # Mismo EPS pero distinto código — NO debe entrar
-        _seed(db_session, eps="SANITAS", codigo="FA0603",
-              valor=999_999)
+        _seed(db_session, eps="SANITAS", codigo="FA0603", valor=999_999)
 
         r = client.get(f"/glosas/{g.id}/comparar-con-promedio")
         d = r.json()

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/relacionadas (R93 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,9 +48,14 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        factura="F-001", valor_objetado=1000, etapa="X",
-        estado="RADICADA", creado_en=ahora_utc(),
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        factura="F-001",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(GlosaRecord(**base))
@@ -91,13 +98,11 @@ class TestGlosasRelacionadas:
         assert len(d["mismo_codigo_y_eps"]) == 1
 
     def test_excluye_la_misma_glosa(self, client, db_session):
-        g1 = _seed(db_session, factura="F-X", paciente="P-X",
-                   eps="E", codigo_glosa="C")
+        g1 = _seed(db_session, factura="F-X", paciente="P-X", eps="E", codigo_glosa="C")
         r = client.get(f"/glosas/{g1.id}/relacionadas")
         d = r.json()
         # La propia glosa nunca debe aparecer en sus relacionadas
-        for grupo in [d["misma_factura"], d["mismo_paciente"],
-                      d["mismo_codigo_y_eps"]]:
+        for grupo in [d["misma_factura"], d["mismo_paciente"], d["mismo_codigo_y_eps"]]:
             assert all(g["id"] != g1.id for g in grupo)
 
     def test_factura_NA_no_busca(self, client, db_session):

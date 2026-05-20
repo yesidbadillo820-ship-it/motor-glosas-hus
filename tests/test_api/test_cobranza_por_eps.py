@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/cobranza-por-eps (R122 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,12 +49,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps, valor, estado="RADICADA", valor_rec=0, dias_atras=10):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C",
-        valor_objetado=valor, valor_recuperado=valor_rec,
-        etapa="X", estado=estado,
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            valor_recuperado=valor_rec,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -79,18 +87,15 @@ class TestCobranzaPorEPS:
 
     def test_excluye_eps_sin_pendientes(self, client, db_session):
         # EPS solo con cerradas → no aparece
-        _seed(db_session, "TODO_CERRADO", 1000, estado="LEVANTADA",
-              valor_rec=1000)
+        _seed(db_session, "TODO_CERRADO", 1000, estado="LEVANTADA", valor_rec=1000)
         r = client.get("/glosas/stats/cobranza-por-eps")
         d = r.json()
         assert d["items"] == []
 
     def test_tasa_historica_por_eps(self, client, db_session):
         # SANITAS histórica: 50% recuperación
-        _seed(db_session, "SANITAS", 10_000, estado="LEVANTADA",
-              valor_rec=10_000)
-        _seed(db_session, "SANITAS", 10_000, estado="ACEPTADA",
-              valor_rec=0)
+        _seed(db_session, "SANITAS", 10_000, estado="LEVANTADA", valor_rec=10_000)
+        _seed(db_session, "SANITAS", 10_000, estado="ACEPTADA", valor_rec=0)
         # SANITAS pendientes: $4k → recuperable estimado $2k
         _seed(db_session, "SANITAS", 4000)
 

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/dashboard-completo (R225 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,8 +48,12 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -60,11 +66,9 @@ class TestDashboardCompleto:
         r = client.get("/glosas/stats/dashboard-completo")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("kpis_globales", "urgencia",
-                    "top_3_eps_pendientes", "actividad_hoy"):
+        for key in ("kpis_globales", "urgencia", "top_3_eps_pendientes", "actividad_hoy"):
             assert key in d
-        for k in ("total_glosas", "abiertas", "valor_pendiente",
-                  "valor_recuperado_acumulado"):
+        for k in ("total_glosas", "abiertas", "valor_pendiente", "valor_recuperado_acumulado"):
             assert k in d["kpis_globales"]
         for k in ("VENCIDA", "CRITICA", "PROXIMA", "LEJANA"):
             assert k in d["urgencia"]

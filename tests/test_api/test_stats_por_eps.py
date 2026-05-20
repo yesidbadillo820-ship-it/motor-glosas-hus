@@ -1,4 +1,5 @@
 """Tests del endpoint /glosas/stats/por-eps (R68 P2)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -37,9 +38,13 @@ def usuario():
 
 def _seed(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="TA0201",
-        valor_objetado=100_000, valor_aceptado=0,
-        etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="TA0201",
+        valor_objetado=100_000,
+        valor_aceptado=0,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -51,6 +56,7 @@ def _seed(db, **kw):
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -103,10 +109,8 @@ class TestStatsPorEps:
         assert d["total_eps"] == 2
 
     def test_filtro_ventana(self, client, db_session):
-        _seed(db_session, eps="VIEJA",
-              creado_en=ahora_utc() - timedelta(days=200))
-        _seed(db_session, eps="NUEVA",
-              creado_en=ahora_utc() - timedelta(days=10))
+        _seed(db_session, eps="VIEJA", creado_en=ahora_utc() - timedelta(days=200))
+        _seed(db_session, eps="NUEVA", creado_en=ahora_utc() - timedelta(days=10))
         r = client.get("/glosas/stats/por-eps?dias=90")
         d = r.json()
         eps_lista = [x["eps"] for x in d["items"]]

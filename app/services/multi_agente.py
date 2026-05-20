@@ -22,12 +22,14 @@ Beneficios:
     agente jurídico
   - Caché IA se mantiene efectivo (mismo flujo = mismo hash)
 """
+
 from __future__ import annotations
 
 import re
 
 
 # ─── Agente Jurídico ────────────────────────────────────────────────────────
+
 
 def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
     """Devuelve citas normativas especializadas según tipo de glosa + contexto.
@@ -69,15 +71,11 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
             "Circular Externa 047 de 2025 MinSalud (Manual Tarifario SOAT 2026 indexado a UVB; "
             "UVB 2026 = $12.110)"
         )
-        resultado["normas_secundarias"].append(
-            "Decreto 780 de 2016 (marco general sector salud)"
-        )
+        resultado["normas_secundarias"].append("Decreto 780 de 2016 (marco general sector salud)")
         resultado["evitar"].append(
             "T-1025/2002 (pertinencia en urgencias) — NO aplica a controversia tarifaria"
         )
-        resultado["evitar"].append(
-            "T-478/1995 (autonomía médica) — NO aplica a tarifas"
-        )
+        resultado["evitar"].append("T-478/1995 (autonomía médica) — NO aplica a tarifas")
     elif prefijo == "SO":  # Soportes
         resultado["normas_primarias"].append(
             "Resolución 1995 de 1999 Art. 3 (historia clínica como documento de plena prueba médico-legal)"
@@ -96,9 +94,7 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
             "Sentencia T-1025/2002 (autorización posterior en urgencias)"
         )
     elif prefijo in ("CL", "PE"):  # Pertinencia clínica
-        resultado["normas_primarias"].append(
-            "Art. 17 Ley 1751 de 2015 (autonomía médica)"
-        )
+        resultado["normas_primarias"].append("Art. 17 Ley 1751 de 2015 (autonomía médica)")
         resultado["jurisprudencia"].append(
             "Sentencia T-478/1995 (autonomía profesional en decisiones clínicas)"
         )
@@ -140,6 +136,7 @@ def agente_juridico(codigo_glosa: str, eps: str, etapa: str) -> dict:
 
 # ─── Agente Clínico ─────────────────────────────────────────────────────────
 
+
 def agente_clinico(cups: str, servicio: str, tipo_servicio: str = "") -> dict:
     """Analiza pertinencia clínica: es urgencia, ambulatorio, hospitalario,
     diagnóstico, procedimiento. Informa a la IA qué soportes justificarían
@@ -164,7 +161,18 @@ def agente_clinico(cups: str, servicio: str, tipo_servicio: str = "") -> dict:
     elif "CONSULTA" in s:
         categoria = "CONSULTA"
         soportes.append("Nota de consulta médica especializada o general")
-    elif any(k in s for k in ("ESTUDIO", "RADIOGRAF", "TOMOGRAF", "RESONAN", "ECOGRAF", "BIOPSIA", "LABORATORIO")):
+    elif any(
+        k in s
+        for k in (
+            "ESTUDIO",
+            "RADIOGRAF",
+            "TOMOGRAF",
+            "RESONAN",
+            "ECOGRAF",
+            "BIOPSIA",
+            "LABORATORIO",
+        )
+    ):
         categoria = "APOYO_DX"
         soportes.append("Orden médica + resultado del estudio")
     elif any(k in s for k in ("CIRUG", "PROCEDIMIENTO", "ABLACION", "IMPLANT", "RESEC", "ARTROD")):
@@ -188,6 +196,7 @@ def agente_clinico(cups: str, servicio: str, tipo_servicio: str = "") -> dict:
 
 # ─── Agente Tarifario ───────────────────────────────────────────────────────
 
+
 def agente_tarifario(
     modalidad: str,
     factor_ajuste: float = 0.0,
@@ -210,7 +219,9 @@ def agente_tarifario(
 
     modalidad_up = (modalidad or "").upper()
     tipo_tarifa = (tipo_tarifa or "VALOR_FIJO").upper()
-    diferencia = abs(valor_facturado - valor_reconocido) if valor_facturado and valor_reconocido else 0.0
+    diferencia = (
+        abs(valor_facturado - valor_reconocido) if valor_facturado and valor_reconocido else 0.0
+    )
 
     resumen = f"MODALIDAD: {modalidad or 'NO ESPECIFICADA'}\n"
 
@@ -231,7 +242,9 @@ def agente_tarifario(
                 f"EPS ${interp_eps:,.0f}.\n"
             )
         recomendacion = "DEFENDER" if diferencia > 0 and interp_hus > interp_eps else "REVISAR"
-    elif "PROPIA" in modalidad_up or "MANUAL HUS" in modalidad_up or "INSTITUCIONAL" in modalidad_up:
+    elif (
+        "PROPIA" in modalidad_up or "MANUAL HUS" in modalidad_up or "INSTITUCIONAL" in modalidad_up
+    ):
         resumen += (
             f"Marco: Res. 054/2026 ESE HUS (listado unificado) + Res. 124/2026 ESE HUS "
             f"(nuevos códigos). Fórmula: FACTOR × SMDLV 2026 (${SMDLV_2026:,})\n"
@@ -263,6 +276,7 @@ def agente_tarifario(
 
 # ─── Agente Conciliador ─────────────────────────────────────────────────────
 
+
 def agente_conciliador(tono: str, etapa: str) -> dict:
     """Ajusta tono y estructura final del dictamen.
 
@@ -274,9 +288,7 @@ def agente_conciliador(tono: str, etapa: str) -> dict:
     es_ratif = "RATIF" in etapa
 
     resultado = {
-        "cierre_sugerido": (
-            "Comunicaciones: cartera@hus.gov.co, glosasydevoluciones@hus.gov.co"
-        ),
+        "cierre_sugerido": ("Comunicaciones: cartera@hus.gov.co, glosasydevoluciones@hus.gov.co"),
         "lineamientos": [],
     }
 
@@ -317,6 +329,7 @@ def agente_conciliador(tono: str, etapa: str) -> dict:
 
 # ─── Orquestador ────────────────────────────────────────────────────────────
 
+
 def orquestar_dictamen(
     codigo_glosa: str,
     eps: str,
@@ -341,9 +354,12 @@ def orquestar_dictamen(
     jur = agente_juridico(codigo_glosa, eps, etapa)
     clin = agente_clinico(cups, servicio, tipo_servicio)
     tar = agente_tarifario(
-        modalidad=modalidad, factor_ajuste=factor_ajuste,
-        valor_pactado=valor_pactado, tipo_tarifa=tipo_tarifa,
-        valor_facturado=valor_facturado, valor_reconocido=valor_reconocido,
+        modalidad=modalidad,
+        factor_ajuste=factor_ajuste,
+        valor_pactado=valor_pactado,
+        tipo_tarifa=tipo_tarifa,
+        valor_facturado=valor_facturado,
+        valor_reconocido=valor_reconocido,
     )
     conc = agente_conciliador(tono, etapa)
 
@@ -370,7 +386,9 @@ def orquestar_dictamen(
     # Agente Clínico
     bloque.append(f"\n[AGENTE CLÍNICO] Categoría: {clin['categoria']}")
     if clin["justificacion_inherente"]:
-        bloque.append("  → El servicio tiene justificación clínica inherente (no requiere autorización previa)")
+        bloque.append(
+            "  → El servicio tiene justificación clínica inherente (no requiere autorización previa)"
+        )
     bloque.append("  Soportes esperados en el expediente:")
     for s in clin["soportes_esperados"]:
         bloque.append(f"    - {s}")

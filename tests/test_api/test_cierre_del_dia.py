@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/cierre-del-dia (R122 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -34,7 +35,10 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
         password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
@@ -46,6 +50,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -55,8 +60,12 @@ def client(db_session, usuario_super):
 
 def _seed_glosa(db, **kw):
     base = dict(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
+        eps="X",
+        paciente="X",
+        codigo_glosa="C",
+        valor_objetado=1000,
+        etapa="X",
+        estado="RADICADA",
         creado_en=ahora_utc(),
     )
     base.update(kw)
@@ -65,10 +74,14 @@ def _seed_glosa(db, **kw):
 
 
 def _seed_audit(db, usuario, horas_atras=1):
-    db.add(AuditLogRecord(
-        usuario_email=usuario, accion="X", tabla="glosas",
-        timestamp=ahora_utc() - timedelta(hours=horas_atras),
-    ))
+    db.add(
+        AuditLogRecord(
+            usuario_email=usuario,
+            accion="X",
+            tabla="glosas",
+            timestamp=ahora_utc() - timedelta(hours=horas_atras),
+        )
+    )
     db.commit()
 
 
@@ -77,9 +90,16 @@ class TestCierreDelDia:
         r = client.get("/admin/cierre-del-dia")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("fecha_reporte", "ventana_horas", "glosas_creadas_24h",
-                    "glosas_cerradas_24h", "valor_recuperado_24h",
-                    "ia_calls_24h", "top_3_gestores", "vencen_manana"):
+        for key in (
+            "fecha_reporte",
+            "ventana_horas",
+            "glosas_creadas_24h",
+            "glosas_cerradas_24h",
+            "valor_recuperado_24h",
+            "ia_calls_24h",
+            "top_3_gestores",
+            "vencen_manana",
+        ):
             assert key in d
         assert d["ventana_horas"] == 24
 
@@ -94,15 +114,19 @@ class TestCierreDelDia:
 
     def test_cerradas_y_valor(self, client, db_session):
         # Cerrada en últimas 24h con $5k recuperado
-        _seed_glosa(db_session,
-                    estado="LEVANTADA",
-                    valor_recuperado=5000,
-                    fecha_decision_eps=ahora_utc() - timedelta(hours=2))
+        _seed_glosa(
+            db_session,
+            estado="LEVANTADA",
+            valor_recuperado=5000,
+            fecha_decision_eps=ahora_utc() - timedelta(hours=2),
+        )
         # Cerrada hace 48h (fuera de ventana)
-        _seed_glosa(db_session,
-                    estado="LEVANTADA",
-                    valor_recuperado=99999,
-                    fecha_decision_eps=ahora_utc() - timedelta(hours=48))
+        _seed_glosa(
+            db_session,
+            estado="LEVANTADA",
+            valor_recuperado=99999,
+            fecha_decision_eps=ahora_utc() - timedelta(hours=48),
+        )
         r = client.get("/admin/cierre-del-dia")
         d = r.json()
         assert d["glosas_cerradas_24h"] == 1

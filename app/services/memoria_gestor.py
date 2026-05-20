@@ -15,6 +15,7 @@ vez que Yesid analice una TA0201 contra FAMISANAR el sistema:
 No reemplaza el dictamen base; lo afina al gusto del gestor sin que
 tenga que pedirlo cada vez.
 """
+
 from __future__ import annotations
 
 import re
@@ -29,23 +30,83 @@ if TYPE_CHECKING:
 # que se inyecta al prompt en lenguaje claro.
 _PATRONES = (
     # (regex case-insensitive, hint canónico, etiqueta corta)
-    (r"\bT-?760(/?2008)?\b|sentencia\s+t-?760", "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.", "T-760"),
+    (
+        r"\bT-?760(/?2008)?\b|sentencia\s+t-?760",
+        "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.",
+        "T-760",
+    ),
     (r"\bt-?1025\b", "Cita Sentencia T-1025/2002 (urgencias sin autorización previa).", "T-1025"),
-    (r"\bt-?760(/?2008)?\b|sentencia\s+t-?760", "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.", "T-760"),
-    (r"\bart[íi]?culo\s+177\b|art\.?\s*177\b", "Cita Art. 177 Ley 100/1993 (deber EPS de pagar lo facturado).", "Art. 177"),
-    (r"\bart[íi]?culo\s+871\b|art\.?\s*871\b", "Cita Art. 871 Código de Comercio (buena fe contractual).", "Art. 871"),
-    (r"\bart[íi]?culo\s+1602\b|art\.?\s*1602\b", "Cita Art. 1602 Código Civil (contrato como ley entre partes).", "Art. 1602"),
-    (r"\b(circular|res\.?)\s*047\b", "Cita Circular Externa 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB).", "Circular 047"),
-    (r"\bres\.?\s*2284\b|2284\s*/?\s*2023", "Cita Res. 2284/2023 (Manual Único de Glosas).", "Res. 2284"),
-    (r"\bres\.?\s*1995\b|1995\s*/?\s*1999", "Cita Res. 1995/1999 (historia clínica como plena prueba).", "Res. 1995"),
-    (r"\bres\.?\s*2641\b|2641\s*/?\s*2025", "Cita Res. 2641/2025 MinSalud (homologación CUPS).", "Res. 2641"),
-    (r"baj[áa]?(r)?\s+(el\s+)?tono|m[áa]s\s+conciliador|ton[oa]\s+conciliador", "Usa tono conciliador (sin verbos imperativos).", "tono conciliador"),
-    (r"sub[ií]r?\s+(el\s+)?tono|m[áa]s\s+firme|ton[oa]\s+firme", "Usa tono firme con verbos enfáticos.", "tono firme"),
+    (
+        r"\bt-?760(/?2008)?\b|sentencia\s+t-?760",
+        "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.",
+        "T-760",
+    ),
+    (
+        r"\bart[íi]?culo\s+177\b|art\.?\s*177\b",
+        "Cita Art. 177 Ley 100/1993 (deber EPS de pagar lo facturado).",
+        "Art. 177",
+    ),
+    (
+        r"\bart[íi]?culo\s+871\b|art\.?\s*871\b",
+        "Cita Art. 871 Código de Comercio (buena fe contractual).",
+        "Art. 871",
+    ),
+    (
+        r"\bart[íi]?culo\s+1602\b|art\.?\s*1602\b",
+        "Cita Art. 1602 Código Civil (contrato como ley entre partes).",
+        "Art. 1602",
+    ),
+    (
+        r"\b(circular|res\.?)\s*047\b",
+        "Cita Circular Externa 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB).",
+        "Circular 047",
+    ),
+    (
+        r"\bres\.?\s*2284\b|2284\s*/?\s*2023",
+        "Cita Res. 2284/2023 (Manual Único de Glosas).",
+        "Res. 2284",
+    ),
+    (
+        r"\bres\.?\s*1995\b|1995\s*/?\s*1999",
+        "Cita Res. 1995/1999 (historia clínica como plena prueba).",
+        "Res. 1995",
+    ),
+    (
+        r"\bres\.?\s*2641\b|2641\s*/?\s*2025",
+        "Cita Res. 2641/2025 MinSalud (homologación CUPS).",
+        "Res. 2641",
+    ),
+    (
+        r"baj[áa]?(r)?\s+(el\s+)?tono|m[áa]s\s+conciliador|ton[oa]\s+conciliador",
+        "Usa tono conciliador (sin verbos imperativos).",
+        "tono conciliador",
+    ),
+    (
+        r"sub[ií]r?\s+(el\s+)?tono|m[áa]s\s+firme|ton[oa]\s+firme",
+        "Usa tono firme con verbos enfáticos.",
+        "tono firme",
+    ),
     (r"ac[óo]rt|m[áa]s\s+corto|reduc[ií]r?", "Mantén el dictamen corto y directo.", "corto"),
-    (r"detall|m[áa]s\s+(largo|completo|extenso)|amplia[rd]?", "Amplía el detalle técnico y normativo.", "detallado"),
-    (r"silenci[oa]\s+(administrativo|positivo|favorable)", "Menciona el silencio favorable al prestador (Art. 57 Ley 1438/2011).", "silencio favorable"),
-    (r"supersalud|sns|art[íi]?culo\s+126", "Menciona escalamiento a SuperSalud (Art. 126 Ley 1438/2011).", "SuperSalud"),
-    (r"conciliaci[óo]n|art[íi]?culo\s+20\s+dec(reto)?\s*4747", "Menciona la mesa de conciliación (Art. 20 Decreto 4747/2007).", "conciliación"),
+    (
+        r"detall|m[áa]s\s+(largo|completo|extenso)|amplia[rd]?",
+        "Amplía el detalle técnico y normativo.",
+        "detallado",
+    ),
+    (
+        r"silenci[oa]\s+(administrativo|positivo|favorable)",
+        "Menciona el silencio favorable al prestador (Art. 57 Ley 1438/2011).",
+        "silencio favorable",
+    ),
+    (
+        r"supersalud|sns|art[íi]?culo\s+126",
+        "Menciona escalamiento a SuperSalud (Art. 126 Ley 1438/2011).",
+        "SuperSalud",
+    ),
+    (
+        r"conciliaci[óo]n|art[íi]?culo\s+20\s+dec(reto)?\s*4747",
+        "Menciona la mesa de conciliación (Art. 20 Decreto 4747/2007).",
+        "conciliación",
+    ),
 )
 
 
@@ -58,7 +119,7 @@ def _clasificar_mensaje(mensaje: str) -> list[str]:
 
 
 def _hint_de_etiqueta(etiqueta: str) -> str:
-    for (_rex, hint, etq) in _PATRONES:
+    for _rex, hint, etq in _PATRONES:
         if etq == etiqueta:
             return hint
     return ""
@@ -87,11 +148,17 @@ def patron_gestor(
       }
     """
     if not autor_email:
-        return {"autor": "", "n_refinamientos": 0, "patrones_globales": [],
-                "patrones_contexto": [], "hint_para_prompt": ""}
+        return {
+            "autor": "",
+            "n_refinamientos": 0,
+            "patrones_globales": [],
+            "patrones_contexto": [],
+            "hint_para_prompt": "",
+        }
 
     from datetime import datetime, timedelta, timezone
     from app.models.db import DictamenVersionRecord, GlosaRecord
+
     desde = datetime.now(timezone.utc) - timedelta(days=30 * limite_meses)
 
     # Cargar refinamientos del gestor en el período
@@ -107,12 +174,17 @@ def patron_gestor(
     rows = q.all()
     n_total = len(rows)
     if n_total == 0:
-        return {"autor": autor_email, "n_refinamientos": 0,
-                "patrones_globales": [], "patrones_contexto": [],
-                "hint_para_prompt": ""}
+        return {
+            "autor": autor_email,
+            "n_refinamientos": 0,
+            "patrones_globales": [],
+            "patrones_contexto": [],
+            "hint_para_prompt": "",
+        }
 
     # Contar patrones globales y por contexto
     from collections import Counter
+
     c_global: Counter = Counter()
     c_ctx: Counter = Counter()
     cod_norm = (codigo_glosa or "").upper().strip()
@@ -139,7 +211,8 @@ def patron_gestor(
     def _to_list(counter: Counter) -> list[dict]:
         return [
             {"etiqueta": e, "hint": _hint_de_etiqueta(e), "veces": v}
-            for e, v in counter.most_common(10) if v >= min_repeticiones
+            for e, v in counter.most_common(10)
+            if v >= min_repeticiones
         ]
 
     glob = _to_list(c_global)
@@ -160,8 +233,7 @@ def patron_gestor(
         hint_prompt = (
             "\n[ESTILO DEL GESTOR — patrones de refinamiento aprendidos]\n"
             "Este auditor suele afinar dictámenes así. Aplícalos si encajan "
-            "con el caso (no fuerces si no aplica):\n"
-            + "\n".join(hint_lista) + "\n"
+            "con el caso (no fuerces si no aplica):\n" + "\n".join(hint_lista) + "\n"
         )
 
     return {

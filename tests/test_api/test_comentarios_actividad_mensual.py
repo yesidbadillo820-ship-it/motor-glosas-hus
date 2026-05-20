@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/comentarios-actividad-mensual (R276 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -41,6 +42,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,21 +51,32 @@ def client(db_session, usuario):
 
 
 def _seed_glosa(db, glosa_id):
-    db.add(GlosaRecord(
-        id=glosa_id,
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            id=glosa_id,
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
 def _seed_comentario(db, glosa_id, autor, mencion=None, resuelto=0):
-    db.add(ComentarioGlosaRecord(
-        glosa_id=glosa_id, autor_email=autor, texto="t",
-        mencion=mencion, resuelto=resuelto,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        ComentarioGlosaRecord(
+            glosa_id=glosa_id,
+            autor_email=autor,
+            texto="t",
+            mencion=mencion,
+            resuelto=resuelto,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -74,9 +87,7 @@ class TestComentariosActividadMensual:
         _seed_comentario(db_session, 1, "bob@x.com", mencion="alice@x.com")
         _seed_comentario(db_session, 1, "alice@x.com", resuelto=1)
 
-        r = client.get(
-            "/glosas/stats/comentarios-actividad-mensual?meses=2"
-        )
+        r = client.get("/glosas/stats/comentarios-actividad-mensual?meses=2")
         d = r.json()
         assert len(d["serie"]) == 1
         mes = d["serie"][0]
@@ -86,8 +97,6 @@ class TestComentariosActividadMensual:
         assert mes["resueltos"] == 1
 
     def test_vacio(self, client):
-        r = client.get(
-            "/glosas/stats/comentarios-actividad-mensual"
-        )
+        r = client.get("/glosas/stats/comentarios-actividad-mensual")
         d = r.json()
         assert d["serie"] == []

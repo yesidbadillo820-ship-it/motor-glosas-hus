@@ -2,6 +2,7 @@
 
 Extraído de app/main.py para reducir su tamaño.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile

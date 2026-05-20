@@ -27,6 +27,7 @@ Output:
 Aprende del histórico: cuántas veces esa combinación (eps, cups) resultó
 en glosa real, qué códigos salieron, cuánto se objetó en promedio.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -48,8 +49,13 @@ def _buscar_tarifa_pactada(db: Session, eps: str, cups: str) -> Optional[dict]:
     """Consulta si hay tarifa pactada en tarifas_contratadas."""
     try:
         from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
+
         info = evaluar_glosa_tarifa(
-            db, eps=eps, cups=cups, valor_facturado=0.0, valor_objetado=0.0,
+            db,
+            eps=eps,
+            cups=cups,
+            valor_facturado=0.0,
+            valor_objetado=0.0,
         )
         if info.get("encontrada"):
             return info.get("tarifa")
@@ -81,7 +87,8 @@ def predecir_glosa(
             .filter(GlosaRecord.eps.ilike(f"%{eps_u}%"))
             .filter(GlosaRecord.cups_servicio == cups)
             .filter(GlosaRecord.creado_en >= hace_12m)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
     except Exception:
         total_hist = 0
@@ -92,7 +99,8 @@ def predecir_glosa(
             db.query(func.count(GlosaRecord.id))
             .filter(GlosaRecord.cups_servicio == cups)
             .filter(GlosaRecord.creado_en >= hace_12m)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
     except Exception:
         total_cups = 0
@@ -120,7 +128,8 @@ def predecir_glosa(
                 "prob": round(n / base_total, 2),
                 "ocurrencias": int(n),
             }
-            for cod, n in top_codigos if cod
+            for cod, n in top_codigos
+            if cod
         ]
     except Exception:
         pass
@@ -152,23 +161,17 @@ def predecir_glosa(
     tarifa = _buscar_tarifa_pactada(db, eps_u, cups)
     if not tarifa:
         score += 0.15
-        motivos.append(
-            "No hay tarifa pactada en el contrato para esta combinación EPS+CUPS."
-        )
+        motivos.append("No hay tarifa pactada en el contrato para esta combinación EPS+CUPS.")
         recomendaciones.append(
             "Cargar el valor oficial del contrato en /tarifas para evitar TA0201."
         )
     else:
-        motivos.append(
-            f"Tarifa pactada encontrada: contrato {tarifa.get('contrato_numero','—')}."
-        )
+        motivos.append(f"Tarifa pactada encontrada: contrato {tarifa.get('contrato_numero', '—')}.")
 
     # Valor facturado alto → riesgo de revisión manual EPS (>$1M)
     if valor_facturado >= 1_000_000:
         score += 0.10
-        motivos.append(
-            f"Valor facturado alto (${valor_facturado:,.0f}), revisión manual probable."
-        )
+        motivos.append(f"Valor facturado alto (${valor_facturado:,.0f}), revisión manual probable.")
     if valor_facturado >= 5_000_000:
         score += 0.10
         motivos.append("Valor > $5M: alta probabilidad de auditoría específica.")

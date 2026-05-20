@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/tiempo-cierre-promedio (R245 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -49,11 +51,18 @@ def client(db_session, usuario):
 def _seed(db, dias_a_cierre):
     cre = ahora_utc() - timedelta(days=dias_a_cierre + 30)
     dec = cre + timedelta(days=dias_a_cierre)
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado="LEVANTADA",
-        creado_en=cre, fecha_decision_eps=dec,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado="LEVANTADA",
+            creado_en=cre,
+            fecha_decision_eps=dec,
+        )
+    )
     db.commit()
 
 
@@ -61,10 +70,12 @@ class TestTiempoCierrePromedio:
     def test_estructura(self, client):
         r = client.get("/glosas/stats/tiempo-cierre-promedio")
         d = r.json()
-        for key in ("count_glosas_cerradas",
-                    "tiempo_promedio_dias",
-                    "tiempo_mediano_dias",
-                    "tiempo_max_dias"):
+        for key in (
+            "count_glosas_cerradas",
+            "tiempo_promedio_dias",
+            "tiempo_mediano_dias",
+            "tiempo_max_dias",
+        ):
             assert key in d
 
     def test_promedio(self, client, db_session):

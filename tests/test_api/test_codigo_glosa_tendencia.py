@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/codigo-glosa-tendencia (R260 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,17 @@ def client(db_session, usuario):
 
 
 def _seed(db, codigo, dias_atras=0):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa=codigo,
-        valor_objetado=1000, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa=codigo,
+            valor_objetado=1000,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -61,10 +69,7 @@ class TestCodigoTendencia:
         for _ in range(5):
             _seed(db_session, "TA0801", dias_atras=5)
 
-        r = client.get(
-            "/glosas/stats/codigo-glosa-tendencia"
-            "?dias=30&min_glosas_actual=3"
-        )
+        r = client.get("/glosas/stats/codigo-glosa-tendencia?dias=30&min_glosas_actual=3")
         d = r.json()
         assert len(d["items"]) == 1
         assert d["items"][0]["codigo_glosa"] == "TA0801"
@@ -78,10 +83,7 @@ class TestCodigoTendencia:
         for _ in range(8):
             _seed(db_session, "FA0603", dias_atras=40)
 
-        r = client.get(
-            "/glosas/stats/codigo-glosa-tendencia"
-            "?dias=30&min_glosas_actual=3"
-        )
+        r = client.get("/glosas/stats/codigo-glosa-tendencia?dias=30&min_glosas_actual=3")
         d = r.json()
         item = next(x for x in d["items"] if x["codigo_glosa"] == "FA0603")
         assert item["count_actual"] == 4
@@ -90,9 +92,6 @@ class TestCodigoTendencia:
 
     def test_min_glosas_actual_filtra(self, client, db_session):
         _seed(db_session, "RA0001", dias_atras=5)  # solo 1 actual
-        r = client.get(
-            "/glosas/stats/codigo-glosa-tendencia"
-            "?dias=30&min_glosas_actual=3"
-        )
+        r = client.get("/glosas/stats/codigo-glosa-tendencia?dias=30&min_glosas_actual=3")
         d = r.json()
         assert d["items"] == []

@@ -1,4 +1,5 @@
 """Tests del endpoint /soportes-auto/facturas-objetivo (jump-box agent)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,11 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1, nombre="ADMIN",
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
+        nombre="ADMIN",
     )
 
 
@@ -39,6 +44,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual, get_auditor_o_superior
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     app.dependency_overrides[get_auditor_o_superior] = lambda: admin_user
@@ -47,8 +53,7 @@ def client(db_session, admin_user):
     app.dependency_overrides.clear()
 
 
-def _seed_glosa(db, factura: str, estado: str = "RADICADA",
-                workflow_state: str = None) -> None:
+def _seed_glosa(db, factura: str, estado: str = "RADICADA", workflow_state: str = None) -> None:
     g = GlosaRecord(
         eps="X",
         paciente="X",

@@ -1,4 +1,5 @@
 """Tests del generador de dictamen directo sin LLM (R-cerebro #10)."""
+
 from __future__ import annotations
 
 import re
@@ -17,8 +18,11 @@ def _aud_caso_real():
         "SIN CONTRATO ENTRE LAS PARTES SE RECONOCE A SOAT VIGENTE."
     )
     return auditar(
-        texto, tiene_contrato=True, valor_pactado=33487,
-        cups="902210", contexto_pdf="X" * 1000,
+        texto,
+        tiene_contrato=True,
+        valor_pactado=33487,
+        cups="902210",
+        contexto_pdf="X" * 1000,
     )
 
 
@@ -26,9 +30,13 @@ class TestPuedeEmitirDirecto:
     def test_caso_unívoco_devuelve_true(self):
         a = _aud_caso_real()
         ok = puede_emitir_directo(
-            a, codigo="TA0801", eps="DISPENSARIO MEDICO",
-            cups="902210", valor_objetado=3151,
-            valor_facturado=33487, valor_pactado=33487,
+            a,
+            codigo="TA0801",
+            eps="DISPENSARIO MEDICO",
+            cups="902210",
+            valor_objetado=3151,
+            valor_facturado=33487,
+            valor_pactado=33487,
             tiene_contrato=True,
             numero_contrato="440-DIGSA",
         )
@@ -36,15 +44,29 @@ class TestPuedeEmitirDirecto:
 
     def test_score_bajo_devuelve_false(self):
         # score < 70 → no
-        a = {"score_evidencia": 50, "accion_sugerida": "DEFENDER",
-             "n_hallazgos_alta": 1, "hallazgos": [
-                 {"id": "afirmacion_sin_contrato_falsa", "severidad": "ALTA",
-                  "afirmacion_eps": "x", "realidad_sistema": "y",
-                  "refutacion_sugerida": "z"}]}
+        a = {
+            "score_evidencia": 50,
+            "accion_sugerida": "DEFENDER",
+            "n_hallazgos_alta": 1,
+            "hallazgos": [
+                {
+                    "id": "afirmacion_sin_contrato_falsa",
+                    "severidad": "ALTA",
+                    "afirmacion_eps": "x",
+                    "realidad_sistema": "y",
+                    "refutacion_sugerida": "z",
+                }
+            ],
+        }
         ok = puede_emitir_directo(
-            a, codigo="TA0801", eps="X", cups="902210",
-            valor_objetado=1000, valor_facturado=1000,
-            valor_pactado=1000, tiene_contrato=True,
+            a,
+            codigo="TA0801",
+            eps="X",
+            cups="902210",
+            valor_objetado=1000,
+            valor_facturado=1000,
+            valor_pactado=1000,
+            tiene_contrato=True,
             numero_contrato="X",
         )
         assert ok is False
@@ -54,29 +76,45 @@ class TestPuedeEmitirDirecto:
         # (el LLM redacta mejor respuestas mixtas).
         a = _aud_caso_real()
         ok = puede_emitir_directo(
-            a, codigo="TA0801", eps="DISPENSARIO MEDICO",
-            cups="902210", valor_objetado=3151,
-            valor_facturado=41151, valor_pactado=33487,  # excedente
-            tiene_contrato=True, numero_contrato="440-DIGSA",
+            a,
+            codigo="TA0801",
+            eps="DISPENSARIO MEDICO",
+            cups="902210",
+            valor_objetado=3151,
+            valor_facturado=41151,
+            valor_pactado=33487,  # excedente
+            tiene_contrato=True,
+            numero_contrato="440-DIGSA",
         )
         assert ok is False
 
     def test_aceptar_excedente_explicito_devuelve_false(self):
         a = _aud_caso_real()
         ok = puede_emitir_directo(
-            a, codigo="TA0801", eps="X", cups="902210",
-            valor_objetado=3151, valor_facturado=33487,
-            valor_pactado=33487, tiene_contrato=True,
-            numero_contrato="X", accion_excedente="ACEPTAR_TOTAL",
+            a,
+            codigo="TA0801",
+            eps="X",
+            cups="902210",
+            valor_objetado=3151,
+            valor_facturado=33487,
+            valor_pactado=33487,
+            tiene_contrato=True,
+            numero_contrato="X",
+            accion_excedente="ACEPTAR_TOTAL",
         )
         assert ok is False
 
     def test_sin_contrato_devuelve_false(self):
         a = _aud_caso_real()
         ok = puede_emitir_directo(
-            a, codigo="TA0801", eps="X", cups="902210",
-            valor_objetado=3151, valor_facturado=33487,
-            valor_pactado=33487, tiene_contrato=False,
+            a,
+            codigo="TA0801",
+            eps="X",
+            cups="902210",
+            valor_objetado=3151,
+            valor_facturado=33487,
+            valor_pactado=33487,
+            tiene_contrato=False,
             numero_contrato=None,
         )
         assert ok is False
@@ -84,9 +122,14 @@ class TestPuedeEmitirDirecto:
     def test_valor_objetado_cero_devuelve_false(self):
         a = _aud_caso_real()
         ok = puede_emitir_directo(
-            a, codigo="TA0801", eps="X", cups="902210",
-            valor_objetado=0, valor_facturado=0,
-            valor_pactado=33487, tiene_contrato=True,
+            a,
+            codigo="TA0801",
+            eps="X",
+            cups="902210",
+            valor_objetado=0,
+            valor_facturado=0,
+            valor_pactado=33487,
+            tiene_contrato=True,
             numero_contrato="X",
         )
         assert ok is False
@@ -94,9 +137,14 @@ class TestPuedeEmitirDirecto:
     def test_codigo_prefijo_desconocido_devuelve_false(self):
         a = _aud_caso_real()
         ok = puede_emitir_directo(
-            a, codigo="ZZ0001", eps="X", cups="902210",
-            valor_objetado=1000, valor_facturado=1000,
-            valor_pactado=1000, tiene_contrato=True,
+            a,
+            codigo="ZZ0001",
+            eps="X",
+            cups="902210",
+            valor_objetado=1000,
+            valor_facturado=1000,
+            valor_pactado=1000,
+            tiene_contrato=True,
             numero_contrato="X",
         )
         assert ok is False
@@ -106,16 +154,29 @@ class TestGenerarDictamen:
     def test_genera_xml_completo(self):
         a = _aud_caso_real()
         xml = generar_dictamen_directo(
-            a, codigo="TA0801", eps="DISPENSARIO MEDICO BUCARAMANGA",
-            cups="902210", servicio="HEMOGRAMA IV AUTOMATIZADO",
-            valor_objetado=3151, valor_facturado=33487,
-            valor_pactado=33487, numero_contrato="440-DIGSA/DMBUG-2025",
+            a,
+            codigo="TA0801",
+            eps="DISPENSARIO MEDICO BUCARAMANGA",
+            cups="902210",
+            servicio="HEMOGRAMA IV AUTOMATIZADO",
+            valor_objetado=3151,
+            valor_facturado=33487,
+            valor_pactado=33487,
+            numero_contrato="440-DIGSA/DMBUG-2025",
         )
         assert xml is not None
         # Estructura XML
-        for tag in ("paciente", "servicio", "contrato", "tarifa",
-                    "accion", "valor_aceptar", "valor_defender",
-                    "normas_clave", "argumento"):
+        for tag in (
+            "paciente",
+            "servicio",
+            "contrato",
+            "tarifa",
+            "accion",
+            "valor_aceptar",
+            "valor_defender",
+            "normas_clave",
+            "argumento",
+        ):
             assert f"<{tag}>" in xml
             assert f"</{tag}>" in xml
         # Apertura obligatoria
@@ -142,10 +203,15 @@ class TestGenerarDictamen:
         # de los hallazgos del auditor (no genérico).
         a = _aud_caso_real()
         xml = generar_dictamen_directo(
-            a, codigo="TA0801", eps="DISPENSARIO MEDICO",
-            cups="902210", servicio="HEMOGRAMA IV",
-            valor_objetado=3151, valor_facturado=33487,
-            valor_pactado=33487, numero_contrato="440-DIGSA",
+            a,
+            codigo="TA0801",
+            eps="DISPENSARIO MEDICO",
+            cups="902210",
+            servicio="HEMOGRAMA IV",
+            valor_objetado=3151,
+            valor_facturado=33487,
+            valor_pactado=33487,
+            numero_contrato="440-DIGSA",
         )
         arg = re.search(r"<argumento>(.*?)</argumento>", xml, re.DOTALL).group(1)
         # Debe atacar la mentira de "sin contrato"
@@ -157,27 +223,45 @@ class TestGenerarDictamen:
 
     def test_sin_hallazgos_devuelve_none(self):
         # Auditoría sin hallazgos mapeables → no se puede generar
-        a = {"hallazgos": [
-            {"id": "id_no_mapeada", "severidad": "ALTA",
-             "afirmacion_eps": "x", "realidad_sistema": "y",
-             "refutacion_sugerida": "z"}
-        ], "score_evidencia": 70, "accion_sugerida": "DEFENDER_FUERTE"}
+        a = {
+            "hallazgos": [
+                {
+                    "id": "id_no_mapeada",
+                    "severidad": "ALTA",
+                    "afirmacion_eps": "x",
+                    "realidad_sistema": "y",
+                    "refutacion_sugerida": "z",
+                }
+            ],
+            "score_evidencia": 70,
+            "accion_sugerida": "DEFENDER_FUERTE",
+        }
         xml = generar_dictamen_directo(
-            a, codigo="TA0801", eps="X", cups="902210",
-            servicio="X", valor_objetado=1000, valor_facturado=1000,
-            valor_pactado=1000, numero_contrato="X",
+            a,
+            codigo="TA0801",
+            eps="X",
+            cups="902210",
+            servicio="X",
+            valor_objetado=1000,
+            valor_facturado=1000,
+            valor_pactado=1000,
+            numero_contrato="X",
         )
         assert xml is None
 
     def test_eps_no_militar_omite_decreto_1795(self):
         a = _aud_caso_real()
         xml = generar_dictamen_directo(
-            a, codigo="TA0801", eps="COOSALUD",
-            cups="902210", servicio="HEMOGRAMA",
-            valor_objetado=3151, valor_facturado=33487,
-            valor_pactado=33487, numero_contrato="X",
+            a,
+            codigo="TA0801",
+            eps="COOSALUD",
+            cups="902210",
+            servicio="HEMOGRAMA",
+            valor_objetado=3151,
+            valor_facturado=33487,
+            valor_pactado=33487,
+            numero_contrato="X",
         )
         if xml:
-            arg = re.search(r"<argumento>(.*?)</argumento>",
-                            xml, re.DOTALL).group(1)
+            arg = re.search(r"<argumento>(.*?)</argumento>", xml, re.DOTALL).group(1)
             assert "DECRETO 1795" not in arg

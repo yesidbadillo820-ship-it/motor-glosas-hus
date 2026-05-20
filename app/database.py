@@ -22,12 +22,12 @@ if db_url.startswith("postgresql"):
     engine = create_engine(
         db_url,
         poolclass=QueuePool,
-        pool_size=5,           # Render Free Postgres = 97 conexiones max,
-                                # con N workers podemos saturar fácil. Bajamos.
-        max_overflow=10,       # Conexiones extra en picos de tráfico
-        pool_pre_ping=True,    # Verifica si la conexión está viva antes de usarla
-        pool_recycle=1800,     # Refresca cada 30 min — Render dropea ~1h
-        pool_timeout=30,       # Espera 30s antes de TimeoutError en pool exhausto
+        pool_size=5,  # Render Free Postgres = 97 conexiones max,
+        # con N workers podemos saturar fácil. Bajamos.
+        max_overflow=10,  # Conexiones extra en picos de tráfico
+        pool_pre_ping=True,  # Verifica si la conexión está viva antes de usarla
+        pool_recycle=1800,  # Refresca cada 30 min — Render dropea ~1h
+        pool_timeout=30,  # Espera 30s antes de TimeoutError en pool exhausto
         connect_args={
             # Keepalives TCP para detectar conexiones SSL muertas más rápido.
             "keepalives": 1,
@@ -39,15 +39,14 @@ if db_url.startswith("postgresql"):
     )
 else:
     # CONFIGURACIÓN BÁSICA PARA SQLITE (Fallback local)
-    engine = create_engine(
-        db_url, connect_args={"check_same_thread": False}
-    )
+    engine = create_engine(db_url, connect_args={"check_same_thread": False})
 
 # Fábrica de sesiones
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Clase base para que nuestros modelos de datos (tablas) se registren aquí
 Base = declarative_base()
+
 
 def get_db():
     """

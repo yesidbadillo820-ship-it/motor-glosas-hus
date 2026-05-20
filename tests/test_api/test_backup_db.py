@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/backup-db.json (R62 P2)."""
+
 from __future__ import annotations
 
 import json
@@ -14,8 +15,11 @@ from app.auth import get_password_hash
 from app.core.tz import ahora_utc
 from app.database import Base, get_db
 from app.models.db import (
-    AuditLogRecord, ContratoRecord, GlosaRecord,
-    PlantillaGoldRecord, UsuarioRecord,
+    AuditLogRecord,
+    ContratoRecord,
+    GlosaRecord,
+    PlantillaGoldRecord,
+    UsuarioRecord,
 )
 
 
@@ -38,8 +42,11 @@ def db_session():
 @pytest.fixture
 def usuario_super(db_session):
     u = UsuarioRecord(
-        id=1, email="root@hus.gov.co", rol="SUPER_ADMIN",
-        activo=1, password_hash=get_password_hash("xxxx"),
+        id=1,
+        email="root@hus.gov.co",
+        rol="SUPER_ADMIN",
+        activo=1,
+        password_hash=get_password_hash("xxxx"),
     )
     db_session.add(u)
     db_session.commit()
@@ -50,6 +57,7 @@ def usuario_super(db_session):
 def client(db_session, usuario_super):
     from app.api.deps import get_admin
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_admin] = lambda: usuario_super
     with TestClient(app) as c:
@@ -76,7 +84,9 @@ class TestBackupDbJson:
     def test_backup_excluye_password_hash(self, client, db_session):
         """SECURITY: el password_hash NUNCA debe estar en el backup."""
         u2 = UsuarioRecord(
-            email="extra@hus.com", rol="AUDITOR", activo=1,
+            email="extra@hus.com",
+            rol="AUDITOR",
+            activo=1,
             password_hash=get_password_hash("secret123"),
         )
         db_session.add(u2)
@@ -84,15 +94,17 @@ class TestBackupDbJson:
         r = client.get("/admin/backup-db.json")
         d = json.loads(r.text)
         for u in d["usuarios"]:
-            assert "password_hash" not in u, (
-                "REGRESIÓN crítica: backup expuso password_hash"
-            )
+            assert "password_hash" not in u, "REGRESIÓN crítica: backup expuso password_hash"
             assert "totp_secret" not in u
 
     def test_backup_incluye_glosas(self, client, db_session):
         g = GlosaRecord(
-            eps="FAMISANAR", paciente="X", codigo_glosa="TA0201",
-            valor_objetado=100_000, etapa="RESPUESTA", estado="RADICADA",
+            eps="FAMISANAR",
+            paciente="X",
+            codigo_glosa="TA0201",
+            valor_objetado=100_000,
+            etapa="RESPUESTA",
+            estado="RADICADA",
             creado_en=ahora_utc(),
         )
         db_session.add(g)
@@ -105,7 +117,8 @@ class TestBackupDbJson:
 
     def test_backup_incluye_contratos(self, client, db_session):
         c = ContratoRecord(
-            eps="FAMISANAR-PRUEBA", detalles="contrato vigente con tarifas pactadas",
+            eps="FAMISANAR-PRUEBA",
+            detalles="contrato vigente con tarifas pactadas",
         )
         db_session.add(c)
         db_session.commit()
@@ -117,14 +130,20 @@ class TestBackupDbJson:
     def test_backup_audit_solo_90_dias(self, client, db_session):
         """audit_log_90d debe filtrar registros más viejos que 90 días."""
         # 1 reciente + 1 viejo
-        db_session.add(AuditLogRecord(
-            usuario_email="X@hus.com", accion="VIEJO",
-            timestamp=ahora_utc() - timedelta(days=120),
-        ))
-        db_session.add(AuditLogRecord(
-            usuario_email="Y@hus.com", accion="RECIENTE",
-            timestamp=ahora_utc() - timedelta(days=30),
-        ))
+        db_session.add(
+            AuditLogRecord(
+                usuario_email="X@hus.com",
+                accion="VIEJO",
+                timestamp=ahora_utc() - timedelta(days=120),
+            )
+        )
+        db_session.add(
+            AuditLogRecord(
+                usuario_email="Y@hus.com",
+                accion="RECIENTE",
+                timestamp=ahora_utc() - timedelta(days=30),
+            )
+        )
         db_session.commit()
         r = client.get("/admin/backup-db.json")
         d = json.loads(r.text)
@@ -134,18 +153,28 @@ class TestBackupDbJson:
 
     def test_backup_plantillas_gold_solo_activas(self, client, db_session):
         """Solo plantillas con activa=1 deben backupearse."""
-        db_session.add(PlantillaGoldRecord(
-            eps="FAMISANAR", codigo_glosa="TA0201",
-            tipo="TA", titulo="Activa",
-            argumento="texto…", activa=1,
-            creado_en=ahora_utc(),
-        ))
-        db_session.add(PlantillaGoldRecord(
-            eps="FAMISANAR", codigo_glosa="TA0202",
-            tipo="TA", titulo="Desactivada",
-            argumento="texto…", activa=0,
-            creado_en=ahora_utc(),
-        ))
+        db_session.add(
+            PlantillaGoldRecord(
+                eps="FAMISANAR",
+                codigo_glosa="TA0201",
+                tipo="TA",
+                titulo="Activa",
+                argumento="texto…",
+                activa=1,
+                creado_en=ahora_utc(),
+            )
+        )
+        db_session.add(
+            PlantillaGoldRecord(
+                eps="FAMISANAR",
+                codigo_glosa="TA0202",
+                tipo="TA",
+                titulo="Desactivada",
+                argumento="texto…",
+                activa=0,
+                creado_en=ahora_utc(),
+            )
+        )
         db_session.commit()
         r = client.get("/admin/backup-db.json")
         d = json.loads(r.text)

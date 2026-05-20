@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/exito-por-codigo-respuesta (R116 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,12 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, codigo_respuesta, estado):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=1000, etapa="X", estado=estado,
-        codigo_respuesta=codigo_respuesta,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            codigo_respuesta=codigo_respuesta,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -74,8 +82,7 @@ class TestExitoCodigoRespuesta:
         _seed(db_session, "RE9502", "RATIFICADA")
         r = client.get("/glosas/stats/exito-por-codigo-respuesta")
         d = r.json()
-        item = next(it for it in d["items"]
-                    if it["codigo_respuesta"] == "RE9502")
+        item = next(it for it in d["items"] if it["codigo_respuesta"] == "RE9502")
         assert item["total_usado"] == 4
         assert item["decididas"] == 4
         assert item["tasa_levantamiento_pct"] == 75.0

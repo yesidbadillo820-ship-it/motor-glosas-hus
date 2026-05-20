@@ -23,6 +23,7 @@ Notas:
   - _NO_STORE_HEADERS fuerza no-store para evitar que navegadores o SW
     viejos sirvan HTML/JS cacheado tras un deploy.
 """
+
 from __future__ import annotations
 
 from io import BytesIO
@@ -68,12 +69,14 @@ def pwa_service_worker():
 def _generar_icono_pwa(size: int) -> bytes:
     """Genera un icono PWA cuadrado con el azul institucional y 'HUS'."""
     from PIL import Image, ImageDraw, ImageFont
+
     img = Image.new("RGB", (size, size), "#0b5d8a")
     draw = ImageDraw.Draw(img)
     pad = int(size * 0.08)
     draw.ellipse(
         [pad, pad, size - pad, size - pad],
-        outline="#ffffff", width=max(2, size // 80),
+        outline="#ffffff",
+        width=max(2, size // 80),
     )
     try:
         font = ImageFont.truetype("DejaVuSans-Bold.ttf", int(size * 0.42))
@@ -85,7 +88,9 @@ def _generar_icono_pwa(size: int) -> bytes:
     th = bbox[3] - bbox[1]
     draw.text(
         ((size - tw) // 2, (size - th) // 2 - int(size * 0.03)),
-        texto, fill="#ffffff", font=font,
+        texto,
+        fill="#ffffff",
+        font=font,
     )
     buf = BytesIO()
     img.save(buf, format="PNG")
@@ -95,7 +100,8 @@ def _generar_icono_pwa(size: int) -> bytes:
 @router.get("/icon-192.png")
 def icon_192():
     return Response(
-        content=_generar_icono_pwa(192), media_type="image/png",
+        content=_generar_icono_pwa(192),
+        media_type="image/png",
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
@@ -103,7 +109,8 @@ def icon_192():
 @router.get("/icon-512.png")
 def icon_512():
     return Response(
-        content=_generar_icono_pwa(512), media_type="image/png",
+        content=_generar_icono_pwa(512),
+        media_type="image/png",
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
@@ -116,6 +123,7 @@ def importar_masiva():
     correcto (ver hashchange listener en index.html).
     """
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/#importacion-masiva", status_code=302)
 
 

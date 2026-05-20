@@ -34,6 +34,7 @@ Uso desde otros módulos:
       glosa_record.dictamen = clase["dictamen_html"]
       glosa_record.modelo_ia = f"pre-analisis/texto_fijo/{clase['tipo']}"
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -86,6 +87,7 @@ def _dias_habiles(desde: datetime, hasta: datetime) -> int:
     cur = desde.date() if hasattr(desde, "date") else desde
     fin = hasta.date() if hasattr(hasta, "date") else hasta
     from datetime import timedelta as _td
+
     while cur < fin:
         cur = cur + _td(days=1)
         if cur.weekday() < 5:  # 0-4 = lun-vie
@@ -119,10 +121,12 @@ def _es_extemporanea(glosa) -> tuple[bool, int]:
 
 # ─── Formateadores de dictamen ─────────────────────────────────────────────
 
+
 def _dictamen_html_ratificada(eps: str, factura: str, info: str = "") -> str:
     """HTML envuelto del TEXTO_RATIFICADA de glosa_service (import-local
     para evitar import circular en tiempo de módulo)."""
     from app.services.glosa_service import TEXTO_RATIFICADA
+
     eps_s = (eps or "—").strip()
     fac_s = (factura or "—").strip()
     info_s = (info or "").strip() or "—"
@@ -140,6 +144,7 @@ def _dictamen_html_ratificada(eps: str, factura: str, info: str = "") -> str:
 def _dictamen_html_extemporanea(eps: str, factura: str, dias: int) -> str:
     """HTML envuelto del generar_texto_extemporanea(dias)."""
     from app.services.glosa_service import generar_texto_extemporanea
+
     eps_s = (eps or "—").strip()
     fac_s = (factura or "—").strip()
     texto = generar_texto_extemporanea(dias)
@@ -155,6 +160,7 @@ def _dictamen_html_extemporanea(eps: str, factura: str, dias: int) -> str:
 
 
 # ─── API principal ─────────────────────────────────────────────────────────
+
 
 def clasificar_texto_fijo(glosa) -> Optional[dict]:
     """Aplica la regla de prioridad y devuelve el dictamen fijo si aplica.
@@ -233,16 +239,13 @@ def aplicar_texto_fijo_si_corresponde(glosa) -> Optional[dict]:
         return None
 
     # Si el texto fijo previo era del mismo tipo, idempotente — no reescribir.
-    if (
-        dictamen_actual
-        and "texto_fijo" in modelo_actual
-        and clase["tipo"].lower() in modelo_actual
-    ):
+    if dictamen_actual and "texto_fijo" in modelo_actual and clase["tipo"].lower() in modelo_actual:
         return None
 
     # Aplicar
     try:
         from datetime import datetime, timezone as _tz
+
         glosa.dictamen = clase["dictamen_html"]
         glosa.modelo_ia = clase["modelo_ia"]
         # Ronda 38: grabar también codigo_respuesta para el export DGH.
@@ -258,7 +261,12 @@ def aplicar_texto_fijo_si_corresponde(glosa) -> Optional[dict]:
             pass
         # Solo actualizamos estado si está vacío o si es una transición válida
         estado_actual = (getattr(glosa, "estado", "") or "").upper()
-        if not estado_actual or estado_actual in ("PENDIENTE", "RADICADA", "EN_REVISION", "BORRADOR"):
+        if not estado_actual or estado_actual in (
+            "PENDIENTE",
+            "RADICADA",
+            "EN_REVISION",
+            "BORRADOR",
+        ):
             glosa.estado = clase["estado_sugerido"]
         # ⚡ Ronda 21+34 (fix): marcar workflow_state como RESPONDIDA para que
         # salga de la bandeja de pendientes. Las RATIFICADAS y EXTEMPORÁNEAS

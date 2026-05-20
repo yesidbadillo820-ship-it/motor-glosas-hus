@@ -21,6 +21,7 @@ Aplicacion:
     Lo hace `app/api/routers/__init__.py` cuando los routers se
     cargan por primera vez.
 """
+
 from __future__ import annotations
 import logging
 from typing import Any
@@ -79,8 +80,11 @@ def apply() -> bool:
         if gemini is not None:
             try:
                 from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
+
                 imagenes = pdfs_a_imagenes_combinadas(
-                    pdfs_raw, max_imagenes_total=20, dpi=130,
+                    pdfs_raw,
+                    max_imagenes_total=20,
+                    dpi=130,
                 )
                 if not imagenes:
                     raise RuntimeError("conversion PDF->PNG vacia")

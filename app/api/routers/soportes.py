@@ -17,6 +17,7 @@ CIFS directo y depende de un agente externo que lee el share desde
 una PC Windows y empuja los archivos. Path traversal está bloqueado
 por validación estricta antes de escribir a disco.
 """
+
 from __future__ import annotations
 
 import os
@@ -55,8 +56,11 @@ def healthz():
         razones.append(f"error:{s['ultimo_error']}")
     if s["construido_en_epoch"] == 0:
         razones.append("indice_nunca_construido")
-    elif s["construido_hace_seg"] is not None and s["construido_hace_seg"] > _UMBRAL_BUILD_OBSOLETO_SEG:
-        razones.append(f"build_obsoleto:{s['construido_hace_seg']/3600:.1f}h")
+    elif (
+        s["construido_hace_seg"] is not None
+        and s["construido_hace_seg"] > _UMBRAL_BUILD_OBSOLETO_SEG
+    ):
+        razones.append(f"build_obsoleto:{s['construido_hace_seg'] / 3600:.1f}h")
 
     body = {
         "status": "ok" if not razones else "degraded",
@@ -219,8 +223,8 @@ def reindex(
 # nota la diferencia.
 
 _EXT_PERMITIDAS = {".pdf", ".json", ".xml", ".txt", ".csv"}
-_MAX_BYTES_POR_ARCHIVO = 50 * 1024 * 1024   # 50 MB
-_MAX_BYTES_POR_LOTE = 200 * 1024 * 1024     # 200 MB total por request
+_MAX_BYTES_POR_ARCHIVO = 50 * 1024 * 1024  # 50 MB
+_MAX_BYTES_POR_LOTE = 200 * 1024 * 1024  # 200 MB total por request
 _MAX_ARCHIVOS_POR_LOTE = 50
 
 
@@ -235,9 +239,7 @@ def _local_root() -> Path:
     el agente re-sincroniza en cada pasada cada 30 min, así que es
     aceptable).
     """
-    raiz = os.getenv("SOPORTES_LOCAL_ROOT") or os.getenv(
-        "SOPORTES_ROOT", "/tmp/motor-soportes"
-    )
+    raiz = os.getenv("SOPORTES_LOCAL_ROOT") or os.getenv("SOPORTES_ROOT", "/tmp/motor-soportes")
     p = Path(raiz)
     # Crear si no existe (idempotente). Sin esto el primer upload
     # falla con FileNotFoundError.
@@ -297,9 +299,14 @@ def facturas_objetivo(
     matchear vs nombres de archivo del share.
     """
     from app.models.db import GlosaRecord
+
     estados_terminales = (
-        "LEVANTADA", "CONCILIADA", "ACEPTADA", "RATIFICADA",
-        "ARCHIVADA", "DUPLICADA_OCULTA",
+        "LEVANTADA",
+        "CONCILIADA",
+        "ACEPTADA",
+        "RATIFICADA",
+        "ARCHIVADA",
+        "DUPLICADA_OCULTA",
     )
     workflow_terminales = ("RESPONDIDA", "CONCILIADA", "LEVANTADA")
     rows = (
@@ -456,12 +463,14 @@ async def upload_bulk(
         )
     except Exception as _e:
         import logging as _l
+
         _l.getLogger("motor_glosas").debug(f"audit upload-bulk falló: {_e}")
 
     # Forzar GC después de procesar el batch — Render Free 512 MB
     # acumula bytes de PDFs sin liberar entre requests si no.
     try:
         import gc as _gc
+
         _gc.collect()
     except Exception:
         pass
@@ -527,7 +536,7 @@ async def upload_zip(
     # Leer en memoria con tope
     blob = await file.read(_MAX_BYTES_ZIP + 1)
     if len(blob) > _MAX_BYTES_ZIP:
-        raise HTTPException(400, f"ZIP excede {_MAX_BYTES_ZIP // (1024*1024)} MB")
+        raise HTTPException(400, f"ZIP excede {_MAX_BYTES_ZIP // (1024 * 1024)} MB")
     if len(blob) < 22:
         raise HTTPException(400, "ZIP vacio o corrupto")
 
@@ -632,6 +641,7 @@ async def upload_zip(
     try:
         del blob
         import gc as _gc
+
         _gc.collect()
     except Exception:
         pass

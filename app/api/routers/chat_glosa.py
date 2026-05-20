@@ -18,6 +18,7 @@ explica, qué significa) → responde sin modificar la BD.
 
 La conversación no persiste (efímera, solo en la UI) para no inflar BD.
 """
+
 from __future__ import annotations
 
 import re
@@ -59,11 +60,22 @@ def _respuesta_rapida(texto: str, glosa: GlosaRecord) -> str:
     """
     t = (texto or "").lower()
     # Detectar preguntas: "por qué / porque / explica / qué es / que es / cuál es"
-    es_pregunta = any(k in t for k in (
-        "por qué", "porque", "explica", "explicame", "explícame",
-        "qué es", "que es", "qué significa", "que significa",
-        "cuál es", "cual es",
-    ))
+    es_pregunta = any(
+        k in t
+        for k in (
+            "por qué",
+            "porque",
+            "explica",
+            "explicame",
+            "explícame",
+            "qué es",
+            "que es",
+            "qué significa",
+            "que significa",
+            "cuál es",
+            "cual es",
+        )
+    )
     if es_pregunta:
         if "871" in t or "comercio" in t:
             return (
@@ -163,8 +175,10 @@ async def enviar_mensaje(
         # Delegamos al refinar. Usamos el mensaje tal cual como instrucción.
         try:
             from app.services.glosa_service import GlosaService
+
             # Construir servicio manualmente (no tenemos Depends en este contexto)
             from app.core.config import get_settings
+
             cfg = get_settings()
             svc = GlosaService(
                 groq_api_key=cfg.groq_api_key,
@@ -194,7 +208,7 @@ async def enviar_mensaje(
         except Exception as e:
             return {
                 "respuesta": f"No pude refinar en este momento ({e}). Intentá "
-                             "usar el botón 'Refinar con IA' directamente.",
+                "usar el botón 'Refinar con IA' directamente.",
                 "tipo": "error",
                 "modifico_dictamen": False,
             }

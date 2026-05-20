@@ -1,4 +1,5 @@
 """Tests del endpoint GET /admin/glosas-altas-cuantia-vencidas (R367 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -31,7 +32,10 @@ def db_session():
 @pytest.fixture
 def admin_user():
     return UsuarioRecord(
-        id=1, email="admin@hus.com", rol="SUPER_ADMIN", activo=1,
+        id=1,
+        email="admin@hus.com",
+        rol="SUPER_ADMIN",
+        activo=1,
     )
 
 
@@ -39,6 +43,7 @@ def admin_user():
 def client(db_session, admin_user):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: admin_user
     with TestClient(app) as c:
@@ -47,12 +52,18 @@ def client(db_session, admin_user):
 
 
 def _seed(db, valor, dias, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C",
-        valor_objetado=valor, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-        dias_restantes=dias,
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            valor_objetado=valor,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+            dias_restantes=dias,
+        )
+    )
     db.commit()
 
 
@@ -66,13 +77,13 @@ class TestGlosasAltasCuantiaVencidas:
         _seed(db_session, valor=8_000_000, dias=5)
         # Cerrada
         _seed(
-            db_session, valor=20_000_000, dias=-10,
+            db_session,
+            valor=20_000_000,
+            dias=-10,
             estado="LEVANTADA",
         )
 
-        r = client.get(
-            "/admin/glosas-altas-cuantia-vencidas?umbral=5000000"
-        )
+        r = client.get("/admin/glosas-altas-cuantia-vencidas?umbral=5000000")
         d = r.json()
         assert d["total_red_flags"] == 1
         assert d["valor_total"] == 10_000_000

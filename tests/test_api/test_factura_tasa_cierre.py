@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/factura-tasa-cierre (R354 P1)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -45,11 +47,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, factura, estado="RADICADA"):
-    db.add(GlosaRecord(
-        eps="X", paciente="X", codigo_glosa="C", factura=factura,
-        valor_objetado=1000, etapa="X", estado=estado,
-        creado_en=ahora_utc(),
-    ))
+    db.add(
+        GlosaRecord(
+            eps="X",
+            paciente="X",
+            codigo_glosa="C",
+            factura=factura,
+            valor_objetado=1000,
+            etapa="X",
+            estado=estado,
+            creado_en=ahora_utc(),
+        )
+    )
     db.commit()
 
 
@@ -63,9 +72,7 @@ class TestFacturaTasaCierre:
         _seed(db_session, "F2", "LEVANTADA")
         _seed(db_session, "F2", "ACEPTADA")
 
-        r = client.get(
-            "/glosas/stats/factura-tasa-cierre?min_glosas=1"
-        )
+        r = client.get("/glosas/stats/factura-tasa-cierre?min_glosas=1")
         d = r.json()
         b = {it["factura"]: it for it in d["items"]}
         assert b["F1"]["pct_cerradas"] == 33.33

@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/stats/creadas-hoy (R175 P1)."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -39,6 +40,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -47,11 +49,18 @@ def client(db_session, usuario):
 
 
 def _seed(db, eps="X", factura="F-1", valor=1000, dias_atras=0):
-    db.add(GlosaRecord(
-        eps=eps, paciente="X", codigo_glosa="C", factura=factura,
-        valor_objetado=valor, etapa="X", estado="RADICADA",
-        creado_en=ahora_utc() - timedelta(days=dias_atras),
-    ))
+    db.add(
+        GlosaRecord(
+            eps=eps,
+            paciente="X",
+            codigo_glosa="C",
+            factura=factura,
+            valor_objetado=valor,
+            etapa="X",
+            estado="RADICADA",
+            creado_en=ahora_utc() - timedelta(days=dias_atras),
+        )
+    )
     db.commit()
 
 
@@ -60,8 +69,13 @@ class TestCreadasHoy:
         r = client.get("/glosas/stats/creadas-hoy")
         assert r.status_code == 200, r.text
         d = r.json()
-        for key in ("fecha", "count", "valor_objetado_total",
-                    "epss_distintas", "facturas_distintas"):
+        for key in (
+            "fecha",
+            "count",
+            "valor_objetado_total",
+            "epss_distintas",
+            "facturas_distintas",
+        ):
             assert key in d
 
     def test_solo_cuenta_hoy(self, client, db_session):

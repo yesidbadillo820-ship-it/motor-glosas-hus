@@ -1,4 +1,5 @@
 """Tests del endpoint GET /glosas/{id}/duplicados-potenciales (R99 P2)."""
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def usuario():
 def client(db_session, usuario):
     from app.api.deps import get_usuario_actual
     from app.main import app
+
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
     app.dependency_overrides[get_usuario_actual] = lambda: usuario
     with TestClient(app) as c:
@@ -46,9 +48,14 @@ def client(db_session, usuario):
 
 def _seed(db, **kw):
     base = dict(
-        eps="SANITAS", paciente="X", codigo_glosa="TA0201",
-        factura="F-001", valor_objetado=10000, etapa="X",
-        estado="RADICADA", creado_en=ahora_utc(),
+        eps="SANITAS",
+        paciente="X",
+        codigo_glosa="TA0201",
+        factura="F-001",
+        valor_objetado=10000,
+        etapa="X",
+        estado="RADICADA",
+        creado_en=ahora_utc(),
     )
     base.update(kw)
     db.add(GlosaRecord(**base))
@@ -69,11 +76,11 @@ class TestDuplicadosPotenciales:
         assert "razon_no_evaluable" in d
 
     def test_detecta_duplicado_exacto(self, client, db_session):
-        g1 = _seed(db_session, eps="SANITAS", factura="F-X",
-                   codigo_glosa="TA0201", valor_objetado=10000)
+        g1 = _seed(
+            db_session, eps="SANITAS", factura="F-X", codigo_glosa="TA0201", valor_objetado=10000
+        )
         # Duplicado exacto
-        _seed(db_session, eps="SANITAS", factura="F-X",
-              codigo_glosa="TA0201", valor_objetado=10000)
+        _seed(db_session, eps="SANITAS", factura="F-X", codigo_glosa="TA0201", valor_objetado=10000)
 
         r = client.get(f"/glosas/{g1.id}/duplicados-potenciales")
         d = r.json()

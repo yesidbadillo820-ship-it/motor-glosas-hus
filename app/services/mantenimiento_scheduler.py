@@ -6,6 +6,7 @@ Hora elegida: ventana de tráfico mínimo del HUS (gestores duermen).
 Patrón idéntico a ia_auditora_proactiva: loop asyncio que se cancela
 limpiamente en shutdown del lifespan de FastAPI.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -42,9 +43,7 @@ async def _loop_mantenimiento() -> None:
             logger.info("[MANTENIMIENTO] Scheduler cancelado (shutdown)")
             break
         except Exception as e:  # noqa: BLE001
-            logger.error(
-                f"[MANTENIMIENTO] Error en loop: {e}. Reintentando en 6h."
-            )
+            logger.error(f"[MANTENIMIENTO] Error en loop: {e}. Reintentando en 6h.")
             await asyncio.sleep(6 * 3600)
 
 

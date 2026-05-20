@@ -1,4 +1,5 @@
 """Tests del analizador del motivo EPS (R-cerebro #6)."""
+
 from __future__ import annotations
 
 from app.services.analizador_motivo_eps import (
@@ -33,12 +34,8 @@ class TestExtraerPuntos:
     def test_soportes_faltantes(self):
         t = "FALTA HISTORIA CLINICA Y NO SE ANEXÓ AUTORIZACION"
         d = extraer_puntos_eps(t)
-        assert any(
-            "HISTORIA" in s for s in d["soportes_faltantes"]
-        )
-        assert any(
-            "AUTORIZ" in s for s in d["soportes_faltantes"]
-        )
+        assert any("HISTORIA" in s for s in d["soportes_faltantes"])
+        assert any("AUTORIZ" in s for s in d["soportes_faltantes"])
 
     def test_devolucion(self):
         t = "SE EXIGE LA DEVOLUCION DEL VALOR PAGADO"
@@ -63,17 +60,13 @@ class TestBloque:
         assert bloque_puntos_a_refutar(d) == ""
 
     def test_con_valor_genera_bloque(self):
-        d = extraer_puntos_eps(
-            "SE RECONOCE $50.000 POR EL SERVICIO FACTURADO"
-        )
+        d = extraer_puntos_eps("SE RECONOCE $50.000 POR EL SERVICIO FACTURADO")
         b = bloque_puntos_a_refutar(d)
         assert "PUNTOS DE LA EPS A REFUTAR" in b
         assert "$50.000" in b
 
     def test_descuento_invoca_normas(self):
-        d = extraer_puntos_eps(
-            "APLICA DESCUENTO SOAT -20% SOBRE LA TARIFA"
-        )
+        d = extraer_puntos_eps("APLICA DESCUENTO SOAT -20% SOBRE LA TARIFA")
         b = bloque_puntos_a_refutar(d)
         assert "Art. 871" in b or "871" in b
         assert "1602" in b
@@ -81,8 +74,6 @@ class TestBloque:
 
 class TestIntegrado:
     def test_un_paso(self):
-        b = construir_bloque_motivo_eps(
-            "FALTA HISTORIA CLINICA. SE RECONOCE $30.000."
-        )
+        b = construir_bloque_motivo_eps("FALTA HISTORIA CLINICA. SE RECONOCE $30.000.")
         assert "PUNTOS DE LA EPS" in b
         assert "$30.000" in b
