@@ -676,11 +676,17 @@ async def analizar(
     modo_respuesta: Optional[str] = Form("defender"),
     valor_aceptado_parcial: Optional[float] = Form(0.0),
     usar_pdf_nativo_soportes: Optional[bool] = Form(False),
+    trace_id: Optional[str] = Form(None),
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
+    from app.services.progreso_analisis import publicar as _publicar_progreso
+
+    _tid = (trace_id or "").strip()
+    _publicar_progreso(_tid, "inicio", {"eps": eps, "etapa": etapa, "tono": tono})
+
     req_id = set_request_id()
     # R56 P1: trazar el call IA al usuario via ContextVar.
     # glosa_id se setea más tarde, en _persistir_y_responder cuando ya
@@ -717,6 +723,11 @@ async def analizar(
         req_id,
         capturar_raw=bool(usar_pdf_nativo_soportes),
     )
+    _publicar_progreso(
+        _tid,
+        "pdfs_extraidos",
+        {"n_archivos": archivos_procesados, "n_caracteres": len(contexto_pdf or "")},
+    )
 
     # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
     # si el gestor NO subió PDFs manualmente, leemos directo del indexador
@@ -745,7 +756,16 @@ async def analizar(
     few_shots, plantillas_gold, cod_pref = _obtener_few_shots(db, eps, tabla_excel)
 
     info_tarifa_pre = _pre_lookup_tarifa(db, cod_pref, eps, tabla_excel, contexto_pdf, req_id)
+    _publicar_progreso(
+        _tid,
+        "tarifa_lookup",
+        {
+            "encontrada": bool(info_tarifa_pre and info_tarifa_pre.get("encontrada")),
+            "few_shots": len(few_shots),
+        },
+    )
 
+    _publicar_progreso(_tid, "ia_iniciada", {"proveedor": cfg.primary_ai})
     resultado = await service.analizar(
         data,
         contexto_pdf,
@@ -753,6 +773,15 @@ async def analizar(
         few_shots=few_shots,
         info_tarifa=info_tarifa_pre,
         pdfs_raw_para_multimodal=pdfs_raw,
+    )
+    _publicar_progreso(
+        _tid,
+        "ia_completada",
+        {
+            "modelo": resultado.modelo_ia,
+            "score": resultado.score,
+            "dictamen_chars": len(resultado.dictamen or ""),
+        },
     )
     if plantillas_gold:
         from app.api.routers.plantillas_gold import marcar_usos
@@ -763,7 +792,7 @@ async def analizar(
         f"| few_shots={len(few_shots)} | tarifa_match={bool(info_tarifa_pre and info_tarifa_pre.get('encontrada'))}"
     )
 
-    return await _persistir_y_responder(
+    respuesta = await _persistir_y_responder(
         db,
         resultado,
         eps,
@@ -777,6 +806,12 @@ async def analizar(
         current_user,
         req_id,
     )
+    _publicar_progreso(
+        _tid,
+        "finalizado",
+        {"ok": True, "glosa_id": getattr(respuesta, "id", None)},
+    )
+    return respuesta
 
 
 # ════════════════════════════════════════════════════════════════════

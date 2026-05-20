@@ -2366,9 +2366,7 @@ class GlosaService:
             # Se limita a 1 iteración para no aumentar latencia >2x.
             # Funciona con cualquier proveedor (Anthropic/Groq/Gemini/OpenRouter)
             # via _llamar_ia que respeta primary_ai + fallbacks.
-            _hay_proveedor = bool(
-                self.anthropic_key or self.groq or self.gemini or self.openrouter
-            )
+            _hay_proveedor = bool(self.anthropic_key or self.groq or self.gemini or self.openrouter)
             if modo_resp != "auditoria_previa" and _hay_proveedor:
                 try:
                     from app.services.validador_dictamen import evaluar_dictamen
