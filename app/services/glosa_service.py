@@ -2106,6 +2106,13 @@ class GlosaService:
                 else:
                     arg_ia = res_ia
 
+            if not arg_ia:
+                logger.warning(
+                    f"[DICTAMEN-VACIO] arg_ia vacío tras extracción XML. "
+                    f"modelo={modelo_usado!r} res_ia_len={len(res_ia or '')} "
+                    f"res_ia_preview={repr((res_ia or '')[:200])}"
+                )
+
             if not normas_clave and "<normas_clave>" in res_ia:
                 start = res_ia.find("<normas_clave>") + len("<normas_clave>")
                 end = res_ia.find("</normas_clave>")
@@ -3532,6 +3539,11 @@ class GlosaService:
                     timeout=120.0,
                 )
                 content = resp.choices[0].message.content
+                if not content:
+                    raise RuntimeError(
+                        f"Groq/{self.groq_model} devolvió content vacío/None "
+                        f"(finish_reason={resp.choices[0].finish_reason!r})"
+                    )
                 return content, f"groq/{self.groq_model}"
             except Exception as e:
                 ultimo_error = e
