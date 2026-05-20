@@ -9,17 +9,16 @@ import csv
 import hashlib
 import io
 import json
-from typing import Optional
+from datetime import UTC
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_coordinador_o_admin, get_usuario_actual
 from app.core.tz import ahora_utc
-from pydantic import BaseModel, Field
-
 from app.database import get_db
-from app.models.db import PlantillaGoldRecord, GlosaRecord, UsuarioRecord
-from app.api.deps import get_usuario_actual, get_coordinador_o_admin
+from app.models.db import GlosaRecord, PlantillaGoldRecord, UsuarioRecord
 from app.repositories.audit_repository import AuditRepository
 
 router = APIRouter(prefix="/plantillas-gold", tags=["plantillas-gold"])
@@ -30,23 +29,23 @@ class PlantillaGoldInput(BaseModel):
     codigo_glosa: str
     titulo: str = Field(..., max_length=200)
     argumento: str
-    tipo: Optional[str] = None
-    glosa_origen_id: Optional[int] = None
-    valor_recuperado: Optional[float] = 0.0
-    notas: Optional[str] = None
+    tipo: str | None = None
+    glosa_origen_id: int | None = None
+    valor_recuperado: float | None = 0.0
+    notas: str | None = None
 
 
 class PlantillaGoldUpdate(BaseModel):
-    titulo: Optional[str] = None
-    argumento: Optional[str] = None
-    notas: Optional[str] = None
-    activa: Optional[bool] = None
+    titulo: str | None = None
+    argumento: str | None = None
+    notas: str | None = None
+    activa: bool | None = None
 
 
 @router.get("/")
 def listar(
-    eps: Optional[str] = None,
-    codigo: Optional[str] = None,
+    eps: str | None = None,
+    codigo: str | None = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
@@ -230,14 +229,21 @@ def obtener_few_shot(
     db: Session, eps: str, codigo_glosa: str, limite: int = 2
 ) -> list[PlantillaGoldRecord]:
     """Obtiene las mejores plantillas gold para inyectar como ejemplo en el
-    prompt. Prioriza: match exacto de EPS y código, luego mismo código para
-    cualquier EPS, ordenando por número de usos."""
+    prompt.
+
+    Prioridad:
+      1. Match exacto (EPS + código).
+      2. Mismo código CUPS en cualquier EPS.
+      3. Plantillas genéricas del banco HUS (eps=GENERICO) cuyo código
+         pertenece al mismo grupo familiar que el código de la glosa:
+         prefijo de 2 letras (ej. "TA" de "TA0201") → busca "TA-G*".
+    """
     if not codigo_glosa:
         return []
     codigo = codigo_glosa.upper().strip()
     eps_u = (eps or "").upper().strip()
 
-    # Match exacto primero
+    # 1. Match exacto primero
     exactas = (
         db.query(PlantillaGoldRecord)
         .filter(
@@ -252,7 +258,7 @@ def obtener_few_shot(
     if len(exactas) >= limite:
         return exactas
 
-    # Completar con mismo código en otras EPS
+    # 2. Mismo código en otras EPS
     faltan = limite - len(exactas)
     ids_ya = [p.id for p in exactas]
     genericas = (
@@ -266,7 +272,28 @@ def obtener_few_shot(
         .limit(faltan)
         .all()
     )
-    return exactas + genericas
+    resultado = exactas + genericas
+    if len(resultado) >= limite:
+        return resultado
+
+    # 3. Fallback por familia: prefijo 2 letras → GENERICO + "XX-G*"
+    faltan = limite - len(resultado)
+    ids_ya = [p.id for p in resultado]
+    prefijo = codigo[:2]  # "TA" de "TA0201", "SO" de "SO0501", etc.
+    patron_familia = f"{prefijo}-G%"
+    familia = (
+        db.query(PlantillaGoldRecord)
+        .filter(
+            PlantillaGoldRecord.activa == 1,
+            PlantillaGoldRecord.eps == "GENERICO",
+            PlantillaGoldRecord.codigo_glosa.like(patron_familia),
+            ~PlantillaGoldRecord.id.in_(ids_ya) if ids_ya else True,
+        )
+        .order_by(PlantillaGoldRecord.usos.desc())
+        .limit(faltan)
+        .all()
+    )
+    return resultado + familia
 
 
 def marcar_usos(db: Session, plantilla_ids: list[int]):
@@ -300,7 +327,7 @@ def exportar_plantillas_gold(
     Solo coordinador/admin (las plantillas son IP del equipo legal).
     """
     import json
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from fastapi.responses import Response
 
@@ -311,7 +338,7 @@ def exportar_plantillas_gold(
 
     payload = {
         "metadata": {
-            "exportado_en": datetime.now(timezone.utc).isoformat(),
+            "exportado_en": datetime.now(UTC).isoformat(),
             "exportado_por": current_user.email,
             "total": len(plantillas),
             "solo_activas": solo_activas,
@@ -335,7 +362,7 @@ def exportar_plantillas_gold(
             for p in plantillas
         ],
     }
-    fname = f"plantillas-gold-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+    fname = f"plantillas-gold-{datetime.now(UTC).strftime('%Y%m%d')}.json"
     return Response(
         content=json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8"),
         media_type="application/json",
@@ -364,7 +391,7 @@ def plantillas_no_usadas(
     Cada plantilla con: dias_sin_uso (None si nunca usada).
     Ordenado DESC por dias_sin_uso (los más obsoletos primero).
     """
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     plantillas = db.query(PlantillaGoldRecord).filter(PlantillaGoldRecord.activa == 1).all()
 
@@ -375,7 +402,7 @@ def plantillas_no_usadas(
     for p in plantillas:
         ult = p.ultima_uso_en
         if ult is not None and ult.tzinfo is None:
-            ult = ult.replace(tzinfo=timezone.utc)
+            ult = ult.replace(tzinfo=UTC)
 
         # Nunca usada O sin actividad en >N días
         if ult is None or ult < corte:
@@ -494,9 +521,9 @@ class PlantillaImportRow(BaseModel):
     codigo_glosa: str
     titulo: str = Field(..., max_length=200)
     argumento: str
-    tipo: Optional[str] = None
-    valor_recuperado: Optional[float] = 0.0
-    notas: Optional[str] = None
+    tipo: str | None = None
+    valor_recuperado: float | None = 0.0
+    notas: str | None = None
 
 
 class PlantillaImportPayload(BaseModel):
@@ -662,7 +689,7 @@ async def importar_masivo_archivo(
             else:
                 raise HTTPException(400, "JSON debe ser lista o {plantillas: [...]}")
         except json.JSONDecodeError as e:
-            raise HTTPException(400, f"JSON inválido: {e}")
+            raise HTTPException(400, f"JSON inválido: {e}") from e
     else:
         try:
             texto = contenido.decode("utf-8-sig")
@@ -712,9 +739,9 @@ def cobertura_plantillas(
     }
 
     # Glosas reales por (eps, codigo) — últimos 365 días
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    desde = datetime.now(timezone.utc) - timedelta(days=365)
+    desde = datetime.now(UTC) - timedelta(days=365)
     glosas = (
         db.query(
             GlosaRecord.eps,
@@ -770,8 +797,8 @@ def cobertura_plantillas(
 
 @router.get("/sugerencias")
 def sugerencias_plantillas_gold(
-    eps: Optional[str] = None,
-    codigo_glosa: Optional[str] = None,
+    eps: str | None = None,
+    codigo_glosa: str | None = None,
     limite: int = 5,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
