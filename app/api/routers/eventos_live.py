@@ -103,6 +103,76 @@ async def sse_importar(
     )
 
 
+@router.get("/analizar/{trace_id}")
+async def sse_analizar(
+    trace_id: str,
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+) -> StreamingResponse:
+    """Stream SSE de progreso en vivo del análisis de UNA glosa.
+
+    Protocolo:
+      1. Frontend genera uuid (trace_id) y abre EventSource a /eventos/analizar/{trace_id}
+      2. Frontend hace POST /analizar con form field 'trace_id'
+      3. El endpoint analizar publica eventos en cada etapa via
+         app.services.progreso_analisis.publicar(trace_id, etapa, datos)
+      4. Esta cola los serializa como SSE 'event: etapa\\ndata: {...}\\n\\n'
+
+    Eventos emitidos por el endpoint /analizar (orden típico):
+      - inicio          {fecha, eps, codigo_glosa}
+      - pdfs_extraidos  {n_archivos, n_caracteres}
+      - tarifa_lookup   {encontrada: bool, valor_pactado?}
+      - few_shots       {n_plantillas}
+      - ia_iniciada     {proveedor, modelo}
+      - ia_completada   {latencia_ms, tokens_output}
+      - persistido      {glosa_id, estado, score}
+      - finalizado      {ok: true}
+
+    Eventos auto-emitidos por el stream:
+      - keepalive      cada 15s (comentario SSE para no cortar la conexión)
+      - timeout        si pasan 60s sin ningún evento del análisis
+    """
+    from app.services.progreso_analisis import (
+        cerrar_cola,
+        obtener_cola,
+    )
+
+    cola = obtener_cola(trace_id)
+
+    async def _stream() -> AsyncGenerator[str, None]:
+        elapsed = 0.0
+        tick = 0.5
+        timeout_s = 60.0
+        try:
+            while elapsed < timeout_s:
+                try:
+                    msg = cola.get_nowait()
+                except asyncio.QueueEmpty:
+                    await asyncio.sleep(tick)
+                    elapsed += tick
+                    if int(elapsed) % 15 == 0:
+                        yield ": keepalive\n\n"
+                    continue
+                payload = json.dumps(msg["datos"], ensure_ascii=False)
+                yield f"event: {msg['etapa']}\ndata: {payload}\n\n"
+                if msg["etapa"] in ("finalizado", "error"):
+                    return
+                # Resetear timeout: hubo actividad
+                elapsed = 0.0
+            yield "event: timeout\ndata: {}\n\n"
+        finally:
+            cerrar_cola(trace_id)
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @router.get("/ping")
 async def sse_ping(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
