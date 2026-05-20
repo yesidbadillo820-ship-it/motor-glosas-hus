@@ -33,15 +33,4 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = "-v --tb=short"
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore:.*SECRET_KEY por defecto.*:UserWarning",
-    "ignore:.*ADMIN_PASSWORD no configurada.*:UserWarning",
-]
-asyncio_mode = "strict"
+# pytest config en pytest.ini (toma precedencia — evita duplicar aquí)
