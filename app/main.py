@@ -939,7 +939,8 @@ from app.api.routers.alertas import router as alertas_router
 from app.api.routers.usuarios import router as usuarios_router
 from app.api.routers.conciliacion import router as conciliacion_router
 from app.api.routers.audit import router as audit_router
-from app.api.routers.salud_total import router as salud_total_router
+
+# salud_total: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.tarifas_contratadas import router as tarifas_contratadas_router
 from app.api.routers.tarifa_liquidador import router as tarifa_liquidador_router
 from app.api.routers.admin import router as admin_router
@@ -965,20 +966,25 @@ from app.api.routers.dashboard_ejecutivo import router as dashboard_ejecutivo_ro
 from app.api.routers.auditoria_forense import router as auditoria_forense_router
 from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
-from app.api.routers.autopilot import router as autopilot_router
+
+# autopilot: stub removido — lógica real en app/services/autopilot_service.py
 from app.api.routers.digest import router as digest_router
-from app.api.routers.control_center import router as control_center_router
+
+# control_center: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.notificaciones import router as notificaciones_router
 from app.api.routers.eventos_live import router as eventos_live_router
-from app.api.routers.preset_filtros import router as preset_filtros_router
-from app.api.routers.notas_privadas import router as notas_privadas_router
+
+# preset_filtros: stub removido — prefijo /_removed/ (mayo 2026)
+# notas_privadas: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.rutas_factura import router as rutas_factura_router
 from app.api.routers.snippets import router as snippets_router
 from app.api.routers.prediccion_ia import router as prediccion_ia_router
-from app.api.routers.chat_history import router as chat_history_router
+
+# chat_history: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
-from app.api.routers.comentarios_thread import router as comentarios_thread_router
-from app.api.routers.webhooks import router as webhooks_router
+
+# comentarios_thread: stub removido — prefijo /_removed/ (mayo 2026)
+# webhooks: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.ia_status import router as ia_status_router
 
 app.include_router(auth_router)
@@ -992,7 +998,7 @@ app.include_router(alertas_router)
 app.include_router(usuarios_router)
 app.include_router(conciliacion_router)
 app.include_router(audit_router)
-app.include_router(salud_total_router)
+# salud_total_router: stub removido
 app.include_router(tarifas_contratadas_router)
 app.include_router(tarifa_liquidador_router)
 app.include_router(admin_router)
@@ -1018,20 +1024,20 @@ app.include_router(dashboard_ejecutivo_router)
 app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
 app.include_router(sistema_router)
-app.include_router(autopilot_router)
+# autopilot_router: stub removido
 app.include_router(digest_router)
-app.include_router(control_center_router)
+# control_center_router: stub removido
 app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)
-app.include_router(preset_filtros_router)
-app.include_router(notas_privadas_router)
+# preset_filtros_router: stub removido
+# notas_privadas_router: stub removido
 app.include_router(rutas_factura_router)
 app.include_router(snippets_router)
 app.include_router(prediccion_ia_router)
-app.include_router(chat_history_router)
+# chat_history_router: stub removido
 app.include_router(dictamen_pdf_router)
-app.include_router(comentarios_thread_router)
-app.include_router(webhooks_router)
+# comentarios_thread_router: stub removido
+# webhooks_router: stub removido
 app.include_router(ia_status_router)
 from app.api.routers.cups import router as cups_router
 
@@ -1060,9 +1066,7 @@ app.include_router(tareas_diarias_router)
 from app.api.routers.nota_credito import router as nota_credito_router
 
 app.include_router(nota_credito_router)
-from app.api.routers.auditor_preview import router as auditor_preview_router
-
-app.include_router(auditor_preview_router)
+# auditor_preview: stub removido — POST /glosas/preview-auditoria está en glosas.py
 from app.api.routers.soportes import router as soportes_auto_router
 
 app.include_router(soportes_auto_router)
@@ -1072,9 +1076,7 @@ app.include_router(noticias_router)
 from app.api.routers.diagnostico import router as diagnostico_router
 
 app.include_router(diagnostico_router)
-from app.api.routers.auditor_forense import router as auditor_forense_router
-
-app.include_router(auditor_forense_router)
+# auditor_forense: stub removido — real: auditoria_forense.py (ya incluido arriba)
 from app.api.routers.asistente_maestro import router as asistente_maestro_router
 
 app.include_router(asistente_maestro_router)
