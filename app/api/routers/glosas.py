@@ -4786,12 +4786,15 @@ def exportar_lote_csv(
 
 
 @router.get("/importar-masiva/plantilla.csv")
-def descargar_plantilla_masiva(
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
-):
+def descargar_plantilla_masiva():
     """IM F2: descarga plantilla CSV con headers correctos y 3 filas
     ejemplo. El usuario abre con Excel, llena las filas, exporta como
     CSV o pega directamente desde Excel en el textarea.
+
+    Endpoint PÚBLICO: el archivo no tiene PII, solo headers de campos
+    documentados + 3 filas de ejemplo. El frontend usa <a href="..."> que
+    no manda el JWT, así que requerir auth aquí lo rompía. La operación
+    sensible (POST /importar-masiva) sí requiere auth.
     """
     from fastapi.responses import StreamingResponse
     import csv
