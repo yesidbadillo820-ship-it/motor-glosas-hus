@@ -2354,6 +2354,63 @@ class GlosaService:
 
             arg_ia = truncar_despues_de_levantamiento(arg_ia)
 
+            # AUTO-CRÍTICA: valida el borrador y pide corrección si es pobre
+            # Solo aplica en modo normal (no auditoria_previa, no texto-fijo).
+            # Se limita a 1 iteración para no aumentar latencia >2x.
+            if modo_resp != "auditoria_previa" and self.anthropic_key:
+                try:
+                    from app.services.validador_dictamen import evaluar_dictamen
+
+                    _texto_eval = arg_ia.replace("<br/>", " ").replace("*", "")
+                    _resultado_val = evaluar_dictamen(
+                        argumento_html=_texto_eval,
+                        cups_esperado=None,
+                        valor_original=valor_raw,
+                        codigo_respuesta=cod_res,
+                        codigo_glosa=codigo_det,
+                    )
+                    _score_val = _resultado_val.get("score", 100)
+                    _defectos = [
+                        d for d in _resultado_val.get("checks", []) if not d.get("aprobado", True)
+                    ]
+
+                    # Solo refinar si score < 70 y hay defectos específicos
+                    if _score_val < 70 and _defectos:
+                        _feedback_items = "\n".join(
+                            f"- {d.get('nombre', '?')}: {d.get('mensaje', '')}"
+                            for d in _defectos[:5]
+                        )
+                        _refine_prompt = (
+                            f"El dictamen que generaste tiene un score de calidad de {_score_val}/100. "
+                            f"Los problemas detectados son:\n{_feedback_items}\n\n"
+                            f"Dictamen actual:\n{_texto_eval}\n\n"
+                            f"Reescríbelo corrigiendo EXACTAMENTE esos problemas. "
+                            f"Usa el mismo formato XML con <argumento>...</argumento>. "
+                            f"No cambies el fondo legal; solo mejora la estructura y el cumplimiento."
+                        )
+                        _sys_refine = (
+                            "Eres un revisor de calidad de dictámenes médicos del ESE HUS. "
+                            "Tu única tarea es corregir los defectos señalados y devolver "
+                            "el dictamen mejorado dentro de <argumento>...</argumento>."
+                        )
+                        try:
+                            _res_refinado, _ = await self._llamar_anthropic(
+                                system=_sys_refine,
+                                user=_refine_prompt,
+                                temperature_override=0.05,
+                            )
+                            _arg_refinado = self._xml("argumento", _res_refinado, "")
+                            if _arg_refinado and len(_arg_refinado) > 100:
+                                arg_ia = _arg_refinado
+                                logger.info(
+                                    f"[AUTO-CRITICA] score={_score_val}→refinado "
+                                    f"({len(_defectos)} defectos corregidos)"
+                                )
+                        except Exception as _e_ref:
+                            logger.warning(f"[AUTO-CRITICA] refinamiento falló: {_e_ref}")
+                except Exception as _e_val:
+                    logger.debug(f"[AUTO-CRITICA] validación falló: {_e_val}")
+
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
 
