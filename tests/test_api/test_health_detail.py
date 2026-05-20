@@ -102,6 +102,42 @@ class TestHealthDetail:
         assert r.json()["uptime_seconds"] >= 0
 
 
+class TestMiDiaDashboard:
+    def test_estructura_basica(self, client):
+        r = client.get("/mi-dia")
+        assert r.status_code == 200
+        body = r.json()
+        assert "fecha" in body
+        assert "saludo" in body
+        assert "tareas" in body
+        assert "glosas" in body
+        assert "alertas" in body
+
+    def test_tareas_tienen_campos(self, client):
+        r = client.get("/mi-dia")
+        tareas = r.json()["tareas"]
+        assert "pendientes" in tareas
+        assert "completadas" in tareas
+        assert "total" in tareas
+        assert tareas["total"] == tareas["pendientes"] + tareas["completadas"]
+
+    def test_glosas_tienen_campos(self, client):
+        r = client.get("/mi-dia")
+        glosas = r.json()["glosas"]
+        assert "asignadas_activas" in glosas
+        assert "vencen_48h" in glosas
+        assert "sin_dictamen" in glosas
+
+    def test_alertas_nivel_valido(self, client):
+        r = client.get("/mi-dia")
+        nivel = r.json()["alertas"]["nivel"]
+        assert nivel in ("OK", "MEDIA", "ALTA")
+
+    def test_saludo_no_vacio(self, client):
+        r = client.get("/mi-dia")
+        assert len(r.json()["saludo"]) > 0
+
+
 class TestCorrelationIdMiddleware:
     def test_respuesta_incluye_request_id(self, client):
         r = client.get("/health")
