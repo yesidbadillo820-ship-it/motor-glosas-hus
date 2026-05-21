@@ -204,30 +204,96 @@ def ir_a_facturas_conciliadas(page: Page) -> None:
     page.wait_for_selector("text=Facturas Conciliadas", timeout=15000)
 
 
+def _screenshot_debug(page: Page, etiqueta: str) -> Path:
+    """Toma un screenshot full-page para diagnóstico, devuelve la ruta."""
+    out_dir = Path("debug_screenshots")
+    out_dir.mkdir(exist_ok=True)
+    ts = time.strftime("%H%M%S")
+    ruta = out_dir / f"{ts}_{etiqueta}.png"
+    try:
+        page.screenshot(path=str(ruta), full_page=True)
+        logger.info(f"  Screenshot de diagnóstico: {ruta}")
+    except Exception as e:
+        logger.warning(f"  No pude tomar screenshot: {e}")
+    return ruta
+
+
 def filtrar_por_factura(page: Page, factura_corta: str) -> None:
-    """Aplica el filtro de columna # Factura."""
-    # Click en el ícono de filtro (▼) del header "# Factura"
-    header_factura = page.locator("th:has-text('# Factura'), th:has-text('Factura')").first
-    header_factura.locator("a, button, img").first.click()
+    """Aplica el filtro de columna # Factura usando el DropDownOptions de GeneXus."""
+    # 1. Click en el chevron DDO del header "# Factura".
+    # En GeneXus el trigger es un img con src DDODefault.png o DDOFiltered.png,
+    # o un link con clase dropdown-toggle.
+    header = page.locator("th").filter(has_text="# Factura").first
+    if header.count() == 0:
+        # Fallback: cualquier th que contenga "Factura"
+        header = page.locator("th").filter(has_text="Factura").first
 
-    # Esperar que aparezca el input de búsqueda del dropdown
-    input_buscar = page.locator(
-        "input[placeholder*='Buscar'], input[name*='Search'], "
-        "input[name*='Filter'], div.DDOOptionFilter input"
-    ).first
+    triggers = [
+        "img[src*='DDO']",
+        "[data-toggle='dropdown']",
+        "a.dropdown-toggle",
+        "a[onclick*='DropDownOptions']",
+        "a",
+    ]
+    abierto = False
+    for sel in triggers:
+        try:
+            header.locator(sel).first.click(timeout=2000)
+            abierto = True
+            break
+        except PlaywrightTimeout:
+            continue
+    if not abierto:
+        header.click()
+
+    # 2. Esperar a que el dropdown se abra
+    page.wait_for_timeout(1200)
+
+    # 3. Buscar el input de búsqueda con selectores amplios
+    input_selectores = [
+        ".dropdown-menu.show input[type='text']:visible",
+        ".dropdown-menu input[type='text']:visible",
+        ".gx-dropdown-options input[type='text']:visible",
+        ".DDOOptionFilteringDataContainer input:visible",
+        ".DDOOptionFilter input:visible",
+        "div[class*='DDO'] input[type='text']:visible",
+        "div[class*='dropdown'] input[type='text']:visible",
+        "input[type='text']:visible:not([readonly]):not([disabled])",
+    ]
+    input_buscar = None
+    for sel in input_selectores:
+        try:
+            elem = page.locator(sel).first
+            elem.wait_for(state="visible", timeout=2000)
+            input_buscar = elem
+            logger.info(f"  Input filtro encontrado con selector: {sel}")
+            break
+        except PlaywrightTimeout:
+            continue
+
+    if input_buscar is None:
+        _screenshot_debug(page, f"filtro_no_encontrado_{factura_corta}")
+        raise PlaywrightTimeout(
+            "No encontré el input de búsqueda del filtro de # Factura. "
+            "Mirá debug_screenshots/ para ver qué aparece en pantalla."
+        )
+
     input_buscar.fill(factura_corta)
-    page.wait_for_timeout(800)  # debounce de búsqueda
+    page.wait_for_timeout(800)  # debounce
 
-    # Click en "Apply filter" o presionar Enter
+    # 4. Aplicar filtro: lupa o Enter
     try:
         page.locator(
-            "img[title*='Apply' i], img[title*='Aplicar' i], button:has-text('Aplicar')"
+            "img[src*='ApplyFilter']:visible, "
+            "img[title*='Apply' i]:visible, "
+            "img[title*='Aplicar' i]:visible, "
+            "img[src*='Search']:visible"
         ).first.click(timeout=2000)
     except PlaywrightTimeout:
-        page.keyboard.press("Enter")
+        input_buscar.press("Enter")
 
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(1000)
 
 
 def abrir_factura(page: Page, factura_corta: str) -> None:
@@ -364,9 +430,11 @@ def procesar_una(page: Page, info: dict) -> dict:
     except PlaywrightTimeout as e:
         registro["estado"] = "TIMEOUT"
         registro["detalle"] = str(e)[:200]
+        _screenshot_debug(page, f"timeout_{nota}")
     except Exception as e:
         registro["estado"] = "ERROR"
         registro["detalle"] = f"{type(e).__name__}: {str(e)[:200]}"
+        _screenshot_debug(page, f"error_{nota}")
 
     return registro
 
