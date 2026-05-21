@@ -153,15 +153,40 @@ def login(page: Page, user: str, password: str) -> None:
     ).first
     pwd_input = page.locator("input[type='password']:visible").first
 
-    user_input.fill(user)
-    pwd_input.fill(password)
+    # click + type para que GeneXus dispare los eventos blur/change que
+    # habilitan el botón submit (con .fill() solos a veces no alcanza).
+    user_input.click()
+    user_input.fill("")
+    user_input.type(user, delay=30)
+    user_input.press("Tab")  # dispara blur del usuario
 
-    # Botón de login: puede decir "Iniciar sesión", "Aceptar", "Login", "Ingresar"
-    boton = page.locator(
-        "button:has-text('Iniciar'), button:has-text('Ingresar'), "
-        "button:has-text('Aceptar'), input[type='submit']"
-    ).first
-    boton.click()
+    pwd_input.click()
+    pwd_input.fill("")
+    pwd_input.type(password, delay=30)
+
+    # Estrategia 1: presionar Enter en el password (la forma más común de
+    # submitir en GeneXus, evita lidiar con el botón que puede estar disabled).
+    pwd_input.press("Enter")
+
+    # Estrategia 2 (fallback): si después de 2s no se redirigió, esperar a
+    # que el botón se habilite y darle click.
+    try:
+        page.wait_for_url(lambda url: "gamexamplelogin" not in url, timeout=3000)
+    except PlaywrightTimeout:
+        logger.info("  (Enter no submiteó, probando click en el botón)")
+        boton = page.locator(
+            "button:has-text('Iniciar'):not([disabled]), "
+            "button:has-text('Ingresar'):not([disabled]), "
+            "button:has-text('Aceptar'):not([disabled]), "
+            "input[type='submit']:not([disabled])"
+        ).first
+        try:
+            boton.wait_for(state="visible", timeout=5000)
+            boton.click(timeout=10000)
+        except PlaywrightTimeout:
+            # Último recurso: forzar submit del form via JS
+            logger.info("  (botón sigue disabled, forzando submit por JS)")
+            page.evaluate("document.forms[0] && document.forms[0].submit()")
 
     # Esperar a que cargue index o cualquier página interna
     try:
