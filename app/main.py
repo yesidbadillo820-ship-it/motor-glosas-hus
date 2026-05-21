@@ -815,54 +815,70 @@ async def lifespan(app: FastAPI):
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
 
+    # Guard global: DISABLE_SCHEDULERS=1 salta TODOS los schedulers en background.
+    # Útil en CI/tests donde múltiples TestClient arrancan lifespan y crean
+    # decenas de asyncio tasks que se acumulan hasta OOM.
+    _SKIP_SCHEDULERS = os.environ.get("DISABLE_SCHEDULERS", "").lower() in ("1", "true", "yes")
+    if _SKIP_SCHEDULERS:
+        logger.info("[SCHEDULERS] DISABLE_SCHEDULERS=1 — schedulers desactivados")
+
     # Ronda 2: iniciar scheduler de IA auditora proactiva (6 AM diario).
     # No bloquea el startup si falla; sólo deja logs.
-    try:
-        from app.services.ia_auditora_proactiva import iniciar_scheduler
+    if not _SKIP_SCHEDULERS:
+        try:
+            from app.services.ia_auditora_proactiva import iniciar_scheduler
 
-        iniciar_scheduler()
-    except Exception as _e:
-        logger.warning(f"No se pudo iniciar scheduler de pre-análisis: {_e}")
+            iniciar_scheduler()
+        except Exception as _e:
+            logger.warning(f"No se pudo iniciar scheduler de pre-análisis: {_e}")
 
     # Ronda 20: scheduler del digest ejecutivo (sólo si DIGEST_DESTINATARIOS
     # está configurado). No bloquea startup si falla.
-    try:
-        from app.services.digest_scheduler import iniciar_scheduler as iniciar_digest_scheduler
+    if not _SKIP_SCHEDULERS:
+        try:
+            from app.services.digest_scheduler import iniciar_scheduler as iniciar_digest_scheduler
 
-        iniciar_digest_scheduler()
-    except Exception as _e:
-        logger.warning(f"No se pudo iniciar scheduler del digest: {_e}")
+            iniciar_digest_scheduler()
+        except Exception as _e:
+            logger.warning(f"No se pudo iniciar scheduler del digest: {_e}")
 
     # R57 P2: scheduler diario de mantenimiento (3 AM) — purga
     # ai_cache > 30d, ai_calls > 90d, papelera > 30d. No bloquea
     # startup ni rompe si falla — el mantenimiento es secundario.
-    try:
-        from app.services.mantenimiento_scheduler import iniciar_scheduler as iniciar_mant_scheduler
+    if not _SKIP_SCHEDULERS:
+        try:
+            from app.services.mantenimiento_scheduler import (
+                iniciar_scheduler as iniciar_mant_scheduler,
+            )
 
-        iniciar_mant_scheduler()
-    except Exception as _e:
-        logger.warning(f"No se pudo iniciar scheduler de mantenimiento: {_e}")
+            iniciar_mant_scheduler()
+        except Exception as _e:
+            logger.warning(f"No se pudo iniciar scheduler de mantenimiento: {_e}")
 
     # Reindex diario del share de soportes (2 AM) + build inicial al
     # arrancar para que el primer gestor del día encuentre el índice
     # caliente. No bloquea startup si el mount aún no está disponible
     # — el healthz lo refleja y el reintento ocurre al día siguiente.
-    try:
-        from app.services.soportes_reindex_scheduler import (
-            iniciar_scheduler as iniciar_soportes_scheduler,
-        )
+    if not _SKIP_SCHEDULERS:
+        try:
+            from app.services.soportes_reindex_scheduler import (
+                iniciar_scheduler as iniciar_soportes_scheduler,
+            )
 
-        iniciar_soportes_scheduler()
-    except Exception as _e:
-        logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
+            iniciar_soportes_scheduler()
+        except Exception as _e:
+            logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
 
     # Scheduler noticias salud Colombia (cada 4h fetch RSS + scraping)
-    try:
-        from app.services.noticias_scheduler import iniciar_scheduler as iniciar_noticias_scheduler
+    if not _SKIP_SCHEDULERS:
+        try:
+            from app.services.noticias_scheduler import (
+                iniciar_scheduler as iniciar_noticias_scheduler,
+            )
 
-        iniciar_noticias_scheduler()
-    except Exception as _e:
-        logger.warning(f"No se pudo iniciar scheduler de noticias: {_e}")
+            iniciar_noticias_scheduler()
+        except Exception as _e:
+            logger.warning(f"No se pudo iniciar scheduler de noticias: {_e}")
 
     yield
 

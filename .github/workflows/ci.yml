@@ -33,6 +33,9 @@ jobs:
       SECRET_KEY: ci-test-secret-do-not-use-in-production
       DATABASE_URL: sqlite:///./test_ci.db
       PYTHONPATH: ${{ github.workspace }}
+      # Salta schedulers en background — sin esto, los TestClient acumulan
+      # asyncio tasks hasta agotar memoria del runner.
+      DISABLE_SCHEDULERS: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -50,9 +53,26 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest tests/ -q --tb=short \
+          # -v + --tb=long para ver el error específico en CI sin acceso interactivo.
+          # --maxfail=5 para no inundar logs si hay errores en cascada.
+          # tee a /tmp para tener log aunque pytest crashee antes del junit.
+          set -o pipefail
+          python -m pytest tests/ -v --tb=long --maxfail=5 \
             --junitxml=junit.xml \
-            -o "junit_family=xunit2"
+            -o "junit_family=xunit2" 2>&1 | tee /tmp/pytest-output.log
+
+      - name: Show last 100 lines on failure
+        if: failure()
+        run: tail -100 /tmp/pytest-output.log || echo "no log file"
+
+      - name: Upload pytest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-log
+          path: /tmp/pytest-output.log
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Upload test results
         if: always()
@@ -61,6 +81,7 @@ jobs:
           name: junit-results
           path: junit.xml
           retention-days: 7
+          if-no-files-found: warn
 
   security:
     name: Security scan (pip-audit)
