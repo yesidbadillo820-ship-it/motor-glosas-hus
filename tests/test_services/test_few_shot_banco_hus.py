@@ -181,10 +181,12 @@ class TestBloqueFewShotDual:
         bloque = bloque_few_shot_para_prompt(ejemplos)
         assert "PLANTILLA(S) JURÍDICA(S) BASE" in bloque
         assert "BANCO HUS" in bloque
-        assert "ESQUELETO BASE" in bloque
+        assert "MÁXIMA PRIORIDAD" in bloque  # marca de "anula reglas del system_prompt"
+        assert "VERBATIM" in bloque  # debe copiar verbatim
+        assert "ANULAN" in bloque  # explicito que override las reglas
         assert "NOMBRE DEL SERVICIO" in bloque
         assert "VALORES MONETARIOS" in bloque
-        assert "PROHIBIDO inventar" in bloque
+        assert "PROHIBIDO ABSOLUTO" in bloque  # actualizado: ahora dice 'ABSOLUTO'
 
     def test_bloque_gold_usa_lenguaje_de_ejemplo(self):
         ejemplos = [{"argumento": "DICTAMEN GANADOR", "fuente": "GOLD", "id": 1}]

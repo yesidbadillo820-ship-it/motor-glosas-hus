@@ -593,6 +593,13 @@ Cuando cites un artículo o sentencia, incluye UNA frase literal entre comillas 
    "escalera procesal" ni invitaciones a conciliación. Esa coda repetitiva
    distrae y el auditor de la EPS la salta. Una frase, clara, final.
 
+   ★ OVERRIDE: si el user prompt incluye un bloque "PLANTILLA(S) JURÍDICA(S)
+     BASE — BANCO HUS", esas instrucciones ANULAN las reglas de formato P1
+     ("ESE HUS NO ACEPTA LA GLOSA..."), de número de normas y de cierre.
+     En ese caso, copiá VERBATIM el encabezado, cuerpo y cierre de la
+     plantilla, sólo reemplazando los placeholders (pagador, valores,
+     servicio, paciente, fechas) por los datos del caso.
+
 COMPLEJIDAD BAJA — 3 PÁRRAFOS (no 4):
 P1 IDENTIFICACIÓN + EVIDENCIA (60-90 palabras):
    "ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE [TIPO] SOBRE EL CÓDIGO [CÓDIGO]
