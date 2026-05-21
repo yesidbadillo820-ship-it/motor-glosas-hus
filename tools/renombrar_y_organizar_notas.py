@@ -1,14 +1,17 @@
-"""renombrar_y_organizar_notas.py — Renombra PDFs de notas crédito y los mueve a las carpetas por nota.
+"""renombrar_y_organizar_notas.py — Renombra PDFs de notas crédito y los mete en su carpeta.
 
 Lee todos los PDFs de una carpeta de origen, extrae de cada uno:
-  - Nota Electrónica (ej. 222446)
-  - Número de Nota Crédito (ej. 186415)
-  - Número de Factura HUS (ej. HUS0000411230)
+  - Nota Electrónica del PDF (ej. 309352)  ← coincide con NOTA CREDITO del Excel
+  - NOTA Credito N° del PDF (ej. 251233)   ← ID interno del CRRP, solo informativo
+  - Factura HUS (ej. HUS0000466879)
 
 Renombra cada PDF como:  NC_<NotaElectronica>_<Factura>.pdf
-Y lo copia (o mueve) a:  <destino>\\<NotaCredito>\\
+Y lo copia (o mueve) a:  <destino>\\<NotaElectronica>\\
 
-Si la carpeta destino no existe, se crea (o se salta si pasás --no-crear-carpetas).
+IMPORTANTE: por defecto NO crea carpetas nuevas. Si la carpeta destino no
+existe, el PDF se salta y se reporta como CARPETA_INEXISTENTE. Esto evita
+generar carpetas paralelas cuando hay un mismatch entre el PDF y el Excel
+original. Si querés crearlas igual, pasá --crear-carpetas.
 
 USO RÁPIDO
 ----------
@@ -21,8 +24,8 @@ USO RÁPIDO
     # Mover en lugar de copiar (los PDFs originales se eliminan)
     py renombrar_y_organizar_notas.py --origen ... --destino ... --mover
 
-    # Saltar PDFs cuya carpeta destino no exista
-    py renombrar_y_organizar_notas.py --origen ... --destino ... --no-crear-carpetas
+    # Crear carpetas nuevas cuando no existan (NO recomendado salvo casos puntuales)
+    py renombrar_y_organizar_notas.py --origen ... --destino ... --crear-carpetas
 
     # Dry-run: solo reporta qué haría, sin tocar archivos
     py renombrar_y_organizar_notas.py --origen ... --destino ... --dry-run
@@ -189,8 +192,6 @@ def procesar_pdf(
     faltantes = []
     if not datos["nota_electronica"]:
         faltantes.append("Nota Electrónica")
-    if not datos["nota_credito"]:
-        faltantes.append("Nota Crédito")
     if not datos["factura"]:
         faltantes.append("Factura HUS")
     if faltantes:
@@ -202,15 +203,20 @@ def procesar_pdf(
     nuevo = nombre_destino(datos)
     resultado["nuevo_nombre"] = nuevo
 
-    carpeta_destino = destino_base / sanitizar(datos["nota_credito"])
+    # La "Nota Electrónica" del PDF es el número que coincide con la columna
+    # NOTA CREDITO del Excel original — por eso es el nombre de la carpeta destino.
+    # El "NOTA Credito N°" del PDF es un ID interno del sistema CRRP, no se usa.
+    carpeta_destino = destino_base / sanitizar(datos["nota_electronica"])
     destino_final = carpeta_destino / nuevo
     resultado["destino_final"] = str(destino_final)
 
     if not carpeta_destino.exists():
         if not crear_carpetas:
             resultado["estado"] = "CARPETA_INEXISTENTE"
-            resultado["detalle"] = f"No existe {carpeta_destino} y --no-crear-carpetas está activo"
-            logger.warning(f"{pdf.name}: CARPETA_INEXISTENTE — {carpeta_destino}")
+            resultado["detalle"] = (
+                f"No existe {carpeta_destino} (pasá --crear-carpetas si querés crearla)"
+            )
+            logger.warning(f"{pdf.name}: CARPETA_INEXISTENTE — {carpeta_destino.name}")
             return resultado
         if not dry_run:
             carpeta_destino.mkdir(parents=True, exist_ok=True)
@@ -304,9 +310,12 @@ def main() -> int:
         help="Mover los PDFs (los elimina del origen). Por defecto copia.",
     )
     parser.add_argument(
-        "--no-crear-carpetas",
+        "--crear-carpetas",
         action="store_true",
-        help="Si la carpeta destino no existe, saltar el PDF (no crearla).",
+        help=(
+            "Crear la carpeta destino si no existe. Por defecto se salta el PDF y "
+            "se reporta CARPETA_INEXISTENTE."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -346,7 +355,7 @@ def main() -> int:
                 pdf,
                 args.destino,
                 mover=args.mover,
-                crear_carpetas=not args.no_crear_carpetas,
+                crear_carpetas=args.crear_carpetas,
                 dry_run=args.dry_run,
             )
         )
