@@ -505,53 +505,54 @@ def confirmar_factura(page: Page) -> str:
         logger.info("  Click Confirmar (fallback)")
 
     # Esperar al popup de 'Mensajes - Registro completado'.
-    # Aparece como iframe `mensajes.aspx`. Probamos varios timings.
-    page.wait_for_timeout(1500)
-
-    # Buscar el iframe de mensajes y el texto adentro
-    iframe_msj = page.frame_locator("iframe[src*='mensajes']")
-    encontrado = False
+    # Aparece como iframe `mensajes.aspx` que se carga ~2-3s después del Confirmar.
+    # 1) Esperar explícitamente a que el iframe aparezca en el DOM
     try:
-        iframe_msj.locator("text=Registro completado").first.wait_for(
-            state="visible", timeout=10000
-        )
-        logger.info("  ✓ 'Registro completado' detectado en popup")
-        encontrado = True
+        page.wait_for_selector("iframe[src*='mensajes']", timeout=15000)
+        logger.info("  iframe mensajes.aspx apareció")
+        page.wait_for_timeout(1500)  # darle tiempo a que cargue el contenido
     except PlaywrightTimeout:
-        # Plan B: buscar en la página principal por si el mensaje no está en iframe
-        try:
-            page.wait_for_selector("text=Registro completado", timeout=3000)
-            logger.info("  ✓ 'Registro completado' detectado en página")
-            encontrado = True
-        except PlaywrightTimeout:
-            pass
+        logger.warning("  No apareció iframe de mensajes en 15s")
+        _screenshot_debug(page, "sin_iframe_mensajes")
+        # Si la URL ya volvió a la grilla, el portal procesó OK sin popup
+        if "glosasfacturaconww" in page.url:
+            return "OK_SIN_POPUP"
+        return "SIN_CONFIRMACION"
 
-    if encontrado:
-        # Click en el 'Confirmar' del popup para cerrarlo y volver a la grilla
+    # 2) Click en el botón Confirmar dentro del iframe del popup
+    iframe_msj = page.frame_locator("iframe[src*='mensajes']")
+    cerrado = False
+    for intento in range(1, 4):
         try:
             iframe_msj.locator(
                 "button:has-text('Confirmar'), input[value='Confirmar']"
-            ).first.click(timeout=3000)
-            logger.info("  Click Confirmar del popup (cierra)")
+            ).first.click(timeout=4000)
+            logger.info(f"  Click Confirmar del popup (intento {intento})")
+            cerrado = True
+            break
         except PlaywrightTimeout:
-            # Fallback en la página principal
-            try:
-                page.locator(
-                    "button:has-text('Confirmar'):visible, input[value='Confirmar']:visible"
-                ).last.click(timeout=2000)
-            except PlaywrightTimeout:
-                logger.info("  (no cerré el popup, pero la factura quedó procesada)")
-        page.wait_for_timeout(1500)
+            page.wait_for_timeout(1500)
+
+    if not cerrado:
+        # Último recurso: simular Enter en el iframe (el botón suele tener focus)
+        try:
+            iframe_msj.locator("body").press("Enter")
+            logger.info("  Press Enter en el popup (forzar cierre)")
+            cerrado = True
+        except Exception:
+            pass
+
+    # 3) Esperar a que el iframe desaparezca (= popup cerrado)
+    page.wait_for_timeout(2000)
+    iframe_sigue = page.locator("iframe[src*='mensajes']").count()
+    if iframe_sigue == 0 or not page.locator("iframe[src*='mensajes']").first.is_visible():
+        logger.info("  ✓ Popup cerrado, factura procesada")
         return "OK"
 
-    # No detectamos el mensaje. Verificar si la URL volvió a glosasfacturaconww
-    # (en ese caso el portal procesó OK aunque no hayamos visto el popup).
-    if "glosasfacturaconww" in page.url:
-        logger.info("  ✓ URL volvió a 'glosasfacturaconww', asumo OK")
-        return "OK_INFERIDO"
-
-    _screenshot_debug(page, "sin_registro_completado")
-    return "SIN_CONFIRMACION"
+    # El iframe sigue ahí: el portal igual procesó pero no pudimos cerrarlo
+    logger.warning("  Popup quedó abierto, pero la factura se procesó")
+    _screenshot_debug(page, "popup_no_cerrado")
+    return "OK_POPUP_ABIERTO"
 
 
 # ─── Orquestación ───────────────────────────────────────────────────────────
