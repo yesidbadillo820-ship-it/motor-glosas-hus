@@ -180,22 +180,41 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
     if solo_hus:
         partes = [
             "",
-            "═══ PLANTILLA(S) JURÍDICA(S) BASE — BANCO HUS ═══",
+            "═══════════════════════════════════════════════════════════════════",
+            "★★★ PLANTILLA(S) JURÍDICA(S) BASE — BANCO HUS — MÁXIMA PRIORIDAD ★★★",
+            "═══════════════════════════════════════════════════════════════════",
             (
-                "Las siguientes plantillas son argumentos jurídicos APROBADOS "
-                "por el equipo legal del HUS. Úsalas como ESQUELETO BASE del "
-                "dictamen — NO reescribas los argumentos legales (citas, normas, "
-                "sentencias, decretos): ya están redactados con rigor jurídico."
+                "ESTAS PLANTILLAS SON LA FUENTE OFICIAL DE LA RESPUESTA. "
+                "ANULAN cualquier 'REGLA DURA' del system prompt sobre formato "
+                "estándar de P1/P2/P3. El equipo jurídico del HUS aprobó cada "
+                "palabra: citas, normas, sentencias, decretos, encabezado y cierre."
             ),
-            ("TU ÚNICA TAREA es PERSONALIZAR la plantilla con los datos del caso actual:"),
-            "  1. NOMBRE DEL SERVICIO (CUPS/procedimiento del BLOQUE 1)",
-            "  2. VALORES MONETARIOS (objetado/facturado del BLOQUE 1)",
+            "",
+            "CÓMO USAR LA PLANTILLA (regla EXACTA):",
             (
-                "  3. NOMBRE DEL PACIENTE Y NÚMERO DE DOCUMENTO (si vienen en "
-                "soportes PDF; si NO hay soportes, OMITIR — no inventar)"
+                "  ① COPIA EL ENCABEZADO VERBATIM. La plantilla empieza con "
+                "'ESE HUS NO ACEPTA GLOSA POR CONCEPTO DE [X]...'. NO lo cambies "
+                "por el formato 'ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO "
+                "DE [Y] SOBRE EL CÓDIGO...' del template estándar."
             ),
-            ("  4. FECHAS DE ATENCIÓN (si vienen en soportes PDF; si NO, OMITIR — no inventar)"),
-            ('  5. Reemplazar "LA ENTIDAD PAGADORA" por el nombre real del pagador (del BLOQUE 1)'),
+            (
+                "  ② COPIA TODO EL CUERPO LEGAL VERBATIM — las citas a artículos, "
+                "decretos y sentencias son JURÍDICAMENTE VERIFICADAS. No las "
+                "reformules ni cambies los números."
+            ),
+            (
+                "  ③ COPIA EL CIERRE VERBATIM: termina en 'SE SOLICITA EL "
+                "LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LO FACTURADO.' — "
+                "NO agregues 'mesa de conciliación', '10 días hábiles', "
+                "emails @hus.gov.co ni nada después del cierre."
+            ),
+            "",
+            "ÚNICA PERSONALIZACIÓN PERMITIDA (los placeholders):",
+            "  • Reemplazar 'LA ENTIDAD PAGADORA' o '{PAGADOR}' por el nombre real del pagador (del BLOQUE 1)",
+            "  • Inyectar VALORES MONETARIOS del caso (objetado/facturado) si la plantilla deja huecos",
+            "  • Inyectar NOMBRE DEL SERVICIO / CUPS del caso si la plantilla deja huecos",
+            "  • NOMBRE DEL PACIENTE Y DOCUMENTO: solo si vienen en soportes PDF — si no hay PDF, OMITIR",
+            "  • FECHAS DE ATENCIÓN: solo si vienen en soportes PDF — si no hay PDF, OMITIR",
             "",
         ]
         for i, ej in enumerate(ejemplos, 1):
@@ -204,9 +223,14 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
             partes.append("--- FIN PLANTILLA ---")
             partes.append("")
         partes.append(
-            "⚠ PROHIBIDO inventar nombres de pacientes, números de documento o "
-            "fechas que NO estén explícitos en los soportes PDF o en el texto "
+            "⚠ PROHIBIDO ABSOLUTO: inventar nombres de pacientes, números de "
+            "documento o fechas que NO estén en los soportes PDF o en el texto "
             "de la glosa. Si el dato no existe, omitir la mención."
+        )
+        partes.append(
+            "⚠ PROHIBIDO ABSOLUTO: re-redactar las citas legales con palabras "
+            "propias. La plantilla DICE 'Artículo 87 del Decreto 2423 de 1996' "
+            "— NO digas 'Art. 10 Ley 1438 de 2011' ni otras citas inventadas."
         )
         partes.append("═══════════════════════════════════════════════════════════════════")
         partes.append("")
