@@ -90,6 +90,7 @@ COLUMNAS_OPCIONALES = (
     "Prefijo Factura",
     "# Factura",
     "CONCATENAR",
+    "GESTOR",
 )
 
 
@@ -330,6 +331,7 @@ def escribir_reporte(resultados: list[dict], ruta_reporte: Path) -> None:
     ruta_reporte.parent.mkdir(parents=True, exist_ok=True)
     campos = [
         "nota",
+        "GESTOR",
         "Radicado",
         "Acta Conciliacion",
         "Prefijo Factura",
