@@ -59,7 +59,6 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
-import re
 import shutil
 import sys
 from pathlib import Path
@@ -85,8 +84,13 @@ def setup_logging(log_file: Path | None = None) -> None:
 # ─── Lectura de la fuente ──────────────────────────────────────────────────
 
 COLUMNAS_REQUERIDAS = ("NOTA CREDITO",)
-COLUMNAS_OPCIONALES = ("Radicado", "Acta Conciliacion", "Prefijo Factura",
-                       "# Factura", "CONCATENAR")
+COLUMNAS_OPCIONALES = (
+    "Radicado",
+    "Acta Conciliacion",
+    "Prefijo Factura",
+    "# Factura",
+    "CONCATENAR",
+)
 
 
 def _normalizar_headers(headers: Iterable[str]) -> list[str]:
@@ -98,8 +102,7 @@ def _filas_desde_iter(headers: list[str], rows_iter: Iterable) -> list[dict]:
     for req in COLUMNAS_REQUERIDAS:
         if req.upper() not in headers_norm:
             raise ValueError(
-                f"No encontré la columna requerida '{req}'. "
-                f"Headers detectados: {headers}"
+                f"No encontré la columna requerida '{req}'. Headers detectados: {headers}"
             )
 
     idx_nota = headers_norm["NOTA CREDITO"]
@@ -160,6 +163,7 @@ def leer_notas_delimitado(ruta: Path, sep: str) -> list[dict]:
 
 # ─── Indexación del share ──────────────────────────────────────────────────
 
+
 def indexar_notas_disponibles(base: Path, subcarpeta: str) -> dict[str, Path]:
     """Indexa carpetas de notas crédito bajo base/<PERIODO>/<subcarpeta>/<nota>.
 
@@ -192,9 +196,7 @@ def indexar_notas_disponibles(base: Path, subcarpeta: str) -> dict[str, Path]:
 
     muestra = ", ".join(p.name for p in periodos[:6])
     sufijo = "..." if len(periodos) > 6 else ""
-    logger.info(
-        f"Indexando {len(periodos)} periodos con '{subcarpeta}' adentro: {muestra}{sufijo}"
-    )
+    logger.info(f"Indexando {len(periodos)} periodos con '{subcarpeta}' adentro: {muestra}{sufijo}")
 
     for periodo in periodos:
         carpeta_facturas = periodo / subcarpeta
@@ -213,6 +215,7 @@ def indexar_notas_disponibles(base: Path, subcarpeta: str) -> dict[str, Path]:
 
 # ─── Copia de archivos ─────────────────────────────────────────────────────
 
+
 def copiar_archivos(origen: Path, destino: Path) -> tuple[int, int, int]:
     """Copia archivos de origen a destino (recursivo).
 
@@ -230,8 +233,10 @@ def copiar_archivos(origen: Path, destino: Path) -> tuple[int, int, int]:
         if item.is_file():
             destino_archivo = destino / item.name
             try:
-                if (destino_archivo.exists()
-                        and destino_archivo.stat().st_size == item.stat().st_size):
+                if (
+                    destino_archivo.exists()
+                    and destino_archivo.stat().st_size == item.stat().st_size
+                ):
                     omitidos += 1
                     continue
                 shutil.copy2(item, destino_archivo)
@@ -248,6 +253,7 @@ def copiar_archivos(origen: Path, destino: Path) -> tuple[int, int, int]:
 
 
 # ─── Orquestación ──────────────────────────────────────────────────────────
+
 
 def procesar(
     notas: list[dict],
@@ -280,14 +286,16 @@ def procesar(
 
         if origen is None:
             logger.warning(f"{prefix}: NO ENCONTRADA")
-            resultados.append({
-                **info,
-                "estado": "NO_ENCONTRADA",
-                "ruta_origen": "",
-                "archivos_copiados": 0,
-                "archivos_omitidos": 0,
-                "errores": 0,
-            })
+            resultados.append(
+                {
+                    **info,
+                    "estado": "NO_ENCONTRADA",
+                    "ruta_origen": "",
+                    "archivos_copiados": 0,
+                    "archivos_omitidos": 0,
+                    "errores": 0,
+                }
+            )
             continue
 
         destino = salida / nota
@@ -303,27 +311,35 @@ def procesar(
             estado = "OK"
 
         logger.info(
-            f"{prefix}: {estado} — {copiados} copiados, "
-            f"{omitidos} ya existían, {errores} errores"
+            f"{prefix}: {estado} — {copiados} copiados, {omitidos} ya existían, {errores} errores"
         )
-        resultados.append({
-            **info,
-            "estado": estado,
-            "ruta_origen": str(origen),
-            "archivos_copiados": copiados,
-            "archivos_omitidos": omitidos,
-            "errores": errores,
-        })
+        resultados.append(
+            {
+                **info,
+                "estado": estado,
+                "ruta_origen": str(origen),
+                "archivos_copiados": copiados,
+                "archivos_omitidos": omitidos,
+                "errores": errores,
+            }
+        )
     return resultados
 
 
 def escribir_reporte(resultados: list[dict], ruta_reporte: Path) -> None:
     ruta_reporte.parent.mkdir(parents=True, exist_ok=True)
     campos = [
-        "nota", "Radicado", "Acta Conciliacion", "Prefijo Factura",
-        "# Factura", "CONCATENAR",
-        "estado", "ruta_origen",
-        "archivos_copiados", "archivos_omitidos", "errores",
+        "nota",
+        "Radicado",
+        "Acta Conciliacion",
+        "Prefijo Factura",
+        "# Factura",
+        "CONCATENAR",
+        "estado",
+        "ruta_origen",
+        "archivos_copiados",
+        "archivos_omitidos",
+        "errores",
     ]
     with ruta_reporte.open("w", encoding="utf-8-sig", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=campos)
@@ -344,28 +360,36 @@ def main() -> int:
     grupo_input.add_argument("--tsv", type=Path, help="Ruta a un archivo .tsv (separador tab)")
 
     parser.add_argument(
-        "--base", default=DEFAULT_BASE,
+        "--base",
+        default=DEFAULT_BASE,
         help=f"Ruta base del share (default: {DEFAULT_BASE})",
     )
     parser.add_argument(
-        "--subcarpeta", default=DEFAULT_SUBCARPETA,
+        "--subcarpeta",
+        default=DEFAULT_SUBCARPETA,
         help=f"Subcarpeta dentro de cada periodo (default: {DEFAULT_SUBCARPETA})",
     )
     parser.add_argument(
-        "--salida", type=Path, default=Path(DEFAULT_SALIDA),
+        "--salida",
+        type=Path,
+        default=Path(DEFAULT_SALIDA),
         help=f"Carpeta destino local (default: {DEFAULT_SALIDA})",
     )
     parser.add_argument(
-        "--reporte", type=Path, default=Path(DEFAULT_REPORTE),
+        "--reporte",
+        type=Path,
+        default=Path(DEFAULT_REPORTE),
         help=f"Archivo CSV de reporte (default: {DEFAULT_REPORTE})",
     )
     parser.add_argument("--log", type=Path, default=None, help="Archivo de log opcional")
     parser.add_argument(
-        "--no-fallback-recursivo", action="store_true",
+        "--no-fallback-recursivo",
+        action="store_true",
         help="No usar rglob como fallback cuando la nota no está en el índice",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="No copia nada; solo reporta qué encontraría",
     )
 
@@ -396,12 +420,17 @@ def main() -> int:
             f"en el índice. No se copia nada."
         )
         if faltantes:
-            logger.info(f"Faltantes ({len(faltantes)}): {', '.join(faltantes[:20])}"
-                        f"{'...' if len(faltantes) > 20 else ''}")
+            logger.info(
+                f"Faltantes ({len(faltantes)}): {', '.join(faltantes[:20])}"
+                f"{'...' if len(faltantes) > 20 else ''}"
+            )
         return 0
 
     resultados = procesar(
-        notas, indice, base, args.salida,
+        notas,
+        indice,
+        base,
+        args.salida,
         fallback_recursivo=not args.no_fallback_recursivo,
     )
     escribir_reporte(resultados, args.reporte)
