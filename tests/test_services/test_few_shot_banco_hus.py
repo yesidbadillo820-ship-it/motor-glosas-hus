@@ -50,7 +50,9 @@ class TestObtenerEjemplosBancoHUS:
         assert len(ejemplos) == 1
         assert ejemplos[0]["fuente"] == "BANCO_HUS"
 
-    def test_gold_exacto_prevalece_sobre_banco_hus(self, db):
+    def test_banco_hus_prevalece_sobre_gold_curado(self, db):
+        """Revisión 21 mayo 2026 — Yesid: banco HUS tiene prelación absoluta.
+        Sus citas están verificadas, las plantillas curadas custom no."""
         db.add(
             PlantillaGoldRecord(
                 eps="FAMISANAR",
@@ -75,9 +77,10 @@ class TestObtenerEjemplosBancoHUS:
 
         ejemplos = obtener_ejemplos_gold(db, "FAMISANAR", "TA0201")
         assert len(ejemplos) == 1
-        assert ejemplos[0]["fuente"] == "GOLD"
+        assert ejemplos[0]["fuente"] == "BANCO_HUS"
 
-    def test_historico_prevalece_sobre_banco_hus(self, db):
+    def test_banco_hus_prevalece_sobre_historico(self, db):
+        """Banco HUS también gana al histórico — citas verificadas first."""
         from datetime import datetime, timezone
 
         db.add(
@@ -103,7 +106,44 @@ class TestObtenerEjemplosBancoHUS:
 
         ejemplos = obtener_ejemplos_gold(db, "FAMISANAR", "TA0201")
         assert len(ejemplos) == 1
-        assert ejemplos[0]["fuente"] == "HISTORICO"
+        assert ejemplos[0]["fuente"] == "BANCO_HUS"
+
+    def test_sin_banco_hus_para_familia_usa_gold(self, db):
+        """Si banco HUS NO tiene la familia (ej. XX-G*), cae al GOLD curado."""
+        # Solo plantilla custom, NO banco HUS para XX-G*
+        db.add(
+            PlantillaGoldRecord(
+                eps="FAMISANAR",
+                codigo_glosa="XX0101",
+                titulo="Gold para familia sin banco",
+                argumento=ARG_LARGO + " GOLD-XX",
+                activa=1,
+                usos=5,
+            )
+        )
+        db.commit()
+
+        ejemplos = obtener_ejemplos_gold(db, "FAMISANAR", "XX0101")
+        assert len(ejemplos) == 1
+        assert ejemplos[0]["fuente"] == "GOLD"
+
+    def test_gold_con_pocos_usos_descartado(self, db):
+        """Plantillas curadas con usos < 3 ahora son descartadas (probable
+        baja calidad / citas no verificadas)."""
+        db.add(
+            PlantillaGoldRecord(
+                eps="FAMISANAR",
+                codigo_glosa="XX0101",
+                titulo="Gold nuevo sin uso",
+                argumento=ARG_LARGO,
+                activa=1,
+                usos=1,  # < 3, debe descartarse
+            )
+        )
+        db.commit()
+
+        ejemplos = obtener_ejemplos_gold(db, "FAMISANAR", "XX0101")
+        assert len(ejemplos) == 0
 
     def test_banco_hus_familia_correcta(self, db):
         # SO-G* no debe aparecer cuando se pide TA
