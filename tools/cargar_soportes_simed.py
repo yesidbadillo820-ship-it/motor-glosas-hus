@@ -296,17 +296,61 @@ def filtrar_por_factura(page: Page, factura_corta: str) -> None:
     page.wait_for_timeout(1000)
 
 
+class FacturaYaProcesada(Exception):
+    """La factura no aparece en la grilla (probablemente ya tiene NC asignada)."""
+
+
 def abrir_factura(page: Page, factura_corta: str) -> None:
-    """Click en el ícono de editar (lápiz) de la fila filtrada."""
-    # La fila debe contener el número de factura
-    fila = page.locator(f"tr:has-text('{factura_corta}')").first
-    # Botón editar: suele ser un ícono <a> al inicio de la fila
-    fila.locator(
-        "a[title*='Editar' i], a[title*='Edit' i], img[title*='Editar' i], "
+    """Click en el ícono de editar (lápiz) de la fila filtrada.
+
+    Si la grilla está vacía después del filtro (la factura ya fue procesada
+    o no corresponde a este NIT), lanza FacturaYaProcesada.
+    """
+    # Esperar un poco a que la grilla termine de refrescar
+    page.wait_for_timeout(1500)
+
+    # Detectar si la grilla muestra "No se encontraron registros"
+    no_resultados = page.locator("text=No se encontraron registros").first
+    try:
+        if no_resultados.is_visible(timeout=2000):
+            raise FacturaYaProcesada(
+                f"Factura {factura_corta} no aparece en la grilla "
+                "(probablemente ya tiene NC asignada o no corresponde al NIT)"
+            )
+    except PlaywrightTimeout:
+        pass  # no encontró el cartel, hay resultados
+
+    # La fila debe contener el número de factura. Buscamos primero un selector
+    # estricto (la columna de # Factura con ese valor exacto) y caemos a
+    # uno más amplio si no encontramos.
+    fila_estricta = page.locator(f"tr").filter(has_text=factura_corta).first
+    try:
+        fila_estricta.wait_for(state="visible", timeout=5000)
+        fila = fila_estricta
+    except PlaywrightTimeout:
+        _screenshot_debug(page, f"fila_no_encontrada_{factura_corta}")
+        raise
+
+    # Botón editar: ícono <a> al inicio de la fila. Suele ser una imagen
+    # con title="Actualizar" o un link a glosasfactura.aspx
+    boton_editar = fila.locator(
+        "a[title*='Actualizar' i], a[title*='Editar' i], a[title*='Edit' i], "
+        "a:has(img[src*='ActionUpdate']), a:has(img[title*='Actualizar' i]), "
+        "img[title*='Actualizar' i], img[title*='Editar' i], "
         "a[href*='glosasfactura.aspx']"
-    ).first.click()
+    ).first
+
+    try:
+        boton_editar.wait_for(state="visible", timeout=5000)
+        boton_editar.click()
+    except PlaywrightTimeout:
+        _screenshot_debug(page, f"editar_no_encontrado_{factura_corta}")
+        raise
+
     page.wait_for_url("**/glosasfactura.aspx*", timeout=15000)
-    page.wait_for_selector("text=Glosas Factura, text=Información General", timeout=10000)
+    page.wait_for_selector(
+        "text=Glosas Factura, text=Información General", timeout=10000
+    )
 
 
 def ingresar_nota_y_subir(page: Page, info: dict) -> str:
@@ -427,6 +471,9 @@ def procesar_una(page: Page, info: dict) -> dict:
         ingresar_nota_y_subir(page, info)
         estado = confirmar_factura(page)
         registro["estado"] = estado
+    except FacturaYaProcesada as e:
+        registro["estado"] = "YA_PROCESADA"
+        registro["detalle"] = str(e)[:200]
     except PlaywrightTimeout as e:
         registro["estado"] = "TIMEOUT"
         registro["detalle"] = str(e)[:200]
