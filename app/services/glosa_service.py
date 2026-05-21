@@ -734,20 +734,30 @@ def limpiar_cierre_extemporanea_indebido(
         r"\s*LA\s+ENTIDAD\s+PAGADORA\s+CUENTA\s+CON\s+10\s+D[ÍI]AS\s+H[ÁA]BILES[\s\S]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
         # Variante "10 días" sin glosasydevoluciones, hasta CARTERA@HUS
         r"\s*LA\s+ENTIDAD\s+PAGADORA\s+CUENTA\s+CON\s+10\s+D[ÍI]AS\s+H[ÁA]BILES[\s\S]*?CARTERA@HUS\.GOV\.CO\.",
+        # Variante sin "PAGADORA": "LA ENTIDAD CUENTA CON 10 DÍAS..."
+        # (frecuente en Groq llama-3.3 — directiva mayo 2026)
+        r"\s*LA\s+ENTIDAD\s+CUENTA\s+CON\s+10\s+D[ÍI]AS\s+H[ÁA]BILES[\s\S]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        r"\s*LA\s+ENTIDAD\s+CUENTA\s+CON\s+10\s+D[ÍI]AS\s+H[ÁA]BILES[\s\S]*?CARTT?ERA@HUS\.GOV\.CO\.",
         # Variante "DE PERSISTIR... mesa de conciliación... correos"
         r"\s*DE\s+PERSISTIR\s+LA\s+OBJECI[ÓO]N[\s\S]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
-        r"\s*DE\s+PERSISTIR\s+LA\s+OBJECI[ÓO]N[\s\S]*?CARTERA@HUS\.GOV\.CO\.",
+        r"\s*DE\s+PERSISTIR\s+LA\s+OBJECI[ÓO]N[\s\S]*?CARTT?ERA@HUS\.GOV\.CO\.",
         # Variante "EN SUBSIDIO... mesa de conciliación... correos"
         r"\s*EN\s+SUBSIDIO[\s\S]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
-        r"\s*EN\s+SUBSIDIO[\s\S]*?CARTERA@HUS\.GOV\.CO\.",
+        r"\s*EN\s+SUBSIDIO[\s\S]*?CARTT?ERA@HUS\.GOV\.CO\.",
         # Variante "COMUNICACIONES: ..." con ambos correos
-        r"\s*COMUNICACIONES:\s*CARTERA@HUS\.GOV\.CO[^.]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        r"\s*COMUNICACIONES:\s*CARTT?ERA@HUS\.GOV\.CO[^.]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
         # Variante "COMUNICACIONES: ..." con solo CARTERA
-        r"\s*COMUNICACIONES:\s*CARTERA@HUS\.GOV\.CO\.",
+        r"\s*COMUNICACIONES:\s*CARTT?ERA@HUS\.GOV\.CO\.",
         # Variante "CUALQUIER INFORMACIÓN AL CORREO..." con ambos
-        r"\s*CUALQUIER\s+INFORMACI[ÓO]N\s+A(?:L\s+CORREO\s+ELECTR[ÓO]NICO\s+INSTITUCIONAL)?:?\s*CARTERA@HUS\.GOV\.CO[^.]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
+        r"\s*CUALQUIER\s+INFORMACI[ÓO]N\s+A(?:L\s+CORREO\s+ELECTR[ÓO]NICO\s+INSTITUCIONAL)?:?\s*CARTT?ERA@HUS\.GOV\.CO[^.]*?GLOSASYDEVOLUCIONES@HUS\.GOV\.CO\.",
         # Variante "CUALQUIER INFORMACIÓN..." solo CARTERA
-        r"\s*CUALQUIER\s+INFORMACI[ÓO]N\s+A(?:L\s+CORREO\s+ELECTR[ÓO]NICO\s+INSTITUCIONAL)?:?\s*CARTERA@HUS\.GOV\.CO\.",
+        r"\s*CUALQUIER\s+INFORMACI[ÓO]N\s+A(?:L\s+CORREO\s+ELECTR[ÓO]NICO\s+INSTITUCIONAL)?:?\s*CARTT?ERA@HUS\.GOV\.CO\.",
+        # Variante "SE EXTIENDE/INVITA UNA INVITACIÓN A LA MESA DE CONCILIACIÓN..."
+        # (Groq la usa antes de los emails — mayo 2026)
+        r"\s*SE\s+EXTIENDE\s+UNA\s+INVITACI[ÓO]N\s+A\s+LA\s+MESA\s+DE\s+CONCILIACI[ÓO]N[\s\S]*?CARTT?ERA@HUS\.GOV\.CO\.",
+        r"\s*SE\s+INVITA\s+A\s+LA\s+(?:ENTIDAD\s+PAGADORA\s+A\s+(?:UNA|LA)\s+)?MESA\s+DE\s+CONCILIACI[ÓO]N[\s\S]*?CARTT?ERA@HUS\.GOV\.CO\.",
+        # Variante combinada: "LAS COMUNICACIONES DEBERÁN/PUEDEN DIRIGIRSE..."
+        r"\s*LAS\s+COMUNICACIONES\s+(?:DEBER[ÁA]N|PUEDEN)\s+(?:DIRIGIRSE|SER\s+DIRIGIDAS)[\s\S]*?CARTT?ERA@HUS\.GOV\.CO\.",
     ]
     out = texto
     for pat in patrones_cierre:
