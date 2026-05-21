@@ -370,24 +370,30 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
         )
 
     # Estrategia robusta para llenar el campo:
-    # 1) Click + Ctrl+A + fill() para escritura atómica (sin perder caracteres
-    #    como pasa con type() cuando GeneXus tiene listeners en cada keydown).
-    # 2) Verificar el valor con input_value() y reintentar si no coincide.
-    # 3) Tab al final para disparar el blur que habilita "Soportes NC".
+    # GeneXus valida la NC contra el CUV en el server-side cuando el campo
+    # pierde foco (blur). Esa validación lee el valor del DOM Y necesita
+    # que los eventos input/change hayan sido disparados antes del blur.
+    # Si usamos sólo fill(), el value queda seteado pero los eventos no
+    # se disparan y la validación corre con un valor stale (el del CUV
+    # esperado). Por eso usamos page.keyboard.type() que dispara eventos
+    # OS-level reales, igual que un usuario tipeando manualmente.
     for intento in range(1, 4):
         campo_nota.click()
+        page.wait_for_timeout(150)
         campo_nota.press("Control+a")
         campo_nota.press("Delete")
-        campo_nota.fill(nota)
-        page.wait_for_timeout(200)
+        page.wait_for_timeout(100)
+        page.keyboard.type(nota, delay=60)
+        page.wait_for_timeout(300)
         valor = campo_nota.input_value()
         if valor == nota:
             break
         logger.warning(f"  intento {intento}: valor escrito '{valor}' ≠ '{nota}', reintentando")
         if intento == 3:
-            # Último recurso: setear el value con JS y disparar el evento change
+            # Último recurso: setear el value con JS Y disparar eventos
             campo_nota.evaluate(
-                "(el, v) => { el.value = v; el.dispatchEvent(new Event('input', {bubbles:true})); "
+                "(el, v) => { el.value = v; "
+                "el.dispatchEvent(new Event('input', {bubbles:true})); "
                 "el.dispatchEvent(new Event('change', {bubbles:true})); }",
                 nota,
             )
@@ -401,9 +407,42 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
             f"quedó '{campo_nota.input_value()}'"
         )
 
+    # Tab para disparar blur → GeneXus valida contra el CUV
     campo_nota.press("Tab")
-    page.wait_for_timeout(800)  # dejá que GeneXus haga su validación
-    logger.info(f"  Nota Crédito ingresada: {nota}")
+    page.wait_for_timeout(1500)  # dale tiempo a que termine la validación
+
+    # Verificar que el valor no cambió tras el Tab (si GeneXus rechazó la NC,
+    # podría haber limpiado el campo o ese cambio de valor sería una señal)
+    valor_post_tab = campo_nota.input_value()
+    if valor_post_tab != nota:
+        logger.warning(f"  ⚠ Tab cambió el valor: ahora '{valor_post_tab}' (esperaba '{nota}')")
+        _screenshot_debug(page, f"nota_cambiada_tras_tab_{nota}")
+    logger.info(f"  Nota Crédito ingresada: {valor_post_tab}")
+
+    # Detectar el popup de error de validación de NC contra el CUV.
+    # GeneXus muestra un iframe `mensajes.aspx` con el texto:
+    #   "El numero de la NC por el CUV ante el Ministerio de Salud ... no
+    #    corresponde con el digitado"
+    # Si aparece, no tiene sentido seguir — la NC y el CUV no matchean.
+    if page.locator("iframe[src*='mensajes']").count() > 0:
+        msg_iframe = page.frame_locator("iframe[src*='mensajes']")
+        try:
+            txt = msg_iframe.locator("body").inner_text(timeout=2000)
+        except PlaywrightTimeout:
+            txt = ""
+        if "no corresponde" in txt.lower() or "ministerio de salud" in txt.lower():
+            _screenshot_debug(page, f"nc_no_corresponde_{nota}")
+            # Cerrar el popup antes de salir para no contaminar la próxima factura
+            try:
+                msg_iframe.locator(
+                    "button:has-text('Confirmar'), input[value='Confirmar']"
+                ).first.click(timeout=3000)
+            except PlaywrightTimeout:
+                pass
+            raise PlaywrightTimeout(
+                f"NC {nota} no corresponde con el CUV — revisar el dato en la carpeta. "
+                f"Mensaje del portal: {txt[:200]}"
+            )
 
     # Click "Soportes NC" del bloque de Conciliación. Esperar a que se habilite.
     soportes_btn = page.locator(
@@ -503,7 +542,8 @@ def enviar_y_confirmar(page: Page, factura_corta: str) -> str:
         _screenshot_debug(page, f"sin_boton_verde_{factura_corta}")
         return "SIN_BOTON_VERDE"
 
-    # 4. Esperar el popup 'Mensajes - Registro completado'
+    # 4. Esperar el popup 'Mensajes' (puede ser éxito 'Registro completado' o
+    # error 'NC no corresponde con el CUV')
     try:
         page.wait_for_selector("iframe[src*='mensajes']", timeout=15000)
         logger.info("  iframe mensajes.aspx apareció")
@@ -522,8 +562,29 @@ def enviar_y_confirmar(page: Page, factura_corta: str) -> str:
         except PlaywrightTimeout:
             return "SIN_CONFIRMACION"
 
-    # 5. Click en Confirmar dentro del iframe del popup (con retries)
+    # 5. Leer el contenido del popup para distinguir éxito vs error
     iframe_msj = page.frame_locator("iframe[src*='mensajes']")
+    try:
+        msg_txt = iframe_msj.locator("body").inner_text(timeout=2000)
+    except PlaywrightTimeout:
+        msg_txt = ""
+    msg_lower = msg_txt.lower()
+    es_error = (
+        "no corresponde" in msg_lower or "ministerio de salud" in msg_lower or "error" in msg_lower
+    )
+    if es_error:
+        logger.error(f"  ✗ El portal rechazó: {msg_txt[:200]}")
+        _screenshot_debug(page, f"validacion_rechazada_{factura_corta}")
+        # Cerrar el popup para no contaminar la próxima factura
+        try:
+            iframe_msj.locator(
+                "button:has-text('Confirmar'), input[value='Confirmar']"
+            ).first.click(timeout=3000)
+        except PlaywrightTimeout:
+            pass
+        return f"RECHAZADA: {msg_txt[:120]}"
+
+    # 6. Es el popup de éxito — click en Confirmar (con retries)
     cerrado = False
     for intento in range(1, 4):
         try:
