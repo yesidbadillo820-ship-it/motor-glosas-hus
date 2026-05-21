@@ -368,13 +368,41 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
             "xpath=following::input[1]"
         )
 
-    # type() + Tab para disparar los eventos blur/change que GeneXus necesita
-    # para habilitar el botón "Soportes NC".
-    campo_nota.click()
-    campo_nota.fill("")
-    campo_nota.type(nota, delay=30)
+    # Estrategia robusta para llenar el campo:
+    # 1) Click + Ctrl+A + fill() para escritura atómica (sin perder caracteres
+    #    como pasa con type() cuando GeneXus tiene listeners en cada keydown).
+    # 2) Verificar el valor con input_value() y reintentar si no coincide.
+    # 3) Tab al final para disparar el blur que habilita "Soportes NC".
+    for intento in range(1, 4):
+        campo_nota.click()
+        campo_nota.press("Control+a")
+        campo_nota.press("Delete")
+        campo_nota.fill(nota)
+        page.wait_for_timeout(200)
+        valor = campo_nota.input_value()
+        if valor == nota:
+            break
+        logger.warning(f"  intento {intento}: valor escrito '{valor}' ≠ '{nota}', reintentando")
+        if intento == 3:
+            # Último recurso: setear el value con JS y disparar el evento change
+            campo_nota.evaluate(
+                "(el, v) => { el.value = v; el.dispatchEvent(new Event('input', {bubbles:true})); "
+                "el.dispatchEvent(new Event('change', {bubbles:true})); }",
+                nota,
+            )
+            valor = campo_nota.input_value()
+            logger.warning(f"  forcé el valor por JS, ahora dice: '{valor}'")
+
+    if campo_nota.input_value() != nota:
+        _screenshot_debug(page, f"nota_mal_escrita_{nota}")
+        raise PlaywrightTimeout(
+            f"No pude escribir '{nota}' en el campo Nota Crédito Conciliación; "
+            f"quedó '{campo_nota.input_value()}'"
+        )
+
     campo_nota.press("Tab")
     page.wait_for_timeout(800)  # dejá que GeneXus haga su validación
+    logger.info(f"  Nota Crédito ingresada: {nota}")
 
     # Click "Soportes NC" del bloque de Conciliación. Esperar a que se habilite.
     soportes_btn = page.locator(
