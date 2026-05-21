@@ -5086,6 +5086,107 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     0%{transform:translateX(-100%)}
     100%{transform:translateX(100%)}
   }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     RONDA 51 (21 mayo 2026 — Yesid): ajustes estéticos panel Analizar.
+     Reportado: "todo muy junto, muy pegado, mucho espacio desperdiciado".
+     Mejoras puntuales sin rewrite — overrides al final del CSS.
+  ═══════════════════════════════════════════════════════════════════ */
+
+  /* 1. Dictamen body: línea más respirable pero no excesiva (era 2 → muy
+        gaseoso; ahora 1.65 con tamaño levemente mayor para mejor lectura). */
+  #p-analizar .res-dictamen-body{
+    line-height:1.65 !important;
+    font-size:.84rem !important;
+    padding:1.1rem 1.4rem !important;
+  }
+
+  /* 2. Result area: ancho máximo legible para no estirar líneas a 1400px
+        en monitores grandes. Mantiene flex pero centra contenido. */
+  #p-analizar .result-area{
+    max-width:980px;
+    margin:0 auto;
+    padding:1.25rem 1.5rem !important;
+    gap:1.1rem !important;
+  }
+
+  /* 3. Separador visual entre preview (detección automática) y dictamen
+        final — evita que metadata y resultado se fusionen. */
+  #p-analizar .pa-prev-card{
+    margin-bottom:.25rem;
+    border-bottom:2px solid var(--border, #e2e8f0);
+    padding-bottom:.85rem;
+  }
+  /* Spacer pequeño antes del dictamen para jerarquía visual */
+  #p-analizar .res-dictamen{
+    margin-top:.4rem;
+  }
+
+  /* 4. Cards de análisis avanzado (confianza, validador citas, auto-pilot,
+        auditor forense): padding compacto + bordes sutiles para distinguir. */
+  #p-analizar .result-area > div[style*="padding"]{
+    padding:.85rem 1.1rem !important;
+    border-radius:.6rem !important;
+    border:1px solid var(--border, #e2e8f0) !important;
+  }
+
+  /* 5. Toolbar de acciones (.res-actions): gap mínimo + wrap permitido +
+        botones consistentes. Antes los 7 botones saltaban a 2 líneas feo. */
+  #p-analizar .res-actions{
+    gap:.4rem !important;
+    flex-wrap:wrap !important;
+    justify-content:flex-start !important;
+    padding:.6rem .25rem !important;
+  }
+  #p-analizar .res-actions button{
+    padding:.45rem .85rem !important;
+    font-size:.78rem !important;
+  }
+
+  /* 6. Labels del formulario izquierdo: más legibles. Antes .65rem gris
+        claro era casi invisible. */
+  #p-analizar .sidebar .pa-lbl-tiny,
+  #p-analizar .sidebar label{
+    font-size:.72rem !important;
+    font-weight:600 !important;
+    letter-spacing:.02em !important;
+    color:var(--text2, #475569) !important;
+  }
+
+  /* 7. Fundamento normativo: lista de 3 normas más prominente que el
+        running text — son las que el gestor consulta primero. */
+  #p-analizar .res-dictamen-body ul li,
+  #p-analizar .res-dictamen-body ol li{
+    padding:.15rem 0 !important;
+    line-height:1.45 !important;
+  }
+
+  /* 8. Textarea del auditor forense: más bajita por defecto, expande on
+        focus. Ahorra 25-30 px de altura visible. */
+  #p-analizar textarea[placeholder*="BACILOSCOPIA"],
+  #p-analizar textarea[placeholder*="folios"]{
+    min-height:64px !important;
+    max-height:120px !important;
+    transition:max-height .18s ease;
+  }
+  #p-analizar textarea[placeholder*="BACILOSCOPIA"]:focus,
+  #p-analizar textarea[placeholder*="folios"]:focus{
+    max-height:200px !important;
+  }
+
+  /* 9. Header del dictamen ("Dictamen Jurídico — ESE HUS / 21 de mayo"):
+        más contraste y separación del body. */
+  #p-analizar .res-dictamen-hdr{
+    padding:.85rem 1.4rem !important;
+    font-size:.85rem !important;
+    border-bottom:2px solid rgba(255,255,255,.08) !important;
+  }
+
+  /* 10. Score / confianza chip: pegado al dictamen para que se lea como
+         una unidad, no como elemento separado huérfano. */
+  #p-analizar .result-area > div:has(> .pa-glass){
+    margin-top:-.5rem !important;
+  }
 </style>
 <div class="fab-stack">
   <button id="asist-fab" class="fab fab-asistente pulsing" onclick="toggleAsistente()" title="Asistente Maestro IA — preguntá lo que sea" style="display:none">
