@@ -37,7 +37,20 @@ def obtener_ejemplos_gold(
 ) -> list[dict]:
     """Devuelve hasta N dictámenes ganadores del par (eps, codigo).
 
-    Cada ejemplo: {"argumento": str, "fuente": "GOLD"|"HISTORICO", "id": int}
+    Prioridad (revisión 21 mayo 2026 — Yesid):
+      1. **BANCO HUS** (eps=GENERICO, codigo='XX-G*' por familia del CUPS)
+         — citas verificadas por el equipo jurídico, prelación absoluta.
+      2. PlantillaGoldRecord específica del par (eps, codigo) — battle-tested
+         (sólo si usos >= 3 evita inyectar plantillas curadas con citas
+         inventadas que la IA todavía no ha refinado).
+      3. GlosaRecord LEVANTADA histórica del par.
+
+    Antes el banco HUS era último recurso; cuando había aunque sea UNA
+    plantilla curada vieja para la EPS+código, esa ganaba y el banco
+    HUS nunca se activaba — por eso los dictámenes seguían con citas
+    inventadas como "Art. 10 Ley 1438" o "Art. 2 Ley 1122".
+
+    Cada ejemplo: {"argumento": str, "fuente": "BANCO_HUS"|"GOLD"|"HISTORICO", "id": int}
     """
     if not db or not eps or not codigo:
         return []
@@ -48,7 +61,38 @@ def obtener_ejemplos_gold(
 
     ejemplos: list[dict] = []
 
-    # 1) PlantillaGoldRecord (curadas por el equipo jurídico)
+    # 1) BANCO HUS — citas jurídicas verificadas, prelación absoluta
+    try:
+        from app.models.db import PlantillaGoldRecord
+
+        prefijo = cod_norm[:2]  # "TA" de "TA0201", "SO" de "SO0501", etc.
+        hus = (
+            db.query(PlantillaGoldRecord)
+            .filter(PlantillaGoldRecord.eps == "GENERICO")
+            .filter(PlantillaGoldRecord.codigo_glosa.like(f"{prefijo}-G%"))
+            .filter(PlantillaGoldRecord.activa == 1)
+            .order_by(PlantillaGoldRecord.usos.desc())
+            .limit(int(max_ejemplos))
+            .all()
+        )
+        for h in hus:
+            arg = (h.argumento or "").strip()
+            if len(arg) < 200:
+                continue
+            ejemplos.append(
+                {
+                    "argumento": arg[:_MAX_CHARS_EJEMPLO],
+                    "fuente": "BANCO_HUS",
+                    "id": h.id,
+                }
+            )
+            if len(ejemplos) >= max_ejemplos:
+                return ejemplos
+    except Exception as e:
+        logger.debug(f"few_shot_gold: error consultando banco HUS: {e}")
+
+    # 2) PlantillaGoldRecord específica del par — solo battle-tested (usos >= 3)
+    # para evitar inyectar plantillas curadas con citas inventadas.
     try:
         from app.models.db import PlantillaGoldRecord
 
@@ -57,6 +101,7 @@ def obtener_ejemplos_gold(
             .filter(PlantillaGoldRecord.eps.ilike(eps_norm))
             .filter(PlantillaGoldRecord.codigo_glosa == cod_norm)
             .filter(PlantillaGoldRecord.activa == 1)
+            .filter(PlantillaGoldRecord.usos >= 3)
             .order_by(PlantillaGoldRecord.usos.desc())
             .limit(int(max_ejemplos))
             .all()
@@ -64,6 +109,9 @@ def obtener_ejemplos_gold(
         for g in gold:
             arg = (g.argumento or "").strip()
             if len(arg) < 200:
+                continue
+            # Evitar duplicados con banco HUS
+            if any(arg[:200] == e["argumento"][:200] for e in ejemplos):
                 continue
             ejemplos.append(
                 {
@@ -74,10 +122,6 @@ def obtener_ejemplos_gold(
             )
             if len(ejemplos) >= max_ejemplos:
                 return ejemplos
-        # Si encontramos AL MENOS un gold, NO mezclamos con histórico:
-        # las plantillas curadas son por definición mejores referentes.
-        if ejemplos:
-            return ejemplos
     except Exception as e:
         logger.debug(f"few_shot_gold: error consultando PlantillaGold: {e}")
 
@@ -113,37 +157,6 @@ def obtener_ejemplos_gold(
                 break
     except Exception as e:
         logger.debug(f"few_shot_gold: error consultando GlosaRecord: {e}")
-
-    # 3) Último recurso: banco HUS de 50 plantillas jurídicas por familia
-    #    (eps=GENERICO, código TA-G01..CL-G10). Sólo si no hay ejemplos del
-    #    par exacto ni histórico — son fallback genérico de "último recurso".
-    if not ejemplos:
-        try:
-            from app.models.db import PlantillaGoldRecord
-
-            prefijo = cod_norm[:2]  # "TA" de "TA0201", "SO" de "SO0501", etc.
-            hus = (
-                db.query(PlantillaGoldRecord)
-                .filter(PlantillaGoldRecord.eps == "GENERICO")
-                .filter(PlantillaGoldRecord.codigo_glosa.like(f"{prefijo}-G%"))
-                .filter(PlantillaGoldRecord.activa == 1)
-                .order_by(PlantillaGoldRecord.usos.desc())
-                .limit(int(max_ejemplos))
-                .all()
-            )
-            for h in hus:
-                arg = (h.argumento or "").strip()
-                if len(arg) < 200:
-                    continue
-                ejemplos.append(
-                    {
-                        "argumento": arg[:_MAX_CHARS_EJEMPLO],
-                        "fuente": "BANCO_HUS",
-                        "id": h.id,
-                    }
-                )
-        except Exception as e:
-            logger.debug(f"few_shot_gold: error consultando banco HUS: {e}")
 
     return ejemplos
 
