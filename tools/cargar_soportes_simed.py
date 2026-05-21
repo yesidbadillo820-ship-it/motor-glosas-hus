@@ -6,11 +6,12 @@ Para cada carpeta `<destino>/<GESTOR>/<NOTA>/` con los 3 archivos finales
 1. Hace login al portal (una sola vez, mantiene sesión).
 2. Por cada factura:
    - Va a "Facturas Conciliadas" y filtra por # Factura.
-   - Abre el editor de la fila.
+   - Abre el editor de la fila (lápiz).
    - Pone la Nota Crédito Conciliación.
-   - Abre "Soportes NC" → sube los 3 archivos.
-   - Click "Actualizar Respuestas" → "Confirmar".
-   - Verifica el mensaje "Registro completado".
+   - Abre "Soportes NC" → sube los 3 archivos → click Confirmar (verde) del modal.
+   - Vuelve a la grilla, filtra de nuevo y click en el botón verde
+     (Enviar/Finalizar, ActionExportFile2.png) de la fila.
+   - Confirma el popup "Registro completado".
 3. Genera un reporte CSV con el estado de cada factura.
 
 CREDENCIALES (en variables de entorno, NO en el código):
@@ -447,79 +448,81 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
     else:
         logger.info("  (subida tardó >25s, continuando igual)")
 
-    # 1. Click "Confirmar" DENTRO del modal de soportes (botón rojo)
+    # Click "Confirmar" (botón verde) DENTRO del modal de soportes.
+    # Esto dispara el popup 'Mensajes - Registro completado'.
     try:
         iframe.locator("button:has-text('Confirmar'), input[value='Confirmar']").first.click(
             timeout=5000
         )
-        logger.info("  Click Confirmar del modal de soportes")
+        logger.info("  Click Confirmar (verde) del modal de soportes")
     except PlaywrightTimeout:
         _screenshot_debug(page, f"sin_confirmar_modal_{nota}")
         raise
 
-    page.wait_for_timeout(2000)
-
-    # 2. Click "Regresar" para cerrar el modal
-    try:
-        iframe.locator(
-            "button:has-text('Regresar'), input[value='Regresar'], a:has-text('Regresar')"
-        ).first.click(timeout=5000)
-        logger.info("  Click Regresar (cierra modal)")
-    except PlaywrightTimeout:
-        # Algunos portales cierran solos tras Confirmar
-        logger.info("  (sin botón Regresar, asumo modal cerrado)")
-
-    page.wait_for_timeout(2000)
     return "soportes_subidos"
 
 
-def confirmar_factura(page: Page) -> str:
-    """Click Actualizar Respuestas + Confirmar + Confirmar popup. Verifica 'Registro completado'."""
-    # Esperar un margen para que el modal de soportes termine de cerrarse
+def enviar_y_confirmar(page: Page, factura_corta: str) -> str:
+    """Vuelve a la grilla, clickea el botón verde (Enviar/Finalizar) de la fila
+    y confirma el popup 'Registro completado'.
+
+    Este es el paso final tras la subida: el botón verde dispara la
+    finalización de la conciliación y abre el popup de confirmación.
+    """
+    # 1. Volver a la grilla y re-filtrar (el modal pudo dejarnos en otra página)
+    page.wait_for_timeout(1500)
+    ir_a_facturas_conciliadas(page)
+    filtrar_por_factura(page, factura_corta)
     page.wait_for_timeout(1500)
 
-    # Actualizar Respuestas (en el form principal, puede no existir)
+    # 2. Buscar la fila de la factura
+    fila = page.locator("tr").filter(has_text=factura_corta).first
     try:
-        page.locator(
-            "button:has-text('Actualizar Respuestas'):visible, "
-            "input[value='Actualizar Respuestas']:visible"
-        ).first.click(timeout=3000)
-        logger.info("  Click Actualizar Respuestas")
-        page.wait_for_timeout(1500)
+        fila.wait_for(state="visible", timeout=8000)
     except PlaywrightTimeout:
-        logger.info("  (sin botón Actualizar Respuestas visible)")
+        if page.locator("text=No se encontraron registros").count() > 0:
+            logger.info("  La factura ya no está en la grilla — finalizada antes de tiempo")
+            return "OK_NO_EN_GRID"
+        _screenshot_debug(page, f"fila_post_subida_{factura_corta}")
+        return "SIN_FILA"
 
-    # Confirmar final (el botón rojo principal del form, distinto del Cancelar).
-    boton_confirmar = (
-        page.locator("button:visible, input[type='submit']:visible, input[type='button']:visible")
-        .filter(has_text=re.compile(r"^\s*Confirmar\s*$"))
-        .first
-    )
+    # 3. Click en el botón verde (ActionExportFile2.png u otros íconos verdes
+    # de envío/finalización en GeneXus). Es el segundo ícono al lado del lápiz.
+    boton_verde = fila.locator(
+        "a:has(img[src*='ActionExportFile']), "
+        "a:has(img[src*='Export']), "
+        "a[title*='Enviar' i], a[title*='Confirmar' i], a[title*='Finalizar' i], "
+        "img[src*='ActionExportFile']:visible, "
+        "img[title*='Enviar' i]:visible, img[title*='Confirmar' i]:visible"
+    ).first
     try:
-        boton_confirmar.click(timeout=10000)
-        logger.info("  Click Confirmar (form principal)")
+        boton_verde.wait_for(state="visible", timeout=5000)
+        boton_verde.click()
+        logger.info("  Click botón verde (Enviar/Finalizar)")
     except PlaywrightTimeout:
-        page.locator(
-            "input[value='Confirmar']:visible, button:has-text('Confirmar'):visible"
-        ).last.click(timeout=10000)
-        logger.info("  Click Confirmar (fallback)")
+        _screenshot_debug(page, f"sin_boton_verde_{factura_corta}")
+        return "SIN_BOTON_VERDE"
 
-    # Esperar al popup de 'Mensajes - Registro completado'.
-    # Aparece como iframe `mensajes.aspx` que se carga ~2-3s después del Confirmar.
-    # 1) Esperar explícitamente a que el iframe aparezca en el DOM
+    # 4. Esperar el popup 'Mensajes - Registro completado'
     try:
         page.wait_for_selector("iframe[src*='mensajes']", timeout=15000)
         logger.info("  iframe mensajes.aspx apareció")
-        page.wait_for_timeout(1500)  # darle tiempo a que cargue el contenido
+        page.wait_for_timeout(1500)
     except PlaywrightTimeout:
-        logger.warning("  No apareció iframe de mensajes en 15s")
-        _screenshot_debug(page, "sin_iframe_mensajes")
-        # Si la URL ya volvió a la grilla, el portal procesó OK sin popup
-        if "glosasfacturaconww" in page.url:
-            return "OK_SIN_POPUP"
-        return "SIN_CONFIRMACION"
+        logger.warning("  No apareció iframe de mensajes tras el botón verde")
+        _screenshot_debug(page, "sin_iframe_mensajes_post_verde")
+        # Plan B: buscar un Confirmar visible en la página (popup no en iframe)
+        try:
+            page.locator(
+                "button:has-text('Confirmar'):visible, input[value='Confirmar']:visible"
+            ).last.click(timeout=3000)
+            logger.info("  Click Confirmar (sin iframe)")
+            page.wait_for_timeout(2000)
+            return "OK_SIN_IFRAME"
+        except PlaywrightTimeout:
+            return "SIN_CONFIRMACION"
 
-    # 2) Click en el botón Confirmar dentro del iframe del popup
+    # 5. Click en Confirmar dentro del iframe del popup (con retries)
     iframe_msj = page.frame_locator("iframe[src*='mensajes']")
     cerrado = False
     for intento in range(1, 4):
@@ -534,7 +537,6 @@ def confirmar_factura(page: Page) -> str:
             page.wait_for_timeout(1500)
 
     if not cerrado:
-        # Último recurso: simular Enter en el iframe (el botón suele tener focus)
         try:
             iframe_msj.locator("body").press("Enter")
             logger.info("  Press Enter en el popup (forzar cierre)")
@@ -542,15 +544,14 @@ def confirmar_factura(page: Page) -> str:
         except Exception:
             pass
 
-    # 3) Esperar a que el iframe desaparezca (= popup cerrado)
+    # 6. Verificar que el popup cerró
     page.wait_for_timeout(2000)
     iframe_sigue = page.locator("iframe[src*='mensajes']").count()
     if iframe_sigue == 0 or not page.locator("iframe[src*='mensajes']").first.is_visible():
-        logger.info("  ✓ Popup cerrado, factura procesada")
+        logger.info("  ✓ Popup cerrado, factura finalizada")
         return "OK"
 
-    # El iframe sigue ahí: el portal igual procesó pero no pudimos cerrarlo
-    logger.warning("  Popup quedó abierto, pero la factura se procesó")
+    logger.warning("  Popup quedó abierto")
     _screenshot_debug(page, "popup_no_cerrado")
     return "OK_POPUP_ABIERTO"
 
@@ -587,7 +588,7 @@ def procesar_una(page: Page, info: dict) -> dict:
         filtrar_por_factura(page, factura_corta)
         abrir_factura(page, factura_corta)
         ingresar_nota_y_subir(page, info)
-        estado = confirmar_factura(page)
+        estado = enviar_y_confirmar(page, factura_corta)
         registro["estado"] = estado
     except FacturaYaProcesada as e:
         registro["estado"] = "YA_PROCESADA"
