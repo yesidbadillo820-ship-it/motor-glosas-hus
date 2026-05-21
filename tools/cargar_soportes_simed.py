@@ -348,9 +348,7 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
         raise
 
     page.wait_for_url("**/glosasfactura.aspx*", timeout=15000)
-    page.wait_for_selector(
-        "text=Glosas Factura, text=Información General", timeout=10000
-    )
+    page.wait_for_selector("text=Glosas Factura, text=Información General", timeout=10000)
 
 
 def ingresar_nota_y_subir(page: Page, info: dict) -> str:
