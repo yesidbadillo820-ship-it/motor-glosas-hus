@@ -748,11 +748,17 @@ async def lifespan(app: FastAPI):
             archivo_hus = (
                 _Path(__file__).resolve().parent.parent / "data" / "plantillas_hus_base.json"
             )
-            if archivo_hus.exists():
+            if not archivo_hus.exists():
+                logger.warning(
+                    f"[SEED-HUS] archivo no encontrado en {archivo_hus} — "
+                    "el banco HUS NO se cargará. Verificar COPY data/ en Dockerfile."
+                )
+            else:
                 with archivo_hus.open(encoding="utf-8") as _fh:
                     _data_hus = _json.load(_fh)
                 _filas_hus = _data_hus.get("plantillas", [])
                 hus_creadas = 0
+                hus_existentes = 0
                 for fila in _filas_hus:
                     eps = (fila.get("eps") or "").upper().strip()
                     cod = (fila.get("codigo_glosa") or "").upper().strip()
@@ -770,6 +776,7 @@ async def lifespan(app: FastAPI):
                         .first()
                     )
                     if existe:
+                        hus_existentes += 1
                         continue
                     db.add(
                         _PGR(
@@ -788,7 +795,10 @@ async def lifespan(app: FastAPI):
                     hus_creadas += 1
                 if hus_creadas:
                     db.commit()
-                    logger.info(f"Seed banco HUS: {hus_creadas} plantillas creadas.")
+                logger.info(
+                    f"[SEED-HUS] {hus_creadas} creadas · {hus_existentes} ya existían · "
+                    f"total filas en archivo: {len(_filas_hus)}"
+                )
         except Exception as _e:
             logger.warning(f"Seed banco HUS falló (no crítico): {_e}")
             db.rollback()

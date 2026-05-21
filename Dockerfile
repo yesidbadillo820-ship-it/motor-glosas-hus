@@ -36,6 +36,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ /app/app/
 COPY scripts/ /app/scripts/
 COPY static/ /app/static/
+# data/ contiene fixtures versionados (banco HUS 50 plantillas, etc.) que
+# el lifespan lee al arranque para auto-seed. SIN ESTO el seed falla
+# silenciosamente con "archivo no existe" y la BD queda sin plantillas.
+COPY data/ /app/data/
 
 # Carpeta de soportes — montada como volumen persistente Fly al
 # correr (ver fly.toml). Si no se monta volumen, queda en disco
