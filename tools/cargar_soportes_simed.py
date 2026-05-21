@@ -4,14 +4,16 @@ Para cada carpeta `<destino>/<GESTOR>/<NOTA>/` con los 3 archivos finales
 (NC_<NE>_HUS<n>.pdf, XML_<NE>_HUS<n>.xml, CUV_<NE>_HUS<n>.json):
 
 1. Hace login al portal (una sola vez, mantiene sesión).
-2. Por cada factura:
-   - Va a "Facturas Conciliadas" y filtra por # Factura.
-   - Abre el editor de la fila (lápiz).
-   - Pone la Nota Crédito Conciliación.
-   - Abre "Soportes NC" → sube los 3 archivos → click Confirmar (verde) del modal.
-   - Vuelve a la grilla, filtra de nuevo y click en el botón verde
-     (Enviar/Finalizar, ActionExportFile2.png) de la fila.
-   - Confirma el popup "Registro completado".
+2. Por cada factura, en 3 pasadas (el portal exige re-entrar al editor
+   para persistir la NC tras subir soportes):
+   - PASADA 1: filtra → abre editor (lápiz) → escribe NC → Soportes NC →
+     sube los 3 archivos → click Confirmar (verde) del modal.
+   - PASADA 2: vuelve a la grilla → filtra → abre editor de nuevo → reescribe
+     la NC (los soportes ya están subidos, no se vuelven a subir) →
+     Confirmar (form principal) para PERSISTIR la NC.
+   - PASADA 3: vuelve a la grilla → filtra → click botón verde
+     (Enviar/Finalizar, ActionExportFile2.png) de la fila → confirma el
+     popup "Registro completado".
 3. Genera un reporte CSV con el estado de cada factura.
 
 CREDENCIALES (en variables de entorno, NO en el código):
@@ -488,7 +490,7 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
         logger.info("  (subida tardó >25s, continuando igual)")
 
     # Click "Confirmar" (botón verde) DENTRO del modal de soportes.
-    # Esto dispara el popup 'Mensajes - Registro completado'.
+    # Esto sube los archivos al servidor (pero NO persiste la NC del form).
     try:
         iframe.locator("button:has-text('Confirmar'), input[value='Confirmar']").first.click(
             timeout=5000
@@ -499,6 +501,85 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
         raise
 
     return "soportes_subidos"
+
+
+def guardar_nc_segunda_pasada(page: Page, info: dict) -> None:
+    """Pasada 2: re-entra al editor tras subir soportes, retipea la NC y
+    clickea Confirmar (form principal) para PERSISTIR la NC en la BD.
+
+    Workaround empírico descubierto por el usuario: en la pasada 1 (subir
+    soportes), GeneXus sube los archivos pero NO guarda el campo NC del
+    form principal cuando salimos a la grilla. En la pasada 2 (sin subir
+    soportes, sólo NC + Confirmar) el form sí persiste el valor. La pasada
+    3 (botón verde) ya valida contra la NC guardada y dispara el popup
+    'Registro completado'.
+    """
+    nota = info["nota"]
+
+    # Esperar a que cargue el edit page
+    page.wait_for_selector("text=Información General", timeout=10000)
+
+    # Localizar el campo NC (mismo selector que pasada 1)
+    campo_nota = page.locator(
+        "input[name*='FCTNOTCRECONGLO']:visible, input[id*='FCTNOTCRECONGLO']:visible"
+    ).first
+    if campo_nota.count() == 0:
+        campo_nota = page.locator("label:has-text('Nota Credito Conciliacion'):visible").locator(
+            "xpath=following::input[1]"
+        )
+
+    # Tipear con eventos OS reales (igual que pasada 1)
+    for intento in range(1, 4):
+        campo_nota.click()
+        page.wait_for_timeout(150)
+        campo_nota.press("Control+a")
+        campo_nota.press("Delete")
+        page.wait_for_timeout(100)
+        page.keyboard.type(nota, delay=60)
+        page.wait_for_timeout(300)
+        valor = campo_nota.input_value()
+        if valor == nota:
+            break
+        logger.warning(f"  pasada 2 intento {intento}: '{valor}' ≠ '{nota}', reintentando")
+        if intento == 3:
+            campo_nota.evaluate(
+                "(el, v) => { el.value = v; "
+                "el.dispatchEvent(new Event('input', {bubbles:true})); "
+                "el.dispatchEvent(new Event('change', {bubbles:true})); }",
+                nota,
+            )
+
+    if campo_nota.input_value() != nota:
+        _screenshot_debug(page, f"pasada2_nc_mal_{nota}")
+        raise PlaywrightTimeout(
+            f"Pasada 2: no pude escribir NC '{nota}'; quedó '{campo_nota.input_value()}'"
+        )
+
+    campo_nota.press("Tab")
+    page.wait_for_timeout(1500)
+    logger.info(f"  Pasada 2: NC retipeada: {campo_nota.input_value()}")
+
+    # NO clickear Soportes NC — los archivos ya están subidos de la pasada 1.
+
+    # Click Confirmar (form principal) para guardar y volver a la grilla
+    boton_confirmar = (
+        page.locator("button:visible, input[type='submit']:visible, input[type='button']:visible")
+        .filter(has_text=re.compile(r"^\s*Confirmar\s*$"))
+        .first
+    )
+    try:
+        boton_confirmar.click(timeout=10000)
+        logger.info("  Pasada 2: Click Confirmar (form principal) — guarda NC")
+    except PlaywrightTimeout:
+        page.locator(
+            "input[value='Confirmar']:visible, button:has-text('Confirmar'):visible"
+        ).last.click(timeout=10000)
+        logger.info("  Pasada 2: Click Confirmar (fallback)")
+
+    # Esperar a que vuelva a la grilla
+    page.wait_for_url("**/glosasfacturaconww.aspx*", timeout=15000)
+    page.wait_for_load_state("networkidle")
+    logger.info("  ✓ Pasada 2: vuelvo a la grilla con la NC guardada")
 
 
 def enviar_y_confirmar(page: Page, factura_corta: str) -> str:
@@ -645,10 +726,20 @@ def procesar_una(page: Page, info: dict) -> dict:
         return registro
 
     try:
+        # PASADA 1: subir los soportes
         ir_a_facturas_conciliadas(page)
         filtrar_por_factura(page, factura_corta)
         abrir_factura(page, factura_corta)
         ingresar_nota_y_subir(page, info)
+
+        # PASADA 2: re-entrar, retipear NC y guardar con Confirmar form principal.
+        # GeneXus no persiste la NC en la pasada 1 — necesitamos este segundo paso.
+        ir_a_facturas_conciliadas(page)
+        filtrar_por_factura(page, factura_corta)
+        abrir_factura(page, factura_corta)
+        guardar_nc_segunda_pasada(page, info)
+
+        # PASADA 3: click botón verde + confirmar popup 'Registro completado'
         estado = enviar_y_confirmar(page, factura_corta)
         registro["estado"] = estado
     except FacturaYaProcesada as e:
