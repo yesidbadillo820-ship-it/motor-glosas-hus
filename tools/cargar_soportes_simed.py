@@ -404,52 +404,81 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
     # El upload se hace por archivo, esperamos un margen amplio
     page.wait_for_timeout(5000)
 
-    # Confirmar la subida (botón Aceptar/Confirmar/Cargar dentro del iframe)
+    # Esperar el mensaje "Archivos cargados correctamente" que indica que
+    # la subida terminó. Si no aparece, hacer un wait largo de respaldo.
     try:
-        iframe.locator(
-            "button:has-text('Aceptar'), button:has-text('Cargar'), "
-            "button:has-text('Subir'), button:has-text('Confirmar'), "
-            "input[value='Aceptar'], input[value='Confirmar']"
-        ).first.click(timeout=5000)
+        iframe.locator("text=Archivos cargados").first.wait_for(state="visible", timeout=20000)
+        logger.info("  Subida confirmada por el portal")
     except PlaywrightTimeout:
-        logger.info("  (sin botón Aceptar/Cargar visible, asumo upload automático)")
+        logger.info("  (sin mensaje 'Archivos cargados', esperando 10s más)")
+        page.wait_for_timeout(10000)
+
+    # 1. Click "Confirmar" DENTRO del modal de soportes (botón rojo)
+    try:
+        iframe.locator("button:has-text('Confirmar'), input[value='Confirmar']").first.click(
+            timeout=5000
+        )
+        logger.info("  Click Confirmar del modal de soportes")
+    except PlaywrightTimeout:
+        _screenshot_debug(page, f"sin_confirmar_modal_{nota}")
+        raise
 
     page.wait_for_timeout(2000)
 
-    # Cerrar/regresar del iframe (suele haber un "Regresar" o "X")
+    # 2. Click "Regresar" para cerrar el modal
     try:
         iframe.locator(
-            "button:has-text('Regresar'), a:has-text('Regresar'), button:has-text('Cerrar')"
-        ).first.click(timeout=3000)
+            "button:has-text('Regresar'), input[value='Regresar'], a:has-text('Regresar')"
+        ).first.click(timeout=5000)
+        logger.info("  Click Regresar (cierra modal)")
     except PlaywrightTimeout:
-        pass
-    page.wait_for_timeout(1500)
+        # Algunos portales cierran solos tras Confirmar
+        logger.info("  (sin botón Regresar, asumo modal cerrado)")
 
+    page.wait_for_timeout(2000)
     return "soportes_subidos"
 
 
 def confirmar_factura(page: Page) -> str:
     """Click Actualizar Respuestas + Confirmar. Verifica 'Registro completado'."""
-    # Actualizar Respuestas (puede no existir en algunos casos)
+    # Esperar un margen para que el modal termine de cerrarse
+    page.wait_for_timeout(1500)
+
+    # Actualizar Respuestas (en el form principal, puede no existir)
     try:
         page.locator(
-            "button:has-text('Actualizar Respuestas'), input[value='Actualizar Respuestas']"
+            "button:has-text('Actualizar Respuestas'):visible, "
+            "input[value='Actualizar Respuestas']:visible"
         ).first.click(timeout=3000)
-        page.wait_for_timeout(1000)
+        logger.info("  Click Actualizar Respuestas")
+        page.wait_for_timeout(1500)
     except PlaywrightTimeout:
-        pass
+        logger.info("  (sin botón Actualizar Respuestas visible)")
 
-    # Confirmar (botón rojo principal)
-    page.locator(
-        "button:has-text('Confirmar'):not(:has-text('Cancelar')), input[value='Confirmar']"
-    ).first.click()
+    # Confirmar final (el botón rojo principal del form, distinto del Cancelar).
+    # Usamos un locator que filtra por texto exacto "Confirmar" y excluye
+    # cualquier elemento que también diga "Cancelar".
+    boton_confirmar = (
+        page.locator("button:visible, input[type='submit']:visible, input[type='button']:visible")
+        .filter(has_text=re.compile(r"^\s*Confirmar\s*$"))
+        .first
+    )
+    try:
+        boton_confirmar.click(timeout=10000)
+        logger.info("  Click Confirmar (form principal)")
+    except PlaywrightTimeout:
+        # Fallback: usar locator con value="Confirmar" exacto
+        page.locator(
+            "input[value='Confirmar']:visible, button:has-text('Confirmar'):visible"
+        ).last.click(timeout=10000)
+        logger.info("  Click Confirmar (fallback)")
 
     # Esperar mensaje de confirmación
     try:
         page.wait_for_selector("text=Registro completado", timeout=15000)
         return "OK"
     except PlaywrightTimeout:
-        # Quizá el mensaje viene en un iframe mensajes.aspx
+        # El mensaje suele venir en un iframe mensajes.aspx
         try:
             mensajes = page.frame_locator("iframe[src*='mensajes']")
             mensajes.locator("text=Registro completado").wait_for(timeout=5000)
