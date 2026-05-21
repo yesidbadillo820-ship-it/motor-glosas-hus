@@ -348,23 +348,46 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
         raise
 
     page.wait_for_url("**/glosasfactura.aspx*", timeout=15000)
-    page.wait_for_selector("text=Glosas Factura, text=Información General", timeout=10000)
+    # Esperar a que cargue el editor. "Información General" siempre aparece.
+    page.wait_for_selector("text=Información General", timeout=10000)
 
 
 def ingresar_nota_y_subir(page: Page, info: dict) -> str:
     """Llena Nota Crédito Conciliación, sube los 3 archivos en el iframe."""
     nota = info["nota"]
 
-    # Campo "Nota Credito Conciliación" — el del bloque "Conciliación Glosa"
-    # (hay dos: uno arriba de Respuesta y otro abajo de Conciliación)
-    campo_nota = page.locator("input[name*='FCTNOTCRECONGLO'], input[id*='FCTNOTCRECONGLO']").first
-    campo_nota.fill(nota)
+    # Campo "Nota Credito Conciliación" — el del bloque "Conciliación Glosa".
+    # En este portal hay UN solo campo visible para esta nota (el de respuesta
+    # IPS no es editable; sólo Cartera tiene el de Conciliación).
+    campo_nota = page.locator(
+        "input[name*='FCTNOTCRECONGLO']:visible, input[id*='FCTNOTCRECONGLO']:visible"
+    ).first
+    if campo_nota.count() == 0:
+        # Fallback: buscar por label asociado
+        campo_nota = page.locator("label:has-text('Nota Credito Conciliacion'):visible").locator(
+            "xpath=following::input[1]"
+        )
 
-    # Click "Soportes NC" del bloque de Conciliación
+    # type() + Tab para disparar los eventos blur/change que GeneXus necesita
+    # para habilitar el botón "Soportes NC".
+    campo_nota.click()
+    campo_nota.fill("")
+    campo_nota.type(nota, delay=30)
+    campo_nota.press("Tab")
+    page.wait_for_timeout(800)  # dejá que GeneXus haga su validación
+
+    # Click "Soportes NC" del bloque de Conciliación. Esperar a que se habilite.
     soportes_btn = page.locator(
-        "button:has-text('Soportes NC'), input[value='Soportes NC'], a:has-text('Soportes NC')"
-    ).last  # last → el de la sección de conciliación
-    soportes_btn.click()
+        "button:has-text('Soportes NC'):not([disabled]), "
+        "input[value='Soportes NC']:not([disabled]), "
+        "a:has-text('Soportes NC'):not([disabled])"
+    ).last
+    try:
+        soportes_btn.wait_for(state="visible", timeout=8000)
+        soportes_btn.click(timeout=8000)
+    except PlaywrightTimeout:
+        _screenshot_debug(page, f"soportes_btn_disabled_{nota}")
+        raise
 
     # Esperar a que aparezca el iframe wcargarsoportesrtaips
     page.wait_for_selector(
