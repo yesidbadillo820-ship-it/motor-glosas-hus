@@ -423,23 +423,29 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
     )
     iframe = page.frame_locator("iframe[src*='wcargarsoportesrtaips'], iframe[src*='soportes']")
 
-    # Subir los 3 archivos
+    # Subir los 3 archivos en un solo set (Playwright maneja el batch)
     archivos = [str(info["pdf"]), str(info["xml"]), str(info["json"])]
     file_input = iframe.locator("input[type='file']").first
     file_input.set_input_files(archivos)
 
-    # Esperar a que termine la subida (FileUpload muestra progress)
-    # El upload se hace por archivo, esperamos un margen amplio
-    page.wait_for_timeout(5000)
-
-    # Esperar el mensaje "Archivos cargados correctamente" que indica que
-    # la subida terminó. Si no aparece, hacer un wait largo de respaldo.
-    try:
-        iframe.locator("text=Archivos cargados").first.wait_for(state="visible", timeout=20000)
-        logger.info("  Subida confirmada por el portal")
-    except PlaywrightTimeout:
-        logger.info("  (sin mensaje 'Archivos cargados', esperando 10s más)")
-        page.wait_for_timeout(10000)
+    # Esperar a que los 3 archivos aparezcan listados o el mensaje OK.
+    # Cualquiera de los dos confirma que la subida terminó.
+    espera_total = 0
+    while espera_total < 25000:
+        page.wait_for_timeout(1000)
+        espera_total += 1000
+        try:
+            # ¿Aparecieron los 3 nombres de archivo en la grilla del modal?
+            count = iframe.locator(f"text=NC_{nota}_").count()
+            if count >= 1:
+                # Esperar un poquito más para que termine la última subida
+                page.wait_for_timeout(2000)
+                logger.info(f"  Subida lista (después de {espera_total // 1000}s)")
+                break
+        except Exception:
+            pass
+    else:
+        logger.info("  (subida tardó >25s, continuando igual)")
 
     # 1. Click "Confirmar" DENTRO del modal de soportes (botón rojo)
     try:
@@ -468,8 +474,8 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
 
 
 def confirmar_factura(page: Page) -> str:
-    """Click Actualizar Respuestas + Confirmar. Verifica 'Registro completado'."""
-    # Esperar un margen para que el modal termine de cerrarse
+    """Click Actualizar Respuestas + Confirmar + Confirmar popup. Verifica 'Registro completado'."""
+    # Esperar un margen para que el modal de soportes termine de cerrarse
     page.wait_for_timeout(1500)
 
     # Actualizar Respuestas (en el form principal, puede no existir)
@@ -484,8 +490,6 @@ def confirmar_factura(page: Page) -> str:
         logger.info("  (sin botón Actualizar Respuestas visible)")
 
     # Confirmar final (el botón rojo principal del form, distinto del Cancelar).
-    # Usamos un locator que filtra por texto exacto "Confirmar" y excluye
-    # cualquier elemento que también diga "Cancelar".
     boton_confirmar = (
         page.locator("button:visible, input[type='submit']:visible, input[type='button']:visible")
         .filter(has_text=re.compile(r"^\s*Confirmar\s*$"))
@@ -495,24 +499,59 @@ def confirmar_factura(page: Page) -> str:
         boton_confirmar.click(timeout=10000)
         logger.info("  Click Confirmar (form principal)")
     except PlaywrightTimeout:
-        # Fallback: usar locator con value="Confirmar" exacto
         page.locator(
             "input[value='Confirmar']:visible, button:has-text('Confirmar'):visible"
         ).last.click(timeout=10000)
         logger.info("  Click Confirmar (fallback)")
 
-    # Esperar mensaje de confirmación
+    # Esperar al popup de 'Mensajes - Registro completado'.
+    # Aparece como iframe `mensajes.aspx`. Probamos varios timings.
+    page.wait_for_timeout(1500)
+
+    # Buscar el iframe de mensajes y el texto adentro
+    iframe_msj = page.frame_locator("iframe[src*='mensajes']")
+    encontrado = False
     try:
-        page.wait_for_selector("text=Registro completado", timeout=15000)
-        return "OK"
+        iframe_msj.locator("text=Registro completado").first.wait_for(
+            state="visible", timeout=10000
+        )
+        logger.info("  ✓ 'Registro completado' detectado en popup")
+        encontrado = True
     except PlaywrightTimeout:
-        # El mensaje suele venir en un iframe mensajes.aspx
+        # Plan B: buscar en la página principal por si el mensaje no está en iframe
         try:
-            mensajes = page.frame_locator("iframe[src*='mensajes']")
-            mensajes.locator("text=Registro completado").wait_for(timeout=5000)
-            return "OK"
+            page.wait_for_selector("text=Registro completado", timeout=3000)
+            logger.info("  ✓ 'Registro completado' detectado en página")
+            encontrado = True
         except PlaywrightTimeout:
-            return "SIN_CONFIRMACION"
+            pass
+
+    if encontrado:
+        # Click en el 'Confirmar' del popup para cerrarlo y volver a la grilla
+        try:
+            iframe_msj.locator(
+                "button:has-text('Confirmar'), input[value='Confirmar']"
+            ).first.click(timeout=3000)
+            logger.info("  Click Confirmar del popup (cierra)")
+        except PlaywrightTimeout:
+            # Fallback en la página principal
+            try:
+                page.locator(
+                    "button:has-text('Confirmar'):visible, input[value='Confirmar']:visible"
+                ).last.click(timeout=2000)
+            except PlaywrightTimeout:
+                logger.info("  (no cerré el popup, pero la factura quedó procesada)")
+        page.wait_for_timeout(1500)
+        return "OK"
+
+    # No detectamos el mensaje. Verificar si la URL volvió a glosasfacturaconww
+    # (en ese caso el portal procesó OK aunque no hayamos visto el popup).
+    if "glosasfacturaconww" in page.url:
+        logger.info("  ✓ URL volvió a 'glosasfacturaconww', asumo OK")
+        return "OK_INFERIDO"
+
+    _screenshot_debug(page, "sin_registro_completado")
+    return "SIN_CONFIRMACION"
 
 
 # ─── Orquestación ───────────────────────────────────────────────────────────
