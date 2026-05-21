@@ -323,7 +323,7 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
     # La fila debe contener el número de factura. Buscamos primero un selector
     # estricto (la columna de # Factura con ese valor exacto) y caemos a
     # uno más amplio si no encontramos.
-    fila_estricta = page.locator(f"tr").filter(has_text=factura_corta).first
+    fila_estricta = page.locator("tr").filter(has_text=factura_corta).first
     try:
         fila_estricta.wait_for(state="visible", timeout=5000)
         fila = fila_estricta
