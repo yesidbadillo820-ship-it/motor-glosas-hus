@@ -2430,6 +2430,22 @@ class GlosaService:
                             _arg_refinado = self._xml("argumento", _res_refinado, "")
                             if _arg_refinado and len(_arg_refinado) > 100:
                                 arg_ia = _arg_refinado
+                                # CRÍTICO: re-aplicar TODOS los sanitizers post-refinamiento.
+                                # La IA refinada puede meter de nuevo coda procesal,
+                                # palabra "injustificado", etc. Si no re-corremos los
+                                # sanitizers, el guard-rail post-IA queda anulado.
+                                if modo_resp != "auditoria_previa":
+                                    arg_ia = _suavizar_tono(arg_ia)
+                                arg_ia = limpiar_palabra_injustificado(
+                                    arg_ia, codigo_respuesta=cod_res
+                                )
+                                arg_ia = limpiar_cierre_extemporanea_indebido(
+                                    arg_ia,
+                                    es_ratificacion=es_ratificacion,
+                                    es_extemporanea=es_extemporanea,
+                                    codigo_respuesta=cod_res,
+                                )
+                                arg_ia = truncar_despues_de_levantamiento(arg_ia)
                                 logger.info(
                                     f"[AUTO-CRITICA] score={_score_val}→refinado "
                                     f"({len(_defectos)} defectos corregidos) "
