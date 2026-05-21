@@ -77,3 +77,69 @@ def truncar_despues_de_levantamiento(texto: str) -> str:
         return texto[: m.end()].rstrip() + "."
 
     return texto[: m.end() + rel + 1].rstrip()
+
+
+# Lista de citas FRECUENTEMENTE inventadas por Groq llama-3.3 que NO existen
+# en el corpus normativo del HUS. Si la IA agrega un párrafo "DE ACUERDO CON..."
+# o "EN ESTE SENTIDO..." que mencione ALGUNA de estas, ese párrafo entero se
+# elimina. La plantilla del banco HUS ya trae las citas verificadas — la IA
+# no necesita inventar más.
+_CITAS_INVENTADAS_FRECUENTES = (
+    "ART. 10 DE LA LEY 1438",
+    "ART. 10 LEY 1438",
+    "ARTÍCULO 10 DE LA LEY 1438",
+    "ART. 15 DE LA LEY 1122",
+    "ART. 15 LEY 1122",
+    "ARTÍCULO 15 DE LA LEY 1122",
+    "ART. 2 DE LA LEY 1122",
+    "ART. 2 LEY 1122",
+    "ARTÍCULO 2 DE LA LEY 1122",
+    "ART. 14 DE LA LEY 1438",
+    "ART. 14 LEY 1438",
+    "ARTÍCULO 14 DE LA LEY 1438",
+    "ART. 14 DE LA LEY 1751",
+    "ART. 30 DE LA LEY 1751",
+    "ART. 44 DE LA LEY 1122",
+    "ART. 20 DE LA LEY 1122",
+    "ART. 23 DE LA LEY 1122",  # OK, existe pero usado en contextos inventados
+    "RESOLUCIÓN 1552 DE 2019",
+)
+
+
+def quitar_parrafos_con_citas_inventadas(texto: str) -> str:
+    """Elimina párrafos enteros que mencionen citas FRECUENTEMENTE inventadas.
+
+    Estrategia: corta el texto por puntos seguidos de espacio (cada "oración"),
+    elimina las que contengan citas conocidas como inventadas, y reconstruye.
+
+    Es idempotente y conservador — sólo elimina oraciones que mencionan citas
+    específicas que el equipo HUS confirmó NO existen en el corpus normativo
+    cargado. No toca oraciones con citas válidas (Art. 87 Decreto 2423, etc.).
+    """
+    if not texto or not isinstance(texto, str):
+        return texto
+
+    texto_upper = texto.upper()
+    # Optimización: si no hay ninguna cita inventada conocida, no hacemos nada
+    if not any(c in texto_upper for c in _CITAS_INVENTADAS_FRECUENTES):
+        return texto
+
+    # Split por oraciones (puntos + espacio). Mantiene puntos finales.
+    oraciones = re.split(r"(?<=\.)\s+", texto)
+    oraciones_limpias: list[str] = []
+    eliminadas = 0
+    for o in oraciones:
+        o_upper = o.upper()
+        if any(c in o_upper for c in _CITAS_INVENTADAS_FRECUENTES):
+            eliminadas += 1
+            continue
+        oraciones_limpias.append(o)
+
+    if eliminadas == 0:
+        return texto
+
+    resultado = " ".join(oraciones_limpias).strip()
+    # Si quedó texto vacío o muy corto (eliminamos demasiado), devolver original
+    if len(resultado) < len(texto) * 0.4:
+        return texto
+    return resultado

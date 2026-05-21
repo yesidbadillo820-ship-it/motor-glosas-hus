@@ -232,6 +232,24 @@ def bloque_few_shot_para_prompt(ejemplos: list[dict]) -> str:
             "propias. La plantilla DICE 'Artículo 87 del Decreto 2423 de 1996' "
             "— NO digas 'Art. 10 Ley 1438 de 2011' ni otras citas inventadas."
         )
+        partes.append(
+            "⚠ ⚠ ⚠ PROHIBIDO ABSOLUTO (mayo 2026, regla nueva): NO AGREGUES "
+            "NORMAS QUE NO ESTÉN LITERALMENTE EN LA PLANTILLA. El validador "
+            "del HUS marca como ERROR cualquier 'Art. X Ley Y' que no esté en "
+            "el corpus normativo cargado. La plantilla YA tiene las 2-3 normas "
+            "verificadas que necesitas — NO agregues 'Art. 10 Ley 1438', "
+            "'Art. 15 Ley 1122', 'Art. 2 Ley 1751' ni similares. Si tu instinto "
+            "es 'reforzar el argumento con más normas', RESÍSTELO: el equipo "
+            "jurídico ya seleccionó las normas óptimas."
+        )
+        partes.append(
+            "⚠ TERMINA EXACTAMENTE DONDE TERMINA LA PLANTILLA. Si la plantilla "
+            "termina en 'SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO "
+            "ÍNTEGRO DE LO FACTURADO.', tu respuesta termina ahí. NO agregues "
+            "párrafos 'DE ACUERDO CON EL ARTÍCULO X DE LA LEY Y' después del "
+            "cierre. NO agregues 'EN ESTE SENTIDO, SE DEBE TENER EN CUENTA QUE...' "
+            "con citas adicionales. La plantilla está completa por diseño."
+        )
         partes.append("═══════════════════════════════════════════════════════════════════")
         partes.append("")
         return "\n".join(partes)
