@@ -21,12 +21,18 @@ Mantra: "ningún dictamen defectuoso llega al usuario silenciosamente.
 Si algo falla, lo decimos con claridad."
 """
 
+from app.services.quality_gate.post_validator import (
+    PostValidationResult,
+    post_validar_dictamen,
+)
 from app.services.quality_gate.pre_validator import (
     PreValidationResult,
     pre_validar_glosa,
 )
 
 __all__ = [
+    "PostValidationResult",
     "PreValidationResult",
+    "post_validar_dictamen",
     "pre_validar_glosa",
 ]
