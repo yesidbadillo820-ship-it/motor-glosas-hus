@@ -21,6 +21,11 @@ Mantra: "ningún dictamen defectuoso llega al usuario silenciosamente.
 Si algo falla, lo decimos con claridad."
 """
 
+from app.services.quality_gate.orchestrator import (
+    IntentoGeneracion,
+    QualityGateResult,
+    ejecutar_quality_gate,
+)
 from app.services.quality_gate.post_validator import (
     PostValidationResult,
     post_validar_dictamen,
@@ -31,8 +36,11 @@ from app.services.quality_gate.pre_validator import (
 )
 
 __all__ = [
+    "IntentoGeneracion",
     "PostValidationResult",
     "PreValidationResult",
+    "QualityGateResult",
+    "ejecutar_quality_gate",
     "post_validar_dictamen",
     "pre_validar_glosa",
 ]
