@@ -827,3 +827,36 @@ class RutaFacturaRecord(Base):
     # Metadatos extra opcionales (eps, mes, ambiente) deserializados de
     # las columnas de la fuente original. JSON blob.
     meta = Column(Text, nullable=True)
+
+
+class QualityGateRunRecord(Base):
+    """Registro de cada ejecución del Quality Gate.
+
+    Plan de Transformación Ola 1 — observabilidad del pipeline determinístico.
+    Cada vez que el orchestrator procesa un dictamen, se guarda una fila aquí
+    para que el coordinador pueda ver métricas reales:
+      - tasa de aprobación
+      - cuántas regeneraciones se necesitan en promedio
+      - qué modelo aprueba más
+      - razones de rechazo más comunes
+    """
+
+    __tablename__ = "quality_gate_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    glosa_id = Column(Integer, ForeignKey("glosas.id"), nullable=True, index=True)
+    estado = Column(String(30), nullable=False, index=True)
+    # APROBADO | RECHAZADO_PRE | ESCALAR_HUMANO | PENDIENTE
+    score_final = Column(Integer, default=0)
+    modelo_final = Column(String(40), nullable=True)
+    n_intentos = Column(Integer, default=1)
+    n_regeneraciones = Column(Integer, default=0)
+    razones_rechazo = Column(Text, nullable=True)  # JSON blob
+    pre_aprobado = Column(Integer, default=1)
+    tiempo_ms = Column(Integer, nullable=True)
+    eps = Column(String(120), nullable=True)
+    codigo_glosa = Column(String(20), nullable=True, index=True)
+    familia_codigo = Column(String(5), nullable=True)
+    es_ratificacion = Column(Integer, default=0)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    creado_por = Column(String(200), nullable=True)
