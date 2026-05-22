@@ -1030,6 +1030,7 @@ from app.api.routers.informes import router as informes_router
 from app.api.routers.mi_desempeno import router as mi_desempeno_router
 from app.api.routers.busqueda_semantica import router as busqueda_semantica_router
 from app.api.routers.dos_fa import router as dos_fa_router
+from app.api.routers.asistente_predictivo import router as asistente_predictivo_router
 from app.api.routers.versiones import router as versiones_router
 from app.api.routers.papelera import router as papelera_router
 from app.api.routers.simulador import router as simulador_router
@@ -1068,6 +1069,7 @@ from app.api.routers.dictamen_pdf import router as dictamen_pdf_router
 from app.api.routers.ia_status import router as ia_status_router
 
 app.include_router(auth_router)
+app.include_router(asistente_predictivo_router)  # Ola 4: inteligencia ambiental
 app.include_router(glosas_router)
 app.include_router(contratos_router)
 app.include_router(analytics_router)

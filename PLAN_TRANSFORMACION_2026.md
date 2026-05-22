@@ -104,9 +104,21 @@ Pipeline que GARANTIZA calidad antes de mostrar:
 
 ## Progreso
 
-| Ola | Item | Estado | PR |
+| Ola | Item | Estado | Tests |
 |---|---|---|---|
-| 1 | Pre-validador + 49 tests | ✅ | PR-A en progreso |
-| 1 | Post-validador corpus | ⏳ | PR-B siguiente |
-| 1 | Orchestrator + regeneración | ⏳ | PR-C |
-| 2-4 | — | ⏳ | — |
+| 1 | Pre-validador determinístico | ✅ | 49 |
+| 1 | Post-validador con corpus real | ✅ | 24 |
+| 1 | Orchestrator con regeneración multi-modelo | ✅ | 9 |
+| 2 | IA Router multi-modelo (Claude/Groq/Gemini) | ✅ | 23 |
+| 3 | Design System propio (Inter + Source Serif) | ✅ | UI |
+| 3 | Modo Enfocado | ✅ | UI |
+| 3 | Command Palette ⌘K | ✅ | UI |
+| 3 | Atajos de teclado | ✅ | UI |
+| 3 | Dictamen como documento jurídico premium | ✅ | UI |
+| 4 | Análisis predictivo en tiempo real | ✅ | 18 |
+| 4 | Predicción de plantilla óptima | ✅ | — |
+| 4 | Sugerencias contextuales (casos similares) | ✅ | — |
+| 4 | Detección de complejidad + ratificación auto | ✅ | — |
+| 4 | Frontend con debounce 250ms | ✅ | UI |
+
+**Total: 123 tests verdes** (49+24+9+23+18). Cero regresiones.
