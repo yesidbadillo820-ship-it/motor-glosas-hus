@@ -1,0 +1,215 @@
+"""Tests del Quality Gate — Pre-validador."""
+
+from __future__ import annotations
+
+import pytest
+
+from app.services.quality_gate.pre_validator import (
+    check_codigo_glosa,
+    check_eps,
+    check_plantilla_disponible,
+    check_texto_glosa,
+    check_valor_monetario,
+    pre_validar_glosa,
+)
+
+
+class TestCodigoGlosa:
+    @pytest.mark.parametrize(
+        "codigo,esperado_ok,familia_esperada",
+        [
+            ("TA0201", True, "TA"),
+            ("SO0501", True, "SO"),
+            ("CO0101", True, "CO"),
+            ("FA0501", True, "FA"),
+            ("CL0101", True, "CL"),
+            ("AU0301", True, "AU"),
+            ("ta0201", True, "TA"),  # normaliza minúsculas
+            ("  TA0201  ", True, "TA"),  # trim espacios
+            ("TA02", True, "TA"),  # 2 dígitos también válido
+            ("TA1234", True, "TA"),  # 4 dígitos también válido
+        ],
+    )
+    def test_codigos_validos(self, codigo, esperado_ok, familia_esperada):
+        res, cod_norm, familia = check_codigo_glosa(codigo)
+        assert res.ok == esperado_ok
+        assert familia == familia_esperada
+
+    @pytest.mark.parametrize(
+        "codigo_invalido",
+        [
+            "",
+            "XX0201",  # prefijo no oficial
+            "TA",  # sin dígitos
+            "0201TA",  # invertido
+            "TA02XX",  # con letras al final
+            "TA-0201",  # con guión
+            None,
+        ],
+    )
+    def test_codigos_invalidos(self, codigo_invalido):
+        res, _, _ = check_codigo_glosa(codigo_invalido or "")
+        assert not res.ok
+        assert res.razon  # debe tener razón explicada
+
+
+class TestEps:
+    def test_eps_conocida(self):
+        res, eps_norm = check_eps("FAMISANAR EPS")
+        assert res.ok
+        assert eps_norm == "FAMISANAR EPS"
+
+    def test_eps_con_tildes(self):
+        res, _ = check_eps("POLICÍA NACIONAL")
+        assert res.ok
+
+    def test_eps_vacia_falla(self):
+        res, _ = check_eps("")
+        assert not res.ok
+        assert "Falta" in res.razon
+
+    def test_eps_desconocida_no_bloquea(self):
+        """EPSs nuevas/raras no deben bloquear — solo whitelist es permisiva."""
+        res, _ = check_eps("EPS NUEVA DEL FUTURO XYZ")
+        assert res.ok  # NO bloquea
+
+
+class TestValorMonetario:
+    @pytest.mark.parametrize(
+        "input_val,esperado",
+        [
+            ("500000", 500000.0),
+            ("$500.000", 500000.0),
+            ("$ 500.000", 500000.0),
+            ("500,000", 500000.0),
+            ("1'500.000", 1500000.0),
+            ("%150.000", 150000.0),  # typo % por $
+            ("500000 pesos", 500000.0),
+            (500000, 500000.0),
+            (500000.0, 500000.0),
+        ],
+    )
+    def test_parseo_valores(self, input_val, esperado):
+        res, v = check_valor_monetario(input_val)
+        assert res.ok, f"Falló parseo de {input_val!r}: {res.razon}"
+        assert v == esperado
+
+    @pytest.mark.parametrize("invalido", ["", None, 0, "0", "abc", "$ 0"])
+    def test_valores_invalidos(self, invalido):
+        res, _ = check_valor_monetario(invalido)
+        assert not res.ok
+
+
+class TestTextoGlosa:
+    def test_texto_largo_ok(self):
+        res = check_texto_glosa("TA0201 - Mayor valor cobrado por consulta de $500.000")
+        assert res.ok
+
+    def test_texto_corto_falla(self):
+        res = check_texto_glosa("TA0201")
+        assert not res.ok
+        assert "corto" in res.razon.lower()
+
+    def test_texto_vacio_falla(self):
+        res = check_texto_glosa("")
+        assert not res.ok
+
+
+class TestPlantillaDisponible:
+    def test_familias_con_banco_hus(self):
+        for familia in ["TA", "SO", "CO", "FA", "CL"]:
+            res = check_plantilla_disponible(familia)
+            assert res.ok
+            assert not res.razon  # familia conocida → sin warnings
+
+    def test_familia_sin_banco_hus_solo_warning(self):
+        """AU/PE/SE/IN/ME/EX no tienen plantilla — no bloquea pero advierte."""
+        res = check_plantilla_disponible("AU")
+        assert res.ok  # NO bloquea
+        assert "no tiene plantillas" in res.razon.lower()
+
+    def test_familia_vacia_ok(self):
+        res = check_plantilla_disponible("")
+        assert res.ok
+
+
+class TestPreValidarGlosa:
+    def test_glosa_completa_aprobada(self):
+        r = pre_validar_glosa(
+            eps="FAMISANAR EPS",
+            codigo_glosa="TA0201",
+            valor_objetado="500000",
+            texto_glosa="TA0201 - Mayor valor cobrado en consulta especializada por $500.000",
+        )
+        assert r.aprobado
+        assert r.codigo_normalizado == "TA0201"
+        assert r.familia_codigo == "TA"
+        assert r.valor_parseado == 500000.0
+        assert not r.razones_bloqueo
+
+    def test_glosa_sin_codigo_falla(self):
+        r = pre_validar_glosa(
+            eps="FAMISANAR EPS",
+            codigo_glosa="",
+            valor_objetado="500000",
+            texto_glosa="Mayor valor cobrado en consulta especializada",
+        )
+        assert not r.aprobado
+        assert any("código" in razon.lower() for razon in r.razones_bloqueo)
+
+    def test_glosa_sin_eps_falla(self):
+        r = pre_validar_glosa(
+            eps="",
+            codigo_glosa="TA0201",
+            valor_objetado="500000",
+            texto_glosa="TA0201 mayor valor cobrado",
+        )
+        assert not r.aprobado
+        assert any("eps" in razon.lower() for razon in r.razones_bloqueo)
+
+    def test_glosa_sin_valor_falla(self):
+        r = pre_validar_glosa(
+            eps="FAMISANAR",
+            codigo_glosa="TA0201",
+            valor_objetado="",
+            texto_glosa="TA0201 mayor valor cobrado en consulta",
+        )
+        assert not r.aprobado
+        assert any("valor" in razon.lower() for razon in r.razones_bloqueo)
+
+    def test_mensaje_para_usuario_legible(self):
+        r = pre_validar_glosa(
+            eps="",
+            codigo_glosa="",
+            valor_objetado="",
+            texto_glosa="",
+        )
+        msg = r.mensaje_para_usuario
+        assert "No puedo generar dictamen" in msg
+        assert "Sugerencias" in msg
+        # Cada razón debe estar listada
+        for razon in r.razones_bloqueo:
+            assert razon in msg
+
+    def test_aprobado_sin_mensaje(self):
+        r = pre_validar_glosa(
+            eps="NUEVA EPS",
+            codigo_glosa="CL0101",
+            valor_objetado="1500000",
+            texto_glosa="CL0101 - No pertinencia clínica del procedimiento por $1.500.000",
+        )
+        assert r.aprobado
+        assert r.mensaje_para_usuario == ""
+
+    def test_familia_sin_banco_hus_aprueba_pero_advierte(self):
+        """AU0301 (autorización) no tiene plantilla — debe pasar pre-check
+        pero el resultado debe incluir la advertencia."""
+        r = pre_validar_glosa(
+            eps="FAMISANAR",
+            codigo_glosa="AU0301",
+            valor_objetado="500000",
+            texto_glosa="AU0301 - autorización pendiente, valor $500.000",
+        )
+        assert r.aprobado  # no bloquea
+        # Pero el check de plantilla debe traer razón (warning)
+        assert r.checks["plantilla"].razon  # advertencia presente
