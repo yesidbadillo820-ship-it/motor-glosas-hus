@@ -2366,14 +2366,19 @@ class GlosaService:
             # HTML — para no romper la estructura del dictamen ni cortar los
             # bloques posteriores (Servicio/Contrato/Tarifa/Normativa).
             from app.services.dictamen_postprocesor import (
+                quitar_citas_invalidas_dinamico,
                 quitar_parrafos_con_citas_inventadas,
                 truncar_despues_de_levantamiento,
             )
 
             # 1. Quitar oraciones que mencionan citas inventadas frecuentes
-            #    (Art. 10 Ley 1438, Art. 15 Ley 1122, Art. 2 Ley 1751, etc.)
+            #    (lista negra estática — rápido)
             arg_ia = quitar_parrafos_con_citas_inventadas(arg_ia)
-            # 2. Truncar coda procesal después del cierre canónico
+            # 2. Quitar citas inválidas DINÁMICAMENTE usando el verificador
+            #    oficial contra el corpus normativo cargado. Cubre casos que
+            #    no están en la lista negra estática (mayo 2026 — Yesid).
+            arg_ia = quitar_citas_invalidas_dinamico(arg_ia, eps=str(data.eps or ""))
+            # 3. Truncar coda procesal después del cierre canónico
             arg_ia = truncar_despues_de_levantamiento(arg_ia)
 
             # AUTO-CRÍTICA: valida el borrador y pide corrección si es pobre.
@@ -2451,6 +2456,9 @@ class GlosaService:
                                     codigo_respuesta=cod_res,
                                 )
                                 arg_ia = quitar_parrafos_con_citas_inventadas(arg_ia)
+                                arg_ia = quitar_citas_invalidas_dinamico(
+                                    arg_ia, eps=str(data.eps or "")
+                                )
                                 arg_ia = truncar_despues_de_levantamiento(arg_ia)
                                 logger.info(
                                     f"[AUTO-CRITICA] score={_score_val}→refinado "
