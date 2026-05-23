@@ -844,7 +844,9 @@ class QualityGateRunRecord(Base):
     __tablename__ = "quality_gate_runs"
 
     id = Column(Integer, primary_key=True, index=True)
-    glosa_id = Column(Integer, ForeignKey("glosas.id"), nullable=True, index=True)
+    # NOTA: GlosaRecord usa __tablename__ "historial" — no agregamos FK para
+    # evitar problemas de orden de creación en tests. Soft-link por id.
+    glosa_id = Column(Integer, nullable=True, index=True)
     estado = Column(String(30), nullable=False, index=True)
     # APROBADO | RECHAZADO_PRE | ESCALAR_HUMANO | PENDIENTE
     score_final = Column(Integer, default=0)
