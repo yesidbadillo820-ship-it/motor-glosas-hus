@@ -119,6 +119,8 @@ body.sds-focus-mode #p-analizar .result-area {
   border-radius: var(--sds-radius-xl);
   box-shadow: var(--sds-shadow-lg);
   position: relative;
+  max-width: 100% !important;
+  width: 100%;
 }
 
 body.sds-focus-mode #p-analizar .result-area::before {
