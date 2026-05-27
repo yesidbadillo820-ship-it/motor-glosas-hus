@@ -323,9 +323,22 @@ body.sds-focus-mode .sds-focus-indicator {
 #p-analizar .res-dictamen {
   border-radius: var(--sds-radius-lg) !important;
   box-shadow: var(--sds-shadow-md) !important;
-  overflow: hidden;
   background: white;
   border: 1px solid var(--sds-gray-200);
+  /* FIX 27-may-2026: NO overflow:hidden — colapsaba el dictamen a 0 alto
+     en algunas combinaciones de zoom + flex. visible es safe. */
+  overflow: visible !important;
+  display: block !important;
+  min-height: auto !important;
+  /* Asegurar que se vea siempre, sin importar el contenedor */
+  width: 100% !important;
+}
+
+/* Asegurar visibilidad del body del dictamen también */
+#p-analizar .res-dictamen-body {
+  display: block !important;
+  min-height: 80px;
+  overflow: visible !important;
 }
 
 #p-analizar .res-dictamen-hdr {
@@ -388,7 +401,10 @@ body.sds-focus-mode .sds-focus-indicator {
 /* ──────────────────────────────────────────────────────────────────
    6. CARDS DE METADATA — diseño consistente
    ────────────────────────────────────────────────────────────────── */
-#p-analizar .result-area > div {
+/* Aplicar solo a divs que NO sean el dictamen principal (que tiene
+   su propio estilo arriba). Antes el "white !important" colapsaba
+   el header navy del dictamen. */
+#p-analizar .result-area > div:not(.res-dictamen) {
   border-radius: var(--sds-radius-md) !important;
   border: 1px solid var(--sds-gray-200) !important;
   background: white !important;
@@ -396,7 +412,7 @@ body.sds-focus-mode .sds-focus-indicator {
   transition: box-shadow var(--sds-transition);
 }
 
-#p-analizar .result-area > div:hover {
+#p-analizar .result-area > div:not(.res-dictamen):hover {
   box-shadow: var(--sds-shadow-md) !important;
 }
 
