@@ -5104,12 +5104,24 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
   }
 
   /* 2. Result area: ancho máximo legible para no estirar líneas a 1400px
-        en monitores grandes. Mantiene flex pero centra contenido. */
+        en monitores grandes. Pero NUNCA más estrecho que el espacio
+        disponible (evita que el dictamen se "esconda" detrás del sidebar
+        cuando el usuario hace zoom in y el viewport útil se achica). */
   #p-analizar .result-area{
     max-width:980px;
+    width:100%;
     margin:0 auto;
     padding:1.25rem 1.5rem !important;
     gap:1.1rem !important;
+    box-sizing:border-box;
+  }
+  /* En pantallas chicas (laptop estándar 1366px con sidebar ~280px), el
+     dictamen necesita el ancho COMPLETO sin restricción de 980px. */
+  @media (max-width: 1400px){
+    #p-analizar .result-area{
+      max-width:100% !important;
+      margin:0 !important;
+    }
   }
 
   /* 3. Separador visual entre preview (detección automática) y dictamen
