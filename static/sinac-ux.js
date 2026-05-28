@@ -39,15 +39,12 @@
   }
 
   // Auto-activar al click en "Analizar con IA"
+  // DESACTIVADO (27 may 2026): causaba confusión — el modo enfocado se
+  // activaba solo y atenuaba el formulario. Ahora es OPT-IN via ⌘K o
+  // el comando "Activar Modo Enfocado" en el palette.
   function installAutoFocus() {
-    document.addEventListener('click', function (e) {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      const txt = (btn.textContent || '').toLowerCase();
-      if (txt.includes('analizar') && txt.includes('ia')) {
-        setTimeout(activarModoEnfocado, 200);
-      }
-    });
+    // Intencionalmente vacío. El modo enfocado solo se activa manualmente.
+    return;
   }
 
   // ──────────────────────────────────────────────────────────────────
