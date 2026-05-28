@@ -92,21 +92,26 @@ body,
 
 /* ──────────────────────────────────────────────────────────────────
    2. MODO ENFOCADO (atenuación del entorno al analizar)
+   FIX 27-may-2026: antes atenuaba `.sidebar` (que es el FORMULARIO de
+   análisis donde el gestor escribe) — error. Lo correcto es atenuar la
+   NAVEGACIÓN (`.sidebar-nav`) y el `header`, NUNCA el formulario.
+   Opacidad suavizada 0.32 → 0.55 para que siga siendo legible.
    ────────────────────────────────────────────────────────────────── */
-body.sds-focus-mode .sidebar,
-body.sds-focus-mode .topbar,
+body.sds-focus-mode .sidebar-nav,
+body.sds-focus-mode > #app > header,
+body.sds-focus-mode header,
 body.sds-focus-mode .fab-stack {
-  opacity: 0.32;
-  filter: saturate(0.6);
+  opacity: 0.55;
+  filter: saturate(0.75);
   transition:
     opacity var(--sds-transition-slow),
     filter var(--sds-transition-slow);
 }
 
-body.sds-focus-mode .sidebar:hover,
-body.sds-focus-mode .topbar:hover,
-body.sds-focus-mode .sidebar:focus-within {
-  opacity: 0.92;
+body.sds-focus-mode .sidebar-nav:hover,
+body.sds-focus-mode header:hover,
+body.sds-focus-mode .sidebar-nav:focus-within {
+  opacity: 1;
   filter: none;
 }
 
