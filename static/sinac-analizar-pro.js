@@ -35,7 +35,13 @@
     const valEl = scoreEl.querySelector('.score-val');
     const labelEl = scoreEl.querySelector('.score-label');
     if (!valEl) return;
-    const pct = parseInt((valEl.textContent || '0').replace(/[^\d]/g, ''), 10) || 0;
+    // El score puede venir con decimales ("89.5%") o coma decimal ("89,5%").
+    // Quitar todo salvo dígitos/punto/coma, normalizar coma→punto, redondear
+    // y acotar a 0–100 (un parse ingenuo convertía "89.5%" en 895).
+    const raw = (valEl.textContent || '').replace(/[^\d.,]/g, '').replace(/,/g, '.');
+    let pct = Math.round(parseFloat(raw));
+    if (!isFinite(pct)) pct = 0;
+    pct = Math.max(0, Math.min(100, pct));
     const color = COLOR_EXITO(pct);
     const titulo = labelEl ? labelEl.textContent : 'Probabilidad de éxito de la defensa';
 
