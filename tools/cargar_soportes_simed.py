@@ -75,6 +75,10 @@ PORTAL_FACTURAS = "https://auditool25.tool.com.co/glosasfacturaconww.aspx"
 
 RE_PDF = re.compile(r"^NC_(\d{4,})_(HUS\d{6,12})\.pdf$", re.IGNORECASE)
 
+# Reutilizar los lectores de notas (Excel/CSV/TSV) de extraer_notas_credito.py
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from extraer_notas_credito import leer_notas_delimitado, leer_notas_excel  # noqa: E402
+
 logger = logging.getLogger("cargar_simed")
 
 
@@ -107,8 +111,30 @@ def cargar_credenciales() -> tuple[str, str]:
 # ─── Búsqueda de carpetas ───────────────────────────────────────────────────
 
 
-def buscar_carpetas(base: Path, solo: str | None = None) -> list[dict]:
-    """Devuelve [{'nota','factura','factura_corta','gestor','pdf','xml','json','carpeta'}]."""
+def cargar_lista_notas(ruta: Path) -> set[str]:
+    """Lee un Excel/CSV/TSV con la columna NOTA CREDITO y devuelve el set de notas.
+
+    Sirve para procesar SÓLO las notas de un lote nuevo, sin re-escanear las
+    que ya están en la carpeta destino de corridas anteriores.
+    """
+    suf = ruta.suffix.lower()
+    if suf in (".xlsx", ".xlsm"):
+        filas = leer_notas_excel(ruta)
+    elif suf == ".csv":
+        filas = leer_notas_delimitado(ruta, sep=",")
+    else:
+        filas = leer_notas_delimitado(ruta, sep="\t")
+    return {f["nota"].strip() for f in filas if f.get("nota") and f["nota"].strip()}
+
+
+def buscar_carpetas(
+    base: Path, solo: str | None = None, solo_set: set[str] | None = None
+) -> list[dict]:
+    """Devuelve [{'nota','factura','factura_corta','gestor','pdf','xml','json','carpeta'}].
+
+    Si `solo` se pasa, filtra a esa única nota. Si `solo_set` se pasa, filtra a
+    las notas presentes en ese set (lote nuevo).
+    """
     carpetas = []
     # Recorre <base>/<GESTOR>/<NOTA>/  y <base>/<NOTA>/ por si no se organizó por gestor
     for sub in base.rglob("NC_*_HUS*.pdf"):
@@ -121,6 +147,8 @@ def buscar_carpetas(base: Path, solo: str | None = None) -> list[dict]:
         factura = m.group(2)  # HUS0000466879
         factura_corta = factura.replace("HUS", "").lstrip("0") or "0"
         if solo and nota != solo:
+            continue
+        if solo_set is not None and nota not in solo_set:
             continue
         carpeta = sub.parent
         xml = carpeta / f"XML_{nota}_{factura}.xml"
@@ -779,6 +807,12 @@ def main() -> int:
         "--solo", type=str, help="Procesar solo esta NOTA (recomendado para test inicial)"
     )
     parser.add_argument(
+        "--lista",
+        type=Path,
+        help="Excel/CSV/TSV con NOTA CREDITO: procesa SOLO esas notas "
+        "(útil al reusar la carpeta destino con notas de lotes anteriores)",
+    )
+    parser.add_argument(
         "--todas", action="store_true", help="Procesar todas las facturas encontradas"
     )
     parser.add_argument(
@@ -791,17 +825,28 @@ def main() -> int:
 
     setup_logging(args.log)
 
-    if not args.solo and not args.todas:
-        logger.error("Pasá --solo <NOTA> para test, o --todas para procesar todo.")
+    if not args.solo and not args.todas and not args.lista:
+        logger.error("Pasá --solo <NOTA> para test, --lista <archivo> para un lote, o --todas.")
         return 1
     if not args.destino.is_dir():
         logger.error(f"--destino no existe: {args.destino}")
         return 1
 
+    solo_set = None
+    if args.lista:
+        if not args.lista.is_file():
+            logger.error(f"--lista no existe: {args.lista}")
+            return 1
+        solo_set = cargar_lista_notas(args.lista)
+        if not solo_set:
+            logger.error(f"--lista no devolvió ninguna nota válida: {args.lista}")
+            return 1
+        logger.info(f"Lista del lote: {len(solo_set)} notas a procesar")
+
     user, password = cargar_credenciales()
     logger.info(f"Usuario SIMED: {user}")
 
-    carpetas = buscar_carpetas(args.destino, solo=args.solo)
+    carpetas = buscar_carpetas(args.destino, solo=args.solo, solo_set=solo_set)
     if not carpetas:
         logger.error(f"No encontré carpetas con PDF NC_*_HUS*.pdf bajo {args.destino}")
         return 1
