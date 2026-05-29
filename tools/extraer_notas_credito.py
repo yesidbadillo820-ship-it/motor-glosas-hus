@@ -61,6 +61,7 @@ import csv
 import logging
 import shutil
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Iterable
 
@@ -83,7 +84,6 @@ def setup_logging(log_file: Path | None = None) -> None:
 
 # ─── Lectura de la fuente ──────────────────────────────────────────────────
 
-COLUMNAS_REQUERIDAS = ("NOTA CREDITO",)
 COLUMNAS_OPCIONALES = (
     "Radicado",
     "Acta Conciliacion",
@@ -93,6 +93,25 @@ COLUMNAS_OPCIONALES = (
     "GESTOR",
 )
 
+# Nombres aceptados para la columna de la nota crédito (ya normalizados con
+# _norm_col: mayúsculas, sin acentos, espacios colapsados). Tolera variantes
+# como "NOTAS CREDITO", "NOTA CRÉDITO", "NOTA DE CREDITO", etc.
+ALIAS_NOTA = {
+    "NOTA CREDITO",
+    "NOTAS CREDITO",
+    "NOTA DE CREDITO",
+    "NOTAS DE CREDITO",
+    "NOTA CRED",
+    "NC",
+}
+
+
+def _norm_col(s: str) -> str:
+    """Normaliza un header: mayúsculas, sin acentos y espacios colapsados."""
+    s = (s or "").strip().upper()
+    s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+    return " ".join(s.split())
+
 
 def _normalizar_headers(headers: Iterable[str]) -> list[str]:
     return [(h or "").strip() for h in headers]
@@ -100,13 +119,19 @@ def _normalizar_headers(headers: Iterable[str]) -> list[str]:
 
 def _filas_desde_iter(headers: list[str], rows_iter: Iterable) -> list[dict]:
     headers_norm = {h.upper(): i for i, h in enumerate(headers)}
-    for req in COLUMNAS_REQUERIDAS:
-        if req.upper() not in headers_norm:
-            raise ValueError(
-                f"No encontré la columna requerida '{req}'. Headers detectados: {headers}"
-            )
 
-    idx_nota = headers_norm["NOTA CREDITO"]
+    # Buscar la columna de nota crédito tolerando variantes (S, acento, "de").
+    idx_nota = None
+    for i, h in enumerate(headers):
+        if _norm_col(h) in ALIAS_NOTA:
+            idx_nota = i
+            break
+    if idx_nota is None:
+        raise ValueError(
+            f"No encontré la columna de nota crédito. Acepté cualquiera de "
+            f"{sorted(ALIAS_NOTA)}. Headers detectados: {headers}"
+        )
+
     idx_opc = {col: headers_norm.get(col.upper()) for col in COLUMNAS_OPCIONALES}
 
     filas: list[dict] = []
