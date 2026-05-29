@@ -852,7 +852,31 @@ def main() -> int:
         return 1
     logger.info(f"Facturas a procesar: {len(carpetas)}")
 
-    resultados: list[dict] = []
+    # Si vino una lista, avisar (y registrar) las notas que NO tienen carpeta con
+    # PDF — antes se omitían en silencio y podían quedar facturas sin cargar.
+    faltan_carpeta: list[dict] = []
+    if solo_set is not None:
+        notas_con_carpeta = {c["nota"] for c in carpetas}
+        sin_carpeta = sorted(solo_set - notas_con_carpeta)
+        if sin_carpeta:
+            logger.warning(
+                f"{len(sin_carpeta)} notas de la lista NO tienen carpeta con PDF "
+                f"NC_*.pdf (no se cargarán): {', '.join(sin_carpeta[:30])}"
+                f"{'...' if len(sin_carpeta) > 30 else ''}"
+            )
+            for nota in sin_carpeta:
+                faltan_carpeta.append(
+                    {
+                        "nota": nota,
+                        "factura": "",
+                        "gestor": "",
+                        "carpeta": "",
+                        "estado": "SIN_CARPETA",
+                        "detalle": "La nota está en la lista pero no hay carpeta con NC_*.pdf",
+                    }
+                )
+
+    resultados: list[dict] = list(faltan_carpeta)
     inicio = time.time()
     try:
         with sync_playwright() as p:
