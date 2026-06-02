@@ -75,8 +75,12 @@ class TestObtenerEjemplos:
         _seed_gold(db, "SAN", "TA01", "x" * 250, usos=20)
         _seed_glosa(db, "SAN", "TA01", "LEVANTADA", "y" * 250)
         ejs = obtener_ejemplos_gold(db, "SAN", "TA01", max_ejemplos=2)
-        assert len(ejs) == 1  # solo gold porque el max es 2 y solo hay 1 gold
+        # obtener_ejemplos_gold completa hasta max_ejemplos combinando fuentes por
+        # prioridad (GOLD primero, luego HISTORICO). Con 1 gold + 1 histórico y
+        # max=2 → 2 ejemplos, con el gold en primer lugar (prelación).
+        assert len(ejs) == 2
         assert ejs[0]["fuente"] == "GOLD"
+        assert ejs[1]["fuente"] == "HISTORICO"
 
     def test_fallback_a_historico(self, db):
         # Sin gold, hay glosa LEVANTADA

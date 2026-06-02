@@ -67,9 +67,12 @@ def _seed(db, accion, usuario, dias_atras=0):
 
 class TestAuditActividadMensual:
     def test_serie_mensual(self, client, db_session):
-        _seed(db_session, "UPDATE", "alice@x.com", dias_atras=2)
-        _seed(db_session, "UPDATE", "alice@x.com", dias_atras=5)
-        _seed(db_session, "DELETE", "bob@x.com", dias_atras=1)
+        # dias_atras=0 en los tres: sembrar a varios días atrás hacía que, al
+        # correr la suite a comienzo de mes, los eventos cruzaran el límite y la
+        # serie quedara partida en 2 meses (test flaky por fecha).
+        _seed(db_session, "UPDATE", "alice@x.com", dias_atras=0)
+        _seed(db_session, "UPDATE", "alice@x.com", dias_atras=0)
+        _seed(db_session, "DELETE", "bob@x.com", dias_atras=0)
 
         r = client.get("/admin/audit-actividad-mensual?meses=3")
         d = r.json()
