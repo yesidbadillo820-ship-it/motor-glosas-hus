@@ -115,12 +115,9 @@ def extraer_lineas_servicios(data: dict) -> list[dict]:
         servicios = u.get("servicios") or {}
         for tipo in SERVICIOS_RIPS:
             for it in servicios.get(tipo) or []:
-                cups = (
-                    it.get("codProcedimiento")
-                    or it.get("codConsulta")
-                    or it.get("codDiagnosticoPrincipal")
-                    or ""
-                )
+                # CUPS sólo de procedimiento/consulta. NO usar codDiagnosticoPrincipal
+                # (es un CIE-10 de diagnóstico, p.ej. S820, no un CUPS).
+                cups = it.get("codProcedimiento") or it.get("codConsulta") or ""
                 cod_servicio = it.get("codTecnologiaSalud", "")
                 cantidad = (
                     it.get("cantidadOS")
