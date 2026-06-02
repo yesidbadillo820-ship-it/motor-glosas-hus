@@ -13,6 +13,7 @@ Expone:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 # Tipos de servicio del RIPS que se vuelven líneas del FUR SERVICIOS
@@ -28,17 +29,42 @@ SERVICIOS_RIPS = (
 
 # Mapeo best-effort del tipo de servicio RIPS → Tipo_de_servicio del FUR SERVICIOS
 # (1=Medicamentos, 2=Procedimientos, 5=Insumos, 6=Dispositivos, 7=Osteosíntesis...)
-# Para 'otrosServicios' no se puede inferir con certeza (insumo/dispositivo/
-# osteosíntesis), así que se deja vacío para que lo complete el prestador.
+# Para 'otrosServicios' no se puede inferir con certeza desde el tipo RIPS,
+# pero SÍ desde el prefijo del código del prestador (ver inferir_tipo_por_codigo).
 TIPO_SERVICIO_FUR = {
     "consultas": "2",
     "procedimientos": "2",
     "urgencias": "2",
     "hospitalizacion": "2",
     "medicamentos": "1",
-    "otrosServicios": "",  # ambiguo → manual
+    "otrosServicios": "",  # → se intenta por código (FMO=7, FMQ/QX=5, ...)
     "recienNacidos": "2",
 }
+
+# Prefijos del catálogo interno HUS → Tipo_de_servicio del FUR.
+# Conocidos hasta hoy: FMO=osteosíntesis, FMQ/QX=insumos quirúrgicos.
+# Si aparecen prefijos nuevos, agregarlos acá tras verificar con la factura.
+_RE_MEDICAMENTO_CUM = re.compile(r"^\d{4,}-\d{1,}$")  # ej. 19908236-07, 224249-2
+
+
+def inferir_tipo_por_codigo(codigo: str) -> str:
+    """Infiere Tipo_de_servicio del FUR a partir del código del prestador.
+
+    Devuelve "" si no se puede inferir con seguridad (lo deja para revisión
+    manual en vez de adivinar mal).
+    """
+    if not codigo:
+        return ""
+    c = codigo.strip().upper()
+    if c.startswith("FMO"):
+        return "7"  # Material de osteosíntesis
+    if c.startswith("FMQ") or c.startswith("QX"):
+        return "5"  # Insumos quirúrgicos
+    if _RE_MEDICAMENTO_CUM.match(c):
+        return "1"  # CUM/IUM de medicamento
+    if c.isdigit():
+        return "2"  # Código CUPS/SOAT numérico = procedimiento
+    return ""
 
 
 def cargar_rips(ruta: Path) -> dict:
@@ -106,12 +132,17 @@ def extraer_lineas_servicios(data: dict) -> list[dict]:
                     it.get("vrUnitOS") or it.get("vrUnitMedicamento") or it.get("vrServicio") or ""
                 )
                 vr_total = it.get("vrServicio", "")
+                # Tipo: primero por sección RIPS; si queda vacío, por prefijo
+                # del código (FMO=7, FMQ/QX=5, dígitos puros=2, CUM=1).
+                tipo_fur = TIPO_SERVICIO_FUR.get(tipo, "")
+                if not tipo_fur:
+                    tipo_fur = inferir_tipo_por_codigo(cod_servicio)
                 lineas.append(
                     {
                         "num_factura": num_factura,
                         "nit_prestador": nit,
                         "tipo_rips": tipo,
-                        "tipo_servicio_fur": TIPO_SERVICIO_FUR.get(tipo, ""),
+                        "tipo_servicio_fur": tipo_fur,
                         "cod_servicio": cod_servicio,
                         "cups": cups,
                         "descripcion": it.get("nomTecnologiaSalud", ""),

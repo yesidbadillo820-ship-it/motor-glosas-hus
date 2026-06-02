@@ -36,7 +36,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rips_lectura import cargar_rips, datos_generales, extraer_lineas_servicios  # noqa: E402
+from factura_lectura import cargar_factura_xml, hallar_factura_xml  # noqa: E402
+from rips_lectura import (  # noqa: E402
+    cargar_rips,
+    datos_generales,
+    extraer_lineas_servicios,
+    inferir_tipo_por_codigo,
+)
 
 logger = logging.getLogger("gen_fur_servicios")
 
@@ -66,12 +72,65 @@ def setup_logging() -> None:
     )
 
 
+def _vr_eq(a: str, b: str) -> bool:
+    """Compara dos importes que pueden venir como '83400', '83400.00' o ''."""
+    try:
+        return abs(float(a) - float(b)) < 0.5
+    except (TypeError, ValueError):
+        return False
+
+
+def enriquecer_con_factura(linea: dict, items_factura: dict, usadas_por_precio: set) -> dict:
+    """Completa descripción y Tipo de servicio desde la factura.
+
+    Estrategia:
+      1) Match por código directo (codTecnologiaSalud — funciona para
+         medicamentos CUM, insumos FMQ/QX y osteosíntesis FMO).
+      2) Si no hay match por código (típico de consultas/procedimientos:
+         RIPS trae CUPS, factura trae SOAT), buscar UN solo ítem de la
+         factura cuyo vr_total coincida y aún no se haya usado. Si hay
+         empate, no se decide (queda para revisión manual).
+    """
+    cod = (linea.get("cod_servicio") or "").strip()
+    enriquecida = dict(linea)
+
+    # 1) Match por código directo
+    if cod and cod in items_factura:
+        item = items_factura[cod]
+        if not enriquecida.get("descripcion") and item.get("descripcion"):
+            enriquecida["descripcion"] = item["descripcion"]
+        return enriquecida
+
+    # 2) Match por valor (consultas/procedimientos donde RIPS=CUPS ≠ factura=SOAT)
+    vr_total_rips = linea.get("vr_total") or ""
+    if vr_total_rips:
+        candidatos = [
+            (k, v)
+            for k, v in items_factura.items()
+            if k not in usadas_por_precio and _vr_eq(v.get("vr_total", ""), vr_total_rips)
+        ]
+        if len(candidatos) == 1:
+            cod_fact, item = candidatos[0]
+            usadas_por_precio.add(cod_fact)
+            if not enriquecida.get("descripcion") and item.get("descripcion"):
+                enriquecida["descripcion"] = item["descripcion"]
+            # Para procedimientos, el código del vendedor de la factura es el SOAT
+            if linea.get("tipo_rips") in ("consultas", "procedimientos", "urgencias") and not cod:
+                enriquecida["cod_servicio"] = cod_fact
+        # Si hay múltiples candidatos o ninguno, dejamos como está (sin adivinar).
+
+    return enriquecida
+
+
 def fila_desde_linea(ln: dict) -> dict:
     """Mapea una línea normalizada del RIPS a las 13 columnas del FUR SERVICIOS."""
+    # Si tipo de servicio sigue vacío, último intento por código (cod_servicio
+    # puede haber sido completado desde la factura).
+    tipo = ln.get("tipo_servicio_fur") or inferir_tipo_por_codigo(ln.get("cod_servicio", ""))
     return {
         "NUM_FACTURA": ln["num_factura"],
         "NIT_PRESTADOR": ln["nit_prestador"],
-        "Tipo_de_servicio": ln["tipo_servicio_fur"],
+        "Tipo_de_servicio": tipo,
         "Codigo_general_del_procedimiento_quirurgico": "",
         "Consecutivo_procedimiento_quirurgico": "",
         "Codigo_del_servicio": ln["cod_servicio"],
@@ -207,6 +266,23 @@ def main() -> int:
         logger.error("El RIPS no trae líneas de servicio (¿estructura distinta?).")
         logger.error(f"Claves raíz del RIPS: {sorted(data.keys())}")
         return 1
+
+    # Enriquecer con la factura DIAN si está disponible (completa descripción
+    # de consultas/procedimientos y agrega código SOAT).
+    items_factura: dict = {}
+    if args.carpeta:
+        factura_path = hallar_factura_xml(args.carpeta)
+        if factura_path:
+            items_factura = cargar_factura_xml(factura_path)
+            logger.info(f"FEV: {factura_path.name}  ({len(items_factura)} items)")
+        else:
+            logger.info("FEV: no encontrada — sin enriquecimiento por factura.")
+
+    usadas_por_precio: set = set()
+    if items_factura:
+        lineas = [enriquecer_con_factura(ln, items_factura, usadas_por_precio) for ln in lineas]
+        enriquecidas = sum(1 for ln in lineas if ln.get("descripcion"))
+        logger.info(f"  Líneas con descripción tras enriquecer: {enriquecidas}/{len(lineas)}")
 
     filas = [fila_desde_linea(ln) for ln in lineas]
     escribir_excel(filas, args.salida, meta)
