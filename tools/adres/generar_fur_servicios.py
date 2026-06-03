@@ -36,6 +36,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from cups_catalogo import buscar as buscar_cups  # noqa: E402
+from cups_catalogo import cargar_catalogo  # noqa: E402
 from factura_lectura import cargar_factura_xml, hallar_factura_xml  # noqa: E402
 from rips_lectura import (  # noqa: E402
     cargar_rips,
@@ -240,6 +242,13 @@ def main() -> int:
     grupo.add_argument("--carpeta", type=Path, help="Carpeta de la factura (busca el *_RIP.json)")
     grupo.add_argument("--rips", type=Path, help="Ruta directa al RIPS .json")
     parser.add_argument("--salida", type=Path, required=True, help="Excel .xlsx de salida")
+    parser.add_argument(
+        "--cups",
+        type=Path,
+        default=None,
+        help="Catálogo CUPS oficial (código→nombre) CSV/TSV/XLSX. Resuelve la "
+        "descripción de consultas/procedimientos que el RIPS no trae.",
+    )
     args = parser.parse_args()
     setup_logging()
 
@@ -283,6 +292,27 @@ def main() -> int:
         lineas = [enriquecer_con_factura(ln, items_factura, usadas_por_precio) for ln in lineas]
         enriquecidas = sum(1 for ln in lineas if ln.get("descripcion"))
         logger.info(f"  Líneas con descripción tras enriquecer: {enriquecidas}/{len(lineas)}")
+
+    # Catálogo CUPS: resuelve el nombre de consultas/procedimientos (el RIPS
+    # sólo trae el código). Es la fuente oficial para esas descripciones.
+    if args.cups:
+        if args.cups.is_file():
+            cat = cargar_catalogo(args.cups)
+            logger.info(f"Catálogo CUPS: {len(cat)} códigos")
+            rellenadas = 0
+            for ln in lineas:
+                if not ln.get("descripcion"):
+                    nom = buscar_cups(cat, ln.get("cups", ""))
+                    if nom:
+                        ln["descripcion"] = nom
+                        rellenadas += 1
+            logger.info(f"  Descripciones resueltas por catálogo CUPS: {rellenadas}")
+        else:
+            logger.warning(f"--cups no existe: {args.cups}")
+
+    sin_desc = sum(1 for ln in lineas if not ln.get("descripcion"))
+    if sin_desc:
+        logger.info(f"  Líneas aún sin descripción (revisar manual): {sin_desc}")
 
     filas = [fila_desde_linea(ln) for ln in lineas]
     escribir_excel(filas, args.salida, meta)
