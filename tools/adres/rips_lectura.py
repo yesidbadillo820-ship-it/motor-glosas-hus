@@ -134,6 +134,17 @@ def extraer_lineas_servicios(data: dict) -> list[dict]:
                 tipo_fur = TIPO_SERVICIO_FUR.get(tipo, "")
                 if not tipo_fur:
                     tipo_fur = inferir_tipo_por_codigo(cod_servicio)
+
+                vr_u = _num(vr_unitario)
+                vr_t = _num(vr_total)
+                # Saltar registros que NO son líneas facturables: la sección
+                # `hospitalizacion` del RIPS es el registro clínico de ingreso/
+                # egreso (sin valor ni CUPS), no un servicio a cobrar. La estancia
+                # que sí se factura viene como otrosServicios. Regla general:
+                # si no hay valor unitario ni total, no es una línea del FUR SERVICIOS.
+                if not vr_u and not vr_t:
+                    continue
+
                 lineas.append(
                     {
                         "num_factura": num_factura,
@@ -144,8 +155,8 @@ def extraer_lineas_servicios(data: dict) -> list[dict]:
                         "cups": cups,
                         "descripcion": it.get("nomTecnologiaSalud", ""),
                         "cantidad": _num(cantidad),
-                        "vr_unitario": _num(vr_unitario),
-                        "vr_total": _num(vr_total),
+                        "vr_unitario": vr_u,
+                        "vr_total": vr_t,
                         "doc_usuario": doc_usuario,
                     }
                 )
