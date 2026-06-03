@@ -412,6 +412,26 @@ def main() -> int:
                 enlazados_desc_dian += 1
         logger.info(f"  Descripciones desde PDF DIAN (por vr unitario único): {enlazados_desc_dian}")
 
+    # Propagación por código SOAT: si una línea quedó sin descripción pero otra
+    # con el MISMO cod_servicio ya la tiene (de cualquier fuente anterior), la
+    # copiamos — mismo código = mismo servicio. Cubre el caso en que sólo
+    # algunas repeticiones del código lograron enlazar por valor.
+    desc_por_cod_servicio: dict[str, str] = {}
+    for ln in lineas:
+        cod = (ln.get("cod_servicio") or "").strip()
+        d = (ln.get("descripcion") or "").strip()
+        if cod and d:
+            desc_por_cod_servicio.setdefault(cod, d)
+    propagados = 0
+    for ln in lineas:
+        if ln.get("descripcion"):
+            continue
+        cod = (ln.get("cod_servicio") or "").strip()
+        if cod and cod in desc_por_cod_servicio:
+            ln["descripcion"] = desc_por_cod_servicio[cod]
+            propagados += 1
+    logger.info(f"  Descripciones propagadas por código SOAT: {propagados}")
+
     # CUPS desde el RIPS: enlazamos por vr_total (1:1 cuando es único). El RIPS
     # es la única fuente del CUPS para procedimientos/consultas.
     cups_por_valor = _cups_por_valor_desde_rips(data)

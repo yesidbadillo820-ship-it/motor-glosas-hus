@@ -391,6 +391,15 @@ def _reparar_palabras_dian(desc: str) -> str:
     return " ".join(out)
 
 
+def _clave_desc(d: str) -> str:
+    """Clave de comparación de descripciones: sin espacios ni signos, en mayúsculas.
+
+    Hace que 'PEL VIS' y 'PELVIS' (mismo servicio, cortes distintos) colapsen
+    a la misma clave, sin fusionar servicios realmente diferentes.
+    """
+    return re.sub(r"[^0-9A-Za-z]", "", d).upper()
+
+
 def descripciones_dian_pdf(pdf_path: Path) -> dict[str, str]:
     """Devuelve {vr_unitario: descripcion} desde la representación DIAN.
 
@@ -428,12 +437,20 @@ def descripciones_dian_pdf(pdf_path: Path) -> dict[str, str]:
                         continue
                     candidatos.setdefault(vr_u, []).append(_reparar_palabras_dian(desc))
 
-    # Solo retener vr_unitarios con descripción única
-    return {
-        vr: descs[0]
-        for vr, descs in candidatos.items()
-        if len(set(descs)) == 1
-    }
+    # Retener vr_unitarios cuya descripción es CONSISTENTE. El mismo servicio
+    # repetido puede venir con cortes de palabra distintos en cada renglón
+    # ('TORAX Y PEL VIS' vs 'TORAX Y PELVIS'); los tratamos como iguales
+    # comparando sin espacios ni signos. Sólo se descarta cuando hay un choque
+    # real: dos servicios genuinamente distintos al mismo precio unitario
+    # (ahí las claves normalizadas difieren). De las variantes equivalentes
+    # devolvemos la más larga (la menos truncada).
+    salida: dict[str, str] = {}
+    for vr, descs in candidatos.items():
+        if len({_clave_desc(d) for d in descs}) == 1:
+            # Mismo contenido de letras en todas: elegimos la menos fragmentada
+            # (menos espacios = palabras más cosidas), p.ej. 'PELVIS' > 'PEL VIS'.
+            salida[vr] = min(descs, key=lambda d: (d.count(" "), len(d)))
+    return salida
 
 
 if __name__ == "__main__":
