@@ -324,6 +324,118 @@ def hallar_factura_pdf(carpeta: Path) -> Path | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Extracción de descripciones de la REPRESENTACIÓN DIAN (últimas páginas)
+# ---------------------------------------------------------------------------
+#
+# El PDF del HUS trae dos vistas: el "Detalle de Cargos" (FCRPFacturaEntidad,
+# páginas 1-7) con código SOAT del manual tarifario, y la representación
+# DIAN (páginas 8+) con código DIAN genérico (85000000, 8100000…) pero
+# descripción legible y tabla limpia (parseable con strategy=lines).
+#
+# El código DIAN NO sirve para el FUR SERVICIOS (es genérico), pero la
+# DESCRIPCIÓN y el VR UNITARIO sí, y se pueden enlazar contra las líneas
+# del FURIPS2 (que sí tienen el SOAT correcto) por vr_unitario único.
+#
+# Esto cubre el hueco de descripción de los procedimientos tipo 2 que el
+# FURIPS2 no trae.
+
+_STOPWORDS_DIAN = {
+    "DE", "EL", "LA", "LOS", "LAS", "DEL", "AL", "EN", "CON", "POR",
+    "Y", "O", "ML", "MG", "G", "UN", "UNA",
+}
+# Números romanos puros: "II", "IV", "VI" — son sufijos de tipo/grado, no
+# trozos de palabra. No los pegamos al token anterior.
+_RE_ROMANO = re.compile(r"^[IVXLCDM]+$")
+
+
+def _reparar_palabras_dian(desc: str) -> str:
+    """Cose sufijos cortos al token anterior cuando el PDF cortó una palabra.
+
+    Ejemplos del HUS:
+        'COMPUTA DA' → 'COMPUTADA'
+        'CADER A'    → 'CADERA'
+        'RODILL A'   → 'RODILLA'
+
+    Heurística: si el token siguiente es alfabético, tiene 1-2 letras, no
+    es una preposición/unidad común y no es un número romano, se concatena
+    con el actual. Los truncamientos por ancho de columna ('ABDOM', 'CRANE')
+    no se pueden reparar y se dejan como vienen.
+    """
+    tokens = re.sub(r"\s+", " ", desc.strip()).split()
+    if len(tokens) < 2:
+        return " ".join(tokens)
+    out: list[str] = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok.upper() in _STOPWORDS_DIAN:
+            out.append(tok)
+            i += 1
+            continue
+        siguiente = tokens[i + 1] if i + 1 < len(tokens) else ""
+        sig_upper = siguiente.upper()
+        if (
+            siguiente
+            and siguiente.isalpha()
+            and 1 <= len(siguiente) <= 2
+            and sig_upper not in _STOPWORDS_DIAN
+            and not _RE_ROMANO.match(sig_upper)
+            and tok.isalpha()
+        ):
+            out.append(tok + siguiente)
+            i += 2
+            continue
+        out.append(tok)
+        i += 1
+    return " ".join(out)
+
+
+def descripciones_dian_pdf(pdf_path: Path) -> dict[str, str]:
+    """Devuelve {vr_unitario: descripcion} desde la representación DIAN.
+
+    Sólo retorna `vr_unitario`s con descripción ÚNICA en todo el documento
+    (cuando varios renglones distintos comparten el mismo precio unitario,
+    queda fuera para no asignar mal).
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return {}
+
+    candidatos: dict[str, list[str]] = {}
+    cfg_lines = {"vertical_strategy": "lines", "horizontal_strategy": "lines"}
+
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        for page in pdf.pages:
+            try:
+                tablas = page.extract_tables(cfg_lines) or []
+            except Exception:
+                tablas = []
+            for tabla in tablas:
+                if not tabla or not tabla[0] or len(tabla[0]) < 13:
+                    continue
+                for row in tabla:
+                    if not row or len(row) < 13:
+                        continue
+                    cod = (row[1] or "").strip()
+                    desc = (row[2] or "").strip()
+                    vr_u = _imp(row[5] or "")
+                    if not desc or not vr_u or vr_u == "0":
+                        continue
+                    # Solo códigos DIAN genéricos (6-8 dígitos: 85000000, 8100000)
+                    if not re.fullmatch(r"\d{6,8}", cod):
+                        continue
+                    candidatos.setdefault(vr_u, []).append(_reparar_palabras_dian(desc))
+
+    # Solo retener vr_unitarios con descripción única
+    return {
+        vr: descs[0]
+        for vr, descs in candidatos.items()
+        if len(set(descs)) == 1
+    }
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         sys.stderr.write("Uso: py factura_pdf_lectura.py <factura.pdf>\n")

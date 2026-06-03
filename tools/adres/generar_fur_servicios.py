@@ -42,7 +42,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cups_catalogo import buscar as buscar_cups  # noqa: E402
 from cups_catalogo import cargar_catalogo  # noqa: E402
 from factura_lectura import hallar_factura_xml  # noqa: E402, F401
-from factura_pdf_lectura import hallar_factura_pdf, leer_factura_pdf  # noqa: E402
+from factura_pdf_lectura import (  # noqa: E402
+    descripciones_dian_pdf,
+    hallar_factura_pdf,
+    leer_factura_pdf,
+)
 from furips_lectura import (  # noqa: E402
     cargar_furips2,
     facturas_en_furips2,
@@ -212,6 +216,26 @@ def _cups_por_valor_desde_rips(data: dict) -> dict[str, list[str]]:
     return idx
 
 
+def _descripciones_por_codigo_desde_rips(data: dict) -> dict[str, str]:
+    """Indexa nombre de tecnología por código (codTecnologiaSalud) desde el RIPS.
+
+    Sirve para llenar la descripción de medicamentos (cuyo CUM aparece tanto
+    en el RIPS como en el FURIPS2) y de cualquier otro servicio donde el
+    código del FURIPS2 coincida con el del RIPS.
+    """
+    idx: dict[str, str] = {}
+    for u in data.get("usuarios") or []:
+        servicios = u.get("servicios") or {}
+        for tipo in ("consultas", "procedimientos", "medicamentos",
+                     "otrosServicios", "urgencias", "recienNacidos"):
+            for it in servicios.get(tipo) or []:
+                cod = (it.get("codTecnologiaSalud") or "").strip()
+                nom = (it.get("nomTecnologiaSalud") or "").strip()
+                if cod and nom:
+                    idx.setdefault(cod, nom)
+    return idx
+
+
 def escribir_excel(filas: list[dict], ruta: Path, meta: dict) -> None:
     """Escribe el Excel FUR SERVICIOS limpio: una sola hoja, una sola fuente y
     tamaño, sin colores ni filas de leyenda. Igual al formato del ejemplo oficial.
@@ -309,13 +333,15 @@ def main() -> int:
     #      Es la fuente más confiable cuando está disponible.
     #   2) PDF de la factura: parser sobre el "Detalle de Cargos".
     #   3) RIPS: fallback. Pierde la descomposición SOAT/quirúrgica.
-    # En todos los casos el RIPS aporta el CUPS por valor.
+    # Aunque FURIPS2 sea la fuente principal, el PDF se carga también para
+    # enriquecer descripciones de procedimientos (representación DIAN) y el
+    # RIPS para el CUPS por valor.
     furips2_path: Path | None = args.furips2
     if not furips2_path and args.carpeta:
         furips2_path = hallar_furips2(args.carpeta)
 
     pdf_path: Path | None = None
-    if args.carpeta and not furips2_path:
+    if args.carpeta:
         pdf_path = hallar_factura_pdf(args.carpeta)
 
     if furips2_path:
@@ -343,6 +369,7 @@ def main() -> int:
         logger.info(f"  Líneas leídas del PDF: {len(lineas_pdf)}")
         # Convertimos cada línea del PDF al formato normalizado que usa fila_desde_linea
         lineas = [_linea_desde_pdf(meta, ln) for ln in lineas_pdf]
+        pdf_path = None  # ya consumido como fuente principal; no usar para enriquecer
     else:
         logger.warning("Ni FURIPS2 ni PDF encontrados — fallback al RIPS.")
         lineas = extraer_lineas_servicios(data)
@@ -350,6 +377,40 @@ def main() -> int:
     if not lineas:
         logger.error("No hay líneas para escribir (PDF/RIPS vacíos).")
         return 1
+
+    # Descripción desde el RIPS por código directo: cubre medicamentos (CUM)
+    # cuyo codTecnologiaSalud existe tanto en RIPS como en FURIPS2.
+    desc_por_codigo = _descripciones_por_codigo_desde_rips(data)
+    enlazados_desc_rips = 0
+    for ln in lineas:
+        if ln.get("descripcion"):
+            continue
+        cod = (ln.get("cod_servicio") or "").strip()
+        if cod and cod in desc_por_codigo:
+            ln["descripcion"] = desc_por_codigo[cod]
+            enlazados_desc_rips += 1
+    logger.info(f"  Descripciones desde RIPS (por código): {enlazados_desc_rips}")
+
+    # Descripción desde la representación DIAN del PDF: cubre procedimientos
+    # SOAT cuya descripción no viene en el FURIPS2 (21712, 21102, 19304…).
+    # Enlace por vr_unitario único (si el DIAN tiene dos servicios distintos
+    # con el mismo precio unitario, no se asigna ninguno).
+    if pdf_path:
+        try:
+            desc_dian = descripciones_dian_pdf(pdf_path)
+        except Exception as e:
+            logger.warning(f"  No pude extraer descripciones del PDF DIAN: {e}")
+            desc_dian = {}
+        logger.info(f"  Descripciones únicas en PDF DIAN: {len(desc_dian)}")
+        enlazados_desc_dian = 0
+        for ln in lineas:
+            if ln.get("descripcion"):
+                continue
+            vr_u = ln.get("vr_unitario", "")
+            if vr_u and vr_u in desc_dian:
+                ln["descripcion"] = desc_dian[vr_u]
+                enlazados_desc_dian += 1
+        logger.info(f"  Descripciones desde PDF DIAN (por vr unitario único): {enlazados_desc_dian}")
 
     # CUPS desde el RIPS: enlazamos por vr_total (1:1 cuando es único). El RIPS
     # es la única fuente del CUPS para procedimientos/consultas.
