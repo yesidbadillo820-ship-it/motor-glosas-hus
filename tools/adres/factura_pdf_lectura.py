@@ -407,6 +407,31 @@ def descripciones_dian_pdf(pdf_path: Path) -> dict[str, str]:
     (cuando varios renglones distintos comparten el mismo precio unitario,
     queda fuera para no asignar mal).
     """
+    candidatos = _candidatos_dian_pdf(pdf_path)
+
+    # Retener vr_unitarios cuya descripción es CONSISTENTE. El mismo servicio
+    # repetido puede venir con cortes de palabra distintos en cada renglón
+    # ('TORAX Y PEL VIS' vs 'TORAX Y PELVIS'); los tratamos como iguales
+    # comparando sin espacios ni signos. Sólo se descarta cuando hay un choque
+    # real: dos servicios genuinamente distintos al mismo precio unitario
+    # (ahí las claves normalizadas difieren). De las variantes equivalentes
+    # devolvemos la menos fragmentada.
+    salida: dict[str, str] = {}
+    for vr, descs in candidatos.items():
+        if len({_clave_desc(d) for d in descs}) == 1:
+            # Mismo contenido de letras en todas: elegimos la menos fragmentada
+            # (menos espacios = palabras más cosidas), p.ej. 'PELVIS' > 'PEL VIS'.
+            salida[vr] = min(descs, key=lambda d: (d.count(" "), len(d)))
+    return salida
+
+
+def _candidatos_dian_pdf(pdf_path: Path) -> dict[str, list[str]]:
+    """Recolecta {vr_unitario: [descripciones…]} crudas de la tabla DIAN.
+
+    Una misma clave de precio puede traer varias descripciones: si todas son
+    el mismo servicio (mismas letras) es repetición; si son textos distintos
+    es un choque (un código de tarifa que cubre varios procedimientos).
+    """
     try:
         import pdfplumber
     except ImportError:
@@ -436,21 +461,7 @@ def descripciones_dian_pdf(pdf_path: Path) -> dict[str, str]:
                     if not re.fullmatch(r"\d{6,8}", cod):
                         continue
                     candidatos.setdefault(vr_u, []).append(_reparar_palabras_dian(desc))
-
-    # Retener vr_unitarios cuya descripción es CONSISTENTE. El mismo servicio
-    # repetido puede venir con cortes de palabra distintos en cada renglón
-    # ('TORAX Y PEL VIS' vs 'TORAX Y PELVIS'); los tratamos como iguales
-    # comparando sin espacios ni signos. Sólo se descarta cuando hay un choque
-    # real: dos servicios genuinamente distintos al mismo precio unitario
-    # (ahí las claves normalizadas difieren). De las variantes equivalentes
-    # devolvemos la más larga (la menos truncada).
-    salida: dict[str, str] = {}
-    for vr, descs in candidatos.items():
-        if len({_clave_desc(d) for d in descs}) == 1:
-            # Mismo contenido de letras en todas: elegimos la menos fragmentada
-            # (menos espacios = palabras más cosidas), p.ej. 'PELVIS' > 'PEL VIS'.
-            salida[vr] = min(descs, key=lambda d: (d.count(" "), len(d)))
-    return salida
+    return candidatos
 
 
 if __name__ == "__main__":
