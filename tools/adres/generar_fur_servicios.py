@@ -1,18 +1,21 @@
 """generar_fur_servicios.py — Genera el Excel FUR SERVICIOS desde el RIPS.
 
 Lee el RIPS de una factura y arma el Excel del **FUR SERVICIOS** (Diccionario
-de 13 campos, Resolución 2284/2023), pre-rellenando las columnas que salen
-del RIPS y dejando en blanco (resaltadas) las que diligencia el prestador.
+de 13 campos, Resolución 2284/2023). El Excel sale **limpio**: una sola hoja,
+una sola fuente y tamaño, sin colores ni filas de leyenda (igual al ejemplo
+oficial). Las columnas que no salen del RIPS quedan vacías para que las
+complete el prestador.
 
-Columnas auto-rellenadas desde el RIPS:
-    NUM_FACTURA, NIT_PRESTADOR, Codificacion_CUPS, Descripción,
-    Cantidad_de_servicios, Valor_unitario_facturado, Valor_total_facturado,
-    Codigo_del_servicio (medicamentos/otros), y Tipo_de_servicio (best-effort).
+Columnas auto-rellenadas desde el RIPS (+ catálogo CUPS para la descripción
+de consultas/procedimientos):
+    Número factura, NIT, Codificación CUPS, Descripción, Cantidad,
+    Valor unitario/total facturado, Código del servicio (medicamentos/otros)
+    y Tipo de servicio.
 
-Columnas que quedan para el prestador (resaltadas en naranja):
-    Codigo_general_del_procedimiento_quirurgico, Consecutivo_procedimiento_quirurgico,
-    Valor_unitario_reclamado, Valor_total_reclamado (se pre-cargan = facturado
-    como punto de partida; el prestador los puede bajar).
+Columnas que completa el prestador (quedan vacías):
+    Código general del procedimiento quirúrgico, Consecutivo quirúrgico,
+    Código del servicio (SOAT) de procedimientos. Los "reclamado" se pre-cargan
+    = facturado como punto de partida.
 
 USO
 ---
@@ -48,21 +51,25 @@ from rips_lectura import (  # noqa: E402
 
 logger = logging.getLogger("gen_fur_servicios")
 
-# (encabezado JSON, ¿auto?) en el orden exacto del Diccionario FUR SERVICIOS
+# (clave interna, encabezado legible) en el orden exacto del Diccionario FUR
+# SERVICIOS. El encabezado visible coincide con el ejemplo oficial.
 COLUMNAS = [
-    ("NUM_FACTURA", True),
-    ("NIT_PRESTADOR", True),
-    ("Tipo_de_servicio", True),  # best-effort (revisar)
-    ("Codigo_general_del_procedimiento_quirurgico", False),
-    ("Consecutivo_procedimiento_quirurgico", False),
-    ("Codigo_del_servicio", True),
-    ("Codificacion_CUPS", True),
-    ("Descripción_del_servicio_o_elemento_reclamado", True),
-    ("Cantidad_de_servicios", True),
-    ("Valor_unitario_facturado", True),
-    ("Valor_unitario_reclamado", False),
-    ("Valor_total_facturado", True),
-    ("Valor_total_reclamado", False),
+    ("NUM_FACTURA", "Número factura"),
+    ("NIT_PRESTADOR", "NIT Prestador"),
+    ("Tipo_de_servicio", "Tipo de servicio"),
+    ("Codigo_general_del_procedimiento_quirurgico", "Código general del procedimiento quirúrgico"),
+    ("Consecutivo_procedimiento_quirurgico", "Consecutivo Procedimiento quirúrgico"),
+    ("Codigo_del_servicio", "Código del servicio"),
+    ("Codificacion_CUPS", "Codificación CUPS"),
+    (
+        "Descripción_del_servicio_o_elemento_reclamado",
+        "Descripción del servicio o elemento reclamado",
+    ),
+    ("Cantidad_de_servicios", "Cantidad de servicios"),
+    ("Valor_unitario_facturado", "Valor unitario facturado"),
+    ("Valor_unitario_reclamado", "Valor unitario reclamado"),
+    ("Valor_total_facturado", "Valor total facturado"),
+    ("Valor_total_reclamado", "Valor total reclamado"),
 ]
 
 
@@ -148,9 +155,12 @@ def fila_desde_linea(ln: dict) -> dict:
 
 
 def escribir_excel(filas: list[dict], ruta: Path, meta: dict) -> None:
+    """Escribe el Excel FUR SERVICIOS limpio: una sola hoja, una sola fuente y
+    tamaño, sin colores ni filas de leyenda. Igual al formato del ejemplo oficial.
+    """
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Alignment, Font, PatternFill
+        from openpyxl.styles import Font
         from openpyxl.utils import get_column_letter
     except ImportError:
         sys.stderr.write("ERROR: falta openpyxl.\n  Instalalo con:  py -m pip install openpyxl\n")
@@ -160,63 +170,20 @@ def escribir_excel(filas: list[dict], ruta: Path, meta: dict) -> None:
     ws = wb.active
     ws.title = "FUR_SERVICIOS"
 
-    fill_auto = PatternFill("solid", fgColor="DCFCE7")  # verde claro: auto
-    fill_manual = PatternFill("solid", fgColor="FFE8CC")  # naranja claro: manual
-    header_font = Font(bold=True, size=9, color="FFFFFF")
-    header_fill = PatternFill("solid", fgColor="1E40AF")
-    wrap = Alignment(wrap_text=True, vertical="center", horizontal="center")
+    anchos = [14, 12, 9, 16, 14, 18, 12, 42, 11, 14, 14, 14, 14]
 
-    # Fila 1: encabezados
-    for col_idx, (nombre, _auto) in enumerate(COLUMNAS, 1):
-        c = ws.cell(row=1, column=col_idx, value=nombre)
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = wrap
-        ws.column_dimensions[get_column_letter(col_idx)].width = 22
+    # Fila 1: encabezados (solo negrita, misma fuente y tamaño por defecto)
+    for col_idx, (_clave, encabezado) in enumerate(COLUMNAS, 1):
+        c = ws.cell(row=1, column=col_idx, value=encabezado)
+        c.font = Font(bold=True)
+        ws.column_dimensions[get_column_letter(col_idx)].width = anchos[col_idx - 1]
 
-    # Fila 2: leyenda auto/manual
-    for col_idx, (_nombre, auto) in enumerate(COLUMNAS, 1):
-        etiqueta = "AUTO (RIPS)" if auto else "← completar"
-        c = ws.cell(row=2, column=col_idx, value=etiqueta)
-        c.fill = fill_auto if auto else fill_manual
-        c.font = Font(italic=True, size=8)
-        c.alignment = wrap
+    # Filas de datos: texto plano, sin formato ni color
+    for i, fila in enumerate(filas, start=2):
+        for col_idx, (clave, _enc) in enumerate(COLUMNAS, 1):
+            ws.cell(row=i, column=col_idx, value=fila.get(clave, ""))
 
-    # Filas de datos
-    for i, fila in enumerate(filas, start=3):
-        for col_idx, (nombre, auto) in enumerate(COLUMNAS, 1):
-            c = ws.cell(row=i, column=col_idx, value=fila.get(nombre, ""))
-            if not auto:
-                c.fill = fill_manual
-
-    ws.freeze_panes = "A3"
-
-    # Hoja de resumen / metadatos
-    ws2 = wb.create_sheet("INFO")
-    ws2["A1"] = "FUR SERVICIOS — generado automáticamente desde el RIPS"
-    ws2["A1"].font = Font(bold=True)
-    info_rows = [
-        ("Número de factura", meta.get("num_factura", "")),
-        ("NIT prestador", meta.get("nit_prestador", "")),
-        ("Usuarios en RIPS", meta.get("num_usuarios", "")),
-        ("Total líneas de servicio", len(filas)),
-        ("", ""),
-        ("Verde = autollenado desde el RIPS", ""),
-        ("Naranja = lo completa el prestador", ""),
-        ("", ""),
-        ("OJO: 'Tipo_de_servicio' es best-effort:", ""),
-        ("  consultas/procedim./urgencias → 2", ""),
-        ("  medicamentos → 1", ""),
-        ("  otrosServicios → vacío (insumo/dispositivo/osteo: completar)", ""),
-        ("'Valor_*_reclamado' viene = facturado; bajalo si reclamás menos.", ""),
-        ("'Codigo_del_servicio' para procedimientos requiere código SOAT", ""),
-        ("  (el RIPS trae CUPS, no SOAT): revisar esa columna.", ""),
-    ]
-    for r, (k, v) in enumerate(info_rows, start=3):
-        ws2.cell(row=r, column=1, value=k)
-        ws2.cell(row=r, column=2, value=v)
-    ws2.column_dimensions["A"].width = 55
-    ws2.column_dimensions["B"].width = 20
+    ws.freeze_panes = "A2"
 
     ruta.parent.mkdir(parents=True, exist_ok=True)
     wb.save(ruta)
@@ -319,8 +286,7 @@ def main() -> int:
 
     logger.info(f"  Factura: {meta['num_factura']}   NIT: {meta['nit_prestador']}")
     logger.info(f"  Líneas de servicio: {len(filas)}")
-    logger.info(f"  ✓ Excel generado: {args.salida}")
-    logger.info("  Verde=autollenado / Naranja=completar el prestador (ver hoja INFO).")
+    logger.info(f"  ✓ Excel generado (limpio, sin formato): {args.salida}")
     return 0
 
 
