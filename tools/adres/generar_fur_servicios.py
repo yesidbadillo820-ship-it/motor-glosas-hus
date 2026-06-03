@@ -43,6 +43,11 @@ from cups_catalogo import buscar as buscar_cups  # noqa: E402
 from cups_catalogo import cargar_catalogo  # noqa: E402
 from factura_lectura import hallar_factura_xml  # noqa: E402, F401
 from factura_pdf_lectura import hallar_factura_pdf, leer_factura_pdf  # noqa: E402
+from furips_lectura import (  # noqa: E402
+    cargar_furips2,
+    facturas_en_furips2,
+    hallar_furips2,
+)
 from rips_lectura import (  # noqa: E402
     cargar_rips,
     datos_generales,
@@ -269,6 +274,14 @@ def main() -> int:
         help="Catálogo CUPS oficial (código→nombre) CSV/TSV/XLSX. Resuelve la "
         "descripción de consultas/procedimientos que el RIPS no trae.",
     )
+    parser.add_argument(
+        "--furips2",
+        type=Path,
+        default=None,
+        help="Ruta al FURIPS2*.txt (detalle de servicios). Si se omite y se "
+        "pasó --carpeta, se busca en la carpeta y en su padre. Cuando está "
+        "presente, es la fuente principal del detalle (en vez del PDF).",
+    )
     args = parser.parse_args()
     setup_logging()
 
@@ -290,13 +303,35 @@ def main() -> int:
     data = cargar_rips(rips_path)
     meta = datos_generales(data)
 
-    # PDF de la factura: fuente PRINCIPAL del detalle (código SOAT, nombre,
-    # cantidad, valor y descomposición quirúrgica). El RIPS sólo aporta el CUPS.
+    # Fuente del detalle por orden de preferencia:
+    #   1) FURIPS2 (archivo plano del HUS): trae código SOAT, descripción,
+    #      cantidad, valores y descomposición quirúrgica ya estructurada.
+    #      Es la fuente más confiable cuando está disponible.
+    #   2) PDF de la factura: parser sobre el "Detalle de Cargos".
+    #   3) RIPS: fallback. Pierde la descomposición SOAT/quirúrgica.
+    # En todos los casos el RIPS aporta el CUPS por valor.
+    furips2_path: Path | None = args.furips2
+    if not furips2_path and args.carpeta:
+        furips2_path = hallar_furips2(args.carpeta)
+
     pdf_path: Path | None = None
-    if args.carpeta:
+    if args.carpeta and not furips2_path:
         pdf_path = hallar_factura_pdf(args.carpeta)
 
-    if pdf_path:
+    if furips2_path:
+        logger.info(f"FURIPS2: {furips2_path.name}")
+        factura_id = meta["num_factura"]
+        lineas = cargar_furips2(
+            furips2_path, factura_id, nit_prestador=meta["nit_prestador"]
+        )
+        logger.info(f"  Líneas leídas del FURIPS2: {len(lineas)}")
+        if not lineas:
+            disponibles = facturas_en_furips2(furips2_path)[:8]
+            logger.warning(
+                f"  FURIPS2 no tiene líneas para {factura_id!r}. "
+                f"Facturas en el archivo (primeras 8): {disponibles}"
+            )
+    elif pdf_path:
         logger.info(f"PDF Factura: {pdf_path.name}")
         try:
             lineas_pdf = leer_factura_pdf(pdf_path)
@@ -309,7 +344,7 @@ def main() -> int:
         # Convertimos cada línea del PDF al formato normalizado que usa fila_desde_linea
         lineas = [_linea_desde_pdf(meta, ln) for ln in lineas_pdf]
     else:
-        logger.warning("PDF de la factura no encontrado — fallback al RIPS.")
+        logger.warning("Ni FURIPS2 ni PDF encontrados — fallback al RIPS.")
         lineas = extraer_lineas_servicios(data)
 
     if not lineas:
