@@ -41,7 +41,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cups_catalogo import buscar as buscar_cups  # noqa: E402
 from cups_catalogo import cargar_catalogo  # noqa: E402
-from factura_lectura import cargar_factura_xml, hallar_factura_xml  # noqa: E402
+from factura_lectura import hallar_factura_xml  # noqa: E402, F401
+from factura_pdf_lectura import hallar_factura_pdf, leer_factura_pdf  # noqa: E402
 from rips_lectura import (  # noqa: E402
     cargar_rips,
     datos_generales,
@@ -132,26 +133,78 @@ def enriquecer_con_factura(linea: dict, items_factura: dict, usadas_por_precio: 
 
 
 def fila_desde_linea(ln: dict) -> dict:
-    """Mapea una línea normalizada del RIPS a las 13 columnas del FUR SERVICIOS."""
-    # Si tipo de servicio sigue vacío, último intento por código (cod_servicio
-    # puede haber sido completado desde la factura).
+    """Mapea una línea normalizada a las 13 columnas del FUR SERVICIOS."""
     tipo = ln.get("tipo_servicio_fur") or inferir_tipo_por_codigo(ln.get("cod_servicio", ""))
     return {
-        "NUM_FACTURA": ln["num_factura"],
-        "NIT_PRESTADOR": ln["nit_prestador"],
+        "NUM_FACTURA": ln.get("num_factura", ""),
+        "NIT_PRESTADOR": ln.get("nit_prestador", ""),
         "Tipo_de_servicio": tipo,
-        "Codigo_general_del_procedimiento_quirurgico": "",
-        "Consecutivo_procedimiento_quirurgico": "",
-        "Codigo_del_servicio": ln["cod_servicio"],
-        "Codificacion_CUPS": ln["cups"],
-        "Descripción_del_servicio_o_elemento_reclamado": ln["descripcion"],
-        "Cantidad_de_servicios": ln["cantidad"],
-        "Valor_unitario_facturado": ln["vr_unitario"],
+        "Codigo_general_del_procedimiento_quirurgico": ln.get("cod_general_quirurgico", ""),
+        "Consecutivo_procedimiento_quirurgico": ln.get("consecutivo_quirurgico", ""),
+        "Codigo_del_servicio": ln.get("cod_servicio", ""),
+        "Codificacion_CUPS": ln.get("cups", ""),
+        "Descripción_del_servicio_o_elemento_reclamado": ln.get("descripcion", ""),
+        "Cantidad_de_servicios": ln.get("cantidad", ""),
+        "Valor_unitario_facturado": ln.get("vr_unitario", ""),
         # Punto de partida: reclamado = facturado (el prestador lo puede bajar)
-        "Valor_unitario_reclamado": ln["vr_unitario"],
-        "Valor_total_facturado": ln["vr_total"],
-        "Valor_total_reclamado": ln["vr_total"],
+        "Valor_unitario_reclamado": ln.get("vr_unitario", ""),
+        "Valor_total_facturado": ln.get("vr_total", ""),
+        "Valor_total_reclamado": ln.get("vr_total", ""),
     }
+
+
+def _tipo_fur_desde_pdf(seccion: str, codigo: str) -> str:
+    """Infiere el Tipo de servicio FUR (1-8) según sección del PDF y código."""
+    cod_up = (codigo or "").upper()
+    if cod_up.startswith("FMO"):
+        return "7"  # Material de osteosíntesis
+    if cod_up.startswith("FMQ") or cod_up.startswith("QX"):
+        return "5"  # Insumos
+    if seccion == "medicamentos":
+        return "1"
+    if seccion == "osteo":
+        return "7"
+    if seccion == "insumos":
+        return "5"
+    if seccion in ("consultas", "procedimientos", "quirurgico", "estancias", "derechos_sala"):
+        return "2"
+    return ""
+
+
+def _linea_desde_pdf(meta: dict, ln_pdf: dict) -> dict:
+    """Convierte una línea parseada del PDF al formato normalizado."""
+    seccion = ln_pdf.get("seccion", "")
+    codigo = ln_pdf.get("codigo", "")
+    return {
+        "num_factura": meta.get("num_factura", ""),
+        "nit_prestador": meta.get("nit_prestador", ""),
+        "tipo_servicio_fur": _tipo_fur_desde_pdf(seccion, codigo),
+        "cod_servicio": codigo,
+        "cups": "",  # se enlaza luego desde el RIPS por valor
+        "descripcion": ln_pdf.get("descripcion", ""),
+        "cantidad": ln_pdf.get("cantidad", ""),
+        "vr_unitario": ln_pdf.get("vr_unitario", ""),
+        "vr_total": ln_pdf.get("vr_total", ""),
+        "cod_general_quirurgico": ln_pdf.get("cod_general_quirurgico", ""),
+        "consecutivo_quirurgico": ln_pdf.get("consecutivo_quirurgico", ""),
+        "_seccion": seccion,
+    }
+
+
+def _cups_por_valor_desde_rips(data: dict) -> dict[str, list[str]]:
+    """Indexa CUPS del RIPS por vr_total (string). Sirve para enlazar con el PDF."""
+    idx: dict[str, list[str]] = {}
+    for u in data.get("usuarios") or []:
+        servicios = u.get("servicios") or {}
+        for tipo in ("consultas", "procedimientos", "urgencias"):
+            for it in servicios.get(tipo) or []:
+                cups = it.get("codProcedimiento") or it.get("codConsulta") or ""
+                vr = it.get("vrServicio")
+                if not cups or vr in (None, "", 0):
+                    continue
+                key = str(int(vr)) if isinstance(vr, (int, float)) else str(vr)
+                idx.setdefault(key, []).append(cups)
+    return idx
 
 
 def escribir_excel(filas: list[dict], ruta: Path, meta: dict) -> None:
@@ -236,46 +289,60 @@ def main() -> int:
     logger.info(f"RIPS: {rips_path.name}")
     data = cargar_rips(rips_path)
     meta = datos_generales(data)
-    lineas = extraer_lineas_servicios(data)
+
+    # PDF de la factura: fuente PRINCIPAL del detalle (código SOAT, nombre,
+    # cantidad, valor y descomposición quirúrgica). El RIPS sólo aporta el CUPS.
+    pdf_path: Path | None = None
+    if args.carpeta:
+        pdf_path = hallar_factura_pdf(args.carpeta)
+
+    if pdf_path:
+        logger.info(f"PDF Factura: {pdf_path.name}")
+        try:
+            lineas_pdf = leer_factura_pdf(pdf_path)
+        except SystemExit:
+            raise
+        except Exception as e:
+            logger.error(f"No pude parsear el PDF de la factura: {e}")
+            lineas_pdf = []
+        logger.info(f"  Líneas leídas del PDF: {len(lineas_pdf)}")
+        # Convertimos cada línea del PDF al formato normalizado que usa fila_desde_linea
+        lineas = [_linea_desde_pdf(meta, ln) for ln in lineas_pdf]
+    else:
+        logger.warning("PDF de la factura no encontrado — fallback al RIPS.")
+        lineas = extraer_lineas_servicios(data)
 
     if not lineas:
-        logger.error("El RIPS no trae líneas de servicio (¿estructura distinta?).")
-        logger.error(f"Claves raíz del RIPS: {sorted(data.keys())}")
+        logger.error("No hay líneas para escribir (PDF/RIPS vacíos).")
         return 1
 
-    # Enriquecer con la factura DIAN si está disponible (completa descripción
-    # de consultas/procedimientos y agrega código SOAT).
-    items_factura: dict = {}
-    if args.carpeta:
-        factura_path = hallar_factura_xml(args.carpeta)
-        if factura_path:
-            items_factura = cargar_factura_xml(factura_path)
-            logger.info(f"FEV: {factura_path.name}  ({len(items_factura)} items)")
-        else:
-            logger.info("FEV: no encontrada — sin enriquecimiento por factura.")
+    # CUPS desde el RIPS: enlazamos por vr_total (1:1 cuando es único). El RIPS
+    # es la única fuente del CUPS para procedimientos/consultas.
+    cups_por_valor = _cups_por_valor_desde_rips(data)
+    enlazados_cups = 0
+    for ln in lineas:
+        if ln.get("cups"):
+            continue
+        if ln.get("tipo_servicio_fur") not in ("", "2"):
+            continue
+        candidatos = cups_por_valor.get(ln.get("vr_total", ""), [])
+        if len(candidatos) == 1:
+            ln["cups"] = candidatos[0]
+            enlazados_cups += 1
+    logger.info(f"  CUPS enlazados desde RIPS (por valor único): {enlazados_cups}")
 
-    usadas_por_precio: set = set()
-    if items_factura:
-        lineas = [enriquecer_con_factura(ln, items_factura, usadas_por_precio) for ln in lineas]
-        enriquecidas = sum(1 for ln in lineas if ln.get("descripcion"))
-        logger.info(f"  Líneas con descripción tras enriquecer: {enriquecidas}/{len(lineas)}")
-
-    # Catálogo CUPS: resuelve el nombre de consultas/procedimientos (el RIPS
-    # sólo trae el código). Es la fuente oficial para esas descripciones.
-    if args.cups:
-        if args.cups.is_file():
-            cat = cargar_catalogo(args.cups)
-            logger.info(f"Catálogo CUPS: {len(cat)} códigos")
-            rellenadas = 0
-            for ln in lineas:
-                if not ln.get("descripcion"):
-                    nom = buscar_cups(cat, ln.get("cups", ""))
-                    if nom:
-                        ln["descripcion"] = nom
-                        rellenadas += 1
-            logger.info(f"  Descripciones resueltas por catálogo CUPS: {rellenadas}")
-        else:
-            logger.warning(f"--cups no existe: {args.cups}")
+    # Catálogo CUPS opcional: nombre oficial si quedó algo sin descripción
+    if args.cups and args.cups.is_file():
+        cat = cargar_catalogo(args.cups)
+        logger.info(f"Catálogo CUPS: {len(cat)} códigos")
+        rellenadas = 0
+        for ln in lineas:
+            if not ln.get("descripcion") and ln.get("cups"):
+                nom = buscar_cups(cat, ln["cups"])
+                if nom:
+                    ln["descripcion"] = nom
+                    rellenadas += 1
+        logger.info(f"  Descripciones rellenadas con catálogo CUPS: {rellenadas}")
 
     sin_desc = sum(1 for ln in lineas if not ln.get("descripcion"))
     if sin_desc:
