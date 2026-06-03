@@ -55,15 +55,22 @@ _TIPO_FURIPS_A_FUR = {
 _RE_PREFIJO_QUIRURGICO = re.compile(r"^(\d{4,5})-")
 
 
-def _abrir(ruta: Path):
-    """Abre el archivo tolerando BOM y latin-1."""
-    ultimo: Exception | None = None
-    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+def _leer_texto(ruta: Path) -> str:
+    """Lee el archivo probando varias codificaciones, en orden.
+
+    Los FURIPS del HUS suelen venir en Windows-1252 / latin-1 (acentos como
+    0xC9='É'), NO en UTF-8. Hay que leer los bytes y decodificar de verdad:
+    `open(encoding=...)` no sirve para detectar, porque el error de
+    decodificación sólo se lanza al leer, no al abrir el handle.
+    """
+    raw = ruta.read_bytes()
+    for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
         try:
-            return ruta.open(encoding=enc, newline="")
-        except UnicodeDecodeError as e:
-            ultimo = e
-    raise ValueError(f"No pude leer {ruta}: {ultimo}")
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    # latin-1 mapea cualquier byte 0..255; este fallback no debería alcanzarse.
+    return raw.decode("latin-1", errors="replace")
 
 
 def _entero(s: str) -> str:
@@ -78,20 +85,19 @@ def _entero(s: str) -> str:
 
 def iter_filas_furips2(ruta: Path):
     """Itera las filas crudas del FURIPS2 como dict con columnas nombradas."""
-    with _abrir(ruta) as fh:
-        for row in csv.reader(fh):
-            if len(row) < 9:
-                continue
-            yield {
-                "factura_hus": row[0].strip(),
-                "radicado": row[1].strip(),
-                "tipo": row[2].strip(),
-                "codigo": row[3].strip(),
-                "descripcion": row[4].strip(),
-                "cantidad": row[5].strip(),
-                "vr_unitario": row[6].strip(),
-                "vr_total": row[7].strip(),
-            }
+    for row in csv.reader(_leer_texto(ruta).splitlines()):
+        if len(row) < 9:
+            continue
+        yield {
+            "factura_hus": row[0].strip(),
+            "radicado": row[1].strip(),
+            "tipo": row[2].strip(),
+            "codigo": row[3].strip(),
+            "descripcion": row[4].strip(),
+            "cantidad": row[5].strip(),
+            "vr_unitario": row[6].strip(),
+            "vr_total": row[7].strip(),
+        }
 
 
 def facturas_en_furips2(ruta: Path) -> list[str]:
