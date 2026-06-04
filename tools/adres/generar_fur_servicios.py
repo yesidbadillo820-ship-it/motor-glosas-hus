@@ -251,6 +251,37 @@ def _clave_descripcion(texto: str) -> str:
     return re.sub(r"[^0-9A-Z]", "", s)
 
 
+def _codigos_por_valor_unico_desde_rips(data: dict) -> dict[str, str]:
+    """Indexa {vr_unitario: cod_servicio} cuando hay UN solo código con ese
+    precio en todo el RIPS.
+
+    Es la red de seguridad final cuando ni la descripción ni
+    (descripción + valor) calzan — caso típico: materiales de osteosíntesis
+    del proveedor externo (PRECIMEC / JAIMES RUEDA), donde el RIPS los
+    carga con una descripción genérica distinta a la del FURIPS2 pero el
+    precio unitario es muy específico (ej. $200.515, $2.612.500).
+    """
+    candidatos: dict[str, list[str]] = {}
+    for u in data.get("usuarios") or []:
+        servicios = u.get("servicios") or {}
+        for tipo in ("medicamentos", "otrosServicios", "procedimientos",
+                     "consultas", "urgencias", "recienNacidos", "hospitalizacion"):
+            for it in servicios.get(tipo) or []:
+                cod = (it.get("codTecnologiaSalud") or "").strip()
+                vr_u = (
+                    it.get("vrUnitMedicamento")
+                    or it.get("vrUnitOS")
+                    or it.get("vrServicio")
+                    or 0
+                )
+                if not cod or not vr_u:
+                    continue
+                vr_u_str = str(int(vr_u)) if isinstance(vr_u, (int, float)) else str(vr_u).strip()
+                if vr_u_str and vr_u_str != "0":
+                    candidatos.setdefault(vr_u_str, []).append(cod)
+    return {k: v[0] for k, v in candidatos.items() if len(set(v)) == 1}
+
+
 def _codigos_por_desc_y_valor_desde_rips(data: dict) -> dict[tuple[str, str], str]:
     """Indexa {(descripción_normalizada, vr_unitario): codTecnologiaSalud}.
 
@@ -618,6 +649,24 @@ def main() -> int:
             ln["cod_servicio"] = codigos_por_desc[clave]
             enlazados_cod += 1
     logger.info(f"  Códigos del servicio desde RIPS (sólo descripción): {enlazados_cod}")
+
+    # Red de seguridad final: si el RIPS tiene UN solo código con ese precio
+    # exacto, lo asignamos. Cubre los materiales de osteosíntesis (PRECIMEC,
+    # JAIMES RUEDA) donde la descripción del RIPS y del FURIPS2 no calzan
+    # pero el precio unitario es muy específico.
+    codigos_por_valor_unico = _codigos_por_valor_unico_desde_rips(data)
+    enlazados_valor = 0
+    for ln in lineas:
+        if ln.get("cod_servicio"):
+            continue
+        desc = (ln.get("descripcion") or "").strip()
+        if not desc or desc.startswith("[ELEGIR]"):
+            continue
+        vr_u = ln.get("vr_unitario", "")
+        if vr_u and vr_u in codigos_por_valor_unico:
+            ln["cod_servicio"] = codigos_por_valor_unico[vr_u]
+            enlazados_valor += 1
+    logger.info(f"  Códigos del servicio desde RIPS (sólo valor único): {enlazados_valor}")
 
     # Diagnóstico: listar las descripciones que quedaron sin código para
     # entender qué falta (el RIPS no las trae, o vienen con otra redacción).
