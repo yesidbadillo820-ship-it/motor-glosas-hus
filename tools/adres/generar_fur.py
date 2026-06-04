@@ -38,7 +38,8 @@ from rips_lectura import cargar_rips  # noqa: E402
 
 logger = logging.getLogger("generar_fur")
 
-NIT_HUS_DEFECTO = "900006037"  # NIT del HUS sin dígito de verificación
+NIT_HUS_DEFECTO = "900006037"  # NIT del HUS sin dígito de verificación (confirmado)
+LARGO_MIN_DESCRIPCION = 100    # ADRES pide una descripción suficiente del hecho
 
 
 def setup_logging() -> None:
@@ -114,6 +115,26 @@ def validar_fila(fila: dict) -> list[str]:
     return faltan
 
 
+def revisar_fila(fila: dict) -> list[str]:
+    """Campos presentes que conviene revisar antes de radicar (AMARILLO).
+
+    No son faltantes (no van en rojo): el dato está, pero algo no cuadra y un
+    humano debería confirmarlo. No se inventa ni se borra nada.
+    """
+    revisar: list[str] = []
+    # Descripción corta: ADRES exige un relato suficiente del hecho.
+    desc = (fila.get("Descripcion_corta_de_lo_ocurrido_en_el_evento") or "").strip()
+    if desc and len(desc) < LARGO_MIN_DESCRIPCION:
+        revisar.append("Descripcion_corta_de_lo_ocurrido_en_el_evento")
+    # SIRAS: el radicado es numérico. Si trae letras (p. ej. un CUV/hash de
+    # 16 caracteres tipo '51f9e585…'), se resalta para verificar; no se asume
+    # que sea un radicado válido ni se borra.
+    siras = (fila.get("Numero_de_radicado_SIRAS") or "").strip()
+    if siras and not siras.isdigit():
+        revisar.append("Numero_de_radicado_SIRAS")
+    return revisar
+
+
 def diagnostico(ruta: Path, num_factura: str) -> None:
     """Imprime posición→valor→campo mapeado para una factura."""
     crudas = filas_crudas(ruta)
@@ -163,7 +184,8 @@ def escribir_excel(filas: list[dict], salida: Path) -> None:
     ws.title = "FUR"
     encabezado_fill = PatternFill("solid", fgColor="1F4E78")
     encabezado_font = Font(bold=True, color="FFFFFF")
-    falta_fill = PatternFill("solid", fgColor="FFC7CE")  # rojo claro
+    falta_fill = PatternFill("solid", fgColor="FFC7CE")    # rojo: obligatorio vacío
+    revisar_fill = PatternFill("solid", fgColor="FFEB9C")  # amarillo: revisar
 
     # Fila 1: encabezados en español.
     for col, etiqueta in enumerate(ENCABEZADOS_FUR, start=1):
@@ -174,10 +196,13 @@ def escribir_excel(filas: list[dict], salida: Path) -> None:
     # Filas de datos.
     for r, fila in enumerate(filas, start=2):
         faltan = set(validar_fila(fila))
+        revisar = set(revisar_fila(fila))
         for col, campo in enumerate(CAMPOS_FUR, start=1):
             celda = ws.cell(row=r, column=col, value=fila.get(campo, ""))
             if campo in faltan:
                 celda.fill = falta_fill
+            elif campo in revisar:
+                celda.fill = revisar_fill
 
     wb.save(str(salida))
 
@@ -265,6 +290,7 @@ def main() -> None:
 
     # Reporte de validación.
     total_faltan = 0
+    total_revisar = 0
     for fila in filas:
         faltan = validar_fila(fila)
         if faltan:
@@ -272,10 +298,15 @@ def main() -> None:
             fac = fila.get("NUM_FACTURA", "?")
             logger.info(f"  ⚠ {fac}: {len(faltan)} campo(s) por completar → {', '.join(faltan[:6])}"
                         + (" …" if len(faltan) > 6 else ""))
+        if revisar_fila(fila):
+            total_revisar += 1
     if total_faltan:
         logger.info(f"  {total_faltan}/{len(filas)} factura(s) con campos pendientes (resaltados en rojo).")
     else:
         logger.info("  Todas las facturas pasaron la validación de obligatorios.")
+    if total_revisar:
+        logger.info(f"  {total_revisar}/{len(filas)} factura(s) para revisar (amarillo): "
+                    f"descripción < {LARGO_MIN_DESCRIPCION} car. o SIRAS no numérico.")
 
     escribir_excel(filas, args.salida)
     logger.info(f"  ✓ Excel FUR generado: {args.salida}")

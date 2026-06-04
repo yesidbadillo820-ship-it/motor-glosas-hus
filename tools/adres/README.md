@@ -41,6 +41,12 @@ diccionario ADRES exige según la naturaleza y el estado de aseguramiento:
   (no identificado) esos campos quedan legítimamente vacíos y no se exigen.
 - SIRAS: obligatorio si la ocurrencia es posterior al 01/06/2023.
 
+Además resalta en **amarillo** (no es faltante, es "revisar antes de radicar",
+el dato está pero conviene confirmarlo):
+- Descripción corta con menos de 100 caracteres (relato insuficiente del hecho).
+- Número de radicado SIRAS no numérico (p. ej. si el export trae un CUV/hash
+  en esa columna en vez del radicado). No se borra ni se inventa: se marca.
+
 ## Uso rápido
 
 ```bat
