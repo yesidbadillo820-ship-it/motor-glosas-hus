@@ -186,8 +186,35 @@ def main() -> None:
     parser.add_argument("--nit", type=str, default=None, help="NIT del prestador (si no, se toma del RIPS o el del HUS).")
     parser.add_argument("--salida", type=Path, help="Excel .xlsx de salida.")
     parser.add_argument("--diagnostico", action="store_true", help="Imprime el mapeo posición→campo para verificar.")
+    parser.add_argument("--buscar", type=Path, default=None, help="Escanea una carpeta (recursivo) y reporta qué archivos contienen filas de facturas HUS.")
     args = parser.parse_args()
     setup_logging()
+
+    if args.buscar:
+        if not args.buscar.is_dir():
+            logger.error(f"No es una carpeta: {args.buscar}")
+            sys.exit(1)
+        logger.info(f"Buscando exports con filas HUS en: {args.buscar}\n")
+        encontrados = 0
+        for p in sorted(args.buscar.rglob("*")):
+            if not p.is_file() or p.suffix.lower() not in (".csv", ".txt", ".tsv", ".xlsx", ".xlsm"):
+                continue
+            try:
+                filas = filas_crudas(p)
+            except Exception as e:
+                logger.info(f"  (no pude leer {p.name}: {e})")
+                continue
+            if filas:
+                encontrados += 1
+                facturas = sorted({f[2] for f in filas if len(f) > 2})
+                muestra = ", ".join(facturas[:3]) + (" …" if len(facturas) > 3 else "")
+                logger.info(f"  ✓ {p}")
+                logger.info(f"      {len(filas)} fila(s), {len(facturas)} factura(s): {muestra}")
+        if not encontrados:
+            logger.info("  No hallé ningún archivo con filas de facturas HUS.")
+        else:
+            logger.info(f"\n  Usá el archivo correcto con --fur \"<ruta>\".")
+        return
 
     fur_path = args.fur
     if not fur_path and args.carpeta:
