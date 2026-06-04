@@ -24,8 +24,14 @@
 (function () {
   'use strict';
 
+  // Umbrales alineados con el render del backend (index.html ~14513):
+  //   score >= 85 → verde, >= 65 → ámbar, resto → rojo.
+  // Mantenerlos iguales evita que el gauge muestre verde donde el backend
+  // considera el score "medio" (incoherencia de color + subtítulo).
+  const UMBRAL_ALTO = 85;
+  const UMBRAL_MEDIO = 65;
   const COLOR_EXITO = (pct) =>
-    pct >= 75 ? '#16a34a' : pct >= 50 ? '#d97706' : '#e11d48';
+    pct >= UMBRAL_ALTO ? '#16a34a' : pct >= UMBRAL_MEDIO ? '#d97706' : '#e11d48';
 
   // ──────────────────────────────────────────────────────────────────
   // 1. GAUGE CIRCULAR (Probabilidad de éxito)
@@ -67,9 +73,9 @@
       '<div class="sds-gauge-text">' +
       '<div class="sds-gauge-text-title"></div>' +
       '<div class="sds-gauge-text-sub">' +
-      (pct >= 75
+      (pct >= UMBRAL_ALTO
         ? 'Alta probabilidad de levantamiento. Argumento sólido.'
-        : pct >= 50
+        : pct >= UMBRAL_MEDIO
         ? 'Probabilidad media. Considera reforzar con soportes.'
         : 'Probabilidad baja. Requiere más evidencia documental.') +
       '</div>' +
@@ -111,18 +117,37 @@
   // 3. DICTAMEN HÉROE + citas clickeables (TreeWalker seguro)
   // ──────────────────────────────────────────────────────────────────
   // Una sola regex combinada; se aplica SOLO a nodos de texto.
+  // Cubre las formas reales que aparecen en los dictámenes del banco HUS:
+  //   · prosa:    "ART. 168 DE LA LEY 100 DE 1993", "Artículo 56 de la Ley 1438 de 2011"
+  //   · suelta:   "Decreto 4747 de 2007", "Resolución 3047 de 2008"
+  //   · compacta: "Ley 1438/2011", "Resolución 2284/2023" (lista FUNDAMENTO)
+  //   · sentencia:"Sentencia T-760/2008", "Sentencia C-313 de 2014"
+  // Los conectores internos usan [^\S\n] (espacio sin salto de línea) para no
+  // fusionar dos citas que estén en renglones distintos del mismo nodo.
+  const _NORMA = '(?:Ley|Decreto|Resoluci[óo]n|C[óo]digo)';
+  const _ART = '(?:Art[íi]culos?|Arts?\\.)';
+  const _ANIO = '(?:[^\\S\\n]*\\/[^\\S\\n]*\\d{2,4}|[^\\S\\n]+de[^\\S\\n]+\\d{4})';
   const RE_CITA = new RegExp(
     [
-      'Art[íi]culo\\s+\\d+[º°]?(?:\\s+(?:del?|de\\s+la)\\s+)?(?:Decreto|Ley|C[óo]digo|Resoluci[óo]n)\\s+[\\d.]+(?:\\s+de\\s+\\d{4})?',
-      'Art\\.\\s*\\d+[º°]?\\s+(?:Ley|Decreto|Resoluci[óo]n)\\s+[\\d.]+(?:\\/\\d{4}|\\s+de\\s+\\d{4})?',
-      'Decreto\\s+[\\d.]+\\s+de\\s+\\d{4}',
-      'Ley\\s+[\\d.]+\\s+de\\s+\\d{4}',
-      'Resoluci[óo]n\\s+[\\d.]+\\s+de\\s+\\d{4}',
-      'Sentencia\\s+[TCSU]+-?\\d+[\\/-]\\d{2,4}',
+      // A) Artículo(s) [de (la)] Norma N [de YYYY | /YYYY]
+      _ART +
+        '[^\\S\\n]*\\d+[º°]?(?:[^\\S\\n]*(?:,|y|e)[^\\S\\n]*\\d+[º°]?)*' +
+        '(?:[^\\S\\n]+(?:de[^\\S\\n]+la|del|de))?' +
+        '[^\\S\\n]+' +
+        _NORMA +
+        '[^\\S\\n]+\\d[\\d.]*(?:' +
+        _ANIO +
+        ')?',
+      // B) Norma N de YYYY   (suelta, sin artículo previo)
+      _NORMA + '[^\\S\\n]+\\d[\\d.]*[^\\S\\n]+de[^\\S\\n]+\\d{4}',
+      // C) Norma N/YYYY      (forma compacta de la lista FUNDAMENTO)
+      _NORMA + '[^\\S\\n]+\\d[\\d.]*[^\\S\\n]*\\/[^\\S\\n]*\\d{2,4}',
+      // D) Sentencia X-NNN/YYYY  o  X-NNN de YYYY
+      'Sentencia[^\\S\\n]+[TCSU]+-?[^\\S\\n]?\\d+(?:[^\\S\\n]*[\\/-][^\\S\\n]*|[^\\S\\n]+de[^\\S\\n]+)\\d{2,4}',
     ].join('|'),
     'gi'
   );
-  const PREFILTRO = /(Art|Ley|Decreto|Resol|Sentencia)/i;
+  const PREFILTRO = /(Art|Ley|Decreto|Resol|C[óo]digo|Sentencia)/i;
 
   function wrapCitasEnNodo(textNode) {
     const text = textNode.nodeValue;
