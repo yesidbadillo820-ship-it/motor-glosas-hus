@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -234,6 +235,47 @@ def _descripciones_por_codigo_desde_rips(data: dict) -> dict[str, str]:
                 if cod and nom:
                     idx.setdefault(cod, nom)
     return idx
+
+
+def _clave_descripcion(texto: str) -> str:
+    """Normaliza una descripción para comparar entre RIPS y FURIPS2.
+
+    Mayúsculas, sin tildes, sin signos ni espacios. 'Jeringa Desechable 10 ML'
+    y 'JERINGA DESECHABLE  10ML' colapsan a 'JERINGADESECHABLE10ML'.
+    """
+    s = (texto or "").upper().strip()
+    # tildes y eñes a su forma simple
+    for a, b in (("Á", "A"), ("É", "E"), ("Í", "I"), ("Ó", "O"), ("Ú", "U"), ("Ñ", "N")):
+        s = s.replace(a, b)
+    # sólo letras y dígitos
+    return re.sub(r"[^0-9A-Z]", "", s)
+
+
+def _codigos_por_descripcion_desde_rips(data: dict) -> dict[str, str]:
+    """Indexa {descripción_normalizada: codTecnologiaSalud} desde el RIPS.
+
+    Sirve para llenar `cod_servicio` cuando el FURIPS2 lo deja vacío — caso
+    típico de insumos (tipo 6) y materiales de osteosíntesis (tipo 7), donde
+    el manual SOAT no codifica pero el RIPS sí trae el código del prestador.
+
+    Sólo se retienen descripciones con código ÚNICO en el RIPS, para evitar
+    asignaciones ambiguas (dos jeringas distintas con la misma descripción
+    pero códigos distintos quedan fuera).
+    """
+    candidatos: dict[str, list[str]] = {}
+    for u in data.get("usuarios") or []:
+        servicios = u.get("servicios") or {}
+        for tipo in ("medicamentos", "otrosServicios", "procedimientos",
+                     "consultas", "urgencias", "recienNacidos"):
+            for it in servicios.get(tipo) or []:
+                cod = (it.get("codTecnologiaSalud") or "").strip()
+                nom = (it.get("nomTecnologiaSalud") or "").strip()
+                if not cod or not nom:
+                    continue
+                clave = _clave_descripcion(nom)
+                if clave:
+                    candidatos.setdefault(clave, []).append(cod)
+    return {k: v[0] for k, v in candidatos.items() if len(set(v)) == 1}
 
 
 def escribir_excel(filas: list[dict], ruta: Path, meta: dict) -> None:
@@ -506,6 +548,26 @@ def main() -> int:
             ln["cups"] = candidatos[0]
             enlazados_cups += 1
     logger.info(f"  CUPS enlazados desde RIPS (por valor único): {enlazados_cups}")
+
+    # Código del servicio desde el RIPS por descripción única: cubre insumos
+    # (tipo 6) y materiales de osteosíntesis (tipo 7), donde el FURIPS2 no
+    # trae código (el manual SOAT no codifica insumos) pero el RIPS sí trae
+    # el codTecnologiaSalud del prestador. Se enlaza por descripción
+    # normalizada para ser robusto a diferencias de mayúsculas, tildes y
+    # espacios entre las dos fuentes.
+    codigos_por_desc = _codigos_por_descripcion_desde_rips(data)
+    enlazados_cod = 0
+    for ln in lineas:
+        if ln.get("cod_servicio"):
+            continue
+        desc = (ln.get("descripcion") or "").strip()
+        if not desc or desc.startswith("[ELEGIR]"):
+            continue
+        clave = _clave_descripcion(desc)
+        if clave and clave in codigos_por_desc:
+            ln["cod_servicio"] = codigos_por_desc[clave]
+            enlazados_cod += 1
+    logger.info(f"  Códigos del servicio desde RIPS (por descripción única): {enlazados_cod}")
 
     # Catálogo CUPS opcional: nombre oficial si quedó algo sin descripción
     if args.cups and args.cups.is_file():
