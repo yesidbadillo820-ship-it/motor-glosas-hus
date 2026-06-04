@@ -1,0 +1,2 @@
+codigo,descripcion
+000000,"EJEMPLO: borra esta fila y pega una por cada codigo del manual ISS/SOAT con su descripcion oficial. Encabezados validos: codigo|cups|codigo y nombre|descripcion|servicio. Acepta .csv .tsv .xlsx"

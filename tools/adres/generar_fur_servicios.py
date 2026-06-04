@@ -299,6 +299,14 @@ def main() -> int:
         "descripción de consultas/procedimientos que el RIPS no trae.",
     )
     parser.add_argument(
+        "--soat",
+        type=Path,
+        default=None,
+        help="Manual tarifario ISS/SOAT (código→descripción) CSV/TSV/XLSX. "
+        "Resuelve por código del servicio los procedimientos que un mismo "
+        "código de tarifa cubre (los que si no quedarían marcados [ELEGIR]).",
+    )
+    parser.add_argument(
         "--furips2",
         type=Path,
         default=None,
@@ -438,6 +446,25 @@ def main() -> int:
             ln["descripcion"] = desc_por_cod_servicio[cod]
             propagados += 1
     logger.info(f"  Descripciones propagadas por código SOAT: {propagados}")
+
+    # Manual tarifario ISS/SOAT (opcional): descripción oficial por código del
+    # servicio. Resuelve los códigos de tarifa que cubren varios procedimientos
+    # (los que si no quedarían marcados [ELEGIR]) con el nombre canónico del
+    # manual. Sólo llena lo que sigue vacío, así las descripciones específicas y
+    # limpias del DIAN/RIPS mantienen prioridad.
+    if args.soat and args.soat.is_file():
+        cat_soat = cargar_catalogo(args.soat)
+        logger.info(f"Manual ISS/SOAT: {len(cat_soat)} códigos")
+        enlazados_soat = 0
+        for ln in lineas:
+            if ln.get("descripcion"):
+                continue
+            cod = (ln.get("cod_servicio") or "").strip()
+            nom = buscar_cups(cat_soat, cod) if cod else ""
+            if nom:
+                ln["descripcion"] = nom
+                enlazados_soat += 1
+        logger.info(f"  Descripciones desde manual ISS/SOAT (por código): {enlazados_soat}")
 
     # Candidatos ambiguos del DIAN: para precios donde un código SOAT cubre
     # varios procedimientos, no hay forma automática de elegir. Se rellenan los

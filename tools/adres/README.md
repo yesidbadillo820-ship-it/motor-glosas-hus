@@ -40,7 +40,32 @@ REM 2) Generar el FUR SERVICIOS del RIPS
 py generar_fur_servicios.py ^
     --carpeta "C:\...\FACTURAS\HUS428139" ^
     --salida  "C:\...\FACTURAS\HUS428139_FURSERVICIOS.xlsx"
+
+REM 2b) Igual, pero resolviendo las descripciones ambiguas con el manual ISS/SOAT
+py generar_fur_servicios.py ^
+    --carpeta "C:\...\FACTURAS\HUS428139" ^
+    --furips2 "C:\...\FACTURAS\FURIPS2....txt" ^
+    --soat    "C:\...\manual_soat.csv" ^
+    --salida  "C:\...\FACTURAS\HUS428139_FURSERVICIOS.xlsx"
 ```
+
+### Descripción del servicio: de dónde sale
+
+Por orden de prioridad (cada fuente sólo llena lo que la anterior dejó vacío):
+
+1. **FURIPS2** (detalle del HUS) — descripción y código SOAT directos.
+2. **RIPS por código** — medicamentos (CUM) y servicios con `codTecnologiaSalud`.
+3. **PDF DIAN, precio único** — un solo servicio a ese precio → descripción limpia.
+4. **Propagación por código SOAT** — copia entre líneas del mismo código.
+5. **Manual ISS/SOAT (`--soat`)** — descripción oficial por código del servicio.
+   Resuelve los códigos de tarifa que cubren varios procedimientos.
+6. **PDF DIAN, precio ambiguo** — si nada anterior resolvió, marca `[ELEGIR]`
+   con los candidatos del DIAN para que el coordinador escoja antes de radicar.
+
+El manual `--soat` es un CSV/TSV/XLSX `código→descripción` (ver
+`manual_soat_PLANTILLA.csv`). Con él, los renglones que de otro modo quedarían
+`[ELEGIR]` (un código SOAT = varios procedimientos al mismo precio) toman el
+nombre canónico del manual y quedan radicables.
 
 ## Nombramiento ADRES de soportes (para el ZIP final)
 
