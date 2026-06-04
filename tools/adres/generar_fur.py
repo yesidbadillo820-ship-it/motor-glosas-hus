@@ -81,13 +81,17 @@ def validar_fila(fila: dict) -> list[str]:
     es_transito = naturaleza == "01"
 
     if es_transito:
-        # Condición y tipo de vehículo siempre exigibles en tránsito.
-        for campo in ("Condicion_victima", "Tipo_de_Vehiculo"):
-            if not (fila.get(campo) or "").strip():
-                faltan.append(campo)
-        # Placa: obligatoria si estado en (2,4,6,7); vacía si (3,8).
-        if estado in ("2", "4", "6", "7") and not (fila.get("Placa_vehiculo") or "").strip():
-            faltan.append("Placa_vehiculo")
+        # Condición de la víctima: siempre exigible en accidente de tránsito.
+        if not (fila.get("Condicion_victima") or "").strip():
+            faltan.append("Condicion_victima")
+        # Placa y tipo de vehículo: obligatorios si el vehículo está
+        # identificado (estado 2, 4, 6, 7). En estado 3 (vehículo fantasma /
+        # se da a la fuga) y 8 (no identificado) quedan legítimamente vacíos
+        # según el diccionario ADRES, así que NO se exigen.
+        if estado in ("2", "4", "6", "7"):
+            for campo in ("Placa_vehiculo", "Tipo_de_Vehiculo"):
+                if not (fila.get(campo) or "").strip():
+                    faltan.append(campo)
         # SIRAS: obligatorio si la ocurrencia es posterior al 01/06/2023.
         fecha = (fila.get("Fecha_de_ocurrencia_evento") or "").strip()
         if fecha >= "2023-06-01" and not (fila.get("Numero_de_radicado_SIRAS") or "").strip():

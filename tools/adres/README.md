@@ -11,7 +11,8 @@ correr **desde cualquier PC**: rutas por parámetro, sin nada hardcodeado.
 | `inspeccionar_soportes.py` | ✅ | Inventaría una carpeta de factura, clasifica cada soporte al código ADRES y lee el RIPS/CUV/FEV | stdlib |
 | `rips_lectura.py` | ✅ | Módulo compartido: parseo y normalización del RIPS | stdlib |
 | `generar_fur_servicios.py` | ✅ | Excel **FUR SERVICIOS** pre-rellenado desde el RIPS | openpyxl |
-| `generar_fur.py` | ⬜ | Excel **FUR** (autollena víctima desde RIPS+aviso; resto manual/IPAT) | openpyxl |
+| `fur_lectura.py` | ✅ | Módulo compartido: lee el export del HUS (.xlsx/.csv/.tsv/.txt) y lo mapea a los 62 campos FUR | openpyxl |
+| `generar_fur.py` | ✅ | Excel **FUR** (62 campos) por factura o masivo desde el export del HUS, con validación de obligatorios/condicionantes | openpyxl |
 | `generar_json_zip.py` | ⬜ | Excel completado → JSON ADRES + ZIP con soportes renombrados | stdlib |
 | `cargar_masivo_adres.py` | ⬜ | Procesa muchas facturas + reporte CSV | — |
 
@@ -24,11 +25,21 @@ correr **desde cualquier PC**: rutas por parámetro, sin nada hardcodeado.
   quirúrgico, valores *reclamados* (vienen = facturado como punto de partida),
   y el código **SOAT** de procedimientos (el RIPS trae CUPS, no SOAT).
 
-**FUR** (62 campos, accidente de tránsito):
-- AUTO desde RIPS: NIT, factura, tipo/número doc víctima, fecha nac., municipio.
-- AUTO desde el aviso (`IPO`): nombres/apellidos, dirección de la víctima.
-- MANUAL / desde IPAT-FURIPS: vehículo, conductor, propietario, póliza SOAT,
-  SIRAS, zona/dirección de ocurrencia, condición de la víctima (~40 campos).
+**FUR** (62 campos): **~100% automático** desde el export consolidado del HUS
+(el `FURIPS1...txt`, una fila por factura). El export ya trae víctima, evento,
+vehículo, propietario, conductor y atención; `fur_lectura.py` mapea cada
+posición al campo oficial y normaliza formatos (fechas `DD/MM/AAAA`→`AAAA-MM-DD`,
+zona `U/R`→`02/01`, municipio depto+muni→DIVIPOLA de 5 dígitos).
+
+La **validación** (no inventa datos) resalta en rojo los campos vacíos que el
+diccionario ADRES exige según la naturaleza y el estado de aseguramiento:
+- Siempre: NIT, factura, doc. víctima, naturaleza, fecha/zona/municipio/
+  dirección de ocurrencia, descripción corta, tipo de atención.
+- En tránsito: condición de la víctima; y placa + tipo de vehículo,
+  conductor y propietario **sólo si el vehículo está identificado**
+  (estado 2/4/6/7). En estado 3 (vehículo fantasma / se da a la fuga) y 8
+  (no identificado) esos campos quedan legítimamente vacíos y no se exigen.
+- SIRAS: obligatorio si la ocurrencia es posterior al 01/06/2023.
 
 ## Uso rápido
 
@@ -47,6 +58,25 @@ py generar_fur_servicios.py ^
     --furips2 "C:\...\FACTURAS\FURIPS2....txt" ^
     --soat    "C:\...\manual_soat.csv" ^
     --salida  "C:\...\FACTURAS\HUS428139_FURSERVICIOS.xlsx"
+
+REM 3) Localizar el export del HUS (escanea recursivo y reporta filas/facturas)
+py generar_fur.py --buscar "C:\Users\Usuario\Downloads"
+
+REM 4) FUR de UNA factura
+py generar_fur.py ^
+    --fur     "C:\...\FACTURAS\FURIPS168001....txt" ^
+    --factura HUS428139 ^
+    --salida  "C:\...\FACTURAS\HUS428139_FUR.xlsx"
+
+REM 4b) Verificar el mapeo posición→campo de una factura (no genera Excel)
+py generar_fur.py ^
+    --fur     "C:\...\FACTURAS\FURIPS168001....txt" ^
+    --factura HUS428139 --diagnostico
+
+REM 5) FUR masivo (TODAS las facturas del export en un solo Excel)
+py generar_fur.py ^
+    --fur    "C:\...\FACTURAS\FURIPS168001....txt" ^
+    --salida "C:\...\FACTURAS\lote_FUR.xlsx"
 ```
 
 ### Descripción del servicio: de dónde sale
