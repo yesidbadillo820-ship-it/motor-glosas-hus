@@ -193,7 +193,18 @@ def main() -> None:
     if not fur_path and args.carpeta:
         fur_path = hallar_fur_csv(args.carpeta)
     if not fur_path or not fur_path.is_file():
-        logger.error("No encontré el CSV export del HUS. Pasalo con --fur o --carpeta.")
+        if args.fur and not args.fur.is_file():
+            logger.error(f"El archivo NO existe en esa ruta: {args.fur}")
+            padre = args.fur.parent
+            if padre.is_dir():
+                cand = [p.name for p in sorted(padre.iterdir())
+                        if p.suffix.lower() in (".csv", ".txt", ".tsv", ".xlsx", ".xlsm")]
+                if cand:
+                    logger.error("  Archivos candidatos en esa carpeta:")
+                    for n in cand:
+                        logger.error(f"    {n}")
+        else:
+            logger.error("No encontré el export del HUS. Pasalo con --fur o --carpeta.")
         sys.exit(1)
     logger.info(f"Export FUR del HUS: {fur_path.name}")
 

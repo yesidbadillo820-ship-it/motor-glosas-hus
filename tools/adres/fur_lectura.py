@@ -268,32 +268,69 @@ def _mapear_fila(c: list[str], nit_prestador: str) -> dict:
 
 
 def leer_fur_hus(ruta: Path, nit_prestador: str) -> list[dict]:
-    """Lee el CSV del HUS y devuelve una lista de dicts (uno por factura)."""
-    filas: list[dict] = []
+    """Lee el export del HUS (.csv/.txt/.tsv o .xlsx) y devuelve dicts FUR."""
+    return [_mapear_fila(c, nit_prestador) for c in filas_crudas(ruta)]
+
+
+def _rebase_factura(row: list[str]) -> list[str] | None:
+    """Re-alinea una fila para que el número de factura quede en el índice 2.
+
+    El layout verificado tiene 2 columnas vacías y la factura (HUS…) en la
+    posición 2. Si el origen (p. ej. un Excel) no trae esas dos columnas
+    iniciales, buscamos la celda 'HUS<dígitos>' y reconstruimos la fila para
+    que caiga en el índice 2. Devuelve None si no hay factura HUS en la fila.
+    """
+    idx = None
+    for i, v in enumerate(row):
+        if re.match(r"^HUS\d+$", (v or "").strip(), re.IGNORECASE):
+            idx = i
+            break
+    if idx is None:
+        return None
+    return ["", ""] + [(v or "").strip() for v in row[idx:]]
+
+
+def _leer_xlsx(ruta: Path) -> list[list[str]]:
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        raise ImportError("Para leer .xlsx instalá openpyxl (pip install openpyxl)")
+    filas: list[list[str]] = []
+    wb = load_workbook(filename=str(ruta), read_only=True, data_only=True)
+    for ws in wb.worksheets:
+        for row in ws.iter_rows(values_only=True):
+            celdas = ["" if c is None else str(c) for c in row]
+            reb = _rebase_factura(celdas)
+            if reb:
+                filas.append(reb)
+    return filas
+
+
+def _leer_texto(ruta: Path) -> list[list[str]]:
+    """Lee CSV/TSV/TXT probando coma, tab y punto y coma."""
     for enc in ("utf-8-sig", "utf-8", "latin-1"):
         try:
-            with ruta.open(encoding=enc, newline="") as fh:
-                for row in csv.reader(fh):
-                    if len(row) < 30:  # línea de ruido / encabezado
-                        continue
-                    if not (row[2] if len(row) > 2 else "").strip().upper().startswith("HUS"):
-                        continue
-                    filas.append(_mapear_fila(row, nit_prestador))
-            return filas
+            texto = ruta.read_text(encoding=enc)
+            break
         except UnicodeDecodeError:
             continue
-    raise ValueError(f"No pude leer el export FUR del HUS: {ruta}")
+    else:
+        return []
+    lineas = texto.splitlines()
+    mejor: list[list[str]] = []
+    for sep in (",", "\t", ";"):
+        filas: list[list[str]] = []
+        for ln in lineas:
+            reb = _rebase_factura(ln.split(sep))
+            if reb:
+                filas.append(reb)
+        if len(filas) > len(mejor):
+            mejor = filas
+    return mejor
 
 
 def filas_crudas(ruta: Path) -> list[list[str]]:
-    """Devuelve las filas crudas (para el modo diagnóstico posicional)."""
-    for enc in ("utf-8-sig", "utf-8", "latin-1"):
-        try:
-            with ruta.open(encoding=enc, newline="") as fh:
-                return [
-                    row for row in csv.reader(fh)
-                    if len(row) > 2 and row[2].strip().upper().startswith("HUS")
-                ]
-        except UnicodeDecodeError:
-            continue
-    return []
+    """Devuelve las filas (re-alineadas, factura en índice 2) de cualquier formato."""
+    if ruta.suffix.lower() in (".xlsx", ".xlsm"):
+        return _leer_xlsx(ruta)
+    return _leer_texto(ruta)
