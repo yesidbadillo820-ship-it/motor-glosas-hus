@@ -400,29 +400,52 @@ def _clave_desc(d: str) -> str:
     return re.sub(r"[^0-9A-Za-z]", "", d).upper()
 
 
-def descripciones_dian_pdf(pdf_path: Path) -> dict[str, str]:
-    """Devuelve {vr_unitario: descripcion} desde la representación DIAN.
+# Marcador para descripciones que el coordinador debe resolver a mano: un
+# código SOAT que cubre varios procedimientos al mismo precio (no se puede
+# elegir automáticamente). NO radicar tal cual.
+MARCA_ELEGIR = "[ELEGIR]"
 
-    Sólo retorna `vr_unitario`s con descripción ÚNICA en todo el documento
-    (cuando varios renglones distintos comparten el mismo precio unitario,
-    queda fuera para no asignar mal).
+
+def _variante_mas_limpia(descs: list[str]) -> str:
+    """De varias formas del MISMO texto, la menos fragmentada ('PELVIS' > 'PEL VIS')."""
+    return min(descs, key=lambda d: (d.count(" "), len(d)))
+
+
+def _clasificar_candidatos_dian(
+    candidatos: dict[str, list[str]],
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Separa los precios del DIAN en (únicos, ambiguos).
+
+    - únicos[vr]:   a ese precio hay un solo servicio (modulo cortes de
+                    palabra) → descripción limpia, asignable directo.
+    - ambiguos[vr]: a ese precio hay varios servicios genuinamente distintos
+                    (un código de tarifa que cubre varios procedimientos) →
+                    candidatos unidos y marcados con [ELEGIR].
     """
-    candidatos = _candidatos_dian_pdf(pdf_path)
-
-    # Retener vr_unitarios cuya descripción es CONSISTENTE. El mismo servicio
-    # repetido puede venir con cortes de palabra distintos en cada renglón
-    # ('TORAX Y PEL VIS' vs 'TORAX Y PELVIS'); los tratamos como iguales
-    # comparando sin espacios ni signos. Sólo se descarta cuando hay un choque
-    # real: dos servicios genuinamente distintos al mismo precio unitario
-    # (ahí las claves normalizadas difieren). De las variantes equivalentes
-    # devolvemos la menos fragmentada.
-    salida: dict[str, str] = {}
+    unicas: dict[str, str] = {}
+    ambiguas: dict[str, str] = {}
     for vr, descs in candidatos.items():
-        if len({_clave_desc(d) for d in descs}) == 1:
-            # Mismo contenido de letras en todas: elegimos la menos fragmentada
-            # (menos espacios = palabras más cosidas), p.ej. 'PELVIS' > 'PEL VIS'.
-            salida[vr] = min(descs, key=lambda d: (d.count(" "), len(d)))
-    return salida
+        grupos: dict[str, list[str]] = {}
+        for d in descs:
+            grupos.setdefault(_clave_desc(d), []).append(d)
+        variantes = [_variante_mas_limpia(v) for v in grupos.values()]
+        if len(variantes) == 1:
+            unicas[vr] = variantes[0]
+        else:
+            ambiguas[vr] = f"{MARCA_ELEGIR} " + " / ".join(sorted(variantes))
+    return unicas, ambiguas
+
+
+def descripciones_dian_pdf(pdf_path: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """Devuelve (únicas, ambiguas) por vr_unitario desde la representación DIAN.
+
+    - únicas[vr]:   un solo servicio a ese precio → descripción limpia.
+    - ambiguas[vr]: varios servicios distintos al mismo precio (un código de
+                    tarifa que cubre varios procedimientos) → candidatos unidos
+                    y marcados con [ELEGIR] para que el coordinador escoja antes
+                    de radicar (no son definitivas).
+    """
+    return _clasificar_candidatos_dian(_candidatos_dian_pdf(pdf_path))
 
 
 def _candidatos_dian_pdf(pdf_path: Path) -> dict[str, list[str]]:

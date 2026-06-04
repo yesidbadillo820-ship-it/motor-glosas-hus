@@ -1,4 +1,4 @@
-"""_diag_desc.py — Diagnóstico (descartable) de por qué quedan descripciones vacías.
+r"""_diag_desc.py — Diagnóstico (descartable) de por qué quedan descripciones vacías.
 
 Para los códigos SOAT / precios que el FUR SERVICIOS deja sin descripción,
 muestra DOS cosas leyendo directamente el PDF de la factura:

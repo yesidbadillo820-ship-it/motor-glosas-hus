@@ -393,24 +393,31 @@ def main() -> int:
 
     # Descripción desde la representación DIAN del PDF: cubre procedimientos
     # SOAT cuya descripción no viene en el FURIPS2 (21712, 21102, 19304…).
-    # Enlace por vr_unitario único (si el DIAN tiene dos servicios distintos
-    # con el mismo precio unitario, no se asigna ninguno).
+    # Se separa en precios ÚNICOS (un solo servicio → se asigna limpio) y
+    # precios AMBIGUOS (un código de tarifa que cubre varios procedimientos →
+    # se marcan con [ELEGIR] al final, ver más abajo).
+    desc_ambiguas_dian: dict[str, str] = {}
+    marcadas = 0
     if pdf_path:
         try:
-            desc_dian = descripciones_dian_pdf(pdf_path)
+            desc_unicas_dian, desc_ambiguas_dian = descripciones_dian_pdf(pdf_path)
         except Exception as e:
             logger.warning(f"  No pude extraer descripciones del PDF DIAN: {e}")
-            desc_dian = {}
-        logger.info(f"  Descripciones únicas en PDF DIAN: {len(desc_dian)}")
+            desc_unicas_dian, desc_ambiguas_dian = {}, {}
+        logger.info(f"  Precios con descripción única en PDF DIAN: {len(desc_unicas_dian)}")
+        logger.info(
+            f"  Precios ambiguos en PDF DIAN (un código, varios servicios): "
+            f"{len(desc_ambiguas_dian)}"
+        )
         enlazados_desc_dian = 0
         for ln in lineas:
             if ln.get("descripcion"):
                 continue
             vr_u = ln.get("vr_unitario", "")
-            if vr_u and vr_u in desc_dian:
-                ln["descripcion"] = desc_dian[vr_u]
+            if vr_u and vr_u in desc_unicas_dian:
+                ln["descripcion"] = desc_unicas_dian[vr_u]
                 enlazados_desc_dian += 1
-        logger.info(f"  Descripciones desde PDF DIAN (por vr unitario único): {enlazados_desc_dian}")
+        logger.info(f"  Descripciones desde PDF DIAN (precio único): {enlazados_desc_dian}")
 
     # Propagación por código SOAT: si una línea quedó sin descripción pero otra
     # con el MISMO cod_servicio ya la tiene (de cualquier fuente anterior), la
@@ -431,6 +438,21 @@ def main() -> int:
             ln["descripcion"] = desc_por_cod_servicio[cod]
             propagados += 1
     logger.info(f"  Descripciones propagadas por código SOAT: {propagados}")
+
+    # Candidatos ambiguos del DIAN: para precios donde un código SOAT cubre
+    # varios procedimientos, no hay forma automática de elegir. Se rellenan los
+    # renglones que sigan vacíos con los candidatos unidos y marcados [ELEGIR];
+    # el coordinador escoge el correcto antes de radicar. Se aplica de ÚLTIMO,
+    # para que cualquier fuente limpia anterior tenga prioridad.
+    if desc_ambiguas_dian:
+        for ln in lineas:
+            if ln.get("descripcion"):
+                continue
+            vr_u = ln.get("vr_unitario", "")
+            if vr_u and vr_u in desc_ambiguas_dian:
+                ln["descripcion"] = desc_ambiguas_dian[vr_u]
+                marcadas += 1
+        logger.info(f"  Líneas marcadas [ELEGIR] (resolver antes de radicar): {marcadas}")
 
     # CUPS desde el RIPS: enlazamos por vr_total (1:1 cuando es único). El RIPS
     # es la única fuente del CUPS para procedimientos/consultas.
@@ -460,6 +482,11 @@ def main() -> int:
                     rellenadas += 1
         logger.info(f"  Descripciones rellenadas con catálogo CUPS: {rellenadas}")
 
+    if marcadas:
+        logger.info(
+            f"  ⚠ {marcadas} línea(s) con [ELEGIR]: elegí el procedimiento correcto "
+            f"(el código de tarifa cubre varios) antes de radicar."
+        )
     sin_desc = sum(1 for ln in lineas if not ln.get("descripcion"))
     if sin_desc:
         logger.info(f"  Líneas aún sin descripción (revisar manual): {sin_desc}")
