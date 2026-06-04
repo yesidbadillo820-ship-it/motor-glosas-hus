@@ -251,6 +251,37 @@ def _clave_descripcion(texto: str) -> str:
     return re.sub(r"[^0-9A-Z]", "", s)
 
 
+def _codigos_por_desc_y_valor_desde_rips(data: dict) -> dict[tuple[str, str], str]:
+    """Indexa {(descripción_normalizada, vr_unitario): codTecnologiaSalud}.
+
+    Cruce más específico que solo descripción: desambigua referencias del
+    mismo insumo con precios distintos. Ej. 'VENDA ELÁSTICA 6 X 5 YARDAS'
+    a $5.500 y a $7.260 son referencias distintas con códigos distintos —
+    el cruce por descripción sola los descarta, este los resuelve.
+    """
+    candidatos: dict[tuple[str, str], list[str]] = {}
+    for u in data.get("usuarios") or []:
+        servicios = u.get("servicios") or {}
+        for tipo in ("medicamentos", "otrosServicios", "procedimientos",
+                     "consultas", "urgencias", "recienNacidos", "hospitalizacion"):
+            for it in servicios.get(tipo) or []:
+                cod = (it.get("codTecnologiaSalud") or "").strip()
+                nom = (it.get("nomTecnologiaSalud") or "").strip()
+                if not cod or not nom:
+                    continue
+                vr_u = (
+                    it.get("vrUnitMedicamento")
+                    or it.get("vrUnitOS")
+                    or it.get("vrServicio")
+                    or 0
+                )
+                vr_u_str = str(int(vr_u)) if isinstance(vr_u, (int, float)) else str(vr_u).strip()
+                clave = (_clave_descripcion(nom), vr_u_str)
+                if clave[0]:
+                    candidatos.setdefault(clave, []).append(cod)
+    return {k: v[0] for k, v in candidatos.items() if len(set(v)) == 1}
+
+
 def _codigos_por_descripcion_desde_rips(data: dict) -> dict[str, str]:
     """Indexa {descripción_normalizada: codTecnologiaSalud} desde el RIPS.
 
@@ -549,12 +580,31 @@ def main() -> int:
             enlazados_cups += 1
     logger.info(f"  CUPS enlazados desde RIPS (por valor único): {enlazados_cups}")
 
-    # Código del servicio desde el RIPS por descripción única: cubre insumos
-    # (tipo 6) y materiales de osteosíntesis (tipo 7), donde el FURIPS2 no
-    # trae código (el manual SOAT no codifica insumos) pero el RIPS sí trae
-    # el codTecnologiaSalud del prestador. Se enlaza por descripción
-    # normalizada para ser robusto a diferencias de mayúsculas, tildes y
-    # espacios entre las dos fuentes.
+    # Código del servicio desde el RIPS: cubre insumos (tipo 6) y materiales
+    # de osteosíntesis (tipo 7), donde el FURIPS2 no trae código (el manual
+    # SOAT no codifica insumos) pero el RIPS sí trae el codTecnologiaSalud
+    # del prestador.
+    #
+    # Dos pasadas, de más específico a más laxo:
+    #   1) (descripción + vr_unitario) único: desambigua referencias del
+    #      mismo insumo a precios distintos (ej. dos vendas con el mismo
+    #      nombre pero distinta referencia comercial).
+    #   2) descripción única: para los demás casos donde el RIPS tiene
+    #      una sola entrada con esa descripción.
+    codigos_por_dv = _codigos_por_desc_y_valor_desde_rips(data)
+    enlazados_dv = 0
+    for ln in lineas:
+        if ln.get("cod_servicio"):
+            continue
+        desc = (ln.get("descripcion") or "").strip()
+        if not desc or desc.startswith("[ELEGIR]"):
+            continue
+        clave = (_clave_descripcion(desc), ln.get("vr_unitario", ""))
+        if clave[0] and clave in codigos_por_dv:
+            ln["cod_servicio"] = codigos_por_dv[clave]
+            enlazados_dv += 1
+    logger.info(f"  Códigos del servicio desde RIPS (descripción + valor): {enlazados_dv}")
+
     codigos_por_desc = _codigos_por_descripcion_desde_rips(data)
     enlazados_cod = 0
     for ln in lineas:
@@ -567,7 +617,26 @@ def main() -> int:
         if clave and clave in codigos_por_desc:
             ln["cod_servicio"] = codigos_por_desc[clave]
             enlazados_cod += 1
-    logger.info(f"  Códigos del servicio desde RIPS (por descripción única): {enlazados_cod}")
+    logger.info(f"  Códigos del servicio desde RIPS (sólo descripción): {enlazados_cod}")
+
+    # Diagnóstico: listar las descripciones que quedaron sin código para
+    # entender qué falta (el RIPS no las trae, o vienen con otra redacción).
+    sin_codigo = [
+        (ln.get("tipo_servicio_fur", "?"), ln.get("descripcion", ""), ln.get("vr_unitario", ""))
+        for ln in lineas
+        if not ln.get("cod_servicio") and ln.get("descripcion")
+    ]
+    if sin_codigo:
+        logger.info(f"  Líneas sin código del servicio: {len(sin_codigo)}")
+        # Agrupar por descripción para que no se repita
+        vistos: set[str] = set()
+        for tipo, desc, vr in sin_codigo:
+            d40 = (desc[:60] + "…") if len(desc) > 60 else desc
+            clave = f"{tipo}|{d40}"
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+            logger.info(f"    [tipo {tipo}] ${vr:>7} — {d40}")
 
     # Catálogo CUPS opcional: nombre oficial si quedó algo sin descripción
     if args.cups and args.cups.is_file():
