@@ -1,0 +1,6 @@
+# Los .bat deben quedar con fin de linea de Windows (CRLF) al hacer checkout,
+# si no, cmd.exe puede fallar al interpretarlos.
+*.bat text eol=crlf
+
+# Los scripts de Python con fin de linea Unix (LF), portables.
+*.py text eol=lf

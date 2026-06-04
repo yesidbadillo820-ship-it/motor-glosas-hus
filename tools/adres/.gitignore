@@ -1,0 +1,13 @@
+# Artefactos de PyInstaller (ejecutables generados localmente, no se versionan)
+build/
+dist/
+*.spec
+
+# Cache de Python
+__pycache__/
+*.pyc
+
+# Salidas locales de prueba
+*_FUR.xlsx
+*_FURSERVICIOS.xlsx
+lote_FUR.xlsx

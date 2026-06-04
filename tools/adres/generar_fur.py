@@ -150,7 +150,8 @@ def diagnostico(ruta: Path, num_factura: str) -> None:
 
     fila = _mapear_fila(objetivo, NIT_HUS_DEFECTO)
     # Mapa inverso campo→valor para mostrar junto a cada posición conocida.
-    logger.info(f"\n=== Posiciones crudas del CSV para {num_factura} ===")
+    logger.info(f"\n=== Posiciones crudas del CSV para {num_factura} ({len(objetivo)} columnas) ===")
+    ultimo = len(objetivo) - 1
     for i, v in enumerate(objetivo):
         marca = ""
         if i in (28,):
@@ -163,6 +164,10 @@ def diagnostico(ruta: Path, num_factura: str) -> None:
             marca = "  (hora ocurrencia — NO va al FUR)"
         elif 37 <= i <= 42:
             marca = "  (códigos servicio/CUPS — van al FUR SERVICIOS)"
+        elif i == ultimo:
+            marca = "  (descripción del evento)"
+        elif i > 62 and (v or "").strip():
+            marca = "  ← SIN MAPEAR (¿transporte/remisión?)"
         logger.info(f"  [{i:>3}] {(v or '')[:40]:<40}{marca}")
     logger.info(f"\n=== Campos FUR resultantes para {num_factura} ===")
     for campo in CAMPOS_FUR:

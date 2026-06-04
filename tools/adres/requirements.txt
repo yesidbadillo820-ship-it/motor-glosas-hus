@@ -1,0 +1,4 @@
+# Dependencias de las herramientas ADRES.
+# Instalar con:  py -m pip install -r requirements.txt
+# (o doble clic en INSTALAR.bat)
+openpyxl>=3.0

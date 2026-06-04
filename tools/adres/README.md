@@ -47,6 +47,41 @@ el dato está pero conviene confirmarlo):
 - Número de radicado SIRAS no numérico (p. ej. si el export trae un CUV/hash
   en esa columna en vez del radicado). No se borra ni se inventa: se marca.
 
+> **Bloque de transporte/remisión (13 campos finales)**: el export del HUS no
+> trae esas columnas (placa de ambulancia, traslado primario/secundario,
+> prestador que remite/recibe, profesional y fecha/hora de aceptación), así que
+> quedan **vacías**. Sólo aplican cuando hubo traslado en ambulancia, y ese dato
+> normalmente lo radica el operador del transporte. Para confirmar si tu export
+> sí los trae escondidos en alguna columna, corré `--diagnostico` sobre una
+> factura con remisión: las columnas no mapeadas se marcan `← SIN MAPEAR`.
+
+## Portabilidad — correr en cualquier PC
+
+Los scripts no tienen rutas fijas (todo va por parámetro), así que son
+portables de por sí. Para que una PC los corra **sin problemas** sólo hacen
+falta Python y `openpyxl`. Hay dos caminos:
+
+### A) PC con Python (recomendado para las PC del hospital)
+1. Instalá Python 3 desde <https://www.python.org/downloads/> — en el
+   instalador marcá **"Add Python to PATH"**.
+2. Doble clic en **`INSTALAR.bat`** (instala `openpyxl` una sola vez).
+3. Doble clic en **`GENERAR_FUR.bat`**: arrastrá el archivo del HUS
+   (`FURIPS1...txt`) a la ventana y Enter. El Excel queda junto al archivo.
+
+### B) PC sin nada instalado (.exe autónomo)
+Para llevarlo a una PC que **no** tiene Python:
+1. En una PC con Python, doble clic en **`construir_exe.bat`**.
+2. Se crean los ejecutables en la carpeta **`dist\`**.
+3. Copiá `dist\generar_fur.exe` (y los demás) a la otra PC. Corren solos, sin
+   Python ni librerías:
+   ```bat
+   generar_fur.exe --fur "FURIPS1....txt" --salida "lote_FUR.xlsx"
+   ```
+
+> Requisito mínimo del código: **Python 3.10+** y `openpyxl`. Sin internet del
+> lado del usuario final si usás los `.exe`. No hay nada hardcodeado: las rutas
+> de entrada/salida siempre se pasan por parámetro.
+
 ## Uso rápido
 
 ```bat
