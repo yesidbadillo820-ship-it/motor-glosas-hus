@@ -1586,9 +1586,14 @@ def build_user_prompt(
             texto = (cl.get("texto_literal") or "").strip()
             if not texto:
                 continue
-            # Truncar texto literal a 500 chars para no explotar tokens
-            if len(texto) > 500:
-                texto = texto[:500] + "…"
+            # Truncar texto literal solo si es muy largo. El límite anterior
+            # (500) cortaba a mitad de palabra y dejaba "…", que la IA copiaba
+            # literal dentro de las comillas → "VIGENCIA FISCAL 202…". Una
+            # cláusula típica cabe entera bajo 2000 chars (la BD guarda hasta
+            # 5000), así que en la práctica ya no se trunca; y si excede, se
+            # corta en frontera de palabra para nunca partir "2025" en "202".
+            if len(texto) > 2000:
+                texto = texto[:2000].rsplit(" ", 1)[0] + " […]"
             pagina = cl.get("pagina")
             pag_str = f" (pag. {pagina})" if pagina else ""
             lineas_cc.append(f"  • CLÁUSULA {num}{pag_str} — {titulo}:\n    «{texto}»")

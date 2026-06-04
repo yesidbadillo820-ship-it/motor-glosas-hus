@@ -121,10 +121,11 @@
   //   · prosa:    "ART. 168 DE LA LEY 100 DE 1993", "Artículo 56 de la Ley 1438 de 2011"
   //   · suelta:   "Decreto 4747 de 2007", "Resolución 3047 de 2008"
   //   · compacta: "Ley 1438/2011", "Resolución 2284/2023" (lista FUNDAMENTO)
+  //   · acuerdo:  "Acuerdo 002/2001" (Consejo Superior de Salud FF.MM., etc.)
   //   · sentencia:"Sentencia T-760/2008", "Sentencia C-313 de 2014"
   // Los conectores internos usan [^\S\n] (espacio sin salto de línea) para no
   // fusionar dos citas que estén en renglones distintos del mismo nodo.
-  const _NORMA = '(?:Ley|Decreto|Resoluci[óo]n|C[óo]digo)';
+  const _NORMA = '(?:Ley|Decreto|Resoluci[óo]n|C[óo]digo|Acuerdo|Circular)';
   const _ART = '(?:Art[íi]culos?|Arts?\\.)';
   const _ANIO = '(?:[^\\S\\n]*\\/[^\\S\\n]*\\d{2,4}|[^\\S\\n]+de[^\\S\\n]+\\d{4})';
   const RE_CITA = new RegExp(
@@ -147,7 +148,9 @@
     ].join('|'),
     'gi'
   );
-  const PREFILTRO = /(Art|Ley|Decreto|Resol|C[óo]digo|Sentencia)/i;
+  // Pre-filtro rápido por nodo de texto: debe incluir TODOS los tipos de
+  // norma de RE_CITA, o el nodo se descarta antes de correr la regex.
+  const PREFILTRO = /(Art|Ley|Decreto|Resol|C[óo]digo|Acuerdo|Circular|Sentencia)/i;
 
   function wrapCitasEnNodo(textNode) {
     const text = textNode.nodeValue;
