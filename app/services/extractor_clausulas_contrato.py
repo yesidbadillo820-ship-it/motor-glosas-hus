@@ -418,8 +418,10 @@ def bloque_clausulas_contrato_para_prompt(eps: str, codigo: str, max_clausulas: 
         for c in seleccionadas:
             num = c.numero_clausula or "(s/n)"
             txt = (c.texto_literal or "").strip()
-            if len(txt) > 600:
-                txt = txt[:600] + "…"
+            # Cortar en frontera de palabra (no a mitad, que dejaba "202…"
+            # dentro de las comillas y la IA lo reproducía literal).
+            if len(txt) > 2000:
+                txt = txt[:2000].rsplit(" ", 1)[0] + " […]"
             lineas.append(f"  • Cláusula {num}: «{txt}»")
 
         return (
