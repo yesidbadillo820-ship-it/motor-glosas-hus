@@ -1083,24 +1083,36 @@ def procesar_factura(
         abrir_factura(page, factura_corta)
 
         for ob in a_procesar:
-            try:
-                res = abrir_modal_objecion(page, ob["num"], rehacer)
-                if res == "YA_CONTESTADA":
-                    omitidas += 1
-                    logger.info(f"  objecion #{ob['num']}: ya contestada → omito (usá --rehacer para pisarla)")
-                    continue
-                logger.info(f"  → objecion #{ob['num']} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
-                ctx = res
-                llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
-                subir_soportes_modal(ctx, page, archivos_soportes)
-                confirmar_modal(ctx, page)
-                respondidas += 1
-                page.wait_for_timeout(800)
-            except Exception as e:
+            # Hasta 2 intentos por objeción: el portal a veces tarda/cuelga de
+            # forma intermitente (no abre el modal o no cierra en 25s). Un
+            # reintento recupera la mayoría sin dejar cleanup manual.
+            ok = False
+            for intento in range(2):
+                try:
+                    res = abrir_modal_objecion(page, ob["num"], rehacer)
+                    if res == "YA_CONTESTADA":
+                        omitidas += 1
+                        logger.info(f"  objecion #{ob['num']}: ya contestada → omito (usá --rehacer para pisarla)")
+                        ok = True
+                        break
+                    sufijo = "" if intento == 0 else f" (reintento {intento})"
+                    logger.info(f"  → objecion #{ob['num']}{sufijo} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
+                    ctx = res
+                    llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
+                    subir_soportes_modal(ctx, page, archivos_soportes)
+                    confirmar_modal(ctx, page)
+                    respondidas += 1
+                    ok = True
+                    page.wait_for_timeout(800)
+                    break
+                except Exception as e:
+                    logger.warning(f"  intento {intento + 1} de objecion #{ob['num']} falló: {type(e).__name__}: {e}")
+                    _cerrar_popup_forzado(page)
+                    page.wait_for_timeout(800)
+            if not ok:
                 fallidas.append(ob["num"])
-                logger.error(f"  ✗ objecion #{ob['num']} falló: {type(e).__name__}: {e}")
+                logger.error(f"  ✗ objecion #{ob['num']} falló tras 2 intentos.")
                 _screenshot_debug(page, f"error_obj_{ob['num']}")
-                # Cerrar cualquier popup colgado para no bloquear la siguiente.
                 _cerrar_popup_forzado(page)
                 page.wait_for_timeout(600)
 
