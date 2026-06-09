@@ -116,16 +116,21 @@ def cargar_credenciales() -> tuple[str, str]:
 
 
 def sanitizar(s: str) -> str:
-    """Quita tildes y deja solo ASCII imprimible. SIMED no acepta especiales."""
+    """Deja SÓLO letras ASCII, números y espacios.
+
+    El portal SIMED valida 'El texto debe iniciar y contener solo letras y
+    numeros. NO debe contener caracteres especiales'. Por eso:
+      - las tildes se transliteran (Ú→U, Ñ→N) vía NFKD,
+      - y CUALQUIER otro signo ( [ ] , ; . - / ' " ( ) : etc.) se reemplaza
+        por un espacio (colapsando espacios múltiples).
+    Resultado: sólo [A-Za-z0-9] y espacios simples, empezando por letra/número.
+    """
     if not s:
         return ""
-    # NFKD separa la letra de su tilde; luego filtramos los diacríticos.
     base = unicodedata.normalize("NFKD", s)
     sin_tildes = "".join(c for c in base if not unicodedata.combining(c))
-    # Quedarnos sólo con ASCII imprimible (espacios, números, letras, puntuación básica).
-    limpio = "".join(c if 32 <= ord(c) < 127 else " " for c in sin_tildes)
-    # Colapsar espacios.
-    return re.sub(r"\s+", " ", limpio).strip()
+    solo_alfanum = re.sub(r"[^A-Za-z0-9]+", " ", sin_tildes)
+    return solo_alfanum.strip()
 
 
 # ─── Lectura del Excel de respuestas ────────────────────────────────────────
@@ -452,14 +457,15 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
 
 
 def _localizar_fila_objecion(page: Page, num_objecion: int):
-    """Devuelve la fila <tr> de la objeción N en la grilla visible, o None."""
-    # En la grilla 'Respuesta Glosa Ips' la columna '# Objeción' contiene un
-    # link con el número (en el screenshot, los números 1..10 son links azules
-    # debajo del header "# Objeción").
+    """Devuelve la fila <tr> de la objeción N en la grilla visible, o None.
+
+    En la grilla 'Respuesta Glosa Ips' el '# Objeción' es un span con id que
+    contiene 'FCTOBJSEC' (verificado en el DOM real). Matcheamos por su texto
+    exacto para no confundir con el radicado u otros números.
+    """
     target = str(num_objecion)
-    # Estrategia 1: la celda con SÓLO el número.
     fila = page.locator("tr").filter(
-        has=page.locator(f"xpath=.//td[normalize-space(.)='{target}']")
+        has=page.locator(f"span[id*='FCTOBJSEC']:text-is('{target}')")
     ).first
     if fila.count() > 0:
         try:
@@ -467,9 +473,9 @@ def _localizar_fila_objecion(page: Page, num_objecion: int):
             return fila
         except PlaywrightTimeout:
             pass
-    # Estrategia 2: link con SÓLO el número.
+    # Fallback: celda con sólo el número.
     fila = page.locator("tr").filter(
-        has=page.locator(f"xpath=.//a[normalize-space(.)='{target}']")
+        has=page.locator(f"xpath=.//td[normalize-space(.)='{target}']")
     ).first
     if fila.count() > 0:
         try:
@@ -568,6 +574,13 @@ def abrir_modal_objecion(page: Page, num_objecion: int):
     """
     page.wait_for_selector("text=Respuesta Glosa Ips", timeout=10000)
 
+    # Guarda: si quedó abierto el popup de una objeción anterior, esperá a que
+    # cierre — un popup abierto intercepta el click de la fila siguiente.
+    try:
+        page.locator("iframe#gxp0_ifrm").wait_for(state="hidden", timeout=5000)
+    except Exception:
+        pass
+
     fila = None
     for _ in range(10):  # hasta 10 páginas
         fila = _localizar_fila_objecion(page, num_objecion)
@@ -582,19 +595,16 @@ def abrir_modal_objecion(page: Page, num_objecion: int):
             "(¿el Excel quedó desincronizado del portal?)"
         )
 
-    target = str(num_objecion)
     # Estrategias de click, en orden — la PRIMERA que haga aparecer el modal gana.
     estrategias = [
-        # 1) Lápiz rojo "Dar Respuesta" (la forma oficial del portal).
-        ("dar_respuesta",
-         "a[title*='Dar Respuesta' i], a:has(img[title*='Dar Respuesta' i]), "
-         "img[title*='Dar Respuesta' i], a[title*='Responder' i], "
-         "a:has(img[title*='Responder' i])"),
-        # 2) Cualquier <a> con imagen al inicio de la fila (primeras 2 celdas).
-        ("a_img_inicio", "xpath=.//td[position()<=2]//a[.//img]"),
-        # 3) Link con el número exacto de la columna # Objeción.
-        ("link_numero_obj", f"xpath=.//a[normalize-space(.)='{target}']"),
-        # 4) Cualquier <img> clickable en las primeras 2 celdas.
+        # 1) Botón exacto del DOM: img id W0104vBTNRESPUESTA_NNNN ("Dar Respuesta").
+        ("btn_respuesta_id",
+         "img[id*='vBTNRESPUESTA'], a:has(img[id*='vBTNRESPUESTA'])"),
+        # 2) Por título/tooltip 'Dar Respuesta'.
+        ("dar_respuesta_title",
+         "img[title*='Dar Respuesta' i], a:has(img[title*='Dar Respuesta' i]), "
+         "a[title*='Dar Respuesta' i]"),
+        # 3) Cualquier <img> clickable en las primeras 2 celdas.
         ("img_inicio", "xpath=.//td[position()<=2]//img"),
     ]
 
@@ -772,8 +782,11 @@ def subir_soportes_modal(ctx, page: Page, archivos: list[Path]) -> None:
 
 
 def confirmar_modal(ctx, page: Page) -> None:
-    """Click 'Confirmar' al pie del modal — guarda la respuesta y cierra."""
-    _clic_tab(ctx, page, "Información Glosa")
+    """Click 'Confirmar' al pie del modal — guarda la respuesta y cierra.
+
+    Detecta el rechazo del portal por texto ('caracteres especiales') y aborta
+    con un mensaje claro en vez de dejar el modal colgado.
+    """
     btn = _buscar_en_frames(
         page, ctx, "button:text-is('Confirmar'), input[type='button'][value='Confirmar']"
     )
@@ -781,13 +794,35 @@ def confirmar_modal(ctx, page: Page) -> None:
         _screenshot_debug(page, "modal_sin_confirmar")
         raise RuntimeError("No encontré el botón 'Confirmar' del modal.")
     btn.click(timeout=6000)
-    page.wait_for_timeout(1200)
-    # Esperar a que el modal cierre (el marcador 'Detalle Respuesta' desaparece).
+    page.wait_for_timeout(1000)
+
+    # ¿El portal rechazó el texto por caracteres especiales?
+    error_validacion = False
+    for c in [ctx] + [f for f in page.frames if f is not ctx]:
+        try:
+            err = c.locator("text=caracteres especiales").first
+            if err.count() > 0 and err.is_visible():
+                error_validacion = True
+                break
+        except Exception:
+            continue
+    if error_validacion:
+        _screenshot_debug(page, "validacion_texto_rechazada")
+        raise RuntimeError(
+            "El portal rechazó el texto por 'caracteres especiales'. "
+            "(La sanitización debería dejar sólo letras/números/espacios — revisar.)"
+        )
+
+    # Esperar a que el popup cierre (la respuesta quedó guardada).
     try:
-        ctx.locator("text=Detalle Respuesta").first.wait_for(state="hidden", timeout=8000)
+        page.locator("iframe#gxp0_ifrm").wait_for(state="hidden", timeout=8000)
     except Exception:
-        # Si el frame se destruyó, también cuenta como cerrado.
-        pass
+        # Fallback: el marcador del modal desaparece.
+        try:
+            ctx.locator("text=Detalle Respuesta").first.wait_for(state="hidden", timeout=4000)
+        except Exception:
+            pass
+    page.wait_for_timeout(500)
 
 
 def confirmar_form_principal(page: Page) -> None:
@@ -943,6 +978,10 @@ def main() -> int:
         browser = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
         ctx = browser.new_context(accept_downloads=True)
         page = ctx.new_page()
+        # El portal puede usar confirm()/alert() nativos ("¿Confirma?"). Por
+        # defecto Playwright los DESCARTA (Cancel), lo que anularía el guardado;
+        # los aceptamos automáticamente.
+        page.on("dialog", lambda d: d.accept())
         try:
             login(page, user, password)
             for i, (factura_corta, objeciones) in enumerate(facturas.items(), start=1):
