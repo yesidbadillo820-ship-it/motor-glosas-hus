@@ -1070,6 +1070,7 @@ def procesar_factura(
     archivos_soportes: list[Path],
     rehacer: bool = False,
     max_obj: int = 0,
+    subir_soportes: bool = True,
 ) -> dict:
     """Procesa UNA factura: filtra, abre, loop objeciones, confirma, envia."""
     a_procesar = objeciones[:max_obj] if max_obj and max_obj > 0 else objeciones
@@ -1099,7 +1100,8 @@ def procesar_factura(
                     logger.info(f"  → objecion #{ob['num']}{sufijo} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
                     ctx = res
                     llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
-                    subir_soportes_modal(ctx, page, archivos_soportes)
+                    if subir_soportes:
+                        subir_soportes_modal(ctx, page, archivos_soportes)
                     confirmar_modal(ctx, page)
                     respondidas += 1
                     ok = True
@@ -1183,6 +1185,9 @@ def main() -> int:
                         help="Rehacer objeciones YA contestadas (por defecto se omiten para no re-subir soportes).")
     parser.add_argument("--max-obj", type=int, default=0,
                         help="Procesar como mucho N objeciones por factura (0 = todas). Útil para pilotos rápidos.")
+    parser.add_argument("--sin-soportes", action="store_true",
+                        help="NO subir soportes: sólo carga la respuesta (texto + fecha) y confirma. "
+                        "Mucho más rápido y evita que la subida trabe el cierre del modal.")
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
     parser.add_argument("--reporte", type=Path, default=Path("reporte_glosa.csv"))
     parser.add_argument("--log", type=Path, default=None)
@@ -1231,17 +1236,18 @@ def main() -> int:
             login(page, user, password)
             for i, (factura_corta, objeciones) in enumerate(facturas.items(), start=1):
                 factura_larga = objeciones[0]["factura"]
-                archivos, avisos = buscar_soportes(
-                    factura_corta, factura_larga, args.soportes_glosa, indice,
-                    carpeta_share_override=args.carpeta_share,
-                )
-                for a in avisos:
-                    logger.warning(f"  ⚠ {a}")
-                logger.info(
-                    f"[{i}/{len(facturas)}] {factura_larga} — {len(objeciones)} objeciones, "
-                    f"{len(archivos)} archivos soporte"
-                )
-                if not archivos:
+                if args.sin_soportes:
+                    archivos, avisos = [], []
+                else:
+                    archivos, avisos = buscar_soportes(
+                        factura_corta, factura_larga, args.soportes_glosa, indice,
+                        carpeta_share_override=args.carpeta_share,
+                    )
+                    for a in avisos:
+                        logger.warning(f"  ⚠ {a}")
+                extra = " (sin soportes)" if args.sin_soportes else f", {len(archivos)} archivos soporte"
+                logger.info(f"[{i}/{len(facturas)}] {factura_larga} — {len(objeciones)} objeciones{extra}")
+                if not args.sin_soportes and not archivos:
                     resultados.append(
                         {"factura": factura_larga, "objeciones": len(objeciones),
                          "estado": "SIN_SOPORTES", "detalle": "; ".join(avisos)}
@@ -1251,6 +1257,7 @@ def main() -> int:
                     procesar_factura(
                         page, factura_corta, factura_larga, objeciones, archivos,
                         rehacer=args.rehacer, max_obj=args.max_obj,
+                        subir_soportes=not args.sin_soportes,
                     )
                 )
         finally:
