@@ -527,23 +527,25 @@ def abrir_modal_objecion(page: Page, num_objecion: int) -> None:
     target = str(num_objecion)
     # Estrategias en orden — la PRIMERA que abra el modal gana.
     estrategias = [
-        # 1) Link con el número exacto (es lo que hace el portal — el # Objeción es un link azul).
+        # 1) Ícono LÁPIZ ROJO con tooltip "Dar Respuesta" (la forma oficial del portal).
+        ("dar_respuesta", lambda f: f.locator(
+            "a[title*='Dar Respuesta' i], a:has(img[title*='Dar Respuesta' i]), "
+            "img[title*='Dar Respuesta' i], a[title*='Responder' i], "
+            "a:has(img[title*='Responder' i])"
+        ).first),
+        # 2) Link con el número exacto en la columna # Objeción.
         ("link_numero_obj", lambda f: f.locator(
             f"xpath=.//a[normalize-space(.)='{target}']"
         ).first),
-        # 2) Ícono "Modificar/Actualizar/Editar" con title o img conocido.
+        # 3) Ícono "Modificar/Actualizar/Editar" con title o img conocido.
         ("icono_modificar", lambda f: f.locator(
             "a[title*='Modificar' i], a[title*='Actualizar' i], a[title*='Editar' i], "
             "a:has(img[src*='ActionUpdate' i]), a:has(img[src*='Edit' i]), "
             "a:has(img[src*='Modify' i]), img[title*='Modificar' i], img[title*='Editar' i]"
         ).first),
-        # 3) Cualquier link clickable en las primeras 2 celdas (íconos al inicio de la fila).
-        ("link_col1_2", lambda f: f.locator(
-            "xpath=.//td[position()<=2]//a[@href or @onclick]"
-        ).first),
-        # 4) Cualquier <img> con onclick o dentro de un <a> en las primeras celdas.
-        ("img_col1_2", lambda f: f.locator(
-            "xpath=.//td[position()<=2]//img"
+        # 4) Cualquier link clickable en las primeras 3 celdas con href real (no '#').
+        ("link_inicio_fila", lambda f: f.locator(
+            "xpath=.//td[position()<=3]//a[@href and @href!='#' and not(contains(@href,'javascript:void'))]"
         ).first),
     ]
 
