@@ -426,20 +426,24 @@ def filtrar_por_factura(page: Page, factura_corta: str) -> None:
     page.wait_for_timeout(1000)
 
 
+class FacturaNoPendiente(Exception):
+    """La factura no está en la grilla de pendientes (ya finalizada / nada que hacer)."""
+
+
 def abrir_factura(page: Page, factura_corta: str) -> None:
     """Click en el lápiz de la fila filtrada → abre glosasfactura.aspx."""
     page.wait_for_timeout(1500)
     no_resultados = page.locator("text=No se encontraron registros").first
     try:
         if no_resultados.is_visible(timeout=2000):
-            raise RuntimeError(f"Factura {factura_corta} no aparece en la grilla.")
+            raise FacturaNoPendiente(f"Factura {factura_corta} no está en pendientes (¿ya finalizada?).")
     except PlaywrightTimeout:
         pass
     fila = page.locator("tr").filter(has_text=factura_corta).first
     try:
         fila.wait_for(state="visible", timeout=5000)
     except PlaywrightTimeout:
-        _screenshot_debug(page, f"fila_no_encontrada_{factura_corta}"); raise
+        raise FacturaNoPendiente(f"Factura {factura_corta} no aparece en la grilla (¿ya finalizada?).")
     boton_editar = fila.locator(
         "a[title*='Actualizar' i], a[title*='Editar' i], a[title*='Edit' i], "
         "a:has(img[src*='ActionUpdate']), a:has(img[title*='Actualizar' i]), "
@@ -452,6 +456,9 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
         _screenshot_debug(page, f"editar_no_encontrado_{factura_corta}"); raise
     page.wait_for_url("**/glosasfactura.aspx*", timeout=15000)
     page.wait_for_selector("text=Información General", timeout=10000)
+    # La paginación de la grilla de objeciones queda pegada entre facturas;
+    # resetear a la página 1 para no buscar en una página vacía.
+    _ir_primera_pagina_grilla(page)
 
 
 # ─── Lógica nueva: iterar objeciones y rellenar el modal ────────────────────
@@ -533,6 +540,46 @@ def _siguiente_pagina_grilla(page: Page) -> bool:
         return True
     except PlaywrightTimeout:
         return False
+
+
+def _pagina_actual_grilla(page: Page) -> int | None:
+    """Lee el número de página actual de la grilla de objeciones ('Página X de Y')."""
+    try:
+        cont = page.get_by_text(re.compile(r"P[aá]gina\s+\d+\s+de", re.I)).first
+        if cont.count() > 0:
+            m = re.search(r"(\d+)\s+de", cont.inner_text(timeout=800))
+            if m:
+                return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def _ir_primera_pagina_grilla(page: Page) -> None:
+    """Lleva la grilla de objeciones a la primera página (clic 'Ant' hasta el tope).
+
+    La paginación de GeneXus queda pegada al cambiar de factura: si la anterior
+    tenía varias páginas, la nueva abre en una página alta y vacía.
+    """
+    try:
+        page.wait_for_selector("text=Respuesta Glosa Ips", timeout=8000)
+    except Exception:
+        return
+    for _ in range(15):
+        if _pagina_actual_grilla(page) == 1:
+            return
+        ant = page.locator("a:has-text('Ant'), a:has-text('Anterior')").first
+        try:
+            if ant.count() == 0:
+                return
+            cls = (ant.get_attribute("class") or "").lower()
+            if "disabled" in cls or not ant.is_visible():
+                return
+            ant.click(timeout=2000)
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(300)
+        except Exception:
+            return
 
 
 def _ctx_modal(page: Page, timeout_ms: int = 7000):
@@ -1149,6 +1196,10 @@ def procesar_factura(
             f"{respondidas} respondidas, {omitidas} omitidas"
             + (f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else "")
         )
+    except FacturaNoPendiente as e:
+        reg["estado"] = "NO_PENDIENTE"
+        reg["detalle"] = str(e)
+        logger.info(f"  ⏭ {factura_larga}: {e}")
     except Exception as e:
         reg["estado"] = "ERROR"
         reg["detalle"] = f"{type(e).__name__}: {e} (respondidas={respondidas}, omitidas={omitidas})"
