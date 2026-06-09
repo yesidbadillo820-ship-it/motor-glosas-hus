@@ -53,6 +53,7 @@ import re
 import sys
 import time
 import unicodedata
+from datetime import date
 from pathlib import Path
 
 try:
@@ -726,6 +727,27 @@ def llenar_informacion_glosa(ctx, page: Page, aceptado: int, detalle: str) -> No
         aceptado_input.press("Tab")
     except Exception as e:
         logger.warning(f"  No pude escribir 'Aceptado' ({e}); sigo.")
+
+    # Campo Fecha Respuesta IPS (OBLIGATORIO — sale en ROJO si queda vacío y el
+    # portal no deja guardar). Si no trae fecha, ponemos la de hoy (DD/MM/AAAA).
+    hoy = date.today().strftime("%d/%m/%Y")
+    fecha_input = _primer_visible(
+        ctx, "input[id*='FECRTA' i], input[id*='FECRES' i], input[id*='FECHA' i]"
+    )
+    if fecha_input is None:
+        fecha_input = ctx.locator(
+            "xpath=//*[contains(text(),'Fecha Respuesta')]/following::input[1]"
+        ).first
+    try:
+        actual = fecha_input.input_value(timeout=1000) if fecha_input else ""
+        if not any(ch.isdigit() for ch in (actual or "")):
+            fecha_input.click()
+            fecha_input.fill("")
+            fecha_input.type(hoy, delay=40)
+            fecha_input.press("Tab")
+            logger.info(f"  Fecha Respuesta seteada: {hoy}")
+    except Exception as e:
+        logger.warning(f"  No pude setear 'Fecha Respuesta' ({e}); sigo.")
 
     # Campo Nota Credito: dejar vacío (ya no van NCs).
     nc_input = ctx.locator(
