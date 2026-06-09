@@ -7251,6 +7251,70 @@ def dictamen_similar_anterior(
     }
 
 
+@router.get("/stats/historicos-ganadores")
+def historicos_ganadores(
+    eps: str,
+    codigo: str,
+    limit: int = 3,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Lista los N dictámenes LEVANTADOS más recientes del mismo (eps, codigo).
+
+    Side-by-side con "el ganador histórico" — el gestor puede ver hasta 3
+    casos previos donde un argumento similar ya ganó, leer el dictamen
+    completo y copiar las frases que probaron funcionar.
+
+    A diferencia de /{id}/dictamen-similar-anterior (que necesita una glosa
+    ya guardada como pivote), este endpoint acepta eps+codigo directos
+    para poder dispararse ANTES del primer "Analizar con IA" — el panel UI
+    se carga apenas el gestor selecciona EPS y se detecta el código.
+
+    Usa ilike+trim para tolerar variaciones de casing/espacios en la EPS
+    (mismo criterio que few_shot_gold).
+    """
+    eps_norm = (eps or "").strip()
+    cod_norm = (codigo or "").strip().upper()
+    if not eps_norm or not cod_norm:
+        return {"total": 0, "items": [], "razon": "Falta eps o codigo"}
+
+    limit = max(1, min(int(limit or 3), 10))
+
+    filas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.eps.ilike(eps_norm))
+        .filter(GlosaRecord.codigo_glosa == cod_norm)
+        .filter(GlosaRecord.estado == "LEVANTADA")
+        .filter(GlosaRecord.dictamen.isnot(None))
+        .order_by(GlosaRecord.fecha_decision_eps.desc().nullslast())
+        .limit(limit)
+        .all()
+    )
+
+    valor_recuperado_total = sum(float(g.valor_recuperado or 0) for g in filas)
+
+    return {
+        "total": len(filas),
+        "eps": eps_norm,
+        "codigo": cod_norm,
+        "valor_recuperado_total": valor_recuperado_total,
+        "items": [
+            {
+                "glosa_id": g.id,
+                "dictamen": g.dictamen,
+                "valor_recuperado": float(g.valor_recuperado or 0),
+                "valor_objetado": float(g.valor_objetado or 0),
+                "fecha_decision_eps": (
+                    g.fecha_decision_eps.isoformat() if g.fecha_decision_eps else None
+                ),
+                "auditor_email": g.auditor_email or "",
+                "paciente": g.paciente or "",
+            }
+            for g in filas
+        ],
+    }
+
+
 @router.get("/{glosa_id}/dashboard")
 def dashboard_glosa(
     glosa_id: int,
