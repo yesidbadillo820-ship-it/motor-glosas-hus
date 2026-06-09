@@ -500,14 +500,18 @@ def _siguiente_pagina_grilla(page: Page) -> bool:
 
 
 def abrir_modal_objecion(page: Page, num_objecion: int) -> None:
-    """Click en el icono gris de la fila de la objeción N de la grilla
-    'Respuesta Glosa Ips' (en la pantalla 'Glosas Factura'), recorriendo
-    las páginas de la grilla si hace falta.
+    """Abre el modal 'Respuesta Glosa Ips Web' de la objeción N.
+
+    En la grilla 'Respuesta Glosa Ips' (dentro de la pantalla 'Glosas Factura')
+    cada fila trae el número de objeción como un LINK azul (clickable) en la
+    columna '# Objeción'. Click ahí abre el modal.
+
+    Recorre las páginas de la grilla hasta encontrar la objeción.
     """
     page.wait_for_selector("text=Respuesta Glosa Ips", timeout=10000)
 
     fila = None
-    for intento in range(10):  # hasta 10 páginas
+    for _ in range(10):  # hasta 10 páginas
         fila = _localizar_fila_objecion(page, num_objecion)
         if fila is not None:
             break
@@ -520,20 +524,63 @@ def abrir_modal_objecion(page: Page, num_objecion: int) -> None:
             "(¿el Excel quedó desincronizado del portal?)"
         )
 
-    boton = fila.locator(
-        "a[title*='Modificar' i], a[title*='Actualizar' i], a[title*='Editar' i], "
-        "a:has(img[src*='ActionUpdate']), a:has(img[title*='Actualizar' i]), "
-        "a:has(img[src*='Edit']), img[title*='Modificar' i], img[title*='Editar' i]"
-    ).first
-    try:
-        boton.wait_for(state="visible", timeout=5000)
-        boton.click()
-    except PlaywrightTimeout:
-        _screenshot_debug(page, f"icono_objecion_no_hallado_{num_objecion}")
-        raise
+    target = str(num_objecion)
+    # Estrategias en orden — la PRIMERA que abra el modal gana.
+    estrategias = [
+        # 1) Link con el número exacto (es lo que hace el portal — el # Objeción es un link azul).
+        ("link_numero_obj", lambda f: f.locator(
+            f"xpath=.//a[normalize-space(.)='{target}']"
+        ).first),
+        # 2) Ícono "Modificar/Actualizar/Editar" con title o img conocido.
+        ("icono_modificar", lambda f: f.locator(
+            "a[title*='Modificar' i], a[title*='Actualizar' i], a[title*='Editar' i], "
+            "a:has(img[src*='ActionUpdate' i]), a:has(img[src*='Edit' i]), "
+            "a:has(img[src*='Modify' i]), img[title*='Modificar' i], img[title*='Editar' i]"
+        ).first),
+        # 3) Cualquier link clickable en las primeras 2 celdas (íconos al inicio de la fila).
+        ("link_col1_2", lambda f: f.locator(
+            "xpath=.//td[position()<=2]//a[@href or @onclick]"
+        ).first),
+        # 4) Cualquier <img> con onclick o dentro de un <a> en las primeras celdas.
+        ("img_col1_2", lambda f: f.locator(
+            "xpath=.//td[position()<=2]//img"
+        ).first),
+    ]
 
-    page.wait_for_selector("text=Respuesta Glosa Ips Web", timeout=10000)
-    page.wait_for_selector("text=Información Glosa", timeout=5000)
+    ultimo_error = None
+    for nombre, hacer_loc in estrategias:
+        candidato = hacer_loc(fila)
+        try:
+            if candidato.count() == 0:
+                continue
+            candidato.wait_for(state="visible", timeout=2500)
+        except PlaywrightTimeout as e:
+            ultimo_error = e
+            continue
+        # Intentar click.
+        try:
+            candidato.click(timeout=4000)
+            logger.info(f"  estrategia para abrir modal: {nombre}")
+        except PlaywrightTimeout as e:
+            ultimo_error = e
+            continue
+        # Verificar que el modal apareció.
+        try:
+            page.wait_for_selector("text=Respuesta Glosa Ips Web", timeout=4500)
+            page.wait_for_selector("text=Información Glosa", timeout=3000)
+            return  # éxito
+        except PlaywrightTimeout as e:
+            ultimo_error = e
+            # No abrió modal; cierro algún popup accidental y reintento con la próxima.
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(400)
+            continue
+
+    _screenshot_debug(page, f"modal_no_abrio_{num_objecion}")
+    raise RuntimeError(
+        f"No pude abrir el modal de la objecion #{num_objecion} con ninguna "
+        f"estrategia (último error: {ultimo_error})"
+    )
 
 
 def llenar_informacion_glosa(page: Page, aceptado: int, detalle: str) -> None:
