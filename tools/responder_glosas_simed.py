@@ -430,6 +430,10 @@ class FacturaNoPendiente(Exception):
     """La factura no está en la grilla de pendientes (ya finalizada / nada que hacer)."""
 
 
+class ObjecionNoEnGrilla(Exception):
+    """La objeción del Excel no existe en la grilla del portal (no reintentar)."""
+
+
 def abrir_factura(page: Page, factura_corta: str) -> None:
     """Click en el lápiz de la fila filtrada → abre glosasfactura.aspx."""
     page.wait_for_timeout(1500)
@@ -456,9 +460,6 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
         _screenshot_debug(page, f"editar_no_encontrado_{factura_corta}"); raise
     page.wait_for_url("**/glosasfactura.aspx*", timeout=15000)
     page.wait_for_selector("text=Información General", timeout=10000)
-    # La paginación de la grilla de objeciones queda pegada entre facturas;
-    # resetear a la página 1 para no buscar en una página vacía.
-    _ir_primera_pagina_grilla(page)
 
 
 # ─── Lógica nueva: iterar objeciones y rellenar el modal ────────────────────
@@ -542,14 +543,12 @@ def _siguiente_pagina_grilla(page: Page) -> bool:
         return False
 
 
-def _pagina_actual_grilla(page: Page) -> int | None:
-    """Lee el número de página actual de la grilla de objeciones ('Página X de Y')."""
+def _primera_objecion_visible(page: Page) -> str | None:
+    """Texto del primer '# Objeción' visible en la grilla (para detectar página 1)."""
     try:
-        cont = page.get_by_text(re.compile(r"P[aá]gina\s+\d+\s+de", re.I)).first
-        if cont.count() > 0:
-            m = re.search(r"(\d+)\s+de", cont.inner_text(timeout=800))
-            if m:
-                return int(m.group(1))
+        loc = page.locator("span[id*='FCTOBJSEC']").first
+        if loc.count() > 0:
+            return (loc.text_content(timeout=600) or "").strip()
     except Exception:
         pass
     return None
@@ -558,27 +557,27 @@ def _pagina_actual_grilla(page: Page) -> int | None:
 def _ir_primera_pagina_grilla(page: Page) -> None:
     """Lleva la grilla de objeciones a la primera página (clic 'Ant' hasta el tope).
 
-    La paginación de GeneXus queda pegada al cambiar de factura: si la anterior
-    tenía varias páginas, la nueva abre en una página alta y vacía.
+    La grilla puede estar ordenada por otra columna (ej. 'VI Aceptado'), así que
+    las objeciones NO siguen el orden 1,2,3 por página; para encontrar una hay
+    que arrancar en la página 1 y escanear hacia adelante.
     """
     try:
         page.wait_for_selector("text=Respuesta Glosa Ips", timeout=8000)
     except Exception:
         return
-    for _ in range(15):
-        if _pagina_actual_grilla(page) == 1:
-            return
+    for _ in range(12):
+        antes = _primera_objecion_visible(page)
         ant = page.locator("a:has-text('Ant'), a:has-text('Anterior')").first
         try:
-            if ant.count() == 0:
-                return
-            cls = (ant.get_attribute("class") or "").lower()
-            if "disabled" in cls or not ant.is_visible():
+            if ant.count() == 0 or not ant.is_visible(timeout=600):
                 return
             ant.click(timeout=2000)
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(300)
         except Exception:
+            return
+        # Si el primer renglón no cambió, el clic 'Ant' no movió nada → página 1.
+        if _primera_objecion_visible(page) == antes:
             return
 
 
@@ -665,8 +664,12 @@ def abrir_modal_objecion(page: Page, num_objecion: int, rehacer: bool = False):
     except Exception:
         pass
 
+    # La grilla puede estar ordenada por otra columna (VI Aceptado), así que la
+    # objeción puede estar en cualquier página. Arrancamos en la página 1 y
+    # escaneamos hacia adelante TODAS las páginas.
+    _ir_primera_pagina_grilla(page)
     fila = None
-    for _ in range(10):  # hasta 10 páginas
+    for _ in range(12):  # hasta 12 páginas
         fila = _localizar_fila_objecion(page, num_objecion)
         if fila is not None:
             break
@@ -674,9 +677,9 @@ def abrir_modal_objecion(page: Page, num_objecion: int, rehacer: bool = False):
             break
     if fila is None:
         _screenshot_debug(page, f"objecion_no_hallada_{num_objecion}")
-        raise RuntimeError(
-            f"No encontre la objecion #{num_objecion} en la grilla "
-            "(¿el Excel quedó desincronizado del portal?)"
+        raise ObjecionNoEnGrilla(
+            f"Objeción #{num_objecion} no está en la grilla del portal "
+            "(el Excel tiene más objeciones que el portal para esta factura)."
         )
 
     # Si ya está contestada y no pedimos rehacer, omitir (no re-subir soportes).
@@ -1135,6 +1138,7 @@ def procesar_factura(
             # forma intermitente (no abre el modal o no cierra en 25s). Un
             # reintento recupera la mayoría sin dejar cleanup manual.
             ok = False
+            no_en_portal = False
             for intento in range(2):
                 try:
                     res = abrir_modal_objecion(page, ob["num"], rehacer)
@@ -1154,11 +1158,16 @@ def procesar_factura(
                     ok = True
                     page.wait_for_timeout(800)
                     break
+                except ObjecionNoEnGrilla as e:
+                    # No existe en el portal: no tiene sentido reintentar.
+                    logger.info(f"  objecion #{ob['num']}: {e}")
+                    no_en_portal = True
+                    break
                 except Exception as e:
                     logger.warning(f"  intento {intento + 1} de objecion #{ob['num']} falló: {type(e).__name__}: {e}")
                     _cerrar_popup_forzado(page)
                     page.wait_for_timeout(800)
-            if not ok:
+            if not ok and not no_en_portal:
                 fallidas.append(ob["num"])
                 logger.error(f"  ✗ objecion #{ob['num']} falló tras 2 intentos.")
                 _screenshot_debug(page, f"error_obj_{ob['num']}")
