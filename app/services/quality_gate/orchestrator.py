@@ -175,6 +175,38 @@ async def ejecutar_quality_gate(
             es_ratificacion=es_ratificacion,
             es_extemporanea=es_extemporanea,
         )
+
+        # Si el único problema son citas inválidas, intentar limpieza
+        # quirúrgica determinística ANTES de gastar otra llamada IA.
+        # quitar_citas_invalidas_dinamico elimina las oraciones con citas
+        # que no existen en el corpus; si el resto del dictamen está bien,
+        # re-validamos y aprobamos sin regenerar.
+        if not post.aprobado and post.citas_problematicas:
+            try:
+                from app.services.dictamen_postprocesor import (
+                    quitar_citas_invalidas_dinamico,
+                )
+
+                texto_limpio = quitar_citas_invalidas_dinamico(
+                    intento.texto, eps=pre.eps_normalizada
+                )
+                if texto_limpio and texto_limpio != intento.texto:
+                    post_limpio = post_validar_dictamen(
+                        texto_limpio,
+                        eps=pre.eps_normalizada,
+                        es_ratificacion=es_ratificacion,
+                        es_extemporanea=es_extemporanea,
+                    )
+                    if post_limpio.aprobado and post_limpio.score >= post.score:
+                        intento.texto = texto_limpio
+                        post = post_limpio
+                        logger.info(
+                            f"[QG] Intento {n}: limpieza de citas inválidas "
+                            f"recuperó el dictamen (score {post_limpio.score})."
+                        )
+            except Exception as e:
+                logger.debug(f"[QG] limpieza de citas no aplicable: {e}")
+
         intento.post_validation = post
         resultado.intentos.append(intento)
 

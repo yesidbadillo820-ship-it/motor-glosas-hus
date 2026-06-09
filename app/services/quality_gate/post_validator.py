@@ -16,8 +16,25 @@ La decisión global agrega todo en un PostValidationResult con score 0-100.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Literal
+
+# Referencia colgante: "el Art./Artículo/Ley/Decreto/Resolución" sin número
+# después (la IA empieza a citar y pierde el hilo, dejando "EL ART. LA
+# AFIRMACIÓN…" o "EL ART. EN ESTE SENTIDO"). Sólo cuenta como problema si
+# tras el "Art." NO viene un dígito (con tolerancia de hasta 3 caracteres
+# de puntuación/espacio).
+_PAT_REFERENCIA_COLGANTE = re.compile(
+    r"\b(?:el|la|del|de\s+la)\s+"
+    r"(?:Art(?:[íi]culo)?\.?|Ley|Decreto|Resoluci[óo]n|Acuerdo|Circular)"
+    r"[\.\,\;:\s]{1,3}(?![0-9])(?:[A-ZÁÉÍÓÚÑa-záéíóúñ]|$)",
+    re.IGNORECASE,
+)
+
+# Cita literal truncada: «…texto…» con elipsis dentro indica que la IA
+# copió una cláusula/norma cortada (el bug "VIGENCIA FISCAL 202…»").
+_PAT_CITA_TRUNCADA = re.compile(r"«[^«»]{10,2000}(?:…|\.\.\.)\s*»")
 
 
 @dataclass
@@ -153,6 +170,47 @@ def check_longitud_razonable(texto: str) -> PostCheckResult:
     return PostCheckResult(ok=True, severidad="INFO", razon=f"Longitud OK ({n} chars)")
 
 
+def check_referencias_colgantes(texto: str) -> PostCheckResult:
+    """Detecta frases tipo "el Art. EN ESTE SENTIDO..." sin número de norma.
+
+    Aparece cuando la IA empieza a citar ("el Art.") y pierde el hilo,
+    dejando una referencia abierta que la EPS usa para ratificar por
+    "argumento incompleto". Era el defecto visible en el último dictamen
+    real reportado por el usuario.
+    """
+    if not texto:
+        return PostCheckResult(ok=True, severidad="INFO", razon="texto vacío")
+    encontrados = _PAT_REFERENCIA_COLGANTE.findall(texto)
+    if encontrados:
+        muestra = ", ".join(f"«{e.strip()}…»" for e in encontrados[:3])
+        return PostCheckResult(
+            ok=False,
+            severidad="ERROR",
+            razon=f"{len(encontrados)} referencia(s) colgante(s) sin número: {muestra}",
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="sin referencias colgantes")
+
+
+def check_citas_no_truncadas(texto: str) -> PostCheckResult:
+    """Detecta citas literales «…texto…» que terminan con elipsis.
+
+    Si una cláusula/norma fue truncada al construir el prompt, la IA copia
+    el texto entrecomillado con la elipsis adentro («... VIGENCIA FISCAL
+    202…»). Indica que la cita no es real, sino un artefacto de truncado.
+    """
+    if not texto:
+        return PostCheckResult(ok=True, severidad="INFO", razon="texto vacío")
+    encontrados = _PAT_CITA_TRUNCADA.findall(texto)
+    if encontrados:
+        muestra = encontrados[0][:80] + "…»"
+        return PostCheckResult(
+            ok=False,
+            severidad="WARN",
+            razon=f"{len(encontrados)} cita(s) literal(es) truncadas con elipsis: {muestra!r}",
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="citas literales completas")
+
+
 def post_validar_dictamen(
     texto: str,
     *,
@@ -187,6 +245,12 @@ def post_validar_dictamen(
 
     # 4. Longitud razonable
     checks["longitud"] = check_longitud_razonable(texto)
+
+    # 5. Referencias colgantes ("EL ART. EN ESTE SENTIDO" sin número)
+    checks["referencias_colgantes"] = check_referencias_colgantes(texto)
+
+    # 6. Citas literales no truncadas («… VIGENCIA FISCAL 202…»)
+    checks["citas_truncadas"] = check_citas_no_truncadas(texto)
 
     # Score: 100 - 30 por cada ERROR, -10 por cada WARN
     score = 100

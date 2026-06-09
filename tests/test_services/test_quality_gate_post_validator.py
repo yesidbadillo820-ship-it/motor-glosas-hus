@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from app.services.quality_gate.post_validator import (
     check_cierre_canonico,
+    check_citas_no_truncadas,
     check_longitud_razonable,
+    check_referencias_colgantes,
     check_sin_coda_procesal,
     post_validar_dictamen,
 )
@@ -135,7 +137,14 @@ class TestPostValidarDictamen:
 
     def test_resultado_incluye_todas_las_claves_de_check(self):
         r = post_validar_dictamen(self.DICTAMEN_LIMPIO_SIN_CITAS)
-        assert set(r.checks.keys()) == {"citas", "cierre", "coda", "longitud"}
+        assert set(r.checks.keys()) == {
+            "citas",
+            "cierre",
+            "coda",
+            "longitud",
+            "referencias_colgantes",
+            "citas_truncadas",
+        }
 
     def test_score_no_negativo(self):
         # Texto pésimo: vacío
@@ -172,3 +181,53 @@ class TestComportamientoConCorpusReal:
         # (puede ser ERROR o WARN según severidad asignada)
         if r.citas_problematicas:
             assert any("1552" in i.get("cita", "") for i in r.citas_problematicas)
+
+
+class TestReferenciasColgantes:
+    """Regresión: el bug visible en dictámenes reales era 'PORQUE EL ART.
+    EN ESTE SENTIDO...' — un 'el Art.' sin número detrás. El post-validador
+    debe marcarlo para que el orchestrator regenere ese intento.
+    """
+
+    def test_dangling_el_art_se_detecta(self):
+        r = check_referencias_colgantes("PORQUE EL ART. EN ESTE SENTIDO QUEDA CLARO QUE NO PROCEDE")
+        assert not r.ok
+        assert r.severidad == "ERROR"
+        assert "colgante" in r.razon.lower()
+
+    def test_dangling_la_ley_se_detecta(self):
+        r = check_referencias_colgantes("Conforme a la Ley, la afirmación de la EPS no procede.")
+        assert not r.ok
+
+    def test_cita_completa_no_se_detecta_como_colgante(self):
+        # "Art. 168" tiene número detrás → no es colgante.
+        r = check_referencias_colgantes(
+            "Según el Art. 168 de la Ley 100 de 1993, la atención es obligatoria."
+        )
+        assert r.ok
+
+    def test_articulo_completo_con_numero_no_se_detecta(self):
+        r = check_referencias_colgantes(
+            "El Artículo 56 de la Ley 1438 de 2011 establece el procedimiento."
+        )
+        assert r.ok
+
+
+class TestCitasNoTruncadas:
+    """Regresión del bug «...VIGENCIA FISCAL 202…»: la IA copiaba el texto
+    de cláusula del prompt con la elipsis pegada. Aunque el prompt ya no
+    trunca a 500 chars (PR #87), este check evita que cualquier elipsis
+    dentro de chevrones se cuele al dictamen.
+    """
+
+    def test_elipsis_unicode_dentro_de_chevrones_se_detecta(self):
+        r = check_citas_no_truncadas("Dice la cláusula: «la cobertura integral 202…»")
+        assert not r.ok
+
+    def test_elipsis_ascii_dentro_de_chevrones_se_detecta(self):
+        r = check_citas_no_truncadas("Dice: «la cobertura integral 202...»")
+        assert not r.ok
+
+    def test_cita_completa_pasa(self):
+        r = check_citas_no_truncadas("Dice la cláusula: «la cobertura es integral».")
+        assert r.ok
