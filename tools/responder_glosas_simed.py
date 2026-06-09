@@ -486,6 +486,35 @@ def _localizar_fila_objecion(page: Page, num_objecion: int):
     return None
 
 
+def _fila_contestada(fila) -> bool:
+    """True si la objeción de esa fila YA está contestada (no hay que rehacerla).
+
+    Señales en el DOM real: span FCTOBJEST == 'Contestado' y/o badge verde con
+    title 'Contestada/Contentada'.
+    """
+    try:
+        est = fila.locator("span[id*='FCTOBJEST']").first
+        if est.count() > 0:
+            txt = (est.text_content() or "").strip().lower()
+            if "contestad" in txt:
+                return True
+    except Exception:
+        pass
+    try:
+        badge = fila.locator("span[id*='vGRIDBADGE']").first
+        if badge.count() > 0:
+            title = (
+                badge.get_attribute("data-original-title")
+                or badge.get_attribute("title")
+                or ""
+            ).lower()
+            if "contest" in title or "content" in title:
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def _siguiente_pagina_grilla(page: Page) -> bool:
     """Click en 'Sig' de la paginación. Devuelve True si avanzó, False si no hay más."""
     # En GeneXus la paginación suele ser "Ant | 1 2 3 ... | Sig" con links.
@@ -564,13 +593,13 @@ def _dump_diagnostico(page: Page, fila, num_objecion: int) -> None:
         logger.warning(f"  No pude volcar el DOM: {e}")
 
 
-def abrir_modal_objecion(page: Page, num_objecion: int):
+def abrir_modal_objecion(page: Page, num_objecion: int, rehacer: bool = False):
     """Abre el modal 'Respuesta Glosa Ips Web' de la objeción N y devuelve el
     contexto (Page o Frame) donde está el formulario.
 
-    Click en el lápiz rojo "Dar Respuesta" de la fila. El modal carga en un
-    iframe, así que verificamos su aparición buscando los campos en todos los
-    frames (no sólo en la página principal).
+    Si la objeción ya está contestada y `rehacer` es False, devuelve el
+    sentinel 'YA_CONTESTADA' sin abrir nada (para no re-subir soportes ni
+    pisar respuestas existentes).
     """
     page.wait_for_selector("text=Respuesta Glosa Ips", timeout=10000)
 
@@ -594,6 +623,10 @@ def abrir_modal_objecion(page: Page, num_objecion: int):
             f"No encontre la objecion #{num_objecion} en la grilla "
             "(¿el Excel quedó desincronizado del portal?)"
         )
+
+    # Si ya está contestada y no pedimos rehacer, omitir (no re-subir soportes).
+    if not rehacer and _fila_contestada(fila):
+        return "YA_CONTESTADA"
 
     # Estrategias de click, en orden — la PRIMERA que haga aparecer el modal gana.
     estrategias = [
@@ -887,28 +920,48 @@ def procesar_factura(
     factura_larga: str,
     objeciones: list[dict],
     archivos_soportes: list[Path],
+    rehacer: bool = False,
 ) -> dict:
     """Procesa UNA factura: filtra, abre, loop objeciones, confirma, envia."""
     reg = {"factura": factura_larga, "objeciones": len(objeciones), "estado": "", "detalle": ""}
+    respondidas = 0
+    omitidas = 0
     try:
         ir_a_respuesta_glosa_web(page)
         filtrar_por_factura(page, factura_corta)
         abrir_factura(page, factura_corta)
 
         for ob in objeciones:
+            res = abrir_modal_objecion(page, ob["num"], rehacer)
+            if res == "YA_CONTESTADA":
+                omitidas += 1
+                logger.info(f"  objecion #{ob['num']}: ya contestada → omito (usá --rehacer para pisarla)")
+                continue
             logger.info(f"  → objecion #{ob['num']} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
-            ctx = abrir_modal_objecion(page, ob["num"])
+            ctx = res
             llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
             subir_soportes_modal(ctx, page, archivos_soportes)
             confirmar_modal(ctx, page)
+            respondidas += 1
             page.wait_for_timeout(800)
 
-        confirmar_form_principal(page)
+        if respondidas == 0:
+            reg["estado"] = "SIN_PENDIENTES"
+            reg["detalle"] = f"{omitidas} objeciones ya estaban contestadas"
+            logger.info(f"  ✓ {factura_larga}: nada para responder ({omitidas} ya contestadas).")
+            return reg
+
+        # Finalizar SÓLO si respondimos algo nuevo.
+        try:
+            confirmar_form_principal(page)
+        except Exception as e:
+            logger.warning(f"  (Confirmar del form principal no aplicó: {e})")
         estado = enviar_finalizar(page, factura_corta)
         reg["estado"] = estado
+        reg["detalle"] = f"{respondidas} respondidas, {omitidas} omitidas"
     except Exception as e:
         reg["estado"] = "ERROR"
-        reg["detalle"] = f"{type(e).__name__}: {e}"
+        reg["detalle"] = f"{type(e).__name__}: {e} (respondidas={respondidas}, omitidas={omitidas})"
         logger.error(f"  ✗ {factura_larga}: {reg['detalle']}")
         _screenshot_debug(page, f"error_{factura_corta}")
     return reg
@@ -938,6 +991,8 @@ def main() -> int:
     grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS... o número corto).")
     grupo.add_argument("--todas", action="store_true", help="Procesar todas las facturas del Excel.")
     parser.add_argument("--con-cabeza", action="store_true", help="Mostrar el browser (no headless).")
+    parser.add_argument("--rehacer", action="store_true",
+                        help="Rehacer objeciones YA contestadas (por defecto se omiten para no re-subir soportes).")
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
     parser.add_argument("--reporte", type=Path, default=Path("reporte_glosa.csv"))
     parser.add_argument("--log", type=Path, default=None)
@@ -1003,7 +1058,10 @@ def main() -> int:
                     )
                     continue
                 resultados.append(
-                    procesar_factura(page, factura_corta, factura_larga, objeciones, archivos)
+                    procesar_factura(
+                        page, factura_corta, factura_larga, objeciones, archivos,
+                        rehacer=args.rehacer,
+                    )
                 )
         finally:
             browser.close()
