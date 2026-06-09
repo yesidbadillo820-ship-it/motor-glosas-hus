@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.api.deps import get_db, get_usuario_actual
+from app.core.tz import ahora_utc
 from app.models.db import UsuarioRecord, GlosaRecord
 from app.models.schemas import AnalyticsResult
 from app.repositories.glosa_repository import GlosaRepository
@@ -267,4 +270,136 @@ def recuperacion_proyectada(
         "valor_pendiente": valor_pendiente,
         "valor_recuperacion_proyectada": round(valor_pendiente * tasa_historica, 0),
         "nota": f"Proyección basada en {total_con_decision} casos históricos.",
+    }
+
+
+@router.get("/win-rate-detalle")
+def win_rate_detalle(
+    dias: int = 90,
+    eps: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Win-rate por combinación (EPS, código), con tendencia trimestral.
+
+    Granularidad que NO existe en el resto de /analytics — los endpoints
+    actuales agregan por EPS o por familia (TA/SO/...), nunca por la
+    combinación EPS+código completa, que es la que de verdad le importa
+    al coordinador para decidir qué plantillas mantener vivas.
+
+    Devuelve una lista ordenada por valor recuperado descendente:
+      [{
+        eps, codigo, n_total, n_levantadas, n_ratificadas,
+        valor_objetado_total, valor_recuperado_total,
+        tasa_levantamiento_pct,
+        tendencia_3m_pct   (delta vs los 3 meses anteriores)
+      }]
+
+    Filtros: ventana de N días sobre fecha_decision_eps (sólo glosas ya
+    decididas), y opcionalmente una EPS específica.
+    """
+    dias = max(7, min(int(dias or 90), 365))
+    ahora = ahora_utc()
+    desde = ahora - timedelta(days=dias)
+    # Ventana previa de igual duración para calcular tendencia
+    desde_previa = desde - timedelta(days=dias)
+
+    base_q = db.query(GlosaRecord).filter(
+        GlosaRecord.codigo_glosa.isnot(None),
+        GlosaRecord.eps.isnot(None),
+        GlosaRecord.estado.in_(["LEVANTADA", "RATIFICADA", "ACEPTADA"]),
+    )
+    if eps:
+        eps_norm = eps.strip()
+        base_q = base_q.filter(GlosaRecord.eps.ilike(eps_norm))
+
+    # Periodo actual
+    rows_actual = (
+        base_q.filter(GlosaRecord.fecha_decision_eps >= desde)
+        .with_entities(
+            GlosaRecord.eps,
+            GlosaRecord.codigo_glosa,
+            GlosaRecord.estado,
+            GlosaRecord.valor_objetado,
+            GlosaRecord.valor_recuperado,
+        )
+        .all()
+    )
+    # Periodo previo (para tendencia)
+    rows_previo = (
+        base_q.filter(GlosaRecord.fecha_decision_eps >= desde_previa)
+        .filter(GlosaRecord.fecha_decision_eps < desde)
+        .with_entities(
+            GlosaRecord.eps,
+            GlosaRecord.codigo_glosa,
+            GlosaRecord.estado,
+        )
+        .all()
+    )
+
+    def _agregar(rows, incluir_valores: bool) -> dict:
+        agregado: dict[tuple[str, str], dict] = {}
+        for r in rows:
+            key = ((r.eps or "").strip(), (r.codigo_glosa or "").strip().upper())
+            d = agregado.setdefault(
+                key,
+                {
+                    "n_total": 0,
+                    "n_levantadas": 0,
+                    "n_ratificadas": 0,
+                    "n_aceptadas": 0,
+                    "valor_objetado_total": 0.0,
+                    "valor_recuperado_total": 0.0,
+                },
+            )
+            d["n_total"] += 1
+            if r.estado == "LEVANTADA":
+                d["n_levantadas"] += 1
+            elif r.estado == "RATIFICADA":
+                d["n_ratificadas"] += 1
+            elif r.estado == "ACEPTADA":
+                d["n_aceptadas"] += 1
+            if incluir_valores:
+                d["valor_objetado_total"] += float(r.valor_objetado or 0)
+                d["valor_recuperado_total"] += float(r.valor_recuperado or 0)
+        return agregado
+
+    actual = _agregar(rows_actual, incluir_valores=True)
+    previo = _agregar(rows_previo, incluir_valores=False)
+
+    items = []
+    for (eps_k, cod_k), d in actual.items():
+        tasa = (d["n_levantadas"] / d["n_total"] * 100) if d["n_total"] else 0
+        prev = previo.get((eps_k, cod_k))
+        if prev and prev["n_total"]:
+            tasa_prev = prev["n_levantadas"] / prev["n_total"] * 100
+            tendencia = tasa - tasa_prev
+        else:
+            tendencia = None
+        items.append(
+            {
+                "eps": eps_k,
+                "codigo": cod_k,
+                "n_total": d["n_total"],
+                "n_levantadas": d["n_levantadas"],
+                "n_ratificadas": d["n_ratificadas"],
+                "n_aceptadas": d["n_aceptadas"],
+                "valor_objetado_total": round(d["valor_objetado_total"], 2),
+                "valor_recuperado_total": round(d["valor_recuperado_total"], 2),
+                "tasa_levantamiento_pct": round(tasa, 1),
+                "tendencia_3m_pct": round(tendencia, 1) if tendencia is not None else None,
+            }
+        )
+
+    # Orden por valor recuperado descendente — el coordinador ve primero
+    # las combinaciones que más plata han traído.
+    items.sort(key=lambda x: -x["valor_recuperado_total"])
+
+    return {
+        "ventana_dias": dias,
+        "desde": desde.isoformat(),
+        "hasta": ahora.isoformat(),
+        "filtro_eps": eps,
+        "total_combinaciones": len(items),
+        "items": items,
     }

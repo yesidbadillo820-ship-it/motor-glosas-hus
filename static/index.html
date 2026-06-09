@@ -2255,6 +2255,29 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
         </div>
 
+        <!-- Win-rate por EPS + código (feature #7) -->
+        <div class="analitica-block" id="win-rate-block" style="margin-top:1rem">
+          <div class="analitica-hdr">
+            <div>
+              <div class="analitica-title">🏆 Win-rate por EPS + código</div>
+              <div class="analitica-sub">Tasa de levantamiento por combinación, con tendencia vs el periodo anterior. Ventana <span id="wr-ventana-lbl">90</span> días.</div>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <select id="wr-ventana" onchange="cargarWinRateDetalle()" class="ap-select">
+                <option value="30">Últimos 30 días</option>
+                <option value="60">Últimos 60 días</option>
+                <option value="90" selected>Últimos 90 días</option>
+                <option value="180">Últimos 180 días</option>
+                <option value="365">Último año</option>
+              </select>
+              <button class="btn btn-ghost" onclick="cargarWinRateDetalle()" style="font-size:.78rem;padding:.3rem .7rem">Actualizar</button>
+            </div>
+          </div>
+          <div id="win-rate-body" style="padding:.6rem 0;font-size:.78rem;color:var(--text2)">
+            Cargando…
+          </div>
+        </div>
+
         <div class="analitica-block">
           <div class="analitica-hdr">
             <div>
@@ -9488,7 +9511,13 @@ function limpiarSoportesPDF(){
 function validarPDFs(input){
   var info = document.getElementById('pdf-info');
   var files = input.files || [];
-  if(!files.length){ info.textContent = ''; info.style.color=''; return; }
+  if(!files.length){
+    info.textContent = '';
+    info.style.color='';
+    var prefill = document.getElementById('soportes-prefill');
+    if(prefill) prefill.style.display = 'none';
+    return;
+  }
   var totalMB = 0;
   for(var i=0;i<files.length;i++){ totalMB += files[i].size/(1024*1024); }
   totalMB = Math.round(totalMB * 10) / 10;
@@ -9496,10 +9525,107 @@ function validarPDFs(input){
   if(n > 10){
     info.innerHTML = '⚠ <b style="color:#dc2626">Máximo 10 archivos</b> — tienes '+n+'. Elimina '+(n-10)+'.';
     info.style.color = '#dc2626';
-  } else {
-    var complejidad = (n >= 2 ? 'ALTA (respuesta 4 párrafos)' : 'ESTÁNDAR');
-    info.innerHTML = '✓ '+n+' archivo(s) · '+totalMB+' MB total · Complejidad: <b>'+complejidad+'</b>';
-    info.style.color = 'var(--c-green)';
+    return;
+  }
+  var complejidad = (n >= 2 ? 'ALTA (respuesta 4 párrafos)' : 'ESTÁNDAR');
+  info.innerHTML = '✓ '+n+' archivo(s) · '+totalMB+' MB total · Complejidad: <b>'+complejidad+'</b>';
+  info.style.color = 'var(--c-green)';
+  // Auto-extraer metadata del PDF en segundo plano para sugerir prefill.
+  extraerMetadataSoportes(files);
+}
+
+// ─── AUTO-EXTRACT desde PDFs de soporte (feature #5) ───────────────
+// Llama a POST /analizar/extraer-soportes apenas el gestor adjunta PDFs
+// y le ofrece chips para confirmar paciente/factura/CUPS/valor/eps.
+// No sobrescribe campos ya escritos por el gestor — solo SUGIERE.
+async function extraerMetadataSoportes(files){
+  var panel = document.getElementById('soportes-prefill');
+  if(!panel){
+    // Crear el panel debajo de #pdf-info la primera vez
+    var info = document.getElementById('pdf-info');
+    if(!info || !info.parentNode) return;
+    panel = document.createElement('div');
+    panel.id = 'soportes-prefill';
+    panel.style.cssText = 'margin-top:.5rem;padding:.6rem .8rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;font-size:.75rem;line-height:1.6;display:none;';
+    info.parentNode.insertBefore(panel, info.nextSibling);
+  }
+  panel.style.display = 'block';
+  panel.innerHTML = '<span style="color:var(--text3)">🔍 Extrayendo metadata de los PDFs…</span>';
+  try{
+    var fd = new FormData();
+    for(var i = 0; i < files.length; i++) fd.append('archivos', files[i]);
+    var r = await fetch('/analizar/extraer-soportes', {method:'POST', body:fd, headers: authH()});
+    if(!r.ok){ panel.style.display = 'none'; return; }
+    var d = await r.json();
+    if(!d.archivos_procesados || d.confianza_global === 0){
+      panel.innerHTML = '<span style="color:var(--text3)">ℹ Los PDFs no tienen texto plano (puede que requieran OCR — se hará al analizar).</span>';
+      return;
+    }
+    panel.innerHTML = renderPrefillSoportes(d);
+  }catch(e){
+    // Silencioso: el auto-extract es UX-mejora, no debe bloquear el flujo
+    panel.style.display = 'none';
+  }
+}
+
+function renderPrefillSoportes(d){
+  var chips = [];
+  var conf = Math.round((d.confianza_global || 0) * 100);
+  var confColor = conf >= 70 ? 'var(--c-green)' : conf >= 40 ? '#d97706' : '#94a3b8';
+  function chip(label, value, campo, targetId){
+    if(!value) return '';
+    var safe = String(value).replace(/'/g, "\\'").replace(/"/g,'&quot;');
+    return '<button type="button" class="pa-chip" style="margin:.15rem;padding:.18rem .55rem;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:14px;cursor:pointer;font-size:.7rem;font-weight:600" '
+      + 'onclick="confirmarPrefillSoporte(\''+targetId+'\',\''+safe+'\',\''+campo+'\',this)" title="Clic para usar este valor en el formulario">'
+      + label + ': ' + (String(value).length > 28 ? String(value).slice(0,28)+'…' : value) + '</button>';
+  }
+  chips.push(chip('Factura',  d.factura,           'factura',  'f-factura'));
+  chips.push(chip('Radicado', d.radicado,          'radicado', 'f-radicado'));
+  chips.push(chip('EPS',      d.eps,               'eps',      'eps-sel'));
+  chips.push(chip('CUPS',     d.cups,              'cups',     'f-cups'));
+  chips.push(chip('Paciente', d.paciente,          'paciente', null));
+  if(d.valor_objetado){
+    chips.push(chip('Valor objetado','$ '+(d.valor_objetado).toLocaleString('es-CO'),'valor_objetado','f-valacp'));
+  }
+  if(d.fecha_radicacion){
+    chips.push(chip('F. Radicación', d.fecha_radicacion, 'fecha_rad', 'f-rad'));
+  }
+  if(d.fecha_recepcion){
+    chips.push(chip('F. Recepción', d.fecha_recepcion, 'fecha_rec', 'f-rec'));
+  }
+  var chipsHtml = chips.filter(function(c){ return !!c; }).join('');
+  if(!chipsHtml){
+    return '<span style="color:var(--text3)">Soportes leídos pero sin metadata reconocible.</span>';
+  }
+  return '<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem">'
+    + '<span style="font-weight:600">⚡ Auto-detectado en los PDFs ('+d.archivos_procesados+' archivo(s)):</span>'
+    + '<span style="color:'+confColor+';font-size:.7rem">confianza '+conf+'%</span>'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;align-items:center">' + chipsHtml + '</div>'
+    + '<div style="margin-top:.3rem;color:var(--text3);font-size:.68rem">Clic en un chip para usar ese valor. No sobrescribe lo que ya tipeaste.</div>';
+}
+
+function confirmarPrefillSoporte(targetId, value, campo, btn){
+  if(targetId){
+    var el = document.getElementById(targetId);
+    if(el){
+      var prev = (el.value || '').trim();
+      if(prev && prev !== value){
+        if(!confirm('Ya escribiste "'+prev+'" en este campo. ¿Reemplazar por "'+value+'"?')) return;
+      }
+      el.value = value;
+      // Disparar eventos para que listeners (preview, etc.) se enteren
+      el.dispatchEvent(new Event('input', {bubbles:true}));
+      el.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+  // Marcar el chip como confirmado
+  if(btn){
+    btn.style.background = '#dcfce7';
+    btn.style.color = '#15803d';
+    btn.style.borderColor = '#86efac';
+    btn.innerHTML = '✓ ' + btn.textContent;
+    btn.disabled = true;
   }
 }
 
@@ -14353,6 +14479,94 @@ async function diagReindexarSoportes(){
   }
 }
 
+// ─── GANADORES HISTÓRICOS (feature #3) ─────────────────────────────
+// Side-by-side: muestra hasta 3 dictámenes LEVANTADOS del mismo
+// (EPS, código_glosa) para que el gestor pueda ver "el que ya ganó"
+// y copiar frases que probaron funcionar. Render lazy — el HTML del
+// placeholder dispara la carga en background y rellena el body cuando
+// llega la respuesta del endpoint /glosas/stats/historicos-ganadores.
+function renderGanadoresHistoricosPlaceholder(eps, codigo){
+  if(!eps || !codigo) return '';
+  var epsSafe   = String(eps).replace(/"/g, '&quot;');
+  var codSafe   = String(codigo).replace(/"/g, '&quot;');
+  // Disparamos la carga después del render (microtask), una sola vez.
+  setTimeout(function(){ cargarGanadoresHistoricos(eps, codigo); }, 0);
+  return '<div class="form-card" id="ganadores-historicos" '
+    + 'data-eps="' + epsSafe + '" data-codigo="' + codSafe + '" '
+    + 'style="margin-bottom:1rem;border-left:4px solid #16a34a;background:#f0fdf4">'
+    + '<div style="font-weight:700;color:#15803d;font-size:.95rem;margin-bottom:.3rem">'
+    + '🏆 Ganadores históricos para esta EPS + código'
+    + '</div>'
+    + '<div id="ganadores-historicos-body" style="font-size:.78rem;color:var(--text2)">'
+    + '<span style="color:var(--text3)">Buscando dictámenes que ya ganaron…</span>'
+    + '</div></div>';
+}
+
+async function cargarGanadoresHistoricos(eps, codigo){
+  var body = document.getElementById('ganadores-historicos-body');
+  if(!body) return;
+  try{
+    var qs = '?eps=' + encodeURIComponent(eps) + '&codigo=' + encodeURIComponent(codigo) + '&limit=3';
+    var r = await fetch('/glosas/stats/historicos-ganadores' + qs, {headers: authH()});
+    if(!r.ok){ body.innerHTML = '<span style="color:var(--text3)">No fue posible cargar ganadores históricos.</span>'; return; }
+    var d = await r.json();
+    if(!d.total){
+      // Esconder el panel completo cuando no hay datos para no agregar ruido visual
+      var card = document.getElementById('ganadores-historicos');
+      if(card) card.style.display = 'none';
+      return;
+    }
+    var fmtCop = function(n){ return '$ ' + Math.round(Number(n)||0).toLocaleString('es-CO'); };
+    var fmtFecha = function(iso){
+      if(!iso) return '—';
+      try{ return new Date(iso).toLocaleDateString('es-CO', {year:'numeric', month:'short', day:'numeric'}); }
+      catch(e){ return iso; }
+    };
+    var totalRec = fmtCop(d.valor_recuperado_total);
+    var html = '<div style="margin-bottom:.4rem;font-size:.72rem;color:var(--text3)">'
+             + d.total + ' caso(s) previo(s) — total recuperado: <b style="color:#15803d">' + totalRec + '</b>'
+             + '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:.5rem">';
+    for(var i = 0; i < d.items.length; i++){
+      var it = d.items[i];
+      var dictSafe = String(it.dictamen || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var preview = dictSafe.length > 380 ? dictSafe.slice(0, 380) + '…' : dictSafe;
+      html += '<div style="padding:.5rem .65rem;background:white;border:1px solid var(--border);border-radius:6px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;font-size:.72rem">'
+            + '<span><b>Glosa #' + it.glosa_id + '</b> · ' + fmtFecha(it.fecha_decision_eps) + '</span>'
+            + '<span style="color:#15803d;font-weight:700">' + fmtCop(it.valor_recuperado) + ' recuperado</span>'
+            + '</div>'
+            + '<div style="font-size:.7rem;color:var(--text3);line-height:1.5;white-space:pre-wrap;word-break:break-word">' + preview + '</div>'
+            + '<div style="margin-top:.35rem">'
+            + '<button class="btn btn-ghost" style="padding:.2rem .55rem;font-size:.68rem" '
+            + 'onclick="copiarGanadorHistorico(' + it.glosa_id + ')">📋 Copiar dictamen</button>'
+            + '</div></div>';
+    }
+    html += '</div>';
+    body.innerHTML = html;
+    // Guardar los dictámenes en el cache local para el botón "copiar"
+    window._ganadoresHistoricos = (window._ganadoresHistoricos || {});
+    for(var j = 0; j < d.items.length; j++){
+      window._ganadoresHistoricos[d.items[j].glosa_id] = d.items[j].dictamen || '';
+    }
+  }catch(e){
+    body.innerHTML = '<span style="color:var(--text3)">Error cargando ganadores.</span>';
+  }
+}
+
+function copiarGanadorHistorico(glosaId){
+  var t = (window._ganadoresHistoricos || {})[glosaId];
+  if(!t){ alert('No tengo cacheado el dictamen #' + glosaId); return; }
+  try{
+    navigator.clipboard.writeText(t).then(function(){
+      if(typeof toast === 'function') toast('Copiado','Dictamen #'+glosaId+' al portapapeles','success');
+    });
+  }catch(e){
+    // Fallback no-clipboard: prompt
+    window.prompt('Copia con Ctrl+C el dictamen:', t);
+  }
+}
+
 // ─── AUDITOR FORENSE — Q&A conversacional sobre soportes (Yesid mayo 2026) ─
 function renderAuditorForensePanel(d){
   // Mostrar siempre que haya factura — el gestor puede preguntar lo
@@ -14543,6 +14757,7 @@ function renderResult(d){
     + (d.confianza ? renderConfianzaPanel(d.confianza) : '')
     + (d.verificacion_citas ? renderVerificacionCitas(d.verificacion_citas) : '')
     + (d.auto_pilot ? renderAutoPilotPanel(d.auto_pilot) : '')
+    + renderGanadoresHistoricosPlaceholder(d.eps, d.codigo_glosa)
     + renderAuditorForensePanel(d)
 
     +'<div class="res-actions">'
@@ -16424,7 +16639,66 @@ async function loadDash(){
     // Sprint #7: dashboard plata recuperada
     cargarPlataRecuperada();
 
+    // Win-rate por EPS+código (feature #7)
+    cargarWinRateDetalle();
+
   } catch(e){console.error('Dashboard error',e);}
+}
+
+// ─── WIN-RATE DETALLADO POR (EPS, CÓDIGO) ──────────────────────────
+async function cargarWinRateDetalle(){
+  var body = document.getElementById('win-rate-body');
+  if(!body) return;
+  var dias = parseInt((document.getElementById('wr-ventana') || {}).value || '90', 10);
+  document.getElementById('wr-ventana-lbl').textContent = dias;
+  body.innerHTML = '<span style="color:var(--text3)">Cargando…</span>';
+  try{
+    var r = await fetch('/analytics/win-rate-detalle?dias=' + dias, {headers: authH()});
+    if(!r.ok){ body.innerHTML = '<span style="color:#dc2626">Error ' + r.status + '</span>'; return; }
+    var d = await r.json();
+    if(!d.total_combinaciones){
+      body.innerHTML = '<span style="color:var(--text3)">Sin glosas decididas en esta ventana.</span>';
+      return;
+    }
+    var fmtCop = function(n){ return '$ ' + Math.round(Number(n)||0).toLocaleString('es-CO'); };
+    var fmtTasa = function(t){
+      var color = t >= 75 ? '#15803d' : t >= 50 ? '#d97706' : '#b91c1c';
+      return '<b style="color:' + color + '">' + t.toFixed(1) + '%</b>';
+    };
+    var fmtTend = function(t){
+      if(t === null || t === undefined) return '<span style="color:var(--text3)">—</span>';
+      if(t > 0) return '<span style="color:#15803d">▲ +' + t.toFixed(1) + 'p</span>';
+      if(t < 0) return '<span style="color:#b91c1c">▼ ' + t.toFixed(1) + 'p</span>';
+      return '<span style="color:var(--text3)">— sin cambio</span>';
+    };
+    var rows = d.items.slice(0, 30).map(function(it){
+      return '<tr>'
+        + '<td style="padding:.35rem .5rem"><b>' + it.eps + '</b></td>'
+        + '<td style="padding:.35rem .5rem"><code>' + it.codigo + '</code></td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + it.n_total + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + it.n_levantadas + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + fmtTasa(it.tasa_levantamiento_pct) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + fmtTend(it.tendencia_3m_pct) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right;color:#15803d;font-weight:600">' + fmtCop(it.valor_recuperado_total) + '</td>'
+        + '</tr>';
+    }).join('');
+    body.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;font-size:.74rem;border-collapse:collapse">'
+      + '<thead><tr style="background:var(--bg-card);text-align:left;border-bottom:1px solid var(--border)">'
+      + '<th style="padding:.4rem .5rem">EPS</th>'
+      + '<th style="padding:.4rem .5rem">Código</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">N total</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Levantadas</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Tasa</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Tendencia</th>'
+      + '<th style="padding:.4rem .5rem;text-align:right">Recuperado</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div style="margin-top:.4rem;color:var(--text3);font-size:.7rem">'
+      + 'Mostrando top ' + Math.min(d.items.length, 30) + ' de ' + d.total_combinaciones + ' combinaciones, ordenadas por valor recuperado. '
+      + 'Tendencia = diferencia (en puntos) vs la ventana anterior del mismo tamaño.'
+      + '</div>';
+  }catch(e){
+    body.innerHTML = '<span style="color:#dc2626">Error: ' + e.message + '</span>';
+  }
 }
 
 // ─── Sprint #7 — Dashboard plata recuperada ────────────────────────

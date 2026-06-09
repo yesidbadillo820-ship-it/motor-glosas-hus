@@ -1167,3 +1167,171 @@ async def score_breakdown(
             f["sugerencia"] for f in sorted(factores, key=lambda x: -x["peso"]) if f["sugerencia"]
         ][:3],
     }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Auto-extracción de metadata desde PDFs de soporte (factura, CUPS, paciente,
+# valores, EPS) — corre ANTES de "Analizar con IA" para que el gestor confirme
+# los campos sin tener que tipear nada del PDF a mano.
+#
+# Mecanismo:
+#   1. Recibe los UploadFile PDF que el usuario adjuntó.
+#   2. Extrae el texto plano con PdfService.extraer() (sin OCR — barato y
+#      rápido; el OCR queda para el flujo principal /analizar si hace falta).
+#   3. Pasa cada texto por extractor_factura.extraer_de_texto() que ya tiene
+#      regex pulida para facturas colombianas.
+#   4. Combina los resultados de los varios PDFs en un solo "prefill":
+#      - factura/radicado/eps/paciente/cups: primero no-vacío
+#      - valor_objetado/facturado/reconocido: max (suele venir del PDF de glosa)
+#      - codigos_glosa: unión deduplicada
+#      - confianza_global: promedio ponderado por presencia de campos
+#   5. Devuelve { paciente, factura, radicado, eps, fecha_radicacion,
+#                 fecha_recepcion, cups, valor_objetado, valor_facturado,
+#                 codigos_glosa, confianza_global, archivos_procesados,
+#                 detalle_por_archivo: [...] }
+#
+# La UI muestra chips "auto-extraído del PDF — clic para confirmar" que
+# rellenan los inputs respectivos. Si el campo extraído contradice lo que
+# el gestor ya escribió, se marca el chip como sugerencia (no sobrescribe).
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def _fundir_extracciones(extraidos: list[dict]) -> dict:
+    """Combina varios resultados de extractor_factura en un solo prefill.
+
+    Regla por campo:
+      · strings (factura/radicado/eps/paciente/...): primer no-vacío,
+        priorizando los que vienen de la extracción con mayor confianza.
+      · valores monetarios: máximo (la factura suele ser el PDF con el
+        valor real, los demás pueden traer ceros).
+      · codigos_glosa: unión deduplicada preservando orden.
+      · confianza_global: promedio simple de las confianzas individuales.
+    """
+    if not extraidos:
+        return {
+            "paciente": "",
+            "factura": "",
+            "radicado": "",
+            "eps": "",
+            "fecha_radicacion": "",
+            "fecha_recepcion": "",
+            "cups": "",
+            "valor_objetado": 0.0,
+            "valor_facturado": 0.0,
+            "codigos_glosa": [],
+            "confianza_global": 0.0,
+        }
+    # Ordenar por confianza desc para que el primer no-vacío gane
+    ordenados = sorted(extraidos, key=lambda r: -float(r.get("confianza") or 0))
+
+    def _primer_no_vacio(campo: str) -> str:
+        for r in ordenados:
+            v = (r.get(campo) or "").strip()
+            if v:
+                return v
+        return ""
+
+    def _max_float(campo: str) -> float:
+        valores = [float(r.get(campo) or 0) for r in extraidos]
+        return max(valores) if valores else 0.0
+
+    codigos: list[str] = []
+    for r in ordenados:
+        for c in r.get("codigos_glosa") or []:
+            c_norm = (c or "").strip().upper()
+            if c_norm and c_norm not in codigos:
+                codigos.append(c_norm)
+
+    confianzas = [float(r.get("confianza") or 0) for r in extraidos]
+    return {
+        "paciente": _primer_no_vacio("paciente"),
+        "factura": _primer_no_vacio("numero_factura"),
+        "radicado": _primer_no_vacio("numero_radicado"),
+        "eps": _primer_no_vacio("eps"),
+        "fecha_radicacion": _primer_no_vacio("fecha_radicacion"),
+        "fecha_recepcion": _primer_no_vacio("fecha_recepcion"),
+        "cups": _primer_no_vacio("cups"),
+        "valor_objetado": _max_float("valor_objetado"),
+        "valor_facturado": _max_float("valor_facturado"),
+        "codigos_glosa": codigos,
+        "confianza_global": round(sum(confianzas) / len(confianzas), 2) if confianzas else 0.0,
+    }
+
+
+@router.post("/analizar/extraer-soportes")
+@limiter.limit("60/minute")
+async def extraer_soportes(
+    request: Request,
+    archivos: list[UploadFile] = File(default=[]),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Auto-extrae metadata de los PDFs ANTES de "Analizar con IA".
+
+    Quita el copy-paste manual de paciente/factura/CUPS/valor (causa frecuente
+    de ratificación administrativa por "datos incongruentes"). El gestor sube
+    el PDF y la UI le ofrece chips para confirmar los campos detectados.
+
+    Usa PdfService.extraer() (SIN OCR) — barato y rápido. El OCR solo se
+    dispara después en /analizar cuando el dictamen real lo necesita.
+    """
+    req_id = set_request_id()
+    if not archivos:
+        return _fundir_extracciones([])
+
+    from app.services.extractor_factura import extraer_de_texto
+    from app.services.pdf_service import PdfService
+
+    pdf_svc = PdfService()
+    extraidos: list[dict] = []
+    detalle: list[dict] = []
+    procesados = 0
+
+    for archivo in archivos:
+        if procesados >= MAX_ARCHIVOS:
+            logger.warning(f"[{req_id}] extraer-soportes: máx {MAX_ARCHIVOS} archivos")
+            break
+        if not archivo.filename:
+            continue
+        try:
+            contenido = await archivo.read()
+            if contenido[:4] != b"%PDF":
+                detalle.append({"archivo": archivo.filename, "ok": False, "error": "no es PDF"})
+                continue
+            if len(contenido) > MAX_BYTES_PDF:
+                detalle.append(
+                    {"archivo": archivo.filename, "ok": False, "error": "PDF muy grande"}
+                )
+                continue
+            texto = await pdf_svc.extraer(contenido)
+            if not texto or len(texto) < 30:
+                detalle.append(
+                    {
+                        "archivo": archivo.filename,
+                        "ok": False,
+                        "error": "PDF sin texto plano (puede requerir OCR — corre /analizar)",
+                    }
+                )
+                continue
+            extracto = extraer_de_texto(texto)
+            extraidos.append(extracto)
+            detalle.append(
+                {
+                    "archivo": archivo.filename,
+                    "ok": True,
+                    "confianza": extracto.get("confianza", 0.0),
+                    "campos_faltantes": extracto.get("campos_faltantes", []),
+                }
+            )
+            procesados += 1
+        except Exception as e:
+            logger.warning(f"[{req_id}] extraer-soportes error en {archivo.filename}: {e}")
+            detalle.append({"archivo": archivo.filename, "ok": False, "error": str(e)})
+
+    resultado = _fundir_extracciones(extraidos)
+    resultado["archivos_procesados"] = procesados
+    resultado["detalle_por_archivo"] = detalle
+    logger.info(
+        f"[{req_id}] extraer-soportes: {procesados} PDFs procesados, "
+        f"confianza_global={resultado['confianza_global']}"
+    )
+    return resultado
