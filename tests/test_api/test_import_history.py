@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -98,15 +96,20 @@ class TestImportHistory:
         assert d["items"][0]["glosas_creadas"] == 12
 
     def test_orden_clusters_desc(self, client, db_session):
-        ts1 = datetime(2026, 4, 10, 10, 0, tzinfo=timezone.utc)
-        ts2 = datetime(2026, 4, 12, 14, 0, tzinfo=timezone.utc)
-        # 20 glosas en ts1
+        # Antes se hardcodeaban fechas absolutas (2026-04-10 / 2026-04-12) y
+        # la consulta usaba ?dias=60. Con el paso del tiempo, abril 2026 cae
+        # FUERA de la ventana de 60 días → el cluster de 20 desaparece y el
+        # test falla con "11 != 20". Anclamos a relativo a hoy.
+        from datetime import timedelta
+
+        ts1 = ahora_utc() - timedelta(days=10, hours=4)  # cluster grande
+        ts2 = ahora_utc() - timedelta(days=8, hours=2)  # cluster pequeño, más reciente
         for _ in range(20):
             _seed(db_session, ts1)
-        # 11 glosas en ts2
         for _ in range(11):
             _seed(db_session, ts2)
         r = client.get("/sistema/import-history?dias=60")
         d = r.json()
+        # Orden por cantidad descendente: primero el de 20, luego el de 11.
         assert d["items"][0]["glosas_creadas"] == 20
         assert d["items"][1]["glosas_creadas"] == 11

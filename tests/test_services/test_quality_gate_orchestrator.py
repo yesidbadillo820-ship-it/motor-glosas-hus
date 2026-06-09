@@ -20,6 +20,15 @@ DICTAMEN_LIMPIO = (
     "Y EL PAGO ÍNTEGRO DE LO FACTURADO."
 )
 
+# Texto de glosa de ejemplo que pasa el pre-validador endurecido
+# (≥60 chars + palabra del dominio). Usado en todos los tests del
+# orchestrator para evitar que la pre-validación bloquee antes de
+# llegar a la lógica que se quiere ejercitar.
+GLOSA_DEMO = (
+    "TA0201 - Mayor valor cobrado en consulta especializada "
+    "por valor objetado de $500.000 según factura electrónica"
+)
+
 DICTAMEN_SIN_CIERRE = "ESE HUS NO ACEPTA LA GLOSA. " * 20
 
 DICTAMEN_CON_CITA_INVENTADA = (
@@ -70,7 +79,7 @@ class TestPreValidacion:
             eps="FAMISANAR EPS",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 Mayor valor cobrado en consulta especializada $500.000",
+            texto_glosa=GLOSA_DEMO,
             generador=gen,
         )
         assert r.estado == "APROBADO"
@@ -86,7 +95,7 @@ class TestGeneracionAprobada:
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 Mayor valor cobrado $500.000 en consulta",
+            texto_glosa=GLOSA_DEMO,
             generador=gen,
         )
         assert r.estado == "APROBADO"
@@ -104,7 +113,7 @@ class TestGeneracionAprobada:
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 mayor valor cobrado consulta $500.000",
+            texto_glosa=GLOSA_DEMO,
             generador=gen,
         )
         assert r.estado == "APROBADO"
@@ -126,7 +135,7 @@ class TestEscalamientoHumano:
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 mayor valor cobrado consulta $500.000",
+            texto_glosa=GLOSA_DEMO,
             generador=gen,
         )
         assert r.estado == "ESCALAR_HUMANO"
@@ -148,7 +157,7 @@ class TestEscalamientoHumano:
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 mayor valor cobrado",
+            texto_glosa=GLOSA_DEMO,
             generador=gen,
         )
         assert r.estado == "ESCALAR_HUMANO"
@@ -164,7 +173,7 @@ class TestMaxIntentosConfigurable:
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 mayor valor cobrado",
+            texto_glosa=GLOSA_DEMO,
             generador=gen,
             max_intentos=1,
         )
@@ -185,7 +194,7 @@ class TestModelosFallback:
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 mayor valor cobrado consulta",
+            texto_glosa=GLOSA_DEMO,
             generador=gen_que_registra,
             modelos_fallback=["anthropic", "groq", "gemini"],
         )
@@ -209,7 +218,7 @@ class TestErrorEnGenerador:
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="500000",
-            texto_glosa="TA0201 mayor valor cobrado",
+            texto_glosa=GLOSA_DEMO,
             generador=gen,
         )
         # El error en el primero NO debe detener el pipeline

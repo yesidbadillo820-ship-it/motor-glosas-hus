@@ -102,8 +102,24 @@ class TestValorMonetario:
 
 class TestTextoGlosa:
     def test_texto_largo_ok(self):
-        res = check_texto_glosa("TA0201 - Mayor valor cobrado por consulta de $500.000")
+        # Mínimo 60 chars + al menos una palabra del dominio (tarifa/factura/...).
+        # El texto antiguo de 53 chars ya no pasa el filtro endurecido — antes
+        # bastaba con 20 chars sin contenido específico y dictámenes se generaban
+        # sobre inputs sin sustancia.
+        res = check_texto_glosa(
+            "TA0201 - Mayor valor cobrado en consulta especializada "
+            "por valor objetado de $500.000 según factura electrónica"
+        )
         assert res.ok
+
+    def test_texto_sin_palabra_dominio_rechazado(self):
+        # 60+ chars pero sin ningún término del dominio: posible copy-paste
+        # de algo no-relacionado con una glosa.
+        res = check_texto_glosa(
+            "Este es un texto suficientemente largo pero sin sustancia ni datos."
+        )
+        assert not res.ok
+        assert "dominio" in (res.razon or "").lower()
 
     def test_texto_corto_falla(self):
         res = check_texto_glosa("TA0201")
@@ -113,6 +129,14 @@ class TestTextoGlosa:
     def test_texto_vacio_falla(self):
         res = check_texto_glosa("")
         assert not res.ok
+
+    def test_se_glosa_por_falta_de_cobertura_se_rechaza(self):
+        # Regresión: el input real "se glosa por falta de cobertura" (33 chars)
+        # pasaba el viejo filtro de 20 chars y la IA generaba un dictamen
+        # plantilla sin sustancia. Debe rechazarse por longitud.
+        res = check_texto_glosa("se glosa por falta de cobertura")
+        assert not res.ok
+        assert "corto" in res.razon.lower()
 
 
 class TestPlantillaDisponible:
@@ -196,7 +220,10 @@ class TestPreValidarGlosa:
             eps="NUEVA EPS",
             codigo_glosa="CL0101",
             valor_objetado="1500000",
-            texto_glosa="CL0101 - No pertinencia clínica del procedimiento por $1.500.000",
+            texto_glosa=(
+                "CL0101 - No pertinencia clínica del procedimiento facturado "
+                "por valor de $1.500.000 según historia clínica del paciente"
+            ),
         )
         assert r.aprobado
         assert r.mensaje_para_usuario == ""
@@ -208,7 +235,10 @@ class TestPreValidarGlosa:
             eps="FAMISANAR",
             codigo_glosa="AU0301",
             valor_objetado="500000",
-            texto_glosa="AU0301 - autorización pendiente, valor $500.000",
+            texto_glosa=(
+                "AU0301 - autorización pendiente del servicio facturado "
+                "por valor de $500.000 según factura electrónica"
+            ),
         )
         assert r.aprobado  # no bloquea
         # Pero el check de plantilla debe traer razón (warning)

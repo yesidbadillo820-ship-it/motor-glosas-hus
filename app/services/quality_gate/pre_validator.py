@@ -214,14 +214,48 @@ def check_valor_monetario(valor: str | int | float | None) -> tuple[PreCheckResu
     return (PreCheckResult(ok=True), v)
 
 
+_PALABRAS_DOMINIO_GLOSA = (
+    "factura",
+    "cups",
+    "glosa",
+    "contrato",
+    "autorizaci",
+    "prestaci",
+    "paciente",
+    "tarif",
+    "soport",
+    "valor",
+    "objet",
+    "cobertura",
+    "auditor",
+)
+
+
 def check_texto_glosa(texto: str) -> PreCheckResult:
-    """Verifica que el texto tenga contenido mínimo."""
+    """Verifica que el texto tenga contenido mínimo y útil.
+
+    Antes solo se exigía len>=20, así que "se glosa por falta de cobertura"
+    (32 chars) pasaba y la IA generaba un dictamen plantilla sin sustancia.
+    Ahora se exige un mínimo de 60 chars Y al menos una palabra del dominio
+    (factura/cups/tarifa/...) para garantizar que hay detalle real.
+    """
     t = (texto or "").strip()
-    if len(t) < 20:
+    if len(t) < 60:
         return PreCheckResult(
             ok=False,
-            razon=f"Texto de glosa muy corto ({len(t)} chars, mínimo 20)",
-            sugerencia="Incluye el código, motivo y valor objetado",
+            razon=f"Texto de glosa muy corto ({len(t)} chars, mínimo 60)",
+            sugerencia=(
+                "Pega el texto completo de la glosa de la EPS — incluye código, "
+                "valor objetado, factura, motivo. Sin esto la IA solo puede "
+                "generar plantilla sin sustancia."
+            ),
+        )
+    t_lower = t.lower()
+    if not any(p in t_lower for p in _PALABRAS_DOMINIO_GLOSA):
+        return PreCheckResult(
+            ok=False,
+            razon="El texto no menciona ningún término del dominio (factura, CUPS, tarifa, contrato, paciente…)",
+            sugerencia="Verifica que estés pegando el texto de la glosa de la EPS y no otra cosa",
         )
     return PreCheckResult(ok=True)
 
