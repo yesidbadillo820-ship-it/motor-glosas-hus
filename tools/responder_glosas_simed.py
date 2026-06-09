@@ -862,53 +862,102 @@ def subir_soportes_modal(ctx, page: Page, archivos: list[Path]) -> None:
             logger.warning("  No pude clickear 'Agregar' del modal de soportes.")
 
 
-def confirmar_modal(ctx, page: Page) -> None:
-    """Click 'Confirmar' al pie del modal — guarda la respuesta y cierra.
+def _hay_caracteres_especiales(page: Page, ctx) -> bool:
+    for c in [ctx] + [f for f in page.frames if f is not ctx]:
+        try:
+            err = c.locator("text=caracteres especiales").first
+            if err.count() > 0 and err.is_visible():
+                return True
+        except Exception:
+            continue
+    return False
 
-    Detecta el rechazo del portal por texto ('caracteres especiales') y aborta
-    con un mensaje claro en vez de dejar el modal colgado.
+
+def _popup_respuesta_abierto(page: Page) -> bool:
+    try:
+        pop = page.locator("iframe#gxp0_ifrm").first
+        return pop.count() > 0 and pop.is_visible()
+    except Exception:
+        return False
+
+
+def _esperar_popup_cerrado(page: Page, timeout_ms: int) -> bool:
+    """Espera (polleando) a que el portal cierre el popup de respuesta. True si cerró."""
+    deadline = time.time() + timeout_ms / 1000
+    while time.time() < deadline:
+        if not _popup_respuesta_abierto(page):
+            return True
+        page.wait_for_timeout(400)
+    return False
+
+
+def _dump_botones(page: Page, etiqueta: str) -> None:
+    """Lista los botones visibles de todos los frames (para descubrir un 2do
+    confirm u otros diálogos) en un .txt de diagnóstico."""
+    out_dir = Path("debug_screenshots")
+    out_dir.mkdir(exist_ok=True)
+    ruta = out_dir / f"{time.strftime('%H%M%S')}_botones_{etiqueta}.txt"
+    lineas: list[str] = []
+    for fr in page.frames:
+        try:
+            els = fr.locator("button, input[type='button'], input[type='submit'], a.btn")
+            for i in range(min(els.count(), 50)):
+                e = els.nth(i)
+                try:
+                    if not e.is_visible():
+                        continue
+                    txt = (e.inner_text(timeout=400) or "").strip() or (e.get_attribute("value") or "")
+                    eid = e.get_attribute("id") or ""
+                    lineas.append(f"[{(fr.url or '')[-45:]}] '{txt[:40]}' id={eid}")
+                except Exception:
+                    continue
+        except Exception:
+            continue
+    try:
+        ruta.write_text("\n".join(lineas), encoding="utf-8")
+        logger.info(f"  Botones visibles → {ruta}")
+    except Exception:
+        pass
+
+
+def confirmar_modal(ctx, page: Page) -> None:
+    """Click 'Confirmar' del modal y ESPERA a que el portal guarde y cierre.
+
+    Clave: NO cerramos el popup a la fuerza apenas vence un timeout corto —
+    eso abortaba el guardado y dejaba la glosa pendiente. Esperamos a que el
+    portal cierre el popup solo (señal de guardado). Si no cierra en 25s,
+    volcamos diagnóstico y marcamos la objeción como NO guardada.
     """
+    # Volver a 'Información Glosa' para asegurar que el Confirmar guarda el form.
+    _clic_tab(ctx, page, "Información Glosa")
     btn = _buscar_en_frames(
-        page, ctx, "button:text-is('Confirmar'), input[type='button'][value='Confirmar']"
+        page, ctx, "input[type='button'][value='Confirmar'], button:text-is('Confirmar')"
     )
     if btn is None:
         _screenshot_debug(page, "modal_sin_confirmar")
         raise RuntimeError("No encontré el botón 'Confirmar' del modal.")
     btn.click(timeout=6000)
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(1200)
 
-    # ¿El portal rechazó el texto por caracteres especiales?
-    error_validacion = False
-    for c in [ctx] + [f for f in page.frames if f is not ctx]:
-        try:
-            err = c.locator("text=caracteres especiales").first
-            if err.count() > 0 and err.is_visible():
-                error_validacion = True
-                break
-        except Exception:
-            continue
-    if error_validacion:
+    if _hay_caracteres_especiales(page, ctx):
         _screenshot_debug(page, "validacion_texto_rechazada")
         raise RuntimeError(
-            "El portal rechazó el texto por 'caracteres especiales'. "
-            "(La sanitización debería dejar sólo letras/números/espacios — revisar.)"
+            "El portal rechazó el texto por 'caracteres especiales' (revisar sanitización)."
         )
 
-    # Esperar a que el popup cierre (la respuesta quedó guardada).
-    cerrado = False
-    try:
-        page.locator("iframe#gxp0_ifrm").wait_for(state="hidden", timeout=8000)
-        cerrado = True
-    except Exception:
-        try:
-            ctx.locator("text=Detalle Respuesta").first.wait_for(state="hidden", timeout=3000)
-            cerrado = True
-        except Exception:
-            pass
-    if not cerrado:
-        logger.warning("  El modal no cerró solo tras Confirmar; lo cierro a la fuerza.")
-        _cerrar_popup_forzado(page)
-    page.wait_for_timeout(500)
+    # Esperar a que el portal guarde y cierre el popup (puede tardar varios segundos).
+    if _esperar_popup_cerrado(page, 25000):
+        page.wait_for_timeout(400)
+        return
+
+    # No cerró en 25s → diagnóstico + cierre forzado; la objeción NO se guardó.
+    _dump_botones(page, "modal_no_cierra")
+    _screenshot_debug(page, "modal_no_cierra")
+    _cerrar_popup_forzado(page)
+    raise RuntimeError(
+        "El modal no cerró tras Confirmar en 25s — la objeción NO se guardó "
+        "(ver el dump de botones por si hay un 2do confirm)."
+    )
 
 
 def confirmar_form_principal(page: Page) -> None:
@@ -934,34 +983,46 @@ def enviar_finalizar(page: Page, factura_corta: str) -> str:
     boton_verde.wait_for(state="visible", timeout=5000)
     boton_verde.click()
 
-    # Esperar el iframe/diálogo de confirmación final.
-    try:
-        page.wait_for_selector(
-            "iframe[src*='mensajes'], iframe[src*='mensaje'], "
-            "text=Respuesta cargada, text=Registro completado, text=Completada",
-            timeout=10000,
-        )
-    except PlaywrightTimeout:
+    # Esperar el diálogo de mensajes del portal y leer su texto.
+    page.wait_for_timeout(2500)
+    texto_msg = ""
+    deadline = time.time() + 12
+    while time.time() < deadline and not texto_msg:
+        for fr in page.frames:
+            if "mensaje" in (fr.url or ""):
+                try:
+                    texto_msg = (fr.locator("body").inner_text(timeout=1500) or "").strip()
+                except Exception:
+                    texto_msg = ""
+                break
+        if texto_msg:
+            break
+        page.wait_for_timeout(500)
+
+    if not texto_msg:
         _screenshot_debug(page, f"sin_dialogo_final_{factura_corta}")
         return "OK_SIN_DIALOGO"
 
-    # Si hay iframe mensajes, leer su texto.
-    iframes = page.frames
-    for fr in iframes:
-        if "mensaje" in (fr.url or ""):
-            try:
-                texto = (fr.locator("body").inner_text(timeout=2000) or "").strip()
-                if any(k in texto.upper() for k in ("RESPUESTA CARGADA", "COMPLETADA", "COMPLETADO")):
-                    # Confirmar el OK del popup.
-                    try:
-                        fr.locator("button:has-text('Confirmar'), button:has-text('OK')").first.click(timeout=2000)
-                    except PlaywrightTimeout:
-                        pass
-                    return "OK"
-                return f"RECHAZADA: {texto[:200]}"
-            except PlaywrightTimeout:
-                continue
-    return "OK"
+    # Confirmar/cerrar el diálogo de mensaje.
+    for fr in page.frames:
+        try:
+            b = fr.locator(
+                "button:has-text('Confirmar'), button:has-text('Aceptar'), "
+                "button:has-text('OK'), input[value='Confirmar']"
+            ).first
+            if b.count() > 0 and b.is_visible():
+                b.click(timeout=2000)
+                page.wait_for_timeout(500)
+                break
+        except Exception:
+            continue
+
+    up = texto_msg.upper()
+    if any(k in up for k in ("RESPUESTA CARGADA", "COMPLETAD", "EXITOS")):
+        return "OK"
+    if "PENDIENTE" in up:
+        return f"PENDIENTES: {texto_msg[:140]}"
+    return f"MENSAJE: {texto_msg[:160]}"
 
 
 # ─── Driver principal ───────────────────────────────────────────────────────
