@@ -1163,7 +1163,7 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--excel", type=Path, required=True, help="Excel con respuestas (de extraer_respuestas_glosa.py).")
-    parser.add_argument("--soportes-glosa", type=Path, required=True, help="Carpeta con HUS<factura>.pdf (Trámite/Respuesta).")
+    parser.add_argument("--soportes-glosa", type=Path, default=None, help="Carpeta con HUS<factura>.pdf (Trámite/Respuesta). No requerida con --sin-soportes.")
     parser.add_argument(
         "--indice",
         type=Path,
@@ -1193,6 +1193,9 @@ def main() -> int:
     parser.add_argument("--log", type=Path, default=None)
     args = parser.parse_args()
     setup_logging(args.log)
+
+    if not args.sin_soportes and args.soportes_glosa is None:
+        parser.error("--soportes-glosa es obligatorio (o usá --sin-soportes para no subir soportes).")
 
     _exigir_playwright()
     user, password = cargar_credenciales()
