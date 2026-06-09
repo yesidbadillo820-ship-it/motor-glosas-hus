@@ -603,10 +603,17 @@ def abrir_modal_objecion(page: Page, num_objecion: int, rehacer: bool = False):
     """
     page.wait_for_selector("text=Respuesta Glosa Ips", timeout=10000)
 
-    # Guarda: si quedó abierto el popup de una objeción anterior, esperá a que
-    # cierre — un popup abierto intercepta el click de la fila siguiente.
+    # Guarda: si quedó abierto el popup de una objeción anterior, intercepta el
+    # click de la fila siguiente. Esperá a que cierre; si no, ciérralo a la fuerza.
     try:
-        page.locator("iframe#gxp0_ifrm").wait_for(state="hidden", timeout=5000)
+        popup = page.locator("iframe#gxp0_ifrm").first
+        if popup.count() > 0 and popup.is_visible():
+            try:
+                popup.wait_for(state="hidden", timeout=4000)
+            except Exception:
+                logger.warning("  (popup anterior seguía abierto; lo cierro a la fuerza)")
+                _cerrar_popup_forzado(page)
+                page.wait_for_timeout(500)
     except Exception:
         pass
 
@@ -753,12 +760,53 @@ def _buscar_en_frames(page: Page, ctx, selector: str):
     return None
 
 
+def _ya_tiene_soportes(ctx) -> bool:
+    """True si la grilla 'Soportes' del modal ya tiene archivos cargados.
+
+    Los soportes existentes aparecen con estado 'Activo' en la tabla; en una
+    objeción pendiente esa tabla está vacía.
+    """
+    try:
+        if ctx.locator("text=Activo").count() > 0:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _cerrar_popup_forzado(page: Page) -> None:
+    """Cierra a la fuerza el popup de respuesta si quedó colgado abierto
+    (con la X del popup o Escape), para no bloquear la objeción siguiente."""
+    for sel in (
+        "#gxp0_b .close", "#gxp0_b .gx-popup-close", "div.gx-popup .close",
+        "div.gx-popup img[onclick*='close' i]", "[id^='gxp'] .close",
+    ):
+        try:
+            b = page.locator(sel).first
+            if b.count() > 0 and b.is_visible():
+                b.click(timeout=1500)
+                page.wait_for_timeout(500)
+                break
+        except Exception:
+            continue
+    try:
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(400)
+    except Exception:
+        pass
+
+
 def subir_soportes_modal(ctx, page: Page, archivos: list[Path]) -> None:
-    """Tab 'Soportes' del modal: sube todos los archivos de la lista."""
+    """Tab 'Soportes' del modal: sube los archivos SÓLO si la objeción aún no
+    tiene soportes (no re-sube ni duplica los ya cargados)."""
     if not archivos:
         return
     _clic_tab(ctx, page, "Soportes")
     page.wait_for_timeout(600)
+
+    if _ya_tiene_soportes(ctx):
+        logger.info("  esta objeción ya tiene soportes cargados → no re-subo")
+        return
 
     # El <input type=file> puede estar en ctx o en un iframe anidado.
     file_input = None
@@ -847,14 +895,19 @@ def confirmar_modal(ctx, page: Page) -> None:
         )
 
     # Esperar a que el popup cierre (la respuesta quedó guardada).
+    cerrado = False
     try:
         page.locator("iframe#gxp0_ifrm").wait_for(state="hidden", timeout=8000)
+        cerrado = True
     except Exception:
-        # Fallback: el marcador del modal desaparece.
         try:
-            ctx.locator("text=Detalle Respuesta").first.wait_for(state="hidden", timeout=4000)
+            ctx.locator("text=Detalle Respuesta").first.wait_for(state="hidden", timeout=3000)
+            cerrado = True
         except Exception:
             pass
+    if not cerrado:
+        logger.warning("  El modal no cerró solo tras Confirmar; lo cierro a la fuerza.")
+        _cerrar_popup_forzado(page)
     page.wait_for_timeout(500)
 
 
@@ -926,29 +979,41 @@ def procesar_factura(
     reg = {"factura": factura_larga, "objeciones": len(objeciones), "estado": "", "detalle": ""}
     respondidas = 0
     omitidas = 0
+    fallidas: list[int] = []
     try:
         ir_a_respuesta_glosa_web(page)
         filtrar_por_factura(page, factura_corta)
         abrir_factura(page, factura_corta)
 
         for ob in objeciones:
-            res = abrir_modal_objecion(page, ob["num"], rehacer)
-            if res == "YA_CONTESTADA":
-                omitidas += 1
-                logger.info(f"  objecion #{ob['num']}: ya contestada → omito (usá --rehacer para pisarla)")
-                continue
-            logger.info(f"  → objecion #{ob['num']} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
-            ctx = res
-            llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
-            subir_soportes_modal(ctx, page, archivos_soportes)
-            confirmar_modal(ctx, page)
-            respondidas += 1
-            page.wait_for_timeout(800)
+            try:
+                res = abrir_modal_objecion(page, ob["num"], rehacer)
+                if res == "YA_CONTESTADA":
+                    omitidas += 1
+                    logger.info(f"  objecion #{ob['num']}: ya contestada → omito (usá --rehacer para pisarla)")
+                    continue
+                logger.info(f"  → objecion #{ob['num']} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
+                ctx = res
+                llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
+                subir_soportes_modal(ctx, page, archivos_soportes)
+                confirmar_modal(ctx, page)
+                respondidas += 1
+                page.wait_for_timeout(800)
+            except Exception as e:
+                fallidas.append(ob["num"])
+                logger.error(f"  ✗ objecion #{ob['num']} falló: {type(e).__name__}: {e}")
+                _screenshot_debug(page, f"error_obj_{ob['num']}")
+                # Cerrar cualquier popup colgado para no bloquear la siguiente.
+                _cerrar_popup_forzado(page)
+                page.wait_for_timeout(600)
 
         if respondidas == 0:
-            reg["estado"] = "SIN_PENDIENTES"
-            reg["detalle"] = f"{omitidas} objeciones ya estaban contestadas"
-            logger.info(f"  ✓ {factura_larga}: nada para responder ({omitidas} ya contestadas).")
+            reg["estado"] = "SIN_PENDIENTES" if not fallidas else "ERROR"
+            reg["detalle"] = (
+                f"{omitidas} ya contestadas"
+                + (f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else "")
+            )
+            logger.info(f"  {factura_larga}: respondidas=0, omitidas={omitidas}, fallidas={len(fallidas)}.")
             return reg
 
         # Finalizar SÓLO si respondimos algo nuevo.
@@ -958,7 +1023,10 @@ def procesar_factura(
             logger.warning(f"  (Confirmar del form principal no aplicó: {e})")
         estado = enviar_finalizar(page, factura_corta)
         reg["estado"] = estado
-        reg["detalle"] = f"{respondidas} respondidas, {omitidas} omitidas"
+        reg["detalle"] = (
+            f"{respondidas} respondidas, {omitidas} omitidas"
+            + (f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else "")
+        )
     except Exception as e:
         reg["estado"] = "ERROR"
         reg["detalle"] = f"{type(e).__name__}: {e} (respondidas={respondidas}, omitidas={omitidas})"
