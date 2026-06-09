@@ -1035,9 +1035,11 @@ def procesar_factura(
     objeciones: list[dict],
     archivos_soportes: list[Path],
     rehacer: bool = False,
+    max_obj: int = 0,
 ) -> dict:
     """Procesa UNA factura: filtra, abre, loop objeciones, confirma, envia."""
-    reg = {"factura": factura_larga, "objeciones": len(objeciones), "estado": "", "detalle": ""}
+    a_procesar = objeciones[:max_obj] if max_obj and max_obj > 0 else objeciones
+    reg = {"factura": factura_larga, "objeciones": len(a_procesar), "estado": "", "detalle": ""}
     respondidas = 0
     omitidas = 0
     fallidas: list[int] = []
@@ -1046,7 +1048,7 @@ def procesar_factura(
         filtrar_por_factura(page, factura_corta)
         abrir_factura(page, factura_corta)
 
-        for ob in objeciones:
+        for ob in a_procesar:
             try:
                 res = abrir_modal_objecion(page, ob["num"], rehacer)
                 if res == "YA_CONTESTADA":
@@ -1075,6 +1077,17 @@ def procesar_factura(
                 + (f", {len(fallidas)} fallaron: {fallidas[:10]}" if fallidas else "")
             )
             logger.info(f"  {factura_larga}: respondidas=0, omitidas={omitidas}, fallidas={len(fallidas)}.")
+            return reg
+
+        # En piloto parcial (--max-obj) no finalizamos: faltarían objeciones y
+        # el botón verde sólo avisaría 'glosas pendientes'.
+        if max_obj and max_obj > 0:
+            reg["estado"] = "PILOTO_PARCIAL"
+            reg["detalle"] = (
+                f"{respondidas} respondidas de {max_obj} (sin finalizar)"
+                + (f", {len(fallidas)} fallaron: {fallidas}" if fallidas else "")
+            )
+            logger.info(f"  ✓ piloto parcial: {respondidas} respondidas, {len(fallidas)} fallaron.")
             return reg
 
         # Finalizar SÓLO si respondimos algo nuevo.
@@ -1122,6 +1135,8 @@ def main() -> int:
     parser.add_argument("--con-cabeza", action="store_true", help="Mostrar el browser (no headless).")
     parser.add_argument("--rehacer", action="store_true",
                         help="Rehacer objeciones YA contestadas (por defecto se omiten para no re-subir soportes).")
+    parser.add_argument("--max-obj", type=int, default=0,
+                        help="Procesar como mucho N objeciones por factura (0 = todas). Útil para pilotos rápidos.")
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
     parser.add_argument("--reporte", type=Path, default=Path("reporte_glosa.csv"))
     parser.add_argument("--log", type=Path, default=None)
@@ -1189,7 +1204,7 @@ def main() -> int:
                 resultados.append(
                     procesar_factura(
                         page, factura_corta, factura_larga, objeciones, archivos,
-                        rehacer=args.rehacer,
+                        rehacer=args.rehacer, max_obj=args.max_obj,
                     )
                 )
         finally:
