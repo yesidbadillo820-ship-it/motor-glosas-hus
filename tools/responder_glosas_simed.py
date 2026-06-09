@@ -499,14 +499,72 @@ def _siguiente_pagina_grilla(page: Page) -> bool:
         return False
 
 
-def abrir_modal_objecion(page: Page, num_objecion: int) -> None:
-    """Abre el modal 'Respuesta Glosa Ips Web' de la objeción N.
+def _ctx_modal(page: Page, timeout_ms: int = 7000):
+    """Devuelve el contexto (Page/Frame) donde vive el modal de respuesta, o None.
 
-    En la grilla 'Respuesta Glosa Ips' (dentro de la pantalla 'Glosas Factura')
-    cada fila trae el número de objeción como un LINK azul (clickable) en la
-    columna '# Objeción'. Click ahí abre el modal.
+    El portal abre 'Respuesta Glosa Ips Web' en un iframe (igual que el modal de
+    soportes de las NCs). Buscamos los marcadores del formulario de respuesta en
+    la página principal y en TODOS los frames.
+    """
+    marcadores = ["Detalle Respuesta", "Glosa Estado", "Detalle Glosa"]
+    deadline = time.time() + timeout_ms / 1000
+    while time.time() < deadline:
+        for ctx in page.frames:
+            for marc in marcadores:
+                try:
+                    loc = ctx.locator(f"text={marc}")
+                    if loc.count() > 0 and loc.first.is_visible():
+                        return ctx
+                except Exception:
+                    continue
+        page.wait_for_timeout(300)
+    return None
 
-    Recorre las páginas de la grilla hasta encontrar la objeción.
+
+def _primer_visible(scope, selector: str):
+    """Primer elemento VISIBLE que matchea `selector` dentro de `scope`, o None."""
+    loc = scope.locator(selector)
+    try:
+        n = loc.count()
+    except Exception:
+        return None
+    for i in range(n):
+        cand = loc.nth(i)
+        try:
+            if cand.is_visible():
+                return cand
+        except Exception:
+            continue
+    return None
+
+
+def _dump_diagnostico(page: Page, fila, num_objecion: int) -> None:
+    """Guarda los frames y el HTML de la fila para diagnosticar selectores."""
+    out_dir = Path("debug_screenshots")
+    out_dir.mkdir(exist_ok=True)
+    ruta = out_dir / f"{time.strftime('%H%M%S')}_dom_objecion_{num_objecion}.txt"
+    try:
+        partes = ["=== FRAMES (url) ==="]
+        for fr in page.frames:
+            partes.append(f"  {fr.url}")
+        partes.append("\n=== outerHTML de la fila de la objeción ===")
+        try:
+            partes.append(fila.evaluate("el => el.outerHTML"))
+        except Exception as e:
+            partes.append(f"(no pude obtener outerHTML: {e})")
+        ruta.write_text("\n".join(partes), encoding="utf-8")
+        logger.info(f"  Volcado DOM para diagnóstico: {ruta}")
+    except Exception as e:
+        logger.warning(f"  No pude volcar el DOM: {e}")
+
+
+def abrir_modal_objecion(page: Page, num_objecion: int):
+    """Abre el modal 'Respuesta Glosa Ips Web' de la objeción N y devuelve el
+    contexto (Page o Frame) donde está el formulario.
+
+    Click en el lápiz rojo "Dar Respuesta" de la fila. El modal carga en un
+    iframe, así que verificamos su aparición buscando los campos en todos los
+    frames (no sólo en la página principal).
     """
     page.wait_for_selector("text=Respuesta Glosa Ips", timeout=10000)
 
@@ -525,177 +583,211 @@ def abrir_modal_objecion(page: Page, num_objecion: int) -> None:
         )
 
     target = str(num_objecion)
-    # Estrategias en orden — la PRIMERA que abra el modal gana.
+    # Estrategias de click, en orden — la PRIMERA que haga aparecer el modal gana.
     estrategias = [
-        # 1) Ícono LÁPIZ ROJO con tooltip "Dar Respuesta" (la forma oficial del portal).
-        ("dar_respuesta", lambda f: f.locator(
-            "a[title*='Dar Respuesta' i], a:has(img[title*='Dar Respuesta' i]), "
-            "img[title*='Dar Respuesta' i], a[title*='Responder' i], "
-            "a:has(img[title*='Responder' i])"
-        ).first),
-        # 2) Link con el número exacto en la columna # Objeción.
-        ("link_numero_obj", lambda f: f.locator(
-            f"xpath=.//a[normalize-space(.)='{target}']"
-        ).first),
-        # 3) Ícono "Modificar/Actualizar/Editar" con title o img conocido.
-        ("icono_modificar", lambda f: f.locator(
-            "a[title*='Modificar' i], a[title*='Actualizar' i], a[title*='Editar' i], "
-            "a:has(img[src*='ActionUpdate' i]), a:has(img[src*='Edit' i]), "
-            "a:has(img[src*='Modify' i]), img[title*='Modificar' i], img[title*='Editar' i]"
-        ).first),
-        # 4) Cualquier link clickable en las primeras 3 celdas con href real (no '#').
-        ("link_inicio_fila", lambda f: f.locator(
-            "xpath=.//td[position()<=3]//a[@href and @href!='#' and not(contains(@href,'javascript:void'))]"
-        ).first),
+        # 1) Lápiz rojo "Dar Respuesta" (la forma oficial del portal).
+        ("dar_respuesta",
+         "a[title*='Dar Respuesta' i], a:has(img[title*='Dar Respuesta' i]), "
+         "img[title*='Dar Respuesta' i], a[title*='Responder' i], "
+         "a:has(img[title*='Responder' i])"),
+        # 2) Cualquier <a> con imagen al inicio de la fila (primeras 2 celdas).
+        ("a_img_inicio", "xpath=.//td[position()<=2]//a[.//img]"),
+        # 3) Link con el número exacto de la columna # Objeción.
+        ("link_numero_obj", f"xpath=.//a[normalize-space(.)='{target}']"),
+        # 4) Cualquier <img> clickable en las primeras 2 celdas.
+        ("img_inicio", "xpath=.//td[position()<=2]//img"),
     ]
 
     ultimo_error = None
-    for nombre, hacer_loc in estrategias:
-        candidato = hacer_loc(fila)
-        try:
-            if candidato.count() == 0:
-                continue
-            candidato.wait_for(state="visible", timeout=2500)
-        except PlaywrightTimeout as e:
-            ultimo_error = e
+    frames_logueados = False
+    for nombre, sel in estrategias:
+        candidato = _primer_visible(fila, sel)
+        if candidato is None:
             continue
-        # Intentar click.
+        try:
+            candidato.scroll_into_view_if_needed(timeout=2000)
+        except Exception:
+            pass
         try:
             candidato.click(timeout=4000)
-            logger.info(f"  estrategia para abrir modal: {nombre}")
         except PlaywrightTimeout as e:
             ultimo_error = e
-            continue
-        # Verificar que el modal apareció.
-        try:
-            page.wait_for_selector("text=Respuesta Glosa Ips Web", timeout=4500)
-            page.wait_for_selector("text=Información Glosa", timeout=3000)
-            return  # éxito
-        except PlaywrightTimeout as e:
-            ultimo_error = e
-            # No abrió modal; cierro algún popup accidental y reintento con la próxima.
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(400)
             continue
 
+        if not frames_logueados:
+            urls = [(fr.url or "")[-70:] for fr in page.frames]
+            logger.info(f"  click '{nombre}' OK. frames: {urls}")
+            frames_logueados = True
+
+        ctx = _ctx_modal(page, timeout_ms=6000)
+        if ctx is not None:
+            tipo = "página" if ctx == page.main_frame else "iframe"
+            logger.info(f"  ✓ modal abierto (estrategia '{nombre}', en {tipo})")
+            return ctx
+
+        ultimo_error = "modal no detectado tras el click"
+        try:
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+        page.wait_for_timeout(400)
+
+    _dump_diagnostico(page, fila, num_objecion)
     _screenshot_debug(page, f"modal_no_abrio_{num_objecion}")
     raise RuntimeError(
-        f"No pude abrir el modal de la objecion #{num_objecion} con ninguna "
-        f"estrategia (último error: {ultimo_error})"
+        f"No pude abrir el modal de la objecion #{num_objecion} "
+        f"(último: {ultimo_error}). Mirá el volcado DOM en debug_screenshots/."
     )
 
 
-def llenar_informacion_glosa(page: Page, aceptado: int, detalle: str) -> None:
-    """Tab 'Información Glosa' del modal: Aceptado, NC (vacío), Detalle Respuesta."""
-    # Asegurar que estamos en el tab 'Información Glosa'.
+def _clic_tab(ctx, page: Page, nombre_tab: str) -> None:
+    """Click en un tab del modal por su texto, tolerante."""
     try:
-        tab = page.locator("a:has-text('Información Glosa'), li:has-text('Información Glosa') a").first
-        tab.click(timeout=2000)
+        tab = ctx.locator(
+            f"a:has-text('{nombre_tab}'), li:has-text('{nombre_tab}') a, "
+            f"span:has-text('{nombre_tab}')"
+        ).first
+        if tab.count() > 0:
+            tab.click(timeout=2500)
+            page.wait_for_timeout(400)
     except PlaywrightTimeout:
         pass
-    page.wait_for_timeout(300)
 
-    # Campo Aceptado: input numérico tras el label 'Aceptado'.
-    aceptado_input = page.locator(
-        "input[name*='ACEPTADO']:visible, input[id*='ACEPTADO']:visible, "
-        "label:has-text('Aceptado') + * input:visible"
-    ).first
-    if aceptado_input.count() == 0:
-        # Fallback por XPath del label.
-        aceptado_input = page.locator(
+
+def llenar_informacion_glosa(ctx, page: Page, aceptado: int, detalle: str) -> None:
+    """Tab 'Información Glosa' del modal: Aceptado, NC (vacío), Detalle Respuesta.
+
+    `ctx` es el contexto del modal (Page o Frame) devuelto por abrir_modal_objecion.
+    """
+    _clic_tab(ctx, page, "Información Glosa")
+
+    # Campo Aceptado.
+    aceptado_input = _primer_visible(
+        ctx, "input[name*='ACEPTADO' i], input[id*='ACEPTADO' i]"
+    )
+    if aceptado_input is None:
+        aceptado_input = ctx.locator(
             "xpath=//label[contains(., 'Aceptado')]/following::input[1]"
-        )
-    aceptado_input.click()
-    aceptado_input.fill("")
-    aceptado_input.type(str(aceptado), delay=20)
-    aceptado_input.press("Tab")
+        ).first
+    try:
+        aceptado_input.click()
+        aceptado_input.fill("")
+        aceptado_input.type(str(aceptado), delay=20)
+        aceptado_input.press("Tab")
+    except Exception as e:
+        logger.warning(f"  No pude escribir 'Aceptado' ({e}); sigo.")
 
-    # Campo Nota Credito: limpiar (queda vacío) — ya no van NCs.
-    nc_input = page.locator(
-        "input[name*='NOTA']:visible, input[id*='NOTA']:visible, "
-        "label:has-text('Nota Credito') + * input:visible"
+    # Campo Nota Credito: dejar vacío (ya no van NCs).
+    nc_input = ctx.locator(
+        "xpath=//label[contains(., 'Nota Credito')]/following::input[1]"
     ).first
-    if nc_input.count() > 0:
-        try:
+    try:
+        if nc_input.count() > 0:
             nc_input.fill("")
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     # Campo Detalle Respuesta (textarea, 4000 chars).
-    detalle_input = page.locator(
-        "textarea[name*='DETALLE']:visible, textarea[id*='DETALLE']:visible, "
-        "textarea:visible"
-    ).first
+    detalle_input = _primer_visible(
+        ctx, "textarea[name*='DETALLE' i], textarea[id*='DETALLE' i], textarea"
+    )
+    if detalle_input is None:
+        _screenshot_debug(page, "sin_textarea_detalle")
+        raise RuntimeError("No encontré el textarea de 'Detalle Respuesta' en el modal.")
     detalle_input.click()
     detalle_input.fill("")
-    # Type con velocidad moderada — algunos portales validan onkey.
     detalle_input.type(detalle[:4000], delay=2)
 
 
-def subir_soportes_modal(page: Page, archivos: list[Path]) -> None:
+def _buscar_en_frames(page: Page, ctx, selector: str):
+    """Primer locator VISIBLE que matchea `selector`, probando primero `ctx`
+    y luego todos los frames (por si hay un iframe anidado)."""
+    contextos = [ctx] + [f for f in page.frames if f is not ctx]
+    for c in contextos:
+        cand = _primer_visible(c, selector)
+        if cand is not None:
+            return cand
+    return None
+
+
+def subir_soportes_modal(ctx, page: Page, archivos: list[Path]) -> None:
     """Tab 'Soportes' del modal: sube todos los archivos de la lista."""
     if not archivos:
         return
-    # Click en el tab 'Soportes'.
-    try:
-        tab = page.locator("a:has-text('Soportes'), li:has-text('Soportes') a").first
-        tab.click(timeout=2000)
-        page.wait_for_timeout(500)
-    except PlaywrightTimeout:
-        logger.warning("  No pude clickear el tab Soportes (¿ya estaba activo?)")
+    _clic_tab(ctx, page, "Soportes")
+    page.wait_for_timeout(600)
 
-    page.wait_for_selector("text=Agregar Soportes", timeout=8000)
-
-    # set_input_files al <input type='file'> oculto (esquina del fileupload).
-    file_input = page.locator("input[type='file']").first
+    # El <input type=file> puede estar en ctx o en un iframe anidado.
+    file_input = None
+    for c in [ctx] + [f for f in page.frames if f is not ctx]:
+        loc = c.locator("input[type='file']")
+        try:
+            if loc.count() > 0:
+                file_input = loc.first
+                break
+        except Exception:
+            continue
+    if file_input is None:
+        _screenshot_debug(page, "sin_input_file_soportes")
+        logger.warning("  No encontré el input de archivos en el tab Soportes; sigo sin soportes.")
+        return
     file_input.set_input_files([str(p) for p in archivos])
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(1000)
 
-    # Click 'Iniciar subida'.
-    try:
-        page.locator("button:has-text('Iniciar subida'), a:has-text('Iniciar subida')").first.click(timeout=5000)
-    except PlaywrightTimeout:
-        logger.warning("  Sin botón 'Iniciar subida' visible; intento seguir igual.")
+    # 'Iniciar subida'.
+    btn_iniciar = _buscar_en_frames(
+        page, ctx, "button:has-text('Iniciar subida'), a:has-text('Iniciar subida')"
+    )
+    if btn_iniciar is not None:
+        try:
+            btn_iniciar.click(timeout=5000)
+        except PlaywrightTimeout:
+            pass
+    else:
+        logger.warning("  Sin botón 'Iniciar subida' visible; intento seguir.")
 
-    # Esperar a que termine la subida. Heurística simple: dar tiempo proporcional
-    # al número de archivos y verificar que no haya barras de progreso activas.
-    timeout_total_ms = 5000 + 4000 * len(archivos)
-    deadline = time.time() + timeout_total_ms / 1000
+    # Esperar a que terminen las barras de progreso.
+    deadline = time.time() + (5 + 4 * len(archivos))
     while time.time() < deadline:
-        en_progreso = page.locator(".progress-bar:not([aria-valuenow='100'])").count()
+        en_progreso = 0
+        for c in [ctx] + [f for f in page.frames if f is not ctx]:
+            try:
+                en_progreso += c.locator(".progress-bar:not([aria-valuenow='100'])").count()
+            except Exception:
+                pass
         if en_progreso == 0:
             break
         page.wait_for_timeout(500)
 
-    # Click 'Agregar' (botón rojo que registra los archivos en la tabla).
-    try:
-        page.locator("button:has-text('Agregar'):not(:has-text('archivos')), input[value='Agregar']").first.click(timeout=5000)
-        page.wait_for_timeout(500)
-    except PlaywrightTimeout:
-        logger.warning("  No encontré el botón 'Agregar' del modal de soportes.")
-
-
-def confirmar_modal(page: Page) -> None:
-    """Click 'Confirmar' al pie del modal — guarda la respuesta y cierra."""
-    # El modal tiene su propio Confirmar; lo distinguimos buscando uno
-    # visible dentro de un contenedor que tenga 'Respuesta Glosa Ips Web'.
-    try:
-        # Volver a la pestaña 'Información Glosa' donde está Confirmar.
+    # 'Agregar' (rojo) — texto EXACTO para no agarrar 'Agregar archivos...'.
+    btn_agregar = _buscar_en_frames(
+        page, ctx, "button:text-is('Agregar'), input[value='Agregar']"
+    )
+    if btn_agregar is not None:
         try:
-            page.locator("a:has-text('Información Glosa')").first.click(timeout=1500)
-            page.wait_for_timeout(300)
+            btn_agregar.click(timeout=5000)
+            page.wait_for_timeout(500)
         except PlaywrightTimeout:
-            pass
-        page.locator(
-            "button:has-text('Confirmar'):visible, input[type='button'][value='Confirmar']:visible"
-        ).first.click(timeout=5000)
-    except PlaywrightTimeout:
-        _screenshot_debug(page, "modal_sin_confirmar"); raise
-    # Esperar a que el modal desaparezca.
+            logger.warning("  No pude clickear 'Agregar' del modal de soportes.")
+
+
+def confirmar_modal(ctx, page: Page) -> None:
+    """Click 'Confirmar' al pie del modal — guarda la respuesta y cierra."""
+    _clic_tab(ctx, page, "Información Glosa")
+    btn = _buscar_en_frames(
+        page, ctx, "button:text-is('Confirmar'), input[type='button'][value='Confirmar']"
+    )
+    if btn is None:
+        _screenshot_debug(page, "modal_sin_confirmar")
+        raise RuntimeError("No encontré el botón 'Confirmar' del modal.")
+    btn.click(timeout=6000)
+    page.wait_for_timeout(1200)
+    # Esperar a que el modal cierre (el marcador 'Detalle Respuesta' desaparece).
     try:
-        page.wait_for_selector("text=Respuesta Glosa Ips Web", state="hidden", timeout=10000)
-    except PlaywrightTimeout:
-        logger.warning("  El modal no se cerró tras Confirmar (puede ser por validación).")
+        ctx.locator("text=Detalle Respuesta").first.wait_for(state="hidden", timeout=8000)
+    except Exception:
+        # Si el frame se destruyó, también cuenta como cerrado.
+        pass
 
 
 def confirmar_form_principal(page: Page) -> None:
@@ -770,10 +862,10 @@ def procesar_factura(
 
         for ob in objeciones:
             logger.info(f"  → objecion #{ob['num']} (aceptado={ob['aceptado']}, detalle {len(ob['detalle'])} chars)")
-            abrir_modal_objecion(page, ob["num"])
-            llenar_informacion_glosa(page, ob["aceptado"], ob["detalle"])
-            subir_soportes_modal(page, archivos_soportes)
-            confirmar_modal(page)
+            ctx = abrir_modal_objecion(page, ob["num"])
+            llenar_informacion_glosa(ctx, page, ob["aceptado"], ob["detalle"])
+            subir_soportes_modal(ctx, page, archivos_soportes)
+            confirmar_modal(ctx, page)
             page.wait_for_timeout(800)
 
         confirmar_form_principal(page)
