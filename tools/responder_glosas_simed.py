@@ -255,9 +255,17 @@ def buscar_soportes(
     factura_corta: str,
     factura_larga: str,
     carpeta_glosa: Path,
-    indice: dict[str, Path],
+    indice: dict[str, Path] | None,
+    carpeta_share_override: Path | None = None,
 ) -> tuple[list[Path], list[str]]:
-    """Devuelve (lista_de_archivos_a_subir, advertencias)."""
+    """Devuelve (lista_de_archivos_a_subir, advertencias).
+
+    Fuentes (en orden):
+      1. PDF de respuesta a la glosa en `carpeta_glosa\\HUS<factura>.pdf`.
+      2. Todos los archivos de la carpeta del share — viene de
+         `carpeta_share_override` (override directo), o del `indice` si se dio.
+         Si no hay ninguna, se omite la fuente 2 (sólo se sube el Trámite).
+    """
     archivos: list[Path] = []
     avisos: list[str] = []
 
@@ -283,16 +291,24 @@ def buscar_soportes(
     else:
         avisos.append(f"No hallé el PDF de respuesta para HUS{factura_corta} en {carpeta_glosa}")
 
-    # 2) Carpeta de soportes de la factura (HC, HEV, HAM, etc.) según el indice.
-    carpeta_soportes = indice.get(factura_corta)
-    if carpeta_soportes is None:
-        avisos.append(f"No hallé HUS{factura_corta} en el indice (sin soportes del share).")
-    elif not carpeta_soportes.is_dir():
-        avisos.append(f"La carpeta del indice no es accesible: {carpeta_soportes}")
+    # 2) Carpeta de soportes de la factura (HC, HEV, HAM, etc.).
+    carpeta_soportes: Path | None = None
+    if carpeta_share_override is not None:
+        carpeta_soportes = carpeta_share_override
+    elif indice is not None:
+        carpeta_soportes = indice.get(factura_corta)
+        if carpeta_soportes is None:
+            avisos.append(f"No hallé HUS{factura_corta} en el indice (sin soportes del share).")
     else:
-        for p in sorted(carpeta_soportes.iterdir()):
-            if p.is_file():
-                archivos.append(p)
+        avisos.append("Sin --indice ni --carpeta-share: subo sólo el PDF de Trámite (no los HC/HEV/HAM).")
+
+    if carpeta_soportes is not None:
+        if not carpeta_soportes.is_dir():
+            avisos.append(f"La carpeta de soportes no es accesible: {carpeta_soportes}")
+        else:
+            for p in sorted(carpeta_soportes.iterdir()):
+                if p.is_file():
+                    archivos.append(p)
     return archivos, avisos
 
 
@@ -729,7 +745,19 @@ def main() -> int:
     )
     parser.add_argument("--excel", type=Path, required=True, help="Excel con respuestas (de extraer_respuestas_glosa.py).")
     parser.add_argument("--soportes-glosa", type=Path, required=True, help="Carpeta con HUS<factura>.pdf (Trámite/Respuesta).")
-    parser.add_argument("--indice", type=Path, required=True, help="TXT con rutas <ruta_share>\\HUS<factura>.")
+    parser.add_argument(
+        "--indice",
+        type=Path,
+        default=None,
+        help="TXT con rutas <ruta_share>\\HUS<factura>. Si se omite, se usa --carpeta-share o se sube sólo el Trámite.",
+    )
+    parser.add_argument(
+        "--carpeta-share",
+        type=Path,
+        default=None,
+        help="Carpeta del share con los soportes de la factura (HC/HEV/HAM). "
+        "Útil para piloto sin tener el indice TXT armado.",
+    )
     grupo = parser.add_mutually_exclusive_group(required=True)
     grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS... o número corto).")
     grupo.add_argument("--todas", action="store_true", help="Procesar todas las facturas del Excel.")
@@ -752,8 +780,20 @@ def main() -> int:
             logger.error(f"No hallé la factura {args.solo} en el Excel.")
             return 1
 
-    indice = cargar_indice(args.indice)
-    logger.info(f"Indice cargado: {len(indice):,} facturas mapeadas a soportes del share.")
+    indice: dict[str, Path] | None = None
+    if args.indice is not None:
+        indice = cargar_indice(args.indice)
+        logger.info(f"Indice cargado: {len(indice):,} facturas mapeadas a soportes del share.")
+    elif args.carpeta_share is not None:
+        if not args.carpeta_share.is_dir():
+            logger.error(f"--carpeta-share no es una carpeta accesible: {args.carpeta_share}")
+            return 1
+        logger.info(f"Carpeta share fija: {args.carpeta_share}")
+    else:
+        logger.warning("Sin --indice ni --carpeta-share: subiré sólo el PDF de Trámite por objeción.")
+    if args.carpeta_share is not None and args.todas:
+        logger.error("--carpeta-share sólo tiene sentido con --solo (1 factura). Para masivo usá --indice.")
+        return 1
     logger.info(f"Facturas a procesar: {len(facturas)}")
 
     resultados: list[dict] = []
@@ -767,7 +807,8 @@ def main() -> int:
             for i, (factura_corta, objeciones) in enumerate(facturas.items(), start=1):
                 factura_larga = objeciones[0]["factura"]
                 archivos, avisos = buscar_soportes(
-                    factura_corta, factura_larga, args.soportes_glosa, indice
+                    factura_corta, factura_larga, args.soportes_glosa, indice,
+                    carpeta_share_override=args.carpeta_share,
                 )
                 for a in avisos:
                     logger.warning(f"  ⚠ {a}")
