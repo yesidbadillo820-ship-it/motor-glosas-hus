@@ -7,6 +7,7 @@ from typing import Optional
 
 import httpx
 from cachetools import TTLCache
+from fastapi import HTTPException
 from groq import AsyncGroq
 from app.models.schemas import GlosaInput, GlosaResult
 from app.core.logging_utils import logger
@@ -1946,13 +1947,84 @@ class GlosaService:
 
                 # Path 3: clásico (con caché + fallback a Groq)
                 if not _intento_ok:
-                    res_ia, modelo_usado = await self._llamar_ia(
-                        system_prompt,
-                        user_prompt,
-                        eps=str(data.eps),
-                        codigo=codigo_det,
-                        modelo_override=_modelo_override,
-                    )
+                    # Quality Gate: cuando el flag QUALITY_GATE_ENABLED=1 está
+                    # activo, el dictamen pasa por pre-val → IA → post-val →
+                    # regenerar si falla, en vez del call directo al IA. Cuando
+                    # el flag está OFF (default) el comportamiento es idéntico
+                    # al de hoy (bit-for-bit) — el path legacy sigue corriendo.
+                    # El glosa_id no existe aún (la glosa se persiste DESPUÉS),
+                    # por eso el sticky-canary cae al modo random.
+                    _qg_resultado = None
+                    try:
+                        from app.services.quality_gate_adapter import (
+                            debe_usar_quality_gate,
+                            ejecutar_con_quality_gate,
+                            registrar_estadistica_qg,
+                        )
+
+                        if debe_usar_quality_gate(glosa_id=None):
+                            _proveedores = {
+                                p
+                                for p, k in [
+                                    ("anthropic", self.anthropic_key),
+                                    ("groq", self.groq),
+                                    ("gemini", self.gemini),
+                                    ("openrouter", self.openrouter),
+                                ]
+                                if k
+                            }
+                            _qg_resultado = await ejecutar_con_quality_gate(
+                                servicio=self,
+                                eps=str(data.eps),
+                                codigo_glosa=codigo_det,
+                                valor_objetado=valor_raw,
+                                texto_glosa=texto_base,
+                                es_ratificacion=es_ratificacion,
+                                es_extemporanea=es_extemporanea,
+                                system_prompt=system_prompt,
+                                user_prompt=user_prompt,
+                                glosa_id=None,
+                                proveedores_disponibles=_proveedores,
+                            )
+                            registrar_estadistica_qg(_qg_resultado)
+                    except Exception as _qg_err:
+                        # Si el QG explota por cualquier razón, caemos al
+                        # path legacy. NO debe afectar producción.
+                        logger.warning(
+                            f"[QG] adapter falló, fallback a _llamar_ia legacy: {_qg_err}"
+                        )
+                        _qg_resultado = None
+
+                    if _qg_resultado and _qg_resultado.estado == "RECHAZADO_PRE":
+                        # Inputs incompletos detectados ANTES de gastar IA.
+                        # Devolver mensaje al usuario, no generar dictamen
+                        # placebo sobre datos vacíos.
+                        raise HTTPException(
+                            status_code=400,
+                            detail=_qg_resultado.mensaje_usuario
+                            or "Inputs incompletos para generar el dictamen.",
+                        )
+
+                    if _qg_resultado and _qg_resultado.dictamen_final:
+                        # QG produjo dictamen (APROBADO o ESCALAR_HUMANO con
+                        # mejor intento). Sintetizamos envelope XML mínimo
+                        # para que la extracción downstream funcione igual.
+                        _arg_qg = _qg_resultado.dictamen_final
+                        res_ia = f"<argumento>{_arg_qg}</argumento>"
+                        modelo_usado = _qg_resultado.modelo_final or "qg"
+                        # Marcar para que UI/postprocesador sepa que vino del
+                        # QG (útil para badge "REVISAR" si ESCALAR_HUMANO).
+                        self._qg_estado_actual = _qg_resultado.estado
+                        self._qg_score_actual = _qg_resultado.score_final
+                    else:
+                        # Legacy path — comportamiento de hoy
+                        res_ia, modelo_usado = await self._llamar_ia(
+                            system_prompt,
+                            user_prompt,
+                            eps=str(data.eps),
+                            codigo=codigo_det,
+                            modelo_override=_modelo_override,
+                        )
 
             # ═══════════════════════════════════════════════════════════
             #  R-CEREBRO #1: Validación post-generación con retry
