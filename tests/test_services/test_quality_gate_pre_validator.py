@@ -108,10 +108,6 @@ class TestValorMonetario:
 
 class TestTextoGlosa:
     def test_texto_largo_ok(self):
-        # Mínimo 60 chars + al menos una palabra del dominio (tarifa/factura/...).
-        # El texto antiguo de 53 chars ya no pasa el filtro endurecido — antes
-        # bastaba con 20 chars sin contenido específico y dictámenes se generaban
-        # sobre inputs sin sustancia.
         res = check_texto_glosa(
             "TA0201 - Mayor valor cobrado en consulta especializada "
             "por valor objetado de $500.000 según factura electrónica"
@@ -119,16 +115,19 @@ class TestTextoGlosa:
         assert res.ok
 
     def test_texto_sin_palabra_dominio_rechazado(self):
-        # 60+ chars pero sin ningún término del dominio: posible copy-paste
-        # de algo no-relacionado con una glosa.
+        # Sin código presente + sin ningún término del dominio (admin o
+        # clínico): posible copy-paste de algo no relacionado con una glosa.
         res = check_texto_glosa(
-            "Este es un texto suficientemente largo pero sin sustancia ni datos."
+            "Este es un texto suficientemente largo pero sin sustancia.",
+            codigo_presente=False,
         )
         assert not res.ok
-        assert "dominio" in (res.razon or "").lower()
+        assert "glosa" in (res.razon or "").lower()
 
     def test_texto_corto_falla(self):
-        res = check_texto_glosa("TA0201")
+        # Antes el mínimo era 60 — bloqueaba glosas reales de 35-50 chars
+        # ("TA0102 - Medicamento fuera del PBS"). Ahora 20 chars.
+        res = check_texto_glosa("TA0201", codigo_presente=True)
         assert not res.ok
         assert "corto" in res.razon.lower()
 
@@ -136,13 +135,27 @@ class TestTextoGlosa:
         res = check_texto_glosa("")
         assert not res.ok
 
-    def test_se_glosa_por_falta_de_cobertura_se_rechaza(self):
-        # Regresión: el input real "se glosa por falta de cobertura" (33 chars)
-        # pasaba el viejo filtro de 20 chars y la IA generaba un dictamen
-        # plantilla sin sustancia. Debe rechazarse por longitud.
-        res = check_texto_glosa("se glosa por falta de cobertura")
-        assert not res.ok
-        assert "corto" in res.razon.lower()
+    def test_glosa_corta_real_con_codigo_pasa(self):
+        # Regresión 10-jun-2026: "TA0102 - Medicamento fuera del PBS. No
+        # procede reconocimiento." (53 chars) era rechazada por el viejo
+        # mínimo de 60. En la vida real las glosas son así de cortas.
+        res = check_texto_glosa(
+            "TA0102 - Medicamento fuera del PBS. No procede reconocimiento.",
+            codigo_presente=True,
+        )
+        assert res.ok
+
+    def test_glosa_clinica_sin_admin_pasa(self):
+        # Regresión 10-jun-2026: "Se reconocen únicamente 8 días de UCI.
+        # Los días restantes se consideran injustificados." era rechazada
+        # porque ninguna palabra de la lista vieja (factura/CUPS/tarifa...)
+        # aparecía. Pero "UCI", "días" y "reconoc" sí son dominio clínico.
+        res = check_texto_glosa(
+            "Se reconocen únicamente 8 días de UCI. Los días restantes "
+            "se consideran injustificados.",
+            codigo_presente=False,
+        )
+        assert res.ok
 
 
 class TestPlantillaDisponible:
@@ -182,7 +195,7 @@ class TestPreValidarGlosa:
             eps="FAMISANAR EPS",
             codigo_glosa="",
             valor_objetado="500000",
-            texto_glosa="Mayor valor cobrado en consulta especializada",
+            texto_glosa="Mayor valor cobrado en consulta especializada por factura",
         )
         assert not r.aprobado
         assert any("código" in razon.lower() for razon in r.razones_bloqueo)

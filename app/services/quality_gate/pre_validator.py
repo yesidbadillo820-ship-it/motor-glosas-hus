@@ -225,47 +225,63 @@ def check_valor_monetario(valor: str | int | float | None) -> tuple[PreCheckResu
     return (PreCheckResult(ok=True), v)
 
 
+# Términos del dominio glosas/clínico — lista amplia para cubrir tanto
+# vocabulario administrativo (factura/contrato) como clínico (UCI/día/
+# medicamento). Las glosas EPS reales usan jerga mixta; antes la lista
+# era demasiado estrecha y bloqueaba textos válidos como "Se reconocen
+# únicamente 8 días de UCI..." — visto en producción el 10-jun-2026.
 _PALABRAS_DOMINIO_GLOSA = (
-    "factura",
-    "cups",
-    "glosa",
-    "contrato",
-    "autorizaci",
-    "prestaci",
-    "paciente",
-    "tarif",
-    "soport",
-    "valor",
-    "objet",
-    "cobertura",
-    "auditor",
+    # Administrativo / contractual
+    "factura", "cups", "glosa", "contrato", "autorizaci", "prestaci",
+    "paciente", "tarif", "soport", "valor", "objet", "cobertura",
+    "auditor", "radicac", "concilia", "ratific", "respuesta",
+    # Clínico / asistencial
+    "medicament", "insumo", "dispositivo", "procedim", "consulta",
+    "urgencia", "uci", "ucin", "hospitalizac", "estancia", "cirug",
+    "quirurg", "anestesi", "imagen", "laboratorio", "examen",
+    "diagnost", "tratamiento", "terapia", "rehabilitac", "ambulator",
+    "internac", "egreso", "ingreso", "día", "dia ", "dias ", "días",
+    # Normativo / coberturas
+    "pbs", "no pbs", "pos ", "no pos", "uvr", "soat", "mipres",
+    "rias", "ips", "eps", "arl", "adres", "iss", "msps", "resoluci",
+    "decreto", "ley", "circular",
+    # Verbos típicos de glosa
+    "reconoc", "acept", "rechaz", "devolv", "objeta", "niega",
+    "valida", "soport", "justific", "subsana", "responde",
 )
 
 
-def check_texto_glosa(texto: str) -> PreCheckResult:
+def check_texto_glosa(texto: str, codigo_presente: bool = False) -> PreCheckResult:
     """Verifica que el texto tenga contenido mínimo y útil.
 
-    Antes solo se exigía len>=20, así que "se glosa por falta de cobertura"
-    (32 chars) pasaba y la IA generaba un dictamen plantilla sin sustancia.
-    Ahora se exige un mínimo de 60 chars Y al menos una palabra del dominio
-    (factura/cups/tarifa/...) para garantizar que hay detalle real.
+    Las glosas reales de EPS suelen ser MUY cortas — "TA0102 - Medicamento
+    fuera del PBS" tiene 35 chars y es perfectamente válida. Por eso:
+
+    1. Mínimo de chars: 20 (no 60 como antes — bloqueaba glosas reales).
+    2. Si el código YA está presente (TA####, etc.), el texto es claramente
+       una glosa y NO exigimos palabras de dominio adicionales.
+    3. Si no hay código, exigimos al menos una palabra de la lista amplia
+       de dominio (administrativo o clínico) para evitar "lorem ipsum".
     """
     t = (texto or "").strip()
-    if len(t) < 60:
+    if len(t) < 20:
         return PreCheckResult(
             ok=False,
-            razon=f"Texto de glosa muy corto ({len(t)} chars, mínimo 60)",
+            razon=f"Texto de glosa muy corto ({len(t)} chars, mínimo 20)",
             sugerencia=(
-                "Pega el texto completo de la glosa de la EPS — incluye código, "
-                "valor objetado, factura, motivo. Sin esto la IA solo puede "
-                "generar plantilla sin sustancia."
+                "Incluye al menos el código y un motivo, "
+                "ej. 'TA0102 - Medicamento fuera del PBS'."
             ),
         )
+    # Si hay código válido (TA0102, SO0501, ...) ya sabemos que es una glosa
+    # y no exigimos vocabulario adicional. El propio código es la prueba.
+    if codigo_presente:
+        return PreCheckResult(ok=True)
     t_lower = t.lower()
     if not any(p in t_lower for p in _PALABRAS_DOMINIO_GLOSA):
         return PreCheckResult(
             ok=False,
-            razon="El texto no menciona ningún término del dominio (factura, CUPS, tarifa, contrato, paciente…)",
+            razon="El texto no parece una glosa (no menciona código, factura, paciente, medicamento, día, UCI…)",
             sugerencia="Verifica que estés pegando el texto de la glosa de la EPS y no otra cosa",
         )
     return PreCheckResult(ok=True)
@@ -323,7 +339,13 @@ def pre_validar_glosa(
     chk_val, valor_num = check_valor_monetario(valor_objetado)
     checks["valor"] = chk_val
 
-    checks["texto"] = check_texto_glosa(texto_glosa)
+    # Si el código de glosa fue parseado OK, el texto no necesita repetir
+    # vocabulario del dominio — el propio código (TA0102, SO0501, ...) es
+    # prueba suficiente de que es una glosa. Esto evita falsos negativos
+    # como "TA0102 - Medicamento fuera del PBS" (35 chars, sin palabras
+    # como "factura/CUPS/tarifa") que antes bloqueaban a la IA.
+    codigo_ok = bool(chk_cod.ok and codigo_norm)
+    checks["texto"] = check_texto_glosa(texto_glosa, codigo_presente=codigo_ok)
     checks["plantilla"] = check_plantilla_disponible(familia)
 
     # Agregar checks → decisión global

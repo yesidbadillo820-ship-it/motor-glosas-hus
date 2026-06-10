@@ -1,13 +1,14 @@
 """Tests: pre-validación de texto de glosa CORRE AUNQUE el Quality Gate
 esté OFF.
 
-Regresión del bug visible en producción 10-jun-2026: el gestor pegó
-"Se glosa por falta de cobertura" (33 chars), el QG estaba OFF, así que
-el wrapper QG nunca corría → el input basura llegaba al IA y se generaba
-un dictamen con valores y contratos inventados.
+Regresión: el wrapper QG nunca corría con QG OFF → el input basura llegaba
+al IA. Ahora `analizar()` corre check_texto_glosa INCONDICIONALMENTE.
 
-Ahora `analizar()` corre check_texto_glosa INCONDICIONALMENTE antes de
-gastar un call de IA. Bloquea con HTTP 400 + mensaje legible.
+El umbral fue ajustado el 10-jun-2026 (Bug2): bajado de 60 a 20 chars y
+ampliada la lista de dominio a vocabulario clínico (UCI, días, PBS, ...).
+Glosas reales son cortas — "TA0102 - Medicamento fuera del PBS" (35
+chars) es legítima y debe pasar. La defensa contra valores y contratos
+fabricados quedó delegada al post_validator (donde corresponde).
 """
 
 from __future__ import annotations
@@ -69,31 +70,31 @@ def _form(eps="DISPENSARIO MEDICO", texto="Se glosa por falta de cobertura"):
 
 
 class TestPreValidacionIncondicional:
-    def test_input_corto_bloqueado_con_flag_off(self, client, monkeypatch):
-        """Aunque QUALITY_GATE_ENABLED esté OFF, el input corto se bloquea
-        antes de gastar un call de IA."""
+    def test_input_muy_corto_bloqueado_con_flag_off(self, client, monkeypatch):
+        """Aunque QUALITY_GATE_ENABLED esté OFF, el input claramente corto
+        (<20 chars) se bloquea antes de gastar un call de IA."""
         monkeypatch.delenv("QUALITY_GATE_ENABLED", raising=False)
 
-        # Espía sobre _llamar_ia para asegurar que NUNCA se llama
         with patch("app.services.glosa_service.GlosaService._llamar_ia") as spy_llamar_ia:
-            r = client.post("/analizar", data=_form(texto="Se glosa por falta de cobertura"))
+            r = client.post("/analizar", data=_form(texto="cobertura"))  # 9 chars
             assert r.status_code == 400, r.text
             detail = r.json().get("detail", "")
             assert "corto" in detail.lower() or "mínimo" in detail.lower()
-            spy_llamar_ia.assert_not_called()  # IA NUNCA se llamó
+            spy_llamar_ia.assert_not_called()
 
-    def test_input_corto_bloqueado_con_flag_on(self, client, monkeypatch):
-        """Con QG ON el mismo input se bloquea por el mismo check
-        (idempotente, no genera 2 errores)."""
+    def test_input_muy_corto_bloqueado_con_flag_on(self, client, monkeypatch):
+        """Con QG ON el mismo input se bloquea por el mismo check."""
         monkeypatch.setenv("QUALITY_GATE_ENABLED", "1")
         monkeypatch.setenv("QUALITY_GATE_ROLLOUT_PCT", "100")
         with patch("app.services.glosa_service.GlosaService._llamar_ia") as spy_llamar_ia:
-            r = client.post("/analizar", data=_form(texto="Se glosa por falta de cobertura"))
+            r = client.post("/analizar", data=_form(texto="objet hoy"))  # 9 chars
             assert r.status_code == 400
             spy_llamar_ia.assert_not_called()
 
-    def test_input_sin_dominio_bloqueado(self, client, monkeypatch):
-        """Texto largo pero sin palabra del dominio (factura/cups/...) → 400."""
+    def test_input_sin_dominio_ni_codigo_bloqueado(self, client, monkeypatch):
+        """Texto largo pero sin código de glosa Y sin ningún término del
+        dominio (admin o clínico) → 400. La defensa contra valores fabricados
+        sigue siendo del post_validator."""
         monkeypatch.delenv("QUALITY_GATE_ENABLED", raising=False)
         with patch("app.services.glosa_service.GlosaService._llamar_ia") as spy_llamar_ia:
             r = client.post(
@@ -101,27 +102,40 @@ class TestPreValidacionIncondicional:
                 data=_form(
                     texto=(
                         "Este es un texto suficientemente largo pero sin "
-                        "ninguna mención específica del dominio."
+                        "ninguna mención específica de nada."
                     )
                 ),
             )
             assert r.status_code == 400
             spy_llamar_ia.assert_not_called()
 
+    def test_glosa_real_corta_con_codigo_pasa(self, client, monkeypatch):
+        """Regresión 10-jun-2026: una glosa real corta como
+        "TA0102 - Medicamento fuera del PBS. No procede." (53 chars) NO
+        debe bloquearse — antes el pre-val exigía 60 chars y rechazaba
+        glosas reales. La defensa contra valores inventados queda en el
+        post_validator."""
+        monkeypatch.delenv("QUALITY_GATE_ENABLED", raising=False)
+        r = client.post(
+            "/analizar",
+            data=_form(texto="TA0102 - Medicamento fuera del PBS. No procede reconocimiento."),
+        )
+        # Puede fallar por otras razones (IA mockeada, etc.), pero NUNCA
+        # con el mensaje del pre-validator de "texto muy corto".
+        if r.status_code == 400:
+            detail = r.json().get("detail", "").lower()
+            assert "corto" not in detail
+            assert "mínimo" not in detail
+
     def test_input_valido_pasa_la_pre_validacion(self, client, monkeypatch):
-        """Input realista (≥60 chars + palabra del dominio) NO se bloquea
-        en pre-validación (cualquier error posterior es de otra etapa)."""
+        """Input realista NO se bloquea en pre-validación (cualquier error
+        posterior es de otra etapa)."""
         monkeypatch.delenv("QUALITY_GATE_ENABLED", raising=False)
         texto_ok = (
             "TA0201 - Mayor valor cobrado en consulta especializada por "
             "valor objetado de $500.000 según factura electrónica FE-001"
         )
-        # No espiamos IA — solo verificamos que el código pasa de la
-        # pre-validación. Cualquier 500/422/etc no debe contener el mensaje
-        # de "Texto de glosa muy corto".
         r = client.post("/analizar", data=_form(texto=texto_ok))
-        # Puede fallar por otras razones (IA mockeada, etc.), pero NUNCA
-        # con el mensaje del pre-validator.
         if r.status_code == 400:
             assert "corto" not in r.json().get("detail", "").lower()
             assert "mínimo" not in r.json().get("detail", "").lower()
