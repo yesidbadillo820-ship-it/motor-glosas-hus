@@ -132,6 +132,10 @@ async def ejecutar_con_quality_gate(
         es_ratificacion=es_ratificacion,
         es_extemporanea=es_extemporanea,
         proveedores_disponibles=proveedores_disponibles,
+        # Texto libre (sin código) → COMPLEJA → Claude. El router necesita
+        # saber si el caller ya tiene un código válido aunque el texto no
+        # lo repita (auditoría 10-jun-2026 P1-5).
+        codigo_glosa=codigo_glosa or "",
     )
     modelos_orden = [decision.modelo_recomendado] + decision.modelos_fallback
     # Dedup preservando orden

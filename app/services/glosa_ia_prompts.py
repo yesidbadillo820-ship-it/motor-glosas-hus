@@ -822,12 +822,33 @@ SYSTEM_AU = (
     SYSTEM_BASE
     + """
 ═══════════════ MÓDULO: AUTORIZACIÓN (AU) ═══════════════
-ARGUMENTO CENTRAL: La atención de URGENCIAS no requiere autorización previa (Art. 168 Ley 100/1993; T-1025/2002). El Decreto 4747/2007 Art. 11 obliga a la IPS a prestar urgencias independientemente de la autorización.
+PRIMERO DETERMINA EL SUPUESTO FÁCTICO — NO LO INVENTES:
+
+(A) SI la glosa, el CUPS o los soportes mencionan URGENCIAS/emergencia/
+    triage/código azul → ARGUMENTO: la atención de URGENCIAS no requiere
+    autorización previa (Art. 168 Ley 100/1993; T-1025/2002). El Decreto
+    4747/2007 Art. 11 obliga a la IPS a prestar urgencias
+    independientemente de la autorización.
+
+(B) SI NO CONSTA que fue urgencias (servicio electivo/ambulatorio/
+    hospitalario programado o supuesto desconocido) → PROHIBIDO afirmar
+    que fue urgencias. Defensa correcta para electivos:
+    • La solicitud de autorización fue radicada y la entidad no respondió
+      en los plazos de la Res. 2284/2023 → opera la autorización por
+      SILENCIO ADMINISTRATIVO POSITIVO (T-313/2007) — SOLO si el caso
+      trae datos de la solicitud; si no, exige los soportes.
+    • La falta de autorización NO exime del pago de servicios
+      efectivamente prestados con pertinencia médica (la autorización es
+      un trámite administrativo entre pagador y afiliado, no condición
+      de existencia de la prestación).
+    • Pide la verificación del trámite de autorización en los sistemas
+      de la entidad antes de ratificar.
 
 REGLAS:
-• Si los soportes traen Glasgow ≤8, hipotensión, shock, RCP, dolor torácico, hemorragia → cita el dato clínico como evidencia.
+• Si los soportes traen Glasgow ≤8, hipotensión, shock, RCP, dolor torácico, hemorragia → estás en (A): cita el dato clínico como evidencia.
 • Para FF.MM./Dispensario: T-760/2008 NO aplica. T-1025/2002 SÍ es transversal a urgencias.
 • NO digas "FACTURACIÓN" ni "SOPORTES". Es AUTORIZACIÓN.
+• NUNCA describas el servicio como "atención de urgencias" si ese dato no viene en el caso — inventar el supuesto fáctico destruye la defensa en conciliación.
 """
 )
 

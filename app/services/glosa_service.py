@@ -376,6 +376,84 @@ def _truncar_runaway(texto: str, max_repeticiones: int = 3) -> str:
     return texto
 
 
+def _dedup_oraciones_largas(texto: str, min_palabras: int = 15) -> str:
+    """Elimina repeticiones textuales largas dentro del dictamen.
+
+    Auditoría 10-jun-2026 P2-6: Groq citó la cláusula primera completa
+    (~60 palabras entre «») DOS veces en el mismo párrafo y nada lo
+    atrapó — _truncar_runaway solo detecta n-gramas de 2-5 palabras
+    repetidos >3 veces consecutivas (loops degenerados), no párrafos
+    duplicados a distancia. Dos redes:
+
+      1. Oración repetida textualmente (>= min_palabras) → se descarta
+         la repetición.
+      2. CITA LARGA repetida (texto entre «» / comillas de >= 12
+         palabras): los preámbulos suelen cambiar ("PORQUE..." vs
+         "EN VIRTUD DE LO ANTERIOR...") así que la oración no es
+         idéntica, pero la cita sí — se descarta la oración que re-cita.
+
+    Solo toca contenido LARGO — las frases rituales cortas legítimas
+    ("SE SOLICITA EL LEVANTAMIENTO...") no alcanzan el umbral.
+    """
+    if not texto or len(texto) < 300:
+        return texto
+    # Separar por fin de oración conservando el delimitador.
+    partes = re.split(r"(?<=[.;])\s+", texto)
+    if len(partes) < 3:
+        return texto
+
+    def _clave(s: str) -> str:
+        s = re.sub(r"\s+", " ", s).strip().upper()
+        return re.sub(r"[^\wÁÉÍÓÚÑ ]", "", s)
+
+    pat_cita = re.compile(r"[«\"“]([^«»\"“”]{40,800})[»\"”]")
+    vistas_oraciones: set[str] = set()
+    vistas_citas: set[str] = set()
+    resultado: list[str] = []
+    for oracion in partes:
+        clave_o = _clave(oracion)
+        if len(clave_o.split()) >= min_palabras and clave_o in vistas_oraciones:
+            continue  # oración repetida textual — descartar
+        citas = [_clave(c) for c in pat_cita.findall(oracion)]
+        citas_largas = [c for c in citas if len(c.split()) >= 12]
+        if citas_largas and any(c in vistas_citas for c in citas_largas):
+            continue  # re-cita la misma cláusula/norma larga — descartar
+        if len(clave_o.split()) >= min_palabras:
+            vistas_oraciones.add(clave_o)
+        vistas_citas.update(citas_largas)
+        resultado.append(oracion)
+    return " ".join(resultado)
+
+
+def _ajustar_score_por_evidencia(score: float, verif_citas, confianza) -> float:
+    """Ajusta el gauge "probabilidad de éxito" con la evidencia real.
+
+    Auditoría 10-jun-2026 P1-4: _calcular_score es una heurística estática
+    (base 85-99 + bonus por cita REGEX + bonus por longitud) que nunca
+    descuenta nada — las citas FABRICADAS subían el score. En paralelo el
+    confidence_scorer calcula la señal honesta (cláusulas reales,
+    precedente, soportes, citas verificadas) y el gestor veía "92% éxito"
+    encima de "41% REFORMULAR". Reglas:
+      - Cada cita inválida ALTA descuenta 8 pts; MEDIA descuenta 3.
+      - El gauge nunca supera (confianza_real% + 10).
+      - Piso 15 para que la barra no desaparezca (sigue siendo una defensa).
+    """
+    try:
+        s = float(score)
+        if verif_citas and isinstance(verif_citas, dict):
+            issues = verif_citas.get("issues") or []
+            altas = sum(1 for i in issues if (i or {}).get("severidad") == "ALTA")
+            medias = sum(1 for i in issues if (i or {}).get("severidad") == "MEDIA")
+            s -= 8.0 * altas + 3.0 * medias
+        if confianza and isinstance(confianza, dict):
+            conf = confianza.get("score")
+            if isinstance(conf, (int, float)) and 0 <= conf <= 1:
+                s = min(s, conf * 100.0 + 10.0)
+        return round(max(15.0, min(100.0, s)), 1)
+    except Exception:
+        return score
+
+
 _SUAVIZAR_PATTERNS = [
     # Apertura obligatoria: nunca "RESPETUOSAMENTE" en la primera frase
     (r"\bESE\s+HUS\s+RESPETUOSAMENTE\s+NO\s+ACEPTA\b", "ESE HUS NO ACEPTA"),
@@ -2354,6 +2432,10 @@ class GlosaService:
             # (cuando la IA entra en degenerate state y repite "DEL X DEL X DEL X...")
             arg_ia = _truncar_runaway(arg_ia)
 
+            # 13b) Dedup de oraciones largas repetidas — la misma cláusula
+            # citada 2 veces en el mismo dictamen (caso real 10-jun-2026)
+            arg_ia = _dedup_oraciones_largas(arg_ia)
+
             # 14) Corregir "DISPOSICIONADO" inventado por IA → DISPENSARIO
             arg_ia = re.sub(
                 r"\bDISPOSICIONADO\b", "DISPENSARIO MÉDICO", arg_ia, flags=re.IGNORECASE
@@ -2789,6 +2871,15 @@ class GlosaService:
             logger.debug(f"[AUTO-PILOT] decidir_auto_envio falló: {_e_ap}")
             auto_pilot = None
 
+        # Auditoría 10-jun-2026 P1-4: el gauge "% éxito" se calculaba ANTES
+        # de verificar citas y confianza, con bonus por cada cita detectada
+        # (¡las fabricadas SUBÍAN el score!) y sin descuento alguno — marcó
+        # 87-92% en 10 casos de estrés mientras la confianza honesta decía
+        # 41-65% REVISAR. El gestor veía dos señales contradictorias y la
+        # inflada era la más visible. Ahora el gauge responde a la evidencia:
+        # cada cita inválida descuenta, y nunca supera confianza_real + 10.
+        score = _ajustar_score_por_evidencia(score, verif_citas, confianza)
+
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
@@ -2929,9 +3020,27 @@ class GlosaService:
             return "IN_INSUMOS"
         elif prefijo == "ME":
             return "ME_MEDICAMENTOS"
-        # 3) Sin código reconocido → detectar por keywords del texto
+        # 3) Sin código reconocido → detectar por keywords del texto.
         #    Orden importa: SOPORTES antes que FACTURACIÓN porque "falta de
         #    soporte" contiene "factura" implícito en muchos casos.
+        #    Auditoría 10-jun-2026 P1-5: el matching por substring exacto
+        #    perdía variantes reales ("injustificados" ≠ "no justificado
+        #    clínicamente", "no existe evidencia" ≠ "falta de evidencia",
+        #    "tornillos y placas" ≠ "dispositivo médico") → 6 de 10 glosas
+        #    de texto libre caían al fallback FA y recibían plantilla
+        #    genérica de contrato. Se amplían stems por familia.
+
+        # ME tiene prioridad cuando el objeto ES un medicamento con tema
+        # de cobertura ("medicamento fuera del PBS"): el módulo ME trae la
+        # defensa correcta (prescripción del tratante, no-PBS→ADRES, y la
+        # variante FF.MM.). Si se dejara a CO, respondía cobertura genérica.
+        if (
+            "medicament" in texto_lower or "farmaco" in texto_lower or "fármaco" in texto_lower
+        ) and (
+            "pbs" in texto_lower or "mipres" in texto_lower or "plan de beneficios" in texto_lower
+        ):
+            return "ME_MEDICAMENTOS"
+
         if any(
             p in texto_lower
             for p in [
@@ -2948,6 +3057,14 @@ class GlosaService:
                 "ordenes medicas",
                 "sin adjuntar",
                 "falta de evidencia",
+                # "No existe evidencia de realización del procedimiento."
+                # (texto libre real 10-jun-2026) — la defensa es probatoria
+                # (HC/RIPS = prueba de la prestación) → SO, no FA genérico.
+                "no existe evidencia",
+                "sin evidencia",
+                "evidencia de realiza",
+                "no se evidencia la atencion",
+                "no se evidencia la atención",
             ]
         ):
             return "SO_SOPORTES"
@@ -3009,6 +3126,22 @@ class GlosaService:
                 "autonomía médica",
                 "autonomia medica",
                 "no justificado clínicamente",
+                # Estancia/UCI y calidad asistencial son disputas de
+                # pertinencia clínica, no de facturación (casos reales
+                # 10-jun-2026: "8 días de UCI... injustificados" y
+                # "reingreso ≤15 días por manejo deficiente" caían a FA
+                # y la respuesta ni mencionaba UCI/reingreso).
+                "injustificad",
+                " uci",
+                "estancia",
+                "días de hospitalizac",
+                "dias de hospitalizac",
+                "reingreso",
+                "relación clínica",
+                "relacion clinica",
+                "manejo deficiente",
+                "evento adverso",
+                "fallecimiento",
             ]
         ):
             return "CL_PERTINENCIA"
@@ -3022,6 +3155,15 @@ class GlosaService:
                 "protesis",
                 "dispositivo médico",
                 "dispositivo medico",
+                # "Tornillos y placas no soportados contractualmente."
+                # (texto libre real 10-jun-2026) — material de osteosíntesis
+                # es la disputa de insumos clásica; caía a FA genérico.
+                "dispositivo",
+                "tornillo",
+                "placa",
+                "osteosíntesis",
+                "osteosintesis",
+                "clavo intramedular",
             ]
         ):
             return "IN_INSUMOS"
@@ -3062,11 +3204,31 @@ class GlosaService:
           - "$ 150.000" / "$150,000" / "150.000 pesos"
           - "por valor de 150.000" / "valor objetado: 150000"
           - "1'500.000" (separador apóstrofe colombiano)
+          - "$850 millones" / "120 mil pesos" (multiplicadores verbales)
         Devuelve "$ <num>" formateado, o "$ 0.00" si no encuentra nada.
         """
         if not texto:
             return "$ 0.00"
         t = texto.replace("'", ".")  # 1'500.000 → 1.500.000
+
+        # Multiplicadores verbales PRIMERO: "factura de $850 millones" se
+        # extraía como "$ 850" (el regex capturaba el número y descartaba
+        # la palabra) — visto en producción 10-jun-2026: la glosa entró a
+        # BD con $850, el dashboard sumó +850 y el router la clasificó
+        # MEDIA→Groq en vez de COMPLEJA→Claude. El número expandido se
+        # devuelve en formato colombiano (puntos de miles) para que
+        # cualquier parse_valor_cop downstream lo lea bien.
+        m_mult = re.search(
+            r"\$?\s*([\d][\d\.,]*)\s*(mil(?:es)?\s+(?:de\s+)?millones|millones|mill[oó]n|mil)\b",
+            t,
+            re.IGNORECASE,
+        )
+        if m_mult:
+            from app.utils.moneda import parse_valor_cop as _pvc
+
+            valor_num = _pvc(f"{m_mult.group(1)} {m_mult.group(2)}")
+            if valor_num > 0:
+                return f"$ {int(round(valor_num)):,}".replace(",", ".")
 
         patrones = [
             r"\$\s*([\d][\d\.,]{2,})",

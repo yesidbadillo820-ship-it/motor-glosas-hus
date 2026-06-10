@@ -60,6 +60,20 @@ PAT_ARTICULO = re.compile(
 )
 # Texto entrecomillado — chevrones franceses « » preferidos en el motor
 PAT_CITA_LITERAL = re.compile(r"«([^«»]{15,800})»")
+# Citas "textuales" con comillas dobles/simples ATRIBUIDAS a una norma o
+# cláusula (ESTABLECE/DISPONE/SEÑALA/...). Auditoría 10-jun-2026 P0-1:
+# la red solo cubría chevrones, así que "CLÁUSULA 12 DEL CONTRATO QUE
+# ESTABLECE: 'LAS PARTES SE OBLIGAN A NO REBATIR...'" (fabricada y
+# autodestructiva) y los arts. 44/45/46 L1438 con texto inventado entre
+# comillas dobles se radicaban sin una sola alarma. Se exige el verbo
+# de atribución para no flaggear citas del texto de la glosa misma
+# ("LA AFIRMACIÓN DE QUE '...'" no es una cita normativa).
+PAT_CITA_ATRIBUIDA = re.compile(
+    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPTÚA|PRECEPTUA)"
+    r"\s*(?:QUE\s*)?(?:TEXTUALMENTE\s*)?:?\s*"
+    r"[\"“‘']([^\"“”‘’']{15,800})[\"”’']",
+    re.IGNORECASE,
+)
 # Limpia HTML para comparar texto plano
 PAT_HTML = re.compile(r"<[^>]+>")
 
@@ -291,8 +305,12 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                     }
                 )
 
-    # 4. Verificar citas literales entre chevrones
+    # 4. Verificar citas literales: entre chevrones «» Y entre comillas
+    # dobles/simples cuando van atribuidas a una norma o cláusula
+    # (ESTABLECE/DISPONE/...). Ambas se contrastan contra el mismo
+    # corpus (normas + cláusulas reales del contrato en BD).
     citas_literales = PAT_CITA_LITERAL.findall(texto)
+    citas_literales += PAT_CITA_ATRIBUIDA.findall(texto)
     if citas_literales:
         # Construir corpus completo de TODOS los textos normativos para búsqueda
         corpus_normas = " ".join(
@@ -327,8 +345,15 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                             "tipo": "CITA_LITERAL_FALSA",
                             "severidad": "ALTA",
                             "cita": "«" + (cita[:140] + "..." if len(cita) > 140 else cita) + "»",
-                            "detalle": "Este texto entrecomillado no se encuentra literalmente en el corpus normativo cargado. Puede ser una cita inventada por la IA.",
-                            "sugerencia": "Reemplaza el texto entre comillas por una cita literal de una norma real, o quita las comillas si solo querías parafrasear.",
+                            "detalle": (
+                                "Este texto entrecomillado no se encuentra literalmente en el "
+                                "corpus normativo ni en las cláusulas reales del contrato cargadas. "
+                                "Puede ser una cita inventada por la IA."
+                            ),
+                            "sugerencia": (
+                                "Reemplaza el texto entre comillas por una cita literal de una "
+                                "norma o cláusula real, o quita las comillas si solo querías parafrasear."
+                            ),
                         }
                     )
 
