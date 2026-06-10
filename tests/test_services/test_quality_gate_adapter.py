@@ -71,7 +71,7 @@ class TestGeneradorRegeneraDeVerdad:
             texto_glosa=_TEXTO_GLOSA_VALIDO,
             system_prompt="system",
             user_prompt="user",
-            proveedores_disponibles={"groq", "anthropic", "gemini"},
+            proveedores_disponibles={"groq", "anthropic"},
         )
         return captura
 
@@ -96,10 +96,10 @@ class TestGeneradorRegeneraDeVerdad:
 
         await gen(modelo="groq")
         await gen(modelo="anthropic")
-        await gen(modelo="gemini")
+        await gen(modelo="groq")
 
         overrides = [c["modelo_override"] for c in spy.llamadas]
-        # groq/gemini no son forzables vía modelo_override (ese parámetro
+        # groq no es forzable vía modelo_override (ese parámetro
         # siempre enruta a Anthropic); anthropic sí.
         assert overrides == [None, "claude-sonnet-4-5", None]
 

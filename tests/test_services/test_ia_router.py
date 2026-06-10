@@ -56,17 +56,30 @@ class TestElegirModelo:
         assert r.modelo_recomendado == "groq"
 
     def test_compleja_sin_anthropic_fallback_groq(self):
-        r = elegir_modelo("COMPLEJA", proveedores_disponibles={"groq", "gemini"})
+        r = elegir_modelo("COMPLEJA", proveedores_disponibles={"groq"})
         assert r.modelo_recomendado == "groq"
         assert "anthropic" not in r.modelos_fallback
 
     def test_simple_sin_groq_fallback_anthropic(self):
-        r = elegir_modelo("SIMPLE", proveedores_disponibles={"anthropic", "gemini"})
+        r = elegir_modelo("SIMPLE", proveedores_disponibles={"anthropic"})
         assert r.modelo_recomendado == "anthropic"
 
     def test_fallback_excluye_preferido(self):
         r = elegir_modelo("COMPLEJA")
         assert r.modelo_recomendado not in r.modelos_fallback
+
+    def test_proveedores_retirados_se_ignoran(self):
+        """Jun-2026: Gemini y OpenRouter salieron del dictamen. Aunque un
+        caller legacy los pase como disponibles, el router NUNCA debe
+        recomendarlos ni incluirlos en la cadena de fallback."""
+        for comp in ("SIMPLE", "MEDIA", "COMPLEJA"):
+            r = elegir_modelo(
+                comp,
+                proveedores_disponibles={"groq", "anthropic", "gemini", "openrouter"},
+            )
+            assert r.modelo_recomendado in ("groq", "anthropic")
+            assert "gemini" not in r.modelos_fallback
+            assert "openrouter" not in r.modelos_fallback
 
 
 class TestEnrutar:

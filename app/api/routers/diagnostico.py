@@ -264,12 +264,19 @@ def diagnostico_completo(
             },
         }
 
-    # ─── Gemini API key + ping (tercer proveedor, free tier) ────────
+    # ─── Gemini API key + ping (SOLO OCR de PDFs escaneados) ────────
+    # Jun-2026: Gemini ya no genera dictámenes — quedó como fallback de
+    # lectura de PDFs (pdf_service + pdf_fallback_patch). Sin esta key,
+    # todo el OCR de escaneados cae sobre Anthropic (quema créditos).
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     if not gemini_key:
         out["secciones"]["gemini"] = {
             "estado": "warning",
-            "mensaje": "GEMINI_API_KEY no configurada — agrega clave en aistudio.google.com/apikey (15 RPM gratis)",
+            "mensaje": (
+                "GEMINI_API_KEY no configurada — sin ella el OCR de PDFs "
+                "escaneados depende 100% de Anthropic (gasta créditos de "
+                "Claude). Agrega clave en aistudio.google.com/apikey (gratis)."
+            ),
             "data": {},
         }
     else:
@@ -312,6 +319,7 @@ def diagnostico_completo(
             "data": {
                 "modelo": gemini_modelo,
                 "key_prefix": gemini_key[:10],
+                "rol": "solo OCR de PDFs escaneados (no genera dictámenes)",
                 "free_tier_info": "15 RPM / 1500 RPD para Flash · 2 RPM / 50 RPD para Pro",
             },
         }

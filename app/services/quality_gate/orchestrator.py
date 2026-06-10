@@ -46,7 +46,7 @@ class IntentoGeneracion:
     """Registro de un intento individual de generación."""
 
     numero: int  # 1, 2, 3
-    modelo_solicitado: str  # "groq", "anthropic", "gemini"
+    modelo_solicitado: str  # "groq" | "anthropic"
     modelo_usado: str  # el que respondió (puede ser distinto si hubo fallback interno)
     texto: str = ""
     post_validation: Optional[PostValidationResult] = None
@@ -79,8 +79,9 @@ class QualityGateResult:
 
 
 # Orden de modelos para regeneración. Si el primer modelo falla post-validation,
-# se prueba con el siguiente. Configurable via env en producción.
-MODELOS_FALLBACK_ORDEN = ["groq", "anthropic", "gemini"]
+# se prueba con el siguiente. Jun-2026: solo Groq + Anthropic generan
+# dictámenes (Gemini quedó como OCR de PDFs; OpenRouter salió del proyecto).
+MODELOS_FALLBACK_ORDEN = ["groq", "anthropic"]
 MAX_INTENTOS = 3
 
 
@@ -109,7 +110,7 @@ async def ejecutar_quality_gate(
         es_ratificacion: si True, post-val acepta coda procesal
         es_extemporanea: si True, post-val acepta coda procesal
         max_intentos: máximo de regeneraciones (default 3)
-        modelos_fallback: orden de modelos a probar (default groq → anthropic → gemini)
+        modelos_fallback: orden de modelos a probar (default groq → anthropic)
 
     Returns:
         QualityGateResult con .estado y .dictamen_final si aprobado.

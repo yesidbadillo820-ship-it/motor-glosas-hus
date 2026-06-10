@@ -196,7 +196,7 @@ class TestModelosFallback:
             valor_objetado="500000",
             texto_glosa=GLOSA_DEMO,
             generador=gen_que_registra,
-            modelos_fallback=["anthropic", "groq", "gemini"],
+            modelos_fallback=["anthropic", "groq"],
         )
         # Debió haberse solicitado en ese orden
         assert modelos_solicitados[0] == "anthropic"

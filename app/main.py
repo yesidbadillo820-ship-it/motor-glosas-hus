@@ -867,12 +867,12 @@ async def lifespan(app: FastAPI):
         _ant = os.getenv("ANTHROPIC_API_KEY", "")
         _gem = os.getenv("GEMINI_API_KEY", "")
         _grq = os.getenv("GROQ_API_KEY", "")
-        _prim = os.getenv("PRIMARY_AI", "gemini")
+        _prim = os.getenv("PRIMARY_AI", "groq")
         logger.info(
-            f"[IA-PROVIDERS] primary={_prim} | "
+            f"[IA-PROVIDERS] primary={_prim} (dictamen: groq+anthropic) | "
+            f"groq={'OK ' + _grq[:10] + '...' if _grq else 'AUSENTE'} | "
             f"anthropic={'OK ' + _ant[:10] + '...' if _ant else 'AUSENTE'} | "
-            f"gemini={'OK ' + _gem[:10] + '...' if _gem else 'AUSENTE'} | "
-            f"groq={'OK ' + _grq[:10] + '...' if _grq else 'AUSENTE'}"
+            f"gemini(solo OCR)={'OK ' + _gem[:10] + '...' if _gem else 'AUSENTE'}"
         )
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")

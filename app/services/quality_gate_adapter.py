@@ -116,7 +116,7 @@ async def ejecutar_con_quality_gate(
         system_prompt: prompt del sistema (estructura/reglas)
         user_prompt: prompt del usuario (datos del caso)
         glosa_id: opcional, para sticky canary
-        proveedores_disponibles: set de "groq"/"anthropic"/"gemini"
+        proveedores_disponibles: set de "groq"/"anthropic"
 
     Returns:
         QualityGateResult — ver app/services/quality_gate/orchestrator.py

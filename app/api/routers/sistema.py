@@ -833,11 +833,13 @@ def ia_presence_publica():
         }
 
     return {
-        "primary_ai": os.getenv("PRIMARY_AI", "gemini"),
+        "primary_ai": os.getenv("PRIMARY_AI", "groq"),
         "anthropic": _info("ANTHROPIC_API_KEY"),
-        "gemini": _info("GEMINI_API_KEY"),
+        "gemini": {**_info("GEMINI_API_KEY"), "rol": "solo OCR de PDFs escaneados"},
         "groq": _info("GROQ_API_KEY"),
         "nota": (
+            "Dictamenes: groq (primario) + anthropic (calidad/fallback). "
+            "Gemini quedo SOLO como OCR de PDFs escaneados (jun-2026). "
             "Si un proveedor muestra estado=AUSENTE, la API key NO llego al "
             "proceso (revisa 'fly secrets list'). Si muestra estado=OK pero "
             "los dictamenes siguen cayendo a Llama, mandame logs de un POST "

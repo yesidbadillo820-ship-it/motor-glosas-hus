@@ -19,27 +19,28 @@ class Settings(BaseSettings):
     # Llaves de IA
     groq_api_key: str = ""
     anthropic_api_key: str = ""
-    # Google Gemini API key (tier gratis muy generoso: 15 RPM, 1500 RPD)
+    # Google Gemini API key — SOLO para OCR/lectura de PDFs escaneados
+    # (pdf_service.extraer_con_ocr + cadena multimodal del
+    # pdf_fallback_patch). NO genera dictamenes desde jun-2026.
+    # Mantenerla configurada: sin ella, todo el OCR de PDFs escaneados
+    # cae sobre Anthropic (quema creditos de Claude).
     # Conseguir en: https://aistudio.google.com/apikey
     gemini_api_key: str = ""
-    # Cual se usa primero. Default "anthropic" (mejor calidad, paid).
-    # Tambien soportado: "anthropic" | "gemini" | "groq".
-    # Jun-2026: OpenRouter (DeepSeek) fue retirado del proyecto
-    # (decision Yesid — no se le veia trabajando y de pago ya
-    # esta Claude).
-    primary_ai: str = "anthropic"
+    # Proveedor primario de DICTAMENES. Jun-2026 (decision Yesid): la
+    # cadena quedo en SOLO Groq (primario, gratis/rapido) + Anthropic
+    # (calidad / casos complejos). Gemini y OpenRouter fueron retirados
+    # del dictamen — "no las veo trabajando y de pago ya tenemos Claude".
+    # Soportado: "groq" | "anthropic". Valores legacy "gemini"/
+    # "openrouter" se normalizan a "groq" en GlosaService con un warning.
+    # Cadena de fallback automatica:
+    #   groq      -> groq -> anthropic
+    #   anthropic -> anthropic -> groq
+    primary_ai: str = "groq"
     groq_model: str = "llama-3.3-70b-versatile"
     anthropic_model: str = "claude-sonnet-4-6"
-    # Modelo Gemini por defecto (Flash 2.0 GA - gratis 15 RPM / 1500 RPD).
-    # ATENCION: gemini-2.0-flash-exp fue deprecado cuando 2.0-flash paso a GA.
-    # Modelos validos en v1beta (mayo 2026):
-    #   - "gemini-2.0-flash"        (default, GA, balanceado)
-    #   - "gemini-2.0-flash-lite"   (mas barato, mismo tier)
-    #   - "gemini-2.5-flash"        (newer, mejor calidad)
-    #   - "gemini-2.5-flash-lite"   (recomendado: sin thinking, rapido)
-    #   - "gemini-2.5-pro"          (top calidad, 5 RPM/25 RPD free)
-    #   - "gemini-1.5-flash"        (legacy estable)
-    #   - "gemini-1.5-pro"          (legacy mejor calidad)
+    # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
+    # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando
+    # 2.0-flash paso a GA.
     gemini_model: str = "gemini-2.0-flash"
 
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"

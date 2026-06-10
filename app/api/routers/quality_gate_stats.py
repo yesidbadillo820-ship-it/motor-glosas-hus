@@ -70,10 +70,13 @@ def estado_quality_gate(
     activo = es_quality_gate_activo()
     pct = porcentaje_rollout()
 
+    # Jun-2026: el dictamen sale SOLO de Groq + Anthropic. Gemini se
+    # reporta aparte porque quedó exclusivamente como OCR de PDFs
+    # escaneados (pdf_service + pdf_fallback_patch) — no genera dictámenes.
     proveedores = {
         "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY", "")),
         "groq": bool(os.environ.get("GROQ_API_KEY", "")),
-        "gemini": bool(os.environ.get("GEMINI_API_KEY", "")),
+        "gemini_solo_ocr": bool(os.environ.get("GEMINI_API_KEY", "")),
     }
 
     if activo:

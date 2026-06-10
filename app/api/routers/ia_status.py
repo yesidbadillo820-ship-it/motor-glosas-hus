@@ -1,8 +1,12 @@
-"""Status y roles de los 3 proveedores IA del motor.
+"""Status y roles de los proveedores IA del motor.
+
+Jun-2026 (decisión Yesid): los DICTÁMENES salen SOLO de Groq (primario)
++ Anthropic (calidad / casos complejos). Gemini quedó exclusivamente
+como OCR/lector de PDFs escaneados; OpenRouter salió del proyecto.
 
 GET /ia-status/proveedores
     Devuelve estado, modelo configurado, rol, y disponibilidad de cada
-    uno de los 3 proveedores (Anthropic, Gemini, Groq).
+    proveedor (Anthropic, Gemini-OCR, Groq).
 
 GET /ia-status/health-check
     Ping ligero a cada proveedor (1 token c/u) para verificar que
@@ -41,11 +45,11 @@ PROVEEDORES_INFO = {
     "gemini": {
         "nombre": "Google Gemini",
         "tipo": "free-tier",
-        "rol": "Fallback #2 cuando hay contexto enorme (1M tokens). Tier free se agota rapido bajo carga (15 RPM / 1500 RPD).",
-        "fortaleza": "1M+ tokens contexto, gratis 15 RPM, multi-modal nativo",
+        "rol": "SOLO OCR/lectura de PDFs escaneados (pdf_service + cadena multimodal del pdf_fallback_patch). NO genera dictamenes desde jun-2026.",
+        "fortaleza": "PDF nativo + Vision gratis — evita quemar creditos de Claude en OCR",
         "tier": "Free tier muy generoso",
         "modelos_disponibles": [
-            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash",
             "gemini-1.5-flash",
             "gemini-1.5-pro",
         ],
@@ -55,7 +59,7 @@ PROVEEDORES_INFO = {
     "groq": {
         "nombre": "Groq Llama",
         "tipo": "free-fast",
-        "rol": "Ultimo fallback. Respuestas rapidas, dictamenes simples cuando todo lo demas cae.",
+        "rol": "Proveedor PRIMARIO de dictamenes (gratis y rapido). Anthropic entra para casos complejos o como fallback de calidad.",
         "fortaleza": "Velocidad bestial (LPU dedicado): 200-400 tokens/s",
         "tier": "Free con rate limits",
         "modelos_disponibles": [
@@ -77,7 +81,11 @@ def listar_proveedores(
     """Lista los 3 proveedores con su configuracion y disponibilidad
     actual (solo basado en env vars, no hace ping)."""
     cfg = get_settings()
-    primary = (cfg.primary_ai or "anthropic").lower()
+    primary = (cfg.primary_ai or "groq").lower()
+    # Espejo de la normalizacion de GlosaService: los proveedores
+    # retirados del dictamen no pueden ser primary.
+    if primary not in ("groq", "anthropic"):
+        primary = "groq"
 
     estado: list[dict] = []
     for clave in ["anthropic", "gemini", "groq"]:
@@ -106,23 +114,28 @@ def listar_proveedores(
 
 
 def _calcular_fallback_chain(cfg, primary: str) -> list[str]:
-    """Construye la cadena real de fallback que usa GlosaService.
+    """Construye la cadena real de fallback de DICTAMENES que usa
+    GlosaService (espejo de la logica en glosa_service.py `_llamar_ia`).
 
-    Espejo de la logica en glosa_service.py `_llamar_ia`.
+    Jun-2026: solo Groq + Anthropic generan dictamenes. Gemini NO aparece
+    aqui — quedo exclusivamente como OCR de PDFs escaneados.
     """
     chain = []
     disponibles = []
-    if cfg.anthropic_api_key:
-        disponibles.append("anthropic")
-    if cfg.gemini_api_key:
-        disponibles.append("gemini")
     if cfg.groq_api_key:
         disponibles.append("groq")
+    if cfg.anthropic_api_key:
+        disponibles.append("anthropic")
+
+    # primary_ai legacy ("gemini"/"openrouter") se normaliza a groq en
+    # GlosaService — reflejarlo aqui tambien.
+    if primary not in ("groq", "anthropic"):
+        primary = "groq"
 
     if primary in disponibles:
         chain.append(primary)
-    # Orden de preferencia para fallbacks: Anthropic > Gemini > Groq
-    for prov in ("anthropic", "gemini", "groq"):
+    # Orden de preferencia para fallbacks: Groq > Anthropic
+    for prov in ("groq", "anthropic"):
         if prov in disponibles and prov not in chain:
             chain.append(prov)
     return chain
