@@ -130,6 +130,18 @@ def _sembrar_contratos_default(db, *, force_reseed: bool = False) -> None:
                 db.delete(contrato)
 
 
+# Índices calientes de historial, creados de forma idempotente en el
+# lifespan (CREATE INDEX IF NOT EXISTS) porque create_all() no agrega
+# índices a tablas pre-existentes. Los nombres DEBEN coincidir con los
+# Index() declarados en GlosaRecord.__table_args__ (app/models/db.py)
+# para que ambos mecanismos converjan sin duplicados.
+_INDICES_HISTORIAL = [
+    ("ix_historial_creado_en", "creado_en"),
+    ("ix_historial_factura", "factura"),
+    ("ix_historial_workflow_state", "workflow_state"),
+]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=== INICIANDO APLICACIÓN ===")
@@ -360,6 +372,21 @@ async def lifespan(app: FastAPI):
             db.commit()
     except Exception as e:
         logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
+
+    # Índices idempotentes para caminos calientes de historial (auditoría
+    # jun-2026 P2 #10): /historial ordena por creado_en, "responder por
+    # factura" filtra por factura y el tablero de workflow por
+    # workflow_state. Mismo mecanismo que el índice de nota_credito; los
+    # nombres coinciden con los Index() de GlosaRecord.__table_args__.
+    for _ix_nombre, _ix_col in _INDICES_HISTORIAL:
+        try:
+            if _tiene_tabla("historial") and _tiene_columna("historial", _ix_col):
+                db.execute(
+                    text(f"CREATE INDEX IF NOT EXISTS {_ix_nombre} ON historial ({_ix_col})")
+                )
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN índice {_ix_nombre}: {e}")
 
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
