@@ -101,11 +101,14 @@ class TestEjecutarConQualityGateOnStub:
         # Servicio stub que devuelve un dictamen limpio
         class StubService:
             anthropic_key = "key"
+            anthropic_model = "claude-sonnet-4-5"
             groq = "client"
             gemini = None
             openrouter = None
 
-            async def _llamar_ia(self, system, user, eps="", codigo=""):
+            async def _llamar_ia(
+                self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+            ):
                 texto = (
                     "<argumento>ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE MAYOR VALOR. " * 5
                     + "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO INTEGRO.</argumento>"
@@ -147,11 +150,14 @@ class TestEjecutarConQualityGateOnStub:
 
         class StubService:
             anthropic_key = "key"
+            anthropic_model = "claude-sonnet-4-5"
             groq = "client"
             gemini = None
             openrouter = None
 
-            async def _llamar_ia(self, system, user, eps="", codigo=""):
+            async def _llamar_ia(
+                self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+            ):
                 ia_calls["n"] += 1
                 return ("<argumento>x</argumento>", "groq")
 
@@ -170,6 +176,115 @@ class TestEjecutarConQualityGateOnStub:
         )
         assert resultado.estado == "RECHAZADO_PRE"
         assert ia_calls["n"] == 0  # IA NUNCA se llamó
+
+
+class TestQGSaltaValidacionLegacy:
+    """Regresión auditoría jun-2026 P1 #3: con QUALITY_GATE_ENABLED=1 el
+    dictamen pasaba por el QG (pre-val → IA → post-val → regenerar) Y
+    ADEMÁS por el R-CEREBRO legacy — hasta 5 llamadas LLM por glosa y
+    veredictos potencialmente contradictorios.
+
+    Contrato esperado:
+      - dictamen producido por el QG → R-CEREBRO se salta.
+      - flag OFF, o QG corre pero no produce dictamen → R-CEREBRO corre
+        como siempre (valida la salida del path legacy).
+    """
+
+    def _data(self):
+        from app.models.schemas import GlosaInput
+
+        return GlosaInput(
+            eps="FAMISANAR EPS",
+            etapa="RESPUESTA A GLOSA",
+            tabla_excel=("FA0101 $ 7.700,00 FALTA SOPORTE DE ENTREGA DE LA FACTURA AL PACIENTE"),
+            valor_aceptado="0",
+        )
+
+    def _spy_validador(self, monkeypatch):
+        """Espía sobre detectar_defectos_criticos — solo lo llama el bloque
+        R-CEREBRO de analizar() (import local, se resuelve en runtime)."""
+        import app.services.validador_dictamen as vd
+
+        calls = {"n": 0}
+
+        def spy(*args, **kwargs):
+            calls["n"] += 1
+            return []
+
+        monkeypatch.setattr(vd, "detectar_defectos_criticos", spy)
+        return calls
+
+    def _servicio(self):
+        from app.services.glosa_service import GlosaService
+
+        return GlosaService(groq_api_key=None, anthropic_api_key=None, primary_ai="groq")
+
+    @pytest.mark.asyncio
+    async def test_dictamen_del_qg_no_corre_rcerebro(self, monkeypatch):
+        monkeypatch.setenv("QUALITY_GATE_ENABLED", "1")
+        monkeypatch.delenv("QUALITY_GATE_ROLLOUT_PCT", raising=False)
+        monkeypatch.delenv("TOOL_USE_HABILITADO", raising=False)
+
+        dictamen_qg = (
+            "ESE HUS NO ACEPTA LA GLOSA POR FALTA DE SOPORTES. " * 4
+            + "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA."
+        )
+
+        async def fake_qg(**kwargs):
+            return QualityGateResult(
+                estado="APROBADO",
+                dictamen_final=dictamen_qg,
+                modelo_final="qg-test",
+                score_final=95,
+            )
+
+        import app.services.quality_gate_adapter as qga
+
+        monkeypatch.setattr(qga, "ejecutar_con_quality_gate", fake_qg)
+        calls = self._spy_validador(monkeypatch)
+
+        resultado = await self._servicio().analizar(
+            self._data(), contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+
+        assert calls["n"] == 0, "R-CEREBRO corrió pese a que el QG ya validó el dictamen"
+        assert resultado.modelo_ia == "qg-test"
+        assert "SE SOLICITA EL LEVANTAMIENTO" in resultado.dictamen.upper()
+
+    @pytest.mark.asyncio
+    async def test_flag_off_rcerebro_sigue_corriendo(self, monkeypatch):
+        monkeypatch.delenv("QUALITY_GATE_ENABLED", raising=False)
+        monkeypatch.delenv("TOOL_USE_HABILITADO", raising=False)
+        calls = self._spy_validador(monkeypatch)
+
+        await self._servicio().analizar(
+            self._data(), contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+
+        assert calls["n"] >= 1, "con el flag OFF la validación legacy debe seguir corriendo"
+
+    @pytest.mark.asyncio
+    async def test_qg_sin_dictamen_rcerebro_valida_el_legacy(self, monkeypatch):
+        """Si el QG corre pero NO produce dictamen (ej. los 3 intentos del
+        generador fallaron), el dictamen sale del path legacy y el R-CEREBRO
+        SÍ debe validarlo."""
+        monkeypatch.setenv("QUALITY_GATE_ENABLED", "1")
+        monkeypatch.delenv("QUALITY_GATE_ROLLOUT_PCT", raising=False)
+        monkeypatch.delenv("TOOL_USE_HABILITADO", raising=False)
+
+        async def fake_qg_vacio(**kwargs):
+            return QualityGateResult(estado="ESCALAR_HUMANO", dictamen_final="")
+
+        import app.services.quality_gate_adapter as qga
+
+        monkeypatch.setattr(qga, "ejecutar_con_quality_gate", fake_qg_vacio)
+        calls = self._spy_validador(monkeypatch)
+
+        await self._servicio().analizar(
+            self._data(), contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+
+        assert calls["n"] >= 1, "QG sin dictamen → el R-CEREBRO debe validar el path legacy"
 
 
 class TestWrapperFallbackOnError:

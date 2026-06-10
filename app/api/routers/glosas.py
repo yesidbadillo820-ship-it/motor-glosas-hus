@@ -17,6 +17,7 @@ from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
 from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
+from app.utils.moneda import parse_valor_cop
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -184,7 +185,10 @@ def _limpiar_observacion(dictamen_html: str) -> str:
 
 @router.get("/historial", response_model=list)
 def historial(
-    limit: int = 50,
+    # le=500: sin tope, un limit=10_000_000 serializa la tabla completa
+    # (dictamenes HTML incluidos) en una sola respuesta — DoS trivial
+    # autenticado (auditoría jun-2026, P2 #9).
+    limit: int = Query(50, ge=1, le=500),
     eps: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
@@ -4263,7 +4267,9 @@ async def _procesar_fila_en_background(
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
+                # parse_valor_cop: "7.700,00" → 7700.0 (el patrón anterior
+                # re.sub(r"[^\d]") inflaba 100× — auditoría jun-2026 P0 #1)
+                valor_objetado=parse_valor_cop(fila_data.get("valor", "0")),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",
@@ -4281,7 +4287,7 @@ async def _procesar_fila_en_background(
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
+                valor_objetado=parse_valor_cop(fila_data.get("valor", "0")),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",

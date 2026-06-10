@@ -1,8 +1,9 @@
 from __future__ import annotations
-import re
 from typing import Optional
 from datetime import date
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.utils.moneda import parse_valor_cop
 
 # ── Entrada ───────────────────────────────────────────────────────────────────
 
@@ -80,8 +81,15 @@ class GlosaInput(BaseModel):
     @field_validator("valor_aceptado")
     @classmethod
     def valor_solo_numeros(cls, v: str) -> str:
-        cleaned = re.sub(r"[^\d]", "", v)
-        return cleaned or "0"
+        # Normaliza a forma canónica COP re-parseable. El patrón anterior
+        # re.sub(r"[^\d]") convertía "7.700,00" en "770000" (100× — auditoría
+        # jun-2026 P0 #1). parse_valor_cop entiende puntos=miles, coma=decimal.
+        valor = parse_valor_cop(v)
+        if valor == int(valor):
+            return str(int(valor))
+        # Decimales reales: conservarlos con coma (formato colombiano) para
+        # que cualquier re-parse con parse_valor_cop devuelva el mismo valor.
+        return f"{valor:.2f}".replace(".", ",")
 
     # R55 P1: validators de enumeración para tono y modo_respuesta.
     # Si el cliente envía un valor desconocido, fallback al default

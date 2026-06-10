@@ -95,6 +95,14 @@ class GlosaRecord(Base):
         Index("ix_historial_alertas", "dias_restantes", "estado"),
         Index("ix_historial_auditor", "auditor_email"),
         Index("ix_historial_decision", "decision_eps"),
+        # Auditoría jun-2026 P2 #10 — caminos calientes sin índice:
+        # /historial ordena por creado_en, "responder por factura" filtra
+        # por factura y el tablero de workflow por workflow_state. Para
+        # tablas pre-existentes los crea el lifespan (CREATE INDEX IF NOT
+        # EXISTS sobre _INDICES_HISTORIAL en app/main.py).
+        Index("ix_historial_creado_en", "creado_en"),
+        Index("ix_historial_factura", "factura"),
+        Index("ix_historial_workflow_state", "workflow_state"),
     )
 
 

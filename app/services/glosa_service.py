@@ -1091,17 +1091,26 @@ class GlosaService:
         msg_tiempo, color_tiempo, dias = "Fechas no ingresadas", "bg-slate-500", 0
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
-                dias = self._calcular_dias_habiles(
+                dias_calc = self._calcular_dias_habiles(
                     str(data.fecha_radicacion), str(data.fecha_recepcion)
                 )
-                # PLAZO LEGAL: 20 días hábiles para que la EPS formule glosa (Art. 57 Ley 1438/2011 + Dec. 4747/2007)
-                es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
-                msg_tiempo = (
-                    f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES - LÍMITE: {DIAS_HABILES_LIMITE_EXTEMPORANEA})"
-                    if es_extemporanea
-                    else f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)"
-                )
-                color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
+                if dias_calc is None:
+                    # Fechas presentes pero imparseables: NO clasificar como
+                    # "DENTRO DE TÉRMINOS" (antes dias=0 silencioso perdía la
+                    # defensa RE9502 por extemporaneidad). El gestor debe
+                    # verificar las fechas. Auditoría jun-2026, P1 #5.
+                    msg_tiempo = "FECHAS NO VÁLIDAS — VERIFICAR RADICACIÓN/RECEPCIÓN"
+                    color_tiempo = "bg-amber-500"
+                else:
+                    dias = dias_calc
+                    # PLAZO LEGAL: 20 días hábiles para que la EPS formule glosa (Art. 57 Ley 1438/2011 + Dec. 4747/2007)
+                    es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
+                    msg_tiempo = (
+                        f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES - LÍMITE: {DIAS_HABILES_LIMITE_EXTEMPORANEA})"
+                        if es_extemporanea
+                        else f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)"
+                    )
+                    color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
             except Exception as e:
                 logger.error(f"Error fechas: {e}")
 
@@ -1843,6 +1852,13 @@ class GlosaService:
                 logger.debug(f"[SKIP-CLAUDE] Falló: {_e_dir}")
                 res_ia = None
 
+            # True cuando el dictamen final salió del Quality Gate (que ya
+            # post-validó y regeneró hasta 3 veces). En ese caso el bloque
+            # R-CEREBRO legacy de más abajo se salta — correr ambos duplicaba
+            # hasta 2 llamadas LLM extra por glosa y podía producir veredictos
+            # contradictorios (auditoría jun-2026, P1 #3).
+            _dictamen_via_qg = False
+
             # Si NO se emitió directamente, llamar al LLM como siempre.
             if not res_ia:
                 # Orden de preferencia para invocar al LLM:
@@ -2016,6 +2032,7 @@ class GlosaService:
                         # QG (útil para badge "REVISAR" si ESCALAR_HUMANO).
                         self._qg_estado_actual = _qg_resultado.estado
                         self._qg_score_actual = _qg_resultado.score_final
+                        _dictamen_via_qg = True
                     else:
                         # Legacy path — comportamiento de hoy
                         res_ia, modelo_usado = await self._llamar_ia(
@@ -2033,124 +2050,131 @@ class GlosaService:
             #  mencionado, valor no textual). Si los hay, regenera UNA
             #  vez bypaseando el caché con instrucciones específicas
             #  de qué corregir.
+            #  Se SALTA cuando el dictamen vino del Quality Gate: el QG
+            #  ya post-validó/regeneró (hasta 3 intentos) y duplicar la
+            #  validación legacy costaba hasta 2 llamadas LLM extra con
+            #  veredictos potencialmente contradictorios.
             # ═══════════════════════════════════════════════════════════
-            try:
-                from app.services.detector_copia import (
-                    detectar_copia_gold,
-                )
-                from app.services.validador_dictamen import (
-                    detectar_defectos_criticos,
-                    construir_instruccion_retry,
-                    resumen_defectos,
-                )
-
-                _defectos = detectar_defectos_criticos(
-                    res_ia,
-                    codigo_glosa=codigo_det,
-                    valor_objetado=valor_raw,
-                    tiene_contrato=tiene_contrato,
-                    valor_facturado=_val_fact_str,
-                    es_ratificacion=es_ratificacion,
-                    es_extemporanea=es_extemporanea,
-                    codigo_respuesta=cod_res,
-                )
-                # Mejora #7: chequear si el dictamen es copia textual
-                # de algún ejemplo Gold inyectado. Si lo es, eso es un
-                # defecto crítico equivalente y forzamos retry.
-                _copia = None
-                if _ejemplos_gold:
-                    try:
-                        # Extraer solo el contenido de <argumento>
-                        import re as _re_arg
-
-                        _m_arg = _re_arg.search(
-                            r"<argumento>(.*?)</argumento>",
-                            res_ia or "",
-                            _re_arg.DOTALL | _re_arg.IGNORECASE,
-                        )
-                        _arg_solo = _m_arg.group(1) if _m_arg else (res_ia or "")
-                        _copia = detectar_copia_gold(
-                            _arg_solo,
-                            _ejemplos_gold,
-                            umbral=0.55,
-                        )
-                        if _copia:
-                            _defectos.append(
-                                {
-                                    "regla": "copia_textual_gold",
-                                    "mensaje": (
-                                        f"El dictamen es {_copia['similitud'] * 100:.0f}% "
-                                        "idéntico a un ejemplo Gold."
-                                    ),
-                                    "sugerencia": (
-                                        "Reformula con vocabulario propio. "
-                                        "Mantén estructura y normas pero "
-                                        "cambia las palabras."
-                                    ),
-                                }
-                            )
-                            logger.warning(
-                                f"[VALIDACION-IA] Copia textual detectada: "
-                                f"{_copia['similitud'] * 100:.0f}% similitud con "
-                                f"ejemplo {_copia['fuente']} #{_copia['ejemplo_id']}"
-                            )
-                    except Exception as _e_c:
-                        logger.debug(f"Detector copia falló: {_e_c}")
-                # Heurística de costo: si el ÚNICO defecto es
-                # "demasiado_largo", el retry rara vez mejora (el LLM
-                # vuelve a producir longitud similar) y gastamos
-                # ~$0.05 + ~25s en latencia por nada. Tratamos esa
-                # regla como soft warning y NO disparamos retry.
-                _solo_largo = len(_defectos) == 1 and _defectos[0].get("regla") == "demasiado_largo"
-                if _solo_largo:
-                    logger.info(
-                        "[VALIDACION-IA] Solo demasiado_largo — "
-                        "retry omitido para ahorrar tokens (~$0.05). "
-                        "Aceptando primera respuesta."
+            if not _dictamen_via_qg:
+                try:
+                    from app.services.detector_copia import (
+                        detectar_copia_gold,
                     )
-                if _defectos and not _solo_largo:
-                    logger.warning(
-                        f"[VALIDACION-IA] Defectos detectados en primera "
-                        f"respuesta: {resumen_defectos(_defectos)}"
+                    from app.services.validador_dictamen import (
+                        detectar_defectos_criticos,
+                        construir_instruccion_retry,
+                        resumen_defectos,
                     )
-                    instr_retry = construir_instruccion_retry(_defectos)
-                    user_retry = user_prompt + instr_retry
-                    try:
-                        res_retry, _modelo_retry = await self._llamar_ia(
-                            system_prompt,
-                            user_retry,
-                            eps=str(data.eps),
-                            codigo=codigo_det,
-                            modelo_override=_modelo_override,
-                            bypass_cache=True,
-                        )
-                        # Aceptamos la nueva respuesta solo si tiene
-                        # MENOS defectos críticos que la primera
-                        _defectos_retry = detectar_defectos_criticos(
-                            res_retry,
-                            codigo_glosa=codigo_det,
-                            valor_objetado=valor_raw,
-                            tiene_contrato=tiene_contrato,
-                            valor_facturado=_val_fact_str,
-                            es_ratificacion=es_ratificacion,
-                            es_extemporanea=es_extemporanea,
-                            codigo_respuesta=cod_res,
-                        )
-                        if len(_defectos_retry) < len(_defectos):
-                            logger.info(
-                                f"[VALIDACION-IA] Retry mejoró: "
-                                f"{len(_defectos)} → {len(_defectos_retry)} defectos"
+
+                    _defectos = detectar_defectos_criticos(
+                        res_ia,
+                        codigo_glosa=codigo_det,
+                        valor_objetado=valor_raw,
+                        tiene_contrato=tiene_contrato,
+                        valor_facturado=_val_fact_str,
+                        es_ratificacion=es_ratificacion,
+                        es_extemporanea=es_extemporanea,
+                        codigo_respuesta=cod_res,
+                    )
+                    # Mejora #7: chequear si el dictamen es copia textual
+                    # de algún ejemplo Gold inyectado. Si lo es, eso es un
+                    # defecto crítico equivalente y forzamos retry.
+                    _copia = None
+                    if _ejemplos_gold:
+                        try:
+                            # Extraer solo el contenido de <argumento>
+                            import re as _re_arg
+
+                            _m_arg = _re_arg.search(
+                                r"<argumento>(.*?)</argumento>",
+                                res_ia or "",
+                                _re_arg.DOTALL | _re_arg.IGNORECASE,
                             )
-                            res_ia = res_retry
-                            modelo_usado = _modelo_retry
-                        else:
-                            logger.warning(
-                                "[VALIDACION-IA] Retry no mejoró — usando primera respuesta"
+                            _arg_solo = _m_arg.group(1) if _m_arg else (res_ia or "")
+                            _copia = detectar_copia_gold(
+                                _arg_solo,
+                                _ejemplos_gold,
+                                umbral=0.55,
                             )
-                    except Exception as _e:
-                        logger.warning(f"Retry IA por validación falló: {_e}")
-            except Exception as _e:
-                logger.debug(f"Validación post-gen no aplicada: {_e}")
+                            if _copia:
+                                _defectos.append(
+                                    {
+                                        "regla": "copia_textual_gold",
+                                        "mensaje": (
+                                            f"El dictamen es {_copia['similitud'] * 100:.0f}% "
+                                            "idéntico a un ejemplo Gold."
+                                        ),
+                                        "sugerencia": (
+                                            "Reformula con vocabulario propio. "
+                                            "Mantén estructura y normas pero "
+                                            "cambia las palabras."
+                                        ),
+                                    }
+                                )
+                                logger.warning(
+                                    f"[VALIDACION-IA] Copia textual detectada: "
+                                    f"{_copia['similitud'] * 100:.0f}% similitud con "
+                                    f"ejemplo {_copia['fuente']} #{_copia['ejemplo_id']}"
+                                )
+                        except Exception as _e_c:
+                            logger.debug(f"Detector copia falló: {_e_c}")
+                    # Heurística de costo: si el ÚNICO defecto es
+                    # "demasiado_largo", el retry rara vez mejora (el LLM
+                    # vuelve a producir longitud similar) y gastamos
+                    # ~$0.05 + ~25s en latencia por nada. Tratamos esa
+                    # regla como soft warning y NO disparamos retry.
+                    _solo_largo = (
+                        len(_defectos) == 1 and _defectos[0].get("regla") == "demasiado_largo"
+                    )
+                    if _solo_largo:
+                        logger.info(
+                            "[VALIDACION-IA] Solo demasiado_largo — "
+                            "retry omitido para ahorrar tokens (~$0.05). "
+                            "Aceptando primera respuesta."
+                        )
+                    if _defectos and not _solo_largo:
+                        logger.warning(
+                            f"[VALIDACION-IA] Defectos detectados en primera "
+                            f"respuesta: {resumen_defectos(_defectos)}"
+                        )
+                        instr_retry = construir_instruccion_retry(_defectos)
+                        user_retry = user_prompt + instr_retry
+                        try:
+                            res_retry, _modelo_retry = await self._llamar_ia(
+                                system_prompt,
+                                user_retry,
+                                eps=str(data.eps),
+                                codigo=codigo_det,
+                                modelo_override=_modelo_override,
+                                bypass_cache=True,
+                            )
+                            # Aceptamos la nueva respuesta solo si tiene
+                            # MENOS defectos críticos que la primera
+                            _defectos_retry = detectar_defectos_criticos(
+                                res_retry,
+                                codigo_glosa=codigo_det,
+                                valor_objetado=valor_raw,
+                                tiene_contrato=tiene_contrato,
+                                valor_facturado=_val_fact_str,
+                                es_ratificacion=es_ratificacion,
+                                es_extemporanea=es_extemporanea,
+                                codigo_respuesta=cod_res,
+                            )
+                            if len(_defectos_retry) < len(_defectos):
+                                logger.info(
+                                    f"[VALIDACION-IA] Retry mejoró: "
+                                    f"{len(_defectos)} → {len(_defectos_retry)} defectos"
+                                )
+                                res_ia = res_retry
+                                modelo_usado = _modelo_retry
+                            else:
+                                logger.warning(
+                                    "[VALIDACION-IA] Retry no mejoró — usando primera respuesta"
+                                )
+                        except Exception as _e:
+                            logger.warning(f"Retry IA por validación falló: {_e}")
+                except Exception as _e:
+                    logger.debug(f"Validación post-gen no aplicada: {_e}")
 
             razonamiento = self._xml("razonamiento", res_ia, "")
             if razonamiento:
@@ -3004,18 +3028,27 @@ class GlosaService:
                     return f"$ {raw}"
         return "$ 0.00"
 
-    def _calcular_dias_habiles(self, f1, f2):
+    def _calcular_dias_habiles(self, f1, f2) -> Optional[int]:
+        """Días hábiles entre f1 y f2 (strings ISO "YYYY-MM-DD...").
+
+        Devuelve None si las fechas no se pueden parsear. ANTES devolvía 0,
+        y 0 días = "DENTRO DE TÉRMINOS": un error de formato clasificaba la
+        glosa como en términos y la defensa por extemporaneidad (RE9502) se
+        perdía en silencio (auditoría jun-2026, P1 #5). El caller debe
+        tratar None como "no se sabe" y pedir verificación de fechas.
+        """
         try:
-            d1 = datetime.strptime(f1[:10], "%Y-%m-%d")
-            d2 = datetime.strptime(f2[:10], "%Y-%m-%d")
-            dias, curr = 0, d1
-            while curr < d2:
-                curr += timedelta(days=1)
-                if curr.weekday() < 5 and curr.strftime("%Y-%m-%d") not in FERIADOS_CO:
-                    dias += 1
-            return dias
-        except Exception:
-            return 0
+            d1 = datetime.strptime(str(f1)[:10], "%Y-%m-%d")
+            d2 = datetime.strptime(str(f2)[:10], "%Y-%m-%d")
+        except (TypeError, ValueError):
+            logger.error(f"_calcular_dias_habiles: fechas no parseables f1={f1!r} f2={f2!r}")
+            return None
+        dias, curr = 0, d1
+        while curr < d2:
+            curr += timedelta(days=1)
+            if curr.weekday() < 5 and curr.strftime("%Y-%m-%d") not in FERIADOS_CO:
+                dias += 1
+        return dias
 
     def _wrapper_auditoria_html(
         self,

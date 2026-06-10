@@ -97,6 +97,51 @@ CONTRATOS_DEFAULT = {
 }
 
 
+def _sembrar_contratos_default(db, *, force_reseed: bool = False) -> None:
+    """Siembra los contratos default SOLO cuando faltan en la BD.
+
+    La BD es la fuente de verdad: los textos editados por la coordinación
+    desde la UI (POST /contratos) NO se sobrescriben en cada arranque.
+    Antes este seed hacía `existente.detalles = v` en cada boot (revirtiendo
+    las ediciones de las 14 EPS default) y además BORRABA cualquier contrato
+    cuyo EPS no estuviera en CONTRATOS_DEFAULT — perdiendo contratos creados
+    por el equipo. Auditoría jun-2026, P1 #4.
+
+    FORCE_RESEED_CONTRATOS=1 restaura la re-sincronización masiva
+    (sobrescribe textos con el default y elimina los no-default), espejo
+    del toggle FORCE_RESEED_USERS para usuarios.
+    """
+    for k, v in CONTRATOS_DEFAULT.items():
+        existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
+        if not existente:
+            db.add(ContratoRecord(eps=k, detalles=v))
+            logger.info(f"Contrato default sembrado: {k}")
+        elif force_reseed and existente.detalles != v:
+            logger.warning(f"[FORCE_RESEED_CONTRATOS] {k}: detalles re-sincronizados al default")
+            existente.detalles = v
+
+    if force_reseed:
+        eps_default = set(CONTRATOS_DEFAULT.keys())
+        for contrato in db.query(ContratoRecord).all():
+            if contrato.eps not in eps_default:
+                logger.warning(
+                    f"[FORCE_RESEED_CONTRATOS] ELIMINANDO contrato no-default: {contrato.eps}"
+                )
+                db.delete(contrato)
+
+
+# Índices calientes de historial, creados de forma idempotente en el
+# lifespan (CREATE INDEX IF NOT EXISTS) porque create_all() no agrega
+# índices a tablas pre-existentes. Los nombres DEBEN coincidir con los
+# Index() declarados en GlosaRecord.__table_args__ (app/models/db.py)
+# para que ambos mecanismos converjan sin duplicados.
+_INDICES_HISTORIAL = [
+    ("ix_historial_creado_en", "creado_en"),
+    ("ix_historial_factura", "factura"),
+    ("ix_historial_workflow_state", "workflow_state"),
+]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=== INICIANDO APLICACIÓN ===")
@@ -328,6 +373,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"MIGRACIÓN índice nota_credito: {e}")
 
+    # Índices idempotentes para caminos calientes de historial (auditoría
+    # jun-2026 P2 #10): /historial ordena por creado_en, "responder por
+    # factura" filtra por factura y el tablero de workflow por
+    # workflow_state. Mismo mecanismo que el índice de nota_credito; los
+    # nombres coinciden con los Index() de GlosaRecord.__table_args__.
+    for _ix_nombre, _ix_col in _INDICES_HISTORIAL:
+        try:
+            if _tiene_tabla("historial") and _tiene_columna("historial", _ix_col):
+                db.execute(
+                    text(f"CREATE INDEX IF NOT EXISTS {_ix_nombre} ON historial ({_ix_col})")
+                )
+                db.commit()
+        except Exception as e:
+            logger.warning(f"MIGRACIÓN índice {_ix_nombre}: {e}")
+
     # Resize de columnas TEXT/VARCHAR cuyo tamaño original quedó corto.
     # Caso 27-abr-2026: importación de Excel falla con
     # "value too long for type character varying(50)" en EPS oficial
@@ -489,21 +549,13 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
 
     try:
-        # Cargar contratos iniciales
-        # Primero eliminar contratos que ya no existen en la lista actual
-        eps_actuales = list(CONTRATOS_DEFAULT.keys())
-        contratos_existentes = db.query(ContratoRecord).all()
-        for contrato in contratos_existentes:
-            if contrato.eps not in eps_actuales:
-                logger.warning(f"ELIMINANDO contrato obsoleto: {contrato.eps}")
-                db.delete(contrato)
-
-        for k, v in CONTRATOS_DEFAULT.items():
-            existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
-            if existente:
-                existente.detalles = v
-            else:
-                db.add(ContratoRecord(eps=k, detalles=v))
+        # Contratos default: solo sembrar los que FALTAN. Los textos
+        # editados desde la UI persisten entre deploys (la BD manda);
+        # FORCE_RESEED_CONTRATOS=1 fuerza la re-sincronización masiva.
+        _sembrar_contratos_default(
+            db,
+            force_reseed=os.getenv("FORCE_RESEED_CONTRATOS", "").lower() in ("1", "true", "yes"),
+        )
 
         # Crear admin solo si no existe
         # CORRECCIÓN: contraseña desde variable de entorno, sin hardcodear.
