@@ -722,6 +722,24 @@ async def analizar(
         logger.error(f"[{req_id}] Validación fallida: {e}")
         raise HTTPException(status_code=422, detail=str(e))
 
+    # Pre-validación INCONDICIONAL del texto de glosa (corre aunque
+    # QUALITY_GATE_ENABLED esté OFF). Bloquea entradas basura tipo "Se glosa
+    # por falta de cobertura" antes de gastar un call de IA y antes de
+    # generar dictamen sobre nada. Esto es el "guardarrail mínimo" — el
+    # Quality Gate completo (post-validador, regeneración, etc.) sigue
+    # gateado por el feature flag, pero esta verificación de input no.
+    from app.services.quality_gate.pre_validator import check_texto_glosa
+
+    _chk_texto = check_texto_glosa(tabla_excel)
+    if not _chk_texto.ok:
+        logger.warning(
+            f"[{req_id}] Pre-validación bloqueada: {_chk_texto.razon}. No se gasta call de IA."
+        )
+        _msg = _chk_texto.razon or "Texto de glosa insuficiente"
+        if _chk_texto.sugerencia:
+            _msg = f"{_msg}.\n\nSugerencia: {_chk_texto.sugerencia}"
+        raise HTTPException(status_code=400, detail=_msg)
+
     contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
         archivos,
         req_id,
