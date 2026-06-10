@@ -1028,21 +1028,17 @@ class GlosaService:
         groq_model: str = "llama-3.3-70b-versatile",
         gemini_api_key: str = None,
         gemini_model: str = "gemini-2.0-flash",
-        openrouter_api_key: str = None,
-        openrouter_model: str = "deepseek/deepseek-chat",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
-        # Default Anthropic-first (mayo 2026): Sonnet/Haiku 4.x da la
-        # mejor calidad legal en español. OpenRouter (DeepSeek) toma el
-        # slot de fallback #1 que antes tenia Gemini — calidad similar
-        # a Sonnet a 5% del costo. Gemini queda como #2 cuando hay
-        # contexto enorme (1M tokens) y Groq Llama de ultimo recurso.
+        # Jun-2026 (decisión Yesid): OpenRouter (DeepSeek) salió del
+        # proyecto — no se le veía trabajando y de pago ya está Claude.
+        # La cadena de dictámenes queda en Groq + Anthropic.
         self.primary_ai = (primary_ai or "anthropic").lower()
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
         self.groq_model = groq_model or "llama-3.3-70b-versatile"
-        # Tercer proveedor: Google Gemini (tier gratis generoso)
+        # Google Gemini (tier gratis generoso)
         from app.services.gemini_service import GeminiService
 
         gem_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
@@ -1050,14 +1046,6 @@ class GlosaService:
             GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
         )
         self.gemini_model = gemini_model
-        # Cuarto proveedor: OpenRouter (meta-router → DeepSeek/Llama/etc)
-        from app.services.openrouter_service import OpenRouterService
-
-        or_key = openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
-        self.openrouter = (
-            OpenRouterService(api_key=or_key, default_model=openrouter_model) if or_key else None
-        )
-        self.openrouter_model = openrouter_model
 
     async def analizar(
         self,
@@ -1985,7 +1973,6 @@ class GlosaService:
                                     ("anthropic", self.anthropic_key),
                                     ("groq", self.groq),
                                     ("gemini", self.gemini),
-                                    ("openrouter", self.openrouter),
                                 ]
                                 if k
                             }
@@ -2480,9 +2467,9 @@ class GlosaService:
             # AUTO-CRÍTICA: valida el borrador y pide corrección si es pobre.
             # Solo aplica en modo normal (no auditoria_previa, no texto-fijo).
             # Se limita a 1 iteración para no aumentar latencia >2x.
-            # Funciona con cualquier proveedor (Anthropic/Groq/Gemini/OpenRouter)
+            # Funciona con cualquier proveedor (Anthropic/Groq/Gemini)
             # via _llamar_ia que respeta primary_ai + fallbacks.
-            _hay_proveedor = bool(self.anthropic_key or self.groq or self.gemini or self.openrouter)
+            _hay_proveedor = bool(self.anthropic_key or self.groq or self.gemini)
             if modo_resp != "auditoria_previa" and _hay_proveedor:
                 try:
                     from app.services.validador_dictamen import evaluar_dictamen
@@ -3612,29 +3599,6 @@ class GlosaService:
             max_intentos=max_intentos,
         )
 
-    async def _llamar_openrouter_con_retry(
-        self, system: str, user: str, max_intentos: int = 3
-    ) -> tuple[str, str]:
-        """Llama a OpenRouter (default DeepSeek V3) con retry. Si el
-        modelo principal del sender falla, OpenRouter cae solo al
-        fallback gratis (Llama 3.3 70B) sin que tengamos que reintentar
-        manualmente — ese fallback lo configuramos con `fallbacks=[]`.
-        """
-        if not self.openrouter:
-            raise RuntimeError("OpenRouter no configurado (OPENROUTER_API_KEY)")
-        return await self.openrouter.completar_con_retry(
-            system=system,
-            user=user,
-            modelo=self.openrouter_model,
-            temperature=0.2,
-            max_tokens=3000,
-            max_intentos=max_intentos,
-            # Fallback dentro del propio OpenRouter: si DeepSeek se cae
-            # en su servidor, automaticamente prueba Llama 70B gratis
-            # antes de devolver error a nuestro lado.
-            fallbacks=["meta-llama/llama-3.3-70b-instruct:free"],
-        )
-
     async def _llamar_groq_con_retry(
         self, system: str, user: str, max_intentos: int = 4
     ) -> tuple[str, str]:
@@ -4112,7 +4076,7 @@ class GlosaService:
 
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
-        if not self.groq and not self.anthropic_key and not self.gemini and not self.openrouter:
+        if not self.groq and not self.anthropic_key and not self.gemini:
             return (
                 "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>",
                 "error",
@@ -4122,17 +4086,8 @@ class GlosaService:
         # RESPETAMOS la decision del usuario: si dice 'groq', va groq primero
         # (etapa de testing donde no quiere gastar tokens pagos). Solo si
         # tecnicamente falla (timeout, error, rate limit), cae al fallback.
-        #
-        # OpenRouter (DeepSeek) entra como FALLBACK #1 en todas las
-        # cadenas no-OpenRouter porque: (a) calidad cercana a Sonnet,
-        # (b) costo 30x menor que Anthropic, (c) tier gratis incluido
-        # via Llama 70B fallback interno. Reemplaza a Gemini en el
-        # slot prioritario porque Gemini agota free tier en lotes
-        # grandes (15 RPM / 1500 RPD vs OpenRouter mucho mas tolerante).
         def _agregar_fallbacks(intentos: list, ya_incluido: str) -> None:
             """Agrega los proveedores restantes en orden de preferencia."""
-            if ya_incluido != "openrouter" and self.openrouter:
-                intentos.append(("openrouter", self._llamar_openrouter_con_retry))
             if ya_incluido != "anthropic" and self.anthropic_key:
                 intentos.append(("anthropic", self._llamar_anthropic))
             if ya_incluido != "gemini" and self.gemini:
@@ -4147,25 +4102,18 @@ class GlosaService:
         elif self.primary_ai == "anthropic" and self.anthropic_key:
             intentos = [("anthropic", self._llamar_anthropic)]
             _agregar_fallbacks(intentos, "anthropic")
-        elif self.primary_ai == "openrouter" and self.openrouter:
-            intentos = [("openrouter", self._llamar_openrouter_con_retry)]
-            _agregar_fallbacks(intentos, "openrouter")
         elif self.primary_ai == "gemini" and self.gemini:
             intentos = [("gemini", self._llamar_gemini_con_retry)]
             _agregar_fallbacks(intentos, "gemini")
         elif self.primary_ai == "groq" and self.groq:
             # USUARIO ELIGIO GROQ — respetar (no gastar tokens pagos).
-            # Fallback: gratis primero (OpenRouter free + Gemini),
-            # despues pago (Anthropic).
+            # Fallback: Anthropic (calidad) despues.
             intentos = [("groq", self._llamar_groq_con_retry)]
             _agregar_fallbacks(intentos, "groq")
         else:
-            # primary_ai desconocido o sin proveedor disponible para el primary
-            # elegido. Estrategia balanceada: OpenRouter (DeepSeek, barato y
-            # bueno) -> Anthropic (top calidad) -> Gemini (1M ctx) -> Groq.
+            # primary_ai desconocido o sin proveedor disponible para el
+            # primary elegido. Anthropic (top calidad) -> Gemini -> Groq.
             intentos = []
-            if self.openrouter:
-                intentos.append(("openrouter", self._llamar_openrouter_con_retry))
             if self.anthropic_key:
                 intentos.append(("anthropic", self._llamar_anthropic))
             if self.gemini:

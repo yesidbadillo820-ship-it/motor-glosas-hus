@@ -104,7 +104,6 @@ class TestEjecutarConQualityGateOnStub:
             anthropic_model = "claude-sonnet-4-5"
             groq = "client"
             gemini = None
-            openrouter = None
 
             async def _llamar_ia(
                 self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
@@ -153,7 +152,6 @@ class TestEjecutarConQualityGateOnStub:
             anthropic_model = "claude-sonnet-4-5"
             groq = "client"
             gemini = None
-            openrouter = None
 
             async def _llamar_ia(
                 self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False

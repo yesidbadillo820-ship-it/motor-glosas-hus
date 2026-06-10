@@ -212,8 +212,6 @@ async def _extraer_pdfs(
                 anthropic_model=cfg.anthropic_model,
                 gemini_api_key=cfg.gemini_api_key,
                 gemini_model=cfg.gemini_model,
-                openrouter_api_key=cfg.openrouter_api_key,
-                openrouter_model=cfg.openrouter_model,
             )
             sep = (
                 f"\n\n═══ DOCUMENTO: {archivo.filename} ═══\n\n"
@@ -654,8 +652,6 @@ def get_glosa_service() -> GlosaService:
         groq_model=cfg.groq_model,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
 

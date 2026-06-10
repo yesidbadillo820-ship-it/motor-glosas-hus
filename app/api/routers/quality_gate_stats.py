@@ -74,7 +74,6 @@ def estado_quality_gate(
         "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY", "")),
         "groq": bool(os.environ.get("GROQ_API_KEY", "")),
         "gemini": bool(os.environ.get("GEMINI_API_KEY", "")),
-        "openrouter": bool(os.environ.get("OPENROUTER_API_KEY", "")),
     }
 
     if activo:

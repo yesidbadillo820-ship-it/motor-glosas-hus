@@ -157,8 +157,8 @@ async def ejecutar_con_quality_gate(
         n_llamadas += 1
         es_regeneracion = n_llamadas > 1
 
-        # `modelo` es un PROVEEDOR del router ("groq"/"anthropic"/"gemini"/
-        # "openrouter"). _llamar_ia solo permite forzar proveedor vía
+        # `modelo` es un PROVEEDOR del router ("groq"/"anthropic").
+        # _llamar_ia solo permite forzar proveedor vía
         # modelo_override (que siempre enruta a Anthropic con ese model id);
         # para el resto respeta primary_ai + su cadena de fallback.
         modelo_override = None

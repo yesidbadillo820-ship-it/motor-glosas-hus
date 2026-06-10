@@ -38,22 +38,6 @@ PROVEEDORES_INFO = {
         "rate_limit": "Variable (Tier 1: 50K ITPM, Tier 2+: ilimitado)",
         "console_url": "https://console.anthropic.com/settings/billing",
     },
-    "openrouter": {
-        "nombre": "OpenRouter (DeepSeek/Llama/etc)",
-        "tipo": "meta-router-cheap",
-        "rol": "Fallback #1 cuando Anthropic 429ea — ofrece DeepSeek V3 a 5% del costo de Sonnet con calidad similar, ademas de fallback gratis a Llama 3.3 70B",
-        "fortaleza": "1 sola key da acceso a 100+ modelos. DeepSeek V3 ~$0.27/M tokens (30x mas barato que Sonnet). Si DeepSeek cae, OpenRouter prueba solo con Llama 70B gratis sin retry manual.",
-        "tier": "Pay-as-you-go (~$5 te dan miles de queries) + modelos :free",
-        "modelos_disponibles": [
-            "deepseek/deepseek-chat",
-            "deepseek/deepseek-r1",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "qwen/qwen-2.5-72b-instruct",
-            "google/gemma-2-27b-it",
-        ],
-        "rate_limit": "Pago: practicamente sin limite. :free models: 50 RPD aprox",
-        "console_url": "https://openrouter.ai/keys",
-    },
     "gemini": {
         "nombre": "Google Gemini",
         "tipo": "free-tier",
@@ -96,16 +80,12 @@ def listar_proveedores(
     primary = (cfg.primary_ai or "anthropic").lower()
 
     estado: list[dict] = []
-    for clave in ["anthropic", "openrouter", "gemini", "groq"]:
+    for clave in ["anthropic", "gemini", "groq"]:
         info = dict(PROVEEDORES_INFO[clave])
         if clave == "anthropic":
             info["api_key_configurada"] = bool(cfg.anthropic_api_key)
             info["modelo_actual"] = cfg.anthropic_model
             info["api_key_prefix"] = cfg.anthropic_api_key[:10] if cfg.anthropic_api_key else ""
-        elif clave == "openrouter":
-            info["api_key_configurada"] = bool(cfg.openrouter_api_key)
-            info["modelo_actual"] = cfg.openrouter_model
-            info["api_key_prefix"] = cfg.openrouter_api_key[:10] if cfg.openrouter_api_key else ""
         elif clave == "gemini":
             info["api_key_configurada"] = bool(cfg.gemini_api_key)
             info["modelo_actual"] = cfg.gemini_model
@@ -128,14 +108,10 @@ def listar_proveedores(
 def _calcular_fallback_chain(cfg, primary: str) -> list[str]:
     """Construye la cadena real de fallback que usa GlosaService.
 
-    Espejo de la logica en glosa_service.py `_llamar_ia_con_fallback`.
-    OpenRouter (DeepSeek) entra como #1 en cadenas no-OpenRouter porque
-    es 30x mas barato que Anthropic con calidad similar.
+    Espejo de la logica en glosa_service.py `_llamar_ia`.
     """
     chain = []
     disponibles = []
-    if cfg.openrouter_api_key:
-        disponibles.append("openrouter")
     if cfg.anthropic_api_key:
         disponibles.append("anthropic")
     if cfg.gemini_api_key:
@@ -145,8 +121,8 @@ def _calcular_fallback_chain(cfg, primary: str) -> list[str]:
 
     if primary in disponibles:
         chain.append(primary)
-    # Orden de preferencia para fallbacks: OpenRouter > Anthropic > Gemini > Groq
-    for prov in ("openrouter", "anthropic", "gemini", "groq"):
+    # Orden de preferencia para fallbacks: Anthropic > Gemini > Groq
+    for prov in ("anthropic", "gemini", "groq"):
         if prov in disponibles and prov not in chain:
             chain.append(prov)
     return chain
@@ -233,29 +209,8 @@ async def health_check(
         except Exception as e:
             return {"ok": False, "error": str(e)[:200]}
 
-    async def _ping_openrouter():
-        if not cfg.openrouter_api_key:
-            return {"ok": False, "error": "sin API key"}
-        from app.services.openrouter_service import OpenRouterService
-
-        ors = OpenRouterService(
-            api_key=cfg.openrouter_api_key,
-            default_model=cfg.openrouter_model,
-        )
-        import time
-
-        t0 = time.time()
-        try:
-            res = await ors.health_check()
-            ms = int((time.time() - t0) * 1000)
-            res["latency_ms"] = ms
-            return res
-        except Exception as e:
-            return {"ok": False, "error": str(e)[:150]}
-
     pings = await asyncio.gather(
         _ping_anthropic(),
-        _ping_openrouter(),
         _ping_gemini(),
         _ping_groq(),
         return_exceptions=True,
@@ -263,14 +218,11 @@ async def health_check(
     resultados["anthropic"] = (
         pings[0] if not isinstance(pings[0], Exception) else {"ok": False, "error": str(pings[0])}
     )
-    resultados["openrouter"] = (
+    resultados["gemini"] = (
         pings[1] if not isinstance(pings[1], Exception) else {"ok": False, "error": str(pings[1])}
     )
-    resultados["gemini"] = (
-        pings[2] if not isinstance(pings[2], Exception) else {"ok": False, "error": str(pings[2])}
-    )
     resultados["groq"] = (
-        pings[3] if not isinstance(pings[3], Exception) else {"ok": False, "error": str(pings[3])}
+        pings[2] if not isinstance(pings[2], Exception) else {"ok": False, "error": str(pings[2])}
     )
 
     todos_ok = all(r.get("ok") for r in resultados.values())

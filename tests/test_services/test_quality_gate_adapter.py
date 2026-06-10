@@ -20,7 +20,6 @@ class _SpyService:
     anthropic_model = "claude-sonnet-4-5"
     groq = "client"
     gemini = None
-    openrouter = None
 
     def __init__(self, respuestas=None):
         self.llamadas = []
