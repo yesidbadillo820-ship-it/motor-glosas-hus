@@ -47,6 +47,7 @@ def clasificar_complejidad(
     es_extemporanea: bool = False,
     eps_familia_critica: bool = False,
     tiene_soportes_pdf: bool = False,
+    codigo_glosa: str = "",
 ) -> Complejidad:
     """Clasifica la glosa por dificultad esperada."""
     # Reglas para COMPLEJA (cualquiera dispara)
@@ -60,6 +61,19 @@ def clasificar_complejidad(
     # Multi-código en el texto
     codigos = re.findall(r"\b(?:TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", texto_glosa.upper())
     if len(set(codigos)) >= 2:
+        return "COMPLEJA"
+
+    # Texto libre (sin código AA#### ni en el texto ni como parámetro):
+    # la familia se infiere por keywords con fallback genérico y no hay
+    # plantilla exacta que guíe al modelo — el caso más difícil, no el
+    # más fácil. Evaluación de estrés 10-jun-2026: las 5 glosas de texto
+    # libre que cayeron a Groq promediaron 2.2/10 (cláusulas fabricadas,
+    # enumeraciones rotas) vs 7.7/10 de las que tomó Claude.
+    codigo_param = (codigo_glosa or "").strip().upper()
+    codigo_param_valido = bool(
+        re.fullmatch(r"(?:TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}", codigo_param)
+    )
+    if texto_glosa and not codigos and not codigo_param_valido:
         return "COMPLEJA"
 
     if len(texto_glosa) > 800:
@@ -141,14 +155,37 @@ def enrutar(
     es_extemporanea: bool = False,
     tiene_soportes_pdf: bool = False,
     proveedores_disponibles: set[str] | None = None,
+    codigo_glosa: str = "",
 ) -> DecisionRouter:
     """Clasificación + selección en un solo paso."""
-    # EPS críticas (régimen especial — más sensibles a errores legales)
+    # EPS críticas (régimen especial — más sensibles a errores legales).
+    # Auditoría 10-jun-2026 P1-5: la lista no incluía la sanidad militar/
+    # policial (DISPENSARIO/DIGSA/DMBUG) — el contrato 440-DIGSA/DMBUG-2025
+    # con cláusulas reales cargadas se enrutaba a Groq, que fabricó
+    # "cláusula 12" inexistente. Todo régimen especial es crítico.
     eps_critica = bool(
         eps
         and any(
             crit in eps.upper()
-            for crit in ("FOMAG", "PPL", "POLICIA", "FAMISANAR", "POSITIVA", "SUMIMEDICAL")
+            for crit in (
+                "FOMAG",
+                "PPL",
+                "POLICIA",
+                "POLICÍA",
+                "FAMISANAR",
+                "POSITIVA",
+                "SUMIMEDICAL",
+                "DISPENSARIO",
+                "DIGSA",
+                "DMBUG",
+                "SANIDAD",
+                "MILITAR",
+                "EJERCITO",
+                "EJÉRCITO",
+                "ARMADA NACIONAL",
+                "FUERZA AEREA",
+                "FUERZA AÉREA",
+            )
         )
     )
     comp = clasificar_complejidad(
@@ -158,5 +195,6 @@ def enrutar(
         es_extemporanea=es_extemporanea,
         eps_familia_critica=eps_critica,
         tiene_soportes_pdf=tiene_soportes_pdf,
+        codigo_glosa=codigo_glosa,
     )
     return elegir_modelo(comp, proveedores_disponibles=proveedores_disponibles)
