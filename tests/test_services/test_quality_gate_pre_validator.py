@@ -52,6 +52,24 @@ class TestCodigoGlosa:
         assert not res.ok
         assert res.razon  # debe tener razón explicada
 
+    @pytest.mark.parametrize(
+        "placeholder", ["N/A", "NA", "-", "—", "?", "SIN CODIGO", "SIN CÓDIGO"]
+    )
+    def test_placeholders_de_codigo_ausente_dan_mensaje_amigable(self, placeholder):
+        # Regresión 10-jun-2026: el gestor pegaba un motivo legítimo sin
+        # código ("Se evidencia cobro duplicado mediante fragmentación de
+        # procedimientos.") y _extraer_codigos_glosa devolvía []. El caller
+        # pasaba "N/A" al pre-validator, que mostraba "Código 'N/A' no
+        # tiene formato válido (debe ser AA####)" — mensaje confuso.
+        # Ahora cualquier placeholder ("N/A", "-", ...) dispara el mensaje
+        # de "Falta el código" con sugerencia accionable.
+        res, _, _ = check_codigo_glosa(placeholder)
+        assert not res.ok
+        assert "no detect" in res.razon.lower() or "falta" in res.razon.lower()
+        assert "agrega" in res.sugerencia.lower() or "incluye" in res.sugerencia.lower()
+        # NO debe filtrar el placeholder al mensaje
+        assert placeholder.upper() not in res.razon
+
 
 class TestEps:
     def test_eps_conocida(self):
