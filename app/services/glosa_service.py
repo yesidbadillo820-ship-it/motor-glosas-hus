@@ -1028,21 +1028,31 @@ class GlosaService:
         groq_model: str = "llama-3.3-70b-versatile",
         gemini_api_key: str = None,
         gemini_model: str = "gemini-2.0-flash",
-        openrouter_api_key: str = None,
-        openrouter_model: str = "deepseek/deepseek-chat",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
         self.anthropic_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY", "")
-        # Default Anthropic-first (mayo 2026): Sonnet/Haiku 4.x da la
-        # mejor calidad legal en español. OpenRouter (DeepSeek) toma el
-        # slot de fallback #1 que antes tenia Gemini — calidad similar
-        # a Sonnet a 5% del costo. Gemini queda como #2 cuando hay
-        # contexto enorme (1M tokens) y Groq Llama de ultimo recurso.
+        # Jun-2026 (decisión Yesid): la cadena de DICTÁMENES queda en SOLO
+        # Groq (primario, gratis/rápido) + Anthropic (calidad / casos
+        # complejos). Gemini y OpenRouter salieron del dictamen — "no las
+        # veo trabajando y de pago ya tenemos Claude". Si llega un
+        # primary_ai legacy ("gemini"/"openrouter", p.ej. un secret viejo
+        # de Fly), se normaliza a "groq" para no dejar el motor sin
+        # proveedor primario válido.
         self.primary_ai = (primary_ai or "anthropic").lower()
+        if self.primary_ai in ("gemini", "openrouter"):
+            logger.warning(
+                f"[IA] primary_ai={self.primary_ai!r} ya no genera dictámenes "
+                "(proveedor retirado jun-2026). Normalizando a 'groq'."
+            )
+            self.primary_ai = "groq"
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
         self.groq_model = groq_model or "llama-3.3-70b-versatile"
-        # Tercer proveedor: Google Gemini (tier gratis generoso)
+        # Google Gemini se conserva ÚNICAMENTE para lectura de PDFs
+        # escaneados: OCR (pdf_service.extraer_con_ocr) y la cadena
+        # multimodal del pdf_fallback_patch (A=Anthropic → B=Gemini PDF →
+        # C=Gemini Vision). NO participa en la generación de dictámenes
+        # vía _llamar_ia.
         from app.services.gemini_service import GeminiService
 
         gem_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
@@ -1050,14 +1060,6 @@ class GlosaService:
             GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
         )
         self.gemini_model = gemini_model
-        # Cuarto proveedor: OpenRouter (meta-router → DeepSeek/Llama/etc)
-        from app.services.openrouter_service import OpenRouterService
-
-        or_key = openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
-        self.openrouter = (
-            OpenRouterService(api_key=or_key, default_model=openrouter_model) if or_key else None
-        )
-        self.openrouter_model = openrouter_model
 
     async def analizar(
         self,
@@ -1711,11 +1713,11 @@ class GlosaService:
             #    OPUS   — alta complejidad: valor>=10M + 2+ PDFs.
             #
             #  IMPORTANTE: el ruteo SOLO aplica cuando primary_ai usa
-            #  Anthropic. Si el usuario eligió 'groq' o 'gemini' como
-            #  primary_ai, NO debemos forzar Anthropic — eso ignora la
-            #  decisión deliberada (etapa testing, ahorrar tokens).
+            #  Anthropic. Si el usuario eligió 'groq' como primary_ai,
+            #  NO debemos forzar Anthropic — eso ignora la decisión
+            #  deliberada (etapa testing, ahorrar tokens).
             _modelo_override = None
-            _saltar_routing = self.primary_ai in ("groq", "gemini")
+            _saltar_routing = self.primary_ai == "groq"
             try:
                 if _saltar_routing:
                     logger.info(
@@ -1872,18 +1874,23 @@ class GlosaService:
                 # romper el análisis para el usuario final.
                 _intento_ok = False
 
-                # Path 1: Multi-modal soportes con cadena de fallback que
-                # PRESERVA los PDFs en cada nivel (Anthropic → Gemini PDF →
-                # Gemini Vision con imagenes). Critico: si Anthropic falla,
-                # NO descartamos los PDFs cayendo a texto plano — los pasamos
-                # a Gemini que tambien lee PDFs nativos. Si el modelo Gemini
-                # no soporta PDF nativo (lite), convertimos a imagenes.
+                # Path 1: Multi-modal soportes. La cadena de fallback que
+                # PRESERVA los PDFs en cada nivel vive en
+                # pdf_fallback_patch.py (parche aplicado al cargar los
+                # routers): A=Anthropic PDF nativo → B=Gemini PDF nativo →
+                # C=Gemini Vision con imágenes. Ese es el ÚNICO lugar donde
+                # Gemini sigue tocando el dictamen — como lector de PDFs
+                # escaneados cuando Anthropic falla (decisión jun-2026:
+                # Gemini fuera del dictamen de texto; los duplicados B/C
+                # inline que vivían aquí se eliminaron porque el parche ya
+                # hacía la misma cadena y se reintentaba Gemini dos veces).
+                # Si la cadena completa falla, caemos a los paths de texto
+                # (Tool Use / clásico) con el contexto OCR ya extraído.
                 _quiere_multimodal = (
                     bool(getattr(data, "usar_pdf_nativo_soportes", False))
                     and pdfs_raw_para_multimodal
                 )
                 if _quiere_multimodal:
-                    # Intento A: Anthropic Claude con PDF nativo
                     try:
                         res_ia, modelo_usado = await self._llamar_anthropic_multimodal(
                             system_prompt,
@@ -1893,55 +1900,8 @@ class GlosaService:
                         _intento_ok = True
                     except Exception as _e_mm:
                         logger.warning(
-                            f"[MULTIMODAL-A] Anthropic fallo: {_e_mm}. Probando Gemini PDF nativo."
+                            f"[MULTIMODAL] Cadena PDF agotada: {_e_mm}. Cae a texto plano."
                         )
-
-                    # Intento B: Gemini con PDF nativo (gratis)
-                    if not _intento_ok and self.gemini:
-                        try:
-                            res_ia, modelo_usado = await self.gemini.completar_con_retry(
-                                system=system_prompt,
-                                user=user_prompt,
-                                modelo=self.gemini_model,
-                                temperature=0.2,
-                                max_tokens=3000,
-                                pdfs_raw=pdfs_raw_para_multimodal,
-                            )
-                            _intento_ok = True
-                            logger.info(f"[MULTIMODAL-B] Gemini PDF nativo OK ({modelo_usado})")
-                        except Exception as _e_gp:
-                            logger.warning(
-                                f"[MULTIMODAL-B] Gemini PDF nativo fallo: {_e_gp}. Probando Vision con imagenes."
-                            )
-
-                    # Intento C: Gemini Vision con PDFs convertidos a imagenes
-                    if not _intento_ok and self.gemini:
-                        try:
-                            from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
-
-                            imagenes = pdfs_a_imagenes_combinadas(
-                                pdfs_raw_para_multimodal,
-                                max_imagenes_total=20,
-                                dpi=130,
-                            )
-                            if imagenes:
-                                res_ia, modelo_usado = await self.gemini.completar_con_retry(
-                                    system=system_prompt,
-                                    user=user_prompt,
-                                    modelo=self.gemini_model,
-                                    temperature=0.2,
-                                    max_tokens=3000,
-                                    imagenes_raw=imagenes,
-                                )
-                                _intento_ok = True
-                                logger.info(
-                                    f"[MULTIMODAL-C] Gemini Vision OK ({modelo_usado}) "
-                                    f"con {len(imagenes)} imgs (de {len(pdfs_raw_para_multimodal)} PDFs)"
-                                )
-                        except Exception as _e_gi:
-                            logger.warning(
-                                f"[MULTIMODAL-C] Gemini Vision fallo: {_e_gi}. Cae a texto plano."
-                            )
 
                 # Path 2: Tool Use opt-in vía env var
                 if not _intento_ok:
@@ -1984,8 +1944,6 @@ class GlosaService:
                                 for p, k in [
                                     ("anthropic", self.anthropic_key),
                                     ("groq", self.groq),
-                                    ("gemini", self.gemini),
-                                    ("openrouter", self.openrouter),
                                 ]
                                 if k
                             }
@@ -2480,9 +2438,9 @@ class GlosaService:
             # AUTO-CRÍTICA: valida el borrador y pide corrección si es pobre.
             # Solo aplica en modo normal (no auditoria_previa, no texto-fijo).
             # Se limita a 1 iteración para no aumentar latencia >2x.
-            # Funciona con cualquier proveedor (Anthropic/Groq/Gemini/OpenRouter)
-            # via _llamar_ia que respeta primary_ai + fallbacks.
-            _hay_proveedor = bool(self.anthropic_key or self.groq or self.gemini or self.openrouter)
+            # Funciona con cualquier proveedor de dictámenes (Anthropic/
+            # Groq) via _llamar_ia que respeta primary_ai + fallback.
+            _hay_proveedor = bool(self.anthropic_key or self.groq)
             if modo_resp != "auditoria_previa" and _hay_proveedor:
                 try:
                     from app.services.validador_dictamen import evaluar_dictamen
@@ -2520,7 +2478,7 @@ class GlosaService:
                             "el dictamen mejorado dentro de <argumento>...</argumento>."
                         )
                         try:
-                            # Usa el proveedor primary_ai (Groq/Gemini/Anthropic) con su
+                            # Usa el proveedor primary_ai (Groq/Anthropic) con su
                             # cadena de fallbacks. Temperature 0.05 solo se aplica si el
                             # proveedor es Anthropic; los demás usan su default (0.2).
                             # bypass_cache=True para no servir el mismo dictamen defectuoso
@@ -3595,46 +3553,6 @@ class GlosaService:
         out = out.upper()
         return _expandir_abreviaturas_tipo(out)
 
-    async def _llamar_gemini_con_retry(
-        self, system: str, user: str, max_intentos: int = 3
-    ) -> tuple[str, str]:
-        """Llama a Gemini con retry. Tier free 15 RPM en Flash 2.0,
-        2 RPM en Pro 1.5. El service maneja retry interno con
-        exponential backoff cuando hits 429/503/504."""
-        if not self.gemini:
-            raise RuntimeError("Gemini no configurado (GEMINI_API_KEY)")
-        return await self.gemini.completar_con_retry(
-            system=system,
-            user=user,
-            modelo=self.gemini_model,
-            temperature=0.2,
-            max_tokens=3000,
-            max_intentos=max_intentos,
-        )
-
-    async def _llamar_openrouter_con_retry(
-        self, system: str, user: str, max_intentos: int = 3
-    ) -> tuple[str, str]:
-        """Llama a OpenRouter (default DeepSeek V3) con retry. Si el
-        modelo principal del sender falla, OpenRouter cae solo al
-        fallback gratis (Llama 3.3 70B) sin que tengamos que reintentar
-        manualmente — ese fallback lo configuramos con `fallbacks=[]`.
-        """
-        if not self.openrouter:
-            raise RuntimeError("OpenRouter no configurado (OPENROUTER_API_KEY)")
-        return await self.openrouter.completar_con_retry(
-            system=system,
-            user=user,
-            modelo=self.openrouter_model,
-            temperature=0.2,
-            max_tokens=3000,
-            max_intentos=max_intentos,
-            # Fallback dentro del propio OpenRouter: si DeepSeek se cae
-            # en su servidor, automaticamente prueba Llama 70B gratis
-            # antes de devolver error a nuestro lado.
-            fallbacks=["meta-llama/llama-3.3-70b-instruct:free"],
-        )
-
     async def _llamar_groq_con_retry(
         self, system: str, user: str, max_intentos: int = 4
     ) -> tuple[str, str]:
@@ -4112,7 +4030,7 @@ class GlosaService:
 
         logger.info(f"IA: {len(system)} + {len(user)} chars primary={self.primary_ai}")
 
-        if not self.groq and not self.anthropic_key and not self.gemini and not self.openrouter:
+        if not self.groq and not self.anthropic_key:
             return (
                 "<paciente>ERROR</paciente><argumento>API key no configurada</argumento>",
                 "error",
@@ -4120,23 +4038,17 @@ class GlosaService:
 
         # Orden de intento segun primary_ai configurado por el usuario.
         # RESPETAMOS la decision del usuario: si dice 'groq', va groq primero
-        # (etapa de testing donde no quiere gastar tokens pagos). Solo si
-        # tecnicamente falla (timeout, error, rate limit), cae al fallback.
+        # (no gastar tokens pagos). Solo si tecnicamente falla (timeout,
+        # error, rate limit), cae al fallback.
         #
-        # OpenRouter (DeepSeek) entra como FALLBACK #1 en todas las
-        # cadenas no-OpenRouter porque: (a) calidad cercana a Sonnet,
-        # (b) costo 30x menor que Anthropic, (c) tier gratis incluido
-        # via Llama 70B fallback interno. Reemplaza a Gemini en el
-        # slot prioritario porque Gemini agota free tier en lotes
-        # grandes (15 RPM / 1500 RPD vs OpenRouter mucho mas tolerante).
+        # Jun-2026 (decision Yesid): la cadena de dictamenes es SOLO
+        # Groq + Anthropic. Gemini quedo exclusivamente como lector de
+        # PDFs escaneados (pdf_service + pdf_fallback_patch) y NO entra
+        # aqui; OpenRouter salio del proyecto.
         def _agregar_fallbacks(intentos: list, ya_incluido: str) -> None:
             """Agrega los proveedores restantes en orden de preferencia."""
-            if ya_incluido != "openrouter" and self.openrouter:
-                intentos.append(("openrouter", self._llamar_openrouter_con_retry))
             if ya_incluido != "anthropic" and self.anthropic_key:
                 intentos.append(("anthropic", self._llamar_anthropic))
-            if ya_incluido != "gemini" and self.gemini:
-                intentos.append(("gemini", self._llamar_gemini_con_retry))
             if ya_incluido != "groq" and self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
 
@@ -4147,31 +4059,19 @@ class GlosaService:
         elif self.primary_ai == "anthropic" and self.anthropic_key:
             intentos = [("anthropic", self._llamar_anthropic)]
             _agregar_fallbacks(intentos, "anthropic")
-        elif self.primary_ai == "openrouter" and self.openrouter:
-            intentos = [("openrouter", self._llamar_openrouter_con_retry)]
-            _agregar_fallbacks(intentos, "openrouter")
-        elif self.primary_ai == "gemini" and self.gemini:
-            intentos = [("gemini", self._llamar_gemini_con_retry)]
-            _agregar_fallbacks(intentos, "gemini")
         elif self.primary_ai == "groq" and self.groq:
             # USUARIO ELIGIO GROQ — respetar (no gastar tokens pagos).
-            # Fallback: gratis primero (OpenRouter free + Gemini),
-            # despues pago (Anthropic).
+            # Fallback: Anthropic (calidad) despues.
             intentos = [("groq", self._llamar_groq_con_retry)]
             _agregar_fallbacks(intentos, "groq")
         else:
-            # primary_ai desconocido o sin proveedor disponible para el primary
-            # elegido. Estrategia balanceada: OpenRouter (DeepSeek, barato y
-            # bueno) -> Anthropic (top calidad) -> Gemini (1M ctx) -> Groq.
+            # primary_ai desconocido o sin proveedor disponible para el
+            # primary elegido: Groq (gratis/rapido) -> Anthropic (calidad).
             intentos = []
-            if self.openrouter:
-                intentos.append(("openrouter", self._llamar_openrouter_con_retry))
-            if self.anthropic_key:
-                intentos.append(("anthropic", self._llamar_anthropic))
-            if self.gemini:
-                intentos.append(("gemini", self._llamar_gemini_con_retry))
             if self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
+            if self.anthropic_key:
+                intentos.append(("anthropic", self._llamar_anthropic))
 
         ultimo_error: Exception = RuntimeError("Sin proveedores IA disponibles")
         for nombre, fn in intentos:

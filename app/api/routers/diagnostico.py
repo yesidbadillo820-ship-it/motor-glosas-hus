@@ -264,12 +264,19 @@ def diagnostico_completo(
             },
         }
 
-    # ─── Gemini API key + ping (tercer proveedor, free tier) ────────
+    # ─── Gemini API key + ping (SOLO OCR de PDFs escaneados) ────────
+    # Jun-2026: Gemini ya no genera dictámenes — quedó como fallback de
+    # lectura de PDFs (pdf_service + pdf_fallback_patch). Sin esta key,
+    # todo el OCR de escaneados cae sobre Anthropic (quema créditos).
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     if not gemini_key:
         out["secciones"]["gemini"] = {
             "estado": "warning",
-            "mensaje": "GEMINI_API_KEY no configurada — agrega clave en aistudio.google.com/apikey (15 RPM gratis)",
+            "mensaje": (
+                "GEMINI_API_KEY no configurada — sin ella el OCR de PDFs "
+                "escaneados depende 100% de Anthropic (gasta créditos de "
+                "Claude). Agrega clave en aistudio.google.com/apikey (gratis)."
+            ),
             "data": {},
         }
     else:
@@ -312,74 +319,8 @@ def diagnostico_completo(
             "data": {
                 "modelo": gemini_modelo,
                 "key_prefix": gemini_key[:10],
+                "rol": "solo OCR de PDFs escaneados (no genera dictámenes)",
                 "free_tier_info": "15 RPM / 1500 RPD para Flash · 2 RPM / 50 RPD para Pro",
-            },
-        }
-
-    # ─── OpenRouter API key + ping (cuarto proveedor — DeepSeek/Llama) ─
-    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
-    if not openrouter_key:
-        out["secciones"]["openrouter"] = {
-            "estado": "warning",
-            "mensaje": (
-                "OPENROUTER_API_KEY no configurada — recomendado para tener "
-                "DeepSeek V3 como fallback barato (30× mas que Sonnet). "
-                "Conseguir en openrouter.ai/keys (~$5 = miles de queries)."
-            ),
-            "data": {},
-        }
-    else:
-        openrouter_modelo = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
-
-        def _do_ping_openrouter():
-            try:
-                import httpx as _httpx_or
-
-                with _httpx_or.Client(timeout=10.0) as client:
-                    r_or = client.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {openrouter_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://motor-glosas-hus.fly.dev",
-                            "X-Title": "Motor Glosas HUS",
-                        },
-                        json={
-                            "model": openrouter_modelo,
-                            "messages": [{"role": "user", "content": "ping"}],
-                            "max_tokens": 3,
-                            "temperature": 0,
-                        },
-                    )
-                if r_or.status_code == 200:
-                    return (
-                        "ok",
-                        f"API key OK · ping {openrouter_modelo} exitoso · {openrouter_key[:10]}…",
-                        {},
-                    )
-                if r_or.status_code in (401, 403):
-                    return "error", f"API key INVALIDA o sin permisos (HTTP {r_or.status_code})", {}
-                if r_or.status_code == 429:
-                    return (
-                        "warning",
-                        "Rate limit hit — esperar 60s o agregar credito en openrouter.ai/credits",
-                        {},
-                    )
-                if r_or.status_code == 402:
-                    return "error", "Sin credito — agregar fondos en openrouter.ai/credits", {}
-                return "warning", f"Ping HTTP {r_or.status_code}: {r_or.text[:120]}", {}
-            except Exception as _eor:
-                return "warning", f"No se pudo hacer ping: {str(_eor)[:120]}", {}
-
-        cache_key = f"openrouter::{openrouter_modelo}::{openrouter_key[:6]}"
-        ping_estado, ping_msg, _ = _ping_cached(cache_key, _do_ping_openrouter)
-        out["secciones"]["openrouter"] = {
-            "estado": ping_estado,
-            "mensaje": ping_msg,
-            "data": {
-                "modelo": openrouter_modelo,
-                "key_prefix": openrouter_key[:10],
-                "rol": "Fallback #1 (DeepSeek V3, ~30× mas barato que Sonnet)",
             },
         }
 

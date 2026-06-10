@@ -1,9 +1,9 @@
 """IA Router — selecciona el modelo óptimo para cada caso.
 
-Cada modelo tiene fortalezas:
-  - Claude Sonnet 4.5: razonamiento jurídico complejo, redacción formal
-  - Gemini 2.0 Flash: extracción multimodal de PDFs, clasificación rápida
-  - Groq Llama 3.3: velocidad masiva, batches
+Proveedores de DICTAMEN (jun-2026, decisión Yesid — Gemini y OpenRouter
+retirados del dictamen; Gemini quedó solo como OCR de PDFs escaneados):
+  - Claude Sonnet 4.x: razonamiento jurídico complejo, redacción formal
+  - Groq Llama 3.3: velocidad masiva, batches (primario)
 
 Esta función decide cuál usar según la complejidad de la glosa.
 
@@ -32,7 +32,7 @@ Complejidad = Literal["SIMPLE", "MEDIA", "COMPLEJA"]
 @dataclass
 class DecisionRouter:
     complejidad: Complejidad
-    modelo_recomendado: str  # "groq", "anthropic", "gemini"
+    modelo_recomendado: str  # "groq" | "anthropic"
     modelos_fallback: list[str]
     razon: str
     tiempo_max_esperado_s: int  # estimación para frontend SSE
@@ -81,18 +81,22 @@ def elegir_modelo(
 
     Args:
         complejidad: SIMPLE | MEDIA | COMPLEJA
-        proveedores_disponibles: set de "groq"/"anthropic"/"gemini". Si None,
-            asume todos disponibles.
+        proveedores_disponibles: set de "groq"/"anthropic". Si None, asume
+            ambos disponibles. Proveedores retirados del dictamen
+            ("gemini"/"openrouter") se ignoran aunque el caller los pase.
 
     Returns:
         DecisionRouter con .modelo_recomendado, .modelos_fallback, .razon, etc.
     """
-    disponibles = proveedores_disponibles or {"groq", "anthropic", "gemini"}
+    # Filtro duro: el dictamen solo puede salir de Groq o Anthropic
+    # (jun-2026). Si un caller legacy pasa "gemini"/"openrouter", se
+    # descartan en silencio.
+    disponibles = (proveedores_disponibles or {"groq", "anthropic"}) & {"groq", "anthropic"}
 
     if complejidad == "COMPLEJA":
         # Anthropic es mejor en razonamiento legal complejo
         preferido = "anthropic" if "anthropic" in disponibles else "groq"
-        fallback = [m for m in ["groq", "gemini"] if m in disponibles and m != preferido]
+        fallback = [m for m in ["groq"] if m in disponibles and m != preferido]
         return DecisionRouter(
             complejidad="COMPLEJA",
             modelo_recomendado=preferido,
@@ -105,7 +109,7 @@ def elegir_modelo(
     if complejidad == "SIMPLE":
         # Groq es 5-10x más rápido que los demás y para glosas simples es suficiente
         preferido = "groq" if "groq" in disponibles else "anthropic"
-        fallback = [m for m in ["anthropic", "gemini"] if m in disponibles and m != preferido]
+        fallback = [m for m in ["anthropic"] if m in disponibles and m != preferido]
         return DecisionRouter(
             complejidad="SIMPLE",
             modelo_recomendado=preferido,
@@ -117,7 +121,7 @@ def elegir_modelo(
 
     # MEDIA (default)
     preferido = "groq" if "groq" in disponibles else "anthropic"
-    fallback = [m for m in ["anthropic", "gemini"] if m in disponibles and m != preferido]
+    fallback = [m for m in ["anthropic"] if m in disponibles and m != preferido]
     return DecisionRouter(
         complejidad="MEDIA",
         modelo_recomendado=preferido,

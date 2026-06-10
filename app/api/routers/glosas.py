@@ -1194,8 +1194,6 @@ async def generar_lote(
         groq_model=cfg.groq_model,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
     sem = asyncio.Semaphore(5)
@@ -1388,8 +1386,6 @@ async def refinar_dictamen_endpoint(
         groq_model=cfg.groq_model,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
     nuevo_argumento = await service.refinar_dictamen(
         dictamen_actual_html=glosa.dictamen,
@@ -1500,8 +1496,6 @@ async def validar_pre_radicacion(
         groq_model=cfg.groq_model,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
     # Calcular días hábiles si hay fechas
@@ -4186,8 +4180,6 @@ async def _procesar_fila_en_background(
             groq_model=cfg.groq_model,
             gemini_api_key=cfg.gemini_api_key,
             gemini_model=cfg.gemini_model,
-            openrouter_api_key=cfg.openrouter_api_key,
-            openrouter_model=cfg.openrouter_model,
         )
 
         from app.models.schemas import GlosaInput
@@ -5616,8 +5608,6 @@ async def reanalizar_glosa(
         groq_model=cfg.groq_model,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
     contrato_repo = ContratoRepository(db)
