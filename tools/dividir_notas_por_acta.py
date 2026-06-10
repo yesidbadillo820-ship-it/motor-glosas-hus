@@ -39,12 +39,13 @@ def _norm(s: str) -> str:
     return " ".join(s.split())
 
 
-# Alias tolerantes para cada columna (ya normalizados).
+# Alias por columna, EN ORDEN DE PREFERENCIA (ya normalizados). Para 'factura'
+# preferimos la columna con el HUS completo antes que el número pelado.
 ALIAS = {
-    "acta": {"ACTA", "NUMERO ACTA", "ACTA CONCILIACION", "N ACTA"},
-    "factura": {"FACTURA", "NUMERO FACTURA", "NUM FACTURA", "FACTURA HUS"},
-    "nota": {"NOTA ELECTRONICA", "NOTA ELECTRONICA NE", "NE", "NOTA CREDITO",
-             "NOTAS CREDITO", "NOTA ELECTRONICA NUMERO"},
+    "acta": ["ACTA", "NUMERO ACTA", "ACTA CONCILIACION", "N ACTA"],
+    "factura": ["FACTURA HUS", "FACTURA", "NUMERO FACTURA", "NUM FACTURA"],
+    "nota": ["NOTA ELECTRONICA", "NE", "NOTA CREDITO", "NOTAS CREDITO",
+             "NOTA ELECTRONICA NUMERO"],
 }
 
 
@@ -52,13 +53,13 @@ def _idx_columnas(headers: list[str]) -> dict[str, int]:
     norm = [_norm(h) for h in headers]
     idx: dict[str, int] = {}
     for clave, opciones in ALIAS.items():
-        for i, h in enumerate(norm):
-            if h in opciones:
-                idx[clave] = i
+        for opt in opciones:  # respeta el orden de preferencia
+            if opt in norm:
+                idx[clave] = norm.index(opt)
                 break
-        if clave not in idx:
+        if clave not in idx and clave != "acta":
             raise ValueError(
-                f"No encontré la columna '{clave}'. Acepté {sorted(opciones)}. "
+                f"No encontré la columna '{clave}'. Acepté {opciones}. "
                 f"Headers: {headers}"
             )
     return idx
@@ -89,29 +90,32 @@ def main() -> int:
         logger.error("Excel vacío.")
         return 1
     idx = _idx_columnas([str(h or "") for h in rows[0]])
+    idx_acta = idx.get("acta")  # puede no existir; las sin ACTA van a SIMED
 
     acta_correo = _norm(args.acta_correo)
-    correo: list[tuple[str, str]] = []  # (nota, factura)
+    correo: list[tuple[str, str]] = []   # (nota, factura)
     simed: list[tuple[str, str, str]] = []  # (acta, nota, factura)
-    sin_nota = 0
+    sin_nota: list[str] = []  # facturas sin NOTA ELECTRONICA (no procesables)
     por_acta: dict[str, int] = defaultdict(int)
 
     for r in rows[1:]:
         if r is None:
             continue
-        acta = str(r[idx["acta"]] or "").strip()
-        if not acta:
-            continue
+        acta = str(r[idx_acta] or "").strip() if idx_acta is not None else ""
         nota = str(r[idx["nota"]] or "").strip()
         factura = str(r[idx["factura"]] or "").strip()
-        if not nota:
-            sin_nota += 1
+        # Saltar fila de total/resumen (sin factura y sin nota).
+        if not factura and not nota:
             continue
-        por_acta[acta] += 1
-        if _norm(acta) == acta_correo:
+        if not nota:
+            sin_nota.append(factura or "(sin factura)")
+            continue
+        por_acta[acta or "(SIN ACTA)"] += 1
+        if acta and _norm(acta) == acta_correo:
             correo.append((nota, factura))
         else:
-            simed.append((acta, nota, factura))
+            # ACTA en blanco u otra acta → van por SIMED.
+            simed.append((acta or "SIN_ACTA", nota, factura))
 
     args.salida.mkdir(parents=True, exist_ok=True)
 
@@ -131,11 +135,23 @@ def main() -> int:
         for acta, nota, factura in simed:
             w.writerow([nota, factura, acta])
 
+    # Reporte de las que NO se pueden procesar (sin NOTA ELECTRONICA).
+    ruta_sin_ne = args.salida / "notas_sin_nota_electronica.csv"
+    if sin_nota:
+        with ruta_sin_ne.open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["FACTURA HUS (sin nota electronica)"])
+            for fac in sin_nota:
+                w.writerow([fac])
+
     logger.info(f"\nNotas por ACTA: {dict(por_acta)}")
     logger.info(f"\n📧 CORREO (ACTA {args.acta_correo}): {len(correo)} notas → {ruta_correo}")
-    logger.info(f"🖥️  SIMED (resto): {len(simed)} notas → {ruta_simed}")
+    logger.info(f"🖥️  SIMED (blanco + otras actas): {len(simed)} notas → {ruta_simed}")
     if sin_nota:
-        logger.warning(f"⚠ {sin_nota} fila(s) sin NOTA ELECTRONICA (omitidas).")
+        logger.warning(f"\n⚠ {len(sin_nota)} factura(s) SIN nota electrónica (no procesables hasta tener la NE):")
+        for fac in sin_nota:
+            logger.warning(f"     {fac}")
+        logger.warning(f"   Listado en: {ruta_sin_ne}")
     logger.info("\nAmbos CSV usan la columna 'NOTA CREDITO' que lee extraer_notas_credito.py.")
     return 0
 
