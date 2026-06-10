@@ -2722,6 +2722,86 @@ def exportar_paquete_multi_zip(
     )
 
 
+@router.get("/lote/pdf-zip")
+def exportar_pdfs_radicables_zip(
+    ids: str = Query(..., description="IDs CSV, ej '1,2,3' (máx 50)"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """ZIP con el PDF radicable de cada glosa solicitada.
+
+    Complementa /glosas/{id}/dictamen.pdf para radicaciones masivas:
+    un PDF formal por glosa (respuesta_glosa_{factura}_{id}.pdf).
+    Las glosas sin dictamen se omiten y quedan listadas en README.txt.
+
+    Param `ids`: lista CSV de IDs (máx 50 por request — cada PDF se
+    renderiza con reportlab en memoria).
+
+    Declarado ANTES de /{glosa_id} para evitar colisión con el path
+    resolver de FastAPI.
+    """
+    import io
+    import zipfile
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services.dictamen_pdf import generar_pdf_dictamen, nombre_archivo_pdf
+
+    try:
+        ids_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(400, "ids debe ser CSV de enteros")
+
+    if not ids_list:
+        raise HTTPException(400, "ids no puede estar vacío")
+    if len(ids_list) > 50:
+        raise HTTPException(400, "máximo 50 glosas por paquete de PDFs")
+
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids_list)).all()
+    if not glosas:
+        raise HTTPException(404, "Ninguna glosa encontrada")
+
+    encontrados = {g.id for g in glosas}
+    no_encontrados = [i for i in ids_list if i not in encontrados]
+    sin_dictamen: list[int] = []
+    con_pdf: list[str] = []
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for g in glosas:
+            if not (g.dictamen or "").strip():
+                sin_dictamen.append(g.id)
+                continue
+            try:
+                fname = nombre_archivo_pdf(g)
+                zf.writestr(fname, generar_pdf_dictamen(g))
+                con_pdf.append(fname)
+            except Exception as e:
+                logger.warning(f"[pdf-zip] glosa {g.id}: PDF falló: {e}")
+                sin_dictamen.append(g.id)
+        indice = (
+            f"PDFs RADICABLES — RESPUESTA A GLOSA / OBJECIÓN\n"
+            f"Generado: {ahora_utc().isoformat()}\n"
+            f"Por: {current_user.email}\n\n"
+            f"PDFs incluidos ({len(con_pdf)}):\n"
+            + "".join(f"  - {n}\n" for n in con_pdf)
+            + (f"\nGlosas SIN dictamen (omitidas): {sin_dictamen}\n" if sin_dictamen else "")
+            + (f"IDs no encontrados: {no_encontrados}\n" if no_encontrados else "")
+        )
+        zf.writestr("README.txt", indice)
+
+    if not con_pdf:
+        raise HTTPException(404, "Ninguna de las glosas solicitadas tiene dictamen generado")
+
+    buf.seek(0)
+    fname_zip = f"respuestas-glosa-pdf-{ahora_utc().strftime('%Y%m%d-%H%M%S')}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname_zip}"'},
+    )
+
+
 @router.get("/top-antiguas")
 def top_glosas_antiguas(
     top: int = Query(20, ge=1, le=100),
@@ -6010,6 +6090,41 @@ def descargar_dictamen_txt(
     return Response(
         content=payload,
         media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.get("/{glosa_id}/dictamen.pdf")
+def descargar_dictamen_pdf_radicable(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """PDF radicable de la respuesta de glosa (documento formal).
+
+    Varias EPS exigen subir un PDF con la respuesta del hospital para
+    radicar la objeción. Genera el documento formal con encabezado
+    institucional, bloque de datos, dictamen en texto limpio (sin HTML
+    crudo) y espacio de firma/sello. Ver app/services/dictamen_pdf.
+    """
+    from fastapi.responses import StreamingResponse
+
+    from app.services.dictamen_pdf import generar_pdf_dictamen, nombre_archivo_pdf
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not (glosa.dictamen or "").strip():
+        raise HTTPException(
+            404,
+            "La glosa no tiene dictamen generado — genera la respuesta antes de descargar el PDF radicable",
+        )
+
+    pdf_bytes = generar_pdf_dictamen(glosa)
+    fname = nombre_archivo_pdf(glosa)
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 

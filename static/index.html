@@ -12065,6 +12065,11 @@ function _renderMisGlosas(dataRaw){
       var primario = '';
       var menuItems = [];
 
+      // PDF radicable (documento formal para subir al portal de la EPS)
+      if(g.dictamen_generado || yaRespondida){
+        menuItems.push({icon:'📄', label:'PDF respuesta (radicable)', onclick:'descargarPdfRespuesta(' + g.id + ')'});
+      }
+
       if(yaRespondida){
         // Respondida: primario = "Ver" (abre la glosa con el dictamen).
         primario = '<button class="btn-sm btn-primary" onclick="responderGlosa(' + g.id + ')" title="Abrir glosa y ver el dictamen">Ver</button>';
@@ -12713,6 +12718,27 @@ function mostrarConfettiBurst(){
     }
     setTimeout(function(){ if(container.parentNode) container.remove(); }, 1700);
   }catch(_){ /* nunca romper UI por una animación */ }
+}
+
+// PDF radicable: documento formal de la respuesta para subir al portal de la EPS.
+async function descargarPdfRespuesta(id){
+  try{
+    var r = await fetch('/glosas/' + id + '/dictamen.pdf', {headers: authH()});
+    if(!r.ok){
+      var d = {}; try{ d = await r.json(); }catch(_){}
+      toast('Error', d.detail || 'No se pudo generar el PDF ('+r.status+')', 'error');
+      return;
+    }
+    var blob = await r.blob();
+    var cd = r.headers.get('content-disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (m && m[1]) || ('respuesta_glosa_' + id + '.pdf');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    toast('PDF listo', 'Respuesta radicable descargada', 'success');
+  }catch(e){ toast('Error', 'Conexión: ' + e.message, 'error'); }
 }
 
 async function cambiarWorkflow(id, nuevoEstado, etiqueta){
