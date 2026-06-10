@@ -1,7 +1,7 @@
 import re
 import uuid
 from typing import Optional
-from datetime import datetime
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -3498,6 +3498,104 @@ def cambiar_workflow(
         "estado_anterior": actual,
         "estado_nuevo": nuevo,
         "nota_workflow": glosa.nota_workflow,
+    }
+
+
+class MarcarRadicadaInput(BaseModel):
+    """Evidencia de radicación ante la entidad: el número de radicado
+    que asigna la EPS al recibir la objeción + observación opcional
+    (canal usado, nombre del archivo de confirmación, etc.)."""
+
+    numero_radicado: str = Field(..., min_length=1, max_length=50)
+    fecha_radicacion: Optional[date] = None  # default: hoy
+    observacion: Optional[str] = Field(default=None, max_length=2000)
+
+
+@router.post("/{glosa_id}/marcar-radicada")
+def marcar_radicada(
+    glosa_id: int,
+    data: MarcarRadicadaInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Registra la radicación de la respuesta ante la entidad CON
+    evidencia auditable.
+
+    Extiende el botón "Marcar radicada" (que solo movía workflow_state
+    vía PATCH /workflow): además de pasar la glosa a RADICADA, persiste
+    el número de radicado que asignó la EPS, la fecha, quién dejó la
+    constancia y una observación opcional — y escribe la entrada
+    MARCAR_RADICADA en el audit log (visible en /glosas/{id}/timeline).
+
+    Permisos: COORDINADOR/SUPER_ADMIN cualquier glosa; AUDITOR solo las
+    suyas (asignadas a su email o sin asignar). El adjunto con la
+    confirmación de la entidad (screenshot/PDF) queda como follow-up.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    if (
+        current_user.rol == "AUDITOR"
+        and glosa.auditor_email
+        and (glosa.auditor_email != current_user.email)
+    ):
+        raise HTTPException(403, "Esta glosa está asignada a otro gestor")
+
+    numero = data.numero_radicado.strip()
+    if not numero:
+        raise HTTPException(400, "numero_radicado no puede estar vacío")
+
+    radicado_anterior = glosa.numero_radicado
+    workflow_anterior = glosa.workflow_state or "BORRADOR"
+
+    if data.fecha_radicacion:
+        radicado_en = datetime(
+            data.fecha_radicacion.year,
+            data.fecha_radicacion.month,
+            data.fecha_radicacion.day,
+            12,  # mediodía UTC: el .date() es estable en Bogotá (UTC-5)
+            tzinfo=timezone.utc,
+        )
+    else:
+        radicado_en = ahora_utc()
+
+    glosa.numero_radicado = numero[:50]
+    glosa.radicado_en = radicado_en
+    glosa.radicado_por = current_user.email
+    if data.observacion:
+        glosa.radicado_observacion = data.observacion.strip()[:2000]
+    glosa.workflow_state = "RADICADA"
+    db.commit()
+    db.refresh(glosa)
+
+    detalle = f"Radicado N° {numero} ante {glosa.eps or 'entidad'}"
+    if data.fecha_radicacion:
+        detalle += f" el {data.fecha_radicacion.isoformat()}"
+    if data.observacion:
+        detalle += f" | {data.observacion.strip()}"
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="MARCAR_RADICADA",
+        tabla="historial",
+        registro_id=glosa_id,
+        campo="numero_radicado",
+        valor_anterior=radicado_anterior,
+        valor_nuevo=numero,
+        detalle=detalle,
+    )
+    logger.info(f"Glosa {glosa_id} marcada RADICADA (N° {numero}) por {current_user.email}")
+
+    return {
+        "message": "Radicación registrada",
+        "glosa_id": glosa_id,
+        "numero_radicado": glosa.numero_radicado,
+        "radicado_en": glosa.radicado_en.isoformat() if glosa.radicado_en else None,
+        "radicado_por": glosa.radicado_por,
+        "observacion": glosa.radicado_observacion,
+        "workflow_anterior": workflow_anterior,
+        "workflow_state": glosa.workflow_state,
     }
 
 

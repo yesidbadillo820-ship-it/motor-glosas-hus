@@ -84,6 +84,13 @@ class GlosaRecord(Base):
     # si > 20 días hábiles, la EPS glosó fuera de término (Art. 57 Ley 1438/2011).
     dias_radicacion_dgh = Column(Integer, default=0)
 
+    # Evidencia de radicación ante la entidad (POST /glosas/{id}/marcar-radicada).
+    # `numero_radicado` (arriba) guarda el número que asigna la EPS; estos
+    # campos registran CUÁNDO y QUIÉN dejó constancia, para auditoría.
+    radicado_en = Column(DateTime(timezone=True), nullable=True)
+    radicado_por = Column(String(200), nullable=True)
+    radicado_observacion = Column(Text, nullable=True)
+
     # Nota crédito asociada cuando la glosa se acepta (parcial o total).
     # El gestor la captura desde "Mis glosas respondidas".
     numero_nota_credito = Column(String(60), nullable=True, index=True)

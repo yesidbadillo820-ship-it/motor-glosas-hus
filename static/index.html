@@ -12104,7 +12104,7 @@ function _renderMisGlosas(dataRaw){
           menuItems.push({icon:'✓', label:'Aprobar', onclick:'cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')'});
           menuItems.push({icon:'←', label:'Devolver a borrador', onclick:'cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')'});
         } else if(wfEstado === 'APROBADA' && puedeAprobar){
-          menuItems.push({icon:'📤', label:'Marcar radicada', onclick:'cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')'});
+          menuItems.push({icon:'📤', label:'Marcar radicada', onclick:'marcarRadicadaUI(' + g.id + ')'});
         }
       }
 
@@ -12739,6 +12739,31 @@ async function descargarPdfRespuesta(id){
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
     toast('PDF listo', 'Respuesta radicable descargada', 'success');
   }catch(e){ toast('Error', 'Conexión: ' + e.message, 'error'); }
+}
+
+// Marcar radicada CON evidencia: pide el N° de radicado que asignó la
+// entidad y una observación opcional. Queda en el audit log de la glosa.
+async function marcarRadicadaUI(id){
+  var numero = prompt('N° de radicado asignado por la entidad (obligatorio):');
+  if(numero === null) return; // cancelado
+  numero = (numero || '').trim();
+  if(!numero){ toast('Falta el radicado','Ingresa el número de radicado para dejar evidencia','error'); return; }
+  var obs = prompt('Observación opcional (canal, archivo de confirmación, etc.):') || '';
+  try{
+    var r = await fetch('/glosas/' + id + '/marcar-radicada', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({numero_radicado: numero, observacion: obs.trim() || null})
+    });
+    var d = await r.json();
+    if(r.ok){
+      toast('Radicación registrada', 'N° ' + (d.numero_radicado || numero) + ' ✓', 'success');
+      mostrarConfettiBurst();
+      if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    } else {
+      toast('Error', d.detail || 'No se pudo registrar la radicación', 'error');
+    }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function cambiarWorkflow(id, nuevoEstado, etiqueta){
