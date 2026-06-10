@@ -437,7 +437,9 @@ def filtrar_por_factura(page: Page, factura_corta: str) -> None:
         raise PlaywrightTimeout("No encontre el input del filtro # Factura.")
 
     input_buscar.fill(factura_corta)
-    page.wait_for_timeout(200)  # mini-debounce del DDO (antes 800ms)
+    page.wait_for_timeout(500)  # debounce del DDO (200ms era demasiado agresivo
+                                # — causaba falsos negativos por race con el AJAX
+                                # que repinta la grilla tras aplicar el filtro)
     try:
         page.locator(
             "img[src*='ApplyFilter']:visible, img[title*='Apply' i]:visible, "
@@ -446,8 +448,11 @@ def filtrar_por_factura(page: Page, factura_corta: str) -> None:
     except PlaywrightTimeout:
         input_buscar.press("Enter")
     page.wait_for_load_state("networkidle")
-    # Sin sleep extra: abrir_factura() espera de forma dirigida a que la fila
-    # (o el 'No se encontraron registros') aparezca tras aplicar el filtro.
+    # Settle adicional para que la grilla termine de repintar: 'networkidle'
+    # vuelve apenas se completa el request, pero el DOM tarda un poco más en
+    # actualizar las filas. Sin esto, abrir_factura puede leer un estado viejo
+    # ('No se encontraron registros' que aún no se quitó) y dar falso negativo.
+    page.wait_for_timeout(600)
 
 
 class FacturaNoPendiente(Exception):
@@ -461,21 +466,26 @@ class ObjecionNoEnGrilla(Exception):
 def abrir_factura(page: Page, factura_corta: str) -> None:
     """Click en el lápiz de la fila filtrada → abre glosasfactura.aspx.
 
-    Espera DIRIGIDA: en vez de un sleep fijo, pollea barato (checks inmediatos
-    cada 150ms) hasta que aparezca la fila de la factura o el mensaje de
-    'No se encontraron registros' — lo que llegue primero.
+    Espera DIRIGIDA con anti-race: durante los primeros ~1.5s damos prioridad a
+    encontrar la fila (no confiamos en 'No se encontraron registros' temprano,
+    porque es el estado previo al AJAX que puede aparecer transitoriamente). A
+    partir de ahí sí; el deadline total son 8s.
     """
     no_resultados = page.locator("text=No se encontraron registros").first
     fila = page.locator(f"tr:has-text('{factura_corta}')").first
-    deadline = time.time() + 7
+    inicio = time.time()
+    deadline = inicio + 8
     while True:
         try:
-            if no_resultados.is_visible():
+            if fila.is_visible():
+                break
+            # Sólo confiamos en 'no resultados' tras un grace period: si
+            # aparece muy rápido suele ser el estado viejo, no la respuesta
+            # real al filtro nuevo.
+            if time.time() - inicio > 1.5 and no_resultados.is_visible():
                 raise FacturaNoPendiente(
                     f"Factura {factura_corta} no está en pendientes (¿ya finalizada?)."
                 )
-            if fila.is_visible():
-                break
         except FacturaNoPendiente:
             raise
         except Exception:
@@ -484,7 +494,7 @@ def abrir_factura(page: Page, factura_corta: str) -> None:
             raise FacturaNoPendiente(
                 f"Factura {factura_corta} no aparece en la grilla (¿ya finalizada?)."
             )
-        page.wait_for_timeout(150)
+        page.wait_for_timeout(200)
     boton_editar = fila.locator(
         "a[title*='Actualizar' i], a[title*='Editar' i], a[title*='Edit' i], "
         "a:has(img[src*='ActionUpdate']), a:has(img[title*='Actualizar' i]), "
