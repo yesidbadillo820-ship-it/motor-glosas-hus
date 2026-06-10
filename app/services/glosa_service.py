@@ -1091,17 +1091,26 @@ class GlosaService:
         msg_tiempo, color_tiempo, dias = "Fechas no ingresadas", "bg-slate-500", 0
         if data.fecha_radicacion and data.fecha_recepcion:
             try:
-                dias = self._calcular_dias_habiles(
+                dias_calc = self._calcular_dias_habiles(
                     str(data.fecha_radicacion), str(data.fecha_recepcion)
                 )
-                # PLAZO LEGAL: 20 días hábiles para que la EPS formule glosa (Art. 57 Ley 1438/2011 + Dec. 4747/2007)
-                es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
-                msg_tiempo = (
-                    f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES - LÍMITE: {DIAS_HABILES_LIMITE_EXTEMPORANEA})"
-                    if es_extemporanea
-                    else f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)"
-                )
-                color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
+                if dias_calc is None:
+                    # Fechas presentes pero imparseables: NO clasificar como
+                    # "DENTRO DE TÉRMINOS" (antes dias=0 silencioso perdía la
+                    # defensa RE9502 por extemporaneidad). El gestor debe
+                    # verificar las fechas. Auditoría jun-2026, P1 #5.
+                    msg_tiempo = "FECHAS NO VÁLIDAS — VERIFICAR RADICACIÓN/RECEPCIÓN"
+                    color_tiempo = "bg-amber-500"
+                else:
+                    dias = dias_calc
+                    # PLAZO LEGAL: 20 días hábiles para que la EPS formule glosa (Art. 57 Ley 1438/2011 + Dec. 4747/2007)
+                    es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
+                    msg_tiempo = (
+                        f"EXTEMPORÁNEA ({dias} DÍAS HÁBILES - LÍMITE: {DIAS_HABILES_LIMITE_EXTEMPORANEA})"
+                        if es_extemporanea
+                        else f"DENTRO DE TÉRMINOS ({dias} DÍAS HÁBILES)"
+                    )
+                    color_tiempo = "bg-red-600" if es_extemporanea else "bg-emerald-500"
             except Exception as e:
                 logger.error(f"Error fechas: {e}")
 
@@ -3019,18 +3028,27 @@ class GlosaService:
                     return f"$ {raw}"
         return "$ 0.00"
 
-    def _calcular_dias_habiles(self, f1, f2):
+    def _calcular_dias_habiles(self, f1, f2) -> Optional[int]:
+        """Días hábiles entre f1 y f2 (strings ISO "YYYY-MM-DD...").
+
+        Devuelve None si las fechas no se pueden parsear. ANTES devolvía 0,
+        y 0 días = "DENTRO DE TÉRMINOS": un error de formato clasificaba la
+        glosa como en términos y la defensa por extemporaneidad (RE9502) se
+        perdía en silencio (auditoría jun-2026, P1 #5). El caller debe
+        tratar None como "no se sabe" y pedir verificación de fechas.
+        """
         try:
-            d1 = datetime.strptime(f1[:10], "%Y-%m-%d")
-            d2 = datetime.strptime(f2[:10], "%Y-%m-%d")
-            dias, curr = 0, d1
-            while curr < d2:
-                curr += timedelta(days=1)
-                if curr.weekday() < 5 and curr.strftime("%Y-%m-%d") not in FERIADOS_CO:
-                    dias += 1
-            return dias
-        except Exception:
-            return 0
+            d1 = datetime.strptime(str(f1)[:10], "%Y-%m-%d")
+            d2 = datetime.strptime(str(f2)[:10], "%Y-%m-%d")
+        except (TypeError, ValueError):
+            logger.error(f"_calcular_dias_habiles: fechas no parseables f1={f1!r} f2={f2!r}")
+            return None
+        dias, curr = 0, d1
+        while curr < d2:
+            curr += timedelta(days=1)
+            if curr.weekday() < 5 and curr.strftime("%Y-%m-%d") not in FERIADOS_CO:
+                dias += 1
+        return dias
 
     def _wrapper_auditoria_html(
         self,
