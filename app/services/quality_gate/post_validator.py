@@ -36,6 +36,24 @@ _PAT_REFERENCIA_COLGANTE = re.compile(
 # copió una cláusula/norma cortada (el bug "VIGENCIA FISCAL 202…»").
 _PAT_CITA_TRUNCADA = re.compile(r"«[^«»]{10,2000}(?:…|\.\.\.)\s*»")
 
+# Detección de "valores fabricados" — el bug visible en producción:
+# el LLM rellena con cifras inventadas cuando el input no las trae.
+# Captura "$ 1.200.000", "$1.200.000", "$1'200.000", "1.200.000 pesos".
+_PAT_VALOR_EN_DICTAMEN = re.compile(
+    r"\$\s*([\d]{1,3}(?:[.,'][\d]{3})+(?:[.,][\d]{1,2})?)"
+    r"|"
+    r"(?<![/\d])(\d{1,3}(?:[.,'][\d]{3})+)\s*(?:pesos|COP|\$)",
+    re.IGNORECASE,
+)
+
+# Detección de "contratos fabricados": números de contrato tipo
+# "S-13-1-03-1-04958" o "440-DIGSA/DMBUG-2025" que la IA inventa.
+# Solo aceptamos números de contrato si aparecen tal cual en el input.
+_PAT_CONTRATO_EN_DICTAMEN = re.compile(
+    r"\b(?:CONTRATO|Contrato|contrato)\s+(?:N[oº°\.]?\s*|No\.?\s*)?"
+    r"([A-Z0-9][A-Z0-9./\-]{4,40}[A-Z0-9])",
+)
+
 
 @dataclass
 class PostCheckResult:
@@ -211,12 +229,115 @@ def check_citas_no_truncadas(texto: str) -> PostCheckResult:
     return PostCheckResult(ok=True, severidad="INFO", razon="citas literales completas")
 
 
+def _normalizar_numero(s: str) -> str:
+    """Quita separadores de miles y decimales para comparar cifras como
+    secuencias de dígitos. "1.200.000" → "1200000", "1'200.000" → "1200000"."""
+    return re.sub(r"[^\d]", "", s or "")
+
+
+def check_valores_no_fabricados(
+    texto_dictamen: str,
+    texto_glosa_input: str | None,
+    valor_objetado_input: str | int | float | None = None,
+) -> PostCheckResult:
+    """Detecta cifras monetarias en el dictamen que NO aparecen en el input.
+
+    El bug visible en producción: el gestor pegó "Se glosa por falta de
+    cobertura" sin valor, y el LLM rellenó con "$ 1.200.000" inventado.
+    Lo mismo para valores que no aparecen en el texto que el gestor pegó.
+
+    Estrategia conservadora:
+      · Extrae todas las cifras monetarias del dictamen (>= 1000 para
+        ignorar números de norma/artículo).
+      · Para cada cifra, normaliza dígitos y verifica si aparece en el
+        input del gestor O en el valor objetado del formulario.
+      · Si alguna cifra del dictamen NO está en el input → ERROR.
+    """
+    if not texto_dictamen:
+        return PostCheckResult(ok=True, severidad="INFO", razon="texto vacío")
+
+    fuente = (texto_glosa_input or "") + " "
+    if valor_objetado_input:
+        fuente += str(valor_objetado_input)
+    fuente_digitos = _normalizar_numero(fuente)
+
+    cifras_en_dictamen: set[str] = set()
+    for m in _PAT_VALOR_EN_DICTAMEN.finditer(texto_dictamen):
+        bruto = m.group(1) or m.group(2) or ""
+        normalizado = _normalizar_numero(bruto)
+        if len(normalizado) < 4:  # < 1000 → ignorar (artículos, fechas)
+            continue
+        cifras_en_dictamen.add(normalizado)
+
+    fabricadas = [c for c in cifras_en_dictamen if c not in fuente_digitos]
+    if fabricadas:
+        muestra = ", ".join(
+            "$" + (f[:-6] + "." + f[-6:-3] + "." + f[-3:] if len(f) >= 7 else f[:-3] + "." + f[-3:])
+            for f in fabricadas[:3]
+        )
+        return PostCheckResult(
+            ok=False,
+            severidad="ERROR",
+            razon=(
+                f"{len(fabricadas)} cifra(s) monetaria(s) en el dictamen NO "
+                f"aparecen en el input del gestor: {muestra}. La IA pudo "
+                "haberlas fabricado."
+            ),
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="cifras consistentes con input")
+
+
+def check_contratos_no_fabricados(
+    texto_dictamen: str,
+    texto_glosa_input: str | None,
+    clausulas_contrato: list[dict] | None = None,
+) -> PostCheckResult:
+    """Detecta números de contrato citados en el dictamen que NO existen
+    en el input del gestor ni en las cláusulas reales inyectadas al prompt.
+
+    Bug visible: el LLM citó "CONTRATO S-13-1-03-1-04958" sin que el gestor
+    lo hubiera mencionado. Esos números son verificables de inmediato por
+    la EPS y delatan al dictamen como fabricado.
+    """
+    if not texto_dictamen:
+        return PostCheckResult(ok=True, severidad="INFO", razon="texto vacío")
+
+    fuente = (texto_glosa_input or "").upper()
+    if clausulas_contrato:
+        for cl in clausulas_contrato:
+            fuente += " " + str(cl.get("texto_literal") or "").upper()
+            fuente += " " + str(cl.get("titulo") or "").upper()
+            fuente += " " + str(cl.get("numero_contrato") or "").upper()
+
+    contratos_dictamen: set[str] = set()
+    for m in _PAT_CONTRATO_EN_DICTAMEN.finditer(texto_dictamen):
+        num = m.group(1).upper().strip().rstrip(",.;:")
+        if "-" in num or "/" in num or len(num) >= 6:
+            contratos_dictamen.add(num)
+
+    fabricados = [c for c in contratos_dictamen if c not in fuente]
+    if fabricados:
+        return PostCheckResult(
+            ok=False,
+            severidad="ERROR",
+            razon=(
+                f"{len(fabricados)} número(s) de contrato citado(s) en el "
+                f"dictamen no aparecen en el input ni en las cláusulas: "
+                f"{', '.join(fabricados[:3])}. Probable fabricación."
+            ),
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="contratos consistentes con input")
+
+
 def post_validar_dictamen(
     texto: str,
     *,
     eps: str | None = None,
     es_ratificacion: bool = False,
     es_extemporanea: bool = False,
+    texto_glosa_input: str | None = None,
+    valor_objetado_input: str | int | float | None = None,
+    clausulas_contrato: list[dict] | None = None,
 ) -> PostValidationResult:
     """Ejecuta todos los post-checks del dictamen ya generado por la IA.
 
@@ -251,6 +372,24 @@ def post_validar_dictamen(
 
     # 6. Citas literales no truncadas («… VIGENCIA FISCAL 202…»)
     checks["citas_truncadas"] = check_citas_no_truncadas(texto)
+
+    # 7. Valores monetarios no fabricados (cifras solo si vienen del input).
+    #    Solo se ejecuta si el caller pasó texto_glosa_input — para flujos
+    #    que no lo proveen, se omite el check (legacy compat).
+    if texto_glosa_input is not None:
+        checks["valores_fabricados"] = check_valores_no_fabricados(
+            texto,
+            texto_glosa_input=texto_glosa_input,
+            valor_objetado_input=valor_objetado_input,
+        )
+
+        # 8. Contratos no fabricados (números solo si vienen del input o
+        #    de las cláusulas reales del contrato vigente).
+        checks["contratos_fabricados"] = check_contratos_no_fabricados(
+            texto,
+            texto_glosa_input=texto_glosa_input,
+            clausulas_contrato=clausulas_contrato,
+        )
 
     # Score: 100 - 30 por cada ERROR, -10 por cada WARN
     score = 100

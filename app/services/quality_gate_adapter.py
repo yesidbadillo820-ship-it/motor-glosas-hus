@@ -105,6 +105,7 @@ async def ejecutar_con_quality_gate(
     user_prompt: str = "",
     glosa_id: int | None = None,
     proveedores_disponibles: set[str] | None = None,
+    clausulas_contrato: list[dict] | None = None,
 ) -> QualityGateResult:
     """Ejecuta el pipeline Quality Gate usando el `_llamar_ia` del servicio.
 
@@ -192,6 +193,7 @@ async def ejecutar_con_quality_gate(
         es_extemporanea=es_extemporanea,
         max_intentos=3,
         modelos_fallback=modelos_orden,
+        clausulas_contrato=clausulas_contrato,
     )
 
 

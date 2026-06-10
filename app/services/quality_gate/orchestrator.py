@@ -95,6 +95,7 @@ async def ejecutar_quality_gate(
     es_extemporanea: bool = False,
     max_intentos: int = MAX_INTENTOS,
     modelos_fallback: Optional[list[str]] = None,
+    clausulas_contrato: Optional[list[dict]] = None,
 ) -> QualityGateResult:
     """Ejecuta el pipeline completo de Quality Gate.
 
@@ -168,12 +169,17 @@ async def ejecutar_quality_gate(
             resultado.intentos.append(intento)
             continue
 
-        # Post-validar
+        # Post-validar — incluye detección de valores/contratos fabricados
+        # cuando el caller proveyó el input original. Si no, esos checks
+        # se omiten silenciosamente (legacy compat con tests/callers viejos).
         post = post_validar_dictamen(
             intento.texto,
             eps=pre.eps_normalizada,
             es_ratificacion=es_ratificacion,
             es_extemporanea=es_extemporanea,
+            texto_glosa_input=texto_glosa,
+            valor_objetado_input=valor_objetado,
+            clausulas_contrato=clausulas_contrato,
         )
 
         # Si el único problema son citas inválidas, intentar limpieza
@@ -196,6 +202,9 @@ async def ejecutar_quality_gate(
                         eps=pre.eps_normalizada,
                         es_ratificacion=es_ratificacion,
                         es_extemporanea=es_extemporanea,
+                        texto_glosa_input=texto_glosa,
+                        valor_objetado_input=valor_objetado,
+                        clausulas_contrato=clausulas_contrato,
                     )
                     if post_limpio.aprobado and post_limpio.score >= post.score:
                         intento.texto = texto_limpio
