@@ -139,3 +139,26 @@ class TestPreValidacionIncondicional:
         if r.status_code == 400:
             assert "corto" not in r.json().get("detail", "").lower()
             assert "mínimo" not in r.json().get("detail", "").lower()
+
+    @pytest.mark.parametrize(
+        "texto_libre",
+        [
+            # Glosas EPS reales de texto libre, SIN código (pedido del
+            # usuario 10-jun-2026: "QUITAR ESA RESTRICCIÓN ... QUIERO
+            # REALMENTE PONERLA A PRUEBA CON ALGO QUE NO ESTÉ FIJO").
+            "No existe relación clínica entre diagnóstico registrado y procedimiento facturado.",
+            "Reingreso dentro de los 15 días atribuible a manejo deficiente de la IPS.",
+            "Tornillos y placas no soportados contractualmente.",
+        ],
+    )
+    def test_glosa_texto_libre_sin_codigo_no_se_bloquea(self, client, monkeypatch, texto_libre):
+        """Modo texto libre: sin código de glosa el análisis procede — la
+        IA clasifica la familia desde el texto. NUNCA debe devolver el
+        viejo bloqueo de 'falta el código' / 'N/A no tiene formato'."""
+        monkeypatch.setenv("QUALITY_GATE_ENABLED", "1")
+        monkeypatch.setenv("QUALITY_GATE_ROLLOUT_PCT", "100")
+        r = client.post("/analizar", data=_form(texto=texto_libre))
+        if r.status_code == 400:
+            detail = r.json().get("detail", "").lower()
+            assert "código" not in detail and "codigo" not in detail, detail
+            assert "n/a" not in detail, detail

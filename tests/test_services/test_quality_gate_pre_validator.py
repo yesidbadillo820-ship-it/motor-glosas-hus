@@ -36,39 +36,36 @@ class TestCodigoGlosa:
         assert familia == familia_esperada
 
     @pytest.mark.parametrize(
-        "codigo_invalido",
+        "codigo_malformado",
         [
-            "",
             "XX0201",  # prefijo no oficial
             "TA",  # sin dígitos
             "0201TA",  # invertido
             "TA02XX",  # con letras al final
             "TA-0201",  # con guión
-            None,
         ],
     )
-    def test_codigos_invalidos(self, codigo_invalido):
-        res, _, _ = check_codigo_glosa(codigo_invalido or "")
+    def test_codigos_malformados_bloquean(self, codigo_malformado):
+        # Un código PRESENTE pero malformado es un typo del gestor —
+        # sigue bloqueando con mensaje explicativo (no es texto libre).
+        res, _, _ = check_codigo_glosa(codigo_malformado)
         assert not res.ok
         assert res.razon  # debe tener razón explicada
 
     @pytest.mark.parametrize(
-        "placeholder", ["N/A", "NA", "-", "—", "?", "SIN CODIGO", "SIN CÓDIGO"]
+        "ausente", ["", None, "N/A", "NA", "-", "—", "?", "SIN CODIGO", "SIN CÓDIGO"]
     )
-    def test_placeholders_de_codigo_ausente_dan_mensaje_amigable(self, placeholder):
-        # Regresión 10-jun-2026: el gestor pegaba un motivo legítimo sin
-        # código ("Se evidencia cobro duplicado mediante fragmentación de
-        # procedimientos.") y _extraer_codigos_glosa devolvía []. El caller
-        # pasaba "N/A" al pre-validator, que mostraba "Código 'N/A' no
-        # tiene formato válido (debe ser AA####)" — mensaje confuso.
-        # Ahora cualquier placeholder ("N/A", "-", ...) dispara el mensaje
-        # de "Falta el código" con sugerencia accionable.
-        res, _, _ = check_codigo_glosa(placeholder)
-        assert not res.ok
-        assert "no detect" in res.razon.lower() or "falta" in res.razon.lower()
-        assert "agrega" in res.sugerencia.lower() or "incluye" in res.sugerencia.lower()
-        # NO debe filtrar el placeholder al mensaje
-        assert placeholder.upper() not in res.razon
+    def test_codigo_ausente_NO_bloquea_modo_texto_libre(self, ausente):
+        # 10-jun-2026 (pedido del usuario): las EPS glosan con texto libre
+        # sin código ("No existe relación clínica entre diagnóstico
+        # registrado y procedimiento facturado."). La ausencia de código
+        # ya no bloquea — la IA clasifica la familia desde el texto. El
+        # check de texto compensa exigiendo vocabulario del dominio.
+        res, cod_norm, familia = check_codigo_glosa(ausente or "")
+        assert res.ok  # NO bloquea
+        assert cod_norm == ""  # pero no inventa un código
+        assert familia == ""
+        assert res.sugerencia  # deja sugerencia de agregar el código
 
 
 class TestEps:
@@ -208,15 +205,36 @@ class TestPreValidarGlosa:
         assert r.valor_parseado == 500000.0
         assert not r.razones_bloqueo
 
-    def test_glosa_sin_codigo_falla(self):
+    def test_glosa_sin_codigo_pasa_en_modo_texto_libre(self):
+        # 10-jun-2026: la ausencia de código ya no bloquea. La glosa de
+        # texto libre con vocabulario del dominio se analiza igual.
         r = pre_validar_glosa(
             eps="FAMISANAR EPS",
             codigo_glosa="",
             valor_objetado="500000",
             texto_glosa="Mayor valor cobrado en consulta especializada por factura",
         )
-        assert not r.aprobado
-        assert any("código" in razon.lower() for razon in r.razones_bloqueo)
+        assert r.aprobado
+        assert r.codigo_normalizado == ""
+        assert r.familia_codigo == ""
+
+    @pytest.mark.parametrize(
+        "texto_libre",
+        [
+            # Casos reales del usuario (10-jun-2026) — glosas EPS sin código
+            "No existe relación clínica entre diagnóstico registrado y procedimiento facturado.",
+            "Reingreso dentro de los 15 días atribuible a manejo deficiente de la IPS.",
+            "Tornillos y placas no soportados contractualmente.",
+        ],
+    )
+    def test_glosas_texto_libre_reales_aprobadas(self, texto_libre):
+        r = pre_validar_glosa(
+            eps="NUEVA EPS",
+            codigo_glosa="N/A",  # como llega del caller cuando no detecta código
+            valor_objetado="",
+            texto_glosa=texto_libre,
+        )
+        assert r.aprobado, f"bloqueada: {r.razones_bloqueo}"
 
     def test_glosa_sin_eps_falla(self):
         r = pre_validar_glosa(

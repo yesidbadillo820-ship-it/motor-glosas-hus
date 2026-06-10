@@ -5,10 +5,12 @@ claro al frontend. Esto evita generar dictámenes basura por inputs
 incompletos, y reduce costos.
 
 Checks implementados:
-  ✓ Código de glosa presente y en formato válido (regex AA####)
+  ✓ Código de glosa: si viene, formato AA#### — su ausencia NO bloquea
+    (modo texto libre: la IA clasifica la familia desde el texto)
   ✓ EPS reconocida (whitelist + sinónimos)
-  ✓ Valor monetario parseable y > 0
-  ✓ Texto de glosa con mínimo de contenido (>= 20 chars)
+  ✓ Valor monetario parseable y > 0 (opcional)
+  ✓ Texto de glosa con mínimo de contenido (>= 20 chars) y, si no hay
+    código, al menos un término del dominio (admin o clínico)
   ✓ Plantilla del banco HUS disponible para la familia del código
 
 Cada check devuelve {"ok": bool, "razon": str, "sugerencia": str}.
@@ -162,22 +164,34 @@ _PLACEHOLDERS_CODIGO_AUSENTE = {"N/A", "NA", "-", "—", "?", "SIN CODIGO", "SIN
 
 
 def check_codigo_glosa(codigo: str) -> tuple[PreCheckResult, str, str]:
-    """Valida que el código sea AA#### (TA0201, SO0501, etc.).
+    """Valida el código si viene; su AUSENCIA ya no bloquea (10-jun-2026).
+
+    Las EPS muchas veces glosan con texto libre sin código ("No existe
+    relación clínica entre diagnóstico registrado y procedimiento
+    facturado.", "Reingreso dentro de los 15 días atribuible a manejo
+    deficiente de la IPS."). Exigir el código bloqueaba esas glosas reales
+    — pedido explícito del usuario: poder probar la IA con texto libre.
+
+    Comportamiento:
+      - Sin código (o placeholder "N/A"/"-"): ok=True con sugerencia —
+        la IA clasifica la familia desde el texto (modo texto libre).
+        El check de texto compensa exigiendo vocabulario del dominio.
+      - Código presente pero MALFORMADO (XX0201, TA-0201): sigue
+        bloqueando — es un typo que el gestor debe corregir, no una
+        glosa de texto libre.
 
     Devuelve (resultado, codigo_normalizado, familia).
     """
     cod_norm = _normalizar_codigo(codigo)
-    # Tratar placeholders ("N/A", "-", ...) como ausencia: la causa real
-    # es que el texto no traía código, no que el "código" sea inválido.
+    # Placeholders ("N/A", "-", ...) = ausencia: el texto no traía código.
     if not cod_norm or cod_norm in _PLACEHOLDERS_CODIGO_AUSENTE:
         return (
             PreCheckResult(
-                ok=False,
-                razon="No detecté el código de glosa en el texto",
+                ok=True,  # NO bloquea — modo texto libre
+                razon="Sin código de glosa — la IA clasificará la familia desde el texto",
                 sugerencia=(
-                    "Agrega el código al inicio del texto, ej. 'TA0102 - "
-                    "Medicamento fuera del PBS' o 'SO0601 - Falta soportes'. "
-                    "Prefijos válidos: TA, SO, AU, CO, CL, PE, FA, SE, IN, ME, EX."
+                    "Si conoces el código, agrégalo al inicio (ej. 'TA0102 - ...') "
+                    "para que el dictamen use la plantilla exacta de su familia."
                 ),
             ),
             "",
