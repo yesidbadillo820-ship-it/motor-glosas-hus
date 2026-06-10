@@ -35,6 +35,7 @@ from app.services.recepcion_service import (
     COLUMN_ALIASES,
     _buscar_fila_encabezado,
 )
+from app.utils.html_a_texto import dictamen_a_texto_plano
 
 
 _NUEVA_COL_RESPUESTA = "RESPUESTA IA"
@@ -180,7 +181,10 @@ def generar_excel_con_respuestas(
                         break
 
             if resp:
-                dictamen = _truncar_para_celda(resp.get("dictamen") or "")
+                # El dictamen se guarda como HTML — a la celda va texto
+                # plano legible (tabla de cabecera → "CÓDIGO GLOSA: ... |
+                # VALOR OBJETADO: ..."), nunca tags crudos.
+                dictamen = _truncar_para_celda(dictamen_a_texto_plano(resp.get("dictamen") or ""))
                 estado = (resp.get("estado") or "").upper()
                 glosa_id = resp.get("glosa_id") or ""
                 gestor_asignado = resp.get("gestor_asignado") or ""

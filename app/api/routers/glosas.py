@@ -1,7 +1,7 @@
 import re
 import uuid
 from typing import Optional
-from datetime import datetime
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -18,6 +18,7 @@ from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
 from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
 from app.utils.moneda import parse_valor_cop
+from app.utils.html_a_texto import dictamen_a_texto_plano
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -494,8 +495,10 @@ def exportar_xlsx(
             or (g.texto_glosa_original or "").strip()
             or (g.concepto_glosa or "").strip()
         )
-        # Dictamen: el texto limpio (sin HTML) generado por la defensa.
-        dictamen_txt = _limpiar_observacion(g.dictamen) or ""
+        # Dictamen: texto plano legible (la tabla de cabecera se vuelve
+        # "CÓDIGO GLOSA: ... | VALOR OBJETADO: ..." en vez de perderse o
+        # salir como HTML crudo).
+        dictamen_txt = dictamen_a_texto_plano(g.dictamen) or ""
         recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
         ws.append(
             [
@@ -2719,6 +2722,86 @@ def exportar_paquete_multi_zip(
     )
 
 
+@router.get("/lote/pdf-zip")
+def exportar_pdfs_radicables_zip(
+    ids: str = Query(..., description="IDs CSV, ej '1,2,3' (máx 50)"),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """ZIP con el PDF radicable de cada glosa solicitada.
+
+    Complementa /glosas/{id}/dictamen.pdf para radicaciones masivas:
+    un PDF formal por glosa (respuesta_glosa_{factura}_{id}.pdf).
+    Las glosas sin dictamen se omiten y quedan listadas en README.txt.
+
+    Param `ids`: lista CSV de IDs (máx 50 por request — cada PDF se
+    renderiza con reportlab en memoria).
+
+    Declarado ANTES de /{glosa_id} para evitar colisión con el path
+    resolver de FastAPI.
+    """
+    import io
+    import zipfile
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services.dictamen_pdf import generar_pdf_dictamen, nombre_archivo_pdf
+
+    try:
+        ids_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(400, "ids debe ser CSV de enteros")
+
+    if not ids_list:
+        raise HTTPException(400, "ids no puede estar vacío")
+    if len(ids_list) > 50:
+        raise HTTPException(400, "máximo 50 glosas por paquete de PDFs")
+
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids_list)).all()
+    if not glosas:
+        raise HTTPException(404, "Ninguna glosa encontrada")
+
+    encontrados = {g.id for g in glosas}
+    no_encontrados = [i for i in ids_list if i not in encontrados]
+    sin_dictamen: list[int] = []
+    con_pdf: list[str] = []
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for g in glosas:
+            if not (g.dictamen or "").strip():
+                sin_dictamen.append(g.id)
+                continue
+            try:
+                fname = nombre_archivo_pdf(g)
+                zf.writestr(fname, generar_pdf_dictamen(g))
+                con_pdf.append(fname)
+            except Exception as e:
+                logger.warning(f"[pdf-zip] glosa {g.id}: PDF falló: {e}")
+                sin_dictamen.append(g.id)
+        indice = (
+            f"PDFs RADICABLES — RESPUESTA A GLOSA / OBJECIÓN\n"
+            f"Generado: {ahora_utc().isoformat()}\n"
+            f"Por: {current_user.email}\n\n"
+            f"PDFs incluidos ({len(con_pdf)}):\n"
+            + "".join(f"  - {n}\n" for n in con_pdf)
+            + (f"\nGlosas SIN dictamen (omitidas): {sin_dictamen}\n" if sin_dictamen else "")
+            + (f"IDs no encontrados: {no_encontrados}\n" if no_encontrados else "")
+        )
+        zf.writestr("README.txt", indice)
+
+    if not con_pdf:
+        raise HTTPException(404, "Ninguna de las glosas solicitadas tiene dictamen generado")
+
+    buf.seek(0)
+    fname_zip = f"respuestas-glosa-pdf-{ahora_utc().strftime('%Y%m%d-%H%M%S')}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname_zip}"'},
+    )
+
+
 @router.get("/top-antiguas")
 def top_glosas_antiguas(
     top: int = Query(20, ge=1, le=100),
@@ -3415,6 +3498,104 @@ def cambiar_workflow(
         "estado_anterior": actual,
         "estado_nuevo": nuevo,
         "nota_workflow": glosa.nota_workflow,
+    }
+
+
+class MarcarRadicadaInput(BaseModel):
+    """Evidencia de radicación ante la entidad: el número de radicado
+    que asigna la EPS al recibir la objeción + observación opcional
+    (canal usado, nombre del archivo de confirmación, etc.)."""
+
+    numero_radicado: str = Field(..., min_length=1, max_length=50)
+    fecha_radicacion: Optional[date] = None  # default: hoy
+    observacion: Optional[str] = Field(default=None, max_length=2000)
+
+
+@router.post("/{glosa_id}/marcar-radicada")
+def marcar_radicada(
+    glosa_id: int,
+    data: MarcarRadicadaInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Registra la radicación de la respuesta ante la entidad CON
+    evidencia auditable.
+
+    Extiende el botón "Marcar radicada" (que solo movía workflow_state
+    vía PATCH /workflow): además de pasar la glosa a RADICADA, persiste
+    el número de radicado que asignó la EPS, la fecha, quién dejó la
+    constancia y una observación opcional — y escribe la entrada
+    MARCAR_RADICADA en el audit log (visible en /glosas/{id}/timeline).
+
+    Permisos: COORDINADOR/SUPER_ADMIN cualquier glosa; AUDITOR solo las
+    suyas (asignadas a su email o sin asignar). El adjunto con la
+    confirmación de la entidad (screenshot/PDF) queda como follow-up.
+    """
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    if (
+        current_user.rol == "AUDITOR"
+        and glosa.auditor_email
+        and (glosa.auditor_email != current_user.email)
+    ):
+        raise HTTPException(403, "Esta glosa está asignada a otro gestor")
+
+    numero = data.numero_radicado.strip()
+    if not numero:
+        raise HTTPException(400, "numero_radicado no puede estar vacío")
+
+    radicado_anterior = glosa.numero_radicado
+    workflow_anterior = glosa.workflow_state or "BORRADOR"
+
+    if data.fecha_radicacion:
+        radicado_en = datetime(
+            data.fecha_radicacion.year,
+            data.fecha_radicacion.month,
+            data.fecha_radicacion.day,
+            12,  # mediodía UTC: el .date() es estable en Bogotá (UTC-5)
+            tzinfo=timezone.utc,
+        )
+    else:
+        radicado_en = ahora_utc()
+
+    glosa.numero_radicado = numero[:50]
+    glosa.radicado_en = radicado_en
+    glosa.radicado_por = current_user.email
+    if data.observacion:
+        glosa.radicado_observacion = data.observacion.strip()[:2000]
+    glosa.workflow_state = "RADICADA"
+    db.commit()
+    db.refresh(glosa)
+
+    detalle = f"Radicado N° {numero} ante {glosa.eps or 'entidad'}"
+    if data.fecha_radicacion:
+        detalle += f" el {data.fecha_radicacion.isoformat()}"
+    if data.observacion:
+        detalle += f" | {data.observacion.strip()}"
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="MARCAR_RADICADA",
+        tabla="historial",
+        registro_id=glosa_id,
+        campo="numero_radicado",
+        valor_anterior=radicado_anterior,
+        valor_nuevo=numero,
+        detalle=detalle,
+    )
+    logger.info(f"Glosa {glosa_id} marcada RADICADA (N° {numero}) por {current_user.email}")
+
+    return {
+        "message": "Radicación registrada",
+        "glosa_id": glosa_id,
+        "numero_radicado": glosa.numero_radicado,
+        "radicado_en": glosa.radicado_en.isoformat() if glosa.radicado_en else None,
+        "radicado_por": glosa.radicado_por,
+        "observacion": glosa.radicado_observacion,
+        "workflow_anterior": workflow_anterior,
+        "workflow_state": glosa.workflow_state,
     }
 
 
@@ -6007,6 +6188,41 @@ def descargar_dictamen_txt(
     return Response(
         content=payload,
         media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.get("/{glosa_id}/dictamen.pdf")
+def descargar_dictamen_pdf_radicable(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """PDF radicable de la respuesta de glosa (documento formal).
+
+    Varias EPS exigen subir un PDF con la respuesta del hospital para
+    radicar la objeción. Genera el documento formal con encabezado
+    institucional, bloque de datos, dictamen en texto limpio (sin HTML
+    crudo) y espacio de firma/sello. Ver app/services/dictamen_pdf.
+    """
+    from fastapi.responses import StreamingResponse
+
+    from app.services.dictamen_pdf import generar_pdf_dictamen, nombre_archivo_pdf
+
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    if not (glosa.dictamen or "").strip():
+        raise HTTPException(
+            404,
+            "La glosa no tiene dictamen generado — genera la respuesta antes de descargar el PDF radicable",
+        )
+
+    pdf_bytes = generar_pdf_dictamen(glosa)
+    fname = nombre_archivo_pdf(glosa)
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 

@@ -34,11 +34,24 @@ Y para defenderse de datos legacy que quedaron naive:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+TZ_BOGOTA = ZoneInfo("America/Bogota")
 
 
 def ahora_utc() -> datetime:
     """Datetime actual TZ-aware en UTC. Reemplazo de datetime.utcnow()."""
     return datetime.now(timezone.utc)
+
+
+def ahora_bogota() -> datetime:
+    """Datetime actual TZ-aware en America/Bogota (UTC-5, sin DST).
+
+    Para documentos de cara al usuario (PDF radicable, fechas impresas)
+    donde la hora local colombiana es la que tiene sentido legal.
+    Para persistir en BD seguir usando ahora_utc().
+    """
+    return datetime.now(TZ_BOGOTA)
 
 
 def a_utc(dt: datetime | None) -> datetime | None:

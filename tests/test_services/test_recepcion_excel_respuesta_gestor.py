@@ -133,3 +133,29 @@ def test_fila_sin_match_queda_no_procesada_y_gestor_vacio(db):
     assert fila_datos[-4] == "—"
     assert fila_datos[-3] == "NO_PROCESADA"
     assert fila_datos[-1] in ("", None)
+
+
+def test_dictamen_html_sale_como_texto_plano_en_la_celda(db):
+    """Regresión: la columna RESPUESTA IA traía `<table border="1"
+    style=...>` literal. El dictamen HTML debe convertirse a texto
+    legible (cabecera → 'CÓDIGO GLOSA: ... | VALOR OBJETADO: ...')."""
+    g = _glosa(db, "HUS0000000004", "100004", auditor_email="gestor.prueba@hus.gov.co")
+    g.dictamen = (
+        '<table border="1" style="width:100%;border-collapse:collapse;">'
+        "<tr><th>CÓDIGO GLOSA</th><th>VALOR OBJETADO</th><th>CÓDIGO RESPUESTA</th></tr>"
+        "<tr><td>TA0801</td><td>$36.402</td><td><b>RE9901</b></td></tr></table>"
+        '<div style="background:#f8fafc;">ARGUMENTACIÓN JURÍDICA<br/>'
+        "El valor facturado corresponde al manual tarifario pactado.</div>"
+    )
+    db.commit()
+    original = _excel_original([_fila("HUS0000000004", "100004")])
+    respuestas = construir_respuestas_por_clave(db, [g.id])
+    xlsx = generar_excel_con_respuestas(original, respuestas)
+    ws = load_workbook(BytesIO(xlsx))["INICIAL"]
+    celda = [c.value for c in ws[3]][-4]
+    assert "<table" not in celda
+    assert "style=" not in celda
+    assert "CÓDIGO GLOSA: TA0801" in celda
+    assert "VALOR OBJETADO: $36.402" in celda
+    assert "CÓDIGO RESPUESTA: RE9901" in celda
+    assert "El valor facturado corresponde al manual tarifario pactado." in celda

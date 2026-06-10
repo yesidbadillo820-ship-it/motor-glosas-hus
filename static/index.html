@@ -12065,6 +12065,11 @@ function _renderMisGlosas(dataRaw){
       var primario = '';
       var menuItems = [];
 
+      // PDF radicable (documento formal para subir al portal de la EPS)
+      if(g.dictamen_generado || yaRespondida){
+        menuItems.push({icon:'📄', label:'PDF respuesta (radicable)', onclick:'descargarPdfRespuesta(' + g.id + ')'});
+      }
+
       if(yaRespondida){
         // Respondida: primario = "Ver" (abre la glosa con el dictamen).
         primario = '<button class="btn-sm btn-primary" onclick="responderGlosa(' + g.id + ')" title="Abrir glosa y ver el dictamen">Ver</button>';
@@ -12099,7 +12104,7 @@ function _renderMisGlosas(dataRaw){
           menuItems.push({icon:'✓', label:'Aprobar', onclick:'cambiarWorkflow(' + g.id + ',\'APROBADA\',\'Aprobar\')'});
           menuItems.push({icon:'←', label:'Devolver a borrador', onclick:'cambiarWorkflow(' + g.id + ',\'BORRADOR\',\'Devolver\')'});
         } else if(wfEstado === 'APROBADA' && puedeAprobar){
-          menuItems.push({icon:'📤', label:'Marcar radicada', onclick:'cambiarWorkflow(' + g.id + ',\'RADICADA\',\'Marcar radicada\')'});
+          menuItems.push({icon:'📤', label:'Marcar radicada', onclick:'marcarRadicadaUI(' + g.id + ')'});
         }
       }
 
@@ -12713,6 +12718,52 @@ function mostrarConfettiBurst(){
     }
     setTimeout(function(){ if(container.parentNode) container.remove(); }, 1700);
   }catch(_){ /* nunca romper UI por una animación */ }
+}
+
+// PDF radicable: documento formal de la respuesta para subir al portal de la EPS.
+async function descargarPdfRespuesta(id){
+  try{
+    var r = await fetch('/glosas/' + id + '/dictamen.pdf', {headers: authH()});
+    if(!r.ok){
+      var d = {}; try{ d = await r.json(); }catch(_){}
+      toast('Error', d.detail || 'No se pudo generar el PDF ('+r.status+')', 'error');
+      return;
+    }
+    var blob = await r.blob();
+    var cd = r.headers.get('content-disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (m && m[1]) || ('respuesta_glosa_' + id + '.pdf');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    toast('PDF listo', 'Respuesta radicable descargada', 'success');
+  }catch(e){ toast('Error', 'Conexión: ' + e.message, 'error'); }
+}
+
+// Marcar radicada CON evidencia: pide el N° de radicado que asignó la
+// entidad y una observación opcional. Queda en el audit log de la glosa.
+async function marcarRadicadaUI(id){
+  var numero = prompt('N° de radicado asignado por la entidad (obligatorio):');
+  if(numero === null) return; // cancelado
+  numero = (numero || '').trim();
+  if(!numero){ toast('Falta el radicado','Ingresa el número de radicado para dejar evidencia','error'); return; }
+  var obs = prompt('Observación opcional (canal, archivo de confirmación, etc.):') || '';
+  try{
+    var r = await fetch('/glosas/' + id + '/marcar-radicada', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type':'application/json'},
+      body: JSON.stringify({numero_radicado: numero, observacion: obs.trim() || null})
+    });
+    var d = await r.json();
+    if(r.ok){
+      toast('Radicación registrada', 'N° ' + (d.numero_radicado || numero) + ' ✓', 'success');
+      mostrarConfettiBurst();
+      if(typeof loadMisGlosas === 'function') loadMisGlosas();
+    } else {
+      toast('Error', d.detail || 'No se pudo registrar la radicación', 'error');
+    }
+  }catch(e){ toast('Error','Conexión: '+e.message,'error'); }
 }
 
 async function cambiarWorkflow(id, nuevoEstado, etiqueta){
@@ -13541,16 +13592,25 @@ async function analizar(modoOverride){
     if(!r.ok){
       var er=await r.json().catch(function(){return{detail:'Error desconocido'}});
       toast('Error en el análisis',er.detail||'Verifique los datos','error');
+      // Bug 10-jun-2026: el simulador del pipeline seguía marcando verde
+      // aunque el backend ya falló (pre-validación) — el usuario veía
+      // "EN CURSO + todo verde" sin dictamen. Marcar fallo + ocultar.
+      if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
       hideLoading();_rehab();return;
     }
     var d=await r.json();
     lastResult=d;
+    // Parar el simulador antes de pintar el dictamen para evitar que un
+    // timer rezagado machaque el estado final.
+    if(typeof _paCancelarSimulador === 'function') _paCancelarSimulador();
+    if(typeof paHidePipeline === 'function') paHidePipeline();
     renderResult(d);
     toast('Análisis completado','Defensa jurídica generada','success');
     // Limpiar draft tras submit exitoso
     if(typeof _draftClear === 'function'){ _draftClear(); _draftClear('nueva'); }
   } catch(e){
     toast('Error de conexión','No se pudo conectar con el servidor','error');
+    if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
   }
   hideLoading();
   _rehab();
@@ -20222,10 +20282,38 @@ const PA_AGENTES_DEFINICION = [
   {id:'verifier',  nombre:'Citation verifier',        desc:'valida cada cita normativa'},
 ];
 
+// Handles del simulador para poderlo cancelar entre análisis o ante error.
+// Sin esto, los setTimeout del intento anterior seguían marcando verdes y
+// el usuario veía "EN CURSO" + todo verde aunque la pre-validación había
+// rechazado el input (bug 10-jun-2026).
+let _paPipelineTimers = [];
+
+function _paCancelarSimulador(){
+  _paPipelineTimers.forEach(t => clearTimeout(t));
+  _paPipelineTimers = [];
+}
+
+function paResetPipelineEstados(){
+  // Limpia clases running/done/fail de cada agente — necesario porque
+  // el clic del nuevo análisis no siempre regenera el innerHTML antes
+  // de que terminen de disparar los timers viejos.
+  PA_AGENTES_DEFINICION.forEach(a => {
+    const el = document.getElementById('pa-ag-'+a.id);
+    if(!el) return;
+    el.classList.remove('running','done','fail');
+    const d = el.querySelector('.pa-agent-detail');
+    if(d) d.textContent = a.desc;
+  });
+}
+
 function paShowPipeline(){
   const wrap = document.getElementById('pa-pipeline');
   const list = document.getElementById('pa-agent-list');
   if(!wrap || !list) return;
+  // Cancelar cualquier simulador previo antes de regenerar — si no, los
+  // setTimeout del intento anterior siguen disparando paSetAgentState
+  // sobre los nuevos divs y aparecen verdes sin que el análisis termine.
+  _paCancelarSimulador();
   list.innerHTML = PA_AGENTES_DEFINICION.map(a =>
     '<div class="pa-agent-row" id="pa-ag-'+a.id+'">'+
       '<div class="pa-agent-dot"></div>'+
@@ -20242,9 +20330,18 @@ function paShowPipeline(){
 }
 
 function paHidePipeline(){
+  _paCancelarSimulador();
   const wrap = document.getElementById('pa-pipeline');
   if(wrap) wrap.style.display = 'none';
   // No mostrar landing-hero de vuelta (el dictamen tomara el espacio)
+}
+
+function paMarcarFallaPipeline(){
+  // Llamado cuando el backend devuelve error (400 pre-val, 500, etc.):
+  // ocultar pipeline tras un breve flash en rojo del agente parser.
+  _paCancelarSimulador();
+  paSetAgentState('parser', 'fail');
+  setTimeout(paHidePipeline, 400);
 }
 
 function paSetAgentState(id, state, detail){
@@ -20259,7 +20356,9 @@ function paSetAgentState(id, state, detail){
 }
 
 function paSimularAvancePipeline(){
-  // Sin SSE real del backend, avanzamos con timings realistas
+  // Sin SSE real del backend, avanzamos con timings realistas.
+  // Los handles quedan en _paPipelineTimers para poder cancelar si el
+  // request termina (ok o fail) antes de que el simulador llegue al final.
   const orden = ['parser','tarifa','normativa','precedente','auditor','redactor','verifier'];
   let i = 0;
   paSetAgentState(orden[0], 'running');
@@ -20269,10 +20368,10 @@ function paSimularAvancePipeline(){
     i++;
     if(i < orden.length){
       paSetAgentState(orden[i], 'running');
-      setTimeout(tick, 1500 + Math.random() * 1500);
+      _paPipelineTimers.push(setTimeout(tick, 1500 + Math.random() * 1500));
     }
   };
-  setTimeout(tick, 1800);
+  _paPipelineTimers.push(setTimeout(tick, 1800));
 }
 
 // ─── CITATION VERIFIER (post-analisis) ───────────────────────────

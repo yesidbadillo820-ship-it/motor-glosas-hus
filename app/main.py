@@ -331,6 +331,10 @@ async def lifespan(app: FastAPI):
         ("tercero_nit", "VARCHAR(30)"),
         ("dias_radicacion_dgh", "INTEGER DEFAULT 0"),
         ("tercero_nombre", "VARCHAR(300)"),
+        # Evidencia de radicación ante la entidad (marcar-radicada)
+        ("radicado_en", "TIMESTAMP WITH TIME ZONE"),
+        ("radicado_por", "VARCHAR(200)"),
+        ("radicado_observacion", "TEXT"),
         # Nota crédito (commit cfafe7d / hotfix 4adbb7b)
         ("numero_nota_credito", "VARCHAR(60)"),
         ("fecha_nota_credito", "TIMESTAMP WITH TIME ZONE"),
