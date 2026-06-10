@@ -185,7 +185,10 @@ def _limpiar_observacion(dictamen_html: str) -> str:
 
 @router.get("/historial", response_model=list)
 def historial(
-    limit: int = 50,
+    # le=500: sin tope, un limit=10_000_000 serializa la tabla completa
+    # (dictamenes HTML incluidos) en una sola respuesta — DoS trivial
+    # autenticado (auditoría jun-2026, P2 #9).
+    limit: int = Query(50, ge=1, le=500),
     eps: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
