@@ -142,19 +142,38 @@ async def ejecutar_con_quality_gate(
         f"orden modelos: {modelos_orden} ({decision.razon})"
     )
 
-    # Generador adapta _llamar_ia al contrato del orchestrator
+    # Generador adapta _llamar_ia al contrato del orchestrator.
+    #
+    # Bug auditoría jun-2026 (P1 #2): la versión anterior ignoraba `modelo`
+    # y llamaba _llamar_ia sin bypass_cache. Como la clave de caché es
+    # (primary|modelo|eps|codigo|system|user) y los prompts no cambian entre
+    # intentos, los intentos 2 y 3 devolvían la MISMA respuesta cacheada que
+    # el post-validador acababa de rechazar → la regeneración era un no-op.
+    n_llamadas = 0
+
     async def generador(modelo: str, **contexto: Any) -> tuple[str, str]:
-        # _llamar_ia respeta PRIMARY_AI env var. Para forzar un modelo
-        # específico, seteamos temporary primary_ai del servicio.
-        # NOTA: implementación simple — en producción quizás convenga
-        # parametrizar _llamar_ia para aceptar modelo directo.
-        # Por ahora confiamos en el orden de fallback del router y dejamos
-        # que _llamar_ia respete su PRIMARY_AI configurado.
+        nonlocal n_llamadas
+        n_llamadas += 1
+        es_regeneracion = n_llamadas > 1
+
+        # `modelo` es un PROVEEDOR del router ("groq"/"anthropic"/"gemini"/
+        # "openrouter"). _llamar_ia solo permite forzar proveedor vía
+        # modelo_override (que siempre enruta a Anthropic con ese model id);
+        # para el resto respeta primary_ai + su cadena de fallback.
+        modelo_override = None
+        if modelo == "anthropic" and getattr(servicio, "anthropic_key", None):
+            modelo_override = getattr(servicio, "anthropic_model", None)
+
         texto_resp, modelo_real = await servicio._llamar_ia(
             system=system_prompt,
             user=user_prompt,
             eps=eps,
             codigo=codigo_glosa,
+            modelo_override=modelo_override,
+            # Intento 1 puede servirse de caché (ahorro). Intentos 2+ existen
+            # porque el post-validador rechazó el anterior: servir caché ahí
+            # repetiría la respuesta defectuosa.
+            bypass_cache=es_regeneracion,
         )
         # Extraer argumento del XML si aplica
         try:

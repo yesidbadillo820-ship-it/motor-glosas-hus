@@ -101,11 +101,14 @@ class TestEjecutarConQualityGateOnStub:
         # Servicio stub que devuelve un dictamen limpio
         class StubService:
             anthropic_key = "key"
+            anthropic_model = "claude-sonnet-4-5"
             groq = "client"
             gemini = None
             openrouter = None
 
-            async def _llamar_ia(self, system, user, eps="", codigo=""):
+            async def _llamar_ia(
+                self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+            ):
                 texto = (
                     "<argumento>ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE MAYOR VALOR. " * 5
                     + "SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO INTEGRO.</argumento>"
@@ -147,11 +150,14 @@ class TestEjecutarConQualityGateOnStub:
 
         class StubService:
             anthropic_key = "key"
+            anthropic_model = "claude-sonnet-4-5"
             groq = "client"
             gemini = None
             openrouter = None
 
-            async def _llamar_ia(self, system, user, eps="", codigo=""):
+            async def _llamar_ia(
+                self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+            ):
                 ia_calls["n"] += 1
                 return ("<argumento>x</argumento>", "groq")
 
