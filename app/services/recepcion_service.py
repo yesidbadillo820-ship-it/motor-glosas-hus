@@ -250,6 +250,130 @@ def _fix_mojibake(texto: str) -> str:
     return texto
 
 
+# ─── Resolución GESTOR (Excel) → UsuarioRecord (asignación automática) ───────
+# La columna GESTOR de la hoja INICIAL trae el nombre de pila del gestor
+# ("YESID PEREZ"). Para que la glosa aparezca en "Mis glosas" del usuario
+# correcto hay que setear auditor_email (gestor_nombre solo matchea por
+# igualdad EXACTA con UsuarioRecord.nombre — tildes o mayúsculas distintas
+# rompen la visibilidad). Matching tolerante: sin tildes/mayúsculas,
+# containment, subconjunto de tokens y local-part del email
+# ("yesid.perez@hus.com" ≈ "YESID PEREZ").
+
+
+def _tokens_nombre(texto: str) -> frozenset[str]:
+    return frozenset(t for t in _normalizar(texto or "").split(" ") if len(t) >= 2)
+
+
+def construir_indice_usuarios(db) -> list[dict]:
+    """Índice en memoria de usuarios activos para resolver gestores."""
+    try:
+        from app.models.db import UsuarioRecord
+
+        usuarios = db.query(UsuarioRecord).filter(UsuarioRecord.activo == 1).all()
+    except Exception as e:
+        logger.warning(f"No se pudo cargar usuarios para asignar gestores: {e}")
+        return []
+    indice: list[dict] = []
+    for u in usuarios:
+        email = (u.email or "").strip().lower()
+        if not email:
+            continue
+        local_como_nombre = re.sub(r"[._\-+]+", " ", email.split("@", 1)[0])
+        indice.append(
+            {
+                "usuario": u,
+                "email": email,
+                "nombre_norm": _normalizar(u.nombre or ""),
+                "tokens_nombre": _tokens_nombre(u.nombre or ""),
+                "email_local_norm": _normalizar(local_como_nombre),
+                "tokens_email": _tokens_nombre(local_como_nombre),
+            }
+        )
+    return indice
+
+
+def _email_con_delegacion(usuario, email: str) -> str:
+    """Si el usuario está de vacaciones con delegado configurado, la
+    asignación automática se redirige al delegado (mismo criterio que
+    /glosas/bulk/asignar — ver UsuarioRecord.delega_a_email)."""
+    try:
+        vd = usuario.vacaciones_desde
+        vh = usuario.vacaciones_hasta
+        delegado = (usuario.delega_a_email or "").strip().lower()
+        if not (vd and vh and delegado):
+            return email
+        from datetime import timezone as _tz
+
+        ahora = datetime.now(_tz.utc)
+        try:
+            en_vacaciones = vd <= ahora <= vh
+        except TypeError:
+            # BD con datetimes naive (SQLite) — comparar naive vs naive
+            en_vacaciones = vd <= datetime.now() <= vh
+        if en_vacaciones:
+            logger.info(
+                f"Gestor {email} en vacaciones — asignación redirigida al delegado {delegado}"
+            )
+            return delegado
+    except Exception as e:
+        logger.debug(f"Chequeo de delegación falló para {email}: {e}")
+    return email
+
+
+def resolver_gestor_a_email(nombre_gestor: str, indice: list[dict]) -> tuple[Optional[str], str]:
+    """Resuelve el nombre de gestor del Excel a un email de usuario.
+
+    Devuelve (email | None, motivo) con motivo en:
+      "exacto"    — nombre normalizado idéntico
+      "parcial"   — containment o tokens del más corto ⊆ tokens del más largo
+      "email"     — match contra el local-part del email
+      "vacio"     — celda vacía / "SIN ASIGNAR"
+      "ambiguo"   — varios usuarios distintos matchean (ej. equipos que
+                    comparten nombre): NO se asigna a uno al azar; el
+                    correo grupal del Excel-respuesta ya los cubre.
+      "sin_match" — ningún usuario activo coincide (se reporta como
+                    advertencia en el resumen de importación).
+    """
+    g_norm = _normalizar(nombre_gestor or "")
+    if not g_norm or g_norm == "sin asignar":
+        return None, "vacio"
+    g_tokens = _tokens_nombre(nombre_gestor)
+
+    def _matchea(e: dict) -> str | None:
+        n = e["nombre_norm"]
+        if n:
+            if n == g_norm:
+                return "exacto"
+            if g_norm in n or n in g_norm:
+                return "parcial"
+            tn = e["tokens_nombre"]
+            if g_tokens and tn and (g_tokens <= tn or tn <= g_tokens):
+                return "parcial"
+        el = e["email_local_norm"]
+        if el:
+            if el == g_norm or g_norm in el:
+                return "email"
+            te = e["tokens_email"]
+            if g_tokens and te and g_tokens <= te:
+                return "email"
+        return None
+
+    matches = [(e, m) for e in indice if (m := _matchea(e))]
+    if not matches:
+        return None, "sin_match"
+    emails_distintos = {e["email"] for e, _ in matches}
+    if len(emails_distintos) > 1:
+        # Desempate: si hay UN solo match exacto, gana (los parciales
+        # suelen ser homónimos/equipos).
+        exactos = [(e, m) for e, m in matches if m == "exacto"]
+        if len({e["email"] for e, _ in exactos}) == 1:
+            e, _ = exactos[0]
+            return _email_con_delegacion(e["usuario"], e["email"]), "exacto"
+        return None, "ambiguo"
+    e, motivo = matches[0]
+    return _email_con_delegacion(e["usuario"], e["email"]), motivo
+
+
 def _split_entidad(entidad: str) -> tuple[str, str]:
     """Separa 'U220181 - FAMISANAR EPS SUBSIDIADO' en ('U220181', 'FAMISANAR EPS SUBSIDIADO').
 
@@ -550,6 +674,16 @@ class ResumenImportacion:
         self.filas_omitidas_detalle: list[dict] = []
         # Hojas descartadas por no tener columnas reconocibles.
         self.hojas_descartadas: list[dict] = []
+        # Asignación automática GESTOR → usuario (auditor_email).
+        # gestores_asignados: {nombre_gestor: email_asignado}
+        # gestores_sin_usuario: nombres que no matchearon ningún usuario
+        # activo (las glosas quedan sin auditor_email y el coordinador ve
+        # la advertencia en el resumen).
+        # advertencias: avisos no-fatales (separados de `errores`, que
+        # significa "filas/hojas que no se pudieron importar").
+        self.gestores_asignados: dict[str, str] = {}
+        self.gestores_sin_usuario: list[str] = []
+        self.advertencias: list[str] = []
 
     def registrar_omitida(self, fila: int, motivo: str) -> None:
         self.filas_omitidas += 1
@@ -574,12 +708,50 @@ class ResumenImportacion:
             "filas_omitidas": self.filas_omitidas,
             "filas_omitidas_detalle": self.filas_omitidas_detalle,
             "hojas_descartadas": self.hojas_descartadas,
+            "gestores_asignados": self.gestores_asignados,
+            "gestores_sin_usuario": self.gestores_sin_usuario,
+            "advertencias": self.advertencias,
         }
 
 
 class RecepcionService:
     def __init__(self, db: Session):
         self.db = db
+        # Índice de usuarios y cache de resolución gestor→email; viven lo
+        # que dura la importación (una instancia por archivo procesado).
+        self._indice_usuarios: list[dict] | None = None
+        self._cache_gestor: dict[str, Optional[str]] = {}
+
+    def _resolver_gestor(self, gestor: str, resumen: "ResumenImportacion") -> Optional[str]:
+        """Email del usuario asignable para este gestor (o None).
+
+        Cachea por nombre normalizado y registra UNA advertencia por
+        gestor sin usuario para que el coordinador la vea en el resumen.
+        """
+        clave = _normalizar(gestor or "")
+        if clave in self._cache_gestor:
+            return self._cache_gestor[clave]
+        if self._indice_usuarios is None:
+            self._indice_usuarios = construir_indice_usuarios(self.db)
+        email, motivo = resolver_gestor_a_email(gestor, self._indice_usuarios)
+        if email:
+            resumen.gestores_asignados[gestor] = email
+            logger.info(f"Gestor '{gestor}' → {email} (match {motivo})")
+        elif motivo == "sin_match":
+            resumen.gestores_sin_usuario.append(gestor)
+            resumen.advertencias.append(
+                f"El gestor '{gestor}' no coincide con ningún usuario activo "
+                f"del sistema — sus glosas quedan sin asignar (auditor_email "
+                f"vacío). Cree el usuario o corrija el nombre en el Excel."
+            )
+            logger.warning(f"Gestor '{gestor}' sin usuario activo que matchee — sin asignar")
+        elif motivo == "ambiguo":
+            logger.info(
+                f"Gestor '{gestor}' matchea varios usuarios distintos "
+                f"(¿equipo?) — no se asigna auditor_email a uno solo"
+            )
+        self._cache_gestor[clave] = email
+        return email
 
     def procesar_excel(self, contenido: bytes) -> ResumenImportacion:
         """Procesa el archivo Excel completo (múltiples hojas).
@@ -750,6 +922,10 @@ class RecepcionService:
 
                 consecutivo = str(_get("consecutivo_dgh") or "").strip()
                 gestor = str(_get("gestor") or "").strip().upper() or "SIN ASIGNAR"
+                # Asignación automática: GESTOR del Excel → usuario activo
+                # (auditor_email). Si no hay match queda sin asignar y se
+                # reporta advertencia (una vez por gestor).
+                auditor_email_asignado = self._resolver_gestor(gestor, resumen)
                 radicado_info = str(_get("radicado") or "").strip()
                 referencia = str(_get("referencia") or "").strip()
                 observacion_tecnico = _fix_mojibake(str(_get("observacion_tecnico") or "").strip())
@@ -873,6 +1049,11 @@ class RecepcionService:
                     workflow_state=estado,
                     modelo_ia="importacion_recepcion",
                 )
+                # Solo si se resolvió un usuario: así una reimportación sin
+                # match NUNCA borra una asignación manual previa (la clave
+                # ausente no entra al setattr del upsert).
+                if auditor_email_asignado:
+                    campos["auditor_email"] = auditor_email_asignado
 
                 if existente:
                     # Detectar duplicado exacto (misma factura+consecutivo+valor+fecha)
