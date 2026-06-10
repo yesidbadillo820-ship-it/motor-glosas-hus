@@ -20,7 +20,12 @@ REGLA DE ORO: ningún log/response fuera de /revelar contiene valores
 descifrados. Los logs solo llevan conteos y metadatos.
 """
 
-from __future__ import annotations
+# NOTA: este módulo NO usa `from __future__ import annotations` a propósito.
+# Con PEP 563 las anotaciones se vuelven strings y FastAPI 0.115.x no las
+# resuelve a través del wrapper de slowapi (@limiter.limit) — el body model
+# RevelarBody terminaba interpretado como query param y el endpoint devolvía
+# 422 "Field required in query". Python 3.11 soporta `X | Y` nativo, así que
+# el import no hace falta. Reproducido y verificado contra fastapi==0.115.6.
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
