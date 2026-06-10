@@ -99,6 +99,20 @@ if(!TOKEN){
   window.location.href = '/';
 }
 
+// Sesión expirada (JWT vencido): cualquier fetch devuelve 401 aunque el
+// token exista en localStorage. Antes el historial pintaba "(401)" y se
+// quedaba ahí — visto en producción 10-jun-2026. Ahora: limpiar el token
+// muerto y volver al login una sola vez.
+let _yaRedirigiendo = false;
+function sesionExpirada(){
+  if(_yaRedirigiendo) return;
+  _yaRedirigiendo = true;
+  localStorage.removeItem('hus_token');
+  sessionStorage.removeItem('hus_token');
+  alert('Tu sesión expiró. Vuelve a iniciar sesión.');
+  window.location.href = '/';
+}
+
 function colorSem(s){
   return {VERDE:'#16a34a',AMARILLO:'#eab308',ROJO:'#dc2626',NEGRO:'#111827'}[s] || '#6b7280';
 }
@@ -176,6 +190,7 @@ async function pollEstado(id){
       const r = await fetch('/glosas/importar-recepcion/'+id+'/status', {
         headers:{'Authorization':'Bearer '+TOKEN}
       });
+      if(r.status === 401){ clearInterval(_pollTimer); sesionExpirada(); return; }
       if(!r.ok) return;
       const s = await r.json();
       cargarHistorial();
@@ -292,6 +307,7 @@ function mostrarResultado(d){
         var rr = await fetch('/glosas/importar-recepcion/'+d.recepcion_import_id+'/excel-respuesta', {
           headers:{'Authorization':'Bearer '+TOKEN}
         });
+        if(rr.status === 401){ sesionExpirada(); return; }
         if(!rr.ok){
           var de = {};
           try{ de = await rr.json(); }catch(_e){}
@@ -369,6 +385,7 @@ async function descargarExcelRecepcion(id, btn){
     const rr = await fetch('/glosas/importar-recepcion/'+id+'/excel-respuesta', {
       headers:{'Authorization':'Bearer '+TOKEN}
     });
+    if(rr.status === 401){ sesionExpirada(); return; }
     if(!rr.ok){
       let de={}; try{ de = await rr.json(); }catch(_e){}
       alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
@@ -397,6 +414,7 @@ async function cargarHistorial(){
     const r = await fetch('/glosas/importar-recepcion/historial', {
       headers:{'Authorization':'Bearer '+TOKEN}
     });
+    if(r.status === 401){ sesionExpirada(); return; }
     if(!r.ok){
       cont.innerHTML = '<div style="color:#991b1b;font-size:13px">No se pudo cargar el historial ('+r.status+')</div>';
       return;

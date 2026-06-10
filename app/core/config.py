@@ -13,7 +13,12 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./glosas.db"
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
+    # 480 min = jornada laboral de 8h. Con 60 min los gestores quedaban en
+    # "sesión zombie" a mitad de turno: el panel seguía visible pero todos
+    # los fetch devolvían 401 (visto en producción 10-jun-2026 — la página
+    # de importar recepción mostraba "No se pudo cargar el historial (401)").
+    # Sigue siendo overrideable con ACCESS_TOKEN_EXPIRE_MINUTES en el env.
+    access_token_expire_minutes: int = 480
     admin_password: str = _UNCONFIGURED_ADMIN_PASSWORD
 
     # Llaves de IA

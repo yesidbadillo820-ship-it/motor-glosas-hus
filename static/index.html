@@ -6289,12 +6289,28 @@ function _h(s){
 }
 
 
+// ─── Detección de sesión expirada (10-jun-2026) ─────────────────────────
+// El JWT vence y el panel quedaba "zombie": visible como logueado pero
+// todos los fetch devolvían 401 en silencio (badge/alertas/analytics
+// cada 60s en los logs de Fly). El gestor solo se enteraba al intentar
+// una acción. Ahora el primer 401 de un poll de fondo fuerza el login.
+window._sesion401Detectada = false;
+function manejarSesionExpirada(){
+  if(window._sesion401Detectada) return;       // una sola vez
+  if(!localStorage.getItem('hus_token')) return; // ya deslogueado
+  window._sesion401Detectada = true;
+  try{ toast('Sesión expirada','Tu sesión venció — vuelve a iniciar sesión. Lo que escribiste en el formulario se conserva.','warning'); }catch(_){}
+  logout();
+  window._sesion401Detectada = false; // permitir detección en el próximo login
+}
+
 // ─── Notificaciones personales (Ronda 26) ───────────────────────────────
 // Pollea /notificaciones/badge cada 60s. Solo pide el conteo total para
 // minimizar carga en BD. El drawer completo se carga on-demand al click.
 async function refrescarBadgeNotif(){
   try{
     var r = await fetch('/notificaciones/badge', {headers: authH()});
+    if(r.status === 401){ manejarSesionExpirada(); return; }
     if(!r.ok) return;
     var d = await r.json();
     var badge = document.getElementById('hdr-notif-badge');
