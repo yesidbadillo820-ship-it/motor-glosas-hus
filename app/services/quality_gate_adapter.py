@@ -42,6 +42,7 @@ from app.services.quality_gate import (
     QualityGateResult,
     ejecutar_quality_gate,
 )
+from app.utils.moneda import parse_valor_cop
 
 logger = logging.getLogger("motor_glosas.quality_gate_adapter")
 
@@ -119,10 +120,13 @@ async def ejecutar_con_quality_gate(
     Returns:
         QualityGateResult — ver app/services/quality_gate/orchestrator.py
     """
-    # Decidir orden de modelos según router
+    # Decidir orden de modelos según router. parse_valor_cop en vez de
+    # float(): los valores llegan como "$ 7.700,00" desde _extraer_valor y
+    # float() crudo lanzaba ValueError → el adapter completo caía al path
+    # legacy (QG muerto para toda glosa con valor monetario en el texto).
     decision = enrutar(
         eps=eps,
-        valor=float(valor_objetado) if valor_objetado else None,
+        valor=parse_valor_cop(valor_objetado) if valor_objetado else None,
         texto_glosa=texto_glosa,
         es_ratificacion=es_ratificacion,
         es_extemporanea=es_extemporanea,

@@ -27,6 +27,7 @@ from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.glosa_ia_prompts import get_contrato
 from app.services.glosa_service import GlosaService
+from app.utils.moneda import parse_valor_cop
 from app.utils.parsers_glosa import (
     _concepto_glosa,
     _descripcion_servicio,
@@ -494,8 +495,11 @@ async def _persistir_y_responder(
     """Cierra el flujo: aplica banner de tarifa, decide estado, construye
     dictamen final, persiste GlosaRecord, guarda snapshot de versión."""
     glosa_repo = GlosaRepository(db)
-    val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)
-    val_ac = float(re.sub(r"[^\d]", "", valor_aceptado) or 0)
+    # parse_valor_cop entiende formato colombiano ("7.700,00" → 7700.0).
+    # El patrón anterior float(re.sub(r"[^\d]","",x)) inflaba 100× los
+    # valores con decimales (auditoría jun-2026, P0 #1).
+    val_obj = parse_valor_cop(resultado.valor_objetado)
+    val_ac = parse_valor_cop(valor_aceptado)
 
     _agregar_banner_tarifa_post(
         db,

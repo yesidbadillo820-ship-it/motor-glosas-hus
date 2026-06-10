@@ -17,6 +17,7 @@ from app.core.logging_utils import set_request_id, logger
 from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordinador_o_admin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
 from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
+from app.utils.moneda import parse_valor_cop
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -4263,7 +4264,9 @@ async def _procesar_fila_en_background(
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
+                # parse_valor_cop: "7.700,00" → 7700.0 (el patrón anterior
+                # re.sub(r"[^\d]") inflaba 100× — auditoría jun-2026 P0 #1)
+                valor_objetado=parse_valor_cop(fila_data.get("valor", "0")),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",
@@ -4281,7 +4284,7 @@ async def _procesar_fila_en_background(
                 eps=eps_final,
                 paciente="N/A",
                 codigo_glosa=resultado.codigo_glosa,
-                valor_objetado=float(re.sub(r"[^\d]", "", fila_data.get("valor", "0")) or 0),
+                valor_objetado=parse_valor_cop(fila_data.get("valor", "0")),
                 valor_aceptado=0,
                 etapa="RESPUESTA A GLOSA",
                 estado="RESPONDIDA",
