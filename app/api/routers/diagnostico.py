@@ -286,13 +286,16 @@ def diagnostico_completo(
             try:
                 import httpx as _httpx_g
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent?key={gemini_key}"
+                # Key por header x-goog-api-key, NUNCA en la URL: el logger
+                # INFO de httpx escribe la URL completa y la key quedaba en
+                # texto plano en los logs de Fly (visto en prod 10-jun-2026).
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent"
                 payload = {
                     "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
                     "generationConfig": {"maxOutputTokens": 4, "temperature": 0},
                 }
                 with _httpx_g.Client(timeout=10.0) as client:
-                    rg = client.post(url, json=payload)
+                    rg = client.post(url, json=payload, headers={"x-goog-api-key": gemini_key})
                 if rg.status_code == 200:
                     return (
                         "ok",
