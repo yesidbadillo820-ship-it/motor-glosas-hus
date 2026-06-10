@@ -870,3 +870,59 @@ class QualityGateRunRecord(Base):
     es_ratificacion = Column(Integer, default=0)
     creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     creado_por = Column(String(200), nullable=True)
+
+
+class EntidadCredencialRecord(Base):
+    """Vault de credenciales de plataformas EPS/entidades (jun-2026).
+
+    Importado del Excel maestro "RADICAR FACTURAS ENTIDADES" (hoja
+    CONSOLIDADO). Cada entidad genera hasta 3 registros: uno por bloque
+    (RADICACION | CARTERA | DEVOLUCIONES). Los campos sensibles
+    (usuario, contraseña, teléfono, correo) se guardan SOLO cifrados
+    con Fernet (app/services/credenciales_vault.py, clave en env
+    CRED_VAULT_KEY) — nunca en claro. El link de la plataforma y los
+    datos de contacto institucionales son públicos dentro del equipo
+    y van en claro para que /credenciales/buscar funcione sin clave.
+    """
+
+    __tablename__ = "entidad_credenciales"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nit = Column(String(30), index=True, nullable=False)
+    empresa = Column(String(300), index=True, nullable=False)
+    bloque = Column(String(20), nullable=False)  # RADICACION | CARTERA | DEVOLUCIONES
+    link_plataforma = Column(Text, nullable=True)  # no secreto
+    usuario_cifrado = Column(Text, nullable=True)  # token Fernet
+    password_cifrado = Column(Text, nullable=True)  # token Fernet
+    telefono_cifrado = Column(Text, nullable=True)  # token Fernet
+    correo_cifrado = Column(Text, nullable=True)  # token Fernet
+    nombre_contacto = Column(String(300), nullable=True)
+    cargo = Column(String(200), nullable=True)
+    manual_radicacion = Column(Text, nullable=True)  # instrucciones, no secreto
+    medio_contacto = Column(String(300), nullable=True)
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    actualizado_por = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        # Clave de upsert del importador: una credencial por entidad y bloque.
+        Index("ix_entidad_cred_nit_bloque", "nit", "bloque", unique=True),
+    )
+
+
+class CredencialAccesoLog(Base):
+    """Auditoría de acceso al vault de credenciales.
+
+    Cada IMPORTAR (carga del Excel) y cada REVELAR (descifrado de
+    usuario/contraseña, con motivo obligatorio) deja fila aquí.
+    LISTAR queda reservado para consumidores automáticos futuros
+    (worker de radicación) — /buscar no lo registra para no inundar.
+    """
+
+    __tablename__ = "credencial_acceso_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    credencial_id = Column(Integer, index=True, nullable=True)  # NULL en IMPORTAR
+    usuario_email = Column(String(200), index=True, nullable=False)
+    accion = Column(String(20), nullable=False)  # REVELAR | IMPORTAR | LISTAR
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    motivo = Column(Text, nullable=True)

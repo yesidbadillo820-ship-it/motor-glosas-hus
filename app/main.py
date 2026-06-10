@@ -1075,6 +1075,7 @@ from app.api.routers.audit import router as audit_router
 # salud_total: stub removido — prefijo /_removed/ (mayo 2026)
 from app.api.routers.tarifas_contratadas import router as tarifas_contratadas_router
 from app.api.routers.tarifa_liquidador import router as tarifa_liquidador_router
+from app.api.routers.credenciales import router as credenciales_router
 from app.api.routers.admin import router as admin_router
 from app.api.routers.plantillas_gold import router as plantillas_gold_router
 from app.api.routers.comentarios import router as comentarios_router
@@ -1137,6 +1138,7 @@ app.include_router(audit_router)
 # salud_total_router: stub removido
 app.include_router(tarifas_contratadas_router)
 app.include_router(tarifa_liquidador_router)
+app.include_router(credenciales_router)  # Vault cifrado de credenciales EPS
 app.include_router(admin_router)
 app.include_router(plantillas_gold_router)
 app.include_router(comentarios_router)
