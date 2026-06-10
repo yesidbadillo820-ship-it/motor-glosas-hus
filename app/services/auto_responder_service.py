@@ -37,6 +37,35 @@ _SEMAFORO = asyncio.Semaphore(_MAX_CONCURRENCIA)
 _BG_TASKS: set[asyncio.Task] = set()
 
 
+def _texto_glosa_para_ia(db, glosa) -> str:
+    """Texto de la glosa que la IA debe LEER para responder.
+
+    Prioridad:
+      1. texto_glosa_original — el importador de recepción lo compila
+         desde las hojas I/R (CONCEPTO real de la EPS: código, CUPS,
+         valor y observación).
+      2. Conceptos vinculados en BD (ConceptoGlosaRecord) — cubre glosas
+         importadas antes de que el importador compilara el texto.
+      3. concepto_glosa (descripción oficial del código).
+      4. dictamen — último recurso (puede ser el placeholder "Pendiente
+         de análisis...", por eso va al final; antes iba SEGUNDO y la IA
+         de las glosas importadas leía el placeholder en vez del
+         concepto de la EPS — bug reportado 2026-06-10).
+    """
+    texto = (glosa.texto_glosa_original or "").strip()
+    if texto:
+        return texto
+    try:
+        from app.services.recepcion_service import componer_texto_desde_conceptos
+
+        texto = (componer_texto_desde_conceptos(db, glosa) or "").strip()
+        if texto:
+            return texto
+    except Exception as e:
+        logger.debug(f"[auto-responder] componer texto desde conceptos falló glosa={glosa.id}: {e}")
+    return (glosa.concepto_glosa or "").strip() or (glosa.dictamen or "").strip()
+
+
 async def procesar_glosa_id(glosa_id: int) -> dict:
     """Procesa una sola glosa en una NUEVA sesión DB.
 
@@ -82,10 +111,14 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
         except Exception as e:
             logger.debug(f"[auto-responder] indexer lookup falló glosa={glosa_id}: {e}")
 
+        # Texto real de la glosa (conceptos de la EPS) — compartido entre
+        # el detector pre-IA y la llamada al cerebro IA.
+        texto_glosa_ia = _texto_glosa_para_ia(db, g)
+
         # Reglas pre-IA (gratis)
         evaluacion = evaluar(
             codigo_glosa=g.codigo_glosa,
-            texto_glosa=(g.texto_glosa_original or g.dictamen or g.concepto_glosa or ""),
+            texto_glosa=texto_glosa_ia,
             contexto_pdf="",  # importación masiva no trae PDFs locales
             valor_objetado=float(g.valor_objetado or 0),
             cups=g.cups_servicio,
@@ -117,7 +150,7 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
 
         # Llamada al cerebro IA con los datos mínimos
         try:
-            return await _ejecutar_ia_y_persistir(db, g)
+            return await _ejecutar_ia_y_persistir(db, g, texto=texto_glosa_ia)
         except Exception as e:
             logger.warning(f"[AUTO-RESPONDER] Glosa {glosa_id} falló en IA: {e}")
             # En caso de error, dejar la glosa pendiente para el gestor
@@ -130,14 +163,18 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
         db.close()
 
 
-async def _ejecutar_ia_y_persistir(db, glosa) -> dict:
+async def _ejecutar_ia_y_persistir(db, glosa, texto: str | None = None) -> dict:
     """Llama al motor IA de glosa_service y guarda el dictamen en la
-    glosa existente."""
+    glosa existente.
+
+    `texto` es el texto de la glosa (conceptos EPS) ya resuelto por el
+    caller; si viene None se recalcula con _texto_glosa_para_ia.
+    """
     from app.services.glosa_service import GlosaService
     from app.models.schemas import GlosaInput
 
     eps = (glosa.eps or "").strip() or "OTRA / SIN DEFINIR"
-    texto = (glosa.texto_glosa_original or glosa.dictamen or glosa.concepto_glosa or "").strip()
+    texto = (texto if texto is not None else _texto_glosa_para_ia(db, glosa)).strip()
     if len(texto) < 15:
         return {
             "glosa_id": glosa.id,

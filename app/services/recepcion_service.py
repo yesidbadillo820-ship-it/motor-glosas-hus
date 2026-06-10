@@ -151,6 +151,65 @@ def _normalizar(texto: str) -> str:
     return re.sub(r"\s+", " ", t).strip().lower()
 
 
+# ─── Texto de glosa compilado desde los conceptos (hojas I/R) ────────────────
+# La hoja INICIAL/RATIFICADA no trae el "por qué" de la glosa; ese texto vive
+# en las hojas I/R (ListadoConceptos.Observaciones + ConceptoObjecion.Nombre).
+# Compilamos esos conceptos en texto_glosa_original para que la IA del
+# auto-responder LEA EL CONCEPTO REAL de la EPS (antes recibía el dictamen
+# placeholder "Pendiente de análisis..." — bug reportado 2026-06-10).
+MARCA_TEXTO_CONCEPTOS = "[CONCEPTOS GLOSADOS"
+_MAX_TEXTO_CONCEPTOS = 30_000  # tope < GlosaInput.tabla_excel (50K)
+
+
+def _fmt_cop(valor) -> str:
+    try:
+        return f"${int(round(float(valor or 0))):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "$0"
+
+
+def componer_texto_desde_conceptos(db, glosa) -> str:
+    """Compila el texto de la glosa desde sus ConceptoGlosaRecord.
+
+    Devuelve "" si la glosa no tiene conceptos vinculados. El texto
+    empieza con MARCA_TEXTO_CONCEPTOS para distinguirlo de texto
+    cargado manualmente (nunca se pisa texto manual al reimportar).
+    """
+    if glosa is None or glosa.id is None:
+        return ""
+    conceptos = (
+        db.query(ConceptoGlosaRecord)
+        .filter(ConceptoGlosaRecord.glosa_id == glosa.id)
+        .order_by(ConceptoGlosaRecord.id)
+        .all()
+    )
+    if not conceptos:
+        return ""
+    bloques = [
+        f"{MARCA_TEXTO_CONCEPTOS} — DETALLE DGH] Factura {glosa.factura or 's/n'} — "
+        f"{len(conceptos)} concepto(s) objetado(s) por la EPS:"
+    ]
+    for i, c in enumerate(conceptos, start=1):
+        encabezado = f"CONCEPTO {i}: {c.codigo_glosa or 'sin código'}"
+        if c.nombre_glosa:
+            encabezado += f" — {c.nombre_glosa}"
+        lineas = [encabezado]
+        servicio = " — ".join(x for x in (c.cups_codigo, c.cups_descripcion) if x)
+        if servicio:
+            lineas.append(f"Servicio/CUPS: {servicio}")
+        if c.centro_costo:
+            lineas.append(f"Centro de costo: {c.centro_costo}")
+        if c.valor_objetado:
+            lineas.append(f"Valor objetado: {_fmt_cop(c.valor_objetado)}")
+        if c.observacion_eps:
+            lineas.append(f"Observación EPS: {c.observacion_eps}")
+        bloques.append("\n".join(lineas))
+    texto = "\n\n".join(bloques)
+    if len(texto) > _MAX_TEXTO_CONCEPTOS:
+        texto = texto[:_MAX_TEXTO_CONCEPTOS] + "\n[... truncado]"
+    return texto
+
+
 def _fix_mojibake(texto: str) -> str:
     """Arregla texto UTF-8 leído como Latin-1 (mojibake) y limpia artefactos.
 
@@ -1087,6 +1146,30 @@ class RecepcionService:
                 resumen.errores.append(f"[Conceptos {nombre_hoja}] Fila {num_fila}: {e}")
                 logger.warning(f"Error procesando concepto fila {num_fila}: {e}")
                 continue
+
+        # Compilar texto_glosa_original de cada glosa que recibió conceptos:
+        # es lo que la IA del auto-responder lee como "texto de la glosa".
+        # Sin esto, la IA recibía el dictamen placeholder ("Pendiente de
+        # análisis...") en vez del CONCEPTO real de la EPS. Solo se pisa si
+        # el campo está vacío o si lo compuso una importación anterior
+        # (empieza con MARCA_TEXTO_CONCEPTOS) — el texto manual se respeta.
+        try:
+            self.db.flush()  # los conceptos recién agregados deben ser visibles
+        except Exception as e:
+            logger.warning(f"flush pre-compilación de conceptos falló: {e}")
+        padres_unicos = {p.id: p for p in _padre_cache.values() if p is not None and p.id}
+        for glosa_padre in padres_unicos.values():
+            try:
+                actual = (glosa_padre.texto_glosa_original or "").strip()
+                if actual and not actual.startswith(MARCA_TEXTO_CONCEPTOS):
+                    continue
+                texto = componer_texto_desde_conceptos(self.db, glosa_padre)
+                if texto:
+                    glosa_padre.texto_glosa_original = texto
+            except Exception as e:
+                logger.warning(
+                    f"No se pudo compilar texto de conceptos para glosa {glosa_padre.id}: {e}"
+                )
 
         try:
             self.db.commit()
