@@ -341,8 +341,10 @@ def login(page: Page, user: str, password: str) -> None:
         "input[type='text']:visible, input[name*='USR']:visible, input[id*='vUSR']:visible"
     ).first
     p = page.locator("input[type='password']:visible").first
-    u.click(); u.fill(""); u.type(user, delay=30); u.press("Tab")
-    p.click(); p.fill(""); p.type(password, delay=30); p.press("Enter")
+    # fill() atómico: el portal acepta fill en usuario/password (sólo el campo
+    # Fecha del modal exige tipeo). Ahorra ~2s vs type(delay=30) char a char.
+    u.click(); u.fill(user); u.press("Tab")
+    p.click(); p.fill(password); p.press("Enter")
     try:
         page.wait_for_url(lambda url: "gamexamplelogin" not in url, timeout=3000)
     except PlaywrightTimeout:
@@ -369,44 +371,65 @@ def ir_a_respuesta_glosa_web(page: Page) -> None:
     page.wait_for_selector("text=Respuesta a Glosas", timeout=15000)
 
 
+# Memo de los selectores que funcionaron la última vez en el filtro DDO.
+# El portal es estable dentro de una sesión: una vez que un selector ganó,
+# va a seguir ganando — probarlo primero evita timeouts de 2s por intento.
+_memo_filtro: dict[str, str] = {}
+
+
 def filtrar_por_factura(page: Page, factura_corta: str) -> None:
     """Aplica el filtro de columna '# Factura' (DropDownOptions de GeneXus).
 
     Idéntica lógica a cargar_soportes_simed.py — el portal es el mismo.
+    Los selectores que SIEMPRE ganan en producción van primero (trigger
+    `img[src*='DDO']`, input `.dropdown-menu input`), y se memorizan.
     """
-    header = page.locator("th").filter(has_text="# Factura").first
+    header = page.locator("th:has-text('# Factura')").first
     if header.count() == 0:
-        header = page.locator("th").filter(has_text="Factura").first
+        header = page.locator("th:has-text('Factura')").first
 
-    for sel in (
-        "img[src*='DDO']",
+    triggers = [
+        "img[src*='DDO']",  # ← el que gana siempre en producción
         "[data-toggle='dropdown']",
         "a.dropdown-toggle",
         "a[onclick*='DropDownOptions']",
         "a",
-    ):
+    ]
+    if _memo_filtro.get("trigger") in triggers:
+        triggers.remove(_memo_filtro["trigger"])
+        triggers.insert(0, _memo_filtro["trigger"])
+    for sel in triggers:
         try:
-            header.locator(sel).first.click(timeout=2000); break
+            header.locator(sel).first.click(timeout=2000)
+            _memo_filtro["trigger"] = sel
+            break
         except PlaywrightTimeout:
             continue
     else:
         header.click()
 
-    page.wait_for_timeout(1200)
+    # Sin sleep fijo: el wait_for(visible) del input ya espera a que el
+    # dropdown termine de abrir (incluye el XHR que carga las opciones).
     input_buscar = None
-    for sel in (
+    selectores_input = [
+        ".dropdown-menu input[type='text']:visible",  # ← gana siempre
         ".dropdown-menu.show input[type='text']:visible",
-        ".dropdown-menu input[type='text']:visible",
         ".DDOOptionFilteringDataContainer input:visible",
         ".DDOOptionFilter input:visible",
         "div[class*='DDO'] input[type='text']:visible",
         "div[class*='dropdown'] input[type='text']:visible",
         "input[type='text']:visible:not([readonly]):not([disabled])",
-    ):
+    ]
+    if _memo_filtro.get("input") in selectores_input:
+        selectores_input.remove(_memo_filtro["input"])
+        selectores_input.insert(0, _memo_filtro["input"])
+    for sel in selectores_input:
         try:
             elem = page.locator(sel).first
-            elem.wait_for(state="visible", timeout=2000)
-            input_buscar = elem; break
+            elem.wait_for(state="visible", timeout=2500)
+            input_buscar = elem
+            _memo_filtro["input"] = sel
+            break
         except PlaywrightTimeout:
             continue
     if input_buscar is None:
@@ -414,7 +437,7 @@ def filtrar_por_factura(page: Page, factura_corta: str) -> None:
         raise PlaywrightTimeout("No encontre el input del filtro # Factura.")
 
     input_buscar.fill(factura_corta)
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(200)  # mini-debounce del DDO (antes 800ms)
     try:
         page.locator(
             "img[src*='ApplyFilter']:visible, img[title*='Apply' i]:visible, "
@@ -423,7 +446,8 @@ def filtrar_por_factura(page: Page, factura_corta: str) -> None:
     except PlaywrightTimeout:
         input_buscar.press("Enter")
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(1000)
+    # Sin sleep extra: abrir_factura() espera de forma dirigida a que la fila
+    # (o el 'No se encontraron registros') aparezca tras aplicar el filtro.
 
 
 class FacturaNoPendiente(Exception):
@@ -435,19 +459,32 @@ class ObjecionNoEnGrilla(Exception):
 
 
 def abrir_factura(page: Page, factura_corta: str) -> None:
-    """Click en el lápiz de la fila filtrada → abre glosasfactura.aspx."""
-    page.wait_for_timeout(1500)
+    """Click en el lápiz de la fila filtrada → abre glosasfactura.aspx.
+
+    Espera DIRIGIDA: en vez de un sleep fijo, pollea barato (checks inmediatos
+    cada 150ms) hasta que aparezca la fila de la factura o el mensaje de
+    'No se encontraron registros' — lo que llegue primero.
+    """
     no_resultados = page.locator("text=No se encontraron registros").first
-    try:
-        if no_resultados.is_visible(timeout=2000):
-            raise FacturaNoPendiente(f"Factura {factura_corta} no está en pendientes (¿ya finalizada?).")
-    except PlaywrightTimeout:
-        pass
-    fila = page.locator("tr").filter(has_text=factura_corta).first
-    try:
-        fila.wait_for(state="visible", timeout=5000)
-    except PlaywrightTimeout:
-        raise FacturaNoPendiente(f"Factura {factura_corta} no aparece en la grilla (¿ya finalizada?).")
+    fila = page.locator(f"tr:has-text('{factura_corta}')").first
+    deadline = time.time() + 7
+    while True:
+        try:
+            if no_resultados.is_visible():
+                raise FacturaNoPendiente(
+                    f"Factura {factura_corta} no está en pendientes (¿ya finalizada?)."
+                )
+            if fila.is_visible():
+                break
+        except FacturaNoPendiente:
+            raise
+        except Exception:
+            pass  # DOM re-renderizando; reintento en el próximo ciclo
+        if time.time() >= deadline:
+            raise FacturaNoPendiente(
+                f"Factura {factura_corta} no aparece en la grilla (¿ya finalizada?)."
+            )
+        page.wait_for_timeout(150)
     boton_editar = fila.locator(
         "a[title*='Actualizar' i], a[title*='Editar' i], a[title*='Edit' i], "
         "a:has(img[src*='ActionUpdate']), a:has(img[title*='Actualizar' i]), "
@@ -473,25 +510,21 @@ def _localizar_fila_objecion(page: Page, num_objecion: int):
     exacto para no confundir con el radicado u otros números.
     """
     target = str(num_objecion)
-    fila = page.locator("tr").filter(
-        has=page.locator(f"span[id*='FCTOBJSEC']:text-is('{target}')")
-    ).first
-    if fila.count() > 0:
+    # CSS :has() directo: el engine poda filas sin materializarlas todas,
+    # mucho más barato que locator("tr").filter(has=...).
+    selectores = (
+        f"tr:has(span[id*='FCTOBJSEC']:text-is('{target}'))",
+        f"tr:has(td:text-is('{target}'))",  # fallback: celda con sólo el número
+    )
+    for sel in selectores:
+        fila = page.locator(sel).first
         try:
-            fila.wait_for(state="visible", timeout=2000)
+            if fila.count() == 0:
+                continue
+            fila.wait_for(state="visible", timeout=1500)
             return fila
-        except PlaywrightTimeout:
-            pass
-    # Fallback: celda con sólo el número.
-    fila = page.locator("tr").filter(
-        has=page.locator(f"xpath=.//td[normalize-space(.)='{target}']")
-    ).first
-    if fila.count() > 0:
-        try:
-            fila.wait_for(state="visible", timeout=2000)
-            return fila
-        except PlaywrightTimeout:
-            pass
+        except Exception:
+            continue
     return None
 
 
@@ -524,22 +557,46 @@ def _fila_contestada(fila) -> bool:
     return False
 
 
-def _siguiente_pagina_grilla(page: Page) -> bool:
-    """Click en 'Sig' de la paginación. Devuelve True si avanzó, False si no hay más."""
-    # En GeneXus la paginación suele ser "Ant | 1 2 3 ... | Sig" con links.
-    # Buscamos un link 'Sig' o 'Siguiente' habilitado.
-    boton_sig = page.locator(
-        "a:has-text('Sig'):not(.disabled), a:has-text('Siguiente'):not(.disabled), "
-        "img[title*='Sig' i]:visible, img[title*='Siguiente' i]:visible"
-    ).first
+_RE_PAGINA = re.compile(r"P[áa]gina:?\s*(\d+)\s+de\s+(\d+)", re.IGNORECASE)
+
+
+def _pagina_actual_grilla(page: Page) -> tuple[int, int] | None:
+    """(página_actual, total) si la pantalla muestra UN único 'Página X de Y'.
+
+    Lectura instantánea que evita el ciclo de clicks 'Ant' cuando la grilla ya
+    está en página 1. Si el label no existe o es ambiguo (más de un match,
+    p.ej. dos grillas paginadas), devuelve None y se usa el camino clásico.
+    """
     try:
-        if boton_sig.count() == 0 or not boton_sig.is_visible(timeout=1500):
-            return False
-        boton_sig.click()
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(700)
-        return True
-    except PlaywrightTimeout:
+        loc = page.locator(r"text=/P[áa]gina:?\s*\d+\s+de\s+\d+/i")
+        if loc.count() != 1:
+            return None
+        m = _RE_PAGINA.search(loc.first.text_content(timeout=600) or "")
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    except Exception:
+        pass
+    return None
+
+
+def _link_paginacion_deshabilitado(link) -> bool:
+    """True si el link 'Ant'/'Sig' está deshabilitado (class/aria/li padre).
+
+    Detectarlo ANTES de clickear ahorra el ciclo click+espera completo cuando
+    la grilla ya está en el borde (página 1 para 'Ant', última para 'Sig').
+    """
+    try:
+        return bool(link.evaluate(
+            """el => {
+                const cls = (el.className || '') + ' ' +
+                            (el.closest('li') ? el.closest('li').className : '');
+                return /disabled|inactive/i.test(cls)
+                    || el.getAttribute('aria-disabled') === 'true'
+                    || el.hasAttribute('disabled');
+            }""",
+            timeout=1000,
+        ))
+    except Exception:
         return False
 
 
@@ -554,53 +611,137 @@ def _primera_objecion_visible(page: Page) -> str | None:
     return None
 
 
+def _esperar_cambio_primera_fila(page: Page, antes: str | None, timeout_ms: int = 4000) -> bool:
+    """Espera a que cambie el primer '# Objeción' visible (señal de que la
+    paginación AJAX re-renderizó la grilla). True si cambió.
+
+    OJO: acá networkidle NO sirve — el estado de carga es sticky por navegación
+    y la paginación de GeneXus es un XHR, así que wait_for_load_state devuelve
+    al instante. La señal confiable es el cambio del contenido de la grilla.
+    """
+    deadline = time.time() + timeout_ms / 1000
+    while time.time() < deadline:
+        ahora = _primera_objecion_visible(page)
+        if ahora is not None and ahora != antes:
+            return True
+        page.wait_for_timeout(120)
+    return False
+
+
+def _siguiente_pagina_grilla(page: Page) -> bool:
+    """Click en 'Sig' de la paginación. Devuelve True si avanzó, False si no hay más."""
+    # Salida temprana sin click si el label dice que ya estamos en la última.
+    pag = _pagina_actual_grilla(page)
+    if pag is not None and pag[0] >= pag[1]:
+        return False
+    # En GeneXus la paginación suele ser "Ant | 1 2 3 ... | Sig" con links.
+    boton_sig = page.locator(
+        "a:has-text('Sig'):not(.disabled), a:has-text('Siguiente'):not(.disabled), "
+        "img[title*='Sig' i]:visible, img[title*='Siguiente' i]:visible"
+    ).first
+    try:
+        if boton_sig.count() == 0 or not boton_sig.is_visible():
+            return False
+        if _link_paginacion_deshabilitado(boton_sig):
+            return False
+        antes = _primera_objecion_visible(page)
+        boton_sig.click(timeout=3000)
+        return _esperar_cambio_primera_fila(page, antes)
+    except PlaywrightTimeout:
+        return False
+
+
 def _ir_primera_pagina_grilla(page: Page) -> None:
-    """Lleva la grilla de objeciones a la primera página (clic 'Ant' hasta el tope).
+    """Lleva la grilla de objeciones a la primera página.
 
     La grilla puede estar ordenada por otra columna (ej. 'VI Aceptado'), así que
     las objeciones NO siguen el orden 1,2,3 por página; para encontrar una hay
     que arrancar en la página 1 y escanear hacia adelante.
+
+    Fast-paths (sin ningún click):
+      1. El label 'Página X de Y' dice X == 1.
+      2. El link 'Ant' no existe, no es visible o está deshabilitado.
     """
     try:
         page.wait_for_selector("text=Respuesta Glosa Ips", timeout=8000)
     except Exception:
         return
+    pag = _pagina_actual_grilla(page)
+    if pag is not None and pag[0] <= 1:
+        return
     for _ in range(12):
-        antes = _primera_objecion_visible(page)
         ant = page.locator("a:has-text('Ant'), a:has-text('Anterior')").first
         try:
-            if ant.count() == 0 or not ant.is_visible(timeout=600):
+            if ant.count() == 0 or not ant.is_visible():
                 return
+            if _link_paginacion_deshabilitado(ant):
+                return
+            antes = _primera_objecion_visible(page)
             ant.click(timeout=2000)
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(300)
+            cambio = _esperar_cambio_primera_fila(page, antes)
         except Exception:
             return
         # Si el primer renglón no cambió, el clic 'Ant' no movió nada → página 1.
-        if _primera_objecion_visible(page) == antes:
+        if not cambio:
             return
+        pag = _pagina_actual_grilla(page)
+        if pag is not None and pag[0] <= 1:
+            return
+
+
+_MODAL_URL_FRAGMENT = "respuestaglosaipsweb"  # respuestaglosaipsweb.aspx
+
+
+def _ctx_modal_por_texto(page: Page):
+    """Fallback legado: UN pase buscando marcadores de texto en todos los frames."""
+    marcadores = ["Detalle Respuesta", "Glosa Estado", "Detalle Glosa"]
+    for ctx in page.frames:
+        for marc in marcadores:
+            try:
+                loc = ctx.locator(f"text={marc}")
+                if loc.count() > 0 and loc.first.is_visible():
+                    return ctx
+            except Exception:
+                continue
+    return None
 
 
 def _ctx_modal(page: Page, timeout_ms: int = 7000):
     """Devuelve el contexto (Page/Frame) donde vive el modal de respuesta, o None.
 
-    El portal abre 'Respuesta Glosa Ips Web' en un iframe (igual que el modal de
-    soportes de las NCs). Buscamos los marcadores del formulario de respuesta en
-    la página principal y en TODOS los frames.
+    El modal SIEMPRE carga en un iframe con URL respuestaglosaipsweb.aspx, así
+    que el camino rápido es matchear el frame por URL: `page.frames` es local
+    (sin roundtrip al browser), o sea que el chequeo es instantáneo. Sólo si la
+    URL nunca aparece se cae al scan de marcadores de texto (costoso) que
+    barría todos los frames en versiones anteriores.
     """
-    marcadores = ["Detalle Respuesta", "Glosa Estado", "Detalle Glosa"]
     deadline = time.time() + timeout_ms / 1000
-    while time.time() < deadline:
-        for ctx in page.frames:
-            for marc in marcadores:
-                try:
-                    loc = ctx.locator(f"text={marc}")
-                    if loc.count() > 0 and loc.first.is_visible():
-                        return ctx
-                except Exception:
-                    continue
-        page.wait_for_timeout(300)
-    return None
+    proximo_scan_texto = time.time() + 1.5  # darle ventaja al fast-path por URL
+    while True:
+        fr = next(
+            (f for f in page.frames if _MODAL_URL_FRAGMENT in (f.url or "").lower()),
+            None,
+        )
+        if fr is not None:
+            # Frame correcto: esperar (dirigido) a que el form esté renderizado.
+            restante = max(800, int((deadline - time.time()) * 1000))
+            try:
+                fr.locator("text=Detalle Respuesta").first.wait_for(
+                    state="visible", timeout=restante
+                )
+            except Exception:
+                logger.warning(
+                    "  (frame del modal hallado por URL pero el marcador tardó; sigo igual)"
+                )
+            return fr
+        if time.time() >= proximo_scan_texto:
+            ctx = _ctx_modal_por_texto(page)
+            if ctx is not None:
+                return ctx
+            proximo_scan_texto = time.time() + 0.6
+        if time.time() >= deadline:
+            return None
+        page.wait_for_timeout(100)
 
 
 def _primer_visible(scope, selector: str):
@@ -687,15 +828,15 @@ def abrir_modal_objecion(page: Page, num_objecion: int, rehacer: bool = False):
         return "YA_CONTESTADA"
 
     # Estrategias de click, en orden — la PRIMERA que haga aparecer el modal gana.
+    # El botón real es img[id*='vBTNRESPUESTA'][title='Dar Respuesta']: matchear
+    # por id es lo que SIEMPRE gana en producción (la vieja estrategia por
+    # title='Dar Respuesta' era el mismo elemento con otro selector — eliminada
+    # para no pagar latencia extra por intento fallido).
     estrategias = [
         # 1) Botón exacto del DOM: img id W0104vBTNRESPUESTA_NNNN ("Dar Respuesta").
         ("btn_respuesta_id",
          "img[id*='vBTNRESPUESTA'], a:has(img[id*='vBTNRESPUESTA'])"),
-        # 2) Por título/tooltip 'Dar Respuesta'.
-        ("dar_respuesta_title",
-         "img[title*='Dar Respuesta' i], a:has(img[title*='Dar Respuesta' i]), "
-         "a[title*='Dar Respuesta' i]"),
-        # 3) Cualquier <img> clickable en las primeras 2 celdas.
+        # 2) Último recurso: cualquier <img> clickable en las primeras 2 celdas.
         ("img_inicio", "xpath=.//td[position()<=2]//img"),
     ]
 
@@ -741,8 +882,14 @@ def abrir_modal_objecion(page: Page, num_objecion: int, rehacer: bool = False):
     )
 
 
-def _clic_tab(ctx, page: Page, nombre_tab: str) -> None:
-    """Click en un tab del modal por su texto, tolerante."""
+def _clic_tab(ctx, page: Page, nombre_tab: str, marcador: str | None = None) -> None:
+    """Click en un tab del modal por su texto, tolerante.
+
+    Si se pasa `marcador` (selector de un elemento propio de ese tab), se
+    espera de forma DIRIGIDA a que sea visible — si el tab ya estaba activo
+    (caso típico: 'Información Glosa' es el tab inicial del modal) la espera
+    es instantánea. Sin marcador, settle corto como antes.
+    """
     try:
         tab = ctx.locator(
             f"a:has-text('{nombre_tab}'), li:has-text('{nombre_tab}') a, "
@@ -750,7 +897,13 @@ def _clic_tab(ctx, page: Page, nombre_tab: str) -> None:
         ).first
         if tab.count() > 0:
             tab.click(timeout=2500)
-            page.wait_for_timeout(400)
+            if marcador:
+                try:
+                    ctx.locator(marcador).first.wait_for(state="visible", timeout=2500)
+                    return
+                except Exception:
+                    pass  # marcador no apareció: caer al settle corto
+            page.wait_for_timeout(350)
     except PlaywrightTimeout:
         pass
 
@@ -790,7 +943,9 @@ def llenar_informacion_glosa(ctx, page: Page, aceptado: int, detalle: str) -> No
 
     `ctx` es el contexto del modal (Page o Frame) devuelto por abrir_modal_objecion.
     """
-    _clic_tab(ctx, page, "Información Glosa")
+    # El textarea de Detalle es el marcador del tab: como 'Información Glosa'
+    # es el tab inicial del modal, la espera resuelve al instante.
+    _clic_tab(ctx, page, "Información Glosa", marcador="textarea")
 
     # Campo Aceptado.
     aceptado_input = _primer_visible(
@@ -957,22 +1112,13 @@ def _hay_caracteres_especiales(page: Page, ctx) -> bool:
     return False
 
 
-def _popup_respuesta_abierto(page: Page) -> bool:
-    try:
-        pop = page.locator("iframe#gxp0_ifrm").first
-        return pop.count() > 0 and pop.is_visible()
-    except Exception:
-        return False
-
-
-def _esperar_popup_cerrado(page: Page, timeout_ms: int) -> bool:
-    """Espera (polleando) a que el portal cierre el popup de respuesta. True si cerró."""
-    deadline = time.time() + timeout_ms / 1000
-    while time.time() < deadline:
-        if not _popup_respuesta_abierto(page):
-            return True
-        page.wait_for_timeout(400)
-    return False
+def _settle_post_confirmacion(page: Page) -> None:
+    """Settle corto tras el cierre del popup: GeneXus dispara un XHR que
+    refresca la grilla (badge 'Contestado'). 400ms cubren ese repaint —
+    antes había 400ms acá + 800ms más en el loop de procesar_factura.
+    (networkidle no sirve de señal: es sticky por navegación y la grilla se
+    refresca por XHR, devolvería al instante sin esperar nada.)"""
+    page.wait_for_timeout(400)
 
 
 def _dump_botones(page: Page, etiqueta: str) -> None:
@@ -1008,31 +1154,51 @@ def confirmar_modal(ctx, page: Page) -> None:
     """Click 'Confirmar' del modal y ESPERA a que el portal guarde y cierre.
 
     Clave: NO cerramos el popup a la fuerza apenas vence un timeout corto —
-    eso abortaba el guardado y dejaba la glosa pendiente. Esperamos a que el
-    portal cierre el popup solo (señal de guardado). Si no cierra en 25s,
-    volcamos diagnóstico y marcamos la objeción como NO guardada.
+    eso abortaba el guardado y dejaba la glosa pendiente. Esperamos con
+    wait_for(state='hidden') sobre el iframe, que despierta en el MISMO
+    instante en que el portal lo cierra (el polling anterior de 400ms perdía
+    hasta 400ms por redondeo, más 1200ms de sleep fijo antes de empezar).
+
+    Presupuesto total: 25s como siempre, en dos fases (5s + 20s) con un
+    chequeo de la validación de 'caracteres especiales' entre medio para
+    fallar rápido si el portal rechazó el texto.
     """
     # Volver a 'Información Glosa' para asegurar que el Confirmar guarda el form.
-    _clic_tab(ctx, page, "Información Glosa")
+    # (Si ya estamos en ese tab — siempre en --sin-soportes — es instantáneo.)
+    _clic_tab(ctx, page, "Información Glosa", marcador="textarea")
     btn = _buscar_en_frames(
-        page, ctx, "input[type='button'][value='Confirmar'], button:text-is('Confirmar')"
+        page, ctx,
+        "input#BTNTRN_ENTER, input[type='button'][value='Confirmar'], "
+        "button:text-is('Confirmar')",
     )
     if btn is None:
         _screenshot_debug(page, "modal_sin_confirmar")
         raise RuntimeError("No encontré el botón 'Confirmar' del modal.")
     btn.click(timeout=6000)
-    page.wait_for_timeout(1200)
 
+    popup = page.locator("iframe#gxp0_ifrm").first
+    # Fase 1: caso feliz — el portal cierra en 200-500ms.
+    try:
+        popup.wait_for(state="hidden", timeout=5000)
+        _settle_post_confirmacion(page)
+        return
+    except PlaywrightTimeout:
+        pass
+
+    # Sigue abierto a los 5s: ¿la validación del portal rechazó el texto?
     if _hay_caracteres_especiales(page, ctx):
         _screenshot_debug(page, "validacion_texto_rechazada")
         raise RuntimeError(
             "El portal rechazó el texto por 'caracteres especiales' (revisar sanitización)."
         )
 
-    # Esperar a que el portal guarde y cierre el popup (puede tardar varios segundos).
-    if _esperar_popup_cerrado(page, 25000):
-        page.wait_for_timeout(400)
+    # Fase 2: resto del presupuesto para guardados lentos del portal.
+    try:
+        popup.wait_for(state="hidden", timeout=20000)
+        _settle_post_confirmacion(page)
         return
+    except PlaywrightTimeout:
+        pass
 
     # No cerró en 25s → diagnóstico + cierre forzado; la objeción NO se guardó.
     _dump_botones(page, "modal_no_cierra")
@@ -1056,8 +1222,7 @@ def enviar_finalizar(page: Page, factura_corta: str) -> str:
     """Click botón verde de la grilla (igual que las NCs) y valida el OK del portal."""
     ir_a_respuesta_glosa_web(page)
     filtrar_por_factura(page, factura_corta)
-    page.wait_for_timeout(1500)
-    fila = page.locator("tr").filter(has_text=factura_corta).first
+    fila = page.locator(f"tr:has-text('{factura_corta}')").first
     fila.wait_for(state="visible", timeout=8000)
     boton_verde = fila.locator(
         "a:has(img[src*='ActionExportFile2']), img[src*='ActionExportFile2'], "
@@ -1067,21 +1232,21 @@ def enviar_finalizar(page: Page, factura_corta: str) -> str:
     boton_verde.wait_for(state="visible", timeout=5000)
     boton_verde.click()
 
-    # Esperar el diálogo de mensajes del portal y leer su texto.
-    page.wait_for_timeout(2500)
+    # Esperar el diálogo de mensajes del portal y leer su texto. El chequeo de
+    # URL sobre page.frames es local (sin roundtrip), así que el poll es barato
+    # y arranca de inmediato (antes: 2500ms de sleep fijo + poll de 500ms).
     texto_msg = ""
-    deadline = time.time() + 12
-    while time.time() < deadline and not texto_msg:
-        for fr in page.frames:
-            if "mensaje" in (fr.url or ""):
-                try:
-                    texto_msg = (fr.locator("body").inner_text(timeout=1500) or "").strip()
-                except Exception:
-                    texto_msg = ""
+    deadline = time.time() + 14
+    while time.time() < deadline:
+        fr = next((f for f in page.frames if "mensaje" in (f.url or "")), None)
+        if fr is not None:
+            try:
+                texto_msg = (fr.locator("body").inner_text(timeout=1500) or "").strip()
+            except Exception:
+                texto_msg = ""
+            if texto_msg:
                 break
-        if texto_msg:
-            break
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(250)
 
     if not texto_msg:
         _screenshot_debug(page, f"sin_dialogo_final_{factura_corta}")
@@ -1156,7 +1321,8 @@ def procesar_factura(
                     confirmar_modal(ctx, page)
                     respondidas += 1
                     ok = True
-                    page.wait_for_timeout(800)
+                    # Sin sleep extra: confirmar_modal ya hace el settle del
+                    # refresh de la grilla (_settle_post_confirmacion).
                     break
                 except ObjecionNoEnGrilla as e:
                     # No existe en el portal: no tiene sentido reintentar.
@@ -1286,6 +1452,23 @@ def main() -> int:
     logger.info(f"Facturas a procesar: {len(facturas)}")
 
     resultados: list[dict] = []
+
+    # Reporte CSV append-as-you-go: cada factura se escribe apenas termina y
+    # se flushea a disco cada 5, así un corte a mitad del masivo (Ctrl+C,
+    # caída de red, kill) no pierde el progreso del registro. Antes el CSV
+    # se escribía ENTERO recién al final.
+    args.reporte.parent.mkdir(parents=True, exist_ok=True)
+    f_rep = args.reporte.open("w", newline="", encoding="utf-8-sig")
+    w_rep = csv.DictWriter(f_rep, fieldnames=["factura", "objeciones", "estado", "detalle"])
+    w_rep.writeheader()
+    f_rep.flush()
+
+    def registrar(reg: dict) -> None:
+        resultados.append(reg)
+        w_rep.writerow(reg)
+        if len(resultados) % 5 == 0:
+            f_rep.flush()
+
     t0 = time.time()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
@@ -1311,12 +1494,12 @@ def main() -> int:
                 extra = " (sin soportes)" if args.sin_soportes else f", {len(archivos)} archivos soporte"
                 logger.info(f"[{i}/{len(facturas)}] {factura_larga} — {len(objeciones)} objeciones{extra}")
                 if not args.sin_soportes and not archivos:
-                    resultados.append(
+                    registrar(
                         {"factura": factura_larga, "objeciones": len(objeciones),
                          "estado": "SIN_SOPORTES", "detalle": "; ".join(avisos)}
                     )
                     continue
-                resultados.append(
+                registrar(
                     procesar_factura(
                         page, factura_corta, factura_larga, objeciones, archivos,
                         rehacer=args.rehacer, max_obj=args.max_obj,
@@ -1325,14 +1508,7 @@ def main() -> int:
                 )
         finally:
             browser.close()
-
-    # Reporte CSV.
-    args.reporte.parent.mkdir(parents=True, exist_ok=True)
-    with args.reporte.open("w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=["factura", "objeciones", "estado", "detalle"])
-        w.writeheader()
-        for r in resultados:
-            w.writerow(r)
+            f_rep.close()  # flush final: lo ya procesado queda en disco
 
     dur = (time.time() - t0) / 60
     logger.info(f"\nReporte: {args.reporte}")
