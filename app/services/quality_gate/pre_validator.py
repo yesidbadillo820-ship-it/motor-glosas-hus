@@ -152,18 +152,33 @@ def _parsear_valor(valor: str | int | float | None) -> float:
         return 0.0
 
 
+# Placeholders que GlosaService usa cuando _extraer_codigos_glosa no
+# encuentra nada en el texto. Llegan al pre-validator como si fueran un
+# código intentado y disparaban el mensaje confuso "Código 'N/A' no
+# tiene formato válido (debe ser AA####)" — visto en producción 10-jun-2026
+# con "Se evidencia cobro duplicado mediante fragmentación de
+# procedimientos." (un motivo de glosa válido, sin código en el texto).
+_PLACEHOLDERS_CODIGO_AUSENTE = {"N/A", "NA", "-", "—", "?", "SIN CODIGO", "SIN CÓDIGO"}
+
+
 def check_codigo_glosa(codigo: str) -> tuple[PreCheckResult, str, str]:
     """Valida que el código sea AA#### (TA0201, SO0501, etc.).
 
     Devuelve (resultado, codigo_normalizado, familia).
     """
     cod_norm = _normalizar_codigo(codigo)
-    if not cod_norm:
+    # Tratar placeholders ("N/A", "-", ...) como ausencia: la causa real
+    # es que el texto no traía código, no que el "código" sea inválido.
+    if not cod_norm or cod_norm in _PLACEHOLDERS_CODIGO_AUSENTE:
         return (
             PreCheckResult(
                 ok=False,
-                razon="Falta el código de glosa",
-                sugerencia="Incluye el código en el texto, ej. 'TA0201 - ...'",
+                razon="No detecté el código de glosa en el texto",
+                sugerencia=(
+                    "Agrega el código al inicio del texto, ej. 'TA0102 - "
+                    "Medicamento fuera del PBS' o 'SO0601 - Falta soportes'. "
+                    "Prefijos válidos: TA, SO, AU, CO, CL, PE, FA, SE, IN, ME, EX."
+                ),
             ),
             "",
             "",
