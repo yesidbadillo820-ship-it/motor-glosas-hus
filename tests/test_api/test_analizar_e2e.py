@@ -172,7 +172,10 @@ class TestAnalizarFlowE2E:
                 "eps": "FAMISANAR",
                 "etapa": "REVISION",
                 "valor_aceptado": "0",
-                "tabla_excel": "TA0201 — análisis preventivo de la glosa",
+                "tabla_excel": (
+                    "TA0201 — Análisis preventivo de la glosa: mayor valor "
+                    "cobrado en consulta especializada según factura electrónica"
+                ),
                 "modo_respuesta": "auditoria_previa",
             },
         )
@@ -187,7 +190,10 @@ class TestAnalizarFlowE2E:
             data={
                 "eps": "FAMISANAR",
                 "etapa": "RESPUESTA",
-                "tabla_excel": "TA0201 texto suficiente",
+                "tabla_excel": (
+                    "TA0201 mayor valor cobrado en consulta especializada por "
+                    "valor objetado de $500.000 según factura electrónica"
+                ),
             },
         )
         assert resp.status_code == 200
