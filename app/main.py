@@ -97,6 +97,39 @@ CONTRATOS_DEFAULT = {
 }
 
 
+def _sembrar_contratos_default(db, *, force_reseed: bool = False) -> None:
+    """Siembra los contratos default SOLO cuando faltan en la BD.
+
+    La BD es la fuente de verdad: los textos editados por la coordinación
+    desde la UI (POST /contratos) NO se sobrescriben en cada arranque.
+    Antes este seed hacía `existente.detalles = v` en cada boot (revirtiendo
+    las ediciones de las 14 EPS default) y además BORRABA cualquier contrato
+    cuyo EPS no estuviera en CONTRATOS_DEFAULT — perdiendo contratos creados
+    por el equipo. Auditoría jun-2026, P1 #4.
+
+    FORCE_RESEED_CONTRATOS=1 restaura la re-sincronización masiva
+    (sobrescribe textos con el default y elimina los no-default), espejo
+    del toggle FORCE_RESEED_USERS para usuarios.
+    """
+    for k, v in CONTRATOS_DEFAULT.items():
+        existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
+        if not existente:
+            db.add(ContratoRecord(eps=k, detalles=v))
+            logger.info(f"Contrato default sembrado: {k}")
+        elif force_reseed and existente.detalles != v:
+            logger.warning(f"[FORCE_RESEED_CONTRATOS] {k}: detalles re-sincronizados al default")
+            existente.detalles = v
+
+    if force_reseed:
+        eps_default = set(CONTRATOS_DEFAULT.keys())
+        for contrato in db.query(ContratoRecord).all():
+            if contrato.eps not in eps_default:
+                logger.warning(
+                    f"[FORCE_RESEED_CONTRATOS] ELIMINANDO contrato no-default: {contrato.eps}"
+                )
+                db.delete(contrato)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=== INICIANDO APLICACIÓN ===")
@@ -489,21 +522,13 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
 
     try:
-        # Cargar contratos iniciales
-        # Primero eliminar contratos que ya no existen en la lista actual
-        eps_actuales = list(CONTRATOS_DEFAULT.keys())
-        contratos_existentes = db.query(ContratoRecord).all()
-        for contrato in contratos_existentes:
-            if contrato.eps not in eps_actuales:
-                logger.warning(f"ELIMINANDO contrato obsoleto: {contrato.eps}")
-                db.delete(contrato)
-
-        for k, v in CONTRATOS_DEFAULT.items():
-            existente = db.query(ContratoRecord).filter(ContratoRecord.eps == k).first()
-            if existente:
-                existente.detalles = v
-            else:
-                db.add(ContratoRecord(eps=k, detalles=v))
+        # Contratos default: solo sembrar los que FALTAN. Los textos
+        # editados desde la UI persisten entre deploys (la BD manda);
+        # FORCE_RESEED_CONTRATOS=1 fuerza la re-sincronización masiva.
+        _sembrar_contratos_default(
+            db,
+            force_reseed=os.getenv("FORCE_RESEED_CONTRATOS", "").lower() in ("1", "true", "yes"),
+        )
 
         # Crear admin solo si no existe
         # CORRECCIÓN: contraseña desde variable de entorno, sin hardcodear.
