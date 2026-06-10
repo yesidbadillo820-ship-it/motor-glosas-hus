@@ -22,28 +22,36 @@ logger = logging.getLogger("motor_glosas")
 
 
 # Patrones de citación legal típicos en dictámenes ESE HUS
+# Todos los patrones exigen \b al inicio: sin él, la alternativa "Res..."
+# matcheaba la cola de palabras ("...TRES 500/2024") y la (T|C|SU) de
+# sentencias se disparaba con la C final de "DEC. 4747/2007" — visto en
+# producción 10-jun-2026: el dictamen citaba "MESA DE CONCILIACIÓN DE
+# AUDITORÍA (ART. 20 DEC. 4747/2007)" y el verifier reportaba la sentencia
+# fantasma "C-4747/2007" como NORMA_INEXISTENTE.
 PAT_RESOLUCION = re.compile(
-    r"Resolución\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|Res(?:olución)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"\bResolución\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bRes(?:olución)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
+# La 2.ª alternativa acepta la abreviatura "Dec. 4747/2007" (antes solo
+# "Decreto NNN/YYYY" — la forma abreviada ni se contaba como cita).
 PAT_DECRETO = re.compile(
-    r"Decreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|Decreto\s+(\d{1,5})[/\-](\d{2,4})",
+    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_LEY = re.compile(
-    r"Ley\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|Ley\s+(\d{1,5})[/\-](\d{2,4})",
+    r"\bLey\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bLey\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_ACUERDO = re.compile(
-    r"Acuerdo\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|Acuerdo\s+(\d{1,5})[/\-](\d{2,4})",
+    r"\bAcuerdo\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bAcuerdo\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_CIRCULAR = re.compile(
-    r"Circular\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|Circular\s+(\d{1,5})[/\-](\d{2,4})",
+    r"\bCircular\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bCircular\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_SENTENCIA = re.compile(
-    r"(?:Sentencia\s+)?(T|C|SU)[\.\-]?\s*(\d{1,4})[/\-](\d{2,4})",
+    r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_ARTICULO = re.compile(
