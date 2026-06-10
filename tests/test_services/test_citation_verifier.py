@@ -57,6 +57,42 @@ class TestNormasInventadas:
         assert any(i["tipo"] == "NORMA_INEXISTENTE" for i in r["issues"])
 
 
+class TestFalsosPositivosPorBordeDePalabra:
+    """Regresión 10-jun-2026: PAT_SENTENCIA no exigía \\b antes de (T|C|SU)
+    y la C final de "DEC." matcheaba como sentencia. El dictamen real decía
+    "MESA DE CONCILIACIÓN DE AUDITORÍA (ART. 20 DEC. 4747/2007)" y el
+    verifier reportaba la sentencia fantasma "C-4747/2007" → el gestor veía
+    un problema de citas sobre una cita perfectamente válida (Decreto
+    4747 de 2007, que SÍ está en el corpus).
+    """
+
+    def test_dec_abreviado_no_es_sentencia(self):
+        r = verificar_citas(
+            "SE INVITA A MESA DE CONCILIACIÓN DE AUDITORÍA (ART. 20 DEC. 4747/2007)."
+        )
+        sentencias = [i for i in r["issues"] if "Sentencia" in i.get("cita", "")]
+        assert not sentencias, f"falso positivo de sentencia: {sentencias}"
+
+    def test_dec_abreviado_se_verifica_como_decreto(self):
+        # Bonus del fix: "DEC. 4747/2007" ahora se reconoce como Decreto y
+        # se valida contra el corpus (antes ni se contaba como cita).
+        r = verificar_citas("DEC. 4747/2007")
+        assert r["total_citas"] >= 1
+        assert not r["issues"], f"Decreto 4747/2007 existe en corpus: {r['issues']}"
+
+    def test_sentencia_real_sigue_detectandose(self):
+        # El \b no debe romper la detección de sentencias genuinas.
+        r = verificar_citas("Sentencia C-9999/2099 dice algo")
+        assert any("C-9999" in i.get("cita", "") for i in r["issues"])
+
+    def test_tres_seguido_de_numeros_no_es_resolucion(self):
+        # "...TRES 500/2024" — la cola "RES" de una palabra no debe
+        # dispararse como "Resolución 500 de 2024".
+        r = verificar_citas("SE PAGARON TRES 500/2024 CUOTAS")
+        resoluciones = [i for i in r["issues"] if "Resolución" in i.get("cita", "")]
+        assert not resoluciones, f"falso positivo de resolución: {resoluciones}"
+
+
 class TestFallbackEstricto:
     """El fallback antiguo matcheaba por substring numérico: '138' caía
     spuriamente dentro de 'LEY 1438 DE 2011'. El fallback nuevo exige

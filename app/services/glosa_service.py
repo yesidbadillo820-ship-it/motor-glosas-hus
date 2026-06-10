@@ -1083,10 +1083,27 @@ class GlosaService:
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
         codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
         if len(codigos_detectados) > 1:
-            logger.warning(
-                f"Multi-código detectado ({len(codigos_detectados)}): {codigos_detectados}. "
-                f"Se procesa solo el primero ({codigo_det})."
+            # Multi-código (jun-2026): antes se procesaba SOLO el primero y
+            # el dictamen mezclaba familias sin declararlas. Con el flag ON
+            # (default) cada código adicional recibe su propia sección de
+            # argumentación — ver bloque "un dictamen por código" más abajo,
+            # tras ensamblar el dictamen del principal.
+            from app.services.multi_codigo import (
+                MAX_CODIGOS_DICTAMEN,
+                multi_codigo_habilitado,
             )
+
+            if multi_codigo_habilitado():
+                logger.info(
+                    f"Multi-código detectado ({len(codigos_detectados)}): {codigos_detectados}. "
+                    f"Se procesarán todos con un dictamen por código "
+                    f"(máx {MAX_CODIGOS_DICTAMEN}; principal: {codigo_det})."
+                )
+            else:
+                logger.warning(
+                    f"Multi-código detectado ({len(codigos_detectados)}): {codigos_detectados}. "
+                    f"Se procesa solo el primero ({codigo_det}) — MULTI_CODIGO_DICTAMENES=0."
+                )
         prefijo = codigo_det[:2] if codigo_det and codigo_det != "N/A" else "XX"
         valor_raw = self._extraer_valor(texto_base)
 
@@ -2565,6 +2582,87 @@ class GlosaService:
                 contrato=contrato_ia if contrato_ia else None,
                 tarifa=tarifa_ia if tarifa_ia else None,
             )
+
+        # ═══════════════════════════════════════════════════════════
+        #  Multi-código: un dictamen por código (jun-2026).
+        #  Glosas EPS con varios códigos en la misma fila ("SO0601 +
+        #  TA0201 + TA0701") recibían respuesta solo del primero y el
+        #  dictamen mezclaba familias sin declararlas. Ahora: encabezado
+        #  con TODOS los códigos + sección del principal (flujo de
+        #  arriba, intacto) + una sección IA por código adicional, cada
+        #  una protegida por el Quality Gate. Todo en el MISMO registro
+        #  (resultado.codigo_glosa sigue siendo el principal — sin
+        #  cambios de BD ni de radicación).
+        #  NO aplica a ratificadas/extemporáneas (defensas procesales
+        #  que cubren la glosa COMPLETA — fragmentarlas por código las
+        #  debilitaría) ni a aceptaciones/auditoría previa (no hay
+        #  defensa por concepto que generar).
+        # ═══════════════════════════════════════════════════════════
+        _mc = None
+        _aplica_mc = False
+        try:
+            from app.services import multi_codigo as _mc
+
+            _aplica_mc = (
+                len(codigos_detectados) > 1
+                and _mc.multi_codigo_habilitado()
+                and modo_resp == "defender"
+                and not es_ratificacion
+                and not es_extemporanea
+            )
+        except Exception as _e_mc_imp:
+            logger.warning(f"[MULTI-CODIGO] módulo no disponible: {_e_mc_imp}")
+        if _aplica_mc:
+            _mc_adicionales = codigos_detectados[1 : _mc.MAX_CODIGOS_DICTAMEN]
+            _mc_excedentes = codigos_detectados[_mc.MAX_CODIGOS_DICTAMEN :]
+            try:
+                _mc_secciones, _mc_fallidos = await _mc.generar_secciones_adicionales(
+                    servicio=self,
+                    codigos=_mc_adicionales,
+                    codigo_principal=codigo_det,
+                    todos_los_codigos=codigos_detectados,
+                    texto_glosa=texto_base,
+                    eps=str(data.eps),
+                    valor_objetado=valor_raw,
+                    contexto_pdf=contexto_pdf or "",
+                    numero_factura=data.numero_factura,
+                    numero_radicado=data.numero_radicado,
+                    dias_habiles=dias,
+                    es_extemporanea=es_extemporanea,
+                    es_ratificacion=es_ratificacion,
+                    tono=getattr(data, "tono", "conciliador") or "conciliador",
+                    proveedores_disponibles={
+                        p
+                        for p, k in [
+                            ("anthropic", self.anthropic_key),
+                            ("groq", self.groq),
+                        ]
+                        if k
+                    },
+                )
+                dictamen = (
+                    _mc.construir_encabezado_html(codigos_detectados, no_procesados=_mc_excedentes)
+                    + dictamen
+                    + _mc_secciones
+                    + _mc.construir_nota_fallidos_html(_mc_fallidos)
+                )
+                if _mc_fallidos:
+                    logger.warning(
+                        f"[MULTI-CODIGO] códigos sin sección automática: {_mc_fallidos} "
+                        "— anotados en el dictamen para respuesta manual."
+                    )
+            except Exception as _e_mc:
+                # El dictamen del código principal JAMÁS se pierde por un
+                # fallo de los bloques adicionales: se entrega tal cual con
+                # la nota de los códigos pendientes de respuesta manual.
+                logger.warning(
+                    f"[MULTI-CODIGO] secciones adicionales fallaron: {_e_mc} "
+                    "— se entrega solo el dictamen del código principal."
+                )
+                try:
+                    dictamen = dictamen + _mc.construir_nota_fallidos_html(list(_mc_adicionales))
+                except Exception:
+                    pass
 
         # Calcular riesgo de ratificación (heurística 0-100)
         try:
