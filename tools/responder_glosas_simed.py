@@ -1470,16 +1470,31 @@ def main() -> int:
             f_rep.flush()
 
     t0 = time.time()
+    def _sesion_muerta(exc: Exception) -> bool:
+        """True si el error indica que el browser/page/context ya no es usable."""
+        msg = str(exc).lower()
+        return (
+            "target page, context or browser has been closed" in msg
+            or "browser has been closed" in msg
+            or "target closed" in msg
+            or "connection closed" in msg
+            or exc.__class__.__name__ == "TargetClosedError"
+        )
+
+    def _abrir_sesion(p):
+        """Crea browser + context + page + login. Devuelve (browser, ctx, page)."""
+        b = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
+        c = b.new_context(accept_downloads=True)
+        pg = c.new_page()
+        pg.on("dialog", lambda d: d.accept())
+        login(pg, user, password)
+        return b, c, pg
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
-        ctx = browser.new_context(accept_downloads=True)
-        page = ctx.new_page()
-        # El portal puede usar confirm()/alert() nativos ("¿Confirma?"). Por
-        # defecto Playwright los DESCARTA (Cancel), lo que anularía el guardado;
-        # los aceptamos automáticamente.
-        page.on("dialog", lambda d: d.accept())
+        browser, ctx, page = _abrir_sesion(p)
+        relogins = 0
+        MAX_RELOGINS = 5
         try:
-            login(page, user, password)
             for i, (factura_corta, objeciones) in enumerate(facturas.items(), start=1):
                 factura_larga = objeciones[0]["factura"]
                 if args.sin_soportes:
@@ -1499,15 +1514,44 @@ def main() -> int:
                          "estado": "SIN_SOPORTES", "detalle": "; ".join(avisos)}
                     )
                     continue
-                registrar(
-                    procesar_factura(
+
+                # Hasta 2 intentos por factura: si la sesión muere a mitad de
+                # camino, reabrimos browser + re-logueamos y reintentamos la
+                # MISMA factura una vez antes de pasar a la siguiente.
+                for sesion_intento in range(2):
+                    reg = procesar_factura(
                         page, factura_corta, factura_larga, objeciones, archivos,
                         rehacer=args.rehacer, max_obj=args.max_obj,
                         subir_soportes=not args.sin_soportes,
                     )
-                )
+                    if reg["estado"] == "ERROR" and _sesion_muerta(Exception(reg["detalle"])):
+                        if relogins >= MAX_RELOGINS:
+                            logger.error(
+                                f"  ✗ Sesión perdida y ya hice {MAX_RELOGINS} re-logins; "
+                                "aborto el masivo. Re-corré el comando para continuar."
+                            )
+                            registrar(reg)
+                            raise RuntimeError("Sesión irrecuperable")
+                        relogins += 1
+                        logger.warning(
+                            f"  ⚠ Sesión cerrada por el portal. Re-login {relogins}/{MAX_RELOGINS} "
+                            f"y reintento {factura_larga}…"
+                        )
+                        try:
+                            browser.close()
+                        except Exception:
+                            pass
+                        browser, ctx, page = _abrir_sesion(p)
+                        continue  # reintenta la misma factura
+                    registrar(reg)
+                    break  # éxito o fallo no-sesión: a la siguiente factura
+        except RuntimeError:
+            pass  # sesión irrecuperable: salida ordenada
         finally:
-            browser.close()
+            try:
+                browser.close()
+            except Exception:
+                pass
             f_rep.close()  # flush final: lo ya procesado queda en disco
 
     dur = (time.time() - t0) / 60
