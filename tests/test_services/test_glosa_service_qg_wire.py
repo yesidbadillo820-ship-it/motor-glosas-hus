@@ -141,9 +141,12 @@ class TestEjecutarConQualityGateOnStub:
 
     @pytest.mark.asyncio
     async def test_pre_validator_bloquea_inputs_cortos(self):
-        """Antes el input "se glosa por falta de cobertura" pasaba al IA;
-        ahora el pre-validator endurecido (60 chars + palabra del dominio)
-        lo bloquea y el adapter devuelve RECHAZADO_PRE sin gastar IA."""
+        """El pre-validator bloquea inputs claramente insuficientes
+        (<20 chars) con RECHAZADO_PRE sin gastar una llamada de IA.
+
+        Nota 10-jun-2026: el umbral bajó de 60 a 20 chars — glosas reales
+        como "TA0102 - Medicamento fuera del PBS" (35 chars) son legítimas
+        y ahora pasan (ver test_glosa_corta_real_con_codigo_pasa_al_ia)."""
 
         ia_calls = {"n": 0}
 
@@ -167,13 +170,53 @@ class TestEjecutarConQualityGateOnStub:
             eps="DISPENSARIO MEDICO",
             codigo_glosa="CO0101",
             valor_objetado="500000",
-            texto_glosa="SE GLOSA POR FALTA DE COBERTURA",
+            texto_glosa="SE GLOSA",  # 8 chars — bajo cualquier umbral
             system_prompt="s",
             user_prompt="u",
             proveedores_disponibles={"groq"},
         )
         assert resultado.estado == "RECHAZADO_PRE"
         assert ia_calls["n"] == 0  # IA NUNCA se llamó
+
+    @pytest.mark.asyncio
+    async def test_glosa_corta_real_con_codigo_pasa_al_ia(self):
+        """Regresión 10-jun-2026: una glosa corta pero real (código válido
+        + motivo) DEBE llegar a la IA. Antes el pre-val exigía 60 chars y
+        la rechazaba — los gestores veían "Texto de glosa muy corto" sobre
+        inputs perfectamente legítimos y no salía ningún dictamen."""
+
+        ia_calls = {"n": 0}
+
+        class StubService:
+            anthropic_key = "key"
+            anthropic_model = "claude-sonnet-4-5"
+            groq = "client"
+            gemini = None
+
+            async def _llamar_ia(
+                self, system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+            ):
+                ia_calls["n"] += 1
+                return ("<argumento>x</argumento>", "groq")
+
+            def _xml(self, tag, text, default=""):
+                return default
+
+        resultado = await ejecutar_con_quality_gate(
+            servicio=StubService(),
+            eps="SALUD TOTAL",
+            codigo_glosa="TA0102",
+            valor_objetado="",
+            texto_glosa="TA0102 - Medicamento fuera del PBS. No procede reconocimiento.",
+            system_prompt="s",
+            user_prompt="u",
+            proveedores_disponibles={"groq"},
+        )
+        # Pasó la pre-validación: la IA SÍ se llamó. El estado final no es
+        # RECHAZADO_PRE (el stub devuelve basura, así que el post-val lo
+        # escala a humano — eso es comportamiento correcto del gate).
+        assert resultado.estado != "RECHAZADO_PRE"
+        assert ia_calls["n"] >= 1
 
 
 class TestQGSaltaValidacionLegacy:
