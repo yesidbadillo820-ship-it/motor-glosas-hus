@@ -95,9 +95,15 @@ class TestValorMonetario:
         assert v == esperado
 
     @pytest.mark.parametrize("invalido", ["", None, 0, "0", "abc", "$ 0"])
-    def test_valores_invalidos(self, invalido):
-        res, _ = check_valor_monetario(invalido)
-        assert not res.ok
+    def test_valor_ausente_o_invalido_no_bloquea(self, invalido):
+        """El valor objetado es OPCIONAL — pre_validator ya no bloquea por su
+        ausencia. Esto permite glosas de cobertura sin monto definido (ej.
+        ratificaciones de etapa previa). El detector de "valores fabricados"
+        del post_validator se encarga de impedir que la IA invente cifras."""
+        res, v = check_valor_monetario(invalido)
+        assert res.ok  # ya no bloquea
+        assert v == 0.0  # pero el valor parseado sigue siendo 0
+        assert res.sugerencia  # deja una sugerencia opcional
 
 
 class TestTextoGlosa:
@@ -191,15 +197,23 @@ class TestPreValidarGlosa:
         assert not r.aprobado
         assert any("eps" in razon.lower() for razon in r.razones_bloqueo)
 
-    def test_glosa_sin_valor_falla(self):
+    def test_glosa_sin_valor_NO_falla(self):
+        """Cambio de comportamiento: el valor objetado ahora es opcional.
+        Una glosa sin valor sigue siendo aprobada por el pre-validator
+        (texto suficiente + código válido + EPS válida). El detector de
+        valores fabricados del post_validator se encarga después de que
+        la IA no invente cifras que no estaban en el input."""
         r = pre_validar_glosa(
             eps="FAMISANAR",
             codigo_glosa="TA0201",
             valor_objetado="",
-            texto_glosa="TA0201 mayor valor cobrado en consulta",
+            texto_glosa=(
+                "TA0201 mayor valor cobrado en consulta especializada "
+                "por servicio facturado según factura electrónica"
+            ),
         )
-        assert not r.aprobado
-        assert any("valor" in razon.lower() for razon in r.razones_bloqueo)
+        assert r.aprobado  # ya no bloquea por falta de valor
+        assert r.valor_parseado == 0.0  # pero el valor sigue siendo 0
 
     def test_mensaje_para_usuario_legible(self):
         r = pre_validar_glosa(

@@ -200,14 +200,25 @@ def check_eps(eps: str) -> tuple[PreCheckResult, str]:
 
 
 def check_valor_monetario(valor: str | int | float | None) -> tuple[PreCheckResult, float]:
-    """Valida que el valor objetado se pueda parsear y sea > 0."""
+    """Intenta parsear el valor objetado, pero NO bloquea si está ausente o es cero.
+
+    Hay casos legítimos donde el gestor no tiene cifra (glosa de cobertura
+    sin monto definido, ratificación de etapa previa, etc). En esos casos el
+    dictamen igual debe poder generarse — el detector de "valores fabricados"
+    del post-validator se encarga de impedir que la IA invente cifras que no
+    están en el input. Por eso este check devuelve siempre ok=True; solo deja
+    una sugerencia para el usuario.
+    """
     v = _parsear_valor(valor)
     if v <= 0:
         return (
             PreCheckResult(
-                ok=False,
-                razon=f"Valor objetado no parseable o cero ({valor!r})",
-                sugerencia="Incluye un valor en el texto, ej. '$500.000' o 'por valor de 1.500.000'",
+                ok=True,  # NO bloquea — solo sugiere
+                razon="Sin valor objetado parseable (opcional)",
+                sugerencia=(
+                    "Si la glosa tiene un valor específico, agrégalo "
+                    "(ej. '$500.000') para precisar el dictamen."
+                ),
             ),
             0.0,
         )
