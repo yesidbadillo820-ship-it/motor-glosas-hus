@@ -18,6 +18,7 @@ from app.api.deps import get_usuario_actual, get_auditor_o_superior, get_coordin
 from app.services.rate_limit_ia import consumir_cupo_ia as _consumir_cupo_ia
 from app.models.db import UsuarioRecord, GlosaRecord, ConceptoGlosaRecord, ContratoRecord
 from app.utils.moneda import parse_valor_cop
+from app.utils.html_a_texto import dictamen_a_texto_plano
 
 router = APIRouter(prefix="/glosas", tags=["glosas"])
 
@@ -494,8 +495,10 @@ def exportar_xlsx(
             or (g.texto_glosa_original or "").strip()
             or (g.concepto_glosa or "").strip()
         )
-        # Dictamen: el texto limpio (sin HTML) generado por la defensa.
-        dictamen_txt = _limpiar_observacion(g.dictamen) or ""
+        # Dictamen: texto plano legible (la tabla de cabecera se vuelve
+        # "CÓDIGO GLOSA: ... | VALOR OBJETADO: ..." en vez de perderse o
+        # salir como HTML crudo).
+        dictamen_txt = dictamen_a_texto_plano(g.dictamen) or ""
         recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
         ws.append(
             [
