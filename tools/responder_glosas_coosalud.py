@@ -362,10 +362,24 @@ def ir_a_bolsa(page: Page) -> None:
 def abrir_factura(page: Page, factura: str) -> None:
     """Bolsa de Respuestas → buscar la factura → click botón azul ▶."""
     ir_a_bolsa(page)
-    buscar = page.locator(
-        "input[type='search']:visible, "
-        "xpath=//label[contains(., 'Buscar')]//input | //input[@placeholder='Buscar']"
-    ).first
+    # Caja "Buscar:" del datatable. No mezclar CSS y XPath en un selector:
+    # se prueban en orden.
+    buscar = None
+    for sel in (
+        "input[type='search']",
+        "xpath=//label[contains(., 'Buscar')]//input",
+        "input[placeholder*='Buscar' i]",
+    ):
+        loc = page.locator(sel)
+        try:
+            if loc.count() > 0 and loc.first.is_visible():
+                buscar = loc.first
+                break
+        except Exception:
+            continue
+    if buscar is None:
+        _screenshot_debug(page, "sin_caja_buscar")
+        raise RuntimeError("No encontré la caja 'Buscar:' de la Bolsa.")
     buscar.fill(factura)
     page.wait_for_timeout(1200)  # debounce del datatable
 
@@ -485,12 +499,24 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
                 break
         except Exception:
             continue
-    # 2) Combo select2: click + tipear + Enter.
+    # 2) Combo select2: click + tipear + Enter. (No mezclar CSS y XPath en
+    # un mismo selector: se prueban en orden.)
     if not seleccionado:
-        combo = page.locator(
-            ".select2-selection:visible, [role='combobox']:visible, "
-            "xpath=//*[contains(text(),'RESPUESTA')]/following::span[contains(@class,'select2')][1]"
-        ).first
+        combo = None
+        for sel_combo in (
+            ".select2-selection",
+            "[role='combobox']",
+            "xpath=//*[contains(text(),'RESPUESTA')]/following::span[contains(@class,'select2')][1]",
+        ):
+            loc = page.locator(sel_combo)
+            try:
+                if loc.count() > 0 and loc.first.is_visible():
+                    combo = loc.first
+                    break
+            except Exception:
+                continue
+        if combo is None:
+            raise RuntimeError("No encontré el dropdown de RESPUESTA en el modal.")
         combo.click()
         page.wait_for_timeout(400)
         caja = page.locator("input.select2-search__field:visible, input[type='search']:visible").last
