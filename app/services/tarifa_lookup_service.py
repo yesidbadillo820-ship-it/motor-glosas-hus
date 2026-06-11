@@ -474,6 +474,37 @@ def evaluar_glosa_tarifa(
     if cups_entrada and cups_entrada != cups_encontrado:
         homologado = True
 
+    # "Contrato: —" en la caja verde (11-jun-2026): las filas importadas
+    # desde Excel de precios no traen contrato_numero. Fallback en cadena:
+    # catálogo estático de contratos vigentes (get_contrato) → metadatos
+    # del ContratoRecord en BD. Así el gestor ve "440-DIGSA/DMBUG-2025"
+    # en vez de un guion.
+    contrato_num = tarifa.contrato_numero
+    if not contrato_num:
+        try:
+            from app.services.glosa_ia_prompts import get_contrato
+
+            contrato_num = (get_contrato(tarifa.eps or "") or {}).get("numero") or None
+        except Exception:
+            contrato_num = None
+    if not contrato_num:
+        try:
+            from app.database import SessionLocal
+            from app.models.db import ContratoRecord
+
+            _db = SessionLocal()
+            try:
+                _c = (
+                    _db.query(ContratoRecord)
+                    .filter(ContratoRecord.eps == (tarifa.eps or "").upper())
+                    .first()
+                )
+                contrato_num = getattr(_c, "numero_contrato", None) if _c else None
+            finally:
+                _db.close()
+        except Exception:
+            contrato_num = None
+
     return {
         "encontrada": True,
         "tarifa": {
@@ -482,7 +513,7 @@ def evaluar_glosa_tarifa(
             "codigo_cups": tarifa.codigo_cups,
             "codigo_ips": getattr(tarifa, "codigo_ips", None),
             "descripcion": tarifa.descripcion,
-            "contrato_numero": tarifa.contrato_numero,
+            "contrato_numero": contrato_num,
             "valor_pactado": float(tarifa.valor_pactado or 0.0),
             "tipo_tarifa": tipo,
             "factor_ajuste": factor_pct,
