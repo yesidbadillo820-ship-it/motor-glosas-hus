@@ -1081,6 +1081,7 @@ def main() -> int:
     grupo = parser.add_mutually_exclusive_group(required=True)
     grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS...).")
     grupo.add_argument("--facturas", type=str, help="Lista de facturas separadas por coma (HUS...,HUS...).")
+    grupo.add_argument("--lista", type=Path, help="TXT con una factura por línea (HUS...).")
     grupo.add_argument("--todas", action="store_true", help="Procesar todas las facturas de la hoja.")
     parser.add_argument("--max-grupos", type=int, default=0, help="Responder como mucho N grupos (piloto; no Termina la factura).")
     parser.add_argument("--max-facturas", type=int, default=0, help="Procesar como mucho N facturas (piloto; corta la lista de --todas).")
@@ -1109,8 +1110,15 @@ def main() -> int:
             logger.error(f"No hallé la factura {args.solo} en la hoja {args.hoja}.")
             return 1
 
-    if args.facturas:
-        objetivos = {f.strip().upper() for f in args.facturas.split(",") if f.strip()}
+    if args.facturas or args.lista:
+        if args.lista:
+            if not args.lista.is_file():
+                logger.error(f"No existe el archivo de lista: {args.lista}")
+                return 1
+            texto = args.lista.read_text(encoding="utf-8-sig", errors="replace")
+            objetivos = {x.strip().upper() for x in texto.replace(",", "\n").splitlines() if x.strip()}
+        else:
+            objetivos = {f.strip().upper() for f in args.facturas.split(",") if f.strip()}
         encontradas = {k: v for k, v in facturas.items() if k.upper() in objetivos}
         faltantes = objetivos - {k.upper() for k in encontradas}
         if not encontradas:
