@@ -1082,6 +1082,7 @@ def main() -> int:
     grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS...).")
     grupo.add_argument("--todas", action="store_true", help="Procesar todas las facturas de la hoja.")
     parser.add_argument("--max-grupos", type=int, default=0, help="Responder como mucho N grupos (piloto; no Termina la factura).")
+    parser.add_argument("--max-facturas", type=int, default=0, help="Procesar como mucho N facturas (piloto; corta la lista de --todas).")
     parser.add_argument("--evidencias", type=Path, default=Path("EVIDENCIA"), help="Carpeta para los pantallazos de cierre (default: EVIDENCIA).")
     parser.add_argument("--con-cabeza", action="store_true", help="Mostrar el browser.")
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
@@ -1106,6 +1107,11 @@ def main() -> int:
         if not facturas:
             logger.error(f"No hallé la factura {args.solo} en la hoja {args.hoja}.")
             return 1
+
+    if args.max_facturas > 0:
+        recorte = dict(list(facturas.items())[:args.max_facturas])
+        logger.info(f"Piloto: proceso solo {len(recorte)} de {len(facturas)} facturas.")
+        facturas = recorte
 
     indice: dict[str, Path] = {}
     if args.indice is not None:
