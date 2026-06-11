@@ -401,15 +401,25 @@ def abrir_factura(page: Page, factura: str) -> None:
     # Anti-falso-negativo: sólo declarar NO_EN_BOLSA si el datatable da una
     # señal EXPLÍCITA de vacío (cartel de sin resultados o 'de 0 Entradas').
     # Una grilla que aún está cargando no muestra ni la fila ni esa señal.
-    fila = page.locator(f"tr:has-text('{factura}')").first
+    # Localización por celda EXACTA de NUMERO FACTURA — el tr:has-text falla
+    # con plantillas ocultas o filas que contienen muchos otros números.
+    def _fila_visible():
+        for sel in (
+            f"tbody tr:has(td:text-is('{factura}'))",
+            f"tbody tr:has(td:has-text('{factura}'))",
+        ):
+            cand = _primer_visible(page.locator(sel))
+            if cand is not None:
+                return cand
+        return None
+
     inicio = time.time()
     aviso = False
+    fila = None
     while True:
-        try:
-            if fila.is_visible():
-                break
-        except Exception:
-            pass
+        fila = _fila_visible()
+        if fila is not None:
+            break
         vacio = False
         try:
             vacio = page.evaluate(
@@ -432,10 +442,17 @@ def abrir_factura(page: Page, factura: str) -> None:
             aviso = True
         page.wait_for_timeout(400)
 
-    boton = fila.locator("button, a").last  # botón azul ▶ en OPCIONES
-    boton.click()
+    # Click en el botón azul ▶ de OPCIONES (último botón/anchor de la fila).
+    accion = _primer_visible(fila.locator("button")) or _primer_visible(fila.locator("a"))
+    if accion is None:
+        # Fallback: cualquier elemento con onclick en la última celda.
+        accion = _primer_visible(fila.locator("td").last.locator("button, a, [onclick]"))
+    if accion is None:
+        _screenshot_debug(page, f"sin_boton_play_{factura}")
+        raise RuntimeError(f"{factura}: no hallé el botón ▶ en la fila.")
+    accion.click()
     # Página de detalle: aparece la sección GLOSAS.
-    page.wait_for_selector("text=GLOSAS", timeout=25000)
+    page.wait_for_selector("text=GLOSAS", timeout=60000)
     page.wait_for_timeout(800)
 
 
