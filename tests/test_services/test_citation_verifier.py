@@ -93,6 +93,47 @@ class TestFalsosPositivosPorBordeDePalabra:
         assert not resoluciones, f"falso positivo de resolución: {resoluciones}"
 
 
+class TestRegresionTextoFijoDMBUG:
+    """Regresión 11-jun-2026: el texto fijo curado para DMBUG citaba
+    "DECRETO-LEY 1795 DE 2000" y "Decreto 111 de 1996" (Estatuto Orgánico
+    del Presupuesto, art. 71 — defensa contra "agotamiento presupuestal").
+    El verifier los marcaba NORMA_INEXISTENTE ALTA:
+      - "Decreto-Ley 1795/2000" → PAT_LEY extraía "Ley 1795 de 2000" y
+        no la encontraba (la norma real es DECRETO-LEY, no LEY).
+      - "Decreto 111/1996" no estaba cargado en el corpus.
+    Resultado: EVIDENCIA C y CONFIANZA 31% en un dictamen jurídicamente
+    correcto. Ambos resueltos.
+    """
+
+    def test_decreto_ley_1795_no_se_lee_como_ley(self):
+        texto = "DECRETO-LEY 1795 DE 2000 (RÉGIMEN DEL SUBSISTEMA DE SALUD DE LAS FF.MM.)"
+        r = verificar_citas(texto)
+        leyes = [i for i in r["issues"] if "Ley 1795" in i.get("cita", "")]
+        assert not leyes, f"Decreto-Ley extraído como Ley: {leyes}"
+
+    def test_decreto_ley_con_espacio_tampoco(self):
+        # Algunos textos escriben "Decreto Ley 1795 de 2000" sin guión.
+        r = verificar_citas("Decreto Ley 1795 de 2000")
+        leyes = [i for i in r["issues"] if "Ley 1795" in i.get("cita", "")]
+        assert not leyes
+
+    def test_ley_real_sigue_detectandose(self):
+        # No debe cazar Decreto-Ley pero sí leyes normales.
+        r = verificar_citas("Ley 9999 de 9999")
+        assert any(i["tipo"] == "NORMA_INEXISTENTE" for i in r["issues"])
+
+    def test_decreto_111_de_1996_esta_en_corpus(self):
+        # Estatuto Orgánico del Presupuesto, cargado el 11-jun-2026 para
+        # eliminar el falso positivo en dictámenes DMBUG por agotamiento.
+        r = verificar_citas("Decreto 111 de 1996")
+        assert not r["issues"], f"esperaba 0 issues: {r['issues']}"
+
+    def test_articulo_71_decreto_111(self):
+        # El texto fijo cita "ART. 71 DEL DECRETO 111/1996" — debe pasar.
+        r = verificar_citas("art. 71 del Decreto 111 de 1996")
+        assert not any(i["tipo"] == "ARTICULO_FUERA_DE_NORMA" for i in r["issues"])
+
+
 class TestFallbackEstricto:
     """El fallback antiguo matcheaba por substring numérico: '138' caía
     spuriamente dentro de 'LEY 1438 DE 2011'. El fallback nuevo exige

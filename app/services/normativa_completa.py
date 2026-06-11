@@ -397,6 +397,31 @@ LEYES = {
 # ═══════════════════════════════════════════════════════════════════
 
 DECRETOS = {
+    # 11-jun-2026: el texto fijo DMBUG cita el art. 71 del Estatuto
+    # Orgánico del Presupuesto (defensa "agotamiento presupuestal es
+    # responsabilidad del contratante") y el verifier lo marcaba
+    # NORMA_INEXISTENTE ALTA por no estar en el corpus — falso positivo
+    # que tumbaba la EVIDENCIA del dictamen a C sobre un texto curado.
+    "DECRETO 111 DE 1996": {
+        "nombre": "Decreto 111 de 1996",
+        "titulo": "Estatuto Orgánico del Presupuesto (compila Leyes 38/1989, 179/1994 y 225/1995)",
+        "ambito": "Gestión presupuestal de entidades públicas — defensa contra glosas por 'agotamiento presupuestal'",
+        "vigente": True,
+        "articulos": {
+            "71": {
+                "titulo": "Certificado de disponibilidad presupuestal",
+                "texto": "Todos los actos administrativos que afecten las apropiaciones presupuestales deberán contar con certificados de disponibilidad previos que garanticen la existencia de apropiación suficiente para atender estos gastos.",
+                "aplicacion": "La gestión de apropiaciones presupuestales es obligación del contratante público; el agotamiento del valor comprometido no se traslada al prestador ni extingue las tarifas pactadas",
+                "keywords": ["presupuesto", "apropiación", "disponibilidad", "agotamiento", "CDP"],
+            },
+        },
+        "keywords": [
+            "estatuto orgánico",
+            "presupuesto",
+            "apropiaciones",
+            "agotamiento presupuestal",
+        ],
+    },
     "DECRETO 4747 DE 2007": {
         "nombre": "Decreto 4747 de 2007",
         "titulo": "Relaciones entre prestadores de servicios de salud y entidades responsables del pago",

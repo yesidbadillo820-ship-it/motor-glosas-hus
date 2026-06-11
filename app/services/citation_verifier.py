@@ -38,8 +38,13 @@ PAT_DECRETO = re.compile(
     r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
+# El lookbehind excluye "DECRETO-LEY 1795 DE 2000" / "DECRETO LEY ...":
+# son DECRETOS con fuerza de ley, no leyes — el 11-jun-2026 el verifier
+# extraía "Ley 1795 de 2000" del texto fijo DMBUG y la marcaba
+# NORMA_INEXISTENTE ALTA (la norma real es el Decreto-Ley 1795/2000).
 PAT_LEY = re.compile(
-    r"\bLey\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bLey\s+(\d{1,5})[/\-](\d{2,4})",
+    r"(?<!DECRETO-)(?<!DECRETO\s)\bLey\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
+    r"|(?<!DECRETO-)(?<!DECRETO\s)\bLey\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_ACUERDO = re.compile(
