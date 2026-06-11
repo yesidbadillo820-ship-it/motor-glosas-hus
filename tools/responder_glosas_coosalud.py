@@ -231,33 +231,89 @@ def cargar_indice(ruta: Path) -> dict[str, Path]:
     return mapa
 
 
+def _pdx_en(carpeta: Path) -> list[Path]:
+    out: list[Path] = []
+    for pat in ("PDX*.pdf", "PDX*.PDF", "pdx*.pdf", "Pdx*.pdf"):
+        out.extend(carpeta.glob(pat))
+    return sorted(set(out))
+
+
+def _carpetas_alternativas(carpeta: Path) -> list[Path]:
+    """En el share del HUS los PDFs no siempre están en la misma carpeta del
+    RIPS (donde viven los JSONs). El patrón observado:
+        ...\\KARIN\\RIPS\\ENV-227237-OK\\HUS508259           ← índice (JSONs)
+        ...\\KARIN\\ENV-227237-OK-C-DGH\\IMG\\HUS508259      ← donde está el PDX
+    Devuelve carpetas hermanas a probar (mismo ENV, sufijo distinto,
+    típicamente -C-DGH, con un nivel /IMG/ intermedio)."""
+    factura = carpeta.name
+    env_dir = carpeta.parent  # ENV-XXX-OK
+    if not env_dir.name.upper().startswith("ENV"):
+        return []
+    alternativas: list[Path] = []
+    raices: list[Path] = [env_dir.parent]
+    abuelo = env_dir.parent.parent
+    if abuelo and abuelo != env_dir.parent:
+        raices.append(abuelo)
+    vistos: set[Path] = set()
+    for raiz in raices:
+        if not raiz.is_dir():
+            continue
+        try:
+            vecinas = list(raiz.iterdir())
+        except OSError:
+            continue
+        for vecina in vecinas:
+            try:
+                if not vecina.is_dir() or vecina == env_dir:
+                    continue
+                # Hermana del envío: empieza con el mismo nombre (ENV-XXX-OK*).
+                if not vecina.name.upper().startswith(env_dir.name.upper()):
+                    continue
+                for sub in (vecina / "IMG" / factura, vecina / factura):
+                    try:
+                        if sub.is_dir() and sub not in vistos:
+                            vistos.add(sub)
+                            alternativas.append(sub)
+                    except OSError:
+                        continue
+            except OSError:
+                continue
+    return alternativas
+
+
 def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]:
     """Busca el PDF tipificado PDX_*.pdf en la carpeta de la factura.
-    Devuelve (ruta o None, detalle)."""
+    Si la carpeta del índice no tiene PDFs (solo RIPS/JSONs), prueba la
+    carpeta hermana de IMG/. Devuelve (ruta o None, detalle)."""
     carpeta = indice.get(factura.upper())
     if carpeta is None:
         return None, f"{factura} no está en el índice"
     if not carpeta.is_dir():
         return None, f"carpeta no accesible: {carpeta}"
-    # Aceptamos PDX_*.pdf, PDX-*.pdf y variantes case-insensitive (Windows lo es,
-    # pero glob en case-sensitive en Linux y nunca está de más).
-    patrones = ["PDX*.pdf", "PDX*.PDF", "pdx*.pdf", "Pdx*.pdf"]
-    candidatos: list[Path] = []
-    for pat in patrones:
-        candidatos.extend(carpeta.glob(pat))
+
+    fuente = carpeta
+    candidatos = _pdx_en(carpeta)
     if not candidatos:
-        for pat in patrones:
-            candidatos.extend(carpeta.rglob(pat))
-    candidatos = sorted(set(candidatos))
+        # rglob como red de seguridad por si el PDX cuelga de un subdir
+        # dentro de la propia carpeta del índice.
+        candidatos = sorted(set(p for p in carpeta.rglob("PDX*.pdf")))
     if not candidatos:
-        # Listar TODOS los PDFs que hay para ayudar a diagnosticar (nombres
-        # típicos: PDX_, AAC_, FAC_, FE_, RIPS_, ANS_, etc.).
+        # Fallback: carpeta hermana (RIPS → IMG).
+        for alt in _carpetas_alternativas(carpeta):
+            cand_alt = _pdx_en(alt)
+            if cand_alt:
+                candidatos = cand_alt
+                fuente = alt
+                logger.info(f"  PDX no estaba en {carpeta.name}; lo encontré en hermana IMG/")
+                break
+    if not candidatos:
         pdfs = sorted(carpeta.glob("*.pdf")) + sorted(carpeta.glob("*.PDF"))
         if pdfs:
             muestras = ", ".join(p.name for p in pdfs[:6])
             extra = "" if len(pdfs) <= 6 else f" (+{len(pdfs) - 6} más)"
             return None, f"sin PDX*.pdf en {carpeta} | PDFs presentes: {muestras}{extra}"
-        return None, f"sin PDX*.pdf en {carpeta} (carpeta sin PDFs)"
+        return None, f"sin PDX*.pdf en {carpeta} (ni en carpeta hermana IMG/)"
+
     pdf = candidatos[0]
     mb = pdf.stat().st_size / (1024 * 1024)
     if mb > MAX_PDF_MB:
