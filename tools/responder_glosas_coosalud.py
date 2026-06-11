@@ -85,6 +85,7 @@ def _exigir_playwright() -> None:
 
 PORTAL_BASE = "https://vco.ctamedicas.com"
 PORTAL_LOGIN = f"{PORTAL_BASE}/app/login"
+PORTAL_HOME = f"{PORTAL_BASE}/app/inicio"
 PORTAL_BOLSA = f"{PORTAL_BASE}/app/respuestaGlosaSearch"
 
 MAX_PDF_MB = 10
@@ -296,10 +297,47 @@ class FacturaNoEnBolsa(Exception):
     """La factura no aparece en la Bolsa de Respuestas (ya cerrada / no glosada)."""
 
 
+def ir_a_bolsa(page: Page) -> None:
+    """Navega al menú Respuesta Glosas → Bolsa Respuesta.
+
+    El goto directo a /respuestaGlosaSearch a veces excede los 30s del DOMContentLoaded
+    (el servidor responde, pero algún recurso bloquea). Más fiable: arrancar en
+    /app/inicio y clickear el menú lateral, como un humano.
+    """
+    # Si ya estamos en la bolsa, no hacer nada.
+    try:
+        if "respuestaGlosaSearch" in page.url and page.locator("text=FILTROS BOLSA RESPUESTA").count() > 0:
+            return
+    except Exception:
+        pass
+
+    try:
+        page.goto(PORTAL_HOME, wait_until="domcontentloaded", timeout=45000)
+    except PlaywrightTimeout:
+        # commit fallback: con que arranque la nav alcanza.
+        page.goto(PORTAL_HOME, wait_until="commit", timeout=45000)
+    page.wait_for_selector("text=Respuesta Glosas", timeout=20000)
+
+    # Click en el menú "Respuesta Glosas" → expande el submenú con "Bolsa Respuesta".
+    try:
+        page.locator("xpath=//a[normalize-space()='Respuesta Glosas'] | "
+                     "//span[normalize-space()='Respuesta Glosas']/ancestor::a[1]").first.click(timeout=5000)
+    except PlaywrightTimeout:
+        page.get_by_text("Respuesta Glosas").first.click()
+    page.wait_for_timeout(500)
+    # Submenú "Bolsa Respuesta" (o "Bolsa de Respuestas" / variantes).
+    sub = page.locator(
+        "xpath=//a[contains(normalize-space(), 'Bolsa')] | "
+        "//span[contains(normalize-space(), 'Bolsa')]/ancestor::a[1]"
+    ).first
+    sub.click(timeout=10000)
+    page.wait_for_selector("text=FILTROS BOLSA RESPUESTA", timeout=30000)
+    page.wait_for_timeout(800)
+
+
 def abrir_factura(page: Page, factura: str) -> None:
     """Bolsa de Respuestas → buscar la factura → click botón azul ▶."""
-    page.goto(PORTAL_BOLSA, wait_until="domcontentloaded")
-    page.wait_for_selector("text=RESPUESTA GLOSA", timeout=20000)
+    ir_a_bolsa(page)
     buscar = page.locator(
         "input[type='search']:visible, "
         "xpath=//label[contains(., 'Buscar')]//input | //input[@placeholder='Buscar']"
