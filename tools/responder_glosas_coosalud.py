@@ -404,15 +404,31 @@ def abrir_factura(page: Page, factura: str) -> None:
 
 def preparar_grilla(page: Page) -> None:
     """Pone 'Mostrar: Todos' en la sección GLOSAS (hay facturas de 800+ glosas)."""
-    try:
-        selector = page.locator(
-            "xpath=//*[contains(text(),'GLOSAS')]/following::select[1]"
-        ).first
-        selector.select_option(label="Todos")
-        page.wait_for_timeout(800)
-    except Exception:
-        # Algunos datatables ya vienen en 'Todos' (como en los pantallazos).
-        logger.info("  (no pude setear Mostrar=Todos; sigo con lo visible)")
+    candidatos = (
+        "xpath=//*[contains(text(),'GLOSAS')]/following::select[1]",
+        "select[name*='length']",
+        "select",
+    )
+    for sel in candidatos:
+        loc = page.locator(sel)
+        try:
+            n = loc.count()
+        except Exception:
+            continue
+        for i in range(min(n, 6)):
+            s = loc.nth(i)
+            try:
+                if not s.is_visible():
+                    continue
+                opciones = s.locator("option").all_inner_texts()
+                if any("Todos" in o for o in opciones):
+                    s.select_option(label=next(o for o in opciones if "Todos" in o))
+                    page.wait_for_timeout(800)
+                    return
+            except Exception:
+                continue
+    # Algunos datatables ya vienen en 'Todos' (como en los pantallazos).
+    logger.info("  (no pude setear Mostrar=Todos; sigo con lo visible)")
 
 
 def leer_estados(page: Page) -> dict[str, str]:
@@ -440,22 +456,53 @@ def leer_estados(page: Page) -> dict[str, str]:
     return estados
 
 
+def _contar_marcadas(page: Page) -> int:
+    try:
+        return page.evaluate(
+            "() => document.querySelectorAll(\"tbody input[type='checkbox']:checked\").length"
+        )
+    except Exception:
+        return 0
+
+
 def marcar_checkboxes(page: Page, ids: list[str], todas_pendientes: bool) -> int:
-    """Marca los checkboxes de las glosas `ids`. Si son TODAS las pendientes de
-    la grilla, usa el checkbox maestro (más rápido). Devuelve cuántas marcó."""
+    """Marca los checkboxes de las glosas `ids` y devuelve cuántas quedaron
+    marcadas (verificado contando en el DOM).
+
+    El JS del portal maneja el estado de los checkboxes a su manera, así que
+    NO usamos check()/uncheck() (su verificación estricta revienta con
+    'Clicking the checkbox did not change its state'): clickeamos sin
+    verificación y validamos nosotros contando los marcados."""
     if todas_pendientes:
         maestro = page.locator("thead input[type='checkbox']").last
         if maestro.count() > 0:
-            maestro.check(force=True)
-            page.wait_for_timeout(400)
-            return len(ids)
+            maestro.click(force=True)
+            page.wait_for_timeout(700)
+            if _contar_marcadas(page) >= len(ids):
+                return len(ids)
+            logger.info("  (checkbox maestro no marcó todo; voy fila por fila)")
     marcadas = 0
     for id_glosa in ids:
         fila = page.locator(f"tr:has(td:text-is('{id_glosa}'))").first
         try:
             cb = fila.locator("input[type='checkbox']").last
-            cb.check(force=True, timeout=3000)
-            marcadas += 1
+            if cb.evaluate("el => el.checked"):
+                marcadas += 1
+                continue
+            cb.click(force=True, timeout=3000)
+            page.wait_for_timeout(60)
+            if cb.evaluate("el => el.checked"):
+                marcadas += 1
+                continue
+            # Último recurso: setear el estado y disparar los eventos que
+            # escucha el framework del portal.
+            cb.evaluate(
+                "el => { el.checked = true;"
+                " el.dispatchEvent(new Event('click', {bubbles: true}));"
+                " el.dispatchEvent(new Event('change', {bubbles: true})); }"
+            )
+            if cb.evaluate("el => el.checked"):
+                marcadas += 1
         except Exception as e:
             logger.warning(f"  no pude marcar id_glosa {id_glosa}: {e}")
     page.wait_for_timeout(300)
@@ -463,18 +510,16 @@ def marcar_checkboxes(page: Page, ids: list[str], todas_pendientes: bool) -> int
 
 
 def _desmarcar_todo(page: Page) -> None:
+    """Desmarca todos los checkboxes de la grilla clickeando los marcados
+    (sin uncheck(): misma incompatibilidad que check())."""
     try:
-        maestro = page.locator("thead input[type='checkbox']").last
-        if maestro.count() > 0 and maestro.is_checked():
-            maestro.uncheck(force=True)
+        for _ in range(3):
+            if _contar_marcadas(page) == 0:
+                return
+            page.evaluate(
+                """() => { for (const cb of document.querySelectorAll("tbody input[type='checkbox']:checked")) cb.click(); }"""
+            )
             page.wait_for_timeout(300)
-    except Exception:
-        pass
-    # Desmarcar cualquiera que haya quedado suelta.
-    try:
-        page.evaluate(
-            """() => { for (const cb of document.querySelectorAll("tbody input[type='checkbox']:checked")) cb.click(); }"""
-        )
     except Exception:
         pass
 
