@@ -1080,6 +1080,7 @@ def main() -> int:
     parser.add_argument("--indice", type=Path, default=None, help="TXT índice factura→carpeta (para el PDX de SOPORTES).")
     grupo = parser.add_mutually_exclusive_group(required=True)
     grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS...).")
+    grupo.add_argument("--facturas", type=str, help="Lista de facturas separadas por coma (HUS...,HUS...).")
     grupo.add_argument("--todas", action="store_true", help="Procesar todas las facturas de la hoja.")
     parser.add_argument("--max-grupos", type=int, default=0, help="Responder como mucho N grupos (piloto; no Termina la factura).")
     parser.add_argument("--max-facturas", type=int, default=0, help="Procesar como mucho N facturas (piloto; corta la lista de --todas).")
@@ -1107,6 +1108,18 @@ def main() -> int:
         if not facturas:
             logger.error(f"No hallé la factura {args.solo} en la hoja {args.hoja}.")
             return 1
+
+    if args.facturas:
+        objetivos = {f.strip().upper() for f in args.facturas.split(",") if f.strip()}
+        encontradas = {k: v for k, v in facturas.items() if k.upper() in objetivos}
+        faltantes = objetivos - {k.upper() for k in encontradas}
+        if not encontradas:
+            logger.error(f"Ninguna de las facturas pedidas está en la hoja {args.hoja}.")
+            return 1
+        if faltantes:
+            logger.warning(f"⚠ No están en la hoja {args.hoja}: {', '.join(sorted(faltantes))}")
+        logger.info(f"Procesando {len(encontradas)} de {len(objetivos)} facturas pedidas.")
+        facturas = encontradas
 
     if args.max_facturas > 0:
         recorte = dict(list(facturas.items())[:args.max_facturas])
