@@ -712,26 +712,72 @@ def marcar_checkboxes(page: Page, ids: list[str], todas_pendientes: bool) -> int
     NO usamos check()/uncheck() (su verificación estricta revienta con
     'Clicking the checkbox did not change its state'): clickeamos sin
     verificación y validamos nosotros contando los marcados."""
+
+    def _marcadas_de(ids_buscar: list[str]) -> set[str]:
+        try:
+            res = page.evaluate(
+                """(ids) => {
+                    const want = new Set(ids); const out = [];
+                    for (const tr of document.querySelectorAll('tbody tr')) {
+                        const tds = tr.querySelectorAll('td');
+                        if (!tds.length) continue;
+                        const id = (tds[0].innerText || '').trim();
+                        if (!want.has(id)) continue;
+                        const cb = tr.querySelector("input[type='checkbox']");
+                        if (cb && cb.checked) out.push(id);
+                    }
+                    return out;
+                }""",
+                ids_buscar,
+            )
+            return set(res)
+        except Exception:
+            return set()
+
     if todas_pendientes:
-        maestro = page.locator("thead input[type='checkbox']").last
-        if maestro.count() > 0:
+        maestro = _primer_visible(page.locator("thead input[type='checkbox']"))
+        if maestro is not None:
             maestro.click(force=True)
             page.wait_for_timeout(700)
-            if _contar_marcadas(page) >= len(ids):
+            if len(_marcadas_de(ids)) >= len(ids):
                 return len(ids)
-            logger.info("  (checkbox maestro no marcó todo; voy fila por fila)")
-    marcadas = 0
-    for id_glosa in ids:
+
+    # Camino rápido: UN evaluate clickea todos los checkboxes objetivo.
+    # (Fila por fila con locators tarda ~0.7s por glosa: una tanda de 200
+    # se iba a 2½ minutos; así baja a segundos.)
+    try:
+        page.evaluate(
+            """(ids) => {
+                const want = new Set(ids);
+                for (const tr of document.querySelectorAll('tbody tr')) {
+                    const tds = tr.querySelectorAll('td');
+                    if (!tds.length) continue;
+                    const id = (tds[0].innerText || '').trim();
+                    if (!want.has(id)) continue;
+                    const cb = tr.querySelector("input[type='checkbox']");
+                    if (cb && !cb.checked) cb.click();
+                }
+            }""",
+            ids,
+        )
+        page.wait_for_timeout(500)
+    except Exception:
+        pass
+    hechas = _marcadas_de(ids)
+    faltan = [i for i in ids if i not in hechas]
+    if faltan:
+        logger.info(f"  ({len(faltan)} checkboxes no entraron en bloque; voy fila por fila)")
+
+    # Lento (fila por fila con eventos), solo para las que falten.
+    for id_glosa in faltan:
         fila = page.locator(f"tr:has(td:text-is('{id_glosa}'))").first
         try:
             cb = fila.locator("input[type='checkbox']").last
             if cb.evaluate("el => el.checked"):
-                marcadas += 1
                 continue
             cb.click(force=True, timeout=3000)
             page.wait_for_timeout(60)
             if cb.evaluate("el => el.checked"):
-                marcadas += 1
                 continue
             # Último recurso: setear el estado y disparar los eventos que
             # escucha el framework del portal.
@@ -740,12 +786,10 @@ def marcar_checkboxes(page: Page, ids: list[str], todas_pendientes: bool) -> int
                 " el.dispatchEvent(new Event('click', {bubbles: true}));"
                 " el.dispatchEvent(new Event('change', {bubbles: true})); }"
             )
-            if cb.evaluate("el => el.checked"):
-                marcadas += 1
         except Exception as e:
             logger.warning(f"  no pude marcar id_glosa {id_glosa}: {e}")
     page.wait_for_timeout(300)
-    return marcadas
+    return len(_marcadas_de(ids))
 
 
 def _desmarcar_todo(page: Page) -> None:
@@ -1039,8 +1083,28 @@ def procesar_factura(
         )
 
         grupos_hechos = 0
+        tandas_hechas = 0  # respuestas enviadas en ESTA carga de página
         grupos_saltados_pdx: list[str] = []
         a_procesar = grupos[:max_grupos] if max_grupos > 0 else grupos
+        # El modal con cientos de glosas marcadas se rompe (el dropdown no
+        # carga los códigos); partimos los grupos grandes en tandas.
+        LOTE_MAX = 200
+
+        def _recargar_pagina() -> None:
+            """El modal del portal es de UN SOLO USO por carga de página: el
+            primer 'Responder Glosa' funciona, el segundo queda disabled para
+            siempre. Recargar (F5) lo resetea — verificado: al reintentar la
+            factura (página fresca) el grupo que fallaba salía al primer
+            intento."""
+            logger.info("  ↻ recargo la página (el modal es de un solo uso)")
+            try:
+                page.reload(wait_until="domcontentloaded", timeout=90000)
+            except PlaywrightTimeout:
+                page.reload(wait_until="commit", timeout=90000)
+            esperar_glosas(page)
+            preparar_grilla(page)
+            esperar_glosas(page)
+
         for n, g in enumerate(a_procesar, start=1):
             ids_pend = [i for i in g["ids"] if i in pendientes_portal]
             if not ids_pend:
@@ -1055,39 +1119,50 @@ def procesar_factura(
                     grupos_saltados_pdx.append(detalle_pdx)
                     continue
 
+            n_tandas = (len(ids_pend) + LOTE_MAX - 1) // LOTE_MAX
             logger.info(
                 f"  → grupo {n}/{len(grupos)}: {len(ids_pend)} glosas, cod {g['cod_corto']}"
                 + (" + PDF" if pdf else "")
+                + (f" (en {n_tandas} tandas de ≤{LOTE_MAX})" if n_tandas > 1 else "")
             )
-            todas = set(ids_pend) == pendientes_portal
-            marcadas = marcar_checkboxes(page, ids_pend, todas_pendientes=todas)
-            if marcadas == 0:
-                raise RuntimeError(f"no pude marcar ningún checkbox del grupo {n}")
-            responder_grupo(page, g, pdf)
+            restantes = list(ids_pend)
+            k = 0
+            while restantes:
+                tanda = restantes[:LOTE_MAX]
+                restantes = restantes[LOTE_MAX:]
+                k += 1
+                if tandas_hechas > 0:
+                    _recargar_pagina()
+                if n_tandas > 1:
+                    logger.info(f"    tanda {k}/{n_tandas}: {len(tanda)} glosas")
+                todas = set(tanda) == pendientes_portal
+                marcadas = marcar_checkboxes(page, tanda, todas_pendientes=todas)
+                if marcadas == 0:
+                    raise RuntimeError(f"no pude marcar ningún checkbox del grupo {n}")
+                responder_grupo(page, g, pdf)
+                tandas_hechas += 1
+                pendientes_portal -= set(tanda)
+                _desmarcar_todo(page)
+                # Esperar a que la grilla confirme lo recién respondido antes
+                # de seguir (si no, el reload puede agarrar al backend a
+                # mitad del guardado).
+                confirmadas: set[str] = set()
+                t_dl = time.time() + 90
+                while time.time() < t_dl:
+                    try:
+                        estados_act = leer_estados(page)
+                    except Exception:
+                        estados_act = {}
+                    confirmadas = {i for i in tanda if estados_act.get(i) == "RESPONDIDA"}
+                    if len(confirmadas) >= len(tanda):
+                        break
+                    page.wait_for_timeout(1500)
+                if len(confirmadas) < len(tanda):
+                    logger.warning(
+                        f"  ⚠ El portal confirmó {len(confirmadas)}/{len(tanda)} "
+                        f"glosas del grupo {n} en 90s; sigo igual"
+                    )
             grupos_hechos += 1
-            pendientes_portal -= set(ids_pend)
-            _desmarcar_todo(page)
-            # CRÍTICO entre grupos: esperar a que las glosas del grupo recién
-            # respondido aparezcan como RESPONDIDA en la grilla. Si abrimos el
-            # modal del siguiente grupo antes, el portal lo deja con el botón
-            # disabled mientras termina de procesar el anterior — y se cae con
-            # timeout. Esperamos hasta 90s.
-            confirmadas = set()
-            t_dl = time.time() + 90
-            while time.time() < t_dl:
-                try:
-                    estados_act = leer_estados(page)
-                except Exception:
-                    estados_act = {}
-                confirmadas = {i for i in ids_pend if estados_act.get(i) == "RESPONDIDA"}
-                if len(confirmadas) >= len(ids_pend):
-                    break
-                page.wait_for_timeout(1500)
-            if len(confirmadas) < len(ids_pend):
-                logger.warning(
-                    f"  ⚠ El portal confirmó {len(confirmadas)}/{len(ids_pend)} "
-                    f"glosas del grupo {n} en 90s; sigo igual"
-                )
 
         if max_grupos > 0:
             reg["estado"] = "PILOTO_PARCIAL"
