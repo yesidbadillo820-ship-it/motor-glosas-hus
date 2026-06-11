@@ -398,17 +398,39 @@ def abrir_factura(page: Page, factura: str) -> None:
     buscar.fill(factura)
     page.wait_for_timeout(1200)  # debounce del datatable
 
+    # Anti-falso-negativo: sólo declarar NO_EN_BOLSA si el datatable da una
+    # señal EXPLÍCITA de vacío (cartel de sin resultados o 'de 0 Entradas').
+    # Una grilla que aún está cargando no muestra ni la fila ni esa señal.
     fila = page.locator(f"tr:has-text('{factura}')").first
     inicio = time.time()
+    aviso = False
     while True:
         try:
             if fila.is_visible():
                 break
         except Exception:
             pass
-        if time.time() - inicio > 8:
+        vacio = False
+        try:
+            vacio = page.evaluate(
+                """() => {
+                    const t = document.body.innerText || '';
+                    return /No se encontraron|No hay (datos|registros)|ning[uú]n registro|de 0 Entradas/i.test(t);
+                }"""
+            )
+        except Exception:
+            pass
+        if vacio:
             raise FacturaNoEnBolsa(f"{factura} no aparece en la Bolsa de Respuestas (¿ya cerrada?).")
-        page.wait_for_timeout(300)
+        if time.time() - inicio > 60:
+            _screenshot_debug(page, f"bolsa_sin_fila_{factura}")
+            raise FacturaNoEnBolsa(
+                f"{factura}: sin fila ni señal de vacío tras 60s (verificar manualmente)."
+            )
+        if not aviso and time.time() - inicio > 5:
+            logger.info("  esperando resultados de la búsqueda…")
+            aviso = True
+        page.wait_for_timeout(400)
 
     boton = fila.locator("button, a").last  # botón azul ▶ en OPCIONES
     boton.click()
