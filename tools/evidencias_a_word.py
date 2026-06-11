@@ -3,7 +3,8 @@
 Lee todos los `.png` de una carpeta (típicamente la de EVIDENCIA del bot de
 COOSALUD, donde cada archivo se llama `HUS<numero>_cierre.png`) y arma un .docx
 con UNA factura por página: encabezado con el número de factura + la imagen
-escalada al ancho de página + salto de página.
+escalada para que entre completa con el encabezado en una sola hoja A4 +
+salto de página.
 
 USO:
     py evidencias_a_word.py ^
@@ -19,12 +20,12 @@ from __future__ import annotations
 import argparse
 import logging
 import re
+import struct
 import sys
 from pathlib import Path
 
 logger = logging.getLogger("evidencias_word")
 
-# HUS123456 al principio del nombre del PNG → encabezado de la factura.
 RE_FACTURA = re.compile(r"^(HUS\d{5,9})", re.IGNORECASE)
 
 
@@ -32,6 +33,21 @@ def _factura_desde_nombre(p: Path) -> str:
     """HUS508259_cierre.png → 'HUS508259'. Si no matchea, usa el stem completo."""
     m = RE_FACTURA.match(p.name)
     return m.group(1).upper() if m else p.stem
+
+
+def _png_dims_px(path: Path) -> tuple[int, int] | None:
+    """Devuelve (ancho_px, alto_px) del PNG leyendo su cabecera IHDR.
+    Devuelve None si el archivo no es un PNG válido."""
+    try:
+        with path.open("rb") as f:
+            sig = f.read(8)
+            if sig[:4] != b"\x89PNG":
+                return None
+            f.read(8)  # IHDR length (4) + chunk type (4)
+            w, h = struct.unpack(">II", f.read(8))
+            return w, h
+    except Exception:
+        return None
 
 
 def main() -> int:
@@ -66,28 +82,48 @@ def main() -> int:
     logger.info(f"Imágenes a incluir: {len(imagenes)}")
 
     doc = Document()
-    # Márgenes razonables (Word default tiende a 2.54cm, dejamos 1.5).
+    # Márgenes razonables para A4.
     for sec in doc.sections:
         sec.top_margin = Cm(1.5)
         sec.bottom_margin = Cm(1.5)
         sec.left_margin = Cm(1.8)
         sec.right_margin = Cm(1.8)
-    # Ancho disponible para la imagen (página A4 21cm − márgenes).
-    ancho_imagen = Cm(17.0)
+    # Área útil A4 con esos márgenes: 17.4cm × 26.7cm aprox.
+    # Reservamos ~1.5cm para el encabezado + 0.5cm para margen visual: la
+    # imagen no debe pasarse de ANCHO_MAX × ALTO_MAX.
+    ANCHO_MAX_CM = 17.0
+    ALTO_MAX_CM = 24.0
 
     for i, img in enumerate(imagenes):
         factura = _factura_desde_nombre(img)
-        # Encabezado: número de factura, grande y centrado.
+        # Encabezado: número de factura, grande, negrita, centrado.
         h = doc.add_paragraph()
         h.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = h.add_run(factura)
         run.bold = True
         run.font.size = Pt(20)
-        # Imagen centrada, ancho fijo (Word escala alto manteniendo aspecto).
+        # Decidir width/height para que la imagen ENTRE en una sola hoja
+        # JUNTO con el encabezado (sin salto de página automático).
+        dims = _png_dims_px(img)
         p_img = doc.add_paragraph()
         p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
         try:
-            p_img.add_run().add_picture(str(img), width=ancho_imagen)
+            if dims is None:
+                # Fallback: que Word elija — limitamos solo el ancho.
+                p_img.add_run().add_picture(str(img), width=Cm(ANCHO_MAX_CM))
+            else:
+                w_px, h_px = dims
+                if w_px <= 0 or h_px <= 0:
+                    p_img.add_run().add_picture(str(img), width=Cm(ANCHO_MAX_CM))
+                else:
+                    # Si fijar ancho=ANCHO_MAX_CM excede ALTO_MAX_CM,
+                    # mejor fijamos por alto (la imagen queda más angosta
+                    # pero entra completa con el encabezado).
+                    alto_si_max_ancho = ANCHO_MAX_CM * (h_px / w_px)
+                    if alto_si_max_ancho <= ALTO_MAX_CM:
+                        p_img.add_run().add_picture(str(img), width=Cm(ANCHO_MAX_CM))
+                    else:
+                        p_img.add_run().add_picture(str(img), height=Cm(ALTO_MAX_CM))
         except Exception as e:
             logger.warning(f"  {img.name}: no se pudo insertar — {e}")
             continue
