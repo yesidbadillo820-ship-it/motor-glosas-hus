@@ -350,9 +350,11 @@ def ir_a_bolsa(page: Page) -> None:
         "xpath=//a[contains(normalize-space(), 'Bolsa')] | "
         "//span[contains(normalize-space(), 'Bolsa')]/ancestor::a[1]"
     ).first
-    sub.click(timeout=10000)
+    # no_wait_after: el click dispara una navegación LENTA (la carga inicial
+    # del datatable); si el click la espera, revienta su propio timeout.
+    sub.click(timeout=10000, no_wait_after=True)
     # La PRIMERA carga del datatable puede tardar más de un minuto.
-    page.wait_for_selector("text=FILTROS BOLSA RESPUESTA", timeout=90000)
+    page.wait_for_selector("text=FILTROS BOLSA RESPUESTA", timeout=120000)
     page.wait_for_timeout(1500)
     _BOLSA_VISITADA = True
 
