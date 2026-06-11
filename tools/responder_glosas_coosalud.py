@@ -376,7 +376,13 @@ def ir_a_en_pausa(page: Page) -> None:
         page.goto(PORTAL_PAUSA, wait_until="domcontentloaded", timeout=60000)
     except PlaywrightTimeout:
         page.goto(PORTAL_PAUSA, wait_until="commit", timeout=60000)
-    page.wait_for_selector("text=EN PAUSA", timeout=60000)
+    # OJO: 'EN PAUSA' a secas matchea el ítem del menú lateral (oculto). El
+    # título real de la página es 'RESPUESTA GLOSA EN PAUSA'; si tarda, la
+    # caja Buscar (gate real) lo cubre después.
+    try:
+        page.wait_for_selector("text=RESPUESTA GLOSA EN PAUSA", timeout=20000)
+    except PlaywrightTimeout:
+        pass
     page.wait_for_timeout(800)
 
 
@@ -410,7 +416,18 @@ def _buscar_y_entrar(page: Page, factura: str, nombre_grilla: str, timeout_s: in
     True = entró al detalle. False = la grilla dio señal de vacío o venció el
     plazo sin fila (la factura no está en ESTA grilla)."""
     buscar = _esperar_caja_buscar(page, nombre_grilla)
-    buscar.fill(factura)
+    # El datatable filtra con eventos de TECLADO (keyup): fill() setea el valor
+    # sin teclas y la grilla nunca filtra (por eso a mano sí funcionaba). Hay
+    # que tipear de verdad, y de yapa disparamos keyup por JS.
+    buscar.click()
+    buscar.fill("")
+    buscar.type(factura, delay=40)
+    try:
+        buscar.evaluate(
+            "el => { el.dispatchEvent(new KeyboardEvent('keyup', {bubbles: true})); }"
+        )
+    except Exception:
+        pass
     page.wait_for_timeout(1200)  # debounce del datatable
 
     # Localización por celda EXACTA de NUMERO FACTURA (tr:has-text se confunde
