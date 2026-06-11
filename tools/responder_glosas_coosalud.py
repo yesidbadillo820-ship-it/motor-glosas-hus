@@ -266,7 +266,13 @@ def _screenshot_debug(page: Page, etiqueta: str) -> None:
 
 def login(page: Page, user: str, password: str) -> None:
     logger.info("Login al portal COOSALUD...")
-    page.goto(PORTAL_LOGIN, wait_until="domcontentloaded")
+    try:
+        page.goto(PORTAL_LOGIN, wait_until="domcontentloaded", timeout=90000)
+    except PlaywrightTimeout:
+        # El portal a veces tarda en disparar DOMContentLoaded; con que la
+        # navegación haya arrancado alcanza — los waits posteriores esperan
+        # los elementos concretos.
+        page.goto(PORTAL_LOGIN, wait_until="commit", timeout=90000)
     page.wait_for_timeout(1500)
     # Si ya hay sesión (el portal redirige al home con el menú), no hay login.
     if page.locator("text=Respuesta Glosas").count() > 0:
@@ -796,13 +802,28 @@ def main() -> int:
         b = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
         c = b.new_context(accept_downloads=True)
         pg = c.new_page()
+        # El portal es lento: timeouts generosos por defecto para TODA
+        # navegación y acción (los waits puntuales ya tienen los suyos).
+        pg.set_default_navigation_timeout(120000)
+        pg.set_default_timeout(30000)
         pg.on("dialog", lambda d: d.accept())
         login(pg, user, password)
         return b, c, pg
 
+    def _abrir_sesion_con_reintentos(p, intentos: int = 3):
+        ultimo = None
+        for n in range(1, intentos + 1):
+            try:
+                return _abrir_sesion(p)
+            except Exception as e:
+                ultimo = e
+                logger.warning(f"Apertura de sesión falló (intento {n}/{intentos}): {e}")
+                time.sleep(5)
+        raise RuntimeError(f"No pude abrir sesión tras {intentos} intentos: {ultimo}")
+
     t0 = time.time()
     with sync_playwright() as p:
-        browser, ctx, page = _abrir_sesion(p)
+        browser, ctx, page = _abrir_sesion_con_reintentos(p)
         relogins = 0
         MAX_RELOGINS = 5
         try:
@@ -831,7 +852,7 @@ def main() -> int:
                             browser.close()
                         except Exception:
                             pass
-                        browser, ctx, page = _abrir_sesion(p)
+                        browser, ctx, page = _abrir_sesion_con_reintentos(p)
                         continue
                     registrar(reg)
                     break
