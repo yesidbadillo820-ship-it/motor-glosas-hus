@@ -84,7 +84,7 @@ def _exigir_playwright() -> None:
 
 
 PORTAL_BASE = "https://vco.ctamedicas.com"
-PORTAL_LOGIN = f"{PORTAL_BASE}/app/inicio"
+PORTAL_LOGIN = f"{PORTAL_BASE}/app/login"
 PORTAL_BOLSA = f"{PORTAL_BASE}/app/respuestaGlosaSearch"
 
 MAX_PDF_MB = 10
@@ -136,9 +136,13 @@ COLUMNAS = {
 }
 
 
-def leer_excel(ruta: Path, hoja: str) -> dict[str, list[dict]]:
-    """Devuelve {factura: [grupos]} donde cada grupo es
+def leer_excel(ruta: Path, hoja: str) -> dict[str, dict]:
+    """Devuelve {factura: {"grupos": [...], "calidad": N}} donde cada grupo es
     {cod, cod_corto, obs, ids: [id_glosa...], es_soporte: bool}.
+
+    Las glosas con tipo_glosa == CALIDAD (pertinencia) NO se responden: se
+    excluyen de los grupos y sólo se cuentan en "calidad" — esas facturas
+    quedan abiertas (sin Terminar) para el equipo médico.
     Los grupos preservan el orden de aparición en el Excel."""
     try:
         from openpyxl import load_workbook
@@ -164,6 +168,7 @@ def leer_excel(ruta: Path, hoja: str) -> dict[str, list[dict]]:
 
     # factura → lista ordenada de (clave_grupo → grupo)
     grupos_por_fac: dict[str, dict] = defaultdict(dict)
+    calidad_por_fac: dict[str, int] = defaultdict(int)
     for r in rows:
         if r is None:
             continue
@@ -171,9 +176,12 @@ def leer_excel(ruta: Path, hoja: str) -> dict[str, list[dict]]:
         id_glosa = str(r[idx["id_glosa"]] or "").strip()
         if not fac or not id_glosa:
             continue
+        tipo = str(r[idx["tipo"]] or "").strip().upper()
+        if tipo == "CALIDAD":
+            calidad_por_fac[fac] += 1
+            continue  # pertinencia: NO se responde
         cod = str(r[idx["cod_rta"]] or "").strip()
         obs = str(r[idx["obs_rta"]] or "").strip()
-        tipo = str(r[idx["tipo"]] or "").strip().upper()
         if not cod or not obs:
             continue  # sin respuesta definida: no se puede responder
         key = (cod, obs)
@@ -192,7 +200,12 @@ def leer_excel(ruta: Path, hoja: str) -> dict[str, list[dict]]:
         if tipo == "SOPORTES":
             g["es_soporte"] = True
 
-    return {fac: list(gs.values()) for fac, gs in grupos_por_fac.items()}
+    todas = set(grupos_por_fac) | set(calidad_por_fac)
+    return {
+        fac: {"grupos": list(grupos_por_fac.get(fac, {}).values()),
+              "calidad": calidad_por_fac.get(fac, 0)}
+        for fac in todas
+    }
 
 
 # ─── Índice de soportes (factura → carpeta del share) ───────────────────────
@@ -475,6 +488,7 @@ def procesar_factura(
     page: Page,
     factura: str,
     grupos: list[dict],
+    calidad: int,
     indice: dict[str, Path],
     evidencias: Path,
     max_grupos: int = 0,
@@ -536,6 +550,15 @@ def procesar_factura(
             reg["estado"] = "PENDIENTE_PDX"
             reg["detalle"] = f"{grupos_hechos} grupos ok; sin PDX: {'; '.join(grupos_saltados_pdx)}"
             return reg
+        if calidad > 0:
+            # Los conceptos CALIDAD no se responden: la factura queda ABIERTA
+            # (sin Terminar) para que el equipo médico maneje la pertinencia.
+            reg["estado"] = "OK_CALIDAD_ABIERTA"
+            reg["detalle"] = (
+                f"{grupos_hechos} grupos respondidos; {calidad} glosas CALIDAD no se "
+                f"responden (portal muestra {aun_pendientes} sin respuesta); queda SIN Terminar"
+            )
+            return reg
         if aun_pendientes:
             reg["estado"] = "PENDIENTES"
             reg["detalle"] = (
@@ -587,8 +610,10 @@ def main() -> int:
     logger.info(f"Usuario COOSALUD: {user}")
 
     facturas = leer_excel(args.excel, args.hoja)
-    logger.info(f"Hoja {args.hoja}: {len(facturas)} facturas, "
-                f"{sum(len(g['ids']) for gs in facturas.values() for g in gs):,} glosas con respuesta.")
+    tot_glosas = sum(len(g["ids"]) for f in facturas.values() for g in f["grupos"])
+    tot_calidad = sum(f["calidad"] for f in facturas.values())
+    logger.info(f"Hoja {args.hoja}: {len(facturas)} facturas, {tot_glosas:,} glosas a responder"
+                + (f" (+{tot_calidad} CALIDAD excluidas)" if tot_calidad else "") + ".")
 
     if args.solo:
         objetivo = args.solo.strip().upper()
@@ -602,7 +627,7 @@ def main() -> int:
         indice = cargar_indice(args.indice)
         logger.info(f"Índice cargado: {len(indice):,} facturas mapeadas.")
     else:
-        n_sop = sum(1 for gs in facturas.values() for g in gs if g["es_soporte"])
+        n_sop = sum(1 for f in facturas.values() for g in f["grupos"] if g["es_soporte"])
         if n_sop:
             logger.warning(f"⚠ Sin --indice: {n_sop} grupos de SOPORTES quedarán PENDIENTE_PDX.")
 
@@ -639,11 +664,19 @@ def main() -> int:
         relogins = 0
         MAX_RELOGINS = 5
         try:
-            for i, (factura, grupos) in enumerate(facturas.items(), start=1):
+            for i, (factura, datos) in enumerate(facturas.items(), start=1):
+                grupos = datos["grupos"]
+                calidad = datos["calidad"]
+                extra = f" (+{calidad} CALIDAD excluidas)" if calidad else ""
                 logger.info(f"[{i}/{len(facturas)}] {factura} — {len(grupos)} grupo(s), "
-                            f"{sum(len(g['ids']) for g in grupos)} glosas")
+                            f"{sum(len(g['ids']) for g in grupos)} glosas{extra}")
+                if not grupos:
+                    registrar({"factura": factura, "grupos": 0, "glosas": 0,
+                               "estado": "SOLO_CALIDAD",
+                               "detalle": f"{calidad} glosas CALIDAD; nada que responder"})
+                    continue
                 for intento in range(2):
-                    reg = procesar_factura(page, factura, grupos, indice,
+                    reg = procesar_factura(page, factura, grupos, calidad, indice,
                                            args.evidencias, max_grupos=args.max_grupos)
                     if reg["estado"] == "ERROR" and _sesion_muerta(reg["detalle"]):
                         if relogins >= MAX_RELOGINS:
