@@ -297,42 +297,64 @@ class FacturaNoEnBolsa(Exception):
     """La factura no aparece en la Bolsa de Respuestas (ya cerrada / no glosada)."""
 
 
-def ir_a_bolsa(page: Page) -> None:
-    """Navega al menú Respuesta Glosas → Bolsa Respuesta.
+# Latch global: una vez que cargamos la Bolsa por primera vez (paciente, por
+# el menú), las siguientes navegaciones usan el goto directo, que es mucho
+# más rápido en la sesión ya "calentada".
+_BOLSA_VISITADA = False
 
-    El goto directo a /respuestaGlosaSearch a veces excede los 30s del DOMContentLoaded
-    (el servidor responde, pero algún recurso bloquea). Más fiable: arrancar en
-    /app/inicio y clickear el menú lateral, como un humano.
-    """
-    # Si ya estamos en la bolsa, no hacer nada.
+
+def _esta_en_bolsa(page: Page) -> bool:
     try:
-        if "respuestaGlosaSearch" in page.url and page.locator("text=FILTROS BOLSA RESPUESTA").count() > 0:
-            return
+        return ("respuestaGlosaSearch" in (page.url or "")
+                and page.locator("text=FILTROS BOLSA RESPUESTA").count() > 0)
     except Exception:
-        pass
+        return False
 
+
+def ir_a_bolsa(page: Page) -> None:
+    """Navega a Respuesta Glosas → Bolsa Respuesta.
+
+    PRIMERA vez en la sesión: paciente. Vamos al home y clickeamos el menú
+    lateral, esperando hasta 90s a que el datatable termine de cargar (el
+    usuario confirmó que esa carga inicial es lenta).
+    SIGUIENTES veces: goto directo a /respuestaGlosaSearch, que sí responde
+    rápido una vez que la página ya corrió la primera vez en la sesión.
+    """
+    global _BOLSA_VISITADA
+    if _esta_en_bolsa(page):
+        return
+
+    if _BOLSA_VISITADA:
+        # Camino rápido (sesión ya calentada).
+        try:
+            page.goto(PORTAL_BOLSA, wait_until="domcontentloaded", timeout=60000)
+        except PlaywrightTimeout:
+            page.goto(PORTAL_BOLSA, wait_until="commit", timeout=60000)
+        page.wait_for_selector("text=FILTROS BOLSA RESPUESTA", timeout=60000)
+        page.wait_for_timeout(500)
+        return
+
+    # Primera vez: por el menú, con paciencia.
     try:
-        page.goto(PORTAL_HOME, wait_until="domcontentloaded", timeout=45000)
+        page.goto(PORTAL_HOME, wait_until="domcontentloaded", timeout=60000)
     except PlaywrightTimeout:
-        # commit fallback: con que arranque la nav alcanza.
-        page.goto(PORTAL_HOME, wait_until="commit", timeout=45000)
-    page.wait_for_selector("text=Respuesta Glosas", timeout=20000)
-
-    # Click en el menú "Respuesta Glosas" → expande el submenú con "Bolsa Respuesta".
+        page.goto(PORTAL_HOME, wait_until="commit", timeout=60000)
+    page.wait_for_selector("text=Respuesta Glosas", timeout=30000)
     try:
         page.locator("xpath=//a[normalize-space()='Respuesta Glosas'] | "
                      "//span[normalize-space()='Respuesta Glosas']/ancestor::a[1]").first.click(timeout=5000)
     except PlaywrightTimeout:
         page.get_by_text("Respuesta Glosas").first.click()
     page.wait_for_timeout(500)
-    # Submenú "Bolsa Respuesta" (o "Bolsa de Respuestas" / variantes).
     sub = page.locator(
         "xpath=//a[contains(normalize-space(), 'Bolsa')] | "
         "//span[contains(normalize-space(), 'Bolsa')]/ancestor::a[1]"
     ).first
     sub.click(timeout=10000)
-    page.wait_for_selector("text=FILTROS BOLSA RESPUESTA", timeout=30000)
-    page.wait_for_timeout(800)
+    # La PRIMERA carga del datatable puede tardar más de un minuto.
+    page.wait_for_selector("text=FILTROS BOLSA RESPUESTA", timeout=90000)
+    page.wait_for_timeout(1500)
+    _BOLSA_VISITADA = True
 
 
 def abrir_factura(page: Page, factura: str) -> None:
