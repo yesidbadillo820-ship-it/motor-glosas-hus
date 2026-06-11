@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>IA GLOSAS SINAC SC — ESE HUS</title>
 <link rel="manifest" href="/manifest.webmanifest"/>
-<meta name="theme-color" content="#0b5d8a"/>
+<meta name="theme-color" content="#0B3D91"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="HUS Glosas"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
@@ -80,7 +80,7 @@
   --grad-header:linear-gradient(135deg,var(--sinac-blue-900) 0%,var(--sinac-blue-700) 100%);
   --font:'Inter',system-ui,-apple-system,sans-serif;
   --font-mono:'JetBrains Mono',ui-monospace,monospace;
-  --font-display:'Inter',system-ui,sans-serif;
+  --font-display:'Manrope','Inter',system-ui,sans-serif;
   --ease:cubic-bezier(.4,0,.2,1);
   --ease-out:cubic-bezier(.16,1,.3,1);
   --ease-spring:cubic-bezier(.34,1.56,.64,1);
@@ -396,46 +396,116 @@ h4{font-size:.95rem;font-weight:600}
 .i-lg{width:20px;height:20px}
 .i-xl{width:24px;height:24px}
 
-/* ─── LOGIN ─────────────────────────────── */
+/* ─── LOGIN SPLIT-SCREEN (Confianza Institucional Digital) ──────── */
 #login-screen{
   position:fixed;inset:0;
-  background:var(--grad-navy);
-  display:flex;align-items:center;justify-content:center;z-index:9999;
+  background:var(--sinac-off-white);
+  display:flex;align-items:stretch;justify-content:flex-start;z-index:9999;
   overflow:hidden;
-}
-#login-screen::before{
-  content:"";position:absolute;inset:0;
-  background:
-    radial-gradient(circle at 20% 30%, rgba(14,165,233,.15), transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(212,160,23,.08), transparent 40%);
-  pointer-events:none;
-}
-#login-screen::after{
-  content:"";position:absolute;inset:0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
-  background-size:48px 48px;
-  pointer-events:none;mask-image:radial-gradient(ellipse at center, #000 30%, transparent 70%);
 }
 #login-screen.hidden{display:none}
 
+/* Pane izquierdo: hero de marca con gradiente azul→verde */
+.login-hero{
+  flex:0 0 58%;max-width:58%;
+  background:var(--grad-sinac);
+  color:#fff;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:4rem 4.5rem;
+}
+.login-hero::before{
+  content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 18% 25%, rgba(255,255,255,.10), transparent 42%),
+    radial-gradient(circle at 85% 80%, rgba(11,61,145,.30), transparent 50%);
+  pointer-events:none;
+}
+.login-hero::after{
+  content:"";position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size:48px 48px;
+  pointer-events:none;mask-image:radial-gradient(ellipse at center, #000 25%, transparent 75%);
+}
+.login-hero > *{position:relative;z-index:1}
+.login-hero-wordmark{
+  display:flex;align-items:baseline;gap:.45rem;margin-bottom:2.4rem;
+}
+.login-hero-wordmark .wm{
+  font-family:var(--font-display);font-weight:800;font-size:1.5rem;
+  letter-spacing:.14em;color:#fff;line-height:1;
+}
+.login-hero-wordmark .wm-dot{
+  width:9px;height:9px;border-radius:2px;background:var(--sinac-green-400);
+  display:inline-block;flex-shrink:0;transform:translateY(-1px);
+}
+.login-hero-wordmark .wm-sub{
+  font-size:.72rem;font-weight:600;color:rgba(255,255,255,.78);
+  letter-spacing:.08em;text-transform:uppercase;
+}
+.login-hero-claim{
+  font-family:var(--font-display);font-weight:800;
+  font-size:clamp(2rem,3.4vw,3rem);line-height:1.12;letter-spacing:-.02em;
+  color:#fff;margin-bottom:1rem;max-width:560px;
+}
+.login-hero-subclaim{
+  font-size:.95rem;color:rgba(255,255,255,.85);line-height:1.55;
+  margin-bottom:2.4rem;max-width:520px;font-weight:500;
+}
+.login-hero-bullets{list-style:none;display:flex;flex-direction:column;gap:1rem;max-width:520px}
+.login-hero-bullets li{
+  display:flex;align-items:flex-start;gap:.8rem;
+  font-size:.9rem;color:rgba(255,255,255,.92);line-height:1.45;font-weight:500;
+}
+.login-hero-bullets .lhb-ico{
+  flex-shrink:0;width:26px;height:26px;border-radius:8px;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:.8rem;font-weight:800;margin-top:-1px;
+}
+.login-hero-foot{
+  margin-top:3rem;font-size:.7rem;color:rgba(255,255,255,.6);
+  letter-spacing:.05em;
+}
+
+/* Pane derecho: card del formulario */
+.login-form-pane{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  padding:2rem;position:relative;
+  background:var(--sinac-off-white);
+}
 .login-box{
-  background:#fff;border-radius:var(--r-xl);padding:2.5rem;width:420px;
-  box-shadow:0 24px 60px -12px rgba(0,0,0,.45),0 0 0 1px rgba(14,165,233,.08),inset 0 1px 0 rgba(255,255,255,1);
+  background:var(--sinac-white);border-radius:var(--r-xl);padding:2.5rem;width:420px;max-width:100%;
+  box-shadow:var(--sh-premium),0 0 0 1px var(--sinac-gray-100);
   position:relative;z-index:1;
   animation:fadeInUp .5s var(--ease-out);
 }
 .login-box::before{
   content:"";position:absolute;top:0;left:2.5rem;right:2.5rem;height:3px;
-  background:linear-gradient(90deg,var(--c-teal2),var(--c-gold2),var(--c-teal2));
+  background:var(--grad-sinac);
   border-radius:0 0 3px 3px;
+}
+
+/* Móvil: columna única, hero compacto arriba */
+@media(max-width:860px){
+  #login-screen{flex-direction:column;overflow-y:auto}
+  .login-hero{
+    flex:0 0 auto;max-width:100%;width:100%;
+    padding:1.6rem 1.4rem 1.5rem;justify-content:flex-start;
+  }
+  .login-hero-claim{font-size:1.45rem;margin-bottom:.5rem}
+  .login-hero-subclaim{margin-bottom:0;font-size:.8rem}
+  .login-hero-bullets,.login-hero-foot{display:none}
+  .login-hero-wordmark{margin-bottom:1rem}
+  .login-form-pane{padding:1.4rem 1rem 2.5rem;align-items:flex-start}
+  .login-box{padding:1.8rem 1.5rem}
 }
 .login-logo{display:flex;align-items:center;gap:.9rem;margin-bottom:2rem}
 .login-badge{
   width:56px;height:56px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px;overflow:hidden;
-  box-shadow:0 4px 12px rgba(15,23,42,.08),0 0 0 3px rgba(212,160,23,.08);
+  box-shadow:0 4px 12px rgba(11,61,145,.08),0 0 0 3px rgba(56,142,60,.08);
 }
 .login-badge img{width:100%;height:100%;object-fit:contain}
 .login-title{font-size:1.05rem;font-weight:700;color:var(--c-navy);letter-spacing:-.015em;line-height:1.25}
@@ -497,31 +567,47 @@ h4{font-size:.95rem;font-weight:600}
 #app{display:none;flex-direction:column;height:100vh;overflow:hidden}
 #app.show{display:flex}
 
-/* ─── HEADER PREMIUM ─────────────────────────────── */
+/* ─── HEADER IDENTIDAD DUAL SINAC + HUS ─────────────────────────── */
 header{
-  background:var(--grad-navy);
+  background:var(--grad-header);
   height:62px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
   padding:0 1.75rem;z-index:200;position:relative;
-  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 4px 24px rgba(11,18,32,.2);
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 4px 24px rgba(11,61,145,.18);
 }
 header::after{
   content:"";position:absolute;bottom:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent 0%,var(--c-teal2) 20%,var(--c-gold2) 50%,var(--c-teal2) 80%,transparent 100%);
-  opacity:.6;
+  background:linear-gradient(90deg,transparent 0%,var(--sinac-blue-400) 25%,var(--sinac-green-500) 55%,var(--sinac-green-600) 80%,transparent 100%);
+  opacity:.75;
 }
-.hdr-left{display:flex;align-items:center;gap:.9rem}
+.hdr-left{display:flex;align-items:center;gap:.9rem;min-width:0}
+/* Wordmark tipográfico SINAC (sin archivo de imagen) */
+.hdr-wordmark{
+  display:flex;align-items:baseline;gap:.3rem;flex-shrink:0;
+  font-family:var(--font-display);font-weight:800;font-size:1.18rem;
+  letter-spacing:.14em;color:#fff;line-height:1;user-select:none;
+}
+.hdr-wordmark .wm-dot{
+  width:7px;height:7px;border-radius:2px;background:var(--sinac-green-400);
+  display:inline-block;flex-shrink:0;
+  box-shadow:0 0 8px rgba(102,187,106,.55);
+}
+.hdr-brand-sep{
+  width:1px;height:30px;background:rgba(255,255,255,.22);flex-shrink:0;
+  margin:0 .15rem;
+}
+.hdr-brand-txt{min-width:0}
 .hdr-badge{
   width:44px;height:44px;background:#fff;border:1px solid rgba(255,255,255,.15);border-radius:10px;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:5px;overflow:hidden;
-  box-shadow:0 2px 8px rgba(0,0,0,.25),0 0 0 1px rgba(212,160,23,.12);
+  box-shadow:0 2px 8px rgba(0,0,0,.25),0 0 0 1px rgba(102,187,106,.18);
   transition:transform .3s var(--ease-spring);
 }
 .hdr-badge:hover{transform:scale(1.05)}
 .hdr-badge img{width:100%;height:100%;object-fit:contain;display:block}
 /* Animación sutil del logo al cargar la primera vez: entrada con bounce + brillo dorado */
 @keyframes logoEntrada {
-  0%   { transform: scale(.4) rotate(-90deg); opacity: 0; filter: brightness(1.8) drop-shadow(0 0 12px rgba(212,160,23,.8)); }
-  60%  { transform: scale(1.12) rotate(6deg);  opacity: 1; filter: brightness(1.3) drop-shadow(0 0 8px rgba(212,160,23,.5)); }
+  0%   { transform: scale(.4) rotate(-90deg); opacity: 0; filter: brightness(1.8) drop-shadow(0 0 12px rgba(102,187,106,.8)); }
+  60%  { transform: scale(1.12) rotate(6deg);  opacity: 1; filter: brightness(1.3) drop-shadow(0 0 8px rgba(102,187,106,.5)); }
   100% { transform: scale(1) rotate(0);       opacity: 1; filter: brightness(1) drop-shadow(0 0 0 transparent); }
 }
 .hdr-badge.anim-entrada { animation: logoEntrada 1s var(--ease-spring, cubic-bezier(.175,.885,.32,1.275)) 1; }
@@ -570,8 +656,9 @@ header::after{
   .confetti-particle{display:none}
   .empty-state .es-emoji{animation:none}
 }
-.hdr-title{font-size:.95rem;font-weight:700;color:#fff;letter-spacing:-.015em;line-height:1.2}
-.hdr-sub{font-size:.68rem;color:rgba(255,255,255,.55);margin-top:3px;font-weight:500;letter-spacing:.02em}
+.hdr-title{font-size:.92rem;font-weight:700;color:#fff;letter-spacing:-.01em;line-height:1.2;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-sub{font-size:.66rem;color:rgba(255,255,255,.62);margin-top:3px;font-weight:500;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-sub .hdr-powered{color:var(--sinac-green-200);font-weight:600}
 .hdr-right{display:flex;align-items:center;gap:.75rem}
 .status-pill{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,255,255,.08);border-radius:20px;font-size:.7rem;color:rgba(255,255,255,.7)}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0}
@@ -620,22 +707,22 @@ header::after{
   transition:background .2s var(--ease-out),color .2s var(--ease-out),transform .15s var(--ease-out);
   position:relative;border-radius:0;
 }
-.sn-item:hover{background:var(--bg-subtle);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(14,165,233,.08)}
-.sn-item:hover svg{color:var(--c-teal2)}
+.sn-item:hover{background:var(--sinac-gray-50);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(11,61,145,.06)}
+.sn-item:hover svg{color:var(--sinac-blue-700)}
 .sn-item.active{
-  background:linear-gradient(90deg,rgba(14,165,233,.10) 0%,rgba(14,165,233,.04) 100%);
-  color:var(--c-teal2);font-weight:600;
+  background:var(--sinac-blue-50);
+  color:var(--sinac-blue-700);font-weight:600;
 }
 .sn-item.active::before{
   content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;
-  background:linear-gradient(180deg,var(--c-teal2),var(--c-teal));
+  background:var(--sinac-green-600);
   border-radius:0 3px 3px 0;
-  box-shadow:0 0 8px rgba(14,165,233,.4);
+  box-shadow:0 0 8px rgba(56,142,60,.35);
   animation:snActivePulse 2.4s ease-in-out infinite;
 }
 @keyframes snActivePulse{
-  0%,100%{box-shadow:0 0 8px rgba(14,165,233,.4)}
-  50%{box-shadow:0 0 14px rgba(14,165,233,.65)}
+  0%,100%{box-shadow:0 0 8px rgba(56,142,60,.30)}
+  50%{box-shadow:0 0 13px rgba(56,142,60,.55)}
 }
 /* Cascade slide-in al cargar el sidebar */
 .sn-group .sn-item{opacity:0;animation:snItemIn .35s var(--ease-out) forwards}
@@ -654,9 +741,11 @@ header::after{
   .sn-group .sn-item{opacity:1;animation:none}
   .sn-item.active::before{animation:none}
 }
-body.dark .sn-item.active{background:rgba(2,132,199,.15);color:#7dd3fc}
+body.dark .sn-item.active{background:rgba(30,136,229,.16);color:#7dd3fc}
+body.dark .sn-item:hover{background:rgba(255,255,255,.05)}
 .sn-item svg{flex-shrink:0;color:var(--text3)}
-.sn-item.active svg{color:var(--c-teal2)}
+.sn-item.active svg{color:var(--sinac-blue-700)}
+body.dark .sn-item.active svg{color:#7dd3fc}
 .sn-item-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-nav.collapsed .sn-item-label{display:none}
 .sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
@@ -1395,11 +1484,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   animation:fadeIn .15s var(--ease-out);
 }
 
-/* Hdr title premium — acento dorado sutil */
-.hdr-title{
-  background:linear-gradient(135deg,#fff 0%,#fff 60%,#fef3c7 100%);
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-}
+/* Hdr title — blanco sólido (contraste AA sobre azul SINAC) */
+.hdr-title{color:#fff}
 
 /* ─── PRINT CSS GLOBAL (para cualquier pantalla) ───────────── */
 @media print{
@@ -1718,6 +1804,21 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 
 <!-- ─── LOGIN ──────────────────── -->
 <div id="login-screen">
+  <div class="login-hero">
+    <div class="login-hero-wordmark">
+      <span class="wm">SINAC</span><span class="wm-dot"></span>
+      <span class="wm-sub">SC SAS</span>
+    </div>
+    <h1 class="login-hero-claim">Motor de Glosas IA</h1>
+    <div class="login-hero-subclaim">ESE Hospital Universitario de Santander · Powered by SINAC SC SAS</div>
+    <ul class="login-hero-bullets">
+      <li><span class="lhb-ico">✓</span><span>Dictámenes con Quality Gate anti-alucinación</span></li>
+      <li><span class="lhb-ico">✓</span><span>Citas normativas verificadas contra corpus</span></li>
+      <li><span class="lhb-ico">✓</span><span>Radicación con evidencia auditable</span></li>
+    </ul>
+    <div class="login-hero-foot">SINAC SC SAS · Soluciones de inteligencia artificial para el sector salud</div>
+  </div>
+  <div class="login-form-pane">
   <div class="login-box">
     <div class="login-logo">
       <div class="login-badge"><img src="/static/logo.png" alt="HUS"/></div>
@@ -1748,6 +1849,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
       <span>v6.0 · IA GLOSAS SINAC SC</span>
     </div>
   </div>
+  </div>
 </div>
 
 <!-- ─── APP ────────────────────── -->
@@ -1757,10 +1859,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
       <button class="btn-menu-mobile" onclick="toggleSidebar()" aria-label="Menú">
         <svg class="i i-lg" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
+      <div class="hdr-wordmark" title="SINAC SC SAS">SINAC<span class="wm-dot"></span></div>
+      <div class="hdr-brand-sep"></div>
       <div class="hdr-badge"><img src="/static/logo.png" alt="HUS"/></div>
-      <div>
-        <div class="hdr-title">IA GLOSAS SINAC SC</div>
-        <div class="hdr-sub">ESE Hospital Universitario de Santander · Área de Cartera</div>
+      <div class="hdr-brand-txt">
+        <div class="hdr-title">HUS · Motor de Glosas IA</div>
+        <div class="hdr-sub">ESE Hospital Universitario de Santander · <span class="hdr-powered">Powered by SINAC SC SAS</span></div>
       </div>
     </div>
     <div class="hdr-right">
@@ -4151,33 +4255,98 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
   .pa-prev-badge.warn{background:rgba(245,158,11,.12); color:#f59e0b; border-color:rgba(245,158,11,.28)}
   .pa-prev-badge.err{background:rgba(239,68,68,.12); color:#ef4444; border-color:rgba(239,68,68,.28)}
 
-  /* Pipeline multi-agente */
-  .pa-agent-list{display:flex; flex-direction:column; gap:.45rem}
+  /* ═══ Pipeline multi-agente — TIMELINE QUIRÚRGICO horizontal ═══
+     (rediseño SINAC 11-jun-2026). El JS (paShowPipeline / paSetAgentState)
+     genera el mismo markup .pa-agent-row > .pa-agent-dot + .pa-agent-name +
+     .pa-agent-detail con estados running/done/fail — aquí solo cambia el CSS.
+     En móvil (≤720px) degrada a la lista vertical original. */
+  .pa-agent-list{
+    display:flex; flex-direction:row; align-items:flex-start; gap:0;
+    position:relative; padding:.6rem 0 2.3rem;
+  }
+  /* Línea conectora detrás de los nodos */
+  .pa-agent-list::before{
+    content:""; position:absolute; top:calc(.6rem + 17px);
+    left:calc(100% / 14); right:calc(100% / 14); height:2px;
+    background:var(--sinac-gray-200); border-radius:2px; z-index:0;
+  }
+  body.dark .pa-agent-list::before{background:var(--border2)}
   .pa-agent-row{
-    display:flex; align-items:center; gap:.65rem;
-    padding:.55rem .75rem; border-radius:10px;
-    background:var(--bg-subtle);
-    border:1px solid var(--border);
+    flex:1 1 0; min-width:0; position:static;
+    display:flex; flex-direction:column; align-items:center; gap:.45rem;
+    padding:0; border-radius:0; background:transparent; border:none;
     transition:all .25s cubic-bezier(.4,0,.2,1);
   }
-  .pa-agent-row.done{background:#f0fdf4; border-color:#bbf7d0}
-  .pa-agent-row.running{background:#eef2ff; border-color:#c7d2fe}
-  .pa-agent-row.fail{background:#fef2f2; border-color:#fecaca}
   .pa-agent-dot{
-    width:18px; height:18px; border-radius:50%; flex-shrink:0;
-    background:var(--bg-card); border:1px solid var(--border);
+    width:34px; height:34px; border-radius:50%; flex-shrink:0;
+    background:var(--bg-card); border:3px solid var(--sinac-gray-300);
     display:flex; align-items:center; justify-content:center;
-    font-size:.65rem; color:var(--text3); font-weight:700;
+    font-size:.85rem; color:var(--text4); font-weight:700;
+    position:relative; z-index:1;
+    transition:border-color .25s, background .25s, color .25s, box-shadow .25s;
   }
-  .pa-agent-row.done .pa-agent-dot{background:#10b981; color:#fff; border-color:#10b981}
-  .pa-agent-row.running .pa-agent-dot{background:#6366f1; color:#fff; border-color:#6366f1; animation:pa-spin 1s linear infinite}
+  body.dark .pa-agent-dot{border-color:var(--border2)}
+  .pa-agent-row.running .pa-agent-dot{
+    background:var(--bg-card); color:var(--sinac-blue-700);
+    border-color:var(--sinac-blue-600);
+    animation:pa-node-pulse 1.6s ease-in-out infinite;
+  }
+  .pa-agent-row.done .pa-agent-dot{background:var(--sinac-green-600); color:#fff; border-color:var(--sinac-green-600)}
   .pa-agent-row.fail .pa-agent-dot{background:#ef4444; color:#fff; border-color:#ef4444}
   @keyframes pa-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .pa-agent-row.running .pa-agent-dot::before{content:"↻"}
+  @keyframes pa-node-pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(21,101,192,.30)}
+    50%{box-shadow:0 0 0 7px rgba(21,101,192,0)}
+  }
+  .pa-agent-row.running .pa-agent-dot::before{content:"↻"; display:inline-block; animation:pa-spin 1.1s linear infinite}
   .pa-agent-row.done .pa-agent-dot::before{content:"✓"}
-  .pa-agent-row.fail .pa-agent-dot::before{content:"!"}
-  .pa-agent-name{flex:1; font-size:.83rem; color:var(--text); font-weight:500}
-  .pa-agent-detail{font-size:.7rem; color:var(--text3); font-feature-settings:"tnum"}
+  .pa-agent-row.fail .pa-agent-dot::before{content:"✕"}
+  .pa-agent-name{
+    flex:none; font-size:.6rem; color:var(--text3); font-weight:600;
+    text-transform:uppercase; letter-spacing:.04em; text-align:center;
+    line-height:1.25; max-width:96px; padding:0 .2rem;
+  }
+  .pa-agent-row.running .pa-agent-name{color:var(--sinac-blue-700); font-weight:700}
+  .pa-agent-row.done .pa-agent-name{color:var(--sinac-green-700)}
+  .pa-agent-row.fail .pa-agent-name{color:#dc2626; font-weight:700}
+  body.dark .pa-agent-row.running .pa-agent-name{color:#7dd3fc}
+  body.dark .pa-agent-row.done .pa-agent-name{color:#86efac}
+  /* Detalle de la fase: oculto por nodo; el de la fase activa (running/fail)
+     se proyecta como línea única bajo el timeline (absolute vs .pa-agent-list) */
+  .pa-agent-detail{display:none; font-size:.72rem; color:var(--text3); font-feature-settings:"tnum"}
+  .pa-agent-row.running .pa-agent-detail,
+  .pa-agent-row.fail .pa-agent-detail{
+    display:block; position:absolute; left:0; right:0; bottom:.15rem;
+    text-align:center; color:var(--text2); font-weight:500;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .pa-agent-row.fail .pa-agent-detail{color:#dc2626; z-index:2; background:var(--bg-card)}
+  /* Móvil: degradar a la lista vertical original */
+  @media (max-width:720px){
+    .pa-agent-list{flex-direction:column; gap:.45rem; padding:0}
+    .pa-agent-list::before{display:none}
+    .pa-agent-row{
+      flex:none; width:100%; flex-direction:row; align-items:center; gap:.65rem;
+      padding:.55rem .75rem; border-radius:10px;
+      background:var(--bg-subtle); border:1px solid var(--border);
+    }
+    .pa-agent-row.done{background:var(--sinac-green-50); border-color:var(--sinac-green-200)}
+    .pa-agent-row.running{background:var(--sinac-blue-50); border-color:var(--sinac-blue-200)}
+    .pa-agent-row.fail{background:#fef2f2; border-color:#fecaca}
+    body.dark .pa-agent-row{background:var(--bg-subtle); border-color:var(--border)}
+    .pa-agent-dot{width:20px; height:20px; border-width:2px; font-size:.65rem}
+    .pa-agent-name{
+      flex:1; font-size:.83rem; text-transform:none; letter-spacing:0;
+      text-align:left; max-width:none; font-weight:500; color:var(--text);
+    }
+    .pa-agent-detail{display:block; position:static; font-size:.7rem; white-space:normal}
+    .pa-agent-row.running .pa-agent-detail,
+    .pa-agent-row.fail .pa-agent-detail{position:static; text-align:right; white-space:normal}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pa-agent-row.running .pa-agent-dot{animation:none}
+    .pa-agent-row.running .pa-agent-dot::before{animation:none}
+  }
 
   /* Score breakdown bars */
   .pa-score-row{
@@ -5263,6 +5432,268 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
          una unidad, no como elemento separado huérfano. */
   #p-analizar .result-area > div:has(> .pa-glass){
     margin-top:-.5rem !important;
+  }
+
+  /* ═══ REDISEÑO SINAC 11-jun-2026 — "Confianza Institucional Digital" ═══
+     Overrides de componentes sobre la paleta SINAC (PR #106).
+     Secciones: tipografía dual · card-doc · sello QG · medalla doble ·
+     documento radicable · dashboard hero · micro-interacciones · dark. */
+
+  /* ── 2. Tipografía dual: Manrope para display, JetBrains Mono para datos ── */
+  .section-title, .chart-hdr, .panel-hero-title, .land-saludo-title,
+  .login-title, .res-title, .pa-prev-title{
+    font-family:var(--font-display);
+  }
+  /* Mono: códigos, factura/radicado, valores COP en KPIs chicos y tablas */
+  .pill-code, .mono-num, #hdr-kpis span[data-num],
+  #f-factura, #f-radicado, #f-cups,
+  .pill.sds-valor-big, .ap-tbl td:not(:first-child){
+    font-family:var(--font-mono);
+    font-feature-settings:'tnum','zero';
+  }
+
+  /* ── 3. CARD-DOC "Documento Institucional" ───────────────────────── */
+  .card-doc{
+    position:relative;
+    background:var(--sinac-white);
+    border:1px solid var(--border);
+    border-radius:var(--r-lg);
+    box-shadow:var(--sh-md);
+    overflow:hidden;
+  }
+  .card-doc::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:3px;
+    background:var(--sinac-blue-700);z-index:2;
+  }
+  body.dark .card-doc{background:var(--bg-card)}
+  /* Sello Quality Gate: visible solo cuando la card lleva .qg-ok
+     (renderResult la pone si verificacion_citas no trae severidad ALTA;
+     el JS puede togglearla con classList si la verificación cambia). */
+  .qg-seal{
+    display:none;
+    position:absolute;top:10px;right:12px;z-index:3;
+    padding:.28rem .6rem;border-radius:6px;
+    background:var(--sinac-green-700);color:#fff;
+    font-size:.6rem;font-weight:800;letter-spacing:.07em;
+    font-family:var(--font-display);
+    box-shadow:0 2px 8px rgba(46,125,50,.35);
+    pointer-events:none;
+  }
+  .card-doc.qg-ok .qg-seal{display:inline-block}
+  /* En el dictamen el sello vive SOBRE la franja navy del hdr; se reserva
+     espacio a la derecha para no tapar la fecha (el ID pesa más, por eso
+     la regla va con #p-analizar). */
+  .res-dictamen.card-doc .qg-seal{top:11px;border:1px solid rgba(255,255,255,.35)}
+  #p-analizar .res-dictamen.qg-ok .res-dictamen-hdr{padding-right:200px !important}
+  /* Login en modo oscuro: pane derecho no debe quedar blanco brillante */
+  body.dark .login-form-pane{background:var(--bg)}
+  body.dark .login-hero{box-shadow:inset 0 0 0 100vmax rgba(0,0,0,.12)}
+
+  /* ── 8. MEDALLA DOBLE: EVIDENCIA + CONFIANZA ─────────────────────── */
+  .medallas-wrap{padding:1.1rem 1.25rem 1rem}
+  .medallas-row{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:1rem;align-items:stretch;
+  }
+  .medalla{
+    display:flex;align-items:center;gap:.9rem;
+    padding:.75rem .9rem;border-radius:var(--r-lg);
+    border:1px solid var(--border);background:var(--bg-card);
+  }
+  .medalla-aro{
+    width:62px;height:62px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    border:4px solid var(--sinac-gray-300);
+    background:var(--bg-card);
+  }
+  .medalla-valor{
+    font-family:var(--font-display);font-weight:800;font-size:1.45rem;
+    line-height:1;color:var(--text);letter-spacing:-.02em;
+  }
+  .medalla-valor small{font-size:.7rem;font-weight:700;margin-left:1px}
+  .medalla-info{min-width:0}
+  .medalla-lbl{
+    font-size:.62rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--text3);
+  }
+  .medalla-tag{
+    display:inline-block;margin-top:.2rem;padding:.14rem .5rem;border-radius:5px;
+    font-size:.66rem;font-weight:800;letter-spacing:.05em;
+    font-family:var(--font-display);
+  }
+  .medalla-det{font-size:.7rem;color:var(--text3);margin-top:.3rem;line-height:1.35}
+  .medalla.med-a{border-color:var(--sinac-green-200);background:linear-gradient(180deg,var(--sinac-white),var(--sinac-green-50))}
+  .medalla.med-a .medalla-aro{border-color:var(--sinac-green-600)}
+  .medalla.med-a .medalla-valor{color:var(--sinac-green-700)}
+  .medalla.med-a .medalla-tag{background:var(--sinac-green-100);color:var(--sinac-green-800)}
+  .medalla.med-b{border-color:#fde68a;background:linear-gradient(180deg,var(--sinac-white),#fffbeb)}
+  .medalla.med-b .medalla-aro{border-color:#d97706}
+  .medalla.med-b .medalla-valor{color:#b45309}
+  .medalla.med-b .medalla-tag{background:#fef3c7;color:#92400e}
+  .medalla.med-c{border-color:#fecaca;background:linear-gradient(180deg,var(--sinac-white),#fff5f5)}
+  .medalla.med-c .medalla-aro{border-color:#dc2626}
+  .medalla.med-c .medalla-valor{color:#b91c1c}
+  .medalla.med-c .medalla-tag{background:#fee2e2;color:#991b1b}
+  .medalla.med-nd .medalla-tag{background:var(--sinac-gray-100);color:var(--sinac-gray-700)}
+  body.dark .medalla.med-a,body.dark .medalla.med-b,body.dark .medalla.med-c{
+    background:var(--bg-subtle);
+  }
+  body.dark .medalla{background:var(--bg-subtle)}
+  body.dark .medalla .medalla-aro{background:var(--bg-card)}
+  body.dark .medalla.med-a .medalla-valor{color:#86efac}
+  body.dark .medalla.med-b .medalla-valor{color:#fcd34d}
+  body.dark .medalla.med-c .medalla-valor{color:#fca5a5}
+  body.dark .medalla.med-a .medalla-tag{background:rgba(134,239,172,.14);color:#86efac}
+  body.dark .medalla.med-b .medalla-tag{background:rgba(252,211,77,.14);color:#fcd34d}
+  body.dark .medalla.med-c .medalla-tag{background:rgba(252,165,165,.14);color:#fca5a5}
+  /* Prob. de éxito histórica — degradada a dato secundario bajo las medallas */
+  .exito-mini{
+    display:flex;align-items:center;gap:.6rem;margin-top:.8rem;
+    padding-top:.7rem;border-top:1px dashed var(--border);
+  }
+  .exito-mini-lbl{
+    font-size:.64rem;font-weight:600;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--text3);flex-shrink:0;
+  }
+  .exito-mini-bar{
+    flex:1;height:5px;border-radius:3px;background:var(--bg-subtle);
+    overflow:hidden;display:block;
+  }
+  .exito-mini-bar > span{display:block;height:100%;border-radius:3px;transition:width .6s var(--ease-out)}
+  .exito-mini-val{
+    font-family:var(--font-mono);font-size:.74rem;font-weight:700;flex-shrink:0;
+  }
+
+  /* ── 7. DICTAMEN "DOCUMENTO RADICABLE" ───────────────────────────── */
+  .doc-membrete{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;
+    flex-wrap:wrap;
+    padding:1.1rem 1.4rem .85rem;
+    border-bottom:2px solid var(--sinac-blue-900);
+    background:var(--sinac-off-white);
+  }
+  .doc-membrete-nombre{
+    font-family:var(--font-display);font-weight:800;font-size:.92rem;
+    color:var(--sinac-blue-900);letter-spacing:.06em;text-transform:uppercase;
+    line-height:1.3;
+  }
+  .doc-membrete-ciudad{
+    font-size:.7rem;color:var(--text3);margin-top:2px;letter-spacing:.04em;
+  }
+  .doc-membrete-meta{
+    display:flex;flex-direction:column;gap:2px;align-items:flex-end;
+    font-size:.68rem;color:var(--text3);text-align:right;
+  }
+  .doc-membrete-meta b{font-weight:600;color:var(--text2)}
+  body.dark .doc-membrete{background:var(--bg-subtle);border-bottom-color:var(--sinac-blue-400)}
+  body.dark .doc-membrete-nombre{color:var(--sinac-blue-200)}
+  /* Cuerpo: hoja formal — justificado, aireado */
+  #p-analizar .res-dictamen .res-dictamen-body{
+    text-align:justify;
+    line-height:1.7 !important;
+    padding:1.4rem 1.6rem !important;
+    font-size:.84rem !important;
+  }
+  .doc-footer{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;
+    flex-wrap:wrap;
+    padding:1.4rem 1.6rem 1.2rem;
+    border-top:1px solid var(--border);
+    background:var(--sinac-off-white);
+  }
+  body.dark .doc-footer{background:var(--bg-subtle)}
+  .doc-firma{flex:1;min-width:220px;max-width:340px}
+  .doc-firma-linea{border-bottom:1.5px solid var(--text2);height:2.4rem}
+  .doc-firma-cargo{
+    font-size:.66rem;color:var(--text3);margin-top:.35rem;
+    letter-spacing:.04em;text-transform:uppercase;font-weight:600;
+  }
+  .doc-sello{
+    display:flex;align-items:center;gap:.6rem;flex-shrink:0;
+    color:var(--sinac-green-700);
+  }
+  body.dark .doc-sello{color:#86efac}
+  .doc-sello svg{flex-shrink:0;transform:rotate(-8deg)}
+  .doc-sello-txt{
+    font-size:.62rem;font-weight:700;letter-spacing:.06em;line-height:1.5;
+    text-transform:uppercase;font-family:var(--font-display);
+  }
+  /* Botón PDF radicable prominente en verde institucional */
+  .btn-pdf-radicable{
+    background:var(--grad-success) !important;
+    box-shadow:0 1px 2px rgba(46,125,50,.25),0 4px 12px -2px rgba(46,125,50,.3),inset 0 1px 0 rgba(255,255,255,.2) !important;
+  }
+  .btn-pdf-radicable:hover{
+    box-shadow:0 2px 4px rgba(46,125,50,.3),0 8px 20px -4px rgba(46,125,50,.4) !important;
+  }
+
+  /* ── 4. DASHBOARD HERO — KPIs estilo Stripe ──────────────────────── */
+  #p-dashboard #kpi-grid .kpi{
+    padding:1.35rem 1.4rem;border-radius:var(--r-xl);
+    border:1px solid var(--border);position:relative;overflow:hidden;
+    transition:transform .2s var(--ease-out),box-shadow .2s var(--ease-out),border-color .2s var(--ease-out);
+  }
+  #p-dashboard #kpi-grid .kpi:hover{
+    transform:translateY(-2px);box-shadow:var(--sh-lg);
+    border-color:var(--sinac-blue-200);
+  }
+  #p-dashboard #kpi-grid .kpi-num{
+    font-family:var(--font-display);font-weight:800;font-size:2.05rem;
+    letter-spacing:-.03em;
+  }
+  #p-dashboard #kpi-grid .kpi-lbl{
+    font-size:.64rem;letter-spacing:.08em;color:var(--text3);font-weight:700;
+  }
+  /* Gradientes MUY sutiles: azules para volumen/dinero, verdes para éxito */
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(1),
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(2){
+    background:linear-gradient(180deg,var(--sinac-white) 30%,var(--sinac-blue-50) 100%);
+  }
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(3),
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(4){
+    background:linear-gradient(180deg,var(--sinac-white) 30%,var(--sinac-green-50) 100%);
+  }
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(3) .kpi-num,
+  body:not(.dark) #p-dashboard #kpi-grid .kpi:nth-child(4) .kpi-num{
+    color:var(--sinac-green-700);
+  }
+  @media(max-width:1100px){
+    #p-dashboard #kpi-grid .kpi-num{font-size:1.7rem}
+  }
+
+  /* ── 1. Header: responsive del wordmark ──────────────────────────── */
+  @media(max-width:980px){
+    .hdr-wordmark,.hdr-brand-sep{display:none}
+  }
+  @media(max-width:760px){
+    .hdr-sub{display:none}
+  }
+
+  /* ── 10. Micro-interacciones institucionales ─────────────────────── */
+  .btn-primary:hover{
+    transform:translateY(-1px);
+    box-shadow:0 2px 4px rgba(11,61,145,.14),0 8px 20px -4px rgba(11,61,145,.18),inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .btn-login:hover{
+    box-shadow:0 8px 20px -4px rgba(11,61,145,.30),inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  /* Toasts: acento de barra por tipo alineado a paleta SINAC */
+  .toast.success{border-left-color:var(--sinac-green-600);color:var(--sinac-green-600)}
+  .toast.info{border-left-color:var(--sinac-blue-600);color:var(--sinac-blue-600)}
+  /* Confetti descartado para el look institucional (decisión 11-jun-2026) */
+  .confetti-particle{display:none !important}
+
+  /* ── Impresión: el documento radicable imprime limpio ────────────── */
+  @media print{
+    .medallas-wrap,.exito-mini{display:none !important}
+    .res-dictamen.card-doc{border:1px solid #999 !important;box-shadow:none !important}
+    .card-doc::before{display:none}
+    .qg-seal{display:none}
+    .card-doc.qg-ok .qg-seal{position:static;display:inline-block;float:right;background:#fff;
+      color:#2E7D32;border:1.5px solid #2E7D32;box-shadow:none}
+    .doc-membrete,.doc-footer{background:#fff !important}
+    .doc-sello{color:#2E7D32 !important}
+    #p-analizar .res-dictamen .res-dictamen-body{font-size:10pt !important;line-height:1.65 !important}
   }
 </style>
 <div class="fab-stack">
@@ -13782,7 +14213,7 @@ function renderConfianzaPanel(c){
     +'<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;">'
     +'<span style="font-size:1.4rem;">'+icono+'</span>'
     +'<div style="flex:1;min-width:200px;">'
-    +'<div style="font-weight:700;color:'+color+';font-size:.95rem;">Confianza del dictamen: '+pct+'% — '+(c.recomendacion||'')+'</div>'
+    +'<div style="font-weight:600;color:var(--text2);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">Desglose de confianza <span style="color:'+color+';font-weight:700;">'+pct+'%</span></div>'
     +'<div style="height:8px;background:#e5e7eb;border-radius:4px;margin-top:.35rem;overflow:hidden;">'
       +'<div style="width:'+pct+'%;height:100%;background:'+color+';transition:width .5s;"></div>'
     +'</div>'
@@ -14836,6 +15267,61 @@ function renderRiesgoRatificacion(r){
   );
 }
 
+// ── Medalla doble EVIDENCIA + CONFIANZA (rediseño SINAC 11-jun-2026) ──
+// Reemplaza el gauge "% éxito" como héroe (contradecía a la Confianza).
+// EVIDENCIA: grade A/B/C derivado de verificacion_citas.issues[].severidad
+//   A = 0 issues · B = solo MEDIA · C = alguna ALTA.
+// CONFIANZA: % real de confianza.score*100 + recomendación del backend.
+// La prob. de éxito histórica queda como dato secundario (.exito-mini).
+function renderMedallasDictamen(d, scoreColor){
+  var v = d.verificacion_citas;
+  var issues = (v && v.issues) || [];
+  var altas = issues.filter(function(i){ return i.severidad === 'ALTA'; }).length;
+  var grade, gradeCls, gradeTag, gradeDet;
+  if(!v){
+    grade='—'; gradeCls='nd'; gradeTag='SIN DATOS'; gradeDet='Sin verificación de citas disponible';
+  } else if(issues.length === 0){
+    grade='A'; gradeCls='a'; gradeTag='CITAS VERIFICADAS';
+    gradeDet=(v.total_citas || 0)+' citas contra corpus · 0 hallazgos';
+  } else if(altas === 0){
+    grade='B'; gradeCls='b'; gradeTag='HALLAZGOS LEVES';
+    gradeDet=issues.length+' hallazgo(s) leve(s) (sin severidad ALTA) en '+(v.total_citas || issues.length)+' citas';
+  } else {
+    grade='C'; gradeCls='c'; gradeTag='HALLAZGOS GRAVES';
+    gradeDet=altas+' cita(s) con severidad ALTA — corregir antes de radicar';
+  }
+  var medEvid =
+    '<div class="medalla med-'+gradeCls+'">'
+    +'<div class="medalla-aro"><span class="medalla-valor">'+grade+'</span></div>'
+    +'<div class="medalla-info"><div class="medalla-lbl">Evidencia</div>'
+    +'<div class="medalla-tag">'+gradeTag+'</div>'
+    +'<div class="medalla-det">'+escHtml(gradeDet)+'</div></div>'
+    +'</div>';
+  var medConf = '';
+  var c = d.confianza;
+  if(c && typeof c.score === 'number'){
+    var pctC = Math.round(c.score * 100);
+    var nivelCls = c.nivel === 'alto' ? 'a' : (c.nivel === 'medio' ? 'b' : 'c');
+    medConf =
+      '<div class="medalla med-'+nivelCls+'">'
+      +'<div class="medalla-aro"><span class="medalla-valor">'+pctC+'<small>%</small></span></div>'
+      +'<div class="medalla-info"><div class="medalla-lbl">Confianza</div>'
+      +'<div class="medalla-tag">'+escHtml(c.recomendacion || '')+'</div>'
+      +'<div class="medalla-det">'+escHtml(c.nivel ? 'Solidez del dictamen: nivel '+c.nivel : '')+'</div></div>'
+      +'</div>';
+  }
+  var mini =
+    '<div class="exito-mini" title="Probabilidad histórica de levantamiento — dato estadístico de referencia, no mide la calidad de este dictamen">'
+    +'<span class="exito-mini-lbl">Prob. éxito histórica</span>'
+    +'<span class="exito-mini-bar"><span style="width:'+d.score+'%;background:'+scoreColor+'"></span></span>'
+    +'<span class="exito-mini-val" style="color:'+scoreColor+'">'+d.score+'%</span>'
+    +'</div>';
+  return '<div class="medallas-wrap card-doc">'
+    +'<div class="medallas-row">'+medEvid+medConf+'</div>'
+    +mini
+    +'</div>';
+}
+
 function renderResult(d){
   var isOk=!d.mensaje_tiempo.includes('EXTEMPOR');
   var scoreColor=d.score>=85?'#15803d':d.score>=65?'#b45309':'#b91c1c';
@@ -14843,6 +15329,15 @@ function renderResult(d){
   CURRENT_GLOSA_ID = d.glosa_id || null;
   // Guardar verificacion_citas para que paMarcarCitasEnDictamen marque en rojo las falsas
   window._paVerificacionCitas = d.verificacion_citas || null;
+
+  // Quality Gate OK = trae verificación de citas y ninguna con severidad ALTA.
+  // La clase .qg-ok hace visible el sello "VALIDADO POR QUALITY GATE" (CSS);
+  // el JS puede togglearla después si la verificación cambia.
+  var _qgIssues = (d.verificacion_citas && d.verificacion_citas.issues) || [];
+  var qgOk = !!(d.verificacion_citas && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
+
+  var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  var consecDoc = d.glosa_id ? ('GL-'+d.glosa_id) : (d.codigo_glosa || '—');
 
   var html='<div class="res-header">'
     +'<div class="res-title">'+d.resumen+'</div>'
@@ -14853,19 +15348,40 @@ function renderResult(d){
     +'<span class="pill pill-teal">'+d.modelo_ia+'</span>'
     +'</div></div>'
 
-    +'<div class="res-score">'
-    +'<div class="score-row"><span class="score-label">Probabilidad de éxito de la defensa</span>'
-    +'<span class="score-val" style="color:'+scoreColor+'">'+d.score+'%</span></div>'
-    +'<div class="score-bar-bg"><div class="score-bar" style="width:'+d.score+'%;background:'+scoreColor+'"></div></div>'
-    +'</div>'
+    + renderMedallasDictamen(d, scoreColor)
     + (d.riesgo_ratificacion ? renderRiesgoRatificacion(d.riesgo_ratificacion) : '')
     + (d.accion_ia ? renderAccionIA(d) : '')
 
-    +'<div class="res-dictamen">'
+    +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
+    +'<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>'
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'
-    +'<span style="opacity:.6;font-weight:400">'+new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'})+'</span>'
+    +'<span style="opacity:.6;font-weight:400">'+fechaLarga+'</span>'
+    +'</div>'
+    +'<div class="doc-membrete">'
+    +'<div class="doc-membrete-ent">'
+    +'<div class="doc-membrete-nombre">ESE Hospital Universitario de Santander</div>'
+    +'<div class="doc-membrete-ciudad">Bucaramanga, Santander · NIT 900.006.037-4</div>'
+    +'</div>'
+    +'<div class="doc-membrete-meta">'
+    +'<span>Fecha: <b class="mono-num">'+fechaLarga+'</b></span>'
+    +'<span>Consecutivo: <b class="mono-num">'+escHtml(String(consecDoc))+'</b></span>'
+    +'</div>'
     +'</div>'
     +'<div id="res-dictamen-body" class="res-dictamen-body">'+d.dictamen+'</div>'
+    +'<div class="doc-footer">'
+    +'<div class="doc-firma">'
+    +'<div class="doc-firma-linea"></div>'
+    +'<div class="doc-firma-cargo">Área de Cartera · Glosas y Devoluciones — ESE HUS</div>'
+    +'</div>'
+    +'<div class="doc-sello">'
+    +'<svg viewBox="0 0 48 48" width="42" height="42" aria-hidden="true">'
+    +'<circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2"/>'
+    +'<circle cx="24" cy="24" r="16.5" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2.5 3"/>'
+    +'<path d="M16 24.5l5.5 5.5L32 19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    +'</svg>'
+    +'<div class="doc-sello-txt">Generado por IA con Quality Gate<br/>SINAC SC SAS</div>'
+    +'</div>'
+    +'</div>'
     +'</div>'
 
     + (d.confianza ? renderConfianzaPanel(d.confianza) : '')
@@ -14875,7 +15391,7 @@ function renderResult(d){
     + renderAuditorForensePanel(d)
 
     +'<div class="res-actions">'
-    +'<button class="btn btn-primary" onclick="imprimirDictamen()">Imprimir / PDF</button>'
+    +'<button class="btn btn-primary btn-pdf-radicable" onclick="imprimirDictamen()">🖨 Imprimir / PDF radicable</button>'
     +'<button class="btn btn-ghost" onclick="copiarDictamen(event)">Copiar texto</button>'
     +'<button class="btn btn-ghost" onclick="validarPreRadicacion()">🛡️ Validar</button>'
     +'<button class="btn btn-ghost" onclick="toggleRefinarInline()">🧠 Refinar con IA</button>'
