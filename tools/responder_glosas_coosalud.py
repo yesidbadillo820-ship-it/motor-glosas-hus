@@ -310,6 +310,26 @@ class FacturaNoEnBolsa(Exception):
 _BOLSA_VISITADA = False
 
 
+def _goto_paciente(page: Page, url: str, intentos: int = 3) -> None:
+    """goto con reintentos: el portal tiene rachas de minutos enteros sin
+    responder (visto en producción: 2 min sin contestar /app/inicio). Cada
+    intento prueba domcontentloaded 60s y, si no, commit 60s más."""
+    for n in range(1, intentos + 1):
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            return
+        except PlaywrightTimeout:
+            pass
+        try:
+            page.goto(url, wait_until="commit", timeout=60000)
+            return
+        except PlaywrightTimeout:
+            if n == intentos:
+                raise
+            logger.info(f"  el portal no responde; reintento navegación ({n}/{intentos})…")
+            page.wait_for_timeout(3000)
+
+
 def _esta_en_bolsa(page: Page) -> bool:
     try:
         return ("respuestaGlosaSearch" in (page.url or "")
@@ -333,19 +353,13 @@ def ir_a_bolsa(page: Page) -> None:
 
     if _BOLSA_VISITADA:
         # Camino rápido (sesión ya calentada).
-        try:
-            page.goto(PORTAL_BOLSA, wait_until="domcontentloaded", timeout=60000)
-        except PlaywrightTimeout:
-            page.goto(PORTAL_BOLSA, wait_until="commit", timeout=60000)
+        _goto_paciente(page, PORTAL_BOLSA)
         page.wait_for_selector("text=FILTROS BOLSA RESPUESTA", timeout=60000)
         page.wait_for_timeout(500)
         return
 
     # Primera vez: por el menú, con paciencia.
-    try:
-        page.goto(PORTAL_HOME, wait_until="domcontentloaded", timeout=60000)
-    except PlaywrightTimeout:
-        page.goto(PORTAL_HOME, wait_until="commit", timeout=60000)
+    _goto_paciente(page, PORTAL_HOME)
     page.wait_for_selector("text=Respuesta Glosas", timeout=30000)
     try:
         page.locator("xpath=//a[normalize-space()='Respuesta Glosas'] | "
@@ -372,10 +386,7 @@ def ir_a_en_pausa(page: Page) -> None:
     Cuando una respuesta se abre y no se Termina, la factura sale de la Bolsa
     y aparece acá. Para cuando llegamos a esta grilla la app ya está caliente
     (siempre pasamos antes por la Bolsa), así que el goto directo alcanza."""
-    try:
-        page.goto(PORTAL_PAUSA, wait_until="domcontentloaded", timeout=60000)
-    except PlaywrightTimeout:
-        page.goto(PORTAL_PAUSA, wait_until="commit", timeout=60000)
+    _goto_paciente(page, PORTAL_PAUSA)
     # OJO: 'EN PAUSA' a secas matchea el ítem del menú lateral (oculto). El
     # título real de la página es 'RESPUESTA GLOSA EN PAUSA'; si tarda, la
     # caja Buscar (gate real) lo cubre después.
@@ -1003,6 +1014,13 @@ def main() -> int:
                 or "target closed" in d or "browser has been closed" in d
                 or "connection closed" in d or "targetclosederror" in d)
 
+    def _es_lentitud(detalle: str) -> bool:
+        """Errores que huelen a racha de lentitud del portal (no a bug):
+        vale la pena reintentar la misma factura desde cero."""
+        d = detalle.lower()
+        return ("timeout" in d or "no cargó" in d or "no mostró filas" in d
+                or "no responde" in d or "net::err" in d)
+
     def _abrir_sesion(p):
         b = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
         c = b.new_context(accept_downloads=True)
@@ -1043,22 +1061,34 @@ def main() -> int:
                                "estado": "SOLO_CALIDAD",
                                "detalle": f"{calidad} glosas CALIDAD; nada que responder"})
                     continue
-                for intento in range(2):
+                INTENTOS_FACTURA = 3
+                intento = 0
+                while True:
+                    intento += 1
                     reg = procesar_factura(page, factura, grupos, calidad, indice,
                                            args.evidencias, max_grupos=args.max_grupos)
-                    if reg["estado"] == "ERROR" and _sesion_muerta(reg["detalle"]):
-                        if relogins >= MAX_RELOGINS:
-                            logger.error("Sesión irrecuperable; re-corré el comando para continuar.")
-                            registrar(reg)
-                            raise RuntimeError("Sesión irrecuperable")
-                        relogins += 1
-                        logger.warning(f"  ⚠ Sesión caída. Re-login {relogins}/{MAX_RELOGINS}…")
-                        try:
-                            browser.close()
-                        except Exception:
-                            pass
-                        browser, ctx, page = _abrir_sesion_con_reintentos(p)
-                        continue
+                    if reg["estado"] == "ERROR" and intento < INTENTOS_FACTURA:
+                        det = reg["detalle"]
+                        if _sesion_muerta(det):
+                            if relogins >= MAX_RELOGINS:
+                                logger.error("Sesión irrecuperable; re-corré el comando para continuar.")
+                                registrar(reg)
+                                raise RuntimeError("Sesión irrecuperable")
+                            relogins += 1
+                            logger.warning(f"  ⚠ Sesión caída. Re-login {relogins}/{MAX_RELOGINS}…")
+                            try:
+                                browser.close()
+                            except Exception:
+                                pass
+                            browser, ctx, page = _abrir_sesion_con_reintentos(p)
+                            continue
+                        if _es_lentitud(det):
+                            logger.warning(
+                                f"  ⚠ Racha de lentitud del portal; reintento la factura "
+                                f"({intento}/{INTENTOS_FACTURA - 1})…"
+                            )
+                            time.sleep(8)
+                            continue
                     registrar(reg)
                     break
         except RuntimeError:
