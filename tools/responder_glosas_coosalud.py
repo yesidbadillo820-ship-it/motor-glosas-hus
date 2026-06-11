@@ -891,7 +891,7 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
     try:
         btn.wait_for(state="visible", timeout=5000)
         habilitado = False
-        for _ in range(45):
+        for _ in range(90):
             try:
                 if not btn.evaluate("el => !!el.disabled || el.getAttribute('disabled')!==null"):
                     habilitado = True
@@ -903,7 +903,7 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
         if not habilitado:
             _screenshot_debug(page, "responder_glosa_disabled")
             raise RuntimeError(
-                "El botón 'Responder Glosa' siguió deshabilitado 45s "
+                "El botón 'Responder Glosa' siguió deshabilitado 90s "
                 "(¿faltó código, justificación o PDF? ¿portal lento?)."
             )
     except PlaywrightTimeout:
@@ -1029,14 +1029,27 @@ def procesar_factura(
             grupos_hechos += 1
             pendientes_portal -= set(ids_pend)
             _desmarcar_todo(page)
-            # Entre grupos: dale tiempo al portal a refrescar la grilla y
-            # habilitar 'Responder Masivamente' (si no, el siguiente grupo
-            # arranca con el portal aún procesando el anterior).
-            page.wait_for_timeout(1500)
-            try:
-                page.wait_for_selector("text=Cargando", state="hidden", timeout=15000)
-            except PlaywrightTimeout:
-                pass
+            # CRÍTICO entre grupos: esperar a que las glosas del grupo recién
+            # respondido aparezcan como RESPONDIDA en la grilla. Si abrimos el
+            # modal del siguiente grupo antes, el portal lo deja con el botón
+            # disabled mientras termina de procesar el anterior — y se cae con
+            # timeout. Esperamos hasta 90s.
+            confirmadas = set()
+            t_dl = time.time() + 90
+            while time.time() < t_dl:
+                try:
+                    estados_act = leer_estados(page)
+                except Exception:
+                    estados_act = {}
+                confirmadas = {i for i in ids_pend if estados_act.get(i) == "RESPONDIDA"}
+                if len(confirmadas) >= len(ids_pend):
+                    break
+                page.wait_for_timeout(1500)
+            if len(confirmadas) < len(ids_pend):
+                logger.warning(
+                    f"  ⚠ El portal confirmó {len(confirmadas)}/{len(ids_pend)} "
+                    f"glosas del grupo {n} en 90s; sigo igual"
+                )
 
         if max_grupos > 0:
             reg["estado"] = "PILOTO_PARCIAL"
