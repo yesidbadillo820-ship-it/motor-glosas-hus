@@ -93,6 +93,25 @@ class TestExtraerValorMultiplicadores:
     def test_sin_valor(self, svc):
         assert svc._extraer_valor("No existe evidencia de realización.") == "$ 0.00"
 
+    def test_fila_tsv_de_excel(self, svc):
+        # Caso real 11-jun-2026: fila pegada desde Excel con el valor como
+        # columna sin '$' — entraba $0 y la recomendación decía "facturó $0".
+        fila = (
+            "TA0801\t882298\tECOGRAFIA DOPPLER OBSTETRICA CON EVALUACION DE "
+            "CIRCULACION PLACENTARIA\t36.402\tMVC SE RECONOCE A TARIFAS SOAT "
+            "VIGENTE UVB NO HAY CONTRATO NI ACUERDO DE TARIFAS."
+        )
+        assert svc._extraer_valor(fila) == "$ 36.402"
+
+    def test_tsv_no_confunde_cups_ni_codigo(self, svc):
+        # "882298" (CUPS, sin puntos) y "TA0801" no deben tomarse como valor.
+        fila = "TA0801\t882298\tSERVICIO X\tsin valor en esta fila"
+        assert svc._extraer_valor(fila) == "$ 0.00"
+
+    def test_tsv_valor_grande_con_decimales(self, svc):
+        fila = "SO0601\t906466\tEXAMEN\t1.234.567,89\tmotivo"
+        assert svc._extraer_valor(fila) == "$ 1.234.567,89"
+
 
 # ─── P0-1: citas atribuidas entre comillas dobles/simples ───────────────
 

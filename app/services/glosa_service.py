@@ -3244,6 +3244,20 @@ class GlosaService:
                 raw = m.group(1).strip().rstrip(".,")
                 if any(ch.isdigit() for ch in raw):
                     return f"$ {raw}"
+
+        # Filas pegadas desde Excel (TSV): "TA0801⇥882298⇥DESCRIPCIÓN⇥36.402⇥MOTIVO".
+        # El valor viene como columna SIN '$' y los patrones de arriba no lo
+        # ven → entraba $0 a BD y la recomendación decía "facturó $0"
+        # (visto en producción 11-jun-2026). Heurística segura: solo celdas
+        # con formato colombiano de miles (punto cada 3 dígitos, decimal
+        # coma opcional) — "36.402" sí, "882298" (CUPS) no, "TA0801" no.
+        if "\t" in t:
+            pat_moneda_col = re.compile(r"^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$")
+            for linea in t.splitlines():
+                for celda in linea.split("\t"):
+                    celda = celda.strip()
+                    if pat_moneda_col.fullmatch(celda):
+                        return f"$ {celda}"
         return "$ 0.00"
 
     def _calcular_dias_habiles(self, f1, f2) -> Optional[int]:
