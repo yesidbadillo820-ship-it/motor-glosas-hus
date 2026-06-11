@@ -502,6 +502,22 @@ async def lifespan(app: FastAPI):
     _CONTRATOS_MISSING = [
         ("pdf_path", "VARCHAR(500)"),
         ("pdf_subido_en", _TS_TIPO),
+        # Metadatos enriquecidos (auditoría 10-jun-2026 P0-CITADA): la
+        # otra IA cita NIT, número de proceso SECOP, fecha exacta y
+        # plazo. Sin esto el sistema producía dictámenes genéricos.
+        ("numero_contrato", "VARCHAR(120)"),
+        ("nit_eps", "VARCHAR(40)"),
+        ("nit_ips", "VARCHAR(40)"),
+        ("razon_social_eps", "VARCHAR(300)"),
+        ("razon_social_ips", "VARCHAR(300)"),
+        ("numero_proceso_secop", "VARCHAR(120)"),
+        ("secop_url", "VARCHAR(500)"),
+        ("fecha_suscripcion", _TS_TIPO),
+        ("fecha_inicio", _TS_TIPO),
+        ("fecha_fin", _TS_TIPO),
+        ("objeto_contractual", "TEXT"),
+        ("anexos_descripcion", "TEXT"),
+        ("modalidades_tarifarias", "TEXT"),
     ]
     for col_name, col_ddl in _CONTRATOS_MISSING:
         try:

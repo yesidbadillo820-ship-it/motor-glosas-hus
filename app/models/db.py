@@ -300,6 +300,28 @@ class ContratoRecord(Base):
     pdf_path = Column(String(500), nullable=True)
     pdf_subido_en = Column(DateTime(timezone=True), nullable=True)
 
+    # Metadatos enriquecidos para argumentación contractual de alto nivel
+    # (auditoría 10-jun-2026: la "otra IA" cita NIT, número de proceso SECOP,
+    # fecha exacta, plazo y anexos específicos — el sistema HUS no los tenía
+    # disponibles para el prompt y producía dictámenes genéricos).
+    # Se llenan al parsear el PDF del contrato o al cargarlo desde el panel
+    # admin. Todos opcionales — el inyector degrada elegantemente si faltan.
+    numero_contrato = Column(String(120), nullable=True)
+    nit_eps = Column(String(40), nullable=True)
+    nit_ips = Column(String(40), nullable=True)
+    razon_social_eps = Column(String(300), nullable=True)
+    razon_social_ips = Column(String(300), nullable=True)
+    numero_proceso_secop = Column(String(120), nullable=True)
+    secop_url = Column(String(500), nullable=True)
+    fecha_suscripcion = Column(DateTime(timezone=True), nullable=True)
+    fecha_inicio = Column(DateTime(timezone=True), nullable=True)
+    fecha_fin = Column(DateTime(timezone=True), nullable=True)
+    objeto_contractual = Column(Text, nullable=True)
+    anexos_descripcion = Column(Text, nullable=True)  # JSON: lista de anexos
+    modalidades_tarifarias = Column(
+        Text, nullable=True
+    )  # JSON: ["TARIFA PROPIA ESE", "SOAT UVB", ...]
+
 
 class ClausulaContrato(Base):
     """Cláusulas extraídas del PDF del contrato de cada EPS.
