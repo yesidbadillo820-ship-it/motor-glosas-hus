@@ -362,24 +362,33 @@ def ir_a_bolsa(page: Page) -> None:
 def abrir_factura(page: Page, factura: str) -> None:
     """Bolsa de Respuestas → buscar la factura → click botón azul ▶."""
     ir_a_bolsa(page)
-    # Caja "Buscar:" del datatable. No mezclar CSS y XPath en un selector:
-    # se prueban en orden.
+    # La caja "Buscar:" del datatable aparece recién cuando la grilla terminó
+    # de cargar las facturas — y esa carga es LENTA (cartel FILTROS sale antes).
+    # Esperamos con paciencia (hasta 3 min), probando los selectores en orden.
     buscar = None
-    for sel in (
-        "input[type='search']",
-        "xpath=//label[contains(., 'Buscar')]//input",
-        "input[placeholder*='Buscar' i]",
-    ):
-        loc = page.locator(sel)
-        try:
-            if loc.count() > 0 and loc.first.is_visible():
-                buscar = loc.first
-                break
-        except Exception:
-            continue
+    deadline = time.time() + 180
+    aviso = False
+    while buscar is None and time.time() < deadline:
+        for sel in (
+            "input[type='search']",
+            "xpath=//label[contains(., 'Buscar')]//input",
+            "input[placeholder*='Buscar' i]",
+        ):
+            loc = page.locator(sel)
+            try:
+                if loc.count() > 0 and loc.first.is_visible():
+                    buscar = loc.first
+                    break
+            except Exception:
+                continue
+        if buscar is None:
+            if not aviso:
+                logger.info("  esperando que cargue la grilla de la Bolsa (es lenta)…")
+                aviso = True
+            page.wait_for_timeout(1500)
     if buscar is None:
         _screenshot_debug(page, "sin_caja_buscar")
-        raise RuntimeError("No encontré la caja 'Buscar:' de la Bolsa.")
+        raise RuntimeError("La grilla de la Bolsa no cargó en 3 min (sin caja 'Buscar:').")
     buscar.fill(factura)
     page.wait_for_timeout(1200)  # debounce del datatable
 
