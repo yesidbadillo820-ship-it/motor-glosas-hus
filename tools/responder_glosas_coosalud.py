@@ -780,9 +780,35 @@ def _primer_visible(loc):
     return None
 
 
+def _esperar_responder_masivamente_habilitado(page: Page, timeout_s: int = 90) -> bool:
+    """El portal deja el botón 'Responder Masivamente' DISABLED mientras
+    está aplicando la respuesta del grupo anterior (aunque la grilla ya
+    muestre RESPONDIDA en pantalla, el backend sigue trabajando). Esto
+    bloquea el siguiente click. Espera hasta que se HABILITE de nuevo."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        btn = _primer_visible(page.locator("button:has-text('Responder Masivamente')"))
+        if btn is not None:
+            try:
+                if not btn.evaluate("el => !!el.disabled || el.getAttribute('disabled')!==null"):
+                    return True
+            except Exception:
+                return True
+        page.wait_for_timeout(1000)
+    return False
+
+
 def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
     """Abre el modal 'Responder Masivamente' y carga código + justificación
     (+ PDF si aplica). Lanza excepción si el portal no confirma."""
+    # Antes del click: esperar a que el portal NO esté procesando algo del
+    # grupo anterior (con esto evitamos abrir el modal en estado raro).
+    if not _esperar_responder_masivamente_habilitado(page, timeout_s=90):
+        _screenshot_debug(page, "responder_masivamente_disabled")
+        raise RuntimeError(
+            "El botón 'Responder Masivamente' siguió DISABLED 90s "
+            "(el portal seguía procesando el grupo anterior)."
+        )
     btn_rm = _primer_visible(page.locator("button:has-text('Responder Masivamente')"))
     if btn_rm is None:
         raise RuntimeError("No veo el botón 'Responder Masivamente'.")
@@ -859,6 +885,18 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
     if textarea is None:
         raise RuntimeError("No encontré el textarea de JUSTIFICACION en el modal.")
     textarea.fill(grupo["obs"])
+    # Forzar blur + change para que la validación JS del portal habilite
+    # el botón 'Responder Glosa' (fill() setea el valor pero no siempre
+    # dispara los eventos que escucha el framework del modal).
+    try:
+        textarea.evaluate(
+            "el => { el.dispatchEvent(new Event('input', {bubbles: true}));"
+            " el.dispatchEvent(new Event('change', {bubbles: true}));"
+            " el.dispatchEvent(new Event('blur', {bubbles: true})); }"
+        )
+    except Exception:
+        pass
+    page.wait_for_timeout(300)
 
     # ── PDF (solo grupos de soporte) ──
     if pdf is not None:
