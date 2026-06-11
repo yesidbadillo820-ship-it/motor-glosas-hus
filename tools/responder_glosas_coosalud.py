@@ -561,18 +561,50 @@ def _desmarcar_todo(page: Page) -> None:
         pass
 
 
+def _primer_visible(loc):
+    """Primer elemento VISIBLE de un locator, o None (los .first a secas
+    pueden agarrar plantillas ocultas del DOM)."""
+    try:
+        n = loc.count()
+    except Exception:
+        return None
+    for i in range(n):
+        e = loc.nth(i)
+        try:
+            if e.is_visible():
+                return e
+        except Exception:
+            continue
+    return None
+
+
 def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
     """Abre el modal 'Responder Masivamente' y carga código + justificación
     (+ PDF si aplica). Lanza excepción si el portal no confirma."""
-    page.locator("button:has-text('Responder Masivamente')").first.click()
+    btn_rm = _primer_visible(page.locator("button:has-text('Responder Masivamente')"))
+    if btn_rm is None:
+        raise RuntimeError("No veo el botón 'Responder Masivamente'.")
+    btn_rm.click()
     page.wait_for_selector("text=Respondiendo Masivamente", timeout=15000)
+    page.wait_for_timeout(600)
+
+    # Contenedor del modal visible: scope para todos los campos (en el DOM
+    # puede haber plantillas/modales ocultos con los mismos textos e IDs).
+    scope = page
+    for sel in (".modal-content", ".modal-dialog", ".modal", "[role='dialog']"):
+        cand = _primer_visible(page.locator(sel).filter(has_text="Respondiendo Masivamente"))
+        if cand is not None:
+            scope = cand
+            break
 
     # ── Código de respuesta (dropdown, posiblemente select2) ──
     cod = grupo["cod_corto"]
     seleccionado = False
-    # 1) <select> nativo (aunque esté estilizado, select_option suele funcionar).
-    for sel in page.locator("select").all():
+    # 1) <select> VISIBLE dentro del modal (nativo estilizado).
+    for sel in scope.locator("select").all():
         try:
+            if not sel.is_visible():
+                continue
             opciones = sel.locator("option").all_inner_texts()
             match = next((o for o in opciones if cod in o), None)
             if match:
@@ -581,49 +613,71 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
                 break
         except Exception:
             continue
-    # 2) Combo select2: click + tipear + Enter. (No mezclar CSS y XPath en
-    # un mismo selector: se prueban en orden.)
+    # 2) Select OCULTO detrás de un select2: setear por JS + change (jQuery
+    # incluido, que es lo que escucha select2).
     if not seleccionado:
-        combo = None
-        for sel_combo in (
-            ".select2-selection",
-            "[role='combobox']",
-            "xpath=//*[contains(text(),'RESPUESTA')]/following::span[contains(@class,'select2')][1]",
-        ):
-            loc = page.locator(sel_combo)
-            try:
-                if loc.count() > 0 and loc.first.is_visible():
-                    combo = loc.first
-                    break
-            except Exception:
-                continue
+        try:
+            seleccionado = bool(page.evaluate(
+                """(cod) => {
+                    for (const s of document.querySelectorAll('select')) {
+                        for (const o of s.options) {
+                            if ((o.text || '').includes(cod)) {
+                                s.value = o.value;
+                                s.dispatchEvent(new Event('change', {bubbles: true}));
+                                if (window.jQuery) window.jQuery(s).trigger('change');
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }""", cod))
+        except Exception:
+            pass
+    # 3) Combo select2 por UI: click + tipear + elegir.
+    if not seleccionado:
+        combo = _primer_visible(scope.locator(".select2-selection")) or \
+                _primer_visible(scope.locator("[role='combobox']"))
         if combo is None:
             raise RuntimeError("No encontré el dropdown de RESPUESTA en el modal.")
         combo.click()
         page.wait_for_timeout(400)
-        caja = page.locator("input.select2-search__field:visible, input[type='search']:visible").last
+        caja = _primer_visible(page.locator("input.select2-search__field")) or \
+               _primer_visible(page.locator("input[type='search']"))
         caja.fill(cod)
         page.wait_for_timeout(800)
-        page.locator(f"li:has-text('{cod}')").first.click()
+        opcion = _primer_visible(page.locator(f"li:has-text('{cod}')"))
+        if opcion is None:
+            raise RuntimeError(f"El dropdown no ofrece el código {cod}.")
+        opcion.click()
         seleccionado = True
     page.wait_for_timeout(500)
 
     # ── Justificación (textarea) — el portal ACEPTA tildes, va tal cual ──
-    textarea = page.locator("textarea:visible").first
+    textarea = _primer_visible(scope.locator("textarea"))
+    if textarea is None:
+        raise RuntimeError("No encontré el textarea de JUSTIFICACION en el modal.")
     textarea.fill(grupo["obs"])
 
     # ── PDF (solo grupos de soporte) ──
     if pdf is not None:
-        file_input = page.locator("input[type='file']").first
+        file_input = scope.locator("input[type='file']").first
         file_input.set_input_files(str(pdf))
         page.wait_for_timeout(800)
         logger.info(f"    adjunto: {pdf.name}")
 
     # ── Responder Glosa ──
-    page.locator("button:has-text('Responder Glosa')").first.click()
+    btn = _primer_visible(scope.locator("#btnAnswerGlosa")) or \
+          _primer_visible(scope.locator("button:has-text('Responder Glosa')")) or \
+          _primer_visible(page.locator("button:has-text('Responder Glosa')"))
+    if btn is None:
+        _screenshot_debug(page, "sin_boton_responder_glosa")
+        raise RuntimeError("No veo el botón 'Responder Glosa' del modal.")
+    btn.click()
     # Confirmación: "¡Se ha dado Respuesta a N Glosas!"
-    page.wait_for_selector("text=Se ha dado Respuesta", timeout=40000)
-    page.locator("button:has-text('Continuar')").first.click()
+    page.wait_for_selector("text=Se ha dado Respuesta", timeout=60000)
+    cont = _primer_visible(page.locator("button:has-text('Continuar')"))
+    if cont is not None:
+        cont.click()
     page.wait_for_timeout(800)
 
 
@@ -631,9 +685,16 @@ def terminar_respuesta(page: Page, factura: str, evidencias: Path) -> str:
     """Click 'Terminar Respuesta' → 'Sí, Terminar!' → pantallazo del cartel
     '¡Usted ha cerrado una cuenta!' en EVIDENCIA → Continuar."""
     evidencias.mkdir(parents=True, exist_ok=True)
-    page.locator("button:has-text('Terminar Respuesta')").first.click()
+    btn_t = _primer_visible(page.locator("button:has-text('Terminar Respuesta')"))
+    if btn_t is None:
+        raise RuntimeError("No veo el botón 'Terminar Respuesta'.")
+    btn_t.click()
     page.wait_for_selector("text=Desea Terminar", timeout=15000)
-    page.locator("button:has-text('Terminar!'), button:has-text('Si, Terminar')").first.click()
+    btn_si = _primer_visible(page.locator("button:has-text('Terminar!')")) or \
+             _primer_visible(page.locator("button:has-text('Si, Terminar')"))
+    if btn_si is None:
+        raise RuntimeError("No veo el botón 'Sí, Terminar!'.")
+    btn_si.click()
 
     # Cartel final de evidencia.
     try:
@@ -645,7 +706,9 @@ def terminar_respuesta(page: Page, factura: str, evidencias: Path) -> str:
     page.screenshot(path=str(ruta), full_page=True)
     logger.info(f"  📸 Evidencia: {ruta}")
     try:
-        page.locator("button:has-text('Continuar')").first.click(timeout=5000)
+        cont = _primer_visible(page.locator("button:has-text('Continuar')"))
+        if cont is not None:
+            cont.click(timeout=5000)
     except PlaywrightTimeout:
         pass
     return "OK"
