@@ -4577,8 +4577,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     color:var(--text) !important;
   }
   #p-analizar .res-dictamen-hdr{
-    color:var(--text2) !important;
+    /* Bug 11-jun-2026: este override legacy ponía --text2 (gris oscuro)
+       sobre la franja navy — "DICTAMEN JURÍDICO" quedaba invisible.
+       La franja es navy SIEMPRE (claro y oscuro): texto blanco. */
+    color:#fff !important;
   }
+  #p-analizar .res-dictamen-hdr span{color:#fff !important}
   #p-analizar .res-dictamen-body{
     color:var(--text) !important;
   }
@@ -5490,11 +5494,17 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
   body.dark .login-hero{box-shadow:inset 0 0 0 100vmax rgba(0,0,0,.12)}
 
   /* ── 8. MEDALLA DOBLE: EVIDENCIA + CONFIANZA ─────────────────────── */
-  .medallas-wrap{padding:1.1rem 1.25rem 1rem}
+  /* min-height + overflow defensivos: reporte del 11-jun-2026 — en
+     algunas condiciones de viewport la card colapsaba y los aros
+     quedaban recortados en el borde superior. */
+  .medallas-wrap{padding:1.1rem 1.25rem 1rem;min-height:128px;overflow:visible}
   .medallas-row{
     display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
-    gap:1rem;align-items:stretch;
+    gap:1rem;align-items:stretch;overflow:visible;
   }
+  .medalla{min-height:88px}
+  .medallas-wrap.card-doc{overflow:visible}
+  .medallas-wrap.card-doc::before{border-radius:var(--r-lg) var(--r-lg) 0 0}
   .medalla{
     display:flex;align-items:center;gap:.9rem;
     padding:.75rem .9rem;border-radius:var(--r-lg);
@@ -15355,7 +15365,7 @@ function renderResult(d){
     +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
     +'<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>'
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'
-    +'<span style="opacity:.6;font-weight:400">'+fechaLarga+'</span>'
+    +'<span style="opacity:.85;font-weight:500;white-space:nowrap">'+fechaLarga+'</span>'
     +'</div>'
     +'<div class="doc-membrete">'
     +'<div class="doc-membrete-ent">'
