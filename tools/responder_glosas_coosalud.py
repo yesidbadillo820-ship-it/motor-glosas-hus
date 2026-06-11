@@ -411,6 +411,27 @@ def _esperar_caja_buscar(page: Page, nombre_grilla: str, timeout_s: int = 180):
     raise RuntimeError(f"La grilla de {nombre_grilla} no cargó en {timeout_s}s (sin caja 'Buscar:').")
 
 
+def _cerrar_cartel_continuar(page: Page, espera_s: float = 0) -> bool:
+    """Cierra el cartel emergente con botón 'Continuar' si está en pantalla.
+    Al abrir una cuenta desde la Bolsa el portal la ASIGNA y bloquea todo con
+    '¡Se ha asignado la cuenta!' — hasta no darle Continuar la sección GLOSAS
+    no se puede tocar. espera_s=0 → un solo chequeo sin esperar."""
+    fin = time.time() + espera_s
+    while True:
+        try:
+            btn = _primer_visible(page.locator("button:has-text('Continuar')"))
+            if btn is not None:
+                btn.click(timeout=3000)
+                logger.info("  cartel de asignación → Continuar")
+                page.wait_for_timeout(400)
+                return True
+        except Exception:
+            pass
+        if time.time() >= fin:
+            return False
+        page.wait_for_timeout(300)
+
+
 def _buscar_y_entrar(page: Page, factura: str, nombre_grilla: str, timeout_s: int = 60) -> bool:
     """Busca la factura en la grilla actual y entra con el botón ▶.
     True = entró al detalle. False = la grilla dio señal de vacío o venció el
@@ -477,6 +498,8 @@ def _buscar_y_entrar(page: Page, factura: str, nombre_grilla: str, timeout_s: in
         _screenshot_debug(page, f"sin_boton_play_{factura}")
         raise RuntimeError(f"{factura}: no hallé el botón ▶ en la fila de {nombre_grilla}.")
     accion.click()
+    # Primera apertura desde la Bolsa → cartel "¡Se ha asignado la cuenta!".
+    _cerrar_cartel_continuar(page, espera_s=3)
     # Página de detalle: aparece la sección GLOSAS.
     page.wait_for_selector("text=GLOSAS", timeout=60000)
     page.wait_for_timeout(800)
@@ -549,6 +572,44 @@ def leer_estados(page: Page) -> dict[str, str]:
     for id_glosa, estado in datos:
         estados[id_glosa] = estado
     return estados
+
+
+def esperar_glosas(page: Page, timeout_s: int = 120) -> dict[str, str]:
+    """Espera a que la grilla GLOSAS tenga filas y se ESTABILICE (la página de
+    la cuenta carga por partes: primero GESTION CUENTA, después GLOSAS; y tras
+    'Mostrar: Todos' el datatable redibuja). Mientras tanto puede saltar el
+    cartel de asignación → lo cierra. Si nunca aparecen filas, aborta SIN
+    tocar nada (jamás dar Terminar con la grilla vacía)."""
+    inicio = time.time()
+    aviso = False
+    previo = -1
+    estables = 0
+    while True:
+        _cerrar_cartel_continuar(page)
+        estados = leer_estados(page)
+        n = len(estados)
+        if n > 0:
+            if n == previo:
+                estables += 1
+                if estables >= 2:  # 3 lecturas iguales seguidas → grilla quieta
+                    return estados
+            else:
+                estables = 0
+            previo = n
+            if time.time() - inicio > timeout_s:
+                return estados  # mejor esfuerzo: hay filas aunque siga moviéndose
+        else:
+            if time.time() - inicio > timeout_s:
+                _screenshot_debug(page, "glosas_no_cargo")
+                raise RuntimeError(
+                    f"la grilla GLOSAS no mostró filas en {timeout_s}s — no toco "
+                    "nada (la cuenta quedó asignada: reintentá y la va a "
+                    "encontrar En Pausa)"
+                )
+            if not aviso and time.time() - inicio > 8:
+                logger.info("  esperando que cargue la sección GLOSAS…")
+                aviso = True
+        page.wait_for_timeout(700)
 
 
 def _contar_marcadas(page: Page) -> int:
@@ -789,8 +850,9 @@ def procesar_factura(
            "estado": "", "detalle": ""}
     try:
         abrir_factura(page, factura)
+        esperar_glosas(page)  # la sección GLOSAS carga después que GESTION CUENTA
         preparar_grilla(page)
-        estados = leer_estados(page)
+        estados = esperar_glosas(page)  # releer ya con 'Mostrar: Todos' aplicado
 
         respondidas_previas = sum(1 for e in estados.values() if e == "RESPONDIDA")
         pendientes_portal = {i for i, e in estados.items() if e == "SIN RESPUESTA"}
