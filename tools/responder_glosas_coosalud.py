@@ -1123,6 +1123,15 @@ def main() -> int:
     parser.add_argument("--con-cabeza", action="store_true", help="Mostrar el browser.")
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
     parser.add_argument("--reporte", type=Path, default=Path("reporte_coosalud.csv"))
+    parser.add_argument(
+        "--saltar-csv",
+        type=Path,
+        action="append",
+        default=[],
+        help="CSV(s) de reportes previos: las facturas con estado terminal "
+        "(OK, OK_CALIDAD_ABIERTA, SOLO_CALIDAD, NO_EN_BOLSA, TERMINADA_SIN_CARTEL) "
+        "se omiten. Podés pasarlo varias veces.",
+    )
     parser.add_argument("--log", type=Path, default=None)
     args = parser.parse_args()
     setup_logging(args.log)
@@ -1162,6 +1171,29 @@ def main() -> int:
             logger.warning(f"⚠ No están en la hoja {args.hoja}: {', '.join(sorted(faltantes))}")
         logger.info(f"Procesando {len(encontradas)} de {len(objetivos)} facturas pedidas.")
         facturas = encontradas
+
+    if args.saltar_csv:
+        ESTADOS_TERMINALES = {
+            "OK", "OK_CALIDAD_ABIERTA", "SOLO_CALIDAD",
+            "NO_EN_BOLSA", "TERMINADA_SIN_CARTEL",
+        }
+        ya_listas: set[str] = set()
+        for ruta in args.saltar_csv:
+            if not ruta.is_file():
+                logger.warning(f"⚠ --saltar-csv: no existe {ruta}, lo ignoro.")
+                continue
+            with ruta.open("r", encoding="utf-8-sig", newline="") as fh:
+                reader = csv.DictReader(fh)
+                for fila in reader:
+                    if (fila.get("estado") or "").strip().upper() in ESTADOS_TERMINALES:
+                        f = (fila.get("factura") or "").strip().upper()
+                        if f:
+                            ya_listas.add(f)
+            logger.info(f"  --saltar-csv {ruta.name}: acumulado {len(ya_listas)} facturas terminales.")
+        if ya_listas:
+            antes = len(facturas)
+            facturas = {k: v for k, v in facturas.items() if k.upper() not in ya_listas}
+            logger.info(f"Salto {antes - len(facturas)} facturas ya cerradas según reportes previos; quedan {len(facturas)}.")
 
     if args.max_facturas > 0:
         recorte = dict(list(facturas.items())[:args.max_facturas])
