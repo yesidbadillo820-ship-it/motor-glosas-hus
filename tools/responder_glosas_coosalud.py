@@ -864,7 +864,16 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
     if pdf is not None:
         file_input = scope.locator("input[type='file']").first
         file_input.set_input_files(str(pdf))
-        page.wait_for_timeout(800)
+        # Los uploads del portal son asíncronos; con 800ms se vio que el
+        # click siguiente disparaba pero el form aún no tenía el adjunto y
+        # el submit pasaba en falso. Bumpeamos a 2.5s y, además, esperamos
+        # al feedback típico del portal (nombre del archivo a la vista) si
+        # aparece.
+        page.wait_for_timeout(2500)
+        try:
+            scope.locator(f"text={pdf.name}").first.wait_for(state="visible", timeout=4000)
+        except PlaywrightTimeout:
+            pass
         logger.info(f"    adjunto: {pdf.name}")
 
     # ── Responder Glosa ──
@@ -874,13 +883,47 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
     if btn is None:
         _screenshot_debug(page, "sin_boton_responder_glosa")
         raise RuntimeError("No veo el botón 'Responder Glosa' del modal.")
+    # Si el botón quedó disabled (validación del portal), no tiene sentido
+    # clickear: el modal no va a cerrarse y el "Se ha dado Respuesta" que
+    # leeríamos sería un texto residual de la respuesta anterior.
+    try:
+        if btn.evaluate("el => !!el.disabled || el.getAttribute('disabled')!==null"):
+            _screenshot_debug(page, "responder_glosa_disabled")
+            raise RuntimeError(
+                "El botón 'Responder Glosa' está deshabilitado (validación "
+                "del portal: ¿faltó código, justificación o PDF?)."
+            )
+    except Exception:
+        pass
     btn.click()
-    # Confirmación: "¡Se ha dado Respuesta a N Glosas!"
-    page.wait_for_selector("text=Se ha dado Respuesta", timeout=60000)
+
+    # SEÑAL FUERTE de submit OK: el modal 'Respondiendo Masivamente' se cierra.
+    # (wait_for_selector "Se ha dado Respuesta" a secas puede matchear un texto
+    # residual del DOM y devolver inmediato sin que la respuesta se guarde.)
+    try:
+        page.wait_for_selector("text=Respondiendo Masivamente", state="hidden", timeout=60000)
+    except PlaywrightTimeout:
+        _screenshot_debug(page, "modal_no_cierra")
+        raise RuntimeError(
+            "El modal 'Respondiendo Masivamente' no se cerró tras click en "
+            "'Responder Glosa' — el portal no aceptó la respuesta."
+        )
+    # Sweet alert de confirmación.
+    try:
+        page.wait_for_selector("text=Se ha dado Respuesta", timeout=15000)
+    except PlaywrightTimeout:
+        # Si el modal se cerró igual debe estar guardado; lo informamos pero
+        # no rompemos: el chequeo final por leer_estados decide.
+        logger.info("    (no vi el cartel 'Se ha dado Respuesta'; sigo)")
     cont = _primer_visible(page.locator("button:has-text('Continuar')"))
     if cont is not None:
         cont.click()
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(1500)
+    # La grilla GLOSAS se redibuja tras la respuesta; le damos chance.
+    try:
+        page.wait_for_selector("text=Cargando", state="hidden", timeout=15000)
+    except PlaywrightTimeout:
+        pass
 
 
 def terminar_respuesta(page: Page, factura: str, evidencias: Path) -> str:
@@ -979,9 +1022,15 @@ def procesar_factura(
             reg["detalle"] = f"{grupos_hechos} grupos respondidos (sin Terminar)"
             return reg
 
-        # ¿Quedó algo sin responder?
-        estados = leer_estados(page)
-        aun_pendientes = sum(1 for e in estados.values() if e == "SIN RESPUESTA")
+        # ¿Quedó algo sin responder? Damos paciencia: tras el último grupo
+        # la grilla puede tardar en reflejar los cambios; releemos hasta 20s.
+        deadline = time.time() + 20
+        while True:
+            estados = leer_estados(page)
+            aun_pendientes = sum(1 for e in estados.values() if e == "SIN RESPUESTA")
+            if aun_pendientes == 0 or time.time() > deadline:
+                break
+            page.wait_for_timeout(1000)
         if grupos_saltados_pdx:
             reg["estado"] = "PENDIENTE_PDX"
             reg["detalle"] = f"{grupos_hechos} grupos ok; sin PDX: {'; '.join(grupos_saltados_pdx)}"
