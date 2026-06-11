@@ -14,33 +14,70 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
-  /* Paleta premium — inspirada en Linear, Stripe, Supabase */
-  --navy:#0b1220; --navy2:#152033; --navy3:#1e293b;
-  --teal:#0284c7; --teal2:#0ea5e9; --teal-light:#e0f2fe;
-  --c-navy:#0b1220; --c-navy2:#152033; --c-navy3:#1e293b;
-  --c-teal:#0369a1; --c-teal2:#0284c7; --c-teal-light:#e0f2fe;
-  --c-blue:#1d4ed8; --c-blue-light:#eff6ff;
-  --c-red:#dc2626; --c-red-light:#fef2f2;
-  --c-amber:#d97706; --c-amber-light:#fffbeb;
-  --c-green:#059669; --c-green-light:#ecfdf5;
-  --c-gold:#b8860b; --c-gold2:#d4a017; --c-gold-light:#fef9e7;
-  --c-indigo:#4f46e5; --c-indigo-light:#eef2ff;
-  --c-gray:#334155; --c-gray2:#64748b; --c-gray3:#94a3b8;
-  --bg:#fbfbfd; --bg-card:#ffffff; --bg-subtle:#f5f7fa;
-  --border:#e5e7eb; --border2:#cbd5e1; --border-focus:#0ea5e9;
-  --text:#0b1220; --text2:#334155; --text3:#64748b; --text4:#94a3b8;
+  /* ═══ PALETA SINAC ═══ (rebrand 10-jun-2026)
+     Identidad corporativa: AZUL + VERDE + BLANCO. Estética
+     profesional / sector salud / institucional. Los nombres viejos
+     (--navy, --teal, --c-blue, etc.) se conservan apuntando a la
+     nueva paleta para no romper componentes existentes. */
+
+  /* SINAC AZUL — institucional, fiabilidad, sanidad
+     - sinac-blue-900: azul profundo (header/marca, navy de fondo)
+     - sinac-blue-700: azul corporativo principal (botones, hover)
+     - sinac-blue-500: azul medio (acentos)
+     - sinac-blue-100: azul suave (cards activas, badges info) */
+  --sinac-blue-900:#0B3D91; --sinac-blue-800:#0D47A1; --sinac-blue-700:#1565C0;
+  --sinac-blue-600:#1976D2; --sinac-blue-500:#1E88E5; --sinac-blue-400:#42A5F5;
+  --sinac-blue-200:#BBDEFB; --sinac-blue-100:#E3F2FD; --sinac-blue-50:#F5FAFF;
+
+  /* SINAC VERDE — éxito, salud, conformidad
+     - sinac-green-700: verde corporativo (CTAs positivos, score alto)
+     - sinac-green-500: verde medio (badges aprobado)
+     - sinac-green-100: verde suave (fondos info) */
+  --sinac-green-800:#1B5E20; --sinac-green-700:#2E7D32; --sinac-green-600:#388E3C;
+  --sinac-green-500:#43A047; --sinac-green-400:#66BB6A;
+  --sinac-green-200:#C8E6C9; --sinac-green-100:#E8F5E9; --sinac-green-50:#F1F8F4;
+
+  /* GRISES NEUTROS — texto y bordes profesionales */
+  --sinac-gray-900:#212B36; --sinac-gray-800:#37474F; --sinac-gray-700:#455A64;
+  --sinac-gray-500:#607D8B; --sinac-gray-400:#90A4AE; --sinac-gray-300:#B0BEC5;
+  --sinac-gray-200:#CFD8DC; --sinac-gray-100:#ECEFF1; --sinac-gray-50:#F5F7FA;
+
+  /* BLANCOS Y FONDOS */
+  --sinac-white:#FFFFFF; --sinac-off-white:#F8FAFC;
+
+  /* Acentos secundarios (alertas y estados — paleta acotada) */
+  --c-red:#C62828; --c-red-light:#FFEBEE;
+  --c-amber:#E65100; --c-amber-light:#FFF3E0;
+  --c-gold:#B8860B; --c-gold2:#C9970F; --c-gold-light:#FEF6DA;
+  --c-indigo:#283593; --c-indigo-light:#E8EAF6;
+
+  /* ═══ Compatibilidad con código existente (apuntan a SINAC) ═══ */
+  --navy:var(--sinac-blue-900); --navy2:var(--sinac-blue-800); --navy3:var(--sinac-gray-800);
+  --teal:var(--sinac-blue-700); --teal2:var(--sinac-blue-500); --teal-light:var(--sinac-blue-100);
+  --c-navy:var(--sinac-blue-900); --c-navy2:var(--sinac-blue-800); --c-navy3:var(--sinac-gray-800);
+  --c-teal:var(--sinac-blue-700); --c-teal2:var(--sinac-blue-600); --c-teal-light:var(--sinac-blue-100);
+  --c-blue:var(--sinac-blue-700); --c-blue-light:var(--sinac-blue-50);
+  --c-green:var(--sinac-green-700); --c-green-light:var(--sinac-green-100);
+  --c-gray:var(--sinac-gray-700); --c-gray2:var(--sinac-gray-500); --c-gray3:var(--sinac-gray-300);
+
+  --bg:var(--sinac-off-white); --bg-card:var(--sinac-white); --bg-subtle:var(--sinac-gray-50);
+  --border:var(--sinac-gray-100); --border2:var(--sinac-gray-200); --border-focus:var(--sinac-blue-500);
+  --text:var(--sinac-gray-900); --text2:var(--sinac-gray-700); --text3:var(--sinac-gray-500); --text4:var(--sinac-gray-400);
   --r:8px; --r-lg:12px; --r-xl:16px; --r-2xl:20px;
-  /* Sombras premium con profundidad */
-  --sh:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.06);
-  --sh-md:0 4px 8px -2px rgba(15,23,42,.06),0 2px 4px -2px rgba(15,23,42,.08);
-  --sh-lg:0 12px 24px -8px rgba(15,23,42,.12),0 8px 16px -4px rgba(15,23,42,.08);
-  --sh-xl:0 24px 48px -12px rgba(15,23,42,.18),0 12px 24px -8px rgba(15,23,42,.10);
-  --sh-premium:0 1px 2px rgba(15,23,42,.04),0 4px 8px rgba(15,23,42,.04),0 16px 32px -8px rgba(15,23,42,.10);
-  /* Gradientes premium */
-  --grad-navy:linear-gradient(135deg,#0b1220 0%,#152033 50%,#1e293b 100%);
-  --grad-teal:linear-gradient(135deg,#0369a1 0%,#0284c7 50%,#0ea5e9 100%);
-  --grad-gold:linear-gradient(135deg,#b8860b 0%,#d4a017 100%);
-  --grad-card:linear-gradient(180deg,#ffffff 0%,#fafbfc 100%);
+  /* Sombras institucionales — más sutiles que la versión anterior */
+  --sh:0 1px 2px rgba(11,61,145,.04),0 1px 3px rgba(11,61,145,.05);
+  --sh-md:0 4px 8px -2px rgba(11,61,145,.05),0 2px 4px -2px rgba(11,61,145,.06);
+  --sh-lg:0 12px 24px -8px rgba(11,61,145,.10),0 8px 16px -4px rgba(11,61,145,.06);
+  --sh-xl:0 24px 48px -12px rgba(11,61,145,.14),0 12px 24px -8px rgba(11,61,145,.08);
+  --sh-premium:0 1px 2px rgba(11,61,145,.04),0 4px 8px rgba(11,61,145,.04),0 16px 32px -8px rgba(11,61,145,.08);
+  /* Gradientes SINAC: azul corporativo + verde acento + blanco */
+  --grad-navy:linear-gradient(135deg,var(--sinac-blue-900) 0%,var(--sinac-blue-800) 50%,var(--sinac-blue-700) 100%);
+  --grad-teal:linear-gradient(135deg,var(--sinac-blue-700) 0%,var(--sinac-blue-600) 50%,var(--sinac-blue-500) 100%);
+  --grad-success:linear-gradient(135deg,var(--sinac-green-700) 0%,var(--sinac-green-500) 100%);
+  --grad-sinac:linear-gradient(135deg,var(--sinac-blue-700) 0%,var(--sinac-green-600) 100%);
+  --grad-gold:linear-gradient(135deg,#B8860B 0%,#C9970F 100%);
+  --grad-card:linear-gradient(180deg,var(--sinac-white) 0%,var(--sinac-off-white) 100%);
+  --grad-header:linear-gradient(135deg,var(--sinac-blue-900) 0%,var(--sinac-blue-700) 100%);
   --font:'Inter',system-ui,-apple-system,sans-serif;
   --font-mono:'JetBrains Mono',ui-monospace,monospace;
   --font-display:'Inter',system-ui,sans-serif;
@@ -49,9 +86,10 @@
   --ease-spring:cubic-bezier(.34,1.56,.64,1);
 }
 body.dark{
-  --bg:#0a0f1c; --bg-card:#0f172a; --bg-subtle:#131c2f;
-  --border:#1e293b; --border2:#334155;
-  --text:#f1f5f9; --text2:#cbd5e1; --text3:#94a3b8; --text4:#64748b;
+  /* Modo oscuro SINAC — preserva azul + verde con fondos profundos */
+  --bg:#0A1929; --bg-card:#0F2438; --bg-subtle:#132B45;
+  --border:#1F3A5F; --border2:#2D4F73;
+  --text:#E3F2FD; --text2:#B0BEC5; --text3:#90A4AE; --text4:#607D8B;
   --sh:0 1px 2px rgba(0,0,0,.3),0 1px 3px rgba(0,0,0,.4);
   --sh-md:0 2px 4px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5);
 }

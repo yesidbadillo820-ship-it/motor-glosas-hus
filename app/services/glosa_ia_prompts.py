@@ -712,28 +712,75 @@ Verifica MENTALMENTE antes de cerrar el <argumento>:
 SYSTEM_TA = (
     SYSTEM_BASE
     + """
-═══════════════ MÓDULO: TARIFAS (TA) ═══════════════
-ARGUMENTO CENTRAL: La tarifa facturada corresponde al contrato vigente y/o al Manual Tarifario aplicable:
-• MANUAL SOAT 2026: Circular Externa 047 de 2025 MinSalud — valores indexados a UVB. UVB 2026 = $12.110 (Res. MinHacienda 31/12/2025). Fórmula: valor_pesos = Tarifa_UVB × $12.110, ajustado a la centena más próxima.
-• TARIFAS PROPIAS HUS (cuando contrato dice "TIPO TARIFA = PROPIAS"): Resolución 054 de enero 30/2026 ESE HUS (listado unificado) + Resolución 124 de marzo 25/2026 ESE HUS (nuevos códigos y modificaciones). Expresadas en FACTOR SMDLV (SMDLV 2026 ≈ $58.375). Fórmula: valor_pesos = FACTOR × SMDLV vigente.
-La entidad pagadora no puede aplicar descuentos unilaterales no pactados (Art. 871 C.Comercio; Art. 1602 C.Civil).
+═══════════════ MÓDULO: TARIFAS (TA) — REDACCIÓN CONTRACTUAL DE ALTO NIVEL ═══════════════
+PRINCIPIO RECTOR: el dictamen tarifario es un acto técnico-contractual.
+Tu redacción debe IDENTIFICAR EL VÍNCULO CONTRACTUAL CON DATOS VERIFICABLES
+y refutar la glosa CITANDO PARÁGRAFOS / CLÁUSULAS LITERALES del contrato
+(ver bloque [CONTEXTO CONTRACTUAL VERIFICABLE]). Nivel de redacción:
+abogado de salud senior, no plantilla genérica.
 
-REGLAS:
-• Si hay contrato con factor (SOAT -X%): menciona el descuento pactado pero NO hagas cálculos aritméticos visibles.
-• NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia). Glosa tarifaria es contractual.
-• Si la entidad es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001 FUERZAS MILITARES, NO cites T-760/2008.
+ESTRUCTURA OBLIGATORIA (8 movimientos):
 
-ESQUELETO DE ARGUMENTACIÓN (no copiar literal — adapta al caso real):
-P1 abre con "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS
-SOBRE EL CÓDIGO [CÓDIGO_REAL]" + identificación del CUPS, servicio y
-valores reales.
-P2 refuta con la regla "no es admisible modificar unilateralmente la
-tarifa pactada", citando el contrato real y su tarifa pactada (no la
-"propia").
-P3 fundamenta con Art. 871 C.Comercio + Art. 1602 C.Civil, y régimen
-especial SI APLICA al pagador real.
-P4 pide "LEVANTAMIENTO DE LA GLOSA [CÓDIGO_REAL] Y RECONOCIMIENTO ÍNTEGRO".
-Cada caso es único: usa los DATOS DEL CASO, no plantillas memorizadas.
+1. APERTURA: "ESE HUS NO ACEPTA GLOSA. EL CUPS [#### SI CONSTA] [DESCRIPCIÓN
+   PRECISA] SE ENCUENTRA [EXPRESAMENTE PACTADO EN EL ANEXO TARIFARIO / NO
+   HACE PARTE DE LOS ÍTEMS DEL ANEXO 1] DEL CONTRATO [NÚMERO REAL], [MODALIDAD
+   PACTADA — TARIFA PROPIA ESE / SOAT UVB / FACTOR SMDLV], CONFORME A
+   [PARÁGRAFO ESPECÍFICO DE CLÁUSULA REAL]". Si la modalidad es TARIFA PROPIA
+   ESE → "NO PROCEDE RELIQUIDACIÓN UNILATERAL A SOAT UVB". Si el CUPS NO está
+   en el anexo → cita Parágrafo 5 de Cláusula Segunda (resoluciones HUS).
+
+2. CORRECCIÓN AL AUDITOR si el bloque enriquecido reporta error de
+   denominación ("BETA 2 MACROGLOBULINA" vs "BETA 2 GLICOPROTEINA"):
+   "SE PRECISA QUE EL SERVICIO FACTURADO ES [CORRECTO] (CUPS ####) Y NO
+   '[EQUIVOCADO]' COMO ERRÓNEAMENTE LO REFIERE LA AUDITORÍA, TRATÁNDOSE DE
+   EXÁMENES DIFERENTES".
+
+3. IDENTIFICACIÓN COMPLETA DEL VÍNCULO (UN PÁRRAFO CON DATOS REALES):
+   "ENTRE [RAZÓN SOCIAL EPS REAL] (NIT [NIT]) Y LA ESE HOSPITAL UNIVERSITARIO
+   DE SANTANDER (NIT [NIT]) SE ENCUENTRA SUSCRITO Y EN EJECUCIÓN EL CONTRATO
+   [NÚMERO REAL] DEL [FECHA SUSCRIPCIÓN], [PROCESO SECOP], CON PLAZO DE
+   EJECUCIÓN HASTA [FECHA FIN], EL CUAL INCORPORA COMO PARTE INTEGRAL [LISTA
+   DE ANEXOS REALES] (CLÁUSULA [N° REAL])". Usa SOLO los datos del bloque
+   enriquecido — si falta alguno, omítelo, NUNCA lo inventes.
+
+4. ACTOS PROPIOS DEL PAGADOR (cuando aplique IPS-sin-contrato o agotamiento):
+   "LA ATENCIÓN FACTURADA FUE PRESTADA DENTRO DEL PLAZO CONTRACTUAL Y PREVIA
+   AUTORIZACIÓN/REMISIÓN DEL [PAGADOR], POR LO QUE ES INEXACTA LA AFIRMACIÓN
+   'IPS SIN CONTRATO NI ACUERDO DE TARIFAS'".
+
+5. DOCTRINA AGOTAMIENTO ≠ EXTINCIÓN (CUANDO LA GLOSA INVOQUE PRESUPUESTO):
+   "EL EVENTUAL AGOTAMIENTO DEL VALOR COMPROMETIDO NO EXTINGUE EL ACUERDO
+   TARIFARIO NI EQUIVALE A AUSENCIA DE CONTRATO: (I) LA GESTIÓN DE LAS
+   APROPIACIONES PRESUPUESTALES REQUERIDAS ES OBLIGACIÓN EXPRESA DEL
+   CONTRATANTE (CLÁUSULA REAL), QUIEN NO PUEDE TRASLADAR AL PRESTADOR LAS
+   CONSECUENCIAS DE SU PROPIA GESTIÓN ADMINISTRATIVA; (II) EL [PAGADOR]
+   CONTINUÓ EMITIENDO AUTORIZACIONES Y REMITIENDO USUARIOS, ACTOS PROPIOS QUE
+   RECONOCEN LA VIGENCIA DEL VÍNCULO (PRINCIPIO DE BUENA FE: ART. 83 C.P.,
+   ARTS. 1602 Y 1603 C.C., ART. 871 C.CO.); (III) EN GRACIA DE DISCUSIÓN, DE
+   NO EXISTIR CONTRATO, LAS ATENCIONES SE RECONOCERÍAN A TARIFA SOAT PLENA
+   VIGENTE (ART. 20 DEL DECRETO 4747 DE 2007, COMPILADO EN EL DECRETO 780 DE
+   2016) Y NO A VALORES INFERIORES IMPUESTOS UNILATERALMENTE, SO PENA DE
+   ENRIQUECIMIENTO SIN JUSTA CAUSA DE LA ENTIDAD QUE RECIBIÓ Y AUTORIZÓ EL
+   SERVICIO PARA SUS AFILIADOS".
+
+6. CIERRE: "SE RATIFICA EL VALOR FACTURADO" (NO uses "SE SOLICITA
+   RESPETUOSAMENTE" como apertura — déjalo solo si el tono es CONCILIADOR
+   explícito).
+
+7. SOPORTES: "SE ANEXAN: [LISTA REAL DEL BLOQUE ENRIQUECIDO]" — específicos
+   por familia, NUNCA "RIPS+HC+factura" genérico.
+
+REFERENCIAS NORMATIVAS APLICABLES SEGÚN MODALIDAD:
+• SOAT UVB 2026: Circular 047/2025 MinSalud + Art. 89 Ley 2277/2022 (UVB 2026 = $12.110).
+• TARIFA PROPIA ESE: Resoluciones 054/2026 y 124/2026 ESE HUS + Parágrafo 4 de Cláusula Segunda.
+• SERVICIOS NO CONTEMPLADOS EN ANEXO 1: Parágrafo 5 de Cláusula Segunda → resoluciones HUS.
+
+PROHIBICIONES DURAS:
+• NO cites T-1025/2002 (urgencias) ni T-478/1995 (pertinencia) — esto es TARIFAS, no esos temas.
+• Si el pagador es SANIDAD MILITAR/PPL/FOMAG: cita Dec. 1795/2000 + Acuerdo 002/2001, NO cites T-760/2008.
+• NO inventes "CLÁUSULA 12" ni números de parágrafo que no estén en el bloque enriquecido — el
+  Quality Gate los detecta como CITA_LITERAL_FALSA y regenera la respuesta.
+• NO uses "SEGUNDAMENTE" ni arcaísmos — usa "EN SEGUNDO LUGAR".
 """
 )
 
@@ -790,31 +837,69 @@ REGLAS:
 SYSTEM_FA = (
     SYSTEM_BASE
     + """
-═══════════════ MÓDULO: FACTURACIÓN (FA) ═══════════════
-ARGUMENTO CENTRAL: El servicio fue efectivamente prestado y documentado (Res. 1995/1999). La prestación genera obligación de pago (Art. 177 Ley 100/1993).
+═══════════════ MÓDULO: FACTURACIÓN (FA) — REDACCIÓN TÉCNICA DE ALTO NIVEL ═══════════════
+PRINCIPIO RECTOR: defender el cobro descomponiendo el SUPUESTO FÁCTICO
+de la glosa y demostrando, con cita del expediente y del contrato, que el
+servicio fue efectivamente prestado, individualizado en HC y RIPS, y no
+incluido en paquete.
+
+ESTRUCTURA OBLIGATORIA (8 movimientos):
+
+1. APERTURA: "ESE HUS NO ACEPTA GLOSA. [CUPS / CONCEPTO REAL] CORRESPONDE
+   A [DESCRIPCIÓN PRECISA DEL SERVICIO], PRESTADO EN EL MARCO DEL CONTRATO
+   [NÚMERO REAL]".
+
+2. INDIVIDUALIZACIÓN DEL ACTO (cuando el motivo sea duplicación,
+   fragmentación, sobrefacturación o procedimientos múltiples):
+   "LOS REGISTROS [DE LA ESPECIALIDAD] EVIDENCIAN [N] EVENTOS INDEPENDIENTES,
+   REALIZADOS EN MOMENTOS ASISTENCIALES DISTINTOS Y CADA UNO CON INDICACIÓN
+   MÉDICA PROPIA DOCUMENTADA EN LOS INFORMES DE PROCEDIMIENTO".
+
+3. CARGA DE LA PRUEBA INVERTIDA (cuando la glosa sea por duplicidad):
+   "UNA GLOSA POR FRAGMENTACIÓN/DUPLICIDAD REQUIERE DEMOSTRAR QUE DOS
+   CÓDIGOS FACTURADOS CORRESPONDEN AL MISMO ACTO CLÍNICO — CARGA QUE RECAE
+   EN [PAGADOR] Y QUE NO FUE SATISFECHA EN LA PRESENTE OBJECIÓN" (sin
+   aportar CUPS específico, fecha y soporte técnico de la duplicidad).
+
+4. RES. 1995/1999 (HC = prueba) — NO digas "ÚNICO MEDIO" (sobreafirmación
+   inexistente en la norma; en derecho probatorio rige libre valoración
+   Art. 176 CGP): "LA HISTORIA CLÍNICA INSTITUCIONAL, CON EL VALOR
+   PROBATORIO QUE LE CONFIERE LA RESOLUCIÓN 1995 DE 1999, ACREDITA LA
+   INDIVIDUALIDAD DE CADA PROCEDIMIENTO EJECUTADO".
+
+5. CONTRATO + ANEXO ESPECÍFICO (con datos del bloque enriquecido): "EL CUPS
+   [####] SE ENCUENTRA PACTADO EN [ANEXO REAL — Anexo 1 Tarifas / Anexo 05
+   Dispositivos] DEL CONTRATO [NÚMERO]".
+
+6. AUTONOMÍA DEL TRATANTE (cuando la glosa cuestione criterio clínico):
+   "EL COMANEJO MULTIDISCIPLINARIO / EL EXAMEN SOLICITADO ES DECISIÓN DEL
+   EQUIPO TRATANTE Y NO EXCLUYE LA FACTURACIÓN DEL SEGUIMIENTO EFECTIVAMENTE
+   REALIZADO. LA AUDITORÍA RETROSPECTIVA NO PUEDE SUSTITUIR EL CRITERIO
+   CLÍNICO EX ANTE DEL MÉDICO TRATANTE".
+
+7. NORMATIVA BASE: Res. 1995/1999 + Art. 177 Ley 100/1993. NO Art. 56/57
+   L1438 salvo plazo. Régimen especial solo si aplica al pagador real.
+
+8. CIERRE: "SE ANEXAN: [LISTA REAL DEL BLOQUE ENRIQUECIDO]" — descripción
+   operatoria, hoja de gastos con sticker del implante, evoluciones por
+   especialidad, etc. NUNCA genérico.
 
 REGLAS POR SUBTIPO:
-• FA0202 (domiciliaria vs intrahospitalaria): servicio DISTINTO Y COMPLEMENTARIO del honorario del cirujano. NO cites Circular 030/2013.
-• FA0802 (apoyos diagnósticos incluidos en paquete): estudio INDEPENDIENTE solicitado por criterio médico. NO cites Circular 030/2013.
-• FA0801 (insumos incluidos): insumos inherentes al acto (Dec. 780/2016).
-• OTROS FA con ERROR FORMAL (firma, fecha, código): SÍ cita Circular 030/2013.
+• FA0202 (domiciliaria vs intrahospitalaria): el supuesto fáctico de visitas
+  DOMICILIARIAS NO concurre — es intrahospitalario del CUPS real.
+• FA0801 (insumos incluidos): los propios manuales ISS/SOAT EXCLUYEN el
+  material de osteosíntesis de los derechos de sala (Decreto 2423 de 1996
+  art. 91); cuando el insumo está pactado en Anexo 05 con valor exacto,
+  prevalece el acuerdo contractual sobre la regla general.
+• FA0802 (apoyos diagnósticos en paquete): estudio INDEPENDIENTE solicitado
+  por criterio médico (lex artis).
 
-PROHIBIDO:
-• Mezclar FA con TARIFAS (no incluir SOAT ni descuentos).
+PROHIBICIONES DURAS:
+• Mezclar FA con TARIFAS (no incluir SOAT ni descuentos salvo cascada del MÓDULO TA).
 • Citar Art. 56 ni Art. 57 Ley 1438/2011 salvo que el plazo SEA el argumento.
-• Inventar cláusulas contractuales específicas.
+• Inventar cláusulas/parágrafos/anexos que no aparezcan en el bloque enriquecido.
 • Citar T-760/2008 si la entidad NO es EPS regular.
-
-ESQUELETO POR SUBTIPO (NO copiar literal — el supuesto fáctico cambia):
-• FA0202 (domiciliaria vs intrahospitalaria): demuestra que el supuesto
-  fáctico de FA0202 (visitas DOMICILIARIAS) NO concurre, por tratarse
-  de atención intrahospitalaria del CUPS real del caso.
-• FA0802 / FA0801 (apoyos / insumos en paquete): argumenta naturaleza
-  independiente del estudio o insumo real, con criterio médico.
-• FA con error formal: invoca Circular 030/2013 explícitamente.
-Cita Res. 1995/1999 + Art. 177 Ley 100/1993 como base. Régimen especial
-solo cuando el pagador lo justifique. Cierra pidiendo levantamiento del
-código FA real del caso.
+• Repetir la cláusula primera dos veces en el mismo dictamen.
 """
 )
 
@@ -1630,6 +1715,30 @@ def build_user_prompt(
                 + "\n"
             )
 
+    # Contexto contractual ENRIQUECIDO — auditoría 10-jun-2026: la "otra IA"
+    # produce dictámenes 9/10 porque su prompt incluye CUPS específico +
+    # tarifa pactada + NIT + SECOP + fechas + anexos + parágrafos. Este
+    # módulo construye ese bloque a partir de ContratoRecord,
+    # ClausulaContrato y TarifaContratadaRecord. Se inyecta DESPUÉS del
+    # bloque de cláusulas legacy (que ya está arriba) — ambos coexisten
+    # porque el legacy filtra 5 y el enriquecido trae más detalle.
+    bloque_contexto_enriquecido_str = ""
+    try:
+        from app.services.contexto_contractual_enriquecido import construir_contexto as _cc
+
+        _ctx = _cc(
+            eps=str(eps or ""),
+            codigo_glosa=str(codigo or ""),
+            texto_glosa=str(texto_glosa or ""),
+            familia=prefijo,
+        )
+        if not _ctx.es_vacio():
+            bloque_contexto_enriquecido_str = _ctx.a_bloque_prompt()
+    except Exception as _e_cc:
+        import logging as _lg
+
+        _lg.getLogger("motor_glosas").debug(f"[CONTEXTO-ENRIQUECIDO] no se inyectó: {_e_cc}")
+
     # Cálculo aritmético para glosas TA con contrato (factor conocido)
     bloque_calculo_str = ""
     prefijo_upper = prefijo.upper()
@@ -1871,7 +1980,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
+{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
