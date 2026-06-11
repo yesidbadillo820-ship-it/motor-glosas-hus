@@ -239,9 +239,25 @@ def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]
         return None, f"{factura} no está en el índice"
     if not carpeta.is_dir():
         return None, f"carpeta no accesible: {carpeta}"
-    candidatos = sorted(carpeta.glob("PDX*.pdf")) or sorted(carpeta.rglob("PDX*.pdf"))
+    # Aceptamos PDX_*.pdf, PDX-*.pdf y variantes case-insensitive (Windows lo es,
+    # pero glob en case-sensitive en Linux y nunca está de más).
+    patrones = ["PDX*.pdf", "PDX*.PDF", "pdx*.pdf", "Pdx*.pdf"]
+    candidatos: list[Path] = []
+    for pat in patrones:
+        candidatos.extend(carpeta.glob(pat))
     if not candidatos:
-        return None, f"sin PDX*.pdf en {carpeta}"
+        for pat in patrones:
+            candidatos.extend(carpeta.rglob(pat))
+    candidatos = sorted(set(candidatos))
+    if not candidatos:
+        # Listar TODOS los PDFs que hay para ayudar a diagnosticar (nombres
+        # típicos: PDX_, AAC_, FAC_, FE_, RIPS_, ANS_, etc.).
+        pdfs = sorted(carpeta.glob("*.pdf")) + sorted(carpeta.glob("*.PDF"))
+        if pdfs:
+            muestras = ", ".join(p.name for p in pdfs[:6])
+            extra = "" if len(pdfs) <= 6 else f" (+{len(pdfs) - 6} más)"
+            return None, f"sin PDX*.pdf en {carpeta} | PDFs presentes: {muestras}{extra}"
+        return None, f"sin PDX*.pdf en {carpeta} (carpeta sin PDFs)"
     pdf = candidatos[0]
     mb = pdf.stat().st_size / (1024 * 1024)
     if mb > MAX_PDF_MB:
