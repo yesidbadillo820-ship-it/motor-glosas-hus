@@ -1220,6 +1220,41 @@ tbody tr:hover{background:var(--bg)}
 .contrato-eps{font-weight:700;color:var(--text);font-size:.9rem;margin-bottom:.4rem}
 .contrato-det{font-size:.75rem;color:var(--text3);line-height:1.6}
 
+/* ─── CONTRATOS · Editor de metadatos enriquecidos ───────────────────
+   Llena las 12 columnas del PR #106 que consume el inyector
+   contexto_contractual_enriquecido.py — sin estos datos el dictamen IA
+   no citaba contrato/NIT/SECOP (auditoría 10-jun-2026). */
+.ctr-meta-card{margin-bottom:1.5rem}
+.ctr-meta-head{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1.15rem 1.25rem .4rem}
+.ctr-meta-title{font-family:var(--font-display);font-size:1.02rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+.ctr-meta-title .badge-ia{background:var(--grad-sinac);color:#fff;font-size:.6rem;font-weight:800;letter-spacing:.06em;padding:.2rem .5rem;border-radius:5px}
+.ctr-meta-head .field{margin:0;min-width:240px;flex:0 1 320px}
+.ctr-meta-banner{display:flex;gap:.55rem;align-items:flex-start;margin:.7rem 1.25rem .95rem;padding:.65rem .85rem;background:var(--sinac-blue-50);border:1px solid var(--sinac-blue-100);border-left:3px solid var(--sinac-blue-700);border-radius:8px;font-size:.78rem;color:var(--sinac-blue-900);line-height:1.5}
+.ctr-meta-banner .ico{font-size:.95rem;line-height:1.2;font-weight:800;color:var(--sinac-blue-700)}
+.ctr-meta-estado{margin:0 1.25rem .9rem;padding:.6rem .85rem;border-radius:8px;font-size:.8rem;line-height:1.45}
+.ctr-meta-estado.nuevo{background:var(--sinac-green-50);border:1px solid var(--sinac-green-200);border-left:3px solid var(--sinac-green-700);color:var(--sinac-green-800)}
+.ctr-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:.85rem 1rem;padding:0 1.25rem}
+.ctr-meta-grid .span-2{grid-column:1/-1}
+.ctr-meta-grid .field{margin-bottom:0}
+.ctr-meta-fechas{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem 1rem}
+.ctr-meta-mono{font-family:var(--font-mono);font-feature-settings:'tnum','zero'}
+.ctr-meta-hint{font-size:.68rem;color:var(--text4);margin-top:.25rem}
+.ctr-meta-chips{display:flex;flex-wrap:wrap;gap:.4rem;padding:.45rem .55rem;border:1.5px solid var(--border);border-radius:var(--r);background:var(--bg-card);min-height:44px;align-items:center;cursor:text}
+.ctr-meta-chip{display:inline-flex;align-items:center;gap:.3rem;background:var(--sinac-blue-100);border:1px solid var(--sinac-blue-200);color:var(--sinac-blue-800);font-family:var(--font-mono);font-size:.7rem;font-weight:700;padding:.22rem .3rem .22rem .55rem;border-radius:14px;white-space:nowrap}
+.ctr-meta-chip button{border:none;background:transparent;color:var(--sinac-blue-800);font-size:.85rem;line-height:1;cursor:pointer;padding:0 .25rem;width:auto}
+.ctr-meta-chip button:hover{color:var(--c-red)}
+.ctr-meta-chips input{width:auto;flex:1;min-width:150px;border:none;background:transparent;font-size:.78rem;padding:.2rem;box-shadow:none}
+.ctr-meta-chips input:focus,.ctr-meta-chips input:hover{border:none;box-shadow:none}
+.ctr-anexo-row{display:grid;grid-template-columns:minmax(130px,210px) 1fr 36px;gap:.5rem;margin-bottom:.45rem;align-items:center}
+.cm-anexo-del{border:1px solid var(--border2);background:var(--bg-subtle);color:var(--text3);border-radius:8px;height:36px;cursor:pointer;font-size:.8rem;width:36px;padding:0}
+.cm-anexo-del:hover{background:var(--c-red-light);color:var(--c-red);border-color:var(--c-red)}
+.ctr-meta-footer{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1rem 1.25rem 1.25rem;margin-top:1.1rem;border-top:1px solid var(--border)}
+.ctr-meta-pdfinfo{font-size:.72rem;color:var(--text3);font-family:var(--font-mono)}
+.btn-guardar-meta{display:inline-flex;align-items:center;gap:.45rem;background:var(--sinac-green-700);color:#fff;border:none;border-radius:10px;padding:.65rem 1.3rem;font-size:.85rem;font-weight:700;cursor:pointer;width:auto;box-shadow:0 4px 12px rgba(46,125,50,.25);transition:all .18s var(--ease)}
+.btn-guardar-meta:hover{background:var(--sinac-green-800);transform:translateY(-1px)}
+.btn-guardar-meta:disabled{opacity:.55;cursor:not-allowed;transform:none}
+@media(max-width:760px){.ctr-meta-grid{grid-template-columns:1fr}.ctr-meta-fechas{grid-template-columns:1fr}}
+
 /* ─── LOADING ─────────────────────────────── */
 #loading{position:fixed;inset:0;background:rgba(14,31,61,.88);display:none;align-items:center;justify-content:center;z-index:9000;flex-direction:column;gap:1rem}
 #loading.show{display:flex}
@@ -3042,6 +3077,100 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- CONTRATOS -->
     <div class="panel" id="p-contratos">
       <div class="contratos-area">
+
+        <!-- ── Editor de metadatos enriquecidos (PR #106 fase 2) ──
+             Las 12 columnas que consume contexto_contractual_enriquecido.py
+             para el bloque [CONTRATO VIGENTE — DATOS AUDITABLES] del prompt.
+             Sin editor quedaban NULL y el dictamen IA salía genérico
+             (auditoría 10-jun-2026). -->
+        <div class="card-doc ctr-meta-card">
+          <div class="ctr-meta-head">
+            <div class="ctr-meta-title">📋 Metadatos del contrato <span class="badge-ia">PARA DICTÁMENES IA</span></div>
+            <div class="field">
+              <label>EPS / Entidad pagadora</label>
+              <select id="ctr-meta-eps" onchange="ctrMetaCargar()">
+                <option value="">— Seleccione EPS —</option>
+              </select>
+            </div>
+          </div>
+          <div class="ctr-meta-banner">
+            <span class="ico">ℹ</span>
+            <span>Estos datos se inyectan al prompt de la IA cuando analiza glosas de esta EPS —
+            el dictamen citará número de contrato, NITs y proceso SECOP automáticamente.</span>
+          </div>
+          <div class="ctr-meta-estado nuevo" id="ctr-meta-estado" style="display:none"></div>
+          <div id="ctr-meta-form" style="display:none">
+            <div class="ctr-meta-grid">
+              <div class="field">
+                <label>Número del contrato</label>
+                <input id="cm-numero-contrato" class="ctr-meta-mono" maxlength="120" placeholder="Ej: 440-DIGSA/DMBUG-2025"/>
+              </div>
+              <div class="field">
+                <label>Nº proceso SECOP</label>
+                <input id="cm-proceso-secop" class="ctr-meta-mono" maxlength="120" placeholder="Ej: CD477"/>
+              </div>
+              <div class="field">
+                <label>Razón social EPS / pagador</label>
+                <input id="cm-razon-eps" maxlength="300" placeholder="Ej: DIRECCIÓN GENERAL DE SANIDAD MILITAR"/>
+              </div>
+              <div class="field">
+                <label>NIT EPS</label>
+                <input id="cm-nit-eps" class="ctr-meta-mono" maxlength="40" placeholder="Ej: 901.541.137-1"/>
+              </div>
+              <div class="field">
+                <label>Razón social IPS / prestador</label>
+                <input id="cm-razon-ips" maxlength="300" value="ESE HOSPITAL UNIVERSITARIO DE SANTANDER"/>
+              </div>
+              <div class="field">
+                <label>NIT IPS</label>
+                <input id="cm-nit-ips" class="ctr-meta-mono" maxlength="40" value="900.006.037-4"/>
+              </div>
+              <div class="field span-2">
+                <label>URL del proceso en SECOP II</label>
+                <input id="cm-secop-url" class="ctr-meta-mono" maxlength="500" placeholder="https://community.secop.gov.co/Public/Tendering/..."/>
+              </div>
+              <div class="span-2 ctr-meta-fechas">
+                <div class="field">
+                  <label>Fecha de suscripción</label>
+                  <input type="date" id="cm-fecha-suscripcion" class="ctr-meta-mono"/>
+                </div>
+                <div class="field">
+                  <label>Inicio de ejecución</label>
+                  <input type="date" id="cm-fecha-inicio" class="ctr-meta-mono"/>
+                </div>
+                <div class="field">
+                  <label>Fin de ejecución (plazo)</label>
+                  <input type="date" id="cm-fecha-fin" class="ctr-meta-mono"/>
+                </div>
+              </div>
+              <div class="field span-2">
+                <label>Objeto contractual</label>
+                <textarea id="cm-objeto" rows="4" maxlength="5000" placeholder="Ej: Prestación de servicios integrales de salud a los usuarios del Subsistema de Salud de las Fuerzas Militares adscritos al DMBUG..."></textarea>
+                <div class="ctr-meta-hint">Máx 5000 caracteres — la IA cita los primeros 400 en el dictamen.</div>
+              </div>
+              <div class="field span-2">
+                <label>Modalidades tarifarias pactadas</label>
+                <div class="ctr-meta-chips" id="cm-modalidades" onclick="document.getElementById('cm-modalidad-input').focus()">
+                  <input id="cm-modalidad-input" onkeydown="ctrMetaChipKey(event)" placeholder="Escribe y presiona Enter (ej: TARIFA PROPIA ESE, SOAT UVB)"/>
+                </div>
+                <div class="ctr-meta-hint">Enter o coma agrega · × quita · Backspace borra la última.</div>
+              </div>
+              <div class="field span-2">
+                <label>Anexos integrales del contrato</label>
+                <div id="cm-anexos"></div>
+                <div style="display:flex;gap:.5rem;margin-top:.45rem;flex-wrap:wrap">
+                  <button type="button" class="btn-sm ghost" onclick="ctrMetaAgregarAnexo('','')">+ Agregar anexo</button>
+                  <button type="button" class="btn-sm ghost" onclick="ctrMetaCargarSugeridos()">⤓ Cargar anexos comunes</button>
+                </div>
+              </div>
+            </div>
+            <div class="ctr-meta-footer">
+              <span class="ctr-meta-pdfinfo" id="cm-pdf-info"></span>
+              <button type="button" class="btn-guardar-meta" id="cm-btn-guardar" onclick="ctrMetaGuardar()">💾 Guardar metadatos</button>
+            </div>
+          </div>
+        </div>
+
         <div class="section-title">Contratos vigentes <span id="n-contratos">0</span></div>
         <div class="contratos-grid" id="contratos-grid"></div>
       </div>
@@ -7060,6 +7189,7 @@ function tab(btn,id){
   if(id==='mi-desempeno') cargarMiDesempeno();
   if(id==='usuarios') cargar2FAEstado();
   if(id==='papelera') cargarPapelera();
+  if(id==='contratos') ctrMetaInit();
   if(id==='tarifas'){ cargarTarifas(); poblarSelectEpsContratos(); }
   if(id==='soportes') cargarSoportesEstado();
   if(id==='importacion-masiva') initImportacionMasiva();
@@ -13863,6 +13993,255 @@ async function loadContratos(){
       grid.innerHTML+='<div class="contrato-card"><div class="contrato-eps">'+c.eps+'</div><div class="contrato-det">'+c.detalles+'</div></div>';
     });
   }catch(e){console.error(e);}
+}
+
+// ─── CONTRATOS · Metadatos enriquecidos (editor admin) ───────────────────
+// Llena las 12 columnas del PR #106 que consume el inyector
+// contexto_contractual_enriquecido.py — sin estos datos el bloque
+// [CONTRATO VIGENTE — DATOS AUDITABLES] del prompt quedaba vacío y el
+// dictamen no citaba contrato/NIT/SECOP (auditoría 10-jun-2026).
+var CTR_META_IPS_DEFAULT = {razon:'ESE HOSPITAL UNIVERSITARIO DE SANTANDER', nit:'900.006.037-4'};
+var CTR_META_CAMPOS = [
+  ['cm-numero-contrato','numero_contrato'],
+  ['cm-proceso-secop','numero_proceso_secop'],
+  ['cm-razon-eps','razon_social_eps'],
+  ['cm-nit-eps','nit_eps'],
+  ['cm-razon-ips','razon_social_ips'],
+  ['cm-nit-ips','nit_ips'],
+  ['cm-secop-url','secop_url'],
+  ['cm-fecha-suscripcion','fecha_suscripcion'],
+  ['cm-fecha-inicio','fecha_inicio'],
+  ['cm-fecha-fin','fecha_fin'],
+  ['cm-objeto','objeto_contractual'],
+];
+
+function ctrMetaVal(id){ var el=document.getElementById(id); return el ? (el.value||'').trim() : ''; }
+function ctrMetaSet(id, v){ var el=document.getElementById(id); if(el) el.value = (v==null ? '' : v); }
+
+// Pobla el selector con las EPS que ya tienen ContratoRecord + las que
+// tienen glosas pero AÚN no tienen contrato (el PUT crea la fila — flujo
+// "Contrato nuevo" del 404).
+async function ctrMetaInit(){
+  var sel = document.getElementById('ctr-meta-eps');
+  if(!sel) return;
+  var seleccionada = sel.value;
+  var conContrato = [], sinContrato = [];
+  try{
+    var r = await fetch('/contratos/', {headers: authH()});
+    if(r.ok){ conContrato = (await r.json()).map(function(c){ return c.eps; }); }
+  }catch(e){}
+  try{
+    var r2 = await fetch('/contratos/eps-sin-contrato', {headers: authH()});
+    if(r2.ok){ sinContrato = ((await r2.json()).items || []).map(function(x){ return x.eps; }); }
+  }catch(e){}
+  var opt = function(eps){ return '<option value="'+escHtml(eps)+'">'+escHtml(eps)+'</option>'; };
+  var html = '<option value="">— Seleccione EPS —</option>';
+  if(conContrato.length) html += '<optgroup label="Con contrato registrado">'+conContrato.map(opt).join('')+'</optgroup>';
+  if(sinContrato.length) html += '<optgroup label="Con glosas, sin contrato (se creará al guardar)">'+sinContrato.map(opt).join('')+'</optgroup>';
+  sel.innerHTML = html;
+  if(seleccionada){ sel.value = seleccionada; }
+}
+
+function ctrMetaLimpiarForm(prefillIps){
+  CTR_META_CAMPOS.forEach(function(par){ ctrMetaSet(par[0], ''); });
+  if(prefillIps){
+    ctrMetaSet('cm-razon-ips', CTR_META_IPS_DEFAULT.razon);
+    ctrMetaSet('cm-nit-ips', CTR_META_IPS_DEFAULT.nit);
+  }
+  ctrMetaRenderChips([]);
+  ctrMetaRenderAnexos([]);
+  var info = document.getElementById('cm-pdf-info');
+  if(info) info.textContent = '';
+}
+
+async function ctrMetaCargar(){
+  var eps = ctrMetaVal('ctr-meta-eps');
+  var form = document.getElementById('ctr-meta-form');
+  var estado = document.getElementById('ctr-meta-estado');
+  if(!form || !estado) return;
+  if(!eps){ form.style.display = 'none'; estado.style.display = 'none'; return; }
+  form.style.display = 'block';
+  estado.style.display = 'none';
+  try{
+    var r = await fetch('/contratos/'+encodeURIComponent(eps)+'/metadatos', {headers: authH()});
+    if(r.status === 404){
+      // EPS sin ContratoRecord: formulario vacío, el PUT creará la fila.
+      ctrMetaLimpiarForm(true);
+      estado.style.display = 'block';
+      estado.innerHTML = '🆕 <b>Contrato nuevo</b> — completa los datos y guarda.';
+      return;
+    }
+    if(!r.ok){
+      var err = await r.json().catch(function(){ return {}; });
+      toast('Error cargando metadatos', err.detail || ('HTTP '+r.status), 'error');
+      return;
+    }
+    var d = await r.json();
+    CTR_META_CAMPOS.forEach(function(par){ ctrMetaSet(par[0], d[par[1]]); });
+    // Defaults institucionales si el contrato aún no los tiene
+    if(!d.razon_social_ips) ctrMetaSet('cm-razon-ips', CTR_META_IPS_DEFAULT.razon);
+    if(!d.nit_ips) ctrMetaSet('cm-nit-ips', CTR_META_IPS_DEFAULT.nit);
+    ctrMetaRenderChips(d.modalidades_tarifarias || []);
+    ctrMetaRenderAnexos(d.anexos_descripcion || []);
+    var info = document.getElementById('cm-pdf-info');
+    if(info){
+      info.textContent = d.pdf_subido_en
+        ? ('PDF del contrato subido: '+new Date(d.pdf_subido_en).toLocaleDateString('es-CO'))
+        : 'Sin PDF del contrato (se sube en la pestaña Tarifas)';
+    }
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
+// ── Chips de modalidades tarifarias ──
+function ctrMetaRenderChips(lista){
+  var cont = document.getElementById('cm-modalidades');
+  if(!cont) return;
+  cont.querySelectorAll('.ctr-meta-chip').forEach(function(c){ c.remove(); });
+  (lista || []).forEach(function(m){ ctrMetaInsertarChip(m); });
+}
+
+function ctrMetaInsertarChip(valor){
+  valor = String(valor == null ? '' : valor).trim();
+  if(!valor) return;
+  var cont = document.getElementById('cm-modalidades');
+  var input = document.getElementById('cm-modalidad-input');
+  if(!cont || !input) return;
+  var repetida = ctrMetaModalidades().some(function(v){ return v.toUpperCase() === valor.toUpperCase(); });
+  if(repetida) return;
+  var chip = document.createElement('span');
+  chip.className = 'ctr-meta-chip';
+  chip.dataset.valor = valor;
+  chip.innerHTML = escHtml(valor) + '<button type="button" title="Quitar modalidad">×</button>';
+  chip.querySelector('button').addEventListener('click', function(){ chip.remove(); });
+  cont.insertBefore(chip, input);
+}
+
+function ctrMetaModalidades(){
+  return Array.prototype.map.call(
+    document.querySelectorAll('#cm-modalidades .ctr-meta-chip'),
+    function(c){ return c.dataset.valor || ''; }
+  ).filter(Boolean);
+}
+
+function ctrMetaChipKey(ev){
+  var input = ev.target;
+  if(ev.key === 'Enter' || ev.key === ','){
+    ev.preventDefault();
+    ctrMetaInsertarChip(input.value.replace(/,/g, ' ').trim());
+    input.value = '';
+  } else if(ev.key === 'Backspace' && !input.value){
+    var chips = document.querySelectorAll('#cm-modalidades .ctr-meta-chip');
+    if(chips.length) chips[chips.length-1].remove();
+  }
+}
+
+// ── Repeater de anexos {nombre, descripcion} ──
+function ctrMetaRenderAnexos(lista){
+  var cont = document.getElementById('cm-anexos');
+  if(!cont) return;
+  cont.innerHTML = '';
+  (lista || []).forEach(function(a){ ctrMetaAgregarAnexo(a.nombre || '', a.descripcion || ''); });
+}
+
+function ctrMetaAgregarAnexo(nombre, descripcion){
+  var cont = document.getElementById('cm-anexos');
+  if(!cont) return;
+  var row = document.createElement('div');
+  row.className = 'ctr-anexo-row';
+  row.innerHTML =
+    '<input class="cm-anexo-nombre ctr-meta-mono" maxlength="120" placeholder="Anexo 1" value="'+escHtml(nombre || '')+'"/>' +
+    '<input class="cm-anexo-desc" maxlength="400" placeholder="Descripción (ej: Tarifas y servicios pactados)" value="'+escHtml(descripcion || '')+'"/>' +
+    '<button type="button" class="cm-anexo-del" title="Quitar anexo">🗑</button>';
+  row.querySelector('.cm-anexo-del').addEventListener('click', function(){ row.remove(); });
+  cont.appendChild(row);
+}
+
+async function ctrMetaCargarSugeridos(){
+  var eps = ctrMetaVal('ctr-meta-eps') || 'HUS';
+  try{
+    var r = await fetch('/contratos/'+encodeURIComponent(eps)+'/anexos/sugeridos', {headers: authH()});
+    if(!r.ok){ toast('Error', 'No se pudieron cargar las sugerencias (HTTP '+r.status+')', 'error'); return; }
+    var d = await r.json();
+    var existentes = Array.prototype.map.call(
+      document.querySelectorAll('#cm-anexos .cm-anexo-nombre'),
+      function(i){ return i.value.trim().toUpperCase(); }
+    );
+    var agregados = 0;
+    (d.sugeridos || []).forEach(function(a){
+      if(existentes.indexOf((a.nombre || '').toUpperCase()) === -1){
+        ctrMetaAgregarAnexo(a.nombre, a.descripcion);
+        agregados++;
+      }
+    });
+    toast('Anexos comunes', agregados + ' sugerencias añadidas — edita o quita las que no apliquen', 'info');
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }
+}
+
+function ctrMetaAnexos(){
+  var anexos = [];
+  document.querySelectorAll('#cm-anexos .ctr-anexo-row').forEach(function(row){
+    var n = (row.querySelector('.cm-anexo-nombre').value || '').trim();
+    var de = (row.querySelector('.cm-anexo-desc').value || '').trim();
+    if(n || de) anexos.push({nombre: n, descripcion: de});
+  });
+  return anexos;
+}
+
+async function ctrMetaGuardar(){
+  var eps = ctrMetaVal('ctr-meta-eps');
+  if(!eps){ toast('Sin EPS', 'Seleccioná la EPS primero', 'warning'); return; }
+  // Validación rápida client-side (el backend revalida todo)
+  var fi = ctrMetaVal('cm-fecha-inicio'), ff = ctrMetaVal('cm-fecha-fin');
+  if(fi && ff && fi > ff){
+    toast('Fechas inválidas', 'La fecha de inicio no puede ser posterior a la fecha fin', 'warning');
+    return;
+  }
+  var url = ctrMetaVal('cm-secop-url');
+  if(url && url.toLowerCase().indexOf('https://') !== 0){
+    toast('URL inválida', 'La URL de SECOP debe empezar con https://', 'warning');
+    return;
+  }
+  // Chip a medio escribir: agregarla para no perder lo tipeado
+  var pendiente = ctrMetaVal('cm-modalidad-input');
+  if(pendiente){ ctrMetaInsertarChip(pendiente); ctrMetaSet('cm-modalidad-input', ''); }
+
+  var body = {anexos_descripcion: ctrMetaAnexos(), modalidades_tarifarias: ctrMetaModalidades()};
+  CTR_META_CAMPOS.forEach(function(par){ body[par[1]] = ctrMetaVal(par[0]) || null; });
+
+  var btn = document.getElementById('cm-btn-guardar');
+  if(btn) btn.disabled = true;
+  try{
+    var r = await fetch('/contratos/'+encodeURIComponent(eps)+'/metadatos', {
+      method: 'PUT',
+      headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(body),
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok){
+      var msg = d.detail || ('HTTP '+r.status);
+      if(r.status === 403) msg = 'Solo COORDINADOR o SUPER_ADMIN pueden editar metadatos';
+      toast('No se pudo guardar', msg, 'error');
+      return;
+    }
+    toast('Metadatos guardados', 'La IA citará estos datos al analizar glosas de '+eps, 'success');
+    var estado = document.getElementById('ctr-meta-estado');
+    if(estado) estado.style.display = 'none';
+    // Repintar con lo normalizado por el backend (NITs sin espacios, etc.)
+    CTR_META_CAMPOS.forEach(function(par){ ctrMetaSet(par[0], d[par[1]]); });
+    ctrMetaRenderChips(d.modalidades_tarifarias || []);
+    ctrMetaRenderAnexos(d.anexos_descripcion || []);
+    // La EPS pudo pasar de "sin contrato" a "con contrato" → refrescar listas
+    ctrMetaInit();
+    loadContratos();
+  }catch(e){
+    toast('Error de red', String(e), 'error');
+  }finally{
+    if(btn) btn.disabled = false;
+  }
 }
 
 // ─── ANALIZAR ─────────────────────────────────────────────────────────────
