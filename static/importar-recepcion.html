@@ -4,45 +4,73 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Importar Recepción · IA GLOSAS SINAC SC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet"/>
   <style>
+    /* ═══ REDISEÑO SINAC 11-jun-2026 — paleta institucional azul+verde+blanco ═══ */
+    :root{
+      --sinac-blue-900:#0B3D91; --sinac-blue-800:#0D47A1; --sinac-blue-700:#1565C0;
+      --sinac-blue-100:#E3F2FD; --sinac-blue-50:#F5FAFF;
+      --sinac-green-700:#2E7D32; --sinac-green-600:#388E3C; --sinac-green-100:#E8F5E9;
+      --sinac-gray-900:#212B36; --sinac-gray-700:#455A64; --sinac-gray-500:#607D8B;
+      --sinac-gray-200:#CFD8DC; --sinac-gray-100:#ECEFF1; --sinac-gray-50:#F5F7FA;
+      --grad-header:linear-gradient(135deg,#0B3D91 0%,#1565C0 100%);
+    }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',Arial,sans-serif;background:#f3f4f6;color:#111827;padding:20px}
-    .wrap{max-width:1000px;margin:0 auto}
-    h1{color:#0e1f3d;font-size:24px;margin-bottom:6px}
-    p.lead{color:#6b7280;margin-bottom:22px;font-size:13px}
-    .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:24px;margin-bottom:18px}
-    label{display:block;font-weight:600;margin-bottom:8px;color:#374151}
-    input[type=file]{width:100%;padding:12px;border:2px dashed #9ca3af;border-radius:8px;background:#f9fafb;cursor:pointer}
-    input[type=file]:hover{border-color:#2563eb;background:#eff6ff}
-    button{background:#2563eb;color:#fff;border:0;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
-    button:hover{background:#1e40af}
-    button:disabled{background:#9ca3af;cursor:not-allowed}
-    .back{display:inline-block;margin-bottom:12px;color:#2563eb;text-decoration:none;font-size:13px}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:#F8FAFC;color:var(--sinac-gray-900);padding:0 0 40px}
+    .sinac-band{
+      background:var(--grad-header);color:#fff;padding:14px 24px;margin-bottom:22px;
+      display:flex;align-items:center;gap:12px;
+      box-shadow:0 4px 16px rgba(11,61,145,.18);
+    }
+    .sinac-band .wm{font-family:'Manrope','Inter',sans-serif;font-weight:800;font-size:18px;letter-spacing:.14em}
+    .sinac-band .wm-dot{display:inline-block;width:7px;height:7px;border-radius:2px;background:#66BB6A;margin-left:4px;vertical-align:baseline}
+    .sinac-band .sep{width:1px;height:24px;background:rgba(255,255,255,.25)}
+    .sinac-band .sub{font-size:12px;color:rgba(255,255,255,.85);font-weight:500}
+    .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+    h1{font-family:'Manrope','Inter',sans-serif;color:var(--sinac-blue-900);font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+    h2,h3{font-family:'Manrope','Inter',sans-serif;letter-spacing:-.01em}
+    p.lead{color:var(--sinac-gray-500);margin-bottom:22px;font-size:13px}
+    .card{background:#fff;border-radius:12px;border:1px solid var(--sinac-gray-100);box-shadow:0 1px 2px rgba(11,61,145,.04),0 1px 3px rgba(11,61,145,.05);padding:24px;margin-bottom:18px;border-top:3px solid var(--sinac-blue-700)}
+    label{display:block;font-weight:600;margin-bottom:8px;color:var(--sinac-gray-700)}
+    input[type=file]{width:100%;padding:12px;border:2px dashed var(--sinac-gray-200);border-radius:8px;background:var(--sinac-gray-50);cursor:pointer;font-family:inherit}
+    input[type=file]:hover{border-color:var(--sinac-blue-700);background:var(--sinac-blue-50)}
+    input[type=file]:focus-visible{outline:3px solid rgba(21,101,192,.35);outline-offset:2px}
+    button{background:var(--sinac-blue-700);color:#fff;border:0;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,transform .12s,box-shadow .15s}
+    button:hover{background:var(--sinac-blue-800);transform:translateY(-1px);box-shadow:0 4px 12px rgba(11,61,145,.18)}
+    button:focus-visible{outline:3px solid rgba(21,101,192,.35);outline-offset:2px}
+    button:disabled{background:var(--sinac-gray-500);cursor:not-allowed;transform:none;box-shadow:none}
+    .back{display:inline-block;margin-bottom:12px;color:var(--sinac-blue-700);text-decoration:none;font-size:13px;font-weight:600}
     .back:hover{text-decoration:underline}
     .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:15px 0}
-    .stat{background:#eff6ff;border-radius:8px;padding:14px;text-align:center}
-    .stat .n{font-size:22px;font-weight:bold;color:#1e40af}
-    .stat .l{font-size:11px;color:#6b7280;margin-top:4px}
+    .stat{background:var(--sinac-blue-50);border:1px solid var(--sinac-blue-100);border-radius:8px;padding:14px;text-align:center}
+    .stat .n{font-family:'Manrope','Inter',sans-serif;font-size:22px;font-weight:800;color:var(--sinac-blue-800)}
+    .stat .l{font-size:11px;color:var(--sinac-gray-500);margin-top:4px;letter-spacing:.04em}
     .semaforo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:15px 0}
     .sem{border-radius:8px;padding:14px;text-align:center;color:#fff}
-    .sem .n{font-size:22px;font-weight:bold}
+    .sem .n{font-family:'Manrope','Inter',sans-serif;font-size:22px;font-weight:800}
     .sem .l{font-size:11px;margin-top:4px}
-    .sem.verde{background:#16a34a}
+    .sem.verde{background:var(--sinac-green-600)}
     .sem.amarillo{background:#eab308}
     .sem.rojo{background:#dc2626}
     .sem.negro{background:#111827}
-    .gestor{background:#f9fafb;border-left:3px solid #3b82f6;border-radius:6px;padding:10px 14px;margin:10px 0}
-    .gestor-head{font-weight:bold;color:#1e40af;margin-bottom:4px}
-    .gestor ul{margin-left:18px;font-size:12px;color:#374151}
+    .gestor{background:var(--sinac-gray-50);border-left:3px solid var(--sinac-blue-700);border-radius:6px;padding:10px 14px;margin:10px 0}
+    .gestor-head{font-weight:bold;color:var(--sinac-blue-800);margin-bottom:4px}
+    .gestor ul{margin-left:18px;font-size:12px;color:var(--sinac-gray-700)}
     .badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;color:#fff;margin-left:4px}
-    .err{background:#fee2e2;color:#991b1b;padding:10px;border-radius:6px;margin:6px 0;font-size:12px}
-    .ok{background:#d1fae5;color:#065f46;padding:12px;border-radius:8px}
+    .err{background:#fee2e2;color:#991b1b;padding:10px;border-radius:6px;margin:6px 0;font-size:12px;border-left:3px solid #dc2626}
+    .ok{background:var(--sinac-green-100);color:#1B5E20;padding:12px;border-radius:8px;border-left:3px solid var(--sinac-green-600)}
     .hidden{display:none}
     .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:sp 1s linear infinite;margin-right:8px;vertical-align:middle}
     @keyframes sp{to{transform:rotate(360deg)}}
   </style>
 </head>
 <body>
+<div class="sinac-band">
+  <span class="wm">SINAC<span class="wm-dot"></span></span>
+  <span class="sep"></span>
+  <span class="sub">HUS · Motor de Glosas IA — Importar recepción · Powered by SINAC SC SAS</span>
+</div>
 <div class="wrap">
   <a class="back" href="/">← Volver al panel</a>
   <h1>📥 Importar Excel de Recepción</h1>
