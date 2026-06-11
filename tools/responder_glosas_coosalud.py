@@ -87,6 +87,7 @@ PORTAL_BASE = "https://vco.ctamedicas.com"
 PORTAL_LOGIN = f"{PORTAL_BASE}/app/login"
 PORTAL_HOME = f"{PORTAL_BASE}/app/inicio"
 PORTAL_BOLSA = f"{PORTAL_BASE}/app/respuestaGlosaSearch"
+PORTAL_PAUSA = f"{PORTAL_BASE}/app/respuestaGlosaPause"
 
 MAX_PDF_MB = 10
 
@@ -365,16 +366,26 @@ def ir_a_bolsa(page: Page) -> None:
     _BOLSA_VISITADA = True
 
 
-def abrir_factura(page: Page, factura: str) -> None:
-    """Bolsa de Respuestas → buscar la factura → click botón azul ▶."""
-    ir_a_bolsa(page)
-    # La caja "Buscar:" del datatable aparece recién cuando la grilla terminó
-    # de cargar las facturas — y esa carga es LENTA (cartel FILTROS sale antes).
-    # Esperamos con paciencia (hasta 3 min), probando los selectores en orden.
-    buscar = None
-    deadline = time.time() + 180
+def ir_a_en_pausa(page: Page) -> None:
+    """Navega a Respuesta Glosas → En Pausa (las respuestas abiertas a medias).
+
+    Cuando una respuesta se abre y no se Termina, la factura sale de la Bolsa
+    y aparece acá. Para cuando llegamos a esta grilla la app ya está caliente
+    (siempre pasamos antes por la Bolsa), así que el goto directo alcanza."""
+    try:
+        page.goto(PORTAL_PAUSA, wait_until="domcontentloaded", timeout=60000)
+    except PlaywrightTimeout:
+        page.goto(PORTAL_PAUSA, wait_until="commit", timeout=60000)
+    page.wait_for_selector("text=EN PAUSA", timeout=60000)
+    page.wait_for_timeout(800)
+
+
+def _esperar_caja_buscar(page: Page, nombre_grilla: str, timeout_s: int = 180):
+    """Espera (con paciencia) la caja 'Buscar:' del datatable — aparece recién
+    cuando la grilla terminó su carga lenta. Devuelve el locator."""
+    deadline = time.time() + timeout_s
     aviso = False
-    while buscar is None and time.time() < deadline:
+    while time.time() < deadline:
         for sel in (
             "input[type='search']",
             "xpath=//label[contains(., 'Buscar')]//input",
@@ -383,26 +394,27 @@ def abrir_factura(page: Page, factura: str) -> None:
             loc = page.locator(sel)
             try:
                 if loc.count() > 0 and loc.first.is_visible():
-                    buscar = loc.first
-                    break
+                    return loc.first
             except Exception:
                 continue
-        if buscar is None:
-            if not aviso:
-                logger.info("  esperando que cargue la grilla de la Bolsa (es lenta)…")
-                aviso = True
-            page.wait_for_timeout(1500)
-    if buscar is None:
-        _screenshot_debug(page, "sin_caja_buscar")
-        raise RuntimeError("La grilla de la Bolsa no cargó en 3 min (sin caja 'Buscar:').")
+        if not aviso:
+            logger.info(f"  esperando que cargue la grilla de {nombre_grilla} (es lenta)…")
+            aviso = True
+        page.wait_for_timeout(1500)
+    _screenshot_debug(page, f"sin_caja_buscar_{nombre_grilla}")
+    raise RuntimeError(f"La grilla de {nombre_grilla} no cargó en {timeout_s}s (sin caja 'Buscar:').")
+
+
+def _buscar_y_entrar(page: Page, factura: str, nombre_grilla: str, timeout_s: int = 60) -> bool:
+    """Busca la factura en la grilla actual y entra con el botón ▶.
+    True = entró al detalle. False = la grilla dio señal de vacío o venció el
+    plazo sin fila (la factura no está en ESTA grilla)."""
+    buscar = _esperar_caja_buscar(page, nombre_grilla)
     buscar.fill(factura)
     page.wait_for_timeout(1200)  # debounce del datatable
 
-    # Anti-falso-negativo: sólo declarar NO_EN_BOLSA si el datatable da una
-    # señal EXPLÍCITA de vacío (cartel de sin resultados o 'de 0 Entradas').
-    # Una grilla que aún está cargando no muestra ni la fila ni esa señal.
-    # Localización por celda EXACTA de NUMERO FACTURA — el tr:has-text falla
-    # con plantillas ocultas o filas que contienen muchos otros números.
+    # Localización por celda EXACTA de NUMERO FACTURA (tr:has-text se confunde
+    # con plantillas ocultas y con los otros números de la fila).
     def _fila_visible():
         for sel in (
             f"tbody tr:has(td:text-is('{factura}'))",
@@ -431,12 +443,10 @@ def abrir_factura(page: Page, factura: str) -> None:
         except Exception:
             pass
         if vacio:
-            raise FacturaNoEnBolsa(f"{factura} no aparece en la Bolsa de Respuestas (¿ya cerrada?).")
-        if time.time() - inicio > 60:
-            _screenshot_debug(page, f"bolsa_sin_fila_{factura}")
-            raise FacturaNoEnBolsa(
-                f"{factura}: sin fila ni señal de vacío tras 60s (verificar manualmente)."
-            )
+            return False
+        if time.time() - inicio > timeout_s:
+            _screenshot_debug(page, f"{nombre_grilla}_sin_fila_{factura}")
+            return False
         if not aviso and time.time() - inicio > 5:
             logger.info("  esperando resultados de la búsqueda…")
             aviso = True
@@ -445,15 +455,29 @@ def abrir_factura(page: Page, factura: str) -> None:
     # Click en el botón azul ▶ de OPCIONES (último botón/anchor de la fila).
     accion = _primer_visible(fila.locator("button")) or _primer_visible(fila.locator("a"))
     if accion is None:
-        # Fallback: cualquier elemento con onclick en la última celda.
         accion = _primer_visible(fila.locator("td").last.locator("button, a, [onclick]"))
     if accion is None:
         _screenshot_debug(page, f"sin_boton_play_{factura}")
-        raise RuntimeError(f"{factura}: no hallé el botón ▶ en la fila.")
+        raise RuntimeError(f"{factura}: no hallé el botón ▶ en la fila de {nombre_grilla}.")
     accion.click()
     # Página de detalle: aparece la sección GLOSAS.
     page.wait_for_selector("text=GLOSAS", timeout=60000)
     page.wait_for_timeout(800)
+    return True
+
+
+def abrir_factura(page: Page, factura: str) -> None:
+    """Abre la factura buscándola primero en la Bolsa y, si no está, en
+    En Pausa (las respuestas que quedaron abiertas a medias van ahí)."""
+    ir_a_bolsa(page)
+    if _buscar_y_entrar(page, factura, "Bolsa"):
+        return
+    logger.info("  no está en la Bolsa; pruebo en 'En Pausa'…")
+    ir_a_en_pausa(page)
+    if _buscar_y_entrar(page, factura, "En Pausa"):
+        logger.info("  ▶ reanudada desde 'En Pausa'")
+        return
+    raise FacturaNoEnBolsa(f"{factura} no está ni en la Bolsa ni En Pausa (¿ya cerrada?).")
 
 
 def preparar_grilla(page: Page) -> None:
