@@ -877,23 +877,36 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
         logger.info(f"    adjunto: {pdf.name}")
 
     # ── Responder Glosa ──
-    btn = _primer_visible(scope.locator("#btnAnswerGlosa")) or \
+    btn = _primer_visible(scope.locator("#btnAnswerMasivoGlosa")) or \
+          _primer_visible(scope.locator("#btnAnswerGlosa")) or \
           _primer_visible(scope.locator("button:has-text('Responder Glosa')")) or \
           _primer_visible(page.locator("button:has-text('Responder Glosa')"))
     if btn is None:
         _screenshot_debug(page, "sin_boton_responder_glosa")
         raise RuntimeError("No veo el botón 'Responder Glosa' del modal.")
-    # Si el botón quedó disabled (validación del portal), no tiene sentido
-    # clickear: el modal no va a cerrarse y el "Se ha dado Respuesta" que
-    # leeríamos sería un texto residual de la respuesta anterior.
+    # El portal deja el botón disabled mientras está procesando la respuesta
+    # del grupo anterior (o validando que tengamos cod + obs + PDF). Esperamos
+    # hasta 45s a que se HABILITE, en vez de clickear ciego y agotar el
+    # timeout del click reintentando la factura entera 4 veces.
     try:
-        if btn.evaluate("el => !!el.disabled || el.getAttribute('disabled')!==null"):
+        btn.wait_for(state="visible", timeout=5000)
+        habilitado = False
+        for _ in range(45):
+            try:
+                if not btn.evaluate("el => !!el.disabled || el.getAttribute('disabled')!==null"):
+                    habilitado = True
+                    break
+            except Exception:
+                habilitado = True
+                break
+            page.wait_for_timeout(1000)
+        if not habilitado:
             _screenshot_debug(page, "responder_glosa_disabled")
             raise RuntimeError(
-                "El botón 'Responder Glosa' está deshabilitado (validación "
-                "del portal: ¿faltó código, justificación o PDF?)."
+                "El botón 'Responder Glosa' siguió deshabilitado 45s "
+                "(¿faltó código, justificación o PDF? ¿portal lento?)."
             )
-    except Exception:
+    except PlaywrightTimeout:
         pass
     btn.click()
 
@@ -1016,6 +1029,14 @@ def procesar_factura(
             grupos_hechos += 1
             pendientes_portal -= set(ids_pend)
             _desmarcar_todo(page)
+            # Entre grupos: dale tiempo al portal a refrescar la grilla y
+            # habilitar 'Responder Masivamente' (si no, el siguiente grupo
+            # arranca con el portal aún procesando el anterior).
+            page.wait_for_timeout(1500)
+            try:
+                page.wait_for_selector("text=Cargando", state="hidden", timeout=15000)
+            except PlaywrightTimeout:
+                pass
 
         if max_grupos > 0:
             reg["estado"] = "PILOTO_PARCIAL"
