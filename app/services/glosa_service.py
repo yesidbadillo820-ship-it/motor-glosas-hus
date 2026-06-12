@@ -2,6 +2,7 @@ import os
 import re
 import hashlib
 import asyncio
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -1103,9 +1104,11 @@ class GlosaService:
         anthropic_api_key: str = None,
         primary_ai: str = "anthropic",
         anthropic_model: str = "claude-sonnet-4-6",
-        groq_model: str = "llama-3.3-70b-versatile",
+        groq_model: str = "openai/gpt-oss-120b",
         gemini_api_key: str = None,
         gemini_model: str = "gemini-2.0-flash",
+        groq_model_fallback_1: str = "qwen/qwen3-32b",
+        groq_model_fallback_2: str = "llama-3.3-70b-versatile",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
@@ -1125,7 +1128,14 @@ class GlosaService:
             )
             self.primary_ai = "groq"
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
-        self.groq_model = groq_model or "llama-3.3-70b-versatile"
+        # Cadena de modelos DENTRO de Groq (decision 12-jun-2026, ver
+        # app/core/config.py): gpt-oss-120b → qwen3-32b → llama-3.3-70b.
+        # Si el primario falla (429/transitorio/deprecado) se prueba el
+        # siguiente modelo Groq ANTES de saltar a Anthropic — ver
+        # _modelos_groq() y _llamar_groq_con_retry().
+        self.groq_model = groq_model or "openai/gpt-oss-120b"
+        self.groq_model_fallback_1 = groq_model_fallback_1 or "qwen/qwen3-32b"
+        self.groq_model_fallback_2 = groq_model_fallback_2 or "llama-3.3-70b-versatile"
         # Google Gemini se conserva ÚNICAMENTE para lectura de PDFs
         # escaneados: OCR (pdf_service.extraer_con_ocr) y la cadena
         # multimodal del pdf_fallback_patch (A=Anthropic → B=Gemini PDF →
@@ -3827,14 +3837,47 @@ class GlosaService:
         out = out.upper()
         return _expandir_abreviaturas_tipo(out)
 
+    def _modelos_groq(self) -> list[str]:
+        """Cadena de modelos Groq a intentar EN ORDEN antes de saltar a
+        Anthropic (decision 12-jun-2026, ver app/core/config.py):
+
+          1. groq_model            (default: openai/gpt-oss-120b)
+          2. groq_model_fallback_1 (default: qwen/qwen3-32b)
+          3. groq_model_fallback_2 (default: llama-3.3-70b-versatile)
+
+        Dedupe preservando orden: si un override por env (p.ej.
+        GROQ_MODEL=llama-3.3-70b-versatile) coincide con un fallback, ese
+        modelo no se intenta dos veces.
+        """
+        vistos: set[str] = set()
+        return [
+            m
+            for m in (self.groq_model, self.groq_model_fallback_1, self.groq_model_fallback_2)
+            if m and not (m in vistos or vistos.add(m))
+        ]
+
     async def _llamar_groq_con_retry(
         self, system: str, user: str, max_intentos: int = 4
     ) -> tuple[str, str]:
-        """Llama a Groq con retry exponencial para manejar rate limits y timeouts."""
+        """Llama a Groq con retry exponencial + cadena de modelos.
+
+        12-jun-2026: antes de caer a Anthropic se agota la cadena de modelos
+        Groq (_modelos_groq). Reglas por modelo:
+          - Rate limit (429) y quedan modelos: saltar DE INMEDIATO al
+            siguiente modelo (los buckets de rate limit de Groq son por
+            modelo — no tiene sentido quemar backoff aqui).
+          - Otro error transitorio (timeout/5xx/conexion): retry exponencial
+            sobre el mismo modelo hasta `max_intentos` (presupuesto POR
+            modelo), luego pasar al siguiente.
+          - Error no reintentable (modelo deprecado, 400, content vacio):
+            pasar al siguiente modelo sin backoff.
+        Solo cuando TODOS los modelos Groq fallaron se propaga la excepcion
+        (y _llamar_ia recien ahi intenta Anthropic).
+        """
         ultimo_error: Exception = Exception("Groq: sin intentos")
 
         _ANTI_COPIA_PREFIX = (
-            "ATENCION CRITICA — INSTRUCCIONES OBLIGATORIAS PARA LLAMA 3.3:\n\n"
+            "ATENCION CRITICA — INSTRUCCIONES OBLIGATORIAS PARA EL MODELO:\n\n"
             "1. PROHIBIDO copia-pega del prompt. NO uses frases de los ESQUELETOS, "
             "placeholders, listas, ejemplos. Cada frase DEBE redactarse desde cero "
             "usando exclusivamente los DATOS DEL CASO concretos.\n\n"
@@ -3866,46 +3909,75 @@ class GlosaService:
         )
         system_reforzado = _ANTI_COPIA_PREFIX + system
 
-        for intento in range(max_intentos):
-            try:
-                resp = await self.groq.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_reforzado},
-                        {"role": "user", "content": user},
-                    ],
-                    # Modelo configurable via env GROQ_MODEL (default: llama-3.3-70b-versatile).
-                    # Llama 3.3 es mas estable que gpt-oss-120b (que entraba en loops
-                    # degenerativos repitiendo frases). gpt-oss es mas rapido/barato pero
-                    # menos predecible.
-                    model=self.groq_model,
-                    temperature=0.2,
-                    # 3000 tokens son suficientes para argumentos de 500-700 palabras.
-                    max_tokens=3000,
-                    # Penalización de frecuencia/presencia evita que el modelo
-                    # repita palabras/frases (anti-runaway degenerativo).
-                    frequency_penalty=0.3,
-                    presence_penalty=0.2,
-                    timeout=120.0,
+        modelos = self._modelos_groq()
+        for idx, modelo in enumerate(modelos):
+            es_ultimo_modelo = idx == len(modelos) - 1
+            for intento in range(max_intentos):
+                t0 = time.monotonic()
+                try:
+                    resp = await self.groq.chat.completions.create(
+                        messages=[
+                            {"role": "system", "content": system_reforzado},
+                            {"role": "user", "content": user},
+                        ],
+                        # Modelo de la cadena Groq (12-jun-2026, ver
+                        # app/core/config.py): gpt-oss-120b primario →
+                        # qwen3-32b → llama-3.3-70b. El SDK de Groq acepta el
+                        # id como string (endpoint compatible OpenAI), incl.
+                        # prefijos "openai/" y "qwen/". Overrideable por env
+                        # GROQ_MODEL / GROQ_MODEL_FALLBACK_1 / _2.
+                        model=modelo,
+                        temperature=0.2,
+                        # 3000 tokens son suficientes para argumentos de 500-700 palabras.
+                        max_tokens=3000,
+                        # Penalización de frecuencia/presencia evita que el modelo
+                        # repita palabras/frases (anti-runaway degenerativo).
+                        frequency_penalty=0.3,
+                        presence_penalty=0.2,
+                        timeout=120.0,
+                    )
+                    content = resp.choices[0].message.content
+                    if not content:
+                        raise RuntimeError(
+                            f"Groq/{modelo} devolvió content vacío/None "
+                            f"(finish_reason={resp.choices[0].finish_reason!r})"
+                        )
+                    # Equivalente Groq del [ANTHROPIC-CALL]: deja claro QUE
+                    # modelo respondió realmente cuando hubo fallback en la
+                    # cadena (parseable desde Sentry/Loki).
+                    latencia_ms = int((time.monotonic() - t0) * 1000)
+                    logger.info(
+                        f"[GROQ-CALL] model={modelo} latency_ms={latencia_ms} "
+                        f"intento={intento + 1}/{max_intentos} "
+                        f"pos_cadena={idx + 1}/{len(modelos)}"
+                    )
+                    return content, f"groq/{modelo}"
+                except Exception as e:
+                    ultimo_error = e
+                    error_msg = str(e).lower()
+                    es_rate_limit = any(k in error_msg for k in ("429", "rate_limit", "rate limit"))
+                    es_reintentable = any(k in error_msg for k in _ERRORES_REINTENTABLES)
+                    if es_rate_limit and not es_ultimo_modelo:
+                        # Rate limit con modelos pendientes en la cadena: el
+                        # siguiente modelo Groq tiene bucket de rate limit
+                        # propio — saltar ya, sin quemar backoff.
+                        break
+                    if es_reintentable and intento < max_intentos - 1:
+                        espera = min(2**intento, 16)
+                        logger.warning(
+                            f"[GROQ-CALL] model={modelo} error reintentable: {e}, "
+                            f"reintento {intento + 2}/{max_intentos} en {espera}s"
+                        )
+                        await asyncio.sleep(espera)
+                        continue
+                    # No reintentable o presupuesto agotado → siguiente
+                    # modelo de la cadena (o raise final si era el último).
+                    break
+            if not es_ultimo_modelo:
+                logger.warning(
+                    f"[GROQ-FALLBACK] model={modelo} agotado ({ultimo_error}); "
+                    f"probando siguiente modelo Groq: {modelos[idx + 1]}"
                 )
-                content = resp.choices[0].message.content
-                if not content:
-                    raise RuntimeError(
-                        f"Groq/{self.groq_model} devolvió content vacío/None "
-                        f"(finish_reason={resp.choices[0].finish_reason!r})"
-                    )
-                return content, f"groq/{self.groq_model}"
-            except Exception as e:
-                ultimo_error = e
-                error_msg = str(e).lower()
-                es_reintentable = any(k in error_msg for k in _ERRORES_REINTENTABLES)
-                if es_reintentable and intento < max_intentos - 1:
-                    espera = min(2**intento, 16)
-                    logger.warning(
-                        f"Groq error reintentarable: {e}, reintento {intento + 2}/{max_intentos} en {espera}s"
-                    )
-                    await asyncio.sleep(espera)
-                    continue
-                raise
         raise ultimo_error
 
     async def _llamar_anthropic(

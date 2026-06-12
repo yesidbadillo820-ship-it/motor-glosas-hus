@@ -419,6 +419,8 @@ async def _ejecutar_ia_y_persistir(db, glosa, texto: str | None = None) -> dict:
         primary_ai=_cfg.primary_ai,
         anthropic_model=_cfg.anthropic_model,
         groq_model=_cfg.groq_model,
+        groq_model_fallback_1=_cfg.groq_model_fallback_1,
+        groq_model_fallback_2=_cfg.groq_model_fallback_2,
         gemini_api_key=_cfg.gemini_api_key,
         gemini_model=_cfg.gemini_model,
     )
