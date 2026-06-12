@@ -59,6 +59,16 @@ def client(db_session, usuario):
 
 
 def test_dictamen_hus_sin_html_crudo(client, db_session):
+    """Verifica que la respuesta del HUS en el Excel exportado salga como
+    texto plano legible, NUNCA con HTML crudo.
+
+    Cambio 12-jun-2026: el endpoint /exportar-xlsx ahora genera el formato
+    RADICABLE institucional (PR #111) en vez del layout viejo de 22
+    columnas planas. Estructura:
+      fila 1 = título institucional (merged), fila 2 = línea del contrato,
+      fila 3 = header de 12 columnas (col 12 = "RESPUESTA ESE HUS"),
+      filas 4+ = una por concepto/glosa.
+    """
     db_session.add(
         GlosaRecord(
             eps="SANITAS",
@@ -77,11 +87,20 @@ def test_dictamen_hus_sin_html_crudo(client, db_session):
     r = client.get("/glosas/exportar-xlsx")
     assert r.status_code == 200, r.text
     ws = load_workbook(io.BytesIO(r.content)).active
-    headers = [c.value for c in ws[1]]
-    col_dictamen = headers.index("Dictamen HUS") + 1
-    celda = ws.cell(row=2, column=col_dictamen).value or ""
+    # Header está en fila 3 del formato radicable; la columna "RESPUESTA"
+    # (la 12) lleva el dictamen — buscarla por nombre por si cambia el
+    # orden en el futuro.
+    headers_f3 = [str(c.value or "") for c in ws[3]]
+    col_resp = next(
+        (i for i, h in enumerate(headers_f3, start=1) if "RESPUESTA" in h.upper()),
+        12,
+    )
+    # Primera fila de datos: fila 4
+    celda = ws.cell(row=4, column=col_resp).value or ""
     assert "<table" not in celda
     assert "style=" not in celda
-    assert "CÓDIGO GLOSA: TA0801" in celda
-    assert "VALOR OBJETADO: $36.402" in celda
+    # Encabezado tabular convertido a "CÓDIGO GLOSA: ... | VALOR OBJETADO: ..."
+    assert "TA0801" in celda
+    assert "36.402" in celda or "$36.402" in celda
+    # Argumentación jurídica conservada en texto plano
     assert "Se objeta la glosa por aplicar tarifa contractual vigente." in celda

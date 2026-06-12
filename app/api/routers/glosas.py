@@ -404,11 +404,21 @@ def exportar_xlsx(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Exporta el historial filtrado a XLSX con las 13 columnas IPS + observación."""
+    """Exporta el historial filtrado en formato RADICABLE institucional.
+
+    Cambio 12-jun-2026 (pedido del dueño): este export usaba un layout de
+    22 columnas planas con el dictamen truncado a 800 chars — visto en el
+    lote real: 713/809 dictámenes cortados a mitad de oración y formato
+    incompatible con la radicación ante la EPS. Ahora reusa el generador
+    del Excel radicable (PR #111): header verde institucional, 12 columnas
+    canónicas, una fila por concepto, fila TOTAL GLOSADO y hoja
+    FUNDAMENTO JURÍDICO — el mismo formato que produce la "otra IA".
+    """
     from io import BytesIO
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
+
     from fastapi.responses import StreamingResponse
+
+    from app.services.excel_radicable import generar_excel_radicable_con_nombre
 
     repo = GlosaRepository(db)
     glosas_raw = repo.listar_para_export(
@@ -424,10 +434,7 @@ def exportar_xlsx(
         workflow=workflow,
     )
 
-    # R-export 27-abr-2026: deduplicar por (factura, código, cups, etapa)
-    # quedándonos con la versión más reciente. Antes el Excel exportaba
-    # TODAS las versiones (13 filas para una sola glosa que se reanalizó
-    # 13 veces). Ahora 1 fila por glosa única — la última.
+    # Dedup por (factura, código, cups, etapa) — la versión más reciente.
     visto = {}
     for g in glosas_raw:
         clave = (
@@ -436,16 +443,49 @@ def exportar_xlsx(
             (g.cups_servicio or "").strip().upper(),
             (g.etapa or "").strip().upper(),
         )
-        # Solo conservamos si NO había una entrada para esta clave o
-        # si la nueva es más reciente (creado_en mayor).
         prev = visto.get(clave)
         if prev is None or (g.creado_en and prev.creado_en and g.creado_en > prev.creado_en):
             visto[clave] = g
-    glosas = sorted(
-        visto.values(),
-        key=lambda x: x.creado_en or 0,
-        reverse=True,
+    glosas = sorted(visto.values(), key=lambda x: x.creado_en or 0, reverse=True)
+    glosa_ids = [g.id for g in glosas]
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="EXPORTAR_XLSX",
+        tabla="historial",
+        detalle=f"Registros exportados: {len(glosas)} (formato radicable)",
     )
+
+    try:
+        contenido, filename = generar_excel_radicable_con_nombre(db, glosa_ids=glosa_ids)
+    except Exception as e:
+        # Si el generador radicable falla por cualquier razón (lote vacío,
+        # datos inconsistentes) devolvemos 422 con la causa — el cliente
+        # decide si reintenta con filtros distintos.
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=422,
+            detail=f"No se pudo generar el Excel radicable: {e}",
+        ) from e
+
+    return StreamingResponse(
+        BytesIO(contenido),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _exportar_xlsx_legacy_22_columnas(glosas, db, current_user):
+    """Generador legacy de 22 columnas planas — preservado por si algún
+    proceso externo dependía del layout viejo. NO se invoca desde el
+    endpoint público; queda como referencia/debug.
+    """
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from fastapi.responses import StreamingResponse  # noqa: F401
 
     wb = Workbook()
     ws = wb.active
@@ -498,6 +538,11 @@ def exportar_xlsx(
         # Dictamen: texto plano legible (la tabla de cabecera se vuelve
         # "CÓDIGO GLOSA: ... | VALOR OBJETADO: ..." en vez de perderse o
         # salir como HTML crudo).
+        # Dictamen: texto plano legible (la tabla de cabecera se vuelve
+        # "CÓDIGO GLOSA: ... | VALOR OBJETADO: ..." en vez de perderse o
+        # salir como HTML crudo). Cap a 30.000 chars (Excel soporta 32.767
+        # por celda; el cap viejo de 800 cortaba 713/809 dictámenes a
+        # mitad de oración — visto en producción 12-jun-2026).
         dictamen_txt = dictamen_a_texto_plano(g.dictamen) or ""
         recuperado = (g.valor_objetado or 0) - (g.valor_aceptado or 0)
         ws.append(
@@ -516,7 +561,7 @@ def exportar_xlsx(
                 float(recuperado),
                 g.codigo_respuesta or "",
                 obs_eps_raw[:600] if obs_eps_raw else "",
-                dictamen_txt[:800] if dictamen_txt else "",
+                dictamen_txt[:30000] if dictamen_txt else "",
                 g.etapa or "",
                 g.estado or "",
                 g.workflow_state or "",
