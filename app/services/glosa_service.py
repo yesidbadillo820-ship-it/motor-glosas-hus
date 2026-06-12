@@ -145,6 +145,18 @@ _ERRORES_REINTENTABLES = frozenset(
     ]
 )
 
+# Presupuesto de tokens de salida por familia de modelo Groq (fix #9,
+# 12-jun-2026). 3000 bastan para un argumento de 500-700 palabras en
+# modelos NO razonadores (llama-3.3 / qwen3 con reasoning default). Los
+# openai/gpt-oss-* son RAZONADORES: su chain-of-thought se descuenta del
+# MISMO max_tokens, y con 3000 el razonamiento podía consumirlo todo →
+# content vacío + finish_reason='length' → fallback a qwen innecesario
+# (evidencia: [GROQ-FALLBACK] en prod 12-jun 19:37 UTC, llamada de
+# auto-crítica). Mínimo 8000 para gpt-oss; el max() conserva el mayor si
+# algún día se sube el presupuesto base por encima de ese piso.
+_GROQ_MAX_TOKENS = 3000
+_GROQ_MAX_TOKENS_GPT_OSS = max(_GROQ_MAX_TOKENS, 8000)
+
 FERIADOS_CO = [
     # 2025
     "2025-01-01",
@@ -424,6 +436,258 @@ def _dedup_oraciones_largas(texto: str, min_palabras: int = 15) -> str:
         vistas_citas.update(citas_largas)
         resultado.append(oracion)
     return " ".join(resultado)
+
+
+# ── Sanitizer "descomillar citas ALTA" (12-jun-2026, ronda 2 — fix #2) ──
+# Evidencia: caso osteosíntesis ENTREGADO con «El pagador reconocerá la
+# factura dentro de los veintidós (22) días hábiles...» marcada
+# CITA_LITERAL_FALSA ALTA por el verifier. Causa raíz doble: (a) con
+# QUALITY_GATE_ENABLED OFF (default) el camino legacy nunca regenera por
+# citas — y quitar_citas_invalidas_dinamico solo elimina citas con número
+# de norma+año, NO citas literales falsas (sin componentes); (b) con QG ON,
+# tras 3 intentos ESCALAR_HUMANO entrega el "mejor" intento CON la cita.
+# Red final determinística: la cita falsa pierde las comillas (paráfrasis
+# neutra "EN LOS TÉRMINOS DE ...") para que NUNCA se radique una cita
+# textual inventada — el contenido argumental se conserva sin atribuirse
+# como copia literal.
+_PAT_DESCOMILLAR_CHEVRON = re.compile(r"«([^«»]{15,800})»")
+# Mismo patrón de atribución del citation_verifier (verbo + comillas).
+_PAT_DESCOMILLAR_ATRIBUIDA = re.compile(
+    r"((?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPTÚA|PRECEPTUA)"
+    r"\s*(?:QUE\s*)?(?:TEXTUALMENTE\s*)?:?\s*)"
+    r"[\"“‘']([^\"“”‘’']{15,800})[\"”’']",
+    re.IGNORECASE,
+)
+
+
+def _descomillar_citas_falsas(texto: str, issues) -> str:
+    """Quita las comillas de las citas marcadas CITA_LITERAL_FALSA.
+
+    Recibe el dictamen y los issues del citation_verifier; para cada
+    CITA_LITERAL_FALSA reemplaza «X» / "X" por la versión SIN comillas
+    precedida de "EN LOS TÉRMINOS DE" (paráfrasis neutra). Solo toca los
+    spans que matchean un issue — las citas verificadas quedan intactas.
+    """
+    if not texto or not issues:
+        return texto
+    falsas = [i for i in issues if (i or {}).get("tipo") == "CITA_LITERAL_FALSA"]
+    if not falsas:
+        return texto
+
+    try:
+        from app.services.citation_verifier import _normalizar as _norm_cita
+    except Exception:
+        return texto
+
+    # El issue trae la cita truncada a 140 chars y envuelta en «»; usamos el
+    # prefijo normalizado como huella para localizar el span original.
+    huellas: list[str] = []
+    for i in falsas:
+        c = str(i.get("cita") or "").strip().strip("«»").strip()
+        if c.endswith("..."):
+            c = c[:-3]
+        cn = _norm_cita(c)
+        if len(cn) >= 15:
+            huellas.append(cn)
+    if not huellas:
+        return texto
+
+    def _es_falsa(contenido: str) -> bool:
+        # El dictamen ya está en HTML: un «...» puede traer <br/> adentro,
+        # pero el issue del verifier se construyó sobre texto SIN tags
+        # (_quitar_html) — se igualan las condiciones antes de comparar.
+        cn = _norm_cita(re.sub(r"<[^>]+>", " ", contenido))
+        if len(cn) < 15:
+            return False
+        for h in huellas:
+            corte = min(len(h), len(cn), 60)
+            if corte >= 15 and cn[:corte] == h[:corte]:
+                return True
+        return False
+
+    def _conector(contenido: str) -> str:
+        letras = [c for c in contenido if c.isalpha()]
+        es_mayus = letras and (sum(1 for c in letras if c.isupper()) / len(letras)) >= 0.5
+        return "EN LOS TÉRMINOS DE " if es_mayus else "en los términos de "
+
+    n_reemplazos = 0
+
+    def _sub_chevron(m: "re.Match[str]") -> str:
+        nonlocal n_reemplazos
+        contenido = m.group(1)
+        if _es_falsa(contenido):
+            n_reemplazos += 1
+            return _conector(contenido) + contenido
+        return m.group(0)
+
+    def _sub_atribuida(m: "re.Match[str]") -> str:
+        nonlocal n_reemplazos
+        contenido = m.group(2)
+        if _es_falsa(contenido):
+            n_reemplazos += 1
+            return m.group(1) + _conector(contenido) + contenido
+        return m.group(0)
+
+    resultado = _PAT_DESCOMILLAR_CHEVRON.sub(_sub_chevron, texto)
+    resultado = _PAT_DESCOMILLAR_ATRIBUIDA.sub(_sub_atribuida, resultado)
+    if n_reemplazos:
+        logger.warning(
+            f"[DESCOMILLAR-CITAS] {n_reemplazos} cita(s) literal(es) FALSA(s) "
+            "neutralizadas como paráfrasis sin comillas (red final ronda 2)."
+        )
+    return resultado
+
+
+# ── Placeholders crudos en el output (12-jun-2026, ronda 2 — fix #6) ──
+# Evidencia: dictamen entregado con "INTERPUESTA POR [ENTIDAD], RESPECTO DE
+# LA PRESCRIPCIÓN Y EJECUCIÓN DEL [SERVICIO] FACTURADO POR [VALOR REAL]...
+# LA GLOSA [CODIGO]". El sanitizer 16a solo cubría "$[...]" con prefijo $.
+# MAYÚSCULAS sostenidas dentro de corchetes — no confunde con "[sic]".
+_PAT_PLACEHOLDER_CRUDO = re.compile(r"\[([A-ZÁÉÍÓÚÑ_ ]{3,})\]")
+
+_PLACEHOLDER_NEUTRO_VALOR = "EL VALOR INDICADO EN EL EXPEDIENTE"
+
+
+def _rellenar_placeholders(texto: str, eps: str = "", codigo: str = "", valor: str = "") -> str:
+    """Reemplaza placeholders crudos por los datos reales del caso.
+
+    [ENTIDAD]/[EPS] → eps real · [CODIGO]/[CÓDIGO] → código real ·
+    [VALOR REAL]/[VALOR] → valor formateado (>0) o frase neutra ·
+    [SERVICIO] → "EL SERVICIO FACTURADO". Si tras reemplazar queda CUALQUIER
+    [PLACEHOLDER] en mayúsculas, se registra warning (y el post_validator lo
+    marca GRAVE en los flujos con Quality Gate).
+    """
+    if not texto or "[" not in texto:
+        return texto
+
+    eps_up = (eps or "").upper().strip()
+    eps_txt = eps_up if eps_up and eps_up not in ("OTRA / SIN DEFINIR", "OTRA") else ""
+    codigo_txt = (codigo or "").strip()
+    if codigo_txt.upper() in ("", "N/A"):
+        codigo_txt = ""
+    valor_txt = ""
+    try:
+        from app.utils.moneda import parse_valor_cop as _pvc_ph
+
+        if valor and _pvc_ph(valor) > 0:
+            valor_txt = str(valor).strip()
+    except Exception:
+        valor_txt = ""
+
+    reemplazos = {
+        "ENTIDAD": eps_txt or "LA ENTIDAD PAGADORA",
+        "EPS": eps_txt or "LA ENTIDAD PAGADORA",
+        "ENTIDAD PAGADORA": eps_txt or "LA ENTIDAD PAGADORA",
+        "CODIGO": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
+        "CÓDIGO": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
+        "CODIGO GLOSA": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
+        "CÓDIGO GLOSA": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
+        "VALOR REAL": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
+        "VALOR": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
+        "VALOR OBJETADO": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
+        "SERVICIO": "EL SERVICIO FACTURADO",
+    }
+
+    def _sub(m: "re.Match[str]") -> str:
+        clave = re.sub(r"\s+", " ", m.group(1)).strip()
+        return reemplazos.get(clave, m.group(0))
+
+    resultado = _PAT_PLACEHOLDER_CRUDO.sub(_sub, texto)
+
+    # Limpieza gramatical post-reemplazo: "DEL [SERVICIO] FACTURADO" →
+    # "DEL EL SERVICIO FACTURADO FACTURADO" sin estos ajustes.
+    resultado = re.sub(r"\bDEL\s+EL\s+", "DEL ", resultado, flags=re.IGNORECASE)
+    resultado = re.sub(r"\bDE\s+EL\s+SERVICIO\b", "DEL SERVICIO", resultado, flags=re.IGNORECASE)
+    resultado = re.sub(
+        r"\bSERVICIO\s+FACTURADO\s+FACTURADO\b",
+        "SERVICIO FACTURADO",
+        resultado,
+        flags=re.IGNORECASE,
+    )
+    resultado = re.sub(
+        r"\bLA\s+GLOSA\s+EL\s+C[ÓO]DIGO\s+DE\s+GLOSA\s+APLICADO\b",
+        "LA GLOSA APLICADA",
+        resultado,
+        flags=re.IGNORECASE,
+    )
+
+    residuales = _PAT_PLACEHOLDER_CRUDO.findall(resultado)
+    if residuales:
+        logger.warning(
+            f"[PLACEHOLDERS] {len(residuales)} placeholder(s) sin equivalencia tras "
+            f"sanitizar: {residuales[:3]} — el dictamen requiere revisión."
+        )
+    return resultado
+
+
+# ── Fechas de ratificación EN EL TEXTO (12-jun-2026, ronda 2 — fix #5) ──
+# Evidencia: "Fecha radicación: 2026-03-01. Fecha recepción ratificación:
+# 2026-05-30" (≈60 días hábiles) y el dictamen ni lo mencionó. El
+# texto_fijo_detector solo cubre extemporaneidad de glosa INICIAL con
+# campos de BD; aquí las fechas vienen EN EL TEXTO y es una RATIFICACIÓN.
+_PAT_FECHA_TEXTO = re.compile(r"(\d{4}-\d{1,2}-\d{1,2})|(\d{1,2}/\d{1,2}/\d{4})")
+_PAT_LABEL_RADICACION_TXT = re.compile(
+    r"(?:FECHA\s+(?:DE\s+)?)?RADICACI[ÓO]N(?:\s+(?:DE\s+)?(?:LA\s+)?FACTURA)?\s*[:\-–]?\s*",
+    re.IGNORECASE,
+)
+_PAT_LABEL_RATIFICACION_TXT = re.compile(
+    r"(?:FECHA\s+(?:DE\s+)?)?(?:RECEPCI[ÓO]N|NOTIFICACI[ÓO]N)\s+(?:DE\s+(?:LA\s+)?)?"
+    r"RATIFICACI[ÓO]N\s*[:\-–]?\s*"
+    r"|RATIFICACI[ÓO]N\s+(?:RECIBIDA|NOTIFICADA)(?:\s+EL)?\s*[:\-–]?\s*",
+    re.IGNORECASE,
+)
+
+
+def _fecha_a_iso(fecha_str: str) -> Optional[str]:
+    """ "2026-03-01" o "01/03/2026" → "2026-03-01" (None si no parsea)."""
+    s = (fecha_str or "").strip()
+    m_iso = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", s)
+    m_col = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", s)
+    try:
+        if m_iso:
+            d = datetime(int(m_iso.group(1)), int(m_iso.group(2)), int(m_iso.group(3)))
+        elif m_col:
+            d = datetime(int(m_col.group(3)), int(m_col.group(2)), int(m_col.group(1)))
+        else:
+            return None
+        return d.strftime("%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def _fecha_tras_label(texto: str, pat_label: re.Pattern) -> Optional[str]:
+    """Primera fecha (ISO o dd/mm/yyyy) dentro de los 30 chars tras el label."""
+    for m in pat_label.finditer(texto or ""):
+        ventana = texto[m.end() : m.end() + 30]
+        m_fecha = _PAT_FECHA_TEXTO.search(ventana)
+        if m_fecha and m_fecha.start() <= 5:
+            return _fecha_a_iso(m_fecha.group(0))
+    return None
+
+
+def detectar_fechas_en_texto(texto: str) -> dict:
+    """Detecta el par radicación → recepción/notificación de RATIFICACIÓN.
+
+    Solo fechas etiquetadas (radicación / recepción-notificación de la
+    ratificación) — los demás pares de fechas del texto se ignoran. NO toca
+    la lógica de texto_fijo de BD existente: esto alimenta ÚNICAMENTE el
+    bloque de prompt "[EXTEMPORANEIDAD DETECTADA]" del flujo analizar().
+
+    Returns:
+        {"fecha_radicacion": "YYYY-MM-DD"|None,
+         "fecha_ratificacion": "YYYY-MM-DD"|None}
+    """
+    if not texto:
+        return {"fecha_radicacion": None, "fecha_ratificacion": None}
+    return {
+        "fecha_radicacion": _fecha_tras_label(texto, _PAT_LABEL_RADICACION_TXT),
+        "fecha_ratificacion": _fecha_tras_label(texto, _PAT_LABEL_RATIFICACION_TXT),
+    }
+
+
+# Término de referencia para la respuesta de la EPS a la respuesta de la IPS
+# (ratificación): Art. 57 Ley 1438/2011. Conservador: 30 días hábiles.
+DIAS_HABILES_LIMITE_RATIFICACION = 30
 
 
 def _ajustar_score_por_evidencia(score: float, verif_citas, confianza) -> float:
@@ -1537,16 +1801,31 @@ class GlosaService:
             except Exception:
                 # Fallback al regex viejo (solo dígitos) — no bloquear si hay
                 # un problema de import circular durante startup.
-                _m_cups = re.search(
+                # Ronda 2 (12-jun-2026, fix #8): el fallback aceptaba fechas
+                # ("CUPS 2026-04" de la fecha 2026-04-15) y facturas ("CUPS
+                # HUS0000522871") como candidatos — mismas exclusiones del
+                # extractor principal vía es_cups_descartable.
+                try:
+                    from app.services.contexto_contractual_enriquecido import (
+                        es_cups_descartable as _cups_desc,
+                    )
+                except Exception:
+
+                    def _cups_desc(c, t=""):
+                        return False
+
+                for _m_cups in re.finditer(
                     r"(?:^|\s|[-·,])\s*([A-Z]{0,3}\d{4,8}[A-Z]?\d{0,2}(?:-\d{1,3})?)\s*(?:[-·,]|\s+[A-ZÁÉÍÓÚÑ])",
                     texto_base,
-                )
-                if _m_cups:
-                    cups_verificado = _m_cups.group(1)
-                else:
-                    _m2 = re.search(r"\b(\d{5,6}[A-Z]?\d{0,2}(?:-\d{1,3})?)\b", texto_base)
-                    if _m2:
-                        cups_verificado = _m2.group(1)
+                ):
+                    if not _cups_desc(_m_cups.group(1), texto_base):
+                        cups_verificado = _m_cups.group(1)
+                        break
+                if not cups_verificado:
+                    for _m2 in re.finditer(r"\b(\d{5,6}[A-Z]?\d{0,2}(?:-\d{1,3})?)\b", texto_base):
+                        if not _cups_desc(_m2.group(1), texto_base):
+                            cups_verificado = _m2.group(1)
+                            break
 
             # Extraer valor facturado/pactado de info_tarifa cuando esté
             # disponible. Es la única forma fiable de distinguir el
@@ -1602,6 +1881,43 @@ class GlosaService:
                 tono=getattr(data, "tono", "conciliador") or "conciliador",
                 clausulas_contrato=_clausulas_contrato,
             )
+
+            # ═══════════════════════════════════════════════════════════
+            #  Extemporaneidad de la RATIFICACIÓN (12-jun-2026, ronda 2 —
+            #  fix #5). Evidencia: "Fecha radicación: 2026-03-01. Fecha
+            #  recepción ratificación: 2026-05-30" (~62 días hábiles) y el
+            #  dictamen ni lo mencionó. El texto_fijo de BD solo cubre la
+            #  glosa INICIAL; estas fechas vienen EN EL TEXTO. Si el par
+            #  radicación → recepción-de-ratificación excede 30 días
+            #  hábiles (Art. 57 Ley 1438/2011), la defensa PROCESAL va
+            #  PRIMERO — se inyecta como bloque prioritario al prompt.
+            #  NO toca la lógica texto_fijo existente.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _fechas_txt = detectar_fechas_en_texto(texto_base)
+                _f_rad_txt = _fechas_txt.get("fecha_radicacion")
+                _f_rat_txt = _fechas_txt.get("fecha_ratificacion")
+                if _f_rad_txt and _f_rat_txt:
+                    _dias_rat = self._calcular_dias_habiles(_f_rad_txt, _f_rat_txt)
+                    if _dias_rat is not None and _dias_rat > DIAS_HABILES_LIMITE_RATIFICACION:
+                        user_prompt += (
+                            "\n\n[EXTEMPORANEIDAD DETECTADA — ARGUMENTO PRIORITARIO]\n"
+                            f"La ratificación fue notificada {_dias_rat} días hábiles "
+                            f"después de la radicación (radicación {_f_rad_txt} → "
+                            f"recepción de la ratificación {_f_rat_txt}), excediendo el "
+                            "término del Art. 57 de la Ley 1438 de 2011. Esta defensa "
+                            "PROCESAL va PRIMERO en el dictamen: abre el argumento "
+                            "invocando la extemporaneidad de la ratificación ANTES de "
+                            "cualquier defensa de fondo, y cita las dos fechas "
+                            "textualmente como evidencia.\n"
+                        )
+                        logger.info(
+                            f"[EXTEMP-RATIFICACION] {_dias_rat} días hábiles entre "
+                            f"radicación ({_f_rad_txt}) y recepción de ratificación "
+                            f"({_f_rat_txt}) — bloque prioritario inyectado al prompt."
+                        )
+            except Exception as _e_ext_rat:
+                logger.debug(f"[EXTEMP-RATIFICACION] detector no aplicado: {_e_ext_rat}")
 
             # Multi-agent foundation (env var MULTI_AGENT_HABILITADO=1):
             # ejecuta el Auditor Agent ANTES de la IA principal para
@@ -2473,6 +2789,19 @@ class GlosaService:
                 flags=re.IGNORECASE,
             )
 
+            # 16a-bis) Placeholders crudos SIN prefijo $ (12-jun-2026,
+            # ronda 2 — fix #6): "[ENTIDAD]", "[SERVICIO]", "[VALOR REAL]",
+            # "[CODIGO]" salieron literales en un dictamen ENTREGADO. Se
+            # rellenan con los datos reales del caso; si queda alguno sin
+            # equivalencia, _rellenar_placeholders deja warning y el score
+            # lo descuenta más abajo.
+            arg_ia = _rellenar_placeholders(
+                arg_ia,
+                eps=str(data.eps or ""),
+                codigo=codigo_det,
+                valor=valor_raw,
+            )
+
             # 16b) Si el texto original de la glosa NO traía un valor numérico,
             # la IA NO debe inventar cifras. Reemplazamos montos específicos.
             _no_hay_valor_original = (not valor_raw) or valor_raw.strip() in (
@@ -2599,6 +2928,9 @@ class GlosaService:
                                 codigo=codigo_det,
                                 temperature_override=0.05,
                                 bypass_cache=True,
+                                # Fix #9: refinamiento = tarea corta → gpt-oss
+                                # con reasoning_effort 'low'.
+                                llamada_corta=True,
                             )
                             _arg_refinado = self._xml("argumento", _res_refinado, "")
                             if _arg_refinado and len(_arg_refinado) > 100:
@@ -2645,6 +2977,22 @@ class GlosaService:
             es_tarifa,
             arg_limpio,
         )
+
+        # Ronda 2 (12-jun-2026, fix #6): si tras el sanitizer quedó algún
+        # [PLACEHOLDER] crudo en el argumento, el dictamen NO está listo
+        # para radicar — warning + descuento en el gauge para que el gestor
+        # lo vea. En los flujos con Quality Gate el post_validator además lo
+        # marca GRAVE (regenera).
+        try:
+            _residuales_ph = _PAT_PLACEHOLDER_CRUDO.findall(arg_limpio or "")
+            if _residuales_ph:
+                logger.warning(
+                    f"[PLACEHOLDERS] dictamen final con {len(_residuales_ph)} "
+                    f"placeholder(s) crudo(s): {_residuales_ph[:3]} — score penalizado."
+                )
+                score = max(0, score - 10)
+        except Exception:
+            pass
 
         # R59 P3: en modo auditoría usamos wrapper minimal — el LLM ya
         # produjo el HTML estructurado con 6 secciones del informe; añadir
@@ -2782,6 +3130,33 @@ class GlosaService:
             from app.services.citation_verifier import verificar_citas as _vc
 
             verif_citas = _vc(dictamen, eps=str(data.eps or ""))
+
+            # ═══════════════════════════════════════════════════════════
+            #  RED FINAL ronda 2 (12-jun-2026, fix #2): NUNCA radicar una
+            #  cita literal FALSA. El caso osteosíntesis salió ENTREGADO
+            #  con la cita inventada «...veintidós (22) días hábiles...»
+            #  marcada CITA_LITERAL_FALSA ALTA porque (a) con el QG OFF el
+            #  camino legacy no regenera por citas y el limpiador dinámico
+            #  solo elimina citas con número de norma (no literales), y
+            #  (b) con QG ON el ESCALAR_HUMANO entrega el "mejor" intento
+            #  con la cita adentro. Aquí, sobre el dictamen YA ensamblado
+            #  (incluye secciones multi-código), cada CITA_LITERAL_FALSA
+            #  pierde las comillas → paráfrasis neutra "EN LOS TÉRMINOS
+            #  DE...", y se re-verifica para que el badge refleje el texto
+            #  final.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                if verif_citas and verif_citas.get("issues"):
+                    _dictamen_descomillado = _descomillar_citas_falsas(
+                        dictamen, verif_citas["issues"]
+                    )
+                    if _dictamen_descomillado != dictamen:
+                        dictamen = _dictamen_descomillado
+                        verif_citas = _vc(dictamen, eps=str(data.eps or ""))
+            except Exception as _e_desc:
+                # Un fallo del descomillado jamás invalida la verificación
+                # ya calculada — se entrega el dictamen original con badge.
+                logger.debug(f"[DESCOMILLAR-CITAS] red final no aplicada: {_e_desc}")
         except Exception as _e:
             logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")
             verif_citas = None
@@ -3268,6 +3643,27 @@ class GlosaService:
                     celda = celda.strip()
                     if pat_moneda_col.fullmatch(celda):
                         return f"$ {celda}"
+
+        # Números deletreados en palabras (12-jun-2026, ronda 2 — fix #7):
+        # "por novecientos cincuenta y dos millones de pesos" entraba como
+        # $0.00. Último intento, conservador: solo corre un patrón cardinal
+        # claro que TERMINA en escala (mil / millón / millones) — nada de
+        # NLP; la conversión vive en moneda.palabras_a_numero.
+        m_cardinal = re.search(
+            r"\b((?:(?:un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|"
+            r"trece|catorce|quince|dieci\w+|veinti\w+|veinte|treinta|cuarenta|cincuenta|"
+            r"sesenta|setenta|ochenta|noventa|cien|ciento|doscient\w+|trescient\w+|"
+            r"cuatrocient\w+|quinient\w+|seiscient\w+|setecient\w+|ochocient\w+|"
+            r"novecient\w+|mil|mill[oó]n|millones|y)\s+)+(?:mil|mill[oó]n|millones))\b",
+            t,
+            re.IGNORECASE,
+        )
+        if m_cardinal:
+            from app.utils.moneda import palabras_a_numero as _pan
+
+            valor_letras = _pan(m_cardinal.group(1))
+            if valor_letras > 0:
+                return f"$ {int(round(valor_letras)):,}".replace(",", ".")
         return "$ 0.00"
 
     def _calcular_dias_habiles(self, f1, f2) -> Optional[int]:
@@ -3642,8 +4038,10 @@ class GlosaService:
                 "(Lista vacía si no hay)"
             )
             try:
+                # Fix #9: check de salida breve (PUEDE_RADICAR/CALIDAD) →
+                # gpt-oss con reasoning_effort 'low'.
                 res_ia, _modelo = await self._llamar_ia(
-                    system_check, user_check, eps=eps, codigo=codigo_glosa
+                    system_check, user_check, eps=eps, codigo=codigo_glosa, llamada_corta=True
                 )
                 ia_check = self._parsear_validacion_ia(res_ia)
                 for h in ia_check.get("hallazgos", []):
@@ -3817,8 +4215,12 @@ class GlosaService:
         if not self.groq and not self.anthropic_key:
             return txt  # sin IA disponible → devolver original
 
-        # Usa _llamar_ia para respetar PRIMARY_AI (Groq o Anthropic)
-        content, _modelo = await self._llamar_ia(system, user, eps=eps, codigo=codigo)
+        # Usa _llamar_ia para respetar PRIMARY_AI (Groq o Anthropic).
+        # Fix #9: refinamiento por instrucción del auditor = tarea corta →
+        # gpt-oss con reasoning_effort 'low'.
+        content, _modelo = await self._llamar_ia(
+            system, user, eps=eps, codigo=codigo, llamada_corta=True
+        )
         out = content.strip()
         # Eliminar cierres XML si la IA los metió por hábito
         out = _re.sub(r"</?(argumento|answer|response)>", "", out, flags=_re.IGNORECASE).strip()
@@ -3857,7 +4259,7 @@ class GlosaService:
         ]
 
     async def _llamar_groq_con_retry(
-        self, system: str, user: str, max_intentos: int = 4
+        self, system: str, user: str, max_intentos: int = 4, llamada_corta: bool = False
     ) -> tuple[str, str]:
         """Llama a Groq con retry exponencial + cadena de modelos.
 
@@ -3873,6 +4275,21 @@ class GlosaService:
             pasar al siguiente modelo sin backoff.
         Solo cuando TODOS los modelos Groq fallaron se propaga la excepcion
         (y _llamar_ia recien ahi intenta Anthropic).
+
+        Fix #9 (12-jun-2026) — modelos razonadores openai/gpt-oss-*:
+          - max_tokens sube a _GROQ_MAX_TOKENS_GPT_OSS (>=8000) porque el
+            chain-of-thought se descuenta del mismo presupuesto; los demas
+            modelos conservan _GROQ_MAX_TOKENS (3000).
+          - reasoning_effort acota el gasto de razonamiento: 'low' si
+            `llamada_corta=True` (auto-critica / refinamiento / checks),
+            'medium' en dictamenes normales. Solo se envia a gpt-oss — el
+            SDK documenta 'low'/'medium'/'high' para gpt-oss y otro set
+            ('none'/'default') para qwen3; llama no lo soporta, y enviarlo
+            a esos modelos arriesga un 400.
+          - Si gpt-oss devuelve content vacio con finish_reason='length'
+            (razonamiento agoto el presupuesto), se reintenta UNA vez el
+            MISMO modelo con max_tokens duplicado (log [GROQ-RETRY-LENGTH])
+            antes de ceder al siguiente modelo de la cadena.
         """
         ultimo_error: Exception = Exception("Groq: sin intentos")
 
@@ -3912,9 +4329,24 @@ class GlosaService:
         modelos = self._modelos_groq()
         for idx, modelo in enumerate(modelos):
             es_ultimo_modelo = idx == len(modelos) - 1
-            for intento in range(max_intentos):
+            # Fix #9: presupuesto y reasoning_effort por familia de modelo
+            # (ver docstring). El max_tokens es mutable: el retry-por-length
+            # lo duplica una vez para el mismo modelo.
+            es_gpt_oss = modelo.startswith("openai/gpt-oss")
+            max_tokens_modelo = _GROQ_MAX_TOKENS_GPT_OSS if es_gpt_oss else _GROQ_MAX_TOKENS
+            retry_length_usado = False
+            # while (no for): el retry-por-length repite el MISMO modelo con
+            # max_tokens duplicado SIN consumir presupuesto de intentos.
+            intento = 0
+            while intento < max_intentos:
                 t0 = time.monotonic()
                 try:
+                    kwargs_razonador: dict = {}
+                    if es_gpt_oss:
+                        # gpt-oss acepta 'low'/'medium'/'high' (default
+                        # medium). 'low' acota el chain-of-thought en las
+                        # llamadas cortas (auto-critica/refinamiento).
+                        kwargs_razonador["reasoning_effort"] = "low" if llamada_corta else "medium"
                     resp = await self.groq.chat.completions.create(
                         messages=[
                             {"role": "system", "content": system_reforzado},
@@ -3928,19 +4360,41 @@ class GlosaService:
                         # GROQ_MODEL / GROQ_MODEL_FALLBACK_1 / _2.
                         model=modelo,
                         temperature=0.2,
-                        # 3000 tokens son suficientes para argumentos de 500-700 palabras.
-                        max_tokens=3000,
+                        # 3000 tokens bastan para argumentos de 500-700
+                        # palabras en modelos no razonadores; gpt-oss usa
+                        # un presupuesto mayor porque el razonamiento se
+                        # descuenta del mismo limite (fix #9).
+                        max_tokens=max_tokens_modelo,
                         # Penalización de frecuencia/presencia evita que el modelo
                         # repita palabras/frases (anti-runaway degenerativo).
                         frequency_penalty=0.3,
                         presence_penalty=0.2,
                         timeout=120.0,
+                        **kwargs_razonador,
                     )
-                    content = resp.choices[0].message.content
+                    choice = resp.choices[0]
+                    content = choice.message.content
                     if not content:
+                        finish_reason = getattr(choice, "finish_reason", None)
+                        if es_gpt_oss and finish_reason == "length" and not retry_length_usado:
+                            # Fix #9: el razonamiento consumió TODO el
+                            # presupuesto sin emitir respuesta. UNA segunda
+                            # oportunidad al mismo modelo con max_tokens
+                            # duplicado antes de ceder al siguiente de la
+                            # cadena (el salto a qwen queda de 2da línea).
+                            retry_length_usado = True
+                            nuevo_max = max_tokens_modelo * 2
+                            logger.warning(
+                                f"[GROQ-RETRY-LENGTH] model={modelo} "
+                                f"max_tokens={max_tokens_modelo}→{nuevo_max} "
+                                "(content vacío con finish_reason='length': "
+                                "el razonamiento agotó el presupuesto)"
+                            )
+                            max_tokens_modelo = nuevo_max
+                            continue
                         raise RuntimeError(
                             f"Groq/{modelo} devolvió content vacío/None "
-                            f"(finish_reason={resp.choices[0].finish_reason!r})"
+                            f"(finish_reason={finish_reason!r})"
                         )
                     # Equivalente Groq del [ANTHROPIC-CALL]: deja claro QUE
                     # modelo respondió realmente cuando hubo fallback en la
@@ -3969,6 +4423,7 @@ class GlosaService:
                             f"reintento {intento + 2}/{max_intentos} en {espera}s"
                         )
                         await asyncio.sleep(espera)
+                        intento += 1
                         continue
                     # No reintentable o presupuesto agotado → siguiente
                     # modelo de la cadena (o raise final si era el último).
@@ -4329,6 +4784,7 @@ class GlosaService:
         modelo_override: Optional[str] = None,
         temperature_override: Optional[float] = None,
         bypass_cache: bool = False,
+        llamada_corta: bool = False,
     ) -> tuple[str, str]:
         """Llama a la IA configurada (primary_ai) con fallback al otro proveedor.
 
@@ -4341,6 +4797,11 @@ class GlosaService:
         en casos de alta complejidad). Se propaga al provider Anthropic.
         bypass_cache: para retries de validación (no queremos servir respuestas
         defectuosas desde caché).
+        llamada_corta: marca llamadas auxiliares de salida breve (auto-crítica,
+        refinamiento, checks pre-radicación). Solo afecta a Groq/gpt-oss:
+        reasoning_effort 'low' en vez de 'medium' (fix #9) para no quemar
+        presupuesto de razonamiento en tareas simples. No participa en la
+        clave de caché (misma semántica de respuesta).
         """
         # Clave de caché incluye EPS, código y modelo override para evitar
         # colisiones cruzadas entre Sonnet/Opus
@@ -4431,7 +4892,9 @@ class GlosaService:
                         temperature_override=temperature_override,
                     )
                 else:
-                    content, modelo = await fn(system, user)
+                    # Groq: propagar la marca de llamada corta para que
+                    # gpt-oss use reasoning_effort 'low' (fix #9).
+                    content, modelo = await fn(system, user, llamada_corta=llamada_corta)
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
                 _guardar_cache_ia_db(clave_cache, content, modelo)

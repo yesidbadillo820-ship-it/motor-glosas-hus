@@ -189,12 +189,27 @@ CONTRATOS_HUS: dict[str, dict] = {
 }
 
 
-def get_contrato(eps: str) -> dict:
-    """Retorna los datos del contrato para una EPS dada (búsqueda flexible)."""
-    eps_upper = eps.upper().strip()
-    for key, val in CONTRATOS_HUS.items():
-        if key in eps_upper or eps_upper in key:
-            return val
+# Entidades sin contrato identificable: jamás deben heredar el contrato de
+# otra EPS por el matching flexible (ronda 2, 12-jun-2026 — una glosa de
+# EPS "OTRA / SIN DEFINIR" salió citando la Cláusula 4.2 del contrato de
+# FAMISANAR).
+_EPS_SIN_CONTRATO = {
+    "OTRA",
+    "OTRAS",
+    "OTRA / SIN DEFINIR",
+    "SIN DEFINIR",
+    "SIN EPS",
+    "SIN CONTRATO",
+    "N/A",
+    "NA",
+    "N/D",
+    "GENERICO",
+    "GENÉRICO",
+}
+
+
+def _contrato_sin_pacto() -> dict:
+    """Ficha fallback para entidades sin contrato (copia fresca por llamada)."""
     return {
         "numero": "SIN CONTRATO PACTADO",
         "tarifa": "SOAT PLENO — Manual Tarifario SOAT 2026 (Circular 047/2025 MinSalud + UVB 2026 = $12.110)",
@@ -205,6 +220,117 @@ def get_contrato(eps: str) -> dict:
         "contacto": "cartera@hus.gov.co",
         "nota": "Sin contrato. Se aplica tarifa SOAT plena según Circular Externa 047 de 2025 del MinSalud (Manual SOAT 2026 indexado a UVB — UVB 2026 = $12.110) y Decreto 780 de 2016.",
     }
+
+
+def get_contrato(eps: str) -> dict:
+    """Retorna los datos del contrato para una EPS dada (búsqueda flexible).
+
+    Hardening ronda 2 (12-jun-2026, CONTRATO CRUZADO entre EPS):
+      • eps vacía → antes `"" in "FAMISANAR"` era True y devolvía el PRIMER
+        contrato del catálogo; ahora devuelve la ficha SIN CONTRATO.
+      • eps genérica ("OTRA / SIN DEFINIR" y variantes) → SIN CONTRATO.
+      • El match inverso (eps contenida en la clave) exige ≥4 caracteres:
+        "EPS" matcheaba "NUEVA EPS" y "SA" matcheaba "FAMISANAR".
+    """
+    eps_upper = (eps or "").upper().strip()
+    if not eps_upper or eps_upper in _EPS_SIN_CONTRATO:
+        return _contrato_sin_pacto()
+    for key, val in CONTRATOS_HUS.items():
+        if key in eps_upper or (len(eps_upper) >= 4 and eps_upper in key):
+            return val
+    return _contrato_sin_pacto()
+
+
+# ── Catálogo contrato → EPS dueña (12-jun-2026, ronda 2) ──────────────
+# Para el check `check_contrato_de_otra_eps` del post_validator y el filtro
+# de few-shots: 3 casos de producción citaron contratos de OTRA entidad
+# (DMBUG citó el S-13-1-03-1-04958 de FAMISANAR; "OTRA / SIN DEFINIR" citó
+# su Cláusula 4.2; FOMAG mezcló cláusulas del ACTA 012). Un número de
+# contrato ajeno es verificable por la EPS en segundos y destruye el
+# dictamen completo.
+_PAT_TOKEN_CONTRATO = re.compile(r"[A-Z0-9][A-Z0-9./\-]{4,40}")
+
+
+def _extraer_tokens_contrato(numero: str) -> list[str]:
+    """Tokens identificables de un campo 'numero' de contrato.
+
+    Conservador: exige ≥6 caracteres, al menos un dígito y al menos un
+    carácter NO numérico (letra, guion, slash o punto) — los números puros
+    ("1388", "0525", "319") son ambiguos con CUPS/valores/años y se omiten.
+    """
+    tokens: list[str] = []
+    for m in _PAT_TOKEN_CONTRATO.finditer((numero or "").upper()):
+        tok = m.group(0).strip(".-/")
+        if len(tok) < 6:
+            continue
+        if not any(c.isdigit() for c in tok):
+            continue
+        if tok.isdigit():
+            continue
+        if tok not in tokens:
+            tokens.append(tok)
+    return tokens
+
+
+def catalogo_contratos_eps() -> dict[str, str]:
+    """Mapa {token_de_contrato → EPS dueña} de CONTRATOS_HUS + ContratoRecord.
+
+    La BD complementa el catálogo estático (contratos cargados por el admin
+    que aún no viven en CONTRATOS_HUS); si no está disponible, degrada al
+    catálogo estático sin romper.
+    """
+    catalogo: dict[str, str] = {}
+    for eps_key, info in CONTRATOS_HUS.items():
+        for tok in _extraer_tokens_contrato(info.get("numero", "")):
+            catalogo.setdefault(tok, eps_key)
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ContratoRecord
+
+        db = SessionLocal()
+        try:
+            for c in db.query(ContratoRecord).all():
+                duena = (c.eps or "").upper().strip()
+                if not duena:
+                    # Sin dueña conocida el token marcaría a TODAS las EPS
+                    # como ajenas — mejor no catalogarlo.
+                    continue
+                for tok in _extraer_tokens_contrato(c.numero_contrato or ""):
+                    catalogo.setdefault(tok, duena)
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return catalogo
+
+
+def _es_misma_entidad(eps_a: str, eps_b: str) -> bool:
+    """Match flexible de nombres de entidad (mismo criterio de get_contrato)."""
+    a = (eps_a or "").upper().strip()
+    b = (eps_b or "").upper().strip()
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    return (len(a) >= 4 and a in b) or (len(b) >= 4 and b in a)
+
+
+def contratos_ajenos_citados(texto: str, eps: str) -> list[str]:
+    """Números de contrato CONOCIDOS citados en `texto` cuya EPS dueña NO es
+    la EPS de la glosa. Para eps vacía/genérica, TODO contrato conocido es
+    ajeno (la entidad no tiene contrato identificado).
+    """
+    if not texto:
+        return []
+    t = texto.upper()
+    eps_up = (eps or "").upper().strip()
+    sin_contrato = not eps_up or eps_up in _EPS_SIN_CONTRATO
+    ajenos: list[str] = []
+    for tok, duena in catalogo_contratos_eps().items():
+        if tok in t:
+            if sin_contrato or not _es_misma_entidad(eps_up, duena):
+                ajenos.append(tok)
+    return ajenos
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -530,6 +656,8 @@ CUANDO CITES un principio, NOMBRALO ("EN APLICACIÓN DEL PRINCIPIO PACTA SUNT SE
     - Si el user prompt incluye un bloque "[VICIOS PROCEDIMENTALES DETECTADOS]", IDENTIFICA POR NOMBRE TECNICO al menos UNO de los vicios listados en el parrafo 2 (refutacion).
     - Formula: "CONFIGURANDO UN VICIO DE [NOMBRE]" o "CONSTITUYE [NOMBRE]".
     - Sin este bloque, intenta detectar vicios por ti mismo y nombrarlos.
+
+11. DATOS CLÍNICOS DEL CASO (12-jun-2026): si el texto de la glosa menciona datos clínicos concretos (clasificaciones NYHA/Glasgow/Kellgren, fracción de eyección, días de estancia o de UCI, diagnósticos, edad, lista de trasplante), INCORPÓRALOS LITERALMENTE en la argumentación — son la prueba de la pertinencia del servicio. Un dictamen que ignora los datos clínicos del caso es plantilla y será rechazado. Si el user prompt trae el bloque "[DATOS CLÍNICOS DEL CASO — ÚSALOS EN LA ARGUMENTACIÓN]", citar al menos uno de esos datos es OBLIGATORIO.
 
 ═══════════════ IDENTIFICACIÓN EXPRESA DE VICIOS DE LA GLOSA (cuando aplique) ═══════════════
 Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO en el párrafo de refutación:
@@ -1525,11 +1653,20 @@ def build_user_prompt(
     # Datos del PDF (si hay)
     datos = extraer_datos_soporte(contexto_pdf)
     cups = cups_verificado or datos["cups"]
+    _nota_cups = ""
     if cups == "NO IDENTIFICADO":
         # Antes: "CUPS INDICADO EN EL EXPEDIENTE" -- aparecia literal en el
         # dictamen y sonaba a placeholder sin reemplazar. Ahora damos un
         # fallback mas natural que la IA puede usar fluido sin parecer copy/paste.
         cups = "el procedimiento facturado conforme al CUPS detallado en la factura electronica"
+        # Ronda 2 (12-jun-2026): sin CUPS confiable la IA rellenaba el hueco
+        # con la fecha ("CUPS 2026-04") o la factura ("CUPS HUS0000522871").
+        # Instrucción explícita: omitir antes que inventar.
+        _nota_cups = (
+            "\n  ⚠ NO hay CUPS confiable en los datos: NO inventes ni rellenes el "
+            "CUPS — omite la referencia al CUPS si no está en los datos. NUNCA uses "
+            "fechas, números de factura ni radicados como CUPS."
+        )
 
     paciente = datos.get("paciente", "NO IDENTIFICADO")
     medico = datos.get("medico", "NO IDENTIFICADO")
@@ -1661,12 +1798,16 @@ def build_user_prompt(
         pass
 
     # Cláusulas anti-rebatimiento típicas por tipo de glosa (pre-anulan
-    # contra-argumentos comunes de la EPS)
+    # contra-argumentos comunes de la EPS). Ronda 2 (12-jun-2026): se pasa
+    # el texto de la glosa para que la familia AU bifurque urgencias vs
+    # electivo — antes la cláusula "LA AUTORIZACIÓN PREVIA NO CONSTITUYE
+    # REQUISITO EN LA ATENCIÓN DE URGENCIAS" se inyectaba SIEMPRE y la IA
+    # la copiaba en procedimientos PROGRAMADOS (evidencia AU0301).
     bloque_antirebatimiento_str = ""
     try:
         from app.services.clausulas_anti_rebatimiento import clausulas_para_codigo
 
-        cls = clausulas_para_codigo(codigo, max_clausulas=2)
+        cls = clausulas_para_codigo(codigo, max_clausulas=2, texto_glosa=texto_glosa or "")
         if cls:
             lineas_cl = [f"  • {c}" for c in cls]
             bloque_antirebatimiento_str = (
@@ -1738,6 +1879,19 @@ def build_user_prompt(
         import logging as _lg
 
         _lg.getLogger("motor_glosas").debug(f"[CONTEXTO-ENRIQUECIDO] no se inyectó: {_e_cc}")
+
+    # DATOS CLÍNICOS DEL ENUNCIADO (12-jun-2026, ronda 2): si la glosa trae
+    # datos clínicos concretos (NYHA, FE%, Glasgow, Kellgren, días de UCI,
+    # lista de trasplante...), se inyectan como bloque imperativo — la
+    # evidencia de estrés mostró dictámenes que ignoraban "NYHA III, FE 25%"
+    # y "47 días UCI por TCE severo" (plantilla pura, fácil de ratificar).
+    bloque_datos_clinicos_str = ""
+    try:
+        from app.services.contexto_contractual_enriquecido import bloque_datos_clinicos
+
+        bloque_datos_clinicos_str = bloque_datos_clinicos(texto_glosa or "")
+    except Exception:
+        pass
 
     # Cálculo aritmético para glosas TA con contrato (factor conocido)
     bloque_calculo_str = ""
@@ -1938,6 +2092,18 @@ def build_user_prompt(
                     f"  Código respuesta sugerido: RE9905.\n"
                 )
 
+    # Aviso anti contrato-cruzado (12-jun-2026, ronda 2): cuando la entidad
+    # NO tiene contrato identificado ("OTRA / SIN DEFINIR", fallback), la IA
+    # arrastraba números de contrato de OTRAS EPS desde ejemplos/históricos.
+    # Instrucción explícita: sin contrato identificado NO se cita ninguno.
+    _nota_contrato = ""
+    if numero_contrato == "SIN CONTRATO PACTADO":
+        _nota_contrato = (
+            "\n  ⚠ NO cites números de contrato: la entidad no tiene contrato "
+            "identificado en el sistema. Cualquier número de contrato que recuerdes "
+            "de otros casos pertenece a OTRA entidad y citarlo invalida el dictamen."
+        )
+
     # Regla de oro para la IA: los datos del BLOQUE 1 son AUTORITATIVOS.
     # La EPS a veces menciona CUPS o valores alternativos en el texto de
     # la glosa ("se reconoce tarifa SOAT UVB vigente código 39143") — eso
@@ -1948,10 +2114,10 @@ def build_user_prompt(
 ═══ BLOQUE 1: DATOS DEL CASO (AUTORITATIVOS — usa EXACTAMENTE estos) ═══
 • Tipo de glosa     : {nombre_tipo} ({codigo})
 • Entidad pagadora  : {eps}
-• Contrato vigente  : {numero_contrato}
+• Contrato vigente  : {numero_contrato}{_nota_contrato}
 • Vigencia contrato : {contrato.get("vigencia", "—")}
 • Tarifa pactada    : {tarifa}
-• CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa
+• CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa{_nota_cups}
 • Valor objetado    : {valor_fmt}  ← USA ESTE VALOR; si no es "EL VALOR INDICADO EN…", úsalo TEXTUALMENTE
 • Valor facturado   : {valor_facturado or "—"}
 • Valor pactado     : {valor_pactado or "—"}
@@ -1980,7 +2146,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
+{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 

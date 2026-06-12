@@ -224,12 +224,15 @@ def _sanitizar_argumento(
     eps: str,
     es_ratificacion: bool,
     es_extemporanea: bool,
+    codigo: str = "",
+    valor_objetado: str = "",
 ) -> str:
     """Aplica a la sección adicional los mismos sanitizers deterministas
     (sin IA) del flujo principal: tono institucional, palabra prohibida
     "injustific*", coda procesal indebida, citas inventadas/inválidas,
-    coda post-levantamiento, runaway y MAYÚSCULAS. Cualquier fallo de un
-    sanitizer degrada al texto previo — el QG ya validó lo esencial.
+    placeholders crudos (ronda 2, 12-jun-2026), coda post-levantamiento,
+    runaway y MAYÚSCULAS. Cualquier fallo de un sanitizer degrada al texto
+    previo — el QG ya validó lo esencial.
 
     Imports locales: glosa_service importa este módulo dentro de
     analizar(), así que importar glosa_service arriba crearía un ciclo.
@@ -242,6 +245,7 @@ def _sanitizar_argumento(
         )
         from app.services.glosa_service import (
             _expandir_abreviaturas_tipo,
+            _rellenar_placeholders,
             _suavizar_tono,
             _truncar_runaway,
             limpiar_cierre_extemporanea_indebido,
@@ -257,6 +261,9 @@ def _sanitizar_argumento(
         )
         t = quitar_parrafos_con_citas_inventadas(t)
         t = quitar_citas_invalidas_dinamico(t, eps=eps)
+        # Placeholders crudos [ENTIDAD]/[VALOR REAL]/[CODIGO] — mismo
+        # sanitizer del flujo principal (ronda 2, 12-jun-2026, fix #6).
+        t = _rellenar_placeholders(t, eps=eps, codigo=codigo, valor=valor_objetado)
         t = truncar_despues_de_levantamiento(t)
         t = _truncar_runaway(t)
         t = _expandir_abreviaturas_tipo(t)
@@ -380,6 +387,8 @@ async def _generar_seccion_codigo(
         eps=eps,
         es_ratificacion=es_ratificacion,
         es_extemporanea=es_extemporanea,
+        codigo=codigo,
+        valor_objetado=valor_objetado,
     )
     texto = texto.replace("\n", "<br/>").replace("*", "")
 
