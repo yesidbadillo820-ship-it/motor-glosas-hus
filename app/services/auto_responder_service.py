@@ -17,9 +17,100 @@ del Excel de recepción:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
+import os
+import re
 
 logger = logging.getLogger(__name__)
+
+# Defensas anti-gasto IA (reportadas por el dueño 12-jun-2026 — un lote
+# importado consumió $14.50 en 251 calls de claude-sonnet-4-6, agotando
+# créditos Anthropic en respuestas que tenían plantilla o pudieron
+# reutilizarse de glosas gemelas).
+#
+# IA_SOLO_COMPLEJAS=1 → el flujo masivo NO llama IA si la glosa clasifica
+#   como SIMPLE o MEDIA. Solo COMPLEJA (ratificación, extemporánea, alto
+#   valor, multi-código, EPS crítica, texto >800 chars) toca tokens.
+#   Las restantes quedan en estado PENDIENTE_MANUAL.
+# AUTO_RESPONDER_REUSAR_GEMELOS=1 (default ON) → busca una glosa previa
+#   idéntica en (eps, codigo, valor, hash del texto) con dictamen
+#   aprobado, y la reusa sin gastar tokens.
+_IA_SOLO_COMPLEJAS = os.getenv("IA_SOLO_COMPLEJAS", "0").strip() in ("1", "true", "TRUE")
+_AUTO_RESPONDER_REUSAR_GEMELOS = os.getenv("AUTO_RESPONDER_REUSAR_GEMELOS", "1").strip() in (
+    "1",
+    "true",
+    "TRUE",
+)
+
+
+def _firma_concepto(texto: str) -> str:
+    """Firma normalizada del texto de la glosa para detectar gemelas.
+
+    Quita espacios extra, valores monetarios y números de factura — lo que
+    cambia entre glosas del mismo concepto pero distinta factura. Lo que
+    sobrevive: el concepto canónico y el motivo.
+    """
+    t = (texto or "").upper()
+    t = re.sub(r"\$\s*[\d\.,]+", "$VAL", t)
+    t = re.sub(r"\bHUS\d{6,}\b", "FAC", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return hashlib.sha256(t.encode()).hexdigest()[:24]
+
+
+def _buscar_dictamen_gemelo(db, glosa, texto_glosa: str) -> dict | None:
+    """Busca una glosa gemela ya analizada que sirva de cache.
+
+    Criterio: misma EPS y mismo código de glosa, valor similar (±10%) y
+    firma de texto idéntica. Solo glosas con estado RESPONDIDA/RADICADA y
+    dictamen suficientemente largo (>=400 chars, descarta placeholders).
+    """
+    try:
+        from app.models.db import GlosaRecord
+
+        if not (glosa.eps and glosa.codigo_glosa):
+            return None
+        firma = _firma_concepto(texto_glosa)
+        if not firma:
+            return None
+        val = float(glosa.valor_objetado or 0)
+        # Tolerancia ±10% sobre el valor (si hay valor); si no hay valor,
+        # se ignora ese filtro.
+        rango_lo = val * 0.9 if val else 0
+        rango_hi = val * 1.1 if val else float("inf")
+        candidatos = (
+            db.query(GlosaRecord)
+            .filter(GlosaRecord.eps == glosa.eps)
+            .filter(GlosaRecord.codigo_glosa == glosa.codigo_glosa)
+            .filter(GlosaRecord.id != glosa.id)
+            .filter(GlosaRecord.estado.in_(["RESPONDIDA", "RADICADA"]))
+            .order_by(GlosaRecord.creado_en.desc())
+            .limit(40)
+            .all()
+        )
+        for c in candidatos:
+            cv = float(c.valor_objetado or 0)
+            if val and not (rango_lo <= cv <= rango_hi):
+                continue
+            if not c.dictamen or len(c.dictamen) < 400:
+                continue
+            texto_c = (
+                getattr(c, "texto_glosa_original", "")
+                or getattr(c, "observacion_eps", "")
+                or getattr(c, "concepto_glosa", "")
+                or ""
+            )
+            if _firma_concepto(texto_c) == firma:
+                return {
+                    "glosa_id": c.id,
+                    "dictamen": c.dictamen,
+                    "codigo_respuesta": c.codigo_respuesta,
+                }
+        return None
+    except Exception as e:
+        logger.debug(f"_buscar_dictamen_gemelo falló: {e}")
+        return None
+
 
 # Límite de glosas procesadas en paralelo. Considera dos restricciones:
 #   1. Rate-limit Anthropic (3-5 paralelas seguro para Claude Sonnet)
@@ -147,6 +238,103 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
                 "requirio_soportes": True,
                 "motivo": evaluacion.get("motivo", ""),
             }
+
+        # ── Defensa anti-gasto IA (11-jun-2026, reporte del dueño) ──────
+        # El import masivo estaba llamando a Claude para CADA glosa, incluso
+        # las que tienen plantilla determinística disponible — el lote del
+        # 12-jun consumió $14.50 en 251 calls de Sonnet y agotó créditos.
+        # Tres capas gratis antes de la IA:
+
+        # 1) Texto fijo (RATIFICADA / EXTEMPORÁNEA / DMBUG TA con tarifa
+        #    pactada): plantilla determinística, 0 tokens.
+        try:
+            from app.services.texto_fijo_detector import aplicar_texto_fijo_si_corresponde
+
+            tf = aplicar_texto_fijo_si_corresponde(g)
+            if tf:
+                g.dictamen = tf["dictamen_html"]
+                g.estado = tf.get("estado_sugerido") or "RESPONDIDA"
+                g.modelo_ia = tf["modelo_ia"]
+                db.commit()
+                logger.info(
+                    f"[auto-responder] glosa={glosa_id} resuelta por texto fijo "
+                    f"({tf['tipo']}) — 0 tokens IA"
+                )
+                return {
+                    "glosa_id": glosa_id,
+                    "estado": tf.get("estado_sugerido") or "RESPONDIDA",
+                    "modelo": tf["modelo_ia"],
+                }
+        except Exception as _e_tf:
+            logger.debug(f"[auto-responder] texto_fijo_detector falló glosa={glosa_id}: {_e_tf}")
+
+        # 2) Reuso de dictamen GEMELO: glosa previa idéntica
+        #    (eps, codigo_glosa, valor_objetado, hash del texto) con
+        #    dictamen aprobado por QG y radicada o cerrada. Evita gastar
+        #    IA en glosas repetitivas (DMBUG ratifica el mismo lote a
+        #    distintas facturas, FOMAG recicla 10 plantillas, etc.).
+        if _IA_SOLO_COMPLEJAS or _AUTO_RESPONDER_REUSAR_GEMELOS:
+            gemelo = _buscar_dictamen_gemelo(db, g, texto_glosa_ia)
+            if gemelo is not None:
+                g.dictamen = gemelo["dictamen"]
+                g.codigo_respuesta = gemelo["codigo_respuesta"] or g.codigo_respuesta
+                g.modelo_ia = f"cache_gemela/{gemelo['glosa_id']}"
+                g.estado = "RESPONDIDA"
+                g.workflow_state = "BORRADOR"
+                db.commit()
+                logger.info(
+                    f"[auto-responder] glosa={glosa_id} reusa dictamen de glosa "
+                    f"gemela #{gemelo['glosa_id']} — 0 tokens IA"
+                )
+                return {
+                    "glosa_id": glosa_id,
+                    "estado": "REUSO_GEMELO",
+                    "modelo": g.modelo_ia,
+                }
+
+        # 3) IA_SOLO_COMPLEJAS=1 (variable Fly): si esta glosa NO clasifica
+        #    como COMPLEJA por el router (ratificación, extemporánea, alto
+        #    valor, multi-código, texto largo, EPS crítica), se marca como
+        #    "pendiente análisis manual" SIN gastar tokens. Solo las glosas
+        #    realmente difíciles van a Claude.
+        if _IA_SOLO_COMPLEJAS:
+            try:
+                from app.services.ia_router import enrutar
+                from app.utils.moneda import parse_valor_cop
+
+                d = enrutar(
+                    eps=g.eps or "",
+                    valor=float(g.valor_objetado or 0) or parse_valor_cop(texto_glosa_ia),
+                    texto_glosa=texto_glosa_ia,
+                    codigo_glosa=g.codigo_glosa or "",
+                )
+                if d.complejidad != "COMPLEJA":
+                    g.dictamen = (
+                        "<div style='background:#eef2ff;border-left:4px solid #4f46e5;"
+                        "padding:16px;border-radius:8px;'>"
+                        "<b>PENDIENTE DE ANÁLISIS MANUAL</b><br/>"
+                        f"Clasificación: {d.complejidad}. La política institucional "
+                        "(IA_SOLO_COMPLEJAS=1) reserva la IA para glosas complejas. "
+                        "El gestor debe abrir esta glosa y analizarla manualmente o "
+                        "marcar la EPS como crítica para forzar el análisis IA."
+                        "</div>"
+                    )
+                    g.estado = "PENDIENTE_MANUAL"
+                    g.modelo_ia = f"skip/IA_SOLO_COMPLEJAS/{d.complejidad}"
+                    db.commit()
+                    logger.info(
+                        f"[auto-responder] glosa={glosa_id} salteada por "
+                        f"IA_SOLO_COMPLEJAS (complejidad={d.complejidad}) — 0 tokens IA"
+                    )
+                    return {
+                        "glosa_id": glosa_id,
+                        "estado": "PENDIENTE_MANUAL",
+                        "modelo": g.modelo_ia,
+                    }
+            except Exception as _e_sc:
+                logger.debug(
+                    f"[auto-responder] IA_SOLO_COMPLEJAS check falló glosa={glosa_id}: {_e_sc}"
+                )
 
         # Llamada al cerebro IA con los datos mínimos
         try:
