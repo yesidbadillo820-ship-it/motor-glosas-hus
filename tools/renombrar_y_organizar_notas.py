@@ -266,11 +266,44 @@ def setup_logging(log_file: Path | None = None) -> None:
 RE_PDF_YA_RENOMBRADO = re.compile(r"^NC_\d{4,}_HUS\d{6,12}\.pdf$", re.IGNORECASE)
 
 
-def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool) -> list[dict]:
+def cargar_mapa(ruta: Path) -> dict[str, str]:
+    """Lee un CSV con columnas NOTA CREDITO y FACTURA HUS (el mismo
+    notas_correo.csv del extractor) y devuelve {NE: factura}."""
+    alias_nota = {"NOTA CREDITO", "NOTAS CREDITO", "NOTA ELECTRONICA", "NC", "NE"}
+    alias_fact = {"FACTURA HUS", "FACTURA", "NUMERO FACTURA", "FACTURA COMPLETA"}
+    mapa: dict[str, str] = {}
+    with ruta.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.reader(fh)
+        headers = next(reader, None)
+        if not headers:
+            return mapa
+        norm = [" ".join((h or "").strip().upper().split()) for h in headers]
+        i_nota = next((i for i, h in enumerate(norm) if h in alias_nota), None)
+        i_fact = next((i for i, h in enumerate(norm) if h in alias_fact), None)
+        if i_nota is None or i_fact is None:
+            raise ValueError(
+                f"--mapa: no encontré columnas de nota y factura en {ruta} (headers: {headers})"
+            )
+        for fila in reader:
+            if len(fila) <= max(i_nota, i_fact):
+                continue
+            ne = (fila[i_nota] or "").strip()
+            fac = (fila[i_fact] or "").strip().upper()
+            if ne and fac:
+                mapa[ne] = fac
+    return mapa
+
+
+def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool, mapa: dict[str, str] | None = None) -> list[dict]:
     """Modo --en-sitio: el PDF de la nota ya está DENTRO de la carpeta
     <NE>/ (vino así del share, ej. nc0900...302478.pdf). Lo renombra en el
     lugar a NC_<NE>_<HUS>.pdf leyendo NE + factura del CONTENIDO del PDF y
-    verificando que la NE extraída coincida con el nombre de la carpeta."""
+    verificando que la NE extraída coincida con el nombre de la carpeta.
+
+    Si el PDF no trae los campos legibles (las notas DIAN del share no usan
+    el layout del CRRP), cae al --mapa (CSV NE→factura): la NE es el nombre
+    de la carpeta (avalado por el extractor, que la buscó así en el share) y
+    la factura sale del mapa. Cualquier contradicción PDF↔mapa = MISMATCH."""
     resultados: list[dict] = []
     pdfs = sorted(p for p in carpeta.iterdir() if p.is_file() and p.suffix.lower() == ".pdf")
     if any(RE_PDF_YA_RENOMBRADO.match(p.name) for p in pdfs):
@@ -315,20 +348,44 @@ def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool) -> list[dict]:
         resultado["nota_credito"] = datos["nota_credito"]
         resultado["factura"] = datos["factura"]
         resultado["facturas_todas"] = ";".join(datos["facturas_todas"])
-        if not datos["nota_electronica"] or not datos["factura"]:
+
+        ne = datos["nota_electronica"]
+        fac = datos["factura"]
+        via_mapa = ""
+        fac_mapa = (mapa or {}).get(carpeta.name, "")
+        if fac_mapa:
+            if fac and fac != fac_mapa:
+                resultado["estado"] = "MISMATCH_MAPA"
+                resultado["detalle"] = (
+                    f"El PDF dice factura {fac} pero el --mapa dice {fac_mapa} "
+                    f"para la NE {carpeta.name} — no lo toco; revisalo a mano"
+                )
+                logger.warning(f"{carpeta.name}/{pdf.name}: MISMATCH_MAPA ({fac} ≠ {fac_mapa})")
+                continue
+            if not fac:
+                fac = fac_mapa
+                via_mapa = " (factura desde --mapa)"
+            if not ne:
+                ne = carpeta.name
+        if not ne or not fac:
             resultado["estado"] = "DATOS_INCOMPLETOS"
-            resultado["detalle"] = "El PDF no trae Nota Electrónica y/o Factura HUS legibles"
+            resultado["detalle"] = (
+                "El PDF no trae Nota Electrónica y/o Factura HUS legibles "
+                "(pasá --mapa notas_correo.csv para completar con el listado)"
+            )
             logger.warning(f"{carpeta.name}/{pdf.name}: DATOS_INCOMPLETOS")
             continue
-        if datos["nota_electronica"] != carpeta.name:
+        if ne != carpeta.name:
             resultado["estado"] = "MISMATCH_CARPETA"
             resultado["detalle"] = (
-                f"El PDF dice NE {datos['nota_electronica']} pero la carpeta es "
+                f"El PDF dice NE {ne} pero la carpeta es "
                 f"{carpeta.name} — no lo toco; revisalo a mano"
             )
-            logger.warning(f"{carpeta.name}/{pdf.name}: MISMATCH_CARPETA ({datos['nota_electronica']})")
+            logger.warning(f"{carpeta.name}/{pdf.name}: MISMATCH_CARPETA ({ne})")
             continue
-        nuevo = nombre_destino(datos)
+        resultado["nota_electronica"] = ne
+        resultado["factura"] = fac
+        nuevo = nombre_destino({"nota_electronica": ne, "factura": fac})
         destino_final = carpeta / nuevo
         resultado["nuevo_nombre"] = nuevo
         resultado["destino_final"] = str(destino_final)
@@ -340,8 +397,8 @@ def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool) -> list[dict]:
         try:
             pdf.rename(destino_final)
             resultado["estado"] = "OK"
-            resultado["detalle"] = f"renombrado desde {pdf.name}"
-            logger.info(f"{carpeta.name}: OK — {pdf.name} → {nuevo}")
+            resultado["detalle"] = f"renombrado desde {pdf.name}{via_mapa}"
+            logger.info(f"{carpeta.name}: OK — {pdf.name} → {nuevo}{via_mapa}")
         except OSError as e:
             resultado["estado"] = "ERROR_RENOMBRE"
             resultado["detalle"] = f"{type(e).__name__}: {e}"
@@ -395,6 +452,16 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--mapa",
+        type=Path,
+        default=None,
+        help=(
+            "CSV NE→factura (columnas NOTA CREDITO y FACTURA HUS, el mismo "
+            "notas_correo.csv del extractor). Completa la factura cuando el PDF "
+            "no la trae legible (notas DIAN). Solo con --en-sitio."
+        ),
+    )
+    parser.add_argument(
         "--reporte",
         type=Path,
         default=Path("reporte_renombrado.csv"),
@@ -431,6 +498,13 @@ def main() -> int:
 
     # ── Modo EN SITIO: renombrar el nc*.pdf dentro de cada subcarpeta <NE>/ ──
     if args.en_sitio:
+        mapa: dict[str, str] = {}
+        if args.mapa is not None:
+            if not args.mapa.is_file():
+                logger.error(f"--mapa no existe: {args.mapa}")
+                return 1
+            mapa = cargar_mapa(args.mapa)
+            logger.info(f"Mapa NE→factura cargado: {len(mapa)} notas desde {args.mapa.name}")
         carpetas = sorted(
             c for c in args.destino.iterdir()
             if c.is_dir() and not c.name.startswith("_")
@@ -443,7 +517,7 @@ def main() -> int:
         resultados = []
         for i, carpeta in enumerate(carpetas, start=1):
             logger.info(f"[{i}/{len(carpetas)}] {carpeta.name}")
-            resultados.extend(procesar_carpeta_en_sitio(carpeta, dry_run=args.dry_run))
+            resultados.extend(procesar_carpeta_en_sitio(carpeta, dry_run=args.dry_run, mapa=mapa))
         escribir_reporte(resultados, args.reporte)
         resumen: dict[str, int] = {}
         for r in resultados:
