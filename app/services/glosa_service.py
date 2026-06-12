@@ -145,6 +145,18 @@ _ERRORES_REINTENTABLES = frozenset(
     ]
 )
 
+# Presupuesto de tokens de salida por familia de modelo Groq (fix #9,
+# 12-jun-2026). 3000 bastan para un argumento de 500-700 palabras en
+# modelos NO razonadores (llama-3.3 / qwen3 con reasoning default). Los
+# openai/gpt-oss-* son RAZONADORES: su chain-of-thought se descuenta del
+# MISMO max_tokens, y con 3000 el razonamiento podía consumirlo todo →
+# content vacío + finish_reason='length' → fallback a qwen innecesario
+# (evidencia: [GROQ-FALLBACK] en prod 12-jun 19:37 UTC, llamada de
+# auto-crítica). Mínimo 8000 para gpt-oss; el max() conserva el mayor si
+# algún día se sube el presupuesto base por encima de ese piso.
+_GROQ_MAX_TOKENS = 3000
+_GROQ_MAX_TOKENS_GPT_OSS = max(_GROQ_MAX_TOKENS, 8000)
+
 FERIADOS_CO = [
     # 2025
     "2025-01-01",
@@ -4238,7 +4250,7 @@ class GlosaService:
         ]
 
     async def _llamar_groq_con_retry(
-        self, system: str, user: str, max_intentos: int = 4
+        self, system: str, user: str, max_intentos: int = 4, llamada_corta: bool = False
     ) -> tuple[str, str]:
         """Llama a Groq con retry exponencial + cadena de modelos.
 
@@ -4254,6 +4266,21 @@ class GlosaService:
             pasar al siguiente modelo sin backoff.
         Solo cuando TODOS los modelos Groq fallaron se propaga la excepcion
         (y _llamar_ia recien ahi intenta Anthropic).
+
+        Fix #9 (12-jun-2026) — modelos razonadores openai/gpt-oss-*:
+          - max_tokens sube a _GROQ_MAX_TOKENS_GPT_OSS (>=8000) porque el
+            chain-of-thought se descuenta del mismo presupuesto; los demas
+            modelos conservan _GROQ_MAX_TOKENS (3000).
+          - reasoning_effort acota el gasto de razonamiento: 'low' si
+            `llamada_corta=True` (auto-critica / refinamiento / checks),
+            'medium' en dictamenes normales. Solo se envia a gpt-oss — el
+            SDK documenta 'low'/'medium'/'high' para gpt-oss y otro set
+            ('none'/'default') para qwen3; llama no lo soporta, y enviarlo
+            a esos modelos arriesga un 400.
+          - Si gpt-oss devuelve content vacio con finish_reason='length'
+            (razonamiento agoto el presupuesto), se reintenta UNA vez el
+            MISMO modelo con max_tokens duplicado (log [GROQ-RETRY-LENGTH])
+            antes de ceder al siguiente modelo de la cadena.
         """
         ultimo_error: Exception = Exception("Groq: sin intentos")
 
