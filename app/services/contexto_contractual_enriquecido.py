@@ -34,6 +34,47 @@ logger = logging.getLogger("motor_glosas.contexto_contractual")
 # Patrones CUPS — los códigos institucionales del HUS pueden tener letras
 # (ej. 39143A-4) y los CUPS oficiales son 6 dígitos. Aceptamos ambos.
 _PAT_CUPS = re.compile(r"\b(\d{6}|\d{2,5}[A-Z]-?\d{1,4}|FMQ\d{3,6}|FMO\d{3,6})\b")
+
+# ── Exclusiones de candidatos CUPS (12-jun-2026, ronda 2) ─────────────
+# Evidencia de producción: el dictamen citó "CUPS 2026-04" (era la fecha
+# 2026-04-15) y "CUPS HUS0000522871" (era el número de FACTURA). Un CUPS
+# falso en el dictamen le regala a la EPS la ratificación por
+# inconsistencia. Ningún candidato que parezca fecha, año o factura puede
+# pasar como CUPS.
+_PAT_FECHA_COMO_CUPS = re.compile(r"^\d{4}-\d{1,2}(?:-\d{1,2})?$")
+_PAT_ANIO_COMO_CUPS = re.compile(r"^(?:19|20)\d{2}$")
+_PAT_FECHAS_EN_TEXTO = re.compile(r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b")
+_PREFIJOS_FACTURA = ("HUS", "FE", "FAC")
+
+
+def es_cups_descartable(candidato: str, texto: str = "") -> bool:
+    """True si el candidato NO debe usarse como CUPS:
+
+    (a) parece fecha (2026-04, 2026-04-15),
+    (b) empieza por prefijo de factura (HUS/FE/FAC) seguido de dígitos,
+    (c) es un año suelto (19xx/20xx), o
+    (d) aparece dentro de una fecha del texto (el "2026-04" capturado del
+        "2026-04-15" de la glosa).
+
+    Helper compartido: lo usan _extraer_cups_del_texto (acá) y el fallback
+    de extracción de CUPS en glosa_service.
+    """
+    cu = (candidato or "").strip().upper()
+    if not cu:
+        return True
+    if _PAT_FECHA_COMO_CUPS.match(cu) or _PAT_ANIO_COMO_CUPS.match(cu):
+        return True
+    for pref in _PREFIJOS_FACTURA:
+        # "HUS0000522871" sí; "FMQ6296" no (FM* es código institucional válido).
+        if cu.startswith(pref) and len(cu) > len(pref) and cu[len(pref)].isdigit():
+            return True
+    if texto:
+        for m in _PAT_FECHAS_EN_TEXTO.finditer(texto):
+            if cu in m.group(0):
+                return True
+    return False
+
+
 # Denominaciones que la auditoría suele equivocar (variantes con typo o
 # confusión por similitud léxica). Al detectar el patrón, el inyector
 # agrega una instrucción para que la IA corrija el nombre del servicio.
@@ -228,16 +269,96 @@ class ContextoContractual:
 def _extraer_cups_del_texto(texto: str) -> list[str]:
     """Extrae CUPS / códigos institucionales del texto de la glosa.
 
-    Devuelve lista deduplicada en orden de aparición.
+    Devuelve lista deduplicada en orden de aparición. Desde la ronda 2
+    (12-jun-2026) descarta candidatos que son fechas, años o números de
+    factura — ver `es_cups_descartable`.
     """
     if not texto:
         return []
     vistos: list[str] = []
     for m in _PAT_CUPS.finditer(texto):
         cod = m.group(1).upper()
+        if es_cups_descartable(cod, texto):
+            continue
         if cod not in vistos:
             vistos.append(cod)
     return vistos[:10]
+
+
+# ── Datos clínicos del enunciado (12-jun-2026, ronda 2) ───────────────
+# Evidencia: glosas con "NYHA III, FE 25%, en lista de trasplante", "47
+# días UCI por TCE severo" y "Kellgren IV" produjeron dictámenes que NO
+# mencionaban ninguno de esos datos — plantilla pura, fácil de ratificar.
+# Extractor determinístico (regex, sin NLP) para inyectarlos al prompt
+# como bloque imperativo y para el check suave del post_validator.
+_PATRONES_DATOS_CLINICOS: tuple[tuple[str, re.Pattern], ...] = (
+    ("NYHA", re.compile(r"\bNYHA\s*(?:CLASE\s*)?(?:IV|III|II|I)\b", re.IGNORECASE)),
+    (
+        "FE",
+        re.compile(
+            r"\b(?:FE|FEVI|FRACCI[ÓO]N\s+DE\s+EYECCI[ÓO]N)\s*(?:DEL?\s*)?[:=]?\s*\d{1,2}\s*%",
+            re.IGNORECASE,
+        ),
+    ),
+    ("GLASGOW", re.compile(r"\b(?:GLASGOW|GCS)\s*[:=]?\s*\d{1,2}(?:\s*/\s*15)?\b", re.IGNORECASE)),
+    (
+        "KELLGREN",
+        re.compile(
+            r"\bKELLGREN(?:\s*[-–]\s*LAWRENCE)?\s*(?:GRADO\s*)?(?:IV|III|II|I)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "ESTANCIA",
+        re.compile(
+            r"\b\d{1,3}\s*D[ÍI]AS?\s+(?:DE\s+|EN\s+)?(?:UCI|ESTANCIA|HOSPITALIZACI[ÓO]N\w*)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "TRASPLANTE",
+        re.compile(r"\bLISTA\s+DE\s+(?:ESPERA\s+(?:DE|PARA)\s+)?TRASPLANTE\b", re.IGNORECASE),
+    ),
+    ("TCE", re.compile(r"\bTCE\s+(?:SEVERO|MODERADO|LEVE)\b", re.IGNORECASE)),
+)
+
+
+def extraer_datos_clinicos(texto: str) -> list[str]:
+    """Extrae datos clínicos concretos del texto de la glosa.
+
+    Devuelve frases normalizadas (MAYÚSCULAS, espacios colapsados) en orden
+    de aparición, ej. ["NYHA III", "FE 25%", "LISTA DE TRASPLANTE"].
+    Solo patrones taxativos — nada de inferencia: si no matchea, no existe.
+    """
+    if not texto:
+        return []
+    hallados: list[tuple[int, str]] = []
+    vistos: set[str] = set()
+    for _nombre, pat in _PATRONES_DATOS_CLINICOS:
+        for m in pat.finditer(texto):
+            dato = re.sub(r"\s+", " ", m.group(0)).strip().upper()
+            if dato not in vistos:
+                vistos.add(dato)
+                hallados.append((m.start(), dato))
+    return [d for _, d in sorted(hallados)]
+
+
+def bloque_datos_clinicos(texto: str) -> str:
+    """Bloque listo para el user prompt con los datos clínicos del caso.
+
+    Cadena vacía si no se detectó ninguno (no perturba el prompt base).
+    """
+    datos = extraer_datos_clinicos(texto)
+    if not datos:
+        return ""
+    lineas = "\n".join(f"  • {d}" for d in datos)
+    return (
+        "\n[DATOS CLÍNICOS DEL CASO — ÚSALOS EN LA ARGUMENTACIÓN]\n"
+        f"{lineas}\n"
+        "⚠ OBLIGATORIO: INCORPORA estos datos LITERALMENTE en la argumentación — "
+        "son la prueba de la pertinencia del servicio. Un dictamen que ignora los "
+        "datos clínicos del caso es plantilla y será rechazado.\n"
+    )
 
 
 def _detectar_correcciones_denominacion(texto_glosa: str) -> list[dict]:

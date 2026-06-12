@@ -29,6 +29,23 @@ _MAX_CHARS_EJEMPLO = 1500
 _MAX_EJEMPLOS = 2
 
 
+def _contiene_contrato_ajeno(argumento: str, eps: str) -> bool:
+    """True si el ejemplo cita un contrato cuya EPS dueña NO es `eps`.
+
+    Ronda 2 (12-jun-2026, CONTRATO CRUZADO): los ejemplos del banco HUS
+    (eps=GENERICO) y los históricos venían con números de contrato reales de
+    OTRAS EPS, y la instrucción "copia el cuerpo VERBATIM" hacía que la IA
+    los arrastrara al dictamen (glosa DMBUG citando el S-13-1-03-1-04958 de
+    FAMISANAR). Un ejemplo así NO se inyecta: contamina más de lo que aporta.
+    """
+    try:
+        from app.services.glosa_ia_prompts import contratos_ajenos_citados
+
+        return bool(contratos_ajenos_citados(argumento or "", eps))
+    except Exception:
+        return False
+
+
 def obtener_ejemplos_gold(
     db,
     eps: str,
@@ -79,6 +96,14 @@ def obtener_ejemplos_gold(
             arg = (h.argumento or "").strip()
             if len(arg) < 200:
                 continue
+            # Ronda 2 12-jun-2026: plantilla genérica con contrato de OTRA
+            # EPS (la IA lo copia verbatim) — no inyectar.
+            if _contiene_contrato_ajeno(arg, eps_norm):
+                logger.warning(
+                    f"[FEW-SHOT-GOLD] plantilla BANCO_HUS #{h.id} omitida: "
+                    f"cita contrato de otra EPS (glosa de {eps_norm})"
+                )
+                continue
             ejemplos.append(
                 {
                     "argumento": arg[:_MAX_CHARS_EJEMPLO],
@@ -113,6 +138,13 @@ def obtener_ejemplos_gold(
             # Evitar duplicados con banco HUS
             if any(arg[:200] == e["argumento"][:200] for e in ejemplos):
                 continue
+            # Ronda 2 12-jun-2026: plantilla curada con contrato ajeno — fuera.
+            if _contiene_contrato_ajeno(arg, eps_norm):
+                logger.warning(
+                    f"[FEW-SHOT-GOLD] plantilla GOLD #{g.id} omitida: "
+                    f"cita contrato de otra EPS (glosa de {eps_norm})"
+                )
+                continue
             ejemplos.append(
                 {
                     "argumento": arg[:_MAX_CHARS_EJEMPLO],
@@ -145,6 +177,13 @@ def obtener_ejemplos_gold(
                 continue
             # Evitar duplicados: ya tenemos uno con este texto
             if any(arg[:200] == e["argumento"][:200] for e in ejemplos):
+                continue
+            # Ronda 2 12-jun-2026: histórico contaminado con contrato ajeno.
+            if _contiene_contrato_ajeno(arg, eps_norm):
+                logger.warning(
+                    f"[FEW-SHOT-GOLD] histórico #{r.id} omitido: "
+                    f"cita contrato de otra EPS (glosa de {eps_norm})"
+                )
                 continue
             ejemplos.append(
                 {

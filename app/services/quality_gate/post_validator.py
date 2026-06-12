@@ -54,6 +54,13 @@ _PAT_CONTRATO_EN_DICTAMEN = re.compile(
     r"([A-Z0-9][A-Z0-9./\-]{4,40}[A-Z0-9])",
 )
 
+# Placeholders crudos sin rellenar (12-jun-2026, ronda 2): dictamen real
+# entregado con "INTERPUESTA POR [ENTIDAD] ... DEL [SERVICIO] FACTURADO POR
+# [VALOR REAL] ... LA GLOSA [CODIGO]". El patrón exige MAYÚSCULAS sostenidas
+# dentro de los corchetes para NO confundir con corchetes legítimos tipo
+# "[sic]" ni con anotaciones del sistema que llevan puntuación interna.
+_PAT_PLACEHOLDER_CRUDO = re.compile(r"\[[A-ZÁÉÍÓÚÑ_ ]{3,}\]")
+
 
 @dataclass
 class PostCheckResult:
@@ -329,6 +336,103 @@ def check_contratos_no_fabricados(
     return PostCheckResult(ok=True, severidad="INFO", razon="contratos consistentes con input")
 
 
+def check_contrato_de_otra_eps(texto_dictamen: str, eps: str | None) -> PostCheckResult:
+    """Detecta números de contrato CONOCIDOS cuya EPS dueña ≠ EPS de la glosa.
+
+    Ronda 2 (12-jun-2026) — el hallazgo más grave del estrés: 3 dictámenes
+    citaron contratos de OTRA entidad (glosa DMBUG citó el
+    S-13-1-03-1-04958 de FAMISANAR; "OTRA / SIN DEFINIR" citó su Cláusula
+    4.2; FOMAG mezcló actas ajenas). check_contratos_no_fabricados NO los
+    caza cuando el número llegó por few-shot/histórico (está "en el input"
+    del prompt) — este check compara contra el catálogo contrato→dueña
+    (CONTRATOS_HUS + ContratoRecord BD) sin importar de dónde vino.
+    """
+    if not texto_dictamen or not eps:
+        return PostCheckResult(ok=True, severidad="INFO", razon="sin texto o sin EPS")
+    try:
+        from app.services.glosa_ia_prompts import contratos_ajenos_citados
+
+        ajenos = contratos_ajenos_citados(texto_dictamen, eps)
+    except Exception:
+        return PostCheckResult(ok=True, severidad="INFO", razon="catálogo no disponible")
+    if ajenos:
+        return PostCheckResult(
+            ok=False,
+            severidad="ERROR",
+            razon=(
+                f"{len(ajenos)} contrato(s) de OTRA EPS citado(s) en el dictamen: "
+                f"{', '.join(ajenos[:3])} (la EPS de la glosa es {eps}). "
+                "Citar el contrato de otra entidad invalida el dictamen completo."
+            ),
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="sin contratos de otras EPS")
+
+
+def check_sin_placeholders_crudos(texto_dictamen: str) -> PostCheckResult:
+    """Detecta placeholders crudos tipo [ENTIDAD] / [VALOR REAL] / [CODIGO].
+
+    Ronda 2 (12-jun-2026): un dictamen ENTREGADO conservaba los corchetes de
+    la plantilla sin rellenar. Es defecto GRAVE — se radica texto roto.
+    """
+    if not texto_dictamen:
+        return PostCheckResult(ok=True, severidad="INFO", razon="texto vacío")
+    encontrados = _PAT_PLACEHOLDER_CRUDO.findall(texto_dictamen)
+    if encontrados:
+        muestra = ", ".join(encontrados[:3])
+        return PostCheckResult(
+            ok=False,
+            severidad="ERROR",
+            razon=f"{len(encontrados)} placeholder(s) sin rellenar en el dictamen: {muestra}",
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="sin placeholders crudos")
+
+
+def check_datos_clinicos_usados(
+    texto_dictamen: str,
+    texto_glosa_input: str | None,
+) -> PostCheckResult:
+    """Check SUAVE (WARN): la glosa traía ≥2 datos clínicos y el dictamen no
+    usa NINGUNO → "dictamen ignora los datos clínicos del caso".
+
+    Ronda 2 (12-jun-2026): "NYHA III, FE 25%, lista de trasplante" / "47
+    días UCI por TCE severo" / "Kellgren IV" — ningún dictamen los mencionó.
+    Cuenta para el score (-10) pero NO bloquea por sí solo.
+    """
+    if not texto_dictamen or not texto_glosa_input:
+        return PostCheckResult(ok=True, severidad="INFO", razon="sin texto o sin input")
+    try:
+        from app.services.contexto_contractual_enriquecido import extraer_datos_clinicos
+
+        datos = extraer_datos_clinicos(texto_glosa_input)
+    except Exception:
+        return PostCheckResult(ok=True, severidad="INFO", razon="extractor no disponible")
+    if len(datos) < 2:
+        return PostCheckResult(
+            ok=True, severidad="INFO", razon=f"{len(datos)} dato(s) clínico(s) en la glosa"
+        )
+
+    dictamen_norm = re.sub(r"\s+", " ", texto_dictamen.upper())
+
+    def _presente(dato: str) -> bool:
+        if dato in dictamen_norm:
+            return True
+        # Tolerancia de redacción: todos los tokens del dato presentes
+        # ("47 DÍAS UCI" → "47", "DÍAS", "UCI" — la IA pudo reordenar).
+        tokens = [t for t in re.split(r"\s+", dato) if t]
+        return bool(tokens) and all(t in dictamen_norm for t in tokens)
+
+    if not any(_presente(d) for d in datos):
+        return PostCheckResult(
+            ok=False,
+            severidad="WARN",
+            razon=(
+                "dictamen ignora los datos clínicos del caso "
+                f"({', '.join(datos[:4])}) — argumentación de plantilla."
+            ),
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="datos clínicos incorporados")
+
+
 def post_validar_dictamen(
     texto: str,
     *,
@@ -389,6 +493,21 @@ def post_validar_dictamen(
             texto,
             texto_glosa_input=texto_glosa_input,
             clausulas_contrato=clausulas_contrato,
+        )
+
+        # 9-11. Checks nuevos de la ronda 2 (12-jun-2026). Van dentro del
+        #   gate `texto_glosa_input is not None` por compatibilidad con
+        #   callers/tests legacy que validan el set exacto de checks sin
+        #   pasar el input (el QG y multi_codigo SIEMPRE lo pasan).
+        # 9. Contrato de OTRA EPS (catálogo contrato→dueña) — el más grave.
+        checks["contrato_otra_eps"] = check_contrato_de_otra_eps(texto, eps)
+
+        # 10. Placeholders crudos [ENTIDAD]/[VALOR REAL]/[CODIGO] → GRAVE.
+        checks["placeholders_crudos"] = check_sin_placeholders_crudos(texto)
+
+        # 11. Datos clínicos del caso ignorados → WARN (score, no bloquea).
+        checks["datos_clinicos"] = check_datos_clinicos_usados(
+            texto, texto_glosa_input=texto_glosa_input
         )
 
     # Score: 100 - 30 por cada ERROR, -10 por cada WARN
