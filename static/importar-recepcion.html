@@ -436,6 +436,46 @@ async function descargarExcelRecepcion(id, btn){
   }
 }
 
+// 📄 Excel radicable (jun-2026): formato institucional que se radica ante
+// la entidad pagadora (hoja RESPUESTA GLOSAS una-fila-por-concepto + hoja
+// FUNDAMENTO JURÍDICO). Mismo manejo de auth/errores que el Excel-respuesta.
+async function descargarExcelRadicable(id, btn){
+  const txt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generando…';
+  try{
+    const rr = await fetch('/glosas/importar-recepcion/'+id+'/excel-radicable', {
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    if(rr.status === 401){ sesionExpirada(); return; }
+    if(!rr.ok){
+      let de={}; try{ de = await rr.json(); }catch(_e){}
+      alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
+      return;
+    }
+    // El servidor manda el nombre institucional (RESPUESTA_GLOSAS_..._HUS.xlsx)
+    // en el Content-Disposition; si no se puede leer, fallback genérico.
+    let nombre = 'RESPUESTA_GLOSAS_'+id+'_HUS.xlsx';
+    const cd = rr.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    const blob = await rr.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert('Error de red al descargar: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = txt;
+  }
+}
+
 async function cargarHistorial(){
   const cont = document.getElementById('historial-lista');
   try{
@@ -469,6 +509,9 @@ async function cargarHistorial(){
       const dl = im.descargable
         ? `<button onclick="descargarExcelRecepcion(${im.id}, this)" style="background:#10b981;color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">⬇ Excel-respuesta</button>`
         : `<span style="color:#9ca3af;font-size:12px">archivo ya no disponible</span>`;
+      // El radicable se regenera 100% desde BD: disponible aunque el
+      // archivo original de la importación ya haya sido purgado.
+      const dlRad = `<button onclick="descargarExcelRadicable(${im.id}, this)" style="background:var(--sinac-green-700);color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">📄 Excel radicable</button>`;
       const pend = im.dictamenes_pendientes||0;
       const listos = im.dictamenes_listos||0;
       const iaInfo = (listos+pend) > 0
@@ -482,7 +525,7 @@ async function cargarHistorial(){
           <span style="color:#6b7280">${im.archivo_nombre||'recepcion.xlsx'} · ${im.total_glosas} glosa(s) · ${im.usuario_email||''}</span>
           ${iaInfo?'<br>'+iaInfo:''}
         </div>
-        <div>${dl}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${dl}${dlRad}</div>
       </div>`;
     }).join('');
   }catch(e){
