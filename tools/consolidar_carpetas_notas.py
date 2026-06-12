@@ -97,7 +97,7 @@ def buscar_json_origen(carpeta: Path) -> Path | None:
     return None
 
 
-def procesar_carpeta(carpeta: Path, base: Path, borrar: bool, dry_run: bool) -> dict:
+def procesar_carpeta(carpeta: Path, base: Path, borrar: bool, dry_run: bool, aceptar_sin_json: bool = False) -> dict:
     registro = {
         "carpeta": carpeta.name,
         "nota_electronica": "",
@@ -152,27 +152,34 @@ def procesar_carpeta(carpeta: Path, base: Path, borrar: bool, dry_run: bool) -> 
 
     # ── PASO 2: mover RIPS/ResultadosDoker_*.json → CUV_<NE>_<factura>.json ──
     json_destino = carpeta / nombre_json_final
+    sin_json = False
     if json_destino.exists():
         registro["json_final"] = nombre_json_final
     else:
         json_origen = buscar_json_origen(carpeta)
         if json_origen is None:
-            registro["estado"] = "FALTA_JSON"
-            registro["detalle"] = "No encontré RIPS/ResultadosDoker_*.json"
-            logger.warning(f"{carpeta.name}: FALTA_JSON — no toco la papelera")
-            return registro
-        if dry_run:
-            logger.info(f"  DRY: movería RIPS/{json_origen.name} → {nombre_json_final}")
-        else:
-            try:
-                shutil.move(str(json_origen), str(json_destino))
-                logger.info(f"  + RIPS/{json_origen.name} → {nombre_json_final}")
-            except OSError as e:
-                registro["estado"] = "ERROR_MOVER_JSON"
-                registro["detalle"] = f"{type(e).__name__}: {e}"
-                logger.error(f"{carpeta.name}: ERROR_MOVER_JSON — {e}")
+            if not aceptar_sin_json:
+                registro["estado"] = "FALTA_JSON"
+                registro["detalle"] = "No encontré RIPS/ResultadosDoker_*.json"
+                logger.warning(f"{carpeta.name}: FALTA_JSON — no toco la papelera")
                 return registro
-        registro["json_final"] = nombre_json_final
+            # Con --aceptar-sin-json: seguimos consolidando solo con PDF+XML
+            sin_json = True
+            nombres_finales.discard(nombre_json_final)
+            logger.info(f"  ⚠ {carpeta.name}: sin JSON — consolido solo PDF+XML")
+        else:
+            if dry_run:
+                logger.info(f"  DRY: movería RIPS/{json_origen.name} → {nombre_json_final}")
+            else:
+                try:
+                    shutil.move(str(json_origen), str(json_destino))
+                    logger.info(f"  + RIPS/{json_origen.name} → {nombre_json_final}")
+                except OSError as e:
+                    registro["estado"] = "ERROR_MOVER_JSON"
+                    registro["detalle"] = f"{type(e).__name__}: {e}"
+                    logger.error(f"{carpeta.name}: ERROR_MOVER_JSON — {e}")
+                    return registro
+            registro["json_final"] = nombre_json_final
 
     # ── PASO 3: limpiar el resto (mover a papelera o borrar) ─────────────
     a_eliminar = []
@@ -185,7 +192,7 @@ def procesar_carpeta(carpeta: Path, base: Path, borrar: bool, dry_run: bool) -> 
     registro["items_a_papelera"] = ";".join(sorted(i.name for i in a_eliminar))
 
     if not a_eliminar:
-        registro["estado"] = "OK"
+        registro["estado"] = "OK_SIN_JSON" if sin_json else "OK"
         return registro
 
     if dry_run:
@@ -229,7 +236,7 @@ def procesar_carpeta(carpeta: Path, base: Path, borrar: bool, dry_run: bool) -> 
             logger.error(f"{carpeta.name}: ERROR_LIMPIAR {item.name} — {e}")
             return registro
 
-    registro["estado"] = "OK"
+    registro["estado"] = "OK_SIN_JSON" if sin_json else "OK"
     return registro
 
 
@@ -287,6 +294,15 @@ def main() -> int:
         default=None,
         help="Procesar solo esta carpeta (útil para testing)",
     )
+    parser.add_argument(
+        "--aceptar-sin-json",
+        action="store_true",
+        help=(
+            "Consolidar también las carpetas que no traen el CUV JSON del RIPS "
+            "(deja solo PDF+XML como finales). Útil para notas viejas donde el "
+            "validador DIAN nunca generó el CUV. Estado final: OK_SIN_JSON."
+        ),
+    )
     args = parser.parse_args()
 
     setup_logging()
@@ -315,7 +331,10 @@ def main() -> int:
     resultados = []
     for i, c in enumerate(carpetas, 1):
         logger.info(f"[{i}/{len(carpetas)}] {c.name}")
-        resultados.append(procesar_carpeta(c, args.destino, args.borrar, args.dry_run))
+        resultados.append(procesar_carpeta(
+            c, args.destino, args.borrar, args.dry_run,
+            aceptar_sin_json=args.aceptar_sin_json,
+        ))
 
     escribir_reporte(resultados, args.reporte)
 
