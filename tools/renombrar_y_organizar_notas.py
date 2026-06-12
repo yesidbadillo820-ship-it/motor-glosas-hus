@@ -263,6 +263,92 @@ def setup_logging(log_file: Path | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers)
 
 
+RE_PDF_YA_RENOMBRADO = re.compile(r"^NC_\d{4,}_HUS\d{6,12}\.pdf$", re.IGNORECASE)
+
+
+def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool) -> list[dict]:
+    """Modo --en-sitio: el PDF de la nota ya está DENTRO de la carpeta
+    <NE>/ (vino así del share, ej. nc0900...302478.pdf). Lo renombra en el
+    lugar a NC_<NE>_<HUS>.pdf leyendo NE + factura del CONTENIDO del PDF y
+    verificando que la NE extraída coincida con el nombre de la carpeta."""
+    resultados: list[dict] = []
+    pdfs = sorted(p for p in carpeta.iterdir() if p.is_file() and p.suffix.lower() == ".pdf")
+    if any(RE_PDF_YA_RENOMBRADO.match(p.name) for p in pdfs):
+        resultados.append({
+            "archivo_origen": str(carpeta),
+            "estado": "YA_RENOMBRADO",
+            "detalle": "La carpeta ya tiene un NC_<NE>_<HUS>.pdf",
+        })
+        logger.info(f"{carpeta.name}: YA_RENOMBRADO — omitida")
+        return resultados
+    if not pdfs:
+        resultados.append({
+            "archivo_origen": str(carpeta),
+            "estado": "SIN_PDF",
+            "detalle": "La carpeta no tiene ningún PDF",
+        })
+        logger.warning(f"{carpeta.name}: SIN_PDF")
+        return resultados
+
+    for pdf in pdfs:
+        resultado = {
+            "archivo_origen": str(pdf),
+            "nota_electronica": "",
+            "nota_credito": "",
+            "factura": "",
+            "facturas_todas": "",
+            "nuevo_nombre": "",
+            "destino_final": "",
+            "estado": "",
+            "detalle": "",
+        }
+        resultados.append(resultado)
+        try:
+            texto = extraer_texto_pdf(pdf)
+        except Exception as e:
+            resultado["estado"] = "ERROR_LECTURA"
+            resultado["detalle"] = f"{type(e).__name__}: {e}"
+            logger.error(f"{carpeta.name}/{pdf.name}: ERROR_LECTURA — {e}")
+            continue
+        datos = extraer_datos(texto)
+        resultado["nota_electronica"] = datos["nota_electronica"]
+        resultado["nota_credito"] = datos["nota_credito"]
+        resultado["factura"] = datos["factura"]
+        resultado["facturas_todas"] = ";".join(datos["facturas_todas"])
+        if not datos["nota_electronica"] or not datos["factura"]:
+            resultado["estado"] = "DATOS_INCOMPLETOS"
+            resultado["detalle"] = "El PDF no trae Nota Electrónica y/o Factura HUS legibles"
+            logger.warning(f"{carpeta.name}/{pdf.name}: DATOS_INCOMPLETOS")
+            continue
+        if datos["nota_electronica"] != carpeta.name:
+            resultado["estado"] = "MISMATCH_CARPETA"
+            resultado["detalle"] = (
+                f"El PDF dice NE {datos['nota_electronica']} pero la carpeta es "
+                f"{carpeta.name} — no lo toco; revisalo a mano"
+            )
+            logger.warning(f"{carpeta.name}/{pdf.name}: MISMATCH_CARPETA ({datos['nota_electronica']})")
+            continue
+        nuevo = nombre_destino(datos)
+        destino_final = carpeta / nuevo
+        resultado["nuevo_nombre"] = nuevo
+        resultado["destino_final"] = str(destino_final)
+        if dry_run:
+            resultado["estado"] = "DRY_RUN"
+            resultado["detalle"] = f"renombraría {pdf.name} → {nuevo}"
+            logger.info(f"{carpeta.name}: DRY_RUN — {pdf.name} → {nuevo}")
+            continue
+        try:
+            pdf.rename(destino_final)
+            resultado["estado"] = "OK"
+            resultado["detalle"] = f"renombrado desde {pdf.name}"
+            logger.info(f"{carpeta.name}: OK — {pdf.name} → {nuevo}")
+        except OSError as e:
+            resultado["estado"] = "ERROR_RENOMBRE"
+            resultado["detalle"] = f"{type(e).__name__}: {e}"
+            logger.error(f"{carpeta.name}/{pdf.name}: ERROR_RENOMBRE — {e}")
+    return resultados
+
+
 def escribir_reporte(resultados: list[dict], ruta: Path) -> None:
     ruta.parent.mkdir(parents=True, exist_ok=True)
     campos = [
@@ -290,13 +376,23 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--origen", type=Path, required=True, help="Carpeta con los PDFs a renombrar"
+        "--origen", type=Path, default=None,
+        help="Carpeta con los PDFs a renombrar (no aplica con --en-sitio)"
     )
     parser.add_argument(
         "--destino",
         type=Path,
         required=True,
         help="Carpeta base donde están las subcarpetas por nota crédito",
+    )
+    parser.add_argument(
+        "--en-sitio",
+        action="store_true",
+        help=(
+            "El PDF de la nota ya está DENTRO de cada subcarpeta <NE>/ (vino así "
+            "del share, ej. nc0900...pdf): renombrarlo ahí mismo a NC_<NE>_<HUS>.pdf "
+            "leyendo el contenido. No necesita --origen."
+        ),
     )
     parser.add_argument(
         "--reporte",
@@ -329,11 +425,43 @@ def main() -> int:
     _cargar_backend()
     logger.info(f"Backend PDF: {_BACKEND}")
 
-    if not args.origen.is_dir():
-        logger.error(f"--origen no existe o no es carpeta: {args.origen}")
-        return 1
     if not args.destino.exists():
         logger.error(f"--destino no existe: {args.destino}")
+        return 1
+
+    # ── Modo EN SITIO: renombrar el nc*.pdf dentro de cada subcarpeta <NE>/ ──
+    if args.en_sitio:
+        carpetas = sorted(
+            c for c in args.destino.iterdir()
+            if c.is_dir() and not c.name.startswith("_")
+        )
+        if not carpetas:
+            logger.error(f"--destino no tiene subcarpetas de notas: {args.destino}")
+            return 1
+        logger.info(f"Modo EN SITIO: {len(carpetas)} carpetas en {args.destino}"
+                    + (" (DRY-RUN)" if args.dry_run else ""))
+        resultados = []
+        for i, carpeta in enumerate(carpetas, start=1):
+            logger.info(f"[{i}/{len(carpetas)}] {carpeta.name}")
+            resultados.extend(procesar_carpeta_en_sitio(carpeta, dry_run=args.dry_run))
+        escribir_reporte(resultados, args.reporte)
+        resumen: dict[str, int] = {}
+        for r in resultados:
+            resumen[r["estado"]] = resumen.get(r["estado"], 0) + 1
+        logger.info("=" * 60)
+        logger.info("RESUMEN (en sitio)")
+        for estado, n in sorted(resumen.items(), key=lambda kv: -kv[1]):
+            logger.info(f"    {estado}: {n}")
+        logger.info(f"  Reporte: {args.reporte}")
+        problemas = sum(n for k, n in resumen.items()
+                        if k not in ("OK", "YA_RENOMBRADO", "DRY_RUN"))
+        return 0 if problemas == 0 else 1
+
+    if args.origen is None:
+        logger.error("Falta --origen (o usá --en-sitio si los PDFs ya están en las subcarpetas).")
+        return 1
+    if not args.origen.is_dir():
+        logger.error(f"--origen no existe o no es carpeta: {args.origen}")
         return 1
 
     pdfs = sorted(p for p in args.origen.iterdir() if p.is_file() and p.suffix.lower() == ".pdf")
