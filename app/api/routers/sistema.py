@@ -1622,7 +1622,7 @@ def info_about(
             "framework": "FastAPI + Pydantic v2",
             "orm": "SQLAlchemy",
             "db": "PostgreSQL",
-            "llm": "Claude Sonnet 4.6 (Anthropic) + Groq Llama 3.3",
+            "llm": "Claude Sonnet 4.6 (Anthropic) + Groq (gpt-oss-120b → qwen3-32b → llama-3.3)",
             "auth": "JWT + 2FA TOTP",
             "hosting": "Render",
         },
@@ -1887,7 +1887,7 @@ def info_inventario_funcionalidades(
             "framework": "FastAPI + Pydantic v2",
             "orm": "SQLAlchemy",
             "db_prod": "PostgreSQL",
-            "llm": "Claude Sonnet 4.6 + Groq Llama 3.3",
+            "llm": "Claude Sonnet 4.6 + Groq (gpt-oss-120b → qwen3-32b → llama-3.3)",
             "auth": "JWT + 2FA TOTP",
             "hosting": "Render",
         },
@@ -2881,7 +2881,7 @@ def info_feature_flags(
         {
             "nombre": "ia_groq",
             "activo": bool(cfg.groq_api_key),
-            "descripcion": "Groq Llama como LLM fallback",
+            "descripcion": "Groq (cadena gpt-oss-120b → qwen3-32b → llama-3.3) como LLM fallback",
         },
         {
             "nombre": "firma_digital_rsa",
@@ -3001,6 +3001,8 @@ def info_configuracion(
         "ia": {
             "primary_ai": cfg.primary_ai,
             "groq_model": cfg.groq_model,
+            "groq_model_fallback_1": cfg.groq_model_fallback_1,
+            "groq_model_fallback_2": cfg.groq_model_fallback_2,
             "anthropic_model": cfg.anthropic_model,
             "anthropic_configurado": bool(cfg.anthropic_api_key),
             "groq_configurado": bool(cfg.groq_api_key),

@@ -231,8 +231,12 @@ def test_respuesta_concepto_y_fallback_a_dictamen_glosa(db_session):
 
     # Concepto con dictamen propio → su texto plano (sin tags HTML)
     assert ws.cell(4, 12).value == "Respuesta concepto 1 con tarifa del anexo."
-    # Concepto sin dictamen → dictamen de la glosa vía dictamen_a_texto_plano
-    assert ws.cell(5, 12).value == "Defensa glosa A por tarifas pactadas."
+    # Concepto sin dictamen, código DISTINTO al principal y dictamen sin
+    # sección para él: desde el fix del 12-jun-2026 (filas duplicadas en
+    # el export) ya no se repite el dictamen completo — nota corta que
+    # remite a la fila del código principal.
+    assert "dictamen integral de la glosa #1" in ws.cell(5, 12).value
+    assert "código principal TA0801" in ws.cell(5, 12).value
     assert "<p>" not in ws.cell(5, 12).value
     # Observación de la EPS por concepto
     assert ws.cell(4, 10).value == "MVC EN SERVICIO 111111"

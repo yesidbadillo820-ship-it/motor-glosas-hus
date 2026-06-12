@@ -79,6 +79,8 @@ async def buscar(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )

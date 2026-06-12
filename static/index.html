@@ -16320,7 +16320,15 @@ async function cargarIAStatus(){
         '<div style="font-size:.74rem;color:var(--text2);margin-bottom:.3rem"><b>Rol:</b> '+escHtml(p.rol)+'</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.4rem;font-size:.7rem;color:var(--text3);margin-top:.4rem">'+
           '<div><b>API key:</b> '+(p.api_key_configurada ? '<code>'+escHtml(p.api_key_prefix)+'…</code>' : '<span style="color:#dc2626">no configurada</span>')+'</div>'+
-          '<div><b>Modelo:</b> <code>'+escHtml(p.modelo_actual||'?')+'</code></div>'+
+          // Groq trae modelos_cadena (12-jun-2026): primario + fallbacks
+          // internos que se agotan antes de saltar a Anthropic.
+          '<div style="grid-column:1/-1"><b>Modelo:</b> '+(
+            (p.modelos_cadena && p.modelos_cadena.length > 1)
+              ? p.modelos_cadena.map(function(m,i){
+                  return (i===0 ? 'Primario: ' : 'Fallback '+i+': ')+'<code>'+escHtml(m)+'</code>';
+                }).join(' · ')
+              : '<code>'+escHtml(p.modelo_actual||'?')+'</code>'
+          )+'</div>'+
           '<div style="grid-column:1/-1"><b>Rate limit:</b> '+escHtml(p.rate_limit)+'</div>'+
         '</div>'+
         '<div style="margin-top:.5rem;text-align:right">'+
@@ -21739,7 +21747,7 @@ function paBuildEmptyStateHTML(data){
     if(presence.gemini && presence.gemini.cargada) proveedores.push('Gemini');
     if(presence.groq && presence.groq.cargada) proveedores.push('Groq');
     const primary = (presence.primary_ai || 'auto').toLowerCase();
-    const primaryLabel = {anthropic:'Anthropic Claude', gemini:'Google Gemini', groq:'Groq Llama'}[primary] || primary.toUpperCase();
+    const primaryLabel = {anthropic:'Anthropic Claude', gemini:'Google Gemini', groq:'Groq'}[primary] || primary.toUpperCase();
     partes.push(
       '<div class="pa-pulse">'+
         '<span class="pa-pulse-dot"></span>'+

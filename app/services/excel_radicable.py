@@ -51,6 +51,7 @@ from app.models.db import (
     ImportacionRecepcionRecord,
 )
 from app.services.contexto_contractual_enriquecido import _regimen_especial_texto
+from app.services.dictamen_secciones import extraer_seccion_por_codigo
 from app.services.glosa_ia_prompts import get_contrato
 from app.services.recepcion_excel_response import _truncar_para_celda
 from app.utils.html_a_texto import dictamen_a_texto_plano
@@ -220,12 +221,50 @@ def _color_decision(decision: str) -> str:
     return _GRIS_PENDIENTE
 
 
-def _respuesta_fila(glosa: GlosaRecord, concepto: ConceptoGlosaRecord | None) -> str:
+def _respuesta_fila(
+    glosa: GlosaRecord,
+    concepto: ConceptoGlosaRecord | None,
+    multi_concepto: bool = False,
+) -> str:
     """RESPUESTA ESE HUS de la fila: dictamen del concepto si está
-    poblado; si no, dictamen de la glosa; si tampoco, marca PENDIENTE."""
+    poblado; si no, dictamen de la glosa; si tampoco, marca PENDIENTE.
+
+    Regresión 12-jun-2026 (export del dueño): en glosas con VARIOS
+    conceptos el campo por-concepto casi nunca viene, así que todas las
+    filas de la misma factura caían al `glosa.dictamen` completo y salían
+    palabra por palabra idénticas (filas AU0101 y CO0701 mostrando ambas
+    el bloque encabezado por TA0101). Fix de PRESENTACIÓN («Opción A»):
+    cuando la glosa es multi-concepto, el dictamen se divide por los
+    separadores «═══ RESPUESTA AL CÓDIGO … ═══» (multi_codigo.py) y cada
+    fila recibe SOLO su sección — el flujo de análisis no se toca.
+    """
     if concepto is not None and (concepto.dictamen_html or "").strip():
         return _truncar_para_celda(dictamen_a_texto_plano(concepto.dictamen_html))
     if (glosa.dictamen or "").strip():
+        if concepto is not None and multi_concepto:
+            cod_glosa = (glosa.codigo_glosa or "").strip().upper()
+            # Mismo fallback que la columna CÓD. GLOSA: un concepto sin
+            # código hereda el de la glosa (y con él, su sección principal).
+            cod_concepto = (concepto.codigo_glosa or "").strip().upper() or cod_glosa
+            seccion = extraer_seccion_por_codigo(
+                glosa.dictamen,
+                codigo_concepto=cod_concepto,
+                codigo_principal=cod_glosa or None,
+            )
+            if seccion:
+                return _truncar_para_celda(dictamen_a_texto_plano(seccion))
+            if cod_concepto and cod_glosa and cod_concepto != cod_glosa:
+                # El dictamen no trae sección para este código (la glosa se
+                # analizó como un todo): nota corta y profesional en vez de
+                # duplicar el dictamen completo en N filas.
+                return (
+                    "Este concepto se responde como parte del dictamen integral de la "
+                    f"glosa #{glosa.id} (código principal {cod_glosa}). Ver la fila del "
+                    "código principal para la argumentación completa."
+                )
+        # Glosa de un solo concepto (o concepto = código principal sin
+        # sección divisible): status quo — dictamen completo, que incluye
+        # la cabecera del documento.
         return _truncar_para_celda(dictamen_a_texto_plano(glosa.dictamen))
     return f"PENDIENTE DE ANÁLISIS — {(glosa.estado or 'SIN ESTADO').upper()}"
 
@@ -397,6 +436,9 @@ def _filas_del_lote(
     filas: list[dict] = []
     for g in sorted(glosas, key=_orden_glosa):
         conceptos = conceptos_por_glosa.get(g.id) or [None]
+        # Con 2+ conceptos la columna RESPUESTA se divide por código (fix
+        # 12-jun-2026: filas duplicadas); con uno solo, status quo.
+        multi = len(conceptos) > 1
         for c in conceptos:
             decision = _decision_hus(
                 g.codigo_respuesta,
@@ -431,7 +473,7 @@ def _filas_del_lote(
                         or ""
                     ),
                     "decision": decision,
-                    "respuesta": _respuesta_fila(g, c),
+                    "respuesta": _respuesta_fila(g, c, multi_concepto=multi),
                 }
             )
     return filas

@@ -1240,6 +1240,8 @@ async def generar_lote(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )
@@ -1432,6 +1434,8 @@ async def refinar_dictamen_endpoint(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )
@@ -1542,6 +1546,8 @@ async def validar_pre_radicacion(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )
@@ -4404,6 +4410,8 @@ async def _procesar_fila_en_background(
             primary_ai=cfg.primary_ai,
             anthropic_model=cfg.anthropic_model,
             groq_model=cfg.groq_model,
+            groq_model_fallback_1=cfg.groq_model_fallback_1,
+            groq_model_fallback_2=cfg.groq_model_fallback_2,
             gemini_api_key=cfg.gemini_api_key,
             gemini_model=cfg.gemini_model,
         )
@@ -5864,6 +5872,8 @@ async def reanalizar_glosa(
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )

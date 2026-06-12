@@ -27,6 +27,7 @@ from sqlalchemy import func, desc
 
 from app.database import get_db
 from app.api.deps import get_admin
+from app.core.config import get_settings
 from app.models.db import (
     UsuarioRecord,
     GlosaRecord,
@@ -256,11 +257,30 @@ def diagnostico_completo(
             "data": {},
         }
     else:
+        # Cadena de modelos Groq desde Settings (12-jun-2026): primario +
+        # 2 fallbacks internos antes de saltar a Anthropic. Espejo de
+        # GlosaService._modelos_groq (dedupe por si un override por env
+        # repite un modelo). Mismo patrón que la sección Anthropic, que ya
+        # muestra su modelo activo.
+        cfg = get_settings()
+        cadena_groq: list[str] = []
+        for _m in (cfg.groq_model, cfg.groq_model_fallback_1, cfg.groq_model_fallback_2):
+            if _m and _m not in cadena_groq:
+                cadena_groq.append(_m)
+        partes_cadena = [f"Primario: {cadena_groq[0]}"] + [
+            f"Fallback {i}: {m}" for i, m in enumerate(cadena_groq[1:], start=1)
+        ]
         out["secciones"]["groq"] = {
             "estado": "ok",
-            "mensaje": f"API key configurada (fallback de Anthropic, prefijo {groq_key[:10]}…)",
+            "mensaje": (
+                f"API key configurada (fallback de Anthropic, prefijo {groq_key[:10]}…) · "
+                + " · ".join(partes_cadena)
+            ),
             "data": {
-                "modelo": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                "modelo": cfg.groq_model,
+                "modelo_fallback_1": cfg.groq_model_fallback_1,
+                "modelo_fallback_2": cfg.groq_model_fallback_2,
+                "cadena_modelos": cadena_groq,
             },
         }
 

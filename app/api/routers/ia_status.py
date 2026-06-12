@@ -57,18 +57,19 @@ PROVEEDORES_INFO = {
         "console_url": "https://aistudio.google.com/apikey",
     },
     "groq": {
-        "nombre": "Groq Llama",
+        "nombre": "Groq",
         "tipo": "free-fast",
         "rol": "Proveedor PRIMARIO de dictamenes (gratis y rapido). Anthropic entra para casos complejos o como fallback de calidad.",
         "fortaleza": "Velocidad bestial (LPU dedicado): 200-400 tokens/s",
         "tier": "Free con rate limits",
+        # Cadena vigente 12-jun-2026 (gpt-oss-120b primario; los
+        # deprecados llama-3.1-70b / mixtral-8x7b salieron de Groq).
         "modelos_disponibles": [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-70b-versatile",
             "openai/gpt-oss-120b",
-            "mixtral-8x7b-32768",
+            "qwen/qwen3-32b",
+            "llama-3.3-70b-versatile",
         ],
-        "rate_limit": "30 RPM en tier gratis",
+        "rate_limit": "30 RPM en tier gratis (bucket por modelo)",
         "console_url": "https://console.groq.com/keys",
     },
 }
@@ -101,6 +102,14 @@ def listar_proveedores(
         else:  # groq
             info["api_key_configurada"] = bool(cfg.groq_api_key)
             info["modelo_actual"] = cfg.groq_model
+            # Cadena interna de modelos Groq (12-jun-2026): primario + 2
+            # fallbacks que se agotan ANTES de saltar a Anthropic (espejo
+            # de GlosaService._modelos_groq, con dedupe).
+            cadena: list[str] = []
+            for m in (cfg.groq_model, cfg.groq_model_fallback_1, cfg.groq_model_fallback_2):
+                if m and m not in cadena:
+                    cadena.append(m)
+            info["modelos_cadena"] = cadena
             info["api_key_prefix"] = cfg.groq_api_key[:10] if cfg.groq_api_key else ""
         info["es_primary"] = clave == primary
         info["clave"] = clave
