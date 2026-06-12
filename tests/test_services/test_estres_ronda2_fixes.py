@@ -1,4 +1,4 @@
-"""Tests de los 8 fixes de la evaluación de estrés ronda-2 (12-jun-2026).
+"""Tests de los 9 fixes de la evaluación de estrés ronda-2 (12-jun-2026).
 
 Cada clase cubre UN fix usando los textos de evidencia REALES de la
 evaluación (glosas sintéticas del dueño — sin datos de pacientes):
@@ -13,10 +13,15 @@ evaluación (glosas sintéticas del dueño — sin datos de pacientes):
   6. Placeholders crudos "[ENTIDAD] / [VALOR REAL] / [CODIGO]" en el output.
   7. Números deletreados en palabras → $0.00.
   8. Fecha/factura tomada como CUPS ("CUPS 2026-04", "CUPS HUS0000522871").
+  9. gpt-oss-120b (RAZONADOR) agotaba max_tokens=3000 en chain-of-thought →
+     content vacío con finish_reason='length' → fallback a qwen innecesario.
+     Evidencia: log [GROQ-FALLBACK] de prod 12-jun 19:37 UTC (auto-crítica).
 """
 
 from __future__ import annotations
 
+import logging
+import uuid
 from unittest.mock import AsyncMock
 
 import pytest
@@ -871,3 +876,222 @@ class TestFix8FechaFacturaComoCups:
             cups_verificado="890602",
         )
         assert "NO inventes ni rellenes el CUPS" not in p
+
+
+# ════════════════════════════════════════════════════════════════════
+# FIX 9 — gpt-oss-120b razonador: presupuesto de tokens + retry-length.
+# Evidencia real (prod 12-jun 19:37 UTC): "[GROQ-FALLBACK]
+# model=openai/gpt-oss-120b agotado (Groq/openai/gpt-oss-120b devolvió
+# content vacío/None (finish_reason='length')); probando siguiente
+# modelo Groq: qwen/qwen3-32b". El chain-of-thought consumía TODO el
+# max_tokens=3000 (calibrado para Llama) y se perdía calidad + latencia
+# saltando a qwen. Fix: max_tokens>=8000 para gpt-oss, reasoning_effort
+# 'medium'/'low', y retry del MISMO modelo con max_tokens duplicado
+# antes de ceder la cadena.
+# ════════════════════════════════════════════════════════════════════
+
+GPT_OSS = "openai/gpt-oss-120b"
+QWEN = "qwen/qwen3-32b"
+LLAMA = "llama-3.3-70b-versatile"
+DICTAMEN_OK = "<paciente>JUAN PEREZ</paciente><argumento>NO SE ACEPTA LA GLOSA</argumento>"
+# Acción que simula la respuesta de prod: content vacío, razonamiento
+# agotó el presupuesto (finish_reason='length').
+VACIO_POR_LENGTH = ("", "length")
+
+
+class _MsgF9:
+    def __init__(self, content):
+        self.content = content
+
+
+class _ChoiceF9:
+    def __init__(self, content, finish_reason):
+        self.message = _MsgF9(content)
+        self.finish_reason = finish_reason
+
+
+class _RespF9:
+    def __init__(self, content, finish_reason="stop"):
+        self.choices = [_ChoiceF9(content, finish_reason)]
+
+
+class _CompletionsF9:
+    """create() falso que REGISTRA los kwargs completos de cada llamada
+    (para asertar max_tokens / reasoning_effort) y consume acciones por
+    modelo: str → respuesta OK; tuple (content, finish_reason) → respuesta
+    cruda; Exception → raise; list → se consume en orden."""
+
+    def __init__(self, por_modelo: dict):
+        self.por_modelo = por_modelo
+        self.kwargs_llamadas: list[dict] = []
+
+    async def create(self, **kwargs):
+        self.kwargs_llamadas.append(kwargs)
+        accion = self.por_modelo[kwargs["model"]]
+        if isinstance(accion, list):
+            accion = accion.pop(0)
+        if isinstance(accion, Exception):
+            raise accion
+        if isinstance(accion, tuple):
+            return _RespF9(*accion)
+        return _RespF9(accion)
+
+
+class _ChatF9:
+    def __init__(self, completions):
+        self.completions = completions
+
+
+class _GroqF9:
+    def __init__(self, por_modelo: dict):
+        self.chat = _ChatF9(_CompletionsF9(por_modelo))
+
+    @property
+    def kwargs_llamadas(self) -> list[dict]:
+        return self.chat.completions.kwargs_llamadas
+
+    @property
+    def modelos_llamados(self) -> list[str]:
+        return [k["model"] for k in self.kwargs_llamadas]
+
+
+@pytest.fixture
+def svc_groq_f9(monkeypatch):
+    """GlosaService primary groq, sin keys del entorno ni BD de caché."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr("app.services.glosa_service._buscar_cache_ia_db", lambda clave: None)
+    monkeypatch.setattr("app.services.glosa_service._guardar_cache_ia_db", lambda *a, **k: None)
+
+    def _crear(por_modelo: dict, **kwargs):
+        from app.services.glosa_service import GlosaService
+
+        defaults = {"groq_api_key": "gsk_test", "anthropic_api_key": None, "primary_ai": "groq"}
+        defaults.update(kwargs)
+        svc = GlosaService(**defaults)
+        svc.groq = _GroqF9(por_modelo)
+        return svc
+
+    return _crear
+
+
+class TestFix9GptOssRazonadorPresupuesto:
+    """max_tokens y reasoning_effort por familia de modelo."""
+
+    @pytest.mark.asyncio
+    async def test_gpt_oss_max_tokens_minimo_8000_y_reasoning_medium(self, svc_groq_f9):
+        """Causa raíz: 3000 tokens calibrados para Llama; en gpt-oss el
+        razonamiento se descuenta del MISMO presupuesto y lo agotaba."""
+        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK})
+
+        content, modelo = await svc._llamar_groq_con_retry("sys", "user")
+
+        assert content == DICTAMEN_OK
+        assert modelo == f"groq/{GPT_OSS}"
+        (kwargs,) = svc.groq.kwargs_llamadas
+        assert kwargs["max_tokens"] >= 8000
+        assert kwargs["reasoning_effort"] == "medium"
+
+    @pytest.mark.asyncio
+    async def test_llamada_corta_usa_reasoning_low(self, svc_groq_f9):
+        """Auto-crítica/refinamiento: salida breve → no quemar razonamiento."""
+        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK})
+
+        await svc._llamar_groq_con_retry("sys", "user", llamada_corta=True)
+
+        (kwargs,) = svc.groq.kwargs_llamadas
+        assert kwargs["reasoning_effort"] == "low"
+        assert kwargs["max_tokens"] >= 8000  # el presupuesto NO baja en cortas
+
+    @pytest.mark.asyncio
+    async def test_modelos_no_gpt_oss_conservan_max_tokens_sin_reasoning(self, svc_groq_f9):
+        """Para llama/qwen el max_tokens sigue en 3000 y reasoning_effort NI
+        SIQUIERA viaja (el SDK documenta otro set de valores para qwen3 y
+        ninguno para llama → riesgo de 400)."""
+        svc = svc_groq_f9({LLAMA: DICTAMEN_OK}, groq_model=LLAMA, groq_model_fallback_1=QWEN)
+
+        content, modelo = await svc._llamar_groq_con_retry("sys", "user")
+
+        assert modelo == f"groq/{LLAMA}"
+        (kwargs,) = svc.groq.kwargs_llamadas
+        assert kwargs["max_tokens"] == 3000
+        assert "reasoning_effort" not in kwargs
+
+    @pytest.mark.asyncio
+    async def test_llamar_ia_propaga_llamada_corta_a_groq(self, svc_groq_f9):
+        """El threading completo: _llamar_ia(llamada_corta=True) → gpt-oss
+        recibe reasoning_effort='low' (path de auto-crítica/refinamiento)."""
+        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK})
+
+        await svc._llamar_ia("sys", f"glosa {uuid.uuid4()}", llamada_corta=True)
+
+        assert svc.groq.kwargs_llamadas[0]["reasoning_effort"] == "low"
+
+
+class TestFix9RetryLength:
+    """content vacío + finish_reason='length' → retry con max_tokens x2."""
+
+    @pytest.mark.asyncio
+    async def test_length_vacio_reintenta_mismo_modelo_con_doble_presupuesto(
+        self, svc_groq_f9, caplog
+    ):
+        """El escenario EXACTO del log de prod: gpt-oss agota el presupuesto
+        razonando. Antes: salto directo a qwen. Ahora: una segunda
+        oportunidad al mismo modelo con max_tokens duplicado."""
+        caplog.set_level(logging.WARNING, logger="motor_glosas")
+        svc = svc_groq_f9({GPT_OSS: [VACIO_POR_LENGTH, DICTAMEN_OK]})
+
+        content, modelo = await svc._llamar_groq_con_retry("sys", "user")
+
+        assert content == DICTAMEN_OK
+        assert modelo == f"groq/{GPT_OSS}"  # NO cayó a qwen
+        assert svc.groq.modelos_llamados == [GPT_OSS, GPT_OSS]
+        primera, segunda = svc.groq.kwargs_llamadas
+        assert segunda["max_tokens"] == primera["max_tokens"] * 2
+        mensajes = " | ".join(r.getMessage() for r in caplog.records)
+        assert (
+            f"[GROQ-RETRY-LENGTH] model={GPT_OSS} "
+            f"max_tokens={primera['max_tokens']}→{segunda['max_tokens']}" in mensajes
+        )
+
+    @pytest.mark.asyncio
+    async def test_length_vacio_persistente_recien_ahi_cae_a_qwen(self, svc_groq_f9):
+        """El salto a qwen queda como SEGUNDA línea: solo tras el retry con
+        presupuesto duplicado. Y qwen conserva su max_tokens de siempre."""
+        svc = svc_groq_f9({GPT_OSS: [VACIO_POR_LENGTH, VACIO_POR_LENGTH], QWEN: DICTAMEN_OK})
+
+        content, modelo = await svc._llamar_groq_con_retry("sys", "user")
+
+        assert content == DICTAMEN_OK
+        assert modelo == f"groq/{QWEN}"
+        assert svc.groq.modelos_llamados == [GPT_OSS, GPT_OSS, QWEN]
+        kwargs_qwen = svc.groq.kwargs_llamadas[2]
+        assert kwargs_qwen["max_tokens"] == 3000  # sin cambios para no-gpt-oss
+        assert "reasoning_effort" not in kwargs_qwen
+
+    @pytest.mark.asyncio
+    async def test_vacio_sin_length_no_gasta_retry(self, svc_groq_f9):
+        """content vacío con finish_reason normal ('stop') NO es el caso del
+        razonador: conserva el comportamiento previo (siguiente modelo ya)."""
+        svc = svc_groq_f9({GPT_OSS: ("", "stop"), QWEN: DICTAMEN_OK})
+
+        content, modelo = await svc._llamar_groq_con_retry("sys", "user")
+
+        assert modelo == f"groq/{QWEN}"
+        assert svc.groq.modelos_llamados == [GPT_OSS, QWEN]
+
+    @pytest.mark.asyncio
+    async def test_length_vacio_en_no_gpt_oss_no_reintenta(self, svc_groq_f9):
+        """El retry-por-length es EXCLUSIVO de gpt-oss: un length vacío en
+        llama (no razonador) significa otra cosa y pasa de modelo directo."""
+        svc = svc_groq_f9(
+            {LLAMA: VACIO_POR_LENGTH, QWEN: DICTAMEN_OK},
+            groq_model=LLAMA,
+            groq_model_fallback_1=QWEN,
+        )
+
+        content, modelo = await svc._llamar_groq_con_retry("sys", "user")
+
+        assert modelo == f"groq/{QWEN}"
+        assert svc.groq.modelos_llamados == [LLAMA, QWEN]
+        assert svc.groq.kwargs_llamadas[0]["max_tokens"] == 3000

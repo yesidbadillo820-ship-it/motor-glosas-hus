@@ -2928,6 +2928,9 @@ class GlosaService:
                                 codigo=codigo_det,
                                 temperature_override=0.05,
                                 bypass_cache=True,
+                                # Fix #9: refinamiento = tarea corta → gpt-oss
+                                # con reasoning_effort 'low'.
+                                llamada_corta=True,
                             )
                             _arg_refinado = self._xml("argumento", _res_refinado, "")
                             if _arg_refinado and len(_arg_refinado) > 100:
@@ -4035,8 +4038,10 @@ class GlosaService:
                 "(Lista vacía si no hay)"
             )
             try:
+                # Fix #9: check de salida breve (PUEDE_RADICAR/CALIDAD) →
+                # gpt-oss con reasoning_effort 'low'.
                 res_ia, _modelo = await self._llamar_ia(
-                    system_check, user_check, eps=eps, codigo=codigo_glosa
+                    system_check, user_check, eps=eps, codigo=codigo_glosa, llamada_corta=True
                 )
                 ia_check = self._parsear_validacion_ia(res_ia)
                 for h in ia_check.get("hallazgos", []):
@@ -4210,8 +4215,12 @@ class GlosaService:
         if not self.groq and not self.anthropic_key:
             return txt  # sin IA disponible → devolver original
 
-        # Usa _llamar_ia para respetar PRIMARY_AI (Groq o Anthropic)
-        content, _modelo = await self._llamar_ia(system, user, eps=eps, codigo=codigo)
+        # Usa _llamar_ia para respetar PRIMARY_AI (Groq o Anthropic).
+        # Fix #9: refinamiento por instrucción del auditor = tarea corta →
+        # gpt-oss con reasoning_effort 'low'.
+        content, _modelo = await self._llamar_ia(
+            system, user, eps=eps, codigo=codigo, llamada_corta=True
+        )
         out = content.strip()
         # Eliminar cierres XML si la IA los metió por hábito
         out = _re.sub(r"</?(argumento|answer|response)>", "", out, flags=_re.IGNORECASE).strip()
@@ -4320,9 +4329,24 @@ class GlosaService:
         modelos = self._modelos_groq()
         for idx, modelo in enumerate(modelos):
             es_ultimo_modelo = idx == len(modelos) - 1
-            for intento in range(max_intentos):
+            # Fix #9: presupuesto y reasoning_effort por familia de modelo
+            # (ver docstring). El max_tokens es mutable: el retry-por-length
+            # lo duplica una vez para el mismo modelo.
+            es_gpt_oss = modelo.startswith("openai/gpt-oss")
+            max_tokens_modelo = _GROQ_MAX_TOKENS_GPT_OSS if es_gpt_oss else _GROQ_MAX_TOKENS
+            retry_length_usado = False
+            # while (no for): el retry-por-length repite el MISMO modelo con
+            # max_tokens duplicado SIN consumir presupuesto de intentos.
+            intento = 0
+            while intento < max_intentos:
                 t0 = time.monotonic()
                 try:
+                    kwargs_razonador: dict = {}
+                    if es_gpt_oss:
+                        # gpt-oss acepta 'low'/'medium'/'high' (default
+                        # medium). 'low' acota el chain-of-thought en las
+                        # llamadas cortas (auto-critica/refinamiento).
+                        kwargs_razonador["reasoning_effort"] = "low" if llamada_corta else "medium"
                     resp = await self.groq.chat.completions.create(
                         messages=[
                             {"role": "system", "content": system_reforzado},
@@ -4336,19 +4360,41 @@ class GlosaService:
                         # GROQ_MODEL / GROQ_MODEL_FALLBACK_1 / _2.
                         model=modelo,
                         temperature=0.2,
-                        # 3000 tokens son suficientes para argumentos de 500-700 palabras.
-                        max_tokens=3000,
+                        # 3000 tokens bastan para argumentos de 500-700
+                        # palabras en modelos no razonadores; gpt-oss usa
+                        # un presupuesto mayor porque el razonamiento se
+                        # descuenta del mismo limite (fix #9).
+                        max_tokens=max_tokens_modelo,
                         # Penalización de frecuencia/presencia evita que el modelo
                         # repita palabras/frases (anti-runaway degenerativo).
                         frequency_penalty=0.3,
                         presence_penalty=0.2,
                         timeout=120.0,
+                        **kwargs_razonador,
                     )
-                    content = resp.choices[0].message.content
+                    choice = resp.choices[0]
+                    content = choice.message.content
                     if not content:
+                        finish_reason = getattr(choice, "finish_reason", None)
+                        if es_gpt_oss and finish_reason == "length" and not retry_length_usado:
+                            # Fix #9: el razonamiento consumió TODO el
+                            # presupuesto sin emitir respuesta. UNA segunda
+                            # oportunidad al mismo modelo con max_tokens
+                            # duplicado antes de ceder al siguiente de la
+                            # cadena (el salto a qwen queda de 2da línea).
+                            retry_length_usado = True
+                            nuevo_max = max_tokens_modelo * 2
+                            logger.warning(
+                                f"[GROQ-RETRY-LENGTH] model={modelo} "
+                                f"max_tokens={max_tokens_modelo}→{nuevo_max} "
+                                "(content vacío con finish_reason='length': "
+                                "el razonamiento agotó el presupuesto)"
+                            )
+                            max_tokens_modelo = nuevo_max
+                            continue
                         raise RuntimeError(
                             f"Groq/{modelo} devolvió content vacío/None "
-                            f"(finish_reason={resp.choices[0].finish_reason!r})"
+                            f"(finish_reason={finish_reason!r})"
                         )
                     # Equivalente Groq del [ANTHROPIC-CALL]: deja claro QUE
                     # modelo respondió realmente cuando hubo fallback en la
@@ -4377,6 +4423,7 @@ class GlosaService:
                             f"reintento {intento + 2}/{max_intentos} en {espera}s"
                         )
                         await asyncio.sleep(espera)
+                        intento += 1
                         continue
                     # No reintentable o presupuesto agotado → siguiente
                     # modelo de la cadena (o raise final si era el último).
@@ -4737,6 +4784,7 @@ class GlosaService:
         modelo_override: Optional[str] = None,
         temperature_override: Optional[float] = None,
         bypass_cache: bool = False,
+        llamada_corta: bool = False,
     ) -> tuple[str, str]:
         """Llama a la IA configurada (primary_ai) con fallback al otro proveedor.
 
@@ -4749,6 +4797,11 @@ class GlosaService:
         en casos de alta complejidad). Se propaga al provider Anthropic.
         bypass_cache: para retries de validación (no queremos servir respuestas
         defectuosas desde caché).
+        llamada_corta: marca llamadas auxiliares de salida breve (auto-crítica,
+        refinamiento, checks pre-radicación). Solo afecta a Groq/gpt-oss:
+        reasoning_effort 'low' en vez de 'medium' (fix #9) para no quemar
+        presupuesto de razonamiento en tareas simples. No participa en la
+        clave de caché (misma semántica de respuesta).
         """
         # Clave de caché incluye EPS, código y modelo override para evitar
         # colisiones cruzadas entre Sonnet/Opus
@@ -4839,7 +4892,9 @@ class GlosaService:
                         temperature_override=temperature_override,
                     )
                 else:
-                    content, modelo = await fn(system, user)
+                    # Groq: propagar la marca de llamada corta para que
+                    # gpt-oss use reasoning_effort 'low' (fix #9).
+                    content, modelo = await fn(system, user, llamada_corta=llamada_corta)
                 async with _CACHE_IA_LOCK:
                     _CACHE_IA[clave_cache] = (content, modelo)
                 _guardar_cache_ia_db(clave_cache, content, modelo)
