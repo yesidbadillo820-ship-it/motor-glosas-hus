@@ -5594,6 +5594,38 @@ def descargar_excel_respuesta_recepcion(
     )
 
 
+@router.get("/importar-recepcion/{rec_id}/excel-radicable")
+def descargar_excel_radicable_recepcion(
+    rec_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Genera y descarga el «Excel radicable» de una importación.
+
+    Jun-2026: a diferencia del Excel-respuesta (que anota el archivo
+    original de recepción para uso interno de los gestores), este es el
+    formato institucional que se radica ante la entidad pagadora: hoja
+    RESPUESTA GLOSAS (una fila por concepto, con DECISIÓN y RESPUESTA
+    ESE HUS) + hoja FUNDAMENTO JURÍDICO generada desde los metadatos
+    del contrato. Se construye 100 % desde BD — no necesita el .xlsx
+    original, por eso no aplica el 410 de archivo purgado.
+    """
+    from fastapi.responses import StreamingResponse
+
+    from app.services.excel_radicable import generar_excel_radicable_con_nombre
+
+    try:
+        xlsx, nombre = generar_excel_radicable_con_nombre(db, recepcion_import_id=rec_id)
+    except LookupError:
+        raise HTTPException(404, "Importación no encontrada")
+
+    return StreamingResponse(
+        iter([xlsx]),
+        media_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
 @router.get("/batch/{batch_id}")
 def obtener_estado_batch(
     batch_id: str,
