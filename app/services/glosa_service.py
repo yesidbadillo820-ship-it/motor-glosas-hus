@@ -172,7 +172,7 @@ _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
 # todos los cachés viejos. El caso 8 de la ronda 3 vino del caché DB con
 # etiqueta `groq/qwen/qwen3-32b` aunque los fixes ya estaban desplegados,
 # porque la clave SHA256 no incluía señal de versión.
-_PROMPT_CACHE_VERSION = "r5-20260616"
+_PROMPT_CACHE_VERSION = "r6-20260616"
 
 FERIADOS_CO = [
     # 2025
@@ -645,6 +645,125 @@ def _neutralizar_eps_inventada(texto: str, eps: str) -> str:
     return resultado
 
 
+# ── Red final: frases absurdas sin valor legal (ronda 6, 16-jun-2026 — fix J) ──
+# Evidencia caso 10 PPL: "Conforme a la cláusula preventiva del contrato,
+# numeral 12, CUALQUIER INTENTO DE REBATIR ESTA SOLICITUD SERÁ CONSIDERADO
+# IMPROCEDENTE." Y caso 12 Compensar: "Esta respuesta es definitiva y NO
+# ADMITE REBATIMIENTO ALGUNO." Son frases arrogantes que la IA inventa
+# para "cerrar" el dictamen — pero NO tienen valor legal (la EPS siempre
+# puede ratificar). Las eliminamos antes de entregar.
+_PATRONES_FRASES_ABSURDAS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"[\"“‘'«»]?[^\"“”‘’'«»\n\.]{0,40}(?:NO\s+ADMITE\s+REBATIMIENTO|"
+        r"NO\s+ADMITE\s+CONTROVERSIA|"
+        r"NO\s+SE\s+ADMITE\s+(?:NINGUNA\s+)?(?:CONTROVERSIA|REBATIMIENTO|RECURSO))"
+        r"[^\"“”‘’'«»\n\.]{0,40}[\"“”‘’'«»]?[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:CUALQUIER\s+INTENTO\s+DE\s+REBATIR|"
+        r"TODO\s+INTENTO\s+DE\s+REBATIR|"
+        r"CUALQUIER\s+OBJECI[ÓO]N\s+ADICIONAL)"
+        r"[^\.\n]{0,80}(?:IMPROCEDENTE|INADMISIBLE|RECHAZADA?)[\.\s]*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:ESTA\s+RESPUESTA|EL\s+PRESENTE\s+DICTAMEN|EL\s+PRESENTE\s+ESCRITO)"
+        r"\s+(?:ES\s+)?DEFINITIV[OA](?:\s+(?:E\s+)?INAPELABLE|\s+Y\s+(?:NO\s+ADMITE|VINCULANTE))"
+        r"[^\.\n]{0,80}[\.\s]*",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _neutralizar_frases_absurdas(texto: str) -> str:
+    """Elimina muletillas arrogantes sin valor legal del dictamen."""
+    if not texto:
+        return texto
+    resultado = texto
+    n_total = 0
+    for pat in _PATRONES_FRASES_ABSURDAS:
+        nuevo, n = pat.subn(" ", resultado)
+        if n:
+            n_total += n
+            resultado = nuevo
+    if n_total:
+        # Limpieza de dobles espacios y "  ." que queden de la eliminación.
+        resultado = re.sub(r"\s{2,}", " ", resultado)
+        resultado = re.sub(r"\s+([\.,;])", r"\1", resultado)
+        logger.warning(
+            f"[FRASE-ABSURDA] {n_total} frase(s) sin valor legal "
+            "neutralizadas en el dictamen final ('no admite rebatimiento', "
+            "'cualquier intento improcedente', 'respuesta definitiva')."
+        )
+    return resultado
+
+
+# ── Red final: código de glosa coherente (ronda 6, 16-jun-2026 — fix I) ──
+# Evidencia caso 9 (FOMAG, DE0101) → "CÓDIGO N/A" en cabecera; caso 12
+# (Compensar, CL0801) → "CÓDIGO 12345" inventado; caso 13 (NUEVA EPS,
+# TA0201) → "CÓDIGO 118800" (número de factura). Si el dictamen menciona
+# explícitamente un "código" distinto del código del input, sustituimos
+# por el real o degradamos a "el código de la glosa aplicada".
+_PAT_CODIGO_EN_DICTAMEN = re.compile(
+    r"(?:SOBRE\s+EL\s+|CON\s+)?C[ÓO]DIGO\s+"
+    r"([A-Z]{2}\d{4}|\d{4,8}|N/A|N\.A\.)",
+    re.IGNORECASE,
+)
+
+
+def _normalizar_codigo_dictamen(
+    texto: str,
+    codigo_real: str,
+    codigos_validos: "Optional[list[str]]" = None,
+) -> str:
+    """Si el dictamen menciona un código distinto del real, corrige.
+
+    `codigo_real`: el código del input (ej. 'CL0801', 'AU0301'). Si está
+    vacío o es 'N/A', no se hace nada (no hay referencia para validar).
+
+    `codigos_validos`: lista de códigos adicionales que TAMBIÉN se aceptan
+    sin corregir (multi-código: dictamen agrupa varios códigos con
+    secciones por cada uno). Si está vacía o es None, sólo `codigo_real`
+    se acepta. Conservador por defecto.
+    """
+    if not texto or not codigo_real or codigo_real.strip().upper() in {"N/A", ""}:
+        return texto
+    codigo_real_up = codigo_real.strip().upper()
+    aceptados: set[str] = {codigo_real_up}
+    for c in codigos_validos or []:
+        if c:
+            aceptados.add(c.strip().upper())
+    n_sub = 0
+
+    def _sub(m: "re.Match[str]") -> str:
+        nonlocal n_sub
+        cod_visto = m.group(1).strip().upper()
+        # Si el visto está en la lista de aceptados (principal + secciones
+        # multi-código), respetar.
+        if cod_visto in aceptados:
+            return m.group(0)
+        # Si es 'N/A' o número puro, claramente no es código → corregir
+        # al real (principal).
+        if cod_visto in {"N/A", "N.A."} or cod_visto.isdigit():
+            n_sub += 1
+            return m.group(0).replace(m.group(1), codigo_real_up)
+        # Si es otro código alfanumérico válido distinto del real y NO está
+        # en aceptados → corregir.
+        if re.fullmatch(r"[A-Z]{2}\d{4}", cod_visto) and cod_visto not in aceptados:
+            n_sub += 1
+            return m.group(0).replace(m.group(1), codigo_real_up)
+        return m.group(0)
+
+    resultado = _PAT_CODIGO_EN_DICTAMEN.sub(_sub, texto)
+    if n_sub:
+        logger.warning(
+            f"[CODIGO-INCOHERENTE] {n_sub} mención(es) de código distinto del "
+            f"input ({codigo_real_up}) corregidas en el dictamen final."
+        )
+    return resultado
+
+
 def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
     """Elimina menciones a números de contrato que pertenecen a OTRA EPS.
 
@@ -701,6 +820,20 @@ _PAT_CUPS_SOSPECHOSO = re.compile(
     r"|FAC\d{4,})",
     re.IGNORECASE,
 )
+# Ronda 6 (16-jun-2026 — fix L): factura tratada como "código de glosa".
+# Evidencia caso 13: "EL LEVANTAMIENTO DE LA GLOSA 118800 Y EL
+# RECONOCIMIENTO INTEGRAL" — 118800 es el número de factura HUS-2026-
+# 118800, no un código de glosa (los códigos son alfanuméricos cortos:
+# TA0201, CO0701, etc.). Conservador: solo neutraliza después del anclaje
+# "GLOSA" (no "CÓDIGO" para no romper CUPS reales como 311400).
+_PAT_FACTURA_COMO_GLOSA = re.compile(
+    r"(?:(?:LA|EL|DE\s+LA|DE\s+LA\s+PRESENTE)\s+)?"
+    r"GLOSA\s+"
+    r"(?:N[°º]\s*|N[ÚU]MERO\s+)?"
+    r"(\d{6,8})"
+    r"(?=[^A-Z0-9]|$)",
+    re.IGNORECASE,
+)
 
 
 def _neutralizar_cups_falsos(texto: str) -> str:
@@ -717,14 +850,23 @@ def _neutralizar_cups_falsos(texto: str) -> str:
         return "el procedimiento facturado"
 
     resultado, n = _PAT_CUPS_SOSPECHOSO.subn(_sub, texto)
+    # Fix L: "GLOSA NNNNNN" (donde NNNNNN parece factura) → "la glosa
+    # aplicada". Conservador: requiere la palabra GLOSA seguida de 6-8
+    # dígitos. No toca códigos de glosa válidos (formato letra+letra+
+    # 4 dígitos como TA0201, CO0701).
+    resultado, n_fac = _PAT_FACTURA_COMO_GLOSA.subn(
+        lambda m: "la glosa aplicada",
+        resultado,
+    )
+    n += n_fac
     if n:
         # Limpieza gramatical: la sustitución puede dejar "facturado facturado"
         # cuando la frase original ya tenía "facturado" después del CUPS.
         resultado = re.sub(r"\b(facturado|facturada)\s+\1\b", r"\1", resultado, flags=re.IGNORECASE)
         resultado = re.sub(r"\b(el|la|del|de\s+la)\s+\1\b", r"\1", resultado, flags=re.IGNORECASE)
         logger.warning(
-            f"[CUPS-FALSO] {n} mención(es) de 'CUPS <fecha/factura>' "
-            "neutralizadas en el dictamen final (red de la ronda 3)."
+            f"[CUPS-FALSO] {n} mención(es) de 'CUPS <fecha/factura>' o 'GLOSA <factura>' "
+            "neutralizadas en el dictamen final (redes ronda 3 + ronda 6)."
         )
     return resultado
 
@@ -1018,11 +1160,25 @@ _PAT_CITA_INDUCIDA = re.compile(
     # variable (corte ≤180 chars) para tolerar "de la Corte
     # Constitucional, que en su parte resolutiva". El verbo se exige
     # cerca de la cita (no en la norma misma).
+    #
+    # Ronda 6 (16-jun-2026 — fix F): añadidos NOM mexicana, ISO/IEC/IEEE,
+    # CONVENIO/ACUERDO/GUÍA. Evidencia caso 12 (Compensar): la EPS citó
+    # "NOM-035-STPS-2018" e "ISO 9001:2015 cláusula 8.5.1" como si
+    # aplicaran en Colombia — son estándares extranjeros sin valor
+    # vinculante. El regex anterior solo cubría LEY/DECRETO/RESOLUCIÓN/
+    # CIRCULAR/SENTENCIA, así que estas pasaban sin disparar el bloque.
     r"(SENTENCIA\s+[CTSU][\-‐-―]?\d{1,4}(?:[\-/]\s*|\s+DE\s+|\s+)\d{4}|"
     r"CIRCULAR\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
     r"RESOLUCI[ÓO]N\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
     r"LEY\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
-    r"DECRETO\s+\d{1,4}(?:\s+DE\s+\d{4})?)"
+    r"DECRETO\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
+    r"NOM[\-‐]?\d{1,4}(?:[\-‐][A-Z]{2,5})?(?:[\-‐]\d{4})?|"
+    r"ISO\s+\d{3,5}(?::\d{4})?(?:\s+CL[ÁA]USULA\s+\d+(?:\.\d+){0,3})?|"
+    r"IEC\s+\d{3,5}(?::\d{4})?|"
+    r"IEEE\s+\d{3,5}(?:\.\d+)?|"
+    r"CONVENIO\s+\d{1,4}(?:\s+(?:DE\s+\d{4}|OIT))?|"
+    r"ACUERDO\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
+    r"GU[ÍI]A\s+(?:[A-Z]{2,6}(?:/[A-Z]{2,6})?|N[°º]\s+\d+|\d+|DE\s+PR[ÁA]CTICA))"
     r"[\s\S]{0,180}?"
     r"['\"‘’“”«»]"
     r"([^'\"‘’“”«»]*?"
@@ -3607,6 +3763,39 @@ class GlosaService:
                     dictamen = _dictamen_sin_eps_falsa
             except Exception as _e_ei:
                 logger.debug(f"[EPS-INVENTADA] red final no aplicada: {_e_ei}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 6 (16-jun-2026) — RED FINAL frases absurdas (fix J).
+            #  Caso 10 PPL: "cualquier intento de rebatir será improcedente".
+            #  Caso 12 Compensar: "Esta respuesta es definitiva y no admite
+            #  rebatimiento alguno". Sin valor legal — la EPS siempre puede
+            #  ratificar. Eliminadas antes de entregar.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_absurdos = _neutralizar_frases_absurdas(dictamen)
+                if _dictamen_sin_absurdos != dictamen:
+                    dictamen = _dictamen_sin_absurdos
+            except Exception as _e_fa:
+                logger.debug(f"[FRASE-ABSURDA] red final no aplicada: {_e_fa}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 6 (16-jun-2026) — RED FINAL código coherente (fix I).
+            #  Caso 9 (FOMAG): cabecera "N/A". Caso 12 (Compensar, CL0801):
+            #  "CÓDIGO 12345". Caso 13 (NUEVA EPS, TA0201): "CÓDIGO 118800"
+            #  (es número de factura). Si el código del dictamen no es el
+            #  del input, lo corregimos.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                # En multi-código el dictamen agrupa varios códigos con
+                # secciones por cada uno — todos son válidos.
+                _codigos_validos = list(codigos_detectados) if codigos_detectados else None
+                _dictamen_cod_ok = _normalizar_codigo_dictamen(
+                    dictamen, codigo_det or "", _codigos_validos
+                )
+                if _dictamen_cod_ok != dictamen:
+                    dictamen = _dictamen_cod_ok
+            except Exception as _e_ci:
+                logger.debug(f"[CODIGO-INCOHERENTE] red final no aplicada: {_e_ci}")
 
         except Exception as _e:
             logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")

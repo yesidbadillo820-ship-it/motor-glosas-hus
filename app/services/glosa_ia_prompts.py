@@ -104,7 +104,39 @@ CONTRATOS_HUS: dict[str, dict] = {
         "nit": "830.053.105-3",
         "vigencia": "Hasta 31/07/2026 (PA Fondo de Atención en Salud PPL 2025 — Otrosí No. 26)",
         "contacto": "MARÍA FERNANDA JARAMILLO GUTIÉRREZ — Vicepresidente Negocios Fiduciarios, Fiduprevisora S.A.",
-        "nota": "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora (cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo especial: Resolución 5159/2015 y Ley 1709/2014.",
+        "nota": (
+            "Fondo de Atención en Salud PPL 2025 administrado por Fiduprevisora "
+            "(cadena de cesiones entre patrimonios autónomos sucesivos: USPEC → "
+            "FNSPPL → PA Fondo de Atención en Salud PPL 2025). Marco normativo "
+            "especial: Decreto 5159 de 2015 (atención en salud PPL), Ley 1709 "
+            "de 2014 (reforma penitenciaria), Acuerdo 002 de 2010 USPEC (modelo "
+            "de atención), Sentencia T-388 de 2013 (Estado de Cosas "
+            "Inconstitucional en cárceles → obligación reforzada del Estado), "
+            "Lineamiento Nacional Programa Nacional Tuberculosis 2025 (cubre "
+            "esquemas de segunda línea: bedaquilina, linezolid, clofazimina, "
+            "pretomanid; medicamentos NO son responsabilidad de la EPS o del "
+            "centro de reclusión, son del Programa Nacional)."
+        ),
+    },
+    "ARL": {
+        "numero": "SIN CONTRATO PACTADO — RÉGIMEN ESPECIAL ARL",
+        "tarifa": "Manual Tarifario ARL (SOAT homologado) — Decreto-Ley 1295 de 1994 y Decreto 1072 de 2015",
+        "factor": 1.00,
+        "tipo": "ADMINISTRADORA DE RIESGOS LABORALES (ARL) — RÉGIMEN ACCIDENTES Y ENFERMEDADES DE ORIGEN LABORAL",
+        "nit": "N/D",
+        "vigencia": "N/A",
+        "contacto": "cartera@hus.gov.co",
+        "nota": (
+            "Régimen de RIESGO LABORAL. Solo cubre: (a) accidente de trabajo "
+            "(Art. 3 Decreto-Ley 1295/1994), (b) enfermedad laboral "
+            "(Tabla Decreto 1477/2014). NO cubre: embarazo y parto (son "
+            "riesgo común de la EPS o régimen especial del trabajador), "
+            "enfermedades comunes (HTA, DM, oncológicas no laborales), "
+            "atenciones de medicina general. Cualquier devolución de una EPS "
+            "argumentando 'esto es ARL' por el solo hecho de ocurrir en "
+            "jornada laboral es IMPROCEDENTE — el origen laboral lo "
+            "determina el evento (mecanismo causal), no la ubicación."
+        ),
     },
     "FOMAG": {
         "numero": "CONTRATO No. 12076-359-2025",
@@ -114,7 +146,18 @@ CONTRATOS_HUS: dict[str, dict] = {
         "nit": "830.053.105-3",
         "vigencia": "2025",
         "contacto": "CHRISTIAN RAMIRO FANDIÑO RIVEROS — Vicepresidente de Contratación, Fiduprevisora S.A. | notjudicial@fiduprevisora.com.co",
-        "nota": "Patrimonio Autónomo FOMAG administrado por Fiduprevisora. Registro especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, Bucaramanga.",
+        "nota": (
+            "Patrimonio Autónomo FOMAG administrado por Fiduprevisora. Registro "
+            "especial IPS: 680010079201. Dirección: Carrera 33 # 28-126, "
+            "Bucaramanga. RÉGIMEN ESPECIAL DEL MAGISTERIO — normas aplicables: "
+            "Decreto 3752 de 2003 (régimen de excepción del magisterio), Decreto "
+            "1655 de 2015 (estructura FOMAG), Resolución 5853 de 2003 (modelo de "
+            "atención), Ley 91 de 1989 (Fondo Nacional de Prestaciones Sociales "
+            "del Magisterio). NO aplican: Decreto-Ley 1795 de 2000 (ese es "
+            "Fuerzas Militares), Decreto 1295 de 1994 (ese es ARL — riesgo "
+            "profesional, no aplica a embarazo/maternidad incluso si ocurre "
+            "durante jornada laboral)."
+        ),
     },
     "POLICIA NACIONAL": {
         "numero": "CONTRATO No. 068-5-200004-26 (SFI 004) — MEDIANA Y ALTA COMPLEJIDAD",
@@ -1910,9 +1953,26 @@ def build_user_prompt(
     # y "47 días UCI por TCE severo" (plantilla pura, fácil de ratificar).
     bloque_datos_clinicos_str = ""
     try:
-        from app.services.contexto_contractual_enriquecido import bloque_datos_clinicos
+        from app.services.contexto_contractual_enriquecido import (
+            bloque_datos_clinicos,
+            bloque_kits_normativos_especiales,
+            bloque_multi_factura,
+        )
 
         bloque_datos_clinicos_str = bloque_datos_clinicos(texto_glosa or "")
+        # Ronda 6 (16-jun-2026 — fix H): si el texto detecta RN/prematuro,
+        # trasplante, MDR-TB o preeclampsia, inyectar las normas reales
+        # del régimen especial (Ley 1438 Art. 67, Decreto 2493/2004,
+        # Lineamiento TBC 2025, etc.). Anexado al MISMO bloque para no
+        # romper el orden del prompt.
+        kits = bloque_kits_normativos_especiales(texto_glosa or "")
+        if kits:
+            bloque_datos_clinicos_str = (bloque_datos_clinicos_str or "") + kits
+        # Ronda 6 (16-jun-2026 — fix K): si hay 2+ facturas en la glosa,
+        # avisar al modelo para que estructure por factura.
+        multif = bloque_multi_factura(texto_glosa or "")
+        if multif:
+            bloque_datos_clinicos_str = (bloque_datos_clinicos_str or "") + multif
     except Exception:
         pass
 
