@@ -536,6 +536,10 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
     # adrede: app/utils es capa hoja y no importa app/services.
     FECHA_COMO_CUPS = re.compile(r"^\d{4}-\d{1,2}(?:-\d{1,2})?$")
     ANIO_COMO_CUPS = re.compile(r"^(?:19|20)\d{2}$")
+    # Ronda 3 (16-jun-2026): "20260511" (yyyymmdd) entraba como CUPS válido.
+    FECHA_YYYYMMDD_COMO_CUPS = re.compile(
+        r"^(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$"
+    )
     fechas_en_texto = re.findall(
         r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b", texto_glosa or ""
     )
@@ -546,6 +550,9 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
         tu = token.upper()
         # (a) fecha "2026-04" / "2026-04-15" y (c) año suelto 19xx/20xx
         if FECHA_COMO_CUPS.match(tu) or ANIO_COMO_CUPS.match(tu):
+            return False
+        # (a') fecha "20260511" yyyymmdd pegada (ronda 3, 16-jun-2026).
+        if FECHA_YYYYMMDD_COMO_CUPS.match(tu):
             return False
         # (b) prefijo de factura HUS/FE/FAC + dígitos ("HUS0000522871").
         # FMQ/FMO siguen siendo códigos institucionales válidos del HUS.
