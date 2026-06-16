@@ -44,6 +44,12 @@ _PAT_CUPS = re.compile(r"\b(\d{6}|\d{2,5}[A-Z]-?\d{1,4}|FMQ\d{3,6}|FMO\d{3,6})\b
 _PAT_FECHA_COMO_CUPS = re.compile(r"^\d{4}-\d{1,2}(?:-\d{1,2})?$")
 _PAT_ANIO_COMO_CUPS = re.compile(r"^(?:19|20)\d{2}$")
 _PAT_FECHAS_EN_TEXTO = re.compile(r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b")
+# Ronda 3 (16-jun-2026): "Verificar radicado 20260511" → la IA lo escribió
+# como CUPS. yyyymmdd: año 19xx/20xx + mes 01-12 + día 01-31, 8 dígitos
+# pegados sin separadores. NO conflictúa con CUPS reales (6-7 dígitos).
+_PAT_FECHA_YYYYMMDD_COMO_CUPS = re.compile(
+    r"^(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$"
+)
 _PREFIJOS_FACTURA = ("HUS", "FE", "FAC")
 
 
@@ -52,9 +58,10 @@ def es_cups_descartable(candidato: str, texto: str = "") -> bool:
 
     (a) parece fecha (2026-04, 2026-04-15),
     (b) empieza por prefijo de factura (HUS/FE/FAC) seguido de dígitos,
-    (c) es un año suelto (19xx/20xx), o
+    (c) es un año suelto (19xx/20xx),
     (d) aparece dentro de una fecha del texto (el "2026-04" capturado del
-        "2026-04-15" de la glosa).
+        "2026-04-15" de la glosa), o
+    (e) parece fecha yyyymmdd pegada (20260511 = 11/05/2026).
 
     Helper compartido: lo usan _extraer_cups_del_texto (acá) y el fallback
     de extracción de CUPS en glosa_service.
@@ -63,6 +70,8 @@ def es_cups_descartable(candidato: str, texto: str = "") -> bool:
     if not cu:
         return True
     if _PAT_FECHA_COMO_CUPS.match(cu) or _PAT_ANIO_COMO_CUPS.match(cu):
+        return True
+    if _PAT_FECHA_YYYYMMDD_COMO_CUPS.match(cu):
         return True
     for pref in _PREFIJOS_FACTURA:
         # "HUS0000522871" sí; "FMQ6296" no (FM* es código institucional válido).

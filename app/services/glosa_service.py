@@ -438,6 +438,182 @@ def _dedup_oraciones_largas(texto: str, min_palabras: int = 15) -> str:
     return " ".join(resultado)
 
 
+# ── Sanitizer chain-of-thought leakage (16-jun-2026, ronda 3 — bug nuevo) ──
+# Evidencia: 7 dictámenes ENTREGADOS con texto del razonamiento interno del
+# modelo en el cuerpo del dictamen:
+#   "tags. Let me go through each section step by step, making sure all
+#    corrections are applied without changing the legal substance."
+#   "changes. Let me draft each part step by step, making sure each
+#    correction is addressed. ... Alright, let's put it all together.
+#    ```xml"
+# Causa raíz: qwen3-32b (y a veces gpt-oss) emite razonamiento ANTES o
+# EN LUGAR de las tags XML pedidas. Cuando el extractor de <argumento>
+# cae al fallback (toma todo res_ia), el razonamiento crudo llega al
+# dictamen. NO toca texto en español del dictamen ni citas legítimas —
+# los marcadores son frases en inglés que el modelo "habla consigo mismo".
+# Marcadores en inglés que el razonador emite "hablándose a sí mismo". El
+# dictamen es en español → frases como "Let me", "Let's", "Alright, let's"
+# no aparecen legítimamente. Detectamos en los primeros ~120 chars de cada
+# línea para no descartar líneas largas con contenido válido al final.
+_PAT_COT_MARKERS = re.compile(
+    r"""(?ix)
+    (?:^|[\s.;:,—\-])
+    (?:
+        let\s+me\b
+       |let'?s\b
+       |alright,?\s+let'?s\b
+       |alright,?\s+let\s+me\b
+       |okay,?\s+let'?s\b
+       |okay,?\s+let\s+me\b
+       |now,?\s+let'?s\b
+       |now,?\s+let\s+me\b
+       |i'?ll\s+(?:go|draft|write|put|make|start|review|check|use|need)\b
+       |i\s+will\b
+       |make\s+sure\b
+       |check\s+(?:the|for)\b
+       |first,?\s+let\b
+    )
+    """
+)
+_PAT_FENCE_MARKDOWN = re.compile(r"```(?:xml|json|python|text|html|markdown)?\s*\n?", re.IGNORECASE)
+_PAT_TAG_SUELTO_LINEA = re.compile(
+    r"^\s*(?:tags?\.?|</?(?:answer|response)>|<answer>|<response>)\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+# "tags." al inicio de línea cuando le sigue contenido (frase completa)
+_PAT_TAGS_PREFIJO = re.compile(r"(?im)^\s*tags?\.\s+")
+
+
+def _limpiar_chain_of_thought(texto: str) -> str:
+    """Sanitiza el output de la IA quitando rastros de chain-of-thought.
+
+    Razonadores como qwen3/gpt-oss a veces emiten razonamiento ANTES o EN
+    LUGAR de las tags XML solicitadas. Cuando el extractor de <argumento>
+    cae al fallback (toma todo res_ia), el razonamiento crudo llega al
+    dictamen entregado. Esta función:
+      (a) Elimina fences sueltos ```xml, ```json
+      (b) Elimina tokens sueltos "tags.", "</answer>", "<response>"
+      (c) Elimina líneas cuyo primer chunk (≤120 chars) contiene un marcador
+          de razonamiento en inglés ("Let me", "I'll draft", "Make sure"…).
+          Los dictámenes son en español; estos marcadores no aparecen
+          legítimamente.
+
+    NO toca texto en español del dictamen ni citas legítimas.
+    """
+    if not texto:
+        return texto
+    resultado = _PAT_FENCE_MARKDOWN.sub("", texto)
+    # "tags." como prefijo de una frase → quitar solo el prefijo, no la línea
+    resultado = _PAT_TAGS_PREFIJO.sub("", resultado)
+    # Tokens sueltos en línea propia
+    resultado = _PAT_TAG_SUELTO_LINEA.sub("", resultado)
+    # Líneas con marcador CoT en los primeros 120 chars → drop completo
+    lineas_limpias = []
+    n_filtradas = 0
+    for linea in resultado.splitlines():
+        if _PAT_COT_MARKERS.search(linea[:120]):
+            n_filtradas += 1
+            continue
+        lineas_limpias.append(linea)
+    resultado = "\n".join(lineas_limpias)
+    resultado = re.sub(r"\n{3,}", "\n\n", resultado).strip()
+    if n_filtradas:
+        logger.warning(
+            f"[COT-LEAK] {n_filtradas} línea(s) de chain-of-thought eliminadas "
+            "del output de la IA antes de entrega final (red de la ronda 3)."
+        )
+    return resultado
+
+
+# ── Red final: contratos de OTRA EPS en el dictamen (16-jun-2026, ronda 3) ──
+# El check_contrato_de_otra_eps del QG ya regenera cuando dispara, pero el
+# flujo legacy (QG OFF por default) lo deja pasar. Análoga determinística a
+# _descomillar_citas_falsas: cada mención del número de contrato ajeno se
+# sustituye por "el contrato vigente entre las partes" antes de entrega.
+def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
+    """Elimina menciones a números de contrato que pertenecen a OTRA EPS.
+
+    Evidencia ronda 3 (caso 5, DISPENSARIO MEDICO): el dictamen citó
+    "cláusula tercera del contrato 440-DIGSA/DMBUG-2025" cuando ese
+    contrato es del régimen militar (DMBUG), no de DISPENSARIO MEDICO.
+    Citar contrato ajeno invalida el dictamen completo ante la EPS.
+    """
+    if not texto or not eps:
+        return texto
+    try:
+        from app.services.glosa_ia_prompts import contratos_ajenos_citados
+    except Exception:
+        return texto
+    ajenos = contratos_ajenos_citados(texto, eps)
+    if not ajenos:
+        return texto
+    resultado = texto
+    n_sub = 0
+    for tok in ajenos:
+        # El token viene en MAYÚSCULAS desde catalogo_contratos_eps(). Se
+        # busca con palabras de contexto que la IA suele anteponer (CONTRATO,
+        # ACTA, NÚMERO) para sustituir un sintagma natural, no un fragmento.
+        pat = re.compile(
+            r"(?:(?:CONTRATO|EL\s+CONTRATO)\s+(?:N[ÚU]MERO\s+)?)?" + re.escape(tok),
+            re.IGNORECASE,
+        )
+        nuevo, n = pat.subn("el contrato vigente entre las partes", resultado)
+        if n:
+            resultado = nuevo
+            n_sub += n
+    if n_sub:
+        logger.warning(
+            f"[CONTRATO-AJENO] {n_sub} mención(es) de contrato de otra EPS "
+            f"neutralizadas en el dictamen final (eps={eps}, ajenos={ajenos[:3]})."
+        )
+    return resultado
+
+
+# ── Red final: "CUPS <fecha/factura>" en el dictamen (16-jun-2026, ronda 3) ──
+# Evidencia caso 4 (COOSALUD): el texto traía "Verificar radicado 20260511 y
+# soporte 4710-2026" → la IA escribió "código CUPS 20260511" (20260511 es
+# yyyymmdd = 11/05/2026, no un código). El extractor de CUPS ya excluye
+# estos patrones del CONTEXTO, pero la IA los inventa igual desde el texto.
+# Esta red final descarta la afirmación CUPS falsa preservando la referencia
+# al servicio.
+_PAT_CUPS_SOSPECHOSO = re.compile(
+    r"(?:(?:EL|LA|DEL|UN|UNA)\s+)?"
+    r"(?:C[ÓO]DIGO\s+CUPS|CUPS(?:\s+DETALLADO)?|C[ÓO]DIGO\s+DE\s+SERVICIO)\s+"
+    r"((?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])"
+    r"|(?:19|20)\d{2}-\d{1,2}(?:-\d{1,2})?"
+    r"|HUS[\d-]+"
+    r"|FE\d{4,}"
+    r"|FAC\d{4,})",
+    re.IGNORECASE,
+)
+
+
+def _neutralizar_cups_falsos(texto: str) -> str:
+    """Sustituye 'CUPS <fecha>' o 'CUPS HUS00...' por 'el procedimiento facturado'.
+
+    Conservador: solo dispara con patrones inequívocamente NO-CUPS (8 dígitos
+    yyyymmdd, fechas con guión, prefijos HUS/FE/FAC). Un CUPS real de 4-6
+    dígitos jamás coincide.
+    """
+    if not texto:
+        return texto
+
+    def _sub(m):
+        return "el procedimiento facturado"
+
+    resultado, n = _PAT_CUPS_SOSPECHOSO.subn(_sub, texto)
+    if n:
+        # Limpieza gramatical: la sustitución puede dejar "facturado facturado"
+        # cuando la frase original ya tenía "facturado" después del CUPS.
+        resultado = re.sub(r"\b(facturado|facturada)\s+\1\b", r"\1", resultado, flags=re.IGNORECASE)
+        resultado = re.sub(r"\b(el|la|del|de\s+la)\s+\1\b", r"\1", resultado, flags=re.IGNORECASE)
+        logger.warning(
+            f"[CUPS-FALSO] {n} mención(es) de 'CUPS <fecha/factura>' "
+            "neutralizadas en el dictamen final (red de la ronda 3)."
+        )
+    return resultado
+
+
 # ── Sanitizer "descomillar citas ALTA" (12-jun-2026, ronda 2 — fix #2) ──
 # Evidencia: caso osteosíntesis ENTREGADO con «El pagador reconocerá la
 # factura dentro de los veintidós (22) días hábiles...» marcada
@@ -578,14 +754,28 @@ def _rellenar_placeholders(texto: str, eps: str = "", codigo: str = "", valor: s
         "ENTIDAD": eps_txt or "LA ENTIDAD PAGADORA",
         "EPS": eps_txt or "LA ENTIDAD PAGADORA",
         "ENTIDAD PAGADORA": eps_txt or "LA ENTIDAD PAGADORA",
+        "NOMBRE EPS": eps_txt or "LA ENTIDAD PAGADORA",
+        "NOMBRE DE LA ENTIDAD": eps_txt or "LA ENTIDAD PAGADORA",
         "CODIGO": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
         "CÓDIGO": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
         "CODIGO GLOSA": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
         "CÓDIGO GLOSA": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
+        "CODIGO REAL": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
+        "CÓDIGO REAL": codigo_txt or "EL CÓDIGO DE GLOSA APLICADO",
         "VALOR REAL": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
         "VALOR": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
         "VALOR OBJETADO": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
+        "VALOR FACTURADO": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
+        "MONTO": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
+        "MONTO REAL": valor_txt or _PLACEHOLDER_NEUTRO_VALOR,
         "SERVICIO": "EL SERVICIO FACTURADO",
+        "DESCRIPCION DEL SERVICIO": "EL SERVICIO FACTURADO",
+        "DESCRIPCIÓN DEL SERVICIO": "EL SERVICIO FACTURADO",
+        "TIPO DE SERVICIO": "EL SERVICIO FACTURADO",
+        "TIPO COMPLETO": "EL CONCEPTO OBJETADO",
+        "PROCEDIMIENTO": "EL PROCEDIMIENTO FACTURADO",
+        "FECHA": "LA FECHA INDICADA EN EL EXPEDIENTE",
+        "FECHA REAL": "LA FECHA INDICADA EN EL EXPEDIENTE",
     }
 
     def _sub(m: "re.Match[str]") -> str:
@@ -626,14 +816,22 @@ def _rellenar_placeholders(texto: str, eps: str = "", codigo: str = "", valor: s
 # texto_fijo_detector solo cubre extemporaneidad de glosa INICIAL con
 # campos de BD; aquí las fechas vienen EN EL TEXTO y es una RATIFICACIÓN.
 _PAT_FECHA_TEXTO = re.compile(r"(\d{4}-\d{1,2}-\d{1,2})|(\d{1,2}/\d{1,2}/\d{4})")
+# Ronda 3 (16-jun-2026): el usuario tipeó "Glosa inicial notificada el
+# 10/04/2026 y RATIFICADA por la EPS el 15/06/2026" — formas verbales que el
+# patrón anterior (label "FECHA RADICACIÓN:") no atrapaba. Ampliamos:
+#   • Radicación: + "GLOSA INICIAL (FUE) NOTIFICADA EL" / "RADICADA EL"
+#   • Ratificación: + "RATIFICADA (POR LA EPS) EL" / "RATIFICADO EL"
 _PAT_LABEL_RADICACION_TXT = re.compile(
-    r"(?:FECHA\s+(?:DE\s+)?)?RADICACI[ÓO]N(?:\s+(?:DE\s+)?(?:LA\s+)?FACTURA)?\s*[:\-–]?\s*",
+    r"(?:FECHA\s+(?:DE\s+)?)?RADICACI[ÓO]N(?:\s+(?:DE\s+)?(?:LA\s+)?FACTURA)?\s*[:\-–]?\s*"
+    r"|(?:LA\s+)?GLOSA(?:\s+INICIAL)?\s+(?:FUE\s+)?(?:NOTIFICAD[AO]|RADICAD[AO])"
+    r"(?:\s+(?:POR\s+(?:LA\s+)?(?:EPS|ENTIDAD)))?(?:\s+EL)?\s*[:\-–]?\s*",
     re.IGNORECASE,
 )
 _PAT_LABEL_RATIFICACION_TXT = re.compile(
     r"(?:FECHA\s+(?:DE\s+)?)?(?:RECEPCI[ÓO]N|NOTIFICACI[ÓO]N)\s+(?:DE\s+(?:LA\s+)?)?"
     r"RATIFICACI[ÓO]N\s*[:\-–]?\s*"
-    r"|RATIFICACI[ÓO]N\s+(?:RECIBIDA|NOTIFICADA)(?:\s+EL)?\s*[:\-–]?\s*",
+    r"|RATIFICACI[ÓO]N\s+(?:RECIBIDA|NOTIFICADA)(?:\s+EL)?\s*[:\-–]?\s*"
+    r"|RATIFICAD[AO](?:\s+(?:POR\s+(?:LA\s+)?(?:EPS|ENTIDAD)))?(?:\s+EL)?\s*[:\-–]?\s*",
     re.IGNORECASE,
 )
 
@@ -2591,6 +2789,14 @@ class GlosaService:
                 else:
                     arg_ia = res_ia
 
+            # Ronda 3 (16-jun-2026): sanitizador de chain-of-thought ANTES
+            # de cualquier otro procesamiento. Razonadores como qwen3 (y
+            # ocasionalmente gpt-oss) emiten razonamiento en inglés ("Let
+            # me go through each section step by step...", "```xml",
+            # "tags.") ANTES de las tags XML — y cuando arg_ia cae al
+            # fallback res_ia entero, ese razonamiento llega al dictamen.
+            arg_ia = _limpiar_chain_of_thought(arg_ia)
+
             if not arg_ia:
                 logger.warning(
                     f"[DICTAMEN-VACIO] arg_ia vacío tras extracción XML. "
@@ -3157,6 +3363,34 @@ class GlosaService:
                 # Un fallo del descomillado jamás invalida la verificación
                 # ya calculada — se entrega el dictamen original con badge.
                 logger.debug(f"[DESCOMILLAR-CITAS] red final no aplicada: {_e_desc}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 3 (16-jun-2026) — RED FINAL contratos ajenos.
+            #  Evidencia caso 5 (DISPENSARIO MEDICO citando "440-DIGSA/
+            #  DMBUG-2025"). El check_contrato_de_otra_eps del QG regenera
+            #  cuando dispara, pero el legacy (QG OFF) lo deja pasar. Esta
+            #  red, determinista, sustituye el número ajeno por "el
+            #  contrato vigente entre las partes" antes de entregar.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_ajeno = _neutralizar_contratos_ajenos(dictamen, str(data.eps or ""))
+                if _dictamen_sin_ajeno != dictamen:
+                    dictamen = _dictamen_sin_ajeno
+            except Exception as _e_ca:
+                logger.debug(f"[CONTRATO-AJENO] red final no aplicada: {_e_ca}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 3 (16-jun-2026) — RED FINAL CUPS falsos.
+            #  Evidencia caso 4 (COOSALUD): "Verificar radicado 20260511"
+            #  → la IA escribió "código CUPS 20260511" (es yyyymmdd, no
+            #  CUPS). Se sustituye por "el procedimiento facturado".
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_cups_falso = _neutralizar_cups_falsos(dictamen)
+                if _dictamen_sin_cups_falso != dictamen:
+                    dictamen = _dictamen_sin_cups_falso
+            except Exception as _e_cf:
+                logger.debug(f"[CUPS-FALSO] red final no aplicada: {_e_cf}")
         except Exception as _e:
             logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")
             verif_citas = None
@@ -4335,6 +4569,12 @@ class GlosaService:
             es_gpt_oss = modelo.startswith("openai/gpt-oss")
             max_tokens_modelo = _GROQ_MAX_TOKENS_GPT_OSS if es_gpt_oss else _GROQ_MAX_TOKENS
             retry_length_usado = False
+            # Ronda 3 (16-jun-2026): si la API rechaza reasoning_effort
+            # (parámetro renombrado/no soportado en una versión nueva del
+            # endpoint), reintentar el MISMO modelo SIN ese kwarg antes de
+            # ceder al siguiente. Sin esto, cada llamada a gpt-oss caía a
+            # qwen — toda la ronda 3 se respondió en qwen3-32b.
+            deshabilitar_reasoning = False
             # while (no for): el retry-por-length repite el MISMO modelo con
             # max_tokens duplicado SIN consumir presupuesto de intentos.
             intento = 0
@@ -4342,7 +4582,7 @@ class GlosaService:
                 t0 = time.monotonic()
                 try:
                     kwargs_razonador: dict = {}
-                    if es_gpt_oss:
+                    if es_gpt_oss and not deshabilitar_reasoning:
                         # gpt-oss acepta 'low'/'medium'/'high' (default
                         # medium). 'low' acota el chain-of-thought en las
                         # llamadas cortas (auto-critica/refinamiento).
@@ -4409,6 +4649,46 @@ class GlosaService:
                 except Exception as e:
                     ultimo_error = e
                     error_msg = str(e).lower()
+                    tipo_error = type(e).__name__
+                    # Ronda 3 (16-jun-2026): log defensivo SIEMPRE. Antes,
+                    # un 400 de Groq (parámetro rechazado) caía al `break`
+                    # sin loguearse — y toda la cadena se desplazaba a qwen
+                    # sin que apareciera el motivo en los logs de Fly.
+                    logger.warning(
+                        f"[GROQ-ERROR] model={modelo} type={tipo_error} "
+                        f"intento={intento + 1}/{max_intentos} "
+                        f"reasoning_off={deshabilitar_reasoning} msg={str(e)[:300]}"
+                    )
+                    # Ronda 3: reasoning_effort rechazado (400 BadRequest
+                    # con mensaje que menciona el parámetro o "unrecognized"/
+                    # "extra inputs"). Reintentar el MISMO modelo SIN el
+                    # parámetro antes de ceder. Hipótesis (a) confirmada en
+                    # vivo si los logs muestran [GROQ-RETRY-NO-REASONING].
+                    if (
+                        es_gpt_oss
+                        and not deshabilitar_reasoning
+                        and any(
+                            k in error_msg
+                            for k in (
+                                "reasoning_effort",
+                                "reasoning effort",
+                                "unknown_argument",
+                                "unknown_parameter",
+                                "unrecognized",
+                                "extra inputs are not permitted",
+                                "unsupported_parameter",
+                                "unsupported parameter",
+                                "invalid_request_error",
+                            )
+                        )
+                    ):
+                        deshabilitar_reasoning = True
+                        logger.warning(
+                            f"[GROQ-RETRY-NO-REASONING] model={modelo} "
+                            "(API rechazó reasoning_effort — reintentando "
+                            "el mismo modelo sin ese parámetro)"
+                        )
+                        continue  # mismo intento, sin sumar
                     es_rate_limit = any(k in error_msg for k in ("429", "rate_limit", "rate limit"))
                     es_reintentable = any(k in error_msg for k in _ERRORES_REINTENTABLES)
                     if es_rate_limit and not es_ultimo_modelo:
