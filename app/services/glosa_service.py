@@ -157,6 +157,23 @@ _ERRORES_REINTENTABLES = frozenset(
 _GROQ_MAX_TOKENS = 3000
 _GROQ_MAX_TOKENS_GPT_OSS = max(_GROQ_MAX_TOKENS, 8000)
 
+# Capability cache del SDK Groq (ronda 5, 16-jun-2026). El SDK instalado
+# en producción NO acepta `reasoning_effort` como kwarg (TypeError del
+# cliente, ni siquiera llega a la API). La ronda 4 introdujo el retry
+# sin el parámetro — pero cada llamada repetía el TypeError porque la
+# bandera era LOCAL a la función. Esta variable de proceso recuerda el
+# fallo y omite el kwarg desde la primera llamada en adelante. Ahorro:
+# ~8s por dictamen (logs Fly 18:01-18:03 UTC).
+_GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
+
+# Versión del cache de IA (ronda 5, 16-jun-2026). Bumpear cuando cambien
+# el system prompt, redes finales (descomillar/contratos/CUPS/EPS/
+# fabricaciones), o sanitizadores (CoT leak / placeholders) — invalida
+# todos los cachés viejos. El caso 8 de la ronda 3 vino del caché DB con
+# etiqueta `groq/qwen/qwen3-32b` aunque los fixes ya estaban desplegados,
+# porque la clave SHA256 no incluía señal de versión.
+_PROMPT_CACHE_VERSION = "r5-20260616"
+
 FERIADOS_CO = [
     # 2025
     "2025-01-01",
@@ -530,6 +547,104 @@ def _limpiar_chain_of_thought(texto: str) -> str:
 # flujo legacy (QG OFF por default) lo deja pasar. Análoga determinística a
 # _descomillar_citas_falsas: cada mención del número de contrato ajeno se
 # sustituye por "el contrato vigente entre las partes" antes de entrega.
+# ── Red final: nombres de EPS ajenos / inventados (ronda 5, 16-jun-2026) ──
+# Evidencia caso 4 (COOSALUD): el dictamen escribió "interpuesta por la
+# entidad Auditoría de la EPS SaludCo, respecto del servicio de
+# hospitalización facturado por valor de cinco millones de pesos". La EPS
+# era COOSALUD pero el modelo fabricó "SaludCo" y CAMBIÓ el valor. El
+# bug es doble (EPS + valor) — esta red ataca SOLO el primero porque el
+# segundo es un agregado del valor objetado por concepto. Conservadora:
+# si el dictamen menciona una EPS conocida ≠ la del input, la sustituye
+# por la EPS del input. Si menciona algo que parece nombre de EPS pero
+# NO está en el catálogo, lo neutraliza a "la entidad pagadora".
+_PAT_NOMBRE_EPS_GENERICA = re.compile(
+    # "EPS X", "la EPS XYZ", "entidad ABC EPS" — capturamos solo el sintagma
+    # COMPLETO, no fragmentos sueltos. Conservador: exige conector EPS.
+    r"\b(?:LA\s+)?EPS\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ0-9.\- ]{2,30}?)(?=[,.\s]|\bEPS\b|$)",
+    re.IGNORECASE,
+)
+_EPS_KNOWN_TOKENS = {
+    "NUEVA",
+    "FAMISANAR",
+    "COOSALUD",
+    "SANITAS",
+    "COMPENSAR",
+    "MUTUAL SER",
+    "MUTUALSER",
+    "SALUD TOTAL",
+    "SALUDTOTAL",
+    "SURA",
+    "ECOOPSOS",
+    "ECOOPSALUD",
+    "EMSSANAR",
+    "ASMET SALUD",
+    "ASMETSALUD",
+    "DMBUG",
+    "DISPENSARIO",
+    "FOMAG",
+    "MAGISTERIO",
+    "ARL",
+    "SOAT",
+}
+
+
+def _neutralizar_eps_inventada(texto: str, eps: str) -> str:
+    """Sustituye nombres de EPS distintos al del input por "la entidad pagadora".
+
+    Caso 4 evidencia: con EPS=COOSALUD el dictamen inventó "EPS SaludCo".
+    Estrategia:
+      • Detecta menciones "EPS <NOMBRE>" en el dictamen.
+      • Si <NOMBRE> NO coincide con la EPS del input ni con ninguna EPS
+        conocida del catálogo, lo neutraliza a "la entidad pagadora".
+      • Si <NOMBRE> ES una EPS conocida distinta de la del input → también
+        neutraliza (caso de mezcla de EPS reales).
+      • Si la EPS del input es "OTRA / SIN DEFINIR", no hace nada (no hay
+        referencia para validar).
+    """
+    if not texto:
+        return texto
+    eps_up = (eps or "").upper().strip()
+    if not eps_up or eps_up in {"OTRA", "OTRA / SIN DEFINIR", "SIN DEFINIR"}:
+        return texto
+    # Token raíz de la EPS del input (primera palabra significativa).
+    raiz_input = eps_up.split()[0].strip(".,")
+
+    n_sub = 0
+
+    def _sub(m: "re.Match[str]") -> str:
+        nonlocal n_sub
+        nombre = (m.group(1) or "").strip(" .,;:").upper()
+        if not nombre:
+            return m.group(0)
+        # Token raíz de la EPS mencionada.
+        raiz_mencion = nombre.split()[0].strip(".,") if nombre.split() else ""
+        if not raiz_mencion:
+            return m.group(0)
+        # Coincide con la EPS del input → respetar.
+        if raiz_mencion == raiz_input or raiz_input in nombre or raiz_mencion in eps_up:
+            return m.group(0)
+        # Es una EPS conocida del catálogo, pero DISTINTA de la del input →
+        # contraindicación.
+        es_conocida_otra = raiz_mencion in _EPS_KNOWN_TOKENS
+        # Si no es conocida y no coincide → es probablemente inventada
+        # (e.g. "SaludCo"). Si es conocida pero ≠ input → contrato cruzado.
+        if not es_conocida_otra and len(raiz_mencion) >= 3:
+            n_sub += 1
+            return "la entidad pagadora"
+        if es_conocida_otra:
+            n_sub += 1
+            return "la entidad pagadora"
+        return m.group(0)
+
+    resultado = _PAT_NOMBRE_EPS_GENERICA.sub(_sub, texto)
+    if n_sub:
+        logger.warning(
+            f"[EPS-INVENTADA] {n_sub} mención(es) de EPS distinta del input "
+            f"(eps_input={eps_up}) neutralizadas en el dictamen final."
+        )
+    return resultado
+
+
 def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
     """Elimina menciones a números de contrato que pertenecen a OTRA EPS.
 
@@ -886,6 +1001,58 @@ def detectar_fechas_en_texto(texto: str) -> dict:
 # Término de referencia para la respuesta de la EPS a la respuesta de la IPS
 # (ratificación): Art. 57 Ley 1438/2011. Conservador: 30 días hábiles.
 DIAS_HABILES_LIMITE_RATIFICACION = 30
+
+
+# ── Citas inducidas por la EPS (ronda 5, 16-jun-2026 — fix E) ──
+# Evidencia caso 3 (Sanitas): la EPS apoya su glosa en una "Sentencia
+# C-313 de 2014" con texto entrecomillado inventado. El dictamen original
+# ignoró la cita y argumentó por el otro lado — el gestor humano queda
+# con la duda de si esa cita era válida. Detectar: cita textual atribuida
+# a NORMA o SENTENCIA dentro del texto de la glosa, para inyectar un
+# bloque al prompt que obligue a desvirtuarla EXPLÍCITAMENTE.
+_PAT_CITA_INDUCIDA = re.compile(
+    # "Sentencia C-313 de 2014 ... 'establece que las IPS...'" o
+    # "Circular 066 de 2010 ... 'dispone la devolución...'" — el verbo
+    # ("establece", "dispone", "señala") puede ir FUERA o DENTRO de las
+    # comillas. El texto entre la norma y la comilla de apertura es
+    # variable (corte ≤180 chars) para tolerar "de la Corte
+    # Constitucional, que en su parte resolutiva". El verbo se exige
+    # cerca de la cita (no en la norma misma).
+    r"(SENTENCIA\s+[CTSU][\-‐-―]?\d{1,4}(?:[\-/]\s*|\s+DE\s+|\s+)\d{4}|"
+    r"CIRCULAR\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
+    r"RESOLUCI[ÓO]N\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
+    r"LEY\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
+    r"DECRETO\s+\d{1,4}(?:\s+DE\s+\d{4})?)"
+    r"[\s\S]{0,180}?"
+    r"['\"‘’“”«»]"
+    r"([^'\"‘’“”«»]*?"
+    r"(?:ESTABLEC[EI]|DISPON[EI]|SE[NÑ]ALA|ORDENA|DECLARA|DEFINE|DICE|RECONOC[EI])"
+    r"[^'\"‘’“”«»]*?)"
+    r"['\"‘’“”«»]",
+    re.IGNORECASE,
+)
+
+
+def _extraer_citas_inducidas_eps(texto: str) -> list[str]:
+    """Citas textuales atribuidas a normas/sentencias dentro del texto de
+    la glosa. Devuelve lista de strings normalizados "Norma: «texto»".
+    """
+    if not texto:
+        return []
+    out: list[str] = []
+    for m in _PAT_CITA_INDUCIDA.finditer(texto):
+        norma = re.sub(r"\s+", " ", m.group(1)).strip()
+        cita = re.sub(r"\s+", " ", m.group(2)).strip()
+        if len(cita) >= 20:
+            out.append(f"{norma}: «{cita[:200]}»")
+    # Dedup por norma (la misma norma con la misma cita aparece una vez).
+    vistos: set[str] = set()
+    unicos: list[str] = []
+    for c in out:
+        if c not in vistos:
+            vistos.add(c)
+            unicos.append(c)
+    return unicos
 
 
 def _ajustar_score_por_evidencia(score: float, verif_citas, confianza) -> float:
@@ -2116,6 +2283,40 @@ class GlosaService:
                         )
             except Exception as _e_ext_rat:
                 logger.debug(f"[EXTEMP-RATIFICACION] detector no aplicado: {_e_ext_rat}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 5 (16-jun-2026) — Citas inducidas por la EPS.
+            #  Evidencia caso 3 (Sanitas): la EPS apoyaba la glosa en
+            #  "Sentencia C-313 de 2014 que ... 'establece que las IPS
+            #  no podrán cobrar servicios complementarios...'" — cita
+            #  ATRIBUIDA con texto inventado. El dictamen NI desvirtuó
+            #  la cita NI la copió: simplemente la ignoró, argumentando
+            #  por el otro lado. El gestor humano queda con la duda. Si
+            #  detectamos una cita entrecomillada atribuida a una norma
+            #  o sentencia DENTRO del texto de la glosa, inyectamos una
+            #  instrucción prioritaria: DESVIRTUARLA EXPLÍCITAMENTE al
+            #  inicio del dictamen.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _citas_eps = _extraer_citas_inducidas_eps(texto_base)
+                if _citas_eps:
+                    bloque_citas = "\n\n[CITAS INDUCIDAS POR LA EPS — DESVIRTUAR PRIMERO]\n"
+                    bloque_citas += (
+                        "La EPS apoya su glosa en las siguientes citas atribuidas a "
+                        "normas o sentencias. NO las repitas como ciertas. ABRE el "
+                        "dictamen verificando que esas citas (a) no existan en el "
+                        "corpus normativo o (b) NO digan lo que la EPS afirma. Solo "
+                        "después de desvirtuarlas, expón tu defensa de fondo.\n"
+                    )
+                    for i, c in enumerate(_citas_eps[:3], 1):
+                        bloque_citas += f"  {i}. {c}\n"
+                    user_prompt += bloque_citas
+                    logger.info(
+                        f"[CITA-INDUCIDA] {len(_citas_eps)} cita(s) atribuida(s) por la "
+                        "EPS detectada(s) en el texto — bloque inyectado al prompt."
+                    )
+            except Exception as _e_ci:
+                logger.debug(f"[CITA-INDUCIDA] detector no aplicado: {_e_ci}")
 
             # Multi-agent foundation (env var MULTI_AGENT_HABILITADO=1):
             # ejecuta el Auditor Agent ANTES de la IA principal para
@@ -3391,6 +3592,22 @@ class GlosaService:
                     dictamen = _dictamen_sin_cups_falso
             except Exception as _e_cf:
                 logger.debug(f"[CUPS-FALSO] red final no aplicada: {_e_cf}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 5 (16-jun-2026) — RED FINAL EPS inventada.
+            #  Evidencia caso 4: con EPS=COOSALUD el dictamen escribió
+            #  "EPS SaludCo" (nombre fabricado). Esta red sustituye
+            #  cualquier "EPS X" donde X ≠ la EPS del input por "la
+            #  entidad pagadora". NO toca el sintagma cuando la EPS del
+            #  input es "OTRA / SIN DEFINIR" (no hay referencia).
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_eps_falsa = _neutralizar_eps_inventada(dictamen, str(data.eps or ""))
+                if _dictamen_sin_eps_falsa != dictamen:
+                    dictamen = _dictamen_sin_eps_falsa
+            except Exception as _e_ei:
+                logger.debug(f"[EPS-INVENTADA] red final no aplicada: {_e_ei}")
+
         except Exception as _e:
             logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")
             verif_citas = None
@@ -4574,7 +4791,11 @@ class GlosaService:
             # endpoint), reintentar el MISMO modelo SIN ese kwarg antes de
             # ceder al siguiente. Sin esto, cada llamada a gpt-oss caía a
             # qwen — toda la ronda 3 se respondió en qwen3-32b.
-            deshabilitar_reasoning = False
+            # Capability cache (ronda 5): si el proceso ya descubrió que el
+            # SDK Groq rechaza `reasoning_effort`, parte con la bandera ON
+            # para no repetir el TypeError en cada llamada.
+            global _GROQ_SDK_SOPORTA_REASONING_EFFORT
+            deshabilitar_reasoning = not _GROQ_SDK_SOPORTA_REASONING_EFFORT
             # while (no for): el retry-por-length repite el MISMO modelo con
             # max_tokens duplicado SIN consumir presupuesto de intentos.
             intento = 0
@@ -4683,10 +4904,17 @@ class GlosaService:
                         )
                     ):
                         deshabilitar_reasoning = True
+                        # Capability cache de proceso: el SDK rechazó
+                        # `reasoning_effort` UNA vez → no volver a probarlo
+                        # en NINGUNA llamada futura de este proceso (los
+                        # logs muestran el TypeError repetido en cada
+                        # llamada cuando esto era local a la función).
+                        _GROQ_SDK_SOPORTA_REASONING_EFFORT = False
                         logger.warning(
                             f"[GROQ-RETRY-NO-REASONING] model={modelo} "
                             "(API rechazó reasoning_effort — reintentando "
-                            "el mismo modelo sin ese parámetro)"
+                            "el mismo modelo sin ese parámetro; bandera de "
+                            "proceso ON para no repetirlo)"
                         )
                         continue  # mismo intento, sin sumar
                     es_rate_limit = any(k in error_msg for k in ("429", "rate_limit", "rate limit"))
@@ -5084,10 +5312,18 @@ class GlosaService:
         clave de caché (misma semántica de respuesta).
         """
         # Clave de caché incluye EPS, código y modelo override para evitar
-        # colisiones cruzadas entre Sonnet/Opus
+        # colisiones cruzadas entre Sonnet/Opus. Bump de versión (ronda 5,
+        # 16-jun-2026): añadimos `_PROMPT_CACHE_VERSION` al hash — al cambiar
+        # el system prompt, una red final o un sanitizador, basta con bumpear
+        # esa constante para invalidar TODOS los cachés viejos. Sin esto el
+        # caso 8 vino del caché DB con etiqueta qwen3 vieja aunque ya
+        # tuviéramos los fixes desplegados.
         modelo_para_clave = modelo_override or self.anthropic_model
         clave_cache = hashlib.sha256(
-            f"{self.primary_ai}|{modelo_para_clave}|{eps}|{codigo}|{system}|{user}".encode()
+            (
+                f"{_PROMPT_CACHE_VERSION}|{self.primary_ai}|{modelo_para_clave}|"
+                f"{eps}|{codigo}|{system}|{user}"
+            ).encode()
         ).hexdigest()
 
         # 1) Caché en memoria (lock asyncio para evitar race condition con
