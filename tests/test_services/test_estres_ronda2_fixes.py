@@ -598,7 +598,9 @@ class TestFix5ExtemporaneidadRatificacion:
         await servicio.analizar(data, contratos_db={})
         assert prompts_capturados, "la IA debió ser llamada por el camino legacy"
         primer_prompt = prompts_capturados[0]
-        assert "[EXTEMPORANEIDAD DETECTADA — ARGUMENTO PRIORITARIO]" in primer_prompt
+        # Ronda 7 (16-jun-2026): el bloque se renombró y se prepende al
+        # inicio del prompt — basta con que las señales clave aparezcan.
+        assert "EXTEMPORANEIDAD DETECTADA" in primer_prompt
         assert "Art. 57 de la Ley 1438 de 2011" in primer_prompt
         assert "2026-03-01" in primer_prompt and "2026-05-30" in primer_prompt
 

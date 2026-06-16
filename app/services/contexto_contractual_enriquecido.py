@@ -561,15 +561,25 @@ def bloque_kits_normativos_especiales(texto: str) -> str:
     """Bloque para el user prompt con los kits normativos activados.
 
     Cadena vacía si ningún contexto clínico especial se detectó.
+
+    Ronda 7 (16-jun-2026 — fix P/T): lenguaje imperativo. Evidencia
+    rondas 5-6: detectores activos, kits inyectados, pero el modelo no
+    citaba las normas (caso 11 no citó Resolución 2273/2024; caso 13 no
+    citó Decreto 2493/2004). Ahora con OBLIGATORIO + lista numerada de
+    normas que el dictamen TIENE que citar al pie de la letra.
     """
     kits = detectar_contextos_clinicos_especiales(texto)
     if not kits:
         return ""
     out = (
-        "\n[KITS NORMATIVOS ESPECIALES DEL CASO — CITA LITERAL OBLIGATORIA]\n"
-        "Los datos clínicos del caso activan los siguientes marcos normativos "
-        "específicos. Estas normas son las CITAS REALES y VINCULANTES — "
-        "úsalas LITERALMENTE en lugar de inventar otras.\n\n"
+        "\n═══ KIT NORMATIVO ESPECIAL DEL CASO — OBLIGATORIO CITAR LITERAL ═══\n"
+        "Los datos clínicos del caso activan marcos normativos específicos. "
+        "Estas normas son REALES (verificadas en el corpus) y APLICABLES al "
+        "caso. Tu dictamen DEBE citar AL MENOS 3 de ellas con su número "
+        "completo (artículo, ley/decreto/resolución, año).\n"
+        "REGLA: si inventas otras normas o citas solo principios genéricos "
+        "(Pacta Sunt Servanda, Art. 17 Ley 1751) en lugar de las normas de "
+        "este kit, el dictamen será marcado como evasivo y rechazado.\n\n"
     )
     for titulo, kit in kits:
         out += f"═ {titulo} ═\n{kit}\n\n"

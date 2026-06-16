@@ -172,7 +172,7 @@ _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
 # todos los cachés viejos. El caso 8 de la ronda 3 vino del caché DB con
 # etiqueta `groq/qwen/qwen3-32b` aunque los fixes ya estaban desplegados,
 # porque la clave SHA256 no incluía señal de versión.
-_PROMPT_CACHE_VERSION = "r6-20260616"
+_PROMPT_CACHE_VERSION = "r7-20260616"
 
 FERIADOS_CO = [
     # 2025
@@ -656,21 +656,38 @@ _PATRONES_FRASES_ABSURDAS: tuple[re.Pattern[str], ...] = (
     re.compile(
         r"[\"“‘'«»]?[^\"“”‘’'«»\n\.]{0,40}(?:NO\s+ADMITE\s+REBATIMIENTO|"
         r"NO\s+ADMITE\s+CONTROVERSIA|"
-        r"NO\s+SE\s+ADMITE\s+(?:NINGUNA\s+)?(?:CONTROVERSIA|REBATIMIENTO|RECURSO))"
+        r"NO\s+SE\s+ADMITE\s+(?:NINGUNA\s+)?(?:CONTROVERSIA|REBATIMIENTO|RECURSO|IMPUGNACI[ÓO]N))"
         r"[^\"“”‘’'«»\n\.]{0,40}[\"“”‘’'«»]?[\.\s]*",
         re.IGNORECASE,
     ),
     re.compile(
         r"(?:CUALQUIER\s+INTENTO\s+DE\s+REBATIR|"
         r"TODO\s+INTENTO\s+DE\s+REBATIR|"
-        r"CUALQUIER\s+OBJECI[ÓO]N\s+ADICIONAL)"
+        r"CUALQUIER\s+OBJECI[ÓO]N\s+ADICIONAL|"
+        r"CUALQUIER\s+INTENTO\s+DE\s+IMPUGN(?:ACI[ÓO]N|AR))"
         r"[^\.\n]{0,80}(?:IMPROCEDENTE|INADMISIBLE|RECHAZADA?)[\.\s]*",
         re.IGNORECASE,
     ),
     re.compile(
         r"(?:ESTA\s+RESPUESTA|EL\s+PRESENTE\s+DICTAMEN|EL\s+PRESENTE\s+ESCRITO)"
-        r"\s+(?:ES\s+)?DEFINITIV[OA](?:\s+(?:E\s+)?INAPELABLE|\s+Y\s+(?:NO\s+ADMITE|VINCULANTE))"
+        r"\s+(?:ES\s+|SER[ÁA]\s+)?(?:DEFINITIV[OA]|INAPELABLE|FINAL)"
+        r"(?:\s+(?:E\s+)?INAPELABLE|\s+Y\s+(?:NO\s+ADMITE|VINCULANTE)|"
+        r"\s+Y\s+NO\s+SUSCEPTIBLE\s+DE)?"
         r"[^\.\n]{0,80}[\.\s]*",
+        re.IGNORECASE,
+    ),
+    # Ronda 7 (16-jun-2026 — fix N): "no susceptible de nueva impugnación"
+    # (caso 9 FOMAG ronda 6 — cláusula "ANTI-REBATIMIENTO" inventada).
+    re.compile(
+        r"(?:[^\"“”‘’'«»\n\.]{0,60}"
+        r"NO\s+SUSCEPTIBLE\s+DE\s+(?:NUEVA\s+|MAYOR\s+|ULTERIOR\s+)?(?:IMPUGNACI[ÓO]N|OBJECI[ÓO]N|"
+        r"REVISI[ÓO]N|RECURSO|CONTROVERSIA)"
+        r"[^\.\n]{0,80})[\.\s]*",
+        re.IGNORECASE,
+    ),
+    # "CLÁUSULA X — ANTI-REBATIMIENTO" inventada
+    re.compile(
+        r"CL[ÁA]USULA\s+\d{1,3}\s*[-—–]\s*ANTI[-‐\s]?REBATIMIENTO[^\.\n]{0,160}[\.\s]*",
         re.IGNORECASE,
     ),
 )
@@ -706,8 +723,12 @@ def _neutralizar_frases_absurdas(texto: str) -> str:
 # explícitamente un "código" distinto del código del input, sustituimos
 # por el real o degradamos a "el código de la glosa aplicada".
 _PAT_CODIGO_EN_DICTAMEN = re.compile(
-    r"(?:SOBRE\s+EL\s+|CON\s+)?C[ÓO]DIGO\s+"
-    r"([A-Z]{2}\d{4}|\d{4,8}|N/A|N\.A\.)",
+    # Ronda 7 (16-jun-2026 — fix M): añadidos códigos cortos (1-3 dígitos
+    # puros, e.g. "CÓDIGO 001", "CÓDIGO 12345"). Evidencia caso 12: el
+    # dictamen escribió "SOBRE EL CÓDIGO 001" y el regex anterior pedía
+    # ≥4 dígitos. Ahora captura también 1-3 dígitos puros.
+    r"(?:SOBRE\s+EL\s+|CON\s+|DE\s+LA\s+GLOSA\s+|GLOSA\s+)?C[ÓO]DIGO\s+"
+    r"([A-Z]{2}\d{4}|\d{1,8}|N/A|N\.A\.)",
     re.IGNORECASE,
 )
 
@@ -762,6 +783,65 @@ def _normalizar_codigo_dictamen(
             f"input ({codigo_real_up}) corregidas en el dictamen final."
         )
     return resultado
+
+
+# ── Red final: cierre de truncamiento (ronda 7, 16-jun-2026 — fix S) ──
+# Evidencia caso 13 NUEVA EPS: el dictamen terminó con "(ART. 2284/2023»."
+# — paréntesis sin cerrar y comilla suelta. Al modelo se le acabó el
+# presupuesto y dejó la frase a medias. Detectamos los cierres rotos y
+# los limpiamos sin inventar texto: si la última frase del argumento
+# termina en " QUE" o " EN" o un paréntesis abierto, cortamos hasta el
+# último punto/`.`/cierre limpio anterior y añadimos puntuación neutra.
+_PAT_TRUNCAMIENTO_FINAL = re.compile(
+    # Captura los últimos 200 chars del texto sin punto final (frase
+    # incompleta). Conservador: solo si NO termina ya con cierre limpio.
+    r"([^\.\!\?\»\)]*\([^\)]{0,200})\s*[\»\"\'\.]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _cerrar_truncamiento(texto: str) -> str:
+    """Si el final del texto está truncado (paréntesis sin cerrar, comilla
+    suelta tras una frase incompleta), corta hasta el último cierre limpio
+    y añade puntuación neutra. Conservador: solo cuando hay paréntesis
+    sin cerrar o frase visiblemente incompleta."""
+    if not texto:
+        return texto
+    # Caso 13: "...DECRETO 780/2016 ART. 2284/2023». ADEMÁS..." sin cerrar
+    # paréntesis. Detectar paréntesis abiertos sin cerrar en los últimos
+    # 400 chars.
+    cola = texto[-400:]
+    abre = cola.count("(")
+    cierra = cola.count(")")
+    if abre > cierra:
+        # Cortar hasta el último punto antes del paréntesis huérfano.
+        ult_par_abre = texto.rfind("(")
+        if ult_par_abre > 0:
+            ult_punto = texto.rfind(".", 0, ult_par_abre)
+            if ult_punto > 0 and (len(texto) - ult_punto) < 400:
+                resultado = texto[: ult_punto + 1] + " Se solicita el levantamiento de la glosa."
+                logger.warning(
+                    "[TRUNCAMIENTO] Dictamen truncado mid-sentence (paréntesis "
+                    "sin cerrar) — cortado al último punto y cerrado con "
+                    "petición estándar."
+                )
+                return resultado
+    # Caso: termina con "QUE", "EN", ":", "—", coma sin texto detrás
+    # (case-insensitive). Ronda 7 fix S.
+    cola_fin = texto.rstrip().rstrip(".»\"'”„").rstrip()
+    cola_fin_up = cola_fin.upper()
+    if cola_fin_up.endswith(
+        (" QUE", " EN", " DE", " A", " O", " Y", " LA", " EL", ":", "—", "-", "/")
+    ):
+        ult_punto = texto.rfind(".", 0, len(texto) - 5)
+        if ult_punto > 0 and (len(texto) - ult_punto) < 200:
+            resultado = texto[: ult_punto + 1] + " Se solicita el levantamiento de la glosa."
+            logger.warning(
+                "[TRUNCAMIENTO] Dictamen terminó con conector colgado — "
+                "cortado al último punto y cerrado con petición estándar."
+            )
+            return resultado
+    return texto
 
 
 def _neutralizar_contratos_ajenos(texto: str, eps: str) -> str:
@@ -2421,21 +2501,30 @@ class GlosaService:
                 if _f_rad_txt and _f_rat_txt:
                     _dias_rat = self._calcular_dias_habiles(_f_rad_txt, _f_rat_txt)
                     if _dias_rat is not None and _dias_rat > DIAS_HABILES_LIMITE_RATIFICACION:
-                        user_prompt += (
-                            "\n\n[EXTEMPORANEIDAD DETECTADA — ARGUMENTO PRIORITARIO]\n"
+                        # Ronda 7 (16-jun-2026 — fix O): el bloque procesal
+                        # también se PREPENDE para que el modelo abra con
+                        # la extemporaneidad ANTES del fondo.
+                        _bloque_ext = (
+                            "═══════════════ INSTRUCCIÓN PRIORITARIA #2 — DEFENSA PROCESAL "
+                            "═══════════════\n"
+                            "[EXTEMPORANEIDAD DETECTADA — ARGUMENTO PROCESAL OBLIGATORIO]\n"
                             f"La ratificación fue notificada {_dias_rat} días hábiles "
                             f"después de la radicación (radicación {_f_rad_txt} → "
                             f"recepción de la ratificación {_f_rat_txt}), excediendo el "
-                            "término del Art. 57 de la Ley 1438 de 2011. Esta defensa "
-                            "PROCESAL va PRIMERO en el dictamen: abre el argumento "
-                            "invocando la extemporaneidad de la ratificación ANTES de "
-                            "cualquier defensa de fondo, y cita las dos fechas "
-                            "textualmente como evidencia.\n"
+                            "término del Art. 57 de la Ley 1438 de 2011 (10 días hábiles "
+                            "para respuesta).\n\n"
+                            "OBLIGATORIO — esta defensa PROCESAL va PRIMERO: abre el "
+                            "dictamen invocando la extemporaneidad de la ratificación "
+                            "ANTES de cualquier defensa de fondo, y cita las dos fechas "
+                            f"textualmente como evidencia ({_f_rad_txt} y {_f_rat_txt}).\n"
+                            "═══════════════════════════════════════════════════════════"
+                            "════════════════\n\n"
                         )
+                        user_prompt = _bloque_ext + user_prompt
                         logger.info(
                             f"[EXTEMP-RATIFICACION] {_dias_rat} días hábiles entre "
                             f"radicación ({_f_rad_txt}) y recepción de ratificación "
-                            f"({_f_rat_txt}) — bloque prioritario inyectado al prompt."
+                            f"({_f_rat_txt}) — bloque PREPENDIDO al prompt (prioritario #2)."
                         )
             except Exception as _e_ext_rat:
                 logger.debug(f"[EXTEMP-RATIFICACION] detector no aplicado: {_e_ext_rat}")
@@ -2456,20 +2545,39 @@ class GlosaService:
             try:
                 _citas_eps = _extraer_citas_inducidas_eps(texto_base)
                 if _citas_eps:
-                    bloque_citas = "\n\n[CITAS INDUCIDAS POR LA EPS — DESVIRTUAR PRIMERO]\n"
-                    bloque_citas += (
-                        "La EPS apoya su glosa en las siguientes citas atribuidas a "
-                        "normas o sentencias. NO las repitas como ciertas. ABRE el "
-                        "dictamen verificando que esas citas (a) no existan en el "
-                        "corpus normativo o (b) NO digan lo que la EPS afirma. Solo "
-                        "después de desvirtuarlas, expón tu defensa de fondo.\n"
+                    # Ronda 7 (16-jun-2026 — fix O): el bloque iba al FINAL
+                    # del prompt y el modelo lo ignoraba (evidencia caso 12
+                    # Compensar — NOM-035/ISO 9001 inducidas no desvirtuadas).
+                    # Ahora se PREPENDE con encabezado imperativo numerado;
+                    # el modelo lo lee ANTES de cualquier otro contexto.
+                    bloque_citas = (
+                        "═══════════════ INSTRUCCIÓN PRIORITARIA #1 — LEE Y APLICA "
+                        "ANTES DE REDACTAR ═══════════════\n"
+                        "[CITAS INDUCIDAS POR LA EPS — DESVIRTUAR EN EL PRIMER PÁRRAFO]\n"
+                        "La EPS apoya su glosa en citas atribuidas a normas o estándares "
+                        "que NO necesariamente existen ni dicen lo que ella afirma. Algunas "
+                        "(NOM mexicana, ISO, IEC, IEEE, normas internacionales) NO son "
+                        "vinculantes en Colombia. Otras pueden ser sentencias o "
+                        "resoluciones inexistentes en el corpus colombiano.\n\n"
+                        "OBLIGATORIO — el PRIMER PÁRRAFO del dictamen DEBE:\n"
+                        "  (a) Citar TEXTUALMENTE la cita atribuida por la EPS (señalar "
+                        "norma y supuesto contenido).\n"
+                        "  (b) Desvirtuarla explícitamente — por inexistencia, por no "
+                        "aplicabilidad territorial (extranjera), o por tergiversación de "
+                        "su texto real.\n"
+                        "  (c) Solo después, exponer la defensa de fondo.\n\n"
+                        "CITAS DETECTADAS A DESVIRTUAR:\n"
                     )
                     for i, c in enumerate(_citas_eps[:3], 1):
                         bloque_citas += f"  {i}. {c}\n"
-                    user_prompt += bloque_citas
+                    bloque_citas += (
+                        "═══════════════════════════════════════════════════════════════"
+                        "════════════════\n\n"
+                    )
+                    user_prompt = bloque_citas + user_prompt
                     logger.info(
                         f"[CITA-INDUCIDA] {len(_citas_eps)} cita(s) atribuida(s) por la "
-                        "EPS detectada(s) en el texto — bloque inyectado al prompt."
+                        "EPS PREPENDIDAS al prompt (instrucción prioritaria #1)."
                     )
             except Exception as _e_ci:
                 logger.debug(f"[CITA-INDUCIDA] detector no aplicado: {_e_ci}")
@@ -3796,6 +3904,19 @@ class GlosaService:
                     dictamen = _dictamen_cod_ok
             except Exception as _e_ci:
                 logger.debug(f"[CODIGO-INCOHERENTE] red final no aplicada: {_e_ci}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 7 (16-jun-2026) — RED FINAL truncamiento (fix S).
+            #  Caso 13 NUEVA EPS: dictamen terminó "(ART. 2284/2023».)"
+            #  — paréntesis sin cerrar tras quedarse sin tokens. Cortamos
+            #  al último punto limpio y agregamos petición estándar.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_cerrado = _cerrar_truncamiento(dictamen)
+                if _dictamen_cerrado != dictamen:
+                    dictamen = _dictamen_cerrado
+            except Exception as _e_tr:
+                logger.debug(f"[TRUNCAMIENTO] red final no aplicada: {_e_tr}")
 
         except Exception as _e:
             logger.debug(f"[CONFIDENCE] citation_verifier falló: {_e}")

@@ -233,8 +233,10 @@ def test_fix_l_no_se_pisa_con_fechas_yyyymmdd():
 
 # ── Cache version bumped ─────────────────────────────────────────────
 def test_cache_version_r6_bumped():
-    """La constante de versión se actualizó a r6 — invalida cachés r5."""
-    assert _PROMPT_CACHE_VERSION == "r6-20260616"
+    """La constante de versión se bumpeó (sigue subiendo en rondas
+    posteriores, basta con que sea >= r6)."""
+    assert _PROMPT_CACHE_VERSION.startswith("r")
+    assert int(_PROMPT_CACHE_VERSION[1]) >= 6
 
 
 # ── Verificación catálogo: ACTA 1388 sigue catalogada (regresión r5) ─

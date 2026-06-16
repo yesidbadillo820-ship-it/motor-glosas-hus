@@ -349,10 +349,13 @@ class TestSingleCodigoSinCambios:
 
 
 class TestCapTresCodigos:
-    """(e) El cap de 3 códigos (principal + 2 adicionales) se respeta."""
+    """(e) El cap de códigos se respeta (subido a 5 en ronda 7)."""
 
     @pytest.mark.asyncio
-    async def test_cuarto_codigo_no_se_procesa_pero_se_declara(self, monkeypatch):
+    async def test_cuatro_codigos_caben_dentro_del_cap(self, monkeypatch):
+        """Ronda 7 (16-jun-2026 — fix Q): cap subido de 3 a 5. Una glosa
+        con 4 códigos (caso 13 NUEVA EPS trasplante) ahora se procesa
+        completa sin excedentes — antes el 4° quedaba siempre fuera."""
         _preparar_entorno(monkeypatch)
         registro: list = []
         _instalar_stub_ia(monkeypatch, registro)
@@ -360,17 +363,16 @@ class TestCapTresCodigos:
         resultado = await _servicio().analizar(_data(TEXTO_4_CODIGOS), contratos_db=_CONTRATOS)
         d = resultado.dictamen
 
-        # El encabezado declara los 4, incluido el excedente
+        # El encabezado declara los 4
         assert "CÓDIGOS GLOSA: SO0601, TA0201, TA0701, FA0801" in d
-        # Solo 2 secciones adicionales (cap = 3 códigos en total)
+        # Las 3 secciones adicionales aparecen (cap = 5 ahora)
         assert "RESPUESTA AL CÓDIGO TA0201" in d
         assert "RESPUESTA AL CÓDIGO TA0701" in d
-        assert "RESPUESTA AL CÓDIGO FA0801" not in d
-        # El excedente queda anunciado como respuesta separada
-        assert "FA0801 exceden el límite de procesamiento automático" in d
-        assert "requieren respuesta separada" in d
-        # FA0801 jamás llegó a la IA
-        assert registro == ["SO0601", "TA0201", "TA0701"]
+        assert "RESPUESTA AL CÓDIGO FA0801" in d
+        # Sin nota de excedente
+        assert "exceden el límite de procesamiento automático" not in d
+        # Los 4 llegaron a la IA
+        assert registro == ["SO0601", "TA0201", "TA0701", "FA0801"]
 
 
 class TestHelpersUnitarios:

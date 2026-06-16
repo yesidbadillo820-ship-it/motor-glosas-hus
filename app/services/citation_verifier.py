@@ -43,8 +43,18 @@ PAT_DECRETO = re.compile(
 # extraía "Ley 1795 de 2000" del texto fijo DMBUG y la marcaba
 # NORMA_INEXISTENTE ALTA (la norma real es el Decreto-Ley 1795/2000).
 PAT_LEY = re.compile(
-    r"(?<!DECRETO-)(?<!DECRETO\s)\bLey\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
-    r"|(?<!DECRETO-)(?<!DECRETO\s)\bLey\s+(\d{1,5})[/\-](\d{2,4})",
+    # Ronda 7 (16-jun-2026 — fix R): los lookbehinds solo cubrían ASCII "-"
+    # y espacio normal. Evidencia caso 9 FOMAG: el dictamen escribió
+    # "Decreto‑Ley 1295/1994" con guión Unicode U+2011 (non-breaking
+    # hyphen), saltando ambos lookbehinds, y el verifier marcaba
+    # "Ley 1295/1994" como NORMA_INEXISTENTE ALTA. Ampliamos a todos los
+    # guiones Unicode (U+002D, U+2010-U+2015) y espacios (regular, NBSP).
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\-‐‑‒–—―])"
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\s ])"
+    r"\bLey\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
+    r"|(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\-‐‑‒–—―])"
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\s ])"
+    r"\bLey\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_ACUERDO = re.compile(
