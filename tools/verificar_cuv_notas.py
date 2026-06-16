@@ -94,6 +94,10 @@ def _rips_match(carpeta_ne: Path) -> str | None:
             data = json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return None
+    if not isinstance(data, dict):
+        # El JSON parsea pero no es un objeto (p. ej. literal 'null', '[]',
+        # o un string); no es un Rips de nota válido.
+        return None
     num_fac = (data.get("numFactura") or "").strip()
     return normalizar_factura(num_fac)
 
@@ -108,9 +112,10 @@ def _resultados_json(carpeta_ne: Path) -> dict | None:
     candidatos.sort(reverse=True)
     try:
         with candidatos[0].open(encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return None
+    return data if isinstance(data, dict) else None
 
 
 def procesar_carpeta_ne(carpeta_ne: Path, buscadas: set[str]) -> dict | None:
