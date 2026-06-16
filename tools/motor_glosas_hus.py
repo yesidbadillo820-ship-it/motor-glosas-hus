@@ -54,6 +54,7 @@ COLS_TRAMITE = {
     "servicio":  "ListadoConceptos.DetalleRecepcionObjecion.ServicioProductoFactura.Descripcion",
     "observ":    "ListadoConceptos.Observaciones",
 }
+# Formato del export "Listado de Recepción de Objeción" (headers sin prefijo).
 COLS_RECEPCION = {
     "tercero":   "FacturaCartera.Tercero.NombreCompletoAN",
     "factura":   "FacturaCartera.Factura",
@@ -61,6 +62,16 @@ COLS_RECEPCION = {
     "val_obj":   "ListadoConceptos.ValorObjecion",
     "servicio":  "ListadoConceptos.ServicioProductoFactura.Descripcion",
     "observ_eps": "ListadoConceptos.Observaciones",
+}
+# Formato del export "Listado de Trámite de Objeción" usado como recepción
+# (mismo archivo TRAMITE → toma las glosas como si fueran pendientes).
+COLS_RECEPCION_DESDE_TRAMITE = {
+    "tercero":   "RecepcionObjecion.FacturaCartera.Tercero.NombreCompletoAN",
+    "factura":   "RecepcionObjecion.FacturaCartera.Factura",
+    "cod_obj":   "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Codigo",
+    "val_obj":   "ListadoConceptos.DetalleRecepcionObjecion.ValorObjecion",
+    "servicio":  "ListadoConceptos.DetalleRecepcionObjecion.ServicioProductoFactura.Descripcion",
+    "observ_eps": "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Nombre",
 }
 
 
@@ -217,7 +228,15 @@ def procesar_recepcion(
     if not rows:
         raise ValueError(f"{ruta_recep} está vacío")
     headers = list(rows[0])
-    idx = _idx(headers, COLS_RECEPCION)
+    # Auto-detectar formato: si los headers traen prefijo RecepcionObjecion. son
+    # del Listado de Trámite (que también sirve como input — el motor toma cada
+    # fila como una glosa a evaluar).
+    try:
+        idx = _idx(headers, COLS_RECEPCION)
+        logger.info(f"  formato detectado: RECEPCION (export del Listado de Recepción)")
+    except ValueError:
+        idx = _idx(headers, COLS_RECEPCION_DESDE_TRAMITE)
+        logger.info(f"  formato detectado: TRAMITE (export del Listado de Trámite)")
 
     fil_eps = _norm(filtro_eps or "")
     fil_fac = (filtro_factura or "").strip().upper()
