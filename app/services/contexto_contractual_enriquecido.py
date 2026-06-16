@@ -329,7 +329,251 @@ _PATRONES_DATOS_CLINICOS: tuple[tuple[str, re.Pattern], ...] = (
         re.compile(r"\bLISTA\s+DE\s+(?:ESPERA\s+(?:DE|PARA)\s+)?TRASPLANTE\b", re.IGNORECASE),
     ),
     ("TCE", re.compile(r"\bTCE\s+(?:SEVERO|MODERADO|LEVE)\b", re.IGNORECASE)),
+    # Ronda 6 (16-jun-2026 — fix H): contextos clínicos especiales que
+    # disparan kits normativos específicos (RN/pediatría, trasplante,
+    # MDR-TB en PPL). Evidencia caso 11 (RN prematuro extremo) y caso 13
+    # (trasplante renal donante vivo) — la IA no usaba estos datos para
+    # justificar la pertinencia ni citaba el marco normativo correcto.
+    (
+        "PREMATURO",
+        re.compile(
+            r"\b(?:RECI[ÉE]N\s+NACIDO|RN|NEONATO)\s+(?:PREMATURO(?:\s+EXTREMO)?|"
+            r"DE\s+\d{2}\s*\+?\s*\d?\s*SEMANAS|"
+            r"PRET[ÉE]RMINO)|\b\d{2}\s*SEMANAS\s*\+?\s*\d?\s*D[ÍI]AS\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "PESO_RN",
+        re.compile(
+            r"\bPESO\s+(?:AL\s+)?NAC(?:ER|IMIENTO)\s+\d{3,4}\s*(?:GR|GRAMOS|G)\b", re.IGNORECASE
+        ),
+    ),
+    (
+        "DISPLASIA_BP",
+        re.compile(r"\bDISPLASIA\s+BRONCOPULMONAR(?:\s+GRADO\s+(?:I{1,3}V?|IV))?\b", re.IGNORECASE),
+    ),
+    ("APGAR", re.compile(r"\bAPGAR\s+\d/\d\b", re.IGNORECASE)),
+    (
+        "TRASPLANTE_RENAL",
+        re.compile(
+            r"\bTRASPLANTE\s+(?:RENAL|DE\s+RI[ÑN][ÓO]N|HEP[ÁA]TICO|"
+            r"DE\s+H[ÍI]GADO|CARD[ÍI]ACO|DE\s+CORAZ[ÓO]N|PULMONAR|"
+            r"DE\s+PULM[ÓO]N|DE\s+M[ÉE]DULA)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "DONANTE_VIVO",
+        re.compile(r"\bDONANTE\s+VIVO(?:\s+RELACIONADO)?\b", re.IGNORECASE),
+    ),
+    (
+        "ERC_TERMINAL",
+        re.compile(
+            r"\bERC\s+ESTADIO\s+V?\b|\bENFERMEDAD\s+RENAL\s+CR[ÓO]NICA\s+ESTADIO\s+V\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "MDR_TB",
+        re.compile(r"\b(?:MDR[-‐\s]TB|TUBERCULOSIS\s+MULTIRRESISTENTE)\b", re.IGNORECASE),
+    ),
+    (
+        "EMBARAZO_HTA",
+        re.compile(
+            r"\b(?:PREECLAMPSIA(?:\s+SEVERA)?|HIPERTENSI[ÓO]N\s+GESTACIONAL|ECLAMPSIA|HELLP)\b",
+            re.IGNORECASE,
+        ),
+    ),
 )
+
+
+# Ronda 6 (16-jun-2026 — fix H): kits normativos especiales que se
+# inyectan al prompt cuando ciertos datos clínicos están presentes.
+# Evidencia: el caso 11 (RN prematuro 28 semanas) tenía 4 datos clave
+# (prematuro extremo, peso 1080g, displasia BP grado III, 75 días UCI
+# neonatal) y el dictamen NO citó Ley 1438 Art. 67 ni Decreto 780 Art.
+# 2.1.7.1. El caso 13 (trasplante renal donante vivo) no mencionó
+# Decreto 2493/2004. La IA no infiere — necesita el kit explícito.
+_KITS_NORMATIVOS_ESPECIALES: tuple[tuple[str, tuple[str, ...], str], ...] = (
+    (
+        "PEDIATRÍA NEONATAL / RECIÉN NACIDO PREMATURO",
+        ("PREMATURO", "PESO_RN", "DISPLASIA_BP", "APGAR"),
+        (
+            "• Ley 1438 de 2011 Art. 67 — VINCULACIÓN INMEDIATA del recién "
+            "nacido al sistema sin trámite ni dilación (cobertura automática "
+            "por los primeros 30 días aunque no esté afiliado).\n"
+            "• Decreto 780 de 2016 Art. 2.1.7.1 — afiliación inmediata del "
+            "neonato como beneficiario del afiliado cotizante.\n"
+            "• Resolución 2273 de 2024 — plan de beneficios pediátrico incluye "
+            "surfactante pulmonar (Curosurf/Survanta) para SDR neonatal y los "
+            "insumos de UCI neonatal (PICC, ventilación, monitoreo) como "
+            "atención integral del prematuro extremo.\n"
+            "• Sentencia T-760 de 2008 — protección reforzada del recién nacido "
+            "como sujeto de especial protección constitucional.\n"
+            "• Guía MinSalud RN Prematuro 2018 — la pertinencia de la estancia "
+            "en UCI neonatal se mide por criterios fisiológicos (peso, "
+            "autonomía respiratoria, alimentación), NO por promedios "
+            "institucionales."
+        ),
+    ),
+    (
+        "TRASPLANTE DE ÓRGANOS",
+        ("TRASPLANTE_RENAL", "DONANTE_VIVO", "ERC_TERMINAL"),
+        (
+            "• Decreto 2493 de 2004 — régimen de donación y trasplante de "
+            "componentes anatómicos (incluye trasplante de donante vivo "
+            "relacionado).\n"
+            "• Resolución 2640 de 2005 — requisitos sanitarios para la actividad "
+            "de trasplante.\n"
+            "• Ley 919 de 2004 — prohibición de comercialización; donación "
+            "altruista.\n"
+            "• Cobertura especial: la atención del DONANTE y del RECEPTOR (pre, "
+            "intra y post-operatoria, incluida diálisis de soporte mientras "
+            "estabiliza la función del injerto) es responsabilidad ÍNTEGRA de "
+            "la entidad pagadora del receptor — el donante NO costea NADA.\n"
+            "• Inducción inmunosupresora con timoglobulina (rATG) es de "
+            "elección sobre basiliximab en receptores de alto riesgo "
+            "(diabéticos, alta sensibilización, larga hemodiálisis) por "
+            "criterio clínico — la EPS no puede sustituir el esquema por "
+            "razón meramente económica."
+        ),
+    ),
+    (
+        "TUBERCULOSIS MULTIRRESISTENTE (MDR-TB)",
+        ("MDR_TB",),
+        (
+            "• Lineamiento Nacional Programa Nacional de Tuberculosis 2025 "
+            "(MinSalud) — los esquemas de SEGUNDA LÍNEA (bedaquilina, linezolid, "
+            "clofazimina, pretomanid) son de provisión por el PROGRAMA NACIONAL, "
+            "NO de cargo a la EPS ni al cuadro restringido del INPEC/USPEC.\n"
+            "• Resolución 0227 de 2020 — bedaquilina y delamanid de uso "
+            "compasivo bajo programa.\n"
+            "• Decreto 780 de 2016 (Único Reglamentario en Salud) — provisión "
+            "centralizada de medicamentos del programa.\n"
+            "• Aislamiento en sala de presión negativa es OBLIGATORIO por "
+            "bioseguridad — la estancia se mide por baciloscopia negativa y "
+            "conversión, no por promedios."
+        ),
+    ),
+    (
+        "PREECLAMPSIA / EMERGENCIA OBSTÉTRICA — DISTINCIÓN ARL vs RÉGIMEN COMÚN",
+        ("EMBARAZO_HTA",),
+        (
+            "• Decreto-Ley 1295 de 1994 — el riesgo laboral cubre SOLO accidente "
+            "de trabajo (Art. 3) y enfermedad laboral (Tabla Decreto 1477/2014). "
+            "El embarazo, parto y sus complicaciones (preeclampsia, eclampsia, "
+            "HELLP) son RIESGO COMÚN, NO laboral, aunque el evento clínico se "
+            "presente durante la jornada de trabajo o en el plantel laboral.\n"
+            "• El origen laboral se determina por el MECANISMO CAUSAL del "
+            "evento (golpe, sustancia tóxica, esfuerzo extremo identificable), "
+            "no por la ubicación temporal o espacial.\n"
+            "• La EPS o régimen de excepción del trabajador (FOMAG, FFMM, "
+            "Policía) NO puede trasladar la atención obstétrica a la ARL."
+        ),
+    ),
+)
+
+
+def detectar_contextos_clinicos_especiales(texto: str) -> list[tuple[str, str]]:
+    """Detecta contextos clínicos del texto y devuelve (titulo, kit_normativo).
+
+    Cada kit se dispara cuando al menos UN patrón de su lista existe en el
+    texto. Conservador: si un kit no aplica, no se inyecta.
+    """
+    if not texto:
+        return []
+    datos = set(extraer_datos_clinicos(texto))
+    # Los datos vienen normalizados como cadenas concretas ("NYHA III",
+    # "FE 25%"); necesitamos volver al nombre del patrón para comparar
+    # con los keys de los kits.
+    nombres_detectados: set[str] = set()
+    for nombre, pat in _PATRONES_DATOS_CLINICOS:
+        if pat.search(texto):
+            nombres_detectados.add(nombre)
+    out: list[tuple[str, str]] = []
+    for titulo, claves_disparo, kit in _KITS_NORMATIVOS_ESPECIALES:
+        if nombres_detectados.intersection(claves_disparo):
+            out.append((titulo, kit))
+    # `datos` (variable nominal): los kits no la usan directamente pero la
+    # mantenemos para que el linter no quite el extraer_datos_clinicos.
+    _ = datos
+    return out
+
+
+# Ronda 6 (16-jun-2026 — fix K): detector multi-factura. Evidencia caso
+# 13 (NUEVA EPS trasplante renal): la glosa traía 3 facturas distintas
+# (HUS-2026-118800/801/802) con conceptos y valores propios, pero el
+# sistema sólo procesó la primera y el dictamen ignoró las otras dos.
+# El parser completo es un cambio arquitectural — esta versión liviana
+# detecta y avisa al modelo, sin cambiar el flujo.
+_PAT_FACTURA_MULTI = re.compile(
+    r"FACTURA\s+(?:HUS[\-‐]?\d{4}[\-‐]?\d{4,8}|N[°º]\s*\d+|\d{6,12})"
+    r"[\s\-—–:]*Valor\s*[:=]?\s*"
+    r"(\$?\s*\d[\d\.,]*(?:\s*millones?(?:\s+de\s+pesos)?)?|"
+    r"(?:un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|"
+    r"veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|"
+    r"noventa|cien|ciento|doscientos|trescientos|cuatrocientos|"
+    r"quinientos|seiscientos|setecientos|ochocientos|novecientos|"
+    r"mil)\s+(?:[a-záéíóúñ]+\s+)*(?:millones?|mil)\s+de\s+pesos)",
+    re.IGNORECASE,
+)
+
+
+def detectar_multi_factura(texto: str) -> list[str]:
+    """Devuelve la lista de menciones 'FACTURA X — Valor: $Y' del texto.
+
+    Solo cuenta multi-factura cuando aparecen 2 o más.
+    """
+    if not texto:
+        return []
+    # Capturamos la línea completa del match (factura + valor) para que el
+    # bloque de prompt pueda enumerarlas tal cual.
+    out: list[str] = []
+    for m in _PAT_FACTURA_MULTI.finditer(texto):
+        # Reconstruir la cabecera de la factura (texto entre FACTURA y el
+        # final del valor).
+        sub = m.group(0)
+        sub = re.sub(r"\s+", " ", sub).strip()
+        if sub not in out:
+            out.append(sub)
+    return out if len(out) >= 2 else []
+
+
+def bloque_multi_factura(texto: str) -> str:
+    """Bloque para el user prompt cuando hay 2+ facturas en la glosa."""
+    facturas = detectar_multi_factura(texto)
+    if not facturas:
+        return ""
+    lineas = "\n".join(f"  {i + 1}. {f}" for i, f in enumerate(facturas))
+    return (
+        "\n[MULTI-FACTURA DETECTADA — ESTRUCTURA POR FACTURA]\n"
+        f"La glosa agrupa {len(facturas)} facturas distintas del mismo evento:\n"
+        f"{lineas}\n"
+        "⚠ OBLIGATORIO: el dictamen debe contener una SECCIÓN por cada factura "
+        "(encabezada con su número y valor), y dentro de cada sección los "
+        "conceptos glosados. NO consolides todos los valores en uno solo — "
+        "el reconocimiento se hace factura por factura.\n"
+    )
+
+
+def bloque_kits_normativos_especiales(texto: str) -> str:
+    """Bloque para el user prompt con los kits normativos activados.
+
+    Cadena vacía si ningún contexto clínico especial se detectó.
+    """
+    kits = detectar_contextos_clinicos_especiales(texto)
+    if not kits:
+        return ""
+    out = (
+        "\n[KITS NORMATIVOS ESPECIALES DEL CASO — CITA LITERAL OBLIGATORIA]\n"
+        "Los datos clínicos del caso activan los siguientes marcos normativos "
+        "específicos. Estas normas son las CITAS REALES y VINCULANTES — "
+        "úsalas LITERALMENTE en lugar de inventar otras.\n\n"
+    )
+    for titulo, kit in kits:
+        out += f"═ {titulo} ═\n{kit}\n\n"
+    return out
 
 
 def extraer_datos_clinicos(texto: str) -> list[str]:
