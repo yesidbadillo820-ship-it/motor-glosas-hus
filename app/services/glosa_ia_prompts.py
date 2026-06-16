@@ -249,6 +249,10 @@ def get_contrato(eps: str) -> dict:
 # contrato ajeno es verificable por la EPS en segundos y destruye el
 # dictamen completo.
 _PAT_TOKEN_CONTRATO = re.compile(r"[A-Z0-9][A-Z0-9./\-]{4,40}")
+_PAT_TOKEN_NUM_ANIO = re.compile(
+    r"\b(\d{3,4})\s+DE\s+(\d{4})\b|\b(\d{3,4})/(\d{4})\b",
+    re.IGNORECASE,
+)
 
 
 def _extraer_tokens_contrato(numero: str) -> list[str]:
@@ -257,9 +261,16 @@ def _extraer_tokens_contrato(numero: str) -> list[str]:
     Conservador: exige ≥6 caracteres, al menos un dígito y al menos un
     carácter NO numérico (letra, guion, slash o punto) — los números puros
     ("1388", "0525", "319") son ambiguos con CUPS/valores/años y se omiten.
+
+    Ronda 5 (16-jun-2026): tokens compuestos "NNN DE YYYY" / "NNN/YYYY".
+    Sin esto, CONTRATOS_HUS["NUEVA EPS"]["numero"] = "ACTA DE NEGOCIACIÓN
+    No. 1388 DE 2024 / ACTA 2025" NO generaba ningún token (1388 y 2024
+    son puros números, omitidos por ambigüedad) y `contratos_ajenos_citados`
+    nunca detectaba el ACTA 1388 citada por otra EPS distinta de NUEVA EPS.
     """
     tokens: list[str] = []
-    for m in _PAT_TOKEN_CONTRATO.finditer((numero or "").upper()):
+    s = (numero or "").upper()
+    for m in _PAT_TOKEN_CONTRATO.finditer(s):
         tok = m.group(0).strip(".-/")
         if len(tok) < 6:
             continue
@@ -269,6 +280,18 @@ def _extraer_tokens_contrato(numero: str) -> list[str]:
             continue
         if tok not in tokens:
             tokens.append(tok)
+    # Tokens compuestos "NNN DE YYYY" / "NNN/YYYY" — el número solo es
+    # ambiguo (años, valores, CUPS), pero junto con su año forma un id
+    # razonablemente único. Genera AMBAS variantes para que el match
+    # literal de `contratos_ajenos_citados` funcione cualquiera sea la
+    # forma que use el dictamen.
+    for m in _PAT_TOKEN_NUM_ANIO.finditer(s):
+        num = m.group(1) or m.group(3)
+        anio = m.group(2) or m.group(4)
+        if num and anio and len(num) >= 3:
+            for tok in (f"{num} DE {anio}", f"{num}/{anio}"):
+                if tok not in tokens:
+                    tokens.append(tok)
     return tokens
 
 
