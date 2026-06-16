@@ -137,3 +137,59 @@ def test_fix_s_dictamen_completo_no_se_toca():
 def test_cache_version_r7_bumped():
     """La constante de versión se actualizó a r7."""
     assert _PROMPT_CACHE_VERSION == "r7-20260616"
+
+
+# ── Fix U: catálogo CONTRATOS_HUS ampliado con 3 entidades nuevas ────
+def test_fix_u_compensar_catalogado():
+    """Compensar entró al catálogo con su contrato real (CSS009-2024)."""
+    from app.services.glosa_ia_prompts import CONTRATOS_HUS
+
+    assert "COMPENSAR" in CONTRATOS_HUS
+    nota = CONTRATOS_HUS["COMPENSAR"]["nota"]
+    assert "CSS009-2024" in CONTRATOS_HUS["COMPENSAR"]["numero"]
+    # Explicita exclusión de normas extranjeras (caso 12 NOM/ISO)
+    assert "NOM" in nota or "ISO" in nota or "extranjeras" in nota.lower()
+
+
+def test_fix_u_positiva_catalogado():
+    """Positiva (ARL) catalogada con contrato 0525/2017 + Otrosí 03."""
+    from app.services.glosa_ia_prompts import CONTRATOS_HUS
+
+    assert "POSITIVA" in CONTRATOS_HUS
+    nota = CONTRATOS_HUS["POSITIVA"]["nota"]
+    assert "0525 DE 2017" in CONTRATOS_HUS["POSITIVA"]["numero"]
+    assert "1295" in nota  # Decreto-Ley ARL
+    assert "MECANISMO CAUSAL" in nota  # distinción ARL vs régimen común
+
+
+def test_fix_u_aurora_catalogada():
+    """Aurora (Cía Vida) catalogada con GID-ARL-0090."""
+    from app.services.glosa_ia_prompts import CONTRATOS_HUS
+
+    assert "AURORA" in CONTRATOS_HUS
+    assert "GID-ARL-0090" in CONTRATOS_HUS["AURORA"]["numero"]
+
+
+def test_fix_u_compensar_contrato_ajeno_si_lo_cita_otra_eps():
+    """Caso 12 ronda 7: si DMBUG cita CSS009-2024 → contrato ajeno."""
+    from app.services.glosa_ia_prompts import contratos_ajenos_citados
+
+    d = "según el contrato CSS009-2024 las tarifas..."
+    assert contratos_ajenos_citados(d, "DMBUG") == ["CSS009-2024"]
+    assert contratos_ajenos_citados(d, "COMPENSAR") == []
+
+
+def test_fix_u_aurora_contrato_ajeno():
+    """Si FAMISANAR cita GID-ARL-0090 → ajeno."""
+    from app.services.glosa_ia_prompts import contratos_ajenos_citados
+
+    d = "contrato GID-ARL-0090 establece"
+    assert contratos_ajenos_citados(d, "FAMISANAR") == ["GID-ARL-0090"]
+
+
+def test_fix_u_catalogo_cubre_15_entidades_principales():
+    """Total de EPSs/regímenes catalogados >= 15 (carga completa de
+    contratos del 16-jun-2026)."""
+    from app.services.glosa_ia_prompts import CONTRATOS_HUS
+
+    assert len(CONTRATOS_HUS) >= 15

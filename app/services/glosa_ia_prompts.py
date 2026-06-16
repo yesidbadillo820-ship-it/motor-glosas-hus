@@ -84,7 +84,16 @@ CONTRATOS_HUS: dict[str, dict] = {
         "nit": "860.063.996-9",
         "vigencia": "01/02/2025 — 31/01/2026 (Anexo No 1 al CSS009-2024)",
         "contacto": "Flor Alba Merchán Acero — Coord. Negociador Red REGIONAL Compensar | negociacionregional@compensarsalud.com",
-        "nota": "Acuerdo tarifario con dos componentes: SOAT homologado CUPS (descuento -10%) y servicios institucionales HUS valorados en tarifa propia. Tope Plan Complementario IV nivel catastróficas: $109.959.400. Medicamentos: tarifas IPS según listado trimestral (Res. 2641/2024). Material de osteosíntesis: 12% sobre valor facturado (Res. 171/2024).",
+        "nota": (
+            "Acuerdo tarifario con dos componentes: SOAT homologado CUPS "
+            "(descuento -10%) y servicios institucionales HUS valorados en "
+            "tarifa propia. Tope Plan Complementario IV nivel catastróficas: "
+            "$109.959.400. Medicamentos: tarifas IPS según listado trimestral "
+            "(Res. 2641/2024). Material de osteosíntesis: 12% sobre valor "
+            "facturado (Res. 171/2024). Régimen contributivo Ley 100/1993. "
+            "NO aplican normas extranjeras (NOM mexicana, ISO 9001, IEC, "
+            "IEEE, AHA/ASA) como fundamento de glosa en Colombia."
+        ),
     },
     "POSITIVA": {
         "numero": "CONTRATO No. 0525 DE 2017 + OTROSÍ No. 03 (diciembre 2025)",
@@ -94,7 +103,20 @@ CONTRATOS_HUS: dict[str, dict] = {
         "nit": "860.011.153-6",
         "vigencia": "Extendida hasta 19/01/2027 por Otrosí No. 03 al Contrato 0525/2017",
         "contacto": "CHARLES RODOLFO BAYONA MOLANO — Vicepresidente Técnico Positiva",
-        "nota": "Contrato de riesgos laborales. El Otrosí 03 modifica obligaciones del contratista, duración, interventoría y garantías.",
+        "nota": (
+            "Contrato ARL Positiva. Marco normativo: Decreto-Ley 1295 de 1994 "
+            "(sistema general riesgos laborales), Tabla Decreto 1477 de 2014 "
+            "(enfermedades laborales), Decreto 780 de 2016, Decreto 441 de 2022. "
+            "Ramos cubiertos: ARL (accidente de trabajo + enfermedad profesional), "
+            "Accidentes Personales (AP Educativo Generación Positiva, AP Colectivos, "
+            "AP Corto Plazo, AP Individual), Vida Individual, Vida Grupo. El Otrosí "
+            "03 (12-12-2025) modifica obligaciones, duración, interventoría y garantías. "
+            "EXCLUSIONES: servicios experimentales, cosméticos, suntuarios. "
+            "La cobertura ARL solo aplica si el evento tiene MECANISMO CAUSAL laboral — "
+            "la sola ocurrencia en jornada de trabajo NO basta (embarazo, parto y "
+            "complicaciones obstétricas son RIESGO COMÚN aunque ocurran en plantel "
+            "laboral)."
+        ),
     },
     "PPL": {
         "numero": "CONTRATO IPS-001B-2022 — OTROSÍ No. 26 (2025)",
@@ -189,6 +211,26 @@ CONTRATOS_HUS: dict[str, dict] = {
         "contacto": "Correo contratación HUS",
         "nota": "Tarifario en dos hojas: SOAT homologado CUPS y servicios institucionales HUS.",
     },
+    "AURORA": {
+        "numero": "CONTRATO No. GID-ARL-0090 — ARL + VIDA AP",
+        "tarifa": "Manual Tarifario ARL (SOAT homologado)",
+        "factor": 1.00,
+        "tipo": "ARL — COMPAÑÍA DE SEGUROS DE VIDA AURORA",
+        "nit": "860.022.137-5",
+        "vigencia": "2024 (vigente)",
+        "contacto": "MARIO ALBERTO DIAZ ARIAS — Representante Legal Aurora",
+        "nota": (
+            "Compañía de Seguros de Vida Aurora S.A. — IPS Persona Jurídica "
+            "habilitada Secretaría Salud Departamental Santander (REPS "
+            "6800100792). Dos contratos firmados: (a) ARL 0090 — atención "
+            "integral por accidente o enfermedad laboral, (b) Vida AP 230824. "
+            "Marco normativo: Decreto 780 de 2016 (sustituido por Decreto 441 "
+            "de 2022 en Capítulo 4 Título 3 Parte 5 Libro 2), Ley 1122 de 2007, "
+            "Decreto 4747 de 2007, Decreto-Ley 1295 de 1994. Las prestaciones "
+            "se otorgan a usuarios del CONTRATANTE en calidad de asegurados. "
+            "Aurora NO cubre eventos sin nexo causal laboral identificable."
+        ),
+    },
     "DISPENSARIO MEDICO": {
         "numero": "CONTRATO No. 440-DIGSA/DMBUG-2025 (Proceso CD477)",
         "tarifa": "SOAT/SMLV -20 % (Manual tarifario homologado SOAT-SMLV con descuento del 20%)",
@@ -218,16 +260,6 @@ CONTRATOS_HUS: dict[str, dict] = {
         "vigencia": "2024-2025",
         "contacto": "Correo contratación HUS",
         "nota": "Contrato de prestación de servicios de salud.",
-    },
-    "AURORA": {
-        "numero": "MINUTA ARL + MINUTA VIDA AP — FIRMADAS SEP 2024",
-        "tarifa": "SOAT PLENO (sin descuento)",
-        "factor": 1.00,
-        "tipo": "COMPAÑÍA DE SEGUROS — ARL Y VIDA",
-        "nit": "N/D",
-        "vigencia": "2024-2025",
-        "contacto": "Compañía de Seguros de Vida Aurora S.A.",
-        "nota": "Dos minutas: ARL y Vida AP. SOAT pleno aplicable.",
     },
 }
 
