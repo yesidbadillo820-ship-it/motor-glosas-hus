@@ -42,10 +42,14 @@ from app.services.quality_gate_adapter import (
 
 logger = logging.getLogger("motor_glosas.multi_codigo")
 
-# Principal + 2 adicionales. Cada adicional cuesta 1-3 llamadas IA (el QG
-# puede regenerar), por eso el cap es bajo: una glosa con 4+ códigos es
-# rarísima y amerita respuesta manual para los excedentes.
-MAX_CODIGOS_DICTAMEN = 3
+# Ronda 7 (16-jun-2026 — fix Q): subido de 3 a 5. Evidencia caso 13
+# NUEVA EPS trasplante: 4 conceptos (TA0201, IN0401, ME0701, CO0701) y
+# el CO0701 quedaba siempre excluido como "excedente". Caso 6 Famisanar
+# cardio: 5 conceptos (AU0301, TA0201, IN0401, ME0501, SO0601) — 2
+# excluidos. La mayoría de glosas hospitalarias complejas tienen 4-5
+# códigos. Override por env: MAX_CODIGOS_DICTAMEN_OVERRIDE.
+_MAX_CODIGOS_OVERRIDE = os.getenv("MAX_CODIGOS_DICTAMEN_OVERRIDE", "").strip()
+MAX_CODIGOS_DICTAMEN = int(_MAX_CODIGOS_OVERRIDE) if _MAX_CODIGOS_OVERRIDE.isdigit() else 5
 
 # Nombre legible de cada familia de código — espejo de _ABREV_A_NOMBRE /
 # _NOMBRE_TIPO (glosa_service / glosa_ia_prompts). Se duplica aquí para no
