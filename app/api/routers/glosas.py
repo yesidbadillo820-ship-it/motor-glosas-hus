@@ -1242,6 +1242,7 @@ async def generar_lote(
         groq_model=cfg.groq_model,
         groq_model_fallback_1=cfg.groq_model_fallback_1,
         groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )
@@ -1436,6 +1437,7 @@ async def refinar_dictamen_endpoint(
         groq_model=cfg.groq_model,
         groq_model_fallback_1=cfg.groq_model_fallback_1,
         groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )
@@ -1548,6 +1550,7 @@ async def validar_pre_radicacion(
         groq_model=cfg.groq_model,
         groq_model_fallback_1=cfg.groq_model_fallback_1,
         groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )
@@ -4412,6 +4415,7 @@ async def _procesar_fila_en_background(
             groq_model=cfg.groq_model,
             groq_model_fallback_1=cfg.groq_model_fallback_1,
             groq_model_fallback_2=cfg.groq_model_fallback_2,
+            groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
             gemini_api_key=cfg.gemini_api_key,
             gemini_model=cfg.gemini_model,
         )
@@ -5874,6 +5878,7 @@ async def reanalizar_glosa(
         groq_model=cfg.groq_model,
         groq_model_fallback_1=cfg.groq_model_fallback_1,
         groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
     )

@@ -1969,11 +1969,12 @@ class GlosaService:
         anthropic_api_key: str = None,
         primary_ai: str = "anthropic",
         anthropic_model: str = "claude-sonnet-4-6",
-        groq_model: str = "openai/gpt-oss-120b",
+        groq_model: str = "meta-llama/llama-4-maverick-17b-128e-instruct",
         gemini_api_key: str = None,
         gemini_model: str = "gemini-2.0-flash",
-        groq_model_fallback_1: str = "qwen/qwen3-32b",
-        groq_model_fallback_2: str = "llama-3.3-70b-versatile",
+        groq_model_fallback_1: str = "openai/gpt-oss-120b",
+        groq_model_fallback_2: str = "qwen/qwen3-32b",
+        groq_model_fallback_3: str = "llama-3.3-70b-versatile",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
@@ -1993,14 +1994,15 @@ class GlosaService:
             )
             self.primary_ai = "groq"
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
-        # Cadena de modelos DENTRO de Groq (decision 12-jun-2026, ver
-        # app/core/config.py): gpt-oss-120b → qwen3-32b → llama-3.3-70b.
-        # Si el primario falla (429/transitorio/deprecado) se prueba el
-        # siguiente modelo Groq ANTES de saltar a Anthropic — ver
-        # _modelos_groq() y _llamar_groq_con_retry().
-        self.groq_model = groq_model or "openai/gpt-oss-120b"
-        self.groq_model_fallback_1 = groq_model_fallback_1 or "qwen/qwen3-32b"
-        self.groq_model_fallback_2 = groq_model_fallback_2 or "llama-3.3-70b-versatile"
+        # Cadena de modelos DENTRO de Groq (decision 16-jun-2026 ronda 8,
+        # ver app/core/config.py): llama-4-maverick → gpt-oss-120b →
+        # qwen3-32b → llama-3.3-70b. Si el primario falla (429/transitorio/
+        # deprecado) se prueba el siguiente modelo Groq ANTES de saltar a
+        # Anthropic — ver _modelos_groq() y _llamar_groq_con_retry().
+        self.groq_model = groq_model or "meta-llama/llama-4-maverick-17b-128e-instruct"
+        self.groq_model_fallback_1 = groq_model_fallback_1 or "openai/gpt-oss-120b"
+        self.groq_model_fallback_2 = groq_model_fallback_2 or "qwen/qwen3-32b"
+        self.groq_model_fallback_3 = groq_model_fallback_3 or "llama-3.3-70b-versatile"
         # Google Gemini se conserva ÚNICAMENTE para lectura de PDFs
         # escaneados: OCR (pdf_service.extraer_con_ocr) y la cadena
         # multimodal del pdf_fallback_patch (A=Anthropic → B=Gemini PDF →
@@ -5002,22 +5004,25 @@ class GlosaService:
 
     def _modelos_groq(self) -> list[str]:
         """Cadena de modelos Groq a intentar EN ORDEN antes de saltar a
-        Anthropic (decision 12-jun-2026, ver app/core/config.py):
+        Anthropic (decision 16-jun-2026 ronda 8, ver app/core/config.py):
 
-          1. groq_model            (default: openai/gpt-oss-120b)
-          2. groq_model_fallback_1 (default: qwen/qwen3-32b)
-          3. groq_model_fallback_2 (default: llama-3.3-70b-versatile)
+          1. groq_model            (default: meta-llama/llama-4-maverick-17b-128e-instruct)
+          2. groq_model_fallback_1 (default: openai/gpt-oss-120b)
+          3. groq_model_fallback_2 (default: qwen/qwen3-32b)
+          4. groq_model_fallback_3 (default: llama-3.3-70b-versatile)
 
         Dedupe preservando orden: si un override por env (p.ej.
         GROQ_MODEL=llama-3.3-70b-versatile) coincide con un fallback, ese
         modelo no se intenta dos veces.
         """
         vistos: set[str] = set()
-        return [
-            m
-            for m in (self.groq_model, self.groq_model_fallback_1, self.groq_model_fallback_2)
-            if m and not (m in vistos or vistos.add(m))
-        ]
+        candidatos = (
+            self.groq_model,
+            self.groq_model_fallback_1,
+            self.groq_model_fallback_2,
+            getattr(self, "groq_model_fallback_3", None),
+        )
+        return [m for m in candidatos if m and not (m in vistos or vistos.add(m))]
 
     async def _llamar_groq_con_retry(
         self, system: str, user: str, max_intentos: int = 4, llamada_corta: bool = False
