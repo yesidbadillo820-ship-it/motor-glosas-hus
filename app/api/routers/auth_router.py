@@ -12,7 +12,7 @@ from app.models.db import UsuarioRecord
 from app.models.schemas import TokenResponse, CambiarPasswordRequest
 from app.auth import authenticate_user, create_access_token, get_password_hash, verify_password
 from app.core.config import get_settings
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_admin
 from datetime import datetime as _dt
 
 router = APIRouter(tags=["auth"])
@@ -180,6 +180,70 @@ def logout(
     return {
         "ok": True,
         "mensaje": "Sesión cerrada. Descarte el token en el cliente.",
+    }
+
+
+@router.post("/auth/token-integracion")
+def emitir_token_integracion(
+    request: Request,
+    email: str = Form(...),
+    dias: int = Form(365),
+    admin: UsuarioRecord = Depends(get_admin),
+    db: Session = Depends(get_db),
+):
+    """Emite un token JWT de LARGA DURACIÓN para una cuenta de servicio
+    (jump-box de soportes, integraciones externas).
+
+    Por qué existe: el token normal expira en 8h (access_token_expire_minutes
+    = 480), lo cual rompe un agente 24/7 como tools/jumpbox_sync.py — moriría
+    con 401 cada 8h y dejaría de sincronizar soportes. Este endpoint genera
+    un token de hasta 730 días (2 años) que se pega en la variable
+    MOTOR_TOKEN del jump-box.
+
+    Seguridad:
+      • Solo SUPER_ADMIN puede emitirlo.
+      • El usuario destino debe existir, estar ACTIVO y tener rol AUDITOR o
+        superior (el endpoint /soportes-auto/upload-bulk exige auditor+).
+      • Se audita en log con email del admin que lo emitió.
+      • Para revocar: desactivar la cuenta de servicio en el panel Usuarios
+        (get_usuario_actual valida `activo` en cada request).
+    """
+    ip = get_remote_address(request)
+    email_norm = (email or "").strip().lower()
+
+    destino = db.query(UsuarioRecord).filter(UsuarioRecord.email == email_norm).first()
+    if not destino:
+        raise HTTPException(404, f"No existe usuario con email {email_norm!r}")
+    if not destino.activo:
+        raise HTTPException(400, "La cuenta de servicio está desactivada")
+    if destino.rol not in ("SUPER_ADMIN", "COORDINADOR", "AUDITOR"):
+        raise HTTPException(
+            400,
+            f"La cuenta debe tener rol AUDITOR o superior para subir soportes "
+            f"(rol actual: {destino.rol}).",
+        )
+
+    # Límite duro de 2 años para no emitir tokens eternos.
+    dias = max(1, min(int(dias or 365), 730))
+    token = create_access_token(
+        data={"sub": destino.email},
+        expires_delta=timedelta(days=dias),
+    )
+    logger.warning(
+        f"[AUTH-TOKEN-INTEGRACION] Token de {dias}d emitido por {admin.email} "
+        f"para cuenta de servicio {destino.email} (rol={destino.rol}) | ip={ip}"
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "email": destino.email,
+        "rol": destino.rol,
+        "expira_en_dias": dias,
+        "uso": (
+            "Pega este token en la variable MOTOR_TOKEN del jump-box "
+            "(tools/jumpbox_sync.py). Para revocarlo, desactiva la cuenta "
+            "de servicio en el panel Usuarios."
+        ),
     }
 
 
