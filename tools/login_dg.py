@@ -106,6 +106,76 @@ def _print_controles(dlg, prefijo: str = "  ") -> None:
         logger.warning(f"{prefijo}no pude imprimir controles: {e}")
 
 
+def _listar_ventanas_visibles() -> None:
+    """Imprime las ventanas top-level visibles para diagnóstico."""
+    try:
+        from pywinauto import Desktop
+        logger.info("  Ventanas top-level visibles ahora:")
+        for w in Desktop(backend="uia").windows():
+            try:
+                title = w.window_text()
+                cls = w.class_name()
+                if title:
+                    logger.info(f"    title={title!r}  class={cls!r}")
+            except Exception:
+                continue
+    except Exception as e:
+        logger.warning(f"  No pude listar ventanas: {e}")
+
+
+def _proceso_dg_existente(nombre_exe: str = "DG.WinDG.exe") -> int | None:
+    """Devuelve el PID del primer DG.WinDG.exe corriendo, o None."""
+    try:
+        import subprocess
+        # tasklist es nativo de Windows, no agrega dependencias.
+        out = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {nombre_exe}", "/FO", "CSV", "/NH"],
+            capture_output=True, text=True, timeout=10,
+        ).stdout
+        for linea in out.splitlines():
+            if nombre_exe.lower() in linea.lower():
+                # CSV: "img","pid","sess",...
+                campos = [c.strip().strip('"') for c in linea.split(",")]
+                if len(campos) >= 2 and campos[1].isdigit():
+                    return int(campos[1])
+    except Exception:
+        pass
+    return None
+
+
+def _ventana_login_por_pid(pid: int):
+    """Devuelve la ventana 'Inicio de sesión' del proceso pid, o None."""
+    try:
+        from pywinauto import Application
+        app = Application(backend="uia").connect(process=pid, timeout=2)
+        for w in app.windows():
+            try:
+                t = w.window_text() or ""
+                if "sesi" in t.lower() and "inicio" in t.lower():
+                    return w
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None
+
+
+def _ventana_dashboard_por_pid(pid: int):
+    try:
+        from pywinauto import Application
+        app = Application(backend="uia").connect(process=pid, timeout=2)
+        for w in app.windows():
+            try:
+                t = (w.window_text() or "").lower()
+                if "dashboard" in t and "dinámica" in t.lower() or "dashboard" in t and "dinamica" in t:
+                    return w
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None
+
+
 def login(
     exe_path: Path,
     usuario: str,
@@ -132,26 +202,32 @@ def login(
     Timings.exists_timeout = 5
     Timings.after_clickinput_wait = 0.2
 
-    if not exe_path.is_file():
-        logger.error(f"No existe el ejecutable: {exe_path}")
-        sys.exit(1)
+    # ── 0) ¿Hay un DG ya abierto? ──────────────────────────────────────────
+    pid = _proceso_dg_existente()
+    if pid:
+        logger.info(f"  DG.WinDG.exe ya esta corriendo (PID {pid}); me conecto a ese.")
+    else:
+        if not exe_path.is_file():
+            logger.error(f"No existe el ejecutable: {exe_path}")
+            logger.error("Pasa --exe con la ruta correcta de DG.WinDG.exe.")
+            sys.exit(1)
+        logger.info(f"Lanzando {exe_path.name} (puede tardar varios segundos en cargar)…")
+        app = Application(backend="uia").start(f'"{exe_path}"', wait_for_idle=False)
+        pid = app.process
 
-    logger.info(f"Lanzando {exe_path.name} (puede tardar varios segundos en cargar)…")
-    app = Application(backend="uia").start(f'"{exe_path}"', wait_for_idle=False)
-
-    # ── 1) Esperar ventana 'Inicio de sesión' ──────────────────────────────
-    logger.info("Esperando ventana 'Inicio de sesión'…")
+    # ── 1) Esperar ventana 'Inicio de sesión' DEL PROCESO ──────────────────
+    logger.info(f"Esperando ventana 'Inicio de sesión' del PID {pid} (timeout {timeout_inicial}s)…")
     dlg_login = _esperar(
-        lambda: Application(backend="uia")
-        .connect(title_re=r"^Inicio de sesi[oó]n$", timeout=2)
-        .window(title_re=r"^Inicio de sesi[oó]n$"),
+        lambda: _ventana_login_por_pid(pid),
         timeout_s=timeout_inicial,
         etiqueta="ventana de login",
     )
     if dlg_login is None:
-        logger.error("No apareció la ventana de login. Cerrá DG a mano y reintentá.")
+        logger.error("No aparecio la ventana de login.")
+        logger.error("Diagnóstico abajo (mandame esta salida si seguís con el problema):")
+        _listar_ventanas_visibles()
         sys.exit(1)
-    logger.info("  ✓ ventana de login visible")
+    logger.info(f"  ✓ ventana de login visible (title='{dlg_login.window_text()}')")
     if con_ventanas:
         _print_controles(dlg_login)
 
@@ -225,15 +301,15 @@ def login(
 
     # ── 4) Segunda ventana: Área de Servicios + Centro de Atención ─────────
     logger.info("Esperando segunda pantalla (Área de Servicios)…")
+    time.sleep(2)  # la transición no es instantánea
     dlg_area = _esperar(
-        lambda: Application(backend="uia")
-        .connect(title_re=r"^Inicio de sesi[oó]n$", timeout=2)
-        .window(title_re=r"^Inicio de sesi[oó]n$"),
+        lambda: _ventana_login_por_pid(pid),
         timeout_s=30,
         etiqueta="segunda ventana de login",
     )
     if dlg_area is None:
         logger.error("No apareció la pantalla de Área de Servicios. ¿Usuario o contraseña incorrectos?")
+        _listar_ventanas_visibles()
         sys.exit(1)
     # Damos tiempo a que renderice los radios
     time.sleep(0.8)
@@ -293,16 +369,15 @@ def login(
     # ── 5) Esperar DashBoard Principal ─────────────────────────────────────
     logger.info("Esperando DashBoard Principal…")
     dlg_dash = _esperar(
-        lambda: Application(backend="uia")
-        .connect(title_re=r"DashBoard Principal.*Din[aá]mica Gerencial", timeout=2)
-        .window(title_re=r"DashBoard Principal.*Din[aá]mica Gerencial"),
+        lambda: _ventana_dashboard_por_pid(pid),
         timeout_s=60,
         etiqueta="DashBoard Principal",
     )
     if dlg_dash is None:
         logger.error("No detecté el DashBoard tras 60s.")
+        _listar_ventanas_visibles()
         sys.exit(1)
-    logger.info("✓ Sesión iniciada — DG listo en DashBoard Principal.")
+    logger.info(f"✓ Sesión iniciada — DG en '{dlg_dash.window_text()}'.")
 
 
 def main() -> int:
@@ -322,8 +397,12 @@ def main() -> int:
         help="Código de centro de atención (default 01)."
     )
     parser.add_argument(
-        "--timeout-inicial", type=int, default=60,
-        help="Segundos máx esperando la ventana de login (default 60)."
+        "--timeout-inicial", type=int, default=120,
+        help="Segundos máx esperando la ventana de login (default 120 — DG es lento de arrancar)."
+    )
+    parser.add_argument(
+        "--solo-listar", action="store_true",
+        help="Solo lista ventanas visibles y termina (diagnóstico)."
     )
     parser.add_argument(
         "--con-ventanas", action="store_true",
@@ -335,6 +414,10 @@ def main() -> int:
     if sys.platform != "win32":
         logger.error("Este script solo corre en Windows (DG es .NET WPF nativo).")
         return 2
+
+    if args.solo_listar:
+        _listar_ventanas_visibles()
+        return 0
 
     usuario, password = cargar_credenciales()
     logger.info(f"DG_USUARIO={usuario}  EXE={args.exe}")
