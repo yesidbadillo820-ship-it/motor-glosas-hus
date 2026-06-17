@@ -20,7 +20,7 @@ import pytest
 
 from app.services.glosa_service import GlosaService
 
-PRIMARIO = "meta-llama/llama-4-maverick-17b-128e-instruct"
+PRIMARIO = "meta-llama/llama-4-scout-17b-16e-instruct"
 FALLBACK_1 = "openai/gpt-oss-120b"
 FALLBACK_2 = "qwen/qwen3-32b"
 FALLBACK_3 = "llama-3.3-70b-versatile"

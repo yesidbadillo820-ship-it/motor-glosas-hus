@@ -3,7 +3,7 @@
 Decisión 16-jun-2026 ronda 8 (dueño + banco de respuestas HUS): la cadena
 de modelos Groq quedó en
 
-    meta-llama/llama-4-maverick-17b-128e-instruct (primario)
+    meta-llama/llama-4-scout-17b-16e-instruct (primario)
     → openai/gpt-oss-120b (fallback 1)
     → qwen/qwen3-32b (fallback 2)
     → llama-3.3-70b-versatile (fallback 3)
@@ -34,7 +34,7 @@ class TestDefaultsModelosGroq:
 
     def test_primario_es_llama_4_maverick(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model == "meta-llama/llama-4-maverick-17b-128e-instruct"
+        assert s.groq_model == "meta-llama/llama-4-scout-17b-16e-instruct"
 
     def test_primario_ya_no_es_llama_33(self, monkeypatch):
         # llama-3.3 pasó a fallback 3 (último recurso).
