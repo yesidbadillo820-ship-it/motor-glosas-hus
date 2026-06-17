@@ -6,7 +6,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Backgro
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.core.tz import ahora_utc
+from app.core.tz import a_utc, ahora_utc
 from app.database import get_db, SessionLocal
 from app.repositories.glosa_repository import GlosaRepository
 from app.repositories.contrato_repository import ContratoRepository
@@ -3322,6 +3322,19 @@ def obtener_glosa(
         "tipo_glosa_excel": glosa.tipo_glosa_excel,
         "profesional_medico": glosa.profesional_medico,
         "creado_en": glosa.creado_en.isoformat() if glosa.creado_en else None,
+        # Seguimiento de cierre (decisión EPS + nota crédito)
+        "decision_eps": glosa.decision_eps,
+        "fecha_decision_eps": glosa.fecha_decision_eps.isoformat()
+        if glosa.fecha_decision_eps
+        else None,
+        "valor_recuperado": float(glosa.valor_recuperado or 0.0),
+        "observacion_eps": glosa.observacion_eps,
+        "numero_nota_credito": glosa.numero_nota_credito,
+        "fecha_nota_credito": glosa.fecha_nota_credito.isoformat()
+        if glosa.fecha_nota_credito
+        else None,
+        "valor_nota_credito": float(glosa.valor_nota_credito or 0.0),
+        "nota_credito_observacion": glosa.nota_credito_observacion,
     }
 
 
@@ -3451,6 +3464,15 @@ class DecisionEPSInput(BaseModel):
     decision_eps: str
     valor_recuperado: float = 0.0
     observacion_eps: Optional[str] = None
+
+
+class NotaCreditoInput(BaseModel):
+    # Nombres alineados con el contrato que la UI ya envía (static/index.html
+    # guardarNotaCredito): numero_nota / fecha_nota / valor / observacion.
+    numero_nota: str = Field(..., min_length=1)
+    fecha_nota: Optional[str] = None  # ISO date; default = hoy
+    valor: Optional[float] = None  # si viene vacío → se usa valor_aceptado
+    observacion: Optional[str] = None
 
 
 class AsignarAuditorInput(BaseModel):
@@ -3704,6 +3726,144 @@ def registrar_decision_eps(
         detalle=f"Decisión: {decision} | recuperado: ${data.valor_recuperado:,.0f}",
     )
     return {"message": "Decisión registrada", "glosa_id": glosa_id, "decision_eps": decision}
+
+
+@router.get("/{glosa_id}/nota-credito")
+def obtener_nota_credito(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Datos de la nota crédito registrada en una glosa (para precargar el
+    modal de edición en la UI)."""
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    return {
+        "glosa_id": glosa_id,
+        "numero_nota_credito": glosa.numero_nota_credito,
+        "fecha_nota_credito": glosa.fecha_nota_credito.isoformat()
+        if glosa.fecha_nota_credito
+        else None,
+        "valor_nota_credito": float(glosa.valor_nota_credito or 0.0),
+        "observacion": glosa.nota_credito_observacion,
+    }
+
+
+@router.patch("/{glosa_id}/nota-credito")
+def registrar_nota_credito(
+    glosa_id: int,
+    data: NotaCreditoInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Registra la nota crédito emitida cuando una glosa se acepta (parcial
+    o total). Cierra el ciclo de seguimiento de cartera: el gestor sabe qué
+    glosas se aceptaron y con qué N° de nota crédito se descargaron.
+
+    Es independiente de /decision-eps: la nota crédito suele emitirse días
+    después de aceptar la glosa, así que se captura por separado. Si la
+    glosa aún no estaba marcada como ACEPTADA, registrar la nota crédito la
+    mueve a ese estado (tener nota crédito implica que se aceptó).
+
+    Si `valor` viene vacío, se usa el valor_aceptado de la glosa (la UI
+    informa al gestor de este default).
+    """
+    numero = (data.numero_nota or "").strip()
+    if not numero:
+        raise HTTPException(400, "El número de nota crédito es obligatorio")
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+
+    # Valor: el explícito manda; si viene vacío se toma el valor_aceptado.
+    # Si tampoco hay valor aceptado, no hay nada que descargar → 400.
+    valor = data.valor
+    if valor is None or float(valor) <= 0:
+        valor = float(glosa.valor_aceptado or 0.0)
+    if valor <= 0:
+        raise HTTPException(
+            400,
+            "La glosa no tiene valor aceptado. Indica el valor de la nota "
+            "crédito explícitamente o registra primero la aceptación parcial.",
+        )
+
+    # Fecha: si viene, debe ser parseable; una fecha basura es error del
+    # gestor, no se silencia.
+    if data.fecha_nota:
+        try:
+            fecha_nc = a_utc(datetime.fromisoformat(data.fecha_nota.replace("Z", "")))
+        except (ValueError, TypeError):
+            raise HTTPException(400, f"Fecha de nota crédito inválida: {data.fecha_nota!r}")
+    else:
+        fecha_nc = ahora_utc()
+
+    glosa.numero_nota_credito = numero
+    glosa.valor_nota_credito = float(valor)
+    glosa.fecha_nota_credito = fecha_nc
+    if data.observacion:
+        glosa.nota_credito_observacion = data.observacion
+
+    # Tener nota crédito implica que la glosa se aceptó. Si no estaba ya en
+    # un estado de cierre por decisión EPS, marcarla ACEPTADA.
+    if (glosa.decision_eps or "").upper() not in ("ACEPTADA", "LEVANTADA", "RATIFICADA"):
+        glosa.decision_eps = "ACEPTADA"
+        glosa.fecha_decision_eps = ahora_utc()
+    if (glosa.estado or "").upper() not in ("ACEPTADA", "LEVANTADA", "RATIFICADA"):
+        glosa.estado = "ACEPTADA"
+    db.commit()
+
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="NOTA_CREDITO",
+        tabla="glosas",
+        registro_id=glosa_id,
+        campo="numero_nota_credito",
+        valor_nuevo=numero,
+        detalle=f"Nota crédito {numero} | valor: ${float(valor or 0):,.0f}",
+    )
+    return {
+        "message": "Nota crédito registrada",
+        "glosa_id": glosa_id,
+        "numero_nota_credito": numero,
+        "valor_nota_credito": float(valor),
+        "fecha_nota_credito": glosa.fecha_nota_credito.isoformat()
+        if glosa.fecha_nota_credito
+        else None,
+        "observacion": glosa.nota_credito_observacion,
+    }
+
+
+@router.delete("/{glosa_id}/nota-credito", status_code=204)
+def eliminar_nota_credito(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Borra la nota crédito de una glosa (corrección de captura). No cambia
+    la decisión EPS ni el estado — solo limpia los campos de nota crédito."""
+    glosa = GlosaRepository(db).obtener_por_id(glosa_id)
+    if not glosa:
+        raise HTTPException(404, "Glosa no encontrada")
+    numero_previo = glosa.numero_nota_credito
+    glosa.numero_nota_credito = None
+    glosa.fecha_nota_credito = None
+    glosa.valor_nota_credito = 0.0
+    glosa.nota_credito_observacion = None
+    db.commit()
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="NOTA_CREDITO",
+        tabla="glosas",
+        registro_id=glosa_id,
+        campo="numero_nota_credito",
+        valor_anterior=numero_previo,
+        valor_nuevo=None,
+        detalle="Nota crédito eliminada",
+    )
+    return None
 
 
 # ─── Sprint #4 — Decisión EPS en LOTE ────────────────────────────────────
