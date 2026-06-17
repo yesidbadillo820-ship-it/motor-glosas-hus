@@ -1043,6 +1043,11 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 
 /* ─── DASHBOARD (sobrio, mono-color con jerarquía) ──────────────────────────── */
 .dash-area{flex:1;overflow-y:auto;padding:1.75rem;display:flex;flex-direction:column;gap:1.25rem}
+/* Tab-bar consolidada de Reportes (Mando·Dashboard·Cartera·Mes) */
+.rep-tabbar{display:flex;gap:.3rem;flex-wrap:wrap;border-bottom:2px solid var(--border);margin-bottom:.35rem;padding-bottom:0}
+.rep-tab{background:transparent;border:0;border-bottom:3px solid transparent;padding:.55rem .95rem;font-size:.82rem;font-weight:600;color:var(--text3);cursor:pointer;border-radius:8px 8px 0 0;transition:color .12s,background .12s,border-color .12s;margin-bottom:-2px;white-space:nowrap}
+.rep-tab:hover{color:var(--text);background:var(--bg)}
+.rep-tab.active{color:var(--c-teal2,#0d9488);border-bottom-color:var(--c-teal2,#0d9488);background:var(--bg)}
 .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:.85rem}
 .kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.35rem;transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
 .kpi:hover{border-color:var(--border2);box-shadow:var(--sh)}
@@ -2370,6 +2375,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- DASHBOARD -->
     <div class="panel" id="p-dashboard">
       <div class="dash-area">
+        <div class="rep-tabbar-host" data-activo="dashboard"></div>
         <div class="kpi-grid" id="kpi-grid">
           <div class="kpi"><div class="kpi-lbl">Total glosas</div><div class="kpi-num" id="k-total">—</div><div class="kpi-sub">procesadas en el mes</div></div>
           <div class="kpi"><div class="kpi-lbl">Valor objetado</div><div class="kpi-num" id="k-obj">—</div><div class="kpi-sub">acumulado del mes</div></div>
@@ -2801,6 +2807,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- R300: Dashboard Cobranza Live -->
     <div class="panel" id="p-cobranza-live">
       <div class="dash-area">
+        <div class="rep-tabbar-host" data-activo="cobranza-live"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
           <div>
             <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Cobranza Live</div>
@@ -2833,6 +2840,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- R350: Resumen mensual ejecutivo -->
     <div class="panel" id="p-resumen-mes">
       <div class="dash-area">
+        <div class="rep-tabbar-host" data-activo="resumen-mes"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
           <div>
             <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Resumen del mes <span id="rm-mes" style="color:var(--c-teal2);font-weight:600"></span></div>
@@ -2864,6 +2872,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- B.1: Mando ejecutivo single-pane-of-glass (coord/admin) -->
     <div class="panel" id="p-mando">
       <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div class="rep-tabbar-host" data-activo="mando"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
           <div>
             <div style="font-size:1.15rem;font-weight:700;color:var(--text)">⚡ Mando ejecutivo</div>
@@ -12017,6 +12026,38 @@ function sidebarTab(el, id){
   if(window.innerWidth <= 900) toggleSidebar(false);
 }
 
+// ─── Tab-bar consolidada de Reportes ───────────────────────────────────────
+// Consolida Mando · Dashboard · Cartera (Cobranza Live) · Resumen del mes en
+// una sola barra de pestañas que aparece arriba de los 4 paneles. Feedback
+// Yesid: "4 botones que sacan la misma info → consolidar en uno". El menú
+// lateral sigue teniendo los accesos, pero ahora dentro de cualquiera de los
+// 4 se navega entre ellos sin volver al sidebar.
+function navReporte(id){
+  // Marca el .sn-item correcto del sidebar y navega (sidebarTab gestiona todo)
+  var target = null;
+  document.querySelectorAll('.sn-item').forEach(function(b){
+    var oc = b.getAttribute('onclick') || '';
+    if(oc.indexOf("'" + id + "'") >= 0) target = b;
+  });
+  sidebarTab(target, id);
+}
+function pintarRepTabbars(){
+  var rol = (window.USER_ROL || '').toUpperCase();
+  var verMando = (rol === 'SUPER_ADMIN' || rol === 'COORDINADOR');
+  var tabs = [];
+  if(verMando) tabs.push(['mando', '⚡ Mando']);
+  tabs.push(['dashboard', '📊 Dashboard']);
+  tabs.push(['cobranza-live', '💰 Cartera & Aging']);
+  tabs.push(['resumen-mes', '📅 Resumen del mes']);
+  document.querySelectorAll('.rep-tabbar-host').forEach(function(host){
+    var activo = host.getAttribute('data-activo');
+    host.innerHTML = '<div class="rep-tabbar">' + tabs.map(function(t){
+      var cls = (t[0] === activo) ? 'rep-tab active' : 'rep-tab';
+      return '<button class="' + cls + '" onclick="navReporte(\'' + t[0] + '\')">' + t[1] + '</button>';
+    }).join('') + '</div>';
+  });
+}
+
 // Toggle colapsable del sidebar (persiste en localStorage)
 function toggleSidebarCollapse(){
   var sb = document.getElementById('sidebar-nav');
@@ -18814,6 +18855,8 @@ function startMandoAutoRefresh(){
       setTimeout(loadMando, 1500);
       startMandoAutoRefresh();
     }
+    // Pintar la tab-bar consolidada de reportes (respeta visibilidad de Mando)
+    if(typeof pintarRepTabbars === 'function') pintarRepTabbars();
   };
   setTimeout(check, 800);
   setTimeout(check, 3500);
