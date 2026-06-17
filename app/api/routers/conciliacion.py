@@ -463,7 +463,9 @@ def pdf_acta_sinac(
         except Exception:
             return str(s)
 
-    fecha_acta_str = _fmt_fecha(payload.fecha_acta) if payload.fecha_acta else ahora_utc().strftime("%d/%m/%Y")
+    fecha_acta_str = (
+        _fmt_fecha(payload.fecha_acta) if payload.fecha_acta else ahora_utc().strftime("%d/%m/%Y")
+    )
 
     total_factura = sum((f.valor_factura or 0.0) for f in payload.filas)
     total_glosa_inicial = sum((f.valor_glosa_inicial or 0.0) for f in payload.filas)
