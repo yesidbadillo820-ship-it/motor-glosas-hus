@@ -1,9 +1,31 @@
-from sqlalchemy import create_engine
+import os
+
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
 
 # 🚀 NUEVO IMPORT: Ahora la configuración viene del Core, no de os.getenv
 from app.core.config import get_settings
+
+
+def registrar_pragmas_sqlite(target_engine) -> None:
+    """Registra los PRAGMAs de SQLite que hacen viable producción en el
+    volumen Fly: WAL (lectores no bloquean al escritor), busy_timeout
+    (escrituras esperan 30s ante lock), synchronous=NORMAL (durable+rápido
+    con WAL) y foreign_keys=ON. Extraído como función para poder testearlo
+    sobre un engine aislado sin tocar el engine global."""
+
+    @event.listens_for(target_engine, "connect")
+    def _set_sqlite_pragmas(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
+
 
 settings = get_settings()
 db_url = settings.database_url
@@ -38,8 +60,33 @@ if db_url.startswith("postgresql"):
         },
     )
 else:
-    # CONFIGURACIÓN BÁSICA PARA SQLITE (Fallback local)
-    engine = create_engine(db_url, connect_args={"check_same_thread": False})
+    # CONFIGURACIÓN SQLITE — local (dev/tests) y PRODUCCIÓN en volumen Fly.
+    # (17-jun-2026) Migración desde Neon Postgres: el free tier de Neon
+    # agotó la cuota de transferencia y tumbó producción. SQLite vive en el
+    # disco persistente /data de Fly → cero egress, cero cuota, gratis.
+    #
+    # Para que SQLite aguante producción (1 worker uvicorn + schedulers
+    # asyncio en threadpool) hay que:
+    #   • check_same_thread=False  → FastAPI usa threadpool
+    #   • timeout=30               → el driver espera ante "database locked"
+    #   • PRAGMA journal_mode=WAL  → lectores no bloquean al escritor
+    #   • PRAGMA busy_timeout      → reintenta escrituras bloqueadas 30s
+    #   • PRAGMA synchronous=NORMAL→ durable con WAL, mucho más rápido
+    #   • PRAGMA foreign_keys=ON   → integridad referencial (SQLite la apaga
+    #                                por defecto)
+    # Si la URL apunta a un archivo (sqlite:////data/x.db), crear el dir.
+    if db_url.startswith("sqlite:///") and ":memory:" not in db_url:
+        _ruta = db_url.replace("sqlite:///", "", 1)
+        _dir = os.path.dirname(_ruta)
+        if _dir:
+            os.makedirs(_dir, exist_ok=True)
+
+    engine = create_engine(
+        db_url,
+        connect_args={"check_same_thread": False, "timeout": 30},
+    )
+    registrar_pragmas_sqlite(engine)
+
 
 # Fábrica de sesiones
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

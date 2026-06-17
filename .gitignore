@@ -24,6 +24,10 @@ env/
 *.db
 *.sqlite
 *.sqlite3
+# Artefactos WAL de SQLite (modo journal_mode=WAL en producción)
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Logs
 *.log
