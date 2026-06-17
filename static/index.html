@@ -2191,7 +2191,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
                   Limpiar
                 </button>
               </div>
-              <textarea id="f-glosa" rows="6" placeholder="Pegá el texto de la glosa tal como aparece en el formato de la EPS. Incluí código, descripción, valores y justificación." required oninput="paPreviewLiveDebounced()"></textarea>
+              <textarea id="f-glosa" rows="6" placeholder="Pegá el texto de la glosa tal como aparece en el formato de la EPS. Incluí código, descripción, valores y justificación." required oninput="paPreviewLiveDebounced(); detectarEpsEnGlosa();" onpaste="setTimeout(detectarEpsEnGlosa, 50);"></textarea>
+              <div id="eps-detectada-badge" style="display:none;margin-top:.4rem;padding:.3rem .6rem;background:#dcfce7;color:#166534;border-radius:6px;font-size:.78rem;font-weight:600;">✓ EPS detectada automáticamente: <span id="eps-detectada-nombre"></span></div>
             </div>
             <div class="field pa-field-tight" style="margin-top:.5rem;">
               <label class="pa-lbl-tiny">CUPS (buscar por descripción)</label>
@@ -7028,6 +7029,65 @@ document.addEventListener('DOMContentLoaded', function(){
     if(c){ c.checked = localStorage.getItem('sonidos_off') !== '1'; }
   }, 1100);
 });
+
+// ── Auto-detección de EPS en el texto pegado de la glosa (17-jun-2026) ──
+// Si el texto trae "COOSALUD EPS" o "GLOSA INICIAL — NUEVA EPS" en el
+// encabezado, autoselecciona la EPS en el dropdown SIN que el usuario
+// tenga que ir a buscarla. Solo dispara la primera vez (cuando la EPS
+// está en "OTRA / SIN DEFINIR" o vacía) — no pisa una selección manual.
+function _normalizarParaMatch(s){
+  return (s || '').toString().toUpperCase()
+    .replace(/[ÁÄÀÂ]/g,'A').replace(/[ÉËÈÊ]/g,'E').replace(/[ÍÏÌÎ]/g,'I')
+    .replace(/[ÓÖÒÔ]/g,'O').replace(/[ÚÜÙÛ]/g,'U').replace(/[Ñ]/g,'N')
+    .replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function detectarEpsEnGlosa(){
+  try{
+    var ta = document.getElementById('f-glosa');
+    var sel = document.getElementById('eps-sel');
+    var badge = document.getElementById('eps-detectada-badge');
+    var nombreEl = document.getElementById('eps-detectada-nombre');
+    if(!ta || !sel) return;
+    var texto = (ta.value || '').slice(0, 800);
+    if(texto.length < 12) { if(badge) badge.style.display = 'none'; return; }
+    // Si el usuario ya eligió manualmente una EPS distinta a "OTRA",
+    // respetar su elección — no sobrescribir.
+    var actual = (sel.value || '').toUpperCase().trim();
+    if(actual && actual !== 'OTRA' && actual !== 'OTRA / SIN DEFINIR' && actual !== 'OTRA/SIN DEFINIR') {
+      return;
+    }
+    var textoNorm = _normalizarParaMatch(texto);
+    // Recorrer todas las EPS del dropdown buscando match en el texto.
+    // Prioriza el match más LARGO (NUEVA EPS sobre EPS, DISPENSARIO MEDICO
+    // sobre DISPENSARIO) para evitar falsos positivos.
+    var candidatos = [];
+    for(var i = 0; i < sel.options.length; i++){
+      var opt = sel.options[i];
+      var v = (opt.value || '').trim();
+      if(!v) continue;
+      var vu = v.toUpperCase();
+      if(vu === 'OTRA' || vu === 'OTRA / SIN DEFINIR' || vu === 'OTRA/SIN DEFINIR') continue;
+      var vn = _normalizarParaMatch(v);
+      // Match: nombre completo en el texto normalizado
+      if(vn && vn.length >= 4 && textoNorm.indexOf(vn) >= 0){
+        candidatos.push({ valor: v, longitud: vn.length });
+      }
+    }
+    if(!candidatos.length){ if(badge) badge.style.display = 'none'; return; }
+    // Elegir el match más largo (más específico)
+    candidatos.sort(function(a, b){ return b.longitud - a.longitud; });
+    var match = candidatos[0].valor;
+    if(sel.value !== match){
+      sel.value = match;
+      // Disparar evento change por si hay listeners que dependen del valor
+      try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch(_){}
+    }
+    if(badge && nombreEl){
+      nombreEl.textContent = match;
+      badge.style.display = 'block';
+    }
+  }catch(_){ /* silencioso */ }
+}
 
 function cargarCasoEjemplo(){
   var ej = {
