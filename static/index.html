@@ -7052,8 +7052,12 @@ function detectarEpsEnGlosa(){
     if(texto.length < 12) { if(badge) badge.style.display = 'none'; return; }
     // Si el usuario ya eligió manualmente una EPS distinta a "OTRA",
     // respetar su elección — no sobrescribir.
+    // Ronda 9 (17-jun-2026): además ocultar el badge para que no quede
+    // residuo del análisis anterior (caso 18 ronda 8: el badge mostraba
+    // "COMPENSAR" cuando ya se había cambiado el texto a otro caso).
     var actual = (sel.value || '').toUpperCase().trim();
     if(actual && actual !== 'OTRA' && actual !== 'OTRA / SIN DEFINIR' && actual !== 'OTRA/SIN DEFINIR') {
+      if(badge) badge.style.display = 'none';
       return;
     }
     var textoNorm = _normalizarParaMatch(texto);

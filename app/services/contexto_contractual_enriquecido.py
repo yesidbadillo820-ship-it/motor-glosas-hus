@@ -417,9 +417,15 @@ _KITS_NORMATIVOS_ESPECIALES: tuple[tuple[str, tuple[str, ...], str], ...] = (
             "institucionales."
         ),
     ),
+    # Ronda 9 (17-jun-2026): el kit trasplante solo se activa con la palabra
+    # 'trasplante' o 'donante' explícita en el texto. Antes ERC_TERMINAL
+    # disparaba el kit en cualquier hemodiálisis crónica (caso 16 ronda 8:
+    # paciente ERC V con hemodiálisis sin trasplante → el dictamen citaba
+    # Decreto 2493/2004 y Resolución 2640/2005 que son de trasplantes y NO
+    # aplican). Ahora ERC_TERMINAL alone no es suficiente.
     (
         "TRASPLANTE DE ÓRGANOS",
-        ("TRASPLANTE_RENAL", "DONANTE_VIVO", "ERC_TERMINAL"),
+        ("TRASPLANTE_RENAL", "DONANTE_VIVO"),
         (
             "• Decreto 2493 de 2004 — régimen de donación y trasplante de "
             "componentes anatómicos (incluye trasplante de donante vivo "
