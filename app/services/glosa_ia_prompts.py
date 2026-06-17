@@ -2000,6 +2000,21 @@ def build_user_prompt(
         kits = bloque_kits_normativos_especiales(texto_glosa or "")
         if kits:
             bloque_datos_clinicos_str = (bloque_datos_clinicos_str or "") + kits
+        # Ronda 8 (16-jun-2026): few-shots del BANCO DE RESPUESTAS HUS.
+        # El dueño aportó 24 respuestas tipo del banco oficial del HUS
+        # (3 por familia × 8 familias: AU, TA, SO, CL, ME, IN, CO, FA).
+        # Cambio estructural — el modelo ya no genera con instrucciones
+        # genéricas, ahora tiene 1-2 ejemplos del ESTILO institucional
+        # como punto de partida. Aclaración explícita en el bloque: son
+        # plantillas, NO copia literal — adapta con los datos reales.
+        try:
+            from app.services.banco_respuestas_hus import bloque_banco_respuestas
+
+            banco_str = bloque_banco_respuestas(codigo or "", max_ejemplos=2)
+            if banco_str:
+                bloque_datos_clinicos_str = (bloque_datos_clinicos_str or "") + banco_str
+        except Exception:
+            pass
         # Ronda 6 (16-jun-2026 — fix K): si hay 2+ facturas en la glosa,
         # avisar al modelo para que estructure por factura.
         multif = bloque_multi_factura(texto_glosa or "")
