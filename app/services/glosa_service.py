@@ -835,6 +835,105 @@ _PATRONES_FRASES_ABSURDAS: tuple[re.Pattern[str], ...] = (
 )
 
 
+# ── Red final: placeholders del esqueleto del prompt (ronda 9, 17-jun-2026) ──
+# Evidencia ronda 8 (casos 14, 16): Llama 4 Scout copia LITERAL el
+# esqueleto del system reforzado en lugar de rellenarlo. Apareció en
+# dictámenes entregados:
+#   "facturado por $X, cuyo código CUPS es YX, prestado al paciente Z"
+#   "$ N millones" / "VALOR $X" / "CÓDIGO YX"
+# El modelo siguió las instrucciones demasiado al pie de la letra y
+# tomó los símbolos del template como literal en vez de sustitución.
+# Esta red neutraliza esos sintagmas conservando el sentido de la frase.
+_PATRONES_PLACEHOLDERS_TEMPLATE: tuple[tuple[re.Pattern[str], str], ...] = (
+    # "$X" / "$Y" / "$Z" / "$N" / "$VALOR" / "$VAL" — variables sueltas del
+    # template (con $ pegado a letra única o palabra clave).
+    (
+        re.compile(r"\$\s*([A-Z]{1,2}|VALOR|VAL|MONTO|NUM|N)\b(?![A-Z0-9])"),
+        "el valor objetado consignado en el expediente",
+    ),
+    # "código YX" / "código X" / "código Y" — sin dígitos detrás
+    (
+        re.compile(
+            r"\bC[ÓO]DIGO\s+(?:CUPS\s+)?(?:ES\s+)?([XYZ][XYZN]?|N|NN|YX|YN|XN)\b(?![A-Z0-9])",
+            re.IGNORECASE,
+        ),
+        "el código de la glosa aplicada",
+    ),
+    # "CUPS YX" / "CUPS X" / "CUPS N" — sin dígitos válidos
+    (
+        re.compile(
+            r"\bCUPS\s+(?:ES\s+)?([XYZ][XYZN]?|N|NN|YX|YN|XN)\b(?![A-Z0-9])",
+            re.IGNORECASE,
+        ),
+        "el procedimiento facturado",
+    ),
+    # "paciente Z" / "paciente X" / "paciente Y" / "paciente N"
+    (
+        re.compile(r"\bPACIENTE\s+([XYZN]|NN)\b(?![A-Z0-9])", re.IGNORECASE),
+        "el paciente identificado en el expediente",
+    ),
+    # "facturado por $X" / "facturado por VALOR" / "facturado por X PESOS"
+    (
+        re.compile(
+            r"\bFACTURADO\s+POR\s+(?:UN\s+VALOR\s+DE\s+)?\$?\s*[XYZN](?:\s+PESOS)?\b",
+            re.IGNORECASE,
+        ),
+        "facturado por el valor objetado consignado en el expediente",
+    ),
+    # "valor de $X" / "monto de $X" — variantes sueltas
+    (
+        re.compile(
+            r"\b(?:VALOR|MONTO)\s+DE\s+\$?\s*[XYZN]\b(?![A-Z0-9])",
+            re.IGNORECASE,
+        ),
+        "valor objetado consignado en el expediente",
+    ),
+)
+
+
+def _neutralizar_placeholders_template(texto: str) -> str:
+    """Sustituye placeholders crudos del esqueleto del prompt por frases
+    neutras del estilo institucional del HUS. Idempotente: si no hay
+    placeholders, devuelve el texto intacto.
+    """
+    if not texto:
+        return texto
+    resultado = texto
+    n_total = 0
+    for pat, reemplazo in _PATRONES_PLACEHOLDERS_TEMPLATE:
+        nuevo, n = pat.subn(reemplazo, resultado)
+        if n:
+            n_total += n
+            resultado = nuevo
+    if n_total:
+        # Limpieza gramatical post-sustitución. Cuando el placeholder
+        # estaba precedido de un conector ("CUYO X" → "CUYO el código"),
+        # quedan secuencias antinaturales tipo "CUYO el", "AL el", "DE
+        # el", "PARA el" duplicado. Eliminamos el conector cuando viene
+        # seguido del determinante "el/la" ya inyectado.
+        resultado = re.sub(
+            r"\b(CUYO|CUYA|EN\s+EL|EN\s+LA|AL|A\s+LA|DEL?|DE\s+LA|PARA\s+EL|PARA\s+LA|CON\s+EL|CON\s+LA)\s+(el|la|del|de\s+la)\s+",
+            r"\2 ",
+            resultado,
+            flags=re.IGNORECASE,
+        )
+        # Dobles redundantes "el el", "la la", "facturado facturado".
+        resultado = re.sub(
+            r"\b(facturado|el|la|del|de\s+la)\s+\1\b",
+            r"\1",
+            resultado,
+            flags=re.IGNORECASE,
+        )
+        # "facturado por el valor… consignado…" → frase fluida sin "EL"
+        # duplicado tras "POR" cuando el placeholder ya inyectó el "el".
+        resultado = re.sub(r"\bPOR\s+EL\s+EL\b", "POR EL", resultado, flags=re.IGNORECASE)
+        logger.warning(
+            f"[PLACEHOLDERS-TEMPLATE] {n_total} placeholder(s) del esqueleto "
+            "del prompt ($X, CÓDIGO YX, paciente Z, etc.) neutralizado(s)."
+        )
+    return resultado
+
+
 def _neutralizar_frases_absurdas(texto: str) -> str:
     """Elimina muletillas arrogantes sin valor legal del dictamen."""
     if not texto:
@@ -1411,7 +1510,24 @@ _PAT_CITA_INDUCIDA = re.compile(
     r"IEEE\s+\d{3,5}(?:\.\d+)?|"
     r"CONVENIO\s+\d{1,4}(?:\s+(?:DE\s+\d{4}|OIT))?|"
     r"ACUERDO\s+\d{1,4}(?:\s+DE\s+\d{4})?|"
-    r"GU[ÍI]A\s+(?:[A-Z]{2,6}(?:/[A-Z]{2,6})?|N[°º]\s+\d+|\d+|DE\s+PR[ÁA]CTICA))"
+    r"GU[ÍI]A\s+(?:[A-Z]{2,6}(?:/[A-Z]{2,6})?|N[°º]\s+\d+|\d+|DE\s+PR[ÁA]CTICA)|"
+    # Ronda 9 (17-jun-2026): guías internacionales clínicas. Evidencia
+    # caso 17 (Compensar fractura cadera): la EPS citó 'OMS Guidelines
+    # on Hip Fracture Care 2024', 'Manual MERCK Edition 2025', 'JCI
+    # Standards 6th Edition' como si aplicaran en Colombia. No son
+    # vinculantes en vía de glosa — el dictamen debe desvirtuarlas.
+    r"OMS\s+GUIDELINES?(?:\s+ON\s+[A-Z][A-Z\s]{2,40})?(?:\s+\d{4})?|"
+    r"WHO\s+GUIDELINES?(?:\s+ON\s+[A-Z][A-Z\s]{2,40})?(?:\s+\d{4})?|"
+    r"(?:MANUAL\s+)?MERCK(?:\s+(?:EDITION|EDICI[ÓO]N))?\s*\d*(?:\s+\d{4})?|"
+    r"JCI(?:\s+(?:STANDARDS?|INTERNATIONAL))?(?:\s+(?:FOR\s+|6TH\s+|\d+[A-Z]{0,3}\s+))?(?:HOSPITAL\s+ACCREDITATION|EDITION)?|"
+    r"AHA(?:/ASA)?(?:\s+GUIDELINES?)?(?:\s+\d{4})?|"
+    r"AAOS(?:\s+(?:GUIDELINE|CLINICAL\s+PRACTICE))?(?:\s+\d{4})?|"
+    r"NCCN(?:\s+GUIDELINES?)?(?:\s+\d{4})?|"
+    r"ESMO(?:\s+GUIDELINES?)?(?:\s+\d{4})?|"
+    r"UHMS(?:\s+(?:GUIDELINES?|INDICATIONS?))?(?:\s+\d{4})?|"
+    r"UPTODATE(?:\s+\d{4})?|"
+    r"PROTOCOLO\s+INSTITUCIONAL(?:\s+INTERNO)?|"
+    r"STANDARDS?\s+(?:JCI|HOSPITAL|INTERNATIONAL)[A-Z\s]{0,40})"
     r"[\s\S]{0,180}?"
     r"['\"‘’“”«»]"
     r"([^'\"‘’“”«»]*?"
@@ -2122,11 +2238,12 @@ class GlosaService:
         anthropic_api_key: str = None,
         primary_ai: str = "anthropic",
         anthropic_model: str = "claude-sonnet-4-6",
-        groq_model: str = "openai/gpt-oss-120b",
+        groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
         gemini_api_key: str = None,
         gemini_model: str = "gemini-2.0-flash",
-        groq_model_fallback_1: str = "qwen/qwen3-32b",
-        groq_model_fallback_2: str = "llama-3.3-70b-versatile",
+        groq_model_fallback_1: str = "openai/gpt-oss-120b",
+        groq_model_fallback_2: str = "qwen/qwen3-32b",
+        groq_model_fallback_3: str = "llama-3.3-70b-versatile",
     ):
         _timeout = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
         self.groq = AsyncGroq(api_key=groq_api_key, timeout=_timeout) if groq_api_key else None
@@ -2146,14 +2263,15 @@ class GlosaService:
             )
             self.primary_ai = "groq"
         self.anthropic_model = anthropic_model or "claude-sonnet-4-6"
-        # Cadena de modelos DENTRO de Groq (decision 12-jun-2026, ver
-        # app/core/config.py): gpt-oss-120b → qwen3-32b → llama-3.3-70b.
-        # Si el primario falla (429/transitorio/deprecado) se prueba el
-        # siguiente modelo Groq ANTES de saltar a Anthropic — ver
-        # _modelos_groq() y _llamar_groq_con_retry().
-        self.groq_model = groq_model or "openai/gpt-oss-120b"
-        self.groq_model_fallback_1 = groq_model_fallback_1 or "qwen/qwen3-32b"
-        self.groq_model_fallback_2 = groq_model_fallback_2 or "llama-3.3-70b-versatile"
+        # Cadena de modelos DENTRO de Groq (decision 16-jun-2026 ronda 8,
+        # ver app/core/config.py): llama-4-maverick → gpt-oss-120b →
+        # qwen3-32b → llama-3.3-70b. Si el primario falla (429/transitorio/
+        # deprecado) se prueba el siguiente modelo Groq ANTES de saltar a
+        # Anthropic — ver _modelos_groq() y _llamar_groq_con_retry().
+        self.groq_model = groq_model or "meta-llama/llama-4-scout-17b-16e-instruct"
+        self.groq_model_fallback_1 = groq_model_fallback_1 or "openai/gpt-oss-120b"
+        self.groq_model_fallback_2 = groq_model_fallback_2 or "qwen/qwen3-32b"
+        self.groq_model_fallback_3 = groq_model_fallback_3 or "llama-3.3-70b-versatile"
         # Google Gemini se conserva ÚNICAMENTE para lectura de PDFs
         # escaneados: OCR (pdf_service.extraer_con_ocr) y la cadena
         # multimodal del pdf_fallback_patch (A=Anthropic → B=Gemini PDF →
@@ -4040,6 +4158,20 @@ class GlosaService:
                 logger.debug(f"[FRASE-ABSURDA] red final no aplicada: {_e_fa}")
 
             # ═══════════════════════════════════════════════════════════
+            #  Ronda 9 (17-jun-2026) — RED FINAL placeholders del template.
+            #  Casos 14, 16 ronda 8: Llama 4 Scout copió literal "$X",
+            #  "código YX", "paciente Z" del esqueleto del prompt en
+            #  lugar de rellenarlos. Esta red los sustituye por frases
+            #  neutras del estilo institucional HUS.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_placeholders = _neutralizar_placeholders_template(dictamen)
+                if _dictamen_sin_placeholders != dictamen:
+                    dictamen = _dictamen_sin_placeholders
+            except Exception as _e_pt:
+                logger.debug(f"[PLACEHOLDERS-TEMPLATE] red final no aplicada: {_e_pt}")
+
+            # ═══════════════════════════════════════════════════════════
             #  Ronda 6 (16-jun-2026) — RED FINAL código coherente (fix I).
             #  Caso 9 (FOMAG): cabecera "N/A". Caso 12 (Compensar, CL0801):
             #  "CÓDIGO 12345". Caso 13 (NUEVA EPS, TA0201): "CÓDIGO 118800"
@@ -5155,22 +5287,25 @@ class GlosaService:
 
     def _modelos_groq(self) -> list[str]:
         """Cadena de modelos Groq a intentar EN ORDEN antes de saltar a
-        Anthropic (decision 12-jun-2026, ver app/core/config.py):
+        Anthropic (decision 16-jun-2026 ronda 8, ver app/core/config.py):
 
-          1. groq_model            (default: openai/gpt-oss-120b)
-          2. groq_model_fallback_1 (default: qwen/qwen3-32b)
-          3. groq_model_fallback_2 (default: llama-3.3-70b-versatile)
+          1. groq_model            (default: meta-llama/llama-4-scout-17b-16e-instruct)
+          2. groq_model_fallback_1 (default: openai/gpt-oss-120b)
+          3. groq_model_fallback_2 (default: qwen/qwen3-32b)
+          4. groq_model_fallback_3 (default: llama-3.3-70b-versatile)
 
         Dedupe preservando orden: si un override por env (p.ej.
         GROQ_MODEL=llama-3.3-70b-versatile) coincide con un fallback, ese
         modelo no se intenta dos veces.
         """
         vistos: set[str] = set()
-        return [
-            m
-            for m in (self.groq_model, self.groq_model_fallback_1, self.groq_model_fallback_2)
-            if m and not (m in vistos or vistos.add(m))
-        ]
+        candidatos = (
+            self.groq_model,
+            self.groq_model_fallback_1,
+            self.groq_model_fallback_2,
+            getattr(self, "groq_model_fallback_3", None),
+        )
+        return [m for m in candidatos if m and not (m in vistos or vistos.add(m))]
 
     async def _llamar_groq_con_retry(
         self, system: str, user: str, max_intentos: int = 4, llamada_corta: bool = False

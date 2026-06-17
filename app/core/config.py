@@ -41,22 +41,28 @@ class Settings(BaseSettings):
     #   groq      -> groq -> anthropic
     #   anthropic -> anthropic -> groq
     primary_ai: str = "groq"
-    # Modelos Groq para dictamenes — decision 12-jun-2026 (dueño + benchmarks
-    # GPQA/MMLU de artificialanalysis.ai; Groq depreca modelos sin mucho
-    # aviso, por eso la cadena de 3):
-    #   1. openai/gpt-oss-120b      PRIMARIO — 120B MoE con chain-of-thought,
-    #      supera a llama-3.3-70b en GPQA/MMLU; recomendado por Groq en 2026.
-    #   2. qwen/qwen3-32b           FALLBACK 1 — razonamiento explicito en
-    #      español; reemplazo a mistral-saba-24b (deprecado sept-2025).
-    #   3. llama-3.3-70b-versatile  FALLBACK 2 — el primario anterior, sigue
-    #      activo en Groq como ultimo recurso.
+    # Modelos Groq para dictamenes — decision 16-jun-2026 (ronda 8 — dueño
+    # pidió Llama 4 Maverick + banco de respuestas HUS como few-shots):
+    #   1. meta-llama/llama-4-scout-17b-16e-instruct   PRIMARIO —
+    #      Llama 4 (abr-2026), arquitectura 17B activos / 128 expertos MoE.
+    #      Mejor seguidor de instrucciones largas (system + few-shots) que
+    #      gpt-oss-120b; no es razonador con CoT (no agota max_tokens en
+    #      razonamiento), respuesta directa. Soporta hasta 8M tokens
+    #      contexto — perfecto para el banco de respuestas + contratos +
+    #      datos clínicos en el prompt.
+    #   2. openai/gpt-oss-120b      FALLBACK 1 — 120B MoE razonador, el
+    #      primario anterior. Sigue útil para casos donde Llama no llegue.
+    #   3. qwen/qwen3-32b           FALLBACK 2 — razonamiento en español.
+    #   4. llama-3.3-70b-versatile  FALLBACK 3 — último recurso.
     # La cadena se aplica en GlosaService._llamar_groq_con_retry: si un
     # modelo falla (429 / error transitorio / deprecado) se prueba el
     # siguiente modelo Groq SIN saltar todavia a Anthropic. Overrideables
-    # por env: GROQ_MODEL, GROQ_MODEL_FALLBACK_1, GROQ_MODEL_FALLBACK_2.
-    groq_model: str = "openai/gpt-oss-120b"
-    groq_model_fallback_1: str = "qwen/qwen3-32b"
-    groq_model_fallback_2: str = "llama-3.3-70b-versatile"
+    # por env: GROQ_MODEL, GROQ_MODEL_FALLBACK_1, GROQ_MODEL_FALLBACK_2,
+    # GROQ_MODEL_FALLBACK_3.
+    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    groq_model_fallback_1: str = "openai/gpt-oss-120b"
+    groq_model_fallback_2: str = "qwen/qwen3-32b"
+    groq_model_fallback_3: str = "llama-3.3-70b-versatile"
     anthropic_model: str = "claude-sonnet-4-6"
     # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
     # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando

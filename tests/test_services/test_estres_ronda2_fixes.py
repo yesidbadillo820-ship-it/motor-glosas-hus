@@ -984,7 +984,7 @@ class TestFix9GptOssRazonadorPresupuesto:
     async def test_gpt_oss_max_tokens_minimo_8000_y_reasoning_medium(self, svc_groq_f9):
         """Causa raíz: 3000 tokens calibrados para Llama; en gpt-oss el
         razonamiento se descuenta del MISMO presupuesto y lo agotaba."""
-        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK})
+        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK}, groq_model=GPT_OSS)
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user")
 
@@ -997,7 +997,7 @@ class TestFix9GptOssRazonadorPresupuesto:
     @pytest.mark.asyncio
     async def test_llamada_corta_usa_reasoning_low(self, svc_groq_f9):
         """Auto-crítica/refinamiento: salida breve → no quemar razonamiento."""
-        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK})
+        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK}, groq_model=GPT_OSS)
 
         await svc._llamar_groq_con_retry("sys", "user", llamada_corta=True)
 
@@ -1023,7 +1023,7 @@ class TestFix9GptOssRazonadorPresupuesto:
     async def test_llamar_ia_propaga_llamada_corta_a_groq(self, svc_groq_f9):
         """El threading completo: _llamar_ia(llamada_corta=True) → gpt-oss
         recibe reasoning_effort='low' (path de auto-crítica/refinamiento)."""
-        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK})
+        svc = svc_groq_f9({GPT_OSS: DICTAMEN_OK}, groq_model=GPT_OSS)
 
         await svc._llamar_ia("sys", f"glosa {uuid.uuid4()}", llamada_corta=True)
 
@@ -1041,7 +1041,7 @@ class TestFix9RetryLength:
         razonando. Antes: salto directo a qwen. Ahora: una segunda
         oportunidad al mismo modelo con max_tokens duplicado."""
         caplog.set_level(logging.WARNING, logger="motor_glosas")
-        svc = svc_groq_f9({GPT_OSS: [VACIO_POR_LENGTH, DICTAMEN_OK]})
+        svc = svc_groq_f9({GPT_OSS: [VACIO_POR_LENGTH, DICTAMEN_OK]}, groq_model=GPT_OSS)
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user")
 
@@ -1060,7 +1060,9 @@ class TestFix9RetryLength:
     async def test_length_vacio_persistente_recien_ahi_cae_a_qwen(self, svc_groq_f9):
         """El salto a qwen queda como SEGUNDA línea: solo tras el retry con
         presupuesto duplicado. Y qwen conserva su max_tokens de siempre."""
-        svc = svc_groq_f9({GPT_OSS: [VACIO_POR_LENGTH, VACIO_POR_LENGTH], QWEN: DICTAMEN_OK})
+        svc = svc_groq_f9(
+            {GPT_OSS: [VACIO_POR_LENGTH, VACIO_POR_LENGTH], QWEN: DICTAMEN_OK}, groq_model=GPT_OSS
+        )
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user")
 
@@ -1075,7 +1077,7 @@ class TestFix9RetryLength:
     async def test_vacio_sin_length_no_gasta_retry(self, svc_groq_f9):
         """content vacío con finish_reason normal ('stop') NO es el caso del
         razonador: conserva el comportamiento previo (siguiente modelo ya)."""
-        svc = svc_groq_f9({GPT_OSS: ("", "stop"), QWEN: DICTAMEN_OK})
+        svc = svc_groq_f9({GPT_OSS: ("", "stop"), QWEN: DICTAMEN_OK}, groq_model=GPT_OSS)
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user")
 

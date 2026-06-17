@@ -20,9 +20,10 @@ import pytest
 
 from app.services.glosa_service import GlosaService
 
-PRIMARIO = "openai/gpt-oss-120b"
-FALLBACK_1 = "qwen/qwen3-32b"
-FALLBACK_2 = "llama-3.3-70b-versatile"
+PRIMARIO = "meta-llama/llama-4-scout-17b-16e-instruct"
+FALLBACK_1 = "openai/gpt-oss-120b"
+FALLBACK_2 = "qwen/qwen3-32b"
+FALLBACK_3 = "llama-3.3-70b-versatile"
 
 RESPUESTA_OK = "<paciente>JUAN PEREZ</paciente><argumento>NO SE ACEPTA LA GLOSA</argumento>"
 
@@ -134,27 +135,29 @@ def _user_unico() -> str:
 
 
 class TestCadenaModelos:
-    def test_orden_default_es_gptoss_qwen_llama(self, svc_factory):
+    def test_orden_default_es_cadena_de_4(self, svc_factory):
         svc = svc_factory()
-        assert svc._modelos_groq() == [PRIMARIO, FALLBACK_1, FALLBACK_2]
+        assert svc._modelos_groq() == [PRIMARIO, FALLBACK_1, FALLBACK_2, FALLBACK_3]
 
     def test_defaults_del_constructor(self, svc_factory):
         svc = svc_factory()
         assert svc.groq_model == PRIMARIO
         assert svc.groq_model_fallback_1 == FALLBACK_1
         assert svc.groq_model_fallback_2 == FALLBACK_2
+        assert svc.groq_model_fallback_3 == FALLBACK_3
 
     def test_override_que_coincide_con_fallback_no_duplica(self, svc_factory):
         # GROQ_MODEL=llama-3.3-70b-versatile (override del usuario) — el
         # mismo modelo no debe intentarse dos veces.
-        svc = svc_factory(groq_model=FALLBACK_2)
-        assert svc._modelos_groq() == [FALLBACK_2, FALLBACK_1]
+        svc = svc_factory(groq_model=FALLBACK_3)
+        assert svc._modelos_groq() == [FALLBACK_3, FALLBACK_1, FALLBACK_2]
 
     def test_override_total_repetido_queda_un_solo_modelo(self, svc_factory):
         svc = svc_factory(
             groq_model="modelo-x",
             groq_model_fallback_1="modelo-x",
             groq_model_fallback_2="modelo-x",
+            groq_model_fallback_3="modelo-x",
         )
         assert svc._modelos_groq() == ["modelo-x"]
 
@@ -192,14 +195,14 @@ class TestRateLimitPasaAlSiguienteModelo:
     @pytest.mark.asyncio
     async def test_todos_429_propaga_excepcion_tras_agotar_cadena(self, svc_factory, esperas):
         svc = svc_factory()
-        fake = _FakeGroq({m: _err_429() for m in (PRIMARIO, FALLBACK_1, FALLBACK_2)})
+        fake = _FakeGroq({m: _err_429() for m in (PRIMARIO, FALLBACK_1, FALLBACK_2, FALLBACK_3)})
         svc.groq = fake
 
         with pytest.raises(Exception, match="429"):
             await svc._llamar_groq_con_retry("sys", "user", max_intentos=1)
 
-        # Probó los 3 modelos (sin duplicados) antes de rendirse.
-        assert fake.llamadas == [PRIMARIO, FALLBACK_1, FALLBACK_2]
+        # Probó los 4 modelos (sin duplicados) antes de rendirse.
+        assert fake.llamadas == [PRIMARIO, FALLBACK_1, FALLBACK_2, FALLBACK_3]
 
     @pytest.mark.asyncio
     async def test_429_en_ultimo_modelo_si_usa_backoff(self, svc_factory, esperas):
@@ -210,15 +213,22 @@ class TestRateLimitPasaAlSiguienteModelo:
             {
                 PRIMARIO: _err_429(),
                 FALLBACK_1: _err_429(),
-                FALLBACK_2: [_err_429(), RESPUESTA_OK],
+                FALLBACK_2: _err_429(),
+                FALLBACK_3: [_err_429(), RESPUESTA_OK],
             }
         )
         svc.groq = fake
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user", max_intentos=2)
 
-        assert modelo == f"groq/{FALLBACK_2}"
-        assert fake.llamadas == [PRIMARIO, FALLBACK_1, FALLBACK_2, FALLBACK_2]
+        assert modelo == f"groq/{FALLBACK_3}"
+        assert fake.llamadas == [
+            PRIMARIO,
+            FALLBACK_1,
+            FALLBACK_2,
+            FALLBACK_3,
+            FALLBACK_3,
+        ]
         assert esperas == [1]  # un solo backoff, en el último modelo
 
 
@@ -331,7 +341,7 @@ class TestLlamarIaRespetaCadenaGroq:
         self, svc_factory, esperas, sin_cache_db, monkeypatch
     ):
         svc = svc_factory(anthropic_api_key="sk-ant-test")
-        fake = _FakeGroq({m: _err_429() for m in (PRIMARIO, FALLBACK_1, FALLBACK_2)})
+        fake = _FakeGroq({m: _err_429() for m in (PRIMARIO, FALLBACK_1, FALLBACK_2, FALLBACK_3)})
         svc.groq = fake
 
         async def _anthropic_ok(system, user, modelo_override=None, temperature_override=None):
@@ -342,7 +352,7 @@ class TestLlamarIaRespetaCadenaGroq:
         content, modelo = await svc._llamar_ia("sys", _user_unico())
 
         assert modelo == "claude-sonnet-4-6"
-        # Los 3 modelos Groq se intentaron en orden antes de Claude
+        # Los 4 modelos Groq se intentaron en orden antes de Claude
         # (el último además con sus retries de backoff).
-        assert fake.llamadas[:3] == [PRIMARIO, FALLBACK_1, FALLBACK_2]
-        assert set(fake.llamadas[3:]) <= {FALLBACK_2}
+        assert fake.llamadas[:4] == [PRIMARIO, FALLBACK_1, FALLBACK_2, FALLBACK_3]
+        assert set(fake.llamadas[4:]) <= {FALLBACK_3}

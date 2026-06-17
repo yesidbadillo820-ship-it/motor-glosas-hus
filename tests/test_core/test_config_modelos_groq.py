@@ -1,10 +1,12 @@
 """Defaults y overrides por env de los modelos Groq.
 
-Decisión 12-jun-2026 (benchmarks GPQA/MMLU de artificialanalysis.ai +
-deprecaciones de Groq): la cadena de modelos Groq quedó en
+Decisión 16-jun-2026 ronda 8 (dueño + banco de respuestas HUS): la cadena
+de modelos Groq quedó en
 
-    openai/gpt-oss-120b (primario) → qwen/qwen3-32b (fallback 1)
-    → llama-3.3-70b-versatile (fallback 2)
+    meta-llama/llama-4-scout-17b-16e-instruct (primario)
+    → openai/gpt-oss-120b (fallback 1)
+    → qwen/qwen3-32b (fallback 2)
+    → llama-3.3-70b-versatile (fallback 3)
 
 Ver el comentario completo en app/core/config.py y la aplicación de la
 cadena en GlosaService._llamar_groq_con_retry.
@@ -12,7 +14,12 @@ cadena en GlosaService._llamar_groq_con_retry.
 
 from app.core.config import Settings, get_settings
 
-_ENVS_GROQ = ("GROQ_MODEL", "GROQ_MODEL_FALLBACK_1", "GROQ_MODEL_FALLBACK_2")
+_ENVS_GROQ = (
+    "GROQ_MODEL",
+    "GROQ_MODEL_FALLBACK_1",
+    "GROQ_MODEL_FALLBACK_2",
+    "GROQ_MODEL_FALLBACK_3",
+)
 
 
 def _settings_limpio(monkeypatch) -> Settings:
@@ -23,29 +30,37 @@ def _settings_limpio(monkeypatch) -> Settings:
 
 
 class TestDefaultsModelosGroq:
-    """Los 3 campos existen y traen la cadena del 12-jun-2026."""
+    """Los 4 campos existen y traen la cadena de la ronda 8."""
 
-    def test_primario_es_gpt_oss_120b(self, monkeypatch):
+    def test_primario_es_llama_4_maverick(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model == "openai/gpt-oss-120b"
+        assert s.groq_model == "meta-llama/llama-4-scout-17b-16e-instruct"
 
     def test_primario_ya_no_es_llama_33(self, monkeypatch):
-        # El default viejo (llama-3.3-70b-versatile) pasó a ser el ÚLTIMO
-        # recurso de la cadena, no el primario.
+        # llama-3.3 pasó a fallback 3 (último recurso).
         s = _settings_limpio(monkeypatch)
         assert s.groq_model != "llama-3.3-70b-versatile"
 
-    def test_fallback_1_es_qwen3_32b(self, monkeypatch):
+    def test_fallback_1_es_gpt_oss(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model_fallback_1 == "qwen/qwen3-32b"
+        assert s.groq_model_fallback_1 == "openai/gpt-oss-120b"
 
-    def test_fallback_2_es_llama_33(self, monkeypatch):
+    def test_fallback_2_es_qwen3_32b(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        assert s.groq_model_fallback_2 == "llama-3.3-70b-versatile"
+        assert s.groq_model_fallback_2 == "qwen/qwen3-32b"
+
+    def test_fallback_3_es_llama_33(self, monkeypatch):
+        s = _settings_limpio(monkeypatch)
+        assert s.groq_model_fallback_3 == "llama-3.3-70b-versatile"
 
     def test_cadena_sin_duplicados_por_default(self, monkeypatch):
         s = _settings_limpio(monkeypatch)
-        cadena = [s.groq_model, s.groq_model_fallback_1, s.groq_model_fallback_2]
+        cadena = [
+            s.groq_model,
+            s.groq_model_fallback_1,
+            s.groq_model_fallback_2,
+            s.groq_model_fallback_3,
+        ]
         assert len(cadena) == len(set(cadena))
 
 

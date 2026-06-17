@@ -421,6 +421,7 @@ async def _ejecutar_ia_y_persistir(db, glosa, texto: str | None = None) -> dict:
         groq_model=_cfg.groq_model,
         groq_model_fallback_1=_cfg.groq_model_fallback_1,
         groq_model_fallback_2=_cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(_cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=_cfg.gemini_api_key,
         gemini_model=_cfg.gemini_model,
     )
