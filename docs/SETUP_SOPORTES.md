@@ -34,10 +34,26 @@ Esta guía es **paso a paso** para que un técnico del HUS (no de SINAC) lo leva
 
 #### 1. Crear el usuario y token de integración (lo hace Yesid o SUPER_ADMIN en el panel)
 - Panel **Usuarios** → "Crear Usuario"
-- Email: `jumpbox.hus@sinacsc.com`
-- Rol: `INTEGRACION` (acceso solo a `/soportes/upload-batch`, sin login UI)
-- Marcar "Generar token API"
-- Copiar el token largo (se muestra una sola vez) — esto es el `MOTOR_TOKEN`.
+  - Nombre: `Jump-box Soportes`
+  - Email: `jumpbox.hus@sinacsc.com`
+  - Contraseña: una larga aleatoria (no se usará para login interactivo)
+- El usuario se crea con rol **AUDITOR** por defecto. **Déjalo en AUDITOR** —
+  el endpoint `/soportes-auto/upload-bulk` exige rol AUDITOR o superior.
+  (Los roles del sistema son: AUDITOR, COORDINADOR, SUPER_ADMIN, VIEWER.
+  No existe un rol "INTEGRACION"; AUDITOR es el mínimo que puede subir
+  soportes.)
+- En la misma página, tarjeta **🔑 Token de integración (Jump-box soportes)**
+  — visible solo para SUPER_ADMIN:
+  1. Email cuenta de servicio: `jumpbox.hus@sinacsc.com`
+  2. Días de validez: `365` (máximo 730)
+  3. Botón **Generar token** → aparece el token; botón **📋 Copiar token**.
+- Ese token largo es el `MOTOR_TOKEN`. **Para revocarlo**, basta con
+  desactivar la cuenta `jumpbox.hus@sinacsc.com` en el panel Usuarios
+  (cada request valida que la cuenta siga activa).
+
+> ⚠️ El token normal de login expira en 8 horas — NO sirve para el agente
+> 24/7. Usa siempre el **Token de integración** de larga duración descrito
+> arriba.
 
 #### 2. Instalar el agente en la jump-box
 ```powershell
@@ -48,35 +64,52 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install requests watchdog
 
-# Descargar el script jumpbox_sync.py desde el panel admin del motor
-# (Panel Soportes → "Plan B - Setup paso a paso" → botón Descargar agente)
+# Copiar el script jumpbox_sync.py del repositorio del motor
+# (carpeta tools/jumpbox_sync.py) a C:\sinac-jumpbox\
+# Pídeselo a SINAC o cópialo desde el repo si tienes acceso.
 ```
 
 #### 3. Configurar variables de entorno (Windows)
-Crea `C:\sinac-jumpbox\.env`:
+Configura las variables como variables de entorno de la máquina (o del
+servicio NSSM en el paso 4). El script lee exactamente estas:
 ```
-MOTOR_URL=https://motor-glosas-hus.fly.dev
-MOTOR_TOKEN=<el token largo del paso 1>
-SHARE_ROOT=Y:\
-INTERVALO_MINUTOS=15
+MOTOR_URL    = https://motor-glosas-hus.fly.dev
+MOTOR_TOKEN  = <el token de integración largo del paso 1>
+SHARE_ROOT   = Y:\
 ```
+> El intervalo NO es una variable de entorno — se pasa como argumento
+> `--interval-min` al script (ver paso 4).
 
 #### 4. Hacer que arranque solo (Windows Service)
 ```powershell
 # Instalar NSSM
 choco install nssm -y
 
-# Registrar el servicio
-nssm install SinacJumpbox "C:\sinac-jumpbox\venv\Scripts\python.exe" "C:\sinac-jumpbox\jumpbox_sync.py"
+# Registrar el servicio. Recomendado: --loop --solo-pendientes
+#   --loop                corre indefinidamente (una pasada cada N min)
+#   --interval-min 15     intervalo entre pasadas
+#   --solo-pendientes     solo sube PDFs de facturas con glosas PENDIENTES
+#                         (decenas en vez de miles de archivos — clave para
+#                          no saturar el disco efímero del motor)
+nssm install SinacJumpbox "C:\sinac-jumpbox\venv\Scripts\python.exe" "C:\sinac-jumpbox\jumpbox_sync.py --loop --interval-min 15 --solo-pendientes"
 nssm set SinacJumpbox AppDirectory C:\sinac-jumpbox
+nssm set SinacJumpbox AppEnvironmentExtra MOTOR_URL=https://motor-glosas-hus.fly.dev MOTOR_TOKEN=<token> SHARE_ROOT=Y:\
 nssm set SinacJumpbox AppStdout C:\sinac-jumpbox\stdout.log
 nssm set SinacJumpbox AppStderr C:\sinac-jumpbox\stderr.log
 nssm start SinacJumpbox
 ```
 
+> Para una prueba manual antes de instalar el servicio:
+> ```powershell
+> $env:MOTOR_URL="https://motor-glosas-hus.fly.dev"
+> $env:MOTOR_TOKEN="<token>"
+> $env:SHARE_ROOT="Y:\"
+> python jumpbox_sync.py --once --solo-pendientes
+> ```
+
 #### 5. Verificar
-- En la jump-box: `Get-Content C:\sinac-jumpbox\stdout.log -Tail 50` → ver líneas tipo `[INFO] Subidos 124 archivos a motor-glosas-hus.fly.dev`
-- En el motor (web): **Soportes** → "Facturas indexadas" debe pasar de 0 a la cifra real (puede tardar la primera vez 30-60 min).
+- En la jump-box: `Get-Content C:\sinac-jumpbox\stdout.log -Tail 50` → ver líneas tipo `Sync hecho: {...}` y `Reindex OK: N archivos / M facturas`.
+- En el motor (web): **Soportes** → "Facturas indexadas" debe pasar de 0 a la cifra real (puede tardar la primera pasada).
 - Probar **Analizar glosa** → "Auditor Forense IA" debe responder con citas reales de los soportes.
 
 ---

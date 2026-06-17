@@ -3401,6 +3401,24 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <button class="btn btn-primary" onclick="crearUsuario()">Crear Usuario</button>
           </div>
 
+          <div id="admin-token-card" class="form-card" style="display:none;border:1px solid #bae6fd;background:#f0f9ff">
+            <h3 style="color:#0369a1">🔑 Token de integración <span style="color:#0284c7">Jump-box soportes</span></h3>
+            <p style="font-size:.76rem;color:#0c4a6e;line-height:1.55;margin-bottom:.7rem">
+              Genera un token de <b>larga duración</b> (hasta 2 años) para una cuenta de
+              servicio con rol <b>AUDITOR o superior</b>. Se pega en la variable
+              <code>MOTOR_TOKEN</code> del jump-box (<code>tools/jumpbox_sync.py</code>)
+              para que sincronice los soportes 24/7 sin que el token expire cada 8 horas.
+            </p>
+            <div class="field"><label>Email cuenta de servicio</label><input type="email" id="tok-email" placeholder="jumpbox.hus@sinacsc.com"/></div>
+            <div class="field"><label>Días de validez (máx 730)</label><input type="number" id="tok-dias" value="365" min="1" max="730"/></div>
+            <button class="btn btn-primary" style="background:#0284c7" onclick="generarTokenIntegracion()">Generar token</button>
+            <div id="tok-resultado" style="margin-top:.8rem;display:none">
+              <label style="font-size:.72rem;color:#0c4a6e;font-weight:600;display:block;margin-bottom:.25rem">Token (cópialo, se muestra una sola vez):</label>
+              <textarea id="tok-valor" readonly rows="4" style="width:100%;font-family:monospace;font-size:.68rem;border:1px solid #7dd3fc;border-radius:6px;padding:.5rem;background:#fff;color:#0c4a6e;resize:vertical"></textarea>
+              <button class="btn-sm" style="background:#0284c7;margin-top:.4rem" onclick="copiarTokenIntegracion()">📋 Copiar token</button>
+            </div>
+          </div>
+
           <div id="admin-reset-card" class="form-card" style="display:none;margin-top:1rem;border:1px solid #fecaca;background:#fff5f5">
             <h3 style="color:#991b1b">Zona peligrosa <span style="color:#dc2626">Solo SUPER_ADMIN</span></h3>
             <p style="font-size:.78rem;color:#7f1d1d;line-height:1.55;margin-bottom:.85rem">
@@ -19348,6 +19366,9 @@ async function loadUsuarios(){
   // Mostrar la zona peligrosa solo si es SUPER_ADMIN
   var resetCard = document.getElementById('admin-reset-card');
   if(resetCard) resetCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
+  // Token de integración: solo SUPER_ADMIN
+  var tokCard = document.getElementById('admin-token-card');
+  if(tokCard) tokCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
 
   var tbody=document.getElementById('usuarios-body');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3)">Cargando…</td></tr>';
@@ -19508,6 +19529,35 @@ async function crearUsuario(){
     if(r.ok){toast('Éxito',d.message||'Usuario creado','success');document.getElementById('u-nombre').value='';document.getElementById('u-email').value='';document.getElementById('u-pass').value='';loadUsuarios();}
     else{toast('Error',d.detail||'Error creando usuario','error');}
   }catch(e){toast('Error',e.message,'error');}
+}
+
+async function generarTokenIntegracion(){
+  var email=(document.getElementById('tok-email').value||'').trim();
+  var dias=parseInt(document.getElementById('tok-dias').value)||365;
+  if(!email){toast('Falta email','Indica el email de la cuenta de servicio','warning');return;}
+  try{
+    var fd=new FormData();
+    fd.append('email',email);
+    fd.append('dias',dias);
+    var r=await fetch('/auth/token-integracion',{method:'POST',headers:{'Authorization':'Bearer '+TOKEN},body:fd});
+    var d=await r.json();
+    if(!r.ok){toast('Error',d.detail||'No se pudo generar el token','error');return;}
+    document.getElementById('tok-valor').value=d.access_token;
+    document.getElementById('tok-resultado').style.display='block';
+    toast('Token generado','Válido '+d.expira_en_dias+' días · rol '+d.rol+'. Cópialo ahora.','success');
+  }catch(e){toast('Error',e.message,'error');}
+}
+
+function copiarTokenIntegracion(){
+  var ta=document.getElementById('tok-valor');
+  ta.select();
+  try{
+    navigator.clipboard.writeText(ta.value);
+    toast('Copiado','Token en el portapapeles. Pégalo en MOTOR_TOKEN del jump-box.','success');
+  }catch(e){
+    document.execCommand('copy');
+    toast('Copiado','Token en el portapapeles','success');
+  }
 }
 
 async function cambiarPass(id,email){
