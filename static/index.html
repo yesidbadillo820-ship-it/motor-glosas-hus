@@ -3440,15 +3440,40 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <!-- CONCILIACIÓN -->
     <div class="panel" id="p-conciliacion">
       <div class="concil-area">
+        <!-- Acordeón de instrucciones (siempre visible al entrar) -->
+        <div style="background:linear-gradient(135deg,#ecfeff,#f0f9ff);border:1px solid #0891b2;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1rem">
+          <div style="display:flex;gap:.8rem;align-items:start">
+            <div style="font-size:1.6rem">📋</div>
+            <div style="flex:1">
+              <div style="font-weight:700;color:#0e7490;font-size:.95rem;margin-bottom:.4rem">¿Cómo funciona Conciliación?</div>
+              <div style="font-size:.82rem;color:#0c4a6e;line-height:1.55">
+                <b>1.</b> Programa una audiencia individual (formulario abajo) o genera un <b>acta SINAC multi-glosa</b> con el botón verde.<br/>
+                <b>2.</b> Tras la audiencia: registra la postura de la EPS, la postura HUS y el resultado (Acuerdo Total / Parcial / Sin Acuerdo).<br/>
+                <b>3.</b> Descarga el <b>acta firmable</b> en formato SINAC (PDF) y carga el acta firmada de regreso al sistema.<br/>
+                <b>4.</b> Si hay acuerdo parcial/total: registra la <b>nota crédito</b> de la EPS y se cierra el caso.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="stat-row" id="concil-stats">
           <div class="stat-mini"><div class="stat-mini-num" id="cs-total">—</div><div class="stat-mini-lbl">Total</div></div>
           <div class="stat-mini"><div class="stat-mini-num" style="color:var(--c-green)" id="cs-acuerdo">—</div><div class="stat-mini-lbl">Acuerdo Total</div></div>
           <div class="stat-mini"><div class="stat-mini-num" style="color:var(--c-amber)" id="cs-parcial">—</div><div class="stat-mini-lbl">Parcial</div></div>
           <div class="stat-mini"><div class="stat-mini-num" style="color:var(--c-red)" id="cs-sin">—</div><div class="stat-mini-lbl">Sin Acuerdo</div></div>
         </div>
+
+        <!-- Botón principal: generar acta SINAC multi-glosa -->
+        <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
+          <button class="btn" style="background:#059669;color:white;border:0;font-weight:700;padding:.7rem 1.2rem;font-size:.85rem;border-radius:8px;cursor:pointer" onclick="abrirActaSinac()">
+            📄 Generar Acta SINAC (multi-glosa)
+          </button>
+          <span style="font-size:.75rem;color:var(--text3);align-self:center">Formato oficial idéntico al ACTA_SINAC_N_XXX. Acepta N facturas en una sola acta.</span>
+        </div>
+
         <div class="concil-grid">
           <div class="form-card" style="height:fit-content">
-            <h3>Nueva Conciliación <span>Programar</span></h3>
+            <h3>Nueva Conciliación <span>(1 glosa)</span></h3>
             <div class="field"><label>ID, factura o consecutivo</label><input type="text" id="c-glosa-id" placeholder="42 | HUS0000491176 | DGH-12345"/><small style="font-size:.68rem;color:var(--text3);margin-top:2px;display:block">Acepta ID interno (ej: 42), número de factura (HUS000...) o consecutivo DGH</small></div>
             <div class="field"><label>Fecha y hora</label><input type="datetime-local" id="c-fecha"/></div>
             <div class="field"><label>Lugar</label><input type="text" id="c-lugar"/></div>
@@ -3463,6 +3488,73 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
               <thead><tr><th>ID</th><th>Glosa</th><th>Fecha</th><th>Lugar</th><th>Resultado</th><th>Valor</th><th>Acciones</th></tr></thead>
               <tbody id="concil-body"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Generador de acta SINAC multi-glosa -->
+      <div id="acta-sinac-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:9999;align-items:flex-start;justify-content:center;padding:2rem;overflow-y:auto">
+        <div style="background:var(--bg-card);border-radius:12px;padding:1.6rem;max-width:1100px;width:100%;color:var(--text)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h2 style="margin:0;color:var(--c-navy)">📄 Generar Acta SINAC</h2>
+            <button onclick="cerrarActaSinac()" style="background:none;border:0;font-size:1.5rem;cursor:pointer;color:var(--text3)">×</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin-bottom:1rem">
+            <div class="field"><label>N° Acta SINAC*</label><input type="text" id="as-acta" placeholder="806"/></div>
+            <div class="field"><label>Fecha del acta</label><input type="date" id="as-fecha"/></div>
+            <div class="field"><label>Período</label><input type="text" id="as-periodo" placeholder="JUNIO 2026"/></div>
+            <div class="field"><label>NIT EPS*</label><input type="text" id="as-nit" placeholder="901541302"/></div>
+            <div class="field" style="grid-column:span 2"><label>Razón Social EPS*</label><input type="text" id="as-razon" placeholder="DISPENSARIO MEDICO NIVEL II BOGOTA - SANIDAD NAVAL"/></div>
+          </div>
+
+          <div style="margin-bottom:.8rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+            <b style="font-size:.85rem">Glosas incluidas:</b>
+            <input type="text" id="as-busqueda-glosa" placeholder="Pega N° factura (HUS000…) y Enter" style="flex:1;min-width:220px;padding:.4rem .6rem;font-size:.8rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter'){as_buscarFactura()}"/>
+            <button class="btn btn-ghost" onclick="as_buscarFactura()" style="font-size:.78rem">Agregar factura</button>
+            <button class="btn btn-ghost" onclick="as_agregarManual()" style="font-size:.78rem">+ Fila manual</button>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:auto;max-height:300px">
+            <table style="width:100%;font-size:.75rem;border-collapse:collapse">
+              <thead>
+                <tr style="background:var(--c-navy);color:white">
+                  <th style="padding:.4rem">#</th>
+                  <th style="padding:.4rem">Factura</th>
+                  <th style="padding:.4rem">Fecha</th>
+                  <th style="padding:.4rem">Tipo</th>
+                  <th style="padding:.4rem">Tipif.</th>
+                  <th style="padding:.4rem">Cód.</th>
+                  <th style="padding:.4rem">Descripción</th>
+                  <th style="padding:.4rem">Factura $</th>
+                  <th style="padding:.4rem">Glosa inicial $</th>
+                  <th style="padding:.4rem">Pendiente $</th>
+                  <th style="padding:.4rem">Acepta IPS $</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="as-filas-body"><tr><td colspan="12" style="text-align:center;padding:1.5rem;color:var(--text3)">Sin filas. Pega una factura arriba o agrega fila manual.</td></tr></tbody>
+            </table>
+          </div>
+
+          <div class="field" style="margin-top:1rem"><label>Observaciones del acta</label><textarea id="as-obs" rows="3"></textarea></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem">
+            <div style="border:1px solid var(--border);padding:.8rem;border-radius:8px;background:var(--bg)">
+              <b style="font-size:.82rem;color:var(--c-navy)">Firmante por la EPS</b>
+              <div class="field" style="margin-top:.4rem"><label>Nombre</label><input type="text" id="as-eps-nombre"/></div>
+              <div class="field"><label>Cargo</label><input type="text" id="as-eps-cargo"/></div>
+              <div class="field"><label>Correo</label><input type="text" id="as-eps-correo"/></div>
+            </div>
+            <div style="border:1px solid var(--border);padding:.8rem;border-radius:8px;background:var(--bg)">
+              <b style="font-size:.82rem;color:var(--c-navy)">Firmante por HUS</b>
+              <div class="field" style="margin-top:.4rem"><label>Nombre</label><input type="text" id="as-hus-nombre"/></div>
+              <div class="field"><label>Cargo</label><input type="text" id="as-hus-cargo" value="TECNICO DE GLOSAS Y DEVOLUCIONES"/></div>
+              <div class="field"><label>Correo</label><input type="text" id="as-hus-correo"/></div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:.6rem;margin-top:1.2rem;justify-content:flex-end">
+            <button class="btn btn-ghost" onclick="cerrarActaSinac()">Cancelar</button>
+            <button class="btn btn-primary" style="background:#059669;color:white;border:0;padding:.6rem 1.2rem;border-radius:8px;font-weight:700;cursor:pointer" onclick="as_generarPdf()">📄 Generar PDF imprimible</button>
           </div>
         </div>
       </div>
@@ -19945,6 +20037,159 @@ async function registrarResultadoConciliacion(id){
   var d=await r.json();
   toast(r.ok?'Resultado registrado':'Error',d.message||d.detail,r.ok?'success':'error');
   if(r.ok)loadConciliaciones();
+}
+
+// ─── ACTA SINAC multi-glosa ───────────────────────────────────────────────
+var AS_FILAS = [];
+
+function abrirActaSinac(){
+  AS_FILAS = [];
+  var modal = document.getElementById('acta-sinac-modal');
+  modal.style.display = 'flex';
+  // Default values
+  var hoy = new Date().toISOString().slice(0,10);
+  document.getElementById('as-fecha').value = hoy;
+  var mes = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'][new Date().getMonth()];
+  document.getElementById('as-periodo').value = mes + ' ' + new Date().getFullYear();
+  document.getElementById('as-hus-correo').value = (window.USUARIO_EMAIL || '');
+  document.getElementById('as-hus-nombre').value = (window.USUARIO_NOMBRE || '');
+  as_renderFilas();
+}
+
+function cerrarActaSinac(){
+  document.getElementById('acta-sinac-modal').style.display = 'none';
+}
+
+function as_renderFilas(){
+  var tb = document.getElementById('as-filas-body');
+  if(!AS_FILAS.length){
+    tb.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:1.5rem;color:var(--text3)">Sin filas. Pega una factura arriba o agrega fila manual.</td></tr>';
+    return;
+  }
+  tb.innerHTML = AS_FILAS.map(function(f,i){
+    var t = function(field, valor, type){
+      type = type || 'text';
+      return '<input type="'+type+'" value="'+(valor||'').toString().replace(/"/g,'&quot;')+'" onchange="AS_FILAS['+i+'].'+field+'=(this.type===\'number\'?parseFloat(this.value)||0:this.value)" style="width:100%;border:0;background:transparent;color:var(--text);font-size:.74rem;padding:.2rem"/>';
+    };
+    var tn = function(field, valor){ return t(field, valor||0, 'number'); };
+    return '<tr>'+
+      '<td style="text-align:center;font-weight:700;padding:.3rem">'+(i+1)+'</td>'+
+      '<td>'+t('numero_factura', f.numero_factura)+'</td>'+
+      '<td>'+t('fecha_factura', f.fecha_factura, 'date')+'</td>'+
+      '<td>'+t('tipo_glosa', f.tipo_glosa)+'</td>'+
+      '<td>'+t('tipificacion', f.tipificacion)+'</td>'+
+      '<td>'+t('cod_glosa', f.cod_glosa)+'</td>'+
+      '<td>'+t('descripcion_glosa', f.descripcion_glosa)+'</td>'+
+      '<td>'+tn('valor_factura', f.valor_factura)+'</td>'+
+      '<td>'+tn('valor_glosa_inicial', f.valor_glosa_inicial)+'</td>'+
+      '<td>'+tn('valor_pendiente_conciliar', f.valor_pendiente_conciliar)+'</td>'+
+      '<td>'+tn('valor_acepta_ips', f.valor_acepta_ips)+'</td>'+
+      '<td style="text-align:center"><button onclick="AS_FILAS.splice('+i+',1);as_renderFilas()" style="background:none;border:0;color:#dc2626;cursor:pointer;font-size:1rem">×</button></td>'+
+      '</tr>';
+  }).join('');
+}
+
+async function as_buscarFactura(){
+  var inp = document.getElementById('as-busqueda-glosa');
+  var termino = (inp.value || '').trim();
+  if(!termino) return;
+  try{
+    var r = await fetch('/glosas/buscar/'+encodeURIComponent(termino), {headers: authH()});
+    if(!r.ok){ toast('Error','No se pudo buscar (HTTP '+r.status+')','error'); return; }
+    var matches = await r.json();
+    if(!matches || matches.length === 0){
+      toast('No encontrada','No hay glosas con "'+termino+'"','warning');
+      return;
+    }
+    matches.forEach(function(g){
+      AS_FILAS.push({
+        glosa_id: g.id,
+        radicado_acta_entidad: '-',
+        numero_factura: g.factura || termino,
+        fecha_factura: (g.fecha_radicacion_factura||'').slice(0,10) || '',
+        tipo_glosa: 'ADMINISTRATIVA',
+        tipificacion: g.tipo_glosa_excel || '',
+        cod_glosa: g.codigo_glosa || '',
+        descripcion_glosa: (g.observacion_eps || g.glosa_texto || '').slice(0,300),
+        valor_factura: g.valor_factura || 0,
+        valor_glosa_inicial: g.valor_objetado || 0,
+        valor_pendiente_conciliar: g.valor_objetado || 0,
+        valor_acepta_ips: 0
+      });
+    });
+    inp.value = '';
+    as_renderFilas();
+    toast('Agregadas', matches.length + ' fila(s) cargada(s)', 'success');
+  }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+function as_agregarManual(){
+  AS_FILAS.push({
+    radicado_acta_entidad: '-',
+    numero_factura: '',
+    fecha_factura: '',
+    tipo_glosa: 'ADMINISTRATIVA',
+    tipificacion: '',
+    cod_glosa: '',
+    descripcion_glosa: '',
+    valor_factura: 0,
+    valor_glosa_inicial: 0,
+    valor_pendiente_conciliar: 0,
+    valor_acepta_ips: 0
+  });
+  as_renderFilas();
+}
+
+async function as_generarPdf(){
+  var acta = (document.getElementById('as-acta').value || '').trim();
+  var nit = (document.getElementById('as-nit').value || '').trim();
+  var razon = (document.getElementById('as-razon').value || '').trim();
+  if(!acta || !nit || !razon){
+    toast('Faltan datos', 'N° acta, NIT y Razón Social son obligatorios', 'warning');
+    return;
+  }
+  if(!AS_FILAS.length){
+    toast('Sin filas', 'Agrega al menos una glosa antes de generar el acta', 'warning');
+    return;
+  }
+  var payload = {
+    acta_numero: acta,
+    nit: nit,
+    razon_social: razon,
+    periodo: document.getElementById('as-periodo').value,
+    fecha_acta: document.getElementById('as-fecha').value,
+    filas: AS_FILAS,
+    observaciones: document.getElementById('as-obs').value,
+    firmante_eps_nombre: document.getElementById('as-eps-nombre').value,
+    firmante_eps_cargo: document.getElementById('as-eps-cargo').value,
+    firmante_eps_correo: document.getElementById('as-eps-correo').value,
+    firmante_hus_nombre: document.getElementById('as-hus-nombre').value,
+    firmante_hus_cargo: document.getElementById('as-hus-cargo').value,
+    firmante_hus_correo: document.getElementById('as-hus-correo').value
+  };
+  try{
+    var r = await fetch('/conciliaciones/acta-sinac/pdf', {
+      method: 'POST',
+      headers: {...authH(), 'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok){
+      var msg = await r.text();
+      toast('Error generando', msg.slice(0,200), 'error');
+      return;
+    }
+    var html = await r.text();
+    var w = window.open('', '_blank');
+    if(!w){
+      toast('Bloqueado','El popup fue bloqueado. Permite ventanas emergentes para iaglosassinac.help','warning');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    toast('Acta generada','Imprime o guarda como PDF desde la nueva ventana','success');
+  }catch(e){
+    toast('Error', e.message, 'error');
+  }
 }
 
 // ─── AUDIT LOG ─────────────────────────────────────────────────────────────
