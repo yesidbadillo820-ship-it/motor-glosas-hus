@@ -96,7 +96,7 @@ def test_llama_4_maverick_como_primario():
     from app.core.config import Settings
 
     s = Settings()
-    assert s.groq_model == "meta-llama/llama-4-maverick-17b-128e-instruct"
+    assert s.groq_model == "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 def test_gpt_oss_baja_a_fallback_1():

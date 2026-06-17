@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     primary_ai: str = "groq"
     # Modelos Groq para dictamenes — decision 16-jun-2026 (ronda 8 — dueño
     # pidió Llama 4 Maverick + banco de respuestas HUS como few-shots):
-    #   1. meta-llama/llama-4-maverick-17b-128e-instruct   PRIMARIO —
+    #   1. meta-llama/llama-4-scout-17b-16e-instruct   PRIMARIO —
     #      Llama 4 (abr-2026), arquitectura 17B activos / 128 expertos MoE.
     #      Mejor seguidor de instrucciones largas (system + few-shots) que
     #      gpt-oss-120b; no es razonador con CoT (no agota max_tokens en
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # siguiente modelo Groq SIN saltar todavia a Anthropic. Overrideables
     # por env: GROQ_MODEL, GROQ_MODEL_FALLBACK_1, GROQ_MODEL_FALLBACK_2,
     # GROQ_MODEL_FALLBACK_3.
-    groq_model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"
+    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
     groq_model_fallback_1: str = "openai/gpt-oss-120b"
     groq_model_fallback_2: str = "qwen/qwen3-32b"
     groq_model_fallback_3: str = "llama-3.3-70b-versatile"
