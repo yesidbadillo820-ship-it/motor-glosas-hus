@@ -319,6 +319,14 @@ def check_contratos_no_fabricados(
     contratos_dictamen: set[str] = set()
     for m in _PAT_CONTRATO_EN_DICTAMEN.finditer(texto_dictamen):
         num = m.group(1).upper().strip().rstrip(",.;:")
+        # Ronda 10 (17-jun-2026) — un número de contrato REAL siempre tiene
+        # al menos un dígito ("S-13-1-03-1-04958", "440-DIGSA/DMBUG-2025",
+        # "1388 DE 2024"). Sin esta restricción la regex matchea "CONTRATO
+        # VIGENTE", "CONTRATO ESTABLECE", "CONTRATO LEGALMENTE" como número,
+        # provocando falsos positivos masivos en producción que tumban el
+        # QG y disparan ESCALAR_HUMANO. Captado en logs reales 17-jun.
+        if not any(ch.isdigit() for ch in num):
+            continue
         if "-" in num or "/" in num or len(num) >= 6:
             contratos_dictamen.add(num)
 

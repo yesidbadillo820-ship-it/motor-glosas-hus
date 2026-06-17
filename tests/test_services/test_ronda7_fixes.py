@@ -135,8 +135,12 @@ def test_fix_s_dictamen_completo_no_se_toca():
 
 # ── Cache version bumped ─────────────────────────────────────────────
 def test_cache_version_r7_bumped():
-    """La constante de versión se actualizó a r7."""
-    assert _PROMPT_CACHE_VERSION == "r7-20260616"
+    """La constante de versión se actualizó a r7 o superior."""
+    import re as _re
+
+    m = _re.match(r"r(\d+)", _PROMPT_CACHE_VERSION)
+    assert m is not None
+    assert int(m.group(1)) >= 7
 
 
 # ── Fix U: catálogo CONTRATOS_HUS ampliado con 3 entidades nuevas ────

@@ -236,7 +236,11 @@ def test_cache_version_r6_bumped():
     """La constante de versión se bumpeó (sigue subiendo en rondas
     posteriores, basta con que sea >= r6)."""
     assert _PROMPT_CACHE_VERSION.startswith("r")
-    assert int(_PROMPT_CACHE_VERSION[1]) >= 6
+    import re as _re
+
+    m = _re.match(r"r(\d+)", _PROMPT_CACHE_VERSION)
+    assert m is not None
+    assert int(m.group(1)) >= 6
 
 
 # ── Verificación catálogo: ACTA 1388 sigue catalogada (regresión r5) ─

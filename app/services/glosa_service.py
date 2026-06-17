@@ -172,7 +172,7 @@ _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
 # todos los cachés viejos. El caso 8 de la ronda 3 vino del caché DB con
 # etiqueta `groq/qwen/qwen3-32b` aunque los fixes ya estaban desplegados,
 # porque la clave SHA256 no incluía señal de versión.
-_PROMPT_CACHE_VERSION = "r7-20260616"
+_PROMPT_CACHE_VERSION = "r10-20260617"
 
 FERIADOS_CO = [
     # 2025
@@ -587,6 +587,142 @@ _EPS_KNOWN_TOKENS = {
     "SOAT",
 }
 
+# Ronda 10 (17-jun-2026) — palabras del DICCIONARIO en español que NO son
+# nombre de EPS aunque sigan a "EPS" en una frase. Evidencia producción
+# 17-jun (FAMISANAR HUS0000506597): la IA escribió "LAS EPS RECONOCER LOS
+# SERVICIOS" — el regex matcheó "EPS RECONOCER", trató "RECONOCER" como
+# nombre inventado y lo reemplazó por "la entidad pagadora", dejando la
+# sintaxis rota "LAS la entidad pagadora RECONOCER". Stop-list excluye
+# verbos/adverbios comunes que la IA puede dejar pegados a "EPS" tras
+# elidir el sujeto plural.
+_EPS_PALABRAS_NO_NOMBRE: frozenset[str] = frozenset(
+    {
+        # Verbos en infinitivo / conjugados
+        "RECONOCER",
+        "RECONOCERA",
+        "RECONOCERÁ",
+        "RECONOCERAN",
+        "RECONOCERÁN",
+        "RECONOZCAN",
+        "RECONOZCA",
+        "PAGAR",
+        "PAGARA",
+        "PAGARÁ",
+        "PAGARAN",
+        "PAGARÁN",
+        "ESTABLECE",
+        "ESTABLECEN",
+        "ESTABLECEN",
+        "ESTABLECER",
+        "ESTABLECIO",
+        "ESTABLECIÓ",
+        "ESTABLECIDA",
+        "ESTABLECIDAS",
+        "ESTABLECIDO",
+        "ESTABLECIDOS",
+        "DEBE",
+        "DEBEN",
+        "DEBERA",
+        "DEBERÁ",
+        "DEBERAN",
+        "DEBERÁN",
+        "DEBERIA",
+        "DEBERÍA",
+        "DEBIERA",
+        "DEBIERAN",
+        "APLICA",
+        "APLICAN",
+        "APLICAR",
+        "APLICARA",
+        "APLICARÁ",
+        "APLICARAN",
+        "APLICANDO",
+        "APLICÓ",
+        "APLICO",
+        "PRETENDE",
+        "PRETENDEN",
+        "PRETENDIO",
+        "PRETENDIÓ",
+        "ARGUMENTA",
+        "ARGUMENTAN",
+        "ARGUMENTÓ",
+        "ARGUMENTO",
+        "OBJETA",
+        "OBJETAN",
+        "OBJETÓ",
+        "OBJETO",
+        "NIEGA",
+        "NIEGAN",
+        "NEGÓ",
+        "NEGO",
+        "AFIRMA",
+        "AFIRMAN",
+        "AFIRMÓ",
+        "AFIRMO",
+        "ALEGA",
+        "ALEGAN",
+        "ALEGÓ",
+        "ALEGO",
+        "SOSTIENE",
+        "SOSTIENEN",
+        "SOSTUVO",
+        "INCURRE",
+        "INCURREN",
+        "INCURRIÓ",
+        "INCURRIO",
+        "TIENE",
+        "TIENEN",
+        "TUVO",
+        "VULNERA",
+        "VULNERAN",
+        "OMITE",
+        "OMITEN",
+        "DESCONOCE",
+        "DESCONOCEN",
+        # Adjetivos / participios / adverbios sueltos
+        "VIGENTE",
+        "VIGENTES",
+        "RESPONSABLE",
+        "RESPONSABLES",
+        "LEGALMENTE",
+        "UNILATERALMENTE",
+        "EXPRESAMENTE",
+        "OBLIGADAS",
+        "OBLIGADA",
+        "OBLIGADOS",
+        "OBLIGADO",
+        # Conectores y demás
+        "PERO",
+        "MAS",
+        "AUN",
+        "AÚN",
+        "SIN",
+        "PARA",
+        "POR",
+        "CON",
+        "DE",
+        "QUE",
+        "QUIEN",
+        "QUIENES",
+        "CUYO",
+        "CUYA",
+        "CUYOS",
+        "CUYAS",
+        # Pronombres
+        "ELLA",
+        "ELLAS",
+        "ELLOS",
+        "TODAS",
+        "TODOS",
+        "AMBAS",
+        "AMBOS",
+        # Conceptos del dominio que no son EPS
+        "CONTRIBUTIVO",
+        "SUBSIDIADO",
+        "PARTICULAR",
+    }
+)
+
 
 def _neutralizar_eps_inventada(texto: str, eps: str) -> str:
     """Sustituye nombres de EPS distintos al del input por "la entidad pagadora".
@@ -619,6 +755,12 @@ def _neutralizar_eps_inventada(texto: str, eps: str) -> str:
         # Token raíz de la EPS mencionada.
         raiz_mencion = nombre.split()[0].strip(".,") if nombre.split() else ""
         if not raiz_mencion:
+            return m.group(0)
+        # Ronda 10 — el "nombre" es realmente una palabra común del español
+        # (verbo, adverbio, conector) que la IA dejó pegada a "EPS" al
+        # elidir el sujeto. Ejemplo prod 17-jun: "LAS EPS RECONOCER LOS
+        # SERVICIOS" → no sustituir, dejar el texto como está.
+        if raiz_mencion in _EPS_PALABRAS_NO_NOMBRE:
             return m.group(0)
         # Coincide con la EPS del input → respetar.
         if raiz_mencion == raiz_input or raiz_input in nombre or raiz_mencion in eps_up:
@@ -1117,10 +1259,19 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
                 return True
         return False
 
-    def _conector(contenido: str) -> str:
-        letras = [c for c in contenido if c.isalpha()]
-        es_mayus = letras and (sum(1 for c in letras if c.isupper()) / len(letras)) >= 0.5
-        return "EN LOS TÉRMINOS DE " if es_mayus else "en los términos de "
+    # Ronda 10 (17-jun-2026) — el contexto manda, no la cita. Producción
+    # 17-jun (FAMISANAR HUS0000507120): "TAMBIÉN, SE INCUMPLE CON LA CLÁUSULA
+    # 5 DEL CONTRATO QUE ESTABLECE: en los términos de Las partes acuerdan
+    # ...". El conector salió en minúscula porque la cita interna está en
+    # mixed-case, pero el párrafo huésped es CAPS sostenido — se ve roto.
+    # Detectamos la mayúscula del párrafo huésped (60 chars antes del span)
+    # en lugar de la del contenido citado.
+    def _conector_por_contexto(texto_completo: str, span_inicio: int) -> str:
+        ventana = texto_completo[max(0, span_inicio - 60) : span_inicio]
+        letras = [c for c in ventana if c.isalpha()]
+        if letras and (sum(1 for c in letras if c.isupper()) / len(letras)) >= 0.6:
+            return "EN LOS TÉRMINOS DE "
+        return "en los términos de "
 
     n_reemplazos = 0
 
@@ -1129,7 +1280,7 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
         contenido = m.group(1)
         if _es_falsa(contenido):
             n_reemplazos += 1
-            return _conector(contenido) + contenido
+            return _conector_por_contexto(texto, m.start()) + contenido
         return m.group(0)
 
     def _sub_atribuida(m: "re.Match[str]") -> str:
@@ -1137,7 +1288,9 @@ def _descomillar_citas_falsas(texto: str, issues) -> str:
         contenido = m.group(2)
         if _es_falsa(contenido):
             n_reemplazos += 1
-            return m.group(1) + _conector(contenido) + contenido
+            # El verbo de atribución (group 1) ya está en el span; el
+            # contexto previo se mide desde el inicio del match completo.
+            return m.group(1) + _conector_por_contexto(texto, m.start()) + contenido
         return m.group(0)
 
     resultado = _PAT_DESCOMILLAR_CHEVRON.sub(_sub_chevron, texto)
