@@ -387,6 +387,72 @@ def _split_entidad(entidad: str) -> tuple[str, str]:
     return "", entidad.strip()
 
 
+# Ronda 10 (17-jun-2026) — el DGH manda la entidad en formato Syscafe muy
+# verboso ("C260043 - ENTIDAD PROMOTORA DE SALUD FAMISANAR S A S
+# CONTRIBUTIVO", "U240061 - FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA
+# LA PREVISORA S.A. FOMAG"). Antes guardábamos esa cadena cruda como
+# `eps`, y la IA la copiaba al dictamen como cabecera ("ESE HUS NO ACEPTA
+# GLOSA APLICADA POR C260043 - ENTIDAD PROMOTORA..."). Normalizamos a la
+# clave canónica del catálogo CONTRATOS_HUS para que la IA use "FAMISANAR
+# EPS", "FOMAG", "MUTUAL SER EPS" — los mismos nombres que conocen sus
+# bloques de contexto contractual.
+_TOKENS_EPS_CANONICA: tuple[tuple[str, str], ...] = (
+    # (token de búsqueda en mayúsculas, nombre canónico final).
+    # Orden importa: el más específico primero (NUEVA EPS antes que SOLO
+    # "EPS", FOMAG/MAGISTERIO antes que FIDEICOMISOS).
+    ("FAMISANAR", "FAMISANAR EPS"),
+    ("FOMAG", "FOMAG"),
+    ("MAGISTERIO", "FOMAG"),
+    ("FIDUPREVISORA", "FOMAG"),
+    ("NUEVA EPS", "NUEVA EPS"),
+    ("COOSALUD", "COOSALUD"),
+    ("COMPENSAR", "COMPENSAR"),
+    ("POSITIVA", "POSITIVA"),
+    ("SANITAS", "SANITAS"),
+    ("MUTUAL SER", "MUTUAL SER EPS"),
+    ("MUTUALSER", "MUTUAL SER EPS"),
+    ("SALUD TOTAL", "SALUD TOTAL EPS"),
+    ("SALUDTOTAL", "SALUD TOTAL EPS"),
+    ("SURA", "SURA EPS"),
+    ("ECOOPSOS", "ECOOPSOS"),
+    ("EMSSANAR", "EMSSANAR"),
+    ("ASMET SALUD", "ASMET SALUD"),
+    ("ASMETSALUD", "ASMET SALUD"),
+    ("CAPITAL SALUD", "CAPITAL SALUD EPS"),
+    ("CAPRESOCA", "CAPRESOCA EPS"),
+    ("DUSAKAWI", "DUSAKAWI EPS"),
+    ("PIJAOS", "PIJAOS SALUD EPS"),
+    ("MALLAMAS", "MALLAMAS EPS"),
+    ("DMBUG", "DMBUG"),
+    ("DISPENSARIO MEDICO", "DISPENSARIO MEDICO"),
+    ("DIRECCION DE SANIDAD", "DIRECCION DE SANIDAD"),
+    ("SANIDAD MILITAR", "SANIDAD MILITAR"),
+    ("POLICIA NACIONAL", "POLICIA NACIONAL"),
+    ("CLINICA CHICAMOCHA", "CLINICA CHICAMOCHA"),
+)
+
+
+def _normalizar_eps_canonica(entidad_raw: str) -> str:
+    """Devuelve el nombre canónico corto si reconoce la entidad, o el
+    nombre limpio (sin código Syscafe) en otro caso.
+
+    Caso real prod 17-jun: "C260043 - ENTIDAD PROMOTORA DE SALUD FAMISANAR
+    S A S CONTRIBUTIVO" → "FAMISANAR EPS".
+    "U240061 - FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA
+    S.A.  FOMAG" → "FOMAG".
+    "U220251 - MUTUAL SER EPS" → "MUTUAL SER EPS".
+    """
+    if not entidad_raw:
+        return ""
+    _, nombre = _split_entidad(entidad_raw)
+    nombre_up = (nombre or entidad_raw).upper()
+    nombre_norm = re.sub(r"\s+", " ", nombre_up).strip()
+    for token, canonico in _TOKENS_EPS_CANONICA:
+        if token in nombre_norm:
+            return canonico
+    return nombre_norm or entidad_raw.strip()
+
+
 def _mapear_cabeceras(
     fila_encabezado: tuple, mapa: dict[str, list[str]] | None = None
 ) -> dict[str, int]:
@@ -919,6 +985,15 @@ class RecepcionService:
 
                 # Separar código plan (U220181) del nombre para normalización
                 eps_codigo, eps_nombre_limpio = _split_entidad(entidad)
+                # Ronda 10 (17-jun-2026) — el Syscafe-DGH manda nombres
+                # verbosos ("C260043 - ENTIDAD PROMOTORA DE SALUD FAMISANAR
+                # S A S CONTRIBUTIVO"). Antes guardábamos esa cadena cruda
+                # como `eps` y la IA la copiaba al dictamen como cabecera.
+                # Normalizamos a la clave canónica del catálogo (FAMISANAR
+                # EPS, FOMAG, MUTUAL SER EPS) — los mismos nombres que
+                # conocen sus bloques de contexto contractual y el resto
+                # del catálogo.
+                eps_canonica = _normalizar_eps_canonica(entidad) or entidad
 
                 consecutivo = str(_get("consecutivo_dgh") or "").strip()
                 gestor = str(_get("gestor") or "").strip().upper() or "SIN ASIGNAR"
@@ -982,12 +1057,12 @@ class RecepcionService:
                 if ratificada:
                     estado = "RATIFICADA"
                     texto_ref = radicado_info or referencia
-                    dictamen = _dictamen_ratificada(entidad, factura, texto_ref)
+                    dictamen = _dictamen_ratificada(eps_canonica, factura, texto_ref)
                     resumen.ratificadas += 1
                     requiere_ia = False
                 elif es_extemporanea:
                     estado = "EXTEMPORANEA"
-                    dictamen = _dictamen_extemporanea(entidad, factura, dias_transcurridos)
+                    dictamen = _dictamen_extemporanea(eps_canonica, factura, dias_transcurridos)
                     resumen.extemporaneas += 1
                     requiere_ia = False
                 else:
@@ -1016,7 +1091,7 @@ class RecepcionService:
                 existente = q.first()
 
                 campos = dict(
-                    eps=entidad,
+                    eps=eps_canonica,
                     eps_codigo=eps_codigo or None,
                     paciente="N/A",
                     factura=factura,
@@ -1101,7 +1176,7 @@ class RecepcionService:
                     {
                         "factura": factura,
                         "consecutivo_dgh": consecutivo,
-                        "eps": entidad,
+                        "eps": eps_canonica,
                         "valor": valor,
                         "vence": fecha_vence.strftime("%d/%m/%Y"),
                         "fecha_entrega": fecha_entrega.strftime("%d/%m/%Y")
