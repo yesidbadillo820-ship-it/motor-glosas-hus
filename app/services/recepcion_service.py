@@ -424,10 +424,12 @@ _TOKENS_EPS_CANONICA: tuple[tuple[str, str], ...] = (
     ("PIJAOS", "PIJAOS SALUD EPS"),
     ("MALLAMAS", "MALLAMAS EPS"),
     ("DMBUG", "DMBUG"),
-    ("DISPENSARIO MEDICO", "DISPENSARIO MEDICO"),
-    ("DIRECCION DE SANIDAD", "DIRECCION DE SANIDAD"),
-    ("SANIDAD MILITAR", "SANIDAD MILITAR"),
-    ("POLICIA NACIONAL", "POLICIA NACIONAL"),
+    # Ronda 10 (17-jun-2026) — entidades de las fuerzas militares NO se
+    # canonizan: "DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO" pierde
+    # "EJERCITO" si colapsamos a "DISPENSARIO MEDICO". Idem POLICIA / ARMADA
+    # / SANIDAD MILITAR — cada una tiene su régimen normativo propio y el
+    # dispensario específico es información importante. Para esos casos el
+    # fallback (strip del prefijo Syscafe) preserva el nombre completo.
     ("CLINICA CHICAMOCHA", "CLINICA CHICAMOCHA"),
 )
 
