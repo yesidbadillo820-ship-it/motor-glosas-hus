@@ -150,8 +150,7 @@ def test_fix_d_fomag_se_normaliza_aun_con_fideicomiso():
     """'U240061 - FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA
     PREVISORA S.A.  FOMAG' → 'FOMAG'."""
     r = _normalizar_eps_canonica(
-        "U240061 - FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA "
-        "LA PREVISORA S.A.  FOMAG"
+        "U240061 - FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA S.A.  FOMAG"
     )
     assert r == "FOMAG"
 
@@ -168,8 +167,7 @@ def test_fix_d_clinica_chicamocha_se_reconoce():
 
 def test_fix_d_capital_salud_subsidiado_se_normaliza():
     r = _normalizar_eps_canonica(
-        "U220332 - CAPITAL SALUD ENTIDAD PROMOTORA DE SALUD DEL "
-        "REGIMEN SUBSIDIADO S.A.S."
+        "U220332 - CAPITAL SALUD ENTIDAD PROMOTORA DE SALUD DEL REGIMEN SUBSIDIADO S.A.S."
     )
     assert r == "CAPITAL SALUD EPS"
 
