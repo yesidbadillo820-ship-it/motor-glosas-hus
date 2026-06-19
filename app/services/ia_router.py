@@ -72,45 +72,60 @@ def elegir_modelo(
     *,
     proveedores_disponibles: set[str] | None = None,
 ) -> DecisionRouter:
-    """Devuelve el modelo recomendado + cadena de fallbacks entre modelos gratuitos."""
-    
-    # Admitimos todos los proveedores, priorizando los gratuitos
-    disponibles = (proveedores_disponibles or {"groq", "gemini", "cohere", "anthropic"})
+    """Devuelve el modelo recomendado + cadena de fallbacks entre los
+    proveedores activos del dictamen.
+
+    Verdad oficial (jun-2026): solo `groq` y `anthropic` se usan para
+    dictámenes. Gemini, Cohere y OpenRouter están RETIRADOS — si el caller
+    legacy los pasa en `proveedores_disponibles`, se ignoran silenciosamente
+    (no se recomiendan ni entran al fallback).
+      • COMPLEJA → anthropic (Claude razonamiento profundo); fallback groq.
+      • SIMPLE   → groq (speed); fallback anthropic.
+      • MEDIA    → groq (balance); fallback anthropic.
+    """
+
+    # Filtrar a los activos. Lo que venga fuera de este set se descarta.
+    _ACTIVOS = {"groq", "anthropic"}
+    dispo_in = proveedores_disponibles or _ACTIVOS
+    disponibles = {p for p in dispo_in if p in _ACTIVOS}
+    if not disponibles:
+        # Ningún proveedor válido: forzamos groq como último recurso.
+        disponibles = {"groq"}
 
     if complejidad == "COMPLEJA":
-        # Cohere y Gemini son mejores en razonamiento legal complejo
-        preferido = "cohere" if "cohere" in disponibles else "gemini"
-        fallback = [m for m in ["gemini", "groq", "cohere", "anthropic"] if m in disponibles and m != preferido]
+        # Claude lidera razonamiento legal complejo; si no está, caemos a groq.
+        preferido = "anthropic" if "anthropic" in disponibles else "groq"
+        fallback = [m for m in ("groq", "anthropic") if m in disponibles and m != preferido]
         return DecisionRouter(
             complejidad="COMPLEJA",
             modelo_recomendado=preferido,
             modelos_fallback=fallback,
-            razon="Glosa compleja → Razonamiento profundo (Cohere/Gemini)",
+            razon="Glosa compleja → Razonamiento profundo (Claude)",
             tiempo_max_esperado_s=20,
             costo_estimado_centavos=0,
         )
 
     if complejidad == "SIMPLE":
-        # Groq (Llama 70B) es el rey de la velocidad
-        preferido = "groq" if "groq" in disponibles else "gemini"
-        fallback = [m for m in ["gemini", "cohere", "groq", "anthropic"] if m in disponibles and m != preferido]
+        # Groq (Llama) es el rey de la speed; si no está, caemos a anthropic.
+        preferido = "groq" if "groq" in disponibles else "anthropic"
+        fallback = [m for m in ("groq", "anthropic") if m in disponibles and m != preferido]
         return DecisionRouter(
             complejidad="SIMPLE",
             modelo_recomendado=preferido,
             modelos_fallback=fallback,
-            razon="Glosa simple → Velocidad máxima (Groq)",
+            razon="Glosa simple → Velocidad máxima (Groq, max speed)",
             tiempo_max_esperado_s=5,
             costo_estimado_centavos=0,
         )
 
-    # MEDIA (default)
-    preferido = "gemini" if "gemini" in disponibles else "groq"
-    fallback = [m for m in ["groq", "cohere", "gemini", "anthropic"] if m in disponibles and m != preferido]
+    # MEDIA (default): groq por balance, fallback anthropic.
+    preferido = "groq" if "groq" in disponibles else "anthropic"
+    fallback = [m for m in ("groq", "anthropic") if m in disponibles and m != preferido]
     return DecisionRouter(
         complejidad="MEDIA",
         modelo_recomendado=preferido,
         modelos_fallback=fallback,
-        razon="Glosa estándar → Balance perfecto (Gemini/Groq)",
+        razon="Glosa estándar → Balance perfecto (Groq)",
         tiempo_max_esperado_s=10,
         costo_estimado_centavos=0,
     )
