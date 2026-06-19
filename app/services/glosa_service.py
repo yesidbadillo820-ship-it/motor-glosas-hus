@@ -172,7 +172,7 @@ _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
 # todos los cachés viejos. El caso 8 de la ronda 3 vino del caché DB con
 # etiqueta `groq/qwen/qwen3-32b` aunque los fixes ya estaban desplegados,
 # porque la clave SHA256 no incluía señal de versión.
-_PROMPT_CACHE_VERSION = "r10-20260617"
+_PROMPT_CACHE_VERSION = "r11-20260618"
 
 FERIADOS_CO = [
     # 2025
@@ -889,6 +889,116 @@ _PATRONES_PLACEHOLDERS_TEMPLATE: tuple[tuple[re.Pattern[str], str], ...] = (
         "valor objetado consignado en el expediente",
     ),
 )
+
+
+# ── Red final ronda 11 (18-jun-2026) — placeholders del prompt ──
+# Evidencia (18-jun, FAMISANAR CO0701 TRAMADOL $1.800 y CO0601 CATETER $5.800):
+#   "FACTURADO POR $100.000" ← valor real era $1.800 y $5.800
+#   "CUPS 1234" ← reales eran 19997313-6 y FMQ0113
+#   "GLOSA 12345" ← inventado
+#   "RESOLUCIÓN 2641 DE 2024" ← inventada
+# Causa raíz: las reglas anti-alucinación del prompt mostraban esos placeholders
+# como EJEMPLOS de lo prohibido — la IA los copiaba. Las reglas se reescribieron
+# para no enseñarlos (mismo commit). Esta red es la malla de seguridad por si
+# alguna variante todavía se cuela.
+_PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
+    # "$1.000.000" o "$1000000" o "$100.000" cuando el monto luce a placeholder
+    # genérico (cifras muy redondas tipo "$X00.000" o "$X000000"). Solo
+    # neutralizamos los muy estandarizados que repite el modelo (no $1.234.567).
+    (
+        re.compile(r"\$\s*1[\.\,]?000[\.\,]?000\b"),
+        "el valor objetado consignado en el expediente",
+    ),
+    (
+        re.compile(r"\$\s*100[\.\,]000\b(?!\d)"),
+        "el valor objetado consignado en el expediente",
+    ),
+    # "CUPS 1234" / "CUPS 12345" — números cortos de relleno. Los CUPS reales
+    # tienen 5-7 dígitos con sufijo letra o son alfanuméricos (FMQ0113,
+    # 19997313-6, 372301H). "1234" puro es siempre falso.
+    (
+        re.compile(r"\bC[ÓO]DIGO\s+CUPS\s+1234\d?\b", re.IGNORECASE),
+        "el código CUPS de la factura",
+    ),
+    (
+        re.compile(r"\bCUPS\s+1234\d?\b(?!-?\d)", re.IGNORECASE),
+        "el CUPS de la factura",
+    ),
+    # "GLOSA 12345" en cualquier contexto (incluido "levantamiento de la glosa 12345")
+    (
+        re.compile(r"\bLA\s+GLOSA\s+12345\b", re.IGNORECASE),
+        "la glosa aplicada",
+    ),
+    (
+        re.compile(r"\bGLOSA\s+12345\b", re.IGNORECASE),
+        "la glosa aplicada",
+    ),
+    # "Resolución 2641 de 2024" — norma inventada que el prompt mencionaba como
+    # ejemplo de lo prohibido. La quitamos en cualquier forma.
+    (
+        re.compile(r"\b(?:LA\s+)?RESOLUCI[ÓO]N\s+2641\s+DE\s+2024\b", re.IGNORECASE),
+        "la normativa vigente del Ministerio de Salud",
+    ),
+    (
+        re.compile(r"\bRes\.?\s*2641/2024\b", re.IGNORECASE),
+        "normativa vigente",
+    ),
+    # "historia clínica N° 1234567" — número del prompt-ejemplo
+    (
+        re.compile(
+            r"\bhistoria\s+cl[íi]nica\s+N[°º\.]?\s*1234567\b",
+            re.IGNORECASE,
+        ),
+        "la historia clínica institucional adjunta",
+    ),
+    # "10 DE ENERO DE 2023" — fecha que la IA inventa cuando no tiene la real.
+    # Solo neutralizamos la combinación EXACTA, no todas las fechas con esos números.
+    (
+        re.compile(
+            r"\bREALIZADO\s+EL\s+10\s+DE\s+ENERO\s+DE\s+2023\b",
+            re.IGNORECASE,
+        ),
+        "prestado en la fecha consignada en la factura",
+    ),
+    (
+        re.compile(
+            r"\b10\s+DE\s+ENERO\s+DE\s+2023\b",
+            re.IGNORECASE,
+        ),
+        "la fecha consignada en el expediente",
+    ),
+)
+
+
+def _neutralizar_alucinaciones_prompt(texto: str) -> str:
+    """Limpia placeholders que la IA copia de los ejemplos del prompt.
+
+    Patrones detectados en dictamenes reales del 18-jun (Llama 4 Scout):
+      $100.000 / $1.000.000 / CUPS 1234 / GLOSA 12345 /
+      Resolución 2641 de 2024 / historia clínica N° 1234567 /
+      10 DE ENERO DE 2023.
+
+    Las reglas del system prompt fueron reescritas para no mostrarlos como
+    ejemplos; esta red es la última malla de seguridad.
+    """
+    if not texto:
+        return texto
+    resultado = texto
+    n_total = 0
+    for pat, reemplazo in _PATRONES_ALUCINADOS_PROMPT:
+        nuevo, n = pat.subn(reemplazo, resultado)
+        if n:
+            n_total += n
+            resultado = nuevo
+    if n_total:
+        # Limpieza gramatical: el reemplazo puede dejar artículos duplicados
+        resultado = re.sub(r"\bLA\s+la\s+", "la ", resultado)
+        resultado = re.sub(r"\bEL\s+el\s+", "el ", resultado)
+        logger.warning(
+            f"[ALUCINACIONES-PROMPT] {n_total} placeholder(s) del prompt "
+            "($100.000, CUPS 1234, GLOSA 12345, Res. 2641/2024) neutralizado(s)."
+        )
+    return resultado
 
 
 def _neutralizar_placeholders_template(texto: str) -> str:
@@ -4170,6 +4280,23 @@ class GlosaService:
                     dictamen = _dictamen_sin_placeholders
             except Exception as _e_pt:
                 logger.debug(f"[PLACEHOLDERS-TEMPLATE] red final no aplicada: {_e_pt}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 11 (18-jun-2026) — RED FINAL alucinaciones del prompt.
+            #  Evidencia: FAMISANAR CO0701 TRAMADOL $1.800 → la IA escribió
+            #  "$100.000", "CUPS 1234", "GLOSA 12345", "Resolución 2641 de
+            #  2024", "10 de enero de 2023". Esos placeholders venían de las
+            #  reglas anti-alucinación del system prompt que los mostraban
+            #  como EJEMPLOS prohibidos — la IA los copiaba (anti-patrón
+            #  conocido). Las reglas se reescribieron en el mismo commit
+            #  para no enseñar los ejemplos. Esta red es la malla final.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _dictamen_sin_alucs = _neutralizar_alucinaciones_prompt(dictamen)
+                if _dictamen_sin_alucs != dictamen:
+                    dictamen = _dictamen_sin_alucs
+            except Exception as _e_alc:
+                logger.debug(f"[ALUCINACIONES-PROMPT] red final no aplicada: {_e_alc}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 6 (16-jun-2026) — RED FINAL código coherente (fix I).

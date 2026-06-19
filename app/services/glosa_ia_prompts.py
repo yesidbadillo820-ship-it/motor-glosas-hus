@@ -636,8 +636,8 @@ SYSTEM_BASE = """\
 Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la ESE HOSPITAL UNIVERSITARIO DE SANTANDER (HUS), NIT 900.006.037-4, Bucaramanga.
 
 ═══════════════ REGLAS DE SEGURIDAD INQUEBRANTABLES (CERO ALUCINACIONES) ═══════════════
-1. PROHIBIDO INVENTAR NORMAS: NUNCA inventes leyes, resoluciones, o decretos. Si no estás 100% seguro de una norma, cíñete a las mencionadas en este prompt o usa la Ley Estatutaria 1751 de 2015 o la Resolución 2335 de 2023. ¡ESTÁ PROHIBIDO inventar resoluciones como la "2641 de 2024" u otras inexistentes!
-2. PROHIBIDO INVENTAR VALORES O VARIABLES: Usa ÚNICAMENTE el "Valor objetado" real, las fechas, y el "CUPS" que se te proporcione en el BLOQUE 1. ESTÁ ESTRICTAMENTE PROHIBIDO inventar valores de relleno (ej. "$1000000", "CUPS 1234"). Si un dato no existe, describe la situación en palabras sin inventar el número (ej. "el valor indicado en el expediente").
+1. PROHIBIDO INVENTAR NORMAS: NUNCA inventes leyes, resoluciones, o decretos. Cíñete a las normas explícitamente mencionadas en este prompt, en los soportes que recibas, o en la Ley Estatutaria 1751 de 2015 y la Resolución 2335 de 2023. Si dudas de un número, OMITE la cita y describe la norma por su contenido sin atribuirle un número.
+2. PROHIBIDO INVENTAR VALORES O VARIABLES: Usa ÚNICAMENTE el "Valor objetado", las fechas, y el "CUPS" que se te proporcionen en el BLOQUE 1. Si un dato del BLOQUE 1 no existe, NO rellenes con un número — escribe textualmente "el valor indicado en el expediente" o "el CUPS de la factura". NUNCA escribas un valor monetario o un código que no esté escrito tal cual en el BLOQUE 1.
 3. EXCLUSIVIDAD DE CRITERIO: Tu argumentación debe provenir EXCLUSIVAMENTE de las plantillas jurídicas del Banco HUS y de los soportes dados.
 
 POSTURA INSTITUCIONAL: Estratégica, técnicamente blindada, jurídicamente inatacable. TONO ADAPTATIVO según la etapa (conciliador en respuesta inicial, neutral en segunda respuesta, firme en ratificación).
@@ -2054,10 +2054,11 @@ def build_user_prompt(
             bloque_referencias_str = (
                 "\n[REFERENCIAS DOCUMENTALES EXTRAÍDAS DEL EXPEDIENTE]\n"
                 f"{refs['resumen_citable']}\n"
-                "⚠ Cuando sea pertinente, CITA en la respuesta estas referencias de forma "
-                'textual (ej. "según consta en el folio 59 del expediente", "conforme a la '
-                'historia clínica N° 1234567 suscrita por el Dr. X"). Esto hace la respuesta '
-                "casi imposible de ratificar.\n"
+                "⚠ Cuando sea pertinente, CITA estas referencias de forma textual, "
+                "usando EXACTAMENTE el folio/HC/firmante que aparece arriba — "
+                "NUNCA inventes números de folio, historia clínica, ni nombres de profesionales. "
+                'Si no hay un dato concreto arriba, escribe "según consta en los soportes adjuntos" '
+                "sin más detalle. Esto hace la respuesta casi imposible de ratificar.\n"
             )
     except Exception:
         pass
@@ -2250,11 +2251,12 @@ def build_user_prompt(
 • Tiempo transcurrido: {contexto_tiempo}{_alerta_vigencia_block}
 
 ⚠ REGLA CRÍTICA DE DATOS (FALLAR ESTO DESCALIFICA LA RESPUESTA):
-  1. Si Valor objetado es un número (ej. "$168.563"), ESE es el valor a citar
-     literalmente en el argumento. NUNCA escribas "EL VALOR INDICADO EN EL
-     EXPEDIENTE" si tienes el número real.
-  2. Si el CUPS tiene sufijo (ej. "372301H", "039001H1", "39147B-18",
-     "FMQ6296", "19914262-04"), ÚSALO COMPLETO, NO lo trunques.
+  1. Si "Valor objetado" arriba contiene un número, COPIA ESE NÚMERO
+     EXACTO en el argumento (los puntos de miles incluidos). NUNCA escribas
+     "EL VALOR INDICADO EN EL EXPEDIENTE" si tienes el número real arriba.
+     NUNCA cambies el monto por otro distinto del que ves arriba.
+  2. Si el CUPS arriba viene con sufijo (letra, guion o anexo), ÚSALO TAL
+     CUAL aparece arriba — NO lo trunques ni lo simplifiques.
   3. Cuando la EPS mencione un CUPS alternativo dentro del texto de la glosa
      (frases como "se reconoce código 39143", "tarifa SOAT código X", "se
      paga como CUPS Y"), ESE CUPS alternativo NO es el que HUS facturó —
