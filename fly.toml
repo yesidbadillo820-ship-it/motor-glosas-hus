@@ -1,0 +1,102 @@
+# Motor Glosas HUS — configuración de Fly.io
+#
+# Free Tier (mid-2026):
+#   • 3 shared-cpu-1x VMs incluidas (256 MB RAM cada una)
+#   • 3 GB de volúmenes persistentes
+#   • Tráfico: 160 GB outbound/mes
+#
+# Para deploy:
+#   1) Subir este archivo + Dockerfile al repo (este commit lo hace).
+#   2) En la UI Fly: "Setup GitHub Integration" → seleccionar este repo.
+#   3) Crear el volumen persistente UNA SOLA VEZ vía CLI o UI:
+#      flyctl volumes create soportes_data --size 3 --region gru
+#   4) Configurar secrets desde la UI Fly (Secrets section):
+#      DATABASE_URL = postgresql://neondb_owner:...@ep-...neon.tech/neondb?sslmode=require
+#      ANTHROPIC_API_KEY = sk-ant-...
+#      JWT_SECRET = (generar con: openssl rand -hex 32)
+#      ADMIN_EMAIL, ADMIN_PASSWORD (opcionales — el seed usa defaults)
+#   5) Deploy: la primera vez automático tras conectar GitHub.
+#
+# Región: GRU (São Paulo) es la más cercana a Bucaramanga, Colombia
+# (~50ms de latencia vs ~120ms de Oregon que era Render).
+
+app = "motor-glosas-hus"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# ─── Servicio HTTP ───────────────────────────────────────────────────
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # NO auto-stop machines — los schedulers asyncio (mantenimiento,
+  # soportes-reindex, pre-análisis) requieren el proceso vivo. Si Fly
+  # apaga la máquina por inactividad, los schedulers no corren a la
+  # 2/3/6 AM como deben.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    # Intervalo más relajado (era 30s) — con 1 solo worker, durante un
+    # upload pesado (Excel Famisanar 3 hojas, PDF contrato con Claude
+    # extrayendo cláusulas 60s) /health puede tardar en responder. Con
+    # interval=60s + timeout=30s, Fly espera lo suficiente sin marcar
+    # la VM unhealthy ni reciclarla a mitad de un upload.
+    interval = "60s"
+    timeout = "30s"
+    grace_period = "60s"
+    method = "GET"
+    path = "/health"
+
+# ─── VM size ─────────────────────────────────────────────────────────
+# 1024MB necesarios — el worker base pesa ~235MB, y al subir un PDF
+# grande (Famisanar contrato 30-50 páginas) pdfplumber lo carga en
+# memoria y el worker crece a 380-450MB momentáneamente. 512MB era
+# justo y producía OOM. Costo aprox: $5.70/mes - $5 free credit Fly =
+# ~$0.70/mes (nada vs estabilidad del sistema).
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
+
+# ─── Volumen persistente para soportes ───────────────────────────────
+# Resuelve el problema de Render Free donde /tmp se borraba en cada
+# deploy. En Fly montamos un disco persistente que sobrevive deploys,
+# reinicios y migraciones de máquina.
+[mounts]
+  source = "soportes_data"
+  destination = "/data"
+
+# ─── Variables de entorno (no secretos) ──────────────────────────────
+# Los SECRETOS van por `flyctl secrets set` o panel UI > Secrets.
+# Acá solo van valores no-sensibles que Fly puede ver públicamente.
+[env]
+  ENV = "production"
+  LOG_LEVEL = "INFO"
+  # Soportes auto-detection: el motor lee/escribe acá. Coincide con
+  # lo declarado en el Dockerfile.
+  SOPORTES_ROOT = "/data/soportes"
+  SOPORTES_LOCAL_ROOT = "/data/soportes"
+  # Anthropic models (mismo setup que Render)
+  ANTHROPIC_MODEL = "claude-sonnet-4-5"
+
+# ─── Despliegue ──────────────────────────────────────────────────────
+[deploy]
+  # SIN release_command de create_all (17-jun-2026).
+  # Antes corría `Base.metadata.create_all` en una máquina EFÍMERA de
+  # release. Dos problemas:
+  #   1) Esa máquina NO monta el volumen /data, así que con la DB en
+  #      SQLite (sqlite:////data/...) el create_all iría a un disco
+  #      efímero inútil.
+  #   2) Con Postgres, si la DB estaba caída (p.ej. Neon excedió cuota),
+  #      el release fallaba (exit 1) y abortaba TODO el deploy — fue lo
+  #      que tumbó v371/372/373.
+  # El schema se crea en el startup de la app (lifespan en app/main.py,
+  # con 5 reintentos), que SÍ corre en la máquina con /data montado.
+  strategy = "rolling"
+
+# Sentry (opcional — si decides activar tracking de errores)
+# [env]
+#   SENTRY_DSN = ""  # poner como secret no como env

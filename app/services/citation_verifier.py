@@ -1,0 +1,389 @@
+"""
+citation_verifier.py — Valida que las normas y citas legales en el dictamen
+correspondan al texto real del corpus normativa_completa.
+
+Detecta 3 problemas comunes que la EPS usa para ratificar glosas:
+  1. NORMA_INEXISTENTE — dictamen cita "Res. 9999/2099" que no existe
+  2. ARTICULO_FUERA_DE_NORMA — cita Art. 47 de norma que no tiene Art. 47
+  3. CITA_LITERAL_FALSA — texto entrecomillado «...» que no aparece literal
+
+Salida: lista de issues con severidad. La UI los muestra como warnings
+debajo del dictamen y sugiere reformulación.
+
+NO bloquea el envío — el gestor decide si corrige o ignora. Pero al menos
+no manda el dictamen a ciegas con citas inventadas.
+"""
+
+import re
+import logging
+from typing import Optional
+
+logger = logging.getLogger("motor_glosas")
+
+
+# Patrones de citación legal típicos en dictámenes ESE HUS
+# Todos los patrones exigen \b al inicio: sin él, la alternativa "Res..."
+# matcheaba la cola de palabras ("...TRES 500/2024") y la (T|C|SU) de
+# sentencias se disparaba con la C final de "DEC. 4747/2007" — visto en
+# producción 10-jun-2026: el dictamen citaba "MESA DE CONCILIACIÓN DE
+# AUDITORÍA (ART. 20 DEC. 4747/2007)" y el verifier reportaba la sentencia
+# fantasma "C-4747/2007" como NORMA_INEXISTENTE.
+PAT_RESOLUCION = re.compile(
+    r"\bResolución\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bRes(?:olución)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+# La 2.ª alternativa acepta la abreviatura "Dec. 4747/2007" (antes solo
+# "Decreto NNN/YYYY" — la forma abreviada ni se contaba como cita).
+PAT_DECRETO = re.compile(
+    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+# El lookbehind excluye "DECRETO-LEY 1795 DE 2000" / "DECRETO LEY ...":
+# son DECRETOS con fuerza de ley, no leyes — el 11-jun-2026 el verifier
+# extraía "Ley 1795 de 2000" del texto fijo DMBUG y la marcaba
+# NORMA_INEXISTENTE ALTA (la norma real es el Decreto-Ley 1795/2000).
+PAT_LEY = re.compile(
+    # Ronda 7 (16-jun-2026 — fix R): los lookbehinds solo cubrían ASCII "-"
+    # y espacio normal. Evidencia caso 9 FOMAG: el dictamen escribió
+    # "Decreto‑Ley 1295/1994" con guión Unicode U+2011 (non-breaking
+    # hyphen), saltando ambos lookbehinds, y el verifier marcaba
+    # "Ley 1295/1994" como NORMA_INEXISTENTE ALTA. Ampliamos a todos los
+    # guiones Unicode (U+002D, U+2010-U+2015) y espacios (regular, NBSP).
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\-‐‑‒–—―])"
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\s ])"
+    r"\bLey\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
+    r"|(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\-‐‑‒–—―])"
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\s ])"
+    r"\bLey\s+(\d{1,5})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+PAT_ACUERDO = re.compile(
+    r"\bAcuerdo\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bAcuerdo\s+(\d{1,5})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+PAT_CIRCULAR = re.compile(
+    r"\bCircular\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bCircular\s+(\d{1,5})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+PAT_SENTENCIA = re.compile(
+    r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+PAT_ARTICULO = re.compile(
+    r"(?:art(?:ículo|iculo|\.)\s*)(\d{1,4})(?:\s*(?:de\s+(?:la\s+)?(Resolución|Ley|Decreto)\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})))?",
+    re.IGNORECASE,
+)
+# Texto entrecomillado — chevrones franceses « » preferidos en el motor
+PAT_CITA_LITERAL = re.compile(r"«([^«»]{15,800})»")
+# Citas "textuales" con comillas dobles/simples ATRIBUIDAS a una norma o
+# cláusula (ESTABLECE/DISPONE/SEÑALA/...). Auditoría 10-jun-2026 P0-1:
+# la red solo cubría chevrones, así que "CLÁUSULA 12 DEL CONTRATO QUE
+# ESTABLECE: 'LAS PARTES SE OBLIGAN A NO REBATIR...'" (fabricada y
+# autodestructiva) y los arts. 44/45/46 L1438 con texto inventado entre
+# comillas dobles se radicaban sin una sola alarma. Se exige el verbo
+# de atribución para no flaggear citas del texto de la glosa misma
+# ("LA AFIRMACIÓN DE QUE '...'" no es una cita normativa).
+PAT_CITA_ATRIBUIDA = re.compile(
+    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPTÚA|PRECEPTUA)"
+    r"\s*(?:QUE\s*)?(?:TEXTUALMENTE\s*)?:?\s*"
+    r"[\"“‘']([^\"“”‘’']{15,800})[\"”’']",
+    re.IGNORECASE,
+)
+# Limpia HTML para comparar texto plano
+PAT_HTML = re.compile(r"<[^>]+>")
+
+
+def _quitar_html(s: str) -> str:
+    return re.sub(r"\s+", " ", PAT_HTML.sub(" ", s or "")).strip()
+
+
+def _normalizar(s: str) -> str:
+    """Lower + sin acentos + sin puntuación + sin espacios extras para
+    comparar fragmentos sin sufrir por mayúsculas/tildes/comillas."""
+    if not s:
+        return ""
+    repl = str.maketrans("áéíóúñÁÉÍÓÚÑ", "aeiounAEIOUN")
+    s = s.translate(repl).lower()
+    s = re.sub(r"[^\w\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+_PREFIJO_UPPER = {
+    # forma corta usada por verificar_citas (tipo_label[:3].lower())
+    "ley": "LEY",
+    "dec": "DECRETO",
+    "res": "RESOLUCION",
+    "acu": "ACUERDO",
+    "cir": "CIRCULAR",
+    # forma larga, por si algún caller futuro pasa el tipo completo
+    "decreto": "DECRETO",
+    "resolucion": "RESOLUCION",
+    "acuerdo": "ACUERDO",
+    "circular": "CIRCULAR",
+}
+
+
+def _buscar_clave_norma(tipo: str, numero: str, anio: str, normas: dict) -> Optional[str]:
+    """Mapea (tipo, número, año) a la clave en _TODAS_LAS_NORMAS.
+
+    El corpus actual usa MAYORITARIAMENTE el formato upper-words:
+      "LEY 100 DE 1993", "LEY 1438 DE 2011", "DECRETO 4747 DE 2007",
+      "ACUERDO 002 DE 2001 CSSFFMM", "CIRCULAR 025 DE 2024".
+    También intentamos snake_case ("ley_1438_2011") por compatibilidad.
+
+    El fallback antiguo matcheaba por sustring numérico → "138" caía dentro
+    de "LEY 1438 DE 2011" como falso positivo. Ahora se exige que el número
+    aparezca como token entre espacios o como segmento entre guiones bajos.
+    """
+    n = numero.lstrip("0") or numero
+    tipo_l = tipo.lower()
+    prefijo_up = _PREFIJO_UPPER.get(tipo_l)
+
+    candidatos: list[str] = [
+        # snake_case (formato histórico)
+        f"{tipo_l}_{n}_{anio}",
+        f"{tipo_l}_{numero}_{anio}",
+    ]
+    if prefijo_up:
+        # upper-words (formato actual del corpus)
+        numero_padded = numero.zfill(3) if len(numero) < 3 else numero
+        candidatos.extend(
+            [
+                f"{prefijo_up} {n} DE {anio}",
+                f"{prefijo_up} {numero} DE {anio}",
+                f"{prefijo_up} {numero_padded} DE {anio}",
+            ]
+        )
+    if tipo_l in ("t", "c", "su"):
+        candidatos.append(f"sentencia_{n.lower()}_{anio}")
+
+    for c in candidatos:
+        if c and c in normas:
+            return c
+
+    # Coincidencia tolerante: clave que empieza por el prefijo, contiene
+    # el número como token entre espacios, y termina/contiene " DE YYYY".
+    # Resuelve casos con sufijo en la clave (p.ej. "ACUERDO 002 DE 2001 CSSFFMM").
+    if prefijo_up:
+        for k in normas.keys():
+            if not k.startswith(f"{prefijo_up} "):
+                continue
+            if f" DE {anio}" not in k:
+                continue
+            # Extraer el número entre el prefijo y "DE"
+            resto = k[len(prefijo_up) + 1 :]
+            cand_num = resto.split(" DE ")[0].strip().lstrip("0") or "0"
+            if cand_num == n:
+                return k
+
+    # Fallback final estricto en snake_case
+    token_n = f"_{n}_"
+    token_anio_end = f"_{anio}"
+    for k in normas.keys():
+        if token_n in k and k.endswith(token_anio_end):
+            return k
+    return None
+
+
+def _corpus_clausulas_contrato(eps: Optional[str] = None) -> str:
+    """Construye un corpus normalizado con el texto literal de las
+    clausulas extraidas del PDF del contrato firmado.
+
+    Si se pasa `eps`, filtra solo las clausulas de esa EPS; si no, incluye
+    TODAS las clausulas de TODOS los contratos. Lo segundo es mas permisivo
+    (una cita del contrato de Compensar podria pasar como valida en una
+    glosa de Sanitas) pero evita falsos positivos cuando el call site no
+    conoce la EPS.
+
+    Retorna string normalizado vacio si no hay clausulas o si la BD falla.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.db import ClausulaContrato
+
+        db = SessionLocal()
+        try:
+            q = db.query(ClausulaContrato)
+            if eps:
+                q = q.filter(ClausulaContrato.eps == eps.upper())
+            textos = [(cl.texto_literal or "") for cl in q.all()]
+            return " ".join(_normalizar(t) for t in textos if t)
+        finally:
+            db.close()
+    except Exception:
+        return ""
+
+
+def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
+    """Escanea el dictamen y devuelve un reporte de validación.
+
+    Estructura:
+        {
+          "total_citas": int,
+          "ok": int,
+          "issues": [
+            {
+              "tipo": "NORMA_INEXISTENTE" | "ARTICULO_FUERA_DE_NORMA" | "CITA_LITERAL_FALSA",
+              "severidad": "ALTA" | "MEDIA" | "BAJA",
+              "cita": str,      # lo que aparece en el dictamen
+              "detalle": str,   # explicación
+              "sugerencia": str | None,
+            }
+          ],
+          "tiene_problemas_graves": bool,  # alguna severidad ALTA
+        }
+
+    Si el corpus no se puede importar, devuelve reporte vacío (no rompe nada).
+    """
+    issues: list[dict] = []
+    total_citas = 0
+
+    try:
+        from app.services.normativa_completa import _TODAS_LAS_NORMAS as normas
+    except Exception:
+        return {"total_citas": 0, "ok": 0, "issues": [], "tiene_problemas_graves": False}
+
+    if not dictamen_html:
+        return {"total_citas": 0, "ok": 0, "issues": [], "tiene_problemas_graves": False}
+
+    texto = _quitar_html(dictamen_html)
+
+    # 1. Verificar Resoluciones / Decretos / Leyes / Acuerdos / Circulares
+    for pat, tipo_label in (
+        (PAT_RESOLUCION, "Resolución"),
+        (PAT_DECRETO, "Decreto"),
+        (PAT_LEY, "Ley"),
+        (PAT_ACUERDO, "Acuerdo"),
+        (PAT_CIRCULAR, "Circular"),
+    ):
+        for m in pat.finditer(texto):
+            total_citas += 1
+            grupos = [g for g in m.groups() if g]
+            if len(grupos) >= 2:
+                numero, anio = grupos[0], grupos[1]
+                if len(anio) == 2:
+                    anio = "20" + anio if int(anio) < 50 else "19" + anio
+                tipo_short = tipo_label[:3].lower()
+                clave = _buscar_clave_norma(tipo_short, numero, anio, normas)
+                if not clave:
+                    issues.append(
+                        {
+                            "tipo": "NORMA_INEXISTENTE",
+                            "severidad": "ALTA",
+                            "cita": f"{tipo_label} {numero} de {anio}",
+                            "detalle": f"No existe en el corpus normativo cargado ({tipo_label} {numero}/{anio}).",
+                            "sugerencia": "Verifica la cita o reemplaza por una norma vigente del corpus.",
+                        }
+                    )
+
+    # 2. Verificar Sentencias
+    for m in PAT_SENTENCIA.finditer(texto):
+        total_citas += 1
+        sala, num, anio = m.groups()
+        if len(anio) == 2:
+            anio = "20" + anio if int(anio) < 50 else "19" + anio
+        clave = _buscar_clave_norma(sala.lower(), num, anio, normas)
+        if not clave:
+            issues.append(
+                {
+                    "tipo": "NORMA_INEXISTENTE",
+                    "severidad": "MEDIA",
+                    "cita": f"Sentencia {sala.upper()}-{num}/{anio}",
+                    "detalle": "Sentencia no incluida en el corpus jurisprudencial.",
+                    "sugerencia": "Verifica que la sentencia exista o reemplaza por una conocida (ej: T-760/2008, T-1025/2002).",
+                }
+            )
+
+    # 3. Verificar artículos cuando se citan junto a su norma
+    for m in PAT_ARTICULO.finditer(texto):
+        art_num = m.group(1)
+        norma_tipo = m.group(2)
+        norma_num = m.group(3)
+        norma_anio = m.group(4)
+        if not (norma_tipo and norma_num and norma_anio):
+            continue
+        total_citas += 1
+        clave = _buscar_clave_norma(norma_tipo[:3].lower(), norma_num, norma_anio, normas)
+        if clave:
+            n = normas[clave]
+            arts = n.get("articulos", {}) or {}
+            # Las claves de articulos pueden ser strings o ints
+            keys_art = {str(k) for k in arts.keys()}
+            if str(art_num) not in keys_art:
+                issues.append(
+                    {
+                        "tipo": "ARTICULO_FUERA_DE_NORMA",
+                        "severidad": "MEDIA",
+                        "cita": f"Art. {art_num} {norma_tipo} {norma_num}/{norma_anio}",
+                        "detalle": f"La {norma_tipo} {norma_num}/{norma_anio} no contiene el Art. {art_num} en el corpus cargado.",
+                        "sugerencia": "Verifica el número de artículo o consulta los artículos disponibles de esta norma.",
+                    }
+                )
+
+    # 4. Verificar citas literales: entre chevrones «» Y entre comillas
+    # dobles/simples cuando van atribuidas a una norma o cláusula
+    # (ESTABLECE/DISPONE/...). Ambas se contrastan contra el mismo
+    # corpus (normas + cláusulas reales del contrato en BD).
+    citas_literales = PAT_CITA_LITERAL.findall(texto)
+    citas_literales += PAT_CITA_ATRIBUIDA.findall(texto)
+    if citas_literales:
+        # Construir corpus completo de TODOS los textos normativos para búsqueda
+        corpus_normas = " ".join(
+            _normalizar(n.get("texto", ""))
+            + " "
+            + _normalizar(n.get("ratio_literal", ""))
+            + " "
+            + _normalizar(n.get("extracto_judicial", ""))
+            + " "
+            + " ".join(_normalizar(a.get("texto", "")) for a in (n.get("articulos") or {}).values())
+            for n in normas.values()
+        )
+        # Ampliar corpus con clausulas literales extraidas del PDF del contrato
+        # firmado con la EPS. Una cita textual del contrato debe pasar como
+        # VALIDA (no como CITA_LITERAL_FALSA) — el contrato es texto autoritativo
+        # tan valido como una norma.
+        corpus_clausulas = _corpus_clausulas_contrato(eps=eps)
+        corpus_normalizado = corpus_normas + " " + corpus_clausulas
+        for cita in citas_literales:
+            total_citas += 1
+            cita_norm = _normalizar(cita)
+            # Tomamos un fragmento mid de 30 chars como "huella" para buscar
+            if len(cita_norm) < 30:
+                continue
+            mid = cita_norm[10 : min(len(cita_norm) - 10, 80)]
+            if mid and mid not in corpus_normalizado:
+                # Probamos también con los primeros 60 chars
+                inicio = cita_norm[:60]
+                if inicio not in corpus_normalizado:
+                    issues.append(
+                        {
+                            "tipo": "CITA_LITERAL_FALSA",
+                            "severidad": "ALTA",
+                            "cita": "«" + (cita[:140] + "..." if len(cita) > 140 else cita) + "»",
+                            "detalle": (
+                                "Este texto entrecomillado no se encuentra literalmente en el "
+                                "corpus normativo ni en las cláusulas reales del contrato cargadas. "
+                                "Puede ser una cita inventada por la IA."
+                            ),
+                            "sugerencia": (
+                                "Reemplaza el texto entre comillas por una cita literal de una "
+                                "norma o cláusula real, o quita las comillas si solo querías parafrasear."
+                            ),
+                        }
+                    )
+
+    ok = max(0, total_citas - len(issues))
+    tiene_graves = any(i["severidad"] == "ALTA" for i in issues)
+
+    if issues:
+        logger.info(
+            f"[CITATION-VERIFIER] {len(issues)} issues "
+            f"({sum(1 for i in issues if i['severidad'] == 'ALTA')} ALTA) en {total_citas} citas"
+        )
+
+    return {
+        "total_citas": total_citas,
+        "ok": ok,
+        "issues": issues,
+        "tiene_problemas_graves": tiene_graves,
+    }

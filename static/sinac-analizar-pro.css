@@ -1,0 +1,198 @@
+/* ═══════════════════════════════════════════════════════════════════
+   SINAC Analizar PRO — Mejoras estéticas del panel Analizar
+   Motor Glosas HUS 2.0 — 28 mayo 2026.
+
+   Mejoras solicitadas por Yesid:
+     1. Gauge circular para Probabilidad de éxito
+     2. Dictamen como "documento héroe" (sello marca de agua + citas chips
+        clickeables que abren un drawer lateral)
+     3. Chips con identidad (color por familia: TA/SO/CO/FA/CL/AU, valor grande)
+
+   El "loading premium" y el "empty state" NO viven aquí: el código existente
+   ya los provee mejor (#pa-pipeline con 7 agentes, y #landing-hero). Duplicar
+   causaría doble loader / sobrescribir el landing.
+
+   Todo CSS/JS, cero backend. El JS (sinac-analizar-pro.js) transforma los
+   elementos cuando aparecen via MutationObserver.
+═══════════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────────────────
+   1. GAUGE CIRCULAR — Probabilidad de éxito
+   ────────────────────────────────────────────────────────────────── */
+.sds-gauge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 4px 0;
+}
+.sds-gauge {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  flex-shrink: 0;
+}
+.sds-gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.sds-gauge-track { stroke: var(--sds-gray-200, #e2e8f0); }
+.sds-gauge-fill {
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sds-gauge-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.sds-gauge-pct {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  font-family: 'Inter', sans-serif;
+}
+.sds-gauge-cap {
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sds-gray-400, #94a3b8);
+  margin-top: 2px;
+}
+.sds-gauge-text {
+  flex: 1;
+}
+.sds-gauge-text-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sds-gray-600, #475569);
+  margin-bottom: 4px;
+}
+.sds-gauge-text-sub {
+  font-size: 0.8rem;
+  color: var(--sds-gray-600, #475569);
+  line-height: 1.4;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   2. DICTAMEN DOCUMENTO HÉROE
+   ────────────────────────────────────────────────────────────────── */
+#p-analizar .res-dictamen.sds-hero {
+  position: relative;
+  overflow: visible !important;
+}
+/* Sello/watermark institucional muy sutil */
+#p-analizar .res-dictamen.sds-hero .res-dictamen-body {
+  position: relative;
+}
+#p-analizar .res-dictamen.sds-hero .res-dictamen-body::before {
+  content: 'ESE HUS';
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  font-family: 'Source Serif Pro', serif;
+  font-size: 5rem;
+  font-weight: 700;
+  color: rgba(37, 99, 235, 0.025);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 0;
+  letter-spacing: 0.1em;
+}
+#p-analizar .res-dictamen.sds-hero .res-dictamen-body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Citas legales como chips clickeables */
+.sds-cita-chip {
+  display: inline;
+  background: var(--sds-blue-50, #eff6ff);
+  color: var(--sds-blue-700, #1d4ed8);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 1.5px dotted var(--sds-blue-500, #3b82f6);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.sds-cita-chip:hover {
+  background: var(--sds-blue-500, #3b82f6);
+  color: white;
+}
+
+/* Drawer lateral para el texto de la norma */
+.sds-norma-drawer {
+  position: fixed;
+  top: 0;
+  right: -440px;
+  width: min(420px, 92vw);
+  height: 100vh;
+  background: white;
+  box-shadow: -8px 0 40px rgba(15, 23, 42, 0.18);
+  z-index: 99997;
+  transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+.sds-norma-drawer.open { right: 0; }
+.sds-norma-drawer-hdr {
+  padding: 18px 22px;
+  background: linear-gradient(135deg, var(--sds-blue-900, #1e3a8a), var(--sds-blue-700, #1d4ed8));
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sds-norma-drawer-hdr h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+.sds-norma-drawer-close {
+  background: rgba(255,255,255,.15);
+  border: none;
+  color: white;
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+.sds-norma-drawer-body {
+  padding: 22px;
+  overflow-y: auto;
+  font-family: 'Source Serif Pro', serif;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: var(--sds-gray-900, #0f172a);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   3. CHIPS CON IDENTIDAD — color por familia
+   ────────────────────────────────────────────────────────────────── */
+.pill-code.sds-fam-TA { background: #dbeafe !important; color: #1d4ed8 !important; border-color: #93c5fd !important; }
+.pill-code.sds-fam-SO { background: #dcfce7 !important; color: #15803d !important; border-color: #86efac !important; }
+.pill-code.sds-fam-CO { background: #ede9fe !important; color: #6d28d9 !important; border-color: #c4b5fd !important; }
+.pill-code.sds-fam-FA { background: #ffedd5 !important; color: #c2410c !important; border-color: #fdba74 !important; }
+.pill-code.sds-fam-CL { background: #fce7f3 !important; color: #be185d !important; border-color: #f9a8d4 !important; }
+.pill-code.sds-fam-AU { background: #cffafe !important; color: #0e7490 !important; border-color: #67e8f9 !important; }
+
+/* Valor objetado grande con ícono */
+.pill.sds-valor-big {
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
+  color: var(--sds-gray-900, #0f172a) !important;
+  background: #fefce8 !important;
+  border-color: #fde047 !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   4. TRANSICIÓN DE APARICIÓN DEL RESULTADO
+   ────────────────────────────────────────────────────────────────── */
+.sds-result-in {
+  animation: sds-result-appear 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes sds-result-appear {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}

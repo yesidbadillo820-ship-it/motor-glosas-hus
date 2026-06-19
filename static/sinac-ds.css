@@ -1,0 +1,506 @@
+/* ═══════════════════════════════════════════════════════════════════
+   SINAC Design System (DS) — Motor Glosas HUS 2.0
+   Ola 3 del Plan de Transformación, mayo 2026.
+
+   Filosofía:
+     • Tipografía premium (Inter UI + Source Serif para dictámenes)
+     • Paleta restringida (azul HUS + 2 grises + 2 acentos)
+     • Espaciado sistema 8px
+     • Sombras: solo 3 niveles (sm, md, lg)
+     • Animaciones: solo cuando aportan información
+
+   Este archivo va DESPUÉS del CSS existente en index.html para que sus
+   overrides apliquen. No reemplaza nada — añade jerarquía visual,
+   tipografía premium y los nuevos componentes (Modo Enfocado, ⌘K).
+═══════════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────────────────
+   1. TIPOGRAFÍA PREMIUM
+   ────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+Pro:wght@400;600;700&display=swap');
+
+:root {
+  /* Sistema de espaciado 8px */
+  --sds-sp-1: 4px;
+  --sds-sp-2: 8px;
+  --sds-sp-3: 12px;
+  --sds-sp-4: 16px;
+  --sds-sp-6: 24px;
+  --sds-sp-8: 32px;
+  --sds-sp-12: 48px;
+
+  /* Paleta — azul HUS + neutrales + 2 acentos */
+  --sds-blue-50: #eff6ff;
+  --sds-blue-500: #3b82f6;
+  --sds-blue-600: #2563eb;
+  --sds-blue-700: #1d4ed8;
+  --sds-blue-900: #1e3a8a;
+
+  --sds-gray-50: #f8fafc;
+  --sds-gray-100: #f1f5f9;
+  --sds-gray-200: #e2e8f0;
+  --sds-gray-400: #94a3b8;
+  --sds-gray-600: #475569;
+  --sds-gray-900: #0f172a;
+
+  --sds-success: #16a34a;
+  --sds-success-bg: #f0fdf4;
+  --sds-amber: #d97706;
+  --sds-amber-bg: #fffbeb;
+  --sds-rose: #e11d48;
+
+  /* Sombras (3 niveles) */
+  --sds-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  --sds-shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+  --sds-shadow-lg: 0 16px 40px -8px rgba(15, 23, 42, 0.12);
+
+  /* Radii */
+  --sds-radius-sm: 4px;
+  --sds-radius-md: 8px;
+  --sds-radius-lg: 12px;
+  --sds-radius-xl: 16px;
+
+  /* Transiciones */
+  --sds-transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sds-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sds-transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Aplicar Inter en TODA la UI sin romper layouts */
+body,
+.btn,
+.field input,
+.field select,
+.field textarea,
+.sb-body,
+.result-area,
+.sidebar {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Source Serif Pro SOLO para el cuerpo del dictamen legal (más solemne) */
+#p-analizar .res-dictamen-body {
+  font-family: 'Source Serif Pro', Georgia, 'Times New Roman', serif !important;
+  font-size: 0.875rem !important;
+  line-height: 1.7 !important;
+  letter-spacing: 0.005em !important;
+  color: var(--sds-gray-900) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   2. MODO ENFOCADO (atenuación del entorno al analizar)
+   FIX 27-may-2026: antes atenuaba `.sidebar` (que es el FORMULARIO de
+   análisis donde el gestor escribe) — error. Lo correcto es atenuar la
+   NAVEGACIÓN (`.sidebar-nav`) y el `header`, NUNCA el formulario.
+   Opacidad suavizada 0.32 → 0.55 para que siga siendo legible.
+   ────────────────────────────────────────────────────────────────── */
+body.sds-focus-mode .sidebar-nav,
+body.sds-focus-mode > #app > header,
+body.sds-focus-mode header,
+body.sds-focus-mode .fab-stack {
+  opacity: 0.55;
+  filter: saturate(0.75);
+  transition:
+    opacity var(--sds-transition-slow),
+    filter var(--sds-transition-slow);
+}
+
+body.sds-focus-mode .sidebar-nav:hover,
+body.sds-focus-mode header:hover,
+body.sds-focus-mode .sidebar-nav:focus-within {
+  opacity: 1;
+  filter: none;
+}
+
+body.sds-focus-mode #p-analizar .result-area {
+  background: linear-gradient(
+    180deg,
+    var(--sds-gray-50) 0%,
+    #ffffff 60%
+  );
+  border-radius: var(--sds-radius-xl);
+  box-shadow: var(--sds-shadow-lg);
+  position: relative;
+  max-width: 100% !important;
+  width: 100%;
+}
+
+body.sds-focus-mode #p-analizar .result-area::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 20px;
+  background: radial-gradient(
+    circle at 50% 0%,
+    rgba(37, 99, 235, 0.08),
+    transparent 60%
+  );
+  z-index: -1;
+  animation: sds-focus-glow 6s ease-in-out infinite;
+}
+
+@keyframes sds-focus-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Indicador de modo enfocado */
+.sds-focus-indicator {
+  position: fixed;
+  top: var(--sds-sp-4);
+  right: var(--sds-sp-4);
+  background: var(--sds-gray-900);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--sds-shadow-md);
+  animation: sds-fade-in 0.3s ease;
+}
+
+body.sds-focus-mode .sds-focus-indicator {
+  display: inline-flex;
+}
+
+.sds-focus-indicator::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--sds-success);
+  border-radius: 50%;
+  animation: sds-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sds-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+@keyframes sds-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   3. COMMAND PALETTE (⌘K / Ctrl+K)
+   ────────────────────────────────────────────────────────────────── */
+.sds-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 99998;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  animation: sds-fade-in 0.18s ease;
+}
+
+.sds-palette-backdrop.open {
+  display: flex;
+}
+
+.sds-palette {
+  width: min(620px, 92vw);
+  background: white;
+  border-radius: var(--sds-radius-lg);
+  box-shadow: var(--sds-shadow-lg);
+  overflow: hidden;
+  transform: translateY(0);
+  animation: sds-palette-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sds-palette-in {
+  from { transform: translateY(-12px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.sds-palette-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--sds-gray-200);
+  padding: 18px 20px;
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  background: transparent;
+  color: var(--sds-gray-900);
+}
+
+.sds-palette-input::placeholder {
+  color: var(--sds-gray-400);
+}
+
+.sds-palette-results {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.sds-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background var(--sds-transition-fast);
+  color: var(--sds-gray-900);
+}
+
+.sds-palette-item.active,
+.sds-palette-item:hover {
+  background: var(--sds-blue-50);
+}
+
+.sds-palette-item-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sds-gray-100);
+  border-radius: var(--sds-radius-sm);
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.sds-palette-item.active .sds-palette-item-icon {
+  background: var(--sds-blue-500);
+  color: white;
+}
+
+.sds-palette-item-text {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.sds-palette-item-shortcut {
+  font-size: 0.7rem;
+  color: var(--sds-gray-400);
+  padding: 2px 6px;
+  border: 1px solid var(--sds-gray-200);
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+}
+
+.sds-palette-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  border-top: 1px solid var(--sds-gray-200);
+  font-size: 0.7rem;
+  color: var(--sds-gray-400);
+  background: var(--sds-gray-50);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   4. ATAJOS DE TECLADO — Hint visual
+   ────────────────────────────────────────────────────────────────── */
+.sds-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.7rem;
+  color: var(--sds-gray-600);
+  background: var(--sds-gray-100);
+  border: 1px solid var(--sds-gray-200);
+  border-radius: 4px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   5. DICTAMEN — Estilo "documento jurídico premium"
+   ────────────────────────────────────────────────────────────────── */
+#p-analizar .res-dictamen {
+  border-radius: var(--sds-radius-lg) !important;
+  box-shadow: var(--sds-shadow-md) !important;
+  background: white;
+  border: 1px solid var(--sds-gray-200);
+  /* FIX 27-may-2026: NO overflow:hidden — colapsaba el dictamen a 0 alto
+     en algunas combinaciones de zoom + flex. visible es safe. */
+  overflow: visible !important;
+  display: block !important;
+  min-height: auto !important;
+  /* Asegurar que se vea siempre, sin importar el contenedor */
+  width: 100% !important;
+}
+
+/* Asegurar visibilidad del body del dictamen también */
+#p-analizar .res-dictamen-body {
+  display: block !important;
+  min-height: 80px;
+  overflow: visible !important;
+}
+
+#p-analizar .res-dictamen-hdr {
+  background: linear-gradient(135deg, var(--sds-blue-900), var(--sds-blue-700)) !important;
+  padding: 14px 24px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  color: white !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#p-analizar .res-dictamen-body {
+  padding: 28px 32px !important;
+  background:
+    linear-gradient(to bottom, white, var(--sds-gray-50)),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 24px,
+      rgba(15, 23, 42, 0.02) 24px,
+      rgba(15, 23, 42, 0.02) 25px
+    ) !important;
+}
+
+#p-analizar .res-dictamen-body p {
+  margin-bottom: 1.2em;
+}
+
+/* Cita normativa con preview enriquecido */
+#p-analizar .pa-cite {
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  cursor: help;
+  position: relative;
+  transition: background var(--sds-transition-fast);
+}
+
+#p-analizar .pa-cite.verified {
+  background: var(--sds-success-bg);
+  color: var(--sds-success) !important;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+#p-analizar .pa-cite.unverified,
+#p-analizar .pa-cite.partial {
+  background: var(--sds-amber-bg);
+  color: var(--sds-amber) !important;
+}
+
+#p-analizar .pa-cite:hover {
+  filter: brightness(0.95);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   6. CARDS DE METADATA — diseño consistente
+   ────────────────────────────────────────────────────────────────── */
+/* Aplicar solo a divs que NO sean el dictamen principal (que tiene
+   su propio estilo arriba). Antes el "white !important" colapsaba
+   el header navy del dictamen. */
+#p-analizar .result-area > div:not(.res-dictamen) {
+  border-radius: var(--sds-radius-md) !important;
+  border: 1px solid var(--sds-gray-200) !important;
+  background: white !important;
+  box-shadow: var(--sds-shadow-sm) !important;
+  transition: box-shadow var(--sds-transition);
+}
+
+#p-analizar .result-area > div:not(.res-dictamen):hover {
+  box-shadow: var(--sds-shadow-md) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   7. TOOLBAR ACCIONES — chips compactos
+   ────────────────────────────────────────────────────────────────── */
+#p-analizar .res-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+  background: transparent !important;
+  border: none !important;
+}
+
+#p-analizar .res-actions button {
+  background: white;
+  border: 1px solid var(--sds-gray-200);
+  padding: 6px 12px !important;
+  border-radius: var(--sds-radius-md) !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  color: var(--sds-gray-600);
+  transition: all var(--sds-transition-fast);
+  cursor: pointer;
+  box-shadow: var(--sds-shadow-sm);
+}
+
+#p-analizar .res-actions button:hover {
+  background: var(--sds-blue-50);
+  border-color: var(--sds-blue-500);
+  color: var(--sds-blue-700);
+  transform: translateY(-1px);
+  box-shadow: var(--sds-shadow-md);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   8. FORM PREMIUM
+   ────────────────────────────────────────────────────────────────── */
+#p-analizar .sidebar .field {
+  margin-bottom: var(--sds-sp-3);
+}
+
+#p-analizar .sidebar label {
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase;
+  color: var(--sds-gray-600) !important;
+  margin-bottom: 4px;
+  display: block;
+}
+
+#p-analizar .sidebar input,
+#p-analizar .sidebar select,
+#p-analizar .sidebar textarea {
+  border-radius: var(--sds-radius-md);
+  border: 1px solid var(--sds-gray-200);
+  transition: all var(--sds-transition-fast);
+}
+
+#p-analizar .sidebar input:focus,
+#p-analizar .sidebar select:focus,
+#p-analizar .sidebar textarea:focus {
+  outline: none;
+  border-color: var(--sds-blue-500);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+#p-analizar .sidebar .btn-primary {
+  background: linear-gradient(135deg, var(--sds-blue-600), var(--sds-blue-700));
+  border: none;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: var(--sds-shadow-md);
+  transition: transform var(--sds-transition-fast);
+}
+
+#p-analizar .sidebar .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--sds-shadow-lg);
+}
+
+#p-analizar .sidebar .btn-primary:active {
+  transform: translateY(0);
+}

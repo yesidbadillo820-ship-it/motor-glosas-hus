@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Importar Recepción · IA GLOSAS SINAC SC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    /* ═══ REDISEÑO SINAC 11-jun-2026 — paleta institucional azul+verde+blanco ═══ */
+    :root{
+      --sinac-blue-900:#0B3D91; --sinac-blue-800:#0D47A1; --sinac-blue-700:#1565C0;
+      --sinac-blue-100:#E3F2FD; --sinac-blue-50:#F5FAFF;
+      --sinac-green-700:#2E7D32; --sinac-green-600:#388E3C; --sinac-green-100:#E8F5E9;
+      --sinac-gray-900:#212B36; --sinac-gray-700:#455A64; --sinac-gray-500:#607D8B;
+      --sinac-gray-200:#CFD8DC; --sinac-gray-100:#ECEFF1; --sinac-gray-50:#F5F7FA;
+      --grad-header:linear-gradient(135deg,#0B3D91 0%,#1565C0 100%);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Segoe UI',Arial,sans-serif;background:#F8FAFC;color:var(--sinac-gray-900);padding:0 0 40px}
+    .sinac-band{
+      background:var(--grad-header);color:#fff;padding:14px 24px;margin-bottom:22px;
+      display:flex;align-items:center;gap:12px;
+      box-shadow:0 4px 16px rgba(11,61,145,.18);
+    }
+    .sinac-band .wm{font-family:'Manrope','Inter',sans-serif;font-weight:800;font-size:18px;letter-spacing:.14em}
+    .sinac-band .wm-dot{display:inline-block;width:7px;height:7px;border-radius:2px;background:#66BB6A;margin-left:4px;vertical-align:baseline}
+    .sinac-band .sep{width:1px;height:24px;background:rgba(255,255,255,.25)}
+    .sinac-band .sub{font-size:12px;color:rgba(255,255,255,.85);font-weight:500}
+    .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+    h1{font-family:'Manrope','Inter',sans-serif;color:var(--sinac-blue-900);font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+    h2,h3{font-family:'Manrope','Inter',sans-serif;letter-spacing:-.01em}
+    p.lead{color:var(--sinac-gray-500);margin-bottom:22px;font-size:13px}
+    .card{background:#fff;border-radius:12px;border:1px solid var(--sinac-gray-100);box-shadow:0 1px 2px rgba(11,61,145,.04),0 1px 3px rgba(11,61,145,.05);padding:24px;margin-bottom:18px;border-top:3px solid var(--sinac-blue-700)}
+    label{display:block;font-weight:600;margin-bottom:8px;color:var(--sinac-gray-700)}
+    input[type=file]{width:100%;padding:12px;border:2px dashed var(--sinac-gray-200);border-radius:8px;background:var(--sinac-gray-50);cursor:pointer;font-family:inherit}
+    input[type=file]:hover{border-color:var(--sinac-blue-700);background:var(--sinac-blue-50)}
+    input[type=file]:focus-visible{outline:3px solid rgba(21,101,192,.35);outline-offset:2px}
+    button{background:var(--sinac-blue-700);color:#fff;border:0;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,transform .12s,box-shadow .15s}
+    button:hover{background:var(--sinac-blue-800);transform:translateY(-1px);box-shadow:0 4px 12px rgba(11,61,145,.18)}
+    button:focus-visible{outline:3px solid rgba(21,101,192,.35);outline-offset:2px}
+    button:disabled{background:var(--sinac-gray-500);cursor:not-allowed;transform:none;box-shadow:none}
+    .back{display:inline-block;margin-bottom:12px;color:var(--sinac-blue-700);text-decoration:none;font-size:13px;font-weight:600}
+    .back:hover{text-decoration:underline}
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:15px 0}
+    .stat{background:var(--sinac-blue-50);border:1px solid var(--sinac-blue-100);border-radius:8px;padding:14px;text-align:center}
+    .stat .n{font-family:'Manrope','Inter',sans-serif;font-size:22px;font-weight:800;color:var(--sinac-blue-800)}
+    .stat .l{font-size:11px;color:var(--sinac-gray-500);margin-top:4px;letter-spacing:.04em}
+    .semaforo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:15px 0}
+    .sem{border-radius:8px;padding:14px;text-align:center;color:#fff}
+    .sem .n{font-family:'Manrope','Inter',sans-serif;font-size:22px;font-weight:800}
+    .sem .l{font-size:11px;margin-top:4px}
+    .sem.verde{background:var(--sinac-green-600)}
+    .sem.amarillo{background:#eab308}
+    .sem.rojo{background:#dc2626}
+    .sem.negro{background:#111827}
+    .gestor{background:var(--sinac-gray-50);border-left:3px solid var(--sinac-blue-700);border-radius:6px;padding:10px 14px;margin:10px 0}
+    .gestor-head{font-weight:bold;color:var(--sinac-blue-800);margin-bottom:4px}
+    .gestor ul{margin-left:18px;font-size:12px;color:var(--sinac-gray-700)}
+    .badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;color:#fff;margin-left:4px}
+    .err{background:#fee2e2;color:#991b1b;padding:10px;border-radius:6px;margin:6px 0;font-size:12px;border-left:3px solid #dc2626}
+    .ok{background:var(--sinac-green-100);color:#1B5E20;padding:12px;border-radius:8px;border-left:3px solid var(--sinac-green-600)}
+    .hidden{display:none}
+    .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:sp 1s linear infinite;margin-right:8px;vertical-align:middle}
+    @keyframes sp{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div class="sinac-band">
+  <span class="wm">SINAC<span class="wm-dot"></span></span>
+  <span class="sep"></span>
+  <span class="sub">HUS · Motor de Glosas IA — Importar recepción · Powered by SINAC SC SAS</span>
+</div>
+<div class="wrap">
+  <a class="back" href="/">← Volver al panel</a>
+  <h1>📥 Importar Excel de Recepción</h1>
+  <p class="lead">Sube el archivo Excel que envía el equipo de recepción. Cada fila se registrará como una glosa, se detectarán automáticamente ratificaciones y extemporaneidades, y se enviará una notificación a todos los gestores configurados.</p>
+
+  <div class="card">
+    <label for="file">Archivo Excel (.xlsx)</label>
+    <input id="file" type="file" accept=".xlsx,.xls" />
+    <div style="margin-top:16px">
+      <button id="btn">Subir y procesar</button>
+    </div>
+  </div>
+
+  <div id="result" class="card hidden">
+    <h2 id="result-title" style="color:#065f46;margin-bottom:10px"></h2>
+
+    <div class="stats">
+      <div class="stat"><div class="n" id="s-total">0</div><div class="l">TOTAL</div></div>
+      <div class="stat"><div class="n" id="s-nuevas" style="color:#15803d">0</div><div class="l">NUEVAS</div></div>
+      <div class="stat"><div class="n" id="s-act" style="color:#2563eb">0</div><div class="l">ACTUALIZADAS</div></div>
+      <div class="stat"><div class="n" id="s-rat" style="color:#7c3aed">0</div><div class="l">RATIFICADAS</div></div>
+      <div class="stat"><div class="n" id="s-ext" style="color:#dc2626">0</div><div class="l">EXTEMPORÁNEAS</div></div>
+    </div>
+
+    <h3 style="margin:20px 0 10px">Semáforo</h3>
+    <div class="semaforo">
+      <div class="sem verde"><div class="n" id="sv">0</div><div class="l">VERDE · &gt;10 días</div></div>
+      <div class="sem amarillo"><div class="n" id="sa">0</div><div class="l">AMARILLO · 5-10 días</div></div>
+      <div class="sem rojo"><div class="n" id="sr">0</div><div class="l">ROJO · &lt;5 días</div></div>
+      <div class="sem negro"><div class="n" id="sn">0</div><div class="l">VENCIDAS</div></div>
+    </div>
+
+    <div id="email-box" class="ok" style="margin:15px 0">📧 Correos enviados: <b id="e-num">0</b></div>
+
+    <h3 style="margin:20px 0 10px">Asignaciones por gestor</h3>
+    <div id="gestores"></div>
+
+    <div id="omitidas" style="margin-top:16px"></div>
+    <div id="errores" style="margin-top:20px"></div>
+  </div>
+
+  <div id="historial-card" class="card">
+    <h2 style="color:#1e3a8a;margin-bottom:6px">🗂️ Importaciones recientes</h2>
+    <p class="lead" style="margin-bottom:14px">Descargá el Excel-respuesta anotado (RESPUESTA IA / ESTADO IA / ID GLOSA) de cualquier importación, aunque no haya llegado el correo. Se regenera al momento con los dictámenes que la IA tenga listos.</p>
+    <div id="historial-lista"><div style="color:#6b7280;font-size:13px">Cargando…</div></div>
+  </div>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('hus_token') || sessionStorage.getItem('hus_token');
+
+if(!TOKEN){
+  alert('Debes iniciar sesión primero');
+  window.location.href = '/';
+}
+
+// Sesión expirada (JWT vencido): cualquier fetch devuelve 401 aunque el
+// token exista en localStorage. Antes el historial pintaba "(401)" y se
+// quedaba ahí — visto en producción 10-jun-2026. Ahora: limpiar el token
+// muerto y volver al login una sola vez.
+let _yaRedirigiendo = false;
+function sesionExpirada(){
+  if(_yaRedirigiendo) return;
+  _yaRedirigiendo = true;
+  localStorage.removeItem('hus_token');
+  sessionStorage.removeItem('hus_token');
+  alert('Tu sesión expiró. Vuelve a iniciar sesión.');
+  window.location.href = '/';
+}
+
+function colorSem(s){
+  return {VERDE:'#16a34a',AMARILLO:'#eab308',ROJO:'#dc2626',NEGRO:'#111827'}[s] || '#6b7280';
+}
+
+document.getElementById('btn').addEventListener('click', async ()=>{
+  const file = document.getElementById('file').files[0];
+  if(!file){ alert('Selecciona un archivo primero'); return; }
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Procesando...';
+
+  const fd = new FormData();
+  fd.append('archivo', file);
+
+  try{
+    const r = await fetch('/glosas/importar-recepcion', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN},
+      body:fd
+    });
+    if(r.status === 401){
+      alert('Sesión expirada. Vuelve a iniciar sesión.');
+      window.location.href = '/';
+      return;
+    }
+    const d = await r.json();
+    if(!r.ok){
+      alert('Error: '+(d.detail || r.status));
+      btn.disabled = false;
+      btn.innerHTML = 'Subir y procesar';
+      return;
+    }
+    // Nuevo flujo: el server procesa en background y responde al toque
+    // con el id. Hacemos polling del estado.
+    if(d && d.recepcion_import_id && (d.procesando || d.estado === 'PROCESANDO')){
+      mostrarProcesando(d);
+      cargarHistorial();
+      pollEstado(d.recepcion_import_id);
+    } else {
+      mostrarResultado(d);
+      btn.disabled = false;
+      btn.innerHTML = 'Subir y procesar';
+    }
+  }catch(e){
+    alert('Error de red: '+e.message);
+    btn.disabled = false;
+    btn.innerHTML = 'Subir y procesar';
+  }
+});
+
+function mostrarProcesando(d){
+  const res = document.getElementById('result');
+  res.classList.remove('hidden');
+  document.getElementById('result-title').innerHTML =
+    '<span style="color:#1e40af"><span class="spin" style="border-color:#1e40af;border-top-color:transparent"></span>Procesando importación #'+d.recepcion_import_id+'…</span>';
+  let box = document.getElementById('proc-box');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'proc-box';
+    box.style.cssText='background:#dbeafe;border:1px solid #2563eb;border-radius:8px;padding:14px;margin:10px 0;color:#1e3a8a;font-size:13px;line-height:1.6';
+    res.insertBefore(box, res.children[1] || null);
+  }
+  box.innerHTML = (d.mensaje || 'Procesando el Excel en segundo plano…')
+    + '<br><span style="font-size:12px;opacity:.8">Esta página se actualiza sola cuando termine. También podés cerrarla: el resultado queda en «Importaciones recientes».</span>';
+}
+
+let _pollTimer = null;
+async function pollEstado(id){
+  const btn = document.getElementById('btn');
+  let intentos = 0;
+  if(_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(async ()=>{
+    intentos++;
+    try{
+      const r = await fetch('/glosas/importar-recepcion/'+id+'/status', {
+        headers:{'Authorization':'Bearer '+TOKEN}
+      });
+      if(r.status === 401){ clearInterval(_pollTimer); sesionExpirada(); return; }
+      if(!r.ok) return;
+      const s = await r.json();
+      cargarHistorial();
+      if(s.estado === 'ERROR'){
+        clearInterval(_pollTimer); _pollTimer=null;
+        const pb = document.getElementById('proc-box');
+        if(pb){ pb.style.cssText='background:#fee2e2;border:1px solid #dc2626;border-radius:8px;padding:14px;margin:10px 0;color:#991b1b;font-size:13px';
+          pb.innerHTML = '✗ La importación falló' + (s.resumen && s.resumen.error ? ': '+s.resumen.error : '') + '. Revisá el archivo y reintentá.'; }
+        document.getElementById('result-title').innerHTML='<span style="color:#991b1b">✗ Importación con error</span>';
+        btn.disabled=false; btn.innerHTML='Subir y procesar';
+        return;
+      }
+      if(!s.procesando && s.resumen){
+        clearInterval(_pollTimer); _pollTimer=null;
+        const pb=document.getElementById('proc-box'); if(pb) pb.remove();
+        mostrarResultado(s.resumen);
+        cargarHistorial();
+        btn.disabled=false; btn.innerHTML='Subir y procesar';
+        return;
+      }
+      // Sigue procesando — corte de seguridad a ~10 min (200 * 3s)
+      if(intentos > 200){
+        clearInterval(_pollTimer); _pollTimer=null;
+        const pb=document.getElementById('proc-box');
+        if(pb) pb.innerHTML='Sigue procesando en segundo plano. Cuando termine aparecerá en «Importaciones recientes» con su botón de descarga.';
+        btn.disabled=false; btn.innerHTML='Subir y procesar';
+      }
+    }catch(e){ /* reintenta en el próximo tick */ }
+  }, 3000);
+}
+
+function mostrarResultado(d){
+  document.getElementById('result').classList.remove('hidden');
+  // Si total = 0 mostramos un título distinto y advertencia clara —
+  // sino el "✅ Importación completada" + 0 glosas confunde al gestor.
+  var totalNum = d.total || 0;
+  if(totalNum === 0){
+    document.getElementById('result-title').innerHTML =
+      '<span style="color:#92400e">⚠ Importación procesada — 0 glosas detectadas</span>';
+    var prev = document.getElementById('warn-cero');
+    if(!prev){
+      var warn = document.createElement('div');
+      warn.id = 'warn-cero';
+      warn.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin:10px 0;color:#92400e;font-size:13px;line-height:1.5';
+      warn.innerHTML = '<b>Posibles causas:</b><br>'
+        + '• El Excel no tiene la hoja correcta (espera "Recepcion" / "INICIAL" / "RATIFICADA" o "I" / "R" del DGH).<br>'
+        + '• Los headers de las columnas no matchean los aliases esperados (ej. "FACTURA", "CONSECUTIVO DGH", "VALOR GLOSA").<br>'
+        + '• Las filas están vacías o solo tienen headers.<br>'
+        + 'Si tenés dudas, revisá los <b>errores</b> al final de esta página.';
+      document.getElementById('result').insertBefore(warn, document.getElementById('result').children[1] || null);
+    }
+  } else {
+    document.getElementById('result-title').textContent = '✅ Importación completada';
+    var prevWarn = document.getElementById('warn-cero');
+    if(prevWarn) prevWarn.remove();
+  }
+  document.getElementById('s-total').textContent = totalNum;
+  document.getElementById('s-nuevas').textContent = d.creadas || 0;
+  document.getElementById('s-act').textContent = d.actualizadas || 0;
+  document.getElementById('s-rat').textContent = d.ratificadas || 0;
+  document.getElementById('s-ext').textContent = d.extemporaneas || 0;
+
+  const sem = d.semaforo || {};
+  document.getElementById('sv').textContent = sem.VERDE || 0;
+  document.getElementById('sa').textContent = sem.AMARILLO || 0;
+  document.getElementById('sr').textContent = sem.ROJO || 0;
+  document.getElementById('sn').textContent = sem.NEGRO || 0;
+
+  document.getElementById('e-num').textContent = d.correos_enviados || 0;
+
+  // 🤖 Indicador prominente de auto-procesamiento IA en background
+  if(d.auto_respuesta_lanzada && d.glosas_en_auto_proceso > 0){
+    const banner = document.createElement('div');
+    banner.style.cssText = 'margin:1rem 0;padding:1.1rem 1.4rem;background:linear-gradient(135deg,#dbeafe,#bfdbfe);border:2px solid #2563eb;border-radius:12px;color:#1e3a8a;';
+    banner.innerHTML =
+      '<div style="display:flex;align-items:center;gap:.8rem;">'
+      + '<div style="font-size:1.8rem;">🤖</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-weight:800;font-size:1rem;">IA procesando ' + d.glosas_en_auto_proceso + ' glosas en segundo plano</div>'
+      + '<div style="font-size:.85rem;margin-top:.25rem;opacity:.85;">'
+      + 'El cerebro auditará cada glosa, generará dictamen automático para las que tienen información suficiente, y marcará como '
+      + '<b>REQUIERE SOPORTES</b> las que necesiten PDFs del expediente. '
+      + 'Volvé a "Mis glosas" en unos minutos — vas a ver las respondidas listas en la pestaña <b>Respondidas</b>.'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+    const wrap = document.getElementById('result');
+    if(wrap) wrap.insertBefore(banner, wrap.children[1] || null);
+  }
+
+  // ⬇ Descarga directa del Excel-respuesta anotado (RESPUESTA IA /
+  // ESTADO IA / ID GLOSA). Disponible aunque el correo no llegue.
+  if(d.recepcion_import_id){
+    var prevDl = document.getElementById('dl-excel-wrap');
+    if(prevDl) prevDl.remove();
+    var dlWrap = document.createElement('div');
+    dlWrap.id = 'dl-excel-wrap';
+    dlWrap.style.cssText = 'margin:1rem 0;padding:1rem 1.2rem;background:#ecfdf5;border:2px solid #10b981;border-radius:12px;color:#065f46;';
+    dlWrap.innerHTML =
+      '<div style="font-weight:800;font-size:.98rem;margin-bottom:.5rem;">📊 Excel-respuesta listo para descargar</div>'
+      + '<div style="font-size:.84rem;opacity:.9;margin-bottom:.7rem;">'
+      + 'Trae el Excel original con las columnas <b>RESPUESTA IA</b>, <b>ESTADO IA</b> e <b>ID GLOSA</b>. '
+      + 'Se regenera al momento, así incluye los dictámenes que la IA termine después.'
+      + '</div>'
+      + '<button id="dl-excel-btn" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:.6rem 1.1rem;font-weight:700;cursor:pointer;">⬇ Descargar Excel-respuesta</button>';
+    var wrapR = document.getElementById('result');
+    if(wrapR) wrapR.insertBefore(dlWrap, wrapR.children[1] || null);
+    document.getElementById('dl-excel-btn').addEventListener('click', async function(){
+      var b = this;
+      b.disabled = true;
+      var txt = b.textContent;
+      b.textContent = 'Generando...';
+      try{
+        var rr = await fetch('/glosas/importar-recepcion/'+d.recepcion_import_id+'/excel-respuesta', {
+          headers:{'Authorization':'Bearer '+TOKEN}
+        });
+        if(rr.status === 401){ sesionExpirada(); return; }
+        if(!rr.ok){
+          var de = {};
+          try{ de = await rr.json(); }catch(_e){}
+          alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
+          return;
+        }
+        var blob = await rr.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'glosas_recepcion_respuesta.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }catch(e){
+        alert('Error de red al descargar: '+e.message);
+      }finally{
+        b.disabled = false;
+        b.textContent = txt;
+      }
+    });
+  }
+
+  const cont = document.getElementById('gestores');
+  cont.innerHTML = '';
+  const porG = d.por_gestor || {};
+  Object.keys(porG).sort().forEach(g=>{
+    const div = document.createElement('div');
+    div.className = 'gestor';
+    const lista = porG[g].map(x=>
+      `<li>${x.factura} — ${x.eps} — $${(x.valor||0).toLocaleString('es-CO')} — vence ${x.vence} <span class="badge" style="background:${colorSem(x.semaforo)}">${x.semaforo}</span></li>`
+    ).join('');
+    div.innerHTML = `<div class="gestor-head">👤 ${g} <span style="color:#6b7280;font-weight:normal">(${porG[g].length})</span></div><ul>${lista}</ul>`;
+    cont.appendChild(div);
+  });
+
+  const om = document.getElementById('omitidas');
+  om.innerHTML = '';
+  const nOm = d.filas_omitidas || 0;
+  const hojasDesc = d.hojas_descartadas || [];
+  if(nOm > 0 || hojasDesc.length){
+    let html = '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;color:#92400e;font-size:13px;line-height:1.6">';
+    if(nOm > 0){
+      html += `<b>⚠ ${nOm} fila(s) no se importaron</b> (faltaba ENTIDAD/EPS, FACTURA o fechas válidas).`;
+      const det = (d.filas_omitidas_detalle||[]).slice(0,8)
+        .map(o=>`fila ${o.fila}: ${o.motivo}`).join(' · ');
+      if(det) html += `<br><span style="font-size:12px;opacity:.85">${det}</span>`;
+    }
+    if(hojasDesc.length){
+      html += (nOm>0?'<br><br>':'') + '<b>Hojas descartadas:</b> ' +
+        hojasDesc.map(h=>`"${h.hoja}" (faltan: ${(h.columnas_faltantes||[]).join(', ')||'encabezados'})`).join(' · ');
+    }
+    html += '</div>';
+    om.innerHTML = html;
+  }
+
+  const errs = document.getElementById('errores');
+  errs.innerHTML = '';
+  if(d.errores && d.errores.length){
+    errs.innerHTML = '<h3 style="color:#991b1b;margin-bottom:6px">Avisos / Errores</h3>' +
+      d.errores.map(e=>`<div class="err">${e}</div>`).join('');
+  }
+
+  // Refrescar el historial para que la nueva importación quede
+  // descargable aunque el usuario recargue la página.
+  cargarHistorial();
+}
+
+async function descargarExcelRecepcion(id, btn){
+  const txt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generando…';
+  try{
+    const rr = await fetch('/glosas/importar-recepcion/'+id+'/excel-respuesta', {
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    if(rr.status === 401){ sesionExpirada(); return; }
+    if(!rr.ok){
+      let de={}; try{ de = await rr.json(); }catch(_e){}
+      alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
+      return;
+    }
+    const blob = await rr.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glosas_recepcion_'+id+'_respuesta.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert('Error de red al descargar: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = txt;
+  }
+}
+
+// 📄 Excel radicable (jun-2026): formato institucional que se radica ante
+// la entidad pagadora (hoja RESPUESTA GLOSAS una-fila-por-concepto + hoja
+// FUNDAMENTO JURÍDICO). Mismo manejo de auth/errores que el Excel-respuesta.
+async function descargarExcelRadicable(id, btn){
+  const txt = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generando…';
+  try{
+    const rr = await fetch('/glosas/importar-recepcion/'+id+'/excel-radicable', {
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    if(rr.status === 401){ sesionExpirada(); return; }
+    if(!rr.ok){
+      let de={}; try{ de = await rr.json(); }catch(_e){}
+      alert('No se pudo descargar: '+(de.detail || ('Error '+rr.status)));
+      return;
+    }
+    // El servidor manda el nombre institucional (RESPUESTA_GLOSAS_..._HUS.xlsx)
+    // en el Content-Disposition; si no se puede leer, fallback genérico.
+    let nombre = 'RESPUESTA_GLOSAS_'+id+'_HUS.xlsx';
+    const cd = rr.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    const blob = await rr.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert('Error de red al descargar: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = txt;
+  }
+}
+
+async function cargarHistorial(){
+  const cont = document.getElementById('historial-lista');
+  try{
+    const r = await fetch('/glosas/importar-recepcion/historial', {
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    if(r.status === 401){ sesionExpirada(); return; }
+    if(!r.ok){
+      cont.innerHTML = '<div style="color:#991b1b;font-size:13px">No se pudo cargar el historial ('+r.status+')</div>';
+      return;
+    }
+    const d = await r.json();
+    const imps = d.importaciones || [];
+    if(!imps.length){
+      cont.innerHTML = '<div style="color:#6b7280;font-size:13px">Todavía no hay importaciones.</div>';
+      return;
+    }
+    const estadoBadge = (e)=>{
+      const m = {
+        ENVIADO:['#dcfce7','#166534','✓ correo enviado'],
+        PARCIAL:['#fef3c7','#92400e','⚠ envío parcial'],
+        SIN_DESTINATARIOS:['#fee2e2','#991b1b','✗ sin destinatarios'],
+        ERROR:['#fee2e2','#991b1b','✗ error de envío'],
+        SIN_ARCHIVO:['#f3f4f6','#6b7280','archivo purgado'],
+        LISTO:['#dbeafe','#1e40af','procesando…'],
+      }[e] || ['#f3f4f6','#6b7280', e||'—'];
+      return `<span style="background:${m[0]};color:${m[1]};font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px">${m[2]}</span>`;
+    };
+    cont.innerHTML = imps.map(im=>{
+      const fecha = im.creado_en ? new Date(im.creado_en).toLocaleString('es-CO') : '—';
+      const dl = im.descargable
+        ? `<button onclick="descargarExcelRecepcion(${im.id}, this)" style="background:#10b981;color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">⬇ Excel-respuesta</button>`
+        : `<span style="color:#9ca3af;font-size:12px">archivo ya no disponible</span>`;
+      // El radicable se regenera 100% desde BD: disponible aunque el
+      // archivo original de la importación ya haya sido purgado.
+      const dlRad = `<button onclick="descargarExcelRadicable(${im.id}, this)" style="background:var(--sinac-green-700);color:#fff;border:0;border-radius:7px;padding:.45rem .9rem;font-weight:700;cursor:pointer;font-size:13px">📄 Excel radicable</button>`;
+      const pend = im.dictamenes_pendientes||0;
+      const listos = im.dictamenes_listos||0;
+      const iaInfo = (listos+pend) > 0
+        ? (pend > 0
+            ? `<span style="color:#b45309;font-size:12px">🤖 IA: ${listos}/${listos+pend} listas · ${pend} en proceso</span>`
+            : `<span style="color:#166534;font-size:12px">🤖 IA: ${listos}/${listos} listas</span>`)
+        : '';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px">
+        <div style="font-size:13px;color:#374151">
+          <b>#${im.id}</b> · ${fecha} · ${estadoBadge(im.estado)}<br>
+          <span style="color:#6b7280">${im.archivo_nombre||'recepcion.xlsx'} · ${im.total_glosas} glosa(s) · ${im.usuario_email||''}</span>
+          ${iaInfo?'<br>'+iaInfo:''}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${dl}${dlRad}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    cont.innerHTML = '<div style="color:#991b1b;font-size:13px">Error de red cargando historial</div>';
+  }
+}
+
+cargarHistorial();
+</script>
+</body>
+</html>

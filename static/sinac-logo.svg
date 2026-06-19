@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <linearGradient id="gradG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="gradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="gradD" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+  </defs>
+  <!-- Círculo degradado (abrazo) -->
+  <circle cx="52" cy="50" r="38" fill="none" stroke="url(#gradG)" stroke-width="8"/>
+  <path d="M 52 12 A 38 38 0 0 1 90 50" fill="none" stroke="url(#gradG)" stroke-width="12" stroke-linecap="round"/>
+  <!-- S central -->
+  <text x="52" y="66" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="48" fill="#1e40af">S</text>
+  <!-- Letras SINAC -->
+  <text x="110" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="36" fill="#1e40af">SINAC</text>
+  <text x="110" y="82" font-family="Arial, sans-serif" font-weight="600" font-size="14" fill="#64748b" letter-spacing="3">SC SAS</text>
+  <!-- Franjas decorativas derechas -->
+  <path d="M 320 10 L 340 10 L 300 90 L 280 90 Z" fill="url(#gradB)"/>
+  <path d="M 350 10 L 370 10 L 330 90 L 310 90 Z" fill="url(#gradD)" opacity="0.85"/>
+  <path d="M 380 10 L 400 10 L 360 90 L 340 90 Z" fill="url(#gradB)" opacity="0.6"/>
+</svg>

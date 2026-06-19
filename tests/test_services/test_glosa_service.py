@@ -1,0 +1,425 @@
+"""Tests for GlosaService."""
+
+import pytest
+
+from app.services.glosa_service import (
+    generar_texto_extemporanea,
+    generar_texto_injustificada,
+    obtener_plantilla_por_codigo,
+    DIAS_HABILES_LIMITE_EXTEMPORANEA,
+    TEXTO_DMBUG_TARIFAS,
+    _es_dispensario_medico,
+    limpiar_palabra_injustificado,
+)
+
+
+class TestSanitizerInjustificado:
+    """Directiva ESE HUS mayo 2026: la palabra "injustificado/a/os/as"
+    NUNCA debe aparecer en respuestas. Verificamos sustitución global."""
+
+    def test_glosa_injustificada_aplicada_pierde_adjetivo(self):
+        out = limpiar_palabra_injustificado(
+            "ESE HUS NO ACEPTA LA GLOSA INJUSTIFICADA APLICADA POR CONCEPTO DE TARIFAS"
+        )
+        assert "INJUSTIFIC" not in out.upper()
+        assert "LA GLOSA APLICADA POR CONCEPTO DE TARIFAS" in out
+
+    def test_descuentos_injustificados_a_unilaterales(self):
+        out = limpiar_palabra_injustificado(
+            "NO SE ACEPTAN DESCUENTOS INJUSTIFICADOS SOBRE MATERIALES"
+        )
+        assert "INJUSTIFIC" not in out.upper()
+        assert "DESCUENTOS UNILATERALES" in out
+
+    def test_retraso_injustificado_a_indebido(self):
+        out = limpiar_palabra_injustificado("EL RETRASO INJUSTIFICADO DE LA EPS")
+        assert "RETRASO INDEBIDO" in out
+        assert "INJUSTIFIC" not in out.upper()
+
+    def test_incumplimiento_injustificado_a_contractual(self):
+        out = limpiar_palabra_injustificado("CONFIGURA UN INCUMPLIMIENTO INJUSTIFICADO")
+        assert "INCUMPLIMIENTO CONTRACTUAL" in out
+        assert "INJUSTIFIC" not in out.upper()
+
+    def test_palabra_suelta_a_improcedente(self):
+        # Singular y plural, mayúsculas y minúsculas
+        cases = [
+            ("la glosa es injustificada", "la glosa es improcedente"),
+            ("LA GLOSA ES INJUSTIFICADA", "LA GLOSA ES IMPROCEDENTE"),
+            ("esta glosa es injustificado", "esta glosa es improcedente"),
+            ("tarifas injustificadas en el contrato", "tarifas improcedentes en el contrato"),
+            ("TARIFAS INJUSTIFICADAS EN EL CONTRATO", "TARIFAS IMPROCEDENTES EN EL CONTRATO"),
+        ]
+        for src, expected in cases:
+            assert limpiar_palabra_injustificado(src) == expected, (
+                f"{src!r} → {limpiar_palabra_injustificado(src)!r} (esperaba {expected!r})"
+            )
+
+    def test_idempotente(self):
+        # Múltiples pases no cambian el resultado.
+        src = "GLOSA INJUSTIFICADA SOBRE DESCUENTOS INJUSTIFICADOS"
+        out1 = limpiar_palabra_injustificado(src)
+        out2 = limpiar_palabra_injustificado(out1)
+        assert out1 == out2
+
+    def test_no_toca_texto_sin_palabra(self):
+        src = "ESE HUS NO ACEPTA LA GLOSA APLICADA POR CONCEPTO DE TARIFAS"
+        assert limpiar_palabra_injustificado(src) == src
+
+    def test_string_vacio_no_explota(self):
+        assert limpiar_palabra_injustificado("") == ""
+        assert limpiar_palabra_injustificado(None) is None
+
+
+class TestDMBUGTextoFijo:
+    """Override institucional Yesid abr 2026: DMBUG + TA siempre con texto canónico."""
+
+    def test_detecta_dispensario_medico_variantes(self):
+        # Casos típicos del DGH (con prefijo U220311)
+        assert _es_dispensario_medico("DISPENSARIO MEDICO")
+        assert _es_dispensario_medico("DISPENSARIO MEDICO BUCARAMANGA")
+        assert _es_dispensario_medico("DISPENSARIO MEDICO BUCARAMANG")
+        assert _es_dispensario_medico(
+            "U220311 - DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANG"
+        )
+        assert _es_dispensario_medico("DMBUG")
+        assert _es_dispensario_medico("DIGSA")
+
+    def test_no_matchea_otras_eps(self):
+        assert not _es_dispensario_medico("FAMISANAR")
+        assert not _es_dispensario_medico("NUEVA EPS")
+        assert not _es_dispensario_medico("COOSALUD")
+        assert not _es_dispensario_medico("")
+
+    def test_texto_dmbug_tiene_referencias_clave(self):
+        # El texto canónico DEBE contener estos elementos para validez
+        # jurídica (revisado y aprobado por Yesid).
+        assert "440-DIGSA/DMBUG-2025" in TEXTO_DMBUG_TARIFAS
+        assert "PROCESO CD477" in TEXTO_DMBUG_TARIFAS
+        assert "30/07/2026" in TEXTO_DMBUG_TARIFAS
+        assert "7.141 ÍTEMS" in TEXTO_DMBUG_TARIFAS
+        assert "ARTÍCULOS 1602 Y 1603" in TEXTO_DMBUG_TARIFAS
+        assert "DECRETO-LEY 1795 DE 2000" in TEXTO_DMBUG_TARIFAS
+        assert "AGOTAMIENTO PRESUPUESTAL" in TEXTO_DMBUG_TARIFAS
+        # No debe arrancar con "RESPETUOSAMENTE" (nunca en aperturas)
+        assert not TEXTO_DMBUG_TARIFAS.startswith("RESPETUOSAMENTE")
+        # Debe iniciar con la fórmula institucional canónica
+        assert TEXTO_DMBUG_TARIFAS.startswith("ESE HUS NO ACEPTA")
+
+
+class TestCalculoDiasHabiles:
+    """Tests for business days calculation."""
+
+    def test_calcular_dias_habiles_mismo_dia(self, glosa_service):
+        """Same day should return 0 business days."""
+        result = glosa_service._calcular_dias_habiles("2026-03-02", "2026-03-02")
+        assert result == 0
+
+    def test_calcular_dias_habiles_un_dia(self, glosa_service):
+        """Monday to Tuesday should return 1 business day."""
+        result = glosa_service._calcular_dias_habiles("2026-03-02", "2026-03-03")
+        assert result == 1
+
+    def test_calcular_dias_habiles_fin_de_semana(self, glosa_service):
+        """Friday to Monday should return 1 business day."""
+        result = glosa_service._calcular_dias_habiles("2026-03-06", "2026-03-09")
+        assert result == 1
+
+    def test_calcular_dias_habiles_feriado(self, glosa_service):
+        """Should skip holidays in count."""
+        result = glosa_service._calcular_dias_habiles("2026-03-02", "2026-03-03")
+        assert result == 1
+
+
+class TestDiasHabilesFechasInvalidas:
+    """Regresión auditoría jun-2026 P1 #5: con fechas imparseables el método
+    devolvía 0 → la glosa quedaba "DENTRO DE TÉRMINOS (0 DÍAS HÁBILES)" y la
+    defensa por extemporaneidad (RE9502) se perdía en silencio. Ahora debe
+    devolver None y analizar() debe pedir verificación de fechas."""
+
+    @pytest.mark.parametrize(
+        "f1,f2",
+        [
+            ("FECHA-INVALIDA", "2026-03-02"),
+            ("2026-03-02", "no-es-fecha"),
+            ("", ""),
+            (None, "2026-03-02"),
+            ("2026-13-45", "2026-03-02"),  # mes/día imposibles
+            ("02/03/2026", "03/03/2026"),  # formato no ISO
+        ],
+    )
+    def test_fechas_invalidas_devuelven_none(self, glosa_service, f1, f2):
+        assert glosa_service._calcular_dias_habiles(f1, f2) is None
+
+    def test_fechas_validas_siguen_devolviendo_int(self, glosa_service):
+        assert glosa_service._calcular_dias_habiles("2026-03-02", "2026-03-09") == 5
+
+    def test_acepta_timestamp_iso_con_hora(self, glosa_service):
+        """El slice [:10] debe seguir aceptando 'YYYY-MM-DDTHH:MM:SS'."""
+        assert glosa_service._calcular_dias_habiles("2026-03-02T08:30:00", "2026-03-03") == 1
+
+    @pytest.mark.asyncio
+    async def test_analizar_no_clasifica_dentro_de_terminos(self, glosa_service, monkeypatch):
+        """Si el cálculo de días falla, el dictamen NO debe decir
+        'DENTRO DE TÉRMINOS' — debe pedir verificación de fechas."""
+        from app.models.schemas import GlosaInput
+
+        monkeypatch.setattr(glosa_service, "_calcular_dias_habiles", lambda f1, f2: None)
+        data = GlosaInput(
+            eps="FAMISANAR EPS",
+            etapa="RESPUESTA A GLOSA",
+            fecha_radicacion="2026-03-02",
+            fecha_recepcion="2026-04-20",
+            tabla_excel="FA0101 $ 7.700,00 FALTA SOPORTE DE ENTREGA DE LA FACTURA",
+            valor_aceptado="0",
+        )
+        resultado = await glosa_service.analizar(
+            data, contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+        assert "DENTRO DE TÉRMINOS" not in resultado.mensaje_tiempo
+        assert "FECHAS NO VÁLIDAS" in resultado.mensaje_tiempo
+        assert resultado.color_tiempo == "bg-amber-500"
+
+    @pytest.mark.asyncio
+    async def test_analizar_extemporanea_sigue_funcionando(self, glosa_service):
+        """Control: con fechas válidas y >20 días hábiles la glosa se marca
+        EXTEMPORÁNEA como siempre (la defensa RE9502 se conserva)."""
+        from app.models.schemas import GlosaInput
+
+        data = GlosaInput(
+            eps="FAMISANAR EPS",
+            etapa="RESPUESTA A GLOSA",
+            fecha_radicacion="2026-03-02",
+            fecha_recepcion="2026-04-20",  # ~35 días hábiles
+            tabla_excel="FA0101 $ 7.700,00 FALTA SOPORTE DE ENTREGA DE LA FACTURA",
+            valor_aceptado="0",
+        )
+        resultado = await glosa_service.analizar(
+            data, contratos_db={"FAMISANAR EPS": "CONTRATO 2026"}
+        )
+        assert "EXTEMPORÁNEA" in resultado.mensaje_tiempo
+        assert resultado.color_tiempo == "bg-red-600"
+
+
+class TestConstantes:
+    """Tests for system constants."""
+
+    def test_dias_limite_extemporanea(self):
+        """Verify 20 business days limit per Art. 56 Ley 1438/2011."""
+        assert DIAS_HABILES_LIMITE_EXTEMPORANEA == 20
+
+
+class TestGenerarTextoExtemporanea:
+    """Tests for extemporaneous response text generation."""
+
+    def test_genera_texto_con_dias(self):
+        """Should include days elapsed in response."""
+        texto = generar_texto_extemporanea(25)
+        assert "25 DÍAS HÁBILES" in texto
+        assert "20 DÍAS HÁBILES" in texto
+        # El texto canónico usa Art. 57 de la Ley 1438/2011 (silencio
+        # administrativo a favor del prestador) como base normativa.
+        assert "ARTÍCULO 57" in texto
+        assert "LEY 1438 DE 2011" in texto
+
+    def test_genera_texto_rechaza_glosa(self):
+        """Should reject the glosa with firm tone."""
+        texto = generar_texto_extemporanea(25)
+        # Texto canónico actual: "NO ACEPTA GLOSA EXTEMPORÁNEA"
+        assert "NO ACEPTA GLOSA" in texto.upper()
+        assert "EXTEMPORÁNEA" in texto
+
+    def test_genera_texto_pago_integro(self):
+        """Should demand immediate and definitive lifting of the glosa."""
+        texto = generar_texto_extemporanea(25)
+        assert "LEVANTAMIENTO INMEDIATO Y DEFINITIVO" in texto.upper()
+        # Correo institucional siempre incluido
+        assert "CARTERA@HUS.GOV.CO" in texto
+
+
+class TestGenerarTextoInjustificada:
+    """Tests for unjustified response text generation."""
+
+    def test_genera_texto_con_eps(self):
+        """Should include EPS name in response."""
+        texto = generar_texto_injustificada("EPS EJEMPLO")
+        assert "EPS EJEMPLO" in texto
+
+    def test_genera_texto_soat(self):
+        """Should mention SOAT tariff."""
+        texto = generar_texto_injustificada("EPS TEST")
+        assert "SOAT" in texto
+
+
+class TestPlantillas:
+    """Tests for glosa response templates lookup.
+
+    Built-in PLANTILLAS_CODIGO is intentionally empty — plantillas are stored
+    in the database and managed through PlantillaRepository. The code-level
+    lookup returns None for every key so the service falls back to IA.
+    """
+
+    def test_obtener_plantilla_inexistente(self):
+        """Should return None for any code when no built-ins are registered."""
+        assert obtener_plantilla_por_codigo("ZZ9999") is None
+
+    def test_obtener_plantilla_ta0201_devuelve_none(self):
+        """TA0201 has no built-in template — expect None (DB-managed)."""
+        assert obtener_plantilla_por_codigo("TA0201") is None
+
+    def test_obtener_plantilla_mayusculas(self):
+        """Lookup should be case-insensitive."""
+        assert obtener_plantilla_por_codigo("ta0201") == obtener_plantilla_por_codigo("TA0201")
+
+
+class TestExtraccionCodigo:
+    """Tests for glosa code extraction."""
+
+    def test_extraer_codigo_ta(self, glosa_service):
+        """Should extract TA codes."""
+        result = glosa_service._extraer_codigo_glosa("GLOSA TA0201 $100000")
+        assert result == "TA0201"
+
+    def test_extraer_codigo_so(self, glosa_service):
+        """Should extract SO codes."""
+        result = glosa_service._extraer_codigo_glosa("Soportes SO0101 incompletos")
+        assert result == "SO0101"
+
+    def test_extraer_codigo_inexistente(self, glosa_service):
+        """Should return N/A for unknown codes."""
+        result = glosa_service._extraer_codigo_glosa("Sin código específico")
+        assert result == "N/A"
+
+
+class TestExtraccionValor:
+    """Tests for value extraction from glosa text."""
+
+    def test_extraer_valor_formato_colombiano(self, glosa_service):
+        """Should extract Colombian peso format."""
+        result = glosa_service._extraer_valor("Glosa por $1,500,000")
+        assert "$ 1,500,000" in result or "1,500,000" in result
+
+    def test_extraer_valor_sin_signo(self, glosa_service):
+        """Should handle value without $ sign - returns default when not found."""
+        result = glosa_service._extraer_valor("Valor 500000 sin pesos")
+        assert "$ 0.00" in result
+
+    def test_extraer_valor_inexistente(self, glosa_service):
+        """Should return default $0.00 when no value found."""
+        result = glosa_service._extraer_valor("Sin valor especificado")
+        assert "$ 0.00" in result
+
+
+class TestDeterminarTipoGlosa:
+    """Tests for glosa type determination."""
+
+    def test_tipo_tarifa(self, glosa_service):
+        """Should identify TA prefix as tariff."""
+        result = glosa_service._determinar_tipo_glosa("TA", "GLOSA TARIFA")
+        assert result == "TA_TARIFA"
+
+    def test_tipo_soportes(self, glosa_service):
+        """Should identify SO prefix as supports."""
+        result = glosa_service._determinar_tipo_glosa("SO", "SOPORTES")
+        assert result == "SO_SOPORTES"
+
+    def test_tipo_extemporanea(self, glosa_service):
+        """Should identify extemporaneous glosa."""
+        result = glosa_service._determinar_tipo_glosa("EX", "EXTEMPORANEA")
+        assert result == "EXT_EXTEMPORANEA"
+
+    def test_tipo_medicamentos(self, glosa_service):
+        """Should identify medications in text."""
+        result = glosa_service._determinar_tipo_glosa("SE", "medicamento no reconocido")
+        assert result == "ME_MEDICAMENTOS"
+
+    def test_tipo_insumos(self, glosa_service):
+        """Should identify supplies in text."""
+        result = glosa_service._determinar_tipo_glosa("SE", "insumo no facturado")
+        assert result == "IN_INSUMOS"
+
+
+class TestXmlParser:
+    """Tests for XML extraction from AI responses."""
+
+    def test_extraer_paciente(self, glosa_service):
+        """Should extract patient name from XML tag."""
+        xml = "<paciente>Juan Pérez</paciente><argumento>Texto</argumento>"
+        result = glosa_service._xml("paciente", xml, "DEFAULT")
+        assert result == "Juan Pérez"
+
+    def test_extraer_argumento(self, glosa_service):
+        """Should extract argument from XML tag."""
+        xml = "<paciente>Test</paciente><argumento>Respuesta legal</argumento>"
+        result = glosa_service._xml("argumento", xml, "DEFAULT")
+        assert result == "Respuesta legal"
+
+    def test_xml_sin_tag_retorna_default(self, glosa_service):
+        """Should return default when tag not found."""
+        xml = "<otro>Contenido</otro>"
+        result = glosa_service._xml("paciente", xml, "NO ENCONTRADO")
+        assert result == "NO ENCONTRADO"
+
+
+class TestScoreCalculo:
+    """Tests for score calculation."""
+
+    def test_score_extemporanea(self, glosa_service):
+        """Extemporaneous should have highest score."""
+        score = glosa_service._calcular_score(
+            tipo_glosa="EXT_EXTEMPORANEA",
+            es_extemporanea=True,
+            es_ratificacion=False,
+            tiene_pdf=False,
+            es_urgencia=False,
+            es_tarifa=False,
+        )
+        assert score == 99.0
+
+    def test_score_ratificacion(self, glosa_service):
+        """Ratification should have high score."""
+        score = glosa_service._calcular_score(
+            tipo_glosa="RATIFICADA",
+            es_extemporanea=False,
+            es_ratificacion=True,
+            tiene_pdf=False,
+            es_urgencia=False,
+            es_tarifa=False,
+        )
+        assert score == 92.0
+
+    def test_score_urgencia(self, glosa_service):
+        """Urgency should have high score."""
+        score = glosa_service._calcular_score(
+            tipo_glosa="AU_AUTORIZACION",
+            es_extemporanea=False,
+            es_ratificacion=False,
+            tiene_pdf=False,
+            es_urgencia=True,
+            es_tarifa=False,
+        )
+        assert score == 90.0
+
+    def test_score_con_pdf(self, glosa_service):
+        """PDF support should add 5 points up to 100."""
+        score = glosa_service._calcular_score(
+            tipo_glosa="EXT_EXTEMPORANEA",
+            es_extemporanea=True,
+            es_ratificacion=False,
+            tiene_pdf=True,
+            es_urgencia=False,
+            es_tarifa=False,
+        )
+        assert score == 100.0
+
+    def test_score_tarifa(self, glosa_service):
+        """Tariff should have base score."""
+        score = glosa_service._calcular_score(
+            tipo_glosa="TA_TARIFA",
+            es_extemporanea=False,
+            es_ratificacion=False,
+            tiene_pdf=False,
+            es_urgencia=False,
+            es_tarifa=True,
+        )
+        assert score == 75.0

@@ -1,0 +1,649 @@
+"""Servicio de consulta y evaluación de tarifas pactadas.
+
+Cuando una glosa es tipo TARIFAS (TA*) con CUPS identificado, este servicio:
+  1. Busca la tarifa pactada en la tabla `tarifas_contratadas`.
+  2. Evalúa si la glosa tiene mérito o no (facturado vs. pactado).
+  3. Devuelve una recomendación de acción para el auditor.
+
+No depende de IA — es lógica pura basada en el contrato cargado por el
+coordinador. La recomendación es un "cheat sheet" para el auditor.
+
+Uso típico desde `glosa_service.analizar()`:
+    from app.services.tarifa_lookup_service import evaluar_glosa_tarifa
+    info = evaluar_glosa_tarifa(db, eps="FAMISANAR EPS", cups="890202",
+                                 valor_facturado=100_000, valor_objetado=16_200)
+    if info["encontrada"]:
+        # Inyectar al prompt / mostrar banner
+        ...
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+from sqlalchemy.orm import Session
+
+from app.models.db import TarifaContratadaRecord
+
+
+def _eps_matchea(eps_glosa: str, eps_tarifa: str) -> bool:
+    """Match permisivo de EPS por tokens significativos.
+
+    El ilike('%X%') falla cuando los nombres no se contienen mutuamente,
+    como con "DISPENSARIO MEDICO BUCARAMANGA" (plan EPS oficial) vs
+    "DISPENSARIO MEDICO DMBUG" (nombre con que se carga el contrato).
+    Este matcher comparte la lógica con app.services.dictamen_stale para
+    consistencia.
+    """
+    if not eps_glosa or not eps_tarifa:
+        return False
+    try:
+        from app.services.dictamen_stale import _matchea_eps
+    except Exception:
+        return False
+    return _matchea_eps(eps_glosa, eps_tarifa)
+
+
+def _buscar(db: Session, eps: str, cups: str) -> Optional[TarifaContratadaRecord]:
+    """Busca la tarifa activa más reciente para (eps, cups).
+
+    Match en EPS en dos pasadas:
+      1. Substring case-insensitive (ilike '%X%') — ruta rápida cuando los
+         nombres se contienen mutuamente (ej. "FAMISANAR" ⊂ "FAMISANAR EPS").
+      2. Token-based — comparte ≥2 palabras significativas con la EPS de la
+         tarifa, o sigla única (DMBUG, FOMAG) que aparezca en el otro
+         nombre. Cubre el caso real "DISPENSARIO MEDICO BUCARAMANG" ↔
+         "DISPENSARIO MEDICO DMBUG".
+
+    Orden de matching de CUPS (Ronda 45 — Res. 2641/2025):
+      1. Match directo por codigo_cups
+      2. Match por codigo_ips (código interno del prestador cargado
+         desde el Excel del contrato, ej. '39147B-18' del HUS)
+      3. Homologación Res. 2641/2025 → rebusca por CUPS oficial
+    """
+    if not eps or not cups:
+        return None
+    eps = eps.strip()
+    cups = cups.strip()
+    if not eps or not cups:
+        return None
+
+    def _resolver_por_eps(filas: list[TarifaContratadaRecord]) -> Optional[TarifaContratadaRecord]:
+        """De una lista de tarifas (mismo CUPS), elige la que matchea la EPS."""
+        for f in filas:
+            if _eps_matchea(eps, f.eps or ""):
+                return f
+        return None
+
+    # 1) Match directo por CUPS oficial — primero ilike (rápido), luego
+    # token-based sobre el universo de tarifas con ese CUPS.
+    fila = (
+        db.query(TarifaContratadaRecord)
+        .filter(TarifaContratadaRecord.activa == 1)
+        .filter(TarifaContratadaRecord.eps.ilike(f"%{eps}%"))
+        .filter(TarifaContratadaRecord.codigo_cups == cups)
+        .order_by(TarifaContratadaRecord.creado_en.desc())
+        .first()
+    )
+    if fila:
+        return fila
+    # Fallback: traer todas las tarifas activas con ese CUPS y filtrar por
+    # tokens de EPS en Python (suelen ser 1-5 candidatos máx).
+    candidatos = (
+        db.query(TarifaContratadaRecord)
+        .filter(TarifaContratadaRecord.activa == 1)
+        .filter(TarifaContratadaRecord.codigo_cups == cups)
+        .order_by(TarifaContratadaRecord.creado_en.desc())
+        .limit(20)
+        .all()
+    )
+    fila = _resolver_por_eps(candidatos)
+    if fila:
+        return fila
+
+    # 2) Match por codigo_ips — misma estrategia
+    fila = (
+        db.query(TarifaContratadaRecord)
+        .filter(TarifaContratadaRecord.activa == 1)
+        .filter(TarifaContratadaRecord.eps.ilike(f"%{eps}%"))
+        .filter(TarifaContratadaRecord.codigo_ips == cups)
+        .order_by(TarifaContratadaRecord.creado_en.desc())
+        .first()
+    )
+    if fila:
+        return fila
+    candidatos = (
+        db.query(TarifaContratadaRecord)
+        .filter(TarifaContratadaRecord.activa == 1)
+        .filter(TarifaContratadaRecord.codigo_ips == cups)
+        .order_by(TarifaContratadaRecord.creado_en.desc())
+        .limit(20)
+        .all()
+    )
+    fila = _resolver_por_eps(candidatos)
+    if fila:
+        return fila
+
+    # 3) Homologación Res. 2641/2025 — si el código entrada es viejo, lo
+    # traducimos al CUPS oficial y reintentamos.
+    try:
+        from app.services.homologador_cups import homologar_cups
+
+        homo = homologar_cups(cups, db=db, eps=eps)
+        if homo and homo.get("cups_oficial") and homo["cups_oficial"] != cups:
+            cups_oficial = homo["cups_oficial"]
+            fila = (
+                db.query(TarifaContratadaRecord)
+                .filter(TarifaContratadaRecord.activa == 1)
+                .filter(TarifaContratadaRecord.eps.ilike(f"%{eps}%"))
+                .filter(TarifaContratadaRecord.codigo_cups == cups_oficial)
+                .order_by(TarifaContratadaRecord.creado_en.desc())
+                .first()
+            )
+            if fila:
+                return fila
+            candidatos = (
+                db.query(TarifaContratadaRecord)
+                .filter(TarifaContratadaRecord.activa == 1)
+                .filter(TarifaContratadaRecord.codigo_cups == cups_oficial)
+                .order_by(TarifaContratadaRecord.creado_en.desc())
+                .limit(20)
+                .all()
+            )
+            fila = _resolver_por_eps(candidatos)
+            if fila:
+                return fila
+    except Exception:
+        pass
+
+    return None
+
+
+def calcular_valor_pactado(tarifa: TarifaContratadaRecord, valor_soat_base: float = 0.0) -> float:
+    """Calcula el valor pactado final según el tipo de tarifa.
+
+    - VALOR_FIJO → devuelve `valor_pactado` directo.
+    - SOAT_PORCENTAJE → aplica `factor_ajuste` sobre `valor_soat_base`.
+      Ej: factor=-5 y soat=100.000 → 100.000 × 0.95 = 95.000.
+      Si `valor_soat_base=0`, no podemos calcular y devolvemos 0.
+    """
+    if not tarifa:
+        return 0.0
+    if (tarifa.tipo_tarifa or "VALOR_FIJO") == "VALOR_FIJO":
+        return float(tarifa.valor_pactado or 0.0)
+    factor = float(tarifa.factor_ajuste or 0.0)
+    if valor_soat_base <= 0:
+        return 0.0
+    return round(valor_soat_base * (1 + factor / 100.0), 2)
+
+
+# Frases en el motivo de la glosa que indican que la EPS está cuestionando
+# la EXISTENCIA del contrato (no un cálculo de diferencia). Cuando se
+# detectan, NO conviene aceptar parcial aunque haya sobrecargo HUS — la
+# defensa correcta es defender íntegro porque el motivo de la EPS es falso,
+# y ajustar el sobrecargo internamente con nota crédito.
+_FRASES_CUESTIONA_CONTRATO = (
+    "NO HAY CONTRATO",
+    "NO EXISTE CONTRATO",
+    "SIN CONTRATO",
+    "AUSENCIA DE CONTRATO",
+    "MAYOR VALOR COBRADO",
+    "TARIFA NO PACTADA",
+    "SIN PACTO",
+    "NO SE RECONOCE",
+    "NO PROCEDE",
+    "FUERA DEL CONTRATO",
+    "NO CONTEMPLADO",
+    "NO INCLUIDO",
+    "EXCEDE EL CONTRATO",
+)
+
+
+def _motivo_cuestiona_contrato(motivo_glosa: str) -> bool:
+    """True si el motivo de la EPS niega la existencia/aplicación del contrato.
+
+    En estos casos la respuesta correcta NO es aceptar parcial el sobrecargo —
+    es defender íntegro porque el argumento de la EPS es falso. El sobrecargo
+    interno del HUS se corrige con nota crédito al expediente, no a la glosa.
+    """
+    if not motivo_glosa:
+        return False
+    import re
+    import unicodedata
+
+    nfkd = unicodedata.normalize("NFKD", motivo_glosa)
+    sin_dia = "".join(c for c in nfkd if not unicodedata.combining(c))
+    txt = re.sub(r"\s+", " ", sin_dia).upper()
+    return any(f in txt for f in _FRASES_CUESTIONA_CONTRATO)
+
+
+def _recomendacion(
+    valor_facturado: float,
+    valor_pactado: float,
+    valor_objetado: float,
+    *,
+    es_soat_pct: bool = False,
+    factor_pct: float = 0.0,
+    valor_reconocido: float = 0.0,
+    motivo_glosa: str = "",
+) -> dict:
+    """Compara facturado vs pactado y sugiere acción.
+
+    Reglas VALOR_FIJO:
+      - facturado == pactado (±$1) → glosa INJUSTIFICADA (defender 100%)
+      - facturado > pactado, diferencia cabe en objetado → aceptar parcial
+        EXCEPTO si el motivo de la glosa cuestiona el CONTRATO (ej. "no hay
+        contrato", "mayor valor cobrado") — en ese caso defender íntegro
+        + ajuste interno con nota crédito.
+      - facturado < pactado → defender (cobró menos del pactado)
+      - diferencia excede objetado → revisar manualmente
+
+    Reglas SOAT_PORCENTAJE:
+      - Si no conocemos valor SOAT base, no podemos calcular el pactado
+        absoluto; pero si tenemos `valor_facturado` y `valor_reconocido`
+        podemos comparar las **interpretaciones** de SOAT base de cada parte
+        y recomendar DEFENDER (ambas aplican el mismo factor; la
+        discrepancia es sobre la tarifa SOAT oficial del CUPS).
+    """
+    tolerancia = 1.0
+    cuestiona_contrato = _motivo_cuestiona_contrato(motivo_glosa)
+
+    # Rama SOAT_PORCENTAJE: siempre inferir SOAT base implícito de HUS y EPS
+    # desde los valores facturado/reconocido, y explicar la discrepancia.
+    if es_soat_pct:
+        multiplicador = 1 + factor_pct / 100.0
+        soat_base_hus = (
+            (valor_facturado / multiplicador)
+            if (valor_facturado > 0 and multiplicador > 0)
+            else 0.0
+        )
+        soat_base_eps = (
+            (valor_reconocido / multiplicador)
+            if (valor_reconocido > 0 and multiplicador > 0)
+            else 0.0
+        )
+        signo = "+" if factor_pct > 0 else ""
+        if valor_facturado > 0 and valor_reconocido > 0:
+            return {
+                "accion": "DEFENDER_TOTAL",
+                "titulo": "✅ Defender (discrepancia sobre SOAT base, no sobre descuento)",
+                "razon": (
+                    f"Contrato pactado: SOAT {signo}{factor_pct:.0f}%. HUS facturó "
+                    f"${valor_facturado:,.0f}, lo que implica valor SOAT base "
+                    f"${soat_base_hus:,.0f} para el CUPS. La EPS reconoce "
+                    f"${valor_reconocido:,.0f} (implica SOAT base ${soat_base_eps:,.0f}). "
+                    "Ambas partes aplican el mismo descuento pactado — el conflicto "
+                    "es sobre la tarifa SOAT oficial del CUPS. Verificar Circular "
+                    "Externa 047/2025 MinSalud (Manual SOAT 2026 indexado a UVB — "
+                    "UVB 2026 = $12.110) y el Decreto 780/2016; si HUS aplicó el "
+                    f"SOAT correcto, defender íntegramente los ${valor_facturado:,.0f}."
+                ),
+                "valor_a_defender": valor_objetado,
+                "valor_a_aceptar": 0.0,
+                "diferencia": valor_objetado,
+                "soat_base_hus": soat_base_hus,
+                "soat_base_eps": soat_base_eps,
+            }
+        return {
+            "accion": "REVISAR",
+            "titulo": "❔ SOAT base no identificado",
+            "razon": (
+                f"Contrato pactado: SOAT {signo}{factor_pct:.0f}%. No se extrajo "
+                "facturado/reconocido del texto y el valor SOAT base del CUPS no "
+                "está cargado. Revisar manualmente la Circular 047/2025 MinSalud "
+                "(Manual SOAT 2026 indexado a UVB — UVB 2026 = $12.110) y "
+                f"calcular tarifa pactada = Tarifa_UVB × $12.110 × {multiplicador:.3f}."
+            ),
+            "valor_a_defender": valor_objetado,
+            "valor_a_aceptar": 0.0,
+            "diferencia": 0.0,
+            "soat_base_hus": soat_base_hus,
+            "soat_base_eps": soat_base_eps,
+        }
+
+    diferencia_abs = round(valor_facturado - valor_pactado, 2)
+
+    if abs(diferencia_abs) <= tolerancia and valor_pactado > 0:
+        return {
+            "accion": "DEFENDER_TOTAL",
+            "titulo": "✅ Defender 100%",
+            "razon": (
+                f"El valor facturado (${valor_facturado:,.0f}) coincide con la "
+                f"tarifa pactada (${valor_pactado:,.0f}). La glosa es "
+                f"INJUSTIFICADA: la EPS no puede glosar lo que ella misma pactó."
+            ),
+            "valor_a_defender": valor_pactado,
+            "valor_a_aceptar": 0.0,
+            "diferencia": 0.0,
+        }
+
+    if valor_pactado > 0 and valor_facturado < valor_pactado:
+        return {
+            "accion": "DEFENDER_TOTAL",
+            "titulo": "✅ Defender 100% (facturado < pactado)",
+            "razon": (
+                f"El hospital facturó ${valor_facturado:,.0f}, MENOR al "
+                f"pactado (${valor_pactado:,.0f}). La glosa es INJUSTIFICADA: "
+                f"lo cobrado está dentro del contrato."
+            ),
+            "valor_a_defender": valor_facturado,
+            "valor_a_aceptar": 0.0,
+            "diferencia": 0.0,
+        }
+
+    if valor_pactado > 0 and diferencia_abs > tolerancia:
+        valor_a_aceptar = (
+            min(diferencia_abs, valor_objetado) if valor_objetado > 0 else diferencia_abs
+        )
+        valor_a_defender = max(0.0, valor_objetado - valor_a_aceptar) if valor_objetado > 0 else 0.0
+        cabe_en_objetado = valor_objetado > 0 and diferencia_abs <= valor_objetado + tolerancia
+        if cabe_en_objetado:
+            # Si el motivo de la EPS cuestiona la EXISTENCIA del contrato
+            # (no un cálculo), aceptar parcial valida el argumento falso.
+            # Mejor defender íntegro y registrar nota crédito INTERNA del HUS
+            # por el sobrecargo (no se cede a la glosa).
+            if cuestiona_contrato:
+                return {
+                    "accion": "DEFENDER_TOTAL_AJUSTE_INTERNO",
+                    "titulo": "🛡 Defender íntegro + ajuste interno (no ceder al argumento EPS)",
+                    "razon": (
+                        f"La EPS objeta ${valor_objetado:,.0f} alegando que NO hay "
+                        f"contrato pactado, pero el catálogo SÍ tiene tarifa para "
+                        f"este CUPS (${valor_pactado:,.0f}). Aceptar parcial validaría "
+                        f"el argumento falso de la EPS. Defender íntegros los "
+                        f"${valor_objetado:,.0f}; el sobrecargo interno HUS de "
+                        f"${diferencia_abs:,.0f} se ajusta con nota crédito al "
+                        f"expediente, NO se cede a la glosa."
+                    ),
+                    "valor_a_defender": valor_objetado,
+                    "valor_a_aceptar": 0.0,
+                    "diferencia": diferencia_abs,
+                    "ajuste_interno_sugerido": diferencia_abs,
+                }
+            return {
+                "accion": "ACEPTAR_PARCIAL",
+                "titulo": "⚠️ Aceptar parcial por la diferencia",
+                "razon": (
+                    f"El hospital facturó ${valor_facturado:,.0f} pero la "
+                    f"tarifa pactada es ${valor_pactado:,.0f}. La diferencia "
+                    f"${diferencia_abs:,.0f} SÍ procede aceptarla; el resto "
+                    f"(${valor_a_defender:,.0f}) se defiende como pactado."
+                ),
+                "valor_a_defender": valor_a_defender,
+                "valor_a_aceptar": valor_a_aceptar,
+                "diferencia": diferencia_abs,
+            }
+        else:
+            return {
+                "accion": "REVISAR",
+                "titulo": "❗ Revisar manualmente",
+                "razon": (
+                    f"La diferencia facturado-pactado (${diferencia_abs:,.0f}) "
+                    f"EXCEDE el valor objetado por la EPS (${valor_objetado:,.0f}). "
+                    f"Revisar si hay más CUPS involucrados o si la tarifa "
+                    f"cargada es la correcta."
+                ),
+                "valor_a_defender": valor_objetado,
+                "valor_a_aceptar": 0.0,
+                "diferencia": diferencia_abs,
+            }
+
+    return {
+        "accion": "REVISAR",
+        "titulo": "❔ Sin comparación posible",
+        "razon": (
+            "La tarifa pactada es $0 o no se pudo calcular. "
+            "Revisar el contrato o subir un catálogo actualizado."
+        ),
+        "valor_a_defender": valor_objetado,
+        "valor_a_aceptar": 0.0,
+        "diferencia": 0.0,
+    }
+
+
+def evaluar_glosa_tarifa(
+    db: Session,
+    eps: str,
+    cups: str,
+    valor_facturado: float = 0.0,
+    valor_objetado: float = 0.0,
+    valor_soat_base: float = 0.0,
+    valor_reconocido: float = 0.0,
+    motivo_glosa: str = "",
+) -> dict:
+    """Evalúa una glosa TA contra la tarifa pactada.
+
+    Cuando el tipo es SOAT_PORCENTAJE y no conocemos el SOAT base, pero sí
+    tenemos valor_facturado (lo que HUS cobró), asumimos que HUS aplicó
+    correctamente el manual SOAT y calculamos pactado implícito.
+    """
+    tarifa = _buscar(db, eps, cups)
+    if tarifa is None:
+        return {
+            "encontrada": False,
+            "tarifa": None,
+            "valor_facturado": valor_facturado,
+            "valor_objetado": valor_objetado,
+            "valor_reconocido": valor_reconocido,
+            "valor_pactado_calc": 0.0,
+            "recomendacion": None,
+        }
+
+    # Sanity check: si el facturado es absurdamente mayor al objetado
+    # (>50×), es señal de que el parser leyó mal el PDF (concatenó
+    # otros valores, agarró el TOTAL de la factura completa, etc.).
+    # Resetear a 0 antes de seguir — preferimos "facturado desconocido"
+    # a un valor erróneo que cause ACEPTAR_TOTAL injustificado.
+    if valor_facturado > 0 and valor_objetado > 0 and valor_facturado > 50 * valor_objetado:
+        valor_facturado = 0
+    # Ronda 47 fix: si la glosa solo trae valor_objetado (lo que la EPS
+    # reconoció de menos) y no el facturado, asumimos facturado = objetado
+    # porque lo típico es que la EPS objete el monto completo. Esto corrige
+    # el mensaje engañoso "El hospital facturó $0".
+    if valor_facturado <= 0 and valor_objetado > 0:
+        valor_facturado = valor_objetado
+
+    tipo = tarifa.tipo_tarifa or "VALOR_FIJO"
+    factor_pct = float(tarifa.factor_ajuste or 0.0)
+    es_soat_pct = tipo == "SOAT_PORCENTAJE"
+
+    # Para SOAT%, si no pasaron SOAT base pero sí tenemos facturado,
+    # asumir facturado = SOAT_base × (1+factor/100) → pactado = facturado
+    # (porque HUS ya aplicó el descuento al facturar).
+    if es_soat_pct and valor_soat_base <= 0 and valor_facturado > 0:
+        valor_soat_base = valor_facturado / (1 + factor_pct / 100.0)
+
+    valor_pactado_calc = calcular_valor_pactado(tarifa, valor_soat_base=valor_soat_base)
+
+    recomendacion = _recomendacion(
+        valor_facturado,
+        valor_pactado_calc,
+        valor_objetado,
+        es_soat_pct=es_soat_pct,
+        factor_pct=factor_pct,
+        valor_reconocido=valor_reconocido,
+        motivo_glosa=motivo_glosa,
+    )
+
+    # Ronda 45: detectar si el match fue por homologación (el cups del auditor
+    # no coincide con codigo_cups de la tarifa encontrada → sí es homologación).
+    homologado = False
+    cups_entrada = (cups or "").strip().upper()
+    cups_encontrado = (tarifa.codigo_cups or "").upper()
+    cod_ips_encontrado = (getattr(tarifa, "codigo_ips", None) or "").upper()
+    if cups_entrada and cups_entrada != cups_encontrado:
+        homologado = True
+
+    # "Contrato: —" en la caja verde (11-jun-2026): las filas importadas
+    # desde Excel de precios no traen contrato_numero. Fallback en cadena:
+    # catálogo estático de contratos vigentes (get_contrato) → metadatos
+    # del ContratoRecord en BD. Así el gestor ve "440-DIGSA/DMBUG-2025"
+    # en vez de un guion.
+    contrato_num = tarifa.contrato_numero
+    if not contrato_num:
+        try:
+            from app.services.glosa_ia_prompts import get_contrato
+
+            contrato_num = (get_contrato(tarifa.eps or "") or {}).get("numero") or None
+        except Exception:
+            contrato_num = None
+    if not contrato_num:
+        try:
+            from app.database import SessionLocal
+            from app.models.db import ContratoRecord
+
+            _db = SessionLocal()
+            try:
+                _c = (
+                    _db.query(ContratoRecord)
+                    .filter(ContratoRecord.eps == (tarifa.eps or "").upper())
+                    .first()
+                )
+                contrato_num = getattr(_c, "numero_contrato", None) if _c else None
+            finally:
+                _db.close()
+        except Exception:
+            contrato_num = None
+
+    return {
+        "encontrada": True,
+        "tarifa": {
+            "id": tarifa.id,
+            "eps": tarifa.eps,
+            "codigo_cups": tarifa.codigo_cups,
+            "codigo_ips": getattr(tarifa, "codigo_ips", None),
+            "descripcion": tarifa.descripcion,
+            "contrato_numero": contrato_num,
+            "valor_pactado": float(tarifa.valor_pactado or 0.0),
+            "tipo_tarifa": tipo,
+            "factor_ajuste": factor_pct,
+            "modalidad": tarifa.modalidad,
+            "fuente_archivo": tarifa.fuente_archivo,
+            "vigencia_desde": tarifa.vigencia_desde.isoformat() if tarifa.vigencia_desde else None,
+            "vigencia_hasta": tarifa.vigencia_hasta.isoformat() if tarifa.vigencia_hasta else None,
+        },
+        "valor_facturado": valor_facturado,
+        "valor_objetado": valor_objetado,
+        "valor_reconocido": valor_reconocido,
+        "valor_pactado_calc": valor_pactado_calc,
+        "recomendacion": recomendacion,
+        "homologacion_2641": {
+            "aplicada": homologado,
+            "codigo_entrada": cups_entrada,
+            "codigo_ips_contrato": cod_ips_encontrado,
+            "cups_oficial": cups_encontrado,
+            "norma": "Res. 2641/2025 MinSalud — CUPS 2025",
+        }
+        if homologado
+        else None,
+    }
+
+
+def pre_lookup_tarifa(
+    db: Session,
+    cod_pref: str,
+    eps: str,
+    tabla_excel: str = "",
+    contexto_pdf: str = "",
+    req_id: str = "",
+) -> Optional[dict]:
+    """Pre-lookup compartido por los flujos de análisis (analizar / reanalizar
+    / generar-lote). Devuelve `info_tarifa` listo para pasar a
+    `GlosaService.analizar(info_tarifa=...)`.
+
+    Si la glosa NO es TA*, no aplica → devuelve None.
+    Si no se identifica el CUPS, devuelve None.
+    Si no se encuentra tarifa pactada, intenta el catálogo oficial HUS/SOAT.
+    Si tampoco hay catálogo oficial, devuelve None.
+
+    Importante: sin este pre-lookup el motor genera el dictamen con argumento
+    genérico SOAT pleno aunque haya contrato pactado en BD — por eso es
+    crítico llamarlo desde TODOS los puntos donde se invoca service.analizar.
+    """
+    if not (cod_pref or "").upper().startswith("TA"):
+        return None
+    try:
+        from app.utils.parsers_glosa import _extraer_cups_servicio, _extraer_valores_glosa
+
+        cups_pre, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+        if not cups_pre:
+            return None
+        vals_pre = _extraer_valores_glosa(tabla_excel or "", cups=cups_pre)
+        # Si la glosa no trae el facturado, intentar extraerlo del PDF
+        # priorizando el valor de línea (no el total de la factura).
+        _vp_fact = vals_pre.get("facturado", 0.0)
+        if _vp_fact <= 0 and contexto_pdf:
+            _vp_pdf = _extraer_valores_glosa(contexto_pdf, cups=cups_pre)
+            if _vp_pdf.get("facturado", 0.0) > 0:
+                _vp_fact = _vp_pdf["facturado"]
+        info = evaluar_glosa_tarifa(
+            db,
+            eps=eps,
+            cups=cups_pre,
+            valor_facturado=_vp_fact,
+            valor_objetado=0.0,
+            valor_reconocido=vals_pre.get("reconocido", 0.0),
+            motivo_glosa=tabla_excel or "",
+        )
+        if info.get("encontrada"):
+            return info
+        # Fallback al catálogo oficial HUS/SOAT
+        from app.services.tarifas_oficiales import tarifa_a_banner_dict
+
+        ofic = tarifa_a_banner_dict(cups_pre)
+        if not ofic:
+            return None
+        diff = abs(vals_pre.get("facturado", 0.0) - ofic["valor_pactado"])
+        accion = "DEFENDER_TOTAL" if diff < max(1.0, ofic["valor_pactado"] * 0.005) else "REVISAR"
+        return {
+            "encontrada": True,
+            "tarifa": ofic,
+            "valor_facturado": vals_pre.get("facturado", 0.0),
+            "valor_objetado": 0.0,
+            "valor_reconocido": vals_pre.get("reconocido", 0.0),
+            "valor_pactado_calc": ofic["valor_pactado"],
+            "recomendacion": {
+                "accion": accion,
+                "titulo": "Valor oficial conocido",
+                "razon": "",
+            },
+        }
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).warning(f"[{req_id}] pre_lookup_tarifa falló: {e}")
+        return None
+
+
+def formato_texto_banner(info: dict) -> str:
+    """Construye un texto plano resumen para inyectar al prompt de la IA.
+
+    Devuelve "" si no hay tarifa encontrada. Se usa como contexto extra
+    en el prompt del LLM para que genere un dictamen con datos duros.
+    """
+    if not info or not info.get("encontrada"):
+        return ""
+    t = info["tarifa"]
+    r = info.get("recomendacion") or {}
+    tipo = t.get("tipo_tarifa", "VALOR_FIJO")
+    if tipo == "SOAT_PORCENTAJE":
+        factor = t.get("factor_ajuste", 0.0)
+        signo = "+" if factor > 0 else ""
+        pactada_txt = f"SOAT {signo}{factor:.0f}% (factor pactado)"
+    else:
+        pactada_txt = f"${t.get('valor_pactado', 0):,.0f} (valor fijo)"
+    return (
+        "\n[TARIFA PACTADA ENCONTRADA EN EL CONTRATO]\n"
+        f"CUPS: {t.get('codigo_cups')}\n"
+        f"Descripción: {t.get('descripcion') or '—'}\n"
+        f"EPS: {t.get('eps')}\n"
+        f"Contrato: {t.get('contrato_numero') or '—'}\n"
+        f"Modalidad: {t.get('modalidad') or '—'}\n"
+        f"Tarifa pactada: {pactada_txt}\n"
+        f"Valor facturado por HUS: ${info['valor_facturado']:,.0f}\n"
+        f"Valor objetado por EPS: ${info['valor_objetado']:,.0f}\n"
+        f"Recomendación: {r.get('titulo', '—')} — {r.get('razon', '')}\n"
+        "USA ESTOS DATOS EN TU DICTAMEN. Cita el número de contrato y "
+        "el valor pactado exacto. Argumenta que la EPS no puede desconocer "
+        "lo que ella misma pactó (Art. 1602 C.Civil; Art. 871 C.Comercio).\n"
+    )

@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Motor de Glosas HUS — Sistema de Inteligencia Artificial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --navy:#0e1f3d; --navy2:#1a3560; --teal:#0d9488; --teal2:#0b7c6e;
+  --amber:#b45309; --green:#15803d; --red:#b91c1c; --gray:#374151;
+  --bg:#f8fafc; --card:#ffffff; --border:#e5e7eb; --text:#0f172a; --text2:#475569; --text3:#94a3b8;
+  --sh:0 1px 3px rgba(0,0,0,.05),0 4px 12px rgba(0,0,0,.05);
+  --sh-lg:0 10px 30px rgba(14,31,61,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55}
+.slide{min-height:100vh;padding:3.5rem 4rem;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid var(--border);page-break-after:always;position:relative}
+.slide:nth-child(even){background:#f1f5f9}
+.slide-num{position:absolute;top:1.25rem;right:1.5rem;font-size:.7rem;color:var(--text3);font-weight:600;letter-spacing:.5px}
+.slide-tag{display:inline-block;background:var(--teal);color:#fff;font-size:.7rem;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;margin-bottom:1.25rem}
+h1{font-size:3rem;font-weight:800;letter-spacing:-.03em;color:var(--navy);line-height:1.1;margin-bottom:1rem}
+h2{font-size:2rem;font-weight:800;letter-spacing:-.02em;color:var(--navy);line-height:1.15;margin-bottom:1.5rem}
+h3{font-size:1.3rem;font-weight:700;color:var(--navy);margin-bottom:.6rem}
+h4{font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:.4rem}
+p{font-size:1rem;color:var(--text2);max-width:70ch;margin-bottom:.75rem}
+.lead{font-size:1.15rem;color:var(--text2);max-width:58ch;font-weight:400}
+.muted{color:var(--text3);font-size:.85rem}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1rem}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;margin-top:1rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;box-shadow:var(--sh)}
+.card-accent{border-left:4px solid var(--teal)}
+.card-accent-navy{border-left:4px solid var(--navy)}
+.card-accent-amber{border-left:4px solid var(--amber)}
+.card-accent-green{border-left:4px solid var(--green)}
+.card-accent-red{border-left:4px solid var(--red)}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.1rem}
+.kpi .n{font-size:2rem;font-weight:800;color:var(--navy);line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:.68rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.b-green{background:#d1fae5;color:#065f46}
+.b-red{background:#fee2e2;color:#991b1b}
+.b-amber{background:#fef3c7;color:#92400e}
+.b-navy{background:var(--navy);color:#fff}
+.b-teal{background:var(--teal);color:#fff}
+ul{list-style:none;margin-top:.5rem}
+ul.chk li{position:relative;padding-left:1.6rem;margin-bottom:.45rem;font-size:.95rem;color:var(--text2)}
+ul.chk li::before{content:'';position:absolute;left:0;top:.45rem;width:14px;height:14px;background:var(--teal);border-radius:4px;box-shadow:inset 0 0 0 2px var(--teal)}
+ul.chk li::after{content:'✓';position:absolute;left:2px;top:-1px;color:#fff;font-size:11px;font-weight:800}
+ul.arrow li{position:relative;padding-left:1.3rem;margin-bottom:.4rem;font-size:.92rem;color:var(--text2)}
+ul.arrow li::before{content:'→';position:absolute;left:0;top:0;color:var(--teal);font-weight:800}
+table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:.88rem;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
+thead tr{background:var(--navy);color:#fff}
+th,td{padding:.75rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+th{font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#f8fafc}
+.highlight{background:linear-gradient(to bottom,transparent 65%,rgba(13,148,136,.2) 65%);padding:0 2px}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.82rem;background:#f1f5f9;padding:2px 6px;border-radius:4px;color:var(--navy)}
+.divider{height:1px;background:var(--border);margin:2rem 0}
+.hero-bg{background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 60%,var(--teal) 100%);color:#fff;min-height:100vh;padding:4rem;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
+.hero-bg::after{content:'';position:absolute;right:-100px;top:-100px;width:500px;height:500px;border-radius:50%;background:rgba(13,148,136,.15);filter:blur(80px)}
+.hero-bg h1{color:#fff;font-size:4rem;line-height:1}
+.hero-bg .lead{color:rgba(255,255,255,.85);font-size:1.3rem;margin-top:1.5rem;max-width:70ch}
+.hero-bg .meta{margin-top:3rem;font-size:.85rem;color:rgba(255,255,255,.6);letter-spacing:.5px}
+.hus-badge{display:flex;align-items:center;gap:.85rem;margin-bottom:2rem;position:relative;z-index:2}
+.hus-badge-icon{width:52px;height:52px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;letter-spacing:.5px}
+.hus-badge-text{color:rgba(255,255,255,.75);font-size:.85rem;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.flow{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:1.25rem}
+.flow-step{flex:1;min-width:140px;background:var(--card);border:2px solid var(--border);border-radius:12px;padding:1rem;text-align:center;position:relative;transition:all .2s}
+.flow-step .n{display:inline-block;width:28px;height:28px;background:var(--teal);color:#fff;border-radius:50%;line-height:28px;font-weight:700;font-size:.85rem;margin-bottom:.5rem}
+.flow-step .t{font-size:.8rem;font-weight:700;color:var(--navy)}
+.flow-step .s{font-size:.7rem;color:var(--text3);margin-top:2px}
+.flow-arrow{color:var(--teal);font-size:1.5rem;font-weight:800}
+.compare-col{padding:1.5rem;border-radius:14px;color:#fff}
+.col-gpt{background:linear-gradient(135deg,#64748b 0%,#334155 100%)}
+.col-claude{background:linear-gradient(135deg,var(--teal) 0%,var(--navy) 100%)}
+.compare-col h3{color:#fff;font-size:1.1rem}
+.compare-col .price{font-size:.75rem;color:rgba(255,255,255,.7);margin-top:.3rem}
+.compare-col ul li{color:rgba(255,255,255,.95);font-size:.85rem}
+.compare-col ul.chk li::before{background:rgba(255,255,255,.25);box-shadow:none}
+.compare-col ul.chk li::after{color:#fff}
+nav.toc{position:fixed;top:0;left:0;right:0;background:rgba(14,31,61,.96);backdrop-filter:blur(12px);z-index:1000;padding:.6rem 1rem;font-size:.72rem;border-bottom:1px solid rgba(255,255,255,.08)}
+nav.toc a{color:rgba(255,255,255,.7);text-decoration:none;margin-right:1rem;transition:color .2s}
+nav.toc a:hover{color:var(--teal)}
+@media print{
+  nav.toc{display:none}
+  .slide{min-height:auto;padding:1.5rem;page-break-after:always}
+  body{background:#fff}
+}
+@media(max-width:900px){
+  .slide{padding:2rem 1.5rem}
+  .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+  h1{font-size:2rem}.hero-bg h1{font-size:2.5rem}h2{font-size:1.5rem}
+  .flow{flex-direction:column}.flow-arrow{transform:rotate(90deg)}
+}
+</style>
+</head>
+<body>
+
+<nav class="toc">
+  <a href="#s1">1 · Portada</a>
+  <a href="#s2">2 · ¿Qué es IA?</a>
+  <a href="#s3">3 · Cómo funciona</a>
+  <a href="#s4">4 · Funcionalidades</a>
+  <a href="#s5">5 · Arquitectura</a>
+  <a href="#s6">6 · Mejoras</a>
+  <a href="#s7">7 · Modelo actual</a>
+  <a href="#s8">8 · Claude</a>
+  <a href="#s9">9 · Comparación</a>
+  <a href="#s10">10 · ROI</a>
+  <a href="#s11">11 · Roadmap</a>
+</nav>
+
+<!-- ═══════ SLIDE 1 — PORTADA ═══════ -->
+<section id="s1" class="hero-bg">
+  <div class="hus-badge">
+    <div class="hus-badge-icon">HUS</div>
+    <div>
+      <div class="hus-badge-text">ESE Hospital Universitario de Santander</div>
+      <div style="color:rgba(255,255,255,.5);font-size:.72rem;margin-top:2px">Bucaramanga · NIT 900.006.037-4</div>
+    </div>
+  </div>
+  <h1>Motor de Glosas HUS</h1>
+  <p class="lead">Sistema automatizado de defensa técnico-jurídica de glosas médicas con Inteligencia Artificial — arquitectura, estado actual y hoja de ruta.</p>
+  <div class="meta">PRESENTACIÓN TÉCNICA · VERSIÓN 2026</div>
+</section>
+
+<!-- ═══════ SLIDE 2 — ¿QUÉ ES LA IA? ═══════ -->
+<section id="s2" class="slide">
+  <div class="slide-num">02 / 11</div>
+  <div class="slide-tag">Fundamentos</div>
+  <h2>¿Qué es la Inteligencia Artificial que usa el Motor?</h2>
+  <p class="lead">Un <strong>Modelo de Lenguaje Grande</strong> (LLM, por sus siglas en inglés) es un sistema entrenado con millones de textos legales, clínicos y técnicos. A partir de ese conocimiento, produce respuestas en español jurídico formal cuando se le presenta un caso concreto.</p>
+
+  <div class="grid-3" style="margin-top:2rem">
+    <div class="card card-accent">
+      <h4>No es una búsqueda en Google</h4>
+      <p class="muted">No copia respuestas de internet. Cada argumento se genera de forma original según el caso (EPS, CUPS, fechas, valores).</p>
+    </div>
+    <div class="card card-accent-navy">
+      <h4>No es un humano</h4>
+      <p class="muted">Es un asistente. Puede equivocarse o alucinar datos. Por eso cada respuesta se revisa antes de radicar.</p>
+    </div>
+    <div class="card card-accent-amber">
+      <h4>Está especializada</h4>
+      <p class="muted">La instruimos explícitamente con el marco normativo colombiano, contratos del HUS y jurisprudencia relevante.</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="grid-2">
+    <div>
+      <h3>¿Por qué usarla en glosas?</h3>
+      <ul class="chk">
+        <li>Cada glosa requiere argumento técnico-jurídico extenso (250-500 palabras).</li>
+        <li>Deben citarse normas específicas (Ley 1438/2011, Resolución 3047/2008, sentencias T-1025, T-760).</li>
+        <li>Responder manualmente cada glosa toma 30-60 minutos; la IA lo hace en 10-30 segundos.</li>
+        <li>Estandariza la calidad del argumento entre todos los gestores del equipo.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Lo que no reemplaza</h3>
+      <ul class="arrow">
+        <li>El <strong>criterio del auditor médico</strong> en casos clínicos complejos.</li>
+        <li>La <strong>revisión final</strong> antes de radicar la respuesta ante la EPS.</li>
+        <li>La <strong>negociación y conciliación</strong> presencial entre partes.</li>
+        <li>El <strong>soporte documental físico</strong> (historia clínica, facturas, RIPS).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 3 — ¿CÓMO FUNCIONA? ═══════ -->
+<section id="s3" class="slide">
+  <div class="slide-num">03 / 11</div>
+  <div class="slide-tag">Arquitectura funcional</div>
+  <h2>¿Cómo funciona el sistema en 5 pasos?</h2>
+
+  <div class="flow">
+    <div class="flow-step"><div class="n">1</div><div class="t">INGRESO</div><div class="s">El gestor sube el Excel de recepción o ingresa la glosa manualmente</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><div class="n">2</div><div class="t">DETECCIÓN</div><div class="s">El sistema identifica código, tipo, EPS, fechas, extemporaneidad</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><div class="n">3</div><div class="t">CONTEXTUALIZA</div><div class="s">Extrae datos clínicos del PDF (Glasgow, CIE-10, signos vitales)</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><div class="n">4</div><div class="t">ARGUMENTA</div><div class="s">La IA genera la defensa con marco normativo inline y datos del caso</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><div class="n">5</div><div class="t">ENTREGA</div><div class="s">Dictamen formateado listo para radicar, con código de respuesta (RE9502 / RE9901...)</div></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>Casos automáticos (sin llamar a la IA)</h3>
+  <div class="grid-3">
+    <div class="card card-accent-red">
+      <span class="badge b-red">RE9502</span>
+      <h4 style="margin-top:.5rem">Extemporánea</h4>
+      <p class="muted">Si la EPS glosó fuera de los 20 días hábiles (Art. 56 Ley 1438/2011), se aplica texto fijo de aceptación tácita sin consumir IA.</p>
+    </div>
+    <div class="card card-accent-navy">
+      <span class="badge b-navy">RE9901</span>
+      <h4 style="margin-top:.5rem">Ratificada</h4>
+      <p class="muted">Si la etapa es RATIFICACIÓN, se aplica texto fijo de mantenimiento de respuesta + solicitud de conciliación.</p>
+    </div>
+    <div class="card card-accent-amber">
+      <span class="badge b-amber">RE9702 / RE9801</span>
+      <h4 style="margin-top:.5rem">Aceptación total o parcial</h4>
+      <p class="muted">Si hay valor aceptado por el HUS, se genera dictamen de aceptación conforme al Anexo Técnico 5 de Res. 3047/2008.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 4 — FUNCIONALIDADES ═══════ -->
+<section id="s4" class="slide">
+  <div class="slide-num">04 / 11</div>
+  <div class="slide-tag">Implementado</div>
+  <h2>Funcionalidades implementadas</h2>
+  <p class="lead">Estado actual del Motor de Glosas HUS: lo que hoy está en producción y funcionando.</p>
+
+  <div class="grid-2" style="margin-top:1.5rem">
+    <div class="card">
+      <h3>Análisis IA de glosas</h3>
+      <ul class="chk">
+        <li>Análisis por tipo: TA (tarifaria), SO (soportes), AU (autorización), CO (cobertura), CL/PE (pertinencia), FA (facturación), IN (insumos), ME (medicamentos).</li>
+        <li>Detección automática de glosas extemporáneas (>20 días hábiles).</li>
+        <li>Detección automática de ratificaciones (texto "RATIFICADA" en columna RADICADO).</li>
+        <li>Manejo de aceptaciones totales y parciales.</li>
+        <li>Integración con marco normativo colombiano completo.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Importación masiva desde Excel</h3>
+      <ul class="chk">
+        <li>Lee el archivo de recepción tal como lo envía el equipo.</li>
+        <li>Reconoce 17 columnas: GESTOR, FECHA DE ENTREGA, FECHA RADICACIÓN, FECHA DOCUMENTO DGH, VENCE, CONSECUTIVO DGH, RADICADO, REFERENCIA, OBSERVACIÓN TÉCNICO, TIPO GLOSA, PROFESIONAL, etc.</li>
+        <li>Detecta automáticamente casos PPL/FOMAG con observación "NO APLICAR EXTEMPORANEIDAD".</li>
+        <li>Actualiza glosas existentes en lugar de duplicar (upsert por factura + consecutivo).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Semáforo de vencimientos</h3>
+      <ul class="chk">
+        <li><span class="badge b-green">VERDE</span> más de 10 días hábiles restantes.</li>
+        <li><span class="badge b-amber">AMARILLO</span> entre 5 y 10 días hábiles.</li>
+        <li><span class="badge b-red">ROJO</span> menos de 5 días hábiles.</li>
+        <li><span class="badge" style="background:#111;color:#fff">VENCIDAS</span> ya pasó la fecha de respuesta.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Gestión por gestor asignado</h3>
+      <ul class="chk">
+        <li>Panel "Mis Glosas" — cada gestor ve solo las facturas que le corresponden.</li>
+        <li>16 usuarios corporativos sembrados con rol y nombre real (YESID PEREZ, DIANEYDA QUINTERO, IRMA RIOS, etc.).</li>
+        <li>Botón "Responder" pre-rellena el formulario con EPS, fechas, factura y radicado.</li>
+        <li>Permisos por rol: SUPER_ADMIN, COORDINADOR, AUDITOR, VIEWER.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Notificación broadcast por correo</h3>
+      <ul class="chk">
+        <li>Al subir un Excel, un correo HTML se envía a toda la lista de gestores (variable ALERTAS_EMAIL).</li>
+        <li>Incluye resumen, semáforo, asignaciones por gestor y link al sistema.</li>
+        <li>Vía SMTP configurable (Brevo, Gmail con App Password, SMTP corporativo).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Extracción de datos del PDF</h3>
+      <ul class="chk">
+        <li>Lee historia clínica adjunta y extrae 13 campos: paciente, edad, sexo, CIE-10, CUPS, signos vitales, Glasgow, laboratorios, médico tratante, evolución.</li>
+        <li>Estos datos se incorporan textualmente al argumento IA como evidencia objetiva.</li>
+        <li>Cuando no hay PDF, la IA usa argumentación basada en el contrato y la normativa.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 5 — ARQUITECTURA TÉCNICA ═══════ -->
+<section id="s5" class="slide">
+  <div class="slide-num">05 / 11</div>
+  <div class="slide-tag">Stack tecnológico</div>
+  <h2>Arquitectura del sistema</h2>
+  <p class="lead">El Motor de Glosas se ejecuta en Render (nube), con base de datos PostgreSQL persistente y arquitectura serverless escalable.</p>
+
+  <div class="grid-3" style="margin-top:1.5rem">
+    <div class="card card-accent">
+      <h4>Frontend</h4>
+      <p class="muted">HTML + JavaScript vanilla + Chart.js.<br>Sin frameworks pesados. Carga rápida en cualquier navegador moderno.</p>
+    </div>
+    <div class="card card-accent">
+      <h4>Backend API</h4>
+      <p class="muted">Python 3.10 + FastAPI (async).<br>Valida datos, coordina IA, persiste en base de datos.</p>
+    </div>
+    <div class="card card-accent">
+      <h4>Base de datos</h4>
+      <p class="muted">PostgreSQL (Render).<br>Historial de glosas, usuarios, contratos, conciliaciones, auditoría.</p>
+    </div>
+  </div>
+
+  <div class="grid-3" style="margin-top:1rem">
+    <div class="card card-accent-navy">
+      <h4>Modelo IA actual</h4>
+      <p class="muted"><span class="mono">openai/gpt-oss-120b</span> vía Groq Cloud — 500 tokens/segundo.<br><strong>Claude Sonnet 4.6</strong> como fallback vía Anthropic API.</p>
+    </div>
+    <div class="card card-accent-navy">
+      <h4>Correo SMTP</h4>
+      <p class="muted">Brevo (300 emails/día gratis) o SMTP corporativo HUS.<br>Envío asíncrono en background.</p>
+    </div>
+    <div class="card card-accent-navy">
+      <h4>Autenticación</h4>
+      <p class="muted">JWT con expiración configurable.<br>Hasheo de contraseñas con bcrypt (12 rounds).<br>Rate limiting en endpoints sensibles.</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>Seguridad y cumplimiento</h3>
+  <div class="grid-4">
+    <div class="kpi"><div class="n">HTTPS</div><div class="l">Todas las conexiones</div></div>
+    <div class="kpi"><div class="n">JWT</div><div class="l">Tokens de sesión</div></div>
+    <div class="kpi"><div class="n">CORS</div><div class="l">Orígenes restringidos</div></div>
+    <div class="kpi"><div class="n">Audit</div><div class="l">Registro de acciones</div></div>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 6 — MEJORAS RECIENTES ═══════ -->
+<section id="s6" class="slide">
+  <div class="slide-num">06 / 11</div>
+  <div class="slide-tag">Evolución del sistema</div>
+  <h2>Mejoras implementadas en esta iteración</h2>
+  <p class="lead">Auditoría técnica realizada sobre respuestas reales de la IA. Detectamos y corregimos problemas críticos:</p>
+
+  <table>
+    <thead>
+      <tr><th style="width:30%">Problema detectado</th><th style="width:35%">Impacto</th><th>Solución aplicada</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Alucinación de datos</strong></td>
+        <td>La IA inventaba nombres de EPS, números de contrato y facturas que no se habían ingresado.</td>
+        <td>Prompt reforzado con reglas anti-alucinación. Si no hay dato, dice "SEGÚN CONSTA EN EL EXPEDIENTE".</td>
+      </tr>
+      <tr>
+        <td><strong>Caché cruzado</strong></td>
+        <td>Dos glosas distintas recibían la misma respuesta por colisión en caché.</td>
+        <td>Clave de caché ahora incluye EPS + código de glosa + prompt completo.</td>
+      </tr>
+      <tr>
+        <td><strong>Confusión de tipo de glosa</strong></td>
+        <td>Glosas de Autorización (AU) recibían respuestas tipo "FACTURACIÓN". Sentencias clave no se citaban.</td>
+        <td>Prompts dedicados por cada tipo: SYSTEM_AU (con T-1025/2002), SYSTEM_IN, SYSTEM_ME.</td>
+      </tr>
+      <tr>
+        <td><strong>Régimen especial ignorado</strong></td>
+        <td>PPL/FOMAG recibían argumentos PBS genéricos sin citar Res. 5159/2015 ni Ley 1709/2014.</td>
+        <td>Detección automática del régimen por EPS con inyección de normativa específica.</td>
+      </tr>
+      <tr>
+        <td><strong>Respuestas genéricas con relleno</strong></td>
+        <td>Texto saturado de muletillas, separadores visibles, bloque de normas final aislado del argumento.</td>
+        <td>Estilo narrativo continuo, citas inline, extensión óptima 250-500 palabras.</td>
+      </tr>
+      <tr>
+        <td><strong>Código de respuesta erróneo en ratificaciones</strong></td>
+        <td>Ratificaciones con +20 días daban RE9502 (aceptación tácita) en lugar de RE9901.</td>
+        <td>Orden de validación corregido: ratificación prevalece sobre extemporaneidad.</td>
+      </tr>
+      <tr>
+        <td><strong>Tarifa incorrecta Dispensario Médico</strong></td>
+        <td>Sistema aplicaba SOAT -15% cuando contrato 440-DIGSA/DMBUG-2025 pacta SOAT/SMLV -20%.</td>
+        <td>Factor contractual actualizado a 0.80 en motor de cálculo.</td>
+      </tr>
+      <tr>
+        <td><strong>PDF no aprovechado</strong></td>
+        <td>La IA ignoraba datos clínicos del PDF adjunto (Glasgow, leucocitos, médico tratante).</td>
+        <td>Extractor ampliado a 13 campos + inyección forzada al argumento.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════ SLIDE 7 — MODELO ACTUAL ═══════ -->
+<section id="s7" class="slide">
+  <div class="slide-num">07 / 11</div>
+  <div class="slide-tag">Modelo IA en producción</div>
+  <h2>Modelo actual: GPT-OSS 120B (vía Groq)</h2>
+  <p class="lead">Hoy el motor usa <span class="mono">openai/gpt-oss-120b</span>, un modelo abierto de OpenAI ejecutado en la infraestructura Groq, reconocida por su alta velocidad de inferencia.</p>
+
+  <div class="grid-4" style="margin-top:1.5rem">
+    <div class="kpi"><div class="n">500</div><div class="l">Tokens/segundo</div></div>
+    <div class="kpi"><div class="n">120B</div><div class="l">Parámetros</div></div>
+    <div class="kpi"><div class="n">131K</div><div class="l">Context window</div></div>
+    <div class="kpi"><div class="n">~$1.50</div><div class="l">Costo mensual (500 análisis)</div></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="grid-2">
+    <div class="card card-accent-green">
+      <h3>Ventajas</h3>
+      <ul class="chk">
+        <li>Respuestas rápidas: 5-10 segundos por glosa.</li>
+        <li>Costo muy bajo: $0.15 por millón de tokens de entrada.</li>
+        <li>Calidad suficiente para casos estándar (TA, SO, CO).</li>
+        <li>Buena adherencia a estructura de respuesta.</li>
+        <li>Funciona con caché para glosas repetidas.</li>
+      </ul>
+    </div>
+    <div class="card card-accent-amber">
+      <h3>Limitaciones observadas</h3>
+      <ul class="arrow">
+        <li>Alucinaciones ocasionales en datos no ingresados (ha mejorado con el prompt reforzado).</li>
+        <li>En casos complejos (régimen especial, alta complejidad clínica) puede perder matices.</li>
+        <li>Español jurídico menos refinado que modelos frontera como Claude.</li>
+        <li>Sin razonamiento profundo sobre ambigüedades contractuales.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 8 — CLAUDE / ANTHROPIC ═══════ -->
+<section id="s8" class="slide">
+  <div class="slide-num">08 / 11</div>
+  <div class="slide-tag">Alternativa premium</div>
+  <h2>¿Y si usamos Claude de Anthropic?</h2>
+  <p class="lead"><strong>Anthropic</strong> es la empresa; <strong>Claude</strong> es su familia de modelos. Claude Sonnet 4.6 es, al día de hoy, uno de los mejores modelos del mundo en seguimiento de instrucciones, escritura técnica en español y reducción de alucinaciones.</p>
+
+  <div class="grid-3" style="margin-top:1.5rem">
+    <div class="card card-accent-navy">
+      <h4>Claude Haiku 4.5</h4>
+      <p class="muted">El más rápido de la familia.<br>Ideal para tareas simples.<br>$1 / $5 por millón de tokens.</p>
+    </div>
+    <div class="card card-accent-navy" style="border-left-color:var(--teal);background:#f0fdfa">
+      <h4>Claude Sonnet 4.6 <span class="badge b-teal">Recomendado</span></h4>
+      <p class="muted">Equilibrio calidad/costo.<br>Mejor para glosas y documentos legales.<br>$3 / $15 por millón de tokens.</p>
+    </div>
+    <div class="card card-accent-navy">
+      <h4>Claude Opus 4.7</h4>
+      <p class="muted">El más potente, razonamiento profundo.<br>Overkill para glosas estándar.<br>$15 / $75 por millón de tokens.</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>Por qué Claude mejoraría la redacción del motor</h3>
+  <div class="grid-2">
+    <div>
+      <ul class="chk">
+        <li><strong>Español jurídico más refinado</strong> — terminología notarial, construcciones gramaticales impecables.</li>
+        <li><strong>Alucinación prácticamente nula</strong> — respeta los datos del prompt sin inventar EPS, contratos o pacientes.</li>
+        <li><strong>Seguimiento de instrucciones casi perfecto</strong> — empezará siempre con "ESE HUS NO ACEPTA...", nunca dejará marcas tipo <span class="mono">---</span> o placeholders.</li>
+        <li><strong>Razonamiento contractual</strong> — distingue mejor entre régimen PBS, PPL, FOMAG, ARL sin instrucciones extras.</li>
+      </ul>
+    </div>
+    <div>
+      <ul class="arrow">
+        <li>Si el PDF tiene historia clínica compleja (múltiples diagnósticos, comorbilidades), Claude la sintetiza con precisión clínica.</li>
+        <li>Cuando se le piden cambios de estilo, obedece literalmente en el primer intento.</li>
+        <li>Mantiene tono formal-técnico consistente a lo largo de miles de palabras sin repeticiones.</li>
+        <li>Considera implicaciones legales cruzadas (un argumento tarifario que también tiene dimensión de soportes, por ejemplo).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 9 — COMPARACIÓN ═══════ -->
+<section id="s9" class="slide">
+  <div class="slide-num">09 / 11</div>
+  <div class="slide-tag">Comparativa directa</div>
+  <h2>GPT-OSS 120B vs Claude Sonnet 4.6</h2>
+
+  <div class="grid-2" style="margin-top:1.5rem">
+    <div class="compare-col col-gpt">
+      <span class="badge" style="background:rgba(255,255,255,.2);color:#fff">ACTUAL</span>
+      <h3 style="margin-top:.6rem">GPT-OSS 120B</h3>
+      <div class="price">$0.15 / $0.60 por millón de tokens</div>
+      <ul class="chk" style="margin-top:1rem">
+        <li>Velocidad: 500 tokens/segundo (⚡ muy rápido)</li>
+        <li>Costo mensual: ~$1.50 USD</li>
+        <li>Calidad general: 8/10</li>
+        <li>Anti-alucinación: 8/10</li>
+        <li>Español jurídico: 7/10</li>
+        <li>Estructura narrativa: 8/10</li>
+        <li>Casos edge / régimen especial: 7/10</li>
+      </ul>
+    </div>
+    <div class="compare-col col-claude">
+      <span class="badge" style="background:#fff;color:var(--navy)">PROPUESTA</span>
+      <h3 style="margin-top:.6rem">Claude Sonnet 4.6</h3>
+      <div class="price">$3.00 / $15.00 por millón de tokens</div>
+      <ul class="chk" style="margin-top:1rem">
+        <li>Velocidad: 60-120 tokens/segundo (↓ más lento)</li>
+        <li>Costo mensual: ~$30 USD (20× más)</li>
+        <li>Calidad general: 9.5/10</li>
+        <li>Anti-alucinación: 10/10</li>
+        <li>Español jurídico: 9.5/10</li>
+        <li>Estructura narrativa: 10/10</li>
+        <li>Casos edge / régimen especial: 9.5/10</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>Arquitectura híbrida recomendada</h3>
+  <div class="card card-accent">
+    <p>El código actual ya soporta <strong>ambos proveedores</strong>. Se puede configurar Claude como modelo primario y GPT-OSS como fallback automático cuando Claude falle o se alcance el rate limit. Así se obtiene lo mejor de ambos:</p>
+    <ul class="arrow" style="margin-top:.5rem">
+      <li>Claude para <strong>glosas críticas</strong> (régimen especial, alto valor, casos complejos).</li>
+      <li>GPT-OSS para <strong>glosas estándar</strong> (tarifarias repetitivas, soportes simples).</li>
+      <li>Se puede alternar con variable de entorno <span class="mono">IA_PRIMARIO=anthropic</span> o <span class="mono">IA_PRIMARIO=groq</span>.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 10 — ROI ═══════ -->
+<section id="s10" class="slide">
+  <div class="slide-num">10 / 11</div>
+  <div class="slide-tag">Análisis costo-beneficio</div>
+  <h2>¿Vale la pena el salto a Claude?</h2>
+  <p class="lead">Comparación económica asumiendo 500 análisis mensuales con prompts de 6K tokens de entrada y 2.5K de salida.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Concepto</th>
+        <th>GPT-OSS 120B</th>
+        <th>Claude Sonnet 4.6</th>
+        <th>Diferencia</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Costo mensual IA</td>
+        <td>~$1.50 USD</td>
+        <td>~$30 USD</td>
+        <td><span class="badge b-amber">+$28.50</span></td>
+      </tr>
+      <tr>
+        <td>Tiempo por glosa</td>
+        <td>5-10 segundos</td>
+        <td>30-60 segundos</td>
+        <td><span class="muted">Más lento, pero aceptable</span></td>
+      </tr>
+      <tr>
+        <td>Errores a corregir manualmente</td>
+        <td>~15% de glosas</td>
+        <td>~2% de glosas</td>
+        <td><span class="badge b-green">↓ 87% menos</span></td>
+      </tr>
+      <tr>
+        <td>Valor promedio por glosa TA</td>
+        <td>$500.000 — $5.000.000 COP</td>
+        <td>Igual</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Probabilidad de defensa exitosa</td>
+        <td>Alta en casos estándar</td>
+        <td>Alta incluso en casos complejos</td>
+        <td><span class="badge b-green">+10-15% de recuperación</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <div class="grid-2">
+    <div class="card card-accent-green">
+      <h3>Punto de equilibrio</h3>
+      <p>Con recuperar <strong>1 sola glosa tarifaria adicional al mes</strong> gracias al mejor argumento de Claude (valor promedio $1.000.000 COP ≈ $250 USD), el ROI mensual es de <strong>~8×</strong>.</p>
+      <p class="muted" style="margin-top:.6rem">El costo extra de $28 USD se amortiza con el primer caso ganado.</p>
+    </div>
+    <div class="card card-accent-navy">
+      <h3>Recomendación institucional</h3>
+      <ul class="arrow">
+        <li>Operar en modo <strong>híbrido</strong>: Claude Sonnet 4.6 como primario, GPT-OSS como fallback.</li>
+        <li>Medir durante <strong>30 días</strong> la tasa real de éxito de glosas vs el modelo anterior.</li>
+        <li>Escalar a <strong>Opus 4.7</strong> únicamente en litigios de alto valor (>$20M COP) o casos ante Supersalud.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ SLIDE 11 — ROADMAP + CIERRE ═══════ -->
+<section id="s11" class="slide">
+  <div class="slide-num">11 / 11</div>
+  <div class="slide-tag">Hoja de ruta</div>
+  <h2>Próximos pasos propuestos</h2>
+
+  <div class="grid-3" style="margin-top:1.5rem">
+    <div class="card card-accent">
+      <span class="badge b-teal">Corto plazo · 2 semanas</span>
+      <h4 style="margin-top:.5rem">Integración Claude</h4>
+      <ul class="arrow">
+        <li>Activar API Key de Anthropic en Render.</li>
+        <li>Configurar <span class="mono">IA_PRIMARIO=anthropic</span>.</li>
+        <li>A/B test de 30 días con métricas.</li>
+      </ul>
+    </div>
+    <div class="card card-accent">
+      <span class="badge b-teal">Mediano plazo · 1-2 meses</span>
+      <h4 style="margin-top:.5rem">RAG de jurisprudencia</h4>
+      <ul class="arrow">
+        <li>Base de sentencias y conceptos MinSalud indexada.</li>
+        <li>IA busca precedentes similares antes de argumentar.</li>
+        <li>Mayor especificidad y menos generalidades.</li>
+      </ul>
+    </div>
+    <div class="card card-accent">
+      <span class="badge b-teal">Largo plazo · 3-6 meses</span>
+      <h4 style="margin-top:.5rem">Dashboard ejecutivo</h4>
+      <ul class="arrow">
+        <li>Métricas en tiempo real: tasa de éxito, días promedio, top EPS.</li>
+        <li>Predicción del valor recuperable por EPS.</li>
+        <li>Alertas proactivas por gestor.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>Resumen ejecutivo</h3>
+  <div class="card">
+    <p style="font-size:1.05rem">El <strong>Motor de Glosas HUS</strong> es hoy una herramienta de producción estable, con <strong>16 usuarios corporativos</strong>, flujo completo de <strong>importación masiva</strong>, <strong>análisis IA</strong>, <strong>semáforo de vencimientos</strong> y <strong>notificación automática</strong> por correo.</p>
+    <p style="font-size:1.05rem;margin-top:.75rem">El modelo IA actual <span class="mono">GPT-OSS 120B</span> cubre adecuadamente el volumen estándar de glosas a muy bajo costo. La actualización a <strong>Claude Sonnet 4.6</strong> elevaría la calidad de los argumentos a nivel notarial por un costo incremental marginal (~$28 USD/mes) con ROI inmediato a partir de la primera glosa adicional recuperada.</p>
+    <p style="font-size:1.05rem;margin-top:.75rem"><strong>Recomendación:</strong> operar en arquitectura híbrida (Claude primario + GPT-OSS fallback) y medir resultados durante 30 días para tomar decisión definitiva basada en datos.</p>
+  </div>
+
+  <div style="margin-top:3rem;padding-top:1.5rem;border-top:2px solid var(--teal);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
+    <div>
+      <div style="font-weight:800;color:var(--navy);font-size:1.1rem">ESE Hospital Universitario de Santander</div>
+      <div class="muted">Cartera · cartera@hus.gov.co · Glosas y Devoluciones · glosasydevoluciones@hus.gov.co</div>
+    </div>
+    <div class="muted" style="font-size:.8rem">Motor de Glosas HUS — Documento técnico 2026</div>
+  </div>
+</section>
+
+</body>
+</html>
+
+
+
+

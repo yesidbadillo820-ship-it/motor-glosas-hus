@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Entorno virtual
+venv/
+env/
+.venv/
+
+# Variables de entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Base de datos (NUNCA subir al repo - puede contener datos de pacientes)
+*.db
+*.sqlite
+*.sqlite3
+# Artefactos WAL de SQLite (modo journal_mode=WAL en producción)
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Logs
+*.log
+logs/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos temporales de pruebas y uploads
+uploads/
+temp/
+tmp/
+
+# Test artifacts
+junit.xml
+.coverage
+htmlcov/
+
+# Pre-commit cache
+.pre-commit-cache/
+
+# Claude Code local settings (personal, no se commitea)
+.claude/settings.local.json

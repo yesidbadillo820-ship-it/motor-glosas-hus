@@ -1,0 +1,75 @@
+# Excluir archivos del build context Docker — acelera el build
+# y evita que se copien a la imagen final.
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Tests (no van a producción)
+tests/
+
+# Documentación
+docs/
+*.md
+README*
+CLAUDE*
+
+# Tools (jump-box agent corre en la PC del HUS, no en el contenedor)
+tools/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtualenv local
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs locales
+*.log
+logs/
+
+# Datos locales / dev DB
+*.db
+*.sqlite
+*.sqlite3
+glosas.db
+local.db
+
+# Archivos sensibles que NUNCA deben ir al contenedor
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.txt
+
+# CI/CD / Render-specific (no aplica a Fly)
+.render/
+render.yaml
+
+# Archivos grandes / temporales
+*.zip
+*.tar.gz
+node_modules/
