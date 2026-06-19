@@ -139,11 +139,25 @@ def sanitizar(nombre: str) -> str:
     return RE_INVALIDOS.sub("_", nombre).strip()
 
 
-def nombre_destino(datos: dict) -> str | None:
+RE_HUS_CORTO = re.compile(r"^(HUS)0*(\d+)$", re.IGNORECASE)
+
+
+def hus_corto(fac: str) -> str:
+    """HUS0000409621 → HUS409621. Saca los ceros del medio. Si no matchea
+    el patrón, devuelve la factura tal cual."""
+    m = RE_HUS_CORTO.match((fac or "").strip())
+    if not m:
+        return fac
+    return m.group(1).upper() + m.group(2)
+
+
+def nombre_destino(datos: dict, formato_corto: bool = False) -> str | None:
     ne = datos["nota_electronica"]
     fac = datos["factura"]
     if not ne or not fac:
         return None
+    if formato_corto:
+        fac = hus_corto(fac)
     return sanitizar(f"NC_{ne}_{fac}.pdf")
 
 
@@ -156,6 +170,7 @@ def procesar_pdf(
     mover: bool,
     crear_carpetas: bool,
     dry_run: bool,
+    formato_corto: bool = False,
 ) -> dict:
     resultado = {
         "archivo_origen": str(pdf),
@@ -200,7 +215,7 @@ def procesar_pdf(
         logger.warning(f"{pdf.name}: DATOS_INCOMPLETOS — faltan {faltantes}")
         return resultado
 
-    nuevo = nombre_destino(datos)
+    nuevo = nombre_destino(datos, formato_corto=formato_corto)
     resultado["nuevo_nombre"] = nuevo
 
     # La "Nota Electrónica" del PDF es el número que coincide con la columna
@@ -294,7 +309,7 @@ def cargar_mapa(ruta: Path) -> dict[str, str]:
     return mapa
 
 
-def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool, mapa: dict[str, str] | None = None) -> list[dict]:
+def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool, mapa: dict[str, str] | None = None, formato_corto: bool = False) -> list[dict]:
     """Modo --en-sitio: el PDF de la nota ya está DENTRO de la carpeta
     <NE>/ (vino así del share, ej. nc0900...302478.pdf). Lo renombra en el
     lugar a NC_<NE>_<HUS>.pdf leyendo NE + factura del CONTENIDO del PDF y
@@ -385,7 +400,7 @@ def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool, mapa: dict[str, str]
             continue
         resultado["nota_electronica"] = ne
         resultado["factura"] = fac
-        nuevo = nombre_destino({"nota_electronica": ne, "factura": fac})
+        nuevo = nombre_destino({"nota_electronica": ne, "factura": fac}, formato_corto=formato_corto)
         destino_final = carpeta / nuevo
         resultado["nuevo_nombre"] = nuevo
         resultado["destino_final"] = str(destino_final)
@@ -481,6 +496,15 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--hus-corto",
+        action="store_true",
+        help=(
+            "Renombra los PDFs sin los ceros de relleno del HUS: "
+            "HUS0000409621 → HUS409621. Algunas plataformas (SIDME del "
+            "Dispensario, p.ej.) no aceptan el formato largo."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="No toca archivos; solo reporta qué haría.",
@@ -517,7 +541,10 @@ def main() -> int:
         resultados = []
         for i, carpeta in enumerate(carpetas, start=1):
             logger.info(f"[{i}/{len(carpetas)}] {carpeta.name}")
-            resultados.extend(procesar_carpeta_en_sitio(carpeta, dry_run=args.dry_run, mapa=mapa))
+            resultados.extend(procesar_carpeta_en_sitio(
+                carpeta, dry_run=args.dry_run, mapa=mapa,
+                formato_corto=args.hus_corto,
+            ))
         escribir_reporte(resultados, args.reporte)
         resumen: dict[str, int] = {}
         for r in resultados:
@@ -559,6 +586,7 @@ def main() -> int:
                 mover=args.mover,
                 crear_carpetas=args.crear_carpetas,
                 dry_run=args.dry_run,
+                formato_corto=args.hus_corto,
             )
         )
 
