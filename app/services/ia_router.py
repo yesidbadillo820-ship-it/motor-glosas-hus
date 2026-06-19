@@ -78,8 +78,18 @@ def elegir_modelo(
     disponibles = proveedores_disponibles or {"groq", "gemini", "cohere", "anthropic"}
 
     if complejidad == "COMPLEJA":
-        # Cohere y Gemini son mejores en razonamiento legal complejo
-        preferido = "cohere" if "cohere" in disponibles else "gemini"
+        # Cohere y Gemini son mejores en razonamiento legal complejo.
+        # Fix (19-jun-2026): si NI cohere NI gemini están disponibles, caemos
+        # a anthropic o groq — antes devolvíamos "gemini" sin validar que
+        # estuviera, rompiendo el flujo cuando el caller solo tenía groq+anthropic.
+        if "cohere" in disponibles:
+            preferido = "cohere"
+        elif "gemini" in disponibles:
+            preferido = "gemini"
+        elif "anthropic" in disponibles:
+            preferido = "anthropic"
+        else:
+            preferido = "groq"
         fallback = [
             m
             for m in ["gemini", "groq", "cohere", "anthropic"]
@@ -89,14 +99,23 @@ def elegir_modelo(
             complejidad="COMPLEJA",
             modelo_recomendado=preferido,
             modelos_fallback=fallback,
-            razon="Glosa compleja → Razonamiento profundo (Cohere/Gemini)",
+            razon="Glosa compleja → Razonamiento profundo (Cohere/Gemini/Claude)",
             tiempo_max_esperado_s=20,
             costo_estimado_centavos=0,
         )
 
     if complejidad == "SIMPLE":
-        # Groq (Llama 70B) es el rey de la velocidad
-        preferido = "groq" if "groq" in disponibles else "gemini"
+        # Groq (Llama 70B) es el rey de la velocidad.
+        # Fix (19-jun-2026): si groq NO está disponible, caemos a anthropic
+        # antes de gemini (antes devolvíamos "gemini" sin validar).
+        if "groq" in disponibles:
+            preferido = "groq"
+        elif "gemini" in disponibles:
+            preferido = "gemini"
+        elif "anthropic" in disponibles:
+            preferido = "anthropic"
+        else:
+            preferido = next(iter(disponibles), "groq")
         fallback = [
             m
             for m in ["gemini", "cohere", "groq", "anthropic"]
