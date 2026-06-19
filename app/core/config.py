@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     alertas_email: str = ""
     app_name: str = "Motor Glosas HUS"
-    app_version: str = "5.4.0"
+    app_version: str = "5.5.0"
     banner_capacitacion: str = ""
 
     model_config = {

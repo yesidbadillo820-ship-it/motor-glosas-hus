@@ -3,7 +3,6 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import Optional
-from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.logging_utils import logger
@@ -12,11 +11,11 @@ from app.models.db import UsuarioRecord
 from app.models.schemas import TokenResponse, CambiarPasswordRequest
 from app.auth import authenticate_user, create_access_token, get_password_hash, verify_password
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.api.deps import get_usuario_actual, get_admin
 from datetime import datetime as _dt
 
 router = APIRouter(tags=["auth"])
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/token", response_model=TokenResponse)

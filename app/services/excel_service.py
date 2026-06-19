@@ -191,7 +191,7 @@ class ExcelExporter:
         if isinstance(fecha, str):
             try:
                 fecha = datetime.fromisoformat(fecha.replace("Z", "+00:00"))
-            except:
+            except (ValueError, TypeError):
                 return fecha
         return fecha.strftime("%Y-%m-%d")
 
