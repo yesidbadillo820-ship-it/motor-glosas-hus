@@ -739,100 +739,107 @@ async def analizar(
             _msg = f"{_msg}.\n\nSugerencia: {_chk_texto.sugerencia}"
         raise HTTPException(status_code=400, detail=_msg)
 
-    contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
-        archivos,
-        req_id,
-        capturar_raw=bool(usar_pdf_nativo_soportes),
-    )
-    _publicar_progreso(
-        _tid,
-        "pdfs_extraidos",
-        {"n_archivos": archivos_procesados, "n_caracteres": len(contexto_pdf or "")},
-    )
-
-    # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
-    # si el gestor NO subió PDFs manualmente, leemos directo del indexador
-    # los soportes asociados a esta factura (HEV, RIPS, FEV, etc.) y los
-    # inyectamos como contexto IA. Esto permite que el dictamen mencione
-    # paciente, servicios y fechas reales sin que el gestor tenga que
-    # buscar y subir cada PDF a mano.
-    contexto_soportes_auto = await _extraer_soportes_del_servidor(
-        numero_factura=numero_factura,
-        contexto_pdf_existente=contexto_pdf,
-        req_id=req_id,
-    )
-    if contexto_soportes_auto:
-        contexto_pdf = (
-            (contexto_pdf + "\n\n" + contexto_soportes_auto)
-            if contexto_pdf
-            else contexto_soportes_auto
+    try:
+        contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
+            archivos,
+            req_id,
+            capturar_raw=bool(usar_pdf_nativo_soportes),
         )
-        # Contar como "archivos procesados" para que el motor IA detecte
-        # que hay soportes disponibles y referencie en el dictamen.
-        archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
+        _publicar_progreso(
+            _tid,
+            "pdfs_extraidos",
+            {"n_archivos": archivos_procesados, "n_caracteres": len(contexto_pdf or "")},
+        )
 
-    contrato_repo = ContratoRepository(db)
-    contratos = contrato_repo.como_dict()
+        # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
+        # si el gestor NO subió PDFs manualmente, leemos directo del indexador
+        # los soportes asociados a esta factura (HEV, RIPS, FEV, etc.) y los
+        # inyectamos como contexto IA. Esto permite que el dictamen mencione
+        # paciente, servicios y fechas reales sin que el gestor tenga que
+        # buscar y subir cada PDF a mano.
+        contexto_soportes_auto = await _extraer_soportes_del_servidor(
+            numero_factura=numero_factura,
+            contexto_pdf_existente=contexto_pdf,
+            req_id=req_id,
+        )
+        if contexto_soportes_auto:
+            contexto_pdf = (
+                (contexto_pdf + "\n\n" + contexto_soportes_auto)
+                if contexto_pdf
+                else contexto_soportes_auto
+            )
+            # Contar como "archivos procesados" para que el motor IA detecte
+            # que hay soportes disponibles y referencie en el dictamen.
+            archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
 
-    few_shots, plantillas_gold, cod_pref = _obtener_few_shots(db, eps, tabla_excel)
+        contrato_repo = ContratoRepository(db)
+        contratos = contrato_repo.como_dict()
 
-    info_tarifa_pre = _pre_lookup_tarifa(db, cod_pref, eps, tabla_excel, contexto_pdf, req_id)
-    _publicar_progreso(
-        _tid,
-        "tarifa_lookup",
-        {
-            "encontrada": bool(info_tarifa_pre and info_tarifa_pre.get("encontrada")),
-            "few_shots": len(few_shots),
-        },
-    )
+        few_shots, plantillas_gold, cod_pref = _obtener_few_shots(db, eps, tabla_excel)
 
-    _publicar_progreso(_tid, "ia_iniciada", {"proveedor": cfg.primary_ai})
-    resultado = await service.analizar(
-        data,
-        contexto_pdf,
-        contratos,
-        few_shots=few_shots,
-        info_tarifa=info_tarifa_pre,
-        pdfs_raw_para_multimodal=pdfs_raw,
-    )
-    _publicar_progreso(
-        _tid,
-        "ia_completada",
-        {
-            "modelo": resultado.modelo_ia,
-            "score": resultado.score,
-            "dictamen_chars": len(resultado.dictamen or ""),
-        },
-    )
-    if plantillas_gold:
-        from app.api.routers.plantillas_gold import marcar_usos
+        info_tarifa_pre = _pre_lookup_tarifa(db, cod_pref, eps, tabla_excel, contexto_pdf, req_id)
+        _publicar_progreso(
+            _tid,
+            "tarifa_lookup",
+            {
+                "encontrada": bool(info_tarifa_pre and info_tarifa_pre.get("encontrada")),
+                "few_shots": len(few_shots),
+            },
+        )
 
-        marcar_usos(db, [p.id for p in plantillas_gold])
-    logger.info(
-        f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} "
-        f"| few_shots={len(few_shots)} | tarifa_match={bool(info_tarifa_pre and info_tarifa_pre.get('encontrada'))}"
-    )
+        _publicar_progreso(_tid, "ia_iniciada", {"proveedor": cfg.primary_ai})
+        resultado = await service.analizar(
+            data,
+            contexto_pdf,
+            contratos,
+            few_shots=few_shots,
+            info_tarifa=info_tarifa_pre,
+            pdfs_raw_para_multimodal=pdfs_raw,
+        )
+        _publicar_progreso(
+            _tid,
+            "ia_completada",
+            {
+                "modelo": resultado.modelo_ia,
+                "score": resultado.score,
+                "dictamen_chars": len(resultado.dictamen or ""),
+            },
+        )
+        if plantillas_gold:
+            from app.api.routers.plantillas_gold import marcar_usos
 
-    respuesta = await _persistir_y_responder(
-        db,
-        resultado,
-        eps,
-        etapa,
-        valor_aceptado,
-        tabla_excel,
-        contexto_pdf,
-        numero_factura,
-        numero_radicado,
-        data,
-        current_user,
-        req_id,
-    )
-    _publicar_progreso(
-        _tid,
-        "finalizado",
-        {"ok": True, "glosa_id": getattr(respuesta, "id", None)},
-    )
-    return respuesta
+            marcar_usos(db, [p.id for p in plantillas_gold])
+        logger.info(
+            f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} "
+            f"| few_shots={len(few_shots)} | tarifa_match={bool(info_tarifa_pre and info_tarifa_pre.get('encontrada'))}"
+        )
+
+        respuesta = await _persistir_y_responder(
+            db,
+            resultado,
+            eps,
+            etapa,
+            valor_aceptado,
+            tabla_excel,
+            contexto_pdf,
+            numero_factura,
+            numero_radicado,
+            data,
+            current_user,
+            req_id,
+        )
+        _publicar_progreso(
+            _tid,
+            "finalizado",
+            {"ok": True, "glosa_id": getattr(respuesta, "id", None)},
+        )
+        return respuesta
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[{req_id}] Error en análisis: {e}", exc_info=True)
+        _publicar_progreso(_tid, "error", {"mensaje": str(e)[:200]})
+        raise HTTPException(status_code=500, detail=f"Error procesando análisis: {str(e)[:200]}")
 
 
 # ════════════════════════════════════════════════════════════════════

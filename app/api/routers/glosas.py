@@ -1023,7 +1023,7 @@ def buscar_similares_texto(
     if not tokens_query:
         return {"total_evaluadas": 0, "items": []}
 
-    candidatas = db.query(GlosaRecord).filter(GlosaRecord.texto_glosa_original.isnot(None)).all()
+    candidatas = db.query(GlosaRecord).filter(GlosaRecord.texto_glosa_original.isnot(None)).limit(5000).all()
 
     items = []
     for g in candidatas:
@@ -2579,8 +2579,19 @@ def actualizar_estado(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
+    estados_validos = {
+        "RADICADA", "BORRADOR", "EN_REVISION", "RESPONDIDA", "LEVANTADA",
+        "RATIFICADA", "ACEPTADA", "PARCIALMENTE_ACEPTADA", "RESUELTA",
+        "CONCILIADA", "ARCHIVADA",
+    }
+    estado_norm = (nuevo_estado or "").strip().upper()
+    if estado_norm not in estados_validos:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Estado '{estado_norm}' inválido. Use uno de: {', '.join(sorted(estados_validos))}",
+        )
     repo = GlosaRepository(db)
-    glosa = repo.actualizar_estado(glosa_id, nuevo_estado, responsable="sistema")
+    glosa = repo.actualizar_estado(glosa_id, estado_norm, responsable="sistema")
     if not glosa:
         raise HTTPException(status_code=404, detail="Glosa no encontrada")
     logger.info(f"Estado actualizado | glosa_id={glosa_id} | nuevo_estado={nuevo_estado}")

@@ -4346,6 +4346,12 @@ class GlosaService:
         # PostHog event tracking. Best-effort, no falla si está down.
         # OJO: solo enviamos métricas, NUNCA texto del paciente / dictamen.
         try:
+            import re as _re
+
+            _valor_num = float(_re.sub(r"[^\d.]", "", valor_raw or "") or 0)
+        except Exception:
+            _valor_num = 0.0
+        try:
             from app.services.posthog_service import capture
 
             capture(
@@ -4363,11 +4369,11 @@ class GlosaService:
                     "tiene_pdf": bool(tiene_pdf),
                     "valor_objetado_bucket": (
                         "<100K"
-                        if valor_raw < 100_000
+                        if _valor_num < 100_000
                         else "<1M"
-                        if valor_raw < 1_000_000
+                        if _valor_num < 1_000_000
                         else "<10M"
-                        if valor_raw < 10_000_000
+                        if _valor_num < 10_000_000
                         else ">=10M"
                     ),
                     "primary_ai_config": self.primary_ai,
