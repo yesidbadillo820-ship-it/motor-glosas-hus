@@ -1023,7 +1023,9 @@ def buscar_similares_texto(
     if not tokens_query:
         return {"total_evaluadas": 0, "items": []}
 
-    candidatas = db.query(GlosaRecord).filter(GlosaRecord.texto_glosa_original.isnot(None)).limit(5000).all()
+    candidatas = (
+        db.query(GlosaRecord).filter(GlosaRecord.texto_glosa_original.isnot(None)).limit(5000).all()
+    )
 
     items = []
     for g in candidatas:
@@ -2580,9 +2582,17 @@ def actualizar_estado(
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
     estados_validos = {
-        "RADICADA", "BORRADOR", "EN_REVISION", "RESPONDIDA", "LEVANTADA",
-        "RATIFICADA", "ACEPTADA", "PARCIALMENTE_ACEPTADA", "RESUELTA",
-        "CONCILIADA", "ARCHIVADA",
+        "RADICADA",
+        "BORRADOR",
+        "EN_REVISION",
+        "RESPONDIDA",
+        "LEVANTADA",
+        "RATIFICADA",
+        "ACEPTADA",
+        "PARCIALMENTE_ACEPTADA",
+        "RESUELTA",
+        "CONCILIADA",
+        "ARCHIVADA",
     }
     estado_norm = (nuevo_estado or "").strip().upper()
     if estado_norm not in estados_validos:

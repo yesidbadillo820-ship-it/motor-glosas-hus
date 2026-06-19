@@ -73,14 +73,18 @@ def elegir_modelo(
     proveedores_disponibles: set[str] | None = None,
 ) -> DecisionRouter:
     """Devuelve el modelo recomendado + cadena de fallbacks entre modelos gratuitos."""
-    
+
     # Admitimos todos los proveedores, priorizando los gratuitos
-    disponibles = (proveedores_disponibles or {"groq", "gemini", "cohere", "anthropic"})
+    disponibles = proveedores_disponibles or {"groq", "gemini", "cohere", "anthropic"}
 
     if complejidad == "COMPLEJA":
         # Cohere y Gemini son mejores en razonamiento legal complejo
         preferido = "cohere" if "cohere" in disponibles else "gemini"
-        fallback = [m for m in ["gemini", "groq", "cohere", "anthropic"] if m in disponibles and m != preferido]
+        fallback = [
+            m
+            for m in ["gemini", "groq", "cohere", "anthropic"]
+            if m in disponibles and m != preferido
+        ]
         return DecisionRouter(
             complejidad="COMPLEJA",
             modelo_recomendado=preferido,
@@ -93,7 +97,11 @@ def elegir_modelo(
     if complejidad == "SIMPLE":
         # Groq (Llama 70B) es el rey de la velocidad
         preferido = "groq" if "groq" in disponibles else "gemini"
-        fallback = [m for m in ["gemini", "cohere", "groq", "anthropic"] if m in disponibles and m != preferido]
+        fallback = [
+            m
+            for m in ["gemini", "cohere", "groq", "anthropic"]
+            if m in disponibles and m != preferido
+        ]
         return DecisionRouter(
             complejidad="SIMPLE",
             modelo_recomendado=preferido,
@@ -105,7 +113,9 @@ def elegir_modelo(
 
     # MEDIA (default)
     preferido = "gemini" if "gemini" in disponibles else "groq"
-    fallback = [m for m in ["groq", "cohere", "gemini", "anthropic"] if m in disponibles and m != preferido]
+    fallback = [
+        m for m in ["groq", "cohere", "gemini", "anthropic"] if m in disponibles and m != preferido
+    ]
     return DecisionRouter(
         complejidad="MEDIA",
         modelo_recomendado=preferido,
