@@ -89,16 +89,21 @@ def main() -> int:
         sec.left_margin = Cm(1.8)
         sec.right_margin = Cm(1.8)
     # Área útil A4 con esos márgenes: 17.4cm × 26.7cm aprox.
-    # Reservamos ~1.5cm para el encabezado + 0.5cm para margen visual: la
-    # imagen no debe pasarse de ANCHO_MAX × ALTO_MAX.
+    # Reservamos ~1.8cm para el encabezado (titulo 20pt + spacing): la imagen
+    # no debe pasarse de ANCHO_MAX × ALTO_MAX para que entre JUNTO al encabezado
+    # en la misma página, sin que Word la empuje a la siguiente hoja.
     ANCHO_MAX_CM = 17.0
-    ALTO_MAX_CM = 24.0
+    ALTO_MAX_CM = 22.0
 
     for i, img in enumerate(imagenes):
         factura = _factura_desde_nombre(img)
         # Encabezado: número de factura, grande, negrita, centrado.
+        # Quitamos el space_after para que la imagen quede pegada y no fuerce
+        # un overflow a la página siguiente.
         h = doc.add_paragraph()
         h.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        h.paragraph_format.space_before = Pt(0)
+        h.paragraph_format.space_after = Pt(6)
         run = h.add_run(factura)
         run.bold = True
         run.font.size = Pt(20)
@@ -107,6 +112,8 @@ def main() -> int:
         dims = _png_dims_px(img)
         p_img = doc.add_paragraph()
         p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_img.paragraph_format.space_before = Pt(0)
+        p_img.paragraph_format.space_after = Pt(0)
         try:
             if dims is None:
                 # Fallback: que Word elija — limitamos solo el ancho.
