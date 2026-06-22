@@ -87,6 +87,21 @@ PORTAL_BASE = "https://vco.ctamedicas.com"
 PORTAL_LOGIN = f"{PORTAL_BASE}/app/login"
 PORTAL_HOME = f"{PORTAL_BASE}/app/inicio"
 PORTAL_BOLSA = f"{PORTAL_BASE}/app/respuestaGlosaSearch"
+
+# Texto estándar para cerrar glosas que están en el portal pero no en el
+# Excel del HUS (residuales). Se usa SOLO con --cerrar-residuales y se
+# adjunta con código RE9901 (el mismo que el bot usa por default para
+# PERTINENCIA del Excel). Cubre el motivo más común: el HUS no acepta la
+# glosa por pertinencia y solicita el levantamiento integro.
+TEXTO_GENERICO_RESIDUALES = (
+    "ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE PERTINENCIA INTERPUESTA POR "
+    "COOSALUD SOBRE LOS SERVICIOS EN MENCION. LOS SERVICIOS PRESTADOS A ESTE "
+    "USUARIO POR LA ESE HUS FUERON PERTINENTES SEGUN EL DIAGNOSTICO Y LA "
+    "EVOLUCION CLINICA DEL PACIENTE, SOPORTADOS EN LA HISTORIA CLINICA QUE "
+    "REPOSA EN LA ESE HUS. SE SOLICITA EL LEVANTAMIENTO DE LA GLOSA Y EL PAGO "
+    "DE LO FACTURADO."
+)
+COD_GENERICO_RESIDUALES = "RE9901"
 PORTAL_PAUSA = f"{PORTAL_BASE}/app/respuestaGlosaPause"
 
 MAX_PDF_MB = 10
@@ -1128,6 +1143,7 @@ def procesar_factura(
     indice: dict[str, Path],
     evidencias: Path,
     max_grupos: int = 0,
+    cerrar_residuales: bool = False,
 ) -> dict:
     total_glosas = sum(len(g["ids"]) for g in grupos)
     reg = {"factura": factura, "grupos": len(grupos), "glosas": total_glosas,
@@ -1245,6 +1261,57 @@ def procesar_factura(
             reg["estado"] = "PENDIENTE_PDX"
             reg["detalle"] = f"{grupos_hechos} grupos ok; sin PDX: {'; '.join(grupos_saltados_pdx)}"
             return reg
+
+        # --cerrar-residuales: si el portal tiene glosas sin respuesta que el
+        # Excel no cubría, marcarlas con código RE9901 y texto genérico de
+        # pertinencia. Esto permite Terminar la factura completa en una pasada
+        # sin tener que abrir cada glosa residual a mano.
+        if cerrar_residuales and aun_pendientes > 0:
+            ids_residuales = [i for i, e in estados.items() if e == "SIN RESPUESTA"]
+            logger.info(
+                f"  --cerrar-residuales: respondiendo {len(ids_residuales)} glosa(s) "
+                f"residual(es) con cód {COD_GENERICO_RESIDUALES}"
+            )
+            grupo_residual = {
+                "cod": COD_GENERICO_RESIDUALES,
+                "cod_corto": COD_GENERICO_RESIDUALES,
+                "obs": TEXTO_GENERICO_RESIDUALES,
+                "ids": ids_residuales,
+                "es_soporte": False,
+            }
+            restantes = list(ids_residuales)
+            k_res = 0
+            n_tandas_res = (len(restantes) + LOTE_MAX - 1) // LOTE_MAX
+            while restantes:
+                tanda = restantes[:LOTE_MAX]
+                restantes = restantes[LOTE_MAX:]
+                k_res += 1
+                if tandas_hechas > 0:
+                    _recargar_pagina()
+                if n_tandas_res > 1:
+                    logger.info(f"    residuales tanda {k_res}/{n_tandas_res}: {len(tanda)} glosas")
+                marcadas = marcar_checkboxes(page, tanda, todas_pendientes=False)
+                if marcadas == 0:
+                    raise RuntimeError("no pude marcar checkboxes de las glosas residuales")
+                responder_grupo(page, grupo_residual, None)
+                tandas_hechas += 1
+                _desmarcar_todo(page)
+                # Esperar a que la grilla confirme antes de pasar a la siguiente tanda
+                t_dl_res = time.time() + 60
+                confirmadas_res: set[str] = set()
+                while time.time() < t_dl_res:
+                    try:
+                        estados_act = leer_estados(page)
+                    except Exception:
+                        estados_act = {}
+                    confirmadas_res = {i for i in tanda if estados_act.get(i) == "RESPONDIDA"}
+                    if len(confirmadas_res) >= len(tanda):
+                        break
+                    page.wait_for_timeout(1500)
+            # Releer estado final
+            estados = leer_estados(page)
+            aun_pendientes = sum(1 for e in estados.values() if e == "SIN RESPUESTA")
+
         if calidad > 0:
             # Los conceptos CALIDAD no se responden: la factura queda ABIERTA
             # (sin Terminar) para que el equipo médico maneje la pertinencia.
@@ -1317,6 +1384,17 @@ def main() -> int:
         help="CSV(s) de reportes previos: las facturas con estado terminal "
         "(OK, OK_CALIDAD_ABIERTA, SOLO_CALIDAD, NO_EN_BOLSA, TERMINADA_SIN_CARTEL) "
         "se omiten. Podés pasarlo varias veces.",
+    )
+    parser.add_argument(
+        "--cerrar-residuales",
+        action="store_true",
+        help=(
+            "Si tras responder todos los grupos del Excel el portal sigue "
+            "mostrando glosas SIN RESPUESTA (residuales que no están en el "
+            "Excel), responderlas con código RE9901 y texto genérico de "
+            "pertinencia, y Terminar la factura. Sin este flag, el bot deja "
+            "la factura en estado PENDIENTES."
+        ),
     )
     parser.add_argument("--log", type=Path, default=None)
     args = parser.parse_args()
@@ -1470,7 +1548,8 @@ def main() -> int:
                 while True:
                     intento += 1
                     reg = procesar_factura(page, factura, grupos, calidad, indice,
-                                           args.evidencias, max_grupos=args.max_grupos)
+                                           args.evidencias, max_grupos=args.max_grupos,
+                                           cerrar_residuales=args.cerrar_residuales)
                     if reg["estado"] == "ERROR" and intento < INTENTOS_FACTURA:
                         det = reg["detalle"]
                         if _sesion_muerta(det):
