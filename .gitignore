@@ -58,3 +58,10 @@ htmlcov/
 
 # Claude Code local settings (personal, no se commitea)
 .claude/settings.local.json
+
+# Self-hosted en HUS (deploy/) — secretos del túnel Cloudflare
+# El config.yml.example SÍ se commitea (template), el real NO.
+deploy/cloudflared/config.yml
+deploy/cloudflared/*.json
+# Carpeta de datos generada por install.sh
+data/

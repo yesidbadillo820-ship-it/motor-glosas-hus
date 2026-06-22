@@ -1,0 +1,39 @@
+# Auto-arranque del Motor Glosas HUS al encender la máquina del hospital.
+#
+# Instalación:
+#   1. Copiar este archivo:
+#        sudo cp deploy/systemd/motor-glosas.service.example /etc/systemd/system/motor-glosas.service
+#   2. Editar /etc/systemd/system/motor-glosas.service si tu repo NO está
+#      en /opt/motor-glosas:
+#        sudo nano /etc/systemd/system/motor-glosas.service
+#   3. Recargar systemd y activar el servicio:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable motor-glosas.service
+#        sudo systemctl start motor-glosas.service
+#   4. Ver estado en cualquier momento:
+#        sudo systemctl status motor-glosas.service
+#        sudo journalctl -u motor-glosas.service -f
+
+[Unit]
+Description=Motor Glosas HUS (FastAPI + Cloudflare Tunnel)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Carpeta del repo en la máquina del HUS. Cambiar si está en otra ruta.
+WorkingDirectory=/opt/motor-glosas
+
+# Levantar todos los servicios del compose en background.
+ExecStart=/usr/bin/docker compose up -d
+# Apagar limpio al detener (sin perder datos — volumen persiste).
+ExecStop=/usr/bin/docker compose down
+
+# Reintentar si falla al arrancar (max 5 veces con backoff)
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
