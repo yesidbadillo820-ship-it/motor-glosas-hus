@@ -138,13 +138,19 @@ COLUMNAS = {
 }
 
 
-def leer_excel(ruta: Path, hoja: str) -> dict[str, dict]:
+def leer_excel(ruta: Path, hoja: str, incluir_calidad: bool = False) -> dict[str, dict]:
     """Devuelve {factura: {"grupos": [...], "calidad": N}} donde cada grupo es
     {cod, cod_corto, obs, ids: [id_glosa...], es_soporte: bool}.
 
-    Las glosas con tipo_glosa == CALIDAD (pertinencia) NO se responden: se
-    excluyen de los grupos y sólo se cuentan en "calidad" — esas facturas
-    quedan abiertas (sin Terminar) para el equipo médico.
+    Por defecto, las glosas con tipo_glosa == CALIDAD (pertinencia) NO se
+    responden: se excluyen de los grupos y sólo se cuentan en "calidad" — esas
+    facturas quedan abiertas (sin Terminar) para el equipo médico.
+
+    Con incluir_calidad=True las glosas CALIDAD SÍ se incluyen en los grupos
+    a responder (usando su COD_RTA y OBSERVACION_RTA del Excel, igual que las
+    otras). Útil cuando la planilla ya viene con la respuesta tipificada para
+    pertinencia y se quiere cerrar la factura completa en una sola corrida.
+
     Los grupos preservan el orden de aparición en el Excel."""
     try:
         from openpyxl import load_workbook
@@ -179,13 +185,17 @@ def leer_excel(ruta: Path, hoja: str) -> dict[str, dict]:
         if not fac or not id_glosa:
             continue
         tipo = str(r[idx["tipo"]] or "").strip().upper()
-        if tipo == "CALIDAD":
+        if tipo == "CALIDAD" and not incluir_calidad:
             calidad_por_fac[fac] += 1
             continue  # pertinencia: NO se responde
         cod = str(r[idx["cod_rta"]] or "").strip()
         obs = str(r[idx["obs_rta"]] or "").strip()
         if not cod or not obs:
-            continue  # sin respuesta definida: no se puede responder
+            # Sin respuesta definida: si era CALIDAD se cuenta como pendiente
+            # de equipo médico; las otras se ignoran.
+            if tipo == "CALIDAD":
+                calidad_por_fac[fac] += 1
+            continue
         key = (cod, obs)
         g = grupos_por_fac[fac].get(key)
         if g is None:
@@ -1276,7 +1286,17 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--excel", type=Path, required=True, help="Excel consolidado de glosas COOSALUD.")
-    parser.add_argument("--hoja", type=str, default="BASE", help="Hoja a procesar (default BASE; CALIDAD no se responde).")
+    parser.add_argument("--hoja", type=str, default="BASE", help="Hoja a procesar (default BASE).")
+    parser.add_argument(
+        "--incluir-calidad", action="store_true",
+        help=(
+            "Responder TAMBIÉN las glosas tipo_glosa==CALIDAD usando el "
+            "COD_RTA y OBSERVACION del Excel. Por defecto se excluyen y la "
+            "factura queda en pausa para el equipo médico. Activá este flag "
+            "cuando la planilla ya trae respuesta tipificada para pertinencia "
+            "y querés cerrar la factura completa en una sola corrida."
+        ),
+    )
     parser.add_argument("--indice", type=Path, default=None, help="TXT índice factura→carpeta (para el PDX de SOPORTES).")
     grupo = parser.add_mutually_exclusive_group(required=True)
     grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS...).")
@@ -1306,7 +1326,11 @@ def main() -> int:
     user, password = cargar_credenciales()
     logger.info(f"Usuario COOSALUD: {user}")
 
-    facturas = leer_excel(args.excel, args.hoja)
+    facturas = leer_excel(args.excel, args.hoja, incluir_calidad=args.incluir_calidad)
+    if args.incluir_calidad:
+        logger.info(
+            f"  --incluir-calidad: las glosas CALIDAD también se responden con su texto del Excel."
+        )
     tot_glosas = sum(len(g["ids"]) for f in facturas.values() for g in f["grupos"])
     tot_calidad = sum(f["calidad"] for f in facturas.values())
     logger.info(f"Hoja {args.hoja}: {len(facturas)} facturas, {tot_glosas:,} glosas a responder"
