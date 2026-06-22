@@ -231,11 +231,33 @@ def cargar_indice(ruta: Path) -> dict[str, Path]:
     return mapa
 
 
+# Prefijos de archivo aceptados como soporte, en orden de preferencia.
+# COOSALUD acepta cualquier PDF tipificado del envío del HUS — preferimos PDX
+# (el que el HUS arma específicamente como respuesta de soportes), pero si no
+# está usamos HAM o PDE que también son válidos como soporte clínico.
+PREFIJOS_SOPORTE = ("PDX", "HAM", "PDE")
+
+
+def _archivos_con_prefijo(carpeta: Path, prefijos: tuple[str, ...]) -> list[tuple[str, Path]]:
+    """Devuelve [(prefijo, path)] para los archivos que matcheen <PREFIJO>*.pdf
+    en la carpeta, respetando el ORDEN de `prefijos` (primero los PDX, después
+    los HAM, etc.)."""
+    out: list[tuple[str, Path]] = []
+    for prefijo in prefijos:
+        encontrados: set[Path] = set()
+        for pat in (f"{prefijo}*.pdf", f"{prefijo}*.PDF",
+                    f"{prefijo.lower()}*.pdf", f"{prefijo.capitalize()}*.pdf"):
+            for p in carpeta.glob(pat):
+                encontrados.add(p)
+        for p in sorted(encontrados):
+            out.append((prefijo, p))
+    return out
+
+
 def _pdx_en(carpeta: Path) -> list[Path]:
-    out: list[Path] = []
-    for pat in ("PDX*.pdf", "PDX*.PDF", "pdx*.pdf", "Pdx*.pdf"):
-        out.extend(carpeta.glob(pat))
-    return sorted(set(out))
+    """Compat: devuelve solo paths PDX (sin tupla). Mantengo por si lo usa
+    código viejo, pero `buscar_pdx` ya usa `_archivos_con_prefijo`."""
+    return [p for _, p in _archivos_con_prefijo(carpeta, ("PDX",))]
 
 
 def _carpetas_alternativas(carpeta: Path) -> list[Path]:
@@ -282,9 +304,10 @@ def _carpetas_alternativas(carpeta: Path) -> list[Path]:
 
 
 def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]:
-    """Busca el PDF tipificado PDX_*.pdf en la carpeta de la factura.
-    Si la carpeta del índice no tiene PDFs (solo RIPS/JSONs), prueba la
-    carpeta hermana de IMG/. Devuelve (ruta o None, detalle)."""
+    """Busca un PDF de soporte para la factura, probando los prefijos en
+    orden: PDX (preferido), HAM, PDE. Si la carpeta del índice no tiene PDFs
+    (solo RIPS/JSONs), prueba la carpeta hermana de IMG/.
+    Devuelve (ruta o None, detalle)."""
     carpeta = indice.get(factura.upper())
     if carpeta is None:
         return None, f"{factura} no está en el índice"
@@ -292,34 +315,50 @@ def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]
         return None, f"carpeta no accesible: {carpeta}"
 
     fuente = carpeta
-    candidatos = _pdx_en(carpeta)
+    candidatos = _archivos_con_prefijo(carpeta, PREFIJOS_SOPORTE)
     if not candidatos:
-        # rglob como red de seguridad por si el PDX cuelga de un subdir
+        # rglob como red de seguridad por si el PDF cuelga de un subdir
         # dentro de la propia carpeta del índice.
-        candidatos = sorted(set(p for p in carpeta.rglob("PDX*.pdf")))
+        for prefijo in PREFIJOS_SOPORTE:
+            for p in sorted(carpeta.rglob(f"{prefijo}*.pdf")):
+                candidatos.append((prefijo, p))
+            if candidatos:
+                break
     if not candidatos:
         # Fallback: carpeta hermana (RIPS → IMG).
         for alt in _carpetas_alternativas(carpeta):
-            cand_alt = _pdx_en(alt)
+            cand_alt = _archivos_con_prefijo(alt, PREFIJOS_SOPORTE)
             if cand_alt:
                 candidatos = cand_alt
                 fuente = alt
-                logger.info(f"  PDX no estaba en {carpeta.name}; lo encontré en hermana IMG/")
+                prefijo_usado = cand_alt[0][0]
+                if prefijo_usado == "PDX":
+                    logger.info(f"  PDX no estaba en {carpeta.name}; lo encontré en hermana IMG/")
+                else:
+                    logger.info(f"  PDX no estaba; uso {prefijo_usado} de hermana IMG/")
                 break
     if not candidatos:
+        nombres_aceptados = "/".join(PREFIJOS_SOPORTE)
         pdfs = sorted(carpeta.glob("*.pdf")) + sorted(carpeta.glob("*.PDF"))
         if pdfs:
             muestras = ", ".join(p.name for p in pdfs[:6])
             extra = "" if len(pdfs) <= 6 else f" (+{len(pdfs) - 6} más)"
-            return None, f"sin PDX*.pdf en {carpeta} | PDFs presentes: {muestras}{extra}"
-        return None, f"sin PDX*.pdf en {carpeta} (ni en carpeta hermana IMG/)"
+            return None, (
+                f"sin {nombres_aceptados}*.pdf en {carpeta} | "
+                f"PDFs presentes: {muestras}{extra}"
+            )
+        return None, f"sin {nombres_aceptados}*.pdf en {carpeta} (ni en carpeta hermana IMG/)"
 
-    pdf = candidatos[0]
+    prefijo_usado, pdf = candidatos[0]
     mb = pdf.stat().st_size / (1024 * 1024)
     if mb > MAX_PDF_MB:
         return None, f"{pdf.name} pesa {mb:.1f}MB (límite {MAX_PDF_MB}MB)"
-    if len(candidatos) > 1:
-        logger.warning(f"  ({factura}: {len(candidatos)} PDX, uso {pdf.name})")
+    # Avisar cuando NO es el prefijo preferido (PDX) para que quede en el
+    # log y vos puedas auditar después qué facturas se cerraron con HAM/PDE.
+    if prefijo_usado != "PDX":
+        logger.info(f"  ⚠ usando {prefijo_usado} como soporte (no había PDX): {pdf.name}")
+    elif len(candidatos) > 1:
+        logger.warning(f"  ({factura}: {len(candidatos)} candidatos, uso {pdf.name})")
     return pdf, pdf.name
 
 
