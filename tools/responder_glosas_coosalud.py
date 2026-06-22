@@ -260,17 +260,31 @@ def _pdx_en(carpeta: Path) -> list[Path]:
     return [p for _, p in _archivos_con_prefijo(carpeta, ("PDX",))]
 
 
+RE_ENV_NUM = re.compile(r"^(ENV-\d+)-", re.IGNORECASE)
+
+
 def _carpetas_alternativas(carpeta: Path) -> list[Path]:
     """En el share del HUS los PDFs no siempre están en la misma carpeta del
-    RIPS (donde viven los JSONs). El patrón observado:
-        ...\\KARIN\\RIPS\\ENV-227237-OK\\HUS508259           ← índice (JSONs)
-        ...\\KARIN\\ENV-227237-OK-C-DGH\\IMG\\HUS508259      ← donde está el PDX
-    Devuelve carpetas hermanas a probar (mismo ENV, sufijo distinto,
-    típicamente -C-DGH, con un nivel /IMG/ intermedio)."""
+    RIPS (donde viven los JSONs). Patrones observados:
+        ...\\KARIN\\RIPS\\ENV-227237-OK\\HUS508259      ← índice (JSONs)
+        ...\\KARIN\\ENV-227237-OK-C-DGH\\IMG\\HUS...   ← hermana (caso A)
+        ...\\VANESSA\\RIPS\\ENV-226686-OK\\HUS500258   ← índice (JSONs)
+        ...\\VANESSA\\ENV-226686-R-C\\IMG\\HUS...       ← hermana (caso B)
+    En el caso B la hermana NO arranca con `ENV-XXX-OK` sino directo con
+    `ENV-XXX-R-C` (sufijo distinto al ENV original). Por eso matcheamos
+    por el NÚMERO del envío (`ENV-NNNN-`), no por el nombre completo.
+    Devuelve las carpetas hermanas que coinciden con `ENV-NNNN-*` y que
+    tengan adentro `/IMG/<factura>/` o `/<factura>/`."""
     factura = carpeta.name
     env_dir = carpeta.parent  # ENV-XXX-OK
     if not env_dir.name.upper().startswith("ENV"):
         return []
+    # Extraer el "ENV-<numero>-" para matchear hermanas con cualquier sufijo
+    # (no solo el sufijo del env_dir original).
+    m = RE_ENV_NUM.match(env_dir.name)
+    if not m:
+        return []
+    env_base = m.group(1).upper() + "-"  # "ENV-226686-"
     alternativas: list[Path] = []
     raices: list[Path] = [env_dir.parent]
     abuelo = env_dir.parent.parent
@@ -288,8 +302,8 @@ def _carpetas_alternativas(carpeta: Path) -> list[Path]:
             try:
                 if not vecina.is_dir() or vecina == env_dir:
                     continue
-                # Hermana del envío: empieza con el mismo nombre (ENV-XXX-OK*).
-                if not vecina.name.upper().startswith(env_dir.name.upper()):
+                # Hermana del envío: arranca con `ENV-<numero>-`
+                if not vecina.name.upper().startswith(env_base):
                     continue
                 for sub in (vecina / "IMG" / factura, vecina / factura):
                     try:
