@@ -249,6 +249,39 @@ def _screenshot_debug(page: Page, etiqueta: str) -> Path:
     return ruta
 
 
+def _cerrar_modal_mensajes(page: Page, contexto: str = "") -> str:
+    """Si hay un iframe `mensajes` visible (popup del portal), lo cierra
+    con Confirmar y devuelve su texto. Si no había modal, devuelve "".
+
+    Sirve para tres escenarios:
+      - Error "no corresponde con el digitado" (NC vs CUV) → el caller
+        debe ver el texto y abortar si contiene "no corresponde".
+      - Info "pendiente por cargar soportes obligatorios..." → sólo hay
+        que cerrarlo y continuar.
+      - Cualquier otro mensaje inesperado → se loguea y se cierra para
+        no contaminar la siguiente acción.
+    """
+    if page.locator("iframe[src*='mensajes']").count() == 0:
+        return ""
+    msg_iframe = page.frame_locator("iframe[src*='mensajes']")
+    try:
+        txt = msg_iframe.locator("body").inner_text(timeout=2000)
+    except PlaywrightTimeout:
+        txt = ""
+    txt_clean = txt.strip()
+    if txt_clean:
+        etiqueta = f" ({contexto})" if contexto else ""
+        logger.info(f"  Modal Mensajes{etiqueta}: {txt_clean[:200]}")
+    try:
+        msg_iframe.locator(
+            "button:has-text('Confirmar'), input[value='Confirmar']"
+        ).first.click(timeout=3000)
+        page.wait_for_timeout(800)
+    except PlaywrightTimeout:
+        pass
+    return txt
+
+
 def filtrar_por_factura(page: Page, factura_corta: str) -> None:
     """Aplica el filtro de columna # Factura usando el DropDownOptions de GeneXus."""
     # 1. Click en el chevron DDO del header "# Factura".
@@ -449,30 +482,18 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
         _screenshot_debug(page, f"nota_cambiada_tras_tab_{nota}")
     logger.info(f"  Nota Crédito ingresada: {valor_post_tab}")
 
-    # Detectar el popup de error de validación de NC contra el CUV.
-    # GeneXus muestra un iframe `mensajes.aspx` con el texto:
-    #   "El numero de la NC por el CUV ante el Ministerio de Salud ... no
-    #    corresponde con el digitado"
-    # Si aparece, no tiene sentido seguir — la NC y el CUV no matchean.
-    if page.locator("iframe[src*='mensajes']").count() > 0:
-        msg_iframe = page.frame_locator("iframe[src*='mensajes']")
-        try:
-            txt = msg_iframe.locator("body").inner_text(timeout=2000)
-        except PlaywrightTimeout:
-            txt = ""
-        if "no corresponde" in txt.lower() or "ministerio de salud" in txt.lower():
-            _screenshot_debug(page, f"nc_no_corresponde_{nota}")
-            # Cerrar el popup antes de salir para no contaminar la próxima factura
-            try:
-                msg_iframe.locator(
-                    "button:has-text('Confirmar'), input[value='Confirmar']"
-                ).first.click(timeout=3000)
-            except PlaywrightTimeout:
-                pass
-            raise PlaywrightTimeout(
-                f"NC {nota} no corresponde con el CUV — revisar el dato en la carpeta. "
-                f"Mensaje del portal: {txt[:200]}"
-            )
+    # Tras el blur de la NC el portal puede mostrar un iframe `mensajes`:
+    #   - Error: "El numero de la NC por el CUV ante el Ministerio de Salud
+    #     ... no corresponde con el digitado" → abortamos.
+    #   - Info: "pendiente por cargar soportes obligatorios correspondientes
+    #     a la NC. CUV, NC, XML," → sólo se cierra y se continúa.
+    txt_modal = _cerrar_modal_mensajes(page, contexto="tras-NC")
+    if "no corresponde" in txt_modal.lower() or "ministerio de salud" in txt_modal.lower():
+        _screenshot_debug(page, f"nc_no_corresponde_{nota}")
+        raise PlaywrightTimeout(
+            f"NC {nota} no corresponde con el CUV — revisar el dato en la carpeta. "
+            f"Mensaje del portal: {txt_modal[:200]}"
+        )
 
     # Click "Soportes NC" del bloque de Conciliación. Esperar a que se habilite.
     soportes_btn = page.locator(
@@ -487,10 +508,22 @@ def ingresar_nota_y_subir(page: Page, info: dict) -> str:
         _screenshot_debug(page, f"soportes_btn_disabled_{nota}")
         raise
 
+    # Después del click en "Soportes NC" puede aparecer otro modal
+    # informativo del portal antes de mostrar el iframe de carga. Lo
+    # cerramos para que el iframe wcargarsoportesrtaips quede visible.
+    _cerrar_modal_mensajes(page, contexto="tras-SoportesNC")
+
     # Esperar a que aparezca el iframe wcargarsoportesrtaips
-    page.wait_for_selector(
-        "iframe[src*='wcargarsoportesrtaips'], iframe[src*='soportes']", timeout=10000
-    )
+    try:
+        page.wait_for_selector(
+            "iframe[src*='wcargarsoportesrtaips'], iframe[src*='soportes']", timeout=10000
+        )
+    except PlaywrightTimeout:
+        # Quizá un modal apareció justo después: intentar cerrarlo y reintentar.
+        _cerrar_modal_mensajes(page, contexto="iframe-no-visible")
+        page.wait_for_selector(
+            "iframe[src*='wcargarsoportesrtaips'], iframe[src*='soportes']", timeout=8000
+        )
     iframe = page.frame_locator("iframe[src*='wcargarsoportesrtaips'], iframe[src*='soportes']")
 
     # Subir los 3 archivos en un solo set (Playwright maneja el batch)
@@ -586,6 +619,17 @@ def guardar_nc_segunda_pasada(page: Page, info: dict) -> None:
     campo_nota.press("Tab")
     page.wait_for_timeout(1500)
     logger.info(f"  Pasada 2: NC retipeada: {campo_nota.input_value()}")
+
+    # Mismo modal "Mensajes" puede aparecer también en pasada 2 tras el
+    # blur de la NC ("pendiente por cargar soportes obligatorios..."). Lo
+    # cerramos antes de buscar el botón Confirmar del form principal.
+    txt_modal2 = _cerrar_modal_mensajes(page, contexto="pasada2-tras-NC")
+    if "no corresponde" in txt_modal2.lower() or "ministerio de salud" in txt_modal2.lower():
+        _screenshot_debug(page, f"pasada2_nc_no_corresponde_{nota}")
+        raise PlaywrightTimeout(
+            f"Pasada 2: NC {nota} no corresponde con el CUV. "
+            f"Mensaje del portal: {txt_modal2[:200]}"
+        )
 
     # NO clickear Soportes NC — los archivos ya están subidos de la pasada 1.
 
