@@ -997,6 +997,20 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
         page.wait_for_timeout(800)
         opcion = _primer_visible(page.locator(f"li:has-text('{cod}')"))
         if opcion is None:
+            # Diagnóstico: listar las opciones que SÍ ofrece el dropdown
+            # antes de fallar. Útil cuando el portal restringe los códigos
+            # según el tipo de glosa (TARIFAS no acepta RE9901, etc.).
+            try:
+                caja.fill("")
+                page.wait_for_timeout(400)
+                items = page.locator("li.select2-results__option:visible").all_inner_texts()
+                ofrecidos = [(t or "").strip()[:80] for t in items if (t or "").strip()]
+                logger.error(
+                    f"  Códigos que SÍ ofrece el dropdown ({len(ofrecidos)}): "
+                    + " | ".join(ofrecidos[:25])
+                )
+            except Exception:
+                pass
             raise RuntimeError(f"El dropdown no ofrece el código {cod}.")
         opcion.click()
         seleccionado = True
