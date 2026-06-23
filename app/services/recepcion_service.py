@@ -1241,8 +1241,13 @@ class RecepcionService:
                 consecutivo = str(_get("consecutivo") or "").strip()
                 raw_codigo = str(_get("concepto_codigo") or "").strip().upper()
                 oid = str(_get("concepto_oid") or "").strip()
-                if not factura or not consecutivo or not raw_codigo:
-                    # Sin estos 3 campos mínimos, la fila no es un concepto válido
+                if not factura or not raw_codigo:
+                    # Sin factura+código no es un concepto válido. El
+                    # 'Consecutivo' puede venir vacío: exports DGH/PowerQuery
+                    # del DMBUG ponen el consecutivo solo en la cabecera y
+                    # dejan vacías las 277 filas de detalle por concepto.
+                    # En ese caso el match a la glosa padre cae a "factura
+                    # sola" (fallback 2 más abajo).
                     continue
 
                 nombre_glosa = _fix_mojibake(str(_get("concepto_nombre") or "").strip())
@@ -1274,14 +1279,19 @@ class RecepcionService:
                 _ck = (factura, consecutivo)
                 glosa_padre = _padre_cache.get(_ck, _MISS)
                 if glosa_padre is _MISS:
-                    glosa_padre = (
-                        self.db.query(GlosaRecord)
-                        .filter(
-                            GlosaRecord.factura == factura,
-                            GlosaRecord.consecutivo_dgh == consecutivo,
+                    # Match exacto solo si la fila trae consecutivo. Si viene
+                    # vacío (export DGH del DMBUG: cabecera tiene consec, las
+                    # filas de detalle no), salteamos al fallback factura-sola.
+                    glosa_padre = None
+                    if consecutivo:
+                        glosa_padre = (
+                            self.db.query(GlosaRecord)
+                            .filter(
+                                GlosaRecord.factura == factura,
+                                GlosaRecord.consecutivo_dgh == consecutivo,
+                            )
+                            .first()
                         )
-                        .first()
-                    )
                     if not glosa_padre and consecutivo:
                         # Fallback 1: factura + consecutivo NULL (parent
                         # creado sin consecutivo). Se lo seteamos ahora.
@@ -1324,7 +1334,10 @@ class RecepcionService:
                                         f"BD tiene '{prev_consec}', I/R trae '{consecutivo}'. "
                                         f"Vinculando igual y conservando el de BD."
                                     )
-                            elif not prev_consec:
+                            elif not prev_consec and consecutivo:
+                                # Solo sobrescribir si la fila TRAE consecutivo.
+                                # No pisar con cadena vacía cuando el export
+                                # del DGH dejó el campo en blanco.
                                 glosa_padre.consecutivo_dgh = consecutivo
                     # Flush para que la asignación de consecutivo sea
                     # visible a queries siguientes; cachear el resultado

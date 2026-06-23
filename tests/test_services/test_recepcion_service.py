@@ -663,3 +663,109 @@ class TestImportacionCompleta:
         assert padre.tercero_nit == "901541137"
         assert padre.valor_factura == 1022622
         assert "BUCARAMANGA" in (padre.tercero_nombre or "")
+
+    def test_concepto_dmbug_con_consecutivo_vacio_se_vincula_por_factura(self, db):
+        """Bug DMBUG jun 2026: el export del Dispensario Médico Bucaramanga
+        pone el 'Consecutivo' SOLO en la cabecera y deja las 277 filas de
+        detalle por concepto VACÍAS en esa columna. Antes el parser hacía
+        `continue` si consecutivo venía vacío y descartaba todos los
+        conceptos → la IA quedaba sin contexto y todas las glosas terminaban
+        en REQUIERE_SOPORTES. Fix: aceptar consecutivo vacío y caer al
+        fallback factura-sola sin pisar el consecutivo del padre."""
+        from app.core.tz import ahora_utc
+        from app.models.db import ConceptoGlosaRecord, GlosaRecord
+        from app.services.recepcion_service import MARCA_TEXTO_CONCEPTOS
+
+        # Padre creado por la hoja INICIAL — trae factura + consecutivo
+        padre = GlosaRecord(
+            eps="DISPENSARIO MEDICO",
+            paciente="N/A",
+            factura="HUS0000499027",
+            etapa="INICIAL",
+            estado="RADICADA",
+            creado_en=ahora_utc(),
+            codigo_glosa="TA0201",
+            valor_objetado=2359398,
+            consecutivo_dgh="174667",  # ← cabecera SÍ trae consecutivo
+        )
+        db.add(padre)
+        db.commit()
+        db.refresh(padre)
+
+        # Hoja `i` con 2 conceptos de la misma factura — Consecutivo en VACÍO
+        wb = Workbook()
+        wb.remove(wb.active)
+        ws = wb.create_sheet("i")
+        _hoja_conceptos(
+            ws,
+            [
+                [
+                    "Glosa_Inicial", "Mixta", "", "DMBUG", 2359398,
+                    "U", "U", "U", "U",
+                    "U220311 - DISPENSARIO MEDICO BUCARAMANG",
+                    "MEBUG", "HUS0000499027", "16/06/2026",
+                    "",  # ← Consecutivo VACÍO (bug DMBUG)
+                    "", "Confirmado", 2359398, "29/04/2026",
+                    "901541137", "DISPENSARIO MEDICO BUCARAMANGA",
+                    "16/06/2026", "", 593984, "", 0,
+                    "DISPENSARIO MEDICO BUCARAMANGA",
+                    "SO4201", "1263042",
+                    "Existe ausencia total, parcial o inconsistencia de la lista de precios",
+                    "FMQ2123", "KIT DE VENTRICULOSTOMIA",
+                    4094400, "733001 - QUIROFANOS",
+                    "SE GLOSA KIT DE VENTRICULOSTOMIA NO HAY FACTURA DE COMPRA",
+                ],
+                [
+                    "Glosa_Inicial", "Mixta", "", "DMBUG", 2359398,
+                    "U", "U", "U", "U",
+                    "U220311 - DISPENSARIO MEDICO BUCARAMANG",
+                    "MEBUG", "HUS0000499027", "16/06/2026",
+                    "",  # ← Consecutivo también VACÍO
+                    "", "Confirmado", 2359398, "29/04/2026",
+                    "901541137", "DISPENSARIO MEDICO BUCARAMANGA",
+                    "16/06/2026", "", 593984, "", 0,
+                    "DISPENSARIO MEDICO BUCARAMANGA",
+                    "CL0101", "1263043",
+                    "Inconsistencias en la facturación",
+                    "FMQ2123", "KIT DE VENTRICULOSTOMIA",
+                    100000, "733001 - QUIROFANOS",
+                    "FACTURA SIN SOPORTE DE COMPRA",
+                ],
+            ],
+        )
+        r = RecepcionService(db).procesar_excel(_bytes_wb(wb))
+
+        # Antes del fix: ambos conceptos quedaban descartados por el continue
+        # de la línea 1244 → conceptos_creados == 0. Después del fix: los 2
+        # se vinculan al padre vía fallback factura-sola.
+        assert r.conceptos_creados == 2, (
+            f"Conceptos NO se crearon (creados={r.conceptos_creados}, "
+            f"huerfanos={r.conceptos_huerfanos}). El fix del consecutivo "
+            f"vacío del DMBUG no aplicó."
+        )
+        assert len(r.conceptos_huerfanos) == 0
+
+        # El consecutivo del padre NO se pisa con la cadena vacía
+        db.refresh(padre)
+        assert padre.consecutivo_dgh == "174667", (
+            f"El consecutivo del padre fue pisado con vacío: '{padre.consecutivo_dgh}'"
+        )
+
+        # Texto compilado: tiene que tener los 2 conceptos con su obs EPS
+        # — es lo que la IA del auto-responder lee para dictaminar.
+        texto = padre.texto_glosa_original or ""
+        assert texto.startswith(MARCA_TEXTO_CONCEPTOS), (
+            f"texto_glosa_original NO se compiló desde conceptos: {texto[:120]!r}"
+        )
+        assert "SO4201" in texto
+        assert "CL0101" in texto
+        assert "KIT DE VENTRICULOSTOMIA" in texto
+        assert "SIN SOPORTE DE COMPRA" in texto.upper()
+
+        # Conceptos persistidos correctamente
+        conceptos = db.query(ConceptoGlosaRecord).filter(
+            ConceptoGlosaRecord.glosa_id == padre.id
+        ).all()
+        assert len(conceptos) == 2
+        codigos = {c.codigo_glosa for c in conceptos}
+        assert codigos == {"SO4201", "CL0101"}
