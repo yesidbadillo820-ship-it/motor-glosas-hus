@@ -163,6 +163,44 @@ sudo systemctl status motor-glosas.service
 
 ---
 
+## Auto-deploy desde Git (opcional, recomendado)
+
+En vez de hacer `git pull && docker compose up -d --build` a mano cada vez
+que se mergea un PR, podés activar `deploy/auto_update.sh` con un cron
+que cada N minutos chequea si hay commits nuevos en `origin/motor-glosas`
+y rebuild + redeploy solo si los hay.
+
+```bash
+# Editar el crontab del root
+sudo crontab -e
+
+# Agregar (cada 5 minutos, log en /var/log/motor-auto-deploy.log)
+*/5 * * * * /opt/motor-glosas/deploy/auto_update.sh >> /var/log/motor-auto-deploy.log 2>&1
+```
+
+Cómo funciona:
+- `git fetch` silencioso. Si la red falla, sale sin tocar nada.
+- Si `HEAD local == HEAD remoto`: salida silenciosa (no spammea el log).
+- Si hay commits nuevos: `git pull --ff-only` + `docker compose up -d --build`.
+- `flock` evita que dos corridas se pisen si un build tarda > intervalo de cron.
+- Si hubo un commit manual local que diverge del remoto, falla con error
+  visible en el log en vez de pisarlo automáticamente.
+
+Verificá que está activo:
+```bash
+sudo tail -f /var/log/motor-auto-deploy.log
+# Cuando se mergee un PR, vas a ver:
+# [2026-06-23T19:05:00-05:00] nuevos commits detectados (abc123 → def456), aplicando...
+# [2026-06-23T19:05:45-05:00] redeploy OK — motor corriendo en def456
+```
+
+Si querés bajar la frecuencia (cada 30 min en vez de 5):
+```bash
+*/30 * * * * /opt/motor-glosas/deploy/auto_update.sh >> /var/log/motor-auto-deploy.log 2>&1
+```
+
+---
+
 ## Backup automático fuera de la máquina (opcional pero recomendado)
 
 Si la máquina del HUS muere, los backups internos se pierden con ella.
@@ -260,14 +298,15 @@ sudo docker compose exec motor du -sh /data/*
 | Sin abrir puertos | ✅ (Cloudflare Tunnel) | n/a | n/a |
 | Disco persistente | ✅ ilimitado | ✅ 3GB | ✅ 5GB |
 | Mantenés tu IP | ✅ | n/a | n/a |
-| Auto-deploy desde Git | ❌ (manual git pull) | ✅ | ✅ |
+| Auto-deploy desde Git | ✅ (cron auto_update.sh) | ✅ | ✅ |
 | Si la máquina muere | manual recovery | Fly recovery | Railway recovery |
 
 ## Desventajas (sé honesto con ellos)
 
 - **Dependes de que la máquina del HUS esté viva**. Si se apaga, se cae.
-- **Updates manuales**: hay que correr `git pull && docker compose up -d`
-  para aplicar nuevos cambios del repo (vs auto-deploy de Fly/Railway).
+- **Updates manuales por defecto**: hay que correr `git pull && docker compose up -d`
+  para aplicar nuevos cambios del repo. Se puede activar auto-deploy con un
+  cron (ver sección "Auto-deploy desde Git" arriba).
 - **Vos sos el sysadmin**. Backups, monitoring, actualizaciones del OS.
 
 Para mitigarlo:
