@@ -141,8 +141,10 @@ cat <<'EOF'
 ║       cloudflared tunnel route dns motor-glosas iaglosassinac.help    ║
 ║                                                                        ║
 ║     Esto te genera un archivo <UUID>.json en ~/.cloudflared/.        ║
-║     Movelo al repo:                                                   ║
+║     Movelo al repo Y dale permisos 644 (el contenedor cloudflared    ║
+║     corre como user 'nonroot' y necesita leer las credenciales):     ║
 ║       sudo cp ~/.cloudflared/<UUID>.json /opt/motor-glosas/deploy/cloudflared/ ║
+║       sudo chmod 644 /opt/motor-glosas/deploy/cloudflared/<UUID>.json ║
 ║                                                                        ║
 ║  3) Configurar el túnel y arrancar el motor:                         ║
 ║       cd /opt/motor-glosas/deploy/cloudflared                         ║

@@ -200,6 +200,24 @@ sudo docker compose logs cloudflared
 Verificá que el UUID del túnel en `config.yml` coincida con el del archivo
 `<UUID>.json` en `deploy/cloudflared/`.
 
+### "Error 1033 Cloudflare Tunnel error" en el navegador
+
+El túnel está registrado pero cloudflared no puede leer las credenciales.
+Pasa cuando el archivo `<UUID>.json` quedó con permisos 400/600 (solo root),
+pero el contenedor cloudflared corre como user `nonroot` y no puede leerlo.
+
+```bash
+# Ver permisos actuales
+ls -l /opt/motor-glosas/deploy/cloudflared/*.json
+
+# Arreglarlo
+sudo chmod 644 /opt/motor-glosas/deploy/cloudflared/*.json
+sudo docker compose restart cloudflared
+
+# Verificar que el túnel registre las 4 conexiones (sea01, sea07, sea09, ...)
+sudo docker compose logs cloudflared | grep "Registered tunnel connection"
+```
+
 ### "Quedó sin espacio en disco"
 
 ```bash

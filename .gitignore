@@ -65,3 +65,6 @@ deploy/cloudflared/config.yml
 deploy/cloudflared/*.json
 # Carpeta de datos generada por install.sh
 data/
+
+# Scratchpad temporal (datos sensibles del usuario, no commitear)
+scratchpad/
