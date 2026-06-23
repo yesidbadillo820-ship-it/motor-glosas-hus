@@ -1,8 +1,11 @@
-# Contexto HUS Dispensario Médico (SIMED) — Guía para iniciar un nuevo chat
+# Contexto HUS Dispensario — Cargue de Notas Crédito (SIMED)
 
 > **Cómo usar este archivo:** pegá su contenido completo como primer mensaje en
 > un nuevo chat de Claude Code y el asistente va a tener todo el contexto del
-> proyecto para retomar el trabajo del DISPENSARIO desde donde quedó.
+> flujo de **CARGUE DE NOTAS CRÉDITO** del Dispensario.
+>
+> **Este archivo NO cubre la respuesta de glosas.** Para eso usá
+> `docs/CONTEXTO_DISPENSARIO_GLOSAS.md` en otro chat.
 
 ---
 
@@ -10,18 +13,20 @@
 
 - Soy auditor de cartera del **Hospital Universitario de Santander** (HUS,
   NIT 900006037-4), Bucaramanga, Colombia.
-- Mi tarea acá: subir **notas crédito** y **respuestas de glosas** al
-  Dispensario Médico Bucaramanga (DMBUG, del Subsistema de Salud FF.MM.).
+- Mi tarea en este flujo: **armar carpetas de soportes de notas crédito y
+  subirlas al portal SIMED** del Dispensario Médico Bucaramanga (DMBUG, del
+  Subsistema de Salud FF.MM.).
 - Trabajo en Windows con PowerShell.
 
 ## 2) Plataforma
 
 - DMBUG usa el portal **SIMED** en `auditool25.tool.com.co`.
 - **ESTO ES PARA DISPENSARIO MEDICO, NO PARA COOSALUD.** COOSALUD usa
-  `vco.ctamedicas.com` (es otra guía aparte). Si el asistente confunde una
-  con la otra, pedirle que pare y verificar.
+  `vco.ctamedicas.com` (otra guía aparte).
+- En este flujo subimos **notas crédito** (NC) con sus 3 archivos:
+  PDF + XML + CUV (JSON del MinSalud).
 
-## 3) Repositorio de scripts
+## 3) Repositorio
 
 - **Path local en Windows:** `C:\temp-notas`
 - **Repo:** `motor-glosas-hus`
@@ -37,9 +42,28 @@ setx SIMED_PASSWORD <password>
 
 Cerrar y reabrir PowerShell para que las tome.
 
-## 5) Pipeline completo de notas crédito (5 pasos)
+## 5) Pipeline completo (5 pasos)
 
 El flujo va del **PDF CRRP del DIAN** al **portal SIMED**:
+
+```
+PDFs CRRP (Nueva carpeta)
+    │
+    ├─ 1. renombrar_y_organizar_notas.py
+    │       → crea <NE>\NC_<NE>_HUS<n>.pdf
+    │
+    ├─ 2. extraer_notas_credito.py
+    │       → trae XML + JSON CUV del share UNC
+    │
+    ├─ 3. consolidar_carpetas_notas.py
+    │       → renombra a XML_/CUV_, manda extras a _papelera
+    │
+    ├─ 4. verificar_cuv_notas.py
+    │       → reporta CUV OK / RECHAZADO
+    │
+    └─ 5. cargar_soportes_simed.py
+            → sube las 3 pasadas al portal SIMED
+```
 
 ### Paso 1 — `tools/renombrar_y_organizar_notas.py`
 
@@ -48,7 +72,8 @@ la factura HUS del contenido con `pdfplumber`, y los renombra a
 `NC_<NE>_HUS<n>.pdf` dentro de la carpeta `<NE>\`.
 
 Flags clave:
-- `--origen <dir>`: carpeta con los PDFs CRRP (default `D:\USUARIO CARTERA\Documents\Nueva carpeta (3)`).
+
+- `--origen <dir>`: carpeta con los PDFs CRRP.
 - `--destino <dir>`: raíz donde se crean las subcarpetas `<NE>\`.
 - `--crear-carpetas`: crea `<NE>\` si no existe.
 - `--mover`: mueve los PDFs (no copia).
@@ -56,6 +81,7 @@ Flags clave:
   (`HUS0000409621` → `HUS409621`). **SIEMPRE pasar esto.**
 - `--mapa <csv>`: si el PDF no trae la factura legible, completar desde un
   CSV NE→factura.
+- `--en-sitio`: PDF ya está dentro de `<NE>\` (no usa --origen).
 
 ### Paso 2 — `tools/extraer_notas_credito.py`
 
@@ -64,20 +90,32 @@ Indexa el share UNC
 copia el contenido completo (RIPS/, .zip, XMLs, PDFs) por NE.
 
 Flags:
-- `--csv <ruta>`: archivo con columnas `NOTA CREDITO` y `FACTURA HUS`.
-- `--salida <dir>`: raíz local destino.
 
-> **⚠️ WORKAROUND DOCUMENTADO**: el script puede colgarse con el `.zip` pesado
-> de cada NE sobre red SMB lenta. En ese caso usar PowerShell directo para
-> copiar SOLO `ad*.xml` y `RIPS\ResultadosDoker_*.json`:
+- `--csv <ruta>` (o `--excel`/`--tsv`): archivo con columna `NOTA CREDITO`
+  (acepta también `FACTURA HUS` como opcional).
+- `--salida <dir>`: raíz local destino.
+- `--no-fallback-recursivo`: no usar `rglob` cuando una nota no está en el
+  índice (más rápido si confiás que está en un periodo conocido).
+
+> **⚠️ WORKAROUND DOCUMENTADO**: el script puede colgarse con el `.zip`
+> pesado de cada NE sobre red SMB lenta. **En ese caso usar PowerShell
+> directo** para copiar SOLO `ad*.xml` y `RIPS\ResultadosDoker_*.json`:
 >
 > ```powershell
 > $share = "\\172.16.32.83\factura_electronica_net22"
-> foreach ($m in $mapeo) {  # mapeo = lista de objetos @{ne; hus}
->   $orig = "$share\<periodo>\FACTURAS_NOTA\$($m.ne)"
->   Copy-Item "$orig\ad*.xml" "$destNE\XML_$($m.ne)_HUS$($m.hus).xml" -Force
->   $json = Get-ChildItem "$orig\RIPS" -Filter "ResultadosDoker_*.json" -File | Select -First 1
->   Copy-Item $json.FullName "$destNE\CUV_$($m.ne)_HUS$($m.hus).json" -Force
+> $periodos = "202606","202605","202604","202603"
+> foreach ($m in $mapeo) {  # mapeo = lista de @{ne; hus}
+>   $destNE = "$destNotas\$($m.ne)"
+>   foreach ($p in $periodos) {
+>     $orig = "$share\$p\FACTURAS_NOTA\$($m.ne)"
+>     if (Test-Path $orig) {
+>       $xml = Get-ChildItem $orig -Filter "ad*.xml" -File | Select -First 1
+>       $json = Get-ChildItem "$orig\RIPS" -Filter "ResultadosDoker_*.json" -File | Select -First 1
+>       if ($xml)  { Copy-Item $xml.FullName  "$destNE\XML_$($m.ne)_HUS$($m.hus).xml"  -Force }
+>       if ($json) { Copy-Item $json.FullName "$destNE\CUV_$($m.ne)_HUS$($m.hus).json" -Force }
+>       break
+>     }
+>   }
 > }
 > ```
 
@@ -93,23 +131,29 @@ Lo demás (`ar*.xml`, `nc*.xml` originales, .zip, carpeta RIPS) va a
 `_papelera\<NE>\` (reversible).
 
 Flags:
+
 - `--destino <dir>`: raíz con `<NE>\`.
 - `--aceptar-sin-json`: también consolida notas sin CUV (estado `OK_SIN_JSON`).
 - `--borrar`: elimina extras en vez de mover a papelera.
+- `--solo <NE>`: procesar solo esa carpeta.
 
 ### Paso 4 — `tools/verificar_cuv_notas.py`
 
 Recorre el share por cada factura HUS y reporta el estado del CUV:
 
-- `OK` — `ResultState:true`, CUV asignado.
-- `RECHAZADO` — códigos típicos: `RVC086` (diagnóstico relacionado = diagnóstico
-  principal), `RVC063` (medicamento inválido), `TOT003` (timeout API SISPRO).
+- `OK` — `ResultState:true`, CUV asignado por MinSalud.
+- `RECHAZADO` — códigos típicos:
+  - `RVC086` — diagnóstico relacionado igual al principal.
+  - `RVC063` — medicamento inválido.
+  - `TOT003` — timeout API SISPRO.
 - `SIN_NOTA` — no aparece en ningún periodo del share.
 
 Flags:
+
 - `--lista <txt>`: TXT con 1 factura HUS por línea.
 - `--facturas`: lista separada por comas.
 - `--periodos`: YYYYMM por coma (default: todos los del share).
+- `--reporte <csv>`: CSV de salida.
 
 ### Paso 5 — `tools/cargar_soportes_simed.py`
 
@@ -126,54 +170,48 @@ Las 3 pasadas son necesarias porque GeneXus no persiste la NC junto con los
 soportes en una sola pasada (workaround verificado en producción).
 
 Flags:
+
 - `--destino <dir>`: raíz con `<NE>\NC_/XML_/CUV_`.
 - `--solo <NE>`: 1 sola nota.
 - `--lista <csv>`: CSV con columna `NOTA CREDITO`.
 - `--todas`: procesa todas las carpetas encontradas.
-- `--con-cabeza`: browser visible.
+- `--con-cabeza`: browser visible (default headless).
 - `--reporte <csv>`: salida.
 
-### Reglas críticas del bot SIMED
+### Estados posibles del cargue
 
-- **HUS CORTO siempre.** El portal rechaza el formato largo.
-- El bot escribe la NC con `page.keyboard.type()` (NO `fill()`) porque GeneXus
-  valida la NC contra el CUV mediante eventos `keyup` reales.
-- El modal "Mensajes" con texto **"pendiente por cargar soportes obligatorios
-  correspondientes a la NC. CUV, NC, XML,"** es INFORMATIVO, no error — el
-  bot lo cierra automáticamente con Confirmar (fix del commit `1c590b4`).
-- Si el CUV es `ResultState:false` (rechazado por SISPRO), el portal acepta
-  el upload pero la NC queda inválida. **Validar SIEMPRE con
-  `verificar_cuv_notas.py` ANTES de cargar.**
+| Estado | Significado |
+|---|---|
+| OK | las 3 pasadas se ejecutaron, "Registro completado" |
+| YA_PROCESADA | el portal dice que ya tiene NC + soportes; se salta limpio |
+| FALTAN_ARCHIVOS | falta PDF, XML o JSON en la carpeta |
+| NO_EN_GRILLA | el filtro no devolvió la factura (ya procesada o no existe) |
+| AMBIGUO | filtro devolvió >1 fila |
+| RECHAZADA: <motivo> | el portal rechazó la NC (típico: "no corresponde con el CUV") |
+| TIMEOUT | algún paso superó el límite |
+| ERROR | excepción no clasificada (ver debug_screenshots\) |
 
-## 6) Script de respuesta de glosas (otro flujo)
+## 6) Reglas críticas
 
-`tools/responder_glosas_simed.py` — bot para responder glosas (NO notas
-crédito) en SIMED. Usa la página "Respuesta Glosa Rad. WEB".
+- **HUS CORTO siempre** en `renombrar_y_organizar_notas` (`--hus-corto`).
+  El portal rechaza el formato largo HUS0000XXXXXX.
+- El bot escribe la NC con `page.keyboard.type()` (NO `fill()`) porque
+  GeneXus valida la NC contra el CUV mediante eventos `keyup` reales.
+- El modal "Mensajes" del portal con texto **"pendiente por cargar soportes
+  obligatorios correspondientes a la NC. CUV, NC, XML,"** es INFORMATIVO,
+  no error — el bot lo cierra automáticamente con Confirmar (fix del commit
+  `1c590b4`).
+- **Validar CUV ANTES de cargar.** Si `ResultState:false`, el portal acepta
+  el upload pero la NC queda inválida. Hay que esperar a que SISTEMAS arregle
+  el RIPS y MinSalud emita un nuevo CUV con `ResultState:true`.
+- **Síntoma "Subida lista (después de 1s)"** en el log de la pasada 1: si
+  aparece tan rápido es sospechoso, puede indicar que los archivos no se
+  subieron y solo se detectó texto residual del iframe. Verificar manualmente
+  o re-correr `--solo <NE>` con `--con-cabeza`.
 
-### Insumo previo
+## 7) Estado actual del lote V2 (al cerrar el chat anterior)
 
-`tools/extraer_respuestas_glosa.py` lee PDFs CRRP de "Trámite de Objeción"
-del HUS y genera un Excel con 1 fila por objeción:
-
-```
-| Factura | # Objeción | Cód. | Servicio | Valor Objetado | Valor Aceptado | Detalle Respuesta |
-```
-
-### Flags del responder
-
-- `--excel <ruta>`: Excel generado por extraer_respuestas_glosa.
-- `--soportes-glosa <dir>`: carpeta con `HUS<n>.pdf` (Trámite/Respuesta) que
-  se adjunta a cada objeción.
-- `--indice <txt>`: TXT con rutas del share para soportes adicionales.
-- `--solo HUS<n>` / `--todas`.
-- `--rehacer`: re-procesa objeciones marcadas como "ya contestadas".
-- `--max-obj N`: piloto rápido — máx N objeciones por factura.
-- `--sin-soportes`: solo carga texto + fecha, no sube PDFs (mucho más rápido).
-- `--con-cabeza`, `--reporte`, `--log`.
-
-## 7) Estado actual del lote (al cerrar el chat anterior)
-
-**Lote V2:** `D:\USUARIO CARTERA\Documents\NOTAS ANTIGUAS\LOTE_DISPENSARIO_2026-06_V2\NOTAS\`
+**Lote:** `D:\USUARIO CARTERA\Documents\NOTAS ANTIGUAS\LOTE_DISPENSARIO_2026-06_V2\NOTAS\`
 
 | Factura | NE | Estado |
 |---|---|---|
@@ -233,12 +271,15 @@ py tools\cargar_soportes_simed.py `
 
 ### C) Resolver bloqueos pendientes
 
-- **HUS410675**: escalar al área de SISTEMAS/RIPS por RVC086 (diagnóstico
-  relacionado igual al principal en el primer procedimiento del RIPS). Cuando
-  reemitan el RIPS y MinSalud lo apruebe, llega un nuevo CUV con
-  `ResultState:true` y se puede subir.
-- **HUS413266 y HUS417459**: descargar PDF CRRP del DIAN.
-- **HUS440328**: pedir al área el número de NC asignado para esa factura.
+- **HUS410675 (NE 311136)**: escalar al área de SISTEMAS/RIPS por **RVC086**
+  (diagnóstico relacionado igual al principal en el primer procedimiento del
+  RIPS, periodo de atención 2025-08-08 a 2025-08-21). Cuando reemitan el
+  RIPS y MinSalud lo apruebe, llega un nuevo CUV con `ResultState:true` y
+  se puede subir.
+- **HUS413266 y HUS417459**: descargar PDF CRRP del DIAN o buscar en otra
+  carpeta del disco.
+- **HUS440328**: pedir al área de facturación el número de NC asignado para
+  esa factura.
 
 ## 9) Comandos de diagnóstico útiles
 
@@ -258,14 +299,15 @@ Get-ChildItem $destNotas -Directory | Sort-Object Name | ForEach-Object {
 
 ```powershell
 Test-Path "\\172.16.32.83\factura_electronica_net22"
-Get-ChildItem "\\172.16.32.83\factura_electronica_net22\202606\FACTURAS_NOTA\311136" | Select Name -First 5
+Get-ChildItem "\\172.16.32.83\factura_electronica_net22\202606\FACTURAS_NOTA\311136" |
+  Select Name -First 5
 ```
 
 ### Buscar archivos de una factura específica en el disco
 
 ```powershell
-Get-ChildItem "D:\USUARIO CARTERA\Documents" -Recurse -Include "*HUS<n>*" -ErrorAction SilentlyContinue |
-  Select Name, FullName | Format-Table -AutoSize
+Get-ChildItem "D:\USUARIO CARTERA\Documents" -Recurse -Include "*HUS<n>*" `
+  -ErrorAction SilentlyContinue | Select Name, FullName | Format-Table -AutoSize
 ```
 
 ### Matar python colgado (UNC slow)
@@ -276,17 +318,19 @@ Stop-Process -Name python, py -Force -ErrorAction SilentlyContinue
 
 ## 10) Reglas que el asistente NO debe romper
 
-1. **NUNCA confundir SIMED con COOSALUD.** Son plataformas distintas.
+1. **NUNCA confundir SIMED con COOSALUD** o mezclar este flujo con el de
+   respuesta de glosas (otra guía).
 2. **NUNCA commitear passwords ni usuarios.** Solo en env vars.
-3. **NUNCA incluir el identificador del modelo en commits, PRs, código pusheado.**
-4. **Antes de cargar al SIMED, SIEMPRE validar CUV** (`verificar_cuv_notas.py`).
-   Una NC con CUV rechazado se acepta en el portal pero queda inválida.
+3. **NUNCA incluir el identificador del modelo en commits, PRs, código
+   pusheado.**
+4. **Antes de cargar al SIMED, SIEMPRE validar CUV** con
+   `verificar_cuv_notas.py`. Una NC con CUV rechazado se acepta en el portal
+   pero queda inválida.
 5. **No matar procesos** sin confirmar (excepto si el usuario lo pidió o
    están colgados >10 min).
 6. **Cuando el usuario diga "ARMAME / SUBE",** chequear primero si el
    asistente realmente puede hacerlo (no tiene acceso al disco D: ni al
    share UNC) y, si no, dar el comando para que el usuario lo corra.
-7. **`--hus-corto` siempre en renombrar_y_organizar_notas.**
-8. **El modal "Mensajes"** del portal SIMED tras escribir la NC es
-   informativo — el bot ya lo cierra automáticamente. Si aparece sin
-   manejar, hay un problema en el bot, no en la nota.
+7. **`--hus-corto` siempre** en renombrar_y_organizar_notas.
+8. **Modal "Mensajes"** del portal SIMED tras escribir la NC es informativo
+   — el bot ya lo cierra automáticamente.
