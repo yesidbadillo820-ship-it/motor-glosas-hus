@@ -1,15 +1,27 @@
 """evidencias_a_word.py — Une los pantallazos de cierre de COOSALUD en un Word.
 
-Lee todos los `.png` de una carpeta (típicamente la de EVIDENCIA del bot de
-COOSALUD, donde cada archivo se llama `HUS<numero>_cierre.png`) y arma un .docx
-con UNA factura por página: encabezado con el número de factura + la imagen
-escalada para que entre completa con el encabezado en una sola hoja A4 +
-salto de página.
+Lee `.png` de evidencia (típicamente la carpeta del bot de COOSALUD, donde
+cada archivo se llama `HUS<numero>_cierre.png`) y arma un .docx con UNA
+factura por página: encabezado con el número de factura + la imagen escalada
+para que entre completa con el encabezado en una sola hoja A4 + salto de
+página.
+
+Acepta dos modos:
+
+  --carpeta  toma todos los archivos que matcheen `--patron` dentro de la
+             carpeta (ordenados por nombre).
+  --lista    toma rutas explícitas desde un TXT (1 ruta por línea, se
+             respeta el orden del TXT). Útil cuando solo querés un subset
+             de la carpeta.
 
 USO:
     py evidencias_a_word.py ^
         --carpeta "D:\\USUARIO CARTERA\\Documents\\COOSALUD\\EVIDENCIA" ^
         --salida  "D:\\USUARIO CARTERA\\Documents\\COOSALUD\\evidencias.docx"
+
+    py evidencias_a_word.py ^
+        --lista   "D:\\USUARIO CARTERA\\Documents\\COOSALUD\\lote_dia3.txt" ^
+        --salida  "D:\\USUARIO CARTERA\\Documents\\COOSALUD\\evidencias_dia3.docx"
 
 DEPENDENCIAS:
     py -m pip install python-docx
@@ -35,6 +47,26 @@ def _factura_desde_nombre(p: Path) -> str:
     return m.group(1).upper() if m else p.stem
 
 
+def _leer_lista(p: Path) -> list[Path]:
+    """Lee un TXT con 1 ruta por linea. Ignora vacias, comentarios (#) y
+    quita comillas simples/dobles envolventes. Preserva el orden del TXT."""
+    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            texto = p.read_text(encoding=enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise RuntimeError(f"No pude decodificar la lista: {p}")
+    rutas: list[Path] = []
+    for linea in texto.splitlines():
+        s = linea.strip().strip('"').strip("'")
+        if not s or s.startswith("#"):
+            continue
+        rutas.append(Path(s))
+    return rutas
+
+
 def _png_dims_px(path: Path) -> tuple[int, int] | None:
     """Devuelve (ancho_px, alto_px) del PNG leyendo su cabecera IHDR.
     Devuelve None si el archivo no es un PNG válido."""
@@ -52,13 +84,15 @@ def _png_dims_px(path: Path) -> tuple[int, int] | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--carpeta", type=Path, required=True, help="Carpeta con los PNG de evidencia.")
+    fuente = parser.add_mutually_exclusive_group(required=True)
+    fuente.add_argument("--carpeta", type=Path, help="Carpeta con los PNG de evidencia.")
+    fuente.add_argument("--lista", type=Path, help="TXT con 1 ruta de PNG por linea (preserva el orden del TXT).")
     parser.add_argument("--salida", type=Path, required=True, help="Archivo .docx de salida.")
     parser.add_argument(
         "--patron",
         type=str,
         default="*.png",
-        help="Glob de archivos (default *.png; ejemplo --patron '*_cierre.png').",
+        help="Glob de archivos (default *.png; ejemplo --patron '*_cierre.png'). Solo aplica con --carpeta.",
     )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -71,14 +105,36 @@ def main() -> int:
         sys.stderr.write("ERROR: falta python-docx. Instalalo con: py -m pip install python-docx\n")
         return 2
 
-    if not args.carpeta.is_dir():
-        logger.error(f"No es una carpeta: {args.carpeta}")
-        return 1
-
-    imagenes = sorted(args.carpeta.glob(args.patron))
-    if not imagenes:
-        logger.error(f"No encontré imágenes ({args.patron}) en {args.carpeta}")
-        return 1
+    if args.lista is not None:
+        if not args.lista.is_file():
+            logger.error(f"No es un archivo: {args.lista}")
+            return 1
+        candidatos = _leer_lista(args.lista)
+        if not candidatos:
+            logger.error(f"La lista esta vacia: {args.lista}")
+            return 1
+        imagenes: list[Path] = []
+        faltantes: list[Path] = []
+        for ruta in candidatos:
+            if ruta.is_file():
+                imagenes.append(ruta)
+            else:
+                faltantes.append(ruta)
+        if faltantes:
+            logger.warning(f"{len(faltantes)} archivos de la lista no existen — se omiten:")
+            for f in faltantes:
+                logger.warning(f"  - {f}")
+        if not imagenes:
+            logger.error("Ninguna ruta de la lista existe en disco.")
+            return 1
+    else:
+        if not args.carpeta.is_dir():
+            logger.error(f"No es una carpeta: {args.carpeta}")
+            return 1
+        imagenes = sorted(args.carpeta.glob(args.patron))
+        if not imagenes:
+            logger.error(f"No encontré imágenes ({args.patron}) en {args.carpeta}")
+            return 1
     logger.info(f"Imágenes a incluir: {len(imagenes)}")
 
     doc = Document()
