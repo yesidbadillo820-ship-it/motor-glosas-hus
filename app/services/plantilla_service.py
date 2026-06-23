@@ -26,20 +26,26 @@ class PlantillaService:
         if not plantilla:
             return ""
         ahora = datetime.now()
+        # Defaults contextuales: usar "N/A" suelto en un dictamen oficial es
+        # antitécnico y la EPS lo descarta de pinta. Si el dato no viene, en
+        # vez de "N/A" ponemos la frase neutra que correspondería al campo
+        # ("el código de la glosa aplicada", "el procedimiento facturado",
+        # etc.) — el dictamen sigue siendo legible incluso con datos faltantes.
+        # Bug detectado 23-jun-2026 en 4 de 6 casos pegados por Yesid.
         reemplazos = {
-            "{{EPS}}": str(data.get("eps", "")).upper(),
-            "{{CODIGO_GLOSA}}": str(data.get("codigo_glosa", "N/A")),
+            "{{EPS}}": str(data.get("eps", "")).upper() or "la EPS",
+            "{{CODIGO_GLOSA}}": str(data.get("codigo_glosa") or "el código de la glosa aplicada"),
             "{{VALOR_OBJETADO}}": f"$ {float(data.get('valor_objetado', 0)):,.0f}",
             "{{VALOR_ACEPTADO}}": f"$ {float(data.get('valor_aceptado', 0)):,.0f}",
-            "{{FECHA_RADICACION}}": str(data.get("fecha_radicacion", "No informada")),
-            "{{FECHA_RECEPCION}}": str(data.get("fecha_recepcion", "No informada")),
-            "{{DIAS_HABILES}}": str(data.get("dias_habiles", "N/A")),
-            "{{NUMERO_FACTURA}}": str(data.get("numero_factura", "N/A")),
-            "{{NUMERO_RADICADO}}": str(data.get("numero_radicado", "N/A")),
-            "{{SERVICIO}}": str(data.get("servicio", "el servicio objetado")),
-            "{{CUPS}}": str(data.get("cups", "N/A")),
-            "{{NUMERO_CONTRATO}}": str(data.get("numero_contrato", "según contrato vigente")),
-            "{{TARIFA_PACTADA}}": str(data.get("tarifa_pactada", "tarifa contractual")),
+            "{{FECHA_RADICACION}}": str(data.get("fecha_radicacion") or "según expediente"),
+            "{{FECHA_RECEPCION}}": str(data.get("fecha_recepcion") or "según expediente"),
+            "{{DIAS_HABILES}}": str(data.get("dias_habiles") or "según calendario hábil"),
+            "{{NUMERO_FACTURA}}": str(data.get("numero_factura") or "según factura electrónica"),
+            "{{NUMERO_RADICADO}}": str(data.get("numero_radicado") or "según radicado"),
+            "{{SERVICIO}}": str(data.get("servicio") or "el servicio objetado"),
+            "{{CUPS}}": str(data.get("cups") or "el procedimiento facturado"),
+            "{{NUMERO_CONTRATO}}": str(data.get("numero_contrato") or "según contrato vigente"),
+            "{{TARIFA_PACTADA}}": str(data.get("tarifa_pactada") or "tarifa contractual"),
             "{{FECHA_HOY}}": ahora.strftime("%d de %B de %Y"),
             "{{ANIO_ACTUAL}}": str(ahora.year),
         }

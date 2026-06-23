@@ -154,7 +154,15 @@ _ERRORES_REINTENTABLES = frozenset(
 # (evidencia: [GROQ-FALLBACK] en prod 12-jun 19:37 UTC, llamada de
 # auto-crítica). Mínimo 8000 para gpt-oss; el max() conserva el mayor si
 # algún día se sube el presupuesto base por encima de ese piso.
-_GROQ_MAX_TOKENS = 3000
+# Ronda 12 (23-jun-2026): subido de 3000 → 5000 tras evidencia de
+# truncamiento en casos complejos del DMBUG. Dos dictámenes pegados por
+# Yesid terminaron a mitad de oración ("...SE DEBE TENER EN CUENTA QUE"
+# y "...LEVANTAMIENTO DE LA GLOSA POR $4.") porque Llama 4 Scout, sin
+# ser razonador, agotó los 3000 tokens redactando una defensa multi-norma.
+# 5000 cubre los dictámenes largos de glosa-huérfana / multi-cita sin
+# inflar costo (Groq es gratis igual). Si llega a 5000 → fallback al
+# siguiente modelo via retry-length para no entregar oración cortada.
+_GROQ_MAX_TOKENS = 5000
 _GROQ_MAX_TOKENS_GPT_OSS = max(_GROQ_MAX_TOKENS, 8000)
 
 # Capability cache del SDK Groq (ronda 5, 16-jun-2026). El SDK instalado
@@ -967,7 +975,129 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "la fecha consignada en el expediente",
     ),
+    # ── Ronda 12 (23-jun-2026): la IA confunde números de NORMA con CUPS ──
+    # Evidencia (6 casos consecutivos pegados por Yesid 23-jun):
+    #   "CUPS 1885" ← era Resolución 1885 de 2018
+    #   "CUPS 1295" ← era Decreto 1295 de 1994
+    #   "CUPS 4747" ← era Decreto 4747 de 2007
+    #   "CUPS 1011" ← era Decreto 1011 de 2006
+    #   "CUPS 1887" ← era año "Ley 153 de 1887"
+    #   "CUPS 2284" ← era Resolución 2284 de 2023
+    # Los CUPS reales tienen 5-7 dígitos (890101, 882201, 870101) o son
+    # alfanuméricos (FMQ2123, 890388H, 19997313-6). Un CUPS puro de 3-4
+    # dígitos NO existe en el catálogo CUPS colombiano — siempre es el
+    # primer número de norma del texto que el modelo copió por error.
+    # Captura también variantes con artículo (EL CUPS, BAJO EL CUPS) y
+    # con "código" delante.
+    (
+        re.compile(
+            r"\b(?:BAJO\s+EL\s+|AL\s+|EL\s+)?CUPS\s+(?:N[°º\.]?\s*)?\d{3,4}\b(?![\d\-A-Z])",
+            re.IGNORECASE,
+        ),
+        "el procedimiento facturado según historia clínica",
+    ),
+    (
+        re.compile(
+            r"\bC[ÓO]DIGO\s+CUPS\s+\d{3,4}\b(?![\d\-A-Z])",
+            re.IGNORECASE,
+        ),
+        "el código CUPS consignado en la factura electrónica",
+    ),
+    # Cola "/A" "/B" sobrante que el regex anterior dejaba — pasaba cuando
+    # el modelo escribía "CÓDIGO YX/A" como placeholder de "código alternativo"
+    # y el sanitizador consumía "CÓDIGO YX" dejando "/A" suelto al final.
+    # Output real: "SOBRE EL código la glosa aplicada/A".
+    (
+        re.compile(
+            r"(el c[óo]digo de la glosa aplicada)\s*/\s*[A-Z]{1,2}\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
+    (
+        re.compile(
+            r"(el procedimiento facturado)\s*/\s*[A-Z]{1,2}\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
+    # "EL código de la glosa aplicada" — el "EL" mayúscula seguido de minúscula
+    # es residuo de "EL CÓDIGO YX" cuando el reemplazo dejó la frase en
+    # minúscula. Lo capitalizamos para que el resultado sea coherente.
+    (
+        re.compile(
+            r"\bEL\s+el\s+c[óo]digo\s+de\s+la\s+glosa\s+aplicada\b",
+            re.IGNORECASE,
+        ),
+        "el código de la glosa aplicada",
+    ),
+    (
+        re.compile(
+            r"\bSOBRE\s+EL\s+el\s+(c[óo]digo|procedimiento)\b",
+            re.IGNORECASE,
+        ),
+        r"sobre el \1",
+    ),
+    # "CUPS LA FACTURA" — placeholder literal del template que se filtró
+    # sin sustitución (output real: "PROCEDIMIENTO FACTURADO BAJO EL CUPS
+    # LA FACTURA"). El "LA FACTURA" viene de `{{NUMERO_FACTURA}}` mal
+    # contextualizado en el system prompt.
+    (
+        re.compile(
+            r"\bCUPS\s+LA\s+FACTURA\b",
+            re.IGNORECASE,
+        ),
+        "CUPS consignado en la factura electrónica",
+    ),
+    # "GLOSA N/A" — default literal que sale cuando codigo_glosa viene
+    # vacío. La salida real era "LEVANTAMIENTO LA GLOSA N/A". Sustituimos
+    # el "N/A" suelto por "aplicada".
+    (
+        re.compile(
+            r"\bGLOSA\s+N\s*/\s*A\b",
+            re.IGNORECASE,
+        ),
+        "glosa aplicada",
+    ),
+    (
+        re.compile(
+            r"\bC[ÓO]DIGO\s+N\s*/\s*A\b",
+            re.IGNORECASE,
+        ),
+        "código de la glosa aplicada",
+    ),
 )
+
+
+# ── Detector de oración truncada (ronda 12, 23-jun-2026) ────────────────────
+# Llama 4 Scout y otros modelos no razonadores saturaban los 3000 tokens en
+# dictámenes multi-norma y devolvían content PARCIAL. El usuario vio en
+# producción "...SE DEBE TENER EN CUENTA QUE" y "...LEVANTAMIENTO DE LA
+# GLOSA POR $4." Este detector identifica esos cortes para que el retry-
+# por-length se dispare antes de devolver basura.
+_SIGNOS_CIERRE_FINAL = (".", "!", "?", "»", '"', "'", ")", "]", "}")
+
+
+def _termina_completo(texto: str) -> bool:
+    """True si el texto cierra con un signo terminal (no quedó cortado).
+
+    Considera HTML al final (</p>, </div>) y emojis/citas como cierre válido.
+    Ignora espacios en blanco al final. Solo dice False cuando claramente
+    quedó a mitad de oración (termina en letra, conector o signo monetario
+    sin número).
+    """
+    if not texto:
+        return True  # texto vacío se maneja arriba como error
+    cola = texto.rstrip()
+    if not cola:
+        return True
+    # HTML cerrado (</p>, </div>, </span>) cuenta como cierre completo
+    if cola.endswith(">") and "</" in cola[-30:]:
+        return True
+    # "$" o "$ N." al final son sospechosos (truncado a la mitad de monto)
+    if cola.endswith("$") or re.search(r"\$\s*\d{1,3}\.$", cola):
+        return False
+    return cola.endswith(_SIGNOS_CIERRE_FINAL)
 
 
 def _neutralizar_alucinaciones_prompt(texto: str) -> str:
@@ -5566,8 +5696,8 @@ class GlosaService:
                     )
                     choice = resp.choices[0]
                     content = choice.message.content
+                    finish_reason = getattr(choice, "finish_reason", None)
                     if not content:
-                        finish_reason = getattr(choice, "finish_reason", None)
                         if es_gpt_oss and finish_reason == "length" and not retry_length_usado:
                             # Fix #9: el razonamiento consumió TODO el
                             # presupuesto sin emitir respuesta. UNA segunda
@@ -5588,6 +5718,29 @@ class GlosaService:
                             f"Groq/{modelo} devolvió content vacío/None "
                             f"(finish_reason={finish_reason!r})"
                         )
+                    # Ronda 12 (23-jun-2026): el retry-por-length ANTES solo
+                    # disparaba con `content` vacío y `gpt-oss`. Pero Llama 4
+                    # Scout (NO razonador) también satura los 5000 tokens en
+                    # dictámenes multi-norma y devuelve content PARCIAL con
+                    # finish_reason='length'. El usuario lo vio en producción
+                    # con oraciones cortadas a la mitad ("...LEVANTAMIENTO DE
+                    # LA GLOSA POR $4."). UNA segunda oportunidad con
+                    # max_tokens duplicado para todos los modelos (no solo
+                    # razonadores) antes de devolver dictamen mutilado.
+                    if (
+                        finish_reason == "length"
+                        and not retry_length_usado
+                        and not _termina_completo(content)
+                    ):
+                        retry_length_usado = True
+                        nuevo_max = max_tokens_modelo * 2
+                        logger.warning(
+                            f"[GROQ-RETRY-LENGTH-TRUNC] model={modelo} "
+                            f"max_tokens={max_tokens_modelo}→{nuevo_max} "
+                            f"(content truncado: '...{content[-60:]!r}')"
+                        )
+                        max_tokens_modelo = nuevo_max
+                        continue
                     # Equivalente Groq del [ANTHROPIC-CALL]: deja claro QUE
                     # modelo respondió realmente cuando hubo fallback en la
                     # cadena (parseable desde Sentry/Loki).
