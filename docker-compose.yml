@@ -1,0 +1,89 @@
+# Motor Glosas HUS — Self-hosted en máquina del HUS con Cloudflare Tunnel
+#
+# Composición de 2 servicios:
+#   1) motor: la app FastAPI (mismo Dockerfile que Fly/Railway).
+#   2) cloudflared: túnel inverso que expone el motor a internet con HTTPS
+#      automático SIN abrir puertos en el firewall del hospital. Solo
+#      requiere conexión saliente (la conexión la inicia cloudflared, no
+#      al revés).
+#
+# Cómo levantarlo (en la máquina del HUS):
+#   1. Copiar este archivo + .env + deploy/cloudflared/config.yml a
+#      /opt/motor-glosas/
+#   2. docker compose up -d
+#   3. ¡Listo! La app responde en https://iaglosassinac.help (o el dominio
+#      que configures en cloudflared/config.yml).
+#
+# Cómo apagarlo:
+#   docker compose down  (el volumen persiste — los datos no se borran)
+#
+# Cómo actualizar a la última versión del código:
+#   docker compose pull && docker compose up -d --build
+
+version: "3.9"
+
+services:
+  # ─── Motor Glosas IA (FastAPI + SQLite) ────────────────────────────
+  motor:
+    build: .
+    container_name: motor-glosas-hus
+    restart: unless-stopped
+    # Sin "ports:" — el motor NO se expone al host. Solo cloudflared lo
+    # alcanza vía la red interna `motor-net`. Más seguro.
+    expose:
+      - "8080"
+    networks:
+      - motor-net
+    volumes:
+      # Disco persistente para SQLite + soportes PDF.
+      # En la máquina del HUS, el path absoluto del host es /opt/motor-glosas/data.
+      - ./data:/data
+    environment:
+      # Lee de un archivo .env adjunto (no committeado). Ver .env.example.
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/motorglosas.db}
+      ENV: ${ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SOPORTES_ROOT: /data/soportes
+      SOPORTES_LOCAL_ROOT: /data/soportes
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      # Secretos — DEBEN venir del .env (no hardcodear)
+      JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      FORCE_RESET_ADMIN_PASSWORD: ${FORCE_RESET_ADMIN_PASSWORD:-0}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ─── Cloudflare Tunnel (cloudflared) ───────────────────────────────
+  # Conecta la máquina del HUS con Cloudflare por una conexión saliente
+  # cifrada, y Cloudflare publica https://iaglosassinac.help apuntando
+  # al motor. SIN ABRIR PUERTOS en el router/firewall del hospital.
+  #
+  # Requiere haber corrido `cloudflared tunnel create` UNA VEZ desde la
+  # máquina (ver docs/SELF_HOSTED_HUS.md) — eso genera el archivo
+  # credentials JSON que va a deploy/cloudflared/.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: motor-glosas-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    depends_on:
+      - motor
+    networks:
+      - motor-net
+    volumes:
+      # Config del túnel + credentials JSON
+      - ./deploy/cloudflared:/etc/cloudflared:ro
+
+networks:
+  # Red privada entre motor y cloudflared. Nadie más en el host puede
+  # alcanzar el motor en el puerto 8080.
+  motor-net:
+    driver: bridge
