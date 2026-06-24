@@ -107,6 +107,27 @@ class TestClasificarSoporte:
         cod, _d, ok = rad.clasificar_soporte("config.json")
         assert (cod, ok) == ("ADM", False)
 
+    def test_dian_fv_xml_es_fev(self):
+        # Factura de venta DIAN (fv…) en XML = factura electrónica.
+        assert rad.clasificar_soporte("fv09000060370002600526350.xml")[0] == "FEV"
+
+    def test_dian_fv_pdf_es_fac(self):
+        # La representación gráfica (pdf) de la fv = factura de venta PDF.
+        assert rad.clasificar_soporte("fv09000060370002600526350.pdf")[0] == "FAC"
+
+    def test_dian_ad_es_documento_adjunto(self):
+        # AttachedDocument DIAN (ad…) con CUFE.
+        cod, _d, ok = rad.clasificar_soporte("ad09000060370002600526350.xml")
+        assert (cod, ok) == ("FED", True)
+
+    def test_dian_ar_es_acuse(self):
+        # ApplicationResponse (ar…) = acuse de la DIAN.
+        assert rad.clasificar_soporte("ar09000060370002600526350.xml")[0] == "ARD"
+
+    def test_zip_desnudo_es_paquete_fe(self):
+        # HUS520769.zip = paquete FE comprimido (documento adjunto).
+        assert rad.clasificar_soporte("HUS520769.zip")[0] == "FED"
+
     def test_prefijo_furips_pegado(self):
         # FURIPS viene pegado a dígitos en los lotes reales.
         assert rad.clasificar_soporte("FURIPS168001007920121012026.txt")[0] == "FUR"
@@ -186,6 +207,21 @@ class TestProcesarFactura:
         res = rad.procesar_factura("HUS469403", rad._archivos_de(d), d, "COOSALUD", cfg)
         assert res.estado != "SIN_FEV"
         assert res.estado != "SIN_RIPS"
+
+    def test_dian_ad_cuenta_como_fev(self, tmp_path, cfg):
+        # Documentos DIAN (sin "FEV_…"): el AttachedDocument ad…xml es la
+        # factura electrónica → FEV presente → LISTA. El cbc:ID puede ser un
+        # CUFE largo y NO debe disparar FACTURA_INCONSISTENTE.
+        d = tmp_path / "HUS520769"
+        d.mkdir()
+        (d / "HUS520769.json").write_text(_rips("HUS520769"), encoding="utf-8")
+        (d / "CUV_HUS520769.json").write_text("{}", encoding="utf-8")
+        (d / "ad09000060370002600526350.xml").write_text(
+            FEV_XML.format(fac="09000060370002600526350"), encoding="utf-8"
+        )
+        res = rad.procesar_factura("HUS520769", rad._archivos_de(d), d, "COOSALUD", cfg)
+        assert res.estado == "LISTA", res.detalle
+        assert "FEV" in res.soportes_presentes
 
     def test_sin_cuv(self, tmp_path, cfg):
         d = _factura_folder(tmp_path, "HUS500001", con_cuv=False)
@@ -290,6 +326,33 @@ class TestDescubrimiento:
         res = rad.procesar_factura(fac, archivos, carpeta, ent, cfg)
         assert res.estado == "LISTA", res.detalle
 
+    def test_auto_share_fe_dian_anida_rips(self, tmp_path, cfg):
+        # Share factura_electronica: …\FACTURAS_SALUD\HUS520769\ con documentos
+        # DIAN y una subcarpeta RIPS\. 'auto' ancla en HUS520769 y recoge AMBOS.
+        fac_dir = tmp_path / "FACTURAS_SALUD" / "HUS520769"
+        rips_dir = fac_dir / "RIPS"
+        rips_dir.mkdir(parents=True)
+        (rips_dir / "HUS520769.json").write_text(_rips("HUS520769"), encoding="utf-8")
+        (rips_dir / "CUV_HUS520769.json").write_text("{}", encoding="utf-8")
+        for nombre in (
+            "ad09000060370002600526350.xml",
+            "ar09000060370002600526350.xml",
+            "fv09000060370002600526350.xml",
+            "fv09000060370002600526350.pdf",
+            "HUS520769.zip",
+        ):
+            (fac_dir / nombre).write_text(FEV_XML.format(fac="520769"), encoding="utf-8")
+        items = rad.descubrir_auto(tmp_path, {}, cfg, cfg.patron_factura)
+        assert len(items) == 1  # una sola factura, no una por subcarpeta
+        fac, archivos, carpeta, _ent = items[0]
+        nombres = {p.name for p in archivos}
+        # Recogió el RIPS de la subcarpeta Y los documentos DIAN de la carpeta.
+        assert "HUS520769.json" in nombres
+        assert "fv09000060370002600526350.xml" in nombres
+        res = rad.procesar_factura(fac, archivos, carpeta, "COOSALUD", cfg)
+        assert {"RIP", "FEV", "CUV"} <= set(res.soportes_presentes), res.detalle
+        assert res.estado == "LISTA", res.detalle
+
 
 class TestArmarPaquete:
     def test_arma_renombra_y_zipea(self, tmp_path, cfg):
@@ -367,8 +430,8 @@ class TestManifiesto:
 class TestCLI:
     def test_main_audita_y_genera_csv(self, tmp_path, cfg):
         origen = tmp_path / "lote"
-        _factura_folder(origen / "COOSALUD", "HUS1")  # LISTA
-        _factura_folder(origen / "NUEVA EPS", "HUS2", con_cuv=False)  # SIN_CUV
+        _factura_folder(origen / "COOSALUD", "HUS480001")  # LISTA
+        _factura_folder(origen / "NUEVA EPS", "HUS480002", con_cuv=False)  # SIN_CUV
         reporte = tmp_path / "rep.csv"
         rc = rad.main(["--origen", str(origen), "--reporte", str(reporte)])
         assert rc == 1  # hay problemas (SIN_CUV)
@@ -378,8 +441,8 @@ class TestCLI:
 
     def test_main_todo_listo_retorna_0(self, tmp_path):
         origen = tmp_path / "lote"
-        _factura_folder(origen / "COOSALUD", "HUS1")
-        _factura_folder(origen / "COOSALUD", "HUS3")
+        _factura_folder(origen / "COOSALUD", "HUS480001")
+        _factura_folder(origen / "COOSALUD", "HUS480003")
         reporte = tmp_path / "rep.csv"
         rc = rad.main(["--origen", str(origen), "--reporte", str(reporte)])
         assert rc == 0
@@ -412,3 +475,35 @@ class TestCLI:
         # Una sola fila de datos (no duplicada por los dos árboles).
         assert contenido.count("HUS469401") >= 1
         assert "SIN_RIPS" not in contenido
+
+    def test_main_share_fe_con_manifiesto(self, tmp_path):
+        # Share factura_electronica (sin EPS en la ruta): RIPS+CUV en la
+        # subcarpeta RIPS\, FEV con nombres DIAN. Con --manifiesto que mapea la
+        # factura a su EPS, debe quedar LISTA (rc 0) bajo el layout auto.
+        fac_dir = tmp_path / "FACTURAS_SALUD" / "HUS520769"
+        rips_dir = fac_dir / "RIPS"
+        rips_dir.mkdir(parents=True)
+        (rips_dir / "HUS520769.json").write_text(_rips("HUS520769"), encoding="utf-8")
+        (rips_dir / "CUV_HUS520769.json").write_text("{}", encoding="utf-8")
+        (fac_dir / "fv09000060370002600526350.xml").write_text(
+            FEV_XML.format(fac="520769"), encoding="utf-8"
+        )
+        (fac_dir / "ad09000060370002600526350.xml").write_text(
+            FEV_XML.format(fac="520769"), encoding="utf-8"
+        )
+        manifiesto = tmp_path / "fact.csv"
+        manifiesto.write_text("FACTURA,EPS\nHUS520769,COOSALUD\n", encoding="utf-8-sig")
+        reporte = tmp_path / "rep.csv"
+        rc = rad.main(
+            [
+                "--origen",
+                str(tmp_path),
+                "--manifiesto",
+                str(manifiesto),
+                "--reporte",
+                str(reporte),
+            ]
+        )
+        contenido = reporte.read_text(encoding="utf-8-sig")
+        assert "LISTA" in contenido and "COOSALUD" in contenido, contenido
+        assert rc == 0

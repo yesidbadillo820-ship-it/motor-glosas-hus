@@ -44,9 +44,9 @@ USO RÁPIDO
     py radicar_facturacion.py --origen "D:\\LOTE" --destino "D:\\RADICAR" \\
         --armar --zip --entidad COOSALUD
 
-    # El lote viene del share (muchas facturas por carpeta, distinguidas por el
-    # token _<factura>_ en el nombre): usar --layout lote
-    py radicar_facturacion.py --origen "/mnt/radicacion_2026/.../ESCANEO" --layout lote
+    # El lote viene de un share anidado (ESCANEO o factura_electronica): el
+    # layout 'auto' (por defecto) ancla en las carpetas HUS<factura>.
+    py radicar_facturacion.py --origen "/mnt/radicacion_2026/.../ESCANEO"
 
     # Mapear factura → entidad con un Excel/CSV de facturación
     py radicar_facturacion.py --origen "D:\\LOTE" --manifiesto "D:\\facturacion.xlsx"
@@ -54,31 +54,43 @@ USO RÁPIDO
 LAYOUTS DE ENTRADA
 ------------------
 
-    carpeta-factura (def.)  Cada subcarpeta es UNA factura; todos sus archivos
-                            le pertenecen. La entidad sale del manifiesto o de
-                            una carpeta padre con nombre de EPS. Si la MISMA
-                            factura aparece en árboles paralelos (RIPS/ y
-                            SOPORTES/) como dos carpetas con el mismo nombre,
-                            se FUSIONAN automáticamente.
-    lote                    Una carpeta con archivos de MUCHAS facturas (como
-                            el share): se agrupan por el token _<factura>_ del
-                            nombre, sin importar en qué subcarpeta estén. Los
-                            compartidos (FURIPS) se asocian a todas las facturas
-                            de su carpeta. Es el más robusto para el share real.
+    auto (def.)             Ancla en carpetas cuyo nombre es una factura
+                            (HUS520769) y les asigna TODO lo que cuelga debajo
+                            (incluye subcarpetas como RIPS/ y los documentos DIAN
+                            fv…/ad…/ar…/.zip). Lo no anclado se agrupa por el
+                            token del nombre. Fusiona por número de factura. Es
+                            el más robusto: cubre todos los shares reales.
+    carpeta-factura         Cada subcarpeta es UNA factura; todos sus archivos
+                            le pertenecen. Fusiona árboles paralelos con el mismo
+                            nombre de carpeta.
+    lote                    Una carpeta con archivos de MUCHAS facturas: se
+                            agrupan por el token _<factura>_ del nombre. Los
+                            compartidos (FURIPS) se reparten a su carpeta.
 
-EL SHARE REAL DE SINAC
-----------------------
+LOS SHARES REALES
+-----------------
 
-    La estructura típica del escaneo es:
+    1) ESCANEO (RIPS + CUV, organizado por EPS):
 
-        …\\02. FEBRERO\\1. DD FACTURACION\\ESCANEO\\<EPS>\\RIPS\\ENV-<lote>\\HUS<factura>\\
+        …\\ESCANEO\\<EPS>\\RIPS\\ENV-<lote>\\HUS<factura>\\
             HUS<factura>.json        ← RIPS (¡nombrado SOLO con la factura!)
-            CUV_HUS<factura>.json    ← resultado de validación MSPS
+            CUV_HUS<factura>.json    ← validación MSPS
 
-    El RIPS viene SIN token de tipo (no "RIP_…"): es solo <factura>.json. El
-    radicador lo reconoce igual. La EPS se toma de la carpeta <EPS> de la ruta
-    (ESCANEO\\COOSALUD\\…). Apuntá --origen a la carpeta ESCANEO (o a la de una
-    EPS) y, si el FEV/PDFs viven en un árbol hermano, usá --layout lote.
+       El RIPS viene SIN token (es solo <factura>.json) y la EPS sale de la
+       carpeta <EPS> de la ruta.
+
+    2) factura_electronica (FEV DIAN, organizado por factura):
+
+        …\\FACTURAS_SALUD\\HUS<factura>\\
+            RIPS\\                    ← subcarpeta con el RIPS (y CUV)
+            ad09…xml                 ← AttachedDocument DIAN (CUFE) = la FEV
+            ar09…xml                 ← ApplicationResponse (acuse DIAN)
+            fv09…xml / fv09…pdf      ← factura de venta (XML + representación)
+            HUS<factura>.zip         ← paquete FE comprimido
+
+       Los nombres DIAN (fv…/ad…/ar…) se tipifican solos. Como NO trae la EPS en
+       la ruta, pasá --manifiesto para resolver el pagador. 'auto' recoge el
+       RIPS de la subcarpeta y los documentos DIAN en una sola factura.
 
 DEPENDENCIAS
 ------------
@@ -138,6 +150,8 @@ CODIGOS_SOPORTE: dict[str, str] = {
     "FEV": "Factura electrónica de venta (XML DIAN)",
     "FAC": "Factura de venta (PDF)",
     "FAT": "Factura / detalle de cobro",
+    "FED": "Factura electrónica DIAN — documento adjunto (AttachedDocument/CUFE)",
+    "ARD": "Acuse de la DIAN (ApplicationResponse)",
     "RIP": "RIPS — registro individual de prestación de servicios",
     "CUV": "Resultado de validación RIPS (MSPS / FEVRIPS)",
     "EPI": "Epicrisis",
@@ -262,14 +276,23 @@ _PREFIJOS_SOPORTE: tuple[tuple[str, str], ...] = (
 # se resuelve antes por el token CUV.
 _RE_FACTURA_DESNUDA = re.compile(r"^(?:HUS)?\d{4,12}$", re.IGNORECASE)
 
+# Factura electrónica DIAN: prefijo de 2 letras pegado al CUFE/consecutivo, como
+# los del share factura_electronica_net22:
+#   fv… = factura de venta (xml = FEV, pdf = representación gráfica)
+#   ad… = AttachedDocument firmado con CUFE (la factura electrónica a radicar)
+#   ar… = ApplicationResponse (acuse de la DIAN)
+_RE_DIAN = re.compile(r"^(fv|ad|ar)\d{6,}", re.IGNORECASE)
+
 
 def clasificar_soporte(nombre: str) -> tuple[str, str, bool]:
     """Devuelve (codigo_adres, descripcion, reconocido) según el TOKEN del
     nombre del archivo. Recorre los tokens de atrás hacia adelante porque el
     tipo suele ir al final (FEV_900006037_HUS487523.pdf → FEV). Si no hay token
-    separado, intenta por prefijo (FURIPS168...txt → FUR) y, en último lugar,
-    reconoce el RIPS desnudo (HUS469401.json)."""
+    separado, intenta por prefijo (FURIPS168...txt → FUR), por nombre DIAN
+    (fv…/ad…/ar…) y, en último lugar, reconoce el RIPS desnudo (HUS469401.json)
+    o el paquete FE comprimido (HUS520769.zip)."""
     base = nombre.rsplit(".", 1)[0]
+    ext = nombre.lower().rsplit(".", 1)[-1] if "." in nombre else ""
     tokens = re.split(r"[ _\-.]+", base)
     for t in reversed(tokens):
         tu = t.upper()
@@ -282,10 +305,23 @@ def clasificar_soporte(nombre: str) -> tuple[str, str, bool]:
     for pref, cod in _PREFIJOS_SOPORTE:
         if base_up.startswith(pref):
             return cod, CODIGOS_SOPORTE[cod], True
-    # RIPS desnudo: .json cuyo nombre es solo la factura (HUS469401.json) y al
-    # que no se le reconoció ningún otro token (no es CUV_…, ResultadosMSPS_…).
-    if nombre.lower().endswith(".json") and _RE_FACTURA_DESNUDA.match(base):
-        return "RIP", CODIGOS_SOPORTE["RIP"], True
+    # Factura electrónica DIAN nombrada por CUFE (fv…/ad…/ar… + dígitos).
+    m = _RE_DIAN.match(base.lower())
+    if m:
+        pref = m.group(1).lower()
+        if pref == "fv":
+            cod = "FEV" if ext == "xml" else "FAC"
+        elif pref == "ad":
+            cod = "FED"
+        else:  # ar
+            cod = "ARD"
+        return cod, CODIGOS_SOPORTE[cod], True
+    # Nombres "desnudos" (solo la factura): .json = RIPS, .zip = paquete FE.
+    if _RE_FACTURA_DESNUDA.match(base):
+        if ext == "json":
+            return "RIP", CODIGOS_SOPORTE["RIP"], True
+        if ext == "zip":
+            return "FED", CODIGOS_SOPORTE["FED"], True
     return "ADM", "Sin clasificar (¿documento administrativo o nombre no ADRES?)", False
 
 
@@ -494,13 +530,22 @@ def procesar_factura(
         # HUS469401.json). El CUV es otro .json y NO debe tomarse como RIPS.
         if sfx == ".json" and cod == "RIP" and rips_path is None:
             rips_path = p
-        elif sfx == ".xml" and cod == "FEV" and fev_path is None:
+        elif sfx == ".xml" and cod in ("FEV", "FED") and fev_path is None:
             fev_path = p
-    # Fallback FEV: si ningún XML quedó tipificado como FEV (nombre atípico),
-    # tomar el primer XML que no sea la factura de costo (FACOSTE/FAT).
+    # El documento adjunto DIAN (FED, ad…xml o el .zip) ES la factura
+    # electrónica: cuenta como FEV para la completitud.
+    if "FED" in presentes:
+        presentes.add("FEV")
+    # Fallback FEV: si ningún XML quedó tipificado como FEV/FED (nombre atípico),
+    # tomar el primer XML que no sea la factura de costo (FACOSTE/FAT) ni un
+    # acuse de la DIAN (ApplicationResponse).
     if fev_path is None:
         for p in archivos:
-            if p.suffix.lower() == ".xml" and p not in por_codigo["FAT"]:
+            if (
+                p.suffix.lower() == ".xml"
+                and p not in por_codigo["FAT"]
+                and p not in por_codigo["ARD"]
+            ):
                 fev_path = p
                 break
     res.soportes_presentes = sorted(presentes)
@@ -603,8 +648,14 @@ def _evaluar_estado(
     if fev_path is None:
         detalle.append("Falta la factura electrónica (FEV .xml).")
 
-    # Consistencia del número de factura entre RIPS y FEV.
-    fuentes = {n for n in (normalizar_factura(num_rips), normalizar_factura(num_fev)) if n != "0"}
+    # Consistencia del número de factura entre RIPS y FEV. Solo comparamos
+    # valores que parezcan un número de factura (dígitos, ≤12): el cbc:ID de un
+    # FEV DIAN puede ser un CUFE largo y no debe disparar falsos inconsistentes.
+    fuentes = {
+        n
+        for n in (normalizar_factura(num_rips), normalizar_factura(num_fev))
+        if n != "0" and n.isdigit() and len(n) <= 12
+    }
     inconsistente = len(fuentes) > 1
     if inconsistente:
         detalle.append(
@@ -761,6 +812,67 @@ def descubrir_lote(
     return salida
 
 
+def descubrir_auto(
+    origen: Path, manifiesto: dict[str, str], cfg: ConfigRadicacion, patron: str
+) -> list[tuple[str, list[Path], Path, str | None]]:
+    """Layout auto (def.): ancla en carpetas cuyo nombre ES una factura
+    (HUS520769) y les asigna TODOS los archivos que cuelgan debajo,
+    recursivamente — así recoge subcarpetas como RIPS/ y los documentos DIAN
+    (fv…/ad…/ar…/.zip) que viven en la carpeta de la factura. Lo que no cae bajo
+    ninguna carpeta-factura se agrupa por el token _<factura>_ del nombre
+    (estilo lote). Fusiona por número de factura, así la misma factura repartida
+    en árboles distintos queda UNA sola. Es el más robusto: cubre el share de FE
+    (FACTURAS_SALUD\\HUS…\\), el de ESCANEO y los lotes sueltos."""
+    rx = re.compile(patron, re.IGNORECASE)
+    anclas = {d for d in origen.rglob("*") if d.is_dir() and _RE_FACTURA_DESNUDA.match(d.name)}
+
+    grupos: dict[str, list[Path]] = defaultdict(list)
+    carpeta_de: dict[str, Path] = {}
+    fac_raw_de: dict[str, str] = {}
+    sueltos: list[Path] = []
+
+    for p in sorted(x for x in origen.rglob("*") if x.is_file()):
+        ancla: Path | None = None
+        for parent in p.parents:
+            if parent in anclas:
+                ancla = parent
+                break
+            if parent == origen:
+                break
+        if ancla is not None:
+            clave = normalizar_factura(ancla.name)
+            grupos[clave].append(p)
+            carpeta_de.setdefault(clave, ancla)
+            fac_raw_de.setdefault(clave, ancla.name)
+        else:
+            sueltos.append(p)
+
+    # Lo no anclado: agrupar por el token del nombre y repartir los compartidos
+    # (sin token) a las facturas de su misma carpeta — igual que el layout lote.
+    compartidos_por_dir: dict[Path, list[Path]] = defaultdict(list)
+    facturas_por_dir: dict[Path, set[str]] = defaultdict(set)
+    for p in sueltos:
+        m = rx.search(p.name)
+        if m:
+            clave = normalizar_factura(m.group(0))
+            grupos[clave].append(p)
+            carpeta_de.setdefault(clave, p.parent)
+            fac_raw_de.setdefault(clave, m.group(0))
+            facturas_por_dir[p.parent].add(clave)
+        else:
+            compartidos_por_dir[p.parent].append(p)
+    for d, comps in compartidos_por_dir.items():
+        for clave in facturas_por_dir.get(d, set()):
+            grupos[clave].extend(comps)
+
+    salida = []
+    for clave, archivos in grupos.items():
+        carpeta = carpeta_de.get(clave, origen)
+        ent = manifiesto.get(clave) or _entidad_desde_ruta(carpeta, origen, cfg)
+        salida.append((fac_raw_de.get(clave, clave), sorted(set(archivos)), carpeta, ent))
+    return salida
+
+
 # ─── Manifiesto factura → entidad ────────────────────────────────────────────
 
 
@@ -809,6 +921,20 @@ def _leer_tabla(ruta: Path) -> list[list]:
 # ─── Armado del paquete ──────────────────────────────────────────────────────
 
 
+def _nombre_unico(nombre: str, usados: set[str]) -> str:
+    """Evita pisar archivos cuando dos soportes mapean al mismo nombre destino
+    (p.ej. fv…xml y ad…xml de un mismo paquete DIAN): agrega _2, _3, …"""
+    if nombre not in usados:
+        return nombre
+    raiz, punto, ext = nombre.rpartition(".")
+    base = raiz if punto else nombre
+    sufijo = ("." + ext) if punto else ""
+    i = 2
+    while f"{base}_{i}{sufijo}" in usados:
+        i += 1
+    return f"{base}_{i}{sufijo}"
+
+
 def nombre_soporte(archivo: Path, factura: str, nit_prestador: str, nomenclatura: str) -> str:
     """Nombre destino del soporte según la nomenclatura de la entidad.
     ADRES: <TOKEN>_<NIT>_<factura>.<ext>.  DISPENSARIO_HUS_CORTO: igual pero
@@ -854,8 +980,10 @@ def armar_paquete(
         dir_factura.mkdir(parents=True, exist_ok=True)
 
     copiados = 0
+    usados: set[str] = set()
     for p in archivos:
-        nuevo = nombre_soporte(p, res.factura, nit_prestador, nomen)
+        nuevo = _nombre_unico(nombre_soporte(p, res.factura, nit_prestador, nomen), usados)
+        usados.add(nuevo)
         destino_final = dir_factura / nuevo
         if dry_run:
             copiados += 1
@@ -1118,9 +1246,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--layout",
-        choices=["carpeta-factura", "lote"],
-        default="carpeta-factura",
-        help="carpeta-factura: una carpeta por factura. lote: muchos archivos por carpeta (share).",
+        choices=["auto", "carpeta-factura", "lote"],
+        default="auto",
+        help="auto (def.): ancla en carpetas HUS<factura> y agrupa lo demás por token "
+        "(cubre los shares anidados). carpeta-factura: una carpeta por factura. "
+        "lote: muchos archivos por carpeta.",
     )
     p.add_argument(
         "--entidad", type=str, default=None, help="Filtrar solo esta entidad (substring)."
@@ -1190,8 +1320,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.layout == "lote":
         items = descubrir_lote(args.origen, manifiesto, cfg, cfg.patron_factura)
-    else:
+    elif args.layout == "carpeta-factura":
         items = descubrir_carpeta_factura(args.origen, manifiesto, cfg)
+    else:
+        items = descubrir_auto(args.origen, manifiesto, cfg, cfg.patron_factura)
 
     if not items:
         logger.error(
