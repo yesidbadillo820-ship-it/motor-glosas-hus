@@ -128,6 +128,16 @@ class TestClasificarSoporte:
         # HUS520769.zip = paquete FE comprimido (documento adjunto).
         assert rad.clasificar_soporte("HUS520769.zip")[0] == "FED"
 
+    def test_resultados_doker_es_cuv(self):
+        # En el share de FE el CUV viene como ResultadosDoker_<fac>_<id>.json.
+        cod, _d, ok = rad.clasificar_soporte("ResultadosDoker_HUS520760_010626002250.json")
+        assert (cod, ok) == ("CUV", True)
+
+    def test_envio_doker_es_auxiliar(self):
+        # El envío al validador es auxiliar (reconocido, no es soporte ADRES).
+        cod, _d, ok = rad.clasificar_soporte("EnvioDoker_HUS520760_010626002250.json")
+        assert (cod, ok) == ("VAL", True)
+
     def test_prefijo_furips_pegado(self):
         # FURIPS viene pegado a dígitos en los lotes reales.
         assert rad.clasificar_soporte("FURIPS168001007920121012026.txt")[0] == "FUR"
@@ -506,4 +516,42 @@ class TestCLI:
         )
         contenido = reporte.read_text(encoding="utf-8-sig")
         assert "LISTA" in contenido and "COOSALUD" in contenido, contenido
+        assert rc == 0
+
+    def test_main_share_fe_doker_completo(self, tmp_path):
+        # Réplica EXACTA del share de FE (captura real): subcarpeta RIPS\ con
+        # Rips_, ResultadosDoker (=CUV) y EnvioDoker (auxiliar), más documentos
+        # DIAN en la carpeta de la factura. Con manifiesto → LISTA.
+        fac_dir = tmp_path / "FACTURAS_SALUD" / "HUS520760"
+        rips_dir = fac_dir / "RIPS"
+        rips_dir.mkdir(parents=True)
+        (rips_dir / "Rips_HUS520760.json").write_text(_rips("HUS520760"), encoding="utf-8")
+        (rips_dir / "ResultadosDoker_HUS520760_010626002250.json").write_text(
+            "{}", encoding="utf-8"
+        )
+        (rips_dir / "EnvioDoker_HUS520760_010626002250.json").write_text("{}", encoding="utf-8")
+        (fac_dir / "ad09000060370002600526350.xml").write_text(
+            FEV_XML.format(fac="520760"), encoding="utf-8"
+        )
+        (fac_dir / "fv09000060370002600526350.xml").write_text(
+            FEV_XML.format(fac="520760"), encoding="utf-8"
+        )
+        (fac_dir / "fv09000060370002600526350.pdf").write_text("PDF", encoding="utf-8")
+        (fac_dir / "HUS520760.zip").write_text("ZIP", encoding="utf-8")
+        manifiesto = tmp_path / "fact.csv"
+        manifiesto.write_text("FACTURA,EPS\nHUS520760,COOSALUD\n", encoding="utf-8-sig")
+        reporte = tmp_path / "rep.csv"
+        rc = rad.main(
+            [
+                "--origen",
+                str(tmp_path),
+                "--manifiesto",
+                str(manifiesto),
+                "--reporte",
+                str(reporte),
+            ]
+        )
+        contenido = reporte.read_text(encoding="utf-8-sig")
+        assert "LISTA" in contenido, contenido
+        assert "SIN_CUV" not in contenido and "SIN_RIPS" not in contenido
         assert rc == 0

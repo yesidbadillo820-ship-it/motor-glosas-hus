@@ -172,6 +172,7 @@ CODIGOS_SOPORTE: dict[str, str] = {
     "SER": "FUR Servicios (detalle de servicios reclamados)",
     "IPO": "Informe policial de accidente / aviso a autoridad",
     "CRA": "Constancia de atención / certificación",
+    "VAL": "Validación RIPS — envío al validador (Doker), auxiliar",
     "ADM": "Documento administrativo / otros soportes",
 }
 
@@ -184,6 +185,8 @@ _ALIAS_TOKEN: dict[str, str] = {
     "INFOPOL": "IPO",
     "FURIPS": "FUR",
     "RESULTADOSMSPS": "CUV",
+    "RESULTADOSDOKER": "CUV",  # resultado de validación vía Doker (= CUV)
+    "ENVIODOKER": "VAL",  # envío al validador Doker (auxiliar, no es soporte)
     "AD": "FEV",  # XML CUFE de la DIAN (ad0900...xml)
     "FACOSTE": "FAT",
 }
@@ -262,6 +265,8 @@ def normalizar_factura(fac: str) -> str:
 # para no confundir FURIPS con FUR ni RESULTADOSMSPS con RIPS.
 _PREFIJOS_SOPORTE: tuple[tuple[str, str], ...] = (
     ("RESULTADOSMSPS", "CUV"),
+    ("RESULTADOSDOKER", "CUV"),
+    ("ENVIODOKER", "VAL"),
     ("FURIPS", "FUR"),
     ("EPICRISIS", "EPI"),
     ("EPICRIS", "EPI"),
