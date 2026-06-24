@@ -353,7 +353,6 @@ def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]
     if not carpeta.is_dir():
         return None, f"carpeta no accesible: {carpeta}"
 
-    fuente = carpeta
     candidatos = _archivos_con_prefijo(carpeta, PREFIJOS_SOPORTE)
     if not candidatos:
         # rglob como red de seguridad por si el PDF cuelga de un subdir
@@ -369,7 +368,6 @@ def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]
             cand_alt = _archivos_con_prefijo(alt, PREFIJOS_SOPORTE)
             if cand_alt:
                 candidatos = cand_alt
-                fuente = alt
                 prefijo_usado = cand_alt[0][0]
                 if prefijo_usado == "PDX":
                     logger.info(f"  PDX no estaba en {carpeta.name}; lo encontré en hermana IMG/")
@@ -1436,7 +1434,7 @@ def main() -> int:
     facturas = leer_excel(args.excel, args.hoja, incluir_calidad=args.incluir_calidad)
     if args.incluir_calidad:
         logger.info(
-            f"  --incluir-calidad: las glosas CALIDAD también se responden con su texto del Excel."
+            "  --incluir-calidad: las glosas CALIDAD también se responden con su texto del Excel."
         )
     tot_glosas = sum(len(g["ids"]) for f in facturas.values() for g in f["grupos"])
     tot_calidad = sum(f["calidad"] for f in facturas.values())
