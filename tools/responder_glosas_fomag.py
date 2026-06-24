@@ -325,12 +325,22 @@ def login(page: Page, user: str, password: str, timeout_login_s: int = 240) -> N
 # ─── Navegación a la grilla (Auditoría → cuadro naranja → pestaña) ──────────
 
 
+def _pestanas_visibles(page: Page) -> bool:
+    """True si hay una pestaña RATIFICADAS/RADICADAS VISIBLE (no oculta en el DOM)."""
+    return (_primer_visible(page.get_by_text("RATIFICADAS", exact=False)) is not None
+            or _primer_visible(page.get_by_text("RADICADAS", exact=False)) is not None)
+
+
 def _abrir_facturas_prestador(page: Page) -> None:
     """Clickea el cuadro naranja 'Facturas prestador' para desplegar las
-    pestañas. Idempotente: si ya están visibles, no hace nada."""
-    if page.get_by_text("RATIFICADAS", exact=False).count() > 0:
+    pestañas. Idempotente: si ya hay una pestaña VISIBLE, no hace nada.
+
+    El handler de click suele estar en el contenedor del card, no en el <span>
+    del texto, así que probamos el texto y sus ancestros hasta que aparezcan
+    las pestañas."""
+    if _pestanas_visibles(page):
         return
-    # Esperar a que el cuadro aparezca (el SPA puede tardar en renderizar).
+    # Esperar a que el cuadro naranja aparezca (el SPA puede tardar).
     caja = None
     deadline = time.time() + 20
     while time.time() < deadline:
@@ -344,9 +354,31 @@ def _abrir_facturas_prestador(page: Page) -> None:
     if caja is None:
         _screenshot_debug(page, "sin_cuadro_naranja")
         raise RuntimeError("No encontré el cuadro 'Facturas prestador'.")
-    caja.click()
-    page.wait_for_selector("text=RATIFICADAS", timeout=20000)
-    page.wait_for_timeout(800)
+
+    # Candidatos a clickear: el texto y sus contenedores (a/button/div padre).
+    candidatos = [caja]
+    for xp in ("xpath=ancestor-or-self::a[1]", "xpath=ancestor-or-self::button[1]",
+               "xpath=ancestor::div[1]", "xpath=ancestor::div[2]"):
+        try:
+            c = _primer_visible(caja.locator(xp))
+            if c is not None:
+                candidatos.append(c)
+        except Exception:
+            continue
+
+    for cand in candidatos:
+        try:
+            cand.click(timeout=4000)
+        except Exception:
+            continue
+        fin = time.time() + 6
+        while time.time() < fin:
+            if _pestanas_visibles(page):
+                page.wait_for_timeout(600)
+                return
+            page.wait_for_timeout(400)
+    _screenshot_debug(page, "tabs_no_aparecen")
+    raise RuntimeError("Clickeé 'Facturas prestador' pero no aparecieron las pestañas.")
 
 
 def _click_tab(page: Page, tab_label: str) -> None:
