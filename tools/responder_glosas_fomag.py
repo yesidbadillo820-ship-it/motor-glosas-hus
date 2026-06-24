@@ -673,6 +673,34 @@ def _grilla_dice_sin_datos(page: Page) -> bool:
         return False
 
 
+def _fila_cargo(page: Page, factura: str) -> bool:
+    """True si la grilla cargó la fila de la factura. Estructura-agnóstico: NO
+    depende de que la grilla sea un <table> (la de Horus no siempre lo es).
+    Señal: hay un botón RESPUESTA visible Y la factura está en pantalla."""
+    if _primer_visible(page.locator(
+            "button:has-text('RESPUESTA'), a:has-text('RESPUESTA')")) is None:
+        return False
+    try:
+        return _primer_visible(page.get_by_text(factura, exact=False)) is not None
+    except Exception:
+        return True
+
+
+def _boton_respuesta_de_fila(page: Page, factura: str):
+    """Botón RESPUESTA de la fila que contiene la factura (o el primero visible
+    si la fila no se puede acotar)."""
+    for sel in (f"tr:has-text('{factura}')", f"[role=row]:has-text('{factura}')",
+                f"li:has-text('{factura}')"):
+        fila = _primer_visible(page.locator(sel))
+        if fila is not None:
+            b = _primer_visible(fila.locator(
+                "button:has-text('RESPUESTA'), a:has-text('RESPUESTA')"))
+            if b is not None:
+                return b
+    return _primer_visible(page.locator(
+        "button:has-text('RESPUESTA'), a:has-text('RESPUESTA')"))
+
+
 def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 45) -> bool:
     """Escribe la factura en 'Número factura', dispara FILTRAR y ESPERA a que la
     grilla (que es LENTA) traiga la fila. True si aparece al menos una fila;
@@ -725,14 +753,14 @@ def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 45) -> bool:
     inicio = time.time()
     aviso = False
     while time.time() - inicio < timeout_s:
-        if _leer_pagina(page):
+        if _fila_cargo(page, factura):
             return True
         if not aviso and time.time() - inicio > 6:
             logger.info("  esperando que la grilla traiga la factura (es lenta)…")
             aviso = True
         page.wait_for_timeout(1000)
     _screenshot_debug(page, f"grilla_sin_fila_{factura}")
-    return bool(_leer_pagina(page))
+    return _fila_cargo(page, factura)
 
 
 # ─── Formulario de RESPUESTA (RTA2) ─────────────────────────────────────────
@@ -743,12 +771,7 @@ def abrir_respuesta(page: Page, factura: str) -> bool:
     if not filtrar_por_factura(page, factura):
         logger.warning(f"  {factura}: no aparece en la grilla tras filtrar.")
         return False
-    fila = _primer_visible(page.locator(f"tr:has-text('{factura}')"))
-    btn = None
-    if fila is not None:
-        btn = _primer_visible(fila.locator("button:has-text('RESPUESTA'), a:has-text('RESPUESTA')"))
-    if btn is None:
-        btn = _primer_visible(page.locator("button:has-text('RESPUESTA'), a:has-text('RESPUESTA')"))
+    btn = _boton_respuesta_de_fila(page, factura)
     if btn is None:
         _screenshot_debug(page, f"sin_boton_respuesta_{factura}")
         logger.warning(f"  {factura}: no encontré el botón RESPUESTA.")
