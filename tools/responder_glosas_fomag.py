@@ -692,21 +692,26 @@ def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 35) -> bool:
         )
     except Exception:
         pass
-    # Verificar que el valor entró en la caja correcta (si no, diagnóstico).
-    valor_ok = False
+    # Log del valor que quedó en la caja (diagnóstico siempre).
     try:
-        valor_ok = factura.upper() in (caja.input_value() or "").upper()
+        val_leido = caja.input_value()
     except Exception:
-        pass
-    if not valor_ok:
+        val_leido = "?"
+    logger.info(f"  caja 'Número factura' = {val_leido!r}")
+    if factura.upper() not in (val_leido or "").upper():
         logger.warning("  ⚠ la caja de filtro no tomó la factura; vuelco inputs visibles:")
         _dump_inputs(page)
+    # Disparar el filtro: botón FILTRAR y, por las dudas, Enter en la caja.
     btn = _primer_visible(page.locator("button:has-text('FILTRAR'), button:has-text('Filtrar')"))
     if btn is not None:
         try:
             btn.click()
         except Exception:
             pass
+    try:
+        caja.press("Enter")
+    except Exception:
+        pass
     # Poll: la grilla puede tardar varios segundos en responder.
     inicio = time.time()
     sin_datos_seguidas = 0
