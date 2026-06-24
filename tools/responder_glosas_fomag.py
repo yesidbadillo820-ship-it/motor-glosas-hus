@@ -673,7 +673,7 @@ def _grilla_dice_sin_datos(page: Page) -> bool:
         return False
 
 
-def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 35) -> bool:
+def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 45) -> bool:
     """Escribe la factura en 'Número factura', dispara FILTRAR y ESPERA a que la
     grilla (que es LENTA) traiga la fila. True si aparece al menos una fila;
     False si la grilla queda estable en 'Sin datos' o vence el plazo."""
@@ -701,35 +701,37 @@ def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 35) -> bool:
     if factura.upper() not in (val_leido or "").upper():
         logger.warning("  ⚠ la caja de filtro no tomó la factura; vuelco inputs visibles:")
         _dump_inputs(page)
-    # Disparar el filtro: botón FILTRAR y, por las dudas, Enter en la caja.
-    btn = _primer_visible(page.locator("button:has-text('FILTRAR'), button:has-text('Filtrar')"))
+    # Disparar el filtro: botón FILTRAR (forzado) + Enter de respaldo.
+    btn = _primer_visible(page.locator(
+        "button:has-text('FILTRAR'), button:has-text('Filtrar'), "
+        "a:has-text('FILTRAR'), [class*=btn]:has-text('FILTRAR'), "
+        "[role=button]:has-text('FILTRAR')"
+    ))
     if btn is not None:
         try:
-            btn.click()
-        except Exception:
-            pass
+            btn.click(force=True)
+            logger.info("  click en FILTRAR.")
+        except Exception as e:
+            logger.info(f"  no pude clickear FILTRAR: {e}")
+    else:
+        logger.warning("  ⚠ no encontré el botón FILTRAR.")
     try:
         caja.press("Enter")
     except Exception:
         pass
-    # Poll: la grilla puede tardar varios segundos en responder.
+
+    # La grilla es MUY lenta: poll largo, SIN bailar por 'Sin datos' (es también
+    # el cartel mientras carga). Si vence el plazo, dejamos screenshot.
     inicio = time.time()
-    sin_datos_seguidas = 0
     aviso = False
     while time.time() - inicio < timeout_s:
         if _leer_pagina(page):
             return True
-        # Tras una gracia inicial, si dice 'Sin datos' de forma estable, no está.
-        if time.time() - inicio > 8 and _grilla_dice_sin_datos(page):
-            sin_datos_seguidas += 1
-            if sin_datos_seguidas >= 3:
-                return False
-        else:
-            sin_datos_seguidas = 0
-        if not aviso and time.time() - inicio > 5:
+        if not aviso and time.time() - inicio > 6:
             logger.info("  esperando que la grilla traiga la factura (es lenta)…")
             aviso = True
-        page.wait_for_timeout(900)
+        page.wait_for_timeout(1000)
+    _screenshot_debug(page, f"grilla_sin_fila_{factura}")
     return bool(_leer_pagina(page))
 
 
