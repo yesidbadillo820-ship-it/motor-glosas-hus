@@ -997,21 +997,36 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
         page.wait_for_timeout(800)
         opcion = _primer_visible(page.locator(f"li:has-text('{cod}')"))
         if opcion is None:
-            # Diagnóstico: listar las opciones que SÍ ofrece el dropdown
-            # antes de fallar. Útil cuando el portal restringe los códigos
-            # según el tipo de glosa (TARIFAS no acepta RE9901, etc.).
+            # Fallback: el filtro de select2 a veces no encuentra la opción
+            # aunque exista (timing del ajax que filtra). Vaciamos la caja
+            # para listar TODAS las opciones del dropdown y, si la lista
+            # contiene `cod`, la clickeamos directamente. Ese mismo barrido
+            # sirve también de diagnóstico cuando el portal realmente no
+            # ofrece el código (ej. tipo de glosa restringido).
+            ofrecidos: list[str] = []
             try:
                 caja.fill("")
-                page.wait_for_timeout(400)
-                items = page.locator("li.select2-results__option:visible").all_inner_texts()
-                ofrecidos = [(t or "").strip()[:80] for t in items if (t or "").strip()]
-                logger.error(
-                    f"  Códigos que SÍ ofrece el dropdown ({len(ofrecidos)}): "
-                    + " | ".join(ofrecidos[:25])
-                )
+                page.wait_for_timeout(800)
+                for it in page.locator("li.select2-results__option:visible").all():
+                    try:
+                        txt = (it.inner_text() or "").strip()
+                    except Exception:
+                        continue
+                    if not txt:
+                        continue
+                    ofrecidos.append(txt[:80])
+                    if opcion is None and cod in txt and "No results" not in txt:
+                        opcion = it
             except Exception:
                 pass
-            raise RuntimeError(f"El dropdown no ofrece el código {cod}.")
+            if opcion is None:
+                if ofrecidos:
+                    logger.error(
+                        f"  Códigos que SÍ ofrece el dropdown ({len(ofrecidos)}): "
+                        + " | ".join(ofrecidos[:25])
+                    )
+                raise RuntimeError(f"El dropdown no ofrece el código {cod}.")
+            logger.info(f"  ↻ filtro select2 fallo con '{cod}'; lo eligi de la lista completa")
         opcion.click()
         seleccionado = True
     page.wait_for_timeout(500)
