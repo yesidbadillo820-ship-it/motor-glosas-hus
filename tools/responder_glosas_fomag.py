@@ -222,16 +222,38 @@ def _screenshot_debug(page: Page, etiqueta: str) -> Path | None:
 # ─── Login (perfil persistente + reCAPTCHA manual) ──────────────────────────
 
 
+def _en_login(page: Page) -> bool:
+    """True si estamos en la pantalla de LOGIN. Se detecta por el campo de
+    contraseña + botón INGRESAR / 'RECUPERAR CONTRASEÑA' (solo existen acá).
+    OJO: la pantalla de login dice 'Bienvenido' igual que el header de adentro,
+    así que ese texto NO sirve para detectar sesión."""
+    try:
+        if page.locator("text=/RECUPERAR CONTRASE/i").count() > 0:
+            return True
+        pwd = _primer_visible(page.locator("input[type='password']"))
+        ingresar = _primer_visible(page.locator(
+            "button:has-text('INGRESAR'), button:has-text('Ingresar'), input[type='submit']"
+        ))
+        if pwd is not None and ingresar is not None:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _logueado(page: Page) -> bool:
-    """True si estamos adentro del portal (no en la pantalla de login)."""
+    """True si estamos DENTRO del portal (no en la pantalla de login)."""
+    if _en_login(page):
+        return False
     try:
         url = page.url or ""
-        if "/inicio" in url or "/cuentasMedicas" in url:
+        if any(s in url for s in ("/inicio", "/cuentasMedicas", "/aseguramiento",
+                                  "/historicos", "/rips", "/solicitudes")):
             return True
-        if page.locator("text=/Bienvenido/i").count() > 0:
-            return True
-        if page.get_by_text("Cuentas medicas", exact=False).count() > 0:
-            return True
+        # Ítems del menú lateral que sólo existen ya adentro.
+        for t in ("Cuentas medicas", "Aseguramiento", "Informe prestador"):
+            if page.get_by_text(t, exact=False).count() > 0:
+                return True
     except Exception:
         pass
     return False
@@ -259,8 +281,21 @@ def login(page: Page, user: str, password: str, timeout_login_s: int = 240) -> N
     pwd = _primer_visible(page.locator("input[type='password']"))
     if email is not None and pwd is not None:
         try:
+            email.click()
             email.fill(user)
+            pwd.click()
             pwd.fill(password)
+            # Disparar input/change/blur para que el form de Angular registre
+            # los valores y habilite INGRESAR.
+            for campo in (email, pwd):
+                try:
+                    campo.evaluate(
+                        "el => { el.dispatchEvent(new Event('input', {bubbles:true}));"
+                        " el.dispatchEvent(new Event('change', {bubbles:true}));"
+                        " el.dispatchEvent(new Event('blur', {bubbles:true})); }"
+                    )
+                except Exception:
+                    pass
             logger.info("  Email y contraseña cargados.")
         except Exception as e:
             logger.warning(f"  No pude autollenar el formulario ({e}); completalo a mano.")
