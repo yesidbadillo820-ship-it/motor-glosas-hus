@@ -1007,16 +1007,19 @@ class TestFix9GptOssRazonadorPresupuesto:
 
     @pytest.mark.asyncio
     async def test_modelos_no_gpt_oss_conservan_max_tokens_sin_reasoning(self, svc_groq_f9):
-        """Para llama/qwen el max_tokens sigue en 3000 y reasoning_effort NI
-        SIQUIERA viaja (el SDK documenta otro set de valores para qwen3 y
-        ninguno para llama → riesgo de 400)."""
+        """Para llama/qwen el max_tokens sigue siendo el base (_GROQ_MAX_TOKENS,
+        subido a 5000 en ronda 12) y reasoning_effort NI SIQUIERA viaja (el SDK
+        documenta otro set de valores para qwen3 y ninguno para llama → riesgo
+        de 400)."""
+        from app.services.glosa_service import _GROQ_MAX_TOKENS
+
         svc = svc_groq_f9({LLAMA: DICTAMEN_OK}, groq_model=LLAMA, groq_model_fallback_1=QWEN)
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user")
 
         assert modelo == f"groq/{LLAMA}"
         (kwargs,) = svc.groq.kwargs_llamadas
-        assert kwargs["max_tokens"] == 3000
+        assert kwargs["max_tokens"] == _GROQ_MAX_TOKENS
         assert "reasoning_effort" not in kwargs
 
     @pytest.mark.asyncio
@@ -1066,11 +1069,14 @@ class TestFix9RetryLength:
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user")
 
+        from app.services.glosa_service import _GROQ_MAX_TOKENS
+
         assert content == DICTAMEN_OK
         assert modelo == f"groq/{QWEN}"
         assert svc.groq.modelos_llamados == [GPT_OSS, GPT_OSS, QWEN]
         kwargs_qwen = svc.groq.kwargs_llamadas[2]
-        assert kwargs_qwen["max_tokens"] == 3000  # sin cambios para no-gpt-oss
+        # Base _GROQ_MAX_TOKENS sin cambios para no-gpt-oss (5000 desde ronda 12)
+        assert kwargs_qwen["max_tokens"] == _GROQ_MAX_TOKENS
         assert "reasoning_effort" not in kwargs_qwen
 
     @pytest.mark.asyncio
@@ -1096,6 +1102,12 @@ class TestFix9RetryLength:
 
         content, modelo = await svc._llamar_groq_con_retry("sys", "user")
 
+        from app.services.glosa_service import _GROQ_MAX_TOKENS
+
         assert modelo == f"groq/{QWEN}"
         assert svc.groq.modelos_llamados == [LLAMA, QWEN]
-        assert svc.groq.kwargs_llamadas[0]["max_tokens"] == 3000
+        # Base sin cambios para no-gpt-oss: el retry-por-length-vacío es
+        # EXCLUSIVO de gpt-oss. Llama con content vacío pasa de modelo directo.
+        # (En ronda 12 se sumó retry-por-truncamiento que dispara con content
+        # PARCIAL en cualquier modelo, pero acá el content viene vacío.)
+        assert svc.groq.kwargs_llamadas[0]["max_tokens"] == _GROQ_MAX_TOKENS
