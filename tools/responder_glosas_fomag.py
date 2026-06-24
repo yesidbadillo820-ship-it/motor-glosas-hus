@@ -786,14 +786,47 @@ def abrir_respuesta(page: Page, factura: str) -> bool:
     return True
 
 
-def _headers_formulario(page: Page) -> list[str]:
-    """Devuelve los encabezados de la tabla del formulario de respuesta."""
+_CLAVES_TABLA_FORM = (
+    "afiliado", "cod rta2", "detalle rta 2", "detalle rta2",
+    "concepto aud", "rta1 prestador", "ratificado",
+)
+
+
+def _tabla_formulario(page: Page):
+    """Locator de la tabla del formulario de Respuesta (columnas Afiliado /
+    Cod Rta2 / Detalle Rta 2 / Concepto Aud), distinguiéndola de las otras
+    tablas ocultas del DOM. Prueba <table> y, si no, <mat-table>."""
+    for sel in ("table", "mat-table"):
+        try:
+            n = page.locator(sel).count()
+        except Exception:
+            n = 0
+        mejor, mejor_hits = -1, 1
+        for i in range(n):
+            try:
+                txt = (page.locator(sel).nth(i).inner_text() or "").lower()
+            except Exception:
+                continue
+            hits = sum(1 for k in _CLAVES_TABLA_FORM if k in txt)
+            if hits > mejor_hits:
+                mejor, mejor_hits = i, hits
+        if mejor >= 0:
+            return page.locator(sel).nth(mejor)
+    return None
+
+
+def _headers_formulario(tabla) -> list[str]:
+    """Encabezados de la tabla del formulario (locator de _tabla_formulario)."""
+    if tabla is None:
+        return []
     try:
-        return page.evaluate(
-            r"""() => {
-                const t = document.querySelector('table');
-                if (!t) return [];
-                const cells = t.querySelectorAll('thead th, thead td, mat-header-cell, [role=columnheader]');
+        return tabla.evaluate(
+            r"""(t) => {
+                let cells = t.querySelectorAll('thead th, thead td, mat-header-cell, [role=columnheader]');
+                if (!cells.length) {
+                    const fr = t.querySelector('tr');
+                    cells = fr ? fr.querySelectorAll('th, td') : [];
+                }
                 return Array.from(cells).map(c => (c.innerText || '').trim());
             }"""
         )
@@ -813,9 +846,11 @@ def _idx_columna(headers: list[str], *needles_nospace: str) -> int:
     return -1
 
 
-def _filas_formulario(page: Page):
-    """Locators de las filas de servicio del formulario (tbody)."""
-    filas = page.locator("table tbody tr, mat-table mat-row")
+def _filas_formulario(tabla):
+    """Filas de servicio del formulario (locator de _tabla_formulario)."""
+    if tabla is None:
+        return []
+    filas = tabla.locator("tbody tr, mat-row")
     visibles = []
     try:
         n = filas.count()
@@ -1057,7 +1092,13 @@ def responder_glosa(
         return reg
 
     _set_rows_per_page_form(page)
-    headers = _headers_formulario(page)
+    tabla = _tabla_formulario(page)
+    if tabla is None:
+        _screenshot_debug(page, f"form_sin_tabla_{factura}")
+        reg["estado"] = "ERROR"
+        reg["detalle"] = "no encontré la tabla del formulario de Respuesta"
+        return reg
+    headers = _headers_formulario(tabla)
     if not headers:
         _screenshot_debug(page, f"form_sin_headers_{factura}")
         reg["estado"] = "ERROR"
@@ -1076,7 +1117,7 @@ def responder_glosa(
         logger.error(f"  {reg['detalle']}")
         return reg
 
-    filas = _filas_formulario(page)
+    filas = _filas_formulario(tabla)
     if max_filas > 0:
         filas = filas[:max_filas]
     reg["filas"] = len(filas)
@@ -1156,7 +1197,8 @@ def diagnosticar_respuesta(page: Page, factura: str) -> None:
     out = Path("debug_screenshots")
     out.mkdir(exist_ok=True)
     _screenshot_debug(page, f"respuesta_form_{factura}")
-    headers = _headers_formulario(page)
+    tabla = _tabla_formulario(page)
+    headers = _headers_formulario(tabla)
     logger.info(f"  Encabezados del formulario ({len(headers)}): {headers}")
     logger.info(f"    idx Cod Rta2 RAT      = {_idx_columna(headers, 'CODRTA2RAT', 'RTA2RAT')}")
     logger.info(f"    idx Detalle Rta 2     = {_idx_columna(headers, 'DETALLERTA2PRESTADOR', 'DETALLERTA2')}")
