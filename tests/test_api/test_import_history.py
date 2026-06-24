@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -87,8 +87,6 @@ class TestImportHistory:
 
     def test_cluster_detectado(self, client, db_session):
         # 12 glosas en la misma hora (hace 3 días)
-        from datetime import timedelta
-
         ts = ahora_utc() - timedelta(days=3)
         for _ in range(12):
             _seed(db_session, ts)
@@ -98,8 +96,10 @@ class TestImportHistory:
         assert d["items"][0]["glosas_creadas"] == 12
 
     def test_orden_clusters_desc(self, client, db_session):
-        ts1 = datetime(2026, 4, 10, 10, 0, tzinfo=timezone.utc)
-        ts2 = datetime(2026, 4, 12, 14, 0, tzinfo=timezone.utc)
+        # Fechas relativas dentro de la ventana (antes estaban fijas en abril/2026
+        # y el test fallaba cuando "hoy" quedaba a más de 60 días).
+        ts1 = ahora_utc() - timedelta(days=12)
+        ts2 = ahora_utc() - timedelta(days=10)
         # 20 glosas en ts1
         for _ in range(20):
             _seed(db_session, ts1)

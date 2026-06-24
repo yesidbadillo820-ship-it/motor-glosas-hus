@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import re
 import sys
 import unicodedata
 from collections import Counter, defaultdict
@@ -45,32 +44,32 @@ logger = logging.getLogger("motor_glosas")
 # (los nombres son los que exporta DG.NET con todo el prefijo del modelo)
 
 COLS_TRAMITE = {
-    "tercero":   "RecepcionObjecion.FacturaCartera.Tercero.NombreCompletoAN",
-    "factura":   "RecepcionObjecion.FacturaCartera.Factura",
-    "cod_obj":   "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Codigo",
-    "cod_res":   "ListadoConceptos.ConceptoObjecion.Codigo",
-    "val_obj":   "ListadoConceptos.DetalleRecepcionObjecion.ValorObjecion",
-    "val_ace":   "ListadoConceptos.ValorAceptado",
-    "servicio":  "ListadoConceptos.DetalleRecepcionObjecion.ServicioProductoFactura.Descripcion",
-    "observ":    "ListadoConceptos.Observaciones",
+    "tercero": "RecepcionObjecion.FacturaCartera.Tercero.NombreCompletoAN",
+    "factura": "RecepcionObjecion.FacturaCartera.Factura",
+    "cod_obj": "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Codigo",
+    "cod_res": "ListadoConceptos.ConceptoObjecion.Codigo",
+    "val_obj": "ListadoConceptos.DetalleRecepcionObjecion.ValorObjecion",
+    "val_ace": "ListadoConceptos.ValorAceptado",
+    "servicio": "ListadoConceptos.DetalleRecepcionObjecion.ServicioProductoFactura.Descripcion",
+    "observ": "ListadoConceptos.Observaciones",
 }
 # Formato del export "Listado de Recepción de Objeción" (headers sin prefijo).
 COLS_RECEPCION = {
-    "tercero":   "FacturaCartera.Tercero.NombreCompletoAN",
-    "factura":   "FacturaCartera.Factura",
-    "cod_obj":   "ListadoConceptos.ConceptoObjecion.Codigo",
-    "val_obj":   "ListadoConceptos.ValorObjecion",
-    "servicio":  "ListadoConceptos.ServicioProductoFactura.Descripcion",
+    "tercero": "FacturaCartera.Tercero.NombreCompletoAN",
+    "factura": "FacturaCartera.Factura",
+    "cod_obj": "ListadoConceptos.ConceptoObjecion.Codigo",
+    "val_obj": "ListadoConceptos.ValorObjecion",
+    "servicio": "ListadoConceptos.ServicioProductoFactura.Descripcion",
     "observ_eps": "ListadoConceptos.Observaciones",
 }
 # Formato del export "Listado de Trámite de Objeción" usado como recepción
 # (mismo archivo TRAMITE → toma las glosas como si fueran pendientes).
 COLS_RECEPCION_DESDE_TRAMITE = {
-    "tercero":   "RecepcionObjecion.FacturaCartera.Tercero.NombreCompletoAN",
-    "factura":   "RecepcionObjecion.FacturaCartera.Factura",
-    "cod_obj":   "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Codigo",
-    "val_obj":   "ListadoConceptos.DetalleRecepcionObjecion.ValorObjecion",
-    "servicio":  "ListadoConceptos.DetalleRecepcionObjecion.ServicioProductoFactura.Descripcion",
+    "tercero": "RecepcionObjecion.FacturaCartera.Tercero.NombreCompletoAN",
+    "factura": "RecepcionObjecion.FacturaCartera.Factura",
+    "cod_obj": "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Codigo",
+    "val_obj": "ListadoConceptos.DetalleRecepcionObjecion.ValorObjecion",
+    "servicio": "ListadoConceptos.DetalleRecepcionObjecion.ServicioProductoFactura.Descripcion",
     "observ_eps": "ListadoConceptos.DetalleRecepcionObjecion.ConceptoObjecion.Nombre",
 }
 
@@ -190,6 +189,7 @@ class PatronesGlosas:
 
 def cargar_tramite(ruta: Path) -> PatronesGlosas:
     from openpyxl import load_workbook
+
     wb = load_workbook(filename=str(ruta), data_only=True, read_only=True)
     ws = wb[wb.sheetnames[0]]
     rows = list(ws.iter_rows(values_only=True))
@@ -199,25 +199,32 @@ def cargar_tramite(ruta: Path) -> PatronesGlosas:
     idx = _idx(headers, COLS_TRAMITE)
     pat = PatronesGlosas()
     for r in rows[1:]:
-        pat.aprender({
-            "eps":      _norm(str(r[idx["tercero"]] or "")),
-            "factura":  str(r[idx["factura"]] or "").strip(),
-            "cod_obj":  (str(r[idx["cod_obj"]] or "").strip() or None),
-            "cod_res":  (str(r[idx["cod_res"]] or "").strip() or None),
-            "val_obj":  r[idx["val_obj"]] or 0,
-            "val_ace":  r[idx["val_ace"]] or 0,
-            "servicio": str(r[idx["servicio"]] or "").strip(),
-            "observ":   str(r[idx["observ"]] or "").strip(),
-        })
-    logger.info(f"Patrones aprendidos del histórico: "
-                f"{len(pat.cod_por_codobj)} códigos de objeción distintos, "
-                f"{len(pat.cod_por_eps_codobj)} combinaciones (EPS, código)")
+        pat.aprender(
+            {
+                "eps": _norm(str(r[idx["tercero"]] or "")),
+                "factura": str(r[idx["factura"]] or "").strip(),
+                "cod_obj": (str(r[idx["cod_obj"]] or "").strip() or None),
+                "cod_res": (str(r[idx["cod_res"]] or "").strip() or None),
+                "val_obj": r[idx["val_obj"]] or 0,
+                "val_ace": r[idx["val_ace"]] or 0,
+                "servicio": str(r[idx["servicio"]] or "").strip(),
+                "observ": str(r[idx["observ"]] or "").strip(),
+            }
+        )
+    logger.info(
+        f"Patrones aprendidos del histórico: "
+        f"{len(pat.cod_por_codobj)} códigos de objeción distintos, "
+        f"{len(pat.cod_por_eps_codobj)} combinaciones (EPS, código)"
+    )
     return pat
 
 
 def procesar_recepcion(
-    ruta_recep: Path, ruta_salida: Path, patrones: PatronesGlosas,
-    filtro_eps: str | None, filtro_factura: str | None,
+    ruta_recep: Path,
+    ruta_salida: Path,
+    patrones: PatronesGlosas,
+    filtro_eps: str | None,
+    filtro_factura: str | None,
 ) -> tuple[int, int]:
     from openpyxl import load_workbook, Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -233,10 +240,10 @@ def procesar_recepcion(
     # fila como una glosa a evaluar).
     try:
         idx = _idx(headers, COLS_RECEPCION)
-        logger.info(f"  formato detectado: RECEPCION (export del Listado de Recepción)")
+        logger.info("  formato detectado: RECEPCION (export del Listado de Recepción)")
     except ValueError:
         idx = _idx(headers, COLS_RECEPCION_DESDE_TRAMITE)
-        logger.info(f"  formato detectado: TRAMITE (export del Listado de Trámite)")
+        logger.info("  formato detectado: TRAMITE (export del Listado de Trámite)")
 
     fil_eps = _norm(filtro_eps or "")
     fil_fac = (filtro_factura or "").strip().upper()
@@ -280,7 +287,6 @@ def procesar_recepcion(
         cod_obj = str(r[idx["cod_obj"]] or "").strip()
         if not cod_obj:
             continue
-        v_obj = r[idx["val_obj"]] or 0
         propuesta = patrones.proponer(eps, cod_obj)
         v_ace = propuesta["valor_aceptado"]
         if v_ace == -1:
@@ -332,16 +338,30 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--tramite", type=Path, required=True,
-                        help="Excel TRAMITE_DE_GLOSA (histórico ya respondido).")
-    parser.add_argument("--recepcion", type=Path, required=True,
-                        help="Excel RECEPCION_DE_GLOSA (glosas pendientes).")
-    parser.add_argument("--salida", type=Path, required=True,
-                        help="XLSX de salida (RECEPCION + columnas SUGERIDO).")
-    parser.add_argument("--eps", type=str, default=None,
-                        help="Filtrar glosas por nombre de EPS (substring, ej. DISPENSARIO).")
-    parser.add_argument("--factura", type=str, default=None,
-                        help="Filtrar solo esta factura (HUS...).")
+    parser.add_argument(
+        "--tramite",
+        type=Path,
+        required=True,
+        help="Excel TRAMITE_DE_GLOSA (histórico ya respondido).",
+    )
+    parser.add_argument(
+        "--recepcion",
+        type=Path,
+        required=True,
+        help="Excel RECEPCION_DE_GLOSA (glosas pendientes).",
+    )
+    parser.add_argument(
+        "--salida", type=Path, required=True, help="XLSX de salida (RECEPCION + columnas SUGERIDO)."
+    )
+    parser.add_argument(
+        "--eps",
+        type=str,
+        default=None,
+        help="Filtrar glosas por nombre de EPS (substring, ej. DISPENSARIO).",
+    )
+    parser.add_argument(
+        "--factura", type=str, default=None, help="Filtrar solo esta factura (HUS...)."
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -365,10 +385,13 @@ def main() -> int:
         logger.info(f"  filtro EPS: substring '{args.eps}'")
     if args.factura:
         logger.info(f"  filtro factura: {args.factura}")
-    procesar_recepcion(args.recepcion, args.salida, patrones,
-                       filtro_eps=args.eps, filtro_factura=args.factura)
-    logger.info("\nAbrí el XLSX, revisá las 5 columnas nuevas (a la derecha) y corregí "
-                "lo que sea necesario antes de pasar a radicación.")
+    procesar_recepcion(
+        args.recepcion, args.salida, patrones, filtro_eps=args.eps, filtro_factura=args.factura
+    )
+    logger.info(
+        "\nAbrí el XLSX, revisá las 5 columnas nuevas (a la derecha) y corregí "
+        "lo que sea necesario antes de pasar a radicación."
+    )
     return 0
 
 

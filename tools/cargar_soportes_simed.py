@@ -273,9 +273,9 @@ def _cerrar_modal_mensajes(page: Page, contexto: str = "") -> str:
         etiqueta = f" ({contexto})" if contexto else ""
         logger.info(f"  Modal Mensajes{etiqueta}: {txt_clean[:200]}")
     try:
-        msg_iframe.locator(
-            "button:has-text('Confirmar'), input[value='Confirmar']"
-        ).first.click(timeout=3000)
+        msg_iframe.locator("button:has-text('Confirmar'), input[value='Confirmar']").first.click(
+            timeout=3000
+        )
         page.wait_for_timeout(800)
     except PlaywrightTimeout:
         pass
@@ -627,8 +627,7 @@ def guardar_nc_segunda_pasada(page: Page, info: dict) -> None:
     if "no corresponde" in txt_modal2.lower() or "ministerio de salud" in txt_modal2.lower():
         _screenshot_debug(page, f"pasada2_nc_no_corresponde_{nota}")
         raise PlaywrightTimeout(
-            f"Pasada 2: NC {nota} no corresponde con el CUV. "
-            f"Mensaje del portal: {txt_modal2[:200]}"
+            f"Pasada 2: NC {nota} no corresponde con el CUV. Mensaje del portal: {txt_modal2[:200]}"
         )
 
     # NO clickear Soportes NC — los archivos ya están subidos de la pasada 1.

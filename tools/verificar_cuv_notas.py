@@ -167,28 +167,33 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--base", type=Path,
+        "--base",
+        type=Path,
         default=Path(r"\\172.16.32.83\factura_electronica_net22"),
-        help=r"Base UNC del share (default \\172.16.32.83\factura_electronica_net22)"
+        help=r"Base UNC del share (default \\172.16.32.83\factura_electronica_net22)",
     )
     parser.add_argument(
-        "--subcarpeta", default="FACTURAS_NOTA",
-        help="Subcarpeta dentro de cada periodo (default FACTURAS_NOTA)"
+        "--subcarpeta",
+        default="FACTURAS_NOTA",
+        help="Subcarpeta dentro de cada periodo (default FACTURAS_NOTA)",
     )
     grupo = parser.add_mutually_exclusive_group(required=True)
     grupo.add_argument("--facturas", help="Facturas HUS separadas por coma.")
     grupo.add_argument("--lista", type=Path, help="TXT con una factura por linea.")
     parser.add_argument(
-        "--periodos", default=None,
-        help="YYYYMM separados por coma. Default: todos los del share."
+        "--periodos", default=None, help="YYYYMM separados por coma. Default: todos los del share."
     )
     parser.add_argument(
-        "--paralelos", type=int, default=8,
-        help="Threads para acelerar lectura del share (default 8)."
+        "--paralelos",
+        type=int,
+        default=8,
+        help="Threads para acelerar lectura del share (default 8).",
     )
     parser.add_argument(
-        "--reporte", type=Path, default=Path("reporte_cuv.csv"),
-        help="CSV de salida (default reporte_cuv.csv)."
+        "--reporte",
+        type=Path,
+        default=Path("reporte_cuv.csv"),
+        help="CSV de salida (default reporte_cuv.csv).",
     )
     args = parser.parse_args()
 
@@ -212,8 +217,7 @@ def main() -> int:
         periodos = [p.strip() for p in args.periodos.split(",") if p.strip()]
     else:
         periodos = sorted(
-            p.name for p in args.base.iterdir()
-            if p.is_dir() and re.fullmatch(r"\d{6}", p.name)
+            p.name for p in args.base.iterdir() if p.is_dir() and re.fullmatch(r"\d{6}", p.name)
         )
     logger.info(f"Periodos a recorrer: {periodos}")
 
@@ -255,25 +259,35 @@ def main() -> int:
 
     # Faltantes
     for f in sorted(pendientes):
-        resultados.append({
-            "factura": f"HUS{f}",
-            "nota_electronica": "",
-            "carpeta": "",
-            "estado": "SIN_NOTA_EN_SHARE",
-            "cuv": "",
-            "codigo_rechazo": "",
-            "observacion_rechazo": "",
-            "path_rechazo": "",
-            "n_rechazos": 0,
-            "n_notificaciones": 0,
-            "fecha_validacion": "",
-        })
+        resultados.append(
+            {
+                "factura": f"HUS{f}",
+                "nota_electronica": "",
+                "carpeta": "",
+                "estado": "SIN_NOTA_EN_SHARE",
+                "cuv": "",
+                "codigo_rechazo": "",
+                "observacion_rechazo": "",
+                "path_rechazo": "",
+                "n_rechazos": 0,
+                "n_notificaciones": 0,
+                "fecha_validacion": "",
+            }
+        )
 
     args.reporte.parent.mkdir(parents=True, exist_ok=True)
     campos = [
-        "factura", "nota_electronica", "estado", "cuv",
-        "codigo_rechazo", "observacion_rechazo", "path_rechazo",
-        "n_rechazos", "n_notificaciones", "fecha_validacion", "carpeta",
+        "factura",
+        "nota_electronica",
+        "estado",
+        "cuv",
+        "codigo_rechazo",
+        "observacion_rechazo",
+        "path_rechazo",
+        "n_rechazos",
+        "n_notificaciones",
+        "fecha_validacion",
+        "carpeta",
     ]
     with args.reporte.open("w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=campos)

@@ -187,7 +187,9 @@ def leer_excel(ruta: Path, hoja: str, incluir_calidad: bool = False) -> dict[str
                 idx[clave] = i
                 break
         if clave not in idx:
-            raise ValueError(f"Falta la columna '{clave}' (acepto {sorted(opciones)}). Headers: {headers}")
+            raise ValueError(
+                f"Falta la columna '{clave}' (acepto {sorted(opciones)}). Headers: {headers}"
+            )
 
     # factura → lista ordenada de (clave_grupo → grupo)
     grupos_por_fac: dict[str, dict] = defaultdict(dict)
@@ -229,8 +231,10 @@ def leer_excel(ruta: Path, hoja: str, incluir_calidad: bool = False) -> dict[str
 
     todas = set(grupos_por_fac) | set(calidad_por_fac)
     return {
-        fac: {"grupos": list(grupos_por_fac.get(fac, {}).values()),
-              "calidad": calidad_por_fac.get(fac, 0)}
+        fac: {
+            "grupos": list(grupos_por_fac.get(fac, {}).values()),
+            "calidad": calidad_por_fac.get(fac, 0),
+        }
         for fac in todas
     }
 
@@ -270,8 +274,12 @@ def _archivos_con_prefijo(carpeta: Path, prefijos: tuple[str, ...]) -> list[tupl
     out: list[tuple[str, Path]] = []
     for prefijo in prefijos:
         encontrados: set[Path] = set()
-        for pat in (f"{prefijo}*.pdf", f"{prefijo}*.PDF",
-                    f"{prefijo.lower()}*.pdf", f"{prefijo.capitalize()}*.pdf"):
+        for pat in (
+            f"{prefijo}*.pdf",
+            f"{prefijo}*.PDF",
+            f"{prefijo.lower()}*.pdf",
+            f"{prefijo.capitalize()}*.pdf",
+        ):
             for p in carpeta.glob(pat):
                 encontrados.add(p)
         for p in sorted(encontrados):
@@ -353,7 +361,6 @@ def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]
     if not carpeta.is_dir():
         return None, f"carpeta no accesible: {carpeta}"
 
-    fuente = carpeta
     candidatos = _archivos_con_prefijo(carpeta, PREFIJOS_SOPORTE)
     if not candidatos:
         # rglob como red de seguridad por si el PDF cuelga de un subdir
@@ -369,7 +376,6 @@ def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]
             cand_alt = _archivos_con_prefijo(alt, PREFIJOS_SOPORTE)
             if cand_alt:
                 candidatos = cand_alt
-                fuente = alt
                 prefijo_usado = cand_alt[0][0]
                 if prefijo_usado == "PDX":
                     logger.info(f"  PDX no estaba en {carpeta.name}; lo encontré en hermana IMG/")
@@ -383,8 +389,7 @@ def buscar_pdx(factura: str, indice: dict[str, Path]) -> tuple[Path | None, str]
             muestras = ", ".join(p.name for p in pdfs[:6])
             extra = "" if len(pdfs) <= 6 else f" (+{len(pdfs) - 6} más)"
             return None, (
-                f"sin {nombres_aceptados}*.pdf en {carpeta} | "
-                f"PDFs presentes: {muestras}{extra}"
+                f"sin {nombres_aceptados}*.pdf en {carpeta} | PDFs presentes: {muestras}{extra}"
             )
         return None, f"sin {nombres_aceptados}*.pdf en {carpeta} (ni en carpeta hermana IMG/)"
 
@@ -482,8 +487,10 @@ def _goto_paciente(page: Page, url: str, intentos: int = 3) -> None:
 
 def _esta_en_bolsa(page: Page) -> bool:
     try:
-        return ("respuestaGlosaSearch" in (page.url or "")
-                and page.locator("text=FILTROS BOLSA RESPUESTA").count() > 0)
+        return (
+            "respuestaGlosaSearch" in (page.url or "")
+            and page.locator("text=FILTROS BOLSA RESPUESTA").count() > 0
+        )
     except Exception:
         return False
 
@@ -512,8 +519,10 @@ def ir_a_bolsa(page: Page) -> None:
     _goto_paciente(page, PORTAL_HOME)
     page.wait_for_selector("text=Respuesta Glosas", timeout=30000)
     try:
-        page.locator("xpath=//a[normalize-space()='Respuesta Glosas'] | "
-                     "//span[normalize-space()='Respuesta Glosas']/ancestor::a[1]").first.click(timeout=5000)
+        page.locator(
+            "xpath=//a[normalize-space()='Respuesta Glosas'] | "
+            "//span[normalize-space()='Respuesta Glosas']/ancestor::a[1]"
+        ).first.click(timeout=5000)
     except PlaywrightTimeout:
         page.get_by_text("Respuesta Glosas").first.click()
     page.wait_for_timeout(500)
@@ -569,7 +578,9 @@ def _esperar_caja_buscar(page: Page, nombre_grilla: str, timeout_s: int = 180):
             aviso = True
         page.wait_for_timeout(1500)
     _screenshot_debug(page, f"sin_caja_buscar_{nombre_grilla}")
-    raise RuntimeError(f"La grilla de {nombre_grilla} no cargó en {timeout_s}s (sin caja 'Buscar:').")
+    raise RuntimeError(
+        f"La grilla de {nombre_grilla} no cargó en {timeout_s}s (sin caja 'Buscar:')."
+    )
 
 
 def _cerrar_cartel_continuar(page: Page, espera_s: float = 0) -> bool:
@@ -605,9 +616,7 @@ def _buscar_y_entrar(page: Page, factura: str, nombre_grilla: str, timeout_s: in
     buscar.fill("")
     buscar.type(factura, delay=40)
     try:
-        buscar.evaluate(
-            "el => { el.dispatchEvent(new KeyboardEvent('keyup', {bubbles: true})); }"
-        )
+        buscar.evaluate("el => { el.dispatchEvent(new KeyboardEvent('keyup', {bubbles: true})); }")
     except Exception:
         pass
     page.wait_for_timeout(1200)  # debounce del datatable
@@ -967,8 +976,9 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
     # incluido, que es lo que escucha select2).
     if not seleccionado:
         try:
-            seleccionado = bool(page.evaluate(
-                """(cod) => {
+            seleccionado = bool(
+                page.evaluate(
+                    """(cod) => {
                     for (const s of document.querySelectorAll('select')) {
                         for (const o of s.options) {
                             if ((o.text || '').includes(cod)) {
@@ -980,19 +990,24 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
                         }
                     }
                     return false;
-                }""", cod))
+                }""",
+                    cod,
+                )
+            )
         except Exception:
             pass
     # 3) Combo select2 por UI: click + tipear + elegir.
     if not seleccionado:
-        combo = _primer_visible(scope.locator(".select2-selection")) or \
-                _primer_visible(scope.locator("[role='combobox']"))
+        combo = _primer_visible(scope.locator(".select2-selection")) or _primer_visible(
+            scope.locator("[role='combobox']")
+        )
         if combo is None:
             raise RuntimeError("No encontré el dropdown de RESPUESTA en el modal.")
         combo.click()
         page.wait_for_timeout(400)
-        caja = _primer_visible(page.locator("input.select2-search__field")) or \
-               _primer_visible(page.locator("input[type='search']"))
+        caja = _primer_visible(page.locator("input.select2-search__field")) or _primer_visible(
+            page.locator("input[type='search']")
+        )
         caja.fill(cod)
         page.wait_for_timeout(800)
         opcion = _primer_visible(page.locator(f"li:has-text('{cod}')"))
@@ -1066,10 +1081,12 @@ def responder_grupo(page: Page, grupo: dict, pdf: Path | None) -> None:
         logger.info(f"    adjunto: {pdf.name}")
 
     # ── Responder Glosa ──
-    btn = _primer_visible(scope.locator("#btnAnswerMasivoGlosa")) or \
-          _primer_visible(scope.locator("#btnAnswerGlosa")) or \
-          _primer_visible(scope.locator("button:has-text('Responder Glosa')")) or \
-          _primer_visible(page.locator("button:has-text('Responder Glosa')"))
+    btn = (
+        _primer_visible(scope.locator("#btnAnswerMasivoGlosa"))
+        or _primer_visible(scope.locator("#btnAnswerGlosa"))
+        or _primer_visible(scope.locator("button:has-text('Responder Glosa')"))
+        or _primer_visible(page.locator("button:has-text('Responder Glosa')"))
+    )
     if btn is None:
         _screenshot_debug(page, "sin_boton_responder_glosa")
         raise RuntimeError("No veo el botón 'Responder Glosa' del modal.")
@@ -1137,8 +1154,9 @@ def terminar_respuesta(page: Page, factura: str, evidencias: Path) -> str:
         raise RuntimeError("No veo el botón 'Terminar Respuesta'.")
     btn_t.click()
     page.wait_for_selector("text=Desea Terminar", timeout=15000)
-    btn_si = _primer_visible(page.locator("button:has-text('Terminar!')")) or \
-             _primer_visible(page.locator("button:has-text('Si, Terminar')"))
+    btn_si = _primer_visible(page.locator("button:has-text('Terminar!')")) or _primer_visible(
+        page.locator("button:has-text('Si, Terminar')")
+    )
     if btn_si is None:
         raise RuntimeError("No veo el botón 'Sí, Terminar!'.")
     btn_si.click()
@@ -1175,8 +1193,13 @@ def procesar_factura(
     cerrar_residuales: bool = False,
 ) -> dict:
     total_glosas = sum(len(g["ids"]) for g in grupos)
-    reg = {"factura": factura, "grupos": len(grupos), "glosas": total_glosas,
-           "estado": "", "detalle": ""}
+    reg = {
+        "factura": factura,
+        "grupos": len(grupos),
+        "glosas": total_glosas,
+        "estado": "",
+        "detalle": "",
+    }
     try:
         abrir_factura(page, factura)
         esperar_glosas(page)  # la sección GLOSAS carga después que GESTION CUENTA
@@ -1381,10 +1404,13 @@ def main() -> int:
         description="Respuesta masiva de glosas en COOSALUD (vco.ctamedicas.com).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--excel", type=Path, required=True, help="Excel consolidado de glosas COOSALUD.")
+    parser.add_argument(
+        "--excel", type=Path, required=True, help="Excel consolidado de glosas COOSALUD."
+    )
     parser.add_argument("--hoja", type=str, default="BASE", help="Hoja a procesar (default BASE).")
     parser.add_argument(
-        "--incluir-calidad", action="store_true",
+        "--incluir-calidad",
+        action="store_true",
         help=(
             "Responder TAMBIÉN las glosas tipo_glosa==CALIDAD usando el "
             "COD_RTA y OBSERVACION del Excel. Por defecto se excluyen y la "
@@ -1393,15 +1419,39 @@ def main() -> int:
             "y querés cerrar la factura completa en una sola corrida."
         ),
     )
-    parser.add_argument("--indice", type=Path, default=None, help="TXT índice factura→carpeta (para el PDX de SOPORTES).")
+    parser.add_argument(
+        "--indice",
+        type=Path,
+        default=None,
+        help="TXT índice factura→carpeta (para el PDX de SOPORTES).",
+    )
     grupo = parser.add_mutually_exclusive_group(required=True)
     grupo.add_argument("--solo", type=str, help="Procesar solo esta factura (HUS...).")
-    grupo.add_argument("--facturas", type=str, help="Lista de facturas separadas por coma (HUS...,HUS...).")
+    grupo.add_argument(
+        "--facturas", type=str, help="Lista de facturas separadas por coma (HUS...,HUS...)."
+    )
     grupo.add_argument("--lista", type=Path, help="TXT con una factura por línea (HUS...).")
-    grupo.add_argument("--todas", action="store_true", help="Procesar todas las facturas de la hoja.")
-    parser.add_argument("--max-grupos", type=int, default=0, help="Responder como mucho N grupos (piloto; no Termina la factura).")
-    parser.add_argument("--max-facturas", type=int, default=0, help="Procesar como mucho N facturas (piloto; corta la lista de --todas).")
-    parser.add_argument("--evidencias", type=Path, default=Path("EVIDENCIA"), help="Carpeta para los pantallazos de cierre (default: EVIDENCIA).")
+    grupo.add_argument(
+        "--todas", action="store_true", help="Procesar todas las facturas de la hoja."
+    )
+    parser.add_argument(
+        "--max-grupos",
+        type=int,
+        default=0,
+        help="Responder como mucho N grupos (piloto; no Termina la factura).",
+    )
+    parser.add_argument(
+        "--max-facturas",
+        type=int,
+        default=0,
+        help="Procesar como mucho N facturas (piloto; corta la lista de --todas).",
+    )
+    parser.add_argument(
+        "--evidencias",
+        type=Path,
+        default=Path("EVIDENCIA"),
+        help="Carpeta para los pantallazos de cierre (default: EVIDENCIA).",
+    )
     parser.add_argument("--con-cabeza", action="store_true", help="Mostrar el browser.")
     parser.add_argument("--lento", action="store_true", help="Slow-motion 300ms (debug).")
     parser.add_argument("--reporte", type=Path, default=Path("reporte_coosalud.csv"))
@@ -1436,12 +1486,15 @@ def main() -> int:
     facturas = leer_excel(args.excel, args.hoja, incluir_calidad=args.incluir_calidad)
     if args.incluir_calidad:
         logger.info(
-            f"  --incluir-calidad: las glosas CALIDAD también se responden con su texto del Excel."
+            "  --incluir-calidad: las glosas CALIDAD también se responden con su texto del Excel."
         )
     tot_glosas = sum(len(g["ids"]) for f in facturas.values() for g in f["grupos"])
     tot_calidad = sum(f["calidad"] for f in facturas.values())
-    logger.info(f"Hoja {args.hoja}: {len(facturas)} facturas, {tot_glosas:,} glosas a responder"
-                + (f" (+{tot_calidad} CALIDAD excluidas)" if tot_calidad else "") + ".")
+    logger.info(
+        f"Hoja {args.hoja}: {len(facturas)} facturas, {tot_glosas:,} glosas a responder"
+        + (f" (+{tot_calidad} CALIDAD excluidas)" if tot_calidad else "")
+        + "."
+    )
 
     if args.solo:
         objetivo = args.solo.strip().upper()
@@ -1456,7 +1509,9 @@ def main() -> int:
                 logger.error(f"No existe el archivo de lista: {args.lista}")
                 return 1
             texto = args.lista.read_text(encoding="utf-8-sig", errors="replace")
-            objetivos = {x.strip().upper() for x in texto.replace(",", "\n").splitlines() if x.strip()}
+            objetivos = {
+                x.strip().upper() for x in texto.replace(",", "\n").splitlines() if x.strip()
+            }
         else:
             objetivos = {f.strip().upper() for f in args.facturas.split(",") if f.strip()}
         encontradas = {k: v for k, v in facturas.items() if k.upper() in objetivos}
@@ -1471,8 +1526,11 @@ def main() -> int:
 
     if args.saltar_csv:
         ESTADOS_TERMINALES = {
-            "OK", "OK_CALIDAD_ABIERTA", "SOLO_CALIDAD",
-            "NO_EN_BOLSA", "TERMINADA_SIN_CARTEL",
+            "OK",
+            "OK_CALIDAD_ABIERTA",
+            "SOLO_CALIDAD",
+            "NO_EN_BOLSA",
+            "TERMINADA_SIN_CARTEL",
         }
         ya_listas: set[str] = set()
         for ruta in args.saltar_csv:
@@ -1486,14 +1544,18 @@ def main() -> int:
                         f = (fila.get("factura") or "").strip().upper()
                         if f:
                             ya_listas.add(f)
-            logger.info(f"  --saltar-csv {ruta.name}: acumulado {len(ya_listas)} facturas terminales.")
+            logger.info(
+                f"  --saltar-csv {ruta.name}: acumulado {len(ya_listas)} facturas terminales."
+            )
         if ya_listas:
             antes = len(facturas)
             facturas = {k: v for k, v in facturas.items() if k.upper() not in ya_listas}
-            logger.info(f"Salto {antes - len(facturas)} facturas ya cerradas según reportes previos; quedan {len(facturas)}.")
+            logger.info(
+                f"Salto {antes - len(facturas)} facturas ya cerradas según reportes previos; quedan {len(facturas)}."
+            )
 
     if args.max_facturas > 0:
-        recorte = dict(list(facturas.items())[:args.max_facturas])
+        recorte = dict(list(facturas.items())[: args.max_facturas])
         logger.info(f"Piloto: proceso solo {len(recorte)} de {len(facturas)} facturas.")
         facturas = recorte
 
@@ -1521,16 +1583,25 @@ def main() -> int:
 
     def _sesion_muerta(detalle: str) -> bool:
         d = detalle.lower()
-        return ("target page, context or browser has been closed" in d
-                or "target closed" in d or "browser has been closed" in d
-                or "connection closed" in d or "targetclosederror" in d)
+        return (
+            "target page, context or browser has been closed" in d
+            or "target closed" in d
+            or "browser has been closed" in d
+            or "connection closed" in d
+            or "targetclosederror" in d
+        )
 
     def _es_lentitud(detalle: str) -> bool:
         """Errores que huelen a racha de lentitud del portal (no a bug):
         vale la pena reintentar la misma factura desde cero."""
         d = detalle.lower()
-        return ("timeout" in d or "no cargó" in d or "no mostró filas" in d
-                or "no responde" in d or "net::err" in d)
+        return (
+            "timeout" in d
+            or "no cargó" in d
+            or "no mostró filas" in d
+            or "no responde" in d
+            or "net::err" in d
+        )
 
     def _abrir_sesion(p):
         b = p.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
@@ -1565,25 +1636,42 @@ def main() -> int:
                 grupos = datos["grupos"]
                 calidad = datos["calidad"]
                 extra = f" (+{calidad} CALIDAD excluidas)" if calidad else ""
-                logger.info(f"[{i}/{len(facturas)}] {factura} — {len(grupos)} grupo(s), "
-                            f"{sum(len(g['ids']) for g in grupos)} glosas{extra}")
+                logger.info(
+                    f"[{i}/{len(facturas)}] {factura} — {len(grupos)} grupo(s), "
+                    f"{sum(len(g['ids']) for g in grupos)} glosas{extra}"
+                )
                 if not grupos:
-                    registrar({"factura": factura, "grupos": 0, "glosas": 0,
-                               "estado": "SOLO_CALIDAD",
-                               "detalle": f"{calidad} glosas CALIDAD; nada que responder"})
+                    registrar(
+                        {
+                            "factura": factura,
+                            "grupos": 0,
+                            "glosas": 0,
+                            "estado": "SOLO_CALIDAD",
+                            "detalle": f"{calidad} glosas CALIDAD; nada que responder",
+                        }
+                    )
                     continue
                 INTENTOS_FACTURA = 3
                 intento = 0
                 while True:
                     intento += 1
-                    reg = procesar_factura(page, factura, grupos, calidad, indice,
-                                           args.evidencias, max_grupos=args.max_grupos,
-                                           cerrar_residuales=args.cerrar_residuales)
+                    reg = procesar_factura(
+                        page,
+                        factura,
+                        grupos,
+                        calidad,
+                        indice,
+                        args.evidencias,
+                        max_grupos=args.max_grupos,
+                        cerrar_residuales=args.cerrar_residuales,
+                    )
                     if reg["estado"] == "ERROR" and intento < INTENTOS_FACTURA:
                         det = reg["detalle"]
                         if _sesion_muerta(det):
                             if relogins >= MAX_RELOGINS:
-                                logger.error("Sesión irrecuperable; re-corré el comando para continuar.")
+                                logger.error(
+                                    "Sesión irrecuperable; re-corré el comando para continuar."
+                                )
                                 registrar(reg)
                                 raise RuntimeError("Sesión irrecuperable")
                             relogins += 1
@@ -1617,6 +1705,7 @@ def main() -> int:
     logger.info(f"Evidencias: {args.evidencias}")
     logger.info(f"Facturas procesadas: {len(resultados)} en {dur:.1f} min")
     from collections import Counter
+
     for estado, n in Counter(r["estado"] for r in resultados).items():
         logger.info(f"  {estado}: {n}")
     return 0

@@ -309,7 +309,9 @@ def cargar_mapa(ruta: Path) -> dict[str, str]:
     return mapa
 
 
-def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool, mapa: dict[str, str] | None = None, formato_corto: bool = False) -> list[dict]:
+def procesar_carpeta_en_sitio(
+    carpeta: Path, dry_run: bool, mapa: dict[str, str] | None = None, formato_corto: bool = False
+) -> list[dict]:
     """Modo --en-sitio: el PDF de la nota ya está DENTRO de la carpeta
     <NE>/ (vino así del share, ej. nc0900...302478.pdf). Lo renombra en el
     lugar a NC_<NE>_<HUS>.pdf leyendo NE + factura del CONTENIDO del PDF y
@@ -322,19 +324,23 @@ def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool, mapa: dict[str, str]
     resultados: list[dict] = []
     pdfs = sorted(p for p in carpeta.iterdir() if p.is_file() and p.suffix.lower() == ".pdf")
     if any(RE_PDF_YA_RENOMBRADO.match(p.name) for p in pdfs):
-        resultados.append({
-            "archivo_origen": str(carpeta),
-            "estado": "YA_RENOMBRADO",
-            "detalle": "La carpeta ya tiene un NC_<NE>_<HUS>.pdf",
-        })
+        resultados.append(
+            {
+                "archivo_origen": str(carpeta),
+                "estado": "YA_RENOMBRADO",
+                "detalle": "La carpeta ya tiene un NC_<NE>_<HUS>.pdf",
+            }
+        )
         logger.info(f"{carpeta.name}: YA_RENOMBRADO — omitida")
         return resultados
     if not pdfs:
-        resultados.append({
-            "archivo_origen": str(carpeta),
-            "estado": "SIN_PDF",
-            "detalle": "La carpeta no tiene ningún PDF",
-        })
+        resultados.append(
+            {
+                "archivo_origen": str(carpeta),
+                "estado": "SIN_PDF",
+                "detalle": "La carpeta no tiene ningún PDF",
+            }
+        )
         logger.warning(f"{carpeta.name}: SIN_PDF")
         return resultados
 
@@ -400,7 +406,9 @@ def procesar_carpeta_en_sitio(carpeta: Path, dry_run: bool, mapa: dict[str, str]
             continue
         resultado["nota_electronica"] = ne
         resultado["factura"] = fac
-        nuevo = nombre_destino({"nota_electronica": ne, "factura": fac}, formato_corto=formato_corto)
+        nuevo = nombre_destino(
+            {"nota_electronica": ne, "factura": fac}, formato_corto=formato_corto
+        )
         destino_final = carpeta / nuevo
         resultado["nuevo_nombre"] = nuevo
         resultado["destino_final"] = str(destino_final)
@@ -448,8 +456,10 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--origen", type=Path, default=None,
-        help="Carpeta con los PDFs a renombrar (no aplica con --en-sitio)"
+        "--origen",
+        type=Path,
+        default=None,
+        help="Carpeta con los PDFs a renombrar (no aplica con --en-sitio)",
     )
     parser.add_argument(
         "--destino",
@@ -530,21 +540,26 @@ def main() -> int:
             mapa = cargar_mapa(args.mapa)
             logger.info(f"Mapa NE→factura cargado: {len(mapa)} notas desde {args.mapa.name}")
         carpetas = sorted(
-            c for c in args.destino.iterdir()
-            if c.is_dir() and not c.name.startswith("_")
+            c for c in args.destino.iterdir() if c.is_dir() and not c.name.startswith("_")
         )
         if not carpetas:
             logger.error(f"--destino no tiene subcarpetas de notas: {args.destino}")
             return 1
-        logger.info(f"Modo EN SITIO: {len(carpetas)} carpetas en {args.destino}"
-                    + (" (DRY-RUN)" if args.dry_run else ""))
+        logger.info(
+            f"Modo EN SITIO: {len(carpetas)} carpetas en {args.destino}"
+            + (" (DRY-RUN)" if args.dry_run else "")
+        )
         resultados = []
         for i, carpeta in enumerate(carpetas, start=1):
             logger.info(f"[{i}/{len(carpetas)}] {carpeta.name}")
-            resultados.extend(procesar_carpeta_en_sitio(
-                carpeta, dry_run=args.dry_run, mapa=mapa,
-                formato_corto=args.hus_corto,
-            ))
+            resultados.extend(
+                procesar_carpeta_en_sitio(
+                    carpeta,
+                    dry_run=args.dry_run,
+                    mapa=mapa,
+                    formato_corto=args.hus_corto,
+                )
+            )
         escribir_reporte(resultados, args.reporte)
         resumen: dict[str, int] = {}
         for r in resultados:
@@ -554,8 +569,9 @@ def main() -> int:
         for estado, n in sorted(resumen.items(), key=lambda kv: -kv[1]):
             logger.info(f"    {estado}: {n}")
         logger.info(f"  Reporte: {args.reporte}")
-        problemas = sum(n for k, n in resumen.items()
-                        if k not in ("OK", "YA_RENOMBRADO", "DRY_RUN"))
+        problemas = sum(
+            n for k, n in resumen.items() if k not in ("OK", "YA_RENOMBRADO", "DRY_RUN")
+        )
         return 0 if problemas == 0 else 1
 
     if args.origen is None:

@@ -131,11 +131,15 @@ def _leer_facturas_grilla(page, nombre: str) -> set[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     fuente = parser.add_mutually_exclusive_group(required=True)
     fuente.add_argument("--lista", type=Path, help="TXT con una factura por línea.")
     fuente.add_argument("--facturas", type=str, help="Lista separada por coma.")
-    fuente.add_argument("--excel", type=Path, help="Excel consolidado: toma las facturas de la hoja.")
+    fuente.add_argument(
+        "--excel", type=Path, help="Excel consolidado: toma las facturas de la hoja."
+    )
     parser.add_argument("--hoja", type=str, default="BASE", help="Hoja del Excel (default BASE).")
     parser.add_argument("--salida", type=Path, default=Path("verificacion_coosalud.csv"))
     parser.add_argument("--con-cabeza", action="store_true", help="Mostrar el browser.")
@@ -218,8 +222,10 @@ def main() -> int:
     for fac in abiertas_pausa:
         logger.info(f"       {fac}")
     if fuera_lista_bolsa or fuera_lista_pausa:
-        logger.info(f"  ℹ Además, fuera de tu lista: {len(fuera_lista_bolsa)} en Bolsa, "
-                    f"{len(fuera_lista_pausa)} En Pausa (ver CSV).")
+        logger.info(
+            f"  ℹ Además, fuera de tu lista: {len(fuera_lista_bolsa)} en Bolsa, "
+            f"{len(fuera_lista_pausa)} En Pausa (ver CSV)."
+        )
     logger.info(f"\nCSV: {args.salida}")
     return 0
 
