@@ -637,7 +637,8 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 ═══════════════ REGLAS DE SEGURIDAD INQUEBRANTABLES (CERO ALUCINACIONES) ═══════════════
 1. PROHIBIDO INVENTAR NORMAS: NUNCA inventes leyes, resoluciones, o decretos. Cíñete a las normas explícitamente mencionadas en este prompt, en los soportes que recibas, o en la Ley Estatutaria 1751 de 2015 y la Resolución 2335 de 2023. Si dudas de un número, OMITE la cita y describe la norma por su contenido sin atribuirle un número.
-2. PROHIBIDO INVENTAR VALORES O VARIABLES: Usa ÚNICAMENTE el "Valor objetado", las fechas, y el "CUPS" que se te proporcionen en el BLOQUE 1. Si un dato del BLOQUE 1 no existe, NO rellenes con un número — escribe textualmente "el valor indicado en el expediente" o "el CUPS de la factura". NUNCA escribas un valor monetario o un código que no esté escrito tal cual en el BLOQUE 1.
+2. PROHIBIDO INVENTAR VALORES O VARIABLES: Usa ÚNICAMENTE el "Valor objetado", las fechas, y el "CUPS" que se te proporcionen en el BLOQUE 1. Si un dato del BLOQUE 1 no existe, NO rellenes con un número — escribe textualmente "el valor objetado consignado en el expediente" o "el CUPS de la factura". NUNCA escribas un valor monetario o un código que no esté escrito tal cual en el BLOQUE 1.
+2.bis. PROHIBIDO ESTIMAR TARIFAS: Si la glosa no trae valor monetario y vos "conocés" la tarifa habitual del procedimiento (ej. ecografía Doppler ≈ $950.000, hemograma ≈ $50.000, UCI ≈ $1.500.000/día), TODA ESTIMACIÓN ES ALUCINACIÓN porque no está soportada en factura. Caso real (24-jun-2026): glosa de doppler obstétrica sin valor pasado → IA escribió "$950.000" → EPS desestima porque no hay soporte. La defensa correcta es escribir literal "el valor objetado consignado en el expediente" sin cifra.
 3. EXCLUSIVIDAD DE CRITERIO: Tu argumentación debe provenir EXCLUSIVAMENTE de las plantillas jurídicas del Banco HUS y de los soportes dados.
 
 POSTURA INSTITUCIONAL: Estratégica, técnicamente blindada, jurídicamente inatacable. TONO ADAPTATIVO según la etapa (conciliador en respuesta inicial, neutral en segunda respuesta, firme en ratificación).
@@ -1240,16 +1241,159 @@ REGIMEN_ESPECIAL = {
         "- Decreto 1295/1994 + Decreto 1072/2015 + Ley 1562/2012.\n"
         "- Cobertura accidente de trabajo y enfermedad laboral, NO PBS regular."
     ),
+    # Ronda 13 (24-jun-2026, Bug H): cualquier ARL no listada arriba —
+    # Bolívar, Liberty, Suramericana, Colpatria, La Equidad, Mapfre, etc.
+    # se detecta por mención literal "ARL" en el nombre o en el texto de
+    # la glosa. Antes la IA usaba Ley 100/Ley 1438 para defender ARL,
+    # cuando la normativa correcta es Decreto 1295/94 + Ley 1562/2012.
+    "ARL": (
+        "RÉGIMEN ESPECIAL — RIESGOS LABORALES (ARL — DEFENSA OBLIGATORIA)\n"
+        "- Decreto-Ley 1295/1994: Sistema General de Riesgos Profesionales.\n"
+        "- Ley 1562/2012: Modifica el Sistema de Riesgos Laborales (origen laboral).\n"
+        "- Decreto 1072/2015 Libro 2 Parte 2 Título 4: Reglamento riesgos laborales.\n"
+        "- Decreto 780/2016: Decreto Único Reglamentario Sector Salud (FURAT).\n"
+        "- Ley 776/2002: Prestaciones por accidente de trabajo / enfermedad laboral.\n"
+        "REGLA ESTRATÉGICA: la ARL que recibe FURAT debe garantizar el 100% del pago al"
+        " prestador. Si la ARL alega 'concausa común' (Art. 2356 CC) para prorratear con"
+        " EPS, esa figura del Código Civil NO le es oponible a la IPS — debe pagar el"
+        " 100% y luego subrogarse contra la EPS vía Junta de Calificación de Invalidez"
+        " (Ley 776/2002 Art. 18). NO citar Ley 100, Ley 1438 ni Art. 168 Ley 100 para"
+        " glosas ARL — esos artículos son del régimen de aseguradoras de salud, no de"
+        " riesgos laborales."
+    ),
 }
 
+# Marcadores para detectar entidades ARL/Riesgos Laborales (caso real
+# 23-jun-2026: "La ARL Bolívar glosa el 100% de la factura..."). Cubre las
+# ARL más comunes en Colombia + frases que indican régimen laboral.
+_TOKENS_ARL_CANONICAS = (
+    # Pelados — son nombres prácticamente unívocos de ARL en Colombia
+    "POSITIVA",
+    "AURORA",
+    # Con prefijo ARL
+    "ARL BOLÍVAR",
+    "ARL BOLIVAR",
+    "ARL LIBERTY",
+    "ARL COLPATRIA",
+    "ARL EQUIDAD",
+    "ARL SURA",
+    "ARL POSITIVA",
+    "POSITIVA COMPAÑIA",
+    "MAPFRE ARL",
+    "ARL MAPFRE",
+    "ARL AURORA",
+    # Frases genéricas que indican régimen
+    "SURA RIESGOS LABORALES",
+    "AURORA RIESGOS",
+    "RIESGOS LABORALES",
+    "RIESGOS PROFESIONALES",
+)
+_RE_ARL_O_LABORAL = re.compile(
+    r"\bARL\b|RIESGOS\s+LABORALES|RIESGOS\s+PROFESIONALES|"
+    r"ACCIDENTE\s+DE\s+TRABAJO|ENFERMEDAD\s+LABORAL|"
+    r"\bFURAT\b|JUNTA\s+DE\s+CALIFICACI[ÓO]N|"
+    r"DECRETO\s*1295|LEY\s*1562|ORIGEN\s+LABORAL",
+    re.IGNORECASE,
+)
 
-def _detectar_regimen_especial(eps: str, contrato_tipo: str) -> str:
-    """Devuelve bloque de normativa especial según EPS o tipo de contrato."""
+# Catálogo de EPS / pagadoras conocidas para auto-detectar cuando el
+# usuario dejó el dropdown en "OTRA / SIN DEFINIR" pero el texto sí menciona
+# la entidad. Tokens ordenados de más específico a menos. Ronda 13 Bug I.
+_TOKENS_PAGADOR_EN_TEXTO: tuple[tuple[str, str], ...] = (
+    ("ARL BOLÍVAR", "ARL BOLÍVAR"),
+    ("ARL BOLIVAR", "ARL BOLÍVAR"),
+    ("ARL POSITIVA", "POSITIVA"),
+    ("ARL SURA", "SURA"),
+    ("ARL LIBERTY", "LIBERTY ARL"),
+    ("ARL COLPATRIA", "COLPATRIA ARL"),
+    ("ARL MAPFRE", "MAPFRE ARL"),
+    ("ARL AURORA", "AURORA"),
+    ("EPS SANITAS", "SANITAS"),
+    ("SANITAS S.A.S", "SANITAS"),
+    ("SANITAS EPS", "SANITAS"),
+    ("EPS COMPENSAR", "COMPENSAR"),
+    ("EPS FAMISANAR", "FAMISANAR EPS"),
+    ("FAMISANAR S.A.S", "FAMISANAR EPS"),
+    ("EPS COOSALUD", "COOSALUD"),
+    ("COOSALUD ESS", "COOSALUD"),
+    ("EPS NUEVA EPS", "NUEVA EPS"),
+    ("NUEVA EPS", "NUEVA EPS"),
+    ("EPS SALUD TOTAL", "SALUD TOTAL EPS"),
+    ("SALUD TOTAL", "SALUD TOTAL EPS"),
+    ("EPS MUTUAL SER", "MUTUAL SER EPS"),
+    ("MUTUAL SER", "MUTUAL SER EPS"),
+    ("EPS MEDIMAS", "MEDIMÁS"),
+    ("EPS MEDIMÁS", "MEDIMÁS"),
+    ("MEDIMÁS", "MEDIMÁS"),
+    ("MEDIMAS", "MEDIMÁS"),
+    ("EPS SURA", "SURA EPS"),
+    ("ECOOPSOS", "ECOOPSOS"),
+    ("EMSSANAR", "EMSSANAR"),
+    ("ASMET SALUD", "ASMET SALUD"),
+    ("CAPITAL SALUD", "CAPITAL SALUD EPS"),
+    ("CAPRESOCA", "CAPRESOCA EPS"),
+    ("DUSAKAWI", "DUSAKAWI EPS"),
+    ("PIJAOS", "PIJAOS SALUD EPS"),
+    ("MALLAMAS", "MALLAMAS EPS"),
+    ("DMBUG", "DMBUG"),
+    ("DISPENSARIO MEDICO BUCARAMANGA", "DMBUG"),
+    ("FOMAG", "FOMAG"),
+    ("MAGISTERIO", "FOMAG"),
+)
+
+
+def _detectar_pagador_en_texto(texto_glosa: str | None) -> str:
+    """Bug I (ronda 13): detecta el nombre canónico de la EPS / ARL que
+    aparece literalmente en el texto de la glosa. Útil cuando el usuario
+    no seleccionó EPS del dropdown y quedó "OTRA / SIN DEFINIR".
+
+    Devuelve string vacío si no encuentra ningún pagador conocido.
+    """
+    if not texto_glosa:
+        return ""
+    txt_up = re.sub(r"\s+", " ", str(texto_glosa).upper())
+    for token, canonico in _TOKENS_PAGADOR_EN_TEXTO:
+        if token in txt_up:
+            return canonico
+    return ""
+
+
+def _es_pagador_arl(eps: str | None, texto_glosa: str | None) -> bool:
+    """Bug H (ronda 13): determina si el régimen aplicable es ARL/Riesgos
+    Laborales — por el nombre de la entidad o por marcadores en el texto.
+    """
+    eps_up = (eps or "").upper()
+    txt = texto_glosa or ""
+    # Por nombre EPS
+    for token in _TOKENS_ARL_CANONICAS:
+        if token in eps_up:
+            return True
+    # Por texto (al menos 1 marcador fuerte)
+    if _RE_ARL_O_LABORAL.search(txt):
+        return True
+    return False
+
+
+def _detectar_regimen_especial(
+    eps: str,
+    contrato_tipo: str,
+    texto_glosa: str | None = None,
+) -> str:
+    """Devuelve bloque de normativa especial según EPS o tipo de contrato.
+
+    Ronda 13 (Bug H): si el texto de la glosa menciona ARL o riesgos
+    laborales — aunque la EPS del dropdown no esté listada — se inyecta el
+    bloque ARL genérico. Esto evita que la IA defienda con Ley 100/Ley 1438
+    una glosa que claramente es del régimen de riesgos laborales.
+    """
     eps_up = (eps or "").upper()
     tipo_up = (contrato_tipo or "").upper()
     for key, bloque in REGIMEN_ESPECIAL.items():
         if key in eps_up or key in tipo_up:
             return bloque
+    # Fallback: detección por texto para ARL no listadas
+    if texto_glosa and _es_pagador_arl(eps, texto_glosa):
+        return REGIMEN_ESPECIAL["ARL"]
     return ""
 
 
@@ -1578,6 +1722,27 @@ def build_user_prompt(
       3. GLOSA ORIGINAL (texto exacto del motivo EPS)
       4. INSTRUCCIÓN (salida XML + estructura 4 párrafos)
     """
+    # ─── Bug I (ronda 13, 24-jun-2026): auto-detección de EPS ─────────
+    # Si el usuario dejó el dropdown en "OTRA / SIN DEFINIR" pero pegó
+    # un texto que menciona literalmente la EPS / ARL ("La EPS Sanitas
+    # glosa..." / "La ARL Bolívar glosa..."), usamos la canónica detectada
+    # para que el dictamen NO diga "OTRA / SIN DEFINIR" sino el nombre
+    # real. Esto también activa el régimen especial correcto (ARL) cuando
+    # la entidad detectada es de riesgos laborales.
+    eps_up_check = (eps or "").upper().strip()
+    if not eps_up_check or eps_up_check in _EPS_SIN_CONTRATO:
+        eps_detectada = _detectar_pagador_en_texto(texto_glosa)
+        if eps_detectada:
+            try:
+                import logging as _log_eps
+
+                _log_eps.getLogger(__name__).info(
+                    f"[EPS-AUTO-DETECT] dropdown='{eps}' → detectado en texto='{eps_detectada}'"
+                )
+            except Exception:
+                pass
+            eps = eps_detectada
+
     prefijo = codigo[:2].upper() if codigo and len(codigo) >= 2 else "FA"
     if prefijo not in _NOMBRE_TIPO:
         prefijo = "FA"
@@ -1830,7 +1995,13 @@ def build_user_prompt(
         concepto_oficial = "(catálogo no disponible)"
 
     # Régimen especial
-    bloque_regimen = _detectar_regimen_especial(eps, contrato.get("tipo", ""))
+    # Ronda 13 (Bug H): pasamos también texto_glosa al detector — así
+    # cuando el dropdown es genérico pero el texto menciona ARL, se
+    # inyecta el bloque normativo ARL (Decreto 1295/94 + Ley 1562/2012)
+    # en vez de defenderse con Ley 100 (régimen EPS) que no aplica.
+    bloque_regimen = _detectar_regimen_especial(
+        eps, contrato.get("tipo", ""), texto_glosa=texto_glosa
+    )
     bloque_regimen_str = (
         f"\n[RÉGIMEN ESPECIAL APLICABLE]\n{bloque_regimen}\n" if bloque_regimen else ""
     )

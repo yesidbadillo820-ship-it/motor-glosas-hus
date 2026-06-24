@@ -1100,6 +1100,352 @@ def _termina_completo(texto: str) -> bool:
     return cola.endswith(_SIGNOS_CIERRE_FINAL)
 
 
+# ─── BUG J (ronda 13, 24-jun-2026): IA inventa valores no aportados ──────────
+# Evidencia real: usuario pegó "MVC EN ECOGRAFIA DOPPLER OBSTETRICA SE
+# RECONOCE A TARIFAS SOAT VIGENTE UVB NO HAY CONTRATO NI ACUERDO DE TARIFAS"
+# sin pasar valor_objetado (campo 0 vacío). La IA escribió en el dictamen:
+# "RESPECTO DEL SERVICIO FACTURADO POR $950.000" — número que NUNCA aparece
+# en el input. La IA "estimó" el valor por conocimiento general de tarifas
+# de ecografía Doppler. Cifras como esa, $1.500.000, $200.000 son
+# alucinaciones puras que la EPS desestima como "no soportado en factura".
+#
+# La defensa correcta es escribir "el valor objetado consignado en el
+# expediente" (sin cifra) cuando el usuario no aportó valor.
+#
+# Patrón: extrae cualquier $N del dictamen, normaliza dígitos, y compara
+# contra el conjunto de cifras "legítimas" (valor del input + cifras
+# dentro del texto pegado por el usuario + número de factura/radicado).
+# Si los dígitos NO aparecen en ese conjunto → es alucinación, reemplazar.
+_RE_MONTO_DICTAMEN = re.compile(
+    r"\$\s*([\d\.,]+)(?=\D|$)",
+)
+_MIN_DIGITOS_MONTO = 4  # ignora cifras chicas ("$10", "$0.00") y porcentajes
+_FRASE_VALOR_NEUTRO = "el valor objetado consignado en el expediente"
+
+
+def _normalizar_digitos(texto: str) -> str:
+    """Devuelve solo los dígitos del texto (descartando puntos, comas, $, espacios)."""
+    if not texto:
+        return ""
+    return re.sub(r"\D", "", str(texto))
+
+
+def _conjunto_digitos_legitimos(
+    valor_raw_input: str | None,
+    texto_input_usuario: str | None,
+    extras: tuple[str, ...] = (),
+) -> set[str]:
+    """Conjunto de secuencias de dígitos consideradas LEGÍTIMAS para el
+    dictamen: las que vienen del input del usuario o de campos auxiliares.
+
+    Incluye normalizaciones tolerantes:
+      - 950000, 950.000, 950,000 → todos colapsan a "950000"
+      - "1.000.000" / "1000000" / "1'000.000" → "1000000"
+    Esto permite que la IA escriba el valor con formato ligeramente
+    distinto (puntos de miles vs sin puntos) sin que el sanitizer
+    lo marque como alucinación.
+    """
+    legitimos: set[str] = set()
+
+    def _agregar(s: str) -> None:
+        if not s:
+            return
+        # Solo dígitos consecutivos de 4+ caracteres (umbral coherente con
+        # cifras monetarias reales — los CUPS y NITs ya tienen sus propios
+        # sanitizers en otros patrones).
+        for token in re.findall(r"\d[\d\.,]{3,}\d|\d{4,}", s):
+            d = _normalizar_digitos(token)
+            if len(d) >= _MIN_DIGITOS_MONTO:
+                legitimos.add(d)
+
+    _agregar(valor_raw_input)
+    _agregar(texto_input_usuario)
+    for x in extras:
+        _agregar(x)
+    return legitimos
+
+
+def _neutralizar_valores_inventados(
+    texto: str,
+    valor_raw_input: str | None = None,
+    texto_input_usuario: str | None = None,
+    extras: tuple[str, ...] = (),
+) -> str:
+    """Bug J (ronda 13): sustituye cifras $N del dictamen que no aparezcan
+    en el input del usuario por la frase neutra del HUS.
+
+    Cobertura tolerante: si la IA escribe el valor con formato distinto
+    (puntos vs comas, con o sin decimales), se acepta. Solo se neutraliza
+    cuando los dígitos NO se cruzan con ninguna cifra del input.
+
+    Casos contemplados:
+      - $950.000 inventado cuando valor_objetado venía vacío → neutralizado.
+      - $1.500.000 inventado en glosa de ARL sin valor → neutralizado.
+      - $48.567.300 que SÍ aparece en el texto del usuario → respetado.
+    """
+    if not texto:
+        return texto
+    legitimos = _conjunto_digitos_legitimos(valor_raw_input, texto_input_usuario, extras)
+    n_neutralizados = 0
+
+    def _maybe_sub(match: re.Match[str]) -> str:
+        nonlocal n_neutralizados
+        cifra = match.group(0)  # "$ 950.000"
+        digitos = _normalizar_digitos(match.group(1))
+        if len(digitos) < _MIN_DIGITOS_MONTO:
+            return cifra  # cifra chica ($10, $100), respetar
+        # Match exacto OR la cifra del dictamen es subcadena de una
+        # cifra legítima OR viceversa (cubre "$950.000" vs "$950"):
+        if digitos in legitimos:
+            return cifra
+        for leg in legitimos:
+            if leg.startswith(digitos) or digitos.startswith(leg):
+                return cifra
+        n_neutralizados += 1
+        return _FRASE_VALOR_NEUTRO
+
+    resultado = _RE_MONTO_DICTAMEN.sub(_maybe_sub, texto)
+    if n_neutralizados:
+        # Limpieza gramatical post-sustitución:
+        # "POR el valor objetado..." → "por el valor..."
+        # "DE el valor objetado..." → "del valor..." cuando es sintaxis natural
+        resultado = re.sub(
+            r"\b(POR|DE|EN|SOBRE)\s+el valor objetado consignado en el expediente",
+            lambda m: m.group(1).lower() + " " + _FRASE_VALOR_NEUTRO,
+            resultado,
+        )
+        logger.warning(
+            f"[VALOR-INVENTADO] {n_neutralizados} cifra(s) monetaria(s) "
+            f"NO presente(s) en el input del usuario → neutralizada(s). "
+            f"Cifras legítimas conocidas: {sorted(legitimos)[:5]}"
+        )
+    return resultado
+
+
+# ─── BUG D + G + F (ronda 13): muletillas normativas fuera de contexto ──────
+# Yesid pegó 6 casos difíciles. En 5 de 6 la IA invocó como cita-comodín:
+#   - Art. 168 Ley 100 ("atención inicial de urgencias") en glosas que NO son
+#     urgencias (terapia ABA crónica, UCI 18 días ortopédicos, terapia
+#     enzimática Cerezyme, doppler obstétrica electivo). Un auditor EPS
+#     desestima de pinta — la cita es desproporcionada al hecho.
+#   - Art. 177 Ley 100 ("movilizar recursos para POS") en glosas de TARIFA,
+#     PERTINENCIA y EVENTO ADVERSO — temas donde no está en discusión la
+#     obligación financiera de la EPS sino otros aspectos (cómputo tarifa,
+#     criterio médico, prevenibilidad).
+#
+# Estrategia: sanitizer post-IA basado en el TEXTO de la glosa (no en el
+# código). Si el texto no contiene marcadores de urgencia → quitar Art. 168.
+# Si el debate evidente no es obligación EPS → quitar Art. 177.
+
+# Marcadores de URGENCIA REAL (debe estar al menos uno para conservar Art. 168)
+_RE_URGENCIA_LEGITIMA = re.compile(
+    r"\bURGENCIA\b|\bURGENTE\b|\bEMERGENCIA\b|TRIAGE|TRIAJE|"
+    r"C[ÓO]DIGO\s+AZUL|REANIMACI[ÓO]N|\bRCP\b|"
+    r"PARO\s+CARDIO|HEMORRAGI[AC]|\bSHOCK\b|"
+    r"ATENCI[ÓO]N\s+INICIAL\s+DE\s+URGENCIA",
+    re.IGNORECASE,
+)
+
+# Marcadores de servicio CRÓNICO/ELECTIVO/AMBULATORIO (negación de urgencia)
+_RE_NO_ES_URGENCIA = re.compile(
+    r"\bELECTIV|\bAMBULATORI|\bPROGRAMAD|"
+    r"\bABA\b|TEA\b|TRASTORNO\s+ESPECTRO\s+AUTISTA|"
+    r"TERAPIA\s+ENZIM[ÁA]TIC|TRASPLANT|HEMODI[ÁA]LISIS\s+CR[ÓO]NIC|"
+    r"\bDOPPLER\b|\bECOGRAF[ÍI]A\b|"
+    r"\bRADIOCIRUG[ÍI]A\b|CRANEOTOMÍA\s+TUMORAL|"
+    r"REHABILITACI[ÓO]N|REINTERVENCI[ÓO]N|"
+    r"\d+\s*d[ií]as\s+UCI|HOSPITALIZACI[ÓO]N\s+DE\s+\d+",
+    re.IGNORECASE,
+)
+
+# Marcadores de "debate financiero EPS" (donde Art. 177 SÍ aplica)
+_RE_DEBATE_OBLIG_EPS = re.compile(
+    r"NO\s+CUBRE|FUERA\s+DE\s+PBS|NO\s+EST[ÁA]\s+EN\s+POS|"
+    r"EXCLUSI[ÓO]N\s+DEL\s+PLAN|"
+    r"NEGACI[ÓO]N\s+DEL\s+SERVICIO|NIEGA\s+LA\s+COBERTURA|"
+    r"INSUFICIENCIA\s+FINANCIERA|RECURSOS\s+UPC|"
+    r"AGOTAMIENTO\s+PRESUPUESTAL",
+    re.IGNORECASE,
+)
+
+# Marcadores de debates NO-financieros (donde Art. 177 NO aplica)
+_RE_DEBATE_NO_FINANCIERO = re.compile(
+    r"TARIFA|HOMOLOGACI[ÓO]N|\bUVB\b|SOAT|MANUAL\s+TARIFARIO|"
+    r"PERTINENCIA|CRITERIO\s+M[ÉE]DICO|AUTONOM[ÍI]A|"
+    r"EVENTO\s+ADVERSO|PREVENIBL|COMPLICACI[ÓO]N|"
+    r"CONCAUSA|RIESGOS\s+LABORALES|ARL\b|FURAT|"
+    r"INVIMA|REGISTRO\s+SANITARIO|"
+    r"RIPS\s+(EXTEMPOR[ÁA]NEO|FUERA\s+DE\s+PLAZO)",
+    re.IGNORECASE,
+)
+
+# Marcadores de "EVENTO ADVERSO" (Bug F): la defensa correcta es NEGAR la
+# prevenibilidad, no aceptar y argumentar "igual paguen".
+_RE_EVENTO_ADVERSO = re.compile(
+    r"EVENTO\s+ADVERSO|PREVENIBL|COMPLICACI[ÓO]N\s+PREVENIBLE|"
+    r"DAÑO\s+IATROG[ÉE]NIC|MALA\s+PRAXIS",
+    re.IGNORECASE,
+)
+
+
+def _neutralizar_art_168_fuera_de_contexto(
+    dictamen: str,
+    texto_glosa: str | None = None,
+) -> str:
+    """Bug D (ronda 13): si el dictamen cita Art. 168 Ley 100 pero el texto
+    de la glosa NO tiene marcadores de urgencia (o sí los tiene PERO también
+    tiene marcadores de servicio crónico/electivo), reemplaza el bloque
+    "Art. 168 Ley 100/1993" por la frase neutra. Conserva el sentido del
+    párrafo pero quita la cita inaplicable.
+    """
+    if not dictamen:
+        return dictamen
+    txt = texto_glosa or ""
+    es_urgencia_real = bool(_RE_URGENCIA_LEGITIMA.search(txt))
+    es_cronico_electivo = bool(_RE_NO_ES_URGENCIA.search(txt))
+    if es_urgencia_real and not es_cronico_electivo:
+        return dictamen  # cita es aplicable, no tocar
+
+    # Patrón: cualquier mención de Art. 168 Ley 100 (variantes)
+    # Cubre: "Art. 168", "Artículo 168", "ART. 168", "Articulo 168",
+    # con/sin "Ley 100", con/sin "/1993" o "de 1993".
+    pat_art168 = re.compile(
+        r"(?:EL\s+|AL\s+|SEGÚN\s+EL\s+|CONFORME\s+AL?\s+)?"
+        r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*168"
+        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?",
+        re.IGNORECASE,
+    )
+    nuevo, n = pat_art168.subn(
+        "la normativa de continuidad y cobertura del Sistema General de Salud",
+        dictamen,
+    )
+    # También frase suelta "atención inicial de urgencias" cuando no aplica
+    pat_atencion_inicial = re.compile(
+        r"\bLA\s+ATENCI[ÓO]N\s+INICIAL\s+DE\s+URGENCIAS\s+"
+        r"DEBE\s+SER\s+PRESTADA[^.]{0,200}\.",
+        re.IGNORECASE,
+    )
+    nuevo, n2 = pat_atencion_inicial.subn("", nuevo)
+    if n + n2:
+        logger.warning(
+            f"[ART-168-FUERA-CONTEXTO] {n + n2} cita(s) de Art. 168 Ley 100 "
+            f"neutralizada(s) en glosa que NO es de urgencias "
+            f"(urgencia_real={es_urgencia_real}, cronico={es_cronico_electivo})"
+        )
+    return nuevo
+
+
+def _neutralizar_art_177_relleno(
+    dictamen: str,
+    texto_glosa: str | None = None,
+    codigo_glosa: str | None = None,
+) -> str:
+    """Bug G (ronda 13): si el dictamen cita Art. 177 Ley 100 ("movilizar
+    recursos para POS") pero el debate no es sobre obligación financiera
+    de la EPS, neutraliza la cita por la genérica.
+
+    Aplica cuando:
+      - El texto contiene marcadores de TARIFA / PERTINENCIA / ARL /
+        EVENTO ADVERSO / SOPORTES / INVIMA, etc. (no es CO).
+      - O el código de glosa NO empieza por CO.
+    Conserva la cita si el debate sí es de cobertura/PBS.
+    """
+    if not dictamen:
+        return dictamen
+    txt = texto_glosa or ""
+    codigo_up = (codigo_glosa or "").upper()
+    es_debate_financiero = bool(_RE_DEBATE_OBLIG_EPS.search(txt))
+    es_debate_no_financiero = bool(_RE_DEBATE_NO_FINANCIERO.search(txt))
+    # Códigos donde Art. 177 está hardcodeado en el SYSTEM (CO=cobertura,
+    # SO=soportes, FA=facturación). Para el resto (TA/PE/CL/IN/ME/etc.)
+    # Art. 177 es muletilla y se quita salvo que el texto explicite POS.
+    es_codigo_co = codigo_up.startswith("CO")
+    es_codigo_so_fa = codigo_up.startswith("SO") or codigo_up.startswith("FA")
+    aplica_art_177 = es_debate_financiero or es_codigo_co or es_codigo_so_fa
+    if aplica_art_177 and not es_debate_no_financiero:
+        return dictamen
+
+    pat_art177 = re.compile(
+        r"(?:CONFORME\s+(?:A\s+LO\s+DISPUESTO\s+EN\s+)?(?:EL\s+|AL\s+)?|"
+        r"AS[ÍI]\s+MISMO,?\s+(?:EL\s+|AL\s+)?|EL\s+|AL\s+)?"
+        r"(?:ART[ÍI]?CULOS?|ARTS?\.?)\s*177"
+        r"\s*(?:DE\s+LA\s+|DE\s+)?LEY\s+100(?:\s*[/\-]\s*|\s+DE\s+)?\s*(?:1993)?"
+        r"[^.]{0,400}?(?:MOVILIZAR|RECURSOS|\bPOS\b|PLAN\s+OBLIGATORIO|"
+        r"PATRIMONIOS?\s+AUT[ÓO]NOM|FIDUCIARIA)[^.]{0,400}(?:\.|$)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    nuevo, n = pat_art177.subn("", dictamen)
+    # Limpieza: "Asimismo,  Conforme..." → "Conforme..." después de borrar
+    nuevo = re.sub(
+        r"\b(ASIMISMO|AS[ÍI]\s+MISMO)[,\s]+(CONFORME|EL\s+ART)", r"\2", nuevo, flags=re.IGNORECASE
+    )
+    nuevo = re.sub(r"\.\s*\.", ".", nuevo)
+    nuevo = re.sub(r"\s{3,}", " ", nuevo)
+    if n:
+        logger.warning(
+            f"[ART-177-RELLENO] {n} cita(s) de Art. 177 Ley 100 (POS) "
+            f"neutralizada(s) en glosa no-financiera "
+            f"(codigo={codigo_up[:4]}, financiero={es_debate_financiero}, "
+            f"no_financiero={es_debate_no_financiero})"
+        )
+    return nuevo
+
+
+def _refutar_evento_adverso_prevenible(
+    dictamen: str,
+    texto_glosa: str | None = None,
+) -> str:
+    """Bug F (ronda 13): cuando la glosa habla de "evento adverso prevenible",
+    la IA caía en aceptar tácitamente la prevenibilidad y argumentar "igual
+    paguen". La defensa correcta es ATACAR la premisa — NEGAR que sea
+    prevenible.
+
+    Esta función detecta los pasajes donde la IA dijo "no exime de pago"
+    aceptando la clasificación y reescribe el cierre con la posición
+    institucional correcta: negar prevenibilidad + exigir auditoría médica
+    conjunta.
+    """
+    if not dictamen or not texto_glosa:
+        return dictamen
+    if not _RE_EVENTO_ADVERSO.search(texto_glosa):
+        return dictamen
+
+    # Patrón de aceptación tácita
+    pat_acepta_culpa = re.compile(
+        r"(LA\s+CLASIFICACI[ÓO]N\s+DEL\s+EVENTO\s+COMO\s+ADVERSO\s+PREVENIBLE\s+"
+        r"NO\s+EXIME\s+A\s+LA\s+EPS[^.]{0,300}\.)",
+        re.IGNORECASE,
+    )
+    nuevo, n = pat_acepta_culpa.subn(
+        "EL HUS NO RECONOCE LA CLASIFICACIÓN UNILATERAL DEL EVENTO COMO "
+        "'ADVERSO PREVENIBLE': la presunción de prevenibilidad NO es procedente "
+        "porque la complicación obedece a factores clínicos inherentes al "
+        "procedimiento, NO a falla en la atención segura. Por tratarse de un "
+        "evento de origen clínico no controlable, su manejo es de cobertura "
+        "obligatoria. Se exige auditoría médica conjunta (Decreto 4747/2007 "
+        "Art. 20) antes de tipificar el evento.",
+        dictamen,
+    )
+    # También variantes "no excluyen la facturabilidad"
+    pat_facturabilidad = re.compile(
+        r"(LAS?\s+NORMAS?[^.]{0,80}NO\s+EXCLUYEN\s+LA\s+FACTURABILIDAD[^.]{0,200}\.)",
+        re.IGNORECASE,
+    )
+    nuevo, n2 = pat_facturabilidad.subn(
+        "Lo procedente NO es la clasificación unilateral del evento como "
+        "'prevenible' sino el análisis clínico colegiado: la complicación "
+        "presentada no obedece a falla de atención segura institucional.",
+        nuevo,
+    )
+    if n + n2:
+        logger.warning(
+            f"[EVENTO-ADVERSO-NEGAR] {n + n2} pasaje(s) de aceptación tácita "
+            "reescrito(s): la defensa ahora NIEGA la prevenibilidad en vez de "
+            "aceptar y argumentar 'igual paguen'."
+        )
+    return nuevo
+
+
 def _neutralizar_alucinaciones_prompt(texto: str) -> str:
     """Limpia placeholders que la IA copia de los ejemplos del prompt.
 
@@ -4427,6 +4773,61 @@ class GlosaService:
                     dictamen = _dictamen_sin_alucs
             except Exception as _e_alc:
                 logger.debug(f"[ALUCINACIONES-PROMPT] red final no aplicada: {_e_alc}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 13 (24-jun-2026) — RED FINAL valores inventados (Bug J).
+            #  Evidencia (24-jun, doppler obstétrica): usuario no aportó
+            #  valor_objetado pero la IA escribió "$950.000" en el dictamen
+            #  (estimación por conocimiento general de tarifas, sin soporte
+            #  en factura). Esta red detecta toda cifra $N del dictamen que
+            #  NO esté en el input (valor_raw / texto_glosa / factura /
+            #  radicado) y la sustituye por "el valor objetado consignado en
+            #  el expediente". Tolerante a formato ($950.000 == 950000).
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _texto_glosa_input = str(getattr(data, "tabla_excel", "") or "")
+                _extras_legitimos = (
+                    str(getattr(data, "numero_factura", "") or ""),
+                    str(getattr(data, "numero_radicado", "") or ""),
+                    str(getattr(data, "numero_contrato", "") or ""),
+                )
+                _dictamen_sin_valor_falso = _neutralizar_valores_inventados(
+                    dictamen,
+                    valor_raw_input=str(valor_raw or ""),
+                    texto_input_usuario=_texto_glosa_input,
+                    extras=_extras_legitimos,
+                )
+                if _dictamen_sin_valor_falso != dictamen:
+                    dictamen = _dictamen_sin_valor_falso
+            except Exception as _e_vi:
+                logger.debug(f"[VALOR-INVENTADO] red final no aplicada: {_e_vi}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 13 (24-jun-2026) — RED FINAL muletillas normativas
+            #  (Bugs D, F, G). Citas-comodín que la IA usaba como relleno
+            #  pero que en la mayoría de los casos NO aplican y un auditor
+            #  EPS las desestima inmediatamente:
+            #    D — Art. 168 Ley 100 ("urgencias") en glosas crónicas
+            #    F — "evento adverso prevenible" aceptado tácitamente
+            #    G — Art. 177 Ley 100 ("POS") como relleno en tarifa/ARL
+            # ═══════════════════════════════════════════════════════════
+            try:
+                _texto_glosa_input_md = str(getattr(data, "tabla_excel", "") or "")
+                _dict_d = _neutralizar_art_168_fuera_de_contexto(
+                    dictamen, texto_glosa=_texto_glosa_input_md
+                )
+                _dict_f = _refutar_evento_adverso_prevenible(
+                    _dict_d, texto_glosa=_texto_glosa_input_md
+                )
+                _dict_g = _neutralizar_art_177_relleno(
+                    _dict_f,
+                    texto_glosa=_texto_glosa_input_md,
+                    codigo_glosa=str(getattr(data, "codigo_glosa", "") or codigo_det or ""),
+                )
+                if _dict_g != dictamen:
+                    dictamen = _dict_g
+            except Exception as _e_mu:
+                logger.debug(f"[MULETILLAS-RONDA13] red final no aplicada: {_e_mu}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 6 (16-jun-2026) — RED FINAL código coherente (fix I).
