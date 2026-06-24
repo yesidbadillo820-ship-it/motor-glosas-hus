@@ -540,7 +540,10 @@ def _leer_pagina(page: Page) -> list[dict]:
                 const tds = Array.from(tr.querySelectorAll('td'));
                 if (!tds.length) continue;
                 const cells = tds.map(td => (td.innerText || '').trim());
-                if (cells.join('').trim() === '') continue;
+                const txt = cells.join(' ').trim();
+                if (txt === '') continue;
+                // Fila placeholder de grilla vacía ("Sin datos para mostrar").
+                if (/sin datos|no hay datos|sin registros|no data|no records/i.test(txt)) continue;
                 rows.push(cells);
             }
             return {headers: ths, rows};
@@ -935,8 +938,9 @@ def responder_glosa(
     de reporte."""
     reg = {"factura": factura, "filas": 0, "ok": 0, "estado": "", "detalle": ""}
     if not abrir_respuesta(page, factura):
-        reg["estado"] = "SIN_FORMULARIO"
-        reg["detalle"] = "no pude abrir el formulario de RESPUESTA"
+        reg["estado"] = "NO_EN_PESTANA"
+        reg["detalle"] = ("no aparece en la pestaña tras filtrar "
+                          "(¿ya respondida, o no es de esta pestaña?)")
         return reg
 
     _set_rows_per_page_form(page)
