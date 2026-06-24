@@ -56,11 +56,29 @@ LAYOUTS DE ENTRADA
 
     carpeta-factura (def.)  Cada subcarpeta es UNA factura; todos sus archivos
                             le pertenecen. La entidad sale del manifiesto o de
-                            una carpeta padre con nombre de EPS.
+                            una carpeta padre con nombre de EPS. Si la MISMA
+                            factura aparece en árboles paralelos (RIPS/ y
+                            SOPORTES/) como dos carpetas con el mismo nombre,
+                            se FUSIONAN automáticamente.
     lote                    Una carpeta con archivos de MUCHAS facturas (como
                             el share): se agrupan por el token _<factura>_ del
-                            nombre. Los compartidos (FURIPS) se asocian a todas
-                            las facturas de su carpeta.
+                            nombre, sin importar en qué subcarpeta estén. Los
+                            compartidos (FURIPS) se asocian a todas las facturas
+                            de su carpeta. Es el más robusto para el share real.
+
+EL SHARE REAL DE SINAC
+----------------------
+
+    La estructura típica del escaneo es:
+
+        …\\02. FEBRERO\\1. DD FACTURACION\\ESCANEO\\<EPS>\\RIPS\\ENV-<lote>\\HUS<factura>\\
+            HUS<factura>.json        ← RIPS (¡nombrado SOLO con la factura!)
+            CUV_HUS<factura>.json    ← resultado de validación MSPS
+
+    El RIPS viene SIN token de tipo (no "RIP_…"): es solo <factura>.json. El
+    radicador lo reconoce igual. La EPS se toma de la carpeta <EPS> de la ruta
+    (ESCANEO\\COOSALUD\\…). Apuntá --origen a la carpeta ESCANEO (o a la de una
+    EPS) y, si el FEV/PDFs viven en un árbol hermano, usá --layout lote.
 
 DEPENDENCIAS
 ------------
@@ -238,12 +256,19 @@ _PREFIJOS_SOPORTE: tuple[tuple[str, str], ...] = (
     ("FACTURA", "FEV"),
 )
 
+# El RIPS "desnudo" del share real viene nombrado SOLO con el número de factura
+# (HUS469401.json), sin token de soporte. Reconocemos ese patrón para no perder
+# el RIPS ni reportarlo como SIN_RIPS. CUV_HUS469401.json no entra aquí porque
+# se resuelve antes por el token CUV.
+_RE_FACTURA_DESNUDA = re.compile(r"^(?:HUS)?\d{4,12}$", re.IGNORECASE)
+
 
 def clasificar_soporte(nombre: str) -> tuple[str, str, bool]:
     """Devuelve (codigo_adres, descripcion, reconocido) según el TOKEN del
     nombre del archivo. Recorre los tokens de atrás hacia adelante porque el
     tipo suele ir al final (FEV_900006037_HUS487523.pdf → FEV). Si no hay token
-    separado, intenta por prefijo (FURIPS168...txt → FUR)."""
+    separado, intenta por prefijo (FURIPS168...txt → FUR) y, en último lugar,
+    reconoce el RIPS desnudo (HUS469401.json)."""
     base = nombre.rsplit(".", 1)[0]
     tokens = re.split(r"[ _\-.]+", base)
     for t in reversed(tokens):
@@ -257,6 +282,10 @@ def clasificar_soporte(nombre: str) -> tuple[str, str, bool]:
     for pref, cod in _PREFIJOS_SOPORTE:
         if base_up.startswith(pref):
             return cod, CODIGOS_SOPORTE[cod], True
+    # RIPS desnudo: .json cuyo nombre es solo la factura (HUS469401.json) y al
+    # que no se le reconoció ningún otro token (no es CUV_…, ResultadosMSPS_…).
+    if nombre.lower().endswith(".json") and _RE_FACTURA_DESNUDA.match(base):
+        return "RIP", CODIGOS_SOPORTE["RIP"], True
     return "ADM", "Sin clasificar (¿documento administrativo o nombre no ADRES?)", False
 
 
@@ -460,11 +489,20 @@ def procesar_factura(
             presentes.add(cod)
         else:
             res.archivos_sin_clasificar.append(p.name)
-        nu = p.name.upper()
-        if p.suffix.lower() == ".json" and "RIP" in nu and "CUV" not in nu:
-            rips_path = rips_path or p
-        elif p.suffix.lower() == ".xml" and "FACOSTE" not in nu:
-            fev_path = fev_path or p
+        sfx = p.suffix.lower()
+        # El RIPS es el .json tipificado como RIP (incluye el desnudo
+        # HUS469401.json). El CUV es otro .json y NO debe tomarse como RIPS.
+        if sfx == ".json" and cod == "RIP" and rips_path is None:
+            rips_path = p
+        elif sfx == ".xml" and cod == "FEV" and fev_path is None:
+            fev_path = p
+    # Fallback FEV: si ningún XML quedó tipificado como FEV (nombre atípico),
+    # tomar el primer XML que no sea la factura de costo (FACOSTE/FAT).
+    if fev_path is None:
+        for p in archivos:
+            if p.suffix.lower() == ".xml" and p not in por_codigo["FAT"]:
+                fev_path = p
+                break
     res.soportes_presentes = sorted(presentes)
 
     # ── Datos del RIPS ──────────────────────────────────────────────────────
@@ -625,7 +663,12 @@ def _entidad_desde_ruta(carpeta: Path, origen: Path, cfg: ConfigRadicacion) -> s
     except ValueError:
         rel = Path(carpeta.name)
     for parte in reversed(rel.parts):
-        if re.match(r"(?i)^(env[-_].*|escaneo|soportes.*|\d+\..*)$", parte):
+        # Saltar carpetas contenedoras del share (no son entidades): ENV-…,
+        # ESCANEO, RIPS, SOPORTES, FE/FACTURA…, y prefijos numéricos
+        # tipo "1. DD FACTURACION".
+        if re.match(
+            r"(?i)^(env[-_].*|escaneo|soportes.*|rips|fe|factura.*|xml|pdf|\d+\..*)$", parte
+        ):
             continue
         if resolver_entidad(parte, cfg) is not None:
             return parte
@@ -636,7 +679,13 @@ def descubrir_carpeta_factura(
     origen: Path, manifiesto: dict[str, str], cfg: ConfigRadicacion
 ) -> list[tuple[str, list[Path], Path, str | None]]:
     """Layout carpeta-factura: cada carpeta con archivos directos es una
-    factura. Devuelve [(factura_hint, archivos, carpeta, entidad_hint)]."""
+    factura. Devuelve [(factura_hint, archivos, carpeta, entidad_hint)].
+
+    En el share real una misma factura aparece en árboles PARALELOS (p.ej.
+    …/RIPS/ENV-…/HUS469401/ con el RIPS+CUV y …/SOPORTES/ENV-…/HUS469401/ con
+    el FEV y los PDFs): dos carpetas con el MISMO nombre de factura. Se FUSIONAN
+    por número de factura para no reportar la misma dos veces ni dejarla
+    incompleta."""
     carpetas: list[Path] = []
     raiz_archivos = _archivos_de(origen)
     if raiz_archivos:
@@ -645,13 +694,29 @@ def descubrir_carpeta_factura(
         if _archivos_de(d):
             carpetas.append(d)
 
-    salida = []
+    fusion: dict[str, list] = {}
+    orden: list[str] = []
     for c in carpetas:
         archivos = _archivos_de(c)
         fac_hint = c.name
         ent = manifiesto.get(normalizar_factura(fac_hint)) or _entidad_desde_ruta(c, origen, cfg)
-        salida.append((fac_hint, archivos, c, ent))
-    return salida
+        # Fusionar solo cuando el nombre de la carpeta ES una factura
+        # (HUS469401); si no, cada carpeta es única (clave = su ruta).
+        clave = (
+            "F:" + normalizar_factura(fac_hint)
+            if _RE_FACTURA_DESNUDA.match(fac_hint)
+            else "D:" + str(c)
+        )
+        if clave in fusion:
+            slot = fusion[clave]
+            ya = {p.name for p in slot[1]}
+            slot[1].extend(p for p in archivos if p.name not in ya)
+            if not slot[3] and ent:
+                slot[3] = ent
+        else:
+            fusion[clave] = [fac_hint, list(archivos), c, ent]
+            orden.append(clave)
+    return [tuple(fusion[k]) for k in orden]
 
 
 def descubrir_lote(

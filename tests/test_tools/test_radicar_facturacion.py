@@ -60,6 +60,19 @@ def _factura_folder(
     return d
 
 
+def _factura_desnuda(base: Path, fac: str, *, con_fev: bool = True, con_cuv: bool = True) -> Path:
+    """Carpeta de factura al estilo del share real de SINAC: el RIPS es
+    <fac>.json (SIN token de tipo), más CUV_<fac>.json y, opcional, el FEV."""
+    d = base / fac
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{fac}.json").write_text(_rips(fac), encoding="utf-8")  # RIPS desnudo
+    if con_cuv:
+        (d / f"CUV_{fac}.json").write_text("{}", encoding="utf-8")
+    if con_fev:
+        (d / f"FEV_900006037_{fac}.xml").write_text(FEV_XML.format(fac=fac), encoding="utf-8")
+    return d
+
+
 @pytest.fixture
 def cfg() -> rad.ConfigRadicacion:
     """Catálogo real de perfiles (data/perfiles_radicacion.json)."""
@@ -76,6 +89,23 @@ class TestClasificarSoporte:
 
     def test_alias_resultadosmsps_es_cuv(self):
         assert rad.clasificar_soporte("ResultadosMSPS_HUS487523.json")[0] == "CUV"
+
+    def test_rips_desnudo_solo_factura(self):
+        # En el share real el RIPS viene como HUS469401.json (sin token RIP).
+        cod, _d, ok = rad.clasificar_soporte("HUS469401.json")
+        assert (cod, ok) == ("RIP", True)
+
+    def test_rips_desnudo_numerico(self):
+        assert rad.clasificar_soporte("469401.json")[0] == "RIP"
+
+    def test_cuv_desnudo_no_se_confunde_con_rips(self):
+        # CUV_HUS469401.json sigue siendo CUV (no RIPS), va junto al RIPS desnudo.
+        assert rad.clasificar_soporte("CUV_HUS469401.json")[0] == "CUV"
+
+    def test_json_no_factura_no_es_rips(self):
+        # Un .json cuyo nombre NO es una factura no se confunde con RIPS.
+        cod, _d, ok = rad.clasificar_soporte("config.json")
+        assert (cod, ok) == ("ADM", False)
 
     def test_prefijo_furips_pegado(self):
         # FURIPS viene pegado a dígitos en los lotes reales.
@@ -129,6 +159,33 @@ class TestProcesarFactura:
         assert res.entidad_id == "COOSALUD"
         assert set(res.soportes_presentes) >= {"FEV", "RIP", "CUV"}
         assert res.valor_total == 52300.0
+
+    def test_rips_desnudo_lista(self, tmp_path, cfg):
+        # Caso real SINAC: el RIPS es HUS469401.json (sin token). Debe leerse
+        # como RIPS y la factura quedar LISTA (no SIN_RIPS).
+        d = _factura_desnuda(tmp_path, "HUS469401")
+        res = rad.procesar_factura("HUS469401", rad._archivos_de(d), d, "COOSALUD", cfg)
+        assert res.estado == "LISTA", res.detalle
+        assert "RIP" in res.soportes_presentes
+        assert res.valor_total == 52300.0
+
+    def test_rips_desnudo_sin_fev_es_sin_fev(self, tmp_path, cfg):
+        # RIPS desnudo + CUV pero sin FEV → debe reportar SIN_FEV (no SIN_RIPS).
+        d = _factura_desnuda(tmp_path, "HUS469402", con_fev=False)
+        res = rad.procesar_factura("HUS469402", rad._archivos_de(d), d, "COOSALUD", cfg)
+        assert res.estado == "SIN_FEV"
+
+    def test_fev_con_nombre_atipico_no_es_sin_fev(self, tmp_path, cfg):
+        # XML sin token FEV: el fallback evita el SIN_FEV duro (queda FALTAN_
+        # SOPORTES pidiendo renombrarlo), pero el RIPS desnudo sí se detecta.
+        d = tmp_path / "HUS469403"
+        d.mkdir()
+        (d / "HUS469403.json").write_text(_rips("HUS469403"), encoding="utf-8")
+        (d / "CUV_HUS469403.json").write_text("{}", encoding="utf-8")
+        (d / "comprobante.xml").write_text(FEV_XML.format(fac="HUS469403"), encoding="utf-8")
+        res = rad.procesar_factura("HUS469403", rad._archivos_de(d), d, "COOSALUD", cfg)
+        assert res.estado != "SIN_FEV"
+        assert res.estado != "SIN_RIPS"
 
     def test_sin_cuv(self, tmp_path, cfg):
         d = _factura_folder(tmp_path, "HUS500001", con_cuv=False)
@@ -190,6 +247,48 @@ class TestDescubrimiento:
             nombres = {p.name for p in archivos}
             assert "FURIPS12345.txt" in nombres  # repartido a ambas
             assert ent == "COOSALUD"  # de la carpeta padre
+
+    def test_carpeta_factura_fusiona_arboles_paralelos(self, tmp_path, cfg):
+        # La MISMA factura en …/RIPS/ENV/HUS469401 (RIPS+CUV) y en
+        # …/SOPORTES/ENV/HUS469401 (FEV) debe fusionarse en UNA sola.
+        base = tmp_path / "ESCANEO" / "COOSALUD"
+        rips_dir = base / "RIPS" / "ENV-222467-OK" / "HUS469401"
+        rips_dir.mkdir(parents=True)
+        (rips_dir / "HUS469401.json").write_text(_rips("HUS469401"), encoding="utf-8")
+        (rips_dir / "CUV_HUS469401.json").write_text("{}", encoding="utf-8")
+        sop_dir = base / "SOPORTES" / "ENV-222467-OK" / "HUS469401"
+        sop_dir.mkdir(parents=True)
+        (sop_dir / "FEV_900006037_HUS469401.xml").write_text(
+            FEV_XML.format(fac="HUS469401"), encoding="utf-8"
+        )
+        items = rad.descubrir_carpeta_factura(tmp_path, {}, cfg)
+        assert len(items) == 1  # fusionadas, no dos facturas
+        fac, archivos, carpeta, ent = items[0]
+        nombres = {p.name for p in archivos}
+        assert {
+            "HUS469401.json",
+            "CUV_HUS469401.json",
+            "FEV_900006037_HUS469401.xml",
+        } <= nombres
+        assert ent == "COOSALUD"  # de la carpeta EPS de la ruta
+        res = rad.procesar_factura(fac, archivos, carpeta, ent, cfg)
+        assert res.estado == "LISTA", res.detalle
+
+    def test_lote_share_real_lee_rips_desnudo(self, tmp_path, cfg):
+        # Todo en la carpeta de la factura, anidada bajo ESCANEO/<EPS>/RIPS/ENV.
+        leaf = tmp_path / "ESCANEO" / "COOSALUD" / "RIPS" / "ENV-1" / "HUS469401"
+        leaf.mkdir(parents=True)
+        (leaf / "HUS469401.json").write_text(_rips("HUS469401"), encoding="utf-8")
+        (leaf / "CUV_HUS469401.json").write_text("{}", encoding="utf-8")
+        (leaf / "FEV_900006037_HUS469401.xml").write_text(
+            FEV_XML.format(fac="HUS469401"), encoding="utf-8"
+        )
+        items = rad.descubrir_lote(tmp_path, {}, cfg, cfg.patron_factura)
+        assert len(items) == 1
+        fac, archivos, carpeta, ent = items[0]
+        assert ent == "COOSALUD"
+        res = rad.procesar_factura(fac, archivos, carpeta, ent, cfg)
+        assert res.estado == "LISTA", res.detalle
 
 
 class TestArmarPaquete:
@@ -290,3 +389,26 @@ class TestCLI:
             ["--origen", str(tmp_path / "no_existe"), "--reporte", str(tmp_path / "r.csv")]
         )
         assert rc == 1
+
+    def test_main_share_real_queda_lista(self, tmp_path):
+        # Reproduce el share real: RIPS+CUV en …/RIPS/ENV/<fac> y FEV en el
+        # árbol hermano …/SOPORTES/ENV/<fac>. La fusión + el RIPS desnudo deben
+        # dejar la factura LISTA con el layout por defecto (rc 0).
+        eps = tmp_path / "ESCANEO" / "COOSALUD"
+        rips_dir = eps / "RIPS" / "ENV-222467-OK" / "HUS469401"
+        rips_dir.mkdir(parents=True)
+        (rips_dir / "HUS469401.json").write_text(_rips("HUS469401"), encoding="utf-8")
+        (rips_dir / "CUV_HUS469401.json").write_text("{}", encoding="utf-8")
+        sop_dir = eps / "SOPORTES" / "ENV-222467-OK" / "HUS469401"
+        sop_dir.mkdir(parents=True)
+        (sop_dir / "FEV_900006037_HUS469401.xml").write_text(
+            FEV_XML.format(fac="HUS469401"), encoding="utf-8"
+        )
+        reporte = tmp_path / "rep.csv"
+        rc = rad.main(["--origen", str(tmp_path), "--reporte", str(reporte)])
+        assert rc == 0, reporte.read_text(encoding="utf-8-sig")
+        contenido = reporte.read_text(encoding="utf-8-sig")
+        assert "LISTA" in contenido and "COOSALUD" in contenido
+        # Una sola fila de datos (no duplicada por los dos árboles).
+        assert contenido.count("HUS469401") >= 1
+        assert "SIN_RIPS" not in contenido
