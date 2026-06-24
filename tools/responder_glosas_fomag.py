@@ -493,24 +493,65 @@ def ir_a_pestana(page: Page, tab_label: str) -> None:
 # ─── Lectura de la grilla de facturas ───────────────────────────────────────
 
 
+def _dump_inputs(page: Page) -> None:
+    """Vuelca los inputs visibles (tag/type/name/placeholder/label/valor) para
+    diagnosticar cuál es la caja 'Número factura'."""
+    try:
+        data = page.evaluate(
+            r"""() => {
+                const vis = el => { const r = el.getBoundingClientRect();
+                    const s = getComputedStyle(el);
+                    return r.width>0 && r.height>0 && s.visibility!=='hidden' && s.display!=='none'; };
+                const out = [];
+                for (const el of document.querySelectorAll('input, textarea')) {
+                    if (!vis(el)) continue;
+                    const ff = el.closest('mat-form-field, .mat-form-field, .form-field, .field');
+                    out.push({tag: el.tagName.toLowerCase(), type: el.type||'',
+                              name: el.getAttribute('name')||el.getAttribute('formcontrolname')||'',
+                              ph: el.getAttribute('placeholder')||'',
+                              label: ff ? (ff.innerText||'').trim().slice(0,50) : '',
+                              val: el.value||''});
+                }
+                return out;
+            }"""
+        )
+        logger.info(f"  [diag] inputs visibles ({len(data)}):")
+        for d in data:
+            logger.info(f"    <{d['tag']}> type={d['type']!r} name={d['name']!r} "
+                        f"ph={d['ph']!r} label={d['label']!r} val={d['val']!r}")
+    except Exception as e:
+        logger.info(f"  [diag] no pude volcar inputs: {e}")
+
+
 def _caja_numero_factura(page: Page):
-    """Localiza el input 'Número factura' (el primero de la barra de filtros)."""
-    caja = _primer_visible(page.locator(
+    """Localiza el input 'Número factura'. Es un campo de Angular Material SIN
+    placeholder (la etiqueta flota aparte), así que probamos por label."""
+    # 1) get_by_label: maneja <label for>, aria-label y mat-label de Material.
+    for etiqueta in ("Número factura", "Numero factura"):
+        try:
+            c = _primer_visible(page.get_by_label(etiqueta, exact=False))
+            if c is not None:
+                return c
+        except Exception:
+            pass
+    # 2) input dentro del mat-form-field cuyo texto dice '...mero factura', o el
+    #    input que sigue a ese texto (tolerante a tilde con 'mero factura').
+    for sel in (
+        "xpath=//mat-form-field[.//*[contains(normalize-space(.),'mero factura')]]//input",
+        "xpath=//*[contains(normalize-space(.),'mero factura')]/following::input[1]",
+    ):
+        c = _primer_visible(page.locator(sel))
+        if c is not None:
+            return c
+    # 3) placeholder / name / formcontrol.
+    c = _primer_visible(page.locator(
         "input[placeholder*='actura' i], input[name*='factura' i], "
         "input[formcontrolname*='factura' i]"
     ))
-    if caja is not None:
-        return caja
-    # Fallback: el input cuyo label/contenedor dice 'Número factura'.
-    caja = _primer_visible(page.locator(
-        "xpath=//*[contains(translate(.,'NÚMERO','numero'),'numero factura')]"
-        "//input | //label[contains(translate(.,'NÚMERO','numero'),'numero factura')]"
-        "/following::input[1]"
-    ))
-    if caja is not None:
-        return caja
-    # Último recurso: el primer input de texto visible (Número factura va 1ro).
-    return _primer_visible(page.locator("input[type='text']"))
+    if c is not None:
+        return c
+    # 4) primer input de texto visible.
+    return _primer_visible(page.locator("input[type='text'], input:not([type])"))
 
 
 def _set_page_size_max(page: Page) -> None:
@@ -651,6 +692,15 @@ def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 35) -> bool:
         )
     except Exception:
         pass
+    # Verificar que el valor entró en la caja correcta (si no, diagnóstico).
+    valor_ok = False
+    try:
+        valor_ok = factura.upper() in (caja.input_value() or "").upper()
+    except Exception:
+        pass
+    if not valor_ok:
+        logger.warning("  ⚠ la caja de filtro no tomó la factura; vuelco inputs visibles:")
+        _dump_inputs(page)
     btn = _primer_visible(page.locator("button:has-text('FILTRAR'), button:has-text('Filtrar')"))
     if btn is not None:
         try:
