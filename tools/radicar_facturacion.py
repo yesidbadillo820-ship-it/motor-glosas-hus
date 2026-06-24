@@ -557,6 +557,7 @@ def procesar_factura(
     por_codigo: dict[str, list[Path]] = defaultdict(list)
     rips_path: Path | None = None
     fev_path: Path | None = None
+    fed_path: Path | None = None
     for p in archivos:
         cod, _desc, reconocido = clasificar_soporte(p.name)
         por_codigo[cod].append(p)
@@ -569,8 +570,16 @@ def procesar_factura(
         # HUS469401.json). El CUV es otro .json y NO debe tomarse como RIPS.
         if sfx == ".json" and cod == "RIP" and rips_path is None:
             rips_path = p
-        elif sfx == ".xml" and cod in ("FEV", "FED") and fev_path is None:
+        elif sfx == ".xml" and cod == "FEV" and fev_path is None:
             fev_path = p
+        elif sfx == ".xml" and cod == "FED" and fed_path is None:
+            fed_path = p
+    # Preferir el Invoice (fv…, FEV) sobre el AttachedDocument (ad…, FED): el AD
+    # lleva su PROPIO cbc:ID (no el número de la factura), lo que provocaba
+    # falsos FACTURA_INCONSISTENTE. El AD sólo se usa si no hay Invoice.
+    fev_es_invoice = fev_path is not None
+    if fev_path is None:
+        fev_path = fed_path
     # El documento adjunto DIAN (FED, ad…xml o el .zip) ES la factura
     # electrónica: cuenta como FEV para la completitud.
     if "FED" in presentes:
@@ -618,15 +627,21 @@ def procesar_factura(
         # Sin pista por ruta/manifiesto (típico del share de factura
         # electrónica): leer el adquiriente (EPS) de la propia FEV. Se prueba
         # primero el Invoice (fv…) y luego el AttachedDocument (ad…).
+        eps_detectada = ""
         for cand in (*por_codigo.get("FEV", []), *por_codigo.get("FED", [])):
             if cand.suffix.lower() != ".xml":
                 continue
             eps_fev = peek_eps_fev(cand)
+            if eps_fev and not eps_detectada:
+                eps_detectada = eps_fev
             perfil = resolver_entidad(eps_fev, cfg)
             if perfil is not None:
-                if not res.entidad_hint:
-                    res.entidad_hint = eps_fev
+                eps_detectada = eps_fev
                 break
+        # Guardar el nombre leído del FEV (aunque NO matchee el catálogo) para
+        # diagnóstico: aparece en el detalle de las ENTIDAD_NO_RESUELTA.
+        if eps_detectada and not res.entidad_hint:
+            res.entidad_hint = eps_detectada
     if perfil is not None:
         res.entidad_id = perfil.id
         res.entidad_nombre = perfil.nombre
@@ -646,7 +661,9 @@ def procesar_factura(
             esperados |= set(cfg.soportes_por_servicio.get(serv, []))
     res.soportes_esperados_faltantes = sorted(esperados - presentes - base)
 
-    res.estado, res.detalle = _evaluar_estado(res, perfil, num_rips, num_fev, rips_path, fev_path)
+    res.estado, res.detalle = _evaluar_estado(
+        res, perfil, num_rips, num_fev, rips_path, fev_path, fev_es_invoice
+    )
     return res
 
 
@@ -686,6 +703,7 @@ def _evaluar_estado(
     num_fev: str,
     rips_path: Path | None,
     fev_path: Path | None,
+    fev_es_invoice: bool = True,
 ) -> tuple[str, list[str]]:
     detalle: list[str] = []
 
@@ -700,18 +718,20 @@ def _evaluar_estado(
     if fev_path is None:
         detalle.append("Falta la factura electrónica (FEV .xml).")
 
-    # Consistencia del número de factura entre RIPS y FEV. Solo comparamos
-    # valores que parezcan un número de factura (dígitos, ≤12): el cbc:ID de un
-    # FEV DIAN puede ser un CUFE largo y no debe disparar falsos inconsistentes.
+    # Nota (NO bloqueante) sobre el número de factura entre RIPS y FEV. La
+    # factura electrónica DIAN suele numerarse con otra serie que el RIPS, así
+    # que una diferencia es esperable y NO debe impedir radicar; la identidad de
+    # la factura la da el RIPS / la carpeta. Solo se compara con un Invoice real
+    # (el AttachedDocument lleva su propio cbc:ID) y con números plausibles.
     fuentes = {
         n
         for n in (normalizar_factura(num_rips), normalizar_factura(num_fev))
         if n != "0" and n.isdigit() and len(n) <= 12
     }
-    inconsistente = len(fuentes) > 1
-    if inconsistente:
+    if fev_es_invoice and len(fuentes) > 1:
         detalle.append(
-            f"El número de factura no coincide entre RIPS ({num_rips or '—'}) y FEV ({num_fev or '—'})."
+            f"Nota: el número del FEV ({num_fev or '—'}) difiere del RIPS "
+            f"({num_rips or '—'}); normal si la FE usa otra numeración."
         )
 
     if res.soportes_faltantes:
@@ -741,8 +761,6 @@ def _evaluar_estado(
         return "SIN_CUV", detalle
     if res.soportes_faltantes:
         return "FALTAN_SOPORTES", detalle
-    if inconsistente:
-        return "FACTURA_INCONSISTENTE", detalle
     if res.archivos_sin_clasificar or res.soportes_esperados_faltantes:
         return "REVISAR_TIPIFICACION", detalle
     detalle.append("Lista para radicar.")

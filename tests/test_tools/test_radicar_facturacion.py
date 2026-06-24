@@ -302,14 +302,44 @@ class TestProcesarFactura:
         assert "FUR" in res.soportes_faltantes and "SER" in res.soportes_faltantes
         assert "CUV" not in res.soportes_faltantes
 
-    def test_factura_inconsistente(self, tmp_path, cfg):
+    def test_numero_fev_distinto_es_nota_no_bloquea(self, tmp_path, cfg):
+        # El número del FEV puede ir en otra serie (DIAN) que el RIPS: es una
+        # NOTA en el detalle, NO bloquea la radicación (queda LISTA).
         d = tmp_path / "HUSX"
         d.mkdir()
         (d / "Rips_HUS111.json").write_text(_rips("HUS111"), encoding="utf-8")
         (d / "FEV_900006037_HUS222.xml").write_text(FEV_XML.format(fac="HUS222"), encoding="utf-8")
         (d / "CUV_900006037_HUS111.json").write_text("{}", encoding="utf-8")
         res = rad.procesar_factura("HUS111", rad._archivos_de(d), d, "COOSALUD", cfg)
-        assert res.estado == "FACTURA_INCONSISTENTE"
+        assert res.estado == "LISTA"
+        assert any("difiere del RIPS" in linea for linea in res.detalle)
+
+    def test_solo_attacheddocument_no_compara_numero(self, tmp_path, cfg):
+        # Solo el AttachedDocument (ad…) lleva su PROPIO cbc:ID: como no es un
+        # Invoice, no se compara el número → sin falsa nota de discrepancia.
+        d = tmp_path / "HUS555"
+        d.mkdir()
+        (d / "Rips_HUS555.json").write_text(_rips("HUS555"), encoding="utf-8")
+        (d / "CUV_HUS555.json").write_text("{}", encoding="utf-8")
+        (d / "ad09000060370009999999999.xml").write_text(
+            FEV_XML.format(fac="9999999999"), encoding="utf-8"
+        )
+        res = rad.procesar_factura("HUS555", rad._archivos_de(d), d, "COOSALUD", cfg)
+        assert res.estado == "LISTA", res.detalle
+        assert not any("difiere del RIPS" in linea for linea in res.detalle)
+
+    def test_prefiere_invoice_fv_sobre_attacheddocument(self, tmp_path, cfg):
+        # Con fv (Invoice) Y ad (AttachedDocument), el número sale del fv.
+        d = tmp_path / "HUS556"
+        d.mkdir()
+        (d / "Rips_HUS556.json").write_text(_rips("HUS556"), encoding="utf-8")
+        (d / "CUV_HUS556.json").write_text("{}", encoding="utf-8")
+        (d / "ad09000060370000000000001.xml").write_text(FEV_XML.format(fac="1"), encoding="utf-8")
+        (d / "fv09000060370000000556.xml").write_text(FEV_XML.format(fac="556"), encoding="utf-8")
+        res = rad.procesar_factura("HUS556", rad._archivos_de(d), d, "COOSALUD", cfg)
+        # fv dice 556 == RIPS 556 → sin nota (si usara el ad "1", habría nota).
+        assert res.estado == "LISTA", res.detalle
+        assert not any("difiere" in linea for linea in res.detalle)
 
 
 class TestDescubrimiento:
