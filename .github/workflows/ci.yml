@@ -24,7 +24,11 @@ jobs:
       # Sólo reglas de alta señal: F (pyflakes), W6xx (escape sequences)
       # Las reglas de estilo/formato se habilitan gradualmente en el plan.
       - run: ruff check . --select F,W6
-      - run: ruff format --check .
+      # El formateo se valida en app/alembic/scripts/tests; los scripts
+      # operativos de tools/ se mantienen con formato manual (adopción gradual
+      # del formateador). Listar dirs explícitos respeta el exclude de
+      # alembic/versions del pyproject.toml.
+      - run: ruff format --check app alembic scripts tests
 
   test:
     name: Tests (pytest)
