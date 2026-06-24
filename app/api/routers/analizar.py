@@ -27,6 +27,7 @@ from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.glosa_ia_prompts import get_contrato
 from app.services.glosa_service import GlosaService
+from app.utils.moneda import parse_valor_cop
 from app.utils.parsers_glosa import (
     _concepto_glosa,
     _descripcion_servicio,
@@ -211,8 +212,6 @@ async def _extraer_pdfs(
                 anthropic_model=cfg.anthropic_model,
                 gemini_api_key=cfg.gemini_api_key,
                 gemini_model=cfg.gemini_model,
-                openrouter_api_key=cfg.openrouter_api_key,
-                openrouter_model=cfg.openrouter_model,
             )
             sep = (
                 f"\n\n═══ DOCUMENTO: {archivo.filename} ═══\n\n"
@@ -494,8 +493,11 @@ async def _persistir_y_responder(
     """Cierra el flujo: aplica banner de tarifa, decide estado, construye
     dictamen final, persiste GlosaRecord, guarda snapshot de versión."""
     glosa_repo = GlosaRepository(db)
-    val_obj = float(re.sub(r"[^\d]", "", resultado.valor_objetado) or 0)
-    val_ac = float(re.sub(r"[^\d]", "", valor_aceptado) or 0)
+    # parse_valor_cop entiende formato colombiano ("7.700,00" → 7700.0).
+    # El patrón anterior float(re.sub(r"[^\d]","",x)) inflaba 100× los
+    # valores con decimales (auditoría jun-2026, P0 #1).
+    val_obj = parse_valor_cop(resultado.valor_objetado)
+    val_ac = parse_valor_cop(valor_aceptado)
 
     _agregar_banner_tarifa_post(
         db,
@@ -648,10 +650,11 @@ def get_glosa_service() -> GlosaService:
         primary_ai=cfg.primary_ai,
         anthropic_model=cfg.anthropic_model,
         groq_model=cfg.groq_model,
+        groq_model_fallback_1=cfg.groq_model_fallback_1,
+        groq_model_fallback_2=cfg.groq_model_fallback_2,
+        groq_model_fallback_3=getattr(cfg, "groq_model_fallback_3", "llama-3.3-70b-versatile"),
         gemini_api_key=cfg.gemini_api_key,
         gemini_model=cfg.gemini_model,
-        openrouter_api_key=cfg.openrouter_api_key,
-        openrouter_model=cfg.openrouter_model,
     )
 
 
@@ -718,100 +721,125 @@ async def analizar(
         logger.error(f"[{req_id}] Validación fallida: {e}")
         raise HTTPException(status_code=422, detail=str(e))
 
-    contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
-        archivos,
-        req_id,
-        capturar_raw=bool(usar_pdf_nativo_soportes),
-    )
-    _publicar_progreso(
-        _tid,
-        "pdfs_extraidos",
-        {"n_archivos": archivos_procesados, "n_caracteres": len(contexto_pdf or "")},
-    )
+    # Pre-validación INCONDICIONAL del texto de glosa (corre aunque
+    # QUALITY_GATE_ENABLED esté OFF). Bloquea entradas basura tipo "Se glosa
+    # por falta de cobertura" antes de gastar un call de IA y antes de
+    # generar dictamen sobre nada. Esto es el "guardarrail mínimo" — el
+    # Quality Gate completo (post-validador, regeneración, etc.) sigue
+    # gateado por el feature flag, pero esta verificación de input no.
+    from app.services.quality_gate.pre_validator import check_texto_glosa
 
-    # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
-    # si el gestor NO subió PDFs manualmente, leemos directo del indexador
-    # los soportes asociados a esta factura (HEV, RIPS, FEV, etc.) y los
-    # inyectamos como contexto IA. Esto permite que el dictamen mencione
-    # paciente, servicios y fechas reales sin que el gestor tenga que
-    # buscar y subir cada PDF a mano.
-    contexto_soportes_auto = await _extraer_soportes_del_servidor(
-        numero_factura=numero_factura,
-        contexto_pdf_existente=contexto_pdf,
-        req_id=req_id,
-    )
-    if contexto_soportes_auto:
-        contexto_pdf = (
-            (contexto_pdf + "\n\n" + contexto_soportes_auto)
-            if contexto_pdf
-            else contexto_soportes_auto
+    _chk_texto = check_texto_glosa(tabla_excel)
+    if not _chk_texto.ok:
+        logger.warning(
+            f"[{req_id}] Pre-validación bloqueada: {_chk_texto.razon}. No se gasta call de IA."
         )
-        # Contar como "archivos procesados" para que el motor IA detecte
-        # que hay soportes disponibles y referencie en el dictamen.
-        archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
+        _msg = _chk_texto.razon or "Texto de glosa insuficiente"
+        if _chk_texto.sugerencia:
+            _msg = f"{_msg}.\n\nSugerencia: {_chk_texto.sugerencia}"
+        raise HTTPException(status_code=400, detail=_msg)
 
-    contrato_repo = ContratoRepository(db)
-    contratos = contrato_repo.como_dict()
+    try:
+        contexto_pdf, archivos_procesados, pdfs_raw = await _extraer_pdfs(
+            archivos,
+            req_id,
+            capturar_raw=bool(usar_pdf_nativo_soportes),
+        )
+        _publicar_progreso(
+            _tid,
+            "pdfs_extraidos",
+            {"n_archivos": archivos_procesados, "n_caracteres": len(contexto_pdf or "")},
+        )
 
-    few_shots, plantillas_gold, cod_pref = _obtener_few_shots(db, eps, tabla_excel)
+        # Soportes auto-detectados del servidor (\\Prime\radicacion_2026):
+        # si el gestor NO subió PDFs manualmente, leemos directo del indexador
+        # los soportes asociados a esta factura (HEV, RIPS, FEV, etc.) y los
+        # inyectamos como contexto IA. Esto permite que el dictamen mencione
+        # paciente, servicios y fechas reales sin que el gestor tenga que
+        # buscar y subir cada PDF a mano.
+        contexto_soportes_auto = await _extraer_soportes_del_servidor(
+            numero_factura=numero_factura,
+            contexto_pdf_existente=contexto_pdf,
+            req_id=req_id,
+        )
+        if contexto_soportes_auto:
+            contexto_pdf = (
+                (contexto_pdf + "\n\n" + contexto_soportes_auto)
+                if contexto_pdf
+                else contexto_soportes_auto
+            )
+            # Contar como "archivos procesados" para que el motor IA detecte
+            # que hay soportes disponibles y referencie en el dictamen.
+            archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
 
-    info_tarifa_pre = _pre_lookup_tarifa(db, cod_pref, eps, tabla_excel, contexto_pdf, req_id)
-    _publicar_progreso(
-        _tid,
-        "tarifa_lookup",
-        {
-            "encontrada": bool(info_tarifa_pre and info_tarifa_pre.get("encontrada")),
-            "few_shots": len(few_shots),
-        },
-    )
+        contrato_repo = ContratoRepository(db)
+        contratos = contrato_repo.como_dict()
 
-    _publicar_progreso(_tid, "ia_iniciada", {"proveedor": cfg.primary_ai})
-    resultado = await service.analizar(
-        data,
-        contexto_pdf,
-        contratos,
-        few_shots=few_shots,
-        info_tarifa=info_tarifa_pre,
-        pdfs_raw_para_multimodal=pdfs_raw,
-    )
-    _publicar_progreso(
-        _tid,
-        "ia_completada",
-        {
-            "modelo": resultado.modelo_ia,
-            "score": resultado.score,
-            "dictamen_chars": len(resultado.dictamen or ""),
-        },
-    )
-    if plantillas_gold:
-        from app.api.routers.plantillas_gold import marcar_usos
+        few_shots, plantillas_gold, cod_pref = _obtener_few_shots(db, eps, tabla_excel)
 
-        marcar_usos(db, [p.id for p in plantillas_gold])
-    logger.info(
-        f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} "
-        f"| few_shots={len(few_shots)} | tarifa_match={bool(info_tarifa_pre and info_tarifa_pre.get('encontrada'))}"
-    )
+        info_tarifa_pre = _pre_lookup_tarifa(db, cod_pref, eps, tabla_excel, contexto_pdf, req_id)
+        _publicar_progreso(
+            _tid,
+            "tarifa_lookup",
+            {
+                "encontrada": bool(info_tarifa_pre and info_tarifa_pre.get("encontrada")),
+                "few_shots": len(few_shots),
+            },
+        )
 
-    respuesta = await _persistir_y_responder(
-        db,
-        resultado,
-        eps,
-        etapa,
-        valor_aceptado,
-        tabla_excel,
-        contexto_pdf,
-        numero_factura,
-        numero_radicado,
-        data,
-        current_user,
-        req_id,
-    )
-    _publicar_progreso(
-        _tid,
-        "finalizado",
-        {"ok": True, "glosa_id": getattr(respuesta, "id", None)},
-    )
-    return respuesta
+        _publicar_progreso(_tid, "ia_iniciada", {"proveedor": cfg.primary_ai})
+        resultado = await service.analizar(
+            data,
+            contexto_pdf,
+            contratos,
+            few_shots=few_shots,
+            info_tarifa=info_tarifa_pre,
+            pdfs_raw_para_multimodal=pdfs_raw,
+        )
+        _publicar_progreso(
+            _tid,
+            "ia_completada",
+            {
+                "modelo": resultado.modelo_ia,
+                "score": resultado.score,
+                "dictamen_chars": len(resultado.dictamen or ""),
+            },
+        )
+        if plantillas_gold:
+            from app.api.routers.plantillas_gold import marcar_usos
+
+            marcar_usos(db, [p.id for p in plantillas_gold])
+        logger.info(
+            f"[{req_id}] Análisis completado | modelo={resultado.modelo_ia} "
+            f"| few_shots={len(few_shots)} | tarifa_match={bool(info_tarifa_pre and info_tarifa_pre.get('encontrada'))}"
+        )
+
+        respuesta = await _persistir_y_responder(
+            db,
+            resultado,
+            eps,
+            etapa,
+            valor_aceptado,
+            tabla_excel,
+            contexto_pdf,
+            numero_factura,
+            numero_radicado,
+            data,
+            current_user,
+            req_id,
+        )
+        _publicar_progreso(
+            _tid,
+            "finalizado",
+            {"ok": True, "glosa_id": getattr(respuesta, "id", None)},
+        )
+        return respuesta
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[{req_id}] Error en análisis: {e}", exc_info=True)
+        _publicar_progreso(_tid, "error", {"mensaje": str(e)[:200]})
+        raise HTTPException(status_code=500, detail=f"Error procesando análisis: {str(e)[:200]}")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -1167,3 +1195,171 @@ async def score_breakdown(
             f["sugerencia"] for f in sorted(factores, key=lambda x: -x["peso"]) if f["sugerencia"]
         ][:3],
     }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Auto-extracción de metadata desde PDFs de soporte (factura, CUPS, paciente,
+# valores, EPS) — corre ANTES de "Analizar con IA" para que el gestor confirme
+# los campos sin tener que tipear nada del PDF a mano.
+#
+# Mecanismo:
+#   1. Recibe los UploadFile PDF que el usuario adjuntó.
+#   2. Extrae el texto plano con PdfService.extraer() (sin OCR — barato y
+#      rápido; el OCR queda para el flujo principal /analizar si hace falta).
+#   3. Pasa cada texto por extractor_factura.extraer_de_texto() que ya tiene
+#      regex pulida para facturas colombianas.
+#   4. Combina los resultados de los varios PDFs en un solo "prefill":
+#      - factura/radicado/eps/paciente/cups: primero no-vacío
+#      - valor_objetado/facturado/reconocido: max (suele venir del PDF de glosa)
+#      - codigos_glosa: unión deduplicada
+#      - confianza_global: promedio ponderado por presencia de campos
+#   5. Devuelve { paciente, factura, radicado, eps, fecha_radicacion,
+#                 fecha_recepcion, cups, valor_objetado, valor_facturado,
+#                 codigos_glosa, confianza_global, archivos_procesados,
+#                 detalle_por_archivo: [...] }
+#
+# La UI muestra chips "auto-extraído del PDF — clic para confirmar" que
+# rellenan los inputs respectivos. Si el campo extraído contradice lo que
+# el gestor ya escribió, se marca el chip como sugerencia (no sobrescribe).
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def _fundir_extracciones(extraidos: list[dict]) -> dict:
+    """Combina varios resultados de extractor_factura en un solo prefill.
+
+    Regla por campo:
+      · strings (factura/radicado/eps/paciente/...): primer no-vacío,
+        priorizando los que vienen de la extracción con mayor confianza.
+      · valores monetarios: máximo (la factura suele ser el PDF con el
+        valor real, los demás pueden traer ceros).
+      · codigos_glosa: unión deduplicada preservando orden.
+      · confianza_global: promedio simple de las confianzas individuales.
+    """
+    if not extraidos:
+        return {
+            "paciente": "",
+            "factura": "",
+            "radicado": "",
+            "eps": "",
+            "fecha_radicacion": "",
+            "fecha_recepcion": "",
+            "cups": "",
+            "valor_objetado": 0.0,
+            "valor_facturado": 0.0,
+            "codigos_glosa": [],
+            "confianza_global": 0.0,
+        }
+    # Ordenar por confianza desc para que el primer no-vacío gane
+    ordenados = sorted(extraidos, key=lambda r: -float(r.get("confianza") or 0))
+
+    def _primer_no_vacio(campo: str) -> str:
+        for r in ordenados:
+            v = (r.get(campo) or "").strip()
+            if v:
+                return v
+        return ""
+
+    def _max_float(campo: str) -> float:
+        valores = [float(r.get(campo) or 0) for r in extraidos]
+        return max(valores) if valores else 0.0
+
+    codigos: list[str] = []
+    for r in ordenados:
+        for c in r.get("codigos_glosa") or []:
+            c_norm = (c or "").strip().upper()
+            if c_norm and c_norm not in codigos:
+                codigos.append(c_norm)
+
+    confianzas = [float(r.get("confianza") or 0) for r in extraidos]
+    return {
+        "paciente": _primer_no_vacio("paciente"),
+        "factura": _primer_no_vacio("numero_factura"),
+        "radicado": _primer_no_vacio("numero_radicado"),
+        "eps": _primer_no_vacio("eps"),
+        "fecha_radicacion": _primer_no_vacio("fecha_radicacion"),
+        "fecha_recepcion": _primer_no_vacio("fecha_recepcion"),
+        "cups": _primer_no_vacio("cups"),
+        "valor_objetado": _max_float("valor_objetado"),
+        "valor_facturado": _max_float("valor_facturado"),
+        "codigos_glosa": codigos,
+        "confianza_global": round(sum(confianzas) / len(confianzas), 2) if confianzas else 0.0,
+    }
+
+
+@router.post("/analizar/extraer-soportes")
+@limiter.limit("60/minute")
+async def extraer_soportes(
+    request: Request,
+    archivos: list[UploadFile] = File(default=[]),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Auto-extrae metadata de los PDFs ANTES de "Analizar con IA".
+
+    Quita el copy-paste manual de paciente/factura/CUPS/valor (causa frecuente
+    de ratificación administrativa por "datos incongruentes"). El gestor sube
+    el PDF y la UI le ofrece chips para confirmar los campos detectados.
+
+    Usa PdfService.extraer() (SIN OCR) — barato y rápido. El OCR solo se
+    dispara después en /analizar cuando el dictamen real lo necesita.
+    """
+    req_id = set_request_id()
+    if not archivos:
+        return _fundir_extracciones([])
+
+    from app.services.extractor_factura import extraer_de_texto
+    from app.services.pdf_service import PdfService
+
+    pdf_svc = PdfService()
+    extraidos: list[dict] = []
+    detalle: list[dict] = []
+    procesados = 0
+
+    for archivo in archivos:
+        if procesados >= MAX_ARCHIVOS:
+            logger.warning(f"[{req_id}] extraer-soportes: máx {MAX_ARCHIVOS} archivos")
+            break
+        if not archivo.filename:
+            continue
+        try:
+            contenido = await archivo.read()
+            if contenido[:4] != b"%PDF":
+                detalle.append({"archivo": archivo.filename, "ok": False, "error": "no es PDF"})
+                continue
+            if len(contenido) > MAX_BYTES_PDF:
+                detalle.append(
+                    {"archivo": archivo.filename, "ok": False, "error": "PDF muy grande"}
+                )
+                continue
+            texto = await pdf_svc.extraer(contenido)
+            if not texto or len(texto) < 30:
+                detalle.append(
+                    {
+                        "archivo": archivo.filename,
+                        "ok": False,
+                        "error": "PDF sin texto plano (puede requerir OCR — corre /analizar)",
+                    }
+                )
+                continue
+            extracto = extraer_de_texto(texto)
+            extraidos.append(extracto)
+            detalle.append(
+                {
+                    "archivo": archivo.filename,
+                    "ok": True,
+                    "confianza": extracto.get("confianza", 0.0),
+                    "campos_faltantes": extracto.get("campos_faltantes", []),
+                }
+            )
+            procesados += 1
+        except Exception as e:
+            logger.warning(f"[{req_id}] extraer-soportes error en {archivo.filename}: {e}")
+            detalle.append({"archivo": archivo.filename, "ok": False, "error": str(e)})
+
+    resultado = _fundir_extracciones(extraidos)
+    resultado["archivos_procesados"] = procesados
+    resultado["detalle_por_archivo"] = detalle
+    logger.info(
+        f"[{req_id}] extraer-soportes: {procesados} PDFs procesados, "
+        f"confianza_global={resultado['confianza_global']}"
+    )
+    return resultado

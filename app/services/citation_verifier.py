@@ -22,20 +22,51 @@ logger = logging.getLogger("motor_glosas")
 
 
 # Patrones de citación legal típicos en dictámenes ESE HUS
+# Todos los patrones exigen \b al inicio: sin él, la alternativa "Res..."
+# matcheaba la cola de palabras ("...TRES 500/2024") y la (T|C|SU) de
+# sentencias se disparaba con la C final de "DEC. 4747/2007" — visto en
+# producción 10-jun-2026: el dictamen citaba "MESA DE CONCILIACIÓN DE
+# AUDITORÍA (ART. 20 DEC. 4747/2007)" y el verifier reportaba la sentencia
+# fantasma "C-4747/2007" como NORMA_INEXISTENTE.
 PAT_RESOLUCION = re.compile(
-    r"Resolución\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|Res(?:olución)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
+    r"\bResolución\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bRes(?:olución)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
+# La 2.ª alternativa acepta la abreviatura "Dec. 4747/2007" (antes solo
+# "Decreto NNN/YYYY" — la forma abreviada ni se contaba como cita).
 PAT_DECRETO = re.compile(
-    r"Decreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})",
+    r"\bDecreto\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bDec(?:reto)?\.?\s*(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
+# El lookbehind excluye "DECRETO-LEY 1795 DE 2000" / "DECRETO LEY ...":
+# son DECRETOS con fuerza de ley, no leyes — el 11-jun-2026 el verifier
+# extraía "Ley 1795 de 2000" del texto fijo DMBUG y la marcaba
+# NORMA_INEXISTENTE ALTA (la norma real es el Decreto-Ley 1795/2000).
 PAT_LEY = re.compile(
-    r"Ley\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})",
+    # Ronda 7 (16-jun-2026 — fix R): los lookbehinds solo cubrían ASCII "-"
+    # y espacio normal. Evidencia caso 9 FOMAG: el dictamen escribió
+    # "Decreto‑Ley 1295/1994" con guión Unicode U+2011 (non-breaking
+    # hyphen), saltando ambos lookbehinds, y el verifier marcaba
+    # "Ley 1295/1994" como NORMA_INEXISTENTE ALTA. Ampliamos a todos los
+    # guiones Unicode (U+002D, U+2010-U+2015) y espacios (regular, NBSP).
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\-‐‑‒–—―])"
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\s ])"
+    r"\bLey\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})"
+    r"|(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\-‐‑‒–—―])"
+    r"(?<![Dd][Ee][Cc][Rr][Ee][Tt][Oo][\s ])"
+    r"\bLey\s+(\d{1,5})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+PAT_ACUERDO = re.compile(
+    r"\bAcuerdo\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bAcuerdo\s+(\d{1,5})[/\-](\d{2,4})",
+    re.IGNORECASE,
+)
+PAT_CIRCULAR = re.compile(
+    r"\bCircular\s+(?:N[oº°\.]?\s*)?(\d{1,5})\s+de\s+(\d{4})|\bCircular\s+(\d{1,5})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_SENTENCIA = re.compile(
-    r"(?:Sentencia\s+)?(T|C|SU)[\.\-]?\s*(\d{1,4})[/\-](\d{2,4})",
+    r"(?:Sentencia\s+)?\b(T|C|SU)[\.\-]?\s*(\d{1,4})[/\-](\d{2,4})",
     re.IGNORECASE,
 )
 PAT_ARTICULO = re.compile(
@@ -44,6 +75,20 @@ PAT_ARTICULO = re.compile(
 )
 # Texto entrecomillado — chevrones franceses « » preferidos en el motor
 PAT_CITA_LITERAL = re.compile(r"«([^«»]{15,800})»")
+# Citas "textuales" con comillas dobles/simples ATRIBUIDAS a una norma o
+# cláusula (ESTABLECE/DISPONE/SEÑALA/...). Auditoría 10-jun-2026 P0-1:
+# la red solo cubría chevrones, así que "CLÁUSULA 12 DEL CONTRATO QUE
+# ESTABLECE: 'LAS PARTES SE OBLIGAN A NO REBATIR...'" (fabricada y
+# autodestructiva) y los arts. 44/45/46 L1438 con texto inventado entre
+# comillas dobles se radicaban sin una sola alarma. Se exige el verbo
+# de atribución para no flaggear citas del texto de la glosa misma
+# ("LA AFIRMACIÓN DE QUE '...'" no es una cita normativa).
+PAT_CITA_ATRIBUIDA = re.compile(
+    r"(?:ESTABLECE|DISPONE|SEÑALA|SENALA|CONSAGRA|REZA|INDICA|PRECEPTÚA|PRECEPTUA)"
+    r"\s*(?:QUE\s*)?(?:TEXTUALMENTE\s*)?:?\s*"
+    r"[\"“‘']([^\"“”‘’']{15,800})[\"”’']",
+    re.IGNORECASE,
+)
 # Limpia HTML para comparar texto plano
 PAT_HTML = re.compile(r"<[^>]+>")
 
@@ -63,27 +108,79 @@ def _normalizar(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+_PREFIJO_UPPER = {
+    # forma corta usada por verificar_citas (tipo_label[:3].lower())
+    "ley": "LEY",
+    "dec": "DECRETO",
+    "res": "RESOLUCION",
+    "acu": "ACUERDO",
+    "cir": "CIRCULAR",
+    # forma larga, por si algún caller futuro pasa el tipo completo
+    "decreto": "DECRETO",
+    "resolucion": "RESOLUCION",
+    "acuerdo": "ACUERDO",
+    "circular": "CIRCULAR",
+}
+
+
 def _buscar_clave_norma(tipo: str, numero: str, anio: str, normas: dict) -> Optional[str]:
     """Mapea (tipo, número, año) a la clave en _TODAS_LAS_NORMAS.
 
-    El corpus usa claves tipo "res_2284_2023", "decreto_4747_2007",
-    "ley_1438_2011", "sentencia_t_1025_2002". Probamos varios formatos.
+    El corpus actual usa MAYORITARIAMENTE el formato upper-words:
+      "LEY 100 DE 1993", "LEY 1438 DE 2011", "DECRETO 4747 DE 2007",
+      "ACUERDO 002 DE 2001 CSSFFMM", "CIRCULAR 025 DE 2024".
+    También intentamos snake_case ("ley_1438_2011") por compatibilidad.
+
+    El fallback antiguo matcheaba por sustring numérico → "138" caía dentro
+    de "LEY 1438 DE 2011" como falso positivo. Ahora se exige que el número
+    aparezca como token entre espacios o como segmento entre guiones bajos.
     """
     n = numero.lstrip("0") or numero
-    candidatos = [
-        f"{tipo.lower()}_{n}_{anio}",
-        f"{tipo.lower()}_{numero}_{anio}",
-        f"res_{n}_{anio}" if tipo.lower().startswith("res") else None,
-        f"decreto_{n}_{anio}" if tipo.lower().startswith("dec") else None,
-        f"ley_{n}_{anio}" if tipo.lower().startswith("ley") else None,
-        f"sentencia_{n.lower()}_{anio}" if tipo.lower() in ("t", "c", "su") else None,
+    tipo_l = tipo.lower()
+    prefijo_up = _PREFIJO_UPPER.get(tipo_l)
+
+    candidatos: list[str] = [
+        # snake_case (formato histórico)
+        f"{tipo_l}_{n}_{anio}",
+        f"{tipo_l}_{numero}_{anio}",
     ]
+    if prefijo_up:
+        # upper-words (formato actual del corpus)
+        numero_padded = numero.zfill(3) if len(numero) < 3 else numero
+        candidatos.extend(
+            [
+                f"{prefijo_up} {n} DE {anio}",
+                f"{prefijo_up} {numero} DE {anio}",
+                f"{prefijo_up} {numero_padded} DE {anio}",
+            ]
+        )
+    if tipo_l in ("t", "c", "su"):
+        candidatos.append(f"sentencia_{n.lower()}_{anio}")
+
     for c in candidatos:
         if c and c in normas:
             return c
-    # Fallback: buscar cualquier clave que contenga el número y el año
+
+    # Coincidencia tolerante: clave que empieza por el prefijo, contiene
+    # el número como token entre espacios, y termina/contiene " DE YYYY".
+    # Resuelve casos con sufijo en la clave (p.ej. "ACUERDO 002 DE 2001 CSSFFMM").
+    if prefijo_up:
+        for k in normas.keys():
+            if not k.startswith(f"{prefijo_up} "):
+                continue
+            if f" DE {anio}" not in k:
+                continue
+            # Extraer el número entre el prefijo y "DE"
+            resto = k[len(prefijo_up) + 1 :]
+            cand_num = resto.split(" DE ")[0].strip().lstrip("0") or "0"
+            if cand_num == n:
+                return k
+
+    # Fallback final estricto en snake_case
+    token_n = f"_{n}_"
+    token_anio_end = f"_{anio}"
     for k in normas.keys():
-        if n in k and anio in k:
+        if token_n in k and k.endswith(token_anio_end):
             return k
     return None
 
@@ -151,11 +248,13 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
 
     texto = _quitar_html(dictamen_html)
 
-    # 1. Verificar Resoluciones / Decretos / Leyes
+    # 1. Verificar Resoluciones / Decretos / Leyes / Acuerdos / Circulares
     for pat, tipo_label in (
         (PAT_RESOLUCION, "Resolución"),
         (PAT_DECRETO, "Decreto"),
         (PAT_LEY, "Ley"),
+        (PAT_ACUERDO, "Acuerdo"),
+        (PAT_CIRCULAR, "Circular"),
     ):
         for m in pat.finditer(texto):
             total_citas += 1
@@ -221,8 +320,12 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                     }
                 )
 
-    # 4. Verificar citas literales entre chevrones
+    # 4. Verificar citas literales: entre chevrones «» Y entre comillas
+    # dobles/simples cuando van atribuidas a una norma o cláusula
+    # (ESTABLECE/DISPONE/...). Ambas se contrastan contra el mismo
+    # corpus (normas + cláusulas reales del contrato en BD).
     citas_literales = PAT_CITA_LITERAL.findall(texto)
+    citas_literales += PAT_CITA_ATRIBUIDA.findall(texto)
     if citas_literales:
         # Construir corpus completo de TODOS los textos normativos para búsqueda
         corpus_normas = " ".join(
@@ -257,8 +360,15 @@ def verificar_citas(dictamen_html: str, eps: Optional[str] = None) -> dict:
                             "tipo": "CITA_LITERAL_FALSA",
                             "severidad": "ALTA",
                             "cita": "«" + (cita[:140] + "..." if len(cita) > 140 else cita) + "»",
-                            "detalle": "Este texto entrecomillado no se encuentra literalmente en el corpus normativo cargado. Puede ser una cita inventada por la IA.",
-                            "sugerencia": "Reemplaza el texto entre comillas por una cita literal de una norma real, o quita las comillas si solo querías parafrasear.",
+                            "detalle": (
+                                "Este texto entrecomillado no se encuentra literalmente en el "
+                                "corpus normativo ni en las cláusulas reales del contrato cargadas. "
+                                "Puede ser una cita inventada por la IA."
+                            ),
+                            "sugerencia": (
+                                "Reemplaza el texto entre comillas por una cita literal de una "
+                                "norma o cláusula real, o quita las comillas si solo querías parafrasear."
+                            ),
                         }
                     )
 

@@ -101,7 +101,11 @@ class GeminiService:
         if not self.disponible:
             raise RuntimeError("GEMINI_API_KEY no configurada")
         modelo = modelo or self.default_model
-        url = f"{self.BASE_URL}/models/{modelo}:generateContent?key={self.api_key}"
+        # La key viaja por header (x-goog-api-key), NUNCA en la URL.
+        # Antes iba como query param (?key=...) y el logger INFO de httpx
+        # escribía la URL completa → la API key quedaba en texto plano en
+        # los logs de Fly. Visto en producción el 10-jun-2026; key rotada.
+        url = f"{self.BASE_URL}/models/{modelo}:generateContent"
 
         # Construir parts: PDFs + imagenes + texto del user
         parts: list[dict] = []
@@ -174,7 +178,14 @@ class GeminiService:
             ],
         }
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r = await client.post(url, json=body, headers={"Content-Type": "application/json"})
+            r = await client.post(
+                url,
+                json=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self.api_key,
+                },
+            )
         if r.status_code != 200:
             err = r.text[:300]
             logger.warning(f"[GEMINI] HTTP {r.status_code}: {err}")

@@ -13,50 +13,60 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./glosas.db"
     secret_key: str = _DEFAULT_SECRET
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
+    # 480 min = jornada laboral de 8h. Con 60 min los gestores quedaban en
+    # "sesión zombie" a mitad de turno: el panel seguía visible pero todos
+    # los fetch devolvían 401 (visto en producción 10-jun-2026 — la página
+    # de importar recepción mostraba "No se pudo cargar el historial (401)").
+    # Sigue siendo overrideable con ACCESS_TOKEN_EXPIRE_MINUTES en el env.
+    access_token_expire_minutes: int = 480
     admin_password: str = _UNCONFIGURED_ADMIN_PASSWORD
 
     # Llaves de IA
     groq_api_key: str = ""
     anthropic_api_key: str = ""
-    # Google Gemini API key (tier gratis muy generoso: 15 RPM, 1500 RPD)
+    # Google Gemini API key — SOLO para OCR/lectura de PDFs escaneados
+    # (pdf_service.extraer_con_ocr + cadena multimodal del
+    # pdf_fallback_patch). NO genera dictamenes desde jun-2026.
+    # Mantenerla configurada: sin ella, todo el OCR de PDFs escaneados
+    # cae sobre Anthropic (quema creditos de Claude).
     # Conseguir en: https://aistudio.google.com/apikey
     gemini_api_key: str = ""
-    # OpenRouter — meta-router que da acceso a 100+ modelos con 1 sola
-    # API key. Util para meter DeepSeek V3 (extremadamente barato y de
-    # calidad cercana a Sonnet) o Llama 3.3 70B (gratis) sin agregar
-    # otra integracion. Conseguir en https://openrouter.ai/keys
-    # Pricing referencia: deepseek-chat ~ $0.27/M in, $1.10/M out (30x
-    # mas barato que Sonnet); meta-llama:free es 100% gratis con
-    # rate-limit moderado (50 RPD aprox).
-    openrouter_api_key: str = ""
-    # Modelo OpenRouter default. Lista completa: openrouter.ai/models
-    # Recomendados:
-    #   - "deepseek/deepseek-chat"           (V3, barato, calidad alta)
-    #   - "deepseek/deepseek-r1"             (reasoning, top calidad)
-    #   - "meta-llama/llama-3.3-70b-instruct:free"  (100% gratis)
-    #   - "qwen/qwen-2.5-72b-instruct"       (alternativa solida)
-    openrouter_model: str = "deepseek/deepseek-chat"
-    # Cual se usa primero. Default "anthropic" (mejor calidad, paid).
-    # Tambien soportado: "anthropic" | "openrouter" | "gemini" | "groq".
+    # Proveedor primario de DICTAMENES. Jun-2026 (decision Yesid): la
+    # cadena quedo en SOLO Groq (primario, gratis/rapido) + Anthropic
+    # (calidad / casos complejos). Gemini y OpenRouter fueron retirados
+    # del dictamen — "no las veo trabajando y de pago ya tenemos Claude".
+    # Soportado: "groq" | "anthropic". Valores legacy "gemini"/
+    # "openrouter" se normalizan a "groq" en GlosaService con un warning.
     # Cadena de fallback automatica:
-    #   anthropic  -> anthropic -> openrouter -> gemini -> groq
-    #   openrouter -> openrouter -> anthropic -> gemini -> groq
-    #   gemini     -> gemini -> openrouter -> anthropic -> groq
-    #   groq       -> openrouter -> anthropic -> gemini -> groq (groq ult.)
-    primary_ai: str = "anthropic"
-    groq_model: str = "llama-3.3-70b-versatile"
+    #   groq      -> groq -> anthropic
+    #   anthropic -> anthropic -> groq
+    primary_ai: str = "groq"
+    # Modelos Groq para dictamenes — decision 16-jun-2026 (ronda 8 — dueño
+    # pidió Llama 4 Maverick + banco de respuestas HUS como few-shots):
+    #   1. meta-llama/llama-4-scout-17b-16e-instruct   PRIMARIO —
+    #      Llama 4 (abr-2026), arquitectura 17B activos / 128 expertos MoE.
+    #      Mejor seguidor de instrucciones largas (system + few-shots) que
+    #      gpt-oss-120b; no es razonador con CoT (no agota max_tokens en
+    #      razonamiento), respuesta directa. Soporta hasta 8M tokens
+    #      contexto — perfecto para el banco de respuestas + contratos +
+    #      datos clínicos en el prompt.
+    #   2. openai/gpt-oss-120b      FALLBACK 1 — 120B MoE razonador, el
+    #      primario anterior. Sigue útil para casos donde Llama no llegue.
+    #   3. qwen/qwen3-32b           FALLBACK 2 — razonamiento en español.
+    #   4. llama-3.3-70b-versatile  FALLBACK 3 — último recurso.
+    # La cadena se aplica en GlosaService._llamar_groq_con_retry: si un
+    # modelo falla (429 / error transitorio / deprecado) se prueba el
+    # siguiente modelo Groq SIN saltar todavia a Anthropic. Overrideables
+    # por env: GROQ_MODEL, GROQ_MODEL_FALLBACK_1, GROQ_MODEL_FALLBACK_2,
+    # GROQ_MODEL_FALLBACK_3.
+    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    groq_model_fallback_1: str = "openai/gpt-oss-120b"
+    groq_model_fallback_2: str = "qwen/qwen3-32b"
+    groq_model_fallback_3: str = "llama-3.3-70b-versatile"
     anthropic_model: str = "claude-sonnet-4-6"
-    # Modelo Gemini por defecto (Flash 2.0 GA - gratis 15 RPM / 1500 RPD).
-    # ATENCION: gemini-2.0-flash-exp fue deprecado cuando 2.0-flash paso a GA.
-    # Modelos validos en v1beta (mayo 2026):
-    #   - "gemini-2.0-flash"        (default, GA, balanceado)
-    #   - "gemini-2.0-flash-lite"   (mas barato, mismo tier)
-    #   - "gemini-2.5-flash"        (newer, mejor calidad)
-    #   - "gemini-2.5-flash-lite"   (recomendado: sin thinking, rapido)
-    #   - "gemini-2.5-pro"          (top calidad, 5 RPM/25 RPD free)
-    #   - "gemini-1.5-flash"        (legacy estable)
-    #   - "gemini-1.5-pro"          (legacy mejor calidad)
+    # Modelo Gemini por defecto para OCR (Flash 2.0 GA - gratis 15 RPM /
+    # 1500 RPD). ATENCION: gemini-2.0-flash-exp fue deprecado cuando
+    # 2.0-flash paso a GA.
     gemini_model: str = "gemini-2.0-flash"
 
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"
@@ -66,7 +76,7 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     alertas_email: str = ""
     app_name: str = "Motor Glosas HUS"
-    app_version: str = "5.4.0"
+    app_version: str = "5.5.0"
     banner_capacitacion: str = ""
 
     model_config = {

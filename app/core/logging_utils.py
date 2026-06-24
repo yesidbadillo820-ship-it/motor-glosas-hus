@@ -1,9 +1,38 @@
 import logging
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from contextvars import ContextVar
+
+# Redacción de secretos en mensajes de log (defensa en profundidad).
+# El logger INFO de httpx escribe URLs completas; si una API key viaja
+# como query param (p.ej. ?key=AIza... de Gemini) terminaba en texto
+# plano en los logs de Fly — visto en producción el 10-jun-2026.
+# Aunque los call sites ya usan headers, este filtro garantiza que
+# cualquier futuro descuido no exponga credenciales.
+_PAT_SECRETO_EN_TEXTO = re.compile(
+    r"(?i)\b(key|api[_-]?key|apikey|token|password|secret|authorization)"
+    r"(=|:\s*)([^\s&\"']{6,})"
+)
+
+
+def _redactar_secretos(texto: str) -> str:
+    """Reemplaza el valor de parámetros sensibles por un marcador.
+
+    "…?key=AIzaSyAZm7Hiq…" → "…?key=***REDACTADO***"
+    Conserva los primeros 4 chars para poder correlacionar sin exponer.
+    """
+    if not texto:
+        return texto
+
+    def _sub(m: "re.Match[str]") -> str:
+        valor = m.group(3)
+        return f"{m.group(1)}{m.group(2)}{valor[:4]}***REDACTADO***"
+
+    return _PAT_SECRETO_EN_TEXTO.sub(_sub, texto)
+
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
@@ -25,7 +54,7 @@ class StructuredFormatter(logging.Formatter):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": _redactar_secretos(record.getMessage()),
             "request_id": request_id_var.get(),
         }
         # Solo emitir los campos opcionales si tienen valor (evita ruido)

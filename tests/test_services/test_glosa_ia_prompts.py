@@ -244,3 +244,59 @@ class TestUserPrompt:
         )
         assert "INSTRUCCIÓN" in prompt.upper() or "INSTRUCCIONES" in prompt.upper()
         assert "NORMAS" in prompt.upper()
+
+
+class TestClausulaContratoTruncacion:
+    """Regresión: la cláusula no debe cortarse a mitad de palabra.
+
+    Antes el builder cortaba el texto literal a 500 chars y agregaba '…',
+    dejando p.ej. '...VIGENCIA FISCAL 202…' que la IA copiaba dentro de las
+    comillas del dictamen. Ahora una cláusula típica entra completa y, si
+    excede el límite, se corta en frontera de palabra.
+    """
+
+    def _clausula(self, texto):
+        return [
+            {
+                "numero_clausula": "PRIMERA",
+                "titulo": "OBJETO",
+                "texto_literal": texto,
+                "pagina": 1,
+            }
+        ]
+
+    def test_clausula_normal_no_se_trunca(self):
+        """Una cláusula realista (<2000 chars) entra completa, sin '…'."""
+        texto = (
+            "LA PRESTACIÓN DE LOS SERVICIOS DE SALUD DE MEDIANA Y ALTA "
+            "COMPLEJIDAD, GARANTIZANDO LA COBERTURA INTEGRAL DE LAS ATENCIONES "
+            "INCLUIDAS EN EL PLAN DE COMPLEJIDAD, A PARTIR DEL MES DE DICIEMBRE "
+            "DE LA VIGENCIA FISCAL 2025"
+        )
+        prompt = build_user_prompt(
+            texto_glosa="GLOSA CO",
+            contexto_pdf="",
+            codigo="CO0001",
+            eps="DISPENSARIO MEDICO",
+            clausulas_contrato=self._clausula(texto),
+        )
+        assert "VIGENCIA FISCAL 2025" in prompt
+        assert "202…" not in prompt
+        assert "2025…" not in prompt
+
+    def test_clausula_muy_larga_corta_en_frontera_de_palabra(self):
+        """Si excede el límite, no parte una palabra a la mitad."""
+        # 300 palabras "palabra" (~2400 chars) + un marcador final.
+        texto = (" ".join(["palabra"] * 300)) + " FINDELACLAUSULA2025"
+        prompt = build_user_prompt(
+            texto_glosa="GLOSA",
+            contexto_pdf="",
+            codigo="CO0001",
+            eps="EPS TEST",
+            clausulas_contrato=self._clausula(texto),
+        )
+        # Se truncó con marcador de omisión claro, no con '…' pegado.
+        assert "[…]" in prompt
+        # El corte cae en frontera de palabra: no debe aparecer una "palabra"
+        # partida (p.ej. "palab […]") justo antes del marcador.
+        assert "palabra […]" in prompt or "palabra[…]" not in prompt

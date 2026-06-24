@@ -27,6 +27,7 @@ from sqlalchemy import func, desc
 
 from app.database import get_db
 from app.api.deps import get_admin
+from app.core.config import get_settings
 from app.models.db import (
     UsuarioRecord,
     GlosaRecord,
@@ -256,20 +257,46 @@ def diagnostico_completo(
             "data": {},
         }
     else:
+        # Cadena de modelos Groq desde Settings (12-jun-2026): primario +
+        # 2 fallbacks internos antes de saltar a Anthropic. Espejo de
+        # GlosaService._modelos_groq (dedupe por si un override por env
+        # repite un modelo). Mismo patrón que la sección Anthropic, que ya
+        # muestra su modelo activo.
+        cfg = get_settings()
+        cadena_groq: list[str] = []
+        for _m in (cfg.groq_model, cfg.groq_model_fallback_1, cfg.groq_model_fallback_2):
+            if _m and _m not in cadena_groq:
+                cadena_groq.append(_m)
+        partes_cadena = [f"Primario: {cadena_groq[0]}"] + [
+            f"Fallback {i}: {m}" for i, m in enumerate(cadena_groq[1:], start=1)
+        ]
         out["secciones"]["groq"] = {
             "estado": "ok",
-            "mensaje": f"API key configurada (fallback de Anthropic, prefijo {groq_key[:10]}…)",
+            "mensaje": (
+                f"API key configurada (fallback de Anthropic, prefijo {groq_key[:10]}…) · "
+                + " · ".join(partes_cadena)
+            ),
             "data": {
-                "modelo": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                "modelo": cfg.groq_model,
+                "modelo_fallback_1": cfg.groq_model_fallback_1,
+                "modelo_fallback_2": cfg.groq_model_fallback_2,
+                "cadena_modelos": cadena_groq,
             },
         }
 
-    # ─── Gemini API key + ping (tercer proveedor, free tier) ────────
+    # ─── Gemini API key + ping (SOLO OCR de PDFs escaneados) ────────
+    # Jun-2026: Gemini ya no genera dictámenes — quedó como fallback de
+    # lectura de PDFs (pdf_service + pdf_fallback_patch). Sin esta key,
+    # todo el OCR de escaneados cae sobre Anthropic (quema créditos).
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     if not gemini_key:
         out["secciones"]["gemini"] = {
             "estado": "warning",
-            "mensaje": "GEMINI_API_KEY no configurada — agrega clave en aistudio.google.com/apikey (15 RPM gratis)",
+            "mensaje": (
+                "GEMINI_API_KEY no configurada — sin ella el OCR de PDFs "
+                "escaneados depende 100% de Anthropic (gasta créditos de "
+                "Claude). Agrega clave en aistudio.google.com/apikey (gratis)."
+            ),
             "data": {},
         }
     else:
@@ -279,13 +306,16 @@ def diagnostico_completo(
             try:
                 import httpx as _httpx_g
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent?key={gemini_key}"
+                # Key por header x-goog-api-key, NUNCA en la URL: el logger
+                # INFO de httpx escribe la URL completa y la key quedaba en
+                # texto plano en los logs de Fly (visto en prod 10-jun-2026).
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_modelo}:generateContent"
                 payload = {
                     "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
                     "generationConfig": {"maxOutputTokens": 4, "temperature": 0},
                 }
                 with _httpx_g.Client(timeout=10.0) as client:
-                    rg = client.post(url, json=payload)
+                    rg = client.post(url, json=payload, headers={"x-goog-api-key": gemini_key})
                 if rg.status_code == 200:
                     return (
                         "ok",
@@ -312,74 +342,8 @@ def diagnostico_completo(
             "data": {
                 "modelo": gemini_modelo,
                 "key_prefix": gemini_key[:10],
+                "rol": "solo OCR de PDFs escaneados (no genera dictámenes)",
                 "free_tier_info": "15 RPM / 1500 RPD para Flash · 2 RPM / 50 RPD para Pro",
-            },
-        }
-
-    # ─── OpenRouter API key + ping (cuarto proveedor — DeepSeek/Llama) ─
-    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
-    if not openrouter_key:
-        out["secciones"]["openrouter"] = {
-            "estado": "warning",
-            "mensaje": (
-                "OPENROUTER_API_KEY no configurada — recomendado para tener "
-                "DeepSeek V3 como fallback barato (30× mas que Sonnet). "
-                "Conseguir en openrouter.ai/keys (~$5 = miles de queries)."
-            ),
-            "data": {},
-        }
-    else:
-        openrouter_modelo = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
-
-        def _do_ping_openrouter():
-            try:
-                import httpx as _httpx_or
-
-                with _httpx_or.Client(timeout=10.0) as client:
-                    r_or = client.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {openrouter_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://motor-glosas-hus.fly.dev",
-                            "X-Title": "Motor Glosas HUS",
-                        },
-                        json={
-                            "model": openrouter_modelo,
-                            "messages": [{"role": "user", "content": "ping"}],
-                            "max_tokens": 3,
-                            "temperature": 0,
-                        },
-                    )
-                if r_or.status_code == 200:
-                    return (
-                        "ok",
-                        f"API key OK · ping {openrouter_modelo} exitoso · {openrouter_key[:10]}…",
-                        {},
-                    )
-                if r_or.status_code in (401, 403):
-                    return "error", f"API key INVALIDA o sin permisos (HTTP {r_or.status_code})", {}
-                if r_or.status_code == 429:
-                    return (
-                        "warning",
-                        "Rate limit hit — esperar 60s o agregar credito en openrouter.ai/credits",
-                        {},
-                    )
-                if r_or.status_code == 402:
-                    return "error", "Sin credito — agregar fondos en openrouter.ai/credits", {}
-                return "warning", f"Ping HTTP {r_or.status_code}: {r_or.text[:120]}", {}
-            except Exception as _eor:
-                return "warning", f"No se pudo hacer ping: {str(_eor)[:120]}", {}
-
-        cache_key = f"openrouter::{openrouter_modelo}::{openrouter_key[:6]}"
-        ping_estado, ping_msg, _ = _ping_cached(cache_key, _do_ping_openrouter)
-        out["secciones"]["openrouter"] = {
-            "estado": ping_estado,
-            "mensaje": ping_msg,
-            "data": {
-                "modelo": openrouter_modelo,
-                "key_prefix": openrouter_key[:10],
-                "rol": "Fallback #1 (DeepSeek V3, ~30× mas barato que Sonnet)",
             },
         }
 

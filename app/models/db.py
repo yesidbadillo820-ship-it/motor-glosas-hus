@@ -84,6 +84,13 @@ class GlosaRecord(Base):
     # si > 20 días hábiles, la EPS glosó fuera de término (Art. 57 Ley 1438/2011).
     dias_radicacion_dgh = Column(Integer, default=0)
 
+    # Evidencia de radicación ante la entidad (POST /glosas/{id}/marcar-radicada).
+    # `numero_radicado` (arriba) guarda el número que asigna la EPS; estos
+    # campos registran CUÁNDO y QUIÉN dejó constancia, para auditoría.
+    radicado_en = Column(DateTime(timezone=True), nullable=True)
+    radicado_por = Column(String(200), nullable=True)
+    radicado_observacion = Column(Text, nullable=True)
+
     # Nota crédito asociada cuando la glosa se acepta (parcial o total).
     # El gestor la captura desde "Mis glosas respondidas".
     numero_nota_credito = Column(String(60), nullable=True, index=True)
@@ -95,6 +102,14 @@ class GlosaRecord(Base):
         Index("ix_historial_alertas", "dias_restantes", "estado"),
         Index("ix_historial_auditor", "auditor_email"),
         Index("ix_historial_decision", "decision_eps"),
+        # Auditoría jun-2026 P2 #10 — caminos calientes sin índice:
+        # /historial ordena por creado_en, "responder por factura" filtra
+        # por factura y el tablero de workflow por workflow_state. Para
+        # tablas pre-existentes los crea el lifespan (CREATE INDEX IF NOT
+        # EXISTS sobre _INDICES_HISTORIAL en app/main.py).
+        Index("ix_historial_creado_en", "creado_en"),
+        Index("ix_historial_factura", "factura"),
+        Index("ix_historial_workflow_state", "workflow_state"),
     )
 
 
@@ -284,6 +299,28 @@ class ContratoRecord(Base):
     # Se sobreescribe cuando se sube uno nuevo — solo guardamos el vigente.
     pdf_path = Column(String(500), nullable=True)
     pdf_subido_en = Column(DateTime(timezone=True), nullable=True)
+
+    # Metadatos enriquecidos para argumentación contractual de alto nivel
+    # (auditoría 10-jun-2026: la "otra IA" cita NIT, número de proceso SECOP,
+    # fecha exacta, plazo y anexos específicos — el sistema HUS no los tenía
+    # disponibles para el prompt y producía dictámenes genéricos).
+    # Se llenan al parsear el PDF del contrato o al cargarlo desde el panel
+    # admin. Todos opcionales — el inyector degrada elegantemente si faltan.
+    numero_contrato = Column(String(120), nullable=True)
+    nit_eps = Column(String(40), nullable=True)
+    nit_ips = Column(String(40), nullable=True)
+    razon_social_eps = Column(String(300), nullable=True)
+    razon_social_ips = Column(String(300), nullable=True)
+    numero_proceso_secop = Column(String(120), nullable=True)
+    secop_url = Column(String(500), nullable=True)
+    fecha_suscripcion = Column(DateTime(timezone=True), nullable=True)
+    fecha_inicio = Column(DateTime(timezone=True), nullable=True)
+    fecha_fin = Column(DateTime(timezone=True), nullable=True)
+    objeto_contractual = Column(Text, nullable=True)
+    anexos_descripcion = Column(Text, nullable=True)  # JSON: lista de anexos
+    modalidades_tarifarias = Column(
+        Text, nullable=True
+    )  # JSON: ["TARIFA PROPIA ESE", "SOAT UVB", ...]
 
 
 class ClausulaContrato(Base):
@@ -827,3 +864,94 @@ class RutaFacturaRecord(Base):
     # Metadatos extra opcionales (eps, mes, ambiente) deserializados de
     # las columnas de la fuente original. JSON blob.
     meta = Column(Text, nullable=True)
+
+
+class QualityGateRunRecord(Base):
+    """Registro de cada ejecución del Quality Gate.
+
+    Plan de Transformación Ola 1 — observabilidad del pipeline determinístico.
+    Cada vez que el orchestrator procesa un dictamen, se guarda una fila aquí
+    para que el coordinador pueda ver métricas reales:
+      - tasa de aprobación
+      - cuántas regeneraciones se necesitan en promedio
+      - qué modelo aprueba más
+      - razones de rechazo más comunes
+    """
+
+    __tablename__ = "quality_gate_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # NOTA: GlosaRecord usa __tablename__ "historial" — no agregamos FK para
+    # evitar problemas de orden de creación en tests. Soft-link por id.
+    glosa_id = Column(Integer, nullable=True, index=True)
+    estado = Column(String(30), nullable=False, index=True)
+    # APROBADO | RECHAZADO_PRE | ESCALAR_HUMANO | PENDIENTE
+    score_final = Column(Integer, default=0)
+    modelo_final = Column(String(40), nullable=True)
+    n_intentos = Column(Integer, default=1)
+    n_regeneraciones = Column(Integer, default=0)
+    razones_rechazo = Column(Text, nullable=True)  # JSON blob
+    pre_aprobado = Column(Integer, default=1)
+    tiempo_ms = Column(Integer, nullable=True)
+    eps = Column(String(120), nullable=True)
+    codigo_glosa = Column(String(20), nullable=True, index=True)
+    familia_codigo = Column(String(5), nullable=True)
+    es_ratificacion = Column(Integer, default=0)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    creado_por = Column(String(200), nullable=True)
+
+
+class EntidadCredencialRecord(Base):
+    """Vault de credenciales de plataformas EPS/entidades (jun-2026).
+
+    Importado del Excel maestro "RADICAR FACTURAS ENTIDADES" (hoja
+    CONSOLIDADO). Cada entidad genera hasta 3 registros: uno por bloque
+    (RADICACION | CARTERA | DEVOLUCIONES). Los campos sensibles
+    (usuario, contraseña, teléfono, correo) se guardan SOLO cifrados
+    con Fernet (app/services/credenciales_vault.py, clave en env
+    CRED_VAULT_KEY) — nunca en claro. El link de la plataforma y los
+    datos de contacto institucionales son públicos dentro del equipo
+    y van en claro para que /credenciales/buscar funcione sin clave.
+    """
+
+    __tablename__ = "entidad_credenciales"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nit = Column(String(30), index=True, nullable=False)
+    empresa = Column(String(300), index=True, nullable=False)
+    bloque = Column(String(20), nullable=False)  # RADICACION | CARTERA | DEVOLUCIONES
+    link_plataforma = Column(Text, nullable=True)  # no secreto
+    usuario_cifrado = Column(Text, nullable=True)  # token Fernet
+    password_cifrado = Column(Text, nullable=True)  # token Fernet
+    telefono_cifrado = Column(Text, nullable=True)  # token Fernet
+    correo_cifrado = Column(Text, nullable=True)  # token Fernet
+    nombre_contacto = Column(String(300), nullable=True)
+    cargo = Column(String(200), nullable=True)
+    manual_radicacion = Column(Text, nullable=True)  # instrucciones, no secreto
+    medio_contacto = Column(String(300), nullable=True)
+    actualizado_en = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    actualizado_por = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        # Clave de upsert del importador: una credencial por entidad y bloque.
+        Index("ix_entidad_cred_nit_bloque", "nit", "bloque", unique=True),
+    )
+
+
+class CredencialAccesoLog(Base):
+    """Auditoría de acceso al vault de credenciales.
+
+    Cada IMPORTAR (carga del Excel) y cada REVELAR (descifrado de
+    usuario/contraseña, con motivo obligatorio) deja fila aquí.
+    LISTAR queda reservado para consumidores automáticos futuros
+    (worker de radicación) — /buscar no lo registra para no inundar.
+    """
+
+    __tablename__ = "credencial_acceso_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    credencial_id = Column(Integer, index=True, nullable=True)  # NULL en IMPORTAR
+    usuario_email = Column(String(200), index=True, nullable=False)
+    accion = Column(String(20), nullable=False)  # REVELAR | IMPORTAR | LISTAR
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    motivo = Column(Text, nullable=True)

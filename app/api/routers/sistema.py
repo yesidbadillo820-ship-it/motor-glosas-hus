@@ -833,11 +833,13 @@ def ia_presence_publica():
         }
 
     return {
-        "primary_ai": os.getenv("PRIMARY_AI", "gemini"),
+        "primary_ai": os.getenv("PRIMARY_AI", "groq"),
         "anthropic": _info("ANTHROPIC_API_KEY"),
-        "gemini": _info("GEMINI_API_KEY"),
+        "gemini": {**_info("GEMINI_API_KEY"), "rol": "solo OCR de PDFs escaneados"},
         "groq": _info("GROQ_API_KEY"),
         "nota": (
+            "Dictamenes: groq (primario) + anthropic (calidad/fallback). "
+            "Gemini quedo SOLO como OCR de PDFs escaneados (jun-2026). "
             "Si un proveedor muestra estado=AUSENTE, la API key NO llego al "
             "proceso (revisa 'fly secrets list'). Si muestra estado=OK pero "
             "los dictamenes siguen cayendo a Llama, mandame logs de un POST "
@@ -1620,7 +1622,7 @@ def info_about(
             "framework": "FastAPI + Pydantic v2",
             "orm": "SQLAlchemy",
             "db": "PostgreSQL",
-            "llm": "Claude Sonnet 4.6 (Anthropic) + Groq Llama 3.3",
+            "llm": "Claude Sonnet 4.6 (Anthropic) + Groq (gpt-oss-120b → qwen3-32b → llama-3.3)",
             "auth": "JWT + 2FA TOTP",
             "hosting": "Render",
         },
@@ -1885,7 +1887,7 @@ def info_inventario_funcionalidades(
             "framework": "FastAPI + Pydantic v2",
             "orm": "SQLAlchemy",
             "db_prod": "PostgreSQL",
-            "llm": "Claude Sonnet 4.6 + Groq Llama 3.3",
+            "llm": "Claude Sonnet 4.6 + Groq (gpt-oss-120b → qwen3-32b → llama-3.3)",
             "auth": "JWT + 2FA TOTP",
             "hosting": "Render",
         },
@@ -2879,7 +2881,7 @@ def info_feature_flags(
         {
             "nombre": "ia_groq",
             "activo": bool(cfg.groq_api_key),
-            "descripcion": "Groq Llama como LLM fallback",
+            "descripcion": "Groq (cadena gpt-oss-120b → qwen3-32b → llama-3.3) como LLM fallback",
         },
         {
             "nombre": "firma_digital_rsa",
@@ -2999,6 +3001,8 @@ def info_configuracion(
         "ia": {
             "primary_ai": cfg.primary_ai,
             "groq_model": cfg.groq_model,
+            "groq_model_fallback_1": cfg.groq_model_fallback_1,
+            "groq_model_fallback_2": cfg.groq_model_fallback_2,
             "anthropic_model": cfg.anthropic_model,
             "anthropic_configurado": bool(cfg.anthropic_api_key),
             "groq_configurado": bool(cfg.groq_api_key),
