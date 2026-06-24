@@ -51,3 +51,6 @@ htmlcov/
 
 # Pre-commit cache
 .pre-commit-cache/
+
+# Reporte por defecto del radicador de facturación (artefacto generado)
+radicacion_reporte.csv
