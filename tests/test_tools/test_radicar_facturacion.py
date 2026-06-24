@@ -195,6 +195,26 @@ class TestResolverEntidad:
     def test_none(self, cfg):
         assert rad.resolver_entidad(None, cfg) is None
 
+    def test_nueva_eps_por_razon_social(self, cfg):
+        # La FEV trae la razón social, no la sigla "NUEVA EPS".
+        ent = rad.resolver_entidad("NUEVA EMPRESA PROMOTORA DE SALUD S.A.", cfg)
+        assert ent is not None and ent.id == "NUEVA_EPS"
+
+    def test_adres_por_razon_social_larga(self, cfg):
+        ent = rad.resolver_entidad(
+            "ADMINISTRADORA DE LOS RECURSOS DEL SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD", cfg
+        )
+        assert ent is not None and ent.id == "ADRES"
+
+    def test_fomag_y_previsora_seguros_no_se_cruzan(self, cfg):
+        # Fiduciaria La Previsora (FOMAG) ≠ La Previsora Cía. de Seguros (SOAT).
+        fomag = rad.resolver_entidad(
+            "FIDEICOMISOS PATRIMONIOS AUTONOMOS FIDUCIARIA LA PREVISORA S.A.", cfg
+        )
+        seguros = rad.resolver_entidad("LA PREVISORA S A COMPAÑIA DE SEGUROS", cfg)
+        assert fomag is not None and fomag.id == "FOMAG"
+        assert seguros is not None and seguros.id == "PREVISORA_SEGUROS"
+
 
 class TestEpsDesdeFev:
     def test_lee_adquiriente_del_invoice(self, tmp_path, cfg):
