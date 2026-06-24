@@ -53,6 +53,9 @@ jobs:
           pip install -r requirements-dev.txt
           # cryptography from PyPI overrides any broken system package
           pip install "cryptography>=42.0.0"
+          # pytest no está en requirements.txt; el runner lo necesita para correr
+          # la suite. pytest-asyncio para los tests async (@pytest.mark.asyncio).
+          pip install pytest pytest-asyncio
 
       - name: Run tests
         run: |
