@@ -72,51 +72,52 @@ py radicar_facturacion.py --origen "D:\LOTE" --manifiesto "D:\facturacion.xlsx"
 
 | `--layout` | Estructura | Cómo agrupa | De dónde sale la entidad |
 |---|---|---|---|
-| `carpeta-factura` *(def.)* | Una **subcarpeta por factura** (`…/HUS469401/`), aunque esté anidada | Todos los archivos de la carpeta = una factura. Si la **misma** factura aparece en árboles paralelos (`RIPS/` y `SOPORTES/`) como dos carpetas con el mismo nombre, **se fusionan** | Manifiesto o un componente de la ruta con nombre de EPS |
-| `lote` | Una carpeta con archivos de **muchas** facturas (el share) | Por el token `_<factura>_` del nombre, **sin importar la subcarpeta**; los compartidos (FURIPS) se reparten a todas las facturas de su carpeta | Manifiesto o un componente de la ruta con nombre de EPS |
+| `auto` *(def.)* | Carpetas con nombre de factura (`…/HUS520760/`), aunque estén anidadas y tengan subcarpetas | Ancla en la carpeta `HUS<factura>` y le asigna **todo lo que cuelga debajo** (subcarpeta `RIPS/`, documentos DIAN); lo demás, por token. Fusiona por número de factura | Manifiesto, carpeta EPS de la ruta, **o el adquiriente del propio FEV** |
+| `carpeta-factura` | Una **subcarpeta por factura** | Todos los archivos de la carpeta = una factura; fusiona árboles paralelos con el mismo nombre | Manifiesto o carpeta EPS de la ruta |
+| `lote` | Una carpeta con **muchas** facturas | Por el token `_<factura>_` del nombre, sin importar la subcarpeta | Manifiesto o carpeta EPS de la ruta |
 
-> **El RIPS desnudo**: en el share real el RIPS suele venir nombrado **solo con
-> el número de factura** —`HUS469401.json`, sin el token `RIP_`/`Rips_`—. El
-> radicador lo reconoce igual (un `.json` cuyo nombre es una factura y que no es
-> el `CUV_…`). Por eso ya **no** salen como `SIN_RIPS`.
+> **Reconoce los nombres reales**: el RIPS desnudo (`HUS520760.json`), el del
+> validador (`Rips_…`, CUV `ResultadosDoker_…`, envío `EnvioDoker_…`) y los
+> documentos DIAN de la factura electrónica (`fv…`=FEV, `ad…`=AttachedDocument,
+> `ar…`=acuse, `<factura>.zip`). Por eso ya **no** salen `SIN_RIPS`/`SIN_FEV`.
 
-### El share real de SINAC
+### Los dos shares reales del HUS
 
-La estructura típica del escaneo (febrero 2026) es:
+**1) ESCANEO** (RIPS + CUV, organizado por EPS):
 
 ```
-…\2. SINAC SC SAS - 2026\02. FEBRERO\1. DD FACTURACION\ESCANEO\
+…\02. FEBRERO\1. DD FACTURACION\ESCANEO\
   COOSALUD\                         ← EPS (de aquí sale la entidad)
-    RIPS\
-      ENV-222467-OK\                ← envío/lote
-        HUS469401\
-          HUS469401.json            ← RIPS (¡nombrado solo con la factura!)
-          CUV_HUS469401.json        ← resultado de validación MSPS
-        HUS470871\
-          ...
-    SOPORTES\                       ← árbol hermano: FEV + PDFs (si aplica)
-      ENV-222467-OK\
-        HUS469401\
-          FEV_900006037_HUS469401.xml
-          HEV_900006037_HUS469401.pdf
+    RIPS\ENV-222467-OK\HUS469401\
+      HUS469401.json                ← RIPS (solo el número de factura)
+      CUV_HUS469401.json
 ```
-
-Recomendado para este share:
 
 ```bat
-REM Auditar todo el mes (no toca nada). Apuntá --origen a la carpeta ESCANEO.
-py radicar_facturacion.py ^
-    --origen "X:\SERVIDOR RADICACION\2. SINAC SC SAS - 2026\02. FEBRERO\1. DD FACTURACION\ESCANEO" ^
-    --layout lote ^
-    --reporte "X:\salida\radicacion_febrero.csv" ^
-    --xlsx    "X:\salida\radicacion_febrero.xlsx"
+py radicar_facturacion.py --origen "X:\...\02. FEBRERO\1. DD FACTURACION\ESCANEO" --reporte "X:\salida\radicacion_feb.csv" --xlsx "X:\salida\radicacion_feb.xlsx"
 ```
 
-- `--layout lote` es el más robusto: agrupa por factura aunque el FEV/PDF estén
-  en un árbol distinto (`SOPORTES/`) del RIPS (`RIPS/`).
-- El layout por defecto (`carpeta-factura`) también sirve y **fusiona**
-  automáticamente las dos carpetas `HUS469401\` (la de `RIPS/` y la de
-  `SOPORTES/`) en una sola factura.
+**2) factura electrónica** (FEV DIAN, organizado por factura):
+
+```
+\\172.16.32.83\factura_electronica_net22\202606\FACTURAS_SALUD\HUS520760\
+  RIPS\                             ← subcarpeta
+    Rips_HUS520760.json             ← RIPS
+    ResultadosDoker_HUS520760_…json ← CUV (resultado de validación)
+    EnvioDoker_HUS520760_…json      ← envío al validador (auxiliar)
+  ad09…xml / fv09…xml / fv09…pdf    ← factura electrónica DIAN
+  HUS520760.zip
+```
+
+```bat
+py radicar_facturacion.py --origen "\\172.16.32.83\factura_electronica_net22\202606\FACTURAS_SALUD" --reporte "%USERPROFILE%\Desktop\radicacion_fe.csv" --xlsx "%USERPROFILE%\Desktop\radicacion_fe.xlsx"
+```
+
+- No hace falta `--layout`: `auto` (por defecto) cubre los dos shares.
+- En el share de FE la EPS **no está en la ruta**: el radicador la lee del
+  adquiriente (`AccountingCustomerParty`) de la propia factura electrónica. Si
+  alguna EPS no resuelve, pasá `--manifiesto` (Excel/CSV con `FACTURA` y `EPS`)
+  para forzar el mapeo.
 
 ---
 
@@ -145,7 +146,7 @@ hay alguna con problemas (útil para encadenar en scripts/CI).
 | `--destino` | Dónde armar los paquetes *(requerido con `--armar`)*. |
 | `--perfiles` | JSON de perfiles (def.: `data/perfiles_radicacion.json`). |
 | `--manifiesto` | CSV/XLSX que mapea `factura → entidad`. |
-| `--layout` | `carpeta-factura` (def.) o `lote`. |
+| `--layout` | `auto` (def.), `carpeta-factura` o `lote`. |
 | `--entidad` | Filtra solo una entidad (substring). |
 | `--reporte` | CSV de salida (def.: `radicacion_reporte.csv`). |
 | `--xlsx` | Reporte XLSX con formato y hoja de resumen. |

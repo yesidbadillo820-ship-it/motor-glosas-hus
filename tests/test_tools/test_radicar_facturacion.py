@@ -23,6 +23,20 @@ import radicar_facturacion as rad  # noqa: E402
 
 FEV_XML = '<?xml version="1.0"?><Invoice xmlns:cbc="x"><cbc:ID>{fac}</cbc:ID></Invoice>'
 
+# FEV DIAN con vendedor (HUS) y adquiriente (EPS) — para probar que la entidad
+# se lee del AccountingCustomerParty cuando la ruta no la trae.
+FEV_DIAN = (
+    '<?xml version="1.0"?><Invoice xmlns:cbc="x" xmlns:cac="y">'
+    "<cbc:ID>{fac}</cbc:ID>"
+    "<cac:AccountingSupplierParty><cac:Party><cac:PartyTaxScheme>"
+    "<cbc:RegistrationName>ESE HOSPITAL UNIVERSITARIO DE SANTANDER</cbc:RegistrationName>"
+    "</cac:PartyTaxScheme></cac:Party></cac:AccountingSupplierParty>"
+    "<cac:AccountingCustomerParty><cac:Party>"
+    "<cac:PartyName><cbc:Name>{eps}</cbc:Name></cac:PartyName>"
+    "<cac:PartyTaxScheme><cbc:RegistrationName>{eps}</cbc:RegistrationName></cac:PartyTaxScheme>"
+    "</cac:Party></cac:AccountingCustomerParty></Invoice>"
+)
+
 
 def _rips(fac: str, servicios: dict | None = None, nit: str = "900006037") -> str:
     return json.dumps(
@@ -180,6 +194,34 @@ class TestResolverEntidad:
 
     def test_none(self, cfg):
         assert rad.resolver_entidad(None, cfg) is None
+
+
+class TestEpsDesdeFev:
+    def test_lee_adquiriente_del_invoice(self, tmp_path, cfg):
+        xml = tmp_path / "fv1.xml"
+        xml.write_text(FEV_DIAN.format(fac="520760", eps="NUEVA EPS S.A."), encoding="utf-8")
+        eps = rad.peek_eps_fev(xml)
+        assert "NUEVA EPS" in eps.upper()
+        assert rad.resolver_entidad(eps, cfg) is not None
+
+    def test_no_confunde_con_el_vendedor_hus(self, tmp_path):
+        # Debe leer el adquiriente (EPS), NO el vendedor (HUS).
+        xml = tmp_path / "fv2.xml"
+        xml.write_text(FEV_DIAN.format(fac="1", eps="COOSALUD EPS SA"), encoding="utf-8")
+        assert "HOSPITAL" not in rad.peek_eps_fev(xml).upper()
+        assert "COOSALUD" in rad.peek_eps_fev(xml).upper()
+
+    def test_lee_adquiriente_embebido_y_escapado(self, tmp_path):
+        # AttachedDocument: el Invoice viene escapado (&lt;…&gt;) adentro.
+        invoice = FEV_DIAN.format(fac="520760", eps="COOSALUD EPS SA")
+        ad = (
+            "<AttachedDocument>"
+            + invoice.replace("<", "&lt;").replace(">", "&gt;")
+            + "</AttachedDocument>"
+        )
+        xml = tmp_path / "ad1.xml"
+        xml.write_text(ad, encoding="utf-8")
+        assert "COOSALUD" in rad.peek_eps_fev(xml).upper()
 
 
 class TestProcesarFactura:
@@ -554,4 +596,22 @@ class TestCLI:
         contenido = reporte.read_text(encoding="utf-8-sig")
         assert "LISTA" in contenido, contenido
         assert "SIN_CUV" not in contenido and "SIN_RIPS" not in contenido
+        assert rc == 0
+
+    def test_main_share_fe_eps_desde_factura(self, tmp_path):
+        # Share de FE SIN manifiesto: la EPS se lee del adquiriente del FEV y la
+        # factura queda LISTA igual.
+        fac_dir = tmp_path / "FACTURAS_SALUD" / "HUS520761"
+        rips_dir = fac_dir / "RIPS"
+        rips_dir.mkdir(parents=True)
+        (rips_dir / "Rips_HUS520761.json").write_text(_rips("HUS520761"), encoding="utf-8")
+        (rips_dir / "ResultadosDoker_HUS520761_01.json").write_text("{}", encoding="utf-8")
+        (fac_dir / "fv09000060370002600526351.xml").write_text(
+            FEV_DIAN.format(fac="520761", eps="NUEVA EPS S.A."), encoding="utf-8"
+        )
+        reporte = tmp_path / "rep.csv"
+        rc = rad.main(["--origen", str(tmp_path), "--reporte", str(reporte)])
+        contenido = reporte.read_text(encoding="utf-8-sig")
+        assert "LISTA" in contenido, contenido
+        assert "NUEVA EPS" in contenido.upper()
         assert rc == 0

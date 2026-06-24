@@ -88,9 +88,11 @@ LOS SHARES REALES
             fv09…xml / fv09…pdf      ← factura de venta (XML + representación)
             HUS<factura>.zip         ← paquete FE comprimido
 
-       Los nombres DIAN (fv…/ad…/ar…) se tipifican solos. Como NO trae la EPS en
-       la ruta, pasá --manifiesto para resolver el pagador. 'auto' recoge el
-       RIPS de la subcarpeta y los documentos DIAN en una sola factura.
+       Los nombres DIAN (fv…/ad…/ar…) se tipifican solos. Como la ruta NO trae
+       la EPS, el radicador la lee del adquiriente (AccountingCustomerParty) de
+       la propia factura electrónica — no necesitás --manifiesto (aunque podés
+       usarlo para forzar/corregir el mapeo). 'auto' recoge el RIPS de la
+       subcarpeta y los documentos DIAN en una sola factura.
 
 DEPENDENCIAS
 ------------
@@ -103,8 +105,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import html
 import json
 import logging
+import os
 import re
 import shutil
 import sys
@@ -463,6 +467,36 @@ def peek_num_factura_fev(ruta: Path) -> str:
     return m.group(1).strip() if m else ""
 
 
+# Adquiriente (EPS) del AccountingCustomerParty del FEV. Permite resolver la
+# entidad cuando la ruta no la trae (share de factura electrónica). Funciona con
+# el Invoice directo y con el Invoice embebido (CDATA o escapado) de un
+# AttachedDocument DIAN.
+_RE_CLIENTE_REG = re.compile(
+    r"AccountingCustomerParty.*?RegistrationName[^>]*>\s*([^<]+?)\s*<",
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_CLIENTE_NOM = re.compile(
+    r"AccountingCustomerParty.*?PartyName.*?:Name[^>]*>\s*([^<]+?)\s*<",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def peek_eps_fev(ruta: Path) -> str:
+    """Nombre del adquiriente (EPS) leído de la factura electrónica."""
+    try:
+        texto = ruta.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+    for _ in range(2):
+        m = _RE_CLIENTE_REG.search(texto) or _RE_CLIENTE_NOM.search(texto)
+        if m:
+            return m.group(1).strip()
+        if "&lt;" not in texto:
+            break
+        texto = html.unescape(texto)  # Invoice embebido y escapado en un AD.
+    return ""
+
+
 def _leer_rips(ruta: Path) -> dict | None:
     if not _ADRES_OK:
         try:
@@ -580,6 +614,19 @@ def procesar_factura(
 
     # ── Resolución de entidad ───────────────────────────────────────────────
     perfil = resolver_entidad(entidad_hint, cfg)
+    if perfil is None:
+        # Sin pista por ruta/manifiesto (típico del share de factura
+        # electrónica): leer el adquiriente (EPS) de la propia FEV. Se prueba
+        # primero el Invoice (fv…) y luego el AttachedDocument (ad…).
+        for cand in (*por_codigo.get("FEV", []), *por_codigo.get("FED", [])):
+            if cand.suffix.lower() != ".xml":
+                continue
+            eps_fev = peek_eps_fev(cand)
+            perfil = resolver_entidad(eps_fev, cfg)
+            if perfil is not None:
+                if not res.entidad_hint:
+                    res.entidad_hint = eps_fev
+                break
     if perfil is not None:
         res.entidad_id = perfil.id
         res.entidad_nombre = perfil.nombre
@@ -829,14 +876,23 @@ def descubrir_auto(
     en árboles distintos queda UNA sola. Es el más robusto: cubre el share de FE
     (FACTURAS_SALUD\\HUS…\\), el de ESCANEO y los lotes sueltos."""
     rx = re.compile(patron, re.IGNORECASE)
-    anclas = {d for d in origen.rglob("*") if d.is_dir() and _RE_FACTURA_DESNUDA.match(d.name)}
+    # Un solo recorrido del árbol con os.walk (no hace stat por entrada → mucho
+    # más rápido en shares de red con miles de facturas que rglob + is_dir).
+    anclas: set[Path] = set()
+    archivos: list[Path] = []
+    for dirpath, _dirnames, filenames in os.walk(origen):
+        d = Path(dirpath)
+        if d != origen and _RE_FACTURA_DESNUDA.match(d.name):
+            anclas.add(d)
+        archivos.extend(d / fn for fn in filenames)
+    archivos.sort()
 
     grupos: dict[str, list[Path]] = defaultdict(list)
     carpeta_de: dict[str, Path] = {}
     fac_raw_de: dict[str, str] = {}
     sueltos: list[Path] = []
 
-    for p in sorted(x for x in origen.rglob("*") if x.is_file()):
+    for p in archivos:
         ancla: Path | None = None
         for parent in p.parents:
             if parent in anclas:
