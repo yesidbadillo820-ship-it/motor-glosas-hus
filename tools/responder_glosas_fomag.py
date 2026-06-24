@@ -295,10 +295,17 @@ def _abrir_facturas_prestador(page: Page) -> None:
     pestañas. Idempotente: si ya están visibles, no hace nada."""
     if page.get_by_text("RATIFICADAS", exact=False).count() > 0:
         return
-    caja = (
-        _primer_visible(page.get_by_text("Facturas prestador", exact=False))
-        or _primer_visible(page.get_by_text("Factures prestador", exact=False))
-    )
+    # Esperar a que el cuadro aparezca (el SPA puede tardar en renderizar).
+    caja = None
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        caja = (
+            _primer_visible(page.get_by_text("Facturas prestador", exact=False))
+            or _primer_visible(page.get_by_text("Factures prestador", exact=False))
+        )
+        if caja is not None:
+            break
+        page.wait_for_timeout(700)
     if caja is None:
         _screenshot_debug(page, "sin_cuadro_naranja")
         raise RuntimeError("No encontré el cuadro 'Facturas prestador'.")
@@ -330,15 +337,80 @@ def _click_tab(page: Page, tab_label: str) -> None:
     raise RuntimeError(f"No encontré la pestaña '{tab_label}'.")
 
 
-def ir_a_pestana(page: Page, tab_label: str) -> None:
-    """Navega Auditoría → cuadro naranja → pestaña pedida y espera la grilla."""
-    logger.info(f"Navegando a Auditoría → Facturas prestador → {tab_label}…")
+def _senal_auditoria(page: Page) -> bool:
+    """True si hay alguna señal de la vista de Auditoría de facturas (cuadro
+    naranja, pestañas, o el título — tolerante a tildes)."""
+    for txt in ("Facturas prestador", "Factures prestador", "RATIFICADAS", "RADICADAS"):
+        try:
+            if page.get_by_text(txt, exact=False).count() > 0:
+                return True
+        except Exception:
+            pass
+    try:
+        if page.locator("text=/AUDITOR[IÍ]A DE FACTURAS/i").count() > 0:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _esperar_auditoria(page: Page, timeout_s: int = 30) -> bool:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if _senal_auditoria(page):
+            return True
+        page.wait_for_timeout(800)
+    return False
+
+
+def _navegar_por_menu(page: Page) -> None:
+    """Fallback: Cuentas médicas → Auditoría por el menú lateral (cuando el
+    goto directo a la URL no rinde la vista)."""
+    try:
+        cm = (_primer_visible(page.locator("text=/Cuentas m[eé]dicas/i"))
+              or _primer_visible(page.get_by_text("Cuentas medicas", exact=False)))
+        if cm is not None:
+            cm.click()
+            page.wait_for_timeout(800)
+        aud = (_primer_visible(page.locator("text=/Auditor[ií]a/i"))
+               or _primer_visible(page.get_by_text("Auditoria", exact=False)))
+        if aud is not None:
+            aud.click()
+            page.wait_for_timeout(1800)
+    except Exception as e:
+        logger.info(f"  no pude navegar por el menú lateral: {e}")
+
+
+def _ir_a_auditoria(page: Page) -> None:
+    """Carga la vista de Auditoría de facturas: prueba el goto directo y, si la
+    vista no aparece, navega por el menú lateral. Lanza si ninguna funciona."""
     try:
         page.goto(PORTAL_AUDITORIA, wait_until="domcontentloaded", timeout=90000)
     except PlaywrightTimeout:
         page.goto(PORTAL_AUDITORIA, wait_until="commit", timeout=90000)
-    page.wait_for_selector("text=/AUDITORIA DE FACTURAS/i", timeout=60000)
-    page.wait_for_timeout(800)
+    if _esperar_auditoria(page, timeout_s=25):
+        return
+    logger.info("  la vista de Auditoría no apareció con la URL directa; pruebo el menú lateral…")
+    _navegar_por_menu(page)
+    if _esperar_auditoria(page, timeout_s=25):
+        return
+    _screenshot_debug(page, "sin_auditoria")
+    cuerpo = ""
+    try:
+        cuerpo = " ".join((page.inner_text("body") or "").split())[:400]
+    except Exception:
+        pass
+    raise RuntimeError(
+        f"No cargó la vista de Auditoría de facturas (URL {page.url}). "
+        f"Texto visible: {cuerpo!r}"
+    )
+
+
+def ir_a_pestana(page: Page, tab_label: str) -> None:
+    """Navega Auditoría → cuadro naranja → pestaña pedida y espera la grilla."""
+    logger.info(f"Navegando a Auditoría → Facturas prestador → {tab_label}…")
+    _ir_a_auditoria(page)
+    page.wait_for_timeout(500)
     _abrir_facturas_prestador(page)
     _click_tab(page, tab_label)
     try:
