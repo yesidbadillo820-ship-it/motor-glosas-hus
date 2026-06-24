@@ -480,11 +480,14 @@ def ir_a_pestana(page: Page, tab_label: str) -> None:
     page.wait_for_timeout(500)
     _abrir_facturas_prestador(page)
     _click_tab(page, tab_label)
+    # No bloqueamos en la grilla sin filtrar (puede venir vacía hasta filtrar);
+    # el filtro por factura ya espera la fila con su propio poll.
     try:
-        page.wait_for_selector("table tbody tr, button:has-text('RESPUESTA')", timeout=60000)
+        page.wait_for_selector("table tbody tr, button:has-text('RESPUESTA'), "
+                               "input", timeout=15000)
     except PlaywrightTimeout:
         logger.info("  (la grilla tardó; sigo con lo visible)")
-    page.wait_for_timeout(800)
+    page.wait_for_timeout(600)
 
 
 # ─── Lectura de la grilla de facturas ───────────────────────────────────────
@@ -622,9 +625,17 @@ def leer_grilla_completa(page: Page, max_paginas: int = 200) -> list[dict]:
     return todas
 
 
-def filtrar_por_factura(page: Page, factura: str) -> bool:
-    """Escribe la factura en 'Número factura' y dispara FILTRAR.
-    Devuelve True si quedó al menos una fila."""
+def _grilla_dice_sin_datos(page: Page) -> bool:
+    try:
+        return page.locator("text=/sin datos|no hay datos|sin registros|no data/i").count() > 0
+    except Exception:
+        return False
+
+
+def filtrar_por_factura(page: Page, factura: str, timeout_s: int = 35) -> bool:
+    """Escribe la factura en 'Número factura', dispara FILTRAR y ESPERA a que la
+    grilla (que es LENTA) traiga la fila. True si aparece al menos una fila;
+    False si la grilla queda estable en 'Sin datos' o vence el plazo."""
     caja = _caja_numero_factura(page)
     if caja is None:
         logger.warning("  No encontré la caja 'Número factura'; sigo sin filtrar.")
@@ -633,6 +644,11 @@ def filtrar_por_factura(page: Page, factura: str) -> bool:
         caja.click()
         caja.fill("")
         caja.type(factura, delay=30)
+        # Eventos para que el form de Angular registre el valor antes de FILTRAR.
+        caja.evaluate(
+            "el => { el.dispatchEvent(new Event('input', {bubbles:true}));"
+            " el.dispatchEvent(new Event('change', {bubbles:true})); }"
+        )
     except Exception:
         pass
     btn = _primer_visible(page.locator("button:has-text('FILTRAR'), button:has-text('Filtrar')"))
@@ -641,8 +657,25 @@ def filtrar_por_factura(page: Page, factura: str) -> bool:
             btn.click()
         except Exception:
             pass
-    page.wait_for_timeout(1800)
-    return len(_leer_pagina(page)) > 0
+    # Poll: la grilla puede tardar varios segundos en responder.
+    inicio = time.time()
+    sin_datos_seguidas = 0
+    aviso = False
+    while time.time() - inicio < timeout_s:
+        if _leer_pagina(page):
+            return True
+        # Tras una gracia inicial, si dice 'Sin datos' de forma estable, no está.
+        if time.time() - inicio > 8 and _grilla_dice_sin_datos(page):
+            sin_datos_seguidas += 1
+            if sin_datos_seguidas >= 3:
+                return False
+        else:
+            sin_datos_seguidas = 0
+        if not aviso and time.time() - inicio > 5:
+            logger.info("  esperando que la grilla traiga la factura (es lenta)…")
+            aviso = True
+        page.wait_for_timeout(900)
+    return bool(_leer_pagina(page))
 
 
 # ─── Formulario de RESPUESTA (RTA2) ─────────────────────────────────────────
