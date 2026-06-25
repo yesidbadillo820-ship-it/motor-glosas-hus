@@ -422,6 +422,28 @@
       "formato_paquete": "ZIP_FACTURA",
       "bot": "",
       "observaciones": "ICBF. REVISAR canal/portal y requisitos específicos."
+    },
+    {
+      "id": "REGIONAL_ASEGURAMIENTO_5",
+      "nombre": "REGIONAL DE ASEGURAMIENTO EN SALUD N° 5",
+      "alias": [
+        "REGIONAL DE ASEGURAMENTO EN SALUD",
+        "REGIONAL DE ASEGURAMIENTO EN SALUD",
+        "REGIONAL DE ASEGURAMENTO EN SALUD N°. 5",
+        "REGIONAL DE ASEGURAMIENTO EN SALUD N°. 5",
+        "REGIONAL DE ASEGURAMENTO EN SALUD N° 5",
+        "REGIONAL DE ASEGURAMIENTO EN SALUD N° 5"
+      ],
+      "nit": "",
+      "regimen": "ASEGURAMIENTO_REGIONAL",
+      "canal": "PORTAL",
+      "portal": "",
+      "nomenclatura": "ADRES",
+      "cuv_obligatorio": true,
+      "soportes_extra": [],
+      "formato_paquete": "ZIP_FACTURA",
+      "bot": "",
+      "observaciones": "Regional de Aseguramiento en Salud N° 5 (aparece con la grafía 'ASEGURAMENTO'). Entidad propia — REVISAR canal/portal/NIT reales de radicación."
     }
   ]
 }

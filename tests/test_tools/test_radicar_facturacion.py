@@ -215,6 +215,11 @@ class TestResolverEntidad:
         assert fomag is not None and fomag.id == "FOMAG"
         assert seguros is not None and seguros.id == "PREVISORA_SEGUROS"
 
+    def test_regional_aseguramiento_5_con_grafia_real(self, cfg):
+        # En la FEV aparece como "ASEGURAMENTO" (sin la i) y con N°. 5.
+        ent = rad.resolver_entidad("REGIONAL DE ASEGURAMENTO EN SALUD N°. 5", cfg)
+        assert ent is not None and ent.id == "REGIONAL_ASEGURAMIENTO_5"
+
 
 class TestEpsDesdeFev:
     def test_lee_adquiriente_del_invoice(self, tmp_path, cfg):
@@ -242,6 +247,35 @@ class TestEpsDesdeFev:
         xml = tmp_path / "ad1.xml"
         xml.write_text(ad, encoding="utf-8")
         assert "COOSALUD" in rad.peek_eps_fev(xml).upper()
+
+    def test_persona_natural_por_indicador_dian(self, tmp_path):
+        # AdditionalAccountID=2 en el adquiriente = persona natural.
+        xml = tmp_path / "p.xml"
+        xml.write_text(
+            '<Invoice xmlns:cbc="x" xmlns:cac="y"><cac:AccountingCustomerParty>'
+            "<cbc:AdditionalAccountID>2</cbc:AdditionalAccountID><cac:Party><cac:PartyName>"
+            "<cbc:Name>JUAN ROSAS PEREZ</cbc:Name></cac:PartyName></cac:Party>"
+            "</cac:AccountingCustomerParty></Invoice>",
+            encoding="utf-8",
+        )
+        nombre, persona = rad.peek_adquiriente_fev(xml)
+        assert persona is True
+        assert "ROSAS" in nombre.upper()
+
+    def test_persona_natural_por_heuristica_sin_indicador(self, tmp_path):
+        # Sin AdditionalAccountID: nombre de persona, sin palabras corporativas.
+        xml = tmp_path / "h.xml"
+        xml.write_text(
+            FEV_DIAN.format(fac="1", eps="CARMEN ZORAIDA RONDON MOGOLLON"), encoding="utf-8"
+        )
+        _nombre, persona = rad.peek_adquiriente_fev(xml)
+        assert persona is True
+
+    def test_persona_juridica_no_es_particular(self, tmp_path):
+        xml = tmp_path / "j.xml"
+        xml.write_text(FEV_DIAN.format(fac="1", eps="COOSALUD EPS SA"), encoding="utf-8")
+        _nombre, persona = rad.peek_adquiriente_fev(xml)
+        assert persona is False
 
 
 class TestProcesarFactura:
@@ -305,6 +339,23 @@ class TestProcesarFactura:
         d = _factura_folder(tmp_path, "HUS600002")
         res = rad.procesar_factura("HUS600002", rad._archivos_de(d), d, None, cfg)
         assert res.estado == "ENTIDAD_NO_RESUELTA"
+
+    def test_particular_persona_natural(self, tmp_path, cfg):
+        # Factura a nombre de un paciente (persona natural) → estado PARTICULAR,
+        # NO ENTIDAD_NO_RESUELTA; sale de la bolsa de pendientes de EPS.
+        d = tmp_path / "HUS560001"
+        d.mkdir()
+        (d / "Rips_HUS560001.json").write_text(_rips("HUS560001"), encoding="utf-8")
+        (d / "fv09000060370000560001.xml").write_text(
+            '<Invoice xmlns:cbc="x" xmlns:cac="y"><cbc:ID>560001</cbc:ID>'
+            "<cac:AccountingCustomerParty><cbc:AdditionalAccountID>2</cbc:AdditionalAccountID>"
+            "<cac:Party><cac:PartyName><cbc:Name>MATEO ANZOLA HERNANDEZ</cbc:Name></cac:PartyName>"
+            "</cac:Party></cac:AccountingCustomerParty></Invoice>",
+            encoding="utf-8",
+        )
+        res = rad.procesar_factura("HUS560001", rad._archivos_de(d), d, None, cfg)
+        assert res.estado == "PARTICULAR", res.detalle
+        assert res.entidad_id == "PARTICULAR"
 
     def test_revisar_por_archivo_sin_tipificar(self, tmp_path, cfg):
         d = _factura_folder(tmp_path, "HUS487523", extra={"basura.pdf": "x"})

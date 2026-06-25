@@ -483,18 +483,88 @@ _RE_CLIENTE_NOM = re.compile(
 
 def peek_eps_fev(ruta: Path) -> str:
     """Nombre del adquiriente (EPS) leído de la factura electrónica."""
+    return peek_adquiriente_fev(ruta)[0]
+
+
+# Tipo de adquiriente DIAN: AdditionalAccountID 1 = persona jurídica, 2 = persona
+# natural. Sirve para marcar PARTICULAR (paciente self-pay) en lugar de
+# ENTIDAD_NO_RESUELTA cuando la factura va a nombre de una persona.
+_RE_ADQ_TIPO = re.compile(
+    r"AccountingCustomerParty.*?AdditionalAccountID[^>]*>\s*([12])",
+    re.IGNORECASE | re.DOTALL,
+)
+# Palabras (token completo) que delatan una persona JURÍDICA, no un particular.
+_PISTAS_JURIDICA = {
+    "EPS",
+    "IPS",
+    "ESE",
+    "SA",
+    "SAS",
+    "LTDA",
+    "SEGUROS",
+    "ASEGURADORA",
+    "FUNDACION",
+    "INSTITUTO",
+    "COMPANIA",
+    "FONDO",
+    "COOPERATIVA",
+    "ASOCIACION",
+    "TEMPORAL",
+    "UT",
+    "PATRIMONIO",
+    "PATRIMONIOS",
+    "FIDUCIARIA",
+    "SECRETARIA",
+    "GOBERNACION",
+    "REGIONAL",
+    "ADMINISTRADORA",
+    "DEPARTAMENTO",
+    "MUNICIPIO",
+    "NACION",
+    "SOCIEDAD",
+    "MINISTERIO",
+    "DIRECCION",
+    "EMPRESA",
+    "SALUD",
+    "ENTIDAD",
+    "POSITIVA",
+    "PREVISORA",
+    "SURAMERICANA",
+    "COLPATRIA",
+    "SANITAS",
+    "COMPENSAR",
+    "MUNDIAL",
+    "EQUIDAD",
+    "PROTEGER",
+    "ICBF",
+}
+
+
+def _es_persona_natural(texto: str, nombre: str) -> bool:
+    """Decide si el adquiriente es persona natural (particular). Primero por el
+    indicador DIAN (AdditionalAccountID=2); si falta, por el nombre."""
+    m = _RE_ADQ_TIPO.search(texto)
+    if m:
+        return m.group(1) == "2"
+    palabras = [p.replace(".", "") for p in _norm(nombre).split()]
+    if not palabras or any(p in _PISTAS_JURIDICA for p in palabras):
+        return False
+    return 2 <= len(palabras) <= 5 and all(p.isalpha() for p in palabras)
+
+
+def peek_adquiriente_fev(ruta: Path) -> tuple[str, bool]:
+    """(nombre del adquiriente, es_persona_natural) de la factura electrónica.
+    Funciona con el Invoice directo y con el embebido (CDATA/escapado) de un AD."""
     try:
         texto = ruta.read_text(encoding="utf-8", errors="ignore")
     except OSError:
-        return ""
-    for _ in range(2):
-        m = _RE_CLIENTE_REG.search(texto) or _RE_CLIENTE_NOM.search(texto)
-        if m:
-            return m.group(1).strip()
-        if "&lt;" not in texto:
-            break
+        return "", False
+    m = _RE_CLIENTE_REG.search(texto) or _RE_CLIENTE_NOM.search(texto)
+    if (not m or "AdditionalAccountID" not in texto) and "&lt;" in texto:
         texto = html.unescape(texto)  # Invoice embebido y escapado en un AD.
-    return ""
+        m = _RE_CLIENTE_REG.search(texto) or _RE_CLIENTE_NOM.search(texto)
+    nombre = m.group(1).strip() if m else ""
+    return nombre, _es_persona_natural(texto, nombre)
 
 
 def _leer_rips(ruta: Path) -> dict | None:
@@ -623,20 +693,24 @@ def procesar_factura(
 
     # ── Resolución de entidad ───────────────────────────────────────────────
     perfil = resolver_entidad(entidad_hint, cfg)
+    es_particular = False
     if perfil is None:
         # Sin pista por ruta/manifiesto (típico del share de factura
-        # electrónica): leer el adquiriente (EPS) de la propia FEV. Se prueba
-        # primero el Invoice (fv…) y luego el AttachedDocument (ad…).
+        # electrónica): leer el adquiriente de la propia FEV. Se prueba primero
+        # el Invoice (fv…) y luego el AttachedDocument (ad…).
         eps_detectada = ""
         for cand in (*por_codigo.get("FEV", []), *por_codigo.get("FED", [])):
             if cand.suffix.lower() != ".xml":
                 continue
-            eps_fev = peek_eps_fev(cand)
-            if eps_fev and not eps_detectada:
-                eps_detectada = eps_fev
-            perfil = resolver_entidad(eps_fev, cfg)
+            nombre_adq, persona = peek_adquiriente_fev(cand)
+            if nombre_adq and not eps_detectada:
+                eps_detectada = nombre_adq
+            if persona:
+                es_particular = True
+            perfil = resolver_entidad(nombre_adq, cfg)
             if perfil is not None:
-                eps_detectada = eps_fev
+                eps_detectada = nombre_adq
+                es_particular = False
                 break
         # Guardar el nombre leído del FEV (aunque NO matchee el catálogo) para
         # diagnóstico: aparece en el detalle de las ENTIDAD_NO_RESUELTA.
@@ -646,6 +720,9 @@ def procesar_factura(
         res.entidad_id = perfil.id
         res.entidad_nombre = perfil.nombre
         res.canal = perfil.canal
+    elif es_particular:
+        res.entidad_id = "PARTICULAR"
+        res.entidad_nombre = "PARTICULAR (paciente)"
 
     # ── Completitud ─────────────────────────────────────────────────────────
     base = set(cfg.soportes_base)
@@ -662,7 +739,7 @@ def procesar_factura(
     res.soportes_esperados_faltantes = sorted(esperados - presentes - base)
 
     res.estado, res.detalle = _evaluar_estado(
-        res, perfil, num_rips, num_fev, rips_path, fev_path, fev_es_invoice
+        res, perfil, num_rips, num_fev, rips_path, fev_path, fev_es_invoice, es_particular
     )
     return res
 
@@ -704,10 +781,16 @@ def _evaluar_estado(
     rips_path: Path | None,
     fev_path: Path | None,
     fev_es_invoice: bool = True,
+    es_particular: bool = False,
 ) -> tuple[str, list[str]]:
     detalle: list[str] = []
 
-    if perfil is None:
+    if perfil is None and es_particular:
+        detalle.append(
+            f"Adquiriente persona natural (particular): '{res.entidad_hint or '—'}'. "
+            "No se radica a una EPS."
+        )
+    elif perfil is None:
         detalle.append(
             f"No se pudo resolver la entidad (pista: '{res.entidad_hint or '—'}'). "
             "Usá --manifiesto o organizá el lote en carpetas por EPS."
@@ -752,7 +835,7 @@ def _evaluar_estado(
 
     # Estado: el primer problema bloqueante manda.
     if perfil is None:
-        return "ENTIDAD_NO_RESUELTA", detalle
+        return ("PARTICULAR" if es_particular else "ENTIDAD_NO_RESUELTA"), detalle
     if rips_path is None:
         return "SIN_RIPS", detalle
     if fev_path is None:
@@ -1198,6 +1281,7 @@ def escribir_reporte_xlsx(resultados: list[ResultadoFactura], ruta: Path) -> Non
         "SIN_FEV": "FFC7CE",
         "SIN_RIPS": "FFC7CE",
         "ENTIDAD_NO_RESUELTA": "F4B084",
+        "PARTICULAR": "D9D9D9",
     }
     wb = Workbook()
     ws = wb.active
