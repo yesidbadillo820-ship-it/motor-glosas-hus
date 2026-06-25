@@ -208,6 +208,17 @@ SOPORTES_POR_SERVICIO_DEFAULT: dict[str, list[str]] = {
     "recienNacidos": ["EPI"],
 }
 
+# Equivalencias de soporte: un documento "paraguas" satisface una exigencia más
+# específica. En el HUS la epicrisis (EPI) y la atención de urgencias (HAU) se
+# escanean DENTRO de la historia clínica / hoja de evolución (HEV) — el
+# indexador de soportes de la app sólo reconoce HEV, no EPI ni HAU—, por eso un
+# HEV presente cubre la exigencia de EPI y HAU. El JSON de perfiles lo puede
+# sobrescribir (clave "equivalencias"); con {} se exige el código exacto.
+EQUIVALENCIAS_SOPORTE_DEFAULT: dict[str, list[str]] = {
+    "EPI": ["EPI", "HEV"],
+    "HAU": ["HAU", "HEV"],
+}
+
 PRESTADOR_NIT_DEFAULT = "900006037"
 PATRON_FACTURA_DEFAULT = r"HUS\d{4,12}"
 
@@ -364,6 +375,9 @@ class ConfigRadicacion:
     soportes_por_servicio: dict[str, list[str]] = field(
         default_factory=lambda: {k: list(v) for k, v in SOPORTES_POR_SERVICIO_DEFAULT.items()}
     )
+    equivalencias_soporte: dict[str, list[str]] = field(
+        default_factory=lambda: {k: list(v) for k, v in EQUIVALENCIAS_SOPORTE_DEFAULT.items()}
+    )
     entidades: list[PerfilEntidad] = field(default_factory=list)
 
 
@@ -393,6 +407,14 @@ def cargar_perfiles(ruta: Path | None) -> ConfigRadicacion:
         soportes_por_servicio={
             k: list(v)
             for k, v in (sop.get("por_servicio") or SOPORTES_POR_SERVICIO_DEFAULT).items()
+        },
+        equivalencias_soporte={
+            k: list(v)
+            for k, v in (
+                sop["equivalencias"]
+                if isinstance(sop.get("equivalencias"), dict)
+                else EQUIVALENCIAS_SOPORTE_DEFAULT
+            ).items()
         },
     )
     for e in data.get("entidades", []):
@@ -599,6 +621,8 @@ class ResultadoFactura:
     soportes_faltantes: list[str] = field(default_factory=list)
     soportes_esperados_faltantes: list[str] = field(default_factory=list)
     archivos_sin_clasificar: list[str] = field(default_factory=list)
+    # Rutas de los soportes clínicos anexados desde el share --soportes (gap-fill).
+    soportes_clinicos: list[str] = field(default_factory=list)
     n_archivos: int = 0
     estado: str = ""
     detalle: list[str] = field(default_factory=list)
@@ -616,9 +640,14 @@ def procesar_factura(
     carpeta: Path,
     entidad_hint: str | None,
     cfg: ConfigRadicacion,
+    soportes_idx: dict[str, list[Path]] | None = None,
 ) -> ResultadoFactura:
     """Diagnóstico de UNA factura: tipifica soportes, lee RIPS/FEV, resuelve
-    entidad y valida completitud. NO toca archivos."""
+    entidad y valida completitud. NO toca archivos.
+
+    `soportes_idx` (opcional) es el índice del share de soportes CLÍNICOS
+    {factura_norm: [rutas]}; si se pasa, los documentos que faltan en la carpeta
+    de la factura (epicrisis, evolución, órdenes…) se rellenan desde ahí."""
     res = ResultadoFactura(carpeta=str(carpeta), entidad_hint=entidad_hint or "")
     res.n_archivos = len(archivos)
 
@@ -724,6 +753,21 @@ def procesar_factura(
         res.entidad_id = "PARTICULAR"
         res.entidad_nombre = "PARTICULAR (paciente)"
 
+    # ── Cruce con el share de soportes clínicos (si --soportes) ─────────────
+    # Rellena SOLO los huecos: anexa los documentos clínicos (epicrisis,
+    # evolución, órdenes, resultados…) cuyo código no venía ya en la carpeta de
+    # la factura. No duplica FEV/RIP/CUV que el share de FE ya trae.
+    if soportes_idx is not None:
+        codigos_fe = set(presentes)
+        for sp in soportes_idx.get(res.factura_norm, []):
+            cod, _desc, reconocido = clasificar_soporte(sp.name)
+            if not reconocido or cod in codigos_fe:
+                continue
+            presentes.add(cod)
+            por_codigo[cod].append(sp)
+            res.soportes_clinicos.append(str(sp))
+        res.soportes_presentes = sorted(presentes)
+
     # ── Completitud ─────────────────────────────────────────────────────────
     base = set(cfg.soportes_base)
     if perfil is not None and not perfil.cuv_obligatorio:
@@ -736,7 +780,14 @@ def procesar_factura(
     for serv, n in res.servicios.items():
         if n:
             esperados |= set(cfg.soportes_por_servicio.get(serv, []))
-    res.soportes_esperados_faltantes = sorted(esperados - presentes - base)
+
+    # Un esperado se da por cumplido si está presente él mismo o cualquiera de
+    # sus equivalentes (p.ej. la epicrisis EPI la cubre la historia clínica HEV).
+    def _satisface(cod: str) -> bool:
+        aceptados = set(cfg.equivalencias_soporte.get(cod, [cod])) or {cod}
+        return bool(aceptados & presentes)
+
+    res.soportes_esperados_faltantes = sorted(e for e in (esperados - base) if not _satisface(e))
 
     res.estado, res.detalle = _evaluar_estado(
         res, perfil, num_rips, num_fev, rips_path, fev_path, fev_es_invoice, es_particular
@@ -1035,6 +1086,42 @@ def descubrir_auto(
     return salida
 
 
+# ─── Índice del share de soportes clínicos ───────────────────────────────────
+
+
+def indexar_soportes_clinicos(raiz: Path, patron: str) -> dict[str, list[Path]]:
+    """Recorre el share de soportes CLÍNICOS (epicrisis, evolución, urgencias,
+    órdenes, resultados de apoyo diagnóstico…) y devuelve {factura_norm: [rutas]}.
+
+    La llave es el número de factura embebido en el nombre del archivo
+    (HEV_900006037_HUS487523.pdf → HUS487523), normalizado igual que el resto del
+    motor (quita 'HUS' y ceros de relleno). Mismo criterio que el indexador de la
+    app (app/services/soportes_autodiscovery_service.py), por eso cruza con las
+    facturas del share de factura electrónica sin configuración extra.
+
+    Sólo se indexan archivos cuyo nombre lleva la factura; los documentos de lote
+    sin factura en el nombre (FURIPS/ACUSE compartidos) no se reparten para no
+    contaminar paquetes ajenos —esos ya viven en el share de FE—."""
+    rx = re.compile(patron, re.IGNORECASE)
+    indice: dict[str, list[Path]] = defaultdict(list)
+    n = 0
+    for dirpath, _dirnames, filenames in os.walk(raiz):
+        d = Path(dirpath)
+        for fn in filenames:
+            m = rx.search(fn)
+            if not m:
+                continue
+            clave = normalizar_factura(m.group(0))
+            if clave == "0":
+                continue
+            indice[clave].append(d / fn)
+            n += 1
+    logger.info(
+        f"Soportes clínicos: {n} archivo(s) indexados para {len(indice)} factura(s) desde {raiz}"
+    )
+    return indice
+
+
 # ─── Manifiesto factura → entidad ────────────────────────────────────────────
 
 
@@ -1160,6 +1247,26 @@ def armar_paquete(
             res.acciones.append(f"ERROR_COPIA {p.name}: {e}")
     res.acciones.append(f"{'movería' if dry_run else 'copió'} {copiados} soporte(s)")
 
+    # Soportes clínicos anexados desde --soportes: SIEMPRE se copian (nunca se
+    # mueven: el share clínico es fuente y lo comparten otras facturas/la app).
+    clinicos_ok = 0
+    for ruta in res.soportes_clinicos:
+        p = Path(ruta)
+        nuevo = _nombre_unico(nombre_soporte(p, res.factura, nit_prestador, nomen), usados)
+        usados.add(nuevo)
+        if dry_run:
+            clinicos_ok += 1
+            continue
+        try:
+            shutil.copy2(str(p), str(dir_factura / nuevo))
+            clinicos_ok += 1
+        except OSError as e:
+            res.acciones.append(f"ERROR_COPIA_CLINICO {p.name}: {e}")
+    if res.soportes_clinicos:
+        res.acciones.append(
+            f"{'anexaría' if dry_run else 'anexó'} {clinicos_ok} soporte(s) clínico(s)"
+        )
+
     if not dry_run:
         _escribir_manifiesto_factura(res, dir_factura, perfil, nit_prestador)
 
@@ -1222,6 +1329,7 @@ CAMPOS_REPORTE = [
     "soportes_faltantes",
     "soportes_esperados_faltantes",
     "archivos_sin_clasificar",
+    "soportes_clinicos",
     "estado",
     "detalle",
     "ruta_paquete",
@@ -1245,6 +1353,7 @@ def _fila_reporte(res: ResultadoFactura) -> dict:
         "soportes_faltantes": " ".join(res.soportes_faltantes),
         "soportes_esperados_faltantes": " ".join(res.soportes_esperados_faltantes),
         "archivos_sin_clasificar": "; ".join(res.archivos_sin_clasificar),
+        "soportes_clinicos": "; ".join(Path(x).name for x in res.soportes_clinicos),
         "estado": res.estado,
         "detalle": " ".join(res.detalle),
         "ruta_paquete": res.ruta_paquete,
@@ -1295,6 +1404,7 @@ def escribir_reporte_xlsx(resultados: list[ResultadoFactura], ruta: Path) -> Non
     anchos = {
         "detalle": 60,
         "soportes_presentes": 22,
+        "soportes_clinicos": 30,
         "carpeta": 40,
         "acciones": 30,
         "servicios": 24,
@@ -1408,6 +1518,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="CSV/XLSX que mapea factura → entidad (cuando el lote no está por carpetas de EPS).",
     )
     p.add_argument(
+        "--soportes",
+        type=Path,
+        default=None,
+        help="Carpeta raíz del share de soportes CLÍNICOS (epicrisis, evolución, "
+        "órdenes…). Se cruza por número de factura para completar las que tienen "
+        "procedimientos/urgencias/hospitalización y sacarlas de REVISAR_TIPIFICACION. "
+        "Si se omite, usa $SOPORTES_ROOT cuando está definida.",
+    )
+    p.add_argument(
         "--layout",
         choices=["auto", "carpeta-factura", "lote"],
         default="auto",
@@ -1481,6 +1600,19 @@ def main(argv: list[str] | None = None) -> int:
         manifiesto = cargar_manifiesto(args.manifiesto)
         logger.info(f"Manifiesto: {len(manifiesto)} facturas mapeadas a entidad.")
 
+    # Share de soportes clínicos: --soportes o, si no, $SOPORTES_ROOT (el mismo
+    # que usa el indexador de la app). Se cruza por número de factura.
+    soportes_idx: dict[str, list[Path]] | None = None
+    ruta_soportes = args.soportes or (
+        Path(os.environ["SOPORTES_ROOT"]) if os.environ.get("SOPORTES_ROOT") else None
+    )
+    if ruta_soportes is not None:
+        if not ruta_soportes.is_dir():
+            logger.error(f"--soportes no existe o no es carpeta: {ruta_soportes}")
+            return 1
+        logger.info(f"Indexando soportes clínicos desde {ruta_soportes} …")
+        soportes_idx = indexar_soportes_clinicos(ruta_soportes, cfg.patron_factura)
+
     if args.layout == "lote":
         items = descubrir_lote(args.origen, manifiesto, cfg, cfg.patron_factura)
     elif args.layout == "carpeta-factura":
@@ -1507,7 +1639,7 @@ def main(argv: list[str] | None = None) -> int:
     resultados: list[ResultadoFactura] = []
     consecutivo = args.consecutivo
     for i, (fac_hint, archivos, carpeta, ent_hint) in enumerate(items, 1):
-        res = procesar_factura(fac_hint, archivos, carpeta, ent_hint, cfg)
+        res = procesar_factura(fac_hint, archivos, carpeta, ent_hint, cfg, soportes_idx)
         if filtro_ent and not _coincide_entidad(filtro_ent, res):
             continue
         logger.info(f"[{i}/{len(items)}] {res.factura} → {res.entidad_nombre}  [{res.estado}]")

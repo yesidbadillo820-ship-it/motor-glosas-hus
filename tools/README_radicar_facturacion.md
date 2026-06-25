@@ -64,6 +64,12 @@ py radicar_facturacion.py --origen "\\Prime\radicacion_2026\...\ESCANEO" --layou
 
 REM 5) Mapear factura -> entidad con un Excel de facturación
 py radicar_facturacion.py --origen "D:\LOTE" --manifiesto "D:\facturacion.xlsx"
+
+REM 6) Cruzar el share de soportes CLÍNICOS (epicrisis, evolución, órdenes…)
+REM     para completar las facturas con procedimientos/hospitalización/urgencias
+py radicar_facturacion.py --origen "\\172.16.32.83\factura_electronica_net22\202606\FACTURAS_SALUD" ^
+    --soportes "\\Prime\soportes_radicacion\2026\06 JUNIO - SOPORTES RADICACION" ^
+    --reporte "%USERPROFILE%\Desktop\radicacion_fe.csv" --xlsx "%USERPROFILE%\Desktop\radicacion_fe.xlsx"
 ```
 
 ---
@@ -119,6 +125,40 @@ py radicar_facturacion.py --origen "\\172.16.32.83\factura_electronica_net22\202
   alguna EPS no resuelve, pasá `--manifiesto` (Excel/CSV con `FACTURA` y `EPS`)
   para forzar el mapeo.
 
+### `--soportes`: cruzar el share de soportes clínicos
+
+El share de FE trae lo **obligatorio** (`FEV`+`RIP`+`CUV`), pero la
+**epicrisis, hoja de evolución, atención de urgencias y órdenes médicas** viven
+en **otro share** (el de escaneo de soportes). Por eso, sin cruzar nada, toda
+factura con `procedimientos`/`urgencias`/`hospitalización`/`medicamentos` queda
+en `REVISAR_TIPIFICACION` (solo las de **consulta** llegan a `LISTA`).
+
+Con `--soportes <raíz>` el radicador **indexa ese share por número de factura**
+y rellena los huecos de cada factura (anexando `HEV`, `OPF`, `PDE`, `PDX`, `CRC`…
+al paquete cuando se arma). Mismo criterio de cruce que el indexador de la app
+(`HUS\d{4,12}` + normalización quitando ceros), así que **no requiere
+configuración extra**.
+
+```
+<raíz>\…\ESCANEO\<EPS>\ENV-<lote>\
+  HEV_900006037_HUS487523.pdf   ← historia clínica / epicrisis / evolución
+  OPF_900006037_HUS487523.pdf   ← orden o prescripción facultativa
+  PDX_900006037_HUS487523.pdf   ← resultado de apoyo diagnóstico
+```
+
+- Si se omite `--soportes`, se usa la variable de entorno **`SOPORTES_ROOT`**
+  cuando está definida (la misma que ya usa el motor de glosas).
+- Los soportes clínicos **siempre se copian** (nunca se mueven, aun con
+  `--mover`): el share clínico es fuente y lo comparten otras facturas.
+- Solo rellena **huecos**: no duplica `FEV`/`RIP`/`CUV` que el share de FE ya
+  trae. La columna `soportes_clinicos` del reporte lista lo que se anexó.
+
+> **Epicrisis ≡ historia clínica (HEV)**: en el HUS la epicrisis (`EPI`) y la
+> atención de urgencias (`HAU`) se escanean **dentro** de la historia clínica
+> (`HEV`), así que un `HEV` presente satisface esas exigencias. Es una
+> *equivalencia* configurable (ver más abajo); con `"equivalencias": {}` en el
+> JSON se vuelve a exigir el código exacto.
+
 ---
 
 ## Estados de cada factura
@@ -126,7 +166,7 @@ py radicar_facturacion.py --origen "\\172.16.32.83\factura_electronica_net22\202
 | Estado | Significado | ¿Se arma? |
 |---|---|---|
 | `LISTA` | Todos los soportes obligatorios presentes y bien tipificados | ✅ |
-| `REVISAR_TIPIFICACION` | Hay archivos sin tipificar o faltan soportes *esperados* (no obligatorios) | Solo con `--forzar` |
+| `REVISAR_TIPIFICACION` | Hay archivos sin tipificar o faltan soportes *esperados* según los servicios (p.ej. epicrisis de una hospitalización). Crúzalo con **`--soportes`** para completarlos | Solo con `--forzar` |
 | `FALTAN_SOPORTES` | Falta algún soporte **obligatorio** de la entidad | ❌ |
 | `SIN_CUV` | Falta el resultado de validación RIPS (CUV) y la entidad lo exige | ❌ |
 | `SIN_RIPS` / `SIN_FEV` | Falta el RIPS o la factura electrónica | ❌ |
@@ -146,6 +186,7 @@ hay alguna con problemas (útil para encadenar en scripts/CI).
 | `--destino` | Dónde armar los paquetes *(requerido con `--armar`)*. |
 | `--perfiles` | JSON de perfiles (def.: `data/perfiles_radicacion.json`). |
 | `--manifiesto` | CSV/XLSX que mapea `factura → entidad`. |
+| `--soportes` | Raíz del share de soportes **clínicos** a cruzar por factura (def.: `$SOPORTES_ROOT`). |
 | `--layout` | `auto` (def.), `carpeta-factura` o `lote`. |
 | `--entidad` | Filtra solo una entidad (substring). |
 | `--reporte` | CSV de salida (def.: `radicacion_reporte.csv`). |
@@ -185,9 +226,25 @@ El catálogo de entidades es **editable sin tocar código**. Cada entidad define
 ```
 
 A nivel global, el bloque `soportes` define los **obligatorios base**
-(`FEV`+`RIP`+`CUV`) y los **esperados por tipo de servicio** del RIPS
-(hospitalización → `EPI`, urgencias → `HAU`, etc.). Estos defaults siguen la
-Res. 2284/2023 y se pueden ajustar por operación.
+(`FEV`+`RIP`+`CUV`), los **esperados por tipo de servicio** del RIPS
+(hospitalización → `EPI`, urgencias → `HAU`, etc.) y las **equivalencias** entre
+códigos. Estos defaults siguen la Res. 2284/2023 y se pueden ajustar por operación:
+
+```jsonc
+"soportes": {
+  "base_obligatorios": ["FEV", "RIP", "CUV"],
+  "por_servicio": {
+    "procedimientos": ["HEV"], "urgencias": ["HAU"],
+    "hospitalizacion": ["EPI"], "medicamentos": ["OPF"]
+  },
+  "equivalencias": {           // un documento "paraguas" cubre uno específico
+    "EPI": ["EPI", "HEV"],     // la epicrisis la cubre la historia clínica (HEV)
+    "HAU": ["HAU", "HEV"]      // la atención de urgencias, igual
+  }
+}
+```
+
+Con `"equivalencias": {}` se exige el **código exacto** (sin paraguas).
 
 > **Nota sobre NIT de pagadores**: vienen vacíos a propósito. Un NIT errado
 > causa devoluciones; complételos desde el contrato/RUT de cada entidad. La

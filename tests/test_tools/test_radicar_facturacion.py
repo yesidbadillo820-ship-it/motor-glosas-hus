@@ -413,6 +413,111 @@ class TestProcesarFactura:
         assert not any("difiere" in linea for linea in res.detalle)
 
 
+# Servicios RIPS de ejemplo para forzar cada soporte esperado.
+_SERV_PROC = {"procedimientos": [{"codProcedimiento": "881202", "vrServicio": 90000}]}
+_SERV_MED = {"medicamentos": [{"codTecnologiaSalud": "ABC", "vrServicio": 5000}]}
+_SERV_HOSP = {"hospitalizacion": [{"viaIngresoServicioSalud": "1", "vrServicio": 800000}]}
+
+
+def _share_clinico(base: Path, fac: str, codigos: list[str], *, env: str = "ENV-1") -> Path:
+    """Crea un share de soportes CLÍNICOS con un PDF por código para `fac`,
+    anidado como el real (ESCANEO/<EPS>/<ENV>/<COD>_<nit>_<fac>.pdf)."""
+    d = base / "ESCANEO" / "COOSALUD" / env
+    d.mkdir(parents=True, exist_ok=True)
+    for cod in codigos:
+        (d / f"{cod}_900006037_{fac}.pdf").write_text("x", encoding="utf-8")
+    return base
+
+
+class TestSoportesClinicos:
+    def test_procedimientos_sin_soportes_es_revisar(self, tmp_path, cfg):
+        d = _factura_folder(tmp_path / "fe", "HUS487523", servicios=_SERV_PROC)
+        res = rad.procesar_factura("HUS487523", rad._archivos_de(d), d, "COOSALUD", cfg)
+        assert res.estado == "REVISAR_TIPIFICACION"
+        assert "HEV" in res.soportes_esperados_faltantes
+
+    def test_procedimientos_con_hev_queda_lista(self, tmp_path, cfg):
+        d = _factura_folder(tmp_path / "fe", "HUS487523", servicios=_SERV_PROC)
+        idx = rad.indexar_soportes_clinicos(
+            _share_clinico(tmp_path / "clin", "HUS487523", ["HEV"]), cfg.patron_factura
+        )
+        res = rad.procesar_factura("HUS487523", rad._archivos_de(d), d, "COOSALUD", cfg, idx)
+        assert res.estado == "LISTA", res.detalle
+        assert "HEV" in res.soportes_presentes
+        assert any("HEV_900006037_HUS487523.pdf" in x for x in res.soportes_clinicos)
+
+    def test_medicamentos_con_opf_queda_lista(self, tmp_path, cfg):
+        d = _factura_folder(tmp_path / "fe", "HUS487600", servicios=_SERV_MED)
+        idx = rad.indexar_soportes_clinicos(
+            _share_clinico(tmp_path / "clin", "HUS487600", ["OPF"]), cfg.patron_factura
+        )
+        res = rad.procesar_factura("HUS487600", rad._archivos_de(d), d, "COOSALUD", cfg, idx)
+        assert res.estado == "LISTA", res.detalle
+
+    def test_hospitalizacion_epi_la_cubre_hev(self, tmp_path, cfg):
+        # El share clínico del HUS no separa EPI: la epicrisis va dentro del HEV,
+        # así que un HEV presente satisface la exigencia de epicrisis.
+        d = _factura_folder(tmp_path / "fe", "HUS487700", servicios=_SERV_HOSP)
+        idx = rad.indexar_soportes_clinicos(
+            _share_clinico(tmp_path / "clin", "HUS487700", ["HEV"]), cfg.patron_factura
+        )
+        res = rad.procesar_factura("HUS487700", rad._archivos_de(d), d, "COOSALUD", cfg, idx)
+        assert res.estado == "LISTA", res.detalle
+        assert "EPI" not in res.soportes_esperados_faltantes
+
+    def test_equivalencia_desactivada_exige_epi_literal(self, tmp_path, cfg):
+        cfg.equivalencias_soporte = {}  # opt-out: exige el código exacto
+        d = _factura_folder(tmp_path / "fe", "HUS487700", servicios=_SERV_HOSP)
+        idx = rad.indexar_soportes_clinicos(
+            _share_clinico(tmp_path / "clin", "HUS487700", ["HEV"]), cfg.patron_factura
+        )
+        res = rad.procesar_factura("HUS487700", rad._archivos_de(d), d, "COOSALUD", cfg, idx)
+        assert res.estado == "REVISAR_TIPIFICACION"
+        assert "EPI" in res.soportes_esperados_faltantes
+
+    def test_indexador_cruza_por_factura_normalizada(self, tmp_path, cfg):
+        base = _share_clinico(tmp_path, "HUS0000487523", ["HEV", "OPF"])
+        idx = rad.indexar_soportes_clinicos(base, cfg.patron_factura)
+        assert "487523" in idx  # HUS0000487523 → 487523
+        assert len(idx["487523"]) == 2
+
+    def test_no_duplica_codigos_del_share_fe(self, tmp_path, cfg):
+        # Si el share clínico también trae FEV/RIP (ya presentes en el de FE),
+        # NO se anexan: el cruce sólo rellena huecos.
+        d = _factura_folder(tmp_path / "fe", "HUS487523", servicios=_SERV_PROC)
+        idx = rad.indexar_soportes_clinicos(
+            _share_clinico(tmp_path / "clin", "HUS487523", ["HEV", "FEV", "RIP"]),
+            cfg.patron_factura,
+        )
+        res = rad.procesar_factura("HUS487523", rad._archivos_de(d), d, "COOSALUD", cfg, idx)
+        anexados = {Path(x).name.split("_")[0] for x in res.soportes_clinicos}
+        assert anexados == {"HEV"}
+
+    def test_armar_copia_clinico_sin_mover_el_original(self, tmp_path, cfg):
+        d = _factura_folder(tmp_path / "fe", "HUS487523", servicios=_SERV_PROC)
+        clin = _share_clinico(tmp_path / "clin", "HUS487523", ["HEV"])
+        idx = rad.indexar_soportes_clinicos(clin, cfg.patron_factura)
+        res = rad.procesar_factura("HUS487523", rad._archivos_de(d), d, "COOSALUD", cfg, idx)
+        destino = tmp_path / "salida"
+        perfil = rad.resolver_entidad("COOSALUD", cfg)
+        rad.armar_paquete(
+            res,
+            rad._archivos_de(d),
+            perfil,
+            destino,
+            "20260625",
+            1,
+            mover=True,
+            hacer_zip=False,
+            forzar=False,
+            dry_run=False,
+            nit_prestador="900006037",
+        )
+        original = clin / "ESCANEO" / "COOSALUD" / "ENV-1" / "HEV_900006037_HUS487523.pdf"
+        assert original.is_file()  # el share clínico es fuente: se copia, no se mueve
+        assert (destino / "COOSALUD" / "HUS487523" / "HEV_900006037_HUS487523.pdf").is_file()
+
+
 class TestDescubrimiento:
     def test_carpeta_factura_con_eps_padre(self, tmp_path, cfg):
         _factura_folder(tmp_path / "COOSALUD", "HUS1")
