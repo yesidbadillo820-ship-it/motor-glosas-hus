@@ -72,10 +72,23 @@ def test_neutraliza_codigo_cups_1234():
 
 
 def test_no_neutraliza_cups_reales():
-    """Los CUPS válidos del catálogo HUS NO deben tocarse."""
+    """Los CUPS reales (alfanuméricos como FMQ0113) NO deben tocarse.
+
+    Ronda 15 (25-jun-2026): el código "19997313-6" tipificado en ronda 11
+    como "CUPS válido del catálogo HUS" en realidad es un CUM (Código
+    Único de Medicamento, formato 8 dígitos + verificador). La IA usaba
+    ese código mal nombrado como "CUPS" — el caso real es alucinación
+    de categorización: TRAMADOL es medicamento, su código correcto es
+    CUM, no CUPS. El sanitizer ronda 15 ahora lo neutraliza con la
+    frase "el medicamento facturado..." cuando aparece como "CUPS X-Y".
+    Los CUPS REALES alfanuméricos (FMQ0113 = catéter) siguen intactos.
+    """
     d = "EL CUPS 19997313-6 (TRAMADOL) Y EL CUPS FMQ0113 (CATÉTER)."
     r = _neutralizar_alucinaciones_prompt(d)
-    assert "19997313-6" in r
+    # CUM mal nombrado como CUPS → neutralizado por ronda 15 Bug A v4
+    assert "19997313-6" not in r
+    assert "el medicamento facturado" in r.lower()
+    # CUPS real alfanumérico → preservado
     assert "FMQ0113" in r
 
 

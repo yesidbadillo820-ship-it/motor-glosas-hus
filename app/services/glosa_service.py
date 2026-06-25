@@ -1091,12 +1091,23 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "el código CUPS consignado en la factura electrónica",
     ),
-    # NOTA: CUM con sufijo "-X" (ej. "19953856-3") NO se neutraliza acá
-    # porque ronda 11 tenía el caso TRAMADOL real "CUPS 19997313-6"
-    # legítimo del input del usuario que debe preservarse. La alucinación
-    # del usuario en los casos del 25-jun fueron todas SIN sufijo
-    # (CUPS 19953856, CUPS 20002174, CUPS 0021987) — las atrapa la regla
-    # de dígitos puros 7-10 de arriba.
+    # ── Ronda 15 (Bug A v4): CUM con sufijo "-X" ──
+    # En ronda 14 lo dejé fuera por compat con ronda 11 (caso TRAMADOL
+    # "CUPS 19997313-6" donde el INPUT lo llamaba CUPS). Pero el caso 1
+    # del 25-jun (Cart-T): la IA escribió "CUPS 20235847-2" — ese código
+    # es CUM Tisagenlecleucel y el INPUT lo nombra explícitamente como
+    # "CUM importado 20235847-2". La IA lo recategorizó como CUPS.
+    # Solución: detectar el patrón "CUPS XXXXXXXX-X" cuando los dígitos
+    # son ≥7 dígitos (típico CUM). Los CUPS reales colombianos NO usan
+    # formato XXXXXXX-X (su sufijo es letra mayúscula como "890388H",
+    # no dígito verificador).
+    (
+        re.compile(
+            r"\b(?:BAJO\s+EL\s+|AL\s+|EL\s+)?CUPS\s+\d{7,9}-\d\b",
+            re.IGNORECASE,
+        ),
+        "el medicamento facturado según historia clínica",
+    ),
     # ── Ronda 14: nuevos placeholders y dobles artículos ──
     # Evidencia (trasplante hepático, $487M): la IA escribió:
     #   "LA NUEVA la entidad pagadora LA GLOSA CON TRES CAUSALES"
@@ -1134,6 +1145,84 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
             re.IGNORECASE,
         ),
         "la entidad pagadora",
+    ),
+    # ── Ronda 15 (25-jun-2026): placeholders persistentes ──
+    # Casos del 25-jun:
+    #   "sobre el código la glosa aplicada/a" (lower después de Bug L)
+    #   "el código la glosa aplicada/A" (UPPER)
+    # El sanitizer ronda 12 esperaba "el código DE la glosa..." pero la IA
+    # escribe "el código LA glosa..." (sin "de"). Extendemos el regex:
+    (
+        re.compile(
+            r"\bel\s+c[óo]digo\s+la\s+glosa\s+aplicada\s*/\s*[a-z]{1,2}\b",
+            re.IGNORECASE,
+        ),
+        "el código de la glosa aplicada",
+    ),
+    (
+        re.compile(
+            r"\bsobre\s+el\s+c[óo]digo\s+la\s+glosa\s+aplicada\b",
+            re.IGNORECASE,
+        ),
+        "sobre el código de la glosa aplicada",
+    ),
+    # "el paciente identificado en el expediente" como CONCATENADO al
+    # campo "Servicio objetado" (caso 3 DPP). Ese sintagma neutro debe
+    # estar en el cuerpo del argumento, NO al final del nombre del
+    # servicio. Si aparece pegado al servicio, lo quitamos.
+    (
+        re.compile(
+            r"\s+el\s+paciente\s+identificado\s+en\s+el\s+expediente"
+            r"(?=\s+(?:CUMPLIÓ|fue|presenta|tuvo|requirió|requiere|"
+            r"se\s+encontraba|recibió|presenta))",
+            re.IGNORECASE,
+        ),
+        "",
+    ),
+    # "[servicio objetado: ...] el procedimiento facturado según historia
+    # clínica" suelto al final — esa frase es para REEMPLAZAR un CUPS
+    # inventado, no para PEGARLA al final del campo de servicio. Si
+    # aparece concatenada, la quitamos.
+    (
+        re.compile(
+            r"\.\s*el\s+procedimiento\s+facturado\s+según\s+historia\s+cl[íi]nica\s*$",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        ".",
+    ),
+    # ── Ronda 15 — Bug Q: alucinación de citas textuales ──
+    # Casos del 25-jun: la IA inventaba "se cita textualmente la Cláusula
+    # 5 del contrato: '...'" o "la Resolución X art. Y dispone: '...'" sin
+    # tener acceso al documento real. Estas citas textuales son ALUCINACIÓN
+    # pura — la IA construye párrafos entre comillas que parecen referencias
+    # legales pero NO existen en el corpus. Neutralizamos sintagmas
+    # introductorios típicos que delatan la alucinación.
+    (
+        re.compile(
+            r"\bse\s+cita\s+textualmente\s+la\s+cl[áa]usula\s+\d+\s+del\s+contrato\s*:\s*[\"«][^\"»]*[\"»]\.?",
+            re.IGNORECASE,
+        ),
+        "según las cláusulas contractuales vigentes entre las partes",
+    ),
+    (
+        re.compile(
+            r"\bla\s+cl[áa]usula\s+\d+\s+del\s+contrato\s+dice\s*:\s*[\"«][^\"»]*[\"»]\.?",
+            re.IGNORECASE,
+        ),
+        "según las cláusulas contractuales pactadas",
+    ),
+    # "la Resolución X art. Y dispone/establece: '...texto inventado...'"
+    # Solo neutralizamos cuando el contenido entre comillas es claramente
+    # genérico ("los servicios de salud prestados en cumplimiento...") —
+    # patrón frecuente que la IA usa como muletilla.
+    (
+        re.compile(
+            r"\bla\s+resoluci[óo]n\s+\d{1,5}\s+de\s+\d{4}\s+"
+            r"(?:art\.?\s*\d+\s+)?(?:establece|dispone)\s+en\s+su\s+art[íi]culo\s+\d+\s*:\s*"
+            r"[\"«]los\s+servicios[^\"»]{0,250}[\"»]\.?",
+            re.IGNORECASE,
+        ),
+        "la normativa contractual aplicable",
     ),
 )
 
@@ -1703,7 +1792,7 @@ def _es_sigla_o_codigo(palabra: str) -> bool:
     return p in _SIGLAS_CONSERVAR_UPPER or _RE_SIGLA_O_CODIGO.match(p) is not None
 
 
-def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.55) -> str:
+def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> str:
     """Convierte texto en MAYÚSCULAS sostenidas a sentence case institucional.
 
     Estrategia:

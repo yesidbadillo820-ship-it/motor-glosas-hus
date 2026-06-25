@@ -389,6 +389,50 @@ LEYES = {
         "vigente": True,
         "keywords": ["PND", "Plan Nacional de Desarrollo", "giro directo", "salud preventiva"],
     },
+    # Ronda 15 (25-jun-2026, Bug P v2): leyes reales que el verifier
+    # marcaba como inexistentes en producción.
+    "LEY 1388 DE 2010": {
+        "nombre": "Ley 1388 de 2010 (Cáncer infantil)",
+        "titulo": "Derechos del menor con cáncer — acceso pleno a tratamientos oncológicos",
+        "ambito": "Pediatría oncológica — protección reforzada del NNA",
+        "vigente": True,
+        "notas": "Garantiza la cobertura integral del tratamiento oncológico en menores (quimio, radio, cirugía, trasplante, terapias avanzadas) sin barreras administrativas. Reglamentada por Resolución 1383/2013.",
+        "keywords": [
+            "Ley 1388",
+            "cáncer infantil",
+            "pediatría oncológica",
+            "atención integral menor",
+        ],
+    },
+    "LEY 1392 DE 2010": {
+        "nombre": "Ley 1392 de 2010 (Enfermedades huérfanas)",
+        "titulo": "Reconocimiento, atención e investigación de enfermedades huérfanas",
+        "ambito": "Enfermedades huérfanas (raras) — hemofilia, Gaucher, Pompe, etc.",
+        "vigente": True,
+        "notas": "Reconoce las enfermedades huérfanas como problema de salud pública con tratamiento prioritario. Las barreras administrativas (CTC vencido, MIPRES extemporáneo) NO son oponibles a la continuidad del tratamiento. Reglamentada por Decreto 1954/2012.",
+        "keywords": ["Ley 1392", "enfermedades huérfanas", "raras", "hemofilia", "Gaucher"],
+    },
+    "LEY 1616 DE 2013": {
+        "nombre": "Ley 1616 de 2013 (Salud Mental)",
+        "titulo": "Ley de Salud Mental — atención integral en salud mental",
+        "ambito": "Salud mental — derechos del paciente psiquiátrico",
+        "vigente": True,
+        "articulos": {
+            "art_11": {
+                "titulo": "Consentimiento informado en salud mental",
+                "texto": "El consentimiento informado en salud mental se otorga por la propia persona; en su ausencia por incapacidad transitoria de juicio (psicosis aguda, riesgo suicida inminente), se acepta consentimiento sustitutivo del cónyuge o familiar de primer grado documentado en historia clínica.",
+                "aplicacion": "Defensa de ECT/internación involuntaria sin firma del paciente",
+                "keywords": ["consentimiento informado", "capacidad de juicio", "sustitutivo"],
+            },
+        },
+        "keywords": [
+            "Ley 1616",
+            "salud mental",
+            "psiquiatría",
+            "consentimiento",
+            "internación involuntaria",
+        ],
+    },
 }
 
 
@@ -981,6 +1025,71 @@ RESOLUCIONES = {
             "requisitos formales de la Factura Electrónica de Venta (FEV)."
         ),
     },
+    # Ronda 15 (Bug P v2): resoluciones reales que aparecieron en producción
+    # marcadas como inexistentes.
+    "RESOLUCION 1652 DE 2021": {
+        "nombre": "Resolución 1652 de 2021 (MinSalud)",
+        "titulo": "Programa de Atención Integral en Hemofilia y otras coagulopatías congénitas (PAB)",
+        "ambito": "Hemofilia — auto-administración domiciliaria, profilaxis",
+        "vigente": True,
+        "notas": "Reconoce la auto-administración domiciliaria del Factor VIII/IX/VIIa como modalidad estándar en pacientes con hemofilia severa, evitando el riesgo de hemartrosis por desplazamiento. La EPS NO puede exigir asistencia institucional cada 48h.",
+        "keywords": ["Resolución 1652", "hemofilia", "PAB", "Factor VIII", "auto-administración"],
+    },
+    "RESOLUCION 2292 DE 2021": {
+        "nombre": "Resolución 2292 de 2021 (MinSalud)",
+        "titulo": "Actualización del Plan de Beneficios en Salud (PBS) con cargo a la UPC",
+        "ambito": "PBS — listado de tecnologías financiadas con UPC",
+        "vigente": True,
+        "notas": "Reemplazó parcialmente la Res. 5267/2017. Incluye tecnologías de alto costo (Factor VIII recombinante, Emicizumab para profilaxis en hemofilia con inhibidores) con financiación UPC.",
+        "keywords": ["Resolución 2292", "PBS", "UPC", "hemofilia", "Emicizumab"],
+    },
+    "RESOLUCION 2335 DE 2023": {
+        "nombre": "Resolución 2335 de 2023 (MinSalud)",
+        "titulo": "Reglamentación atención integral cáncer infantil — Ley 1388/2010",
+        "ambito": "Pediatría oncológica — atención integral con red de complejidad",
+        "vigente": True,
+        "notas": "Define el alcance de la atención integral del cáncer infantil incluyendo terapias avanzadas (trasplante MO, CAR-T cells) cuando las líneas previas han fallado. La EPS no puede excluir terapias génicas argumentando 'fuera de PBS' si son la única alternativa terapéutica.",
+        "keywords": [
+            "Resolución 2335",
+            "cáncer infantil",
+            "Ley 1388",
+            "atención integral",
+            "CAR-T",
+        ],
+    },
+    "RESOLUCION 2358 DE 1998": {
+        "nombre": "Resolución 2358 de 1998 (MinSalud)",
+        "titulo": "Lineamientos de atención en crisis psiquiátrica e internación involuntaria",
+        "ambito": "Salud mental — crisis psiquiátrica, contención mecánica",
+        "vigente": True,
+        "notas": "Establece protocolo de intervención en crisis psiquiátricas vitales: la contención mecánica intermitente está permitida como ÚLTIMO RECURSO en pacientes con riesgo inminente para sí mismos. Salvar la vida prima sobre la restricción temporal de movilidad.",
+        "keywords": [
+            "Resolución 2358",
+            "crisis psiquiátrica",
+            "contención mecánica",
+            "salud mental",
+        ],
+    },
+    "RESOLUCION 4886 DE 2018": {
+        "nombre": "Resolución 4886 de 2018 (MinSalud)",
+        "titulo": "Política Nacional de Salud Mental — internación involuntaria y junta médica",
+        "ambito": "Salud mental — internación involuntaria, criterios de prolongación",
+        "vigente": True,
+        "articulos": {
+            "art_25": {
+                "titulo": "Junta médica para internación involuntaria prolongada",
+                "texto": "La internación involuntaria que supere 14 días requiere pronunciamiento documentado de junta médica interdisciplinaria cada 7 días con criterios clínicos de mantenimiento (riesgo suicida activo, agitación severa, respuesta parcial al tratamiento).",
+                "aplicacion": "Defensa de internación prolongada con junta médica documentada",
+                "keywords": [
+                    "internación involuntaria",
+                    "junta médica",
+                    "prolongación",
+                    "salud mental",
+                ],
+            },
+        },
+        "keywords": ["Resolución 4886", "salud mental", "internación involuntaria", "junta médica"],
+    },
 }
 
 
@@ -1389,6 +1498,51 @@ JURISPRUDENCIA = {
         "ratio": "La salud es un derecho fundamental autónomo; ni la sostenibilidad fiscal ni los procedimientos administrativos pueden negar el acceso efectivo. La Corte declaró exequible la Ley Estatutaria con condicionamientos.",
         "aplica_a": "Defensa estructural en glosas de cobertura/exclusión",
         "keywords": ["C-313/2014", "Ley estatutaria", "derecho fundamental", "salud"],
+    },
+    # Ronda 15 (Bug P v2): sentencias específicas que aparecen en producción
+    # y el verifier marcaba como inexistentes.
+    "SENTENCIA T-027 DE 2020": {
+        "nombre": "Sentencia T-027 de 2020",
+        "titulo": "Atención integral al menor con cáncer — Ley 1388/2010",
+        "ambito": "Pediatría oncológica — derecho a la salud reforzado del NNA",
+        "vigente": True,
+        "ratio": "La atención integral del menor con cáncer no admite barreras administrativas (PBS, MIPRES, CTC) cuando la vida está en riesgo. La EPS debe garantizar acceso pleno incluyendo terapias avanzadas cuando las líneas previas fracasan.",
+        "aplica_a": "Defensa de glosas a tratamientos oncológicos pediátricos de alto costo",
+        "keywords": ["T-027/2020", "cáncer infantil", "Ley 1388", "atención integral menor"],
+    },
+    "SENTENCIA T-553 DE 2024": {
+        "nombre": "Sentencia T-553 de 2024",
+        "titulo": "CAR-T cells en leucemia pediátrica refractaria — cobertura directa",
+        "ambito": "Terapias CAR-T en LLA pediátrica — eliminación de barreras MIPRES",
+        "vigente": True,
+        "ratio": "La Corte Constitucional ordenó la cobertura DIRECTA de terapias CAR-T (Tisagenlecleucel, Axicabtagene) en pacientes pediátricos con leucemia linfoblástica aguda refractaria a líneas previas, sin exigir trámites de MIPRES ni junta CRES, cuando hay riesgo vital inminente y opciones terapéuticas agotadas. Esta es la cita OBLIGATORIA en glosas a CAR-T pediátrico.",
+        "aplica_a": "Defensa Cart-T (Kymriah, Yescarta) en LLA pediátrica refractaria",
+        "keywords": [
+            "T-553/2024",
+            "CAR-T",
+            "Cart-T",
+            "Tisagenlecleucel",
+            "Kymriah",
+            "LLA pediátrica",
+        ],
+    },
+    "SENTENCIA T-705 DE 2017": {
+        "nombre": "Sentencia T-705 de 2017",
+        "titulo": "Atención en urgencias a migrantes irregulares — dignidad humana",
+        "ambito": "Migrantes venezolanos sin afiliación al SGSSS — atención inicial obligatoria",
+        "vigente": True,
+        "ratio": "La atención inicial de urgencias a migrantes sin afiliación al SGSSS es obligatoria por dignidad humana (Art. 1 CP). El pago, sin embargo, corresponde al Ente Territorial vía SGP (Decreto 064/2020), no a una EPS donde el paciente no estaba afiliado.",
+        "aplica_a": "Defensa de glosas en atención a migrantes irregulares",
+        "keywords": ["T-705/2017", "migrante", "Venezuela", "urgencias", "dignidad humana"],
+    },
+    "SENTENCIA T-401 DE 1994": {
+        "nombre": "Sentencia T-401 de 1994",
+        "titulo": "Dignidad del paciente psiquiátrico y contención mecánica",
+        "ambito": "Salud mental — uso proporcional de contención mecánica",
+        "vigente": True,
+        "ratio": "La contención mecánica es admisible como medida temporal y proporcional cuando hay riesgo inminente para la vida del paciente o terceros, debiéndose documentar cada episodio. NO es per se una violación a la dignidad cuando se aplica con criterio clínico y de último recurso.",
+        "aplica_a": "Defensa de glosas que alegan 'abuso de medida invasiva' en internación psiquiátrica",
+        "keywords": ["T-401/1994", "psiquiatría", "contención mecánica", "dignidad"],
     },
     "SENTENCIA T-1198 DE 2003": {
         "nombre": "Sentencia T-1198 de 2003",

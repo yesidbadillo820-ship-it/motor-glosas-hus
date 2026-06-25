@@ -58,13 +58,15 @@ class TestBugAv3CumInvima:
         assert "CUPS 19953856" not in resultado
         assert "procedimiento facturado" in resultado.lower()
 
-    def test_cum_con_sufijo_se_respeta_compat_ronda11(self):
-        # Por compatibilidad con el test de ronda 11 (caso TRAMADOL real
-        # "CUPS 19997313-6"), los códigos con sufijo "-X" NO se tocan.
-        # La alucinación real del usuario en producción fueron SIN sufijo.
+    def test_cum_con_sufijo_se_neutraliza_ronda15(self):
+        # Ronda 14 dejaba el sufijo "-X" por compat ronda 11. Ronda 15
+        # corrigió: TODO CUM (con o sin sufijo) que la IA escribe como
+        # CUPS es alucinación de categorización (medicamento ≠ procedimiento).
+        # El test viejo de ronda 11 también fue actualizado.
         texto = "EL CUPS 19953856-3 DEL TACROLIMUS"
         resultado = _neutralizar_alucinaciones_prompt(texto)
-        assert "19953856-3" in resultado
+        assert "19953856-3" not in resultado
+        assert "medicamento facturado" in resultado.lower()
 
     def test_cum_norepinefrina_se_neutraliza(self):
         # Caso real migrante Dengue: "CUPS 20002174"

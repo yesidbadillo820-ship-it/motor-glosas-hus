@@ -1743,14 +1743,53 @@ def build_user_prompt(
     # real. Esto también activa el régimen especial correcto (ARL) cuando
     # la entidad detectada es de riesgos laborales.
     eps_up_check = (eps or "").upper().strip()
+    eps_detectada = _detectar_pagador_en_texto(texto_glosa)
     if not eps_up_check or eps_up_check in _EPS_SIN_CONTRATO:
-        eps_detectada = _detectar_pagador_en_texto(texto_glosa)
+        # Bug I v2: dropdown genérico + texto trae EPS → usar la del texto
         if eps_detectada:
             try:
                 import logging as _log_eps
 
                 _log_eps.getLogger(__name__).info(
                     f"[EPS-AUTO-DETECT] dropdown='{eps}' → detectado en texto='{eps_detectada}'"
+                )
+            except Exception:
+                pass
+            eps = eps_detectada
+    elif eps_detectada and eps_up_check != eps_detectada.upper():
+        # Bug R (ronda 15, 25-jun-2026): dropdown ESPECÍFICO pero TEXTO
+        # menciona OTRA EPS — caso real DPP psiquiátrica: dropdown
+        # "NUEVA EPS" (error del usuario) pero el texto dice "EPS
+        # COMPENSAR glosa". La IA usaba la del dropdown y citaba
+        # contraparte incorrecta en el dictamen.
+        #
+        # Cuando el match en el texto es muy explícito ("La EPS X glosa"
+        # / "La ARL X glosa" en las primeras 200 chars del input), damos
+        # prioridad al texto y emitimos advertencia. La EPS del texto es
+        # la que conoce el caso real, el dropdown puede ser un click
+        # equivocado.
+        _txt_head = (texto_glosa or "")[:400].upper()
+        _eps_det_up = eps_detectada.upper()
+        # Match contundente: el nombre detectado aparece después de
+        # "EPS", "ARL", "FAMISANAR", etc. en las primeras 400 chars
+        marcadores_explicitos = (
+            f"EPS {_eps_det_up}",
+            f"LA EPS {_eps_det_up}",
+            f"ARL {_eps_det_up}",
+            f"LA ARL {_eps_det_up}",
+            f"{_eps_det_up} EPS",
+            f"{_eps_det_up} GLOSA",
+            f"{_eps_det_up} RATIFICA",
+            f"{_eps_det_up} OBJETA",
+        )
+        if any(m in _txt_head for m in marcadores_explicitos):
+            try:
+                import logging as _log_disc
+
+                _log_disc.getLogger(__name__).warning(
+                    f"[EPS-DISCREPANCIA] dropdown='{eps}' "
+                    f"≠ texto='{eps_detectada}' → priorizamos el texto "
+                    f"(el dropdown puede ser un click equivocado)"
                 )
             except Exception:
                 pass
@@ -2363,6 +2402,52 @@ def build_user_prompt(
     # y debe aceptar la diferencia. La IA necesita saberlo para producir la
     # acción correcta (ACEPTAR_PARCIAL / ACEPTAR_TOTAL) en lugar de defender
     # íntegramente cuando hay un excedente legítimo.
+    # ─── Bug O v2 (ronda 15, 25-jun): instrucciones explícitas del usuario ───
+    # Casos del 25-jun: el usuario escribió al final del texto pegado
+    # "Solicitamos defensa que cite expresamente la Sentencia T-553 de 2024"
+    # o "Solicitamos defensa que aborde la C-313/2014 + Resolución 2358/1998"
+    # — y la IA IGNORÓ esa instrucción. Detectamos los patrones tipo
+    # "solicitamos|necesitamos|exige|requiere defensa que (cite|aborde|
+    # invoque) X" y los promovemos a INSTRUCCIÓN OBLIGATORIA en bloque
+    # separado al final del user prompt para que el modelo no las pase.
+    bloque_instrucciones_usuario_str = ""
+    try:
+        _patrones_instruccion = (
+            re.compile(
+                r"(?:solicitamos|necesitamos|requerimos)\s+(?:defensa|respuesta|argumento)\s+"
+                r"que\s+(?:cite|aborde|invoque|incluya|mencione|fundamente)\s+([^.]{20,400}\.)",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"(?:debe|deber[áa])\s+(?:citar|invocar|incluir|fundamentar)\s+([^.]{20,400}\.)",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"(?:exigimos|exigir)\s+que\s+(?:cite|aborde|incluya)\s+([^.]{20,400}\.)",
+                re.IGNORECASE,
+            ),
+        )
+        instrucciones_capturadas: list[str] = []
+        for _pat_inst in _patrones_instruccion:
+            for _m_inst in _pat_inst.finditer(texto_glosa or ""):
+                _ins_text = _m_inst.group(1).strip()
+                if _ins_text and len(_ins_text) >= 15:
+                    instrucciones_capturadas.append(_ins_text)
+        if instrucciones_capturadas:
+            bloque_instrucciones_usuario_str = (
+                "\n═══ BLOQUE 3.bis: INSTRUCCIONES ESPECÍFICAS DEL GESTOR (OBLIGATORIAS) ═══\n"
+                "⚠ El gestor del HUS escribió en el texto las siguientes INSTRUCCIONES EXPLÍCITAS\n"
+                "para esta respuesta. DEBES seguirlas literalmente. Omitirlas = dictamen rechazado:\n\n"
+            )
+            for _i_ins, _ins in enumerate(instrucciones_capturadas[:5], 1):
+                bloque_instrucciones_usuario_str += f"  {_i_ins}. {_ins}\n"
+            bloque_instrucciones_usuario_str += (
+                "\nEn la argumentación DEBES citar TEXTUALMENTE las normas/sentencias/conceptos\n"
+                "que el gestor pidió. NO digas que 'la jurisprudencia respalda' — CITÁ EL NÚMERO.\n\n"
+            )
+    except Exception:
+        pass
+
     bloque_excedente_str = ""
     _vf = _parsear_valor_cop(valor_facturado)
     _vp = _parsear_valor_cop(valor_pactado)
@@ -2469,7 +2554,7 @@ DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos 
 SOPORTES ADJUNTOS (extracto de PDF, si los hay):
 {pdf_texto}
 {bloque_excedente_str}
-═══ BLOQUE 4: INSTRUCCIÓN ═══
+{bloque_instrucciones_usuario_str}═══ BLOQUE 4: INSTRUCCIÓN ═══
 Responde EXACTAMENTE en XML según el contrato definido en el system prompt:
 <paciente>...</paciente>
 <servicio>...</servicio>
