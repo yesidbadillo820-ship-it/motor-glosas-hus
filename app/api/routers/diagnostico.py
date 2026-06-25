@@ -3,7 +3,7 @@ diagnostico.py — Status / Diagnostic page del motor (A.2 del plan UX).
 
 Endpoint admin que devuelve health de TODO el sistema en un solo
 JSON:
-  - Conexión a DB Neon
+  - Conexión a la BD (SQLite local en la VM del HUS o Postgres remoto)
   - Estado del indexer de soportes (cuántos archivos, última build)
   - Estado de noticias (cuántas indexadas, última fetch)
   - Estados de los schedulers (mantenimiento, soportes-reindex,
@@ -15,6 +15,11 @@ JSON:
 Uso: el admin entra a /admin/diagnostico (tab del SPA) y ve un panel
 verde-amarillo-rojo con cada componente. Si algo está rojo, tiene
 botones "Reindexar ahora" / "Refrescar noticias" para auto-fix.
+
+Nota histórica: este motor migró el 23-jun-2026 de Fly.io + Neon Postgres
+a self-hosted en VM Google Cloud + SQLite en volumen local + cloudflared
+tunnel ($0/mes). Las labels y mensajes de este endpoint se actualizaron
+para reflejar el nuevo stack.
 """
 
 from __future__ import annotations
@@ -76,15 +81,31 @@ def diagnostico_completo(
         "secciones": {},
     }
 
-    # ─── DB Neon Postgres ──────────────────────────────────────────
+    # ─── Base de datos (SQLite local en VM HUS o Postgres remoto) ──
+    # Detecta el tipo desde DATABASE_URL: SQLite (self-hosted, default
+    # desde 23-jun-2026) o Postgres (Neon antiguo). Mostrar correctamente
+    # para que el panel no diga "Neon Postgres" cuando ya migramos.
     try:
         n_glosas = db.query(func.count(GlosaRecord.id)).scalar() or 0
         n_usuarios = db.query(func.count(UsuarioRecord.id)).scalar() or 0
         n_contratos = db.query(func.count(ContratoRecord.eps)).scalar() or 0
+        _db_url = os.getenv("DATABASE_URL", "")
+        if _db_url.startswith("sqlite"):
+            _db_label = "SQLite local (volumen /data)"
+        elif "neon" in _db_url.lower():
+            _db_label = "Neon Postgres"
+        elif _db_url.startswith("postgres"):
+            _db_label = "Postgres"
+        else:
+            _db_label = "Base de datos"
         out["secciones"]["base_de_datos"] = {
             "estado": "ok",
-            "mensaje": f"Neon Postgres conectado · {n_glosas} glosas, {n_usuarios} usuarios, {n_contratos} contratos",
+            "mensaje": (
+                f"{_db_label} conectada · {n_glosas} glosas, "
+                f"{n_usuarios} usuarios, {n_contratos} contratos"
+            ),
             "data": {
+                "tipo": _db_label,
                 "glosas": n_glosas,
                 "usuarios": n_usuarios,
                 "contratos": n_contratos,
@@ -106,9 +127,10 @@ def diagnostico_completo(
         if stats.get("facturas_indexadas", 0) == 0:
             estado = "warning"
             mensaje = (
-                "Indexer sin archivos. "
-                "Verificá que el jump-box (tools/jumpbox_sync.py) esté corriendo "
-                "y subiendo soportes al volumen Fly."
+                "Indexer sin archivos en /data/soportes. Subí los PDFs vía la "
+                "tab 'Soportes' del panel admin, o copialos manualmente al "
+                "volumen montado en la VM (/opt/motor-glosas/data/soportes/) "
+                "y andá a la tab Diagnóstico → 'Reindexar soportes'."
             )
         else:
             ultima = stats.get("construido_hace_seg")
@@ -184,7 +206,10 @@ def diagnostico_completo(
     if not anthropic_key:
         out["secciones"]["anthropic"] = {
             "estado": "error",
-            "mensaje": "ANTHROPIC_API_KEY no configurada en Fly Secrets",
+            "mensaje": (
+                "ANTHROPIC_API_KEY no configurada en /opt/motor-glosas/.env. "
+                "Editá el .env de la VM con sudo nano y agregá la clave."
+            ),
             "data": {},
         }
     else:
@@ -356,7 +381,9 @@ def diagnostico_completo(
                 "SENTRY_DSN no configurado — los errores en producción "
                 "se pierden silenciosamente. Setup en 5 min: crear cuenta "
                 "en sentry.io (free 5K events/mes), copiar DSN del "
-                "proyecto y `fly secrets set SENTRY_DSN=https://...`"
+                "proyecto y agregarlo al .env de la VM: "
+                "`sudo nano /opt/motor-glosas/.env` → SENTRY_DSN=https://... "
+                "→ `sudo docker compose restart motor`."
             ),
             "data": {},
         }
@@ -401,8 +428,9 @@ def diagnostico_completo(
                 "POSTHOG_API_KEY no configurada — no estamos midiendo "
                 "qué gestores usan qué features ni dónde se traban. "
                 "Setup en 3 min: posthog.com (free 1M eventos/mes), "
-                "Project Settings → API Key → "
-                "`fly secrets set POSTHOG_API_KEY=phc_...`"
+                "Project Settings → API Key → agregalo al .env de la VM: "
+                "`sudo nano /opt/motor-glosas/.env` → POSTHOG_API_KEY=phc_... "
+                "→ `sudo docker compose restart motor`."
             ),
             "data": {},
         }
@@ -470,7 +498,10 @@ def diagnostico_completo(
     except Exception as e:
         out["secciones"]["clausulas_contratos"] = {"estado": "error", "mensaje": str(e), "data": {}}
 
-    # ─── Volumen de Fly montado ───────────────────────────────────
+    # ─── Volumen de datos montado (self-hosted: /data en la VM HUS) ──
+    # Mantenemos la clave "volumen_fly" del JSON por backwards-compat con
+    # el frontend que la consume — el mensaje y el label sí están
+    # actualizados al stack actual (Google Cloud VM + bind mount Docker).
     try:
         soportes_root = os.getenv("SOPORTES_ROOT", "/data/soportes")
         existe = os.path.exists(soportes_root)
@@ -482,9 +513,13 @@ def diagnostico_completo(
         out["secciones"]["volumen_fly"] = {
             "estado": "ok" if existe else "error",
             "mensaje": (
-                f"Volumen montado en {soportes_root}, {mb_disponible} MB disponibles"
+                f"Volumen de datos montado en {soportes_root}, {mb_disponible} MB disponibles"
                 if existe
-                else f"Volumen NO montado en {soportes_root}"
+                else (
+                    f"Volumen de datos NO montado en {soportes_root}. "
+                    "Verificá `sudo docker compose ps` en la VM y que el "
+                    "bind mount ./data:/data esté en docker-compose.yml."
+                )
             ),
             "data": {"path": soportes_root, "existe": existe, "mb_disponibles": mb_disponible},
         }
