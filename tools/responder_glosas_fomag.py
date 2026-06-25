@@ -1130,27 +1130,51 @@ def _buscar_pdf_factura(pdf_dir: Path | None, factura: str) -> Path | None:
     return None
 
 
+def _esperar_adjunto(page: Page, timeout_s: int = 25) -> bool:
+    """Espera la confirmación 'Adjunto cargado con exito' (la subida puede ser
+    lenta, sobre todo desde un recurso de red Z:)."""
+    try:
+        page.wait_for_selector(
+            "text=/adjunto cargado con exito|cargado con exito|adjunto cargado/i",
+            timeout=timeout_s * 1000)
+        return True
+    except PlaywrightTimeout:
+        return True  # mejor esfuerzo: el set_input_files ya corrió
+
+
 def _subir_pdf_en_celda(page: Page, celda, pdf_path: Path) -> bool:
-    """Sube el PDF a la columna 'Archivo' de la fila. Usa el input[type=file]
-    directo si existe; si no, intercepta el file chooser del icono (evita el
-    diálogo del sistema operativo)."""
+    """Sube el PDF a la columna 'Archivo' SIN abrir el diálogo del SO: setea el
+    archivo directo sobre un <input type=file>. Espera la confirmación de carga.
+    Todos los pasos con timeout para no colgar."""
     if celda is None:
         return False
-    inp = celda.locator("input[type=file]")
+    # 1) input[type=file] dentro de la celda (no abre diálogo del SO).
     try:
+        inp = celda.locator("input[type=file]")
         if inp.count() > 0:
-            inp.first.set_input_files(str(pdf_path))
-            page.wait_for_timeout(1200)
-            return True
-    except Exception:
-        pass
+            inp.first.set_input_files(str(pdf_path), timeout=20000)
+            return _esperar_adjunto(page)
+    except Exception as e:
+        logger.info(f"    upload directo (celda) no anduvo: {e}")
+    # 2) input[type=file] a nivel de página (a veces es uno compartido oculto).
+    try:
+        inpg = page.locator("input[type=file]")
+        if inpg.count() > 0:
+            inpg.last.set_input_files(str(pdf_path), timeout=20000)
+            return _esperar_adjunto(page)
+    except Exception as e:
+        logger.info(f"    upload directo (página) no anduvo: {e}")
+    # 3) Interceptar el file chooser (Playwright evita el diálogo del SO).
+    #    Timeout corto para no colgar.
     icono = _primer_visible(celda.locator("button, a, i, mat-icon, svg, img")) or celda
     try:
-        with page.expect_file_chooser(timeout=8000) as fc_info:
+        with page.expect_file_chooser(timeout=9000) as fc_info:
             icono.click()
-        fc_info.value.set_files(str(pdf_path))
-        page.wait_for_timeout(1200)
-        return True
+        fc_info.value.set_files(str(pdf_path), timeout=20000)
+        return _esperar_adjunto(page)
+    except PlaywrightTimeout:
+        logger.warning("    no se abrió el selector de archivo del portal (sigo sin PDF).")
+        return False
     except Exception as e:
         logger.warning(f"    no pude subir el PDF: {e}")
         return False
