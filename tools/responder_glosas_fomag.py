@@ -895,60 +895,84 @@ def _celda(fila, idx: int):
 
 
 def _elegir_codigo_en_celda(page: Page, celda, codigo: str) -> bool:
-    """Selecciona `codigo` en el dropdown que vive en `celda`. Maneja <select>
-    nativo y dropdowns tipo Angular Material (overlay con las opciones)."""
+    """Selecciona `codigo` en el dropdown de `celda` y VERIFICA que quede pegado
+    (la celda muestra el código). Maneja <select> nativo y dropdowns tipo
+    Angular Material (overlay). Reintenta hasta 3 veces."""
     if celda is None:
         return False
-    # 1) <select> nativo.
-    sel = _primer_visible(celda.locator("select"))
-    if sel is not None:
+
+    def _ya_esta() -> bool:
         try:
-            opciones = sel.locator("option").all_inner_texts()
-            match = next((o for o in opciones if codigo in o), None)
-            if match:
-                sel.select_option(label=match)
-                page.wait_for_timeout(400)
-                return True
-        except Exception:
-            pass
-    # 2) Dropdown custom: abrir y elegir del overlay.
-    trigger = (
-        _primer_visible(celda.locator(
-            "mat-select, [role=combobox], .mat-select-trigger, .mat-mdc-select-trigger, "
-            "[aria-haspopup], button, .mat-select"
-        ))
-        or celda  # como último recurso, clickeo la celda entera
-    )
-    try:
-        trigger.click()
-    except Exception:
-        try:
-            celda.click()
+            return codigo.upper() in (celda.inner_text() or "").upper()
         except Exception:
             return False
-    page.wait_for_timeout(600)
-    # Las opciones aparecen en un overlay a nivel body.
-    opcion = _primer_visible(page.locator(
-        f".cdk-overlay-pane [role=option]:has-text('{codigo}'), "
-        f".cdk-overlay-pane mat-option:has-text('{codigo}'), "
-        f".cdk-overlay-container li:has-text('{codigo}'), "
-        f"[role=listbox] [role=option]:has-text('{codigo}'), "
-        f"li:has-text('{codigo}')"
-    ))
-    if opcion is None:
-        _screenshot_debug(page, f"dropdown_sin_{codigo}")
-        # Cerrar el overlay para no bloquear la pantalla.
+
+    for intento in range(3):
+        if _ya_esta():
+            return True
+        # 1) <select> nativo dentro de la celda.
+        sel = _primer_visible(celda.locator("select"))
+        if sel is not None:
+            try:
+                opciones = sel.locator("option").all_inner_texts()
+                match = next((o for o in opciones if codigo in o), None)
+                if match:
+                    sel.select_option(label=match)
+                    page.wait_for_timeout(500)
+                    if _ya_esta():
+                        return True
+            except Exception:
+                pass
+        # 2) Dropdown custom: abrir el trigger de la celda.
+        trigger = (
+            _primer_visible(celda.locator(
+                "mat-select, [role=combobox], [aria-haspopup], .mat-select-trigger, "
+                ".mat-mdc-select-trigger, .mat-select, .select"))
+            or _primer_visible(celda.locator("button, div, span"))
+            or celda
+        )
         try:
-            page.keyboard.press("Escape")
+            trigger.click()
         except Exception:
-            pass
-        return False
-    try:
-        opcion.click()
-        page.wait_for_timeout(400)
-        return True
-    except Exception:
-        return False
+            try:
+                celda.click()
+            except Exception:
+                pass
+        # Esperar a que aparezca la opción del código en un overlay.
+        opcion = None
+        fin = time.time() + 8
+        while time.time() < fin:
+            opcion = _primer_visible(page.locator(
+                f"mat-option:has-text('{codigo}'), [role=option]:has-text('{codigo}'), "
+                f".cdk-overlay-pane li:has-text('{codigo}'), "
+                f".cdk-overlay-container li:has-text('{codigo}'), "
+                f"li:has-text('{codigo}'), [role=listbox] *:has-text('{codigo}')"))
+            if opcion is not None:
+                break
+            page.wait_for_timeout(300)
+        if opcion is None:
+            logger.info(f"    dropdown Cod Rta2 RAT: no apareció la opción {codigo} "
+                        f"(intento {intento + 1}/3)")
+            _screenshot_debug(page, f"dropdown_sin_{codigo}_{intento}")
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+            page.wait_for_timeout(400)
+            continue
+        try:
+            opcion.click()
+        except Exception:
+            try:
+                opcion.click(force=True)
+            except Exception:
+                pass
+        page.wait_for_timeout(800)
+        if _ya_esta():
+            return True
+        logger.info(f"    dropdown Cod Rta2 RAT: clickié {codigo} pero la celda sigue "
+                    f"vacía (intento {intento + 1}/3)")
+    return _ya_esta()
 
 
 def _cargar_detalle_en_celda(page: Page, celda, texto: str) -> bool:
