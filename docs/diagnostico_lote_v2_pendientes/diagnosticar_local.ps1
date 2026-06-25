@@ -66,8 +66,30 @@ function Inspeccionar-Carpeta($path) {
     if ($a.Name -match "^CUV_.*\.json$") {
       $info.TieneCUV  = $true
       $info.NombreCUV = $a.Name
+      $raw = ""
+      try { $raw = Get-Content $a.FullName -Raw -Encoding UTF8 } catch {}
+      # Caso 1: el archivo no es JSON sino texto plano con el error del
+      # servicio interno del HUS (dockerrips.hus.gov.co:9443 caido). Asi salen
+      # los "CUV" de las notas cuyo RIPS nunca llego a validarse contra
+      # MinSalud — el archivo se guarda con el mensaje de excepcion del API.
+      if ($raw -match "Se ha generado un error en el consumo" -or `
+          $raw -match "dockerrips\.hus\.gov\.co" -or `
+          $raw -match "No connection could be made" -or `
+          $raw -match "A connection attempt failed") {
+        $info.CUV_State = "INVALIDO_RIPS_DOWN"
+        $info.CUV_CodigoError = "DOCKERRIPS_DOWN"
+        # Extraer la causa especifica (refused vs timeout) para el reporte.
+        if ($raw -match "actively refused it") {
+          $info.CUV_Observacion = "Servicio dockerrips.hus.gov.co:9443 RECHAZO la conexion (servicio caido)"
+        } elseif ($raw -match "A connection attempt failed") {
+          $info.CUV_Observacion = "Servicio dockerrips.hus.gov.co:9443 TIMEOUT (no respondio)"
+        } else {
+          $info.CUV_Observacion = ($raw.Substring(0, [Math]::Min(200, $raw.Length))).Replace("`r"," ").Replace("`n"," ")
+        }
+        return [PSCustomObject]$info
+      }
       try {
-        $j = Get-Content $a.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        $j = $raw | ConvertFrom-Json
         # ResultState es booleano nativo en el JSON; PowerShell lo deserializa
         # como [bool] real, asi que normalizamos a "True"/"False".
         if ($null -ne $j.ResultState) {
@@ -92,6 +114,9 @@ function Inspeccionar-Carpeta($path) {
         }
       } catch {
         $info.CUV_State = "JSON_ILEGIBLE"
+        if ($raw) {
+          $info.CUV_Observacion = ($raw.Substring(0, [Math]::Min(200, $raw.Length))).Replace("`r"," ").Replace("`n"," ")
+        }
       }
     }
   }
@@ -126,6 +151,10 @@ foreach ($f in $facturas) {
       $estadoCalculado = "COMPLETA_CUV_OK"
     } elseif ($infoV2.CUV_State -eq "False") {
       $estadoCalculado = "COMPLETA_CUV_RECHAZADO_$($infoV2.CUV_CodigoError)"
+    } elseif ($infoV2.CUV_State -eq "INVALIDO_RIPS_DOWN") {
+      $estadoCalculado = "COMPLETA_CUV_INVALIDO_DOCKERRIPS"
+    } elseif ($infoV2.CUV_State -eq "JSON_ILEGIBLE") {
+      $estadoCalculado = "COMPLETA_CUV_JSON_ILEGIBLE"
     } else {
       $estadoCalculado = "COMPLETA_CUV_DESCONOCIDO"
     }
@@ -138,12 +167,14 @@ foreach ($f in $facturas) {
   }
 
   $color = switch -Regex ($estadoCalculado) {
-    "^COMPLETA_CUV_OK$"          { "Green" }
-    "^COMPLETA_CUV_RECHAZADO"    { "Red" }
-    "^FALTAN_"                   { "Yellow" }
-    "^CARPETA_NO_EXISTE_EN_V2$"  { "Yellow" }
-    "^SIN_NE_V2$"                { "Red" }
-    default                       { "White" }
+    "^COMPLETA_CUV_OK$"               { "Green" }
+    "^COMPLETA_CUV_RECHAZADO"         { "Red" }
+    "^COMPLETA_CUV_INVALIDO_DOCKERRIPS$" { "Magenta" }
+    "^COMPLETA_CUV_JSON_ILEGIBLE$"    { "Magenta" }
+    "^FALTAN_"                        { "Yellow" }
+    "^CARPETA_NO_EXISTE_EN_V2$"       { "Yellow" }
+    "^SIN_NE_V2$"                     { "Red" }
+    default                            { "White" }
   }
 
   Write-Host ("[{0}]  NE_V2={1}  Estado={2}" -f $f.HUS, $f.NE_V2, $estadoCalculado) -ForegroundColor $color

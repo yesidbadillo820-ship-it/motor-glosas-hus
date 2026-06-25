@@ -1,85 +1,81 @@
 # Diagnóstico — 12 facturas pendientes del Lote V2 (Dispensario)
 
-Carpeta de trabajo armada a partir de lo que el repo y el contexto saben sobre
-las 12 facturas que figuran como pendientes en el lote
-`LOTE_DISPENSARIO_2026-06_V2`.
+> **ACTUALIZADO 2026-06-25** tras inspección real de los `CUV_*.json` en disco.
+> El cuadro inicial decía que 5 facturas estaban subidas OK y otras necesitaban
+> simplemente re-correr el bot — **eso era falso positivo**. La verdad: 9 de
+> las 12 están bloqueadas por SISTEMAS (CUV inválido o rechazado).
 
-**Objetivo:** entender, para cada factura, **por qué no se subió** al portal
-SIMED y qué acción concreta toca hacer.
-
-## Listado de facturas analizadas
+## Listado analizado
 
 ```
-HUS0000404136
-HUS0000411234
-HUS0000410675
-HUS0000413266
-HUS0000417459
-HUS0000420099
-HUS0000421733
-HUS0000418576
-HUS0000420160
-HUS0000422238
-HUS0000435485
-HUS0000440328
+HUS0000404136  HUS0000411234  HUS0000410675  HUS0000413266
+HUS0000417459  HUS0000420099  HUS0000421733  HUS0000418576
+HUS0000420160  HUS0000422238  HUS0000435485  HUS0000440328
 ```
+
+## Causa raíz por factura (resumen ejecutivo)
+
+| Causa raíz | Conteo | Facturas | Quién resuelve |
+|---|---|---|---|
+| RIPS rechazado MinSalud — RVC086 | 3 | HUS404136, HUS410675, HUS435485 | **SISTEMAS/RIPS** |
+| RIPS nunca validado — `dockerrips.hus.gov.co:9443` caído | 6 | HUS411234, 420099, 421733, 418576, 420160, 422238 | **SISTEMAS** |
+| Sin PDF CRRP en disco | 2 | HUS413266, HUS417459 | **Auditor** (descargar DIAN) |
+| Sin NE V2 asignado | 1 | HUS440328 | **Facturación** |
+| **TOTAL** | **12** | | |
+
+**9 de las 12 quedan en manos de SISTEMAS.** Un solo correo destraba el bloque
+más grande.
 
 ## Archivos en esta carpeta
 
 | Archivo | Para qué sirve |
 |---|---|
 | `README.md` | este resumen |
-| `estado_facturas.md` | ficha detallada por factura (NEs, motivo, acción) |
+| `estado_facturas.md` | ficha detallada por factura (NEs + causa real + acción) |
 | `resumen.csv` | la misma info en formato tabla (Excel) |
-| `diagnosticar_local.ps1` | script PowerShell que corrés en Windows para validar el estado **real** de cada carpeta en disco + CUV |
+| `correo_sistemas.md` | **plantilla del correo a SISTEMAS** con las 9 NEs y la captura del error |
+| `diagnosticar_local.ps1` | script PowerShell para re-validar el estado real (corrió ya — el resultado está en `reporte_diagnostico.csv`) |
+| `reporte_diagnostico.csv` | salida del script (generado localmente, no se commitea) |
 
 ## Cómo usar
 
-1. Hacer `git pull` en `C:\temp-notas`.
-2. Abrir `docs/diagnostico_lote_v2_pendientes/estado_facturas.md` y leer el
-   resumen por factura.
-3. Correr el script:
+1. Mandar el correo de `correo_sistemas.md` al área de SISTEMAS/RIPS.
+2. Mientras esperás respuesta, bajar los 2 PDFs CRRP del DIAN (HUS413266 y
+   HUS417459) — eso destraba 2 facturas más sin depender de nadie.
+3. Mandar mensaje corto a Facturación por HUS440328.
+4. Cuando SISTEMAS confirme que ya regeneraron los CUVs, **revalidar**:
 
    ```powershell
    cd C:\temp-notas
-   powershell -ExecutionPolicy Bypass -File docs\diagnostico_lote_v2_pendientes\diagnosticar_local.ps1
+   git pull
+   py tools\verificar_cuv_notas.py `
+     --facturas "HUS404136,HUS411234,HUS410675,HUS420099,HUS421733,HUS418576,HUS420160,HUS422238,HUS435485" `
+     --reporte  "D:\USUARIO CARTERA\Documents\NOTAS ANTIGUAS\reporte_cuv_pendientes.csv"
    ```
 
-   El script va a:
-   - listar archivos `NC_/XML_/CUV_` por cada carpeta `NE` en
-     `LOTE_DISPENSARIO_2026-06_V2\NOTAS`.
-   - reportar `COMPLETA / FALTA: ...` por carpeta.
-   - decir si la carpeta original (`NOTAS_DISP_9`, `NOTAS_DISP_10`, etc.) existe
-     para las que hay que copiar.
-   - leer el CUV JSON y reportar `ResultState` y código de rechazo.
+   Si las 9 salen `OK`, recién ahí re-correr `cargar_soportes_simed.py` para
+   subirlas.
 
-4. Tomar acción según la tabla "Próxima acción" del `estado_facturas.md`.
+## Cómo se llegó a esto
 
-## Cuadro rápido (resumen)
+`diagnosticar_local.ps1` (versión final) lee cada `CUV_*.json` y:
 
-| # | Factura | NE V2 | Estado conocido | Acción |
-|---|---|---|---|---|
-| 1 | HUS0000404136 | 311131 | COMPLETA en `NOTAS_DISP_10` | copiar al V2 y subir |
-| 2 | HUS0000411234 | 311147 | COMPLETA en `NOTAS_DISP_9` | copiar al V2 y subir |
-| 3 | HUS0000410675 | 311136 | **CUV RECHAZADO RVC086** | escalar SISTEMAS/RIPS, NO subir |
-| 4 | HUS0000413266 | 311183 | sin PDF CRRP | descargar del DIAN |
-| 5 | HUS0000417459 | 311186 | sin PDF CRRP | descargar del DIAN |
-| 6 | HUS0000420099 | 311188 | ✅ Subida (contexto) | verificar en SIMED por qué sale como pendiente |
-| 7 | HUS0000421733 | 311190 | ✅ Subida (contexto) | verificar en SIMED |
-| 8 | HUS0000418576 | 311194 | ✅ Subida (contexto) | verificar en SIMED |
-| 9 | HUS0000420160 | 311197 | ✅ Subida (contexto) | verificar en SIMED |
-| 10 | HUS0000422238 | 311199 | ✅ Subida (contexto) | verificar en SIMED |
-| 11 | HUS0000435485 | 311222 | NC subió, soportes pendientes | re-correr cargue (`--solo 311222`) |
-| 12 | HUS0000440328 | sin NE V2 (TSV histórico 302111) | falta NE definitivo | confirmar con facturación si NE 302111 es válido o si emitieron uno nuevo |
+- Si tiene `ResultState:true` → CUV válido.
+- Si tiene `ResultState:false` → rechazo MinSalud (lee `ResultadosValidacion[].Codigo`
+  donde `Clase=RECHAZADO`).
+- Si no es JSON parseable → CUV inválido (texto plano con error de red).
 
-## Diferencia entre NE histórico (TSV) y NE V2 (contexto)
+Los `CUV_*.json` de las 6 facturas DOCKERRIPS contienen literalmente:
 
-`tools/notas_credito_ejemplo.tsv` guarda los NEs **originales** (263xxx, 234xxx,
-243xxx, 264xxx, 302xxx) emitidos en las Actas AC000456 / AC000619 / etc.
+```
+Se ha generado un error en el consumo
+Se ha generado un error en el proceso de login
+One or more errors occurred. (No connection could be made because the target
+machine actively refused it. (dockerrips.hus.gov.co:9443))
+```
 
-Para el lote V2 (junio 2026), la mayoría de estas facturas tuvieron una NC
-**re-emitida** con NE 311xxx. El `estado_facturas.md` muestra los dos NEs lado
-a lado para evitar confusión.
-
-> **No mezclar ambos NEs al armar carpetas**: el SIMED espera el NE V2 vigente,
-> no el histórico.
+Eso es el mensaje que devolvió el servicio interno del HUS cuando intentó
+validar los RIPS contra MinSalud — el container `dockerrips` estaba caído /
+rechazó conexiones / dio timeout. El sistema guardó el error como si fuera el
+resultado, y `consolidar_carpetas_notas.py` lo movió a `CUV_*.json` sin saber
+que era basura.
