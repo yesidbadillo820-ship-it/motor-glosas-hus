@@ -355,28 +355,39 @@ def _abrir_facturas_prestador(page: Page) -> None:
         _screenshot_debug(page, "sin_cuadro_naranja")
         raise RuntimeError("No encontré el cuadro 'Facturas prestador'.")
 
-    # Candidatos a clickear: el texto y sus contenedores (a/button/div padre).
-    candidatos = [caja]
+    # Preferir el card clickeable (ancestro), no el <span> del texto: el handler
+    # suele estar en el contenedor.
+    objetivo = caja
     for xp in ("xpath=ancestor-or-self::a[1]", "xpath=ancestor-or-self::button[1]",
-               "xpath=ancestor::div[1]", "xpath=ancestor::div[2]"):
+               "xpath=ancestor-or-self::*[@role='button'][1]", "xpath=ancestor::div[1]"):
         try:
             c = _primer_visible(caja.locator(xp))
             if c is not None:
-                candidatos.append(c)
+                objetivo = c
+                break
         except Exception:
             continue
 
-    for cand in candidatos:
+    # Click ÚNICO por intento + espera LARGA (el SPA es lento). Se chequea la
+    # visibilidad ANTES de cada click para no togglear y cerrar las pestañas.
+    for intento in range(4):
+        if _pestanas_visibles(page):
+            page.wait_for_timeout(400)
+            return
         try:
-            cand.click(timeout=4000)
+            objetivo.click(timeout=4000)
         except Exception:
-            continue
-        fin = time.time() + 6
+            try:
+                caja.click(timeout=4000)
+            except Exception:
+                pass
+        fin = time.time() + 18
         while time.time() < fin:
             if _pestanas_visibles(page):
                 page.wait_for_timeout(600)
                 return
-            page.wait_for_timeout(400)
+            page.wait_for_timeout(500)
+        logger.info(f"  las pestañas no aparecieron tras el click ({intento + 1}/4); reintento…")
     _screenshot_debug(page, "tabs_no_aparecen")
     raise RuntimeError("Clickeé 'Facturas prestador' pero no aparecieron las pestañas.")
 
