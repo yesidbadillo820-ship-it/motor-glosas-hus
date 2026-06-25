@@ -1225,8 +1225,17 @@ def responder_glosa(
     for n, fila in enumerate(filas, start=1):
         ok_cod = _elegir_codigo_en_celda(page, _celda(fila, i_cod), codigo)
         try:
-            cel = (_celda(fila, i_cod).inner_text() or "").strip()
-            logger.info(f"    Cod Rta2 RAT (celda) = {cel[:30]!r}")
+            cel = _celda(fila, i_cod).evaluate(
+                """el => {
+                    let t = (el.innerText||'').trim();
+                    for (const i of el.querySelectorAll('input,select')) {
+                        if (i.value) t += ' [' + i.value + ']';
+                        if (i.selectedOptions) for (const o of i.selectedOptions) t += ' {' + (o.text||'') + '}';
+                    }
+                    return t.trim();
+                }"""
+            )
+            logger.info(f"    Cod Rta2 RAT = {(cel or '')[:60]!r}  ({'OK' if ok_cod else 'FALLO'})")
         except Exception:
             pass
         if not ok_cod:
