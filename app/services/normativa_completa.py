@@ -563,6 +563,57 @@ DECRETOS = {
         "vigente": True,
         "keywords": ["flujo recursos", "aseguramiento", "giro directo IPS"],
     },
+    # Ronda 14 (Bug P): normas reales que el verifier marcaba como
+    # inexistentes en producción.
+    "DECRETO 2493 DE 2004": {
+        "nombre": "Decreto 2493 de 2004 (MinProtección Social)",
+        "titulo": "Régimen general de obtención, donación, preservación y trasplante de componentes anatómicos",
+        "ambito": "Trasplantes — atención del donante y receptor",
+        "vigente": True,
+        "articulos": {
+            "general": {
+                "titulo": "Cobertura integral del proceso de trasplante",
+                "texto": "La atención del donante cadavérico (extracción, preservación, transporte del órgano) y la del receptor (pre, intra y postoperatoria, inmunosupresión incluida) son responsabilidad ÍNTEGRA de la entidad pagadora del receptor, independientemente del estatus de afiliación del donante.",
+                "aplicacion": "Defensa de glosas de trasplante por 'donante no afiliado'",
+                "keywords": ["donante", "trasplante", "extracción", "receptor"],
+            },
+        },
+        "keywords": ["Decreto 2493", "trasplante", "donante", "componente anatómico", "INS"],
+    },
+    "DECRETO 600 DE 2017": {
+        "nombre": "Decreto 600 de 2017 (Min. Justicia + MinSalud)",
+        "titulo": "Atención en salud para Población Privada de la Libertad (PPL)",
+        "ambito": "PPL — financiamiento vía Fondo Nacional de Salud PPL administrado por Fiduprevisora",
+        "vigente": True,
+        "notas": "Establece que las atenciones a PPL se cargan al Fondo Nacional, no a la EPS contributiva del núcleo familiar — salvo urgencia vital ya iniciada.",
+        "keywords": ["Decreto 600", "PPL", "INPEC", "Fiduprevisora", "fondo PPL"],
+    },
+    "DECRETO 4725 DE 2005": {
+        "nombre": "Decreto 4725 de 2005 (MinProtección Social)",
+        "titulo": "Régimen de registros sanitarios INVIMA para dispositivos médicos",
+        "ambito": "Dispositivos médicos — registro, vigilancia, renovación",
+        "vigente": True,
+        "articulos": {
+            "art_35": {
+                "titulo": "Vigencia y renovación del registro sanitario",
+                "texto": "El registro sanitario tiene vigencia de 10 años renovable. Si se radica la solicitud de renovación antes del vencimiento, el registro se entiende vigente hasta el pronunciamiento del INVIMA (extensión automática).",
+                "aplicacion": "Defensa de glosas por uso de dispositivo con registro 'vencido' pero en proceso de renovación",
+                "keywords": [
+                    "registro sanitario",
+                    "vencimiento",
+                    "renovación",
+                    "extensión automática",
+                ],
+            },
+        },
+        "keywords": [
+            "Decreto 4725",
+            "dispositivos médicos",
+            "INVIMA",
+            "registro sanitario",
+            "renovación",
+        ],
+    },
 }
 
 
@@ -581,6 +632,31 @@ RESOLUCIONES = {
         },
         "reemplaza": "Resolución 3047/2008 Anexo Técnico 5 (que queda como antecedente procedimental)",
         "keywords": ["manual único", "glosas", "códigos taxativos", "2284", "anexo técnico 3"],
+    },
+    # Ronda 14 (Bug P): la Resolución 1885 de 2018 es la del MIPRES
+    # (Mi Prescripción), distinta a la Resolución 1885 de 2024 que el
+    # corpus ya tenía (esa es de cronograma del Manual Único). El verifier
+    # marcaba la de 2018 como inexistente porque solo tenía la de 2024.
+    "RESOLUCION 1885 DE 2018": {
+        "nombre": "Resolución 1885 de 2018 (MinSalud)",
+        "titulo": "Procedimiento MIPRES — prescripción de servicios y tecnologías no incluidas en PBS",
+        "ambito": "Prescripción NoPBS — vigencia de la prescripción y trámite",
+        "vigente": True,
+        "articulos": {
+            "art_14": {
+                "titulo": "Vigencia de la prescripción MIPRES",
+                "texto": "La prescripción tiene vigencia equivalente a la duración del tratamiento prescrito por el médico tratante. La continuidad del tratamiento en hospitalización por descompensación clínica no requiere nueva prescripción si el evento clínico es el mismo.",
+                "aplicacion": "Defensa de glosas por 'MIPRES vencido' cuando la atención hospitalaria continúa el tratamiento crónico",
+                "keywords": ["vigencia MIPRES", "continuidad", "tratamiento crónico"],
+            },
+            "art_22": {
+                "titulo": "MIPRES en eventos especiales — junta médica",
+                "texto": "En urgencia vital o tratamiento iniciado prequirúrgicamente (inducción inmunológica en trasplantes), la prescripción MIPRES puede radicarse antes o durante el evento; el rigor administrativo NO impide la cobertura del tratamiento.",
+                "aplicacion": "Defensa de inmunosupresión PRE-trasplante prescrita antes de la cirugía",
+                "keywords": ["MIPRES contingencia", "trasplante", "urgencia vital"],
+            },
+        },
+        "keywords": ["Resolución 1885", "MIPRES", "no PBS", "prescripción"],
     },
     "RESOLUCION 1885 DE 2024": {
         "nombre": "Resolución 1885 de 2024 (MinSalud)",
@@ -1356,6 +1432,28 @@ ACUERDOS = {
         "vigente": True,
         "notas": "Establece que la remuneración a las IPS que atienden población FF.MM. se rige íntegramente por las tarifas consignadas en los contratos interadministrativos.",
         "keywords": ["Acuerdo 002", "FF.MM.", "sanidad militar", "tarifas contractuales"],
+    },
+    # Ronda 14 (25-jun-2026, Bug P): el verifier marcaba como
+    # "NORMA_INEXISTENTE" las siguientes normas que SÍ existen en el
+    # ordenamiento jurídico colombiano. Las agregamos al corpus para que
+    # el quality gate deje de generar falsos positivos en dictámenes
+    # legítimos.
+    "ACUERDO 256 DE 2001": {
+        "nombre": "Acuerdo 256 de 2001 (Consejo Nacional de Seguridad Social en Salud — CNSSS)",
+        "titulo": "Mecanismo de actualización de tarifas SOAT (anualidad fiscal)",
+        "ambito": "Tarifas SOAT — cambio de manual al inicio de cada vigencia",
+        "vigente": True,
+        "notas": "Regula el ajuste anual del Manual Tarifario SOAT y la aplicación temporal de los nuevos valores al 1 de enero de cada año.",
+        "keywords": ["Acuerdo 256", "SOAT", "anualidad fiscal", "actualización tarifas"],
+    },
+    "ACUERDO 029 DE 2011": {
+        "nombre": "Acuerdo 029 de 2011 (CRES)",
+        "titulo": "Plan Obligatorio de Salud — actualización integral",
+        "ambito": "Cobertura PBS (derogado parcialmente por Resolución 5267/2017)",
+        "vigente": False,
+        "reemplazado_por": "Resolución 5267 de 2017 (luego Resolución 2292 de 2021)",
+        "notas": "Norma de transición — el contenido fue subrogado pero algunas EPS aún la invocan en glosas. Cuando la EPS la cite, contrarrestar con la norma vigente del PBS.",
+        "keywords": ["Acuerdo 029", "POS", "PBS", "CRES", "derogado"],
     },
 }
 

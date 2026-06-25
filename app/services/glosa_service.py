@@ -1066,6 +1066,75 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "código de la glosa aplicada",
     ),
+    # ── Ronda 14 (25-jun-2026): CUM y restos de INVIMA confundidos con CUPS ──
+    # Evidencia: nuevos casos (trasplante, dengue, TEVAR) — la IA escribió:
+    #   "CUPS 19953856" (era CUM Tacrolimus 19953856-3)
+    #   "CUPS 20002174" (era CUM Norepinefrina 20002174-1)
+    #   "CUPS 0021987" (era fragmento del Registro INVIMA 2023DM-0021987)
+    # Los CUM colombianos típicamente tienen 7-9 dígitos numéricos + "-X"
+    # como dígito verificador. Los registros INVIMA tienen formato
+    # "AÑO+DM-XXXXXXX" donde la cola es 6-7 dígitos.
+    # Los CUPS REALES tienen 5-7 dígitos pero la IA NUNCA debería tomar el
+    # número de un CUM/INVIMA del texto y llamarlo CUPS. Cualquier CUPS de
+    # 7+ dígitos puros (sin sufijo letra ni guión) es alucinación.
+    (
+        re.compile(
+            r"\b(?:BAJO\s+EL\s+|AL\s+|EL\s+)?CUPS\s+\d{7,10}\b(?![\d\-A-Z])",
+            re.IGNORECASE,
+        ),
+        "el procedimiento facturado según historia clínica",
+    ),
+    (
+        re.compile(
+            r"\bC[ÓO]DIGO\s+CUPS\s+\d{7,10}\b(?![\d\-A-Z])",
+            re.IGNORECASE,
+        ),
+        "el código CUPS consignado en la factura electrónica",
+    ),
+    # NOTA: CUM con sufijo "-X" (ej. "19953856-3") NO se neutraliza acá
+    # porque ronda 11 tenía el caso TRAMADOL real "CUPS 19997313-6"
+    # legítimo del input del usuario que debe preservarse. La alucinación
+    # del usuario en los casos del 25-jun fueron todas SIN sufijo
+    # (CUPS 19953856, CUPS 20002174, CUPS 0021987) — las atrapa la regla
+    # de dígitos puros 7-10 de arriba.
+    # ── Ronda 14: nuevos placeholders y dobles artículos ──
+    # Evidencia (trasplante hepático, $487M): la IA escribió:
+    #   "LA NUEVA la entidad pagadora LA GLOSA CON TRES CAUSALES"
+    # — el "la entidad pagadora" es residuo de un placeholder mal
+    # sustituido entre "LA NUEVA" (EPS) y el resto.
+    (
+        re.compile(
+            r"\b(LA\s+NUEVA\s+EPS|LA\s+NUEVA|NUEVA\s+EPS)\s+la\s+entidad\s+pagadora\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
+    # "el manejo clínico el paciente identificado en el expediente" — falta
+    # la preposición "de" entre "clínico" y "el paciente"
+    (
+        re.compile(
+            r"(EL\s+\w+\s+CL[ÍI]NIC[OA]S?)\s+(el\s+paciente|los\s+pacientes)",
+            re.IGNORECASE,
+        ),
+        r"\1 d\2",
+    ),
+    # "EL [palabra] LA EPS" sin "de" entre [palabra] y "LA EPS"
+    # Caso real: "NO REQUIERE LA APROBACIÓN PREVIA LA EPS"
+    (
+        re.compile(
+            r"\bPREVIA\s+LA\s+EPS\b",
+            re.IGNORECASE,
+        ),
+        "previa de la EPS",
+    ),
+    # "POR la entidad pagadora la entidad pagadora" (duplicado)
+    (
+        re.compile(
+            r"\bla\s+entidad\s+pagadora\s+la\s+entidad\s+pagadora\b",
+            re.IGNORECASE,
+        ),
+        "la entidad pagadora",
+    ),
 )
 
 
@@ -1122,6 +1191,32 @@ _RE_MONTO_DICTAMEN = re.compile(
 _MIN_DIGITOS_MONTO = 4  # ignora cifras chicas ("$10", "$0.00") y porcentajes
 _FRASE_VALOR_NEUTRO = "el valor objetado consignado en el expediente"
 
+# ── Ronda 14 (Bug K): constantes legítimas que el system prompt enseña a la IA ──
+# Regresión introducida por el sanitizer Bug J de ronda 13: cuando el dictamen
+# escribía "UVB 2026 = $12.110" (constante del manual SOAT incluida
+# explícitamente en el prompt), el sanitizer pisaba el $12.110 por la frase
+# neutra porque la cifra no estaba en el input del usuario. Solución:
+# whitelisteamos las constantes monetarias que el prompt enseña a la IA — son
+# valores objetivos del marco normativo, NO estimaciones.
+_DIGITOS_CONSTANTES_LEGITIMOS: frozenset[str] = frozenset(
+    {
+        # UVB (Unidad de Valor Básico SOAT) Manual Tarifario SOAT
+        "12110",  # UVB 2026 — Circ. 047/2025 MinSalud
+        "11552",  # UVB 2025 — Circ. 026/2024
+        "11078",  # UVB 2024
+        "10500",  # UVB 2023
+        # Salario mínimo mensual legal vigente (referencia tarifaria SMLV)
+        "1423500",  # SMLV 2026
+        "1300000",  # SMLV 2025
+        "1160000",  # SMLV 2024
+        # SMDLV (salario mínimo diario)
+        "47450",  # 2026
+        "43333",  # 2025
+        # Auxilio de transporte 2026
+        "200000",
+    }
+)
+
 
 def _normalizar_digitos(texto: str) -> str:
     """Devuelve solo los dígitos del texto (descartando puntos, comas, $, espacios)."""
@@ -1162,6 +1257,9 @@ def _conjunto_digitos_legitimos(
     _agregar(texto_input_usuario)
     for x in extras:
         _agregar(x)
+    # Ronda 14: constantes del prompt SIEMPRE legítimas (UVB, SMLV, etc.) —
+    # nunca deben ser pisadas como "alucinación".
+    legitimos |= _DIGITOS_CONSTANTES_LEGITIMOS
     return legitimos
 
 
@@ -1443,6 +1541,220 @@ def _refutar_evento_adverso_prevenible(
             "reescrito(s): la defensa ahora NIEGA la prevenibilidad en vez de "
             "aceptar y argumentar 'igual paguen'."
         )
+    return nuevo
+
+
+def _sustituir_eps_generica_en_dictamen(
+    dictamen: str,
+    eps_real_detectada: str | None,
+) -> str:
+    """Bug I v2 (ronda 14): si la EPS real fue auto-detectada del texto
+    pero el dictamen sigue mostrando "OTRA / SIN DEFINIR" (típicamente en
+    el header de la tabla o en notas auxiliares), reemplaza esas
+    ocurrencias por el nombre canónico real.
+
+    Caso real 25-jun: FAMISANAR detectada en cuerpo del argumento pero el
+    header de la tabla "INTERPUESTA POR" seguía diciendo "OTRA / SIN
+    DEFINIR" porque la sustitución solo se aplicó al texto generado por
+    la IA, no a las plantillas de cabecera.
+    """
+    if not dictamen or not eps_real_detectada:
+        return dictamen
+    eps_norm = eps_real_detectada.strip().upper()
+    if not eps_norm or eps_norm in ("OTRA / SIN DEFINIR", "OTRA", "SIN DEFINIR"):
+        return dictamen
+    n = 0
+    # "OTRA / SIN DEFINIR" → EPS real (case-insensitive, ortografía exacta
+    # del dropdown). Cubre con/sin "/" pegado o espaciado.
+    patrones = (
+        re.compile(r"\bOTRA\s*/\s*SIN\s+DEFINIR\b", re.IGNORECASE),
+        re.compile(r"\bOTRA\s*-\s*SIN\s+DEFINIR\b", re.IGNORECASE),
+    )
+    nuevo = dictamen
+    for pat in patrones:
+        nuevo, k = pat.subn(eps_norm, nuevo)
+        n += k
+    if n:
+        logger.warning(
+            f"[EPS-HEADER-SUSTITUCION] {n} mención(es) de "
+            f"'OTRA / SIN DEFINIR' sustituida(s) por '{eps_norm}' "
+            f"(EPS auto-detectada del texto del usuario)"
+        )
+    return nuevo
+
+
+# ── Ronda 14 (Bug L): normalizar dictamen "TODO EN MAYÚSCULAS" ──
+# Yesid lo señaló múltiples veces como antitécnico: dictámenes oficiales
+# salen 100% en mayúsculas, lo que le saca pinta jurídica y comunica
+# "documento generado por plantilla automática sin revisión humana". La
+# IA hereda esto del estilo de los anti-patrones del prompt. Esta red
+# detecta párrafos donde más del 60% de las letras alfabéticas son
+# UPPERCASE y los normaliza a sentence case institucional, conservando:
+#   - Siglas conocidas (HUS, EPS, ARL, NIT, CUM, CUPS, UVB, IPS, ESE,
+#     SuperSalud, MinSalud, INVIMA, ADRES, FOSYGA, POS, PBS, FFMM)
+#   - Nombres canónicos de entidades (FAMISANAR, COMPENSAR, COOSALUD,
+#     SANITAS, FOMAG, DMBUG, etc.)
+#   - Códigos de norma (LEY, DECRETO, RESOLUCIÓN seguidos de número)
+#   - Códigos CUPS/glosa (TA0201, SO0501, FMQ2123, etc.)
+#   - Inicio de oración (mayúscula tras . ! ?)
+
+_SIGLAS_CONSERVAR_UPPER = frozenset(
+    {
+        "HUS",
+        "ESE",
+        "EPS",
+        "ARL",
+        "ARLs",
+        "IPS",
+        "NIT",
+        "CUM",
+        "CUPS",
+        "UVB",
+        "SMLV",
+        "SMDLV",
+        "UCI",
+        "UCIN",
+        "POS",
+        "PBS",
+        "PBSC",
+        "INVIMA",
+        "ADRES",
+        "FOSYGA",
+        "SOAT",
+        "SOGCS",
+        "MIPRES",
+        "FURAT",
+        "OMS",
+        "OPS",
+        "FFMM",
+        "FAC",
+        "MEBUG",
+        "DMBUG",
+        "PPL",
+        "ARP",
+        "ARS",
+        "EAPB",
+        "EPS-S",
+        "EPS-C",
+        "CIE",
+        "CIE-10",
+        "CIE10",
+        "RIPS",
+        "FEV",
+        "CUFE",
+        "DIAN",
+        "MinSalud",
+        "SuperSalud",
+        "MinHacienda",
+        "ICBF",
+        # Famosas EPS / pagadoras canónicas
+        "FAMISANAR",
+        "COMPENSAR",
+        "COOSALUD",
+        "SANITAS",
+        "FOMAG",
+        "ECOOPSOS",
+        "EMSSANAR",
+        "CAPRESOCA",
+        "DUSAKAWI",
+        "PIJAOS",
+        "MALLAMAS",
+        "POSITIVA",
+        "AURORA",
+        "MEDIMÁS",
+        "MEDIMAS",
+        "SURA",
+        "BOLÍVAR",
+        "BOLIVAR",
+        "MAPFRE",
+        "LIBERTY",
+        # Normas comúnmente referenciadas
+        "RCP",
+        "DNR",
+        "DVA",
+        "CTC",
+        "GPC",
+        "OMS",
+        "TEC",
+        "TEA",
+        "TEVAR",
+        "EVAR",
+        "USPEC",
+        "INPEC",
+    }
+)
+# Tokens que ya parecen siglas reales (todo upper, 2-6 chars, sin tilde),
+# o códigos alfanuméricos típicos de salud (TA0201, FMQ2123) — preservar.
+_RE_SIGLA_O_CODIGO = re.compile(r"^[A-Z]{2,6}$|^[A-Z]{1,4}\d{2,7}[A-Z]?$|^[A-Z]\d{4,7}-?\d?$")
+_RE_NUMERO_NORMA = re.compile(r"^\d{1,5}/\d{4}$|^\d{1,5}-\d{2,4}$|^\d+°$|^\d+º$")
+_RE_PALABRA_SOLO_LETRAS = re.compile(r"^[A-ZÁÉÍÓÚÑÜ]+$")
+
+
+def _es_sigla_o_codigo(palabra: str) -> bool:
+    """Devuelve True si la palabra debe conservar su uppercase original."""
+    if not palabra:
+        return False
+    # Tokens con dígitos = código, conservar
+    if any(c.isdigit() for c in palabra):
+        return True
+    p = palabra.strip(".,;:¿?¡!()[]{}\"'»«")
+    if not p:
+        return False
+    return p in _SIGLAS_CONSERVAR_UPPER or _RE_SIGLA_O_CODIGO.match(p) is not None
+
+
+def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.55) -> str:
+    """Convierte texto en MAYÚSCULAS sostenidas a sentence case institucional.
+
+    Estrategia:
+      1. Si el dictamen completo tiene < umbral_pct de letras en uppercase,
+         no se toca (probablemente ya está bien formateado).
+      2. Si supera el umbral, se divide en oraciones (por . ! ?) y cada
+         oración se normaliza: primer carácter alfabético en uppercase,
+         resto en lowercase EXCEPTO siglas conocidas y códigos.
+      3. Después de la conversión, se restauran las siglas a uppercase
+         exacto si quedaron en lowercase.
+    """
+    if not texto:
+        return texto
+    # Calcular porcentaje de uppercase en letras alfabéticas
+    letras_alfa = [c for c in texto if c.isalpha()]
+    if not letras_alfa:
+        return texto
+    pct_upper = sum(1 for c in letras_alfa if c.isupper()) / len(letras_alfa)
+    if pct_upper < umbral_pct:
+        return texto
+
+    # 1) Lowercase global
+    nuevo = texto.lower()
+    # 2) Capitalizar tras inicio de oración (., !, ?, salto de línea, " " al inicio)
+    nuevo = re.sub(
+        r"(^|[\.!?\n]\s*)([a-záéíóúñü])",
+        lambda m: m.group(1) + m.group(2).upper(),
+        nuevo,
+    )
+
+    # 3) Restaurar siglas conocidas: word-by-word
+    def _restaurar(match: re.Match[str]) -> str:
+        palabra = match.group(0)
+        upper = palabra.upper()
+        if upper in _SIGLAS_CONSERVAR_UPPER:
+            return upper
+        return palabra
+
+    nuevo = re.sub(r"\b\w+\b", _restaurar, nuevo)
+    # 4) Conservar uppercase en códigos alfanuméricos (TA0201, FMQ2123)
+    nuevo = re.sub(
+        r"\b([a-z]{1,4}\d{2,7}[a-z]?)\b",
+        lambda m: m.group(1).upper(),
+        nuevo,
+    )
+    # 5) "Ley", "Decreto", "Resolución" + número se conservan tal cual:
+    # la regla 2 ya capitalizó la inicial; nada extra.
+    logger.info(
+        f"[MAYUSCULAS-NORMALIZADAS] dictamen normalizado a sentence case "
+        f"(antes: {pct_upper:.0%} mayúsculas)"
+    )
     return nuevo
 
 
@@ -4828,6 +5140,38 @@ class GlosaService:
                     dictamen = _dict_g
             except Exception as _e_mu:
                 logger.debug(f"[MULETILLAS-RONDA13] red final no aplicada: {_e_mu}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Ronda 14 (25-jun-2026) — Bug I v2: EPS detectada del texto
+            #  debe reemplazar "OTRA / SIN DEFINIR" en el dictamen final
+            #  (incluyendo header de tabla). Bug L: dictámenes en
+            #  MAYÚSCULAS sostenidas se normalizan a sentence case.
+            # ═══════════════════════════════════════════════════════════
+            try:
+                from app.services.glosa_ia_prompts import _detectar_pagador_en_texto
+
+                _texto_glosa_input_lh = str(getattr(data, "tabla_excel", "") or "")
+                _eps_input = str(getattr(data, "eps", "") or "").strip().upper()
+                _eps_detectada = ""
+                if _eps_input in ("", "OTRA / SIN DEFINIR", "OTRA", "SIN DEFINIR"):
+                    _eps_detectada = _detectar_pagador_en_texto(_texto_glosa_input_lh)
+                if _eps_detectada:
+                    _dict_i = _sustituir_eps_generica_en_dictamen(dictamen, _eps_detectada)
+                    if _dict_i != dictamen:
+                        dictamen = _dict_i
+            except Exception as _e_eh:
+                logger.debug(f"[EPS-HEADER-RONDA14] red final no aplicada: {_e_eh}")
+
+            try:
+                # Bug L: normaliza mayúsculas sostenidas a sentence case
+                # institucional. Por seguridad solo aplica si el texto
+                # tiene más de 55% de letras en uppercase (umbral default
+                # de _normalizar_mayusculas_sostenidas).
+                _dict_l = _normalizar_mayusculas_sostenidas(dictamen)
+                if _dict_l != dictamen:
+                    dictamen = _dict_l
+            except Exception as _e_may:
+                logger.debug(f"[MAYUSCULAS-RONDA14] red final no aplicada: {_e_may}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 6 (16-jun-2026) — RED FINAL código coherente (fix I).
