@@ -989,18 +989,33 @@ def _cargar_detalle_en_celda(page: Page, celda, texto: str) -> bool:
         logger.warning(f"  No pude escribir el detalle: {e}")
         return False
     page.wait_for_timeout(300)
-    # Confirmar el editor si tiene botón propio (Aceptar/Guardar/OK/Listo/✓).
-    conf = _primer_visible(page.locator(
-        ".cdk-overlay-pane button:has-text('Aceptar'), [role=dialog] button:has-text('Aceptar'), "
-        ".cdk-overlay-pane button:has-text('Guardar'), [role=dialog] button:has-text('Guardar'), "
-        ".cdk-overlay-pane button:has-text('OK'), [role=dialog] button:has-text('Listo')"
-    ))
+    # Confirmar el editor con su botón GUARDAR/Aceptar — NUNCA 'GUARDAR RESPUESTA'
+    # (ese cerraría y enviaría toda la auditoría).
+    conf = None
+    cands = page.locator(
+        "button:has-text('Guardar'), button:has-text('Aceptar'), "
+        "button:has-text('OK'), button:has-text('Aplicar'), button:has-text('Listo')"
+    )
+    try:
+        for i in range(cands.count()):
+            c = cands.nth(i)
+            if not c.is_visible():
+                continue
+            if "RESPUESTA" in _norm(c.inner_text()):
+                continue
+            conf = c
+            break
+    except Exception:
+        pass
     if conf is not None:
         try:
             conf.click()
-            page.wait_for_timeout(400)
+            page.wait_for_timeout(600)
+            logger.info("    detalle: editor confirmado (Guardar).")
         except Exception:
             pass
+    else:
+        logger.info("    detalle: no vi botón Guardar del editor (¿commit por blur?).")
     return True
 
 
@@ -1134,6 +1149,11 @@ def responder_glosa(
                 + (f"; pdf={pdf.name}" if pdf else ""))
     for n, fila in enumerate(filas, start=1):
         ok_cod = _elegir_codigo_en_celda(page, _celda(fila, i_cod), codigo)
+        try:
+            cel = (_celda(fila, i_cod).inner_text() or "").strip()
+            logger.info(f"    Cod Rta2 RAT (celda) = {cel[:30]!r}")
+        except Exception:
+            pass
         if not ok_cod:
             logger.warning(f"    fila {n}: no pude elegir {codigo} en 'Cod Rta2 RAT'.")
             continue
@@ -1350,12 +1370,21 @@ def main() -> int:
                     resultados.append(reg)
                     w_rep.writerow(reg)
                     f_rep.flush()
-                    # Volver a la grilla para la siguiente factura.
+                    # Volver a la grilla para la siguiente (no en la última).
+                    if i < len(objetivos):
+                        try:
+                            ir_a_pestana(page, tab_label)
+                        except Exception:
+                            pass
+                f_rep.close()
+                # Piloto visible: pausar para inspeccionar el formulario lleno
+                # antes de cerrar (no se guardó nada).
+                if args.sin_guardar and args.con_cabeza:
                     try:
-                        ir_a_pestana(page, tab_label)
+                        input("\n  ⏸  Revisá en el browser que la fila tenga RE9901 + texto + PDF. "
+                              "Enter para cerrar…\n")
                     except Exception:
                         pass
-                f_rep.close()
                 from collections import Counter
                 logger.info(f"\n✅ Reporte: {args.reporte}")
                 for estado, n in Counter(r["estado"] for r in resultados).items():
