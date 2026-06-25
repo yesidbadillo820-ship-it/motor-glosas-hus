@@ -1033,18 +1033,24 @@ def _cargar_detalle_en_celda(page: Page, celda, texto: str) -> bool:
             celda.click()
         except Exception:
             return False
-    page.wait_for_timeout(700)
-    # Campo de edición: textarea / contenteditable / input (en modal o inline).
-    campo = (
-        _primer_visible(page.locator(
-            ".cdk-overlay-pane textarea, .modal textarea, [role=dialog] textarea, textarea"
-        ))
-        or _primer_visible(page.locator(
-            ".cdk-overlay-pane [contenteditable=true], [role=dialog] [contenteditable=true], "
-            "[contenteditable=true]"
-        ))
-        or _primer_visible(celda.locator("input, textarea"))
-    )
+    # Esperar (poll) a que aparezca el campo del editor — el portal es lento y
+    # en lotes largos tarda más de 700ms en renderizar.
+    campo = None
+    fin = time.time() + 12
+    while time.time() < fin:
+        campo = (
+            _primer_visible(page.locator(
+                ".cdk-overlay-pane textarea, .modal textarea, [role=dialog] textarea, textarea"
+            ))
+            or _primer_visible(page.locator(
+                ".cdk-overlay-pane [contenteditable=true], [role=dialog] [contenteditable=true], "
+                "[contenteditable=true]"
+            ))
+            or _primer_visible(celda.locator("input, textarea"))
+        )
+        if campo is not None:
+            break
+        page.wait_for_timeout(400)
     if campo is None:
         _screenshot_debug(page, "detalle_sin_editor")
         return False
@@ -1292,6 +1298,13 @@ def responder_glosa(
     if not guardar:
         reg["estado"] = "PILOTO_SIN_GUARDAR"
         reg["detalle"] = f"{reg['ok']}/{reg['filas']} filas cargadas (sin ✓ ni GUARDAR RESPUESTA)"
+        return reg
+
+    # Seguridad: si NINGUNA fila se cargó completa, NO dar GUARDAR RESPUESTA
+    # (no comprometer una respuesta a medias).
+    if reg["ok"] == 0:
+        reg["estado"] = "PARCIAL"
+        reg["detalle"] = "ninguna fila se cargó completa; NO se dio GUARDAR RESPUESTA"
         return reg
 
     # GUARDAR RESPUESTA (botón verde, arriba a la derecha) → vuelve a la grilla.
