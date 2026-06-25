@@ -2412,7 +2412,6 @@ def build_user_prompt(
     # separado al final del user prompt para que el modelo no las pase.
     bloque_instrucciones_usuario_str = ""
     try:
-
         _patrones_instruccion = (
             re.compile(
                 r"(?:solicitamos|necesitamos|requerimos)\s+(?:defensa|respuesta|argumento)\s+"
