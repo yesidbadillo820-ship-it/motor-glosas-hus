@@ -15667,7 +15667,17 @@ async function cargarDiagnostico(){
       var col = s.estado === 'ok' ? '#16a34a' : (s.estado === 'warning' ? '#d97706' : '#dc2626');
       var ico = s.estado === 'ok' ? '✅' : (s.estado === 'warning' ? '⚠️' : '🚨');
       var bg = s.estado === 'ok' ? '#f0fdf4' : (s.estado === 'warning' ? '#fefce8' : '#fef2f2');
-      var nombre = k.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+      // Overrides de label: la key del JSON puede ser histórica (ej.
+      // "volumen_fly" del periodo Fly.io) pero el panel ya está corriendo
+      // en self-hosted Google Cloud. Mostramos el nombre actual.
+      var LABEL_OVERRIDES = {
+        'volumen_fly': 'Volumen de Datos',
+        'base_de_datos': 'Base de Datos',
+        'soportes_indexer': 'Soportes Indexer',
+        'lotes_importacion': 'Lotes Importación',
+        'clausulas_contratos': 'Cláusulas Contratos',
+      };
+      var nombre = LABEL_OVERRIDES[k] || k.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
       html += '<div style="background:'+bg+';border:1.5px solid '+col+';border-radius:10px;padding:.85rem 1rem;font-size:.83rem;">'
         + '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">'
         +   '<span style="font-size:1.2rem;">'+ico+'</span>'
