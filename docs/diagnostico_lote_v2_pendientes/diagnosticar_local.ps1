@@ -51,6 +51,9 @@ function Inspeccionar-Carpeta($path) {
     NombreCUV    = ""
     CUV_State    = ""
     CUV_CodigoError = ""
+    CUV_Observacion = ""
+    CUV_NumRechazos = 0
+    CUV_FechaValidacion = ""
     Archivos     = @()
   }
   if (-not (Test-Path $path)) { return [PSCustomObject]$info }
@@ -64,10 +67,28 @@ function Inspeccionar-Carpeta($path) {
       $info.TieneCUV  = $true
       $info.NombreCUV = $a.Name
       try {
-        $j = Get-Content $a.FullName -Raw | ConvertFrom-Json
-        if ($null -ne $j.ResultState) { $info.CUV_State = [string]$j.ResultState }
-        if ($j.ResultErrors -and $j.ResultErrors.Count -gt 0 -and $j.ResultErrors[0].Code) {
-          $info.CUV_CodigoError = [string]$j.ResultErrors[0].Code
+        $j = Get-Content $a.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        # ResultState es booleano nativo en el JSON; PowerShell lo deserializa
+        # como [bool] real, asi que normalizamos a "True"/"False".
+        if ($null -ne $j.ResultState) {
+          if ($j.ResultState) { $info.CUV_State = "True" } else { $info.CUV_State = "False" }
+        }
+        if ($j.FechaRadicacion) {
+          $info.CUV_FechaValidacion = ([string]$j.FechaRadicacion).Substring(0, [Math]::Min(19, ([string]$j.FechaRadicacion).Length))
+        }
+        # El codigo de rechazo (RVC086, RVC063, TOT003, etc.) vive en
+        # ResultadosValidacion[].Codigo donde Clase == "RECHAZADO".
+        if ($j.ResultadosValidacion) {
+          $rechazos = @($j.ResultadosValidacion | Where-Object { $_.Clase -and $_.Clase.ToUpper() -eq "RECHAZADO" })
+          $info.CUV_NumRechazos = $rechazos.Count
+          if ($rechazos.Count -gt 0) {
+            $r0 = $rechazos[0]
+            $info.CUV_CodigoError = [string]$r0.Codigo
+            $obs = [string]$r0.Observaciones
+            # Recortar a 200 chars para que entre en el CSV sin romper Excel.
+            if ($obs.Length -gt 200) { $obs = $obs.Substring(0, 200) + "..." }
+            $info.CUV_Observacion = $obs
+          }
         }
       } catch {
         $info.CUV_State = "JSON_ILEGIBLE"
@@ -127,6 +148,12 @@ foreach ($f in $facturas) {
 
   Write-Host ("[{0}]  NE_V2={1}  Estado={2}" -f $f.HUS, $f.NE_V2, $estadoCalculado) -ForegroundColor $color
 
+  if ($infoV2.CUV_CodigoError -or $infoV2.CUV_Observacion) {
+    $obsCorta = $infoV2.CUV_Observacion
+    if ($obsCorta.Length -gt 120) { $obsCorta = $obsCorta.Substring(0, 120) + "..." }
+    Write-Host ("    CUV rechazo: [{0}] {1}" -f $infoV2.CUV_CodigoError, $obsCorta) -ForegroundColor DarkRed
+  }
+
   if ($infoOrigen) {
     $origenEstado = if ($infoOrigen.Existe) {
       if ($infoOrigen.TienePDF -and $infoOrigen.TieneXML -and $infoOrigen.TieneCUV) { "COMPLETA" } else { "INCOMPLETA" }
@@ -135,21 +162,24 @@ foreach ($f in $facturas) {
   }
 
   $resultados += [PSCustomObject]@{
-    Factura          = $f.Factura
-    HUS_corto        = $f.HUS
-    NE_V2            = $f.NE_V2
-    NE_TSV_historico = $f.NE_TSV
-    Motivo_contexto  = $f.Motivo
-    V2_existe        = $infoV2.Existe
-    V2_PDF           = $infoV2.NombrePDF
-    V2_XML           = $infoV2.NombreXML
-    V2_CUV           = $infoV2.NombreCUV
-    CUV_ResultState  = $infoV2.CUV_State
-    CUV_CodigoError  = $infoV2.CUV_CodigoError
-    Estado_real      = $estadoCalculado
-    Origen_alterno   = if ($f.OrigenAlt) { $f.OrigenAlt } else { "" }
-    Origen_existe    = if ($infoOrigen) { $infoOrigen.Existe } else { "" }
-    Archivos_V2      = ($infoV2.Archivos -join "; ")
+    Factura            = $f.Factura
+    HUS_corto          = $f.HUS
+    NE_V2              = $f.NE_V2
+    NE_TSV_historico   = $f.NE_TSV
+    Motivo_contexto    = $f.Motivo
+    V2_existe          = $infoV2.Existe
+    V2_PDF             = $infoV2.NombrePDF
+    V2_XML             = $infoV2.NombreXML
+    V2_CUV             = $infoV2.NombreCUV
+    CUV_ResultState    = $infoV2.CUV_State
+    CUV_CodigoError    = $infoV2.CUV_CodigoError
+    CUV_NumRechazos    = $infoV2.CUV_NumRechazos
+    CUV_FechaValidacion= $infoV2.CUV_FechaValidacion
+    CUV_Observacion    = $infoV2.CUV_Observacion
+    Estado_real        = $estadoCalculado
+    Origen_alterno     = if ($f.OrigenAlt) { $f.OrigenAlt } else { "" }
+    Origen_existe      = if ($infoOrigen) { $infoOrigen.Existe } else { "" }
+    Archivos_V2        = ($infoV2.Archivos -join "; ")
   }
 }
 
