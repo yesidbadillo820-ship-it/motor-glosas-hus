@@ -895,17 +895,49 @@ def _celda(fila, idx: int):
 
 
 def _elegir_codigo_en_celda(page: Page, celda, codigo: str) -> bool:
-    """Selecciona `codigo` en el dropdown de `celda` y VERIFICA que quede pegado
-    (la celda muestra el código). Maneja <select> nativo y dropdowns tipo
-    Angular Material (overlay). Reintenta hasta 3 veces."""
+    """Selecciona `codigo` en el dropdown de `celda` y VERIFICA que quede pegado.
+    Maneja <select> nativo y dropdowns custom (mat-select/overlay). Prueba varios
+    métodos de click y reintenta. Si falla, vuelca el HTML de la celda."""
     if celda is None:
         return False
 
     def _ya_esta() -> bool:
         try:
-            return codigo.upper() in (celda.inner_text() or "").upper()
+            return bool(celda.evaluate(
+                """(c, cod) => {
+                    cod = (cod || '').toUpperCase();
+                    if (((c.innerText)||'').toUpperCase().includes(cod)) return true;
+                    for (const el of c.querySelectorAll('input,select,textarea')) {
+                        if (((el.value)||'').toUpperCase().includes(cod)) return true;
+                        if (el.selectedOptions) for (const o of el.selectedOptions)
+                            if (((o.text)||'').toUpperCase().includes(cod)) return true;
+                    }
+                    for (const el of c.querySelectorAll('.mat-select-value,.mat-mdc-select-value,[class*=value],[class*=Value]'))
+                        if (((el.innerText)||'').toUpperCase().includes(cod)) return true;
+                    return false;
+                }""", codigo))
         except Exception:
             return False
+
+    def _click_opcion(opcion) -> bool:
+        try:
+            opcion.scroll_into_view_if_needed(timeout=1500)
+        except Exception:
+            pass
+        for metodo in ("normal", "force", "js"):
+            try:
+                if metodo == "normal":
+                    opcion.click(timeout=2500)
+                elif metodo == "force":
+                    opcion.click(force=True, timeout=2500)
+                else:
+                    opcion.evaluate("el => el.click()")
+            except Exception:
+                continue
+            page.wait_for_timeout(700)
+            if _ya_esta():
+                return True
+        return False
 
     for intento in range(3):
         if _ya_esta():
@@ -938,7 +970,7 @@ def _elegir_codigo_en_celda(page: Page, celda, codigo: str) -> bool:
                 celda.click()
             except Exception:
                 pass
-        # Esperar a que aparezca la opción del código en un overlay.
+        # Esperar la opción del código en un overlay.
         opcion = None
         fin = time.time() + 8
         while time.time() < fin:
@@ -946,7 +978,7 @@ def _elegir_codigo_en_celda(page: Page, celda, codigo: str) -> bool:
                 f"mat-option:has-text('{codigo}'), [role=option]:has-text('{codigo}'), "
                 f".cdk-overlay-pane li:has-text('{codigo}'), "
                 f".cdk-overlay-container li:has-text('{codigo}'), "
-                f"li:has-text('{codigo}'), [role=listbox] *:has-text('{codigo}')"))
+                f"li:has-text('{codigo}')"))
             if opcion is not None:
                 break
             page.wait_for_timeout(300)
@@ -960,18 +992,26 @@ def _elegir_codigo_en_celda(page: Page, celda, codigo: str) -> bool:
                 pass
             page.wait_for_timeout(400)
             continue
-        try:
-            opcion.click()
-        except Exception:
-            try:
-                opcion.click(force=True)
-            except Exception:
-                pass
-        page.wait_for_timeout(800)
-        if _ya_esta():
+        if _click_opcion(opcion):
             return True
         logger.info(f"    dropdown Cod Rta2 RAT: clickié {codigo} pero la celda sigue "
                     f"vacía (intento {intento + 1}/3)")
+        try:
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+        page.wait_for_timeout(300)
+
+    # Falló: volcar el HTML de la celda para ver el control real del dropdown.
+    try:
+        html = celda.evaluate("el => el.outerHTML")
+        out = Path("debug_screenshots")
+        out.mkdir(exist_ok=True)
+        (out / "celda_cod_rta2.html").write_text(html, encoding="utf-8")
+        logger.info("    [diag] celda Cod Rta2 RAT → debug_screenshots/celda_cod_rta2.html")
+        logger.info(f"    [diag] HTML (recorte): {' '.join(html.split())[:400]}")
+    except Exception:
+        pass
     return _ya_esta()
 
 
