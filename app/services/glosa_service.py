@@ -180,7 +180,7 @@ _GROQ_SDK_SOPORTA_REASONING_EFFORT: bool = True
 # todos los cachés viejos. El caso 8 de la ronda 3 vino del caché DB con
 # etiqueta `groq/qwen/qwen3-32b` aunque los fixes ya estaban desplegados,
 # porque la clave SHA256 no incluía señal de versión.
-_PROMPT_CACHE_VERSION = "r11-20260618"
+_PROMPT_CACHE_VERSION = "r18-20260626"
 
 FERIADOS_CO = [
     # 2025
@@ -1526,14 +1526,33 @@ _RE_URGENCIA_LEGITIMA = re.compile(
 )
 
 # Marcadores de servicio CRÓNICO/ELECTIVO/AMBULATORIO (negación de urgencia)
+# Ronda 18 (Bug X, 26-jun-2026): agregados los marcadores que detectaron los
+# 3 casos super difíciles del 26-jun (auditoría Yesid): implante coclear,
+# da Vinci, prostatectomía radical, Norwood/Glenn/Fontan (electivas), TMS,
+# Cart-T (programada). En todos ellos la IA invocaba "atención inicial de
+# urgencias" como muletilla y el dictamen perdía credibilidad ante la EPS.
 _RE_NO_ES_URGENCIA = re.compile(
     r"\bELECTIV|\bAMBULATORI|\bPROGRAMAD|"
     r"\bABA\b|TEA\b|TRASTORNO\s+ESPECTRO\s+AUTISTA|"
     r"TERAPIA\s+ENZIM[ÁA]TIC|TRASPLANT|HEMODI[ÁA]LISIS\s+CR[ÓO]NIC|"
     r"\bDOPPLER\b|\bECOGRAF[ÍI]A\b|"
-    r"\bRADIOCIRUG[ÍI]A\b|CRANEOTOMÍA\s+TUMORAL|"
+    r"\bRADIOCIRUG[ÍI]A\b|CRANEOT?OM[ÍI]A\s+TUMORAL|"
     r"REHABILITACI[ÓO]N|REINTERVENCI[ÓO]N|"
-    r"\d+\s*d[ií]as\s+UCI|HOSPITALIZACI[ÓO]N\s+DE\s+\d+",
+    r"\d+\s*d[ií]as\s+UCI|HOSPITALIZACI[ÓO]N\s+DE\s+\d+|"
+    # Ronda 18 (Bug X): cirugías programadas de alto costo
+    r"IMPLANTE\s+COCLEAR|DA\s+VINCI|CIRUG[ÍI]A\s+ROB[ÓO]TIC|"
+    r"PROSTATECTOM[ÍI]A\s+RADICAL|PROSTATECTOM[ÍI]A|"
+    r"NORWOOD|FONTAN|GLENN|HLHS|"
+    # Terapias programadas en sala (no urgencia vital)
+    r"CART[\-\s]?T|TISAGENLECLEUCEL|AXICABTAGENE|"
+    r"\bTMS\b|ESTIMULACI[ÓO]N\s+MAGN[ÉE]TICA|"
+    r"\bEPICEL\b|QUERATINOCITOS\s+CULTIV|"
+    # Salud mental refractaria (no urgencia inicial)
+    r"PSIQUI[ÁA]TRIC\s+REFRACTAR|ESQUIZOFRENIA\s+REFRACTARIA|"
+    # Oncología programada
+    r"QUIMIOTERAPIA\s+PROGRAMAD|RADIOTERAPIA\s+PROGRAMAD|"
+    # Pediátrico programado
+    r"NEONATAL\s+PROGRAMAD|VENTANA\s+CR[ÍI]TICA",
     re.IGNORECASE,
 )
 
@@ -1827,6 +1846,125 @@ def _rechazar_sancion_eps_ilegal(
             "de competencia (Ley 1438/2011 Art. 126)."
         )
     return nuevo
+
+
+# ── Ronda 18 (Bug Y, 26-jun-2026): niega contrato citado por EPS ──
+# Caso real MEDIMÁS 26-jun: la glosa de entrada decía textualmente
+# "contrato vigente CTR-2024-MEDIMAS-HUS define para prostatectomía
+# CUPS 60.1.2.01 una tarifa de SOAT × 0.85". La IA respondió con
+# "Contrato: SIN CONTRATO PACTADO" — error administrativo fatal.
+# Detector: si texto_glosa menciona un patrón CTR-XXXX-XXX-HUS (o
+# variantes "contrato vigente CTR", "contrato CTR-", "según contrato N°"),
+# el dictamen NO puede afirmar "sin contrato pactado". Sustituimos por
+# referencia genérica al contrato vigente.
+_RE_CONTRATO_CITADO_GLOSA = re.compile(
+    r"\bCTR\-\d{4}\-[A-Z0-9]+\-HUS\b|"
+    r"\bCONTRATO\s+(?:VIGENTE\s+)?CTR\-\d{2,4}|"
+    r"\bSEG[ÚU]N\s+CONTRATO\s+N[°º\.]?\s*\d{2,6}|"
+    r"\bCONTRATO\s+(?:N[°º\.]?\s*|N[ÚU]MERO\s+)?\d{4,6}|"
+    r"\bCONFORME\s+AL\s+CONTRATO\s+\d{3,}",
+    re.IGNORECASE,
+)
+
+
+def _detectar_contrato_citado_en_glosa(texto_glosa: str) -> str | None:
+    """Devuelve el código de contrato si la glosa lo cita textualmente.
+    Útil para validar que el dictamen no niegue su existencia.
+    """
+    if not texto_glosa:
+        return None
+    m = _RE_CONTRATO_CITADO_GLOSA.search(texto_glosa)
+    return m.group(0) if m else None
+
+
+def _reescribir_negacion_contrato(
+    dictamen: str,
+    texto_glosa: str | None = None,
+) -> str:
+    """Bug Y (ronda 18): si la glosa de entrada cita un contrato (CTR-...)
+    y el dictamen dice "SIN CONTRATO PACTADO" o similar, reescribe la
+    afirmación por una referencia al contrato vigente citado.
+    """
+    if not dictamen or not texto_glosa:
+        return dictamen
+    contrato_citado = _detectar_contrato_citado_en_glosa(texto_glosa)
+    if not contrato_citado:
+        return dictamen
+
+    contrato_clean = contrato_citado.strip()
+    # Patrones del dictamen que niegan el contrato
+    patrones_negacion = (
+        (
+            re.compile(
+                r"SIN\s+CONTRATO\s+PACTADO|"
+                r"NO\s+EXISTE\s+CONTRATO\s+PACTADO|"
+                r"AUSENCIA\s+DE\s+CONTRATO|"
+                r"EN\s+AUSENCIA\s+DE\s+CONTRATO\s+PACTADO",
+                re.IGNORECASE,
+            ),
+            f"según el contrato {contrato_clean}",
+        ),
+    )
+    nuevo = dictamen
+    n = 0
+    for pat, reemplazo in patrones_negacion:
+        nuevo, k = pat.subn(reemplazo, nuevo)
+        n += k
+    if n:
+        logger.warning(
+            f"[CONTRATO-NEGADO] {n} negación(es) de contrato reescrita(s) — "
+            f"la glosa cita textualmente {contrato_clean!r} pero el "
+            "dictamen afirmaba 'sin contrato pactado'."
+        )
+    return nuevo
+
+
+# ── Ronda 18 (Bug Z, 26-jun-2026): evade cláusula citada por EPS ──
+# Caso real ECOOPSOS 26-jun: la EPS citó "Cláusula 24 del Contrato
+# CTR-2025-ECOOPSOS-HUS exige cotización comparativa de al menos 3
+# proveedores". La IA respondió con "la historia clínica institucional...
+# constituye único instrumento válido para la auditoría" — evadió la
+# cláusula con muletilla. La defensa correcta es responder por nombre:
+# justificar exclusividad MED-EL, distribuidor único, anexo tarifario, etc.
+# Detector: si la glosa cita "Cláusula N" pero el dictamen no menciona
+# esa cláusula → warning. (No modifica el texto — el caller decide).
+_RE_CLAUSULA_CITADA_GLOSA = re.compile(
+    r"\bCL[ÁA]USULA\s+(\d{1,3})\s+(?:DEL\s+)?(?:CONTRATO|ACUERDO)",
+    re.IGNORECASE,
+)
+
+
+def _auditar_clausulas_citadas_en_glosa(
+    dictamen: str,
+    texto_glosa: str | None,
+) -> tuple[bool, list[int]]:
+    """Bug Z (ronda 18): verifica que las cláusulas citadas por la EPS
+    en su texto de glosa aparezcan referenciadas en el dictamen.
+
+    Devuelve (todas_referenciadas, lista_evadidas).
+    """
+    if not dictamen or not texto_glosa:
+        return True, []
+    citadas = {int(m.group(1)) for m in _RE_CLAUSULA_CITADA_GLOSA.finditer(texto_glosa)}
+    if not citadas:
+        return True, []
+    dictamen_up = dictamen.upper()
+    evadidas = []
+    for n in citadas:
+        # Acepta "Cláusula N", "Cl. N", "cláusula número N"
+        pat = re.compile(
+            rf"CL[ÁA]USULA(?:\s+N[°º\.]?\s*|\s+N[ÚU]MERO\s+|\s+)?{n}\b",
+            re.IGNORECASE,
+        )
+        if not pat.search(dictamen_up):
+            evadidas.append(n)
+    if evadidas:
+        logger.warning(
+            f"[CLAUSULAS-EVADIDAS] La glosa cita {len(evadidas)} cláusula(s) "
+            f"({evadidas}) que el dictamen no respondió por nombre. "
+            "Defensa débil — el auditor EPS lee silencio como concesión."
+        )
+    return len(evadidas) == 0, evadidas
 
 
 # ── Ronda 16 (Bug O v3): post-validador de instrucciones del gestor ──
@@ -5586,10 +5724,19 @@ class GlosaService:
                 # tácita cuando la glosa de entrada habla de "sanción del
                 # N%", "multa del N%", etc.
                 _dict_u = _rechazar_sancion_eps_ilegal(_dict_g, texto_glosa=_texto_glosa_input_md)
-                if _dict_u != dictamen:
-                    dictamen = _dict_u
+                # Ronda 18 (Bug Y): si la glosa cita CTR-XXXX-XXX-HUS y el
+                # dictamen dice "SIN CONTRATO PACTADO", reescribirlo.
+                _dict_y = _reescribir_negacion_contrato(_dict_u, texto_glosa=_texto_glosa_input_md)
+                # Ronda 18 (Bug Z): audita cláusulas evadidas (no modifica;
+                # registra warning para que el gestor revise).
+                try:
+                    _auditar_clausulas_citadas_en_glosa(_dict_y, texto_glosa=_texto_glosa_input_md)
+                except Exception as _e_z:
+                    logger.debug(f"[CLAUSULAS-EVADIDAS] no auditadas: {_e_z}")
+                if _dict_y != dictamen:
+                    dictamen = _dict_y
             except Exception as _e_mu:
-                logger.debug(f"[MULETILLAS-RONDA13-16] red final no aplicada: {_e_mu}")
+                logger.debug(f"[MULETILLAS-RONDA13-16-18] red final no aplicada: {_e_mu}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 14 (25-jun-2026) — Bug I v2: EPS detectada del texto
@@ -7127,6 +7274,15 @@ class GlosaService:
         _t_inicio = _time.monotonic()
 
         ultimo_error = None
+        # Ronda 18 (Bug V, 26-jun-2026): retry-por-truncamiento. Si
+        # stop_reason="max_tokens" o el content termina mid-oración (sin
+        # punto final), reintentamos UNA vez con max_tokens duplicado.
+        # Antes solo Groq tenía esta protección; Anthropic Sonnet sí se
+        # trunca en dictámenes multi-norma o argumentación detallada
+        # (caso real MEDIMÁS 26-jun: "Por lo expuesto y con base en"
+        # truncado sin cierre).
+        max_tokens_anthropic = 3000
+        retry_length_usado_anthropic = False
         for intento in range(3):
             try:
                 async with httpx.AsyncClient(timeout=_timeout_anthropic) as client:
@@ -7143,9 +7299,7 @@ class GlosaService:
                         headers=_headers,
                         json={
                             "model": _modelo_efectivo,
-                            # Ronda 49: 3000 tokens es suficiente para dictamen
-                            # de 800-1200 palabras; reduce latencia vs 4000.
-                            "max_tokens": 3000,
+                            "max_tokens": max_tokens_anthropic,
                             "temperature": _temp_efectiva,
                             "system": system_payload,
                             "messages": [{"role": "user", "content": user}],
@@ -7153,6 +7307,25 @@ class GlosaService:
                     )
                     data = resp.json()
                     if "content" in data and data["content"]:
+                        content_text = data["content"][0].get("text", "")
+                        stop_reason = data.get("stop_reason", "")
+                        # Bug V: retry-por-truncamiento si stop_reason=max_tokens
+                        # o el texto no cierra con signo terminal.
+                        if (
+                            content_text
+                            and not retry_length_usado_anthropic
+                            and (stop_reason == "max_tokens" or not _termina_completo(content_text))
+                        ):
+                            retry_length_usado_anthropic = True
+                            nuevo_max = max_tokens_anthropic * 2
+                            logger.warning(
+                                f"[ANTHROPIC-RETRY-LENGTH-TRUNC] model={_modelo_efectivo} "
+                                f"max_tokens={max_tokens_anthropic}→{nuevo_max} "
+                                f"stop={stop_reason!r} (content truncado: "
+                                f"'...{content_text[-60:]!r}')"
+                            )
+                            max_tokens_anthropic = nuevo_max
+                            continue
                         usage = data.get("usage", {})
                         latencia_ms = int((_time.monotonic() - _t_inicio) * 1000)
                         _log_metricas_anthropic(
@@ -7160,7 +7333,7 @@ class GlosaService:
                             _modelo_efectivo,
                             latencia_ms,
                         )
-                        return data["content"][0]["text"], f"anthropic/{_modelo_efectivo}"
+                        return content_text, f"anthropic/{_modelo_efectivo}"
                     err = data.get("error", {}).get("message", str(data)[:300])
                     # Si es error 529 (overloaded) o 429 (rate limit), reintentar
                     status = resp.status_code
@@ -7429,10 +7602,21 @@ class GlosaService:
         # caso 8 vino del caché DB con etiqueta qwen3 vieja aunque ya
         # tuviéramos los fixes desplegados.
         modelo_para_clave = modelo_override or self.anthropic_model
+        # Ronda 18 (Bug W, 26-jun-2026): el hash de cache se compone también
+        # de un fingerprint del `user` prompt completo. Esto es necesario
+        # porque el user prompt incluye numero_factura + numero_radicado +
+        # texto_glosa (todos llegan via build_user_prompt). Sin embargo, un
+        # bug en la BD de cache permitió que el caso MEDIMÁS (factura
+        # HUS0000602103) recibiera el dictamen cacheado del caso ECOOPSOS
+        # (factura HUS0000601892) — dos glosas distintas pero hash colisionando.
+        # Hipótesis: la columna `clave_cache` en SQLite tenía algún truncado
+        # silencioso. Bumpear _PROMPT_CACHE_VERSION invalida todos los
+        # registros viejos y este hash incluye explícitamente la longitud
+        # del user (defensa adicional contra truncados).
         clave_cache = hashlib.sha256(
             (
                 f"{_PROMPT_CACHE_VERSION}|{self.primary_ai}|{modelo_para_clave}|"
-                f"{eps}|{codigo}|{system}|{user}"
+                f"{eps}|{codigo}|len={len(system)}+{len(user)}|{system}|{user}"
             ).encode()
         ).hexdigest()
 
