@@ -291,7 +291,13 @@ class TestFix2DescomillarCitasFalsas:
         )
         resultado = await servicio.analizar(data, contratos_db={})
         assert f"«{CITA_FALSA_OSTEOSINTESIS}»" not in resultado.dictamen
-        assert "EN LOS TÉRMINOS DE" in resultado.dictamen
+        # Ronda 17 (26-jun-2026): la frase neutra "en los términos de" se
+        # normaliza a sentence case por _normalizar_mayusculas_sostenidas
+        # aplicado a arg_ia antes del HTML wrap (Bug L ronda 14 reforzado).
+        # Antes el assert pedía "EN LOS TÉRMINOS DE" en MAYÚSCULAS sostenidas;
+        # el comportamiento institucional ahora es sentence case para
+        # darle pinta profesional al dictamen.
+        assert "en los términos de" in resultado.dictamen.lower()
         if resultado.verificacion_citas:
             assert not any(
                 i["tipo"] == "CITA_LITERAL_FALSA"
