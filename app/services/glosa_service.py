@@ -4303,9 +4303,17 @@ class GlosaService:
             #  críticas tipo Cart-T/Norwood/trasplante/hemofilia/
             #  Epicel/recobro/tutela), FORZAMOS Anthropic — Llama 4
             #  Scout aluciona masivamente en estos casos (evidencia:
-            #  3 dictamens 26-jun con Bug T/U/Q/B/N detectados). Como
-            #  modelo_override siempre va a Anthropic (línea 7096),
-            #  basta con setearlo para sobrepasar el primary_ai=groq.
+            #  3 dictamens 26-jun con Bug T/U/Q/B/N detectados). El
+            #  override se rutea a Anthropic en _llamar_ia (línea 7427)
+            #  bypasseando primary_ai=groq.
+            #
+            #  RONDA 17 (26-jun-2026): el detector de complejidad fue
+            #  EXTRAÍDO a app.services.routing_complejidad para ser
+            #  reusable por (a) el router del Quality Gate, (b) las
+            #  secciones adicionales de multi-código, (c) refinar_dictamen
+            #  desde chat_glosa, y (d) la auto-crítica de R-CEREBRO #1.
+            #  Antes solo R-CEREBRO #5 lo aplicaba — los otros caminos
+            #  perdían la señal y los casos complejos caían en Llama.
             _modelo_override = None
             _es_complejo_forzar_claude = False
             try:
@@ -4314,6 +4322,9 @@ class GlosaService:
                 # Bug detectado 12-may-2026: Sonnet se activaba para casos de
                 # $7.700 porque el parser interpretaba mal los puntos de miles.
                 from app.services.auto_pilot_decision import _parse_valor as _pval_route
+                from app.services.routing_complejidad import (
+                    detectar_complejidad_critica as _detectar,
+                )
 
                 _valor_num_route = int(_pval_route(valor_raw)) if valor_raw else 0
                 _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
@@ -4321,57 +4332,14 @@ class GlosaService:
                 _len_pdf_route = len(str(contexto_pdf or ""))
                 _num_codigos_route = len(codigos_detectados or [])
 
-                # ── Detector de COMPLEJIDAD (ronda 16, 26-jun-2026) ──
-                # Si CUALQUIERA de estas condiciones se cumple, el caso es
-                # "alta complejidad jurídica" y debe ir a Claude aunque el
-                # usuario haya elegido Groq por defecto:
-                #   1. Valor ≥ $50M (impacto financiero alto)
-                #   2. Multi-PDF (2+ documentos soporte → análisis cruzado)
-                #   3. Multi-código (≥ 3 códigos de glosa → defensa multinorma)
-                #   4. Texto largo (> 4000 chars → dictamen muy detallado)
-                #   5. Palabras-clave críticas que históricamente le revientan
-                #      el dictamen a Llama (oncología cara, neonatal grave,
-                #      enfermedades raras, recobros, tutelas, evento adverso).
-                _palabras_clave_complejas = (
-                    "CART-T",
-                    "CAR-T",
-                    "TISAGENLECLEUCEL",
-                    "AXICABTAGENE",
-                    "NORWOOD",
-                    "TRASPLANT",
-                    "HEMOFILIA",
-                    "EPICEL",
-                    "ELIZARIA",
-                    "ATALUREN",
-                    "NUSINERSEN",
-                    "ZOLGENSMA",
-                    "TUTELA",
-                    "RECOBRO",
-                    "EVENTO ADVERSO",
-                    "PREVENIBLE",
-                    "MUERTE MATERNA",
-                    "DAÑO IATROG",
-                    "ENFERMEDAD HUÉRFANA",
-                    "ENFERMEDAD HUERFANA",
-                    "CARTAGENA-T",
-                    "GAUCHER",
-                    "POMPE",
-                    "CEREZYME",
-                    "VPH-RECOMB",
-                    "DUCHENNE",
+                _resultado_complej = _detectar(
+                    valor=_valor_num_route,
+                    num_pdfs=_num_pdfs_route,
+                    num_codigos=_num_codigos_route,
+                    texto_glosa=texto_base or "",
+                    contexto_pdf=contexto_pdf or "",
                 )
-                _texto_upper_route = (f"{texto_base or ''} {contexto_pdf or ''}"[:50000]).upper()
-                _hit_palabra_clave = any(
-                    kw in _texto_upper_route for kw in _palabras_clave_complejas
-                )
-
-                _es_complejo_forzar_claude = (
-                    _valor_num_route >= 50_000_000
-                    or (_num_pdfs_route >= 2 and _valor_num_route >= 5_000_000)
-                    or _num_codigos_route >= 3
-                    or _len_glosa_route > 4_000
-                    or _hit_palabra_clave
-                )
+                _es_complejo_forzar_claude = _resultado_complej.es_complejo
 
                 _saltar_routing = self.primary_ai == "groq" and not _es_complejo_forzar_claude
 
@@ -4394,21 +4362,11 @@ class GlosaService:
                     # a Llama 4 Scout (rondas 14-15-16: Cart-T, Norwood, VIH).
                     elif _es_complejo_forzar_claude and self.primary_ai == "groq":
                         _modelo_override = self.anthropic_model or "claude-sonnet-4-6"
-                        _motivos = []
-                        if _valor_num_route >= 50_000_000:
-                            _motivos.append(f"valor=${_valor_num_route:,}")
-                        if _num_pdfs_route >= 2 and _valor_num_route >= 5_000_000:
-                            _motivos.append(f"pdfs={_num_pdfs_route}+5M")
-                        if _num_codigos_route >= 3:
-                            _motivos.append(f"codigos={_num_codigos_route}")
-                        if _len_glosa_route > 4_000:
-                            _motivos.append(f"texto={_len_glosa_route}c")
-                        if _hit_palabra_clave:
-                            _motivos.append("palabra-clave-critica")
                         logger.warning(
                             "[ROUTING-IA] FORZANDO ANTHROPIC — primary_ai=groq pero "
-                            f"caso complejo ({', '.join(_motivos)}). Llama 4 Scout "
-                            f"aluciona en estos casos; escalamos a {_modelo_override}."
+                            f"caso complejo ({', '.join(_resultado_complej.motivos)}). "
+                            f"Llama 4 Scout aluciona en estos casos; escalamos a "
+                            f"{_modelo_override}."
                         )
                     # HAIKU: caso liviano. Reduce ~75% el costo y conserva
                     # calidad porque el cerebro pre-IA ya hizo el trabajo
@@ -4625,6 +4583,16 @@ class GlosaService:
                                 user_prompt=user_prompt,
                                 glosa_id=None,
                                 proveedores_disponibles=_proveedores,
+                                # Ronda 17 (26-jun-2026): propagar la señal
+                                # de R-CEREBRO #5 al QG. Antes el QG decidía
+                                # su propio modelo via su router interno y
+                                # ignoraba la complejidad detectada acá —
+                                # casos Cart-T/Norwood/$50M+ con
+                                # QUALITY_GATE_ENABLED=1 seguían cayendo en
+                                # Llama 4 Scout. Ahora el override forza
+                                # Anthropic al primer intento del QG.
+                                modelo_override_forzado=_modelo_override,
+                                contexto_pdf=contexto_pdf or "",
                             )
                             registrar_estadistica_qg(_qg_resultado)
                     except Exception as _qg_err:
@@ -5174,11 +5142,18 @@ class GlosaService:
                             # proveedor es Anthropic; los demás usan su default (0.2).
                             # bypass_cache=True para no servir el mismo dictamen defectuoso
                             # ya cacheado — necesitamos fuerza nueva generación.
+                            #
+                            # Ronda 17 (26-jun-2026): reusar el _modelo_override que
+                            # R-CEREBRO #5 calculó arriba. Si el caso era suficientemente
+                            # complejo para escalar la generación original a Claude,
+                            # también lo es para escalar la auto-crítica — si Llama
+                            # produjo dictamen malo, refinarlo con Llama no lo arregla.
                             _res_refinado, _modelo_refinado = await self._llamar_ia(
                                 system=_sys_refine,
                                 user=_refine_prompt,
                                 eps=str(data.eps or ""),
                                 codigo=codigo_det,
+                                modelo_override=_modelo_override,
                                 temperature_override=0.05,
                                 bypass_cache=True,
                                 # Fix #9: refinamiento = tarea corta → gpt-oss
@@ -6692,8 +6667,39 @@ class GlosaService:
         # Usa _llamar_ia para respetar PRIMARY_AI (Groq o Anthropic).
         # Fix #9: refinamiento por instrucción del auditor = tarea corta →
         # gpt-oss con reasoning_effort 'low'.
+        #
+        # Ronda 17 (26-jun-2026): detectar complejidad sobre (argumento
+        # actual + instrucción del auditor). Si hay palabras-clave
+        # críticas (Cart-T, Norwood, tutela, recobro, etc.), forzar
+        # Anthropic. Antes el refinamiento siempre iba a Llama 4 Scout
+        # incluso si el dictamen original era de un caso complejo —
+        # inconsistente porque el dictamen radicado era Claude pero la
+        # modificación pedida por chat era Llama.
+        from app.services.routing_complejidad import detectar_complejidad_critica as _det
+
+        _complej_refinar = _det(
+            valor=None,
+            num_pdfs=0,
+            num_codigos=0,
+            texto_glosa=mensaje_usuario or "",
+            contexto_pdf=txt or "",
+        )
+        _modelo_override_refinar = None
+        if _complej_refinar.es_complejo and self.anthropic_key:
+            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-4-6"
+            logger.warning(
+                f"[REFINAR-DICTAMEN] FORZANDO ANTHROPIC "
+                f"({', '.join(_complej_refinar.motivos)}) — "
+                f"modelo={_modelo_override_refinar}"
+            )
+
         content, _modelo = await self._llamar_ia(
-            system, user, eps=eps, codigo=codigo, llamada_corta=True
+            system,
+            user,
+            eps=eps,
+            codigo=codigo,
+            modelo_override=_modelo_override_refinar,
+            llamada_corta=True,
         )
         out = content.strip()
         # Eliminar cierres XML si la IA los metió por hábito

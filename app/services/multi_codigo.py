@@ -39,6 +39,7 @@ from app.services.quality_gate_adapter import (
     ejecutar_con_quality_gate,
     registrar_estadistica_qg,
 )
+from app.services.routing_complejidad import detectar_complejidad_critica
 
 logger = logging.getLogger("motor_glosas.multi_codigo")
 
@@ -360,6 +361,34 @@ async def _generar_seccion_codigo(
     # bloque adicional es una llamada IA nueva sin el resto de guard-rails
     # del flujo principal (R-CEREBRO, auto-crítica), así que el pre/post-
     # validator es su única defensa contra valores/contratos fabricados.
+    #
+    # Ronda 17 (26-jun-2026): re-evaluar complejidad para cada código
+    # adicional. Antes el R-CEREBRO #5 corría solo sobre el código
+    # principal, así que un caso Cart-T multi-código tenía el principal
+    # en Claude y los adicionales en Llama (= alucina justo en estos
+    # casos). Ahora cada sección detecta complejidad y propaga override.
+    num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
+    try:
+        from app.services.auto_pilot_decision import _parse_valor as _pval
+
+        valor_num = int(_pval(valor_objetado)) if valor_objetado else 0
+    except Exception:
+        valor_num = 0
+    _complejidad = detectar_complejidad_critica(
+        valor=valor_num,
+        num_pdfs=num_pdfs_route,
+        num_codigos=len(todos_los_codigos),
+        texto_glosa=texto_glosa,
+        contexto_pdf=contexto_pdf or "",
+    )
+    _modelo_forzado = None
+    if _complejidad.es_complejo and getattr(servicio, "anthropic_key", None):
+        _modelo_forzado = getattr(servicio, "anthropic_model", None) or "claude-sonnet-4-6"
+        logger.warning(
+            f"[MULTI-CODIGO] {codigo}: FORZANDO ANTHROPIC en sección adicional "
+            f"({', '.join(_complejidad.motivos)}) — modelo={_modelo_forzado}"
+        )
+
     resultado = await ejecutar_con_quality_gate(
         servicio=servicio,
         eps=eps,
@@ -373,6 +402,8 @@ async def _generar_seccion_codigo(
         glosa_id=None,
         proveedores_disponibles=proveedores_disponibles,
         clausulas_contrato=clausulas,
+        modelo_override_forzado=_modelo_forzado,
+        contexto_pdf=contexto_pdf or "",
     )
     try:
         registrar_estadistica_qg(resultado)

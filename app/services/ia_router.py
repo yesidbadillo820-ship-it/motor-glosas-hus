@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from app.services.routing_complejidad import detectar_complejidad_critica
+
 
 Complejidad = Literal["SIMPLE", "MEDIA", "COMPLEJA"]
 
@@ -35,6 +37,7 @@ def clasificar_complejidad(
     eps_familia_critica: bool = False,
     tiene_soportes_pdf: bool = False,
     codigo_glosa: str = "",
+    contexto_pdf: str = "",
 ) -> Complejidad:
     """Clasifica la glosa por dificultad esperada."""
     # Reglas para COMPLEJA (cualquiera dispara)
@@ -58,6 +61,23 @@ def clasificar_complejidad(
         return "COMPLEJA"
 
     if len(texto_glosa) > 800:
+        return "COMPLEJA"
+
+    # Ronda 17 (26-jun-2026): palabras-clave críticas (Cart-T, Norwood,
+    # Epicel, hemofilia, tutela, recobro, evento adverso, etc.) disparan
+    # COMPLEJA aunque el valor sea bajo y haya un solo código. Antes esto
+    # solo lo detectaba el R-CEREBRO #5 de glosa_service y no llegaba al
+    # router del QG; resultado: una Cart-T con valor < $1M caía en SIMPLE
+    # y se generaba con Llama 4 Scout (que alucina justamente en este
+    # tipo de casos).
+    resultado_critico = detectar_complejidad_critica(
+        valor=valor,
+        num_pdfs=2 if tiene_soportes_pdf else 0,  # no tenemos num_pdfs exacto aquí
+        num_codigos=len(set(codigos)) + (1 if codigo_param_valido else 0),
+        texto_glosa=texto_glosa,
+        contexto_pdf=contexto_pdf,
+    )
+    if resultado_critico.es_complejo:
         return "COMPLEJA"
 
     # SIMPLE si tiene soportes y es valor bajo
@@ -141,6 +161,7 @@ def enrutar(
     tiene_soportes_pdf: bool = False,
     proveedores_disponibles: set[str] | None = None,
     codigo_glosa: str = "",
+    contexto_pdf: str = "",
 ) -> DecisionRouter:
     """Clasificación + selección en un solo paso."""
     eps_critica = bool(
@@ -176,5 +197,6 @@ def enrutar(
         eps_familia_critica=eps_critica,
         tiene_soportes_pdf=tiene_soportes_pdf,
         codigo_glosa=codigo_glosa,
+        contexto_pdf=contexto_pdf,
     )
     return elegir_modelo(comp, proveedores_disponibles=proveedores_disponibles)

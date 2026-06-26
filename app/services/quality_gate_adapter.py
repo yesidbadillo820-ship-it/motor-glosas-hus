@@ -106,6 +106,8 @@ async def ejecutar_con_quality_gate(
     glosa_id: int | None = None,
     proveedores_disponibles: set[str] | None = None,
     clausulas_contrato: list[dict] | None = None,
+    modelo_override_forzado: str | None = None,
+    contexto_pdf: str = "",
 ) -> QualityGateResult:
     """Ejecuta el pipeline Quality Gate usando el `_llamar_ia` del servicio.
 
@@ -117,6 +119,16 @@ async def ejecutar_con_quality_gate(
         user_prompt: prompt del usuario (datos del caso)
         glosa_id: opcional, para sticky canary
         proveedores_disponibles: set de "groq"/"anthropic"
+        modelo_override_forzado: cuando el caller ya detectó complejidad
+            crítica (R-CEREBRO #5 en glosa_service o el detector
+            compartido), pasa aquí el ID del modelo Anthropic
+            ("claude-sonnet-4-6", "claude-opus-4-7", etc.) y el adapter
+            antepone "anthropic" al orden de modelos y propaga ese ID al
+            generador. RESPONDE el bug detectado en ronda 17 donde el
+            R-CEREBRO #5 perdía su señal de complejidad al pasar por el QG.
+        contexto_pdf: texto extraído de PDFs soporte. Se pasa al router
+            para que también detecte palabras-clave críticas que solo
+            estén en el contexto y no en el texto_glosa.
 
     Returns:
         QualityGateResult — ver app/services/quality_gate/orchestrator.py
@@ -136,15 +148,29 @@ async def ejecutar_con_quality_gate(
         # saber si el caller ya tiene un código válido aunque el texto no
         # lo repita (auditoría 10-jun-2026 P1-5).
         codigo_glosa=codigo_glosa or "",
+        contexto_pdf=contexto_pdf,
     )
     modelos_orden = [decision.modelo_recomendado] + decision.modelos_fallback
+    # Ronda 17 — si el caller forzó Anthropic, anteponer al orden para que
+    # sea el primer intento. Garantiza que la señal de complejidad de
+    # R-CEREBRO #5 (o de multi_codigo / refinar_dictamen / auto-crítica)
+    # llegue al QG y no se pierda en la decisión interna del router.
+    if modelo_override_forzado:
+        modelos_orden = ["anthropic"] + [m for m in modelos_orden if m != "anthropic"]
     # Dedup preservando orden
     seen: set[str] = set()
     modelos_orden = [m for m in modelos_orden if not (m in seen or seen.add(m))]
 
+    razon_log = decision.razon
+    if modelo_override_forzado:
+        razon_log = (
+            f"FORZADO POR CALLER (modelo={modelo_override_forzado}) sobre "
+            f"router={decision.complejidad}"
+        )
+
     logger.info(
         f"[QG-Adapter] glosa_id={glosa_id} → router: {decision.complejidad} → "
-        f"orden modelos: {modelos_orden} ({decision.razon})"
+        f"orden modelos: {modelos_orden} ({razon_log})"
     )
 
     # Generador adapta _llamar_ia al contrato del orchestrator.
@@ -167,7 +193,15 @@ async def ejecutar_con_quality_gate(
         # para el resto respeta primary_ai + su cadena de fallback.
         modelo_override = None
         if modelo == "anthropic" and getattr(servicio, "anthropic_key", None):
-            modelo_override = getattr(servicio, "anthropic_model", None)
+            # Ronda 17 — si el caller pasó modelo_override_forzado (típicamente
+            # "claude-sonnet-4-6" cuando R-CEREBRO #5 detectó complejidad o
+            # "claude-opus-4-7" en casos super-críticos), usamos ese modelo
+            # específico; sino caemos al anthropic_model genérico del servicio.
+            modelo_override = (
+                modelo_override_forzado
+                if modelo_override_forzado
+                else getattr(servicio, "anthropic_model", None)
+            )
 
         texto_resp, modelo_real = await servicio._llamar_ia(
             system=system_prompt,
