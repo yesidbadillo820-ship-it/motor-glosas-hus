@@ -1224,6 +1224,98 @@ _PATRONES_ALUCINADOS_PROMPT: tuple[tuple[re.Pattern[str], str], ...] = (
         ),
         "la normativa contractual aplicable",
     ),
+    # ── Ronda 16 — Bug Q v2: citas inventadas EN MAYÚSCULAS ──
+    # Casos 26-jun (Quemado SURA $487M, Norwood NUEVA EPS $678M): la IA
+    # escribió cláusulas inventadas en MAYÚSCULAS sostenidas SIN el
+    # introductorio "se cita textualmente" — Bug Q v1 las dejaba pasar
+    # porque exigía la frase introductoria. Patrón nuevo:
+    #   "CLÁUSULA 7 DEL CONTRATO: 'LA EPS RECONOCERÁ...'"
+    #   "ARTÍCULO 12 DISPONE: 'EL PRESTADOR...'"
+    # Capturamos cualquier estructura "[Cláusula|Artículo] N ... : 'TEXTO'"
+    # con texto entre comillas (rectas, curvas o simples) en MAYÚSCULAS.
+    (
+        re.compile(
+            r"\bCL[ÁA]USULA\s+\d+\s+(?:DEL\s+CONTRATO|DEL\s+ACUERDO|PACTADA)\s*:?\s*"
+            r"['\"«][^'\"»]{20,400}['\"»]\.?",
+            re.IGNORECASE,
+        ),
+        "según las cláusulas contractuales pactadas entre las partes",
+    ),
+    (
+        re.compile(
+            r"\bART[ÍI]CULO\s+\d+\s+(?:DEL\s+CONTRATO|DEL\s+ACUERDO)\s+"
+            r"(?:DISPONE|ESTABLECE|SE[ÑN]ALA|REZA|INDICA)\s*:?\s*"
+            r"['\"«][^'\"»]{20,400}['\"»]\.?",
+            re.IGNORECASE,
+        ),
+        "según las cláusulas contractuales pactadas entre las partes",
+    ),
+    # "Resolución X de Y, Artículo Z: 'TEXTO INVENTADO'" — variante de
+    # citas normativas inventadas sin introductoria "se cita textualmente".
+    # Genérica: cualquier texto largo entre comillas precedido por
+    # "Resolución/Decreto/Ley + artículo + dos puntos".
+    (
+        re.compile(
+            r"\b(?:RESOLUCI[ÓO]N|DECRETO|LEY|RES\.?|DEC\.?)\s+\d{1,5}\s+DE\s+\d{4}"
+            r"\s*,?\s*ART[ÍI]CULO\s+\d+\s*:?\s*"
+            r"['\"«][^'\"»]{30,500}['\"»]\.?",
+            re.IGNORECASE,
+        ),
+        "la normativa vigente aplicable",
+    ),
+    # ── Ronda 16 — Bug B v5: "procedimiento facturado [frase neutra]" ──
+    # Caso 26-jun (post Bug A v4): cuando A v4 sustituyó "CUPS 20235847-2"
+    # por "el medicamento facturado según historia clínica", el dictamen
+    # quedaba con concatenaciones tipo:
+    #   "el procedimiento facturado el medicamento facturado según historia clínica"
+    #   "el código CUPS de la factura el procedimiento facturado según historia clínica"
+    # Donde la frase A v4 quedó pegada a la frase B de placeholders sin
+    # gramaticalidad. Limpiamos las concatenaciones dobles.
+    (
+        re.compile(
+            r"\bel\s+procedimiento\s+facturado\s+el\s+medicamento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
+            re.IGNORECASE,
+        ),
+        "el medicamento facturado según historia clínica",
+    ),
+    (
+        re.compile(
+            r"\bel\s+c[óo]digo\s+CUPS\s+de\s+la\s+factura\s+el\s+procedimiento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
+            re.IGNORECASE,
+        ),
+        "el procedimiento facturado según historia clínica",
+    ),
+    (
+        re.compile(
+            r"\bel\s+procedimiento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\s+"
+            r"el\s+procedimiento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
+            re.IGNORECASE,
+        ),
+        "el procedimiento facturado según historia clínica",
+    ),
+    # "el medicamento facturado según historia clínica el medicamento
+    # facturado según historia clínica" (duplicado por dobles matches A v4)
+    (
+        re.compile(
+            r"\bel\s+medicamento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\s+"
+            r"el\s+medicamento\s+facturado\s+seg[úu]n\s+historia\s+cl[íi]nica\b",
+            re.IGNORECASE,
+        ),
+        "el medicamento facturado según historia clínica",
+    ),
+    # ── Ronda 16 — Bug B v6: palabra duplicada consecutiva ──
+    # Casos 26-jun: la IA escribió "la glosa aplicada aplicada por SURA",
+    # "según según el contrato", "el el código CUPS". Limpiamos cualquier
+    # token alfa de ≥4 letras que aparezca duplicado consecutivamente.
+    # No tocamos siglas cortas ("EPS EPS", "HUS HUS") porque pueden ser
+    # nombre de archivo o tabla. Tampoco tocamos números.
+    (
+        re.compile(
+            r"\b([a-záéíóúñü]{4,})\s+\1\b",
+            re.IGNORECASE,
+        ),
+        r"\1",
+    ),
 )
 
 
@@ -1631,6 +1723,159 @@ def _refutar_evento_adverso_prevenible(
             "aceptar y argumentar 'igual paguen'."
         )
     return nuevo
+
+
+# ── Ronda 16 (Bug U): rechazo de sanciones unilaterales de la EPS ──
+# Casos 26-jun (Quemado SURA, Norwood NUEVA EPS): la EPS aplicó glosa por
+# "sanción del 8%" y "multa del 12% por demora". La IA aceptó la sanción
+# como cobro válido (Bug grave — la EPS NO tiene facultad sancionatoria;
+# esa función está reservada a la SuperSalud por Ley 1438/2011 Art. 126).
+# Esta red detecta cuando el dictamen RECONOCE la sanción ("se ajusta a
+# la sanción aplicada", "procede el descuento sancionatorio") y lo
+# reescribe como RECHAZO por vicio de competencia.
+_RE_SANCION_EPS_MENCIONADA = re.compile(
+    r"(?:SANCI[ÓO]N\s+(?:DEL\s+)?\d{1,2}(?:[\.,]\d{1,2})?\s*%|"
+    r"MULTA\s+(?:DEL\s+)?\d{1,2}(?:[\.,]\d{1,2})?\s*%|"
+    r"PENALIDAD\s+(?:DEL\s+)?\d{1,2}(?:[\.,]\d{1,2})?\s*%|"
+    r"RETENCI[ÓO]N\s+PUNITIVA|"
+    r"DESCUENTO\s+SANCIONATORIO)",
+    re.IGNORECASE,
+)
+
+_RE_ACEPTA_SANCION_DICTAMEN = re.compile(
+    r"\b(?:SE\s+AJUSTA\s+A\s+LA\s+SANCI[ÓO]N|"
+    r"PROCEDE\s+(?:EL\s+)?DESCUENTO\s+SANCIONATORIO|"
+    r"ACEPTAR\s+LA\s+SANCI[ÓO]N|"
+    r"LA\s+SANCI[ÓO]N\s+(?:APLICADA|IMPUESTA)\s+ES\s+(?:PROCEDENTE|V[ÁA]LIDA))\b",
+    re.IGNORECASE,
+)
+
+
+def _rechazar_sancion_eps_ilegal(
+    dictamen: str,
+    texto_glosa: str | None = None,
+) -> str:
+    """Bug U (ronda 16): si la glosa de entrada habla de "sanción del N%",
+    "multa del N%" o variantes, y el dictamen NO incluye el rechazo por
+    vicio de competencia (la EPS no tiene facultad sancionatoria), se
+    inyecta el rechazo como bloque adicional al inicio del argumento.
+
+    Además, si el dictamen erróneamente "acepta" la sanción (por ejemplo
+    "SE AJUSTA A LA SANCIÓN APLICADA"), se reescribe esa frase por el
+    rechazo formal.
+    """
+    if not dictamen or not texto_glosa:
+        return dictamen
+    # ¿La glosa de entrada habla de sanción?
+    glosa_menciona_sancion = bool(_RE_SANCION_EPS_MENCIONADA.search(texto_glosa))
+    if not glosa_menciona_sancion:
+        return dictamen
+
+    nuevo = dictamen
+    n_reescritas = 0
+
+    # 1) Si el dictamen acepta la sanción, lo reescribimos como rechazo.
+    def _sub_rechazo(_match: re.Match[str]) -> str:
+        nonlocal n_reescritas
+        n_reescritas += 1
+        return (
+            "EL HUS RECHAZA EXPRESAMENTE LA SANCIÓN UNILATERAL APLICADA POR "
+            "VICIO DE COMPETENCIA: la entidad pagadora NO tiene facultad "
+            "sancionatoria sobre el prestador (función reservada a la "
+            "Superintendencia Nacional de Salud — Ley 1438/2011 Art. 126 — "
+            "y al Juez competente — Ley 1564/2012 Art. 33). Lo máximo "
+            "reclamable por demora son intereses moratorios DTF pactados o "
+            "tasa máxima legal (Art. 884 C.Co., Decreto 4747/2007 Art. 21)"
+        )
+
+    nuevo, n1 = _RE_ACEPTA_SANCION_DICTAMEN.subn(_sub_rechazo, nuevo)
+
+    # 2) Si la glosa habla de sanción pero el dictamen NO menciona "vicio
+    # de competencia" o "facultad sancionatoria", inyectamos un bloque
+    # de rechazo al final del primer párrafo argumentativo.
+    menciona_vicio_competencia = bool(
+        re.search(
+            r"VICIO\s+DE\s+COMPETENCIA|FACULTAD\s+SANCIONATORIA|"
+            r"SUPERINTENDENCIA\s+NACIONAL\s+DE\s+SALUD\s+ART[ÍI]?CULOS?\s+126|"
+            r"LEY\s+1438[^.]{0,50}ART[ÍI]?CULO\s+126",
+            nuevo,
+            re.IGNORECASE,
+        )
+    )
+    if not menciona_vicio_competencia:
+        # Inyectamos un bloque de rechazo después del primer punto.
+        bloque_rechazo = (
+            " ADICIONALMENTE, EL HUS RECHAZA POR VICIO DE COMPETENCIA "
+            "CUALQUIER SANCIÓN UNILATERAL APLICADA POR LA ENTIDAD PAGADORA: "
+            "la facultad sancionatoria sobre el prestador está reservada "
+            "constitucionalmente a la Superintendencia Nacional de Salud "
+            "(Ley 1438/2011 Art. 126) y al Juez competente (Ley 1564/2012 "
+            "Art. 33). Lo máximo que la EPS puede reclamar por demora son "
+            "intereses moratorios DTF pactados o la tasa máxima legal "
+            "(Art. 884 C.Co.; Decreto 4747/2007 Art. 21)."
+        )
+        # Insertamos después de la primera oración terminada en ".".
+        idx_punto = nuevo.find(".")
+        if 0 < idx_punto < len(nuevo) - 1:
+            nuevo = nuevo[: idx_punto + 1] + bloque_rechazo + nuevo[idx_punto + 1 :]
+            n_reescritas += 1
+
+    if n_reescritas:
+        logger.warning(
+            f"[SANCION-EPS-RECHAZADA] {n_reescritas} ajuste(s) al dictamen: "
+            "se reescribió aceptación tácita o se inyectó rechazo por vicio "
+            "de competencia (Ley 1438/2011 Art. 126)."
+        )
+    return nuevo
+
+
+# ── Ronda 16 (Bug O v3): post-validador de instrucciones del gestor ──
+# Casos 26-jun: el usuario pidió en user_instructions "INCLUIR LA SENTENCIA
+# T-553/2024" pero la IA no la incluyó. Bug O v2 (ronda 15) ya implementaba
+# detección + re-prompt cuando el dictamen ignora la instrucción; esto es
+# la red final post-IA: si tras todo el pipeline la instrucción crítica
+# sigue sin aparecer en el dictamen, registramos warning + flag para que
+# el quality gate decida re-llamar. NO modifica el texto — solo audita.
+_RE_KEY_INSTRUCCION_NORMA = re.compile(
+    r"\b(?:SENTENCIA|AUTO|LEY|DECRETO|RESOLUCI[ÓO]N|CIRCULAR)\s+"
+    r"(?:[TC]\-?)?\d{1,5}(?:\s*[/\-]\s*\d{2,4})?",
+    re.IGNORECASE,
+)
+
+
+def _compactar_para_match_normativo(texto: str) -> str:
+    """Compacta texto para comparar identificadores normativos sin que
+    espacios, guiones o slashes interfieran. Ej: "T-553/2024" → "T5532024".
+    """
+    return re.sub(r"[\s/\-]+", "", texto.upper())
+
+
+def _auditar_instrucciones_gestor(
+    dictamen: str,
+    instrucciones_gestor: str | None,
+) -> tuple[bool, list[str]]:
+    """Bug O v3 (ronda 16): verifica que las normas mencionadas
+    explícitamente por el gestor en sus instrucciones aparezcan en el
+    dictamen final. Devuelve (todas_cumplidas, lista_omisiones).
+
+    No modifica el dictamen; el caller decide si re-prompt o aceptar.
+    """
+    if not dictamen or not instrucciones_gestor:
+        return True, []
+    pedidas = {
+        _compactar_para_match_normativo(m.group(0))
+        for m in _RE_KEY_INSTRUCCION_NORMA.finditer(instrucciones_gestor)
+    }
+    if not pedidas:
+        return True, []
+    dictamen_compacto = _compactar_para_match_normativo(dictamen)
+    omisiones = [p for p in pedidas if p not in dictamen_compacto]
+    if omisiones:
+        logger.warning(
+            f"[INSTRUCCIONES-GESTOR-OMITIDAS] El dictamen NO incluyó "
+            f"{len(omisiones)} norma(s) pedida(s) por el gestor: {omisiones}"
+        )
+    return len(omisiones) == 0, omisiones
 
 
 def _sustituir_eps_generica_en_dictamen(
@@ -4042,49 +4287,128 @@ class GlosaService:
                 logger.debug(f"Calibración no inyectada: {_e}")
 
             # ═══════════════════════════════════════════════════════════
-            #  R-CEREBRO #5: Ruteo dinámico Sonnet → Opus
-            #  Para casos de ALTA complejidad (puntaje >= 6 ya marca
-            #  "complejo", aquí endurecemos: solo si valor >= 10M Y
-            #  hay 2+ PDFs) usamos Opus 4.7 que rinde mejor en tareas
-            #  jurídicas largas.
-            # ═══════════════════════════════════════════════════════════
-            #  Routing en 3 niveles para optimizar costo:
+            #  R-CEREBRO #5: Ruteo dinámico Haiku/Sonnet/Opus + auto-
+            #  escalación a Claude para CASOS COMPLEJOS (ronda 16).
+            #
+            #  Routing en 3 niveles para optimizar costo cuando
+            #  primary_ai=anthropic:
             #    HAIKU  — casos simples / valor bajo / sin PDF / glosa
             #             corta. ~20× más barato que Sonnet.
             #    SONNET — caso por defecto.
             #    OPUS   — alta complejidad: valor>=10M + 2+ PDFs.
             #
-            #  IMPORTANTE: el ruteo SOLO aplica cuando primary_ai usa
-            #  Anthropic. Si el usuario eligió 'groq' como primary_ai,
-            #  NO debemos forzar Anthropic — eso ignora la decisión
-            #  deliberada (etapa testing, ahorrar tokens).
+            #  RONDA 16 (26-jun-2026): además del routing anterior,
+            #  cuando primary_ai=groq pero el caso es COMPLEJO (valor
+            #  ≥ $50M, multi-PDF, multi-código, o palabras-clave
+            #  críticas tipo Cart-T/Norwood/trasplante/hemofilia/
+            #  Epicel/recobro/tutela), FORZAMOS Anthropic — Llama 4
+            #  Scout aluciona masivamente en estos casos (evidencia:
+            #  3 dictamens 26-jun con Bug T/U/Q/B/N detectados). Como
+            #  modelo_override siempre va a Anthropic (línea 7096),
+            #  basta con setearlo para sobrepasar el primary_ai=groq.
             _modelo_override = None
-            _saltar_routing = self.primary_ai == "groq"
+            _es_complejo_forzar_claude = False
             try:
+                # Usa el parser robusto que respeta formato colombiano
+                # ("7.700,00" = 7700, no 770000 como hacía el regex viejo).
+                # Bug detectado 12-may-2026: Sonnet se activaba para casos de
+                # $7.700 porque el parser interpretaba mal los puntos de miles.
+                from app.services.auto_pilot_decision import _parse_valor as _pval_route
+
+                _valor_num_route = int(_pval_route(valor_raw)) if valor_raw else 0
+                _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
+                _len_glosa_route = len(str(texto_base or ""))
+                _len_pdf_route = len(str(contexto_pdf or ""))
+                _num_codigos_route = len(codigos_detectados or [])
+
+                # ── Detector de COMPLEJIDAD (ronda 16, 26-jun-2026) ──
+                # Si CUALQUIERA de estas condiciones se cumple, el caso es
+                # "alta complejidad jurídica" y debe ir a Claude aunque el
+                # usuario haya elegido Groq por defecto:
+                #   1. Valor ≥ $50M (impacto financiero alto)
+                #   2. Multi-PDF (2+ documentos soporte → análisis cruzado)
+                #   3. Multi-código (≥ 3 códigos de glosa → defensa multinorma)
+                #   4. Texto largo (> 4000 chars → dictamen muy detallado)
+                #   5. Palabras-clave críticas que históricamente le revientan
+                #      el dictamen a Llama (oncología cara, neonatal grave,
+                #      enfermedades raras, recobros, tutelas, evento adverso).
+                _palabras_clave_complejas = (
+                    "CART-T",
+                    "CAR-T",
+                    "TISAGENLECLEUCEL",
+                    "AXICABTAGENE",
+                    "NORWOOD",
+                    "TRASPLANT",
+                    "HEMOFILIA",
+                    "EPICEL",
+                    "ELIZARIA",
+                    "ATALUREN",
+                    "NUSINERSEN",
+                    "ZOLGENSMA",
+                    "TUTELA",
+                    "RECOBRO",
+                    "EVENTO ADVERSO",
+                    "PREVENIBLE",
+                    "MUERTE MATERNA",
+                    "DAÑO IATROG",
+                    "ENFERMEDAD HUÉRFANA",
+                    "ENFERMEDAD HUERFANA",
+                    "CARTAGENA-T",
+                    "GAUCHER",
+                    "POMPE",
+                    "CEREZYME",
+                    "VPH-RECOMB",
+                    "DUCHENNE",
+                )
+                _texto_upper_route = (f"{texto_base or ''} {contexto_pdf or ''}"[:50000]).upper()
+                _hit_palabra_clave = any(
+                    kw in _texto_upper_route for kw in _palabras_clave_complejas
+                )
+
+                _es_complejo_forzar_claude = (
+                    _valor_num_route >= 50_000_000
+                    or (_num_pdfs_route >= 2 and _valor_num_route >= 5_000_000)
+                    or _num_codigos_route >= 3
+                    or _len_glosa_route > 4_000
+                    or _hit_palabra_clave
+                )
+
+                _saltar_routing = self.primary_ai == "groq" and not _es_complejo_forzar_claude
+
                 if _saltar_routing:
                     logger.info(
-                        f"[ROUTING-IA] SKIP — primary_ai={self.primary_ai} "
-                        f"(usuario elige no usar Anthropic). El override Haiku/Opus "
-                        f"solo aplica cuando primary_ai=anthropic."
+                        f"[ROUTING-IA] SKIP — primary_ai={self.primary_ai} y caso simple "
+                        f"(valor=${_valor_num_route:,}, pdfs={_num_pdfs_route}, "
+                        f"codigos={_num_codigos_route}). Usando Groq como configurado."
                     )
                 else:
-                    # Usa el parser robusto que respeta formato colombiano
-                    # ("7.700,00" = 7700, no 770000 como hacía el regex viejo).
-                    # Bug detectado 12-may-2026: Sonnet se activaba para casos de
-                    # $7.700 porque el parser interpretaba mal los puntos de miles.
-                    from app.services.auto_pilot_decision import _parse_valor as _pval_route
-
-                    _valor_num_route = int(_pval_route(valor_raw)) if valor_raw else 0
-                    _num_pdfs_route = (contexto_pdf or "").count("═══ DOCUMENTO:")
-                    _len_glosa_route = len(str(texto_base or ""))
-                    _len_pdf_route = len(str(contexto_pdf or ""))
-
-                    # OPUS: valor alto + multi-PDF
+                    # OPUS: valor alto + multi-PDF (caso ricamente documentado).
                     if _valor_num_route >= 10_000_000 and _num_pdfs_route >= 2:
                         _modelo_override = "claude-opus-4-7"
                         logger.info(
                             "[ROUTING-IA] OPUS — "
                             f"valor=${_valor_num_route:,} pdfs={_num_pdfs_route}"
+                        )
+                    # SONNET forzado por complejidad pese a primary_ai=groq.
+                    # Las palabras-clave críticas o valores ≥ $50M reventaban
+                    # a Llama 4 Scout (rondas 14-15-16: Cart-T, Norwood, VIH).
+                    elif _es_complejo_forzar_claude and self.primary_ai == "groq":
+                        _modelo_override = self.anthropic_model or "claude-sonnet-4-6"
+                        _motivos = []
+                        if _valor_num_route >= 50_000_000:
+                            _motivos.append(f"valor=${_valor_num_route:,}")
+                        if _num_pdfs_route >= 2 and _valor_num_route >= 5_000_000:
+                            _motivos.append(f"pdfs={_num_pdfs_route}+5M")
+                        if _num_codigos_route >= 3:
+                            _motivos.append(f"codigos={_num_codigos_route}")
+                        if _len_glosa_route > 4_000:
+                            _motivos.append(f"texto={_len_glosa_route}c")
+                        if _hit_palabra_clave:
+                            _motivos.append("palabra-clave-critica")
+                        logger.warning(
+                            "[ROUTING-IA] FORZANDO ANTHROPIC — primary_ai=groq pero "
+                            f"caso complejo ({', '.join(_motivos)}). Llama 4 Scout "
+                            f"aluciona en estos casos; escalamos a {_modelo_override}."
                         )
                     # HAIKU: caso liviano. Reduce ~75% el costo y conserva
                     # calidad porque el cerebro pre-IA ya hizo el trabajo
@@ -4103,8 +4427,8 @@ class GlosaService:
                             f"texto={_len_glosa_route}c). "
                             "Ahorro ~75% vs Sonnet."
                         )
-            except Exception:
-                pass
+            except Exception as _e_route:
+                logger.debug(f"[ROUTING-IA] error calculando complejidad: {_e_route}")
 
             # ═══════════════════════════════════════════════════════════
             #  R-CEREBRO #10: Skip Claude (dictamen directo sin tokens).
@@ -5225,10 +5549,17 @@ class GlosaService:
                     texto_glosa=_texto_glosa_input_md,
                     codigo_glosa=str(getattr(data, "codigo_glosa", "") or codigo_det or ""),
                 )
-                if _dict_g != dictamen:
-                    dictamen = _dict_g
+                # Ronda 16 (Bug U): rechazo de sanciones unilaterales EPS
+                # — la EPS NO tiene facultad sancionatoria (Ley 1438/2011
+                # Art. 126 reserva esa función a SuperSalud). Inyecta
+                # rechazo por vicio de competencia o reescribe aceptación
+                # tácita cuando la glosa de entrada habla de "sanción del
+                # N%", "multa del N%", etc.
+                _dict_u = _rechazar_sancion_eps_ilegal(_dict_g, texto_glosa=_texto_glosa_input_md)
+                if _dict_u != dictamen:
+                    dictamen = _dict_u
             except Exception as _e_mu:
-                logger.debug(f"[MULETILLAS-RONDA13] red final no aplicada: {_e_mu}")
+                logger.debug(f"[MULETILLAS-RONDA13-16] red final no aplicada: {_e_mu}")
 
             # ═══════════════════════════════════════════════════════════
             #  Ronda 14 (25-jun-2026) — Bug I v2: EPS detectada del texto

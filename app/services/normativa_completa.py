@@ -1090,6 +1090,40 @@ RESOLUCIONES = {
         },
         "keywords": ["Resolución 4886", "salud mental", "internación involuntaria", "junta médica"],
     },
+    # ── Ronda 16 (26-jun-2026 — Bug P v3): normas pre-existentes que la EPS
+    #     SURA/NUEVA EPS/COMPENSAR invocaron y que el verifier marcaba como
+    #     "NORMA_INEXISTENTE". Las agregamos para que el quality gate las
+    #     reconozca como reales y el dictamen pueda usarlas en su defensa.
+    "RESOLUCION 13437 DE 1991": {
+        "nombre": "Resolución 13437 de 01-11-1991 (MinSalud)",
+        "titulo": "Decálogo de Derechos del Paciente — primera carta nacional",
+        "ambito": "Derechos del usuario en la atención en salud (preconstitucional, ratificada por Ley Estatutaria 1751/2015)",
+        "vigente": True,
+        "ratio": "Establece el decálogo de derechos del paciente: trato digno, respeto a creencias, información comprensible, segunda opinión, confidencialidad, autonomía, atención completa, identificación del personal, libre elección, y formulación de quejas. Norma fundacional citada como soporte en glosas que invocan calidad de la atención.",
+        "aplica_a": "Glosas que cuestionan calidad o trato — defensa por aplicación del decálogo institucional",
+        "keywords": [
+            "Resolución 13437/1991",
+            "decálogo paciente",
+            "derechos del usuario",
+            "trato digno",
+            "confidencialidad",
+        ],
+    },
+    "RESOLUCION 2338 DE 2013": {
+        "nombre": "Resolución 2338 de 11-07-2013 (MinSalud)",
+        "titulo": "Lineamientos para la gestión de tecnologías biomédicas e insumos",
+        "ambito": "Adquisición, mantenimiento y gestión de equipo biomédico — IPS prestadoras",
+        "vigente": True,
+        "ratio": "Define los lineamientos para la gestión integral de tecnología biomédica (selección, adquisición, instalación, mantenimiento, baja). Norma técnica de obligatorio cumplimiento para IPS y soporte en glosas de calidad por uso de dispositivos: el HUS acredita procesos institucionales conforme a esta resolución, no admite cuestionamientos al equipo biomédico aprobado por gerencia técnica.",
+        "aplica_a": "Glosas que cuestionan dispositivos biomédicos, mantenimiento de equipos o calibración",
+        "keywords": [
+            "Resolución 2338/2013",
+            "tecnología biomédica",
+            "gestión de insumos",
+            "mantenimiento equipos",
+            "calidad",
+        ],
+    },
 }
 
 
@@ -1570,6 +1604,70 @@ JURISPRUDENCIA = {
         "ratio": "El sistema de salud es solidario y de financiación cruzada; ninguna IPS pública puede ser usada como mecanismo de financiación de la liquidez de las EPS mediante glosas reiterativas.",
         "aplica_a": "Argumento de fondo en glosas reiterativas a IPS pública (HUS)",
         "keywords": ["SU-1023/2001", "solidaridad SGSSS", "IPS pública", "financiación cruzada"],
+    },
+    # ── Ronda 16 (26-jun-2026 — Bug P v3): jurisprudencia que la EPS
+    #     SURA/NUEVA EPS/COMPENSAR invocaron y que el verifier marcaba
+    #     como inexistente. Las agregamos para que el quality gate las
+    #     reconozca y el dictamen pueda responder por nombre.
+    "SENTENCIA T-385 DE 2023": {
+        "nombre": "Sentencia T-385 de 2023 (Corte Constitucional)",
+        "titulo": "Derecho a la salud — paciente complejo y bilateralidad EPS-IPS",
+        "ambito": "Defensa de prestadores frente a EPS — obligaciones bilaterales y continuidad",
+        "vigente": True,
+        "ratio": "La Corte reiteró que la relación EPS-IPS es bilateral: a la obligación del prestador de garantizar atención corresponde la obligación correlativa de la EPS de pagar oportunamente. La sostenibilidad de la red prestadora es presupuesto material del derecho a la salud. Las glosas dilatorias o reiterativas vulneran este equilibrio.",
+        "aplica_a": "Glosas sistemáticas o dilatorias contra IPS pública",
+        "keywords": [
+            "T-385/2023",
+            "bilateralidad",
+            "EPS-IPS",
+            "sostenibilidad red",
+            "glosas dilatorias",
+        ],
+    },
+    "SENTENCIA T-970 DE 2014": {
+        "nombre": "Sentencia T-970 de 2014 (Corte Constitucional)",
+        "titulo": "Muerte digna y autonomía del paciente terminal",
+        "ambito": "Cuidados paliativos, sedación terminal y voluntad anticipada",
+        "vigente": True,
+        "ratio": "Reconoció la muerte digna como derecho fundamental y ordenó a MinSalud reglamentar su procedimiento. Los servicios de cuidados paliativos, sedación terminal y manejo de dolor en paciente terminal son cobertura obligatoria por dignidad humana (Art. 1 CP) y libre desarrollo de la personalidad (Art. 16 CP). Cualquier glosa que cuestione la pertinencia de cuidados paliativos vulnera el precedente.",
+        "aplica_a": "Glosas a servicios de paliativos, oncología terminal, sedación, manejo del dolor",
+        "keywords": [
+            "T-970/2014",
+            "muerte digna",
+            "cuidados paliativos",
+            "sedación terminal",
+            "autonomía paciente",
+        ],
+    },
+    "AUTO 037 DE 2024": {
+        "nombre": "Auto 037 de 2024 (Corte Constitucional — seguimiento T-553/2024)",
+        "titulo": "Seguimiento al cumplimiento de órdenes en terapia CAR-T (Tisagenlecleucel)",
+        "ambito": "Tecnologías de alto costo en cáncer hemato-oncológico",
+        "vigente": True,
+        "ratio": "Auto de seguimiento que ordena medidas urgentes a EPS y entidades pagadoras para garantizar el acceso efectivo a terapia CAR-T cell ordenada por orden judicial. Reafirma que el costo del tratamiento no es eximente cuando hay orden de tutela en firme. Aplica directamente a glosas que cuestionan recobros por Cart-T.",
+        "aplica_a": "Glosas de recobro o pertinencia en terapia Cart-T",
+        "keywords": [
+            "Auto 037/2024",
+            "CAR-T",
+            "Tisagenlecleucel",
+            "cumplimiento tutela",
+            "seguimiento",
+        ],
+    },
+    "AUTO 116 DE 2024": {
+        "nombre": "Auto 116 de 2024 (Corte Constitucional)",
+        "titulo": "Sostenibilidad fiscal del SGSSS y giros directos a IPS públicas",
+        "ambito": "Crisis financiera de EPS intervenidas — protección de IPS prestadora",
+        "vigente": True,
+        "ratio": "La Corte ordenó medidas estructurales para el saneamiento de cartera de IPS públicas frente a EPS intervenidas o liquidadas (Nueva EPS, SaludCoop, Cafesalud histórica, Medimás). El giro directo desde ADRES a la IPS pública es mecanismo excepcional pero exigible cuando la EPS deudora no garantiza el pago. Soporte fuerte para glosas con riesgo de no-pago por liquidación inminente.",
+        "aplica_a": "Glosas de EPS intervenidas o en proceso de liquidación — fundamento para giro directo ADRES",
+        "keywords": [
+            "Auto 116/2024",
+            "sostenibilidad SGSSS",
+            "giro directo",
+            "ADRES",
+            "EPS intervenida",
+        ],
     },
 }
 
