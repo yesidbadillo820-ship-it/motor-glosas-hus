@@ -2037,19 +2037,48 @@ def _es_sigla_o_codigo(palabra: str) -> bool:
     return p in _SIGLAS_CONSERVAR_UPPER or _RE_SIGLA_O_CODIGO.match(p) is not None
 
 
+# Detector simple de HTML estructural — si el texto está envuelto en
+# <table>/<div>/<span> con atributos de estilo, NO normalizar el texto.
+# El generador de HTML del dictamen ya controla el case de tags, headers
+# de tabla, etiquetas y nombres de contrato (Bug detectado en ronda 17:
+# el sanitizer convertía S-13-1-03-1-04958 → s-13-1-03-1-04958 y
+# <TH>CÓDIGO GLOSA</TH> → <th>código glosa</th>, rompiendo el render).
+_RE_HTML_ESTRUCTURAL = re.compile(
+    r"<table\b|<div\s+style=|<span\s+style=|<th\s+style=|<td\s+style=",
+    re.IGNORECASE,
+)
+
+# Códigos hifenados de contrato/normativa que el sanitizer NO debe lowercase.
+# Ej: S-13-1-03-1-04958, F-2024-001, T-553/2024, RES-456, AU-301.
+# Pattern: 1-3 mayúsculas iniciales + hífen/slash + alfanumérico (≥4 chars).
+_RE_CODIGO_HIFENADO = re.compile(r"\b[A-Z]{1,4}(?:[\-/][A-Z0-9]+){2,}\b")
+
+
 def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> str:
     """Convierte texto en MAYÚSCULAS sostenidas a sentence case institucional.
 
     Estrategia:
-      1. Si el dictamen completo tiene < umbral_pct de letras en uppercase,
-         no se toca (probablemente ya está bien formateado).
-      2. Si supera el umbral, se divide en oraciones (por . ! ?) y cada
+      1. Si el texto contiene HTML estructural (tags <table>, <div style=>,
+         etc.), no se toca — el HTML ya viene del generador del dictamen
+         con el case correcto en headers, atributos y nombres de contrato.
+         Bug ronda 17 (26-jun-2026): el sanitizer lowercase HTML y
+         convertía códigos como "S-13-1-03-1-04958" a "s-13-..." rompiendo
+         test_optimizaciones_tokens y test_multi_codigo. La normalización
+         de mayúsculas correcta es sobre el ARGUMENTO antes de envolverlo
+         en HTML, no sobre el HTML ensamblado.
+      2. Si el texto plano completo tiene < umbral_pct de letras en
+         uppercase, no se toca (probablemente ya está bien formateado).
+      3. Si supera el umbral, se divide en oraciones (por . ! ?) y cada
          oración se normaliza: primer carácter alfabético en uppercase,
          resto en lowercase EXCEPTO siglas conocidas y códigos.
-      3. Después de la conversión, se restauran las siglas a uppercase
-         exacto si quedaron en lowercase.
+      4. Después de la conversión, se restauran las siglas y códigos
+         hifenados a uppercase exacto si quedaron en lowercase.
     """
     if not texto:
+        return texto
+    # Skip: si tiene HTML estructural, no es texto plano. El sanitizer no
+    # aplica acá — el HTML ya viene con el case correcto del generador.
+    if _RE_HTML_ESTRUCTURAL.search(texto):
         return texto
     # Calcular porcentaje de uppercase en letras alfabéticas
     letras_alfa = [c for c in texto if c.isalpha()]
@@ -2059,8 +2088,19 @@ def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> s
     if pct_upper < umbral_pct:
         return texto
 
+    # ── Preserve códigos hifenados antes del lowercase global ──
+    # Reemplazamos cada match por un placeholder único y restauramos al
+    # final. Esto evita que "S-13-1-03-1-04958" pase a lowercase.
+    codigos_preservados: list[str] = []
+
+    def _reserve(m: re.Match[str]) -> str:
+        codigos_preservados.append(m.group(0))
+        return f"\x00CODHIF{len(codigos_preservados) - 1}\x00"
+
+    nuevo = _RE_CODIGO_HIFENADO.sub(_reserve, texto)
+
     # 1) Lowercase global
-    nuevo = texto.lower()
+    nuevo = nuevo.lower()
     # 2) Capitalizar tras inicio de oración (., !, ?, salto de línea, " " al inicio)
     nuevo = re.sub(
         r"(^|[\.!?\n]\s*)([a-záéíóúñü])",
@@ -2085,9 +2125,16 @@ def _normalizar_mayusculas_sostenidas(texto: str, umbral_pct: float = 0.45) -> s
     )
     # 5) "Ley", "Decreto", "Resolución" + número se conservan tal cual:
     # la regla 2 ya capitalizó la inicial; nada extra.
+
+    # 6) Restaurar códigos hifenados originales (S-13-..., T-553/2024, etc.)
+    for i, codigo in enumerate(codigos_preservados):
+        nuevo = nuevo.replace(f"\x00codhif{i}\x00", codigo)
+        nuevo = nuevo.replace(f"\x00CODHIF{i}\x00", codigo)
+
     logger.info(
         f"[MAYUSCULAS-NORMALIZADAS] dictamen normalizado a sentence case "
-        f"(antes: {pct_upper:.0%} mayúsculas)"
+        f"(antes: {pct_upper:.0%} mayúsculas, códigos preservados: "
+        f"{len(codigos_preservados)})"
     )
     return nuevo
 
@@ -5194,7 +5241,15 @@ class GlosaService:
                     logger.debug(f"[AUTO-CRITICA] validación falló: {_e_val}")
 
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
+            # Ronda 17 (26-jun-2026): aplicar normalización de MAYÚSCULAS
+            # sostenidas AQUÍ, sobre el ARGUMENTO en texto plano, antes
+            # del wrap en HTML estructural. Después del wrap, llamar al
+            # mismo sanitizer sobre el HTML completo lo hacía lowercase
+            # también las tags y nombres de contrato como S-13-1-03-1-04958
+            # (regresión detectada en CI tras ronda 16 con umbral 0.45).
+            arg_limpio = _normalizar_mayusculas_sostenidas(arg_limpio)
             arg_ia = arg_ia.replace("\n", "<br/>").replace("*", "")
+            arg_ia = _normalizar_mayusculas_sostenidas(arg_ia)
 
         score = self._calcular_score(
             tipo_glosa,

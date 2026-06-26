@@ -262,6 +262,65 @@ class TestRefinarDictamenDetectaComplejidad:
         assert "modelo_override=_modelo_override_refinar" in cuerpo
 
 
+class TestNormalizarMayusculasProtegeHTMLyCodigosHifenados:
+    """Bug regresión detectado en CI tras ronda 16 (umbral 0.45): el
+    sanitizer lowercase HTML estructural y códigos de contrato hifenados
+    como S-13-1-03-1-04958. Rompía test_optimizaciones_tokens y
+    test_multi_codigo. Fix de ronda 17: skip si hay HTML estructural,
+    preserva códigos hifenados con placeholder."""
+
+    def test_codigo_contrato_hifenado_se_preserva(self):
+        from app.services.glosa_service import _normalizar_mayusculas_sostenidas
+
+        texto = (
+            "ESE HUS NO ACEPTA LA GLOSA TA0301 INTERPUESTA POR FAMISANAR EPS, "
+            "POR CUANTO EL VALOR FACTURADO COINCIDE EXACTAMENTE CON LA TARIFA "
+            "PACTADA EN EL S-13-1-03-1-04958 PARA EL CUPS 890202."
+        )
+        res = _normalizar_mayusculas_sostenidas(texto)
+        # El código de contrato debe quedar en mayúsculas exactas
+        assert "S-13-1-03-1-04958" in res
+
+    def test_sentencia_t553_2024_se_preserva(self):
+        from app.services.glosa_service import _normalizar_mayusculas_sostenidas
+
+        texto = (
+            "ESTE HUS INVOCA LA SENTENCIA T-553/2024 DE LA CORTE CONSTITUCIONAL "
+            "QUE GARANTIZA EL ACCESO BAJO ORDEN JUDICIAL."
+        )
+        res = _normalizar_mayusculas_sostenidas(texto)
+        assert "T-553/2024" in res
+
+    def test_html_estructural_no_se_toca(self):
+        from app.services.glosa_service import _normalizar_mayusculas_sostenidas
+
+        html = (
+            '<table border="1" style="width:100%"><tr>'
+            "<th>CÓDIGO GLOSA</th></tr></table>"
+            '<div style="background:#f8fafc;">ESE HUS NO ACEPTA LA GLOSA</div>'
+        )
+        res = _normalizar_mayusculas_sostenidas(html)
+        # No debe haber tocado nada
+        assert res == html
+        # Específicamente: el header CÓDIGO GLOSA debe seguir uppercase
+        assert "<th>CÓDIGO GLOSA</th>" in res
+
+    def test_texto_plano_se_normaliza(self):
+        # Garantiza que el sanitizer aún normaliza texto plano (no es no-op)
+        from app.services.glosa_service import _normalizar_mayusculas_sostenidas
+
+        texto = (
+            "ESE HUS NO ACEPTA LA GLOSA APLICADA POR FAMISANAR EPS. SE SOLICITA EL LEVANTAMIENTO."
+        )
+        res = _normalizar_mayusculas_sostenidas(texto)
+        # Debe normalizar a sentence case
+        assert res != texto
+        # Pero conserva siglas conocidas
+        assert "HUS" in res
+        assert "EPS" in res
+        assert "FAMISANAR" in res
+
+
 class TestRegresionRonda16:
     """Los fixes de ronda 16 siguen funcionando — sanitizers, corpus, prompt."""
 
