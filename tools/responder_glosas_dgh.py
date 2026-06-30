@@ -262,12 +262,38 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
         except Exception:
             pass
 
-    # 2) Ir al campo Factura operando por FOCO (NO por aislar la ventana del
-    #    Editor, que con pestañas duplicadas es ambiguo y fue la causa de fondo
-    #    de los falsos negativos). Tras AGREGAR el Editor nuevo está activo y el
-    #    foco arranca en Consecutivo; TAB hasta que el control con foco real se
-    #    llame 'Factura' (orden Consecutivo→Fecha→[Estado]→Factura).
+    # 2) Ir al campo Factura operando por FOCO. Pero primero hay que ANCLAR el
+    #    foco en el Editor: al correr desde la terminal el foco queda en
+    #    PowerShell y los TAB irían a la terminal. Traemos DG al frente
+    #    (set_focus) y clickeamos Consecutivo (primer campo) para enfocarlo; de
+    #    ahí TAB hasta que el control con foco real se llame 'Factura' (orden
+    #    Consecutivo→Fecha→[Estado]→Factura).
     from pywinauto.keyboard import send_keys
+
+    try:
+        win.set_focus()
+        time.sleep(0.5)
+    except Exception:
+        pass
+    cons = _buscar(win, auto_id="ctrlConsecutivo", timeout=8)
+    if cons is None:
+        logger.error(
+            "  no hallé Consecutivo para anclar el foco. ¿Se abrió el Editor tras AGREGAR?"
+        )
+        if dump_al_fallar:
+            _dump("sin_consecutivo")
+        return "ERROR_FACTURA"
+    try:
+        cons.click_input()
+        time.sleep(0.4)
+    except Exception as e:
+        logger.warning(f"  no pude clickear Consecutivo para anclar el foco: {e}")
+    aid0, nm0 = _foco_actual()
+    if nm0 not in ("Consecutivo", "Factura") and "Consecutivo" not in nm0:
+        logger.warning(
+            f"  ⚠ tras anclar, el foco está en {nm0!r} (no en el Editor). NO toques el "
+            "mouse/teclado mientras corre el bot."
+        )
 
     en_factura = False
     for intento in range(20):
