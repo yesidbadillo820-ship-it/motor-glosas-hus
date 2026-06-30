@@ -117,7 +117,7 @@ import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 logger = logging.getLogger("radicar")
 
@@ -1122,6 +1122,54 @@ def indexar_soportes_clinicos(raiz: Path, patron: str) -> dict[str, list[Path]]:
     return indice
 
 
+def indexar_soportes_desde_indice(ruta_indice: Path, patron: str) -> dict[str, list[Path]]:
+    """Construye el índice de soportes desde un LISTADO pre-armado de rutas de
+    ARCHIVOS (un 'dir /s /b' de los share(s) de soportes, una ruta por línea).
+
+    No recorre la red: el listado ya hizo ese trabajo una vez, así que cubre de
+    una TODAS las rutas que tenga adentro (X:, Y:, Z:…) — ideal cuando los
+    soportes están repartidos en varios discos y recorrerlos sería lentísimo.
+    Clasifica cada archivo por su nombre y lo cruza por número de factura. Las
+    líneas que son CARPETAS (terminan en HUS<factura>, sin extensión) no aportan
+    archivos: si el listado es de carpetas, regeneralo listando archivos."""
+    rx = re.compile(patron, re.IGNORECASE)
+    indice: dict[str, list[Path]] = defaultdict(list)
+    n_arch = n_carpetas = 0
+    with ruta_indice.open(encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            linea = raw.strip().strip('"')
+            if not linea:
+                continue
+            base = linea.replace("/", "\\").rsplit("\\", 1)[-1]
+            m = rx.search(base)
+            if m is None:
+                continue
+            if "." not in base:  # carpeta HUS<factura>, no un archivo
+                n_carpetas += 1
+                continue
+            clave = normalizar_factura(m.group(0))
+            if clave == "0":
+                continue
+            _cod, _desc, reconocido = clasificar_soporte(base)
+            if reconocido:
+                # El listado trae rutas de Windows (X:\…, \\srv\…); PureWindowsPath
+                # interpreta '\\' como separador en cualquier SO, así .name y str()
+                # quedan correctos (Path nativo en Linux no parte por '\\').
+                indice[clave].append(PureWindowsPath(linea))
+                n_arch += 1
+    msg = (
+        f"Índice de soportes: {n_arch} archivo(s) para {len(indice)} factura(s) "
+        f"desde {ruta_indice.name}"
+    )
+    if n_carpetas and not n_arch:
+        msg += (
+            f" — OJO: las {n_carpetas} línea(s) son CARPETAS, no archivos. "
+            "Regenerá el índice listando ARCHIVOS (dir /s /b o Get-ChildItem -File)."
+        )
+    logger.info(msg)
+    return dict(indice)
+
+
 # ─── Manifiesto factura → entidad ────────────────────────────────────────────
 
 
@@ -1531,6 +1579,18 @@ def build_parser() -> argparse.ArgumentParser:
         "(que puede traer varias rutas separadas por ';').",
     )
     p.add_argument(
+        "--soportes-indice",
+        type=Path,
+        default=None,
+        dest="soportes_indice",
+        metavar="ARCHIVO",
+        help="Listado pre-armado de rutas de ARCHIVOS de soporte (un 'dir /s /b' o "
+        "'Get-ChildItem -Recurse -File', una ruta por línea). El radicador lo lee SIN "
+        "recorrer la red, así cubre de una todas las rutas del listado (X:, Y:, Z:…). "
+        "Ideal cuando los soportes están repartidos en varios discos. Se combina con "
+        "--soportes si pasás ambos.",
+    )
+    p.add_argument(
         "--layout",
         choices=["auto", "carpeta-factura", "lote"],
         default="auto",
@@ -1604,14 +1664,24 @@ def main(argv: list[str] | None = None) -> int:
         manifiesto = cargar_manifiesto(args.manifiesto)
         logger.info(f"Manifiesto: {len(manifiesto)} facturas mapeadas a entidad.")
 
-    # Share(s) de soportes clínicos: --soportes (una o varias carpetas) o, si no,
-    # $SOPORTES_ROOT (la misma que usa la app; admite varias rutas separadas por
-    # os.pathsep). En el HUS los soportes están repartidos en carpetas por mes
-    # (Y:\6. JUNIO…, Y:\Radicacion Digital - Carpeta 2, …): se indexan todas y se
-    # fusionan en un solo índice por número de factura.
+    # Soportes clínicos (epicrisis, evolución, urgencias, órdenes…), que viven en
+    # OTRO(S) share(s). Dos fuentes que se FUSIONAN en un solo índice por factura:
+    #   --soportes-indice  un listado pre-armado de archivos (no recorre la red;
+    #                      cubre de una todas las rutas del listado: X:, Y:, Z:…).
+    #   --soportes         una o varias carpetas que se recorren recursivamente
+    #                      (o $SOPORTES_ROOT, con rutas separadas por os.pathsep).
     soportes_idx: dict[str, list[Path]] | None = None
+    fusion: dict[str, list[Path]] = defaultdict(list)
+    if args.soportes_indice is not None:
+        if not args.soportes_indice.is_file():
+            logger.error(f"--soportes-indice no existe o no es archivo: {args.soportes_indice}")
+            return 1
+        for fac, rutas in indexar_soportes_desde_indice(
+            args.soportes_indice, cfg.patron_factura
+        ).items():
+            fusion[fac].extend(rutas)
     rutas_soportes: list[Path] = list(args.soportes) if args.soportes else []
-    if not rutas_soportes and os.environ.get("SOPORTES_ROOT"):
+    if not rutas_soportes and args.soportes_indice is None and os.environ.get("SOPORTES_ROOT"):
         rutas_soportes = [
             Path(p) for p in os.environ["SOPORTES_ROOT"].split(os.pathsep) if p.strip()
         ]
@@ -1623,17 +1693,13 @@ def main(argv: list[str] | None = None) -> int:
                 + ", ".join(str(x) for x in invalidas)
             )
             return 1
-        fusion: dict[str, list[Path]] = defaultdict(list)
         for raiz in rutas_soportes:
             logger.info(f"Indexando soportes clínicos desde {raiz} …")
             for fac, rutas in indexar_soportes_clinicos(raiz, cfg.patron_factura).items():
                 fusion[fac].extend(rutas)
+    if fusion:
         soportes_idx = dict(fusion)
-        if len(rutas_soportes) > 1:
-            logger.info(
-                f"Soportes clínicos: {len(soportes_idx)} factura(s) cubiertas por "
-                f"{len(rutas_soportes)} carpeta(s)."
-            )
+        logger.info(f"Soportes clínicos: {len(soportes_idx)} factura(s) con soporte para cruzar.")
 
     if args.layout == "lote":
         items = descubrir_lote(args.origen, manifiesto, cfg, cfg.patron_factura)

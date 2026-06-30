@@ -518,6 +518,26 @@ class TestSoportesClinicos:
         assert (destino / "COOSALUD" / "HUS487523" / "HEV_900006037_HUS487523.pdf").is_file()
 
 
+class TestSoportesIndice:
+    def test_indexa_archivos_del_listado(self, tmp_path):
+        f = tmp_path / "indice.txt"
+        f.write_text(
+            "Y:\\6. JUNIO 2026 - SOPORTES RADICACION\\NUEVA EPS\\ENV-1\\HUS520760\\HEV_900006037_HUS520760.pdf\n"
+            "Z:\\SERVIDOR GLOSAS\\F\\ESC\\HUS520751\\OPF_900006037_HUS520751.pdf\n"
+            "\n",
+            encoding="utf-8",
+        )
+        idx = rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT)
+        assert set(idx) == {"520760", "520751"}
+        assert any("HEV" in p.name for p in idx["520760"])
+
+    def test_lineas_de_carpeta_no_aportan(self, tmp_path):
+        # Si el listado trae CARPETAS (sin extensión), no aporta archivos.
+        f = tmp_path / "indice.txt"
+        f.write_text("X:\\RAD\\HUS520760\nY:\\RAD\\HUS520761\n", encoding="utf-8")
+        assert rad.indexar_soportes_desde_indice(f, rad.PATRON_FACTURA_DEFAULT) == {}
+
+
 class TestDescubrimiento:
     def test_carpeta_factura_con_eps_padre(self, tmp_path, cfg):
         _factura_folder(tmp_path / "COOSALUD", "HUS1")
@@ -750,6 +770,23 @@ class TestCLI:
             ]
         )
         assert rc == 1
+
+    def test_main_soportes_indice_completa_factura(self, tmp_path):
+        # --soportes-indice: el listado pre-armado (rutas de archivos en Z:\…)
+        # completa la factura sin recorrer la red → LISTA.
+        origen = tmp_path / "lote"
+        _factura_folder(origen / "COOSALUD", "HUS487523", servicios=_SERV_PROC)  # espera HEV
+        indice = tmp_path / "indice.txt"
+        indice.write_text(
+            "Z:\\SERVIDOR GLOSAS\\F\\ESCANEO\\HUS487523\\HEV_900006037_HUS487523.pdf\n",
+            encoding="utf-8",
+        )
+        reporte = tmp_path / "rep.csv"
+        rc = rad.main(
+            ["--origen", str(origen), "--reporte", str(reporte), "--soportes-indice", str(indice)]
+        )
+        assert rc == 0, reporte.read_text(encoding="utf-8-sig")
+        assert "LISTA" in reporte.read_text(encoding="utf-8-sig")
 
     def test_main_share_real_queda_lista(self, tmp_path):
         # Reproduce el share real: RIPS+CUV en …/RIPS/ENV/<fac> y FEV en el

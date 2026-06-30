@@ -157,6 +157,31 @@ requiere configuración extra**. Recorre cada raíz **recursivamente**.
   (la misma que usa el motor de glosas); admite **varias rutas separadas por `;`**.
 - Los soportes clínicos **siempre se copian** (nunca se mueven, aun con
   `--mover`): el share clínico es fuente y lo comparten otras facturas.
+
+#### `--soportes-indice`: usar un listado pre-armado (varios discos, sin recorrer la red)
+
+En el HUS los soportes están repartidos en **varios discos** (`X:\SERVIDOR
+RADICACION`, `Y:\…SOPORTES RADICACION`, `Z:\SERVIDOR GLOSAS`, …) con cientos de
+miles de carpetas; recorrerlos por red en cada corrida es lentísimo. En vez de
+eso, generá **una vez** un listado de los archivos y pasáselo con
+`--soportes-indice`: el radicador lo lee al instante y cruza **todas** las rutas
+del listado.
+
+```powershell
+REM 1) Generar el índice de ARCHIVOS (una sola vez; se puede programar a diario)
+Get-ChildItem "X:\SERVIDOR RADICACION","Y:\","Z:\SERVIDOR GLOSAS" -Recurse -File -ErrorAction SilentlyContinue |
+  Select-Object -ExpandProperty FullName | Set-Content "$env:USERPROFILE\Desktop\indice_soportes.txt"
+
+REM 2) Radicar usando el índice (no recorre la red)
+py radicar_facturacion.py --origen "\\172.16.32.83\...\FACTURAS_SALUD" ^
+    --soportes-indice "%USERPROFILE%\Desktop\indice_soportes.txt" ^
+    --reporte "%USERPROFILE%\Desktop\radicacion_fe.csv"
+```
+
+- El listado debe ser de **archivos** (full path por línea). Si por error es de
+  **carpetas**, el radicador avisa y no cruza nada (regeneralo con `-File`).
+- Se puede **combinar** con `--soportes <carpeta>` (p.ej. índice para lo viejo +
+  carpeta para el mes en curso): los dos se fusionan.
 - Solo rellena **huecos**: no duplica `FEV`/`RIP`/`CUV` que el share de FE ya
   trae. La columna `soportes_clinicos` del reporte lista lo que se anexó.
 
