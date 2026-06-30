@@ -228,28 +228,55 @@ def procesar_factura(win, factura_larga, objeciones, cod_respuesta, grabar, dump
 
     # Acotar al ÁRBOL del Editor activo: buscar controles profundos en el árbol
     # completo de DG (con todas las pestañas) es lento y no siempre resuelve.
-    # Con una sola pestaña Editor abierta, esto es único y rápido.
-    editor = _buscar(win, name_re="Editor de Tr.mite", control_type="Window", timeout=8) or win
+    editor = _buscar(win, name_re="Editor de Tr.mite", control_type="Window", timeout=8)
+    if editor is None:
+        logger.warning("  no aislé la ventana del Editor; uso el árbol completo (más lento).")
+        editor = win
+    else:
+        logger.info("  ✓ Editor activo localizado.")
 
-    # 2) Escribir la Factura → DG autocarga los datos de la objeción.
-    factura_ctl = _buscar(editor, auto_id="ctrlFactura", timeout=8)
-    if factura_ctl is None:
-        # Fallback: el LayoutItem 'Factura' → su editor interno (estado en blanco).
-        fac_pane = _buscar(editor, auto_id="Factura", control_type="Pane", timeout=4)
-        if fac_pane is not None:
-            factura_ctl = _buscar(
-                fac_pane, auto_id="PART_Editor", control_type="Edit", timeout=3
-            ) or _buscar(fac_pane, control_type="Edit", timeout=3)
-    if factura_ctl is None:
-        logger.error(
-            "  no hallé el campo Factura. Si tenés varias pestañas 'Editor de Trámite' abiertas, "
-            "cerralas (dejá sólo el Listado) y reintentá."
+    # 2) Escribir la Factura. Los editores DevExpress en BLANCO virtualizan su
+    #    parte editable (no exponen el control interno hasta enfocarse). Por eso
+    #    CLICKEAMOS el campo para enfocarlo y tipeamos al control enfocado.
+    from pywinauto.keyboard import send_keys
+
+    fac = _buscar(editor, auto_id="ctrlFactura", timeout=5) or _buscar(
+        editor, auto_id="Factura", control_type="Pane", timeout=5
+    )
+    enfocado = False
+    if fac is not None:
+        try:
+            r = fac.rectangle()
+            # Click en el ~75% del ancho (zona del editor, no de la etiqueta).
+            fac.click_input(coords=(int(r.width() * 0.75), int(r.height() * 0.5)))
+            enfocado = True
+        except Exception as e:
+            logger.warning(f"  no pude clickear el campo Factura: {e}")
+    if not enfocado:
+        # Fallback (pista del usuario): enfocar Consecutivo y TAB hasta Factura.
+        cons = _buscar(editor, auto_id="ctrlConsecutivo", timeout=4) or _buscar(
+            editor, auto_id="Consecutivo", control_type="Pane", timeout=4
         )
-        if dump_al_fallar:
-            _dump("sin_factura")
-        return "ERROR_FACTURA"
-    _set_editor(factura_ctl, factura_larga)
-    factura_ctl.type_keys("{ENTER}")
+        if cons is None:
+            logger.error("  no pude enfocar ni Factura ni Consecutivo. Mandame el dump.")
+            if dump_al_fallar:
+                _dump("sin_factura")
+            return "ERROR_FACTURA"
+        try:
+            cons.click_input()
+            time.sleep(0.3)
+            # Consecutivo → (Fecha) → Factura. Estado es de sólo lectura y se
+            # suele saltear; probamos 2 TABs.
+            send_keys("{TAB}{TAB}")
+            enfocado = True
+        except Exception as e:
+            logger.error(f"  fallback Consecutivo+TAB falló: {e}")
+            if dump_al_fallar:
+                _dump("sin_factura")
+            return "ERROR_FACTURA"
+    time.sleep(0.5)
+    send_keys("^a{DEL}")
+    send_keys(_escapar(factura_larga) + "{ENTER}")
     logger.info(f"  factura {factura_larga} escrita; esperando autocargue…")
 
     # 3) Esperar a que cargue (el Tercero deja de estar vacío).
