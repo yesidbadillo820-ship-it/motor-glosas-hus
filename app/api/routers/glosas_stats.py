@@ -54,7 +54,6 @@ def stats_por_gestor(
 
     from sqlalchemy import func as _f
 
-
     desde = ahora_utc() - timedelta(days=int(dias))
 
     # Agregar por auditor_email (gestor responsable)
@@ -370,7 +369,6 @@ def stats_refinaciones(
       - tasa_refinacion_pct (REFINAR / total acciones)
     """
 
-
     desde = ahora_utc() - timedelta(days=int(dias))
     versiones = (
         db.query(DictamenVersionRecord).filter(DictamenVersionRecord.creado_en >= desde).all()
@@ -446,7 +444,6 @@ def stats_conciliaciones(
       - audiencias_proximas_30d
     """
     from datetime import timezone
-
 
     todas = db.query(ConciliacionRecord).all()
 
@@ -1771,7 +1768,6 @@ def stats_mas_comentadas(
     comentarios.
     """
 
-
     rows = (
         db.query(
             ComentarioGlosaRecord.glosa_id,
@@ -1939,7 +1935,6 @@ def stats_refinaciones_por_dia(
     """
     from datetime import timezone
 
-
     desde = ahora_utc() - timedelta(days=int(dias))
     versiones = (
         db.query(DictamenVersionRecord).filter(DictamenVersionRecord.creado_en >= desde).all()
@@ -2001,7 +1996,6 @@ def stats_tiempo_primer_dictamen(
       - tiempo_max_horas
     """
     from datetime import timezone
-
 
     rows = (
         db.query(
@@ -3289,7 +3283,6 @@ def stats_eps_volumen_mes_anterior(
 
     Ordenado DESC por count_glosas.
     """
-
 
     ahora = ahora_utc()
     inicio_mes_actual = ahora.replace(
@@ -5565,7 +5558,6 @@ def stats_sin_actividad_reciente(
     Solo abiertas, ordenado por valor_objetado DESC.
     """
 
-
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
     desde = ahora_utc() - timedelta(days=int(dias))
@@ -6355,7 +6347,6 @@ def stats_conciliaciones_mensual(
     """
     from datetime import timezone
 
-
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
     rows = db.query(ConciliacionRecord).filter(ConciliacionRecord.creado_en >= desde).all()
 
@@ -6421,7 +6412,6 @@ def stats_comentarios_actividad_mensual(
     Útil para medir colaboración del equipo en el tiempo.
     """
     from datetime import timezone
-
 
     desde = ahora_utc() - timedelta(days=int(meses) * 31)
     rows = db.query(ComentarioGlosaRecord).filter(ComentarioGlosaRecord.creado_en >= desde).all()
@@ -8774,7 +8764,6 @@ def stats_multi_concepto_ratio(
     Devuelve totales + ratio_multi_pct + promedio.
     """
 
-
     total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
 
     rows = (
@@ -8820,7 +8809,6 @@ def stats_audit_mas_cambiada(
 
     Devuelve top N glosas ordenado DESC por eventos audit.
     """
-
 
     rows = (
         db.query(
@@ -8877,7 +8865,6 @@ def stats_glosas_mas_refinadas(
 
     Devuelve top N ordenado DESC por número de versiones.
     """
-
 
     rows = (
         db.query(
@@ -9257,7 +9244,6 @@ def stats_transiciones_recientes(
     Útil para entender el flujo del proceso en tiempo real.
     """
 
-
     desde = ahora_utc() - timedelta(hours=int(horas))
     eventos = (
         db.query(AuditLogRecord)
@@ -9409,7 +9395,6 @@ def stats_analizadas_hoy(
       - por_accion (CREAR/REFINAR/REGENERAR/RESTAURAR)
       - por_autor: top 5
     """
-
 
     ahora = ahora_utc()
     inicio_hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -9827,7 +9812,6 @@ def stats_comentarios_globales(
 
     Ventana default 30d.
     """
-
 
     desde = ahora_utc() - timedelta(days=int(dias))
     coms = db.query(ComentarioGlosaRecord).filter(ComentarioGlosaRecord.creado_en >= desde).all()
@@ -11188,7 +11172,6 @@ def stats_tendencia_diaria(
 
     from sqlalchemy import func as _f
 
-
     desde = (ahora_utc() - timedelta(days=int(dias))).date()
 
     # Agregar por fecha (truncando a date)
@@ -11272,7 +11255,6 @@ def stats_por_tipo_glosa(
     """
 
     from sqlalchemy import func as _f
-
 
     desde = ahora_utc() - timedelta(days=int(dias))
 

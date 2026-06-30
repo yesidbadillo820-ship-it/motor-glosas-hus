@@ -72,7 +72,6 @@ def observabilidad(
     """
     import os
 
-
     # Detección de configuración
     sentry_ok = bool(os.getenv("SENTRY_DSN"))
     anthropic_ok = bool(os.getenv("ANTHROPIC_API_KEY"))
@@ -179,7 +178,6 @@ def metricas_ia(
       - top 5 modelos por costo
     """
     from datetime import timedelta
-
 
     desde = ahora_utc() - timedelta(days=max(1, int(dias)))
     q = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde)
@@ -309,7 +307,6 @@ def metricas_ia_por_usuario(
     interna en multi-tenancy futuro.
     """
     from datetime import timedelta
-
 
     desde = ahora_utc() - timedelta(days=max(1, int(dias)))
     calls = (
@@ -479,7 +476,6 @@ def alertas_criticas_consolidadas(
 
     from sqlalchemy import func as _f
 
-
     items = []
     estados_activos = ("RADICADA", "BORRADOR", "EN_REVISION", "RESPONDIDA")
 
@@ -628,7 +624,6 @@ def healthcheck_profundo(
     from fastapi import status as _http_status
     from fastapi.responses import JSONResponse
 
-
     componentes = {}
     todo_ok = True
 
@@ -707,7 +702,6 @@ def resumen_mensual_ejecutivo(
     from datetime import datetime, timezone
 
     from sqlalchemy import func as _f
-
 
     ahora = ahora_utc()
     year = year or ahora.year
@@ -985,7 +979,6 @@ def info_kpis_negocio(
     """
     from datetime import timedelta, timezone
 
-
     ESTADOS_CERRADOS = {"ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"}
 
     todas = db.query(GlosaRecord).all()
@@ -1081,7 +1074,6 @@ def info_milestones(
     Solo COORDINADOR/ADMIN.
     """
     from sqlalchemy import func as _f
-
 
     total_glosas = db.query(_f.count(GlosaRecord.id)).scalar() or 0
     valor_recuperado = db.query(_f.coalesce(_f.sum(GlosaRecord.valor_recuperado), 0)).scalar() or 0
@@ -1346,7 +1338,6 @@ def copilot_resumen(
     o landing.
     """
     from datetime import timezone
-
 
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
     ESTADOS_DECIDIDOS = {"LEVANTADA", "ACEPTADA", "RATIFICADA"}
@@ -1703,7 +1694,6 @@ def info_auth_stats(
 
     from sqlalchemy import func as _f
 
-
     desde = ahora_utc() - timedelta(days=int(dias))
 
     rows = (
@@ -1908,7 +1898,6 @@ def info_health_completo(
 
     from sqlalchemy import func as _f, text as _text
 
-
     ESTADOS_CERRADOS = ["ACEPTADA", "LEVANTADA", "ARCHIVADA", "CONCILIADA"]
 
     # 1. BD viva
@@ -2006,7 +1995,6 @@ def info_health_score(
     """
     import os
     from datetime import timedelta
-
 
     desglose = []
 
@@ -2148,7 +2136,6 @@ def metricas_ia_cache_eficiencia(
     """
     from datetime import timedelta
 
-
     desde = ahora_utc() - timedelta(days=int(dias))
 
     rows = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
@@ -2203,7 +2190,6 @@ def metricas_ia_budget(
       - pct_consumido / pct_proyectado
     """
     from calendar import monthrange
-
 
     ahora = ahora_utc()
     inicio_mes = ahora.replace(
@@ -2274,7 +2260,6 @@ def metricas_ia_por_modelo(
     Ordenado DESC por cost_usd_total.
     """
     from datetime import timedelta
-
 
     desde = ahora_utc() - timedelta(days=int(dias))
     rows = db.query(AICallRecord).filter(AICallRecord.creado_en >= desde).all()
@@ -2456,7 +2441,6 @@ def info_import_history(
     """
     from datetime import timedelta, timezone
 
-
     desde = ahora_utc() - timedelta(days=int(dias))
     glosas = db.query(GlosaRecord).filter(GlosaRecord.creado_en >= desde).all()
 
@@ -2597,7 +2581,6 @@ def info_zonas_horarias(
     import os
     from datetime import datetime
 
-
     ahora = ahora_utc()
     now_local = datetime.now()
 
@@ -2652,7 +2635,6 @@ def info_observabilidad_completa(
     from datetime import timedelta
 
     from sqlalchemy import func as _f
-
 
     ahora = ahora_utc()
     desde_1h = ahora - timedelta(hours=1)
@@ -2714,7 +2696,6 @@ def info_snapshot_general(
     """
     from sqlalchemy import func as _f
 
-
     def _count(model):
         return db.query(_f.count()).select_from(model).scalar() or 0
 
@@ -2761,7 +2742,6 @@ def info_glosas_con_ia(
     Solo COORDINADOR/ADMIN.
     """
     from datetime import timedelta
-
 
     desde = ahora_utc() - timedelta(days=int(dias))
 
